@@ -50,7 +50,7 @@ These set up the working environment. Dev Setup creates the commands that everyt
 | 9 | **Dev Environment Setup** | `docs/dev-setup.md`, Makefile/scripts, `.env.example` | Creates lint/test/install commands used by workflow |
 | 10 | **Design System** | `docs/design-system.md`, theme config | **(optional)** Only for projects with a frontend |
 | 11 | **Git Workflow** | `docs/git-workflow.md`, `scripts/setup-agent-worktree.sh`, CI config | References dev-setup.md for lint/test commands |
-| 11.5 | **Multi-Model Code Review** | `.github/workflows/`, review prompts, `docs/review-standards.md` | **(optional)** Adds Codex + Gemini review loop on PRs. Requires API keys for OpenAI, Google, Anthropic |
+| 11.5 | **Multi-Model Code Review** | `AGENTS.md`, `.github/workflows/code-review.yml`, `.github/review-prompts/`, `docs/review-standards.md` | **(optional)** Adds Codex Cloud review loop on PRs. Requires ChatGPT Pro subscription + `ANTHROPIC_API_KEY` for fixes |
 
 ---
 
@@ -109,7 +109,7 @@ These create tasks and start building.
 | → **Platform Parity Review** | After Enhancement adds platform-specific features — check platform coverage |
 | **Implementation Plan Review** | After creating 5+ new tasks from any source |
 | **Platform Parity Review** | After adding platform-specific features from any source |
-| **Multi-Model Code Review** | Runs automatically on every PR — tune `docs/review-standards.md` as you learn which findings are valuable |
+| **Multi-Model Code Review** | Runs automatically on every PR — tune `AGENTS.md` and `docs/review-standards.md` as you learn which findings are valuable |
 
 ---
 
@@ -1912,23 +1912,27 @@ If running only ONE Claude Code session at a time, worktrees are not needed. Sta
 git add .
 git commit -m "[BD-<id>] type(scope): description"
 
-# 2. Rebase onto latest main
+# 2. Self-review (catch issues before external review)
+# Spawn a review subagent to check changes against project standards
+claude -p "Review changes on this branch vs origin/main. Check against docs/review-standards.md for P0/P1/P2 issues. Fix any issues found. Run <lint> and <test> after fixes. Commit fixes with [BD-<id>] fix: address self-review findings"
+
+# 3. Rebase onto latest main
 git fetch origin && git rebase origin/main
 
-# 3. Push feature branch
+# 4. Push feature branch
 git push -u origin HEAD
 
-# 4. Create PR
+# 5. Create PR
 gh pr create --title "[BD-<id>] type(scope): description" --body "Closes BD-<id>"
 
-# 5. Enable auto-merge (merges after CI passes, deletes remote branch)
+# 6. Enable auto-merge (merges after CI passes, deletes remote branch)
 gh pr merge --squash --auto --delete-branch
 
-# 6. Watch CI (blocks until checks pass or fail)
+# 7. Watch CI (blocks until checks pass or fail)
 gh pr checks --watch --fail-fast
 # If a check fails: fix locally, commit, push, re-run watch
 
-# 7. Confirm merge
+# 8. Confirm merge
 gh pr view --json state -q .state   # Must show "MERGED"
 # NEVER close the task until this shows MERGED
 ```
@@ -2257,116 +2261,57 @@ Create `.github/pull_request_template.md`:
 ____________________________________________________
 # Multi-Model Code Review Loop (Prompt)
 
-Set up an automated review loop where Claude Code (engineer) creates PRs, external AI models (OpenAI Codex and/or Google Gemini) review them, Claude Code addresses the feedback, and the cycle repeats until consensus is reached — then the PR auto-merges.
+Set up a two-tier automated code review system: a local self-review before every PR (required for all projects), and an optional external Codex Cloud review loop that auto-fixes findings and auto-merges.
 
----
-
-## Research Summary
-
-### What People Are Doing Today
-
-The emerging pattern in AI-assisted development is "model-vs-model" review — using a different model to critique code than the one that wrote it. This avoids the "marking your own homework" problem where a single model approves its own patterns, misses its own blind spots, and silently hides medium-confidence issues behind threshold filters.
-
-**Current approaches fall into three tiers:**
-
-**Tier 1: Same-model self-review (most common, weakest)**
-Claude Code's built-in `/code-review` plugin launches 4 parallel Claude subagents to review a PR. This catches surface issues but shares the same model biases. The O'Reilly article "Auto-Reviewing Claude's Code" documents how even Opus 4.5 repeatedly makes the same mistakes (silent default fallbacks, swallowed exceptions) regardless of system prompt instructions — because the reviewing model has the same tendencies as the authoring model.
-
-**Tier 2: Cross-model review via CI (emerging, what we want)**
-A few teams are wiring multiple models into GitHub Actions. The `levnikolaevich/claude-code-skills` plugin delegates code and story reviews to Codex and Gemini agents running in parallel, with automatic fallback to Claude if external agents are unavailable. Kim Major at Flow Specialty documented automating plan reviews where Claude Code produces a planning document, then Codex CLI is invoked to critique it — with Claude ingesting the critique, updating the plan, and repeating with a hard cap. The key lesson: "independent review is only meaningful if you define what context is allowed" and "exit conditions must be crisp."
-
-**Tier 3: Full iterative convergence loop (what we're building)**
-Nobody has published a complete, automated, multi-round convergence loop with multiple external reviewers that runs entirely in CI. The pieces all exist — they just haven't been composed into a single orchestrated workflow. That's what this prompt sets up.
-
-### Available Tools
-
-| Tool | What It Does | How to Invoke in CI |
-|------|-------------|-------------------|
-| **Claude Code Action** | Full Claude Code session in GitHub Actions. Can read code, write files, push commits, post PR comments. | `anthropics/claude-code-action@v1` |
-| **Codex Action** | Runs OpenAI Codex CLI in GitHub Actions. Can read code, generate structured JSON output, run in read-only sandbox. | `openai/codex-action@v1` |
-| **Gemini CLI Action** | Runs Google Gemini CLI in GitHub Actions. Can read code, post structured review comments. | `google-github-actions/run-gemini-cli@v1` |
-| **Codex Cloud** | Auto-reviews PRs when connected via GitHub app. Posts P0/P1 findings. Triggered by `@codex review`. | GitHub App + `@codex` comments |
-| **Gemini Code Assist** | Auto-reviews PRs when installed as GitHub App. Posts severity-graded findings. | GitHub App + `/gemini review` |
-
-### Key Design Decisions from Research
-
-**1. Structured output is essential for the loop.**
-Codex supports `--output-schema` to produce typed JSON (findings array with severity, file, line, explanation, suggestion). Gemini's CLI action outputs structured markdown with severity ratings. Raw prose reviews can't be reliably parsed for convergence detection. We need structured output from reviewers and a structured format for Claude to consume.
-
-**2. Fresh sessions prevent "agreeing because we already agreed."**
-Kim Major's key finding: iterative sessions converge into a shared narrative where the reviewer stops pushing back. Fresh sessions (no prior conversation history) preserve the independence of each review round. Each review round should be a clean invocation, not a continuation.
-
-**3. Hard cap on rounds prevents infinite loops.**
-Every practitioner who implemented review loops hit the same issue: fuzzy agreement detection causes pointless cycling. The consensus is 3 rounds maximum — if issues remain after 3 rounds, escalate to human review rather than continuing. Most PRs converge in 1-2 rounds.
-
-**4. Separate "what to check" from "how to check."**
-The review prompt should reference the project's standards (CLAUDE.md, coding-standards.md, tdd-standards.md) so reviewers check against YOUR rules, not generic best practices. Generic reviews produce noise; project-anchored reviews produce signal.
-
-**5. The reviewing model should NOT have write access.**
-Reviewers run in read-only mode. Only Claude Code (the engineer) has write access. This prevents reviewers from making changes that conflict with each other and maintains a single source of truth for the codebase.
+For background research, tool comparisons, and design decisions, see `Multi Model Review Research.md`. For cost analysis, see `Multi Model Review Cost Analysis.md`.
 
 ---
 
 ## Architecture
 
-### The Loop
+### Two-Tier Review
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    PR Created/Updated                    │
-│              (by Claude Code or manually)                │
-└────────────────────┬────────────────────────────────────┘
-                     ▼
-┌─────────────────────────────────────────────────────────┐
-│              STEP 1: External Review                     │
-│  ┌──────────────┐  ┌──────────────┐                     │
-│  │ Codex Review  │  │ Gemini Review│  (parallel)         │
-│  │ (read-only)   │  │ (read-only)  │                     │
-│  └──────┬───────┘  └──────┬───────┘                     │
-│         └────────┬────────┘                              │
-│                  ▼                                        │
-│         Structured Findings                              │
-│         (JSON posted as PR comment)                      │
-└────────────────────┬────────────────────────────────────┘
-                     ▼
-┌─────────────────────────────────────────────────────────┐
-│              STEP 2: Convergence Check                   │
-│  • Parse findings from all reviewers                     │
-│  • If ZERO critical/high findings → APPROVE → merge      │
-│  • If round >= MAX_ROUNDS → ESCALATE → label for human   │
-│  • Otherwise → proceed to Step 3                         │
-└────────────────────┬────────────────────────────────────┘
-                     ▼
-┌─────────────────────────────────────────────────────────┐
-│              STEP 3: Claude Code Fix                     │
-│  • Read all reviewer findings                            │
-│  • Address critical and high issues                      │
-│  • Skip low/style issues (linter handles those)          │
-│  • Commit fixes to the PR branch                         │
-│  • Post summary of what was fixed                        │
-└────────────────────┬────────────────────────────────────┘
-                     ▼
-              (Back to Step 1 — new push triggers review)
+TIER 1: LOCAL SELF-REVIEW (before push — required, no extra cost)
+  Agent runs review subagent → checks against docs/review-standards.md
+       ↓
+  Fixes P0/P1/P2 issues locally → runs lint + test → pushes
+
+TIER 2: EXTERNAL CODEX CLOUD REVIEW (after PR — optional, subscription-based)
+  Codex Cloud auto-reviews via GitHub App (reads AGENTS.md)
+       ↓
+  Convergence check (GitHub Actions)
+  • No P0/P1/P2 → auto-merge
+  • Round >= 3 → auto-merge anyway (label: ai-review-capped)
+  • Otherwise → Claude Code Action fixes (needs ANTHROPIC_API_KEY)
+       ↓
+  Push fixes → re-triggers Codex Cloud review
 ```
 
-### What Triggers What
+**Tier 1 (self-review)** is built into the Git Workflow prompt and applies to ALL projects. It is inserted as a step in the PR workflow — see the Git Workflow prompt for the exact command.
+
+**Tier 2 (Codex Cloud + CI fix loop)** is optional and per-project. The rest of this prompt sets up Tier 2.
+
+### What Triggers What (Tier 2)
 
 The loop is event-driven via GitHub Actions — no polling, no external orchestrator:
 
-1. **PR opened or pushed** → triggers the Review workflow
-2. Review workflow runs Codex + Gemini in parallel → posts findings as PR comment
-3. Convergence job checks findings → if issues remain and rounds < max, triggers the Fix workflow
-4. Fix workflow runs Claude Code Action → pushes commits to PR branch
-5. New push on PR branch → re-triggers the Review workflow (back to step 1)
-6. The `review-round` label tracks iteration count to enforce the cap
+1. **PR opened or pushed** → triggers the code-review workflow
+2. Gate job checks: any code files changed? Round count? Human override?
+3. Wait job polls for Codex Cloud's review comment (it posts independently via the GitHub App)
+4. Convergence job checks Codex comment for approval signal → labels the round
+5. If approved OR round cap reached → auto-merge job runs `gh pr merge --squash --auto --delete-branch`
+6. If findings remain and rounds < cap → Claude Code Action reads findings, fixes P0/P1/P2, pushes
+7. New push on PR branch → re-triggers the workflow (back to step 1)
 
 ### Safety Rails
 
-- **Round cap**: Maximum 3 review rounds. After that, the PR gets labeled `needs-human-review` and the loop stops.
-- **Bot-loop prevention**: Review workflow skips if the latest commit author is `github-actions[bot]` AND the round cap is hit. The fix workflow only fires when explicitly dispatched by the review workflow, not on raw push events.
-- **Cost cap**: Each reviewer gets `--max-turns 3` (Codex) and a 10-minute timeout (Gemini). Claude Code fix gets `--max-turns 10`.
-- **Read-only reviewers**: Codex and Gemini run in `read-only` / `sandbox` mode. Only Claude Code gets `contents: write`.
+- **Round cap**: Maximum 3 review rounds. After that, the PR auto-merges with the `ai-review-capped` label — no human gate.
+- **Bot-loop prevention**: Review workflow skips if the latest commit author is the fix bot AND the round cap is hit. The fix job only fires when the convergence job says "fix," not on raw push events.
+- **Cost cap**: Claude Code Action fix gets `--max-turns 10`. Codex Cloud has no turns to control (it's subscription-based).
+- **Read-only reviewer**: Codex Cloud has no write access. Only Claude Code Action (the engineer) has `contents: write`.
 - **Human override**: Any human comment with `/lgtm` or `/skip-review` bypasses the loop and allows merge.
+- **File filter**: Gate job checks `git diff --name-only` and skips review if only docs/config files changed (markdown, yaml, json, toml, lock files).
 
 ---
 
@@ -2374,9 +2319,10 @@ The loop is event-driven via GitHub Actions — no polling, no external orchestr
 
 | Requirement | How to Get It |
 |-------------|--------------|
-| **OpenAI API key** | Create at platform.openai.com → stored as `OPENAI_API_KEY` repo secret |
-| **Google Gemini API key** | Create at aistudio.google.com → stored as `GEMINI_API_KEY` repo secret |
-| **Anthropic API key** | Create at console.anthropic.com → stored as `ANTHROPIC_API_KEY` repo secret |
+| **ChatGPT Pro subscription** | For Codex Cloud auto-reviews — subscribe at chatgpt.com |
+| **Codex Cloud GitHub App** | Install "ChatGPT Codex Connector" on your repo at github.com → verify bot username after install (likely `chatgpt-codex[bot]` or `codex-bot[bot]`) |
+| **Enable code review** | In Codex settings (chatgpt.com → Codex → Settings), enable "Code review" for the repo |
+| **Anthropic API key** | Create at console.anthropic.com → stored as `ANTHROPIC_API_KEY` repo secret (for Claude Code Action fixes, ~$5-7/month) |
 | **GitHub App (Claude)** | Run `claude /install-github-app` in Claude Code terminal, or install from github.com/apps/claude |
 | **Repo permissions** | Actions must have Read/Write permissions: Settings → Actions → General → Workflow permissions |
 
@@ -2386,7 +2332,7 @@ The loop is event-driven via GitHub Actions — no polling, no external orchestr
 
 ### 1. Review Standards Document (`docs/review-standards.md`)
 
-Create a document that ALL reviewers (human and AI) reference. This is the single source of truth for what "good code" means in this project. Pull content from your existing docs:
+Create a document that ALL reviewers (self-review, Codex Cloud, and human) reference. This is the single source of truth for what "good code" means in this project. Pull content from your existing docs:
 
 ```markdown
 # Code Review Standards
@@ -2413,90 +2359,62 @@ Reviewers should check code against these project standards:
 - "I would have done it differently" without a concrete improvement
 
 ## Severity Definitions
-- **critical**: Will cause data loss, security vulnerability, or crash in production
-- **high**: Bug that will manifest in normal usage, or violates a MUST rule from standards
-- **medium**: Code smell, missing edge case, or SHOULD-level standards violation
-- **low**: Suggestion for improvement, not a defect
+- **P0 (critical)**: Will cause data loss, security vulnerability, or crash in production
+- **P1 (high)**: Bug that will manifest in normal usage, or violates a MUST rule from standards
+- **P2 (medium)**: Code smell, missing edge case, or SHOULD-level standards violation
+- **P3 (low)**: Suggestion for improvement, not a defect — do NOT fix in review loop
 ```
 
-### 2. Reviewer Prompt Files
+### 2. AGENTS.md (repo root)
 
-Create `.github/review-prompts/` directory with prompts for each reviewer.
-
-#### `.github/review-prompts/codex-review.md`
+Codex Cloud reads `AGENTS.md` at the repo root for custom review instructions. Create this file:
 
 ```markdown
+# AGENTS.md
+
+## Code Review Instructions
+
 You are reviewing a pull request as an independent code reviewer. You did NOT write this code.
 
-## Your Task
-Review the PR diff for issues. Check against the project's documented standards.
+### What to Check
+Read `docs/review-standards.md` for the full review criteria, priorities, and severity definitions.
 
-## Project Standards
-Read these files for project-specific rules:
-- `docs/review-standards.md` — Review priorities and severity definitions
+Also read these project standards:
 - `docs/coding-standards.md` — Code conventions
 - `docs/tdd-standards.md` — Testing requirements
 - `CLAUDE.md` — Workflow and commit rules
 
-## Rules
-- Only flag issues with severity "critical" or "high". Skip "medium" and "low".
+### Severity Levels
+Use these severity levels in your review:
+- **P0 (critical)**: Data loss, security vulnerability, production crash
+- **P1 (high)**: Bug in normal usage, MUST-rule violation
+- **P2 (medium)**: Code smell, missing edge case, SHOULD-level violation
+
+### Approval Signal
+If there are NO P0, P1, or P2 issues, your review MUST include this exact line:
+```
+APPROVED: No P0/P1/P2 issues found.
+```
+
+If there ARE findings, list each one with its severity, file, line, and a concrete suggestion.
+
+### Rules
+- Only flag P0, P1, and P2 issues. Skip P3 (low) — those are for humans.
 - Be specific: include exact file paths and line numbers.
 - For each finding, include a concrete suggestion for how to fix it.
-- If there are no critical or high issues, say so explicitly.
 - Do NOT flag style/formatting issues — the linter handles those.
 - Do NOT suggest alternative approaches unless the current one has a defect.
-
-## PR Context
-Repository: $REPO
-PR Number: $PR_NUMBER
-PR Title: $PR_TITLE
-Changed Files: $CHANGED_FILES
-```
-
-#### `.github/review-prompts/gemini-review.md`
-
-```markdown
-You are an independent code reviewer analyzing a pull request. You did NOT author this code.
-
-## Your Task
-Review the changed files in this PR for defects, security issues, and standards violations.
-
-## Project Standards
-Read these files for project-specific conventions:
-- `docs/review-standards.md` — Severity definitions and review focus areas
-- `docs/coding-standards.md` — Naming, patterns, code conventions
-- `docs/tdd-standards.md` — Test coverage expectations
-- `CLAUDE.md` — Workflow rules
-
-## Output Format
-For each finding, provide:
-- **severity**: critical | high (only report these two levels)
-- **file**: exact file path
-- **line**: line number or range
-- **issue**: what's wrong
-- **suggestion**: how to fix it
-
-If the code looks good with no critical or high issues, respond with:
-"APPROVED: No critical or high issues found."
-
-## Rules
-- Do NOT flag formatting, import ordering, or style issues.
 - Do NOT rewrite working code just because you'd do it differently.
-- Focus on correctness, security, testing gaps, and documented standards violations.
-
-## PR Context
-Repository: $REPO
-PR Number: $PR_NUMBER
 ```
 
-#### `.github/review-prompts/fix-prompt.md`
+### 3. Fix Prompt (`.github/review-prompts/fix-prompt.md`)
 
 ```markdown
-You are the engineer who wrote this PR. External code reviewers have posted findings.
+You are the engineer who wrote this PR. Codex Cloud has posted review findings.
 
 ## Your Task
-1. Read ALL review comments on this PR from Codex and Gemini reviewers.
-2. For each **critical** or **high** finding:
+1. Read ALL review comments on this PR from Codex Cloud.
+2. For each **P0**, **P1**, or **P2** finding:
    - If the finding is valid: fix the code.
    - If the finding is a false positive: note why in a reply comment.
 3. Run the project's lint and test commands (see CLAUDE.md Key Commands) to verify fixes.
@@ -2504,7 +2422,8 @@ You are the engineer who wrote this PR. External code reviewers have posted find
 5. Push to the PR branch.
 
 ## Rules
-- Do NOT fix "medium" or "low" issues — focus on what blocks merge.
+- Fix P0, P1, AND P2 issues — all three severity levels.
+- Do NOT fix P3 (low) issues — those are suggestions, not defects.
 - Do NOT refactor unrelated code.
 - Keep changes minimal and surgical.
 - If a reviewer finding contradicts project standards (in docs/coding-standards.md or docs/tdd-standards.md), follow the project standards and explain why in a comment.
@@ -2514,16 +2433,13 @@ You are the engineer who wrote this PR. External code reviewers have posted find
 - `CLAUDE.md` — Workflow rules, Key Commands for lint/test
 - `docs/coding-standards.md` — Conventions to follow
 - `docs/tdd-standards.md` — Test requirements
+- `docs/review-standards.md` — Severity definitions
 ```
 
-### 3. GitHub Actions Workflows
-
-#### `.github/workflows/multi-model-review.yml`
-
-This is the primary orchestration workflow.
+### 4. GitHub Actions Workflow (`.github/workflows/code-review.yml`)
 
 ```yaml
-name: Multi-Model Code Review
+name: Code Review
 
 on:
   pull_request:
@@ -2536,6 +2452,8 @@ concurrency:
 
 env:
   MAX_REVIEW_ROUNDS: 3
+  # Update this after installing Codex Cloud — check the bot's username
+  CODEX_BOT_NAME: "chatgpt-codex[bot]"
 
 jobs:
   # ─── Gate: Should we run? ────────────────────────────────
@@ -2545,19 +2463,36 @@ jobs:
       should_review: ${{ steps.gate.outputs.should_review }}
       current_round: ${{ steps.gate.outputs.current_round }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Check review gate
         id: gate
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Check if any code files changed (skip for docs/config-only PRs)
+          CODE_CHANGED=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD \
+            | grep -v -E '\.(md|yaml|yml|json|toml|lock)$' | wc -l)
+
+          if [ "$CODE_CHANGED" -eq 0 ]; then
+            echo "should_review=false" >> $GITHUB_OUTPUT
+            echo "No code files changed — skipping review"
+            exit 0
+          fi
+
           # Count existing review-round labels
-          LABELS=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels --jq '.[].name' | grep '^review-round-' | wc -l)
+          LABELS=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels \
+            --jq '.[].name' | grep '^review-round-' | wc -l)
           CURRENT_ROUND=$((LABELS + 1))
           echo "current_round=$CURRENT_ROUND" >> $GITHUB_OUTPUT
 
           # Check for human override
-          SKIP=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments --jq '.[].body' | grep -c '/skip-review' || true)
-          LGTM=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments --jq '.[].body' | grep -c '/lgtm' || true)
+          SKIP=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+            --jq '.[].body' | grep -c '/skip-review' || true)
+          LGTM=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+            --jq '.[].body' | grep -c '/lgtm' || true)
 
           if [ "$SKIP" -gt 0 ] || [ "$LGTM" -gt 0 ]; then
             echo "should_review=false" >> $GITHUB_OUTPUT
@@ -2565,110 +2500,54 @@ jobs:
           elif [ "$CURRENT_ROUND" -gt "$MAX_REVIEW_ROUNDS" ]; then
             echo "should_review=false" >> $GITHUB_OUTPUT
             echo "Max rounds reached — skipping review"
-            gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels -X POST -f "labels[]=needs-human-review"
           else
             echo "should_review=true" >> $GITHUB_OUTPUT
           fi
 
-  # ─── Codex Review (parallel) ─────────────────────────────
-  codex-review:
+  # ─── Wait for Codex Cloud review ────────────────────────
+  wait-for-codex:
     needs: check-gate
     if: needs.check-gate.outputs.should_review == 'true'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      pull-requests: write
+      pull-requests: read
+    outputs:
+      codex_comment: ${{ steps.poll.outputs.comment }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Get PR diff context
-        id: diff
-        run: |
-          git fetch origin ${{ github.event.pull_request.base.ref }}
-          CHANGED=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD)
-          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
-          echo "$CHANGED" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Run Codex review
-        id: codex
-        uses: openai/codex-action@v1
-        with:
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          prompt-file: .github/review-prompts/codex-review.md
-          sandbox: read-only
-          model: o4-mini
-          codex-args: '["--max-turns", "3"]'
-          output-file: codex-review.json
-        env:
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          CHANGED_FILES: ${{ steps.diff.outputs.changed_files }}
-
-      - name: Post Codex findings
-        if: always()
+      - name: Poll for Codex Cloud comment
+        id: poll
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ROUND=${{ needs.check-gate.outputs.current_round }}
-          if [ -s codex-review.json ]; then
-            REVIEW=$(cat codex-review.json | jq -r '.content // .message // .')
-            BODY=$(printf "## 🤖 Codex Review (Round %s)\n\n%s" "$ROUND" "$REVIEW")
-          else
-            BODY=$(printf "## 🤖 Codex Review (Round %s)\n\nNo findings — APPROVED" "$ROUND")
-          fi
-          gh pr comment ${{ github.event.pull_request.number }} --body "$BODY"
+          PR=${{ github.event.pull_request.number }}
+          REPO=${{ github.repository }}
+          # The workflow trigger time — Codex Cloud comment must be after this
+          TRIGGER_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-  # ─── Gemini Review (parallel) ────────────────────────────
-  gemini-review:
-    needs: check-gate
-    if: needs.check-gate.outputs.should_review == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+          echo "Waiting for Codex Cloud review comment..."
+          for i in $(seq 1 30); do
+            sleep 20
+            # Look for a comment from the Codex bot posted after the workflow started
+            COMMENT=$(gh api "repos/$REPO/issues/$PR/comments" \
+              --jq "[.[] | select(.user.login == env.CODEX_BOT_NAME or .user.login == \"codex-bot[bot]\") | select(.created_at >= \"$TRIGGER_TIME\")] | last | .body // empty")
 
-      - name: Get changed files
-        id: diff
-        run: |
-          git fetch origin ${{ github.event.pull_request.base.ref }}
-          DIFF=$(git diff origin/${{ github.event.pull_request.base.ref }}...HEAD)
-          echo "$DIFF" > /tmp/pr-diff.txt
+            if [ -n "$COMMENT" ]; then
+              echo "Found Codex Cloud review comment"
+              echo "comment<<EOF" >> $GITHUB_OUTPUT
+              echo "$COMMENT" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            echo "Attempt $i/30 — no comment yet, waiting 20s..."
+          done
 
-      - name: Run Gemini review
-        id: gemini
-        uses: google-github-actions/run-gemini-cli@v1
-        with:
-          gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
-          prompt: |
-            Review this pull request diff for code quality issues.
-            Read .github/review-prompts/gemini-review.md for your full instructions.
-            Read docs/review-standards.md for project-specific review criteria.
-
-            Here is the diff:
-            $(cat /tmp/pr-diff.txt | head -c 50000)
-          timeout: 600  # 10 minutes max
-
-      - name: Post Gemini findings
-        if: always()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          ROUND=${{ needs.check-gate.outputs.current_round }}
-          REVIEW="${{ steps.gemini.outputs.response || 'No findings — APPROVED' }}"
-          BODY=$(printf "## 🔍 Gemini Review (Round %s)\n\n%s" "$ROUND" "$REVIEW")
-          gh pr comment ${{ github.event.pull_request.number }} --body "$BODY"
+          echo "Timed out waiting for Codex Cloud comment (10 minutes)"
+          echo "comment=" >> $GITHUB_OUTPUT
 
   # ─── Convergence Check ──────────────────────────────────
   check-convergence:
-    needs: [check-gate, codex-review, gemini-review]
+    needs: [check-gate, wait-for-codex]
     if: always() && needs.check-gate.outputs.should_review == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -2677,38 +2556,28 @@ jobs:
     outputs:
       verdict: ${{ steps.check.outputs.verdict }}
     steps:
-      - name: Check for consensus
+      - name: Check for approval
         id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CODEX_COMMENT: ${{ needs.wait-for-codex.outputs.codex_comment }}
         run: |
           ROUND=${{ needs.check-gate.outputs.current_round }}
 
-          # Get latest review comments from this round
-          COMMENTS=$(gh pr view ${{ github.event.pull_request.number }} \
-            --repo ${{ github.repository }} \
-            --json comments --jq ".comments[].body")
-
-          # Check if both reviewers approved (look for Round N comments)
-          CODEX_APPROVED=$(echo "$COMMENTS" | grep -c "Codex Review (Round $ROUND)" | head -1)
-          GEMINI_APPROVED=$(echo "$COMMENTS" | grep -c "Gemini Review (Round $ROUND)" | head -1)
-
-          # Look for approval signals in latest round comments
-          CODEX_OK=$(echo "$COMMENTS" | grep "Codex Review (Round $ROUND)" -A 100 | grep -ci "approved\|no.*findings\|no.*critical\|no.*high\|looks good\|no issues" || true)
-          GEMINI_OK=$(echo "$COMMENTS" | grep "Gemini Review (Round $ROUND)" -A 100 | grep -ci "approved\|no.*findings\|no.*critical\|no.*high\|looks good\|no issues" || true)
-
-          echo "Codex approved signals: $CODEX_OK"
-          echo "Gemini approved signals: $GEMINI_OK"
-
-          if [ "$CODEX_OK" -gt 0 ] && [ "$GEMINI_OK" -gt 0 ]; then
+          # Look for the explicit approval signal from Codex Cloud
+          if echo "$CODEX_COMMENT" | grep -qi "APPROVED: No P0/P1/P2 issues found"; then
             echo "verdict=approved" >> $GITHUB_OUTPUT
-            echo "✅ Both reviewers approved!"
+            echo "Codex Cloud approved — no P0/P1/P2 issues"
+          elif [ -z "$CODEX_COMMENT" ]; then
+            # No comment found (timeout) — treat as approval to avoid blocking
+            echo "verdict=approved" >> $GITHUB_OUTPUT
+            echo "Codex Cloud did not respond — treating as approved"
           elif [ "$ROUND" -ge "$MAX_REVIEW_ROUNDS" ]; then
-            echo "verdict=escalate" >> $GITHUB_OUTPUT
-            echo "⚠️ Max rounds reached — escalating to human"
+            echo "verdict=capped" >> $GITHUB_OUTPUT
+            echo "Max rounds reached — auto-merging"
           else
             echo "verdict=fix" >> $GITHUB_OUTPUT
-            echo "🔧 Issues found — triggering fix cycle"
+            echo "Findings present — triggering fix cycle"
           fi
 
       - name: Label round
@@ -2724,34 +2593,49 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERDICT="${{ steps.check.outputs.verdict }}"
+          PR=${{ github.event.pull_request.number }}
+          ROUND=${{ needs.check-gate.outputs.current_round }}
 
           if [ "$VERDICT" = "approved" ]; then
-            gh pr comment ${{ github.event.pull_request.number }} --body \
-              "## ✅ Multi-Model Review: APPROVED
+            gh pr comment "$PR" --body "## Code Review: APPROVED
 
-              Both Codex and Gemini reviewers found no critical or high issues.
-              This PR is ready to merge.
+          Codex Cloud found no P0/P1/P2 issues. This PR is ready to merge.
 
-              _Round ${{ needs.check-gate.outputs.current_round }} of $MAX_REVIEW_ROUNDS_"
+          _Round $ROUND of $MAX_REVIEW_ROUNDS_"
 
-            # Add approved label
-            gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels \
+            gh api repos/${{ github.repository }}/issues/$PR/labels \
               -X POST -f "labels[]=ai-review-approved" || true
 
-          elif [ "$VERDICT" = "escalate" ]; then
-            gh pr comment ${{ github.event.pull_request.number }} --body \
-              "## ⚠️ Multi-Model Review: NEEDS HUMAN REVIEW
+          elif [ "$VERDICT" = "capped" ]; then
+            gh pr comment "$PR" --body "## Code Review: AUTO-MERGING (round cap)
 
-              After $MAX_REVIEW_ROUNDS rounds, reviewers still have findings.
-              A human should review the remaining issues and decide whether to merge.
+          After $MAX_REVIEW_ROUNDS rounds, some findings may remain.
+          Auto-merging — self-review and $MAX_REVIEW_ROUNDS rounds of external review have run.
 
-              _Reached maximum review rounds._"
+          _Reached maximum review rounds._"
 
-            gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels \
-              -X POST -f "labels[]=needs-human-review" || true
+            gh api repos/${{ github.repository }}/issues/$PR/labels \
+              -X POST -f "labels[]=ai-review-capped" || true
           fi
 
-  # ─── Claude Code Fix (only if issues found) ──────────────
+  # ─── Auto-merge (approved or capped) ────────────────────
+  auto-merge:
+    needs: [check-convergence]
+    if: needs.check-convergence.outputs.verdict == 'approved' || needs.check-convergence.outputs.verdict == 'capped'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Auto-merge PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr merge ${{ github.event.pull_request.number }} \
+            --repo ${{ github.repository }} \
+            --squash --auto --delete-branch
+
+  # ─── Claude Code Fix (only if findings remain) ──────────
   claude-fix:
     needs: [check-gate, check-convergence]
     if: needs.check-convergence.outputs.verdict == 'fix'
@@ -2776,9 +2660,9 @@ jobs:
 
             Read .github/review-prompts/fix-prompt.md for your full instructions.
 
-            External reviewers (Codex and Gemini) have posted findings as PR comments.
+            Codex Cloud has posted review findings as a PR comment.
             Read ALL comments from Round ${{ needs.check-gate.outputs.current_round }}.
-            Fix the critical and high issues they identified.
+            Fix the P0, P1, and P2 issues identified.
             Run lint and test commands from CLAUDE.md Key Commands to verify.
             Commit and push your fixes.
           claude_args: |
@@ -2786,141 +2670,90 @@ jobs:
             --max-turns 10
 ```
 
-### 4. Update CLAUDE.md
+### 5. Update CLAUDE.md
 
 Add this section to CLAUDE.md (the Workflow Audit and Claude.md Optimization prompts will pick it up):
 
 ```markdown
-## Multi-Model Code Review
+## Code Review
 
-PRs are automatically reviewed by external AI models (Codex and Gemini) when opened or updated.
+### Self-Review (before every PR)
+Before pushing, run a review subagent to check changes against `docs/review-standards.md`. Fix any P0/P1/P2 issues found. This is built into the PR workflow (see step 2 below).
 
-### How It Works
+### External Review (optional — Codex Cloud)
+If Codex Cloud is configured, PRs are automatically reviewed by Codex Cloud when opened or updated.
+
 1. You create the PR as normal (push branch, `gh pr create`)
-2. GitHub Actions triggers Codex and Gemini reviews in parallel
-3. If they find critical/high issues, Claude Code Action automatically fixes them
-4. The loop repeats until both reviewers approve or 3 rounds are reached
-5. After 3 rounds without consensus, a human reviews
+2. Codex Cloud auto-reviews (reads `AGENTS.md` for instructions)
+3. If it finds P0/P1/P2 issues, Claude Code Action automatically fixes them
+4. The loop repeats until Codex approves or 3 rounds are reached
+5. After approval or 3 rounds, the PR auto-merges
 
 ### Human Controls
-- Comment `/skip-review` to bypass AI review entirely
+- Comment `/skip-review` to bypass Codex review entirely
 - Comment `/lgtm` to approve and allow merge
-- The `ai-review-approved` label means both external reviewers approved
-- The `needs-human-review` label means the loop hit its cap
+- The `ai-review-approved` label means Codex Cloud approved
+- The `ai-review-capped` label means the loop hit its round cap and auto-merged
 
 ### What Reviewers Check
 See `docs/review-standards.md` for the full review criteria. Reviewers check against your project's documented standards, not generic best practices.
-```
-
-### 5. Update Pipeline Document
-
-Add to the pipeline's Phase 3 (after Git Workflow):
-
-```
-| # | Prompt | Produces | Notes |
-| 12.5 | **Multi-Model Review Setup** | `.github/workflows/`, review prompts, review-standards.md | Requires API keys for OpenAI, Google, Anthropic |
-```
-
-Add to the "Ongoing — After Initial Setup" section:
-
-```
-| Multi-Model Review | Runs automatically on every PR — no manual trigger needed |
 ```
 
 ---
 
 ## Customization Options
 
-### Use Only One External Reviewer
+### Adding Gemini Code Assist as a Second Reviewer
 
-If you only want Codex OR Gemini (not both), remove the unused job from the workflow and update the convergence check to only look for one reviewer's approval.
+Install the Gemini Code Assist GitHub App for an independent second perspective at no API cost. Update the convergence check in `code-review.yml` to also wait for a Gemini comment and require both reviewers to approve before auto-merging.
 
-### Add Claude's Own Self-Review First
+### Disabling Auto-Merge
 
-Add Claude's built-in `/code-review` as a pre-commit check (via hooks) BEFORE the PR is created. This catches the easy stuff locally so external reviewers focus on deeper issues:
+To require human approval instead of auto-merging:
+1. Remove the `auto-merge` job from `code-review.yml`
+2. Change the `capped` verdict to add `needs-human-review` label instead of `ai-review-capped`
+3. The PR will wait for a human to merge manually
 
-```json
-// .claude/settings.json — hooks
-{
-  "hooks": {
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": ["claude -p 'Run /code-review on the current changes. Fix any issues with confidence >= 80.'"]
-      }
-    ]
-  }
-}
-```
+### Adjusting the Round Cap
 
-### Adjust Severity Threshold
+Change the `MAX_REVIEW_ROUNDS` env var in `code-review.yml`. Higher caps catch more issues but increase fix costs (~$0.43 per round). Most PRs converge in 1-2 rounds.
 
-The default only flags critical and high issues. To include medium:
-- Update `.github/review-prompts/codex-review.md` and `gemini-review.md` to include "medium"
-- Update the convergence check grep patterns
-- Be aware this will increase review rounds and cost
+### Tuning Review Behavior
 
-### Use Codex Cloud or Gemini Code Assist Instead
-
-Both Codex and Gemini offer GitHub Apps that auto-review without custom Actions:
-- **Codex Cloud**: Enable "Automatic reviews" in Codex settings → auto-posts on every PR
-- **Gemini Code Assist**: Install the GitHub App → auto-reviews on PR creation
-
-The trade-off: these are simpler to set up but offer less control over the review prompt and don't integrate into the automated fix loop as cleanly.
+Edit `AGENTS.md` to change what Codex Cloud looks for. Add "What NOT to flag" examples from real reviews to reduce false positives. Adjust severity definitions in `docs/review-standards.md` to calibrate what gets caught.
 
 ---
 
 ## Process
 
-1. **Create the review standards document** (`docs/review-standards.md`) by pulling review criteria from your existing coding-standards.md, tdd-standards.md, and project-structure.md.
+1. **Create the review standards document** (`docs/review-standards.md`) by pulling review criteria from your existing coding-standards.md, tdd-standards.md, and project-structure.md. Use the severity definitions above (P0/P1/P2/P3).
 
-2. **Create the reviewer prompt directory** (`.github/review-prompts/`) with the three prompt files above. Customize the prompts to reference your specific project conventions.
+2. **Create `AGENTS.md`** at the repo root with the content above. This is what Codex Cloud reads for review instructions.
 
-3. **Create the GitHub Actions workflow** (`.github/workflows/multi-model-review.yml`). Start with only one reviewer (Codex is recommended — it has the best structured output) and add the second after you've verified the loop works.
+3. **Create the fix prompt** (`.github/review-prompts/fix-prompt.md`) with the content above.
 
-4. **Configure repository secrets**: `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`.
+4. **Create the GitHub Actions workflow** (`.github/workflows/code-review.yml`) with the content above. After creating it, update the `CODEX_BOT_NAME` env var with the actual bot username from your Codex Cloud installation.
 
-5. **Configure repository settings**:
+5. **Configure repository secret**: `ANTHROPIC_API_KEY` (the only API key needed — Codex Cloud uses your ChatGPT Pro subscription).
+
+6. **Configure repository settings**:
    - Settings → Actions → General → Workflow permissions → Read and write
-   - Settings → Actions → General → Allow GitHub Actions to create and approve pull requests ✓
+   - Settings → Actions → General → Allow GitHub Actions to create and approve pull requests
 
-6. **Update CLAUDE.md** with the Multi-Model Code Review section so agents understand the review process exists.
-
-7. **Update `docs/review-standards.md`** as you learn which findings are valuable and which are noise. Add "good vs bad" examples from real PR reviews to improve reviewer accuracy over time.
+7. **Update CLAUDE.md** with the Code Review section so agents understand the review process exists.
 
 8. **Test with a small PR** that has intentional issues (unused variable, missing error handling, hardcoded secret). Verify:
-   - Both reviewers post findings
-   - Claude Code fixes the issues
+   - Codex Cloud posts a review comment with findings
+   - The convergence check detects findings and triggers the fix job
+   - Claude Code Action fixes the P0/P1/P2 issues
    - Second review round approves
-   - Convergence is detected and the approved label is added
+   - The PR auto-merges with the `ai-review-approved` label
 
 9. **Commit everything** to the repo:
    ```bash
-   git add docs/review-standards.md .github/review-prompts/ .github/workflows/multi-model-review.yml CLAUDE.md
-   git commit -m "[BD-<id>] feat: add multi-model code review loop"
+   git add docs/review-standards.md AGENTS.md .github/review-prompts/ .github/workflows/code-review.yml CLAUDE.md
+   git commit -m "[BD-<id>] feat: add code review loop (Codex Cloud + Claude fix)"
    ```
-
----
-
-## Cost Estimates
-
-| Component | Per PR Round | Notes |
-|-----------|-------------|-------|
-| Codex review (o4-mini) | ~$0.05-0.20 | Read-only, 3 turns max |
-| Gemini review | ~$0.02-0.10 | Free tier available |
-| Claude Code fix | ~$0.50-2.00 | Write access, up to 10 turns |
-| **Total per round** | **~$0.57-2.30** | |
-| **Typical PR (2 rounds)** | **~$1.14-4.60** | Most converge in 1-2 rounds |
-
-Compare to: human code review averaging 30-60 minutes at $75-150/hr = $37.50-150.00 per PR.
-
----
-
-## What This Document Should NOT Be
-
-- A replacement for human review on high-stakes changes — the loop caps at 3 rounds and escalates
-- A guarantee that all bugs are caught — AI reviewers have blind spots too
-- Tested against your specific CI/CD setup — the workflow YAML is a starting template that you'll need to adapt to your project's runner config, test commands, and branch protection rules
 
 
 __________________________________________________________
@@ -4114,7 +3947,7 @@ After analysis, restructure CLAUDE.md to follow this format:
 [Think through approach for non-trivial work. Write specs upfront. CRITICAL: Do NOT enter Claude Code's interactive `/plan` mode — it blocks autonomous execution. Just think through the problem internally.]
 
 ### Implementation Loop
-[TDD cycle repeating per piece of functionality, verification using Key Commands lint+test, commits with [BD-<id>] format. Multiple commits per task are normal — they squash-merge. Rebase onto origin/main before push. One clear flow.]
+[TDD cycle repeating per piece of functionality, verification using Key Commands lint+test, commits with [BD-<id>] format. Multiple commits per task are normal — they squash-merge. Self-review before push (claude -p subagent checks against docs/review-standards.md for P0/P1/P2). Rebase onto origin/main before push. One clear flow.]
 
 ### Task Closure and Next Task
 [Confirm merge, bd close, bd sync. Single agent: checkout main, delete branch, prune. Worktree agent: fetch, prune, clean, branch from origin/main (cannot checkout main). Keep working until no tasks remain]
@@ -4144,6 +3977,8 @@ After analysis, restructure CLAUDE.md to follow this format:
 | Git/branching question | docs/git-workflow.md |
 | Where to put a file | docs/project-structure.md |
 | Running multiple agents in parallel | docs/git-workflow.md |
+| Review criteria / severity definitions | docs/review-standards.md |
+| Codex Cloud review instructions | AGENTS.md |
 
 ## Rules
 
@@ -4215,12 +4050,13 @@ Before finalizing, verify CLAUDE.md explicitly covers:
 
 1. **Never push to main** — main is protected, all changes via PR
 2. **PR workflow** — rebase onto origin/main, then `gh pr create`, then `gh pr merge --squash --auto --delete-branch`, then `gh pr checks --watch --fail-fast`, then `gh pr view --json state -q .state` must show "MERGED"
-3. **Task closure** — two variants: single agent (checkout main, delete branch, prune) and worktree agent (fetch, prune, clean — cannot checkout main). Both use `bd close`, `bd sync`
-4. **Continuous work loop** — clean workspace between tasks, keep working until `bd ready` returns nothing
-5. **Parallel agent setup** — permanent worktrees with workspace branches, BD_ACTOR, agents always branch from `origin/main`, never `git checkout main`
-6. **TDD always** — failing test before implementation, loop repeats per piece of functionality, multiple commits per task squash-merge
-7. **Every commit needs a Beads task** — commit messages require `[BD-<id>]` format
-8. **Error recovery** — test failures, merge conflicts, CI failures, crashed sessions, orphaned worktree work
+3. **Self-review before push** — `claude -p` subagent checks against `docs/review-standards.md` for P0/P1/P2 issues, fixes them, runs lint+test
+4. **Task closure** — two variants: single agent (checkout main, delete branch, prune) and worktree agent (fetch, prune, clean — cannot checkout main). Both use `bd close`, `bd sync`
+5. **Continuous work loop** — clean workspace between tasks, keep working until `bd ready` returns nothing
+6. **Parallel agent setup** — permanent worktrees with workspace branches, BD_ACTOR, agents always branch from `origin/main`, never `git checkout main`
+7. **TDD always** — failing test before implementation, loop repeats per piece of functionality, multiple commits per task squash-merge
+8. **Every commit needs a Beads task** — commit messages require `[BD-<id>]` format
+9. **Error recovery** — test failures, merge conflicts, CI failures, crashed sessions, orphaned worktree work
 
 
 
@@ -4273,6 +4109,12 @@ Repeat for each piece of functionality in the task:
 
 Continue until all acceptance criteria for the task are met. Multiple commits per task are normal — they'll be squash-merged into one commit on main.
 
+**4.5. Self-review (before push)**
+```bash
+claude -p "Review changes on this branch vs origin/main. Check against docs/review-standards.md for P0/P1/P2 issues. Fix any issues found. Run <lint> and <test> after fixes. Commit fixes with [BD-<id>] fix: address self-review findings"
+```
+Catches issues before external review. Runs once before push — cheaper and more targeted than a hook.
+
 **5. Rebase, push, and open a PR**
 ```bash
 git fetch origin && git rebase origin/main    # Rebase onto latest main
@@ -4280,7 +4122,7 @@ git push -u origin HEAD
 gh pr create --title "[BD-<id>] type(scope): description" --body "Closes BD-<id>"
 gh pr merge --squash --auto --delete-branch
 ```
-Auto-merge is set immediately — the PR merges itself once CI passes. The `--delete-branch` flag automatically removes the remote branch after merge (local branch is cleaned up in step 8).
+Auto-merge is set immediately — the PR merges itself once CI passes. The `--delete-branch` flag automatically removes the remote branch after merge (local branch is cleaned up in step 9).
 
 **6. Watch CI**
 ```bash
@@ -4369,7 +4211,7 @@ CLAUDE.md must contain the complete workflow. Check for:
 **Workflow Section Exists**:
 - [ ] Dedicated section for feature workflow (e.g., "## Feature Workflow" or "## Development Workflow")
 - [ ] Steps are numbered and in correct order
-- [ ] All 9 steps are present (pick task → next task)
+- [ ] All 9 steps are present (pick task → next task), plus step 4.5 (self-review)
 - [ ] Commands are copy-pasteable (not pseudo-code)
 
 **Step 1: Task Selection**:
@@ -4397,6 +4239,13 @@ CLAUDE.md must contain the complete workflow. Check for:
 - [ ] Multiple commits per task acknowledged (squash-merged later)
 - [ ] Lint and test verification step (using project's commands from CLAUDE.md Key Commands table)
 - [ ] Commit message format: `[BD-<id>] type(scope): description`
+
+**Step 4.5: Self-Review**:
+- [ ] `claude -p` subagent command documented
+- [ ] Reviews against `docs/review-standards.md` for P0/P1/P2 issues
+- [ ] Runs lint and test after fixes
+- [ ] Commits fixes with `[BD-<id>] fix: address self-review findings`
+- [ ] Runs once before push (not a hook)
 
 **Step 5: Rebase, Push, PR Creation**:
 - [ ] `git fetch origin && git rebase origin/main` before push
@@ -4458,6 +4307,7 @@ CLAUDE.md must contain the complete workflow. Check for:
 **docs/git-workflow.md** (if exists):
 - [ ] Branch naming matches: `bd-<task-id>/<short-desc>`
 - [ ] Branching from `origin/main` (not checkout-pull-branch)
+- [ ] Self-review step documented (step 4.5 — `claude -p` subagent before push)
 - [ ] Rebase onto origin/main before push documented
 - [ ] Commit format matches: `[BD-<id>] type(scope): description`
 - [ ] Squash merge with `--delete-branch` documented
@@ -4592,6 +4442,12 @@ Repeat for each piece of functionality in the task:
 5. **Commit**: `git commit -m "[BD-<id>] type(scope): description"`
 
 Continue until all acceptance criteria are met. Multiple commits are normal — they squash-merge.
+
+### 4.5. Self-Review
+```bash
+claude -p "Review changes on this branch vs origin/main. Check against docs/review-standards.md for P0/P1/P2 issues. Fix any issues found. Run <lint> and <test> after fixes. Commit fixes with [BD-<id>] fix: address self-review findings"
+```
+Catches issues before external review. Runs once before push — not a hook.
 
 ### 5. Rebase, Push, and Open PR
 ```bash
@@ -4774,6 +4630,7 @@ bd create "Create PR template with task ID format" -p 2
 - Step 2 (Branch creation): [✓ / ⚠️ / ✗]
 - Step 3 (Planning): [✓ / ⚠️ / ✗]
 - Step 4 (TDD loop): [✓ / ⚠️ / ✗]
+- Step 4.5 (Self-review): [✓ / ⚠️ / ✗]
 - Step 5 (PR creation): [✓ / ⚠️ / ✗]
 - Step 6 (CI watch): [✓ / ⚠️ / ✗]
 - Step 7 (Confirm merge): [✓ / ⚠️ / ✗]
@@ -4816,7 +4673,7 @@ After approval:
 
 After updates, verify:
 
-- [ ] CLAUDE.md has complete 9-step workflow
+- [ ] CLAUDE.md has complete workflow (9 steps + step 4.5 self-review)
 - [ ] All commands are copy-pasteable
 - [ ] Commit format `[BD-<id>] type(scope): description` is consistent everywhere
 - [ ] Branch naming `bd-<task-id>/<short-desc>` from `origin/main` is consistent everywhere
@@ -4853,6 +4710,7 @@ After updates, verify:
 | 2 | `git fetch`, branch format, `origin/main`, lessons.md reference |
 | 3 | Think through approach (3+ steps), write specs, do NOT use `/plan`, re-plan if stuck |
 | 4 | Red/Green/Refactor, verify command (project's lint+test from Key Commands), commit format `[BD-<id>]` |
+| 4.5 | Self-review: `claude -p` subagent checks against `docs/review-standards.md` for P0/P1/P2, fixes issues, runs lint+test |
 | 5 | Rebase onto origin/main, push, PR create with title, auto-merge with `--delete-branch` |
 | 6 | `gh pr checks --watch`, failure handling |
 | 7 | Merge confirmation command, "never close until MERGED" |

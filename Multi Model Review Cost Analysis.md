@@ -1,8 +1,22 @@
 # Multi-Model Code Review: Cost Analysis
 
+## Architecture Summary
+
+The review loop has two tiers:
+
+| Tier | What | Cost |
+|------|------|------|
+| **Tier 1: Local self-review** | Claude subagent reviews changes before push | $0 (covered by Claude Code subscription/API) |
+| **Tier 2: Codex Cloud review** | GitHub App auto-reviews PRs | $0 per review (ChatGPT Pro subscription) |
+| **Fix cycle** | Claude Code Action fixes findings in CI | ~$0.43 per fix (ANTHROPIC_API_KEY) |
+
+**Only one API key needed:** `ANTHROPIC_API_KEY` (for the fix cycle in GitHub Actions).
+
+---
+
 ## Current API Pricing (February 2026)
 
-### Anthropic (Claude — the "Engineer" that writes code and fixes issues)
+### Anthropic (Claude — the "Engineer" that fixes issues)
 
 | Model | Input / 1M tokens | Output / 1M tokens | Notes |
 |-------|-------------------|-------------------|-------|
@@ -14,65 +28,37 @@
 - Prompt caching: cache reads cost 10% of base input price (90% savings on repeated context like CLAUDE.md, review standards)
 - Batch API: 50% off (not applicable — we need real-time fixes)
 
-### OpenAI (Codex — the "Reviewer")
+### Codex Cloud (Subscription-Based Review)
 
-| Model | Input / 1M tokens | Output / 1M tokens | Notes |
-|-------|-------------------|-------------------|-------|
-| **o4-mini** | $1.10 | $4.40 | Recommended reviewer — strong reasoning, very cheap. *Note: reasoning tokens billed as output but invisible in API* |
-| gpt-5.2-codex | $1.25 | $10.00 | Strongest code review, but hidden reasoning tokens can 2-4x the visible output cost |
-| codex-mini-latest | $1.50 | $6.00 | Optimized for code tasks |
-| gpt-4.1-mini | $0.40 | $1.60 | Budget option, weaker review quality |
+| Subscription | Monthly Cost | Reviews Included | Notes |
+|-------------|-------------|------------------|-------|
+| **ChatGPT Pro** | $200/month | Unlimited | Covers Codex Cloud auto-reviews at $0/review |
+| ChatGPT Plus | $20/month | Limited | May have review caps — verify current limits |
+| ChatGPT Team | $25/user/month | Included | Team plan includes Codex Cloud |
 
-**Key cost trap — reasoning tokens:** o4-mini and gpt-5.2-codex use internal reasoning tokens billed as output but not visible in the API response. A review that produces 500 visible output tokens might consume 2,000+ total output tokens. The estimates below account for this with a **3x reasoning multiplier** on output tokens.
-
-### Google (Gemini — the "Second Reviewer")
-
-| Model | Input / 1M tokens | Output / 1M tokens | Notes |
-|-------|-------------------|-------------------|-------|
-| **Gemini 2.5 Flash** | $0.15 | $0.60 | Recommended — extremely cheap, good quality for review. Thinking mode adds $3.50/1M output tokens |
-| Gemini 2.5 Pro | $1.25 | $10.00 | Strong but expensive — similar cost to Codex |
-| Gemini 3 Flash Preview | $0.50 | $3.00 | Newer, pricier than 2.5 Flash |
-| Gemini 3 Pro Preview | $2.00 | $12.00 | Frontier model, expensive for review |
-| Gemini 2.5 Flash-Lite | $0.10 | $0.40 | Cheapest option, may miss subtle issues |
-
-**Free tier note:** Gemini 2.5 Flash has a free tier (up to 500 RPD) that could cover low-volume usage during early development. However, free tier data may be used to improve Google's models.
+**Key point:** If you already have a ChatGPT Pro subscription, Codex Cloud reviews are a sunk cost — $0 marginal cost per review.
 
 ---
 
-## Token Usage Model: What a Typical PR Review Consumes
-
-These estimates are based on real-world data from Claude Code cost tracking (Anthropic reports average $6/dev/day, 90% under $12/day), the O'Reilly article benchmarking review at ~52 seconds, and typical PR sizes in the 200-800 line diff range common in task-based development like your workflow.
-
-### Per-Review Token Estimates
-
-| Component | Input Tokens | Output Tokens | Why |
-|-----------|-------------|--------------|-----|
-| **PR diff** (context sent to reviewer) | ~8,000 | — | Average 400-line diff ≈ 8K tokens |
-| **Project standards docs** (review-standards.md, coding-standards.md, tdd-standards.md snippets) | ~4,000 | — | Reviewer needs to know YOUR rules |
-| **Review prompt** | ~1,000 | — | The instruction template |
-| **Reviewer output** (findings/approval) | — | ~1,500 visible | Structured findings with file/line/suggestion |
-| **Reasoning overhead** (OpenAI o-series only) | — | ~4,500 hidden | 3x multiplier for internal reasoning tokens |
-
-**Total per review call:**
-- Codex (o4-mini): ~13K input + ~6K output (including reasoning)
-- Gemini (2.5 Flash): ~13K input + ~1.5K output (no hidden reasoning)
-- Gemini (2.5 Flash thinking mode): ~13K input + ~4K output (thinking tokens)
+## Token Usage Model: What a Fix Cycle Consumes
 
 ### Per-Fix Token Estimates (Claude Code Action)
 
 | Component | Input Tokens | Output Tokens | Why |
 |-----------|-------------|--------------|-----|
 | **Codebase context** (files read) | ~25,000 | — | Claude reads affected files, CLAUDE.md, standards docs |
-| **Review findings** (from PR comments) | ~3,000 | — | Reading reviewer findings |
+| **Review findings** (from PR comments) | ~3,000 | — | Reading Codex Cloud findings |
 | **Fix prompt** | ~1,000 | — | Instructions |
 | **Code changes + git operations** | — | ~8,000 | Writing fixes, running tests, committing |
 | **Multi-turn tool use** (up to 10 turns) | ~15,000 | ~12,000 | Iterative fix-test-fix cycle |
 
 **Total per fix cycle:** ~44K input + ~20K output
 
+**Cost per fix (Sonnet 4.5):** $0.132 (input) + $0.300 (output) = **$0.43**
+
 ---
 
-## Scenario Modeling
+## Scenario: Codex Cloud + Claude Fix
 
 ### Assumptions
 - **PR volume:** 5 PRs per week (typical for a solo developer with Claude Code agents)
@@ -80,167 +66,101 @@ These estimates are based on real-world data from Claude Code cost tracking (Ant
 - **Weighted average rounds per PR:** 1.5 rounds
 - **Monthly PRs:** ~22 PRs
 
-### Scenario A: Claude + OpenAI (Codex) Only
-
-**Per PR round:**
-
-| Step | Input Tokens | Output Tokens | Model | Cost |
-|------|-------------|--------------|-------|------|
-| Codex review | 13,000 | 6,000 | o4-mini ($1.10/$4.40) | $0.014 + $0.026 = **$0.04** |
-| Claude fix (when needed) | 44,000 | 20,000 | Sonnet 4.5 ($3/$15) | $0.132 + $0.300 = **$0.43** |
-
-**Monthly cost calculation:**
+### Monthly Cost
 
 | | Round 1 (22 PRs) | Round 2 (8.8 PRs) | Round 3 (2.2 PRs) | Total |
 |---|---|---|---|---|
-| Codex reviews | 22 × $0.04 = $0.88 | 8.8 × $0.04 = $0.35 | 2.2 × $0.04 = $0.09 | **$1.32** |
+| Codex Cloud reviews | $0 | $0 | $0 | **$0** |
 | Claude fixes | 8.8 × $0.43 = $3.78 | 2.2 × $0.43 = $0.95 | 0 × $0.43 = $0.00 | **$4.73** |
-| **Subtotal** | | | | **$6.05** |
+| **Subtotal** | | | | **$4.73** |
 
 | | Monthly | Annual |
 |---|---|---|
-| **Codex reviews** | $1.32 | $15.84 |
+| **Codex Cloud reviews** | $0 | $0 |
 | **Claude fixes** | $4.73 | $56.76 |
 | **GitHub Actions minutes** (~3 min/run × 33 runs × $0.008/min) | $0.79 | $9.50 |
-| **Total** | **$6.84** | **$82.10** |
-
-### Scenario B: Claude + Gemini Only
-
-**Per PR round:**
-
-| Step | Input Tokens | Output Tokens | Model | Cost |
-|------|-------------|--------------|-------|------|
-| Gemini review | 13,000 | 1,500 | 2.5 Flash ($0.15/$0.60) | $0.002 + $0.001 = **$0.003** |
-| Gemini review (thinking mode) | 13,000 | 4,000 | 2.5 Flash + thinking ($0.15/$3.50) | $0.002 + $0.014 = **$0.016** |
-| Claude fix (when needed) | 44,000 | 20,000 | Sonnet 4.5 ($3/$15) | $0.132 + $0.300 = **$0.43** |
-
-**Monthly cost (using thinking mode for better review quality):**
-
-| | Round 1 (22 PRs) | Round 2 (8.8 PRs) | Round 3 (2.2 PRs) | Total |
-|---|---|---|---|---|
-| Gemini reviews | 22 × $0.016 = $0.35 | 8.8 × $0.016 = $0.14 | 2.2 × $0.016 = $0.04 | **$0.53** |
-| Claude fixes | 8.8 × $0.43 = $3.78 | 2.2 × $0.43 = $0.95 | 0 | **$4.73** |
-| **Subtotal** | | | | **$5.26** |
-
-| | Monthly | Annual |
-|---|---|---|
-| **Gemini reviews** | $0.53 | $6.36 |
-| **Claude fixes** | $4.73 | $56.76 |
-| **GitHub Actions minutes** | $0.79 | $9.50 |
-| **Total** | **$6.05** | **$72.62** |
-
-**Note on Gemini free tier:** If using the free tier (500 RPD), the Gemini review cost drops to $0. Monthly total becomes **$5.52** / **$66.26 annual**. However, free tier data may be used to train Google's models — likely fine for code review findings but worth knowing.
-
-### Scenario C: Claude + Codex + Gemini (All Three)
-
-**Per PR round:**
-
-| Step | Input Tokens | Output Tokens | Model | Cost |
-|------|-------------|--------------|-------|------|
-| Codex review | 13,000 | 6,000 | o4-mini | **$0.04** |
-| Gemini review | 13,000 | 4,000 | 2.5 Flash + thinking | **$0.016** |
-| Claude fix (when needed) | 44,000 | 20,000 | Sonnet 4.5 | **$0.43** |
-
-**Monthly cost:**
-
-| | Round 1 (22 PRs) | Round 2 (8.8 PRs) | Round 3 (2.2 PRs) | Total |
-|---|---|---|---|---|
-| Codex reviews | 22 × $0.04 = $0.88 | 8.8 × $0.04 = $0.35 | 2.2 × $0.04 = $0.09 | **$1.32** |
-| Gemini reviews | 22 × $0.016 = $0.35 | 8.8 × $0.016 = $0.14 | 2.2 × $0.016 = $0.04 | **$0.53** |
-| Claude fixes | 8.8 × $0.43 = $3.78 | 2.2 × $0.43 = $0.95 | 0 | **$4.73** |
-| **Subtotal** | | | | **$6.58** |
-
-| | Monthly | Annual |
-|---|---|---|
-| **Codex reviews** | $1.32 | $15.84 |
-| **Gemini reviews** | $0.53 | $6.36 |
-| **Claude fixes** | $4.73 | $56.76 |
-| **GitHub Actions minutes** (~4 min/run × 33 runs × $0.008/min) | $1.06 | $12.67 |
-| **Total** | **$7.64** | **$91.63** |
+| **Total** | **$5.52** | **$66.26** |
 
 ---
 
-## Side-by-Side Comparison
+## Where the Money Goes
 
-| | Claude + Codex | Claude + Gemini | All Three |
-|---|---|---|---|
-| **Monthly cost** | $6.84 | $6.05 | $7.64 |
-| **Annual cost** | $82.10 | $72.62 | $91.63 |
-| **Review diversity** | Single external perspective | Single external perspective | Two independent perspectives |
-| **Review quality** | Strong (o4-mini has excellent reasoning) | Good (2.5 Flash + thinking is capable but less deep than o4-mini) | Best (different models catch different blind spots) |
-| **Speed** | ~2-3 min per review round | ~1-2 min per review round (Flash is fast) | ~3-4 min (parallel, so wall-clock same as slowest) |
-| **Reasoning tokens** | Hidden cost risk (3x multiplier) | Transparent (thinking tokens visible) | Mixed |
-| **Setup complexity** | 1 API key + 1 reviewer job | 1 API key + 1 reviewer job | 2 API keys + 2 reviewer jobs |
-| **Free tier available** | No | Yes (500 RPD) | Gemini portion only |
+| Component | % of Monthly Cost |
+|-----------|------------------|
+| **Claude Code fixes** | **86%** ($4.73) |
+| GitHub Actions minutes | **14%** ($0.79) |
+| Codex Cloud reviews | **0%** ($0) |
 
----
-
-## Where the Money Actually Goes
-
-The cost breakdown reveals something important: **the reviewer cost is almost irrelevant**. The overwhelming cost driver is the Claude Code fix cycle.
-
-| Component | % of Monthly Cost (All Three scenario) |
-|-----------|---------------------------------------|
-| **Claude Code fixes** | **62%** ($4.73) |
-| Codex reviews | 17% ($1.32) |
-| GitHub Actions | 14% ($1.06) |
-| Gemini reviews | 7% ($0.53) |
-
-This means:
-1. Adding Gemini on top of Codex costs only **$0.53/month more** — essentially free for a second perspective
-2. The real cost lever is reducing the number of fix rounds, not choosing cheaper reviewers
-3. Optimizing the fix prompt to be more surgical (fewer turns, smaller context) saves more than any reviewer choice
+The real cost lever is reducing the number of fix rounds, not the reviewer. Self-review (Tier 1) catches easy issues before the PR is created, reducing external review findings and fix rounds.
 
 ---
 
 ## Cost Under Different PR Volumes
 
-| PRs/week | Monthly PRs | Claude + Codex | Claude + Gemini | All Three |
-|----------|------------|----------------|-----------------|-----------|
-| 2 | 9 | $2.81 | $2.48 | $3.13 |
-| **5** | **22** | **$6.84** | **$6.05** | **$7.64** |
-| 10 | 44 | $13.68 | $12.10 | $15.27 |
-| 20 | 88 | $27.35 | $24.20 | $30.55 |
-| 50 (team) | 220 | $68.38 | $60.49 | $76.37 |
+| PRs/week | Monthly PRs | Monthly Cost | Annual Cost |
+|----------|------------|--------------|-------------|
+| 2 | 9 | $2.26 | $27.17 |
+| **5** | **22** | **$5.52** | **$66.26** |
+| 10 | 44 | $11.04 | $132.52 |
+| 20 | 88 | $22.08 | $265.04 |
+| 50 (team) | 220 | $55.21 | $662.60 |
 
-Even at 50 PRs/week (a small team), the all-three configuration costs under $77/month — less than one hour of a senior engineer's code review time.
+Even at 50 PRs/week (a small team), the total cost is under $56/month — less than one hour of a senior engineer's code review time.
 
 ---
 
 ## Cost Optimization Strategies
 
 ### 1. Use Sonnet 4.5 (not Opus) for the fix cycle
-Already assumed above. Switching to Opus 4.6 would **3.5x the fix cost** ($0.43 → $1.52 per fix), pushing monthly costs for all-three from $7.64 to $18.35.
+Already assumed above. Switching to Opus 4.6 would **3.5x the fix cost** ($0.43 → $1.52 per fix), pushing monthly costs from $5.52 to $18.35.
 
 ### 2. Use prompt caching for standards documents
-The review-standards.md and coding-standards.md are sent with every review call. With prompt caching enabled, repeated calls within 5 minutes (which happens in the parallel review + fix loop) reduce the ~4K standards context from $0.012 to $0.0012 per call. Savings: ~$0.30/month. Small but free.
+The review-standards.md and coding-standards.md are sent with every fix call. With prompt caching enabled, repeated calls within 5 minutes reduce the ~4K standards context from $0.012 to $0.0012 per call. Savings: ~$0.30/month. Small but free.
 
-### 3. Use gpt-4.1-mini instead of o4-mini if reviews are too expensive
-Drops Codex review cost from $0.04 to $0.01 per review. But weaker reasoning means more false positives → more fix rounds → potentially higher Claude fix costs. Test before committing.
+### 3. Self-review catches easy issues locally
+The self-review step (Tier 1) runs before the PR is created, using a Claude subagent to check changes against project standards. This means Codex Cloud only sees code that's already passed one quality gate, reducing findings and fix rounds. Estimated reduction: 20-30% fewer fix rounds.
 
-### 4. Use Gemini free tier for development, paid for production
-The 500 RPD free tier covers up to ~16 PRs/day. For solo development, this is more than enough. Switch to paid tier only if you need data privacy guarantees or exceed the rate limit.
+### 4. Tune AGENTS.md to reduce false positives
+Codex Cloud reads `AGENTS.md` for review instructions. Adding "What NOT to flag" examples from real reviews reduces noise, which means fewer fix rounds triggered by false positives.
 
-### 5. Skip round 2+ fixes for medium-severity issues
-The prompt already says "only fix critical and high." Enforcing this strictly reduces the percentage of PRs needing round 2 from 30% to ~15%, cutting fix costs nearly in half.
+---
 
-### 6. Run Claude's built-in /code-review locally before pushing
-Using Claude Code hooks to auto-review on the Stop hook catches easy issues before the PR is even created. This means external reviewers only see code that's already passed one quality gate, reducing findings and fix rounds. The O'Reilly article measured this at ~52 seconds per local review — very cheap since it's covered by your existing Claude Code subscription/API usage.
+## Comparison: Codex Cloud vs Codex Action (API)
+
+| | Codex Cloud (Subscription) | Codex Action (API) |
+|---|---|---|
+| **Review cost** | $0/review | ~$0.04/review (o4-mini) |
+| **Monthly review cost (22 PRs, 1.5 rounds)** | $0 | $1.32 |
+| **Total monthly cost** | $5.52 | $6.84 |
+| **API key needed** | No (GitHub App) | Yes (`OPENAI_API_KEY`) |
+| **Output format** | Prose (approval signal detection) | Structured JSON (parseable findings) |
+| **Prompt control** | AGENTS.md only | Full prompt file |
+| **Setup** | Install GitHub App + enable | Repo secret + custom workflow |
+
+**Recommendation:** Use Codex Cloud. The $1.32/month savings from not needing an OpenAI API key is minor, but the simpler setup and zero API management make it the better choice for most projects.
+
+---
+
+## Optional: Adding Gemini Code Assist as Second Reviewer
+
+If you want a second perspective, install the Gemini Code Assist GitHub App. This adds a second independent reviewer at no API cost (subscription-based or free tier). The convergence check would require both reviewers to approve before auto-merging.
+
+Additional monthly cost: $0 (Gemini Code Assist free tier covers low-volume usage).
 
 ---
 
 ## Recommendation
 
-**Start with Claude + Codex (Scenario A).**
+**Use Codex Cloud (subscription) for reviews + ANTHROPIC_API_KEY for fixes.**
 
 Reasoning:
-- o4-mini's reasoning capability produces higher-quality reviews than Gemini 2.5 Flash, meaning fewer false positives and fewer wasted fix rounds
-- At $6.84/month, the cost is negligible compared to the value of catching bugs before they ship
-- Single API key to manage (you likely already have an OpenAI key)
-- If it works well after 2-4 weeks, add Gemini as the second reviewer — it only adds $0.53/month and gives you a genuinely independent second perspective
-- The "all three" configuration at $7.64/month is the long-term sweet spot — two independent reviewers with different model architectures catching different classes of issues, at a cost that rounds to zero against developer productivity gains
+- $0 marginal cost for reviews if you already have a ChatGPT Pro subscription
+- Single API key to manage (`ANTHROPIC_API_KEY`)
+- At $5.52/month total, the cost is negligible compared to the value of catching bugs before they ship
+- Self-review (Tier 1) further reduces costs by catching easy issues locally
+- If you want a second reviewer later, add Gemini Code Assist — it's free and independent
 
 **What NOT to do:**
 - Don't use Opus 4.6 for the fix cycle — it's 3.5x the cost of Sonnet 4.5 and the fix prompt doesn't need frontier reasoning, just competent coding
-- Don't use gpt-5.2-codex for reviews — hidden reasoning tokens make costs unpredictable, and o4-mini is nearly as capable for review tasks
-- Don't use Gemini 2.5 Pro or 3 Pro for reviews — you're paying frontier model prices for a task that Flash handles well
+- Don't use Codex Action (API) unless you need structured JSON output for a custom convergence pipeline
+- Don't skip self-review — it's the cheapest way to reduce fix round costs
