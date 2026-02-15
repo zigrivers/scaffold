@@ -59,7 +59,8 @@ There are two ways to install Scaffold. Both give you the same commands — the 
 Open Claude Code and run:
 
 ```
-/plugin install scaffold@zigrivers/scaffold
+/plugin marketplace add zigrivers/scaffold
+/plugin install scaffold
 ```
 
 After installing, commands are available as `/scaffold:command-name` (for example, `/scaffold:create-prd`).
@@ -103,10 +104,10 @@ From a Claude Code session:
 /scaffold:update
 ```
 
-Or re-run the install command:
+Or update the plugin directly:
 
 ```
-/plugin install scaffold@zigrivers/scaffold
+/plugin update scaffold
 ```
 
 ### User command installs

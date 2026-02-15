@@ -1,0 +1,13 @@
+{
+  "name": "scaffold",
+  "owner": {
+    "name": "zigrivers"
+  },
+  "plugins": [
+    {
+      "name": "scaffold",
+      "source": ".",
+      "description": "25-prompt pipeline for scaffolding new software projects with Claude Code"
+    }
+  ]
+}
