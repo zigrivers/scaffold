@@ -514,17 +514,17 @@ ___________________________________________
 ## Tech Stack (Prompt)
 Thoroughly review and analyze docs/plan.md to understand every feature, integration, and technical requirement of this project. Then deeply research tech stack options and create docs/tech-stack.md as the definitive technology reference for this project.
 
-## My Preferences (customize before running)
+## Step 1: Gather User Preferences
 
-<!-- Replace the line below with YOUR preferences before running this prompt -->
-I'd like to use [YOUR PREFERRED LANGUAGE] on the backend, assuming there aren't good reasons not to.
+Before researching options, use AskUserQuestion to ask the user about their preferences. Ask up to 4 questions based on what the PRD implies (e.g., skip frontend questions if the PRD describes a CLI tool). Tailor the options to what's realistic for this project.
 
-<!-- Examples of what to put here:
-- "I'd like to use Python on the backend, assuming there aren't good reasons not to."
-- "No preference — recommend whatever is the best fit."
-- "Must be TypeScript full-stack for team consistency."
-- "I want to use Go for the backend and React for the frontend."
--->
+Example questions (adapt based on PRD):
+- **Backend language** — "Which backend language do you prefer?" with options like "TypeScript", "Python", "Go", "No preference — recommend the best fit"
+- **Frontend framework** (if PRD has a UI) — "Which frontend framework do you prefer?" with options like "React", "Vue", "Svelte", "No preference"
+- **Deployment target** — "Where do you plan to deploy?" with options like "Vercel/Netlify", "AWS", "Self-hosted", "No preference"
+- **Constraints** — "Any hard constraints on the stack?" with options like "Must be TypeScript full-stack", "Must use specific database", "Must stay free-tier", "No constraints"
+
+Use the answers to guide your research. "No preference" means recommend the best fit based on PRD requirements and the guiding principles below.
 
 ## Guiding Principles for Stack Selection
 
@@ -592,12 +592,13 @@ This project will be built and maintained entirely by AI agents. Every technolog
 - Boilerplate descriptions of what a framework is — assume the reader knows, just explain why we chose it
 
 ## Process
-- Create a Beads task for this work before starting: `bd create "docs: <document being created>" -p 0` and `bd update <id> --claim`
+- **First**, gather user preferences using AskUserQuestion as described in Step 1 above — do this before creating the Beads task or starting any research
+- Create a Beads task for this work: `bd create "docs: <document being created>" -p 0` and `bd update <id> --claim`
 - When the document is complete and committed, close it: `bd close <id>`
 - If this work surfaces implementation tasks (bugs, missing infrastructure), create separate Beads tasks for those — don't try to do them now
 - Use subagents to research and compare tech stack options in parallel
 - Cross-reference every PRD feature against the proposed stack — verify nothing requires a capability the stack doesn't support
-- Use AskUserQuestionTool to present key decisions (especially framework choices and hosting) with your recommendation and rationale before finalizing
+- Use AskUserQuestion to present key decisions (especially framework choices and hosting) with your recommendation and rationale before finalizing
 - After creating tech-stack.md, review plan.md and update it with any technical clarifications or additions that emerged from the analysis
 - At the end of the document, include a **Quick Reference** section listing every dependency with its version — this becomes the source of truth for package.json / requirements.txt / pyproject.toml
 
