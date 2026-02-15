@@ -50,10 +50,10 @@ Report the result to the user.
 Tell the user to update the plugin by running:
 
 ```
-/install scaffold@zigrivers/scaffold
+/plugin install scaffold@zigrivers/scaffold
 ```
 
-Explain that Claude Code will pull the latest version of the plugin. If that doesn't work, they can uninstall first with `/uninstall scaffold` and then re-install.
+Explain that Claude Code will pull the latest version of the plugin. If that doesn't work, they can uninstall first with `/plugin uninstall scaffold` and then re-install.
 
 ## Step 5 — Confirm
 

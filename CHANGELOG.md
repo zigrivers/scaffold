@@ -2,6 +2,11 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.3.1] — 2026-02-15
+
+### Fixed
+- Update `/install` and `/uninstall` references to `/plugin install` and `/plugin uninstall` across docs and commands
+
 ## [1.3.0] — 2026-02-15
 
 ### Added
@@ -28,7 +33,7 @@ All notable changes to Scaffold are documented here.
 
 ### Added
 - Initial release — 25-prompt pipeline for scaffolding new software projects
-- Plugin install via `/install scaffold@zigrivers/scaffold`
+- Plugin install via `/plugin install scaffold@zigrivers/scaffold`
 - User command install via `scripts/install.sh`
 - Auto-activated pipeline context skill
 - Full pipeline from product definition (Phase 1) through implementation (Phase 7)

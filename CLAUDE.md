@@ -8,7 +8,7 @@ This is a **prompt pipeline** — a curated sequence of structured prompts used 
 
 ## Structure
 
-This repo is a **Claude Code plugin** (installable via `/install`) and also distributable as user commands.
+This repo is a **Claude Code plugin** (installable via `/plugin install`) and also distributable as user commands.
 
 ### Source of Truth
 `prompts.md` contains:
