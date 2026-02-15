@@ -7,7 +7,7 @@ A 25-prompt pipeline for scaffolding new software projects with Claude Code. Tak
 ### Option 1: Claude Code Plugin (recommended)
 
 ```
-/install scaffold@kenallred/scaffold
+/install scaffold@zigrivers/scaffold
 ```
 
 Commands available as `/scaffold:command-name`.
@@ -15,7 +15,7 @@ Commands available as `/scaffold:command-name`.
 ### Option 2: User Commands (shorter prefix)
 
 ```bash
-git clone https://github.com/kenallred/scaffold
+git clone https://github.com/zigrivers/scaffold
 cd scaffold && ./scripts/install.sh
 ```
 
