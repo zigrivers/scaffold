@@ -33,6 +33,8 @@ FILES=(
     "single-agent-resume.md"
     "new-enhancement.md"
     "prompt-pipeline.md"
+    "update.md"
+    ".scaffold-version"
 )
 
 count=0

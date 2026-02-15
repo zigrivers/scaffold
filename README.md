@@ -91,6 +91,40 @@ After installing, open Claude Code and run:
 
 This prints the full pipeline reference. If you see a table of phases and commands, you're all set.
 
+## Updating
+
+When new prompts or fixes are released, update to get the latest versions.
+
+### Plugin installs
+
+From a Claude Code session:
+
+```
+/scaffold:update
+```
+
+Or re-run the install command:
+
+```
+/install scaffold@zigrivers/scaffold
+```
+
+### User command installs
+
+From a Claude Code session:
+
+```
+/user:update
+```
+
+Or from the terminal:
+
+```bash
+./scripts/update.sh
+```
+
+If you no longer have the repo cloned locally, the update command will fetch it automatically.
+
 ## Quick Start
 
 Here's what the first few steps look like in practice:
@@ -291,6 +325,9 @@ It's fine to say you're not sure. Claude will suggest reasonable defaults and ex
 
 **How do I know which command to run next?**
 Every command prints "After This Step" guidance when it finishes, telling you exactly what to run next (including which optional steps to skip based on your project type).
+
+**How do I get the latest prompts?**
+Run `/scaffold:update` (or `/user:update`) from a Claude Code session. This fetches the latest version and updates your command files. You can also run `./scripts/update.sh` from the terminal. See [Updating](#updating) for details.
 
 **Can I use this for an existing project?**
 Scaffold is designed for new projects. For existing projects, you can use `/scaffold:new-enhancement` to add features using the same structured approach, but the full pipeline assumes a fresh start.

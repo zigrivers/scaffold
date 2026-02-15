@@ -42,5 +42,11 @@ echo "Installed $count command(s) to $TARGET_DIR"
 if [ "$skipped" -gt 0 ]; then
     echo "Skipped $skipped file(s) — use -f to force overwrite"
 fi
+
+# Write version marker
+VERSION=$(grep -m1 '^\## \[' "$SCRIPT_DIR/../CHANGELOG.md" 2>/dev/null | sed 's/.*\[\(.*\)\].*/\1/' || echo "unknown")
+SHA=$(git -C "$SCRIPT_DIR/.." rev-parse --short HEAD 2>/dev/null || echo "unknown")
+echo "$VERSION ($SHA)" > "$TARGET_DIR/.scaffold-version"
+
 echo ""
 echo "Commands available as /user:<command-name>"

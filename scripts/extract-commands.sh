@@ -50,6 +50,7 @@ declare -a FRONTMATTER=(
     'single-agent-resume|Resume work after a break|'
     'new-enhancement|Add a new feature to an existing project|<enhancement description>'
     'prompt-pipeline|Show the full pipeline reference|'
+    'update|Check for and apply scaffold updates|'
 )
 
 # ─── Heading-to-slug mapping ───────────────────────────────────────
