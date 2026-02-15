@@ -1,0 +1,10 @@
+{
+  "name": "scaffold",
+  "version": "1.0.0",
+  "description": "25-prompt pipeline for scaffolding new software projects with Claude Code",
+  "author": {
+    "name": "kenallred"
+  },
+  "license": "MIT",
+  "keywords": ["scaffolding", "project-setup", "pipeline", "prompts", "beads"]
+}

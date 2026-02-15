@@ -8,10 +8,19 @@ This is a **prompt pipeline** — a curated sequence of structured prompts used 
 
 ## Structure
 
+This repo is a **Claude Code plugin** (installable via `/install`) and also distributable as user commands.
+
+### Source of Truth
 `prompts.md` contains:
 1. **Setup Order table** (top of file) — The execution sequence across 7 phases, from product definition through implementation
 2. **Individual prompt sections** — Each marked with `# Prompt Name (Prompt)`, containing the full prompt text to paste into Claude Code sessions
 3. **Migration prompts** — For updating projects created with older versions of the pipeline
+
+### Plugin Structure
+- `.claude-plugin/plugin.json` — Plugin manifest (name: `scaffold`)
+- `commands/` — 25 individual command `.md` files with YAML frontmatter and "Next Steps" guidance, generated from `prompts.md`
+- `skills/scaffold-pipeline/SKILL.md` — Auto-activated pipeline context skill
+- `scripts/` — Install, uninstall, and extraction scripts
 
 ## Key Concepts
 
@@ -27,3 +36,4 @@ When modifying prompts:
 - Keep the Setup Order table at the top in sync with the actual prompt sections below
 - Respect inter-prompt dependencies (documented in the dependency graph at line ~128)
 - Each prompt's "Process" section at the end defines its execution rules — don't remove these
+- After editing `prompts.md`, update the corresponding file in `commands/` to stay in sync (frontmatter + "After This Step" sections are maintained in `commands/` only, not in `prompts.md`)
