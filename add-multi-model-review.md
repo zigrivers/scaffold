@@ -448,13 +448,11 @@ Complete these before the review loop will work:
 
 1. [ ] **ChatGPT Pro subscription** — Subscribe at chatgpt.com (for Codex Cloud auto-reviews)
 
-2. [ ] **Install Codex Cloud GitHub App** — Install "ChatGPT Codex Connector" on your repo
-   - Go to github.com and find the ChatGPT Codex Connector app
+2. [ ] **Install Codex Cloud GitHub App and enable code review**
+   - Go to github.com and find the "ChatGPT Codex Connector" app
    - Install it on your repository
-   - After installing, note the bot's username (likely `chatgpt-codex[bot]` or `codex-bot[bot]`)
-   - Update CODEX_BOT_NAME in `.github/workflows/code-review.yml` if needed
-
-3. [ ] **Enable code review in Codex settings** — chatgpt.com → Codex → Settings → enable "Code review" for this repo
+   - Enable "Code review" in Codex settings (chatgpt.com → Codex → Settings)
+   - **Tell me when this is done** — I'll auto-detect the bot username and update the workflow
 
 4. [ ] **Add ANTHROPIC_API_KEY repo secret** — For Claude Code Action fixes (~$5-7/month)
    - Create key at console.anthropic.com (if you don't already have one)
@@ -467,6 +465,20 @@ Complete these before the review loop will work:
 
 7. [ ] **Allow Actions to create PRs** — Settings → Actions → General → Allow GitHub Actions to create and approve pull requests ✓
 ```
+
+---
+
+## Phase 4.5: Auto-Detect Codex Bot Username
+
+After the user confirms they've installed the Codex Cloud GitHub App (prerequisite #2), auto-detect the bot username and update the workflow:
+
+```bash
+# Detect the Codex bot username from installed apps
+BOT_NAME=$(gh api repos/:owner/:repo/installations \
+  --jq '.[] | select(.app_slug | test("codex|chatgpt")) | .app_slug + "[bot]"' 2>/dev/null | head -1)
+```
+
+If detected, update the `CODEX_BOT_NAME` env var in `.github/workflows/code-review.yml` with the actual value. If detection fails (API permissions may vary), ask the user to check the bot's username from a test PR comment and update manually.
 
 ---
 
