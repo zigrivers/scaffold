@@ -51,6 +51,7 @@ declare -a FRONTMATTER=(
     'new-enhancement|Add a new feature to an existing project|<enhancement description>'
     'prompt-pipeline|Show the full pipeline reference|'
     'update|Check for and apply scaffold updates|'
+    'version|Show installed and latest scaffold version|'
 )
 
 # ─── Heading-to-slug mapping ───────────────────────────────────────

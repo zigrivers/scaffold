@@ -2,6 +2,11 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.2.0] — 2025-02-15
+
+### Added
+- `/scaffold:version` command — check installed vs. latest version without updating
+
 ## [1.1.0] — 2025-02-15
 
 ### Added

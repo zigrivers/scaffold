@@ -34,6 +34,7 @@ FILES=(
     "new-enhancement.md"
     "prompt-pipeline.md"
     "update.md"
+    "version.md"
     ".scaffold-version"
 )
 
