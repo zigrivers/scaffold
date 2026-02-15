@@ -345,7 +345,7 @@ When this step is complete, tell the user:
 **Next (if applicable):**
 - If you created **5+ tasks**: Run `/scaffold:implementation-plan-review` — Review task quality, coverage, and dependencies.
 - If the enhancement has **platform-specific behavior**: Run `/scaffold:platform-parity-review` — Check platform coverage.
-- Otherwise: Run `/scaffold:single-agent-start` or `/scaffold:single-agent-resume` to begin implementation.
+- Otherwise: Run `/scaffold:single-agent-start` or `/scaffold:single-agent-resume` to begin implementation (or `/scaffold:multi-agent-start <agent-name>` / `/scaffold:multi-agent-resume <agent-name>` for worktree agents).
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

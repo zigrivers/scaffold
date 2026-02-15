@@ -48,6 +48,8 @@ declare -a FRONTMATTER=(
     'implementation-plan-review|Review task quality, coverage, and dependencies|'
     'single-agent-start|Start single-agent execution loop|'
     'single-agent-resume|Resume work after a break|'
+    'multi-agent-start|Start multi-agent execution loop in a worktree|<agent-name>'
+    'multi-agent-resume|Resume multi-agent work after a break|<agent-name>'
     'new-enhancement|Add a new feature to an existing project|<enhancement description>'
     'prompt-pipeline|Show the full pipeline reference|'
     'update|Check for and apply scaffold updates|'
@@ -449,7 +451,9 @@ When this step is complete, tell the user:
 ---
 **Phase 7 in progress** — Tasks reviewed, gaps filled, dependencies verified.
 
-**Next:** Run `/scaffold:single-agent-start` — Start single-agent execution loop. Or, for parallel execution, set up worktrees per `docs/git-workflow.md` and launch multiple agents.
+**Next:** Choose an execution mode:
+- **Single agent:** Run `/scaffold:single-agent-start` — Start execution from the main repo.
+- **Multiple agents:** Set up worktrees per `docs/git-workflow.md`, then run `/scaffold:multi-agent-start <agent-name>` in each worktree.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 
@@ -469,7 +473,7 @@ When this step is complete, tell the user:
 **Next (if applicable):**
 - If you created **5+ tasks**: Run `/scaffold:implementation-plan-review` — Review task quality, coverage, and dependencies.
 - If the enhancement has **platform-specific behavior**: Run `/scaffold:platform-parity-review` — Check platform coverage.
-- Otherwise: Run `/scaffold:single-agent-start` or `/scaffold:single-agent-resume` to begin implementation.
+- Otherwise: Run `/scaffold:single-agent-start` or `/scaffold:single-agent-resume` to begin implementation (or `/scaffold:multi-agent-start <agent-name>` / `/scaffold:multi-agent-resume <agent-name>` for worktree agents).
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

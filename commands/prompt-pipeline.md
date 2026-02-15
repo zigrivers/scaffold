@@ -64,13 +64,15 @@ Display the prompt pipeline order below. Do not read any files or run any comman
 |---|--------|---------|-------|
 | 19 | **Implementation Plan** | `/scaffold:implementation-plan` | Creates full task graph |
 | 20 | **Implementation Plan Review** | `/scaffold:implementation-plan-review` | Second pass for quality |
-| 21 | **Execution** | `/scaffold:single-agent-start` | Autonomous execution loop |
+| 21 | **Execution (single)** | `/scaffold:single-agent-start` | Single-agent execution loop |
+| 21 | **Execution (multi)** | `/scaffold:multi-agent-start <agent-name>` | One per worktree |
 
 ### Ongoing
 | Prompt | Command | When |
 |--------|---------|------|
 | **New Enhancement** | `/scaffold:new-enhancement` | Adding features to existing project |
-| **Resume Work** | `/scaffold:single-agent-resume` | Resuming after a break |
+| **Resume (single)** | `/scaffold:single-agent-resume` | Resuming single-agent after a break |
+| **Resume (multi)** | `/scaffold:multi-agent-resume <agent-name>` | Resuming a worktree agent after a break |
 | **Implementation Plan Review** | `/scaffold:implementation-plan-review` | After creating 5+ new tasks |
 | **Platform Parity Review** | `/scaffold:platform-parity-review` | After adding platform-specific features |
 | **Multi-Model Code Review** | `/scaffold:multi-model-review` | Runs automatically on every PR |

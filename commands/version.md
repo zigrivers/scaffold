@@ -4,7 +4,7 @@ description: "Show installed and latest scaffold version"
 
 Show the installed scaffold version and check if a newer version is available. Follow these steps exactly:
 
-**Bundled version:** 1.2.0
+**Bundled version:** 1.3.0
 
 ## Step 1 — Detect Installed Version
 

@@ -5270,7 +5270,7 @@ cd ../project-agent-2 && BD_ACTOR="Agent-2" claude
 cd ../project-agent-3 && BD_ACTOR="Agent-3" claude
 ```
 
-### Agent Prompt (same for all, just change the number)
+### Agent Prompt — multi-agent-start (same for all, just change the name)
 
 ```
 You are Agent-1. Verify your setup:
@@ -5304,7 +5304,7 @@ If there's in-progress work, finish it. Otherwise, start fresh with `bd ready`.
 Keep working until `bd ready` shows no available tasks.
 ```
 
-### Worktree Agent
+### Worktree Agent Resume — multi-agent-resume
 
 ```
 You are Agent-N. Verify your setup:

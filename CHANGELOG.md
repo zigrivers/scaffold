@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.3.0] — 2026-02-15
+
+### Added
+- `/scaffold:multi-agent-start` command — start multi-agent execution loop in a worktree
+- `/scaffold:multi-agent-resume` command — resume multi-agent work after a break
+
 ## [1.2.0] — 2025-02-15
 
 ### Added

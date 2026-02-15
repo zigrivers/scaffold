@@ -302,7 +302,9 @@ When this step is complete, tell the user:
 ---
 **Phase 7 in progress** — Tasks reviewed, gaps filled, dependencies verified.
 
-**Next:** Run `/scaffold:single-agent-start` — Start single-agent execution loop. Or, for parallel execution, set up worktrees per `docs/git-workflow.md` and launch multiple agents.
+**Next:** Choose an execution mode:
+- **Single agent:** Run `/scaffold:single-agent-start` — Start execution from the main repo.
+- **Multiple agents:** Set up worktrees per `docs/git-workflow.md`, then run `/scaffold:multi-agent-start <agent-name>` in each worktree.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

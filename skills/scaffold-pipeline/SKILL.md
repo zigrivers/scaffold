@@ -32,13 +32,15 @@ This skill provides context about the scaffold prompt pipeline ordering. When th
 | 18 | Consolidation | `/scaffold:workflow-audit` | Run AFTER claude-md-optimization |
 | 19 | Implementation | `/scaffold:implementation-plan` | Creates full task graph |
 | 20 | Implementation | `/scaffold:implementation-plan-review` | Second pass for quality |
-| 21 | Implementation | `/scaffold:single-agent-start` | Autonomous execution loop |
+| 21 | Implementation | `/scaffold:single-agent-start` | Single-agent execution loop |
+| 21 | Implementation | `/scaffold:multi-agent-start` | Multi-agent — one per worktree |
 
 ## Standalone Commands
 
 | Command | When to Use |
 |---------|-------------|
 | `/scaffold:single-agent-resume` | Resume work after a break |
+| `/scaffold:multi-agent-resume` | Resume multi-agent work after a break |
 | `/scaffold:new-enhancement` | Add a feature to an existing project |
 | `/scaffold:prompt-pipeline` | Show the full pipeline reference |
 
