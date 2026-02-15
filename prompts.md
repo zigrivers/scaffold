@@ -2322,7 +2322,7 @@ The loop is event-driven via GitHub Actions — no polling, no external orchestr
 | **ChatGPT Pro subscription** | For Codex Cloud auto-reviews — subscribe at chatgpt.com |
 | **Codex Cloud GitHub App** | Install "ChatGPT Codex Connector" on your repo at github.com → verify bot username after install (likely `chatgpt-codex[bot]` or `codex-bot[bot]`) |
 | **Enable code review** | In Codex settings (chatgpt.com → Codex → Settings), enable "Code review" for the repo |
-| **Anthropic API key** | Create at console.anthropic.com → stored as `ANTHROPIC_API_KEY` repo secret (for Claude Code Action fixes, ~$5-7/month) |
+| **Anthropic API key** | Create at console.anthropic.com → run `gh secret set ANTHROPIC_API_KEY` and paste when prompted (for Claude Code Action fixes, ~$5-7/month) |
 | **GitHub App (Claude)** | Run `claude /install-github-app` in Claude Code terminal, or install from github.com/apps/claude |
 | **Repo permissions** | Actions must have Read/Write permissions: Settings → Actions → General → Workflow permissions |
 
@@ -2734,7 +2734,7 @@ Edit `AGENTS.md` to change what Codex Cloud looks for. Add "What NOT to flag" ex
 
 4. **Create the GitHub Actions workflow** (`.github/workflows/code-review.yml`) with the content above. After creating it, update the `CODEX_BOT_NAME` env var with the actual bot username from your Codex Cloud installation.
 
-5. **Configure repository secret**: `ANTHROPIC_API_KEY` (the only API key needed — Codex Cloud uses your ChatGPT Pro subscription).
+5. **Configure repository secret**: Run `gh secret set ANTHROPIC_API_KEY` in your terminal and paste the key when prompted (the only API key needed — Codex Cloud uses your ChatGPT Pro subscription).
 
 6. **Configure repository settings**:
    - Settings → Actions → General → Workflow permissions → Read and write
