@@ -1258,7 +1258,9 @@ Before creating a new file, check project-structure.md for the correct location.
 - Use AskUserQuestionTool for key decisions: organization strategy, test location, barrel file policy
 - After documenting, actually create the directory structure and commit it
 - Verify the structure works by checking that imports resolve correctly (if tooling is set up)
-- Use Beads tasks
+- Create a Beads task for this work before starting: `bd create "docs: <document being created>" -p 0` and `bd update <id> --claim`
+- When the document is complete and committed, close it: `bd close <id>`
+- If this work surfaces implementation tasks (bugs, missing infrastructure), create separate Beads tasks for those — don't try to do them now
 
 
 _____________________________________
@@ -3422,6 +3424,9 @@ Then thoroughly review and analyze the PRD (docs/plan.md) and create all user st
 - Use subagents to research best practices while analyzing the PRD in parallel
 - Use AskUserQuestionTool for any questions, ambiguities in the PRD, or priority decisions
 - After drafting, do a final pass to verify full PRD coverage and story quality against INVEST
+- Create a Beads task for this work before starting: `bd create "docs: <document being created>" -p 0` and `bd update <id> --claim`
+- When the document is complete and committed, close it: `bd close <id>`
+- If this work surfaces implementation tasks (bugs, missing infrastructure), create separate Beads tasks for those — don't try to do them now
 
 
 __________________________________________________
@@ -3481,10 +3486,12 @@ For each innovation idea, present it with:
 Use AskUserQuestionTool to present innovation ideas for my approval BEFORE adding them to user-stories.md. Group related ideas together so we can make decisions efficiently rather than one at a time.
 
 ## Process
+- Create a Beads task for this work before starting: `bd create "docs: <document being created>" -p 0` and `bd update <id> --claim`
+- When the document is complete and committed, close it: `bd close <id>`
+- If this work surfaces implementation tasks (bugs, missing infrastructure), create separate Beads tasks for those — don't try to do them now
 - Use subagents to research the competitive landscape and best practices in parallel with the gap analysis
 - After all approved changes, do a final INVEST criteria pass on any new or modified stories
 - At the end, provide a concise changelog of what was added, modified, or removed
-- Use Beads tasks
 
 
 _________________________________________________________________
