@@ -60,7 +60,12 @@ Open Claude Code and run:
 
 ```
 /plugin marketplace add zigrivers/scaffold
-/plugin install scaffold
+```
+
+Then install the plugin:
+
+```
+/plugin install scaffold@zigrivers-scaffold
 ```
 
 After installing, commands are available as `/scaffold:command-name` (for example, `/scaffold:create-prd`).
@@ -107,7 +112,7 @@ From a Claude Code session:
 Or update the plugin directly:
 
 ```
-/plugin update scaffold
+/plugin marketplace update zigrivers-scaffold
 ```
 
 ### User command installs

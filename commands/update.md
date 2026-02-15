@@ -50,10 +50,10 @@ Report the result to the user.
 Tell the user to update the plugin by running:
 
 ```
-/plugin update scaffold
+/plugin marketplace update zigrivers-scaffold
 ```
 
-Explain that Claude Code will pull the latest version of the plugin. If that doesn't work, they can uninstall first with `/plugin uninstall scaffold`, remove the marketplace with `/plugin marketplace remove scaffold`, then re-add and re-install.
+Explain that Claude Code will pull the latest version of the plugin. If that doesn't work, they can uninstall first with `/plugin uninstall scaffold@zigrivers-scaffold`, remove the marketplace with `/plugin marketplace remove zigrivers-scaffold`, then re-add and re-install.
 
 ## Step 5 — Confirm
 

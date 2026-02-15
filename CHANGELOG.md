@@ -8,8 +8,8 @@ All notable changes to Scaffold are documented here.
 - `.claude-plugin/marketplace.json` — enables two-step plugin install via `/plugin marketplace add`
 
 ### Fixed
-- Update install flow from single-command `/plugin install scaffold@zigrivers/scaffold` to two-step marketplace flow (`/plugin marketplace add` + `/plugin install`)
-- Update all docs and commands to use `/plugin update scaffold` instead of re-running install
+- Update install flow from single-command `/plugin install scaffold@zigrivers/scaffold` to two-step marketplace flow (`/plugin marketplace add` + `/plugin install scaffold@zigrivers-scaffold`)
+- Update all docs and commands to use `/plugin marketplace update zigrivers-scaffold` instead of re-running install
 
 ## [1.3.0] — 2026-02-15
 
@@ -37,7 +37,7 @@ All notable changes to Scaffold are documented here.
 
 ### Added
 - Initial release — 25-prompt pipeline for scaffolding new software projects
-- Plugin install via `/plugin marketplace add zigrivers/scaffold` + `/plugin install scaffold`
+- Plugin install via `/plugin marketplace add zigrivers/scaffold` + `/plugin install scaffold@zigrivers-scaffold`
 - User command install via `scripts/install.sh`
 - Auto-activated pipeline context skill
 - Full pipeline from product definition (Phase 1) through implementation (Phase 7)
