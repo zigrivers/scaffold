@@ -17,6 +17,22 @@ Both layers merge at runtime:
 - Deny lists combine (union) — **deny always wins over allow**
 - Commands matching an allow pattern (and no deny pattern) run without prompting
 
+### How Permission Matching Works
+
+Claude Code's permission matcher is **shell-operator-aware**. A specific pattern like `Bash(git *)` matches `git status` but does NOT match commands containing shell operators:
+
+| Operator | Example | Why `Bash(git *)` fails |
+|----------|---------|------------------------|
+| `&&` | `git fetch && git rebase` | Two commands chained |
+| `\|\|` | `git checkout main \|\| true` | Fallback operator |
+| `\|` | `git log \| head -5` | Pipe |
+| `2>/dev/null` | `git status 2>/dev/null` | Redirect |
+| `$(...)` | `echo $(git rev-parse HEAD)` | Command substitution |
+| `&` | `npx next dev &` | Background execution |
+| `;` | `cd dir; make test` | Sequential execution |
+
+**Specific patterns alone cannot cover compound commands. The bare `Bash` entry is the only way to auto-approve them. Safety comes from deny rules, not from enumerating allowed commands.**
+
 ### 1. Project-level settings (`.claude/settings.json`)
 
 This gets checked into git. It defines **deny rules only** — the things agents must never do in this project. Allow rules live at the user level (your standard tools, shared across all projects).
@@ -77,89 +93,13 @@ If the file already exists, **MERGE** these entries into the existing allow/deny
       "Read",
       "Write",
       "Edit",
-
       "Read(~/**)",
       "Edit(~/**)",
       "Write(~/**)",
       "Glob(~/**)",
       "Grep(~/**)",
       "WebFetch(*)",
-      "WebSearch",
-
-      "Bash(git status)",
-      "Bash(git diff *)",
-      "Bash(git log *)",
-      "Bash(git branch *)",
-      "Bash(git show *)",
-      "Bash(git add *)",
-      "Bash(git commit *)",
-      "Bash(git push *)",
-      "Bash(git checkout *)",
-      "Bash(git pull *)",
-      "Bash(git stash *)",
-      "Bash(git fetch *)",
-      "Bash(git rebase *)",
-      "Bash(git merge *)",
-      "Bash(git worktree *)",
-      "Bash(git rev-parse *)",
-      "Bash(git clean *)",
-      "Bash(git -C *)",
-
-      "Bash(gh pr *)",
-      "Bash(gh issue *)",
-      "Bash(gh auth *)",
-      "Bash(gh api *)",
-
-      "Bash(bd)",
-      "Bash(bd *)",
-
-      "Bash(make)",
-      "Bash(make *)",
-      "Bash(npm run *)",
-      "Bash(npm test *)",
-      "Bash(npm install *)",
-      "Bash(npx *)",
-      "Bash(node *)",
-
-      "Bash(python *)",
-      "Bash(pytest *)",
-      "Bash(uv *)",
-      "Bash(pip *)",
-
-      "Bash(docker compose *)",
-      "Bash(docker ps *)",
-      "Bash(docker logs *)",
-
-      "Bash(curl *)",
-      "Bash(ls)",
-      "Bash(ls *)",
-      "Bash(cat *)",
-      "Bash(find *)",
-      "Bash(grep *)",
-      "Bash(head *)",
-      "Bash(tail *)",
-      "Bash(sort *)",
-      "Bash(wc *)",
-      "Bash(pwd)",
-      "Bash(echo *)",
-      "Bash(which *)",
-      "Bash(tree *)",
-      "Bash(mkdir *)",
-      "Bash(cp *)",
-      "Bash(mv *)",
-      "Bash(rm *)",
-      "Bash(touch *)",
-      "Bash(chmod *)",
-      "Bash(diff *)",
-      "Bash(sed *)",
-      "Bash(awk *)",
-      "Bash(tee *)",
-      "Bash(xargs *)",
-      "Bash(export *)",
-      "Bash(env *)",
-      "Bash(printenv *)",
-      "Bash(cd *)",
-      "Bash(./scripts/*)"
+      "WebSearch"
     ],
     "deny": [
       "Bash(rm -rf *)",
@@ -173,11 +113,108 @@ If the file already exists, **MERGE** these entries into the existing allow/deny
 }
 ```
 
+**The bare `Bash` entry is the most important line.** It auto-approves all bash commands including compound commands with shell operators (`&&`, `||`, pipes, redirects, `$(...)`, backgrounding). Deny rules still block destructive operations — deny always wins over allow. Without the bare `Bash` entry, agents will be prompted for every compound command and autonomous workflows become impractical.
+
 **Important**: Expand `~/**` to your actual home directory path (e.g., `/Users/username/**`).
 
 **Why broad `Bash` lives at user level:** Your standard dev tools are the same across all projects. Putting them in user-level means you don't copy the same allow list into every project. Project-level only needs deny rules for project-specific destructive operations. The deny rules at both levels combine — deny always wins.
 
+### Reference: What Bare Bash Covers
+
+The bare `Bash` entry covers all of the following (and their compound combinations). This is provided for documentation — you do NOT need to add these as individual patterns:
+
+- **Git**: status, diff, log, branch, show, add, commit, push, checkout, pull, stash, fetch, rebase, merge, worktree, rev-parse, clean
+- **GitHub CLI**: gh pr, gh issue, gh auth, gh api
+- **Task tracking**: bd, bd *
+- **Build tools**: make, npm, npx, node, python, pytest, uv, pip
+- **Containers**: docker compose, docker ps, docker logs
+- **Shell utilities**: curl, ls, cat, find, grep, head, tail, sort, wc, pwd, echo, which, tree, mkdir, cp, mv, rm, touch, chmod, diff, sed, awk, tee, xargs
+
+### Cautious Mode (alternative)
+
+If you cannot use the bare `Bash` entry (org policy, shared machines, etc.), you can instead enumerate specific patterns. Create your user-level settings with individual `Bash(command *)` entries for each tool category listed in the reference above.
+
+> **Trade-off:** With specific patterns only, you WILL still be prompted for compound commands (anything with `&&`, `||`, pipes, redirects, `$(...)`, backgrounding, `;`). There is no workaround — this is how Claude Code's permission matcher works. Autonomous agent workflows will be impractical in cautious mode.
+
+<details>
+<summary>Full cautious-mode allow list (click to expand)</summary>
+
+```json
+"Bash(git status)",
+"Bash(git diff *)",
+"Bash(git log *)",
+"Bash(git branch *)",
+"Bash(git show *)",
+"Bash(git add *)",
+"Bash(git commit *)",
+"Bash(git push *)",
+"Bash(git checkout *)",
+"Bash(git pull *)",
+"Bash(git stash *)",
+"Bash(git fetch *)",
+"Bash(git rebase *)",
+"Bash(git merge *)",
+"Bash(git worktree *)",
+"Bash(git rev-parse *)",
+"Bash(git clean *)",
+"Bash(git -C *)",
+"Bash(gh pr *)",
+"Bash(gh issue *)",
+"Bash(gh auth *)",
+"Bash(gh api *)",
+"Bash(bd)",
+"Bash(bd *)",
+"Bash(make)",
+"Bash(make *)",
+"Bash(npm run *)",
+"Bash(npm test *)",
+"Bash(npm install *)",
+"Bash(npx *)",
+"Bash(node *)",
+"Bash(python *)",
+"Bash(pytest *)",
+"Bash(uv *)",
+"Bash(pip *)",
+"Bash(docker compose *)",
+"Bash(docker ps *)",
+"Bash(docker logs *)",
+"Bash(curl *)",
+"Bash(ls)",
+"Bash(ls *)",
+"Bash(cat *)",
+"Bash(find *)",
+"Bash(grep *)",
+"Bash(head *)",
+"Bash(tail *)",
+"Bash(sort *)",
+"Bash(wc *)",
+"Bash(pwd)",
+"Bash(echo *)",
+"Bash(which *)",
+"Bash(tree *)",
+"Bash(mkdir *)",
+"Bash(cp *)",
+"Bash(mv *)",
+"Bash(rm *)",
+"Bash(touch *)",
+"Bash(chmod *)",
+"Bash(diff *)",
+"Bash(sed *)",
+"Bash(awk *)",
+"Bash(tee *)",
+"Bash(xargs *)",
+"Bash(export *)",
+"Bash(env *)",
+"Bash(printenv *)",
+"Bash(cd *)",
+"Bash(./scripts/*)"
+```
+
+</details>
+
 ### 3. Stack-Specific Additions
+
+> **Note:** If you're using bare `Bash` (recommended), stack-specific additions are unnecessary — all commands are already covered. This section only applies if you chose cautious mode.
 
 Review `docs/tech-stack.md` for this project's tools. Add any additional tool permissions to your **user-level** settings (since you'll use the same tools across projects).
 
@@ -228,21 +265,26 @@ cat .claude/settings.json
 
 # Confirm user settings
 cat ~/.claude/settings.json
-
-# Test core workflow commands run without prompts:
-git status
-git fetch origin
-bd ready
-gh pr list
-echo $BD_ACTOR
 ```
 
-**Workflow command verification checklist:**
+#### Tier 1 — Compound Command Tests
+
+These are the litmus test for bare `Bash`. **If any Tier 1 command prompts, the bare `Bash` entry is missing — fix it before continuing.**
+
+| Test Command | Validates |
+|--------------|-----------|
+| `git fetch origin && echo "done"` | `&&` passes |
+| `git rev-parse --show-toplevel \|\| echo "not a repo"` | `\|\|` passes |
+| `ls -la 2>/dev/null` | Redirect passes |
+| `echo $(pwd)` | Command substitution passes |
+
+#### Tier 2 — Standard Workflow Commands
 
 Test that these commands (used in the canonical workflow) don't prompt:
 
 | Command | Used In |
 |---------|---------|
+| `git status` | General |
 | `git fetch origin` | Branch creation, between tasks |
 | `git checkout -b test-branch origin/main` | Branch creation |
 | `git clean -fd` | Worktree cleanup between tasks |
@@ -257,20 +299,43 @@ Test that these commands (used in the canonical workflow) don't prompt:
 | `bd create "test" -p 3` | Task creation |
 | `bd close <id>` | Task closure |
 | `bd sync` | Task sync |
-| Lint and test commands (e.g., `make lint && make test` or `npm run lint && npm test`) | Verification |
+| `make lint` | Verification |
+| `make test` | Verification |
 
 Clean up after testing:
 ```bash
-git checkout main 2>/dev/null || true
-git branch -D test-branch 2>/dev/null || true
+git checkout main
+git branch -D test-branch
 ```
 
-### 5. Commit Project Settings
+### 5. Still Getting Prompted?
+
+Four common causes:
+
+1. **Missing bare `Bash`** — open `~/.claude/settings.json` and check for a standalone `"Bash"` entry (not `"Bash(something)"`). It must be present in the allow array.
+2. **Conflicting deny rule** — deny always wins over allow. Check both user-level and project-level deny arrays for rules that match the command being prompted.
+3. **Unexpanded `~/**` paths** — Claude Code may not expand `~`. Replace `~` with your actual home directory path (e.g., `/Users/username/**`).
+4. **Session not restarted** — permission changes require restarting Claude Code (`/exit` and relaunch, or start a new session).
+
+### 6. Commit Project Settings
 
 ```bash
 git add .claude/settings.json
 git commit -m "[BD-0] chore: configure Claude Code permissions"
 ```
+
+## Process
+- Create a Beads task: `bd create "chore: configure Claude Code permissions" -p 0`
+  and `bd update <id> --claim`
+- Read the user's existing `~/.claude/settings.json` before making changes — if it
+  exists, MERGE entries; do not replace the file
+- The bare `"Bash"` entry in the user-level allow array is CRITICAL — verify it is
+  present after writing the file
+- Do NOT include specific `Bash(...)` patterns alongside the bare `"Bash"` — they
+  are redundant and create confusion about what's actually needed
+- Run the verification checklist (Tier 1 first). If any compound command prompts,
+  the bare `"Bash"` entry is missing — fix before continuing
+- When both files are created, verified, and committed: `bd close <id>`
 
 ## After This Step
 
