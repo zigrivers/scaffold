@@ -33,8 +33,8 @@ These configure tooling and create standards documents. Run in this order becaus
 | # | Prompt | Produces | Notes |
 |---|--------|----------|-------|
 | 3 | **Beads Setup** | `.beads/`, `tasks/lessons.md`, initial `CLAUDE.md` | Creates CLAUDE.md — must run before other setup prompts |
-| 4 | **Claude Code Permissions** | `.claude/settings.json`, `~/.claude/settings.json` | Enables agents to work without permission prompts |
-| 5 | **Tech Stack** | `docs/tech-stack.md` | Drives all subsequent technical decisions |
+| 4 | **Tech Stack** | `docs/tech-stack.md` | Drives all subsequent technical decisions |
+| 5 | **Claude Code Permissions** | `.claude/settings.json`, `~/.claude/settings.json` | Enables agents to work without permission prompts. References tech-stack.md for stack-specific rules |
 | 6 | **Coding Standards** | `docs/coding-standards.md`, linter/formatter configs | References tech-stack.md |
 | 7 | **TDD Standards** | `docs/tdd-standards.md` | References tech-stack.md and coding-standards.md |
 | 8 | **Project Structure** | `docs/project-structure.md`, scaffolded directories | References all Phase 2 docs above |
@@ -139,7 +139,7 @@ Dev Setup → Git Workflow → Claude.md Optimization → Workflow Audit
 
 The most critical ordering constraints:
 1. **Beads Setup before everything else in Phase 2** — creates CLAUDE.md
-2. **Tech Stack before Coding Standards and TDD** — they reference it
+2. **Tech Stack before Permissions, Coding Standards, and TDD** — they reference it
 3. **Dev Setup before Git Workflow** — Git Workflow references lint/test commands
 4. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
 5. **Implementation Plan before Implementation Plan Review** — can't review what doesn't exist
@@ -510,6 +510,98 @@ Tell me:
 
 
 
+___________________________________________
+## Tech Stack (Prompt)
+Thoroughly review and analyze docs/plan.md to understand every feature, integration, and technical requirement of this project. Then deeply research tech stack options and create docs/tech-stack.md as the definitive technology reference for this project.
+
+## My Preferences (customize before running)
+
+<!-- Replace the line below with YOUR preferences before running this prompt -->
+I'd like to use [YOUR PREFERRED LANGUAGE] on the backend, assuming there aren't good reasons not to.
+
+<!-- Examples of what to put here:
+- "I'd like to use Python on the backend, assuming there aren't good reasons not to."
+- "No preference — recommend whatever is the best fit."
+- "Must be TypeScript full-stack for team consistency."
+- "I want to use Go for the backend and React for the frontend."
+-->
+
+## Guiding Principles for Stack Selection
+
+This project will be built and maintained entirely by AI agents. Every technology choice must optimize for:
+
+1. **AI familiarity** — Choose libraries and frameworks with massive training data representation. Obscure or bleeding-edge tools mean more hallucination and more bugs.
+2. **Convention over configuration** — Prefer opinionated frameworks with clear "one right way" patterns. AI thrives on convention, struggles with ambiguous choices.
+3. **Minimal dependency surface** — Fewer dependencies = fewer version conflicts, fewer breaking changes, fewer security vulnerabilities. Only add a dependency if building it ourselves would be unreasonable.
+4. **Strong typing and validation** — Static types catch AI mistakes at build time instead of runtime. Prioritize type safety across every layer.
+5. **Mature ecosystem** — Stable, well-documented libraries with active maintenance. Check that critical dependencies haven't been abandoned.
+
+## What the Document Must Cover
+
+### 1. Architecture Overview
+- High-level architecture diagram (described in text/mermaid)
+- Monolith vs. microservices decision with rationale
+- Key architectural patterns chosen (MVC, clean architecture, etc.) and why
+
+### 2. Backend
+- Framework selection with rationale (compare top 2-3 options, explain the winner)
+- ORM / database access layer
+- API approach (REST, GraphQL, etc.) with rationale
+- Authentication/authorization library
+- Background jobs / task queue (if needed per PRD)
+- File storage (if needed per PRD)
+
+### 3. Database
+- Database engine selection with rationale (compare options given our data model needs)
+- Migration tooling
+- Caching layer (if needed per PRD — don't add one speculatively)
+
+### 4. Frontend (if applicable per PRD)
+- Framework selection with rationale
+- State management approach
+- UI component library (if applicable)
+- Styling approach
+- Build tooling
+
+### 5. Infrastructure & DevOps
+- Hosting / deployment target recommendation
+- CI/CD approach
+- Environment management (local, staging, production)
+- Environment variable / secrets management
+
+### 6. Developer Tooling
+- Linter and formatter for each language
+- Type checking configuration
+- Pre-commit hooks
+- Test runner and assertion library (this feeds into TDD standards later)
+
+### 7. Third-Party Services & APIs
+- Identify every external integration implied by the PRD
+- Recommended service/provider for each with rationale
+- Fallback options if a primary choice has issues
+
+### For Every Technology Choice, Document:
+- **What**: The specific library/framework and version
+- **Why**: Rationale tied to our project requirements (not generic praise)
+- **Why not alternatives**: Brief note on what was considered and rejected
+- **AI compatibility note**: How well-represented this is in AI training data, any known AI pitfalls with this tool
+
+## What This Document Should NOT Include
+- Technologies we don't need yet — no speculative "we might need Kafka someday"
+- Multiple options without a decision — make a recommendation, don't present a menu
+- Boilerplate descriptions of what a framework is — assume the reader knows, just explain why we chose it
+
+## Process
+- Create a Beads task for this work before starting: `bd create "docs: <document being created>" -p 0` and `bd update <id> --claim`
+- When the document is complete and committed, close it: `bd close <id>`
+- If this work surfaces implementation tasks (bugs, missing infrastructure), create separate Beads tasks for those — don't try to do them now
+- Use subagents to research and compare tech stack options in parallel
+- Cross-reference every PRD feature against the proposed stack — verify nothing requires a capability the stack doesn't support
+- Use AskUserQuestionTool to present key decisions (especially framework choices and hosting) with your recommendation and rationale before finalizing
+- After creating tech-stack.md, review plan.md and update it with any technical clarifications or additions that emerged from the analysis
+- At the end of the document, include a **Quick Reference** section listing every dependency with its version — this becomes the source of truth for package.json / requirements.txt / pyproject.toml
+
+
 _________________________________________
 # Claude Code Permissions Setup (Prompt)
 
@@ -589,7 +681,7 @@ If the file already exists, **MERGE** these entries into the existing allow/deny
       "Read",
       "Write",
       "Edit",
-      
+
       "Read(~/**)",
       "Edit(~/**)",
       "Write(~/**)",
@@ -783,100 +875,6 @@ git branch -D test-branch 2>/dev/null || true
 git add .claude/settings.json
 git commit -m "[BD-0] chore: configure Claude Code permissions"
 ```
-
-
-
-
-___________________________________________
-## Tech Stack (Prompt)
-Thoroughly review and analyze docs/plan.md to understand every feature, integration, and technical requirement of this project. Then deeply research tech stack options and create docs/tech-stack.md as the definitive technology reference for this project.
-
-## My Preferences (customize before running)
-
-<!-- Replace the line below with YOUR preferences before running this prompt -->
-I'd like to use [YOUR PREFERRED LANGUAGE] on the backend, assuming there aren't good reasons not to.
-
-<!-- Examples of what to put here:
-- "I'd like to use Python on the backend, assuming there aren't good reasons not to."
-- "No preference — recommend whatever is the best fit."
-- "Must be TypeScript full-stack for team consistency."
-- "I want to use Go for the backend and React for the frontend."
--->
-
-## Guiding Principles for Stack Selection
-
-This project will be built and maintained entirely by AI agents. Every technology choice must optimize for:
-
-1. **AI familiarity** — Choose libraries and frameworks with massive training data representation. Obscure or bleeding-edge tools mean more hallucination and more bugs.
-2. **Convention over configuration** — Prefer opinionated frameworks with clear "one right way" patterns. AI thrives on convention, struggles with ambiguous choices.
-3. **Minimal dependency surface** — Fewer dependencies = fewer version conflicts, fewer breaking changes, fewer security vulnerabilities. Only add a dependency if building it ourselves would be unreasonable.
-4. **Strong typing and validation** — Static types catch AI mistakes at build time instead of runtime. Prioritize type safety across every layer.
-5. **Mature ecosystem** — Stable, well-documented libraries with active maintenance. Check that critical dependencies haven't been abandoned.
-
-## What the Document Must Cover
-
-### 1. Architecture Overview
-- High-level architecture diagram (described in text/mermaid)
-- Monolith vs. microservices decision with rationale
-- Key architectural patterns chosen (MVC, clean architecture, etc.) and why
-
-### 2. Backend
-- Framework selection with rationale (compare top 2-3 options, explain the winner)
-- ORM / database access layer
-- API approach (REST, GraphQL, etc.) with rationale
-- Authentication/authorization library
-- Background jobs / task queue (if needed per PRD)
-- File storage (if needed per PRD)
-
-### 3. Database
-- Database engine selection with rationale (compare options given our data model needs)
-- Migration tooling
-- Caching layer (if needed per PRD — don't add one speculatively)
-
-### 4. Frontend (if applicable per PRD)
-- Framework selection with rationale
-- State management approach
-- UI component library (if applicable)
-- Styling approach
-- Build tooling
-
-### 5. Infrastructure & DevOps
-- Hosting / deployment target recommendation
-- CI/CD approach
-- Environment management (local, staging, production)
-- Environment variable / secrets management
-
-### 6. Developer Tooling
-- Linter and formatter for each language
-- Type checking configuration
-- Pre-commit hooks
-- Test runner and assertion library (this feeds into TDD standards later)
-
-### 7. Third-Party Services & APIs
-- Identify every external integration implied by the PRD
-- Recommended service/provider for each with rationale
-- Fallback options if a primary choice has issues
-
-### For Every Technology Choice, Document:
-- **What**: The specific library/framework and version
-- **Why**: Rationale tied to our project requirements (not generic praise)
-- **Why not alternatives**: Brief note on what was considered and rejected
-- **AI compatibility note**: How well-represented this is in AI training data, any known AI pitfalls with this tool
-
-## What This Document Should NOT Include
-- Technologies we don't need yet — no speculative "we might need Kafka someday"
-- Multiple options without a decision — make a recommendation, don't present a menu
-- Boilerplate descriptions of what a framework is — assume the reader knows, just explain why we chose it
-
-## Process
-- Create a Beads task for this work before starting: `bd create "docs: <document being created>" -p 0` and `bd update <id> --claim`
-- When the document is complete and committed, close it: `bd close <id>`
-- If this work surfaces implementation tasks (bugs, missing infrastructure), create separate Beads tasks for those — don't try to do them now
-- Use subagents to research and compare tech stack options in parallel
-- Cross-reference every PRD feature against the proposed stack — verify nothing requires a capability the stack doesn't support
-- Use AskUserQuestionTool to present key decisions (especially framework choices and hosting) with your recommendation and rationale before finalizing
-- After creating tech-stack.md, review plan.md and update it with any technical clarifications or additions that emerged from the analysis
-- At the end of the document, include a **Quick Reference** section listing every dependency with its version — this becomes the source of truth for package.json / requirements.txt / pyproject.toml
 
 
 _____________________________________
