@@ -2,7 +2,7 @@
 
 ## 1. Product Overview
 
-Scaffold v2 is a modular, profile-based prompt pipeline for scaffolding new software projects with Claude Code. It replaces the rigid 25-prompt linear sequence of v1 with a dependency-graph engine that lets users select a **profile** (e.g., `web-app`, `cli-tool`, `mobile`, `minimal`) and automatically resolves which prompts to run, in what order, based on declared dependencies. Users can override any built-in prompt, add custom prompts, and create their own profiles — all while preserving the high-quality prompt content that makes v1 effective.
+Scaffold v2 is a modular, profile-based prompt pipeline for scaffolding new software projects with Claude Code. It replaces the rigid 25-prompt linear sequence of v1 with a dependency-graph engine that lets users select a **profile** (e.g., `web-app`, `cli-tool`, `mobile`, `api-service`, `minimal`) and automatically resolves which prompts to run, in what order, based on declared dependencies. Users can override any built-in prompt, add custom prompts, and create their own profiles — all while preserving the high-quality prompt content that makes v1 effective.
 
 Scaffold v2 is for solo developers and small teams who use Claude Code as their primary development tool and want to go from a raw product idea to a fully documented, task-tracked, CI-configured project in under an hour — without running prompts that don't apply to their project type.
 
@@ -36,16 +36,17 @@ This is the primary entry point for all new projects.
 
 1. User runs `/scaffold:init` (or `/scaffold:init <idea>` with inline description).
 2. Scaffold checks if the current directory already has scaffold artifacts (`.scaffold/config.json`). If found, warns: "This directory already has a scaffold configuration. Run `/scaffold:resume` to continue the existing pipeline, or pass `--force` to reinitialize." Flow stops unless `--force` is provided.
-3. Scaffold presents a profile selection using `AskUserQuestion`:
+3. If the directory has existing code artifacts (package.json with dependencies, src/ with files, etc.) and `--brownfield` was not explicitly passed, Scaffold asks: "This directory has existing code. Would you like to scaffold around it (brownfield) or start fresh (greenfield)?" If the user chooses brownfield, `mode` is set to `"brownfield"` in config.json and prompts that support brownfield mode adapt their behavior (see F-UX-10).
+4. If the user provided `<idea>` text, Scaffold analyzes it and recommends a profile (see F-UX-7). The recommended profile appears first with "(Recommended)" in the selection. Scaffold presents profile selection using `AskUserQuestion`:
    - **Web App** — Full-stack web application (includes: design system, Playwright, frontend standards)
    - **CLI Tool** — Command-line tool or library (skips: design system, Playwright, Maestro, multi-model review)
    - **Mobile** — React Native / Expo mobile app (includes: Maestro, design system; skips: Playwright)
    - **API Service** — Backend API / microservice (skips: design system, Playwright, Maestro)
    - **Minimal** — Just PRD + tech stack + coding standards + implementation (fewest prompts)
    - **Custom** — I'll choose which prompts to include
-4. If user selects "Custom," Scaffold displays all available prompts grouped by phase with checkboxes (via `AskUserQuestion` with `multiSelect: true`). Dependencies are auto-included: if the user selects "Coding Standards," "Tech Stack" is automatically included because it's a dependency. Scaffold shows which prompts were auto-included and why.
-5. Scaffold creates `.scaffold/config.json` with the selected profile and resolved prompt list.
-6. Scaffold displays the resolved pipeline: a numbered list of prompts that will run, with dependencies visualized. Example:
+5. If user selects "Custom," Scaffold walks through prompt selection one phase at a time using `AskUserQuestion` with `multiSelect: true` (since `AskUserQuestion` supports 2-4 options per question, phases with more than 4 prompts are split across multiple questions). Each question shows the phase's prompts with descriptions. After all phases, Scaffold resolves dependencies — if the user selected "Coding Standards" but not "Tech Stack," Scaffold auto-includes "Tech Stack" and shows: "Auto-included `tech-stack` (required by `coding-standards`)."
+6. Scaffold creates `.scaffold/config.json` with the selected profile and resolved prompt list.
+7. Scaffold displays the resolved pipeline: a numbered list of prompts that will run, with dependencies visualized. Example:
    ```
    Scaffold pipeline for profile "web-app" (18 prompts):
 
@@ -81,8 +82,8 @@ This is the primary entry point for all new projects.
      17. implementation-plan
      18. implementation-plan-review
    ```
-7. Scaffold asks: "Ready to start? The first prompt is `create-prd`." User confirms.
-8. Scaffold begins executing the first prompt (`create-prd`). If the user provided `<idea>` in step 1, it's passed as the argument.
+8. Scaffold asks: "Ready to start? The first prompt is `create-prd`." User confirms.
+9. Scaffold begins executing the first prompt (`create-prd`). If the user provided `<idea>` in step 1, it's passed as the argument.
 
 **Error/edge cases:**
 
@@ -90,6 +91,7 @@ This is the primary entry point for all new projects.
 - **Dependency conflicts in custom selection**: If the user deselects a prompt that other selected prompts depend on, Scaffold shows the conflict: "`coding-standards` requires `tech-stack`. Include `tech-stack`?" and auto-resolves by adding the dependency.
 - **Directory not empty but no scaffold config**: Scaffold proceeds normally — the user may be adding Scaffold to an existing project.
 - **User cancels during profile selection**: Pipeline is not created. No files written.
+- **`--force` reinitialize**: When `--force` is used on an existing project, Scaffold deletes `.scaffold/config.json` and `.scaffold/context.json` (pipeline state) but preserves `.scaffold/prompts/` and `.scaffold/profiles/` (user customizations). The user is shown what will be reset: "Resetting pipeline state. Custom prompts and profiles will be preserved. Proceed?"
 
 ### Flow 2: Resume an In-Progress Pipeline
 
@@ -104,8 +106,9 @@ This is the primary entry point for all new projects.
 **Error/edge cases:**
 
 - **All prompts complete**: Scaffold shows: "Pipeline complete. Run `/scaffold:new-enhancement` to add features, or `/scaffold:single-agent-start` to begin implementation."
-- **Config file corrupted or missing completion data**: Scaffold re-scans project artifacts (checks for `docs/plan.md`, `docs/tech-stack.md`, etc.) and infers which prompts have been completed based on their expected outputs. Updates the config accordingly.
-- **User wants to re-run a completed prompt**: `/scaffold:resume --from <prompt-name>` re-runs from that prompt forward. Scaffold warns: "This will re-run `coding-standards` and may overwrite `docs/coding-standards.md`. Proceed?" Prompts downstream of the re-run are not automatically re-run — the user can continue with `/scaffold:resume` which picks up the next uncompleted prompt.
+- **Config file corrupted or missing completion data**: Scaffold re-scans project artifacts (checks for `docs/plan.md`, `docs/tech-stack.md`, etc.) and infers which prompts have been completed based on their `produces` artifacts. Updates the config accordingly.
+- **User manually edited config.json between sessions**: Scaffold validates config.json on load. If the `prompts` array was modified (prompts added/removed), Scaffold re-resolves dependencies for the updated list and reports any errors. If `extra-prompts` references a prompt that doesn't exist at any tier, Scaffold reports: "Extra prompt `X` not found at .scaffold/prompts/X.md, ~/.scaffold/prompts/X.md, or built-in commands/X.md. Remove it from extra-prompts or create the prompt file."
+- **User wants to re-run a completed prompt**: `/scaffold:resume --from <prompt-name>` re-runs the specified prompt only (not all downstream prompts). Scaffold warns: "This will re-run `coding-standards` and may overwrite `docs/coding-standards.md`. Proceed?" After that prompt completes, `/scaffold:resume` picks up the next uncompleted prompt in the normal pipeline order. Downstream prompts are not invalidated or re-run unless the user explicitly `--from`s each one — the assumption is that re-running one prompt produces compatible outputs for what came after.
 
 ### Flow 3: Customize a Prompt
 
@@ -115,11 +118,12 @@ This is the primary entry point for all new projects.
 2. User creates `.scaffold/prompts/create-prd.md` with their custom version. The file follows the same format as the built-in prompt (markdown with optional YAML frontmatter).
 3. Next time the pipeline runs `create-prd`, Scaffold uses the project-level override instead of the built-in version. Scaffold shows: "Using project override for `create-prd` (.scaffold/prompts/create-prd.md)."
 
-**Three-tier precedence (highest to lowest):**
+**Precedence (highest to lowest):**
 
-1. **Project-level** (`.scaffold/prompts/<name>.md`) — Specific to this project
-2. **User-level** (`~/.scaffold/prompts/<name>.md`) — Shared across all your projects
-3. **Built-in** (`commands/<name>.md` from the plugin) — Default Scaffold prompts
+1. **Profile override** (explicit path in profile's `prompt-overrides`) — Per-pipeline customization
+2. **Project-level** (`.scaffold/prompts/<name>.md`) — Specific to this project
+3. **User-level** (`~/.scaffold/prompts/<name>.md`) — Shared across all your projects
+4. **Built-in** (`commands/<name>.md` from the plugin) — Default Scaffold prompts
 
 **Adding a custom prompt (not overriding):**
 
@@ -131,7 +135,7 @@ This is the primary entry point for all new projects.
    phase: 6
    ---
    ```
-2. User adds the prompt to their profile in `.scaffold/config.json` under the `extra-prompts` array, or the prompt's `phase` field causes it to appear in the appropriate pipeline position.
+2. User adds the prompt to their profile via `add-prompts` in the profile JSON, or adds it to `extra-prompts` in `.scaffold/config.json`. Simply placing a file in `.scaffold/prompts/` does NOT auto-include it in the pipeline — it must be explicitly referenced by a profile or config. The `phase` field in frontmatter controls display positioning within the pipeline, not inclusion.
 3. When the pipeline reaches Phase 6, Scaffold includes `security-audit` after its dependencies are satisfied.
 
 **Error/edge cases:**
@@ -195,7 +199,8 @@ This is the primary entry point for all new projects.
    - `docs/tech-stack.md` exists → `tech-stack` marked complete
    - `.beads/` exists → `beads` marked complete
    - etc.
-4. Scaffold creates `.scaffold/config.json` with the inferred state and suggests: "Detected 14/18 prompts already completed. Next uncompleted: `claude-md-optimization`. Run `/scaffold:resume` to continue."
+4. Scaffold infers the best-matching built-in profile based on which optional prompts' artifacts are present (e.g., if `docs/design-system.md` exists but no Maestro config, it's likely `web-app`). If the match is ambiguous, Scaffold presents the candidates via `AskUserQuestion` and lets the user choose.
+5. Scaffold creates `.scaffold/config.json` with the inferred profile and completion state, and suggests: "Detected 14/18 prompts already completed (profile: web-app). Next uncompleted: `claude-md-optimization`. Run `/scaffold:resume` to continue."
 
 **Error/edge cases:**
 
@@ -210,35 +215,42 @@ This is the primary entry point for all new projects.
 
 - **What**: Prompts declare their dependencies via `depends-on` in frontmatter. The engine performs topological sort to determine execution order. Within a phase, prompts with satisfied dependencies can run in any order (the engine presents them in the order defined by the profile).
 - **Why**: Replaces the brittle hardcoded ordering of v1. Allows custom prompts to be inserted anywhere in the pipeline without manual ordering.
-- **Priority**: Must-have (v1)
+- **Priority**: Must-have (v2.0)
 - **Business rules**:
   - Circular dependencies are detected at pipeline resolution time (before any prompt executes) and reported as errors with the full cycle path.
   - If a prompt declares a dependency that doesn't exist in the current profile's prompt list, it's a resolution error: "Prompt `X` depends on `Y`, but `Y` is not in this pipeline. Add `Y` to the profile or remove the dependency."
   - Dependencies are always on prompt names (strings), not on artifact files. This keeps the graph simple and inspectable.
+  - If `extra-prompts` or `add-prompts` references a prompt name that doesn't exist at any tier (no file found at project, user, or built-in level), it's a resolution error: "Prompt `X` referenced in extra-prompts but not found at .scaffold/prompts/X.md, ~/.scaffold/prompts/X.md, or built-in commands/X.md."
   - Resolution happens once at `init` time and is cached in `.scaffold/config.json`. It's re-resolved when the profile or prompt list changes.
 
 #### F-PE-2: Pipeline State Tracking
 
 - **What**: `.scaffold/config.json` records which prompts have been completed, which are pending, and pipeline metadata (profile used, timestamps, scaffold version). Each prompt's completion is recorded when the prompt finishes executing (not when its output artifact exists).
 - **Why**: Enables `resume`, `preview`, progress display, and v1 detection.
-- **Priority**: Must-have (v1)
+- **Priority**: Must-have (v2.0)
 - **Business rules**:
   - Completion is recorded by adding the prompt name to the `completed` array in config.json with a timestamp.
-  - A prompt is "completed" when the command finishes executing without the user aborting. Scaffold records this automatically — prompts don't need to self-report.
+  - **Completion detection strategy**: Scaffold uses a two-mechanism approach:
+    - **Primary (artifact-based)**: The `resume` command checks whether a prompt's `produces` artifacts exist on disk. If all files in the `produces` list exist, the prompt is considered complete. This is the same mechanism used for v1 detection and provides resilience against session crashes.
+    - **Secondary (prompt self-report)**: Each pipeline prompt's "After This Step" section includes an instruction to update `.scaffold/config.json` by adding the prompt to the `completed` array. This provides timestamp tracking and handles prompts that don't produce files (e.g., `claude-code-permissions` modifies an existing file rather than creating one).
+    - When both mechanisms disagree (artifact exists but not in `completed` array), the artifact takes precedence — the prompt ran successfully even if the config wasn't updated (likely a session crash after the prompt finished but before the config write).
+    - When `completed` says done but artifacts are missing, `resume` warns: "Prompt `X` was marked complete but its output `Y` is missing. Re-run with `/scaffold:resume --from X`?"
   - If a completed prompt is re-run (via `--from`), its previous completion entry is replaced with the new timestamp.
   - Config format:
     ```json
     {
       "scaffold-version": "2.0.0",
       "profile": "web-app",
+      "mode": "greenfield",
       "created": "2026-02-15T10:30:00Z",
       "prompts": ["create-prd", "prd-gap-analysis", "beads", "..."],
       "completed": [
         { "prompt": "create-prd", "at": "2026-02-15T10:35:00Z" },
         { "prompt": "prd-gap-analysis", "at": "2026-02-15T10:42:00Z" }
       ],
+      "skipped": [],
       "extra-prompts": [],
-      "prompt-overrides": {},
+      "resolved-overrides": {},
       "custom-config": {}
     }
     ```
@@ -247,7 +259,7 @@ This is the primary entry point for all new projects.
 
 - **What**: A shared context object (`.scaffold/context.json`) accumulates data across prompts. Each prompt can read the context and write new entries. Context is key-value pairs with namespaced keys (e.g., `tech-stack.language`, `prd.personas`).
 - **Why**: Enables prompts to reference outputs from earlier prompts programmatically. In v1, prompts read files on disk — context provides a structured supplement (not a replacement for file reads).
-- **Priority**: Should-have (v1 if time)
+- **Priority**: Should-have (v2.0 if time)
 - **Business rules**:
   - Context is append-only during normal execution. A prompt can overwrite its own namespace but not another prompt's.
   - Context is JSON. Values can be strings, numbers, booleans, arrays, or objects. No binary data.
@@ -274,7 +286,7 @@ This is the primary entry point for all new projects.
 
 - **What**: When a prompt is executed, Scaffold loads the prompt content (resolved via the 3-tier precedence), substitutes `$ARGUMENTS` if present, and presents it to Claude Code as a command. The prompt runs within the current Claude Code session.
 - **Why**: Prompts are Claude Code commands — they must execute in the user's session where Claude has access to tools, files, and conversation context.
-- **Priority**: Must-have (v1)
+- **Priority**: Must-have (v2.0)
 - **Business rules**:
   - Prompts execute one at a time, sequentially. There is no automatic parallel prompt execution (agents parallelize during implementation, not during pipeline setup).
   - After a prompt completes, Scaffold records completion in config.json and displays: "Prompt `X` complete. Next: `Y`. Run it now?" The user must confirm before the next prompt runs.
@@ -287,7 +299,7 @@ This is the primary entry point for all new projects.
 
 - **What**: Four built-in profiles ship with Scaffold v2, each defining a curated list of prompts optimized for that project type.
 - **Why**: Most projects fit one of a few categories. Profiles eliminate the need to manually select prompts for common cases.
-- **Priority**: Must-have (v1)
+- **Priority**: Must-have (v2.0)
 - **Business rules**:
   - **web-app**: All prompts from v1 pipeline except Maestro and Platform Parity Review. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, design-system, git-workflow, add-playwright, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. (18 prompts)
   - **cli-tool**: Focused set for CLI tools / libraries. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. Excludes: design-system, add-playwright, add-maestro, multi-model-review, platform-parity-review. (16 prompts)
@@ -300,7 +312,7 @@ This is the primary entry point for all new projects.
 
 - **What**: Users can create profiles in `.scaffold/profiles/` (project-level) or `~/.scaffold/profiles/` (user-level) that define a custom prompt list, optionally extending a built-in or other custom profile.
 - **Why**: Teams and power users need to standardize on a custom pipeline configuration without forking Scaffold.
-- **Priority**: Must-have (v1)
+- **Priority**: Must-have (v2.0)
 - **Business rules**:
   - Profile format:
     ```json
@@ -325,7 +337,7 @@ This is the primary entry point for all new projects.
 
 - **What**: A profile can extend another profile, inheriting its prompt list and settings, then adding/removing prompts and overriding prompt files.
 - **Why**: Avoids duplication. A team can create `web-app-plus-security` that extends `web-app` and adds security prompts, without re-listing all 18 web-app prompts.
-- **Priority**: Must-have (v1)
+- **Priority**: Must-have (v2.0)
 - **Business rules**:
   - Inheritance depth is limited to 3 levels. Deeper chains are rejected at resolution time.
   - Resolution order: start with the base profile's prompts → apply `add-prompts` → apply `remove-prompts` → apply `prompt-overrides`. Each level in the chain applies its modifications in this order.
@@ -338,14 +350,14 @@ This is the primary entry point for all new projects.
 
 - **What**: Prompts are Markdown files with optional YAML frontmatter. Frontmatter can declare: `description`, `depends-on`, `phase`, `argument-hint`, and `produces` (list of output artifact paths).
 - **Why**: Consistent format enables the engine to resolve dependencies and display pipeline previews. Markdown body is the prompt content passed to Claude Code.
-- **Priority**: Must-have (v1)
+- **Priority**: Must-have (v2.0)
 - **Business rules**:
   - Frontmatter fields:
     - `description` (string, required): Short description shown in pipeline preview and help.
     - `depends-on` (array of strings, optional): Prompt names this prompt depends on. Defaults to empty (no dependencies).
     - `phase` (integer, optional): Phase number (1-7) for display grouping. Defaults to the phase of the last dependency, or 1 if no dependencies.
     - `argument-hint` (string, optional): Hint for `$ARGUMENTS` substitution, shown in help (e.g., `"<idea or @files>"`).
-    - `produces` (array of strings, optional): Expected output file paths (e.g., `["docs/plan.md"]`). Used by v1 detection to infer completion. Not enforced — prompts may produce additional outputs.
+    - `produces` (array of strings, required for built-in prompts, optional for custom): Expected output file paths (e.g., `["docs/plan.md"]`). Used by completion detection and v1 project detection to infer which prompts have run. Not enforced at runtime — prompts may produce additional outputs beyond what's listed. Custom prompts that omit `produces` can still be tracked via the self-report mechanism (config.json `completed` array) but won't benefit from artifact-based completion detection.
   - All existing v1 prompts will have frontmatter added/updated to declare `depends-on` and `produces`. The dependency graph is derived from the existing "Key Dependencies Between Prompts" section in prompts.md:
     - `prd-gap-analysis` depends on `create-prd`
     - `tech-stack` depends on `create-prd`
@@ -369,26 +381,29 @@ This is the primary entry point for all new projects.
     - `beads` has no dependencies (but must run before any prompt that creates Beads tasks — enforced by convention in prompt content, not as a formal dependency, since Phase 1 prompts don't use Beads)
   - `$ARGUMENTS` is the only substitution variable. When a prompt is executed with arguments, `$ARGUMENTS` is replaced with the argument string. If no arguments are provided and the prompt contains `$ARGUMENTS`, the placeholder remains (the prompt is responsible for handling the empty case).
 
-#### F-PS-2: Three-Tier Prompt Precedence
+#### F-PS-2: Prompt Precedence
 
-- **What**: When Scaffold resolves a prompt by name, it checks three locations in order: project-level (`.scaffold/prompts/<name>.md`), user-level (`~/.scaffold/prompts/<name>.md`), built-in (`commands/<name>.md` from the plugin directory).
-- **Why**: Enables customization without forking. Project-level overrides apply to one project, user-level overrides apply to all projects for that user.
-- **Priority**: Must-have (v1)
+- **What**: When Scaffold resolves a prompt by name, it checks up to four locations in order: (1) profile-level `prompt-overrides` (explicit path), (2) project-level (`.scaffold/prompts/<name>.md`), (3) user-level (`~/.scaffold/prompts/<name>.md`), (4) built-in (`commands/<name>.md` from the plugin directory). The first match wins.
+- **Why**: Enables customization without forking. Profile overrides allow per-pipeline customization, project-level overrides apply to one project, user-level overrides apply to all projects for that user.
+- **Priority**: Must-have (v2.0)
 - **Business rules**:
-  - First match wins. If `.scaffold/prompts/create-prd.md` exists, the built-in `commands/create-prd.md` is not used.
-  - Scaffold logs which tier was used when executing a prompt: "Using project override for `create-prd`" or "Using built-in `create-prd`". This appears in the pipeline progress output, not as a separate message.
+  - **Resolution order** (first match wins):
+    1. Profile `prompt-overrides` — if the active profile maps this prompt name to a file path, use that file. If the file at that path doesn't exist, it's a resolution error: "Profile `X` overrides prompt `Y` with path `Z`, but `Z` does not exist."
+    2. `.scaffold/prompts/<name>.md` — project-level override
+    3. `~/.scaffold/prompts/<name>.md` — user-level override
+    4. `commands/<name>.md` — built-in from plugin
+  - Scaffold logs which source was used when executing a prompt: "Using project override for `create-prd`" or "Using built-in `create-prd`". This appears in the pipeline progress output, not as a separate message.
   - Custom prompts at any tier must follow the same format (Markdown with optional YAML frontmatter). If the frontmatter declares `depends-on`, those dependencies are used. If a custom prompt omits frontmatter, it inherits the dependency and phase information from the built-in prompt it's overriding (if one exists). A completely new prompt with no frontmatter has no dependencies and defaults to Phase 1.
-  - Profile-level `prompt-overrides` take highest precedence, even above project-level `.scaffold/prompts/`. Precedence: profile override > project-level > user-level > built-in.
 
 #### F-PS-3: Adding Custom Prompts
 
 - **What**: Users can add prompts that don't exist in the built-in set. Custom prompts are placed in `.scaffold/prompts/` or `~/.scaffold/prompts/` and added to a profile via `add-prompts` or by declaring a `phase` in frontmatter.
 - **Why**: Different project types need different prompts. A healthtech company needs compliance checks, a fintech company needs security audits, a design agency needs brand guidelines prompts.
-- **Priority**: Must-have (v1)
+- **Priority**: Must-have (v2.0)
 - **Business rules**:
   - Custom prompts are identified by filename (without `.md` extension). The name must be lowercase, use hyphens for spaces, and not conflict with built-in prompt names unless intentionally overriding.
   - Custom prompts appear in the pipeline at the position determined by their `phase` and `depends-on` declarations. Within a phase, custom prompts appear after built-in prompts with satisfied dependencies.
-  - Custom prompts can depend on built-in prompts and vice versa (though built-in prompts will never depend on custom prompts — that would be done via profile configuration).
+  - Custom prompts can declare dependencies on built-in prompts (e.g., a custom `security-audit` can depend on built-in `coding-standards`). Built-in prompts never depend on custom prompts — they ship independently. If a profile needs a built-in prompt to run after a custom prompt, use the profile's `add-prompts` ordering or add a wrapper prompt.
 
 ### Init and User Experience
 
@@ -396,7 +411,7 @@ This is the primary entry point for all new projects.
 
 - **What**: A single entry-point command that handles profile selection, pipeline resolution, configuration creation, and optionally starts the first prompt.
 - **Why**: Replaces the v1 experience of "read the docs, figure out which prompts to run, run them in order." One command handles everything.
-- **Priority**: Must-have (v1)
+- **Priority**: Must-have (v2.0)
 - **Business rules**:
   - Invoked as `/scaffold:init` or `/scaffold:init <idea>`.
   - If `<idea>` is provided, it's stored and passed as `$ARGUMENTS` to `create-prd`.
@@ -409,7 +424,7 @@ This is the primary entry point for all new projects.
 
 - **What**: Resumes an in-progress pipeline from where it left off.
 - **Why**: Users stop and restart Claude Code sessions frequently. Resume picks up exactly where they left off.
-- **Priority**: Must-have (v1)
+- **Priority**: Must-have (v2.0)
 - **Business rules**:
   - Reads `.scaffold/config.json` to determine next uncompleted prompt.
   - Shows pipeline progress: "8/18 prompts complete."
@@ -421,7 +436,7 @@ This is the primary entry point for all new projects.
 
 - **What**: `/scaffold:init --dry-run` or `/scaffold:preview <profile-name>` resolves and displays the pipeline without executing anything or creating files.
 - **Why**: Users want to see what they're committing to before starting. Useful for evaluating profiles and debugging custom configurations.
-- **Priority**: Should-have (v1 if time)
+- **Priority**: Should-have (v2.0 if time)
 - **Business rules**:
   - Shows the full resolved pipeline: prompt names, phases, dependencies, source tier (built-in/user/project), and expected output artifacts.
   - Shows any resolution errors (missing deps, circular refs) inline.
@@ -432,7 +447,7 @@ This is the primary entry point for all new projects.
 
 - **What**: Every time a prompt completes or the user runs `resume`, Scaffold shows a progress summary: completed/total prompts, current phase, and next prompt.
 - **Why**: Keeps the user oriented in a multi-prompt pipeline. v1 relied on the skill auto-suggesting the next command, which was less informative.
-- **Priority**: Must-have (v1)
+- **Priority**: Must-have (v2.0)
 - **Business rules**:
   - Format:
     ```
@@ -454,13 +469,110 @@ This is the primary entry point for all new projects.
   - The progress is displayed after each prompt completes and when `resume` is invoked.
   - Completed prompts show ✓, the next prompt shows →, pending prompts are indented.
 
+#### F-UX-5: `scaffold status` Command
+
+- **What**: A lightweight command (`/scaffold:status`) that displays pipeline progress without offering to run the next prompt. Shows completed/pending/skipped prompts, current phase, and profile name.
+- **Why**: Users returning to a project after days away need quick orientation — "where am I in this pipeline?" — without committing to run anything. The `resume` command always offers to execute the next prompt, which creates unnecessary friction when the user just wants to check status.
+- **Priority**: Must-have (v2.0)
+- **Business rules**:
+  - Reads `.scaffold/config.json` and displays the same progress format as F-UX-4 but without the "Run it now?" prompt.
+  - If `.scaffold/config.json` doesn't exist, shows: "No pipeline found. Run `/scaffold:init` to start."
+  - If all prompts are complete, shows: "Pipeline complete (18/18). Profile: web-app."
+  - Skipped prompts (see F-UX-6) show as `⊘ design-system (skipped)` in the progress display.
+
+#### F-UX-6: `scaffold skip` Command
+
+- **What**: Explicitly skip a prompt mid-pipeline: `/scaffold:skip <prompt-name>`. Records the prompt as skipped (distinct from completed) in config.json. The pipeline advances past it.
+- **Why**: Users sometimes realize mid-pipeline that a prompt doesn't apply (e.g., they chose `web-app` but decide they don't need a design system). Currently there's no way to skip without `--force` reinitializing or manually editing config.json.
+- **Priority**: Must-have (v2.0)
+- **Business rules**:
+  - Adds the prompt to a `skipped` array in config.json: `{ "prompt": "design-system", "at": "2026-02-15T11:00:00Z", "reason": "No frontend design needed" }`.
+  - Scaffold prompts the user for a brief reason (via `AskUserQuestion` with a text option) to aid future reference, but the reason is optional.
+  - Skipped prompts are treated as "done" for dependency resolution — downstream prompts that depend on the skipped prompt can still run. The downstream prompt's content may reference the skipped prompt's output file; if that file doesn't exist, it's the prompt's responsibility to handle the missing input (same as v1 behavior with optional prompts).
+  - A skipped prompt can be un-skipped and run later via `/scaffold:resume --from <prompt-name>`.
+  - Cannot skip a prompt that has already been completed (use `--from` to re-run instead).
+  - Cannot skip a prompt that is the only remaining prompt (pipeline would be done — just let it complete).
+
+#### F-UX-7: Smart Profile Suggestion
+
+- **What**: During `scaffold init`, after the user provides their idea (if any), Claude analyzes the idea text and recommends a profile before presenting the full selection. The recommendation appears as the first option in the profile selection with "(Recommended)" appended.
+- **Why**: First-time users (persona "Sam") don't know which profile to pick. Analyzing the idea — "I want to build a CLI tool that..." → recommend `cli-tool` — removes a decision barrier and demonstrates that Scaffold understands their project.
+- **Priority**: Should-have (v2.0 if time)
+- **Business rules**:
+  - Only applies when the user provides `<idea>` text with `/scaffold:init <idea>`. If no idea is provided, the profile selection shows all options without a recommendation.
+  - The recommendation is based on keyword analysis of the idea text:
+    - "web app", "website", "dashboard", "frontend", "React", "Next.js" → `web-app`
+    - "CLI", "command-line", "terminal", "library", "npm package", "SDK" → `cli-tool`
+    - "mobile", "iOS", "Android", "React Native", "Expo" → `mobile`
+    - "API", "backend", "microservice", "REST", "GraphQL", "server" → `api-service`
+    - If no clear signal, default to no recommendation (show all options equally).
+  - The recommendation is a suggestion, not a default. The user must still explicitly select a profile via `AskUserQuestion`.
+  - If Claude's analysis suggests a profile, the `AskUserQuestion` options are reordered so the recommended profile appears first with "(Recommended)" in its label.
+
+#### F-UX-8: `scaffold validate` Command
+
+- **What**: Validate profiles and prompt files for errors without running init or modifying any files. Reports missing dependencies, circular references, invalid frontmatter, missing prompt files, and profile inheritance errors.
+- **Why**: Profile authors and teams need a way to test their configurations before sharing them. Running `init --dry-run` is close but also resolves and displays a pipeline — `validate` is focused purely on error detection.
+- **Priority**: Must-have (v2.0)
+- **Business rules**:
+  - Invoked as `/scaffold:validate` (validates everything in the current project) or `/scaffold:validate <profile-name>` (validates a specific profile).
+  - Checks performed:
+    1. All profiles in `.scaffold/profiles/` and `~/.scaffold/profiles/` parse as valid JSON with required fields.
+    2. All `extends` references resolve to existing profiles (no missing parents, no circular inheritance).
+    3. All prompt names referenced in profiles (`prompts`, `add-prompts`, `remove-prompts`, `prompt-overrides`) resolve to files at some tier.
+    4. All `prompt-overrides` file paths point to existing files.
+    5. All prompt files in `.scaffold/prompts/` have valid YAML frontmatter (if frontmatter is present).
+    6. All `depends-on` references resolve to prompt names that exist in the pipeline.
+    7. No circular dependencies in the prompt dependency graph.
+  - Output format: list of errors grouped by source file. If no errors: "All profiles and prompts are valid."
+  - Exit cleanly — no files created or modified.
+
+#### F-UX-9: `scaffold reset` Command
+
+- **What**: Reset pipeline state while preserving user customizations. Deletes `.scaffold/config.json` and `.scaffold/context.json` but keeps `.scaffold/prompts/` and `.scaffold/profiles/` intact.
+- **Why**: Users who want to start over (changed their mind about the profile, pipeline went sideways) currently have to manually delete `.scaffold/` which also wipes custom prompts and profiles. A dedicated reset command is safer and more discoverable.
+- **Priority**: Must-have (v2.0)
+- **Business rules**:
+  - Invoked as `/scaffold:reset`.
+  - Shows what will be deleted and what will be preserved:
+    ```
+    Will delete:
+      .scaffold/config.json (pipeline state)
+      .scaffold/context.json (pipeline context)
+
+    Will preserve:
+      .scaffold/prompts/ (custom prompts)
+      .scaffold/profiles/ (custom profiles)
+
+    Proceed?
+    ```
+  - Requires explicit user confirmation via `AskUserQuestion` before deleting anything.
+  - After reset, the user runs `/scaffold:init` to start fresh.
+  - If `.scaffold/config.json` doesn't exist, shows: "No pipeline state to reset."
+
+#### F-UX-10: Brownfield Mode
+
+- **What**: A mode for adding Scaffold to an existing codebase that already has code, dependencies, and structure but was not scaffolded with Scaffold v1 or v2. Activated via `/scaffold:init --brownfield` or detected when the directory has significant existing code (e.g., `package.json` with dependencies, `src/` directory with files).
+- **Why**: Scaffold v1 was greenfield-only. Many developers discover Scaffold after they've already started a project and want to retroactively add the structure, standards, and workflow that Scaffold provides. Competitor tools like OpenSpec excel at brownfield scenarios — Scaffold should not cede this use case.
+- **Priority**: Should-have (v2.0 if time)
+- **Business rules**:
+  - **Detection**: When `init` runs in a directory with existing code artifacts (`package.json`/`pyproject.toml`/`go.mod` with dependencies, `src/` or `lib/` directories with source files, existing `README.md`), Scaffold offers brownfield mode: "This directory has existing code. Would you like to scaffold around it (brownfield) or start fresh?"
+  - **Brownfield pipeline adjustments**:
+    - `create-prd`: Prompt is modified to say "Document the existing application" rather than "Create from an idea." Claude reads existing code to generate the PRD, then asks the user to fill gaps.
+    - `tech-stack`: Prompt reads `package.json`/`pyproject.toml`/etc. to document the existing stack rather than choosing one.
+    - `project-structure`: Prompt documents the existing structure rather than scaffolding a new one.
+    - `dev-env-setup`: Prompt documents existing dev commands rather than creating new ones.
+    - All other prompts (coding-standards, tdd, git-workflow, etc.) run normally — they create new standards documents that reference the existing codebase.
+  - **Brownfield config**: `.scaffold/config.json` includes `"mode": "brownfield"` to indicate the project was scaffolded in brownfield mode. This is informational only — it doesn't change engine behavior after init.
+  - **Which prompts change**: Only 4 prompts need brownfield variants (create-prd, tech-stack, project-structure, dev-env-setup). These are implemented as conditional sections within the existing prompts (not separate prompt files), triggered by a `brownfield: true` flag in pipeline context. The remaining prompts work identically in brownfield and greenfield modes.
+
 ### v1 Compatibility
 
 #### F-V1-1: v1 Project Detection
 
 - **What**: When `scaffold init` runs in a directory with v1 artifacts but no `.scaffold/` directory, Scaffold detects the v1 project and offers to create a v2 configuration based on existing artifacts.
 - **Why**: Users with v1-scaffolded projects should be able to adopt v2 without re-running prompts that already produced correct outputs.
-- **Priority**: Should-have (v1 if time)
+- **Priority**: Should-have (v2.0 if time)
 - **Business rules**:
   - Detection is based on the presence of expected output artifacts, not on a version marker file.
   - Artifact-to-prompt mapping uses the `produces` field from prompt frontmatter. For each built-in prompt, if all artifacts in its `produces` list exist, the prompt is marked as complete.
@@ -472,7 +584,7 @@ This is the primary entry point for all new projects.
 
 - **What**: The three existing migration prompts (Beads Migration, Workflow Migration, Permissions Migration) are preserved as standalone commands, not part of any profile's pipeline.
 - **Why**: These are one-time migration tools for v1 projects, not part of the normal scaffolding flow.
-- **Priority**: Must-have (v1)
+- **Priority**: Must-have (v2.0)
 - **Business rules**:
   - Migration prompts remain as `/scaffold:beads-migration`, `/scaffold:workflow-migration`, `/scaffold:permissions-migration`.
   - They do not appear in any profile's prompt list.
@@ -482,9 +594,9 @@ This is the primary entry point for all new projects.
 
 #### F-SC-1: Commands Outside the Pipeline
 
-- **What**: Certain commands remain standalone and are not part of any profile's pipeline: `new-enhancement`, `single-agent-start`, `single-agent-resume`, `multi-agent-start`, `multi-agent-resume`, `prompt-pipeline`, `update`, `version`, and all migration commands.
+- **What**: Certain commands remain standalone and are not part of any profile's pipeline: `new-enhancement`, `single-agent-start`, `single-agent-resume`, `multi-agent-start`, `multi-agent-resume`, `prompt-pipeline`, `update`, `version`, `status`, `skip`, `validate`, `reset`, and all migration commands.
 - **Why**: These are used after the pipeline completes or for ongoing project work. They don't belong in the scaffolding sequence.
-- **Priority**: Must-have (v1)
+- **Priority**: Must-have (v2.0)
 - **Business rules**:
   - Standalone commands are accessible at any time via `/scaffold:<command-name>`.
   - They do not appear in the pipeline preview or progress display.
@@ -537,8 +649,10 @@ Stored in `.scaffold/config.json`, this is the runtime state of the pipeline for
 - **created**: ISO 8601 timestamp of when `init` was run.
 - **prompts**: Resolved ordered array of prompt names (the final pipeline after dependency resolution).
 - **completed**: Array of `{ prompt: string, at: string }` entries recording when each prompt was completed.
-- **extra-prompts**: Array of custom prompt names added outside the profile definition.
-- **prompt-overrides**: Map of prompt name → file path for per-project prompt overrides.
+- **skipped**: Array of `{ prompt: string, at: string, reason: string }` entries recording when each prompt was explicitly skipped via `/scaffold:skip`. Skipped prompts are treated as "done" for dependency resolution.
+- **mode**: Either `"greenfield"` (default) or `"brownfield"` — indicates how the project was initialized. Informational only after init.
+- **extra-prompts**: Array of custom prompt names added outside the profile definition (must have corresponding prompt files at project, user, or built-in level).
+- **resolved-overrides**: Map of prompt name → file path, merged from the profile's `prompt-overrides` at resolution time. This is a computed/cached field — the source of truth is the profile JSON. Stored for fast lookup during execution.
 - **custom-config**: Free-form object for user/profile-specific configuration.
 
 ### Pipeline Context
@@ -604,7 +718,7 @@ Pipeline Context ──(written by)──> Prompt[] (each writes its namespace)
 ### Reliability
 
 - **Crash recovery**: If a Claude Code session crashes mid-prompt, no data is lost. The prompt is simply not marked as complete. The user can `resume` and the prompt runs again.
-- **Config integrity**: `.scaffold/config.json` is written atomically (write to temp file, rename). A partial write never corrupts the config.
+- **Config integrity**: `.scaffold/config.json` is small (under 10KB) and written in full on each update via Claude Code's Write tool. If a session crashes mid-write, the file may be incomplete. The `resume` command handles this gracefully: if config.json fails to parse, Scaffold falls back to artifact-based completion detection (scanning `produces` files) and regenerates config.json from the detected state.
 - **Idempotent prompts**: Running a prompt twice should not produce corrupt state. Prompts are designed to overwrite their outputs cleanly (e.g., `create-prd` overwrites `docs/plan.md`, not appends to it).
 
 ### Compatibility
