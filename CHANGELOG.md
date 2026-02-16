@@ -2,6 +2,20 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.5.0] — 2026-02-16
+
+### Added
+- **Quick Task** command (`/scaffold:quick-task`) — Create focused Beads tasks for bug fixes, refactors, performance improvements, and small refinements without full Enhancement discovery
+- Phase 0 Complexity Gate auto-detects when a "quick task" is actually an enhancement and redirects to `/scaffold:new-enhancement`
+- Duplicate detection via `bd list` before creating tasks (matches Implementation Plan prompt pattern)
+- `tasks/lessons.md` review as first-class input during task definition — surfaces anti-patterns early
+- Conventional commit task titles (`type(scope): description`) that feed directly into commit messages
+- Cross-reference from Enhancement prompt's "When NOT to Use" section pointing to Quick Task for bug fixes, refactoring, and performance work
+
+### Changed
+- Enhancement prompt "When NOT to Use" updated to reference `/scaffold:quick-task` instead of generic advice
+- Prompt count updated from 25 to 26 across all references
+
 ## [1.4.0] — 2026-02-16
 
 ### Added

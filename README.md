@@ -1,6 +1,6 @@
 # Scaffold
 
-A guided AI pipeline that takes you from "I have an idea" to working software. Scaffold walks you through 25 structured prompts — run them in order, and Claude Code handles the research, planning, and implementation for you.
+A guided AI pipeline that takes you from "I have an idea" to working software. Scaffold walks you through 26 structured prompts — run them in order, and Claude Code handles the research, planning, and implementation for you.
 
 By the end, you'll have a fully planned, standards-documented, implementation-ready project with working code.
 
@@ -291,6 +291,7 @@ Once your project is scaffolded and you're building features, these commands are
 | Command | When to Use |
 |---------|-------------|
 | `/scaffold:new-enhancement` | You want to add a new feature to an already-scaffolded project. It updates the PRD, creates new user stories, and sets up Beads tasks with proper dependencies. |
+| `/scaffold:quick-task` | You need a focused Beads task for a bug fix, refactor, performance improvement, or small refinement — work that needs clear acceptance criteria and a test plan but not full enhancement discovery. |
 | `/scaffold:single-agent-resume` | You closed Claude Code and want to pick up where you left off. It checks your current git state, finds in-progress tasks, and resumes the workflow. |
 | `/scaffold:prompt-pipeline` | Quick reference — prints the full pipeline table so you can see where you are and what's next. |
 | `/scaffold:implementation-plan-review` | Re-run after creating 5+ new tasks to audit quality and dependencies. |
@@ -336,13 +337,13 @@ Every command prints "After This Step" guidance when it finishes, telling you ex
 Run `/scaffold:update` (or `/user:update`) from a Claude Code session. This fetches the latest version and updates your command files. You can also run `./scripts/update.sh` from the terminal. See [Updating](#updating) for details.
 
 **Can I use this for an existing project?**
-Scaffold is designed for new projects. For existing projects, you can use `/scaffold:new-enhancement` to add features using the same structured approach, but the full pipeline assumes a fresh start.
+Scaffold is designed for new projects. For existing projects, you can use `/scaffold:new-enhancement` to add features or `/scaffold:quick-task` for bug fixes and small improvements, both using the same structured approach. The full pipeline assumes a fresh start.
 
 ## How It Works (for contributors)
 
 The pipeline lives in a few key places:
 
-- **`prompts.md`** — The source of truth. Contains all 25 prompts in a single file with a setup order table at the top and individual prompt sections below.
+- **`prompts.md`** — The source of truth. Contains all 26 prompts in a single file with a setup order table at the top and individual prompt sections below.
 - **`commands/`** — Individual `.md` files (one per command) with YAML frontmatter and "After This Step" guidance. These are what Claude Code actually executes when you run a slash command.
 - **`.claude-plugin/plugin.json`** — Plugin manifest that tells Claude Code the plugin's name and metadata.
 - **`skills/scaffold-pipeline/SKILL.md`** — Auto-activated skill that provides pipeline context.

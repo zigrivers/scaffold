@@ -42,6 +42,7 @@ This skill provides context about the scaffold prompt pipeline ordering. When th
 | `/scaffold:single-agent-resume` | Resume work after a break |
 | `/scaffold:multi-agent-resume` | Resume multi-agent work after a break |
 | `/scaffold:new-enhancement` | Add a feature to an existing project |
+| `/scaffold:quick-task` | Create a focused task for a bug fix, refactor, or small improvement |
 | `/scaffold:prompt-pipeline` | Show the full pipeline reference |
 
 ## Key Dependencies

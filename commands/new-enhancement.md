@@ -293,8 +293,9 @@ Depending on the enhancement scope, you may want to re-run these prompts:
 
 ## When NOT to Use This Prompt
 
-- **Bug fixes**: Create a Beads task directly and fix it
-- **Refactoring**: No user-facing changes = just create a task, no doc updates needed
+- **Bug fixes**: Use `/scaffold:quick-task` instead — it creates focused, well-defined Beads tasks
+- **Refactoring**: Use `/scaffold:quick-task` instead — no doc updates needed, just a task with clear acceptance criteria
+- **Performance improvements**: Use `/scaffold:quick-task` instead — targeted fixes don't need full discovery
 - **Initial product creation**: Use the PRD prompt instead
 - **Major pivots**: If this changes the core product direction, revisit the full PRD first
 - **Exploratory ideas**: If you're not sure you want this, discuss before documenting

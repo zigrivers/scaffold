@@ -6,7 +6,7 @@ set -e
 
 TARGET_DIR="$HOME/.claude/commands"
 
-# Hardcoded list of the 25 known scaffold command files
+# Hardcoded list of the 26 known scaffold command files
 FILES=(
     "create-prd.md"
     "prd-gap-analysis.md"
@@ -32,6 +32,7 @@ FILES=(
     "single-agent-start.md"
     "single-agent-resume.md"
     "new-enhancement.md"
+    "quick-task.md"
     "prompt-pipeline.md"
     "update.md"
     "version.md"

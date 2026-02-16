@@ -71,6 +71,7 @@ Display the prompt pipeline order below. Do not read any files or run any comman
 | Prompt | Command | When |
 |--------|---------|------|
 | **New Enhancement** | `/scaffold:new-enhancement` | Adding features to existing project |
+| **Quick Task** | `/scaffold:quick-task` | Bug fixes, refactors, perf improvements |
 | **Resume (single)** | `/scaffold:single-agent-resume` | Resuming single-agent after a break |
 | **Resume (multi)** | `/scaffold:multi-agent-resume <agent-name>` | Resuming a worktree agent after a break |
 | **Implementation Plan Review** | `/scaffold:implementation-plan-review` | After creating 5+ new tasks |
