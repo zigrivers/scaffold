@@ -704,7 +704,8 @@ If the file already exists, **MERGE** these entries into the existing allow/deny
       "Glob(~/**)",
       "Grep(~/**)",
       "WebFetch(*)",
-      "WebSearch"
+      "WebSearch",
+      "mcp__*"
     ],
     "deny": [
       "Bash(rm -rf *)",
@@ -720,11 +721,13 @@ If the file already exists, **MERGE** these entries into the existing allow/deny
 
 **The bare `Bash` entry is the most important line.** It auto-approves all bash commands including compound commands with shell operators (`&&`, `||`, pipes, redirects, `$(...)`, backgrounding). Deny rules still block destructive operations — deny always wins over allow. Without the bare `Bash` entry, agents will be prompted for every compound command and autonomous workflows become impractical.
 
+**The `mcp__*` entry auto-approves all MCP (plugin) tools.** MCP servers are explicitly installed by the user — if you trust the plugin, you trust its tools. Without this entry, agents will be prompted for every Context7 lookup, every Playwright browser action, and every other MCP tool call. For granular control, use per-server wildcards instead (e.g., `mcp__plugin_context7_context7__*`, `mcp__plugin_playwright_playwright__*`).
+
 **Important**: Expand `~/**` to your actual home directory path (e.g., `/Users/username/**`).
 
 **Why broad `Bash` lives at user level:** Your standard dev tools are the same across all projects. Putting them in user-level means you don't copy the same allow list into every project. Project-level only needs deny rules for project-specific destructive operations. The deny rules at both levels combine — deny always wins.
 
-### Reference: What Bare Bash Covers
+### Reference: What These Entries Cover
 
 The bare `Bash` entry covers all of the following (and their compound combinations). This is provided for documentation — you do NOT need to add these as individual patterns:
 
@@ -734,6 +737,8 @@ The bare `Bash` entry covers all of the following (and their compound combinatio
 - **Build tools**: make, npm, npx, node, python, pytest, uv, pip
 - **Containers**: docker compose, docker ps, docker logs
 - **Shell utilities**: curl, ls, cat, find, grep, head, tail, sort, wc, pwd, echo, which, tree, mkdir, cp, mv, rm, touch, chmod, diff, sed, awk, tee, xargs
+
+**MCP (`mcp__*`)**: All tools from all installed MCP servers (plugins). Common servers include Context7 (documentation lookup), Playwright (browser automation), and any custom MCP servers configured in your environment.
 
 ### Cautious Mode (alternative)
 
@@ -812,7 +817,9 @@ If you cannot use the bare `Bash` entry (org policy, shared machines, etc.), you
 "Bash(env *)",
 "Bash(printenv *)",
 "Bash(cd *)",
-"Bash(./scripts/*)"
+"Bash(./scripts/*)",
+"mcp__plugin_context7_context7__*",
+"mcp__plugin_playwright_playwright__*"
 ```
 
 </details>
@@ -907,6 +914,8 @@ Test that these commands (used in the canonical workflow) don't prompt:
 | `make lint` | Verification |
 | `make test` | Verification |
 
+If MCP plugins are installed, verify that MCP tool calls (e.g., Context7 `resolve-library-id`, Playwright `browser_snapshot`) execute without prompting.
+
 Clean up after testing:
 ```bash
 git checkout main
@@ -915,12 +924,13 @@ git branch -D test-branch
 
 ### 5. Still Getting Prompted?
 
-Four common causes:
+Five common causes:
 
 1. **Missing bare `Bash`** — open `~/.claude/settings.json` and check for a standalone `"Bash"` entry (not `"Bash(something)"`). It must be present in the allow array.
 2. **Conflicting deny rule** — deny always wins over allow. Check both user-level and project-level deny arrays for rules that match the command being prompted.
 3. **Unexpanded `~/**` paths** — Claude Code may not expand `~`. Replace `~` with your actual home directory path (e.g., `/Users/username/**`).
 4. **Session not restarted** — permission changes require restarting Claude Code (`/exit` and relaunch, or start a new session).
+5. **Missing `mcp__*`** — the bare `Bash` entry does NOT cover MCP tools. MCP tools need their own allow entry. Check for `"mcp__*"` in the user-level allow array.
 
 ### 6. Commit Project Settings
 

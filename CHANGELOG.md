@@ -2,6 +2,13 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.3.5] — 2026-02-15
+
+### Added
+- MCP tool permissions (`mcp__*`) to Claude Code Permissions prompt — auto-approves all MCP plugin tools (Context7, Playwright, etc.) so agents aren't prompted on every MCP call
+- Per-server MCP wildcards added to cautious mode
+- MCP troubleshooting and verification guidance
+
 ## [1.3.4] — 2026-02-15
 
 ### Added
