@@ -7,7 +7,7 @@ The review loop has two tiers:
 | Tier | What | Cost |
 |------|------|------|
 | **Tier 1: Local self-review** | Claude subagent reviews changes before push | $0 (covered by Claude Code subscription/API) |
-| **Tier 2: Codex Cloud review** | GitHub App auto-reviews PRs | $0 per review (ChatGPT Pro subscription) |
+| **Tier 2: Codex Cloud review** | GitHub App auto-reviews PRs | Credit-based (~25 credits/review; weekly limits vary by plan) |
 | **Fix cycle** | Claude Code Action fixes findings in CI | ~$0.43 per fix (ANTHROPIC_API_KEY) |
 
 **Only one API key needed:** `ANTHROPIC_API_KEY` (for the fix cycle in GitHub Actions).
@@ -28,15 +28,17 @@ The review loop has two tiers:
 - Prompt caching: cache reads cost 10% of base input price (90% savings on repeated context like CLAUDE.md, review standards)
 - Batch API: 50% off (not applicable — we need real-time fixes)
 
-### Codex Cloud (Subscription-Based Review)
+### Codex Cloud (Credit-Based Review)
 
-| Subscription | Monthly Cost | Reviews Included | Notes |
-|-------------|-------------|------------------|-------|
-| **ChatGPT Pro** | $200/month | Unlimited | Covers Codex Cloud auto-reviews at $0/review |
-| ChatGPT Plus | $20/month | Limited | May have review caps — verify current limits |
-| ChatGPT Team | $25/user/month | Included | Team plan includes Codex Cloud |
+Codex Cloud reviews consume credits (~25 credits per review). Credit allocations reset weekly and vary by plan:
 
-**Key point:** If you already have a ChatGPT Pro subscription, Codex Cloud reviews are a sunk cost — $0 marginal cost per review.
+| Subscription | Monthly Cost | Weekly Credits | Reviews/Week (approx) | Notes |
+|-------------|-------------|----------------|----------------------|-------|
+| **ChatGPT Pro** | $200/month | ~1,250 credits | ~50 reviews | Highest allocation; best for active repos |
+| ChatGPT Plus | $20/month | ~200 credits | ~8 reviews | May hit limits on active repos |
+| ChatGPT Team | $25/user/month | ~500 credits/user | ~20 reviews/user | Per-user allocation |
+
+**Key point:** Codex Cloud reviews are NOT truly unlimited. At ~25 credits per review, even Pro users can hit limits on high-volume repos. The workflow includes usage-limit detection — if Codex hits its cap, it posts a comment and the handler labels the PR `ai-review-blocked` for human merge.
 
 ---
 
@@ -127,17 +129,18 @@ Codex Cloud reads `AGENTS.md` for review instructions. Adding "What NOT to flag"
 
 ## Comparison: Codex Cloud vs Codex Action (API)
 
-| | Codex Cloud (Subscription) | Codex Action (API) |
+| | Codex Cloud (Credits) | Codex Action (API) |
 |---|---|---|
-| **Review cost** | $0/review | ~$0.04/review (o4-mini) |
-| **Monthly review cost (22 PRs, 1.5 rounds)** | $0 | $1.32 |
-| **Total monthly cost** | $5.52 | $6.84 |
+| **Review cost** | ~25 credits/review (from subscription) | ~$0.04/review (o4-mini) |
+| **Monthly review cost (22 PRs, 1.5 rounds)** | ~825 credits/week peak | $1.32 |
+| **Total monthly cost** | Credits (included in subscription) + $4.73 fixes | $6.84 |
 | **API key needed** | No (GitHub App) | Yes (`OPENAI_API_KEY`) |
 | **Output format** | Prose (approval signal detection) | Structured JSON (parseable findings) |
 | **Prompt control** | AGENTS.md only | Full prompt file |
 | **Setup** | Install GitHub App + enable | Repo secret + custom workflow |
+| **Failure mode** | Hits credit limit → posts usage-limit comment | API rate limits / billing caps |
 
-**Recommendation:** Use Codex Cloud. The $1.32/month savings from not needing an OpenAI API key is minor, but the simpler setup and zero API management make it the better choice for most projects.
+**Recommendation:** Use Codex Cloud. The simpler setup and no API key management make it the better choice for most projects. Be aware of weekly credit limits — at 5 PRs/week with 1.5 rounds average, you'll use ~188 credits/week, well within Pro limits but potentially tight on Plus.
 
 ---
 
@@ -151,13 +154,14 @@ Additional monthly cost: $0 (Gemini Code Assist free tier covers low-volume usag
 
 ## Recommendation
 
-**Use Codex Cloud (subscription) for reviews + ANTHROPIC_API_KEY for fixes.**
+**Use Codex Cloud (credits from subscription) for reviews + ANTHROPIC_API_KEY for fixes.**
 
 Reasoning:
-- $0 marginal cost for reviews if you already have a ChatGPT Pro subscription
+- Low marginal cost for reviews if you already have a ChatGPT subscription (~25 credits/review from your weekly allocation)
 - Single API key to manage (`ANTHROPIC_API_KEY`)
-- At $5.52/month total, the cost is negligible compared to the value of catching bugs before they ship
+- At $4.73/month for fixes (plus credits from existing subscription), the cost is negligible compared to the value of catching bugs before they ship
 - Self-review (Tier 1) further reduces costs by catching easy issues locally
+- The workflow detects Codex usage-limit failures gracefully (labels PR for human merge)
 - If you want a second reviewer later, add Gemini Code Assist — it's free and independent
 
 **What NOT to do:**

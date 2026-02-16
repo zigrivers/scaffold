@@ -24,7 +24,7 @@ Nobody has published a complete, automated, multi-round convergence loop with mu
 | **Claude Code Action** | Full Claude Code session in GitHub Actions. Can read code, write files, push commits, post PR comments. | `anthropics/claude-code-action@v1` |
 | **Codex Action** | Runs OpenAI Codex CLI in GitHub Actions. Can read code, generate structured JSON output, run in read-only sandbox. | `openai/codex-action@v1` |
 | **Gemini CLI Action** | Runs Google Gemini CLI in GitHub Actions. Can read code, post structured review comments. | `google-github-actions/run-gemini-cli@v1` |
-| **Codex Cloud** | Auto-reviews PRs when connected via GitHub App. Posts P0/P1 findings. Reads `AGENTS.md` for custom review instructions. | GitHub App — no API key needed (uses ChatGPT Pro subscription) |
+| **Codex Cloud** | Auto-reviews PRs when connected via GitHub App. Posts P0/P1 findings. Reads `AGENTS.md` for custom review instructions. | GitHub App — no API key needed (uses ChatGPT subscription credits) |
 | **Gemini Code Assist** | Auto-reviews PRs when installed as GitHub App. Posts severity-graded findings. | GitHub App + `/gemini review` |
 
 ---
@@ -33,37 +33,42 @@ Nobody has published a complete, automated, multi-round convergence loop with mu
 
 ### How It Works
 
-Codex Cloud is a GitHub App that auto-reviews PRs using your ChatGPT Pro subscription — no OpenAI API key required. After installing the "ChatGPT Codex Connector" GitHub App on your repository and enabling "Code review" in Codex settings:
+Codex Cloud is a GitHub App that auto-reviews PRs using credits from your ChatGPT subscription — no OpenAI API key required. After installing the "ChatGPT Codex Connector" GitHub App on your repository and enabling "Code review" in Codex settings:
 
 1. Every PR triggers an automatic review by Codex Cloud
 2. Codex reads `AGENTS.md` at the repo root for custom review instructions
 3. Reviews are posted as PR comments (prose, not structured JSON)
-4. No API usage — covered entirely by the ChatGPT Pro subscription ($20/month or included in ChatGPT Plus/Team/Enterprise)
+4. No API key needed — uses credits from your ChatGPT subscription (~25 credits per review, weekly limits vary by plan)
 
 ### Key Characteristics
 
-- **Cost**: $0 per review (subscription-based)
-- **Output format**: Prose comments, not structured JSON — convergence checks look for an explicit approval signal rather than parsing findings
-- **Custom instructions**: Reads `AGENTS.md` at repo root (not a prompt file in `.github/`)
+- **Cost**: Credit-based (~25 credits per review); weekly limits vary by plan (not truly unlimited)
+- **Severity**: Flags P0/P1 issues only. P2/P3 are handled by local self-review (Tier 1).
+- **Output format**: Prose comments, not structured JSON — convergence checks look for an explicit approval signal (`APPROVED: No P0/P1 issues found.`) rather than parsing findings
+- **Custom instructions**: Reads `AGENTS.md` at repo root (not a prompt file in `.github/`). Recommended heading: `## Review guidelines`
 - **Bot username**: `chatgpt-codex-connector[bot]` (standard Codex Cloud GitHub App — verify with a test PR if different)
-- **Trigger**: Automatic on PR creation/update — no `@codex review` comment needed
-- **Limitations**: Less control over review prompt than Codex Action; review depth depends on subscription tier
+- **Trigger**: Automatic on PR creation/update — no `@codex review` comment needed. Posts a `pull_request_review` event that can be handled event-driven (no polling required).
+- **Limitations**: Less control over review prompt than Codex Action; credit limits may block reviews on high-volume repos; posts a usage-limit comment when credits are exhausted
 
 ### Subscription vs API Key
 
 | Approach | Cost | Control | Setup |
 |----------|------|---------|-------|
-| **Codex Cloud (subscription)** | $0/review (ChatGPT Pro covers it) | Medium — custom instructions via AGENTS.md only | Install GitHub App, enable code review |
+| **Codex Cloud (subscription)** | Credit-based (~25 credits/review, weekly limits) | Medium — custom instructions via AGENTS.md only | Install GitHub App, enable code review |
 | **Codex Action (API key)** | ~$0.04/review (o4-mini) | High — full prompt control, structured JSON output | `OPENAI_API_KEY` repo secret, custom workflow |
 
-**Our recommendation**: Use Codex Cloud for reviews (free, good enough) and reserve API keys for the fix cycle (Claude Code Action needs `ANTHROPIC_API_KEY`).
+**Our recommendation**: Use Codex Cloud for reviews (low marginal cost via credits) and reserve API keys for the fix cycle (Claude Code Action needs `ANTHROPIC_API_KEY`).
+
+### Event-Driven Architecture
+
+Codex Cloud posts a `pull_request_review` event when its review is complete. This means the review loop can be fully event-driven — a handler workflow triggered by `pull_request_review: [submitted]` fires only when Codex actually posts, eliminating the need to poll. The trigger workflow (on `pull_request: [opened, synchronize]`) just sets up the gate and labels; the handler workflow does convergence checking and fix dispatch. An optional timeout cron workflow handles the case where Codex never responds.
 
 ---
 
 ## Key Design Decisions from Research
 
 **1. Structured output is essential for API-driven loops.**
-Codex Action supports `--output-schema` to produce typed JSON (findings array with severity, file, line, explanation, suggestion). Gemini's CLI action outputs structured markdown with severity ratings. However, Codex Cloud posts prose — so when using the GitHub App approach, convergence detection uses explicit approval signals ("APPROVED: No P0/P1/P2 issues found") rather than JSON parsing.
+Codex Action supports `--output-schema` to produce typed JSON (findings array with severity, file, line, explanation, suggestion). Gemini's CLI action outputs structured markdown with severity ratings. However, Codex Cloud posts prose — so when using the GitHub App approach, convergence detection uses explicit approval signals ("APPROVED: No P0/P1 issues found") rather than JSON parsing.
 
 **2. Fresh sessions prevent "agreeing because we already agreed."**
 Kim Major's key finding: iterative sessions converge into a shared narrative where the reviewer stops pushing back. Fresh sessions (no prior conversation history) preserve the independence of each review round. Each review round should be a clean invocation, not a continuation.
