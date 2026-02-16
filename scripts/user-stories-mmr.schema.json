@@ -1,0 +1,194 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "User Stories Multi-Model Review",
+  "description": "Structured output schema for Codex/Gemini review of user stories against PRD requirements",
+  "type": "object",
+  "required": [
+    "missing_requirements",
+    "story_issues",
+    "contradictions",
+    "duplication_or_overlap",
+    "coverage_assertion"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "missing_requirements": {
+      "type": "array",
+      "description": "PRD requirements that have no corresponding user story",
+      "items": {
+        "type": "object",
+        "required": ["requirement_id", "requirement_text", "prd_section", "suggested_story"],
+        "additionalProperties": false,
+        "properties": {
+          "requirement_id": {
+            "type": "string",
+            "description": "Identifier from requirements-index.md (e.g., REQ-014)"
+          },
+          "requirement_text": {
+            "type": "string",
+            "description": "The uncovered PRD requirement text"
+          },
+          "prd_section": {
+            "type": "string",
+            "description": "Section of docs/plan.md where this requirement appears"
+          },
+          "suggested_story": {
+            "type": "object",
+            "required": ["title", "story", "acceptance_criteria", "priority"],
+            "additionalProperties": false,
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "Suggested story title"
+              },
+              "story": {
+                "type": "string",
+                "description": "As a [persona], I want [action], so that [outcome]"
+              },
+              "acceptance_criteria": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Given/When/Then acceptance criteria"
+              },
+              "priority": {
+                "type": "string",
+                "enum": ["Must", "Should", "Could", "Won't"],
+                "description": "MoSCoW priority"
+              }
+            }
+          }
+        }
+      }
+    },
+    "story_issues": {
+      "type": "array",
+      "description": "Quality problems found in existing user stories",
+      "items": {
+        "type": "object",
+        "required": ["story_id", "severity", "issue_type", "description", "evidence", "suggested_fix"],
+        "additionalProperties": false,
+        "properties": {
+          "story_id": {
+            "type": "string",
+            "description": "The user story ID (e.g., US-003)"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"],
+            "description": "Impact severity"
+          },
+          "issue_type": {
+            "type": "string",
+            "enum": [
+              "vague_acceptance_criteria",
+              "missing_edge_case",
+              "too_large",
+              "missing_scope_boundary",
+              "missing_data_requirements",
+              "untestable",
+              "ambiguous",
+              "other"
+            ],
+            "description": "Category of the issue"
+          },
+          "description": {
+            "type": "string",
+            "description": "What is wrong with this story"
+          },
+          "evidence": {
+            "type": "string",
+            "description": "Quote or reference from the story/PRD supporting this finding"
+          },
+          "suggested_fix": {
+            "type": "string",
+            "description": "Concrete suggestion for how to fix the issue"
+          }
+        }
+      }
+    },
+    "contradictions": {
+      "type": "array",
+      "description": "Conflicts between PRD requirements and user stories",
+      "items": {
+        "type": "object",
+        "required": ["prd_statement", "prd_section", "story_id", "story_statement", "resolution"],
+        "additionalProperties": false,
+        "properties": {
+          "prd_statement": {
+            "type": "string",
+            "description": "What the PRD says"
+          },
+          "prd_section": {
+            "type": "string",
+            "description": "Section of docs/plan.md"
+          },
+          "story_id": {
+            "type": "string",
+            "description": "The conflicting user story ID"
+          },
+          "story_statement": {
+            "type": "string",
+            "description": "What the story says that conflicts"
+          },
+          "resolution": {
+            "type": "string",
+            "description": "Suggested resolution"
+          }
+        }
+      }
+    },
+    "duplication_or_overlap": {
+      "type": "array",
+      "description": "Stories that overlap significantly or are redundant",
+      "items": {
+        "type": "object",
+        "required": ["story_ids", "overlap_description", "recommendation"],
+        "additionalProperties": false,
+        "properties": {
+          "story_ids": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 2,
+            "description": "IDs of overlapping stories (e.g., [\"US-003\", \"US-017\"])"
+          },
+          "overlap_description": {
+            "type": "string",
+            "description": "What the stories have in common"
+          },
+          "recommendation": {
+            "type": "string",
+            "enum": ["consolidate", "clarify_boundaries", "keep_separate"],
+            "description": "What to do about the overlap"
+          }
+        }
+      }
+    },
+    "coverage_assertion": {
+      "type": "object",
+      "required": ["total_requirements", "covered_count", "uncovered_ids", "confidence"],
+      "additionalProperties": false,
+      "description": "Overall coverage assessment",
+      "properties": {
+        "total_requirements": {
+          "type": "integer",
+          "description": "Total number of atomic PRD requirements from requirements-index.md"
+        },
+        "covered_count": {
+          "type": "integer",
+          "description": "Number of requirements with at least one user story"
+        },
+        "uncovered_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Requirement IDs that lack story coverage (should match missing_requirements)"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Confidence score (0-1) in the coverage assessment"
+        }
+      }
+    }
+  }
+}

@@ -41,6 +41,7 @@ declare -a FRONTMATTER=(
     'add-maestro|Configure Maestro for mobile app testing|'
     'user-stories|Create user stories covering every PRD feature|'
     'user-stories-gaps|Gap analysis and UX innovation for user stories|'
+    'user-stories-multi-model-review|Multi-model review of user stories for PRD coverage|'
     'platform-parity-review|Audit platform coverage across all docs|'
     'claude-md-optimization|Consolidate and optimize CLAUDE.md|'
     'workflow-audit|Verify workflow consistency across all docs|'
@@ -76,6 +77,7 @@ HEADING_TO_SLUG["Integrate Playwright (if building a web app)"]="add-playwright"
 HEADING_TO_SLUG["Maestro Setup"]="add-maestro"
 HEADING_TO_SLUG["User Stories"]="user-stories"
 HEADING_TO_SLUG["User Stories Gap Analysis & Innovation"]="user-stories-gaps"
+HEADING_TO_SLUG["User Stories Multi-Model Review"]="user-stories-multi-model-review"
 HEADING_TO_SLUG["Platform Parity Review"]="platform-parity-review"
 HEADING_TO_SLUG["Claude.md Optimization"]="claude-md-optimization"
 HEADING_TO_SLUG["Workflow Audit"]="workflow-audit"
@@ -365,6 +367,26 @@ When this step is complete, tell the user:
 
 ---
 **Phase 5 in progress** — `docs/user-stories.md` updated with gap fixes and approved innovations.
+
+**Next:**
+- **(Optional)** If you have **Codex CLI and/or Gemini CLI** installed: Run `/scaffold:user-stories-multi-model-review` — Multi-model coverage audit with independent reviewers.
+- If your project targets **multiple platforms** (web + mobile): Run `/scaffold:platform-parity-review` — Audit platform coverage across all docs.
+- Otherwise: Skip to `/scaffold:claude-md-optimization` — Consolidate and optimize CLAUDE.md (starts Phase 6).
+
+**Pipeline reference:** `/scaffold:prompt-pipeline`
+
+---
+NEXTSTEP
+            ;;
+        user-stories-multi-model-review)
+            cat <<'NEXTSTEP'
+
+## After This Step
+
+When this step is complete, tell the user:
+
+---
+**Phase 5 in progress** — User stories reviewed by independent models, coverage verified against PRD.
 
 **Next:**
 - If your project targets **multiple platforms** (web + mobile): Run `/scaffold:platform-parity-review` — Audit platform coverage across all docs.

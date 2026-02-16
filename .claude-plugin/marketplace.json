@@ -7,7 +7,7 @@
     {
       "name": "scaffold",
       "source": "./",
-      "description": "26-prompt pipeline for scaffolding new software projects with Claude Code"
+      "description": "27-prompt pipeline for scaffolding new software projects with Claude Code"
     }
   ]
 }

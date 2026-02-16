@@ -71,6 +71,7 @@ When this step is complete, tell the user:
 **Phase 5 in progress** — `docs/user-stories.md` updated with gap fixes and approved innovations.
 
 **Next:**
+- **(Optional)** If you have **Codex CLI and/or Gemini CLI** installed: Run `/scaffold:user-stories-multi-model-review` — Multi-model coverage audit with independent reviewers.
 - If your project targets **multiple platforms** (web + mobile): Run `/scaffold:platform-parity-review` — Audit platform coverage across all docs.
 - Otherwise: Skip to `/scaffold:claude-md-optimization` — Consolidate and optimize CLAUDE.md (starts Phase 6).
 

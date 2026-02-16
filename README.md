@@ -230,6 +230,7 @@ Break the PRD down into implementable user stories.
 |---|---------|-------------|-------|
 | 14 | `/scaffold:user-stories` | Creates `docs/user-stories.md` with detailed stories for every PRD feature | |
 | 15 | `/scaffold:user-stories-gaps` | Gap analysis and UX innovation pass on user stories | |
+| 15.5 | `/scaffold:user-stories-multi-model-review` | Multi-model coverage audit with Codex/Gemini reviewers | **Optional** — requires Codex/Gemini CLI |
 | 16 | `/scaffold:platform-parity-review` | Audits docs for platform coverage gaps | **Optional** — multi-platform projects only |
 
 ### Phase 6 — Consolidation & Verification
@@ -343,7 +344,7 @@ Scaffold is designed for new projects. For existing projects, you can use `/scaf
 
 The pipeline lives in a few key places:
 
-- **`prompts.md`** — The source of truth. Contains all 26 prompts in a single file with a setup order table at the top and individual prompt sections below.
+- **`prompts.md`** — The source of truth. Contains all 27 prompts in a single file with a setup order table at the top and individual prompt sections below.
 - **`commands/`** — Individual `.md` files (one per command) with YAML frontmatter and "After This Step" guidance. These are what Claude Code actually executes when you run a slash command.
 - **`.claude-plugin/plugin.json`** — Plugin manifest that tells Claude Code the plugin's name and metadata.
 - **`skills/scaffold-pipeline/SKILL.md`** — Auto-activated skill that provides pipeline context.

@@ -27,6 +27,7 @@ This skill provides context about the scaffold prompt pipeline ordering. When th
 | 13 | Testing | `/scaffold:add-maestro` | **(optional)** Mobile/Expo apps only |
 | 14 | Stories & Planning | `/scaffold:user-stories` | Covers every PRD feature |
 | 15 | Stories & Planning | `/scaffold:user-stories-gaps` | UX improvements |
+| 15.5 | Stories & Planning | `/scaffold:user-stories-multi-model-review` | **(optional)** Requires Codex/Gemini CLI |
 | 16 | Stories & Planning | `/scaffold:platform-parity-review` | **(optional)** Multi-platform projects |
 | 17 | Consolidation | `/scaffold:claude-md-optimization` | Run BEFORE workflow-audit |
 | 18 | Consolidation | `/scaffold:workflow-audit` | Run AFTER claude-md-optimization |

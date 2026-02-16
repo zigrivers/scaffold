@@ -2,6 +2,18 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.6.0] — 2026-02-16
+
+### Added
+- **User Stories Multi-Model Review** command (`/scaffold:user-stories-multi-model-review`) — optional quality gate that runs Codex and Gemini as independent reviewers of user stories, enforcing 100% PRD coverage with hard traceability
+- `scripts/user-stories-mmr.sh` — automation script for parallel Codex/Gemini CLI review execution with graceful degradation, auto-retry, and JSON validation
+- `scripts/user-stories-mmr.schema.json` — structured output schema for review JSON (used by Codex `--output-schema` and Gemini output validation)
+- Atomic PRD requirements index (`docs/reviews/user-stories/requirements-index.md`) and coverage map (`docs/reviews/user-stories/coverage.json`) for verifiable PRD-to-story traceability
+
+### Changed
+- Prompt count updated from 26 to 27 across all references
+- User Stories Gap Analysis "After This Step" updated to mention optional multi-model review
+
 ## [1.5.0] — 2026-02-16
 
 ### Added
