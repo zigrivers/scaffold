@@ -50,6 +50,9 @@ Lets Claude control a real browser for visual testing and screenshots. MCP (Mode
 **ChatGPT subscription** (for multi-model review)
 One optional step (`multi-model-review`) sets up automated code review using both Claude and OpenAI's Codex. This requires a ChatGPT subscription (Plus, Pro, or Team) — reviews use credits (~25 per review) with weekly limits that vary by plan. You can skip this step entirely if you don't have one.
 
+**Codex CLI and/or Gemini CLI** (for user stories multi-model review)
+One optional step (`user-stories-multi-model-review`) runs independent AI reviewers against your user stories to catch gaps a single model might miss. You need at least one of: Codex CLI (requires ChatGPT subscription) or Gemini CLI (free tier available). See [Multi-Model Stories Review Setup](docs/multi-model-stories-review-setup.md) for detailed instructions.
+
 ## Installation
 
 There are two ways to install Scaffold. Both give you the same commands — the only difference is the prefix you type.
@@ -283,6 +286,7 @@ Run everything above, including both Playwright and Maestro, plus:
 ### Other optional steps
 
 - `/scaffold:multi-model-review` — requires a ChatGPT subscription (Plus/Pro/Team). Sets up a two-tier automated code review (Claude + OpenAI Codex) on every PR. Reviews use credits (~25 per review, weekly limits). Skip it if you don't have a ChatGPT subscription.
+- `/scaffold:user-stories-multi-model-review` — runs independent Codex and/or Gemini reviews of your user stories against the PRD. Requires at least one of: Codex CLI (ChatGPT subscription) or Gemini CLI (free tier available). See [setup guide](docs/multi-model-stories-review-setup.md).
 - `/scaffold:platform-parity-review` — only needed if your project targets multiple platforms (e.g., web + iOS + Android). Skip it for single-platform projects.
 
 ## After the Pipeline: Ongoing Commands

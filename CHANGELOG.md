@@ -2,6 +2,13 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.6.1] — 2026-02-16
+
+### Added
+- `docs/multi-model-stories-review-setup.md` — beginner-friendly setup guide for Codex CLI and Gemini CLI installation, authentication, and troubleshooting
+- README: "Codex CLI and/or Gemini CLI" entry in Optional prerequisites section with link to setup guide
+- README: `/scaffold:user-stories-multi-model-review` entry in Other optional steps section with link to setup guide
+
 ## [1.6.0] — 2026-02-16
 
 ### Added
