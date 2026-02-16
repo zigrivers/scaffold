@@ -2,6 +2,11 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.3.4] — 2026-02-15
+
+### Added
+- `docs/scaffold-overview.md` — central reference document covering purpose, all 29 commands, pipeline phases, dependencies, documentation outputs, and key concepts
+
 ## [1.3.1] — 2026-02-15
 
 ### Added
