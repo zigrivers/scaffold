@@ -47,8 +47,8 @@ Lets Claude control a real browser for visual testing and screenshots. MCP (Mode
 - Install: `claude mcp add playwright npx @playwright/mcp@latest`
 - Only needed if your project has a web frontend
 
-**ChatGPT Pro subscription** (for multi-model review)
-One optional step (`multi-model-review`) sets up automated code review using both Claude and OpenAI's Codex. This requires a ChatGPT Pro subscription. You can skip this step entirely if you don't have one.
+**ChatGPT subscription** (for multi-model review)
+One optional step (`multi-model-review`) sets up automated code review using both Claude and OpenAI's Codex. This requires a ChatGPT subscription (Plus, Pro, or Team) — reviews use credits (~25 per review) with weekly limits that vary by plan. You can skip this step entirely if you don't have one.
 
 ## Installation
 
@@ -211,7 +211,7 @@ Get the dev server running and set up collaboration infrastructure.
 | 9 | `/scaffold:dev-env-setup` | Sets up dev server, database, environment variables, and `docs/dev-setup.md` | |
 | 10 | `/scaffold:design-system` | Creates a design system with components, colors, and typography | **Optional** — frontend projects only |
 | 11 | `/scaffold:git-workflow` | Configures branching strategy, CI pipeline, and parallel agent worktrees in `docs/git-workflow.md` | |
-| 11.5 | `/scaffold:multi-model-review` | Sets up automated code review using Claude and OpenAI Codex on PRs | **Optional** — requires ChatGPT Pro |
+| 11.5 | `/scaffold:multi-model-review` | Sets up automated code review using Claude and OpenAI Codex on PRs | **Optional** — requires ChatGPT subscription (credits) |
 
 ### Phase 4 — Testing Integration
 
@@ -281,7 +281,7 @@ Run everything above, including both Playwright and Maestro, plus:
 
 ### Other optional steps
 
-- `/scaffold:multi-model-review` — requires a ChatGPT Pro subscription. Sets up a two-tier automated code review (Claude + OpenAI Codex) on every PR. Skip it if you don't have ChatGPT Pro.
+- `/scaffold:multi-model-review` — requires a ChatGPT subscription (Plus/Pro/Team). Sets up a two-tier automated code review (Claude + OpenAI Codex) on every PR. Reviews use credits (~25 per review, weekly limits). Skip it if you don't have a ChatGPT subscription.
 - `/scaffold:platform-parity-review` — only needed if your project targets multiple platforms (e.g., web + iOS + Android). Skip it for single-platform projects.
 
 ## After the Pipeline: Ongoing Commands
