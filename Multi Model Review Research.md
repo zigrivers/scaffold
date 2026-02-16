@@ -45,7 +45,7 @@ Codex Cloud is a GitHub App that auto-reviews PRs using your ChatGPT Pro subscri
 - **Cost**: $0 per review (subscription-based)
 - **Output format**: Prose comments, not structured JSON — convergence checks look for an explicit approval signal rather than parsing findings
 - **Custom instructions**: Reads `AGENTS.md` at repo root (not a prompt file in `.github/`)
-- **Bot username**: Verify after installing — candidates are `chatgpt-codex[bot]` or `codex-bot[bot]`
+- **Bot username**: `chatgpt-codex-connector[bot]` (standard Codex Cloud GitHub App — verify with a test PR if different)
 - **Trigger**: Automatic on PR creation/update — no `@codex review` comment needed
 - **Limitations**: Less control over review prompt than Codex Action; review depth depends on subscription tier
 

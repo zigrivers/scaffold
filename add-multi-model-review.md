@@ -118,7 +118,7 @@ If there ARE findings, list each one with its severity, file, line, and a concre
 You are the engineer who wrote this PR. Codex Cloud has posted review findings.
 
 ## Your Task
-1. Read ALL review comments on this PR from Codex Cloud.
+1. Read ALL review findings from Codex Cloud. Findings are posted as inline PR review comments. Use: `gh api repos/OWNER/REPO/pulls/NUMBER/comments --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | {path: .path, body: .body}'`
 2. For each **P0**, **P1**, or **P2** finding:
    - If the finding is valid: fix the code.
    - If the finding is a false positive: note why in a reply comment.
@@ -157,8 +157,7 @@ concurrency:
 
 env:
   MAX_REVIEW_ROUNDS: 3
-  # Update this after installing Codex Cloud — check the bot's username
-  CODEX_BOT_NAME: "chatgpt-codex[bot]"
+  CODEX_BOT_NAME: "chatgpt-codex-connector[bot]"
 
 jobs:
   # ─── Gate: Should we run? ────────────────────────────────
@@ -179,7 +178,7 @@ jobs:
         run: |
           # Check if any code files changed (skip for docs/config-only PRs)
           CODE_CHANGED=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD \
-            | grep -v -E '\.(md|yaml|yml|json|toml|lock)$' | wc -l)
+            | grep -v -E '\.(md|yaml|yml|json|jsonl|toml|lock)$' | wc -l)
 
           if [ "$CODE_CHANGED" -eq 0 ]; then
             echo "should_review=false" >> $GITHUB_OUTPUT
@@ -217,38 +216,50 @@ jobs:
     permissions:
       pull-requests: read
     outputs:
-      codex_comment: ${{ steps.poll.outputs.comment }}
+      has_review: ${{ steps.poll.outputs.has_review }}
+      findings_count: ${{ steps.poll.outputs.findings_count }}
+      review_body: ${{ steps.poll.outputs.review_body }}
     steps:
-      - name: Poll for Codex Cloud comment
+      - name: Poll for Codex Cloud review
         id: poll
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ROUND=${{ needs.check-gate.outputs.current_round }}
           PR=${{ github.event.pull_request.number }}
           REPO=${{ github.repository }}
-          # The workflow trigger time — Codex Cloud comment must be after this
-          TRIGGER_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          BOT="${{ env.CODEX_BOT_NAME }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
 
-          echo "Waiting for Codex Cloud review comment..."
+          echo "Waiting for Codex Cloud PR review on commit $HEAD_SHA..."
           for i in $(seq 1 30); do
             sleep 20
-            # Look for a comment from the Codex bot posted after the workflow started
-            COMMENT=$(gh api "repos/$REPO/issues/$PR/comments" \
-              --jq "[.[] | select(.user.login == env.CODEX_BOT_NAME or .user.login == \"codex-bot[bot]\") | select(.created_at >= \"$TRIGGER_TIME\")] | last | .body // empty")
 
-            if [ -n "$COMMENT" ]; then
-              echo "Found Codex Cloud review comment"
-              echo "comment<<EOF" >> $GITHUB_OUTPUT
-              echo "$COMMENT" >> $GITHUB_OUTPUT
+            # Check PR reviews for the CURRENT commit only (ignore stale reviews from previous rounds)
+            REVIEW_BODY=$(gh api "repos/$REPO/pulls/$PR/reviews" \
+              --jq "[.[] | select(.user.login == \"$BOT\" and .commit_id == \"$HEAD_SHA\")] | last | .body // empty" 2>/dev/null || echo "")
+
+            if [ -n "$REVIEW_BODY" ]; then
+              echo "Found Codex Cloud review for commit $HEAD_SHA"
+
+              # Count inline review comments for the current commit only
+              FINDINGS=$(gh api "repos/$REPO/pulls/$PR/comments" \
+                --jq "[.[] | select(.user.login == \"$BOT\" and .commit_id == \"$HEAD_SHA\")] | length" 2>/dev/null || echo "0")
+
+              echo "has_review=true" >> $GITHUB_OUTPUT
+              echo "findings_count=$FINDINGS" >> $GITHUB_OUTPUT
+              echo "review_body<<EOF" >> $GITHUB_OUTPUT
+              echo "$REVIEW_BODY" >> $GITHUB_OUTPUT
               echo "EOF" >> $GITHUB_OUTPUT
+              echo "Review found with $FINDINGS inline finding(s)"
               exit 0
             fi
-            echo "Attempt $i/30 — no comment yet, waiting 20s..."
+            echo "Attempt $i/30 — no review yet, waiting 20s..."
           done
 
-          echo "Timed out waiting for Codex Cloud comment (10 minutes)"
-          echo "comment=" >> $GITHUB_OUTPUT
+          echo "Timed out waiting for Codex Cloud review (10 minutes)"
+          echo "has_review=false" >> $GITHUB_OUTPUT
+          echo "findings_count=0" >> $GITHUB_OUTPUT
+          echo "review_body=" >> $GITHUB_OUTPUT
 
   # ─── Convergence Check ──────────────────────────────────
   check-convergence:
@@ -265,24 +276,32 @@ jobs:
         id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CODEX_COMMENT: ${{ needs.wait-for-codex.outputs.codex_comment }}
+          HAS_REVIEW: ${{ needs.wait-for-codex.outputs.has_review }}
+          FINDINGS_COUNT: ${{ needs.wait-for-codex.outputs.findings_count }}
+          REVIEW_BODY: ${{ needs.wait-for-codex.outputs.review_body }}
         run: |
           ROUND=${{ needs.check-gate.outputs.current_round }}
 
-          # Look for the explicit approval signal from Codex Cloud
-          if echo "$CODEX_COMMENT" | grep -qi "APPROVED: No P0/P1/P2 issues found"; then
-            echo "verdict=approved" >> $GITHUB_OUTPUT
-            echo "Codex Cloud approved — no P0/P1/P2 issues"
-          elif [ -z "$CODEX_COMMENT" ]; then
-            # No comment found (timeout) — treat as approval to avoid blocking
+          echo "Round: $ROUND | Has review: $HAS_REVIEW | Findings: $FINDINGS_COUNT"
+
+          if [ "$HAS_REVIEW" != "true" ]; then
+            # No review found (timeout) — treat as approval to avoid blocking
             echo "verdict=approved" >> $GITHUB_OUTPUT
             echo "Codex Cloud did not respond — treating as approved"
+          elif [ "$FINDINGS_COUNT" -eq 0 ]; then
+            # Review exists but no inline findings — approved
+            echo "verdict=approved" >> $GITHUB_OUTPUT
+            echo "Codex Cloud reviewed with no findings — approved"
+          elif echo "$REVIEW_BODY" | grep -qi "APPROVED: No P0/P1/P2 issues found"; then
+            # Explicit approval signal in review body
+            echo "verdict=approved" >> $GITHUB_OUTPUT
+            echo "Codex Cloud explicitly approved"
           elif [ "$ROUND" -ge "$MAX_REVIEW_ROUNDS" ]; then
             echo "verdict=capped" >> $GITHUB_OUTPUT
             echo "Max rounds reached — auto-merging"
           else
             echo "verdict=fix" >> $GITHUB_OUTPUT
-            echo "Findings present — triggering fix cycle"
+            echo "$FINDINGS_COUNT finding(s) present — triggering fix cycle"
           fi
 
       - name: Label round
@@ -355,9 +374,24 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
 
+      - name: Select fix model
+        id: model
+        run: |
+          ROUND=${{ needs.check-gate.outputs.current_round }}
+          # Round 1: Sonnet handles straightforward fixes at lower cost
+          # Round 2+: Escalate to Opus if prior fix attempt didn't satisfy reviewer
+          if [ "${ROUND:-1}" -gt 1 ]; then
+            echo "selected=claude-opus-4-6" >> $GITHUB_OUTPUT
+            echo "Using Opus (round ${ROUND} — escalating after prior fix attempt)"
+          else
+            echo "selected=claude-sonnet-4-5-20250929" >> $GITHUB_OUTPUT
+            echo "Using Sonnet (round ${ROUND} — first fix attempt)"
+          fi
+
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          allowed_bots: 'claude[bot]'
           prompt: |
             REPO: ${{ github.repository }}
             PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -365,13 +399,14 @@ jobs:
 
             Read .github/review-prompts/fix-prompt.md for your full instructions.
 
-            Codex Cloud has posted review findings as a PR comment.
-            Read ALL comments from Round ${{ needs.check-gate.outputs.current_round }}.
+            Codex Cloud has posted review findings as PR review comments (inline on files).
+            To read them, run: gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments --jq '.[] | select(.user.login == "${{ env.CODEX_BOT_NAME }}") | {path: .path, body: .body}'
             Fix the P0, P1, and P2 issues identified.
             Run lint and test commands from CLAUDE.md Key Commands to verify.
             Commit and push your fixes.
           claude_args: |
-            --allowedTools "Bash(git:*),Bash(gh pr comment:*),Bash(make:*),Bash(npm:*),Read,Write,Bash(pip:*)"
+            --model ${{ steps.model.outputs.selected }}
+            --allowedTools "Bash(git:*),Bash(gh:*),Bash(make:*),Bash(npm:*),Read,Write,Edit,Bash(pip:*),Bash(cd:*),Bash(uv:*),Bash(pnpm:*)"
             --max-turns 10
 ```
 
@@ -452,7 +487,7 @@ Complete these before the review loop will work:
    - Go to github.com and find the "ChatGPT Codex Connector" app
    - Install it on your repository
    - Enable "Code review" in Codex settings (chatgpt.com → Codex → Settings)
-   - **Tell me when this is done** — I'll auto-detect the bot username and update the workflow
+   - The default bot username `chatgpt-codex-connector[bot]` is pre-configured in the workflow
 
 4. [ ] **Add ANTHROPIC_API_KEY repo secret** — For Claude Code Action fixes (~$5-7/month)
    - Create key at console.anthropic.com (if you don't already have one)
@@ -465,20 +500,6 @@ Complete these before the review loop will work:
 
 7. [ ] **Allow Actions to create PRs** — Settings → Actions → General → Allow GitHub Actions to create and approve pull requests ✓
 ```
-
----
-
-## Phase 4.5: Auto-Detect Codex Bot Username
-
-After the user confirms they've installed the Codex Cloud GitHub App (prerequisite #2), auto-detect the bot username and update the workflow:
-
-```bash
-# Detect the Codex bot username from installed apps
-BOT_NAME=$(gh api repos/:owner/:repo/installations \
-  --jq '.[] | select(.app_slug | test("codex|chatgpt")) | .app_slug + "[bot]"' 2>/dev/null | head -1)
-```
-
-If detected, update the `CODEX_BOT_NAME` env var in `.github/workflows/code-review.yml` with the actual value. If detection fails (API permissions may vary), ask the user to check the bot's username from a test PR comment and update manually.
 
 ---
 
@@ -499,10 +520,11 @@ ls .github/workflows/code-review.yml
 ### 5.2 Verify Cross-References
 
 - `AGENTS.md` references `docs/review-standards.md` and other project docs
-- `.github/review-prompts/fix-prompt.md` references `docs/review-standards.md`
+- `.github/review-prompts/fix-prompt.md` references `docs/review-standards.md` and instructs reading inline PR review comments (not issue comments)
 - `CLAUDE.md` mentions the Code Review section and references `docs/review-standards.md`
 - `docs/git-workflow.md` has the self-review step with the correct lint/test commands
 - If CLAUDE.md has a PR workflow, it matches the updated `docs/git-workflow.md`
+- The workflow polls `pulls/{n}/reviews` for the review and `pulls/{n}/comments` for inline findings (not `issues/{n}/comments`)
 
 ### 5.3 Verify No Conflicts with Existing CI
 

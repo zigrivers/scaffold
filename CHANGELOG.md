@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.3.7] — 2026-02-15
+
+### Added
+- Tiered model selection for `claude-fix` job — round 1 uses Sonnet (~40% cheaper), round 2+ escalates to Opus when prior fix didn't satisfy reviewer
+- Updated Safety Rails cost cap documentation to reflect tiered pricing
+
 ## [1.3.6] — 2026-02-15
 
 ### Fixed
