@@ -2,6 +2,32 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.3.8] — 2026-02-16
+
+### Breaking Changes
+- Single `code-review.yml` workflow replaced by three event-driven files: `code-review-trigger.yml`, `code-review-handler.yml`, and `codex-timeout.yml` (optional)
+- AGENTS.md heading changed from `## Code Review Instructions` to `## Review guidelines`
+- Approval signal changed from `APPROVED: No P0/P1/P2 issues found.` to `APPROVED: No P0/P1 issues found.`
+
+### Added
+- Fully event-driven review loop — handler fires on `pull_request_review` events, no more 10-minute polling
+- Fork and draft PR blocking in gate job (security hardening)
+- Codex usage-limit detection — labels PR `ai-review-blocked` and requires human merge when credits are exhausted
+- Stale review detection — handler compares review `commit_id` to HEAD SHA, skips outdated reviews
+- `commit_id` filtering in fix prompt — only reads findings for the current commit
+
+### Fixed
+- Shell `git diff | grep | wc -l` pipelines replaced with `gh api` + `jq` (fixes pipefail crashes on zero matches)
+- Human override now verified via `author_association` (prevents non-members from bypassing review)
+- Removed unnecessary `actions/checkout` from trigger workflow
+
+### Changed
+- Tier-2 (Codex Cloud) review scoped to P0/P1 only, matching real Codex behavior (P2/P3 handled by self-review)
+- Cost model updated from "subscription-based (no per-review cost)" to credit-based (~25 credits/review, weekly limits)
+- Convergence logic reordered: approval signal → zero findings → round cap → fix
+- Prerequisites updated to accept ChatGPT Plus/Pro/Team (not just Pro)
+- README updated to reflect credit-based pricing
+
 ## [1.3.7] — 2026-02-15
 
 ### Added
