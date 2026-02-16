@@ -3,6 +3,38 @@ description: "Initialize Beads task tracking in this project"
 ---
 Set up **Beads** (https://github.com/steveyegge/beads) in this project for AI-friendly task tracking. Beads is already installed on the system (the `bd` CLI should be available).
 
+## Mode Detection
+
+Before starting, check if `.beads/` directory already exists:
+
+**If `.beads/` does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If `.beads/` exists → UPDATE MODE**:
+1. **Read & analyze**: Read `CLAUDE.md` completely. Check for Beads-related sections (Task Management, Core Principles, Self-Improvement, Autonomous Behavior). Check `tasks/lessons.md` for existing entries.
+2. **Diff against current structure**: Compare the existing CLAUDE.md Beads sections against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing CLAUDE.md
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read `docs/git-workflow.md` and `docs/coding-standards.md` and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `.beads/` directory, `CLAUDE.md` Beads sections, `tasks/lessons.md`
+- **Preserve**: All `tasks/lessons.md` entries, existing Beads task data, project-specific CLAUDE.md customizations
+- **Related docs**: `docs/git-workflow.md`, `docs/coding-standards.md`
+- **Special rules**: **Never re-initialize `.beads/`** — existing task data is irreplaceable. Never overwrite `tasks/lessons.md` — only add missing sections. Update CLAUDE.md Beads sections in-place.
+
 ## Why Beads
 
 This project can use parallel Claude Code sessions. Beads provides:

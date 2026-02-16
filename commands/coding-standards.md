@@ -6,6 +6,40 @@ Deeply research best practices for coding standards for our tech stack — revie
 
 This document will be referenced by AI agents during every implementation task. It needs to be prescriptive with concrete examples, not abstract principles.
 
+## Mode Detection
+
+Before starting, check if `docs/coding-standards.md` already exists:
+
+**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If the file exists → UPDATE MODE**:
+1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:coding-standards v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing doc
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/tech-stack.md`, `docs/tdd-standards.md`, `docs/project-structure.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:coding-standards v<ver> <date> -->`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `docs/coding-standards.md`
+- **Secondary output**: Linter/formatter config files (`.eslintrc`, `.prettierrc`, etc.)
+- **Preserve**: Naming conventions, lint rule customizations, commit message format, project-specific patterns and examples
+- **Related docs**: `docs/tech-stack.md`, `docs/tdd-standards.md`, `docs/project-structure.md`, `docs/git-workflow.md`
+- **Special rules**: Never change the commit message format without checking `docs/git-workflow.md` and CI config for references. Preserve all linter/formatter config customizations.
+
 ## What the Document Must Cover
 
 ### 1. Project Structure & Organization

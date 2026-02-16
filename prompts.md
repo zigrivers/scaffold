@@ -110,18 +110,17 @@ These create tasks and start building.
 | **Implementation Plan Review** | After creating 5+ new tasks from any source |
 | **Platform Parity Review** | After adding platform-specific features from any source |
 | **Multi-Model Code Review** | Runs automatically on every PR — tune `AGENTS.md` and `docs/review-standards.md` as you learn which findings are valuable |
+| **Any prompt (re-run)** | All document-creating prompts auto-detect update mode — re-run any prompt to bring its output up to date with the latest prompt version. See "Mode Detection" in each prompt. |
 
 ---
 
-## Migration Prompts — For Existing Projects
+## Update Mode — Replaces Migration Prompts
 
-Use these when updating a project set up with older versions of the prompts:
+All document-creating prompts now include **Mode Detection** — they automatically detect whether their output file already exists and switch between fresh (create from scratch) and update (preserve project-specific content, add missing sections) modes.
 
-| Prompt | Purpose |
-|--------|---------|
-| **Beads Migration** | Updates bd commands, commit format, removes duplicate workflow |
-| **Workflow Migration** | Updates git commands, PR workflow, worktree patterns |
-| **Permissions Migration** | Restructures project/user settings layers |
+**To update a project to the latest prompt standards:** Re-run the relevant prompt. It will read your existing document, show you a diff summary (ADD/RESTRUCTURE/PRESERVE), wait for your approval, then update in-place without losing your project-specific decisions.
+
+This replaces the previous Beads Migration, Workflow Migration, and Permissions Migration stubs. Every prompt is now its own migration.
 
 ---
 
@@ -148,6 +147,39 @@ The most critical ordering constraints:
 __________________________________
 # PRD Creation (Prompt)
 I have an idea for an application and I want you to help me create a thorough and detailed product requirements document that AI will use to build user stories, define the tech stack, and create an implementation plan.
+
+## Mode Detection
+
+Before starting, check if `docs/plan.md` already exists:
+
+**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If the file exists → UPDATE MODE**:
+1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:prd v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing doc
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/tech-stack.md`, `docs/user-stories.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:prd v<ver> <date> -->`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `docs/plan.md`
+- **Preserve**: Feature list (all IDs and descriptions), user personas, scope decisions, enhancement markers added by later prompts
+- **Related docs**: `docs/tech-stack.md`, `docs/user-stories.md`, `docs/implementation-plan.md`
+- **Special rules**: Never remove features without user approval. Preserve any `<!-- enhancement: ... -->` markers added by the New Enhancement prompt.
 
 ## Here's my idea:
 [idea information and explanations]
@@ -321,6 +353,38 @@ ______________________________________________________
 # Beads Setup (Prompt)
 
 Set up **Beads** (https://github.com/steveyegge/beads) in this project for AI-friendly task tracking. Beads is already installed on the system (the `bd` CLI should be available).
+
+## Mode Detection
+
+Before starting, check if `.beads/` directory already exists:
+
+**If `.beads/` does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If `.beads/` exists → UPDATE MODE**:
+1. **Read & analyze**: Read `CLAUDE.md` completely. Check for Beads-related sections (Task Management, Core Principles, Self-Improvement, Autonomous Behavior). Check `tasks/lessons.md` for existing entries.
+2. **Diff against current structure**: Compare the existing CLAUDE.md Beads sections against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing CLAUDE.md
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read `docs/git-workflow.md` and `docs/coding-standards.md` and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `.beads/` directory, `CLAUDE.md` Beads sections, `tasks/lessons.md`
+- **Preserve**: All `tasks/lessons.md` entries, existing Beads task data, project-specific CLAUDE.md customizations
+- **Related docs**: `docs/git-workflow.md`, `docs/coding-standards.md`
+- **Special rules**: **Never re-initialize `.beads/`** — existing task data is irreplaceable. Never overwrite `tasks/lessons.md` — only add missing sections. Update CLAUDE.md Beads sections in-place.
 
 ## Why Beads
 
@@ -513,6 +577,39 @@ Tell me:
 ___________________________________________
 ## Tech Stack (Prompt)
 Thoroughly review and analyze docs/plan.md to understand every feature, integration, and technical requirement of this project. Then deeply research tech stack options and create docs/tech-stack.md as the definitive technology reference for this project.
+
+## Mode Detection
+
+Before starting, check if `docs/tech-stack.md` already exists:
+
+**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If the file exists → UPDATE MODE**:
+1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:tech-stack v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing doc
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/plan.md`, `docs/coding-standards.md`, `docs/tdd-standards.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:tech-stack v<ver> <date> -->`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `docs/tech-stack.md`
+- **Preserve**: All technology choices and their rationale, version pins, AI compatibility notes, user-confirmed preferences
+- **Related docs**: `docs/plan.md`, `docs/coding-standards.md`, `docs/tdd-standards.md`, `docs/project-structure.md`
+- **Special rules**: Never change a technology choice without user approval. Preserve version pins exactly. Update the Quick Reference section to match any structural changes.
 
 ## Step 1: Gather User Preferences
 
@@ -959,6 +1056,40 @@ Deeply research best practices for coding standards for our tech stack — revie
 
 This document will be referenced by AI agents during every implementation task. It needs to be prescriptive with concrete examples, not abstract principles.
 
+## Mode Detection
+
+Before starting, check if `docs/coding-standards.md` already exists:
+
+**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If the file exists → UPDATE MODE**:
+1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:coding-standards v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing doc
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/tech-stack.md`, `docs/tdd-standards.md`, `docs/project-structure.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:coding-standards v<ver> <date> -->`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `docs/coding-standards.md`
+- **Secondary output**: Linter/formatter config files (`.eslintrc`, `.prettierrc`, etc.)
+- **Preserve**: Naming conventions, lint rule customizations, commit message format, project-specific patterns and examples
+- **Related docs**: `docs/tech-stack.md`, `docs/tdd-standards.md`, `docs/project-structure.md`, `docs/git-workflow.md`
+- **Special rules**: Never change the commit message format without checking `docs/git-workflow.md` and CI config for references. Preserve all linter/formatter config customizations.
+
 ## What the Document Must Cover
 
 ### 1. Project Structure & Organization
@@ -1078,6 +1209,39 @@ Deeply research test-driven development (TDD) best practices for our tech stack 
 
 This document will be referenced by AI agents during every implementation task. It needs to be prescriptive and concrete, not theoretical.
 
+## Mode Detection
+
+Before starting, check if `docs/tdd-standards.md` already exists:
+
+**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If the file exists → UPDATE MODE**:
+1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:tdd-standards v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing doc
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/tech-stack.md`, `docs/coding-standards.md`, `docs/project-structure.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:tdd-standards v<ver> <date> -->`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `docs/tdd-standards.md`
+- **Preserve**: Coverage thresholds, test runner configuration, E2E sections added by Playwright/Maestro prompts, project-specific mocking strategies
+- **Related docs**: `docs/tech-stack.md`, `docs/coding-standards.md`, `docs/project-structure.md`
+- **Special rules**: Never remove E2E sections added by the Playwright or Maestro prompts. Preserve coverage threshold decisions. Keep existing reference test examples alongside any new ones.
+
 ## What the Document Must Cover
 
 ### 1. TDD Workflow (the non-negotiable process)
@@ -1150,6 +1314,40 @@ Until those prompts run, E2E testing patterns are not yet defined. Focus TDD eff
 ___________________________________
 ## Project Structure (Prompt)
 Research best practices for project structure based on our tech stack and standards. Review docs/tech-stack.md, docs/coding-standards.md, docs/tdd-standards.md, and docs/plan.md, then create docs/project-structure.md and scaffold the actual directory structure.
+
+## Mode Detection
+
+Before starting, check if `docs/project-structure.md` already exists:
+
+**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If the file exists → UPDATE MODE**:
+1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:project-structure v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing doc
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/tech-stack.md`, `docs/coding-standards.md`, `docs/tdd-standards.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:project-structure v<ver> <date> -->`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `docs/project-structure.md`
+- **Secondary output**: Scaffolded directories, `.gitignore`, CLAUDE.md "Project Structure Quick Reference" section
+- **Preserve**: Module organization decisions, file placement rules, import conventions, high-contention file lists
+- **Related docs**: `docs/tech-stack.md`, `docs/coding-standards.md`, `docs/tdd-standards.md`
+- **Special rules**: **Never delete existing directories** — only add new ones. Preserve the module organization strategy choice (feature-based/layer-based/hybrid). Update the CLAUDE.md Quick Reference section in-place.
 
 ## Why This Matters for AI Development
 
@@ -1344,6 +1542,40 @@ _____________________________________
 Set up a complete local development environment for this project based on docs/tech-stack.md and docs/project-structure.md. The goal is a one-command dev experience with live reloading so I can see changes in real-time as work progresses.
 
 I'm not a professional developer, so the setup should be beginner-friendly with clear instructions for common tasks.
+
+## Mode Detection
+
+Before starting, check if `docs/dev-setup.md` already exists:
+
+**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If the file exists → UPDATE MODE**:
+1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:dev-setup v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing doc
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/tech-stack.md`, `docs/project-structure.md`, `docs/git-workflow.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:dev-setup v<ver> <date> -->`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `docs/dev-setup.md`
+- **Secondary output**: Makefile/scripts, `.env.example`, CLAUDE.md "Key Commands" section
+- **Preserve**: Port assignments, custom scripts, `.env` variable names and values, database configuration, Makefile customizations
+- **Related docs**: `docs/tech-stack.md`, `docs/project-structure.md`, `docs/git-workflow.md`
+- **Special rules**: Never change port assignments without checking for references in other config files. Preserve all `.env.example` variables. Update CLAUDE.md Key Commands section in-place.
 
 ## Objectives
 
@@ -1555,6 +1787,40 @@ Create a cohesive design system for this project that AI agents will use for all
 Review docs/tech-stack.md to understand our frontend framework and any UI libraries already chosen. Review docs/plan.md to understand the application's purpose and target users.
 
 I have no design experience, so I'm relying on you to make good choices and explain them simply.
+
+## Mode Detection
+
+Before starting, check if `docs/design-system.md` already exists:
+
+**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If the file exists → UPDATE MODE**:
+1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:design-system v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing doc
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/tech-stack.md`, `docs/plan.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:design-system v<ver> <date> -->`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `docs/design-system.md`
+- **Secondary output**: Theme config files (tailwind.config.js, theme.ts, etc.)
+- **Preserve**: All token values (colors, fonts, spacing), theme configuration, component pattern decisions, accessibility choices
+- **Related docs**: `docs/tech-stack.md`, `docs/plan.md`
+- **Special rules**: Never change color values, font families, or spacing scales without user approval — these define the visual identity. Preserve all theme config file customizations.
 
 ## Objectives
 
@@ -1802,6 +2068,40 @@ Create `docs/git-workflow.md` and configure the repository to support parallel C
 Review CLAUDE.md, docs/tech-stack.md, and docs/coding-standards.md to understand the existing project conventions.
 
 **Command placeholders:** This prompt uses `<install-deps>`, `<lint>`, and `<test>` as placeholders. When creating `docs/git-workflow.md`, replace these with the actual commands from the project's CLAUDE.md Key Commands table (e.g., `npm install`, `make lint`, `make test`). These are configured by the Dev Setup prompt.
+
+## Mode Detection
+
+Before starting, check if `docs/git-workflow.md` already exists:
+
+**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If the file exists → UPDATE MODE**:
+1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:git-workflow v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing doc
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`CLAUDE.md`, `docs/dev-setup.md`, `docs/coding-standards.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:git-workflow v<ver> <date> -->`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `docs/git-workflow.md`
+- **Secondary output**: `scripts/setup-agent-worktree.sh`, CI config files, CLAUDE.md workflow sections
+- **Preserve**: CI job names (branch protection references these), worktree script customizations, branch naming conventions, PR template customizations
+- **Related docs**: `CLAUDE.md`, `docs/dev-setup.md`, `docs/coding-standards.md`
+- **Special rules**: Never rename CI jobs without checking branch protection rules. Preserve worktree directory naming conventions. Keep the setup-agent-worktree.sh script's customizations intact.
 
 ## The Core Problem
 
@@ -2340,6 +2640,40 @@ ____________________________________________________
 Set up a two-tier automated code review system: a local self-review before every PR (required for all projects), and an optional external Codex Cloud review loop that auto-fixes findings and auto-merges.
 
 For background research, tool comparisons, and design decisions, see `Multi Model Review Research.md`. For cost analysis, see `Multi Model Review Cost Analysis.md`.
+
+## Mode Detection
+
+Before starting, check if `AGENTS.md` already exists:
+
+**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If the file exists → UPDATE MODE**:
+1. **Read & analyze**: Read `AGENTS.md`, all workflow files in `.github/workflows/code-review-*.yml`, `docs/review-standards.md`, and `.github/review-prompts/fix-prompt.md` completely. Check for a tracking comment on line 1 of `AGENTS.md`: `<!-- scaffold:multi-model-review v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing files against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing files
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/coding-standards.md`, `docs/tdd-standards.md`, `docs/git-workflow.md`, `CLAUDE.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1 of `AGENTS.md`: `<!-- scaffold:multi-model-review v<ver> <date> -->`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `AGENTS.md`
+- **Secondary output**: `.github/workflows/code-review-trigger.yml`, `.github/workflows/code-review-handler.yml`, `.github/workflows/codex-timeout.yml`, `docs/review-standards.md`, `.github/review-prompts/fix-prompt.md`
+- **Preserve**: Custom review rules in `AGENTS.md`, `CODEX_BOT_NAME` env var, `MAX_REVIEW_ROUNDS` setting, repository-specific secrets configuration, custom severity rules in `docs/review-standards.md`
+- **Related docs**: `docs/coding-standards.md`, `docs/tdd-standards.md`, `docs/git-workflow.md`, `CLAUDE.md`
+- **Special rules**: Never change `CODEX_BOT_NAME` without verifying the actual bot username. Preserve all "What NOT to flag" customizations in `AGENTS.md`. Each secondary file should be checked independently for existence (update vs. create).
 
 ---
 
@@ -3024,6 +3358,40 @@ Configure Playwright MCP for browser automation and visual testing in this proje
 
 Review docs/tech-stack.md, docs/tdd-standards.md, and CLAUDE.md to understand the existing project conventions.
 
+## Mode Detection
+
+Before starting, check if Playwright config files already exist (e.g., `playwright.config.ts`, `playwright.config.js`, or `tests/screenshots/`):
+
+**If no Playwright config exists → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If Playwright config exists → UPDATE MODE**:
+1. **Read & analyze**: Read existing Playwright config, the E2E section of `docs/tdd-standards.md`, and the browser testing section of `CLAUDE.md`. Check for a tracking comment on line 1 of the Playwright config: `// scaffold:playwright v<ver> <date>`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing configuration against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing config
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/tdd-standards.md`, `docs/dev-setup.md`, `CLAUDE.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1 of Playwright config: `// scaffold:playwright v<ver> <date>`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: Playwright config file (`playwright.config.ts` or `.js`)
+- **Secondary output**: `docs/tdd-standards.md` E2E section, `CLAUDE.md` browser testing section, `tests/screenshots/` directory
+- **Preserve**: Baseline screenshots, custom viewport configurations, project-specific test patterns, existing E2E test files
+- **Related docs**: `docs/tdd-standards.md`, `docs/dev-setup.md`, `CLAUDE.md`
+- **Special rules**: **Never delete baseline screenshots** — they represent verified visual states. Preserve custom viewport sizes. Update `docs/tdd-standards.md` E2E section in-place rather than appending duplicates.
+
 ## Objectives
 
 1. Configure Playwright for the project's frontend testing needs
@@ -3216,6 +3584,40 @@ _______________________________________________
 Install and configure Maestro for mobile UI testing in this Expo project. Maestro will be used for automated testing and visual verification of mobile app features.
 
 Review docs/tech-stack.md, docs/tdd-standards.md, and CLAUDE.md to understand the existing project conventions.
+
+## Mode Detection
+
+Before starting, check if `maestro/` directory already exists:
+
+**If `maestro/` does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If `maestro/` exists → UPDATE MODE**:
+1. **Read & analyze**: Read `maestro/config.yaml`, existing flow files, the E2E section of `docs/tdd-standards.md`, and the mobile testing section of `CLAUDE.md`. Check for a tracking comment on line 1 of `maestro/config.yaml`: `# scaffold:maestro v<ver> <date>`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing configuration against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing config
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/tdd-standards.md`, `docs/dev-setup.md`, `CLAUDE.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1 of `maestro/config.yaml`: `# scaffold:maestro v<ver> <date>`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `maestro/config.yaml`
+- **Secondary output**: `maestro/flows/`, `maestro/shared/`, `maestro/screenshots/`, `docs/tdd-standards.md` E2E section, `CLAUDE.md` mobile testing section
+- **Preserve**: All existing flow files, sub-flows, baseline screenshots, custom `testID` conventions, environment variables in config
+- **Related docs**: `docs/tdd-standards.md`, `docs/dev-setup.md`, `CLAUDE.md`
+- **Special rules**: **Never delete existing flow files or sub-flows** — they represent tested user journeys. **Never delete baseline screenshots**. Preserve custom environment variables in `maestro/config.yaml`. Update `docs/tdd-standards.md` E2E section in-place rather than appending duplicates.
 
 ## What is Maestro
 
@@ -3645,6 +4047,39 @@ __________________________________
 First, deeply research best practices for creating user stories, with emphasis on stories that will be consumed by AI agents (not human developers) for implementation. Focus on what makes a user story unambiguous and implementable without further clarification.
 
 Then thoroughly review and analyze the PRD (docs/plan.md) and create all user stories needed to cover every feature, flow, and requirement identified in the PRD.
+
+## Mode Detection
+
+Before starting, check if `docs/user-stories.md` already exists:
+
+**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If the file exists → UPDATE MODE**:
+1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:user-stories v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing doc
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/plan.md`, `docs/tech-stack.md`, `docs/implementation-plan.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:user-stories v<ver> <date> -->`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `docs/user-stories.md`
+- **Preserve**: All story IDs (US-xxx), enhancement markers (`<!-- enhancement: ... -->`), epic groupings, acceptance criteria refinements, priority decisions
+- **Related docs**: `docs/plan.md`, `docs/tech-stack.md`, `docs/implementation-plan.md`
+- **Special rules**: **Never renumber story IDs** — Beads tasks and implementation plan reference them. **Never remove stories** without user approval. Preserve all `<!-- enhancement: ... -->` markers. New stories get the next available ID in sequence.
 
 ## Output: `docs/user-stories.md`
 
@@ -4991,6 +5426,40 @@ _______________________________
 # Implementation Plan (Prompt)
 
 Review the PRD (`docs/plan.md`), user stories (`docs/user-stories.md`), and all project standards, then create an implementation plan and Beads task graph for this project.
+
+## Mode Detection
+
+Before starting, check if `docs/implementation-plan.md` already exists:
+
+**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If the file exists → UPDATE MODE**:
+1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:implementation-plan v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative. Also run `bd list` to see all existing Beads tasks.
+2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing doc
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/plan.md`, `docs/user-stories.md`, `docs/project-structure.md`, `docs/tdd-standards.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:implementation-plan v<ver> <date> -->`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `docs/implementation-plan.md`
+- **Secondary output**: Beads tasks (via `bd create`)
+- **Preserve**: Architecture decisions, component boundaries, existing task descriptions
+- **Related docs**: `docs/plan.md`, `docs/user-stories.md`, `docs/project-structure.md`, `docs/tdd-standards.md`, `docs/coding-standards.md`
+- **Special rules**: **Never duplicate Beads tasks** — run `bd list` first and cross-reference before creating any tasks. **Never re-create tasks that already exist** (even if their description differs from what this prompt would produce). Only create tasks for genuinely new work not covered by existing tasks.
 
 ## Required Reading Before Creating Tasks
 

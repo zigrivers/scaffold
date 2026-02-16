@@ -6,6 +6,40 @@ Configure Playwright MCP for browser automation and visual testing in this proje
 
 Review docs/tech-stack.md, docs/tdd-standards.md, and CLAUDE.md to understand the existing project conventions.
 
+## Mode Detection
+
+Before starting, check if Playwright config files already exist (e.g., `playwright.config.ts`, `playwright.config.js`, or `tests/screenshots/`):
+
+**If no Playwright config exists → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If Playwright config exists → UPDATE MODE**:
+1. **Read & analyze**: Read existing Playwright config, the E2E section of `docs/tdd-standards.md`, and the browser testing section of `CLAUDE.md`. Check for a tracking comment on line 1 of the Playwright config: `// scaffold:playwright v<ver> <date>`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing configuration against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing config
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/tdd-standards.md`, `docs/dev-setup.md`, `CLAUDE.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1 of Playwright config: `// scaffold:playwright v<ver> <date>`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: Playwright config file (`playwright.config.ts` or `.js`)
+- **Secondary output**: `docs/tdd-standards.md` E2E section, `CLAUDE.md` browser testing section, `tests/screenshots/` directory
+- **Preserve**: Baseline screenshots, custom viewport configurations, project-specific test patterns, existing E2E test files
+- **Related docs**: `docs/tdd-standards.md`, `docs/dev-setup.md`, `CLAUDE.md`
+- **Special rules**: **Never delete baseline screenshots** — they represent verified visual states. Preserve custom viewport sizes. Update `docs/tdd-standards.md` E2E section in-place rather than appending duplicates.
+
 ## Objectives
 
 1. Configure Playwright for the project's frontend testing needs

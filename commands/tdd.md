@@ -6,6 +6,39 @@ Deeply research test-driven development (TDD) best practices for our tech stack 
 
 This document will be referenced by AI agents during every implementation task. It needs to be prescriptive and concrete, not theoretical.
 
+## Mode Detection
+
+Before starting, check if `docs/tdd-standards.md` already exists:
+
+**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If the file exists → UPDATE MODE**:
+1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:tdd-standards v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing doc
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/tech-stack.md`, `docs/coding-standards.md`, `docs/project-structure.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:tdd-standards v<ver> <date> -->`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `docs/tdd-standards.md`
+- **Preserve**: Coverage thresholds, test runner configuration, E2E sections added by Playwright/Maestro prompts, project-specific mocking strategies
+- **Related docs**: `docs/tech-stack.md`, `docs/coding-standards.md`, `docs/project-structure.md`
+- **Special rules**: Never remove E2E sections added by the Playwright or Maestro prompts. Preserve coverage threshold decisions. Keep existing reference test examples alongside any new ones.
+
 ## What the Document Must Cover
 
 ### 1. TDD Workflow (the non-negotiable process)

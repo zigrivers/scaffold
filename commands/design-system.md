@@ -8,6 +8,40 @@ Review docs/tech-stack.md to understand our frontend framework and any UI librar
 
 I have no design experience, so I'm relying on you to make good choices and explain them simply.
 
+## Mode Detection
+
+Before starting, check if `docs/design-system.md` already exists:
+
+**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If the file exists → UPDATE MODE**:
+1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:design-system v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing doc
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/tech-stack.md`, `docs/plan.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:design-system v<ver> <date> -->`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `docs/design-system.md`
+- **Secondary output**: Theme config files (tailwind.config.js, theme.ts, etc.)
+- **Preserve**: All token values (colors, fonts, spacing), theme configuration, component pattern decisions, accessibility choices
+- **Related docs**: `docs/tech-stack.md`, `docs/plan.md`
+- **Special rules**: Never change color values, font families, or spacing scales without user approval — these define the visual identity. Preserve all theme config file customizations.
+
 ## Objectives
 
 1. Define a complete visual language (colors, typography, spacing, etc.)

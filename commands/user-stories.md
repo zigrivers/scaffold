@@ -6,6 +6,39 @@ First, deeply research best practices for creating user stories, with emphasis o
 
 Then thoroughly review and analyze the PRD (docs/plan.md) and create all user stories needed to cover every feature, flow, and requirement identified in the PRD.
 
+## Mode Detection
+
+Before starting, check if `docs/user-stories.md` already exists:
+
+**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If the file exists → UPDATE MODE**:
+1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:user-stories v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing doc
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/plan.md`, `docs/tech-stack.md`, `docs/implementation-plan.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:user-stories v<ver> <date> -->`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `docs/user-stories.md`
+- **Preserve**: All story IDs (US-xxx), enhancement markers (`<!-- enhancement: ... -->`), epic groupings, acceptance criteria refinements, priority decisions
+- **Related docs**: `docs/plan.md`, `docs/tech-stack.md`, `docs/implementation-plan.md`
+- **Special rules**: **Never renumber story IDs** — Beads tasks and implementation plan reference them. **Never remove stories** without user approval. Preserve all `<!-- enhancement: ... -->` markers. New stories get the next available ID in sequence.
+
 ## Output: `docs/user-stories.md`
 
 ### Document Structure

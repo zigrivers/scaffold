@@ -14,7 +14,7 @@ This repo is a **Claude Code plugin** (installable via `/plugin marketplace add`
 `prompts.md` contains:
 1. **Setup Order table** (top of file) — The execution sequence across 7 phases, from product definition through implementation
 2. **Individual prompt sections** — Each marked with `# Prompt Name (Prompt)`, containing the full prompt text to paste into Claude Code sessions
-3. **Migration prompts** — For updating projects created with older versions of the pipeline
+3. **Update mode** — All document-creating prompts auto-detect fresh vs. update mode via Mode Detection blocks
 
 ### Plugin Structure
 - `.claude-plugin/plugin.json` — Plugin manifest (name: `scaffold`)
@@ -37,3 +37,5 @@ When modifying prompts:
 - Respect inter-prompt dependencies (documented in the dependency graph at line ~128)
 - Each prompt's "Process" section at the end defines its execution rules — don't remove these
 - After editing `prompts.md`, update the corresponding file in `commands/` to stay in sync (frontmatter + "After This Step" sections are maintained in `commands/` only, not in `prompts.md`)
+- Every document-creating prompt has a **Mode Detection** block and **Update Mode Specifics** block — when modifying prompts, preserve these blocks and keep them positioned after the opening paragraph and before the first content section
+- When adding a new document-creating prompt, include Mode Detection + Update Mode Specifics following the same pattern as existing prompts (check any existing prompt for the template)

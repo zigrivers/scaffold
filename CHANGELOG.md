@@ -2,6 +2,21 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.4.0] — 2026-02-16
+
+### Added
+- **Universal Update Mode** for all 14 document-creating prompts — each prompt now auto-detects whether its output file already exists and switches between fresh (create from scratch) and update (preserve project-specific content, add missing sections) modes
+- Mode Detection protocol: read existing doc, diff against current prompt structure, categorize content as ADD/RESTRUCTURE/PRESERVE, preview changes for user approval, execute update, add version tracking comment
+- Per-prompt Update Mode Specifics with primary/secondary outputs, preserve rules, related docs for consistency checks, and special merge rules
+- Version tracking comments (`<!-- scaffold:<prompt-id> v<ver> <date> -->`) added to all generated documents for update mode detection
+- "Update Mode" section in setup order table explaining that re-running any prompt brings its output up to date
+
+### Removed
+- Migration Prompts section (Beads Migration, Workflow Migration, Permissions Migration stubs) — replaced by universal update mode. Every prompt is now its own migration.
+
+### Changed
+- "Ongoing" section updated to note that any prompt can be re-run in update mode
+
 ## [1.3.8] — 2026-02-16
 
 ### Breaking Changes

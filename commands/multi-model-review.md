@@ -6,6 +6,40 @@ Set up a two-tier automated code review system: a local self-review before every
 
 For background research, tool comparisons, and design decisions, see `Multi Model Review Research.md`. For cost analysis, see `Multi Model Review Cost Analysis.md`.
 
+## Mode Detection
+
+Before starting, check if `AGENTS.md` already exists:
+
+**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If the file exists → UPDATE MODE**:
+1. **Read & analyze**: Read `AGENTS.md`, all workflow files in `.github/workflows/code-review-*.yml`, `docs/review-standards.md`, and `.github/review-prompts/fix-prompt.md` completely. Check for a tracking comment on line 1 of `AGENTS.md`: `<!-- scaffold:multi-model-review v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing files against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing files
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/coding-standards.md`, `docs/tdd-standards.md`, `docs/git-workflow.md`, `CLAUDE.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1 of `AGENTS.md`: `<!-- scaffold:multi-model-review v<ver> <date> -->`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `AGENTS.md`
+- **Secondary output**: `.github/workflows/code-review-trigger.yml`, `.github/workflows/code-review-handler.yml`, `.github/workflows/codex-timeout.yml`, `docs/review-standards.md`, `.github/review-prompts/fix-prompt.md`
+- **Preserve**: Custom review rules in `AGENTS.md`, `CODEX_BOT_NAME` env var, `MAX_REVIEW_ROUNDS` setting, repository-specific secrets configuration, custom severity rules in `docs/review-standards.md`
+- **Related docs**: `docs/coding-standards.md`, `docs/tdd-standards.md`, `docs/git-workflow.md`, `CLAUDE.md`
+- **Special rules**: Never change `CODEX_BOT_NAME` without verifying the actual bot username. Preserve all "What NOT to flag" customizations in `AGENTS.md`. Each secondary file should be checked independently for existence (update vs. create).
+
 ---
 
 ## Architecture

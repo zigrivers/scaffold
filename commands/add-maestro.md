@@ -6,6 +6,40 @@ Install and configure Maestro for mobile UI testing in this Expo project. Maestr
 
 Review docs/tech-stack.md, docs/tdd-standards.md, and CLAUDE.md to understand the existing project conventions.
 
+## Mode Detection
+
+Before starting, check if `maestro/` directory already exists:
+
+**If `maestro/` does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If `maestro/` exists → UPDATE MODE**:
+1. **Read & analyze**: Read `maestro/config.yaml`, existing flow files, the E2E section of `docs/tdd-standards.md`, and the mobile testing section of `CLAUDE.md`. Check for a tracking comment on line 1 of `maestro/config.yaml`: `# scaffold:maestro v<ver> <date>`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing configuration against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing config
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/tdd-standards.md`, `docs/dev-setup.md`, `CLAUDE.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1 of `maestro/config.yaml`: `# scaffold:maestro v<ver> <date>`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `maestro/config.yaml`
+- **Secondary output**: `maestro/flows/`, `maestro/shared/`, `maestro/screenshots/`, `docs/tdd-standards.md` E2E section, `CLAUDE.md` mobile testing section
+- **Preserve**: All existing flow files, sub-flows, baseline screenshots, custom `testID` conventions, environment variables in config
+- **Related docs**: `docs/tdd-standards.md`, `docs/dev-setup.md`, `CLAUDE.md`
+- **Special rules**: **Never delete existing flow files or sub-flows** — they represent tested user journeys. **Never delete baseline screenshots**. Preserve custom environment variables in `maestro/config.yaml`. Update `docs/tdd-standards.md` E2E section in-place rather than appending duplicates.
+
 ## What is Maestro
 
 Maestro is a mobile UI testing framework that's ideal for Expo/React Native apps. It uses simple YAML flow files to define user interactions and assertions. It's more reliable than alternatives because it waits for the UI to settle automatically.

@@ -3,6 +3,39 @@ description: "Research and document tech stack decisions"
 ---
 Thoroughly review and analyze docs/plan.md to understand every feature, integration, and technical requirement of this project. Then deeply research tech stack options and create docs/tech-stack.md as the definitive technology reference for this project.
 
+## Mode Detection
+
+Before starting, check if `docs/tech-stack.md` already exists:
+
+**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+
+**If the file exists → UPDATE MODE**:
+1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:tech-stack v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
+2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
+   - **ADD** — Required by current prompt but missing from existing doc
+   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
+   - **PRESERVE** — Project-specific decisions, rationale, and customizations
+3. **Cross-doc consistency**: Read related docs (`docs/plan.md`, `docs/coding-standards.md`, `docs/tdd-standards.md`) and verify updates won't contradict them. Skip any that don't exist yet.
+4. **Preview changes**: Present the user a summary:
+   | Action | Section | Detail |
+   |--------|---------|--------|
+   | ADD | ... | ... |
+   | RESTRUCTURE | ... | ... |
+   | PRESERVE | ... | ... |
+   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
+   Wait for user approval before proceeding.
+5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
+6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:tech-stack v<ver> <date> -->`
+7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
+### Update Mode Specifics
+- **Primary output**: `docs/tech-stack.md`
+- **Preserve**: All technology choices and their rationale, version pins, AI compatibility notes, user-confirmed preferences
+- **Related docs**: `docs/plan.md`, `docs/coding-standards.md`, `docs/tdd-standards.md`, `docs/project-structure.md`
+- **Special rules**: Never change a technology choice without user approval. Preserve version pins exactly. Update the Quick Reference section to match any structural changes.
+
 ## Step 1: Gather User Preferences
 
 Before researching options, use AskUserQuestion to ask the user about their preferences. Ask up to 4 questions based on what the PRD implies (e.g., skip frontend questions if the PRD describes a CLI tool). Tailor the options to what's realistic for this project.
