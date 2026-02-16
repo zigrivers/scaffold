@@ -4,15 +4,26 @@ description: "Show installed and latest scaffold version"
 
 Show the installed scaffold version and check if a newer version is available. Follow these steps exactly:
 
-**Bundled version:** 1.3.0
-
 ## Step 1 — Detect Installed Version
 
-Determine the currently installed scaffold version:
+Determine the currently installed scaffold version using this detection cascade (stop at the first match):
 
-1. Run `cat ~/.claude/commands/.scaffold-version 2>/dev/null` to check for the user-command version marker.
+1. **User-command install:** Run `cat ~/.claude/commands/.scaffold-version 2>/dev/null` to check for the user-command version marker.
    - If the file exists, parse the version from it (format: `1.2.0 (abc1234)` — extract the version number before the space).
-2. If `.scaffold-version` does not exist (plugin install), use the **Bundled version** shown above in this command as the installed version.
+
+2. **Plugin install (clone):** Read the version from the marketplace clone's plugin manifest:
+   ```bash
+   cat ~/.claude/plugins/marketplaces/zigrivers-scaffold/.claude-plugin/plugin.json 2>/dev/null
+   ```
+   Extract the `version` field from the JSON.
+
+3. **Plugin install (metadata fallback):** Read the version from Claude Code's plugin registry:
+   ```bash
+   cat ~/.claude/plugins/installed_plugins.json 2>/dev/null
+   ```
+   Find the entry for `scaffold@zigrivers-scaffold` and extract its `version` field.
+
+4. **Final fallback:** If none of the above worked, report the installed version as "unknown".
 
 Store the detected version for comparison.
 

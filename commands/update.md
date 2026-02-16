@@ -47,13 +47,36 @@ Report the result to the user.
 
 **For plugin installs** (`/scaffold:` prefix):
 
-Tell the user to update the plugin by running:
+Update the plugin in-place by pulling the latest code into the marketplace clone:
 
-```
-/plugin marketplace update zigrivers-scaffold
-```
+1. Locate the marketplace clone directory:
+   ```bash
+   PLUGIN_DIR="$HOME/.claude/plugins/marketplaces/zigrivers-scaffold"
+   ```
 
-Explain that Claude Code will pull the latest version of the plugin. If that doesn't work, they can uninstall first with `/plugin uninstall scaffold@zigrivers-scaffold`, remove the marketplace with `/plugin marketplace remove zigrivers-scaffold`, then re-add and re-install.
+2. Verify it exists and is a git repo. If the directory doesn't exist or has no `.git`, fall back to telling the user to run `/plugin marketplace update zigrivers-scaffold` and stop here.
+
+3. Record the current state before updating:
+   ```bash
+   cd "$PLUGIN_DIR" && git rev-parse --short HEAD
+   ```
+
+4. Pull the latest changes:
+   ```bash
+   cd "$PLUGIN_DIR" && git pull origin main
+   ```
+
+5. Read the new version from the plugin manifest:
+   ```bash
+   cat "$PLUGIN_DIR/.claude-plugin/plugin.json"
+   ```
+   Extract the `version` field from the JSON.
+
+6. **Best-effort metadata sync** — Update `~/.claude/plugins/installed_plugins.json` to keep Claude Code's metadata in sync. Read the file, find the entry for `scaffold@zigrivers-scaffold`, and update its `version`, `commitSha` (from `git rev-parse HEAD`), and `lastUpdated` (current ISO timestamp) fields. Write the updated JSON back. **Wrap this in error handling** — if reading/writing fails, skip it silently. The update still worked because commands are served directly from the clone.
+
+7. **Best-effort timestamp sync** — Update the `lastUpdated` field for `zigrivers-scaffold` in `~/.claude/plugins/known_marketplaces.json`. Same error handling approach — skip silently on failure.
+
+8. Report the result: old SHA → new SHA, old version → new version.
 
 ## Step 5 — Confirm
 
@@ -63,6 +86,8 @@ After updating, tell the user:
 **Scaffold updated.** Run `/scaffold:prompt-pipeline` (or `/user:prompt-pipeline`) to verify the commands are working.
 
 Check the changelog above for what's new. If any prompts you've already run were changed, you may want to re-run them.
+
+**Note:** For plugin installs, updated commands take effect immediately for new invocations. If anything seems stale, start a fresh Claude Code session.
 
 ---
 

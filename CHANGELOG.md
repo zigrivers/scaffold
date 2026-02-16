@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.3.6] — 2026-02-15
+
+### Fixed
+- `/scaffold:update` now actively updates plugin installs by pulling the marketplace clone in-place, instead of telling the user to run a manual command
+- `/scaffold:version` dynamically detects the installed version from the marketplace clone's `plugin.json`, replacing the hardcoded version that went stale after updates
+
 ## [1.3.5] — 2026-02-15
 
 ### Added
