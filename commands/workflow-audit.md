@@ -637,6 +637,7 @@ After updates, verify:
 4. **Commands must be exact** — No pseudo-code, no "something like this"
 5. **Present before changing** — Get approval on findings first
 6. **Document updates happen now** — Don't create tasks for doc fixes; just fix them
+7. Add a tracking comment as the last line of `CLAUDE.md` (after any existing scaffold comments): `<!-- scaffold:workflow-audit v1 YYYY-MM-DD -->` (use actual date)
 
 ---
 

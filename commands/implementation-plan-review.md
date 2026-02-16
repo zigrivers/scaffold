@@ -294,6 +294,7 @@ bd ready           # Show the updated first wave of parallel work
 3. **Err toward splitting** — if you're unsure whether a task is too large, it probably is
 4. **Don't add scope** — if something isn't in plan.md or user-stories.md, don't create a task for it
 5. **Fix descriptions in place** — use `bd update` to fix task descriptions rather than recreating tasks (preserves IDs and existing dependencies)
+6. After all changes are applied, add a tracking comment to `docs/implementation-plan.md` after any existing scaffold tracking comment: `<!-- scaffold:implementation-plan-review v1 YYYY-MM-DD -->` (use actual date)
 
 ## After This Step
 

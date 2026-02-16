@@ -72,6 +72,7 @@ After all changes are applied:
 - Confirm every feature could be turned into user stories without ambiguity
 - Confirm the data model supports every described user flow
 - Provide a concise changelog of what was added, modified, or removed
+- Add a tracking comment to `docs/plan.md` after the PRD tracking comment (line 2 or after the existing `<!-- scaffold:prd -->` comment): `<!-- scaffold:prd-gap-analysis v1 YYYY-MM-DD -->` (use actual date)
 
 ## Process
 - Use subagents to research the competitive landscape and UX best practices in parallel with the gap analysis

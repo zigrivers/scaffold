@@ -372,6 +372,7 @@ After updates:
 5. **Present before changing** — Get approval on the gap list before updating docs
 6. **Create tasks for implementation** — Documentation updates happen now; code work goes to Beads
 7. **Don't prescribe tech choices** — If a platform API adapter is needed, describe what it must do, not which library to use (that's in tech-stack.md)
+8. After all changes are applied, add a tracking comment to `docs/user-stories.md` after any existing scaffold tracking comments: `<!-- scaffold:platform-parity v1 YYYY-MM-DD -->` (use actual date)
 
 ## After This Step
 

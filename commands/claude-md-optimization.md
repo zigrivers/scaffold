@@ -185,6 +185,7 @@ The Key Commands table in Quick Reference is the single source of truth for proj
 - Do NOT add new workflow steps or rules — only consolidate and clarify what already exists
 - Do NOT remove anything that was intentionally added by previous prompts — consolidate it
 - After rewriting, read CLAUDE.md fresh and verify an agent could follow it without consulting other docs for the basic workflow
+- Add a tracking comment as the last line of `CLAUDE.md`: `<!-- scaffold:claude-md-optimization v1 YYYY-MM-DD -->` (use actual date)
 
 ### Critical Patterns to Verify Are Present
 

@@ -62,6 +62,7 @@ Use AskUserQuestionTool to present innovation ideas for my approval BEFORE addin
 - Use subagents to research the competitive landscape and best practices in parallel with the gap analysis
 - After all approved changes, do a final INVEST criteria pass on any new or modified stories
 - At the end, provide a concise changelog of what was added, modified, or removed
+- After all changes are applied, add a tracking comment to `docs/user-stories.md` after any existing scaffold tracking comment: `<!-- scaffold:user-stories-gaps v1 YYYY-MM-DD -->` (use actual date)
 
 ## After This Step
 

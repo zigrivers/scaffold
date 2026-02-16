@@ -65,3 +65,37 @@ Dev Setup → Git Workflow → Claude.md Optimization → Workflow Audit
 3. **Dev Setup before Git Workflow** — Git Workflow references lint/test commands
 4. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
 5. **Implementation Plan before Implementation Plan Review** — can't review what doesn't exist
+
+## Completion Detection
+
+When checking pipeline status, use these detection criteria:
+
+| # | Step | Check file exists | Tracking comment to search for |
+|---|------|-------------------|-------------------------------|
+| 1 | PRD Creation | `docs/plan.md` | `<!-- scaffold:prd ` |
+| 2 | PRD Gap Analysis | `docs/plan.md` | `<!-- scaffold:prd-gap-analysis ` |
+| 3 | Beads Setup | `.beads/` directory | N/A |
+| 4 | Tech Stack | `docs/tech-stack.md` | `<!-- scaffold:tech-stack ` |
+| 5 | Claude Code Permissions | `.claude/settings.json` | N/A |
+| 6 | Coding Standards | `docs/coding-standards.md` | `<!-- scaffold:coding-standards ` |
+| 7 | TDD Standards | `docs/tdd-standards.md` | `<!-- scaffold:tdd-standards ` |
+| 8 | Project Structure | `docs/project-structure.md` | `<!-- scaffold:project-structure ` |
+| 9 | Dev Env Setup | `docs/dev-setup.md` | `<!-- scaffold:dev-setup ` |
+| 10 | Design System | `docs/design-system.md` | `<!-- scaffold:design-system ` |
+| 11 | Git Workflow | `docs/git-workflow.md` | `<!-- scaffold:git-workflow ` |
+| 11.5 | Multi-Model Review | `AGENTS.md` + `.github/workflows/code-review-*.yml` | `<!-- scaffold:multi-model-review ` |
+| 12 | Playwright | Playwright config file | `// scaffold:playwright ` |
+| 13 | Maestro | `maestro/config.yaml` | `# scaffold:maestro ` |
+| 14 | User Stories | `docs/user-stories.md` | `<!-- scaffold:user-stories ` |
+| 15 | User Stories Gaps | `docs/user-stories.md` | `<!-- scaffold:user-stories-gaps ` |
+| 15.5 | User Stories MMR | `docs/reviews/user-stories/review-summary.md` | `<!-- scaffold:user-stories-mmr ` |
+| 16 | Platform Parity | `docs/user-stories.md` | `<!-- scaffold:platform-parity ` |
+| 17 | Claude.md Optimization | `CLAUDE.md` | `<!-- scaffold:claude-md-optimization ` |
+| 18 | Workflow Audit | `CLAUDE.md` | `<!-- scaffold:workflow-audit ` |
+| 19 | Implementation Plan | `docs/implementation-plan.md` | `<!-- scaffold:implementation-plan ` |
+| 20 | Impl Plan Review | `docs/implementation-plan.md` | `<!-- scaffold:implementation-plan-review ` |
+
+**Detection rules:**
+- If the file exists → step was likely run (even without tracking comment — older projects lack them)
+- If the tracking comment exists in the file → step was definitively run
+- For update-only steps (2, 15, 16, 17, 18, 20): file existence alone only confirms the prerequisite ran; check for the specific tracking comment to confirm the update step itself

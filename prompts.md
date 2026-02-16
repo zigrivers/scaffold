@@ -342,6 +342,7 @@ After all changes are applied:
 - Confirm every feature could be turned into user stories without ambiguity
 - Confirm the data model supports every described user flow
 - Provide a concise changelog of what was added, modified, or removed
+- Add a tracking comment to `docs/plan.md` after the PRD tracking comment (line 2 or after the existing `<!-- scaffold:prd -->` comment): `<!-- scaffold:prd-gap-analysis v1 YYYY-MM-DD -->` (use actual date)
 
 ## Process
 - Use subagents to research the competitive landscape and UX best practices in parallel with the gap analysis
@@ -4183,6 +4184,7 @@ Use AskUserQuestionTool to present innovation ideas for my approval BEFORE addin
 - Use subagents to research the competitive landscape and best practices in parallel with the gap analysis
 - After all approved changes, do a final INVEST criteria pass on any new or modified stories
 - At the end, provide a concise changelog of what was added, modified, or removed
+- After all changes are applied, add a tracking comment to `docs/user-stories.md` after any existing scaffold tracking comment: `<!-- scaffold:user-stories-gaps v1 YYYY-MM-DD -->` (use actual date)
 
 
 _________________________________________________________________
@@ -4819,6 +4821,7 @@ After updates:
 5. **Present before changing** — Get approval on the gap list before updating docs
 6. **Create tasks for implementation** — Documentation updates happen now; code work goes to Beads
 7. **Don't prescribe tech choices** — If a platform API adapter is needed, describe what it must do, not which library to use (that's in tech-stack.md)
+8. After all changes are applied, add a tracking comment to `docs/user-stories.md` after any existing scaffold tracking comments: `<!-- scaffold:platform-parity v1 YYYY-MM-DD -->` (use actual date)
 
 
 
@@ -5008,6 +5011,7 @@ The Key Commands table in Quick Reference is the single source of truth for proj
 - Do NOT add new workflow steps or rules — only consolidate and clarify what already exists
 - Do NOT remove anything that was intentionally added by previous prompts — consolidate it
 - After rewriting, read CLAUDE.md fresh and verify an agent could follow it without consulting other docs for the basic workflow
+- Add a tracking comment as the last line of `CLAUDE.md`: `<!-- scaffold:claude-md-optimization v1 YYYY-MM-DD -->` (use actual date)
 
 ### Critical Patterns to Verify Are Present
 
@@ -5664,6 +5668,7 @@ After updates, verify:
 4. **Commands must be exact** — No pseudo-code, no "something like this"
 5. **Present before changing** — Get approval on findings first
 6. **Document updates happen now** — Don't create tasks for doc fixes; just fix them
+7. Add a tracking comment as the last line of `CLAUDE.md` (after any existing scaffold comments): `<!-- scaffold:workflow-audit v1 YYYY-MM-DD -->` (use actual date)
 
 ---
 
@@ -6129,6 +6134,7 @@ bd ready           # Show the updated first wave of parallel work
 3. **Err toward splitting** — if you're unsure whether a task is too large, it probably is
 4. **Don't add scope** — if something isn't in plan.md or user-stories.md, don't create a task for it
 5. **Fix descriptions in place** — use `bd update` to fix task descriptions rather than recreating tasks (preserves IDs and existing dependencies)
+6. After all changes are applied, add a tracking comment to `docs/implementation-plan.md` after any existing scaffold tracking comment: `<!-- scaffold:implementation-plan-review v1 YYYY-MM-DD -->` (use actual date)
 
 
 
