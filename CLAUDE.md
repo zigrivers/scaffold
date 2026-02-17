@@ -35,6 +35,7 @@ This repo is a **Claude Code plugin** (installable via `/plugin marketplace add`
 - **Beads** (`@beads/bd`) is the task tracking tool used throughout the pipeline
 - **Worktrees** are used for parallel agent execution — the Git Workflow prompt sets up permanent worktrees for multiple Claude Code sessions
 - **Optional prompts** are marked and only apply to specific project types (web apps, mobile/Expo, multi-platform)
+- **Parallel agents** pull tasks from Beads and work in separate git worktrees — see `docs/git-workflow.md` section 10 for setup
 
 ## Editing Guidelines
 
@@ -96,6 +97,13 @@ bd sync                                  # Force sync to git
 | `bd sync` | Force sync to git |
 | `bd list` | List all tasks |
 | `bd dep cycles` | Debug stuck/circular dependencies |
+| `scripts/setup-agent-worktree.sh <name>` | Create permanent worktree for parallel agent |
+| `git worktree list` | List all active worktrees |
+| `gh pr create` | Create pull request from current branch |
+| `gh pr merge --squash --delete-branch` | Squash-merge PR and clean up branch |
+| `gh pr diff` | Review PR diff before merging |
+| `gh pr checks` | Check CI status on current PR |
+| `git push --force-with-lease` | Safe force push after rebase (feature branches only) |
 
 **NEVER** use `bd edit` — it opens an interactive editor and breaks AI agents.
 
@@ -111,6 +119,58 @@ bd update <id> --claim
 bd close <id>
 ```
 This keeps Beads as the single source of truth for all changes.
+
+### Committing and Creating PRs
+
+1. Run `make check` to verify all quality gates pass
+2. Rebase on latest main: `git fetch origin && git rebase origin/main`
+3. Push branch: `git push -u origin HEAD`
+4. Create PR: `gh pr create --title "[BD-<id>] type(scope): description"`
+5. Wait for CI (`check` job) to pass
+6. Self-review: `gh pr diff`
+7. Merge: `gh pr merge --squash --delete-branch`
+
+See `docs/git-workflow.md` for the full PR workflow.
+
+### Task Closure and Next Task
+
+After a PR is merged:
+```bash
+bd close <id>
+bd sync
+bd ready                # Pick next task
+```
+
+In a worktree, also update main first:
+```bash
+bd close <id>
+bd sync
+git checkout main && git pull origin main
+bd ready
+```
+
+### Parallel Sessions (Worktrees)
+
+Each parallel agent runs in its own git worktree — an independent working directory sharing the same `.git` repository.
+
+```bash
+# Create a worktree for a new agent
+scripts/setup-agent-worktree.sh agent-1
+
+# Set agent identity for Beads attribution
+export BD_ACTOR="agent-1"
+
+# Install dev dependencies in the worktree
+make setup
+```
+
+### Worktree Awareness
+
+When running in a worktree:
+- **Always check `bd ready`** before starting work — another agent may have claimed your next task
+- **Rebase frequently** — other agents are merging to main
+- **Never edit high-contention files** (`prompts.md`, `CLAUDE.md`) without rebasing first
+- **Use `bd update <id> --claim`** immediately after picking a task to prevent conflicts
 
 ## Self-Improvement
 
@@ -153,3 +213,13 @@ See `docs/dev-setup.md` for the full setup guide.
 - **Test**: bats-core (`make test`)
 - **All gates**: `make check` (lint + validate + test)
 - **Git hooks**: `make hooks` installs pre-commit (ShellCheck + frontmatter) and pre-push (test suite)
+
+## When to Consult Other Docs
+
+| Question | Document |
+|----------|----------|
+| How do I branch, commit, create PRs? | `docs/git-workflow.md` |
+| What are the coding conventions? | `docs/coding-standards.md` |
+| How is the project structured? | `docs/project-structure.md` |
+| How do I set up my dev environment? | `docs/dev-setup.md` |
+| What's the prompt pipeline order? | `prompts.md` (Setup Order table at top) |

@@ -7,7 +7,7 @@ test: ## Run bats test suite
 	bats tests/
 
 lint: ## Run ShellCheck on all shell scripts
-	shellcheck scripts/*.sh lib/*.sh
+	@find scripts lib -name '*.sh' -print0 2>/dev/null | xargs -0 shellcheck --severity=warning
 
 validate: ## Validate frontmatter in command files
 	./scripts/validate-frontmatter.sh commands/*.md

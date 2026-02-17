@@ -256,7 +256,7 @@ except json.JSONDecodeError:
     stripped = content
     if stripped.startswith('\`\`\`'):
         lines = stripped.split('\n')
-        # Remove first line (```json) and last line (```)
+        # Remove markdown fence lines
         lines = [l for l in lines if not l.strip().startswith('\`\`\`')]
         stripped = '\n'.join(lines)
     try:
