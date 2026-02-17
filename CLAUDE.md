@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Core Principles
+
+- **Simplicity First**: Make every change as simple as possible. Minimal code, minimal impact. Don't over-engineer.
+- **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
+- **TDD Always**: Write failing tests first, then make them pass, then refactor. No exceptions.
+- **Prove It Works**: Never mark a task complete without demonstrating correctness — tests pass, logs clean, behavior verified.
+
 ## Project Overview
 
 This is a **prompt pipeline** — a curated sequence of structured prompts used to scaffold new software projects with Claude Code. The entire pipeline lives in a single file (`prompts.md`) and is designed to be run in order, with each prompt building on artifacts produced by earlier ones.
@@ -39,3 +46,72 @@ When modifying prompts:
 - After editing `prompts.md`, update the corresponding file in `commands/` to stay in sync (frontmatter + "After This Step" sections are maintained in `commands/` only, not in `prompts.md`)
 - Every document-creating prompt has a **Mode Detection** block and **Update Mode Specifics** block — when modifying prompts, preserve these blocks and keep them positioned after the opening paragraph and before the first content section
 - When adding a new document-creating prompt, include Mode Detection + Update Mode Specifics following the same pattern as existing prompts (check any existing prompt for the template)
+
+## Task Management (Beads)
+
+All task tracking lives in Beads — no separate todo files.
+
+### Creating Tasks
+```bash
+bd create "Imperative, specific title" -p <0-3>
+bd update <id> --claim                   # Always claim after creating
+bd dep add <child> <parent>              # Child blocked by parent
+```
+
+Priority levels:
+- 0 = blocking release
+- 1 = must-have v1
+- 2 = should-have
+- 3 = nice-to-have
+
+Good titles: `"Fix streak calculation for timezone edge case"`
+Bad titles: `"Backend stuff"`
+
+### Closing Tasks
+```bash
+bd close <id>                            # Marks complete — use this, not bd update --status completed
+bd sync                                  # Force sync to git
+```
+
+### Beads Commands
+| Command | Purpose |
+|---------|---------|
+| `bd ready` | Show unblocked tasks ready for work |
+| `bd create "Title" -p N` | Create task with priority |
+| `bd update <id> --status S` | Update status (in_progress, blocked, etc.) |
+| `bd update <id> --claim` | Claim task (uses BD_ACTOR for attribution) |
+| `bd close <id>` | Close completed task |
+| `bd dep add <child> <parent>` | Add dependency |
+| `bd dep tree <id>` | View dependency graph |
+| `bd show <id>` | Full task details |
+| `bd sync` | Force sync to git |
+| `bd list` | List all tasks |
+| `bd dep cycles` | Debug stuck/circular dependencies |
+
+**NEVER** use `bd edit` — it opens an interactive editor and breaks AI agents.
+
+### Every Commit Needs a Task
+
+All commits require a Beads task ID in the message: `[BD-<id>] type(scope): description`
+
+If you encounter a bug or need to make an ad-hoc fix:
+```bash
+bd create "fix: <description>" -p 1
+bd update <id> --claim
+# implement fix, then close when done
+bd close <id>
+```
+This keeps Beads as the single source of truth for all changes.
+
+## Self-Improvement
+
+- After ANY correction from the user: update `tasks/lessons.md` with the pattern
+- Write rules that prevent the same mistake recurring
+- Review `tasks/lessons.md` at session start before picking up work
+
+## Autonomous Behavior
+
+- **Fix bugs on sight**: When encountering bugs, errors, or failing tests — create a Beads task and fix them. Zero hand-holding required.
+- **Use subagents**: Offload research, exploration, and parallel analysis to subagents. Keeps main context clean.
+- **Keep working**: Continue until `bd ready` returns no available tasks.
+- **Re-plan when stuck**: If implementation goes sideways, stop and rethink your approach rather than pushing through. (Do NOT enter interactive `/plan` mode — just think through the problem and adjust.)
