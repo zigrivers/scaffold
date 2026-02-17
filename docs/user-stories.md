@@ -1,4 +1,5 @@
 <!-- scaffold:user-stories v1 2026-02-17 -->
+<!-- scaffold:user-stories-gaps v1 2026-02-17 -->
 # User Stories — Scaffold v2
 
 User stories for Scaffold v2, derived from the [Product Requirements Document](plan.md). Every PRD feature (F-PE-\*, F-PR-\*, F-PS-\*, F-UX-\*, F-V1-\*, F-SC-\*) maps to at least one story. All 6 user flows are covered. Stories are grouped by epic.
@@ -10,6 +11,7 @@ User stories for Scaffold v2, derived from the [Product Requirements Document](p
 - **INVEST criteria**: Stories are Independent, Non-ambiguous, Valuable, Estimable, Scoped, and Testable.
 - **Size target**: No story is so large it couldn't be implemented in 1–3 focused Claude Code sessions.
 - **MoSCoW priorities**: Must-have, Should-have, Could-have, Won't-have — mapped from PRD Section 4 priorities.
+- **Actionable error messages**: Every error AC includes three parts: (1) what went wrong, (2) the exact command or action to fix it, (3) a pointer to further help (e.g., `/scaffold:validate`). No error message is a dead end.
 
 ## User Personas
 
@@ -82,6 +84,14 @@ Covers: F-UX-1, F-UX-7, Flow 1
 4. **Given** the pipeline is displayed,
    **When** Scaffold asks "Ready to start? The first prompt is `create-prd`" and the user confirms,
    **Then** Scaffold executes the `create-prd` prompt.
+
+5. **Given** config.json is created with a `custom-config` field,
+   **When** Scaffold writes the initial config,
+   **Then** `custom-config` is an empty object `{}`. The field is a free-form object preserved across reads/writes — prompts can write to it during execution and read it back in later sessions.
+
+6. **Given** the user's session is interrupted during any `AskUserQuestion` interaction in the init flow (profile selection, confirmation, etc.),
+   **When** Scaffold resumes or the user runs init again,
+   **Then** no `.scaffold/` directory or files were created — interrupted `AskUserQuestion` flows result in no state change. This applies to all interactive stories (US-1.4, US-1.5, US-3.5, US-3.6, US-7.1).
 
 **Scope Boundary**: Does NOT cover: custom profile selection (US-1.5), idea text analysis (US-1.7), brownfield detection (US-7.1), or prompt execution mechanics (US-2.5).
 
@@ -226,6 +236,10 @@ Covers: F-UX-1, F-UX-7, Flow 1
 5. **Given** custom selection is complete,
    **When** dependencies are resolved and the pipeline is displayed,
    **Then** the resolved `prompts` array in `.scaffold/config.json` includes both user-selected and auto-included prompts in topological order.
+
+6. **Given** the user cancels during any phase of custom prompt selection (e.g., closes the session or interrupts the `AskUserQuestion` flow),
+   **When** Scaffold checks the filesystem,
+   **Then** no `.scaffold/` directory or files are created — cancellation is a no-op.
 
 **Scope Boundary**: Does NOT cover: back-navigation during selection (not supported — user must re-run init). Does NOT cover: creating a reusable profile (US-4.2).
 
@@ -415,11 +429,11 @@ Covers: F-PE-1 through F-PE-6
 
 3. **Given** prompt X depends on prompt Y but Y is not in the current profile's prompt list,
    **When** resolution runs,
-   **Then** it reports: "Prompt `X` depends on `Y`, but `Y` is not in this pipeline. Add `Y` to the profile or remove the dependency."
+   **Then** it reports: "Prompt `X` depends on `Y`, but `Y` is not in this pipeline. Fix: add `Y` to your profile's `add-prompts`, or remove the dependency from `X`'s frontmatter. Run `/scaffold:validate` to check all dependencies."
 
 4. **Given** `extra-prompts` references a prompt name with no file at any tier,
    **When** resolution runs,
-   **Then** it reports: "Prompt `Z` referenced in extra-prompts but not found at .scaffold/prompts/Z.md, ~/.scaffold/prompts/Z.md, or built-in commands/Z.md."
+   **Then** it reports: "Prompt `Z` referenced in extra-prompts but not found at .scaffold/prompts/Z.md, ~/.scaffold/prompts/Z.md, or built-in commands/Z.md. Fix: create the prompt file, or remove `Z` from `extra-prompts` in .scaffold/config.json."
 
 **Scope Boundary**: Does NOT cover: valid topological sort (US-2.1). This story covers only error detection.
 
@@ -457,6 +471,10 @@ Covers: F-PE-1 through F-PE-6
 4. **Given** the `completed` array says a prompt is done but its `produces` artifacts are missing,
    **When** `resume` loads the config,
    **Then** it warns: "Prompt `X` was marked complete but its output `Y` is missing. Re-run with `/scaffold:resume --from X`?"
+
+5. **Given** config.json contains fields not recognized by the current Scaffold version (e.g., a field added by a newer version),
+   **When** Scaffold reads and writes config.json,
+   **Then** unknown fields are preserved — not stripped or overwritten. This enables forward compatibility so a newer Scaffold version can add fields that older versions won't destroy.
 
 **Scope Boundary**: Does NOT cover: artifact-based detection (US-2.4). This story covers the orchestrator-recorded mechanism only.
 
@@ -522,15 +540,24 @@ Covers: F-PE-1 through F-PE-6
 
 3. **Given** the prompt file is resolved via the 4-tier precedence (US-5.2),
    **When** Scaffold loads the prompt,
-   **Then** it logs which source was used: "Using project override for `create-prd`" or "Using built-in `create-prd`".
+   **Then** it always logs which source tier was used, using a consistent format:
+   - `"Using built-in create-prd"` (Tier 4)
+   - `"Using user override for create-prd (~/.scaffold/prompts/create-prd.md)"` (Tier 3)
+   - `"Using project override for create-prd (.scaffold/prompts/create-prd.md)"` (Tier 2)
+   - `"Using profile override for create-prd (.scaffold/prompts/create-prd-custom.md)"` (Tier 1)
+   This transparency helps users understand which version of a prompt is running.
 
 4. **Given** a prompt completes,
    **When** the engine records completion and identifies the next prompt,
    **Then** it displays: "Prompt `create-prd` complete. Next: `prd-gap-analysis`. Run it now?"
 
-5. **Given** a prompt fails (user aborts),
+5. **Given** a prompt fails (user aborts mid-execution),
    **When** the engine checks state,
-   **Then** the prompt is NOT marked complete, and `resume` will retry it.
+   **Then** the prompt is NOT marked complete, and `resume` will retry it. Partial completion is indistinguishable from no completion — the artifact check and self-report are the best available signals.
+
+6. **Given** a prompt executes but produces no artifacts (e.g., a prompt that only configures settings, or a prompt whose `produces` list is empty),
+   **When** the user confirms the prompt is done,
+   **Then** the prompt is marked complete via the orchestrator-recorded mechanism (added to `completed` array in config.json).
 
 **Scope Boundary**: Does NOT cover: pre-execution preview of file changes (US-6.3). Does NOT cover: prompt content itself — this is engine-level execution.
 
@@ -676,6 +703,16 @@ Covers: F-PE-1 through F-PE-6
    **When** state files are deleted,
    **Then** `.scaffold/decisions.json` is deleted.
 
+6. **Given** `.scaffold/decisions.json` contains decisions from `tech-stack` and `coding-standards`,
+   **When** `tdd` is about to execute (which depends on `coding-standards`),
+   **Then** Scaffold displays relevant prior decisions before the prompt runs:
+   ```
+   Relevant decisions from prior prompts:
+     • Chose Vitest over Jest for speed (tech-stack)
+     • Adopted strict TypeScript with no-any rule (coding-standards)
+   ```
+   This gives Claude cross-session context automatically. Only decisions from direct and transitive dependencies are shown.
+
 **Scope Boundary**: Does NOT cover: decision log entries are never modified or deleted except by reset. Each prompt optionally records 1–3 decisions.
 
 **Data/State Requirements**:
@@ -709,7 +746,19 @@ Covers: F-UX-2, F-UX-4, F-UX-5, F-UX-6, F-UX-9, F-UX-11, Flow 2
 
 3. **Given** all prompts are complete (18/18),
    **When** the user runs `/scaffold:resume`,
-   **Then** Scaffold shows: "Pipeline complete. Run `/scaffold:new-enhancement` to add features, or `/scaffold:single-agent-start` to begin implementation."
+   **Then** Scaffold shows a completion summary:
+   ```
+   Pipeline complete (18/18). Profile: web-app.
+
+   Artifacts created:
+     docs/plan.md, docs/tech-stack.md, docs/coding-standards.md, ...
+   Decisions logged: 12 (see .scaffold/decisions.json)
+   Total time: 1h 23m (from init to last prompt)
+
+   Next steps:
+     /scaffold:new-enhancement — Add features
+     /scaffold:single-agent-start — Begin implementation
+   ```
 
 4. **Given** `.scaffold/config.json` doesn't exist,
    **When** the user runs `/scaffold:resume`,
@@ -718,6 +767,17 @@ Covers: F-UX-2, F-UX-4, F-UX-5, F-UX-6, F-UX-9, F-UX-11, Flow 2
 5. **Given** config.json fails to parse (corrupt from session crash),
    **When** `resume` loads the config,
    **Then** it falls back to artifact-based completion detection (US-2.4), regenerates config.json from detected state, and reports what it found.
+
+6. **Given** the user manually edited `.scaffold/config.json` between sessions (e.g., added prompts to `extra-prompts`, modified `completed` entries),
+   **When** `resume` loads the config,
+   **Then** Scaffold validates the modified config:
+   - If `extra-prompts` references a prompt name with no file at any tier, reports: "Extra prompt `X` not found at .scaffold/prompts/X.md, ~/.scaffold/prompts/X.md, or built-in commands/X.md. Remove it from extra-prompts or create the prompt file."
+   - If `completed` contains entries for prompt names not in the `prompts` array, ignores them silently.
+   - If `prompts` array was modified (prompts added/removed), re-resolves dependencies for the updated list and reports any errors.
+
+7. **Given** config.json has `scaffold-version` indicating a newer format than the running Scaffold version (e.g., config says `"3.0.0"` but Scaffold is `"2.0.0"`),
+   **When** `resume` loads the config,
+   **Then** Scaffold warns: "This config was created by Scaffold v3.0.0. You are running v2.0.0. Proceeding — some features may not be available." and continues operating.
 
 **Scope Boundary**: Does NOT cover: `--from` flag (US-3.2), prompt execution mechanics (US-2.5).
 
@@ -775,7 +835,7 @@ Covers: F-UX-2, F-UX-4, F-UX-5, F-UX-6, F-UX-9, F-UX-11, Flow 2
 
 1. **Given** the `tech-stack` prompt just completed (prompt 4 of 18),
    **When** Scaffold shows progress,
-   **Then** the output format is:
+   **Then** the output format matches the PRD-specified ASCII format:
    ```
    Pipeline: web-app (4/18 complete)
    Phase 2 — Project Foundation
@@ -789,14 +849,28 @@ Covers: F-UX-2, F-UX-4, F-UX-5, F-UX-6, F-UX-9, F-UX-11, Flow 2
      project-structure
      ...
    ```
+   Specifically: completed prompts use `✓`, the next prompt uses `→` with `(next)`, pending prompts are indented with 2 spaces, and prompts are grouped under phase headers in the format `Phase N — Phase Name`.
 
 2. **Given** a prompt was skipped,
    **When** progress is displayed,
    **Then** it shows as: `⊘ design-system (skipped)`
 
-3. **Given** the progress is displayed,
+3. **Given** the progress is displayed after a prompt completes,
    **When** Scaffold identifies the next prompt,
-   **Then** it asks: "Next: `claude-code-permissions`. Run it now?"
+   **Then** it shows elapsed time and asks: "Prompt `tech-stack` complete (3m 42s). Next: `claude-code-permissions`. Run it now?" Elapsed time is calculated from the prompt's start to its completion timestamp.
+
+4. **Given** the initial pipeline display during `init` (before any prompts are run),
+   **When** Scaffold shows the resolved pipeline,
+   **Then** the format is:
+   ```
+   Scaffold pipeline for profile "web-app" (18 prompts):
+
+   Phase 1 — Product Definition
+     1. create-prd
+     2. prd-gap-analysis
+   ...
+   ```
+   With numbered prompts grouped by phase.
 
 **Scope Boundary**: Does NOT cover: `scaffold status` (US-3.4) — status shows the same format but without the "Run it now?" prompt.
 
@@ -946,13 +1020,15 @@ Covers: F-UX-2, F-UX-4, F-UX-5, F-UX-6, F-UX-9, F-UX-11, Flow 2
 
 1. **Given** the pipeline has 8/18 prompts complete and `dev-env-setup` is next,
    **When** the user runs `/scaffold:next`,
-   **Then** Scaffold shows:
+   **Then** Scaffold shows context-rich information about the next prompt:
    ```
-   Next: dev-env-setup
+   Next: dev-env-setup (prompt 9/18)
    Description: Set up local dev environment with live reload
    Produces: docs/dev-setup.md, Makefile
    Reads: docs/project-structure.md, docs/tech-stack.md
+   Source: [built-in]
    ```
+   The `Reads` field shows which predecessor artifacts will feed into this prompt, and `Source` shows which tier the prompt resolves from.
 
 2. **Given** multiple prompts are eligible (all dependencies satisfied within a phase),
    **When** `next` runs,
@@ -1427,12 +1503,12 @@ Covers: F-UX-3, F-UX-8, Flow 5
 
 3. **Given** errors exist,
    **When** validation completes,
-   **Then** errors are grouped by source file:
+   **Then** errors are grouped by source file with actionable fix suggestions:
    ```
    .scaffold/profiles/healthtech-api.json:
-     - extends: "nonexistent" — profile not found
+     - extends: "nonexistent" — profile not found. Available: web-app, cli-tool, mobile, api-service, minimal
    .scaffold/prompts/security-audit.md:
-     - depends-on: "missing-prompt" — prompt not in pipeline
+     - depends-on: "missing-prompt" — prompt not in pipeline. Fix: add it to your profile's add-prompts or remove the dependency
    ```
 
 4. **Given** the user runs `/scaffold:validate healthtech-api`,
