@@ -115,3 +115,22 @@ This keeps Beads as the single source of truth for all changes.
 - **Use subagents**: Offload research, exploration, and parallel analysis to subagents. Keeps main context clean.
 - **Keep working**: Continue until `bd ready` returns no available tasks.
 - **Re-plan when stuck**: If implementation goes sideways, stop and rethink your approach rather than pushing through. (Do NOT enter interactive `/plan` mode — just think through the problem and adjust.)
+
+## Project Structure Quick Reference
+
+See `docs/project-structure.md` for the full authoritative guide.
+
+| Directory | Purpose |
+|-----------|---------|
+| `commands/` | Individual command `.md` files (generated from `prompts.md`) |
+| `scripts/` | Bash utility scripts called by prompts |
+| `lib/` | Shared bash libraries (`common.sh`) |
+| `docs/` | Project documentation and standards |
+| `tests/` | bats-core `.bats` test files |
+| `tests/test_helper/` | Shared test setup (`common-setup.bash`) |
+| `tests/fixtures/` | Test data files |
+| `skills/` | Auto-activated skills |
+| `.claude-plugin/` | Plugin manifest (`plugin.json`) |
+| `.beads/` | Beads issue database (managed by `bd` CLI) |
+
+**File placement**: Scripts → `scripts/<name>.sh` | Tests → `tests/<name>.bats` | Docs → `docs/<topic>.md` | Shared functions → `lib/common.sh` (only when used by 2+ scripts)

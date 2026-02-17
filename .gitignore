@@ -1,2 +1,12 @@
 .DS_Store
 .history
+
+# Coverage output (kcov)
+coverage/
+
+# Temp files (atomic writes)
+*.tmp
+
+# Editor backups
+*~
+*.bak
