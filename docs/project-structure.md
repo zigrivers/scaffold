@@ -18,10 +18,12 @@ scaffold/
 │   ├── uninstall.sh
 │   ├── update.sh
 │   └── user-stories-mmr.sh
-├── lib/                       # Shared bash libraries (common.sh) [NEW — scaffolded]
-│   └── .gitkeep
+├── lib/                       # Shared bash libraries and assets
+│   ├── .gitkeep
+│   └── dashboard-theme.css    # Dashboard CSS (embedded into generated HTML)
 ├── docs/                      # Project documentation and standards
 │   ├── coding-standards.md
+│   ├── design-system.md       # Dashboard visual design system
 │   ├── project-structure.md   # This file
 │   ├── tdd-standards.md
 │   └── tech-stack.md
@@ -75,7 +77,7 @@ Scaffold uses a **role-based** organization. Each directory has a single clear p
 | Prompts (source of truth) | `prompts.md` | All prompt text, extracted to `commands/` |
 | Commands (distributed) | `commands/` | Individual `.md` files with YAML frontmatter |
 | Scripts (deterministic ops) | `scripts/` | Bash utilities called by prompts |
-| Shared library | `lib/` | `common.sh` — sourced by all scripts |
+| Shared library & assets | `lib/` | `common.sh` (sourced by scripts), `dashboard-theme.css` (embedded into HTML) |
 | Tests | `tests/` | bats-core `.bats` files, one per script |
 | Documentation | `docs/` | Standards docs, reviews, this file |
 | Skills | `skills/` | Auto-activated skill files |
@@ -96,6 +98,7 @@ Scaffold uses a **role-based** organization. Each directory has a single clear p
 | Test fixtures | `tests/fixtures/` | `<descriptive-name>.<ext>` | `tests/fixtures/valid-config.json` |
 | Test helpers | `tests/test_helper/` | `common-setup.bash` | `tests/test_helper/common-setup.bash` |
 | JSON schemas | `scripts/` | `<name>.schema.json` | `scripts/user-stories-mmr.schema.json` |
+| CSS / theme files | `lib/` | `<name>.css` (kebab-case) | `lib/dashboard-theme.css` |
 | Skills | `skills/<skill-name>/` | `SKILL.md` | `skills/scaffold-pipeline/SKILL.md` |
 | Config files | repo root | standard names | `.editorconfig`, `.shellcheckrc`, `.gitignore` |
 

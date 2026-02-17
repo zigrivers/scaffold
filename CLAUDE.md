@@ -214,6 +214,17 @@ See `docs/dev-setup.md` for the full setup guide.
 - **All gates**: `make check` (lint + validate + test)
 - **Git hooks**: `make hooks` installs pre-commit (ShellCheck + frontmatter) and pre-push (test suite)
 
+## Design System
+
+Before modifying any dashboard HTML/CSS, review `docs/design-system.md`.
+
+### Key Rules
+- Use ONLY colors from CSS custom properties in `lib/dashboard-theme.css`
+- Use ONLY spacing values from the defined `--sp-*` scale
+- Follow component patterns exactly — don't invent new styles
+- Always provide both light and dark mode token values
+- Config: `lib/dashboard-theme.css`
+
 ## When to Consult Other Docs
 
 | Question | Document |
@@ -222,4 +233,5 @@ See `docs/dev-setup.md` for the full setup guide.
 | What are the coding conventions? | `docs/coding-standards.md` |
 | How is the project structured? | `docs/project-structure.md` |
 | How do I set up my dev environment? | `docs/dev-setup.md` |
+| How should dashboard HTML/CSS look? | `docs/design-system.md` |
 | What's the prompt pipeline order? | `prompts.md` (Setup Order table at top) |
