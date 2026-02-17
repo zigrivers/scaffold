@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(rm -rf /)",
+      "Bash(rm -r *)",
+      "Bash(sudo *)",
+      "Bash(git push --force *)",
+      "Bash(git push origin main)",
+      "Bash(git push -f origin main)",
+      "Bash(git push --force origin main)",
+      "Bash(git reset --hard *)",
+      "Bash(git worktree remove *)",
+      "Bash(bd edit *)"
+    ]
+  }
+}
