@@ -578,7 +578,7 @@ Tell me:
 
 
 ___________________________________________
-## Tech Stack (Prompt)
+# Tech Stack (Prompt)
 Thoroughly review and analyze docs/plan.md to understand every feature, integration, and technical requirement of this project. Then deeply research tech stack options and create docs/tech-stack.md as the definitive technology reference for this project.
 
 ## Mode Detection
@@ -1054,7 +1054,7 @@ git commit -m "[BD-0] chore: configure Claude Code permissions"
 
 
 _____________________________________
-## Coding Standards (Prompt)
+# Coding Standards (Prompt)
 Deeply research best practices for coding standards for our tech stack — review docs/tech-stack.md — then create docs/coding-standards.md as the definitive code quality reference for this project.
 
 This document will be referenced by AI agents during every implementation task. It needs to be prescriptive with concrete examples, not abstract principles.
@@ -1207,7 +1207,7 @@ A quick-reference checklist AI agents should self-apply before marking a task co
 - If this work surfaces implementation tasks (bugs, missing infrastructure), create separate Beads tasks for those — don't try to do them now
 
 _______________________________
-## TDD (Prompt)
+# TDD (Prompt)
 Deeply research test-driven development (TDD) best practices for our tech stack — review docs/tech-stack.md and docs/coding-standards.md — then create docs/tdd-standards.md as the definitive testing reference for this project.
 
 This document will be referenced by AI agents during every implementation task. It needs to be prescriptive and concrete, not theoretical.
@@ -1315,7 +1315,7 @@ Until those prompts run, E2E testing patterns are not yet defined. Focus TDD eff
 - If this work surfaces implementation tasks (bugs, missing infrastructure), create separate Beads tasks for those — don't try to do them now
 
 ___________________________________
-## Project Structure (Prompt)
+# Project Structure (Prompt)
 Research best practices for project structure based on our tech stack and standards. Review docs/tech-stack.md, docs/coding-standards.md, docs/tdd-standards.md, and docs/plan.md, then create docs/project-structure.md and scaffold the actual directory structure.
 
 ## Mode Detection
@@ -3356,7 +3356,7 @@ Edit `AGENTS.md` to change what Codex Cloud looks for. Add "What NOT to flag" ex
 
 
 __________________________________________________________
-## Integrate Playwright (if building a web app) (Prompt)
+# Integrate Playwright (if building a web app) (Prompt)
 Configure Playwright MCP for browser automation and visual testing in this project if applicable, otherwise tell me we don't need this. The Playwright MCP server has already been added to Claude Code.
 
 Review docs/tech-stack.md, docs/tdd-standards.md, and CLAUDE.md to understand the existing project conventions.

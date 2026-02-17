@@ -2,6 +2,11 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.7.2] — 2026-02-16
+
+### Fixed
+- Normalize 5 prompt headings in `prompts.md` from `##` to `#` — Tech Stack, Coding Standards, TDD, Project Structure, and Integrate Playwright now match the `# Name (Prompt)` convention used by all other prompts
+
 ## [1.7.1] — 2026-02-16
 
 ### Fixed
