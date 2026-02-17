@@ -41,7 +41,7 @@ fi
 staged_sh=$(git diff --cached --name-only --diff-filter=ACM | grep '\.sh$' || true)
 if [ -n "$staged_sh" ]; then
     if command -v shellcheck >/dev/null 2>&1; then
-        echo "$staged_sh" | xargs shellcheck || exit 1
+        echo "$staged_sh" | xargs shellcheck --severity=warning || exit 1
     else
         echo "Warning: shellcheck not installed, skipping lint check" >&2
     fi

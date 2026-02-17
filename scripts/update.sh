@@ -15,6 +15,7 @@ set -e
 REPO_URL="https://github.com/zigrivers/scaffold.git"
 CACHE_DIR="$HOME/.cache/scaffold"
 TARGET_DIR="$HOME/.claude/commands"
+# shellcheck disable=SC2034 # TODO [BD-scaffold-evw] VERSION_FILE planned for version tracking
 VERSION_FILE="$TARGET_DIR/.scaffold-version"
 
 # ─── Fetch latest ─────────────────────────────────────────────────

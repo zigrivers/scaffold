@@ -84,6 +84,7 @@ HEADING_TO_SLUG["Workflow Audit"]="workflow-audit"
 HEADING_TO_SLUG["Implementation Plan"]="implementation-plan"
 HEADING_TO_SLUG["Implementation Plan Review"]="implementation-plan-review"
 HEADING_TO_SLUG["New Enhancement"]="new-enhancement"
+# shellcheck disable=SC2034 # Array used via ${HEADING_TO_SLUG[$key]} below
 HEADING_TO_SLUG["Quick Task"]="quick-task"
 
 # ─── Next steps mapping ────────────────────────────────────────────
