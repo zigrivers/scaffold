@@ -73,9 +73,18 @@ bd close <id>                            # Marks complete — use this, not bd u
 bd sync                                  # Force sync to git
 ```
 
-### Beads Commands
+### Key Commands
+
 | Command | Purpose |
 |---------|---------|
+| `make check` | Run all quality gates (lint + validate + test) |
+| `make test` | Run bats test suite |
+| `make lint` | Run ShellCheck on all shell scripts |
+| `make validate` | Validate frontmatter in command files |
+| `make setup` | Install dev dependencies via Homebrew |
+| `make hooks` | Install pre-commit and pre-push hooks |
+| `make install` | Install scaffold commands to ~/.claude/commands/ |
+| `make extract` | Extract commands from prompts.md |
 | `bd ready` | Show unblocked tasks ready for work |
 | `bd create "Title" -p N` | Create task with priority |
 | `bd update <id> --status S` | Update status (in_progress, blocked, etc.) |
@@ -134,3 +143,13 @@ See `docs/project-structure.md` for the full authoritative guide.
 | `.beads/` | Beads issue database (managed by `bd` CLI) |
 
 **File placement**: Scripts → `scripts/<name>.sh` | Tests → `tests/<name>.bats` | Docs → `docs/<topic>.md` | Shared functions → `lib/common.sh` (only when used by 2+ scripts)
+
+## Dev Environment
+
+See `docs/dev-setup.md` for the full setup guide.
+
+- **Build tool**: GNU Make (`Makefile` at repo root)
+- **Lint**: ShellCheck (`make lint`)
+- **Test**: bats-core (`make test`)
+- **All gates**: `make check` (lint + validate + test)
+- **Git hooks**: `make hooks` installs pre-commit (ShellCheck + frontmatter) and pre-push (test suite)
