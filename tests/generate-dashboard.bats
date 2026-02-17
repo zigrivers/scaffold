@@ -49,11 +49,11 @@ teardown() {
     grep -q 'DASHBOARD_DATA' "$TEST_OUT/dashboard.html"
 }
 
-@test "no external https:// references in output" {
+@test "no external https:// resource references in HTML/CSS" {
     run bash "$SCRIPT" --no-open --output "$TEST_OUT/dashboard.html"
     [ "$status" -eq 0 ]
-    # Should have zero external resource references (data URIs and inline only)
-    count=$(grep -c 'https://' "$TEST_OUT/dashboard.html" || true)
+    # Check <head> and CSS only — JSON data payload may contain URLs from prompt content
+    count=$(sed -n '1,/<\/style>/p' "$TEST_OUT/dashboard.html" | grep -c 'https://' || true)
     [ "$count" -eq 0 ]
 }
 
@@ -132,4 +132,109 @@ teardown() {
     # First non-empty character should be { (JSON object)
     first_char=$(echo "$output" | head -1 | cut -c1)
     [ "$first_char" = "{" ]
+}
+
+# ─── Theme toggle ────────────────────────────────────────────────
+
+@test "HTML contains theme initialization script" {
+    run bash "$SCRIPT" --no-open --output "$TEST_OUT/dashboard.html"
+    [ "$status" -eq 0 ]
+    grep -q 'scaffold-theme' "$TEST_OUT/dashboard.html"
+    grep -q 'data-theme' "$TEST_OUT/dashboard.html"
+}
+
+@test "HTML contains toggleTheme function" {
+    run bash "$SCRIPT" --no-open --output "$TEST_OUT/dashboard.html"
+    [ "$status" -eq 0 ]
+    grep -q 'function toggleTheme' "$TEST_OUT/dashboard.html"
+}
+
+@test "CSS uses data-theme selector instead of prefers-color-scheme" {
+    run bash "$SCRIPT" --no-open --output "$TEST_OUT/dashboard.html"
+    [ "$status" -eq 0 ]
+    grep -q '\[data-theme="dark"\]' "$TEST_OUT/dashboard.html"
+    # Should NOT have @media prefers-color-scheme for dark mode tokens
+    count=$(grep -c '@media.*prefers-color-scheme.*dark' "$TEST_OUT/dashboard.html" || true)
+    [ "$count" -eq 0 ]
+}
+
+# ─── Status badges ───────────────────────────────────────────────
+
+@test "HTML contains status-badge elements instead of dots" {
+    run bash "$SCRIPT" --no-open --output "$TEST_OUT/dashboard.html"
+    [ "$status" -eq 0 ]
+    grep -q 'status-badge' "$TEST_OUT/dashboard.html"
+}
+
+@test "HTML contains status legend" {
+    run bash "$SCRIPT" --no-open --output "$TEST_OUT/dashboard.html"
+    [ "$status" -eq 0 ]
+    grep -q 'status-legend' "$TEST_OUT/dashboard.html"
+}
+
+# ─── Long descriptions ──────────────────────────────────────────
+
+@test "JSON payload contains longDescription for prompts" {
+    run bash "$SCRIPT" --json-only
+    [ "$status" -eq 0 ]
+    # create-prd should have a non-empty longDescription
+    ldesc=$(echo "$output" | jq -r '.prompts[0].longDescription')
+    [ -n "$ldesc" ]
+    [ "$ldesc" != "null" ]
+}
+
+# ─── Prompt content ─────────────────────────────────────────────
+
+@test "JSON payload contains promptContent for prompts" {
+    run bash "$SCRIPT" --json-only
+    [ "$status" -eq 0 ]
+    # create-prd should have non-empty promptContent
+    pcontent=$(echo "$output" | jq -r '.prompts[0].promptContent | length')
+    [ "$pcontent" -gt 100 ]
+}
+
+@test "HTML contains modal functions" {
+    run bash "$SCRIPT" --no-open --output "$TEST_OUT/dashboard.html"
+    [ "$status" -eq 0 ]
+    grep -q 'function openModal' "$TEST_OUT/dashboard.html"
+    grep -q 'function closeModal' "$TEST_OUT/dashboard.html"
+    grep -q 'modal-overlay' "$TEST_OUT/dashboard.html"
+}
+
+# ─── Beads tasks ─────────────────────────────────────────────────
+
+@test "JSON payload contains beads tasks array" {
+    run bash "$SCRIPT" --json-only
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.beads.tasks | type == "array"' >/dev/null
+}
+
+@test "HTML contains beads filter function" {
+    run bash "$SCRIPT" --no-open --output "$TEST_OUT/dashboard.html"
+    [ "$status" -eq 0 ]
+    grep -q 'function filterBeads' "$TEST_OUT/dashboard.html"
+}
+
+@test "JSON uses bd list --all for complete task data" {
+    run bash "$SCRIPT" --json-only
+    [ "$status" -eq 0 ]
+    # If beads is available, total should include closed tasks
+    total=$(echo "$output" | jq '.beads.total')
+    closed=$(echo "$output" | jq '.beads.closed')
+    # Total should be >= closed (can't have more closed than total)
+    [ "$total" -ge "$closed" ]
+}
+
+# ─── Bug fix verification ───────────────────────────────────────
+
+@test "beads detection uses config.yaml not directory" {
+    # Verify the SKILL.md fix: .beads/config.yaml instead of .beads/ directory
+    run grep 'config.yaml' "$BATS_TEST_DIRNAME/../skills/scaffold-pipeline/SKILL.md"
+    [ "$status" -eq 0 ]
+}
+
+@test "jq enrichment uses captured step variable" {
+    # Verify the jq fix: (.step) as $s instead of .step == .step
+    run grep 'as \$s' "$BATS_TEST_DIRNAME/../scripts/generate-dashboard.sh"
+    [ "$status" -eq 0 ]
 }

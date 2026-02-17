@@ -1,5 +1,6 @@
 ---
 description: "Check for and apply scaffold updates"
+long-description: "Checks the scaffold plugin registry for newer versions and guides you through updating commands and skills to the latest release."
 ---
 
 Check for and apply updates to the scaffold prompt pipeline. Follow these steps exactly:

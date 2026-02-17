@@ -1,5 +1,6 @@
 ---
 description: "Audit platform coverage across all docs"
+long-description: "Checks all documentation for platform-specific gaps when targeting multiple platforms (web, iOS, Android), ensuring feature parity across targets."
 ---
 
 This app targets multiple platforms as first-class citizens. Review `docs/tech-stack.md` and `docs/plan.md` to identify the specific target platforms (iOS, Android, web browsers, desktop) and their version requirements.

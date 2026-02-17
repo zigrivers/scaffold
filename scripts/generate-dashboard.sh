@@ -91,7 +91,7 @@ if [[ -f "$SKILL_FILE" ]]; then
         found && /^\|/ {
             n = split($0, cols, "|")
             step = cols[2]; gsub(/^[ \t]+|[ \t]+$/, "", step)
-            check = cols[4]; gsub(/^[ \t]+|[ \t]+$/, "", check); gsub(/`/, "", check)
+            check = cols[4]; gsub(/^[ \t]+|[ \t]+$/, "", check); gsub(/`/, "", check); sub(/ .*/, "", check)
             comment = cols[5]; gsub(/^[ \t]+|[ \t]+$/, "", comment); gsub(/`/, "", comment)
             if (step != "" && step != "#") {
                 printf "%s|%s|%s\n", step, check, comment
@@ -107,6 +107,36 @@ if [[ -f "$EXTRACT_SCRIPT" ]]; then
     DESCRIPTIONS_JSON=$(grep "^    '" "$EXTRACT_SCRIPT" | sed "s/^    '//; s/'$//" | \
         awk -F'|' '{gsub(/^[ \t]+|[ \t]+$/, "", $1); gsub(/^[ \t]+|[ \t]+$/, "", $2); if ($1 != "") printf "%s|%s\n", $1, $2}' | \
         jq -R 'split("|") | {(.[0]): .[1]}' | jq -s 'add // {}')
+fi
+
+# Parse long descriptions from command file frontmatter
+LONG_DESCRIPTIONS_JSON="{}"
+COMMANDS_DIR="$REPO_DIR/commands"
+if [[ -d "$COMMANDS_DIR" ]]; then
+    LONG_DESCRIPTIONS_JSON=$(
+        for f in "$COMMANDS_DIR"/*.md; do
+            slug=$(basename "$f" .md)
+            ldesc=$(awk '/^---$/{n++;next} n==1 && /^long-description:/{sub(/^long-description: *"?/,"");sub(/"? *$/,"");print;exit}' "$f")
+            if [[ -n "$ldesc" ]]; then
+                printf '%s|%s\n' "$slug" "$ldesc"
+            fi
+        done | jq -R 'split("|") | {(.[0]): .[1]}' | jq -s 'add // {}'
+    )
+fi
+
+# Read full prompt content from command files (strip YAML frontmatter)
+PROMPT_CONTENT_JSON="{}"
+if [[ -d "$COMMANDS_DIR" ]]; then
+    PROMPT_CONTENT_JSON=$(
+        for f in "$COMMANDS_DIR"/*.md; do
+            slug=$(basename "$f" .md)
+            # Strip YAML frontmatter (between first two --- lines)
+            content=$(awk 'BEGIN{fm=0} /^---$/{fm++;next} fm>=2{print}' "$f")
+            if [[ -n "$content" ]]; then
+                jq -n --arg s "$slug" --arg c "$content" '{($s): $c}'
+            fi
+        done | jq -s 'add // {}'
+    )
 fi
 
 # Dependencies (hardcoded — stable, small dataset)
@@ -184,23 +214,45 @@ BEADS_TOTAL=0
 BEADS_OPEN=0
 BEADS_CLOSED=0
 HAS_BEADS=false
+BEADS_TASKS_JSON="[]"
 
 if command -v bd &>/dev/null; then
-    beads_json=$(bd list --json 2>/dev/null || echo "")
+    beads_json=$(bd list --all --json 2>/dev/null || echo "")
     if [[ -n "$beads_json" ]]; then
         HAS_BEADS=true
         BEADS_TOTAL=$(echo "$beads_json" | jq 'length' 2>/dev/null || echo 0)
         BEADS_CLOSED=$(echo "$beads_json" | jq '[.[] | select(.status == "closed")] | length' 2>/dev/null || echo 0)
         BEADS_OPEN=$((BEADS_TOTAL - BEADS_CLOSED))
+        BEADS_TASKS_JSON=$(echo "$beads_json" | jq '[.[] | {
+            id: .id,
+            title: .title,
+            status: .status,
+            priority: (.priority // null),
+            assignee: (.assignee // null),
+            createdAt: (.created_at // null),
+            updatedAt: (.updated_at // null),
+            closedAt: (.closed_at // null)
+        }]' 2>/dev/null || echo "[]")
     fi
 fi
 
 # ─── Section 5: Build final JSON payload with jq ─────────────────
 
+# Write large JSON values to temp files to avoid ARG_MAX limits on CI
+PROMPT_CONTENT_FILE=$(mktemp "${TMPDIR:-/tmp}/scaffold-pc-XXXXXX.json")
+LONG_DESC_FILE=$(mktemp "${TMPDIR:-/tmp}/scaffold-ld-XXXXXX.json")
+BEADS_TASKS_FILE=$(mktemp "${TMPDIR:-/tmp}/scaffold-bt-XXXXXX.json")
+echo "$PROMPT_CONTENT_JSON" > "$PROMPT_CONTENT_FILE"
+echo "$LONG_DESCRIPTIONS_JSON" > "$LONG_DESC_FILE"
+echo "$BEADS_TASKS_JSON" > "$BEADS_TASKS_FILE"
+trap 'rm -f "$PROMPT_CONTENT_FILE" "$LONG_DESC_FILE" "$BEADS_TASKS_FILE"' EXIT
+
 PAYLOAD=$(jq -n \
     --argjson pipeline "$PIPELINE_JSON" \
     --argjson detection "$DETECTION_JSON" \
     --argjson descriptions "$DESCRIPTIONS_JSON" \
+    --slurpfile longDescriptions "$LONG_DESC_FILE" \
+    --slurpfile promptContent "$PROMPT_CONTENT_FILE" \
     --argjson deps "$DEPS_JSON" \
     --argjson config "$CONFIG_JSON" \
     --argjson fileStatus "$FILE_STATUS_JSON" \
@@ -210,6 +262,7 @@ PAYLOAD=$(jq -n \
     --argjson beadsTotal "$BEADS_TOTAL" \
     --argjson beadsOpen "$BEADS_OPEN" \
     --argjson beadsClosed "$BEADS_CLOSED" \
+    --slurpfile beadsTasks "$BEADS_TASKS_FILE" \
     --arg timestamp "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
     --arg projectDir "$PROJECT_DIR" \
     '
@@ -226,8 +279,10 @@ PAYLOAD=$(jq -n \
         status: resolveStatus(.slug; .step),
         description: ($descriptions[.slug] // ""),
         deps: ($deps[.slug] // []),
+        longDescription: ($longDescriptions[0][.slug] // ""),
+        promptContent: ($promptContent[0][.slug] // ""),
         optional: ((.notes // "") | test("optional")),
-        checkFile: (($detection | map(select(.step == .step)) | .[0].checkFile) // "")
+        checkFile: ((.step) as $s | ($detection | map(select(.step == $s)) | .[0].checkFile) // "")
     })) as $prompts |
 
     # Unique phases in order
@@ -265,7 +320,8 @@ PAYLOAD=$(jq -n \
             available: $hasBeads,
             total: $beadsTotal,
             open: $beadsOpen,
-            closed: $beadsClosed
+            closed: $beadsClosed,
+            tasks: $beadsTasks[0]
         },
         timestamp: $timestamp,
         projectDir: $projectDir
@@ -305,6 +361,9 @@ cat > "$OUTPUT_FILE" <<'HTMLPRE'
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Scaffold Pipeline Dashboard</title>
+<script>
+(function(){var t=localStorage.getItem('scaffold-theme');if(!t){t=window.matchMedia&&window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+</script>
 <style>
 HTMLPRE
 
@@ -332,16 +391,34 @@ cat >> "$OUTPUT_FILE" <<'HTMLTAIL'
         div.textContent = s || '';
         return div.innerHTML;
     }
+    var statusMap = {
+        completed:         {icon:'\u2713', label:'Done'},
+        'likely-completed':{icon:'\u2248', label:'Likely Done'},
+        skipped:           {icon:'\u2192', label:'Skipped'},
+        pending:           {icon:'\u25CB', label:'Pending'}
+    };
     function stLbl(s) {
-        return {completed:'Completed','likely-completed':'Likely done',skipped:'Skipped',pending:'Pending'}[s] || s;
+        var m = statusMap[s];
+        return m ? m.icon + ' ' + m.label : s;
+    }
+    function stBadge(s) {
+        var m = statusMap[s] || {icon:'', label:s};
+        return '<span class="status-badge st-' + s + '">' + m.icon + '&nbsp;' + m.label + '</span>';
     }
 
     var projectName = d.projectDir.split('/').pop();
     var h = '<div class="header"><h1>Scaffold Pipeline</h1>';
     if (d.profile) h += '<span class="badge">' + esc(d.profile) + '</span>';
+    h += '<button class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode" aria-label="Toggle theme">';
+    h += document.documentElement.getAttribute('data-theme') === 'dark' ? '&#9788;' : '&#9790;';
+    h += '</button>';
     h += '</div>';
     h += '<div class="header-meta">' + esc(projectName) + ' &mdash; ' + new Date(d.timestamp).toLocaleString();
     if (!d.hasScaffold) h += ' &mdash; <em>Overview mode (no .scaffold/ detected)</em>';
+    h += '</div>';
+
+    h += '<div class="status-legend">';
+    h += stBadge('completed') + stBadge('likely-completed') + stBadge('skipped') + stBadge('pending');
     h += '</div>';
 
     var pct = function(n) { return (n / d.summary.total * 100).toFixed(1); };
@@ -401,16 +478,60 @@ cat >> "$OUTPUT_FILE" <<'HTMLTAIL'
                 }
             }
 
-            h += '<div class="pcard">';
-            h += '<div class="dot st-' + p.status + '" title="' + stLbl(p.status) + '"></div>';
+            h += '<div class="pcard" style="cursor:pointer" onclick="openModal(\'' + esc(p.slug) + '\')">';
+            h += stBadge(p.status);
             h += '<div class="pinfo">';
             h += '<span class="pname">' + esc(p.slug) + '</span>';
             h += ' <span class="pstep">Step ' + esc(p.step) + '</span>';
             if (p.optional) h += ' <span class="badge badge-optional">optional</span>';
             if (p.description) h += '<div class="pdesc">' + esc(p.description) + '</div>';
+            if (p.longDescription) h += '<div class="pdesc pdesc-long">' + esc(p.longDescription) + '</div>';
             if (blockers.length > 0) h += '<div class="pdeps">Blocked by: ' + blockers.map(esc).join(', ') + '</div>';
             h += '</div>';
-            h += '<div class="pcmd" onclick="copyCmd(this)" data-cmd="/scaffold:' + esc(p.slug) + '">/scaffold:' + esc(p.slug) + '</div>';
+            h += '<div class="pcmd" onclick="event.stopPropagation();copyCmd(this)" data-cmd="/scaffold:' + esc(p.slug) + '">/scaffold:' + esc(p.slug) + '</div>';
+            h += '</div>';
+        }
+        h += '</div></div>';
+    }
+
+    // ─── Beads Task Section ─────────────────────────
+    if (d.beads.available && d.beads.tasks.length > 0) {
+        h += '<div class="beads-section">';
+        h += '<div class="phase-hdr" onclick="togglePhase(this)">';
+        h += '<span class="arr">&#9660;</span>';
+        h += '<h2 style="margin:0">Beads Tasks</h2>';
+        h += '<span class="phase-cnt">' + d.beads.closed + '/' + d.beads.total + ' closed</span>';
+        h += '</div>';
+        h += '<div class="plist" id="beads-list">';
+
+        h += '<div class="beads-filters">';
+        h += '<button class="beads-filter active" onclick="filterBeads(\'open\',this)">Open (' + d.beads.open + ')</button>';
+        h += '<button class="beads-filter" onclick="filterBeads(\'closed\',this)">Closed (' + d.beads.closed + ')</button>';
+        h += '<button class="beads-filter" onclick="filterBeads(\'all\',this)">All (' + d.beads.total + ')</button>';
+        h += '</div>';
+
+        var prioColors = {'0':'var(--yellow)','1':'var(--blue)','2':'var(--green)','3':'var(--text-faint)'};
+        var prioLabels = {'0':'P0','1':'P1','2':'P2','3':'P3'};
+        for (var bi = 0; bi < d.beads.tasks.length; bi++) {
+            var bt = d.beads.tasks[bi];
+            var isClosed = bt.status === 'closed';
+            h += '<div class="pcard beads-task" data-bead-status="' + (isClosed ? 'closed' : 'open') + '"' + (isClosed ? ' style="display:none"' : '') + '>';
+            if (isClosed) {
+                h += stBadge('completed');
+            } else {
+                h += '<span class="status-badge" style="background:var(--accent-glow);color:var(--accent);border:1px solid var(--accent)">\u25CF</span>';
+            }
+            h += '<div class="pinfo">';
+            h += '<span class="pname">' + esc(bt.title) + '</span>';
+            h += ' <span class="pstep">' + esc(bt.id) + '</span>';
+            if (bt.priority != null) {
+                var pc = prioColors[String(bt.priority)] || 'var(--text-faint)';
+                var pl = prioLabels[String(bt.priority)] || 'P' + bt.priority;
+                h += ' <span class="badge" style="background:' + pc + '">' + pl + '</span>';
+            }
+            if (bt.assignee) h += '<div class="pdesc">Assignee: ' + esc(bt.assignee) + '</div>';
+            h += '</div>';
+            h += '<div class="pcmd" style="cursor:default;font-size:var(--text-xs);color:var(--text-faint)">' + esc(bt.status) + '</div>';
             h += '</div>';
         }
         h += '</div></div>';
@@ -432,7 +553,7 @@ cat >> "$OUTPUT_FILE" <<'HTMLTAIL'
     for (var si = 0; si < standalone.length; si++) {
         var sp = standalone[si];
         h += '<div class="pcard">';
-        h += '<div class="dot" style="background:var(--accent)"></div>';
+        h += '<span class="status-badge" style="background:var(--accent-glow);color:var(--accent);border:1px solid var(--accent)">\u2605</span>';
         h += '<div class="pinfo"><span class="pname">' + esc(sp.s) + '</span>';
         h += '<div class="pdesc">' + esc(sp.d) + '</div></div>';
         h += '<div class="pcmd" onclick="copyCmd(this)" data-cmd="/scaffold:' + esc(sp.s) + '">/scaffold:' + esc(sp.s) + '</div>';
@@ -444,6 +565,74 @@ cat >> "$OUTPUT_FILE" <<'HTMLTAIL'
     document.querySelector('.wrap').innerHTML = h;
 })();
 
+function fmtPrompt(text) {
+    var e = document.createElement('div');
+    e.textContent = text;
+    var safe = e.innerHTML;
+    // Bold markdown headings
+    safe = safe.replace(/^(#{1,4} .+)$/gm, '<span class="md-heading">$1</span>');
+    // Inline code
+    safe = safe.replace(/`([^`]+)`/g, '<span class="md-code">$1</span>');
+    // Bold
+    safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    return safe;
+}
+function openModal(slug) {
+    var p = null;
+    for (var i = 0; i < DASHBOARD_DATA.prompts.length; i++) {
+        if (DASHBOARD_DATA.prompts[i].slug === slug) { p = DASHBOARD_DATA.prompts[i]; break; }
+    }
+    if (!p || !p.promptContent) return;
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
+    overlay.innerHTML =
+        '<div class="modal">' +
+        '<div class="modal-header"><h3>/scaffold:' + slug + '</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+        '<div class="modal-body"><pre>' + fmtPrompt(p.promptContent) + '</pre></div>' +
+        '<div class="modal-footer"><button class="modal-copy-btn" onclick="copyPrompt(this, \'' + slug + '\')">Copy Full Prompt</button></div>' +
+        '</div>';
+    document.body.appendChild(overlay);
+    document.addEventListener('keydown', modalEscHandler);
+}
+function closeModal() {
+    var m = document.querySelector('.modal-overlay');
+    if (m) m.remove();
+    document.removeEventListener('keydown', modalEscHandler);
+}
+function modalEscHandler(e) { if (e.key === 'Escape') closeModal(); }
+function copyPrompt(btn, slug) {
+    var p = null;
+    for (var i = 0; i < DASHBOARD_DATA.prompts.length; i++) {
+        if (DASHBOARD_DATA.prompts[i].slug === slug) { p = DASHBOARD_DATA.prompts[i]; break; }
+    }
+    if (!p) return;
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(p.promptContent).then(function() {
+            btn.classList.add('copied');
+            btn.textContent = 'Copied!';
+            setTimeout(function() { btn.classList.remove('copied'); btn.textContent = 'Copy Full Prompt'; }, 1500);
+        });
+    }
+}
+function filterBeads(filter, btn) {
+    var tasks = document.querySelectorAll('.beads-task');
+    for (var i = 0; i < tasks.length; i++) {
+        var s = tasks[i].getAttribute('data-bead-status');
+        tasks[i].style.display = (filter === 'all' || s === filter) ? '' : 'none';
+    }
+    var btns = document.querySelectorAll('.beads-filter');
+    for (var j = 0; j < btns.length; j++) btns[j].classList.remove('active');
+    btn.classList.add('active');
+}
+function toggleTheme() {
+    var html = document.documentElement;
+    var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('scaffold-theme', next);
+    var btn = document.querySelector('.theme-toggle');
+    if (btn) btn.innerHTML = next === 'dark' ? '&#9788;' : '&#9790;';
+}
 function togglePhase(el) {
     el.classList.toggle('closed');
     el.nextElementSibling.classList.toggle('hidden');

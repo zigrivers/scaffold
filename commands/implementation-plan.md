@@ -1,5 +1,6 @@
 ---
 description: "Create task graph from stories and standards"
+long-description: "Converts user stories into a dependency-ordered task graph in docs/implementation-plan.md and creates corresponding Beads tasks with priorities."
 ---
 
 Review the PRD (`docs/plan.md`), user stories (`docs/user-stories.md`), and all project standards, then create an implementation plan and Beads task graph for this project.

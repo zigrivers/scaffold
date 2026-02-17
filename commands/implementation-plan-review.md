@@ -1,5 +1,6 @@
 ---
 description: "Review task quality, coverage, and dependencies"
+long-description: "Performs a second pass on the implementation plan to verify task granularity, dependency correctness, coverage completeness, and priority assignments."
 ---
 
 Review the implementation plan by cross-referencing `docs/plan.md`, `docs/user-stories.md`, project standards, and all Beads tasks. Identify gaps, oversized tasks, missing coverage, and dependency issues. Then fix them.

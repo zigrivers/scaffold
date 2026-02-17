@@ -1,5 +1,6 @@
 ---
 description: "Gap analysis and UX innovation for user stories"
+long-description: "Reviews user stories for missing flows, edge cases, and accessibility gaps, then proposes UX innovations for approval before updating docs/user-stories.md."
 ---
 
 ## Phase 1: Gap Analysis

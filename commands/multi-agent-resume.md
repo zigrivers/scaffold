@@ -1,5 +1,6 @@
 ---
 description: "Resume multi-agent work after a break"
+long-description: "Recovers a named agent's context in its worktree by syncing with main, checking claimed tasks, and resuming the execution loop."
 argument-hint: "<agent-name>"
 ---
 

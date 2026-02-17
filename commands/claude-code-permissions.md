@@ -1,5 +1,6 @@
 ---
 description: "Configure Claude Code permissions for agents"
+long-description: "Sets up .claude/settings.json with appropriate tool permissions so Claude Code agents can run autonomously without manual approval for safe operations."
 ---
 Set up Claude Code permissions for this project so agents can work without "Do you want to proceed?" prompts. The permissions use two layers that merge at runtime.
 

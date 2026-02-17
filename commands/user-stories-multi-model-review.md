@@ -1,5 +1,6 @@
 ---
 description: "Multi-model review of user stories for PRD coverage"
+long-description: "Dispatches user stories to independent AI models (Codex, Gemini) for parallel coverage audits, then synthesizes findings into an actionable review."
 ---
 
 Run independent Codex and Gemini reviews of `docs/user-stories.md` against the PRD to eliminate single-model blind spots. This is a quality gate that enforces 100% PRD coverage with hard traceability — every atomic PRD requirement must map to at least one user story.

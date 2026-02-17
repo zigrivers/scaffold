@@ -1,5 +1,6 @@
 ---
 description: "Create coding standards for the tech stack"
+long-description: "Generates docs/coding-standards.md with linter configs, formatter settings, naming conventions, and architectural patterns tailored to the chosen tech stack."
 ---
 
 Deeply research best practices for coding standards for our tech stack — review docs/tech-stack.md — then create docs/coding-standards.md as the definitive code quality reference for this project.

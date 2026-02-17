@@ -1,5 +1,6 @@
 ---
 description: "Configure Maestro for mobile app testing"
+long-description: "Sets up Maestro test framework with flow definitions, test helpers, and CI integration for mobile app UI testing on iOS and Android."
 ---
 
 Install and configure Maestro for mobile UI testing in this Expo project. Maestro will be used for automated testing and visual verification of mobile app features.

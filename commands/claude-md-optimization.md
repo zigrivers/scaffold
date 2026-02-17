@@ -1,5 +1,6 @@
 ---
 description: "Consolidate and optimize CLAUDE.md"
+long-description: "Reorganizes and deduplicates CLAUDE.md to maximize signal density, ensuring all project conventions are clear and non-redundant for AI agents."
 ---
 
 Review all project documentation and consolidate CLAUDE.md into the definitive, optimized reference for AI agents working on this project.

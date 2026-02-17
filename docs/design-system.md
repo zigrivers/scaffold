@@ -354,6 +354,149 @@ Minimal footer with generation attribution.
 - Light top border for separation
 - Uppercase with wide letter-spacing
 
+### 3.11 Theme Toggle
+
+**Classes:** `.theme-toggle`
+
+Button in the header bar that switches between light and dark mode.
+
+```html
+<button class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode" aria-label="Toggle theme">☼</button>
+```
+
+**Tokens used:** `--bg-inset`, `--border`, `--radius-sm`, `--accent`, `--accent-glow`, `--text-muted`
+
+**Design details:**
+- Positioned in header via `margin-left: auto` (flexbox push)
+- Sun icon (☼) in dark mode, moon icon (☾) in light mode
+- Hover: border and text transition to accent color with accent glow background
+- Theme preference saved to `localStorage('scaffold-theme')`
+- Defaults to system preference via `prefers-color-scheme` media query
+
+### 3.12 Status Badge
+
+**Classes:** `.status-badge`, `.st-completed`, `.st-likely-completed`, `.st-skipped`, `.st-pending`
+
+Pill-shaped badges with icon and label replacing the previous status dots.
+
+```html
+<span class="status-badge st-completed">✓&nbsp;Done</span>
+<span class="status-badge st-likely-completed">≈&nbsp;Likely Done</span>
+<span class="status-badge st-skipped">→&nbsp;Skipped</span>
+<span class="status-badge st-pending">○&nbsp;Pending</span>
+```
+
+**Tokens used:** Status color tokens + their `-bg` and `-border` variants
+
+**Design details:**
+- 99px radius for full pill shape
+- Icon + non-breaking space + label text
+- Background uses status `-bg` token, text uses status color, border uses `-border` token
+- Extra-small text with wide letter-spacing and medium weight
+- Replaces previous `.dot` elements — provides both visual and text status indication
+
+### 3.13 Status Legend
+
+**Classes:** `.status-legend`
+
+Horizontal list of all status badges displayed below the header for reference.
+
+```html
+<div class="status-legend">
+    <span class="status-badge st-completed">✓&nbsp;Done</span>
+    <span class="status-badge st-likely-completed">≈&nbsp;Likely Done</span>
+    <span class="status-badge st-skipped">→&nbsp;Skipped</span>
+    <span class="status-badge st-pending">○&nbsp;Pending</span>
+</div>
+```
+
+**Design details:**
+- Flex row with wrapping, gap of `--sp-2`
+- Bottom margin of `--sp-4` separates from progress bar
+- Badges in legend are non-interactive (`cursor: default`)
+
+### 3.14 Prompt Modal
+
+**Classes:** `.modal-overlay`, `.modal`, `.modal-header`, `.modal-body`, `.modal-footer`, `.modal-close`, `.modal-copy-btn`
+
+Full-screen overlay modal showing complete prompt content for any pipeline step.
+
+```html
+<div class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>/scaffold:slug</h3>
+            <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body"><pre>Prompt content...</pre></div>
+        <div class="modal-footer">
+            <button class="modal-copy-btn">Copy Full Prompt</button>
+        </div>
+    </div>
+</div>
+```
+
+**Tokens used:** `--bg-card`, `--border`, `--radius`, `--shadow-lg`, `--accent`, `--accent-hover`, `--green`
+
+**Design details:**
+- Overlay: fixed position, semi-transparent black background (`rgba(0,0,0,0.6)`)
+- Modal: max-width 720px, max-height 85vh, flex column layout for header/body/footer
+- Header: flex row with title and close button, bottom border
+- Body: scrollable content area with preformatted text
+- Content formatting: headings styled bold with accent color, inline code with inset background
+- Footer: copy button with accent background, turns green on copy success
+- Close: X button, Escape key, or backdrop click
+
+### 3.15 Beads Task Section
+
+**Classes:** `.beads-section`, `.beads-filters`, `.beads-filter`, `.beads-filter.active`
+
+Collapsible section showing all Beads tasks with open/closed/all filter buttons.
+
+```html
+<div class="beads-section">
+    <div class="phase-hdr" onclick="togglePhase(this)">
+        <span class="arr">&#9660;</span>
+        <h2>Beads Tasks</h2>
+        <span class="phase-cnt">5/12 closed</span>
+    </div>
+    <div class="plist">
+        <div class="beads-filters">
+            <button class="beads-filter active">Open (7)</button>
+            <button class="beads-filter">Closed (5)</button>
+            <button class="beads-filter">All (12)</button>
+        </div>
+        <!-- Task cards using .pcard pattern -->
+    </div>
+</div>
+```
+
+**Tokens used:** `--bg-inset`, `--border`, `--accent`, `--text-muted`
+
+**Design details:**
+- Uses same `.phase-hdr` pattern as pipeline phases for collapsible header
+- Filter buttons: pill-shaped (99px radius), extra-small text with wide letter-spacing
+- Active filter: accent background with white text
+- Hover: border and text transition to accent
+- Task cards reuse `.pcard` grid layout
+- Priority badges (P0-P3) use colored `.badge` with priority-specific colors
+- Positioned between pipeline phases and standalone commands
+
+### 3.16 Long Description
+
+**Classes:** `.pdesc-long`
+
+Extended description shown below the short description in prompt cards.
+
+```html
+<div class="pdesc pdesc-long">Detailed explanation of what the command does...</div>
+```
+
+**Design details:**
+- Extra-small font size (`--text-xs`)
+- Faint text color (`--text-faint`) — visually subordinate to short description
+- Minimal top margin (2px) to sit close to short description
+
 ## 4. Interaction Patterns
 
 ### Hover Effects
@@ -379,7 +522,7 @@ All interactive surfaces respond to hover:
 
 ## 5. Dark Mode
 
-**Mechanism:** `@media (prefers-color-scheme: dark)` overrides `:root` custom properties. No JavaScript, no toggle — follows system preference.
+**Mechanism:** `[data-theme="dark"]` selector overrides `:root` custom properties. Theme toggle button in header switches modes. Preference saved to `localStorage('scaffold-theme')` and defaults to system preference via `prefers-color-scheme` media query on first visit.
 
 **Philosophy:**
 - Backgrounds go dramatically darker (not just inverted)
@@ -425,7 +568,7 @@ All interactive surfaces respond to hover:
 - Hardcode hex colors, pixel values, or font names in component styles
 - Add external resource references (CDN fonts, stylesheets, scripts)
 - Use `!important` — restructure selectors instead
-- Add JavaScript-driven dark mode — rely on `prefers-color-scheme`
+- Add additional theme mechanisms — use the existing data-theme attribute toggle
 - Create new spacing values outside the `--sp-*` scale
 
 ## 8. Accessibility Notes

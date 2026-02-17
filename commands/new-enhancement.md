@@ -1,5 +1,6 @@
 ---
 description: "Add a new feature to an existing project"
+long-description: "Guides adding a feature to a completed project: updates the PRD, creates user stories, builds Beads tasks, and optionally begins implementation."
 argument-hint: "<enhancement description>"
 ---
 

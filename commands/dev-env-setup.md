@@ -1,5 +1,6 @@
 ---
 description: "Set up local dev environment with live reload"
+long-description: "Creates docs/dev-setup.md and configures Makefile commands for linting, testing, building, and running the project with hot-reload support."
 ---
 
 Set up a complete local development environment for this project based on docs/tech-stack.md and docs/project-structure.md. The goal is a one-command dev experience with live reloading so I can see changes in real-time as work progresses.

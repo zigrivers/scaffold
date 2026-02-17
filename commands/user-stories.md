@@ -1,5 +1,6 @@
 ---
 description: "Create user stories covering every PRD feature"
+long-description: "Translates every PRD feature into structured user stories in docs/user-stories.md with acceptance criteria, test scenarios, and priority assignments."
 ---
 
 First, deeply research best practices for creating user stories, with emphasis on stories that will be consumed by AI agents (not human developers) for implementation. Focus on what makes a user story unambiguous and implementable without further clarification.

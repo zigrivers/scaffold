@@ -1,5 +1,6 @@
 ---
 description: "Configure Playwright for web app testing"
+long-description: "Installs and configures Playwright with test structure, page objects, and CI integration for end-to-end testing of web applications."
 ---
 
 Configure Playwright MCP for browser automation and visual testing in this project if applicable, otherwise tell me we don't need this. The Playwright MCP server has already been added to Claude Code.
