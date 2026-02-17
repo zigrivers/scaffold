@@ -1,0 +1,294 @@
+{
+  "missing_requirements": [
+    {
+      "requirement_id": "REQ-185",
+      "requirement_text": "All pipeline logic expressed as natural-language instructions in prompt files (not compiled code)",
+      "prd_section": "Section 6 \u2014 External Integrations / Implementation Architecture",
+      "suggested_story": {
+        "title": "Implement Runtime Orchestration in Command Prompts",
+        "story": "As a Scaffold maintainer, I want orchestration logic defined in command prompt files, so that v2 follows the Claude Code prompt-driven architecture.",
+        "acceptance_criteria": [
+          "Given runtime orchestration commands (`init`, `resume`, `validate`), when implementation is reviewed, then behavior is defined in `commands/*.md` instructions rather than required runtime scripts.",
+          "Given a command executes in Claude Code, when it performs dependency resolution/state updates, then it uses Claude tools per prompt instructions.",
+          "Given helper scripts exist, when runtime behavior is validated, then those scripts are optional test harnesses and not required for production execution."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-186",
+      "requirement_text": "Instructions must be precise with verification steps",
+      "prd_section": "Section 6 \u2014 External Integrations / Implementation Architecture",
+      "suggested_story": {
+        "title": "Add Verification Steps to Orchestration Prompts",
+        "story": "As a maintainer, I want each orchestration prompt to include explicit verification checkpoints, so that command behavior is reliable and repeatable.",
+        "acceptance_criteria": [
+          "Given each orchestration prompt file, when reviewed, then it contains explicit numbered execution steps and at least one verification step.",
+          "Given dependency resolution runs, when sorting completes, then the prompt verifies all dependencies precede dependents and reports any violation.",
+          "Given config updates run, when write completes, then the prompt re-reads and validates required fields before proceeding."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-187",
+      "requirement_text": "Plugin manifest updated with new version and description",
+      "prd_section": "Section 6 \u2014 Claude Code Plugin System",
+      "suggested_story": {
+        "title": "Update v2 Plugin Manifest",
+        "story": "As a maintainer, I want the plugin manifest updated for Scaffold v2, so that users get the correct version metadata and command set.",
+        "acceptance_criteria": [
+          "Given `.claude-plugin/plugin.json`, when v2 is released, then version and description reflect Scaffold v2.",
+          "Given v2 commands, when manifest is validated, then required new commands are listed and discoverable.",
+          "Given `/scaffold:version`, when invoked, then it matches manifest version metadata."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-193",
+      "requirement_text": "Prompt loading from any tier completes in under 100ms",
+      "prd_section": "Section 7 \u2014 Non-Functional Requirements / Performance",
+      "suggested_story": {
+        "title": "Enforce Prompt-Load Latency Budget",
+        "story": "As a maintainer, I want prompt resolution/loading performance tested, so that prompt lookup remains responsive.",
+        "acceptance_criteria": [
+          "Given tiered prompt lookup, when benchmarked across built-in/user/project/profile override tiers, then p95 prompt load latency is under 100ms.",
+          "Given CI performance checks run, when latency exceeds budget, then the check fails with measured timings."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-194",
+      "requirement_text": "Config reads/writes complete in under 100ms",
+      "prd_section": "Section 7 \u2014 Non-Functional Requirements / Performance",
+      "suggested_story": {
+        "title": "Enforce Config I/O Latency Budget",
+        "story": "As a maintainer, I want config read/write performance budgets enforced, so that orchestration commands stay fast.",
+        "acceptance_criteria": [
+          "Given `.scaffold/config.json` under expected size, when read/write operations are benchmarked, then p95 operation time is under 100ms.",
+          "Given CI runs performance checks, when budget is exceeded, then the pipeline reports a failing performance test."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-195",
+      "requirement_text": "No background processes, daemons, or watchers",
+      "prd_section": "Section 7 \u2014 Non-Functional Requirements / Performance",
+      "suggested_story": {
+        "title": "Guarantee Synchronous Runtime Behavior",
+        "story": "As a maintainer, I want Scaffold commands to run without background workers, so that execution remains simple and predictable.",
+        "acceptance_criteria": [
+          "Given any Scaffold command execution, when it finishes, then no persistent Scaffold processes remain running.",
+          "Given command implementation review, when orchestration logic is inspected, then no daemon/watcher/background service behavior is introduced."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-198",
+      "requirement_text": "Idempotent prompts: running twice does not produce corrupt state",
+      "prd_section": "Section 7 \u2014 Non-Functional Requirements / Reliability",
+      "suggested_story": {
+        "title": "Define and Test Prompt Idempotency",
+        "story": "As a user, I want re-running prompts to be safe, so that retries and `--from` do not corrupt outputs.",
+        "acceptance_criteria": [
+          "Given a built-in prompt is run twice, when outputs are regenerated, then artifacts remain valid and non-duplicated.",
+          "Given `resume --from` re-runs a completed prompt, when state is reconciled, then config and artifacts remain consistent and parseable."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-199",
+      "requirement_text": "Requires Claude Code with plugin support",
+      "prd_section": "Section 7 \u2014 Non-Functional Requirements / Compatibility",
+      "suggested_story": {
+        "title": "Add Compatibility Prerequisite Check",
+        "story": "As a first-time user, I want clear compatibility checks, so that I know if my Claude Code environment supports Scaffold v2.",
+        "acceptance_criteria": [
+          "Given an unsupported Claude Code environment, when `/scaffold:init` runs, then Scaffold warns with concrete upgrade guidance.",
+          "Given supported environments, when commands run, then compatibility checks do not block execution."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-200",
+      "requirement_text": "macOS and Linux supported; Windows via WSL expected to work",
+      "prd_section": "Section 7 \u2014 Non-Functional Requirements / Compatibility",
+      "suggested_story": {
+        "title": "Validate OS Support Matrix",
+        "story": "As a maintainer, I want OS compatibility verified, so that Scaffold behavior is reliable on supported platforms.",
+        "acceptance_criteria": [
+          "Given release validation, when smoke tests run, then macOS and Linux pass required command scenarios.",
+          "Given documentation review, when compatibility is published, then WSL support is explicitly marked as expected-but-untested with caveats."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-201",
+      "requirement_text": "No Node.js dependency for Scaffold itself",
+      "prd_section": "Section 7 \u2014 Non-Functional Requirements / Compatibility",
+      "suggested_story": {
+        "title": "Enforce Node-Free Scaffold Runtime",
+        "story": "As a maintainer, I want Scaffold core runtime independent of Node.js, so that users are not blocked by Node installation for orchestration.",
+        "acceptance_criteria": [
+          "Given Node.js is unavailable, when core orchestration commands run, then Scaffold still operates.",
+          "Given docs are reviewed, when prerequisites are listed, then Node is required only for Beads (not Scaffold core)."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-202",
+      "requirement_text": "Each prompt is self-contained \u2014 modifying one doesn't require changes to others",
+      "prd_section": "Section 7 \u2014 Non-Functional Requirements / Maintainability",
+      "suggested_story": {
+        "title": "Enforce Prompt Independence Contract",
+        "story": "As a maintainer, I want prompts to remain self-contained, so that changes are isolated and low-risk.",
+        "acceptance_criteria": [
+          "Given a prompt update, when validation runs, then no hidden cross-prompt implementation coupling is required.",
+          "Given prompt metadata, when dependencies are needed, then they are declared explicitly in frontmatter rather than implicit shared logic."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-204",
+      "requirement_text": "Plugin remains small with no external runtime dependencies",
+      "prd_section": "Section 7 \u2014 Non-Functional Requirements / Maintainability",
+      "suggested_story": {
+        "title": "Add Plugin Footprint and Dependency Guardrails",
+        "story": "As a maintainer, I want footprint and dependency guardrails, so that Scaffold stays lightweight.",
+        "acceptance_criteria": [
+          "Given release checks run, when runtime dependencies are audited, then no external runtime dependency requirement is introduced.",
+          "Given plugin artifacts are packaged, when size checks run, then plugin footprint stays within agreed release budget."
+        ],
+        "priority": "Must"
+      }
+    }
+  ],
+  "story_issues": [
+    {
+      "story_id": "US-2.1",
+      "severity": "critical",
+      "issue_type": "other",
+      "description": "The story mandates script-based runtime implementation, which conflicts with the PRD architecture that the engine is prompt-instruction driven.",
+      "evidence": "US-2.1 AC1 references `scripts/resolve-deps.sh`; PRD Section 6 states pipeline logic is in command prompts, not compiled/runtime engine code.",
+      "suggested_fix": "Rewrite ACs as behavior of orchestration command prompts (`commands/init.md` etc.). If scripts remain, mark them explicitly as test utilities only."
+    },
+    {
+      "story_id": "US-7.4",
+      "severity": "high",
+      "issue_type": "missing_data_requirements",
+      "description": "The story introduces a 'partially complete' state without corresponding schema support in config.json.",
+      "evidence": "US-7.4 AC3: '`tdd` is flagged as partially complete'; PRD config model defines `completed` and `skipped` arrays only.",
+      "suggested_fix": "Either extend the data model with an explicit partial state (and downstream behavior), or remove partial-state semantics and keep binary completion with notes."
+    },
+    {
+      "story_id": "US-3.5",
+      "severity": "medium",
+      "issue_type": "ambiguous",
+      "description": "Skip-reason capture via AskUserQuestion is underspecified relative to option constraints and text-input behavior.",
+      "evidence": "US-3.5 AC1 requires an optional free-text reason via AskUserQuestion; UX constraints emphasize 2-4 options plus automatic Other handling.",
+      "suggested_fix": "Specify exact interaction: e.g., option 1 'Provide reason' (text path via Other), option 2 'Skip without reason', and explicit no-state-change behavior on interruption."
+    },
+    {
+      "story_id": "US-2.8",
+      "severity": "medium",
+      "issue_type": "too_large",
+      "description": "The story mixes decision-log persistence with a new pre-run dependency-filtered surfacing feature, expanding scope beyond PRD minimum.",
+      "evidence": "US-2.8 AC6 adds automatic relevance filtering/display of prior decisions before prompt execution.",
+      "suggested_fix": "Split AC6 into a separate story (e.g., 'Decision Context Surfacing') or mark it explicitly as Could-have."
+    },
+    {
+      "story_id": "US-3.1",
+      "severity": "medium",
+      "issue_type": "untestable",
+      "description": "Completion summary requirements (artifact list and total time) lack a defined data source/algorithm, risking inconsistent implementations.",
+      "evidence": "US-3.1 AC3 requires 'Artifacts created' and 'Total time' output, but no canonical tracking fields are defined for these calculations.",
+      "suggested_fix": "Add explicit computation rules (e.g., total time = last completed timestamp - created; artifact list derived from union of completed prompts' `produces`)."
+    },
+    {
+      "story_id": "US-5.1",
+      "severity": "low",
+      "issue_type": "ambiguous",
+      "description": "Default phase logic references 'phase of last dependency' without defining deterministic ordering semantics.",
+      "evidence": "US-5.1 AC2 states phase defaults to 'phase of last dependency' if dependencies exist.",
+      "suggested_fix": "Define 'last dependency' as the final entry in `depends-on` array order (or another deterministic rule) and add an explicit test case."
+    }
+  ],
+  "contradictions": [
+    {
+      "prd_statement": "Scaffold v2's engine is not compiled code; pipeline logic is expressed as natural-language instructions in prompt files executed by Claude.",
+      "prd_section": "Section 6 \u2014 External Integrations / Implementation Architecture",
+      "story_id": "US-2.1",
+      "story_statement": "Dependency resolution is implemented as `scripts/resolve-deps.sh` and treated as the runtime path.",
+      "resolution": "Align stories with prompt-driven runtime behavior; keep scripts only for verification/testing if needed."
+    },
+    {
+      "prd_statement": "Pipeline configuration tracks prompt state via `completed` and `skipped` arrays.",
+      "prd_section": "Section 5 \u2014 Data Model / Pipeline Configuration",
+      "story_id": "US-7.4",
+      "story_statement": "Adopt flow marks `tdd` as 'partially complete'.",
+      "resolution": "Either formalize a `partial` state in config schema and UX, or remove 'partial' from story and map findings to notes only."
+    }
+  ],
+  "duplication_or_overlap": [
+    {
+      "story_ids": [
+        "US-1.5",
+        "US-1.6"
+      ],
+      "overlap_description": "Both stories cover dependency auto-inclusion during custom prompt selection.",
+      "recommendation": "consolidate"
+    },
+    {
+      "story_ids": [
+        "US-5.4",
+        "US-5.5"
+      ],
+      "overlap_description": "Both cover override behavior when frontmatter is absent/present and metadata fallback rules.",
+      "recommendation": "clarify_boundaries"
+    },
+    {
+      "story_ids": [
+        "US-3.3",
+        "US-3.4"
+      ],
+      "overlap_description": "Both define nearly identical progress display formatting; difference is execute-offer vs read-only status.",
+      "recommendation": "clarify_boundaries"
+    },
+    {
+      "story_ids": [
+        "US-7.1",
+        "US-7.4"
+      ],
+      "overlap_description": "Both scan existing projects and set brownfield-related state, with similar detection concerns but different entry points (`init` vs `adopt`).",
+      "recommendation": "keep_separate"
+    }
+  ],
+  "coverage_assertion": {
+    "total_requirements": 221,
+    "covered_count": 209,
+    "uncovered_ids": [
+      "REQ-185",
+      "REQ-186",
+      "REQ-187",
+      "REQ-193",
+      "REQ-194",
+      "REQ-195",
+      "REQ-198",
+      "REQ-199",
+      "REQ-200",
+      "REQ-201",
+      "REQ-202",
+      "REQ-204"
+    ],
+    "confidence": 0.79
+  }
+}

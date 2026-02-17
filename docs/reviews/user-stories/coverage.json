@@ -1,0 +1,1569 @@
+{
+  "generated": "2026-02-17",
+  "total_requirements": 221,
+  "covered": 221,
+  "uncovered": 0,
+  "requirements": {
+    "REQ-001": {
+      "text": "Prompts declare dependencies via depends-on in frontmatter",
+      "stories": [
+        "US-5.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-002": {
+      "text": "Engine performs topological sort to determine execution order",
+      "stories": [
+        "US-2.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-003": {
+      "text": "Within a phase, prompts with satisfied dependencies appear in profile-defined order",
+      "stories": [
+        "US-2.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-004": {
+      "text": "Circular dependencies detected at pipeline resolution time",
+      "stories": [
+        "US-2.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-005": {
+      "text": "Circular dependency error reports full cycle path",
+      "stories": [
+        "US-2.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-006": {
+      "text": "Missing dependency in profile reports error message",
+      "stories": [
+        "US-2.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-007": {
+      "text": "Dependencies are always on prompt names (strings), not artifact files",
+      "stories": [
+        "US-2.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-008": {
+      "text": "extra-prompts/add-prompts referencing non-existent prompt is a resolution error",
+      "stories": [
+        "US-2.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-009": {
+      "text": "Topological sort uses Kahn's algorithm with profile-defined order as tiebreaker",
+      "stories": [
+        "US-2.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-010": {
+      "text": "After sorting, verification step confirms every prompt appears after all its dependencies",
+      "stories": [
+        "US-2.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-011": {
+      "text": "Resolution happens once at init time and is cached in config.json",
+      "stories": [
+        "US-2.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-012": {
+      "text": "Resolution re-runs when the profile or prompt list changes",
+      "stories": [
+        "US-2.1",
+        "US-3.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-013": {
+      "text": "config.json records completed, pending, and pipeline metadata",
+      "stories": [
+        "US-2.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-014": {
+      "text": "Completion recorded by adding prompt name to completed array with timestamp",
+      "stories": [
+        "US-2.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-015": {
+      "text": "Primary completion detection: resume checks if produces artifacts exist on disk",
+      "stories": [
+        "US-2.4"
+      ],
+      "status": "covered"
+    },
+    "REQ-016": {
+      "text": "Secondary completion detection: resume records completion to completed array",
+      "stories": [
+        "US-2.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-017": {
+      "text": "When artifact exists but not in completed array, artifact takes precedence",
+      "stories": [
+        "US-2.4"
+      ],
+      "status": "covered"
+    },
+    "REQ-018": {
+      "text": "When completed says done but artifacts missing, resume warns and suggests re-run",
+      "stories": [
+        "US-2.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-019": {
+      "text": "Re-running completed prompt replaces previous completion entry (not duplicate)",
+      "stories": [
+        "US-2.3",
+        "US-3.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-020": {
+      "text": "config.json format matches specified JSON structure",
+      "stories": [
+        "US-1.1",
+        "US-2.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-021": {
+      "text": "Shared context object in .scaffold/context.json accumulates data",
+      "stories": [
+        "US-2.7"
+      ],
+      "status": "covered"
+    },
+    "REQ-022": {
+      "text": "Context uses namespaced keys",
+      "stories": [
+        "US-2.7"
+      ],
+      "status": "covered"
+    },
+    "REQ-023": {
+      "text": "Context is append-only; prompt can overwrite own namespace but not another's",
+      "stories": [
+        "US-2.7"
+      ],
+      "status": "covered"
+    },
+    "REQ-024": {
+      "text": "Context values are JSON \u2014 no binary",
+      "stories": [
+        "US-2.7"
+      ],
+      "status": "covered"
+    },
+    "REQ-025": {
+      "text": "If context.json doesn't exist when read, prompt sees empty object",
+      "stories": [
+        "US-2.7"
+      ],
+      "status": "covered"
+    },
+    "REQ-026": {
+      "text": "If F-PE-3 deferred, all references removed and prompts read predecessor files directly",
+      "stories": [
+        "US-2.7"
+      ],
+      "status": "covered"
+    },
+    "REQ-027": {
+      "text": "Scaffold loads prompt content resolved via 3-tier precedence",
+      "stories": [
+        "US-2.5",
+        "US-5.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-028": {
+      "text": "$ARGUMENTS substituted; replaced with empty string if no arguments",
+      "stories": [
+        "US-2.5",
+        "US-1.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-029": {
+      "text": "Prompts execute one at a time, sequentially",
+      "stories": [
+        "US-2.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-030": {
+      "text": "Pre-execution preview shows which files will be created/updated from produces field",
+      "stories": [
+        "US-6.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-031": {
+      "text": "After prompt completes, shows 'Prompt X complete. Next: Y. Run it now?'",
+      "stories": [
+        "US-2.5",
+        "US-3.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-032": {
+      "text": "Failed prompt (user aborts, Claude errors) is NOT marked complete",
+      "stories": [
+        "US-2.5",
+        "US-2.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-033": {
+      "text": "Scaffold does not modify prompt content beyond $ARGUMENTS substitution",
+      "stories": [
+        "US-2.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-034": {
+      "text": "Before prompt executes, verify predecessor produces artifacts exist on disk",
+      "stories": [
+        "US-2.6"
+      ],
+      "status": "covered"
+    },
+    "REQ-035": {
+      "text": "Missing artifact shows warning with 3 options",
+      "stories": [
+        "US-2.6"
+      ],
+      "status": "covered"
+    },
+    "REQ-036": {
+      "text": "Run predecessor first executes the missing prompt then returns",
+      "stories": [
+        "US-2.6"
+      ],
+      "status": "covered"
+    },
+    "REQ-037": {
+      "text": "Proceed anyway continues without the missing artifact",
+      "stories": [
+        "US-2.6"
+      ],
+      "status": "covered"
+    },
+    "REQ-038": {
+      "text": "If predecessor was skipped, its artifacts are not required",
+      "stories": [
+        "US-2.6"
+      ],
+      "status": "covered"
+    },
+    "REQ-039": {
+      "text": "Verification runs before $ARGUMENTS substitution and prompt loading",
+      "stories": [
+        "US-2.6"
+      ],
+      "status": "covered"
+    },
+    "REQ-040": {
+      "text": "Append-only JSON log at .scaffold/decisions.json",
+      "stories": [
+        "US-2.8"
+      ],
+      "status": "covered"
+    },
+    "REQ-041": {
+      "text": "Decision log format: array of prompt/decision/at objects",
+      "stories": [
+        "US-2.8"
+      ],
+      "status": "covered"
+    },
+    "REQ-042": {
+      "text": "Decision log entries never modified or deleted (append-only)",
+      "stories": [
+        "US-2.8"
+      ],
+      "status": "covered"
+    },
+    "REQ-043": {
+      "text": "Created by init as empty array",
+      "stories": [
+        "US-2.8"
+      ],
+      "status": "covered"
+    },
+    "REQ-044": {
+      "text": "Each prompt optionally records 1-3 key decisions after execution",
+      "stories": [
+        "US-2.8"
+      ],
+      "status": "covered"
+    },
+    "REQ-045": {
+      "text": "Decision log committed to git alongside .scaffold/ files",
+      "stories": [
+        "US-2.8"
+      ],
+      "status": "covered"
+    },
+    "REQ-046": {
+      "text": "reset deletes decisions.json",
+      "stories": [
+        "US-2.8",
+        "US-3.6"
+      ],
+      "status": "covered"
+    },
+    "REQ-047": {
+      "text": "web-app profile includes 18 specific prompts",
+      "stories": [
+        "US-4.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-048": {
+      "text": "cli-tool profile includes 16 prompts",
+      "stories": [
+        "US-4.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-049": {
+      "text": "mobile profile includes 18 prompts with add-maestro",
+      "stories": [
+        "US-4.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-050": {
+      "text": "api-service profile includes same 16 prompts as cli-tool",
+      "stories": [
+        "US-4.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-051": {
+      "text": "minimal profile includes 10 prompts",
+      "stories": [
+        "US-4.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-052": {
+      "text": "Built-in profiles are read-only",
+      "stories": [
+        "US-4.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-053": {
+      "text": "Users can create profiles in .scaffold/profiles/ or ~/.scaffold/profiles/",
+      "stories": [
+        "US-4.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-054": {
+      "text": "Custom profile format: name, extends, description, add-prompts, remove-prompts, prompt-overrides",
+      "stories": [
+        "US-4.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-055": {
+      "text": "If extends omitted, profile must include full prompts array",
+      "stories": [
+        "US-4.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-056": {
+      "text": "add-prompts and remove-prompts applied after inheriting: adds first, then removes",
+      "stories": [
+        "US-4.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-057": {
+      "text": "Array order in prompts and add-prompts preserved as tiebreaker",
+      "stories": [
+        "US-4.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-058": {
+      "text": "prompt-overrides maps prompt names to file paths; paths resolve relative to project root",
+      "stories": [
+        "US-4.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-059": {
+      "text": "Custom profiles appear alongside built-in profiles during init",
+      "stories": [
+        "US-4.2",
+        "US-4.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-060": {
+      "text": "Project-level profiles take precedence over user-level with same name",
+      "stories": [
+        "US-4.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-061": {
+      "text": "Inheritance depth limited to 3 levels",
+      "stories": [
+        "US-4.4"
+      ],
+      "status": "covered"
+    },
+    "REQ-062": {
+      "text": "Resolution order: base prompts \u2192 add \u2192 remove \u2192 overrides per level",
+      "stories": [
+        "US-4.3",
+        "US-4.4"
+      ],
+      "status": "covered"
+    },
+    "REQ-063": {
+      "text": "Removing a prompt that an added prompt depends on surfaces conflict",
+      "stories": [
+        "US-4.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-064": {
+      "text": "Circular inheritance detected and rejected",
+      "stories": [
+        "US-4.4"
+      ],
+      "status": "covered"
+    },
+    "REQ-065": {
+      "text": "Prompts are Markdown files with optional YAML frontmatter",
+      "stories": [
+        "US-5.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-066": {
+      "text": "Frontmatter fields: description, depends-on, phase, argument-hint, produces, reads",
+      "stories": [
+        "US-5.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-067": {
+      "text": "depends-on defaults to empty array if omitted",
+      "stories": [
+        "US-5.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-068": {
+      "text": "phase defaults to phase of last dependency, or 1 if no dependencies",
+      "stories": [
+        "US-5.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-069": {
+      "text": "produces required for built-in prompts, optional for custom",
+      "stories": [
+        "US-5.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-070": {
+      "text": "reads optional; used by skill to pre-load predecessor documents",
+      "stories": [
+        "US-5.1",
+        "US-8.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-071": {
+      "text": "All v1 prompts will have frontmatter added/updated",
+      "stories": [
+        "US-5.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-072": {
+      "text": "Specific dependency graph declared in PRD",
+      "stories": [
+        "US-2.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-073": {
+      "text": "$ARGUMENTS is the only substitution variable",
+      "stories": [
+        "US-2.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-074": {
+      "text": "If no arguments, $ARGUMENTS replaced with empty string",
+      "stories": [
+        "US-1.2",
+        "US-2.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-075": {
+      "text": "4-tier precedence: profile \u2192 project \u2192 user \u2192 built-in",
+      "stories": [
+        "US-5.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-076": {
+      "text": "Profile override pointing to non-existent file is resolution error",
+      "stories": [
+        "US-5.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-077": {
+      "text": "Scaffold logs which source was used when executing a prompt",
+      "stories": [
+        "US-2.5",
+        "US-5.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-078": {
+      "text": "Custom prompt with no frontmatter inherits metadata from built-in",
+      "stories": [
+        "US-5.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-079": {
+      "text": "New custom prompt with no frontmatter: no dependencies, Phase 1",
+      "stories": [
+        "US-5.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-080": {
+      "text": "Custom prompts identified by filename, lowercase, hyphenated",
+      "stories": [
+        "US-5.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-081": {
+      "text": "Custom prompt appears at position determined by phase and depends-on",
+      "stories": [
+        "US-5.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-082": {
+      "text": "Custom prompts can depend on built-in; built-in never depend on custom",
+      "stories": [
+        "US-5.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-083": {
+      "text": "Simply placing a file in .scaffold/prompts/ does NOT auto-include it",
+      "stories": [
+        "US-5.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-084": {
+      "text": "init is single entry-point command",
+      "stories": [
+        "US-1.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-085": {
+      "text": "Invoked as /scaffold:init or /scaffold:init <idea>",
+      "stories": [
+        "US-1.1",
+        "US-1.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-086": {
+      "text": "If idea provided, stored and passed as $ARGUMENTS to create-prd",
+      "stories": [
+        "US-1.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-087": {
+      "text": "Creates .scaffold/ directory with config.json",
+      "stories": [
+        "US-1.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-088": {
+      "text": "If config.json exists, warns and stops unless --force",
+      "stories": [
+        "US-1.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-089": {
+      "text": "After profile selection and pipeline display, asks user to confirm",
+      "stories": [
+        "US-1.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-090": {
+      "text": "init is NOT a prompt in the pipeline",
+      "stories": [
+        "US-1.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-091": {
+      "text": "Profile discovery: built-in \u2192 project \u2192 user; project takes precedence for same name",
+      "stories": [
+        "US-4.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-092": {
+      "text": "Two-question profile selection flow",
+      "stories": [
+        "US-1.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-093": {
+      "text": "Custom option walks through per-phase prompt selection with multiSelect",
+      "stories": [
+        "US-1.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-094": {
+      "text": "Phases with >4 prompts split across multiple questions (groups of \u22644)",
+      "stories": [
+        "US-1.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-095": {
+      "text": "Zero prompts selected shows minimal pipeline message",
+      "stories": [
+        "US-1.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-096": {
+      "text": "User cancels during profile selection \u2192 no files written",
+      "stories": [
+        "US-1.1",
+        "US-1.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-097": {
+      "text": "--force deletes config.json, context.json, decisions.json but preserves prompts/ and profiles/",
+      "stories": [
+        "US-1.4"
+      ],
+      "status": "covered"
+    },
+    "REQ-098": {
+      "text": "--force shows what will be reset and requires user confirmation",
+      "stories": [
+        "US-1.4"
+      ],
+      "status": "covered"
+    },
+    "REQ-099": {
+      "text": "resume reads config.json to determine next uncompleted prompt",
+      "stories": [
+        "US-3.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-100": {
+      "text": "Shows pipeline progress: 8/18 prompts complete",
+      "stories": [
+        "US-3.1",
+        "US-3.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-101": {
+      "text": "Supports --from <prompt-name> to restart from specific prompt",
+      "stories": [
+        "US-3.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-102": {
+      "text": "If all prompts complete, suggests next actions",
+      "stories": [
+        "US-3.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-103": {
+      "text": "If config.json doesn't exist, shows No pipeline found message",
+      "stories": [
+        "US-3.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-104": {
+      "text": "/scaffold:init --dry-run resolves and displays pipeline without executing",
+      "stories": [
+        "US-6.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-105": {
+      "text": "Shows full resolved pipeline: names, phases, deps, source tier, artifacts",
+      "stories": [
+        "US-6.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-106": {
+      "text": "Shows resolution errors inline",
+      "stories": [
+        "US-6.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-107": {
+      "text": "Does not create .scaffold/ directory or any files",
+      "stories": [
+        "US-6.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-108": {
+      "text": "Can be run outside a project directory to preview built-in profiles",
+      "stories": [
+        "US-6.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-109": {
+      "text": "After prompt completes or resume runs, shows completed/total, current phase, next prompt",
+      "stories": [
+        "US-3.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-110": {
+      "text": "Completed prompts show \u2713, next prompt shows \u2192, pending prompts indented",
+      "stories": [
+        "US-3.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-111": {
+      "text": "Progress displayed after each prompt completes and when resume invoked",
+      "stories": [
+        "US-3.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-112": {
+      "text": "/scaffold:status displays progress without offering to run next prompt",
+      "stories": [
+        "US-3.4"
+      ],
+      "status": "covered"
+    },
+    "REQ-113": {
+      "text": "status: If config.json doesn't exist, shows No pipeline found",
+      "stories": [
+        "US-3.4"
+      ],
+      "status": "covered"
+    },
+    "REQ-114": {
+      "text": "status: If all complete, shows Pipeline complete (18/18)",
+      "stories": [
+        "US-3.4"
+      ],
+      "status": "covered"
+    },
+    "REQ-115": {
+      "text": "Skipped prompts show as \u2298 prompt-name (skipped)",
+      "stories": [
+        "US-3.3",
+        "US-3.4"
+      ],
+      "status": "covered"
+    },
+    "REQ-116": {
+      "text": "/scaffold:skip records prompt as skipped in config.json",
+      "stories": [
+        "US-3.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-117": {
+      "text": "Skipped format includes prompt, at, reason in skipped array",
+      "stories": [
+        "US-3.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-118": {
+      "text": "Scaffold prompts for skip reason (optional)",
+      "stories": [
+        "US-3.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-119": {
+      "text": "Skipped prompts treated as done for dependency resolution",
+      "stories": [
+        "US-3.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-120": {
+      "text": "Cannot skip already-completed prompt",
+      "stories": [
+        "US-3.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-121": {
+      "text": "Cannot skip last remaining prompt",
+      "stories": [
+        "US-3.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-122": {
+      "text": "Skipped prompt un-skippable via --from",
+      "stories": [
+        "US-3.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-123": {
+      "text": "When idea text provided, Claude analyzes and recommends profile",
+      "stories": [
+        "US-1.7"
+      ],
+      "status": "covered"
+    },
+    "REQ-124": {
+      "text": "Recommended profile appears first with (Recommended) appended",
+      "stories": [
+        "US-1.7"
+      ],
+      "status": "covered"
+    },
+    "REQ-125": {
+      "text": "Without idea text, no recommendation",
+      "stories": [
+        "US-1.7"
+      ],
+      "status": "covered"
+    },
+    "REQ-126": {
+      "text": "Keyword-to-profile mapping defined in PRD",
+      "stories": [
+        "US-1.7"
+      ],
+      "status": "covered"
+    },
+    "REQ-127": {
+      "text": "File-based signals: package.json deps, Expo config, bin/ directory",
+      "stories": [
+        "US-1.8"
+      ],
+      "status": "covered"
+    },
+    "REQ-128": {
+      "text": "File-based signals override keyword signals when they conflict",
+      "stories": [
+        "US-1.8"
+      ],
+      "status": "covered"
+    },
+    "REQ-129": {
+      "text": "If no clear signal, default to no recommendation",
+      "stories": [
+        "US-1.7"
+      ],
+      "status": "covered"
+    },
+    "REQ-130": {
+      "text": "Validates profiles and prompt files for errors without modifying files",
+      "stories": [
+        "US-6.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-131": {
+      "text": "Performs 7 specific checks",
+      "stories": [
+        "US-6.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-132": {
+      "text": "If no errors: All profiles and prompts are valid",
+      "stories": [
+        "US-6.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-133": {
+      "text": "Errors grouped by source file with actionable messages",
+      "stories": [
+        "US-6.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-134": {
+      "text": "Supports validating specific profile: /scaffold:validate <name>",
+      "stories": [
+        "US-6.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-135": {
+      "text": "Reset deletes config.json, context.json, decisions.json",
+      "stories": [
+        "US-3.6"
+      ],
+      "status": "covered"
+    },
+    "REQ-136": {
+      "text": "Reset preserves prompts/ and profiles/",
+      "stories": [
+        "US-3.6"
+      ],
+      "status": "covered"
+    },
+    "REQ-137": {
+      "text": "Shows what will be deleted/preserved, requires confirmation",
+      "stories": [
+        "US-3.6"
+      ],
+      "status": "covered"
+    },
+    "REQ-138": {
+      "text": "If config.json doesn't exist: No pipeline state to reset.",
+      "stories": [
+        "US-3.6"
+      ],
+      "status": "covered"
+    },
+    "REQ-139": {
+      "text": "Brownfield detection: package manifest with \u22651 dep, or src/lib/ with \u22651 source",
+      "stories": [
+        "US-7.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-140": {
+      "text": "Offers brownfield vs greenfield choice when detection triggers",
+      "stories": [
+        "US-7.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-141": {
+      "text": "--brownfield flag sets mode without prompting",
+      "stories": [
+        "US-7.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-142": {
+      "text": "Config.json includes mode: brownfield or greenfield",
+      "stories": [
+        "US-7.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-143": {
+      "text": "Only 4 prompts have brownfield variants",
+      "stories": [
+        "US-7.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-144": {
+      "text": "Brownfield create-prd reads existing code to draft PRD",
+      "stories": [
+        "US-7.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-145": {
+      "text": "Brownfield tech-stack reads package manifests and presents detected stack",
+      "stories": [
+        "US-7.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-146": {
+      "text": "Brownfield project-structure documents existing structure",
+      "stories": [
+        "US-7.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-147": {
+      "text": "Brownfield dev-env-setup documents existing dev commands",
+      "stories": [
+        "US-7.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-148": {
+      "text": "Brownfield implemented as conditional sections, not separate files",
+      "stories": [
+        "US-7.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-149": {
+      "text": "Prompts detect brownfield by reading config.json mode field",
+      "stories": [
+        "US-7.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-150": {
+      "text": "/scaffold:next shows next eligible prompt with name, description, produces, reads",
+      "stories": [
+        "US-3.7"
+      ],
+      "status": "covered"
+    },
+    "REQ-151": {
+      "text": "If multiple eligible, shows all",
+      "stories": [
+        "US-3.7"
+      ],
+      "status": "covered"
+    },
+    "REQ-152": {
+      "text": "If all complete: Pipeline complete. All prompts have been executed.",
+      "stories": [
+        "US-3.7"
+      ],
+      "status": "covered"
+    },
+    "REQ-153": {
+      "text": "If no config: No pipeline found message",
+      "stories": [
+        "US-3.7"
+      ],
+      "status": "covered"
+    },
+    "REQ-154": {
+      "text": "Does not modify state or offer to execute",
+      "stories": [
+        "US-3.7"
+      ],
+      "status": "covered"
+    },
+    "REQ-155": {
+      "text": "/scaffold:adopt scans for package manifests, docs/, README, test/CI configs",
+      "stories": [
+        "US-7.4"
+      ],
+      "status": "covered"
+    },
+    "REQ-156": {
+      "text": "Maps findings to Scaffold prompts and marks them complete",
+      "stories": [
+        "US-7.4"
+      ],
+      "status": "covered"
+    },
+    "REQ-157": {
+      "text": "Sets mode: brownfield in config.json",
+      "stories": [
+        "US-7.4"
+      ],
+      "status": "covered"
+    },
+    "REQ-158": {
+      "text": "Shows what was detected, requires user confirmation",
+      "stories": [
+        "US-7.4"
+      ],
+      "status": "covered"
+    },
+    "REQ-159": {
+      "text": "Detects v1 project by presence of artifacts without .scaffold/",
+      "stories": [
+        "US-7.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-160": {
+      "text": "Artifact-to-prompt mapping uses produces field from frontmatter",
+      "stories": [
+        "US-7.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-161": {
+      "text": "Never modifies existing v1 artifacts during detection",
+      "stories": [
+        "US-7.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-162": {
+      "text": "Shows what was detected and asks user to confirm",
+      "stories": [
+        "US-7.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-163": {
+      "text": "After detection, pipeline continues with uncompleted prompts",
+      "stories": [
+        "US-7.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-164": {
+      "text": "No dedicated migration prompts \u2014 universal update mode handles v1",
+      "stories": [],
+      "status": "covered",
+      "note": "Won't-have negative requirement \u2014 no story needed"
+    },
+    "REQ-165": {
+      "text": "Standalone commands accessible at any time",
+      "stories": [
+        "US-9.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-166": {
+      "text": "Standalone commands do not appear in pipeline preview or progress",
+      "stories": [
+        "US-9.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-167": {
+      "text": "Standalone commands do not require config.json (except resume)",
+      "stories": [
+        "US-9.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-168": {
+      "text": "prompt-pipeline shows resolved pipeline from config.json if exists, else built-in",
+      "stories": [
+        "US-9.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-169": {
+      "text": "user-stories-multi-model-review and platform-parity-review are opt-in",
+      "stories": [
+        "US-9.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-170": {
+      "text": "Opt-in prompts addable via add-prompts or extra-prompts",
+      "stories": [
+        "US-9.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-171": {
+      "text": "Resolved pipeline displayed as numbered, phase-grouped list before confirm",
+      "stories": [
+        "US-1.1",
+        "US-3.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-172": {
+      "text": "Corrupt config.json \u2192 fallback to artifact-based detection",
+      "stories": [
+        "US-3.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-173": {
+      "text": "User-modified config.json \u2192 validate extra-prompts and re-resolve deps",
+      "stories": [
+        "US-3.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-174": {
+      "text": "Newer scaffold-version in config \u2192 warn but continue operating",
+      "stories": [
+        "US-3.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-175": {
+      "text": "Resume all complete: show completion summary with artifacts, decisions, time, next steps",
+      "stories": [
+        "US-3.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-176": {
+      "text": "Custom prompt file follows same format as built-in",
+      "stories": [
+        "US-5.3",
+        "US-5.4"
+      ],
+      "status": "covered"
+    },
+    "REQ-177": {
+      "text": "Invalid frontmatter shows clear error with field name and valid values",
+      "stories": [
+        "US-5.1",
+        "US-6.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-178": {
+      "text": "Scaffold does not validate prompt content \u2014 trusts user's customization",
+      "stories": [
+        "US-5.3",
+        "US-5.4"
+      ],
+      "status": "covered"
+    },
+    "REQ-179": {
+      "text": "Profile appears in init selection alongside built-in profiles",
+      "stories": [
+        "US-4.2",
+        "US-4.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-180": {
+      "text": "v1 detection: ambiguous profile \u2192 present candidates via AskUserQuestion",
+      "stories": [
+        "US-7.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-181": {
+      "text": "v1 detection: partial project \u2192 only mark complete where ALL produces exist",
+      "stories": [
+        "US-7.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-182": {
+      "text": "Config versioning: unknown fields preserved on read/write",
+      "stories": [
+        "US-2.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-183": {
+      "text": "If scaffold-version newer than running version, warn but don't refuse",
+      "stories": [
+        "US-3.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-184": {
+      "text": ".scaffold/ committed to git; ~/.scaffold/ is not",
+      "stories": [
+        "US-2.8"
+      ],
+      "status": "covered"
+    },
+    "REQ-185": {
+      "text": "All pipeline logic expressed as natural-language in prompt files",
+      "stories": [
+        "US-10.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-186": {
+      "text": "Instructions must be precise with verification steps",
+      "stories": [
+        "US-10.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-187": {
+      "text": "Plugin manifest updated with new version and description",
+      "stories": [
+        "US-10.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-188": {
+      "text": "Auto-activated skill updated to reference v2 pipeline from config.json",
+      "stories": [
+        "US-8.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-189": {
+      "text": "Skill falls back to showing profiles if no config exists",
+      "stories": [
+        "US-8.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-190": {
+      "text": "Optional reads field: skill ensures Claude has read listed files",
+      "stories": [
+        "US-8.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-191": {
+      "text": "Missing file in reads is skipped silently",
+      "stories": [
+        "US-8.2"
+      ],
+      "status": "covered"
+    },
+    "REQ-192": {
+      "text": "Pipeline resolution for up to 50 prompts in under 1 second",
+      "stories": [
+        "US-2.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-193": {
+      "text": "Prompt loading from any tier in under 100ms",
+      "stories": [
+        "US-10.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-194": {
+      "text": "Config reads/writes in under 100ms",
+      "stories": [
+        "US-10.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-195": {
+      "text": "No background processes, daemons, or watchers",
+      "stories": [
+        "US-10.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-196": {
+      "text": "Crash recovery: prompt not marked complete, user can resume",
+      "stories": [
+        "US-2.3",
+        "US-2.4",
+        "US-3.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-197": {
+      "text": "Config integrity: incomplete config.json \u2192 resume detects and recovers",
+      "stories": [
+        "US-3.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-198": {
+      "text": "Idempotent prompts: running twice does not produce corrupt state",
+      "stories": [
+        "US-10.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-199": {
+      "text": "Requires Claude Code with plugin support",
+      "stories": [
+        "US-10.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-200": {
+      "text": "macOS and Linux supported; Windows via WSL expected to work",
+      "stories": [
+        "US-10.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-201": {
+      "text": "No Node.js dependency for Scaffold itself",
+      "stories": [
+        "US-10.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-202": {
+      "text": "Each prompt is self-contained",
+      "stories": [
+        "US-10.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-203": {
+      "text": "Config files versioned with scaffold-version field",
+      "stories": [
+        "US-1.1",
+        "US-2.3"
+      ],
+      "status": "covered"
+    },
+    "REQ-204": {
+      "text": "Plugin remains small with no external runtime dependencies",
+      "stories": [
+        "US-10.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-205": {
+      "text": "No credential storage by Scaffold",
+      "stories": [],
+      "status": "covered",
+      "note": "Negative requirement \u2014 security constraint implicit in all stories"
+    },
+    "REQ-206": {
+      "text": "No network access by Scaffold's engine",
+      "stories": [],
+      "status": "covered",
+      "note": "Negative requirement \u2014 implicit in architecture"
+    },
+    "REQ-207": {
+      "text": ".scaffold/ uses default file permissions",
+      "stories": [],
+      "status": "covered",
+      "note": "Negative requirement \u2014 no elevated permissions needed"
+    },
+    "REQ-208": {
+      "text": "No automatic prompt execution without user confirmation",
+      "stories": [
+        "US-2.5",
+        "US-1.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-209": {
+      "text": "No prompt versioning or rollback within Scaffold",
+      "stories": [],
+      "status": "covered",
+      "note": "Won't-have \u2014 out of scope"
+    },
+    "REQ-210": {
+      "text": "No remote profile registry or marketplace",
+      "stories": [],
+      "status": "covered",
+      "note": "Won't-have \u2014 out of scope"
+    },
+    "REQ-211": {
+      "text": "No GUI or web interface \u2014 CLI-only",
+      "stories": [],
+      "status": "covered",
+      "note": "Won't-have \u2014 out of scope"
+    },
+    "REQ-212": {
+      "text": "No support for non-Claude Code environments",
+      "stories": [],
+      "status": "covered",
+      "note": "Won't-have \u2014 out of scope"
+    },
+    "REQ-213": {
+      "text": "No runtime prompt generation \u2014 prompts are static Markdown",
+      "stories": [],
+      "status": "covered",
+      "note": "Won't-have \u2014 out of scope"
+    },
+    "REQ-214": {
+      "text": "No prompt marketplace for third-party prompts",
+      "stories": [],
+      "status": "covered",
+      "note": "Won't-have \u2014 out of scope"
+    },
+    "REQ-215": {
+      "text": "No parallel prompt execution",
+      "stories": [],
+      "status": "covered",
+      "note": "Won't-have \u2014 out of scope, US-2.5 states sequential"
+    },
+    "REQ-216": {
+      "text": "No breaking changes to prompt content in v2",
+      "stories": [],
+      "status": "covered",
+      "note": "Won't-have \u2014 out of scope"
+    },
+    "REQ-217": {
+      "text": "No removal of Beads dependency",
+      "stories": [],
+      "status": "covered",
+      "note": "Won't-have \u2014 out of scope"
+    },
+    "REQ-218": {
+      "text": "AskUserQuestion supports 2-4 options per question",
+      "stories": [
+        "US-1.1",
+        "US-1.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-219": {
+      "text": "multiSelect: true allows selecting multiple from same 2-4 limit",
+      "stories": [
+        "US-1.5"
+      ],
+      "status": "covered"
+    },
+    "REQ-220": {
+      "text": "Interrupted AskUserQuestion results in no state change",
+      "stories": [
+        "US-1.1"
+      ],
+      "status": "covered"
+    },
+    "REQ-221": {
+      "text": "Selections with >4 items split across multiple sequential questions",
+      "stories": [
+        "US-1.5"
+      ],
+      "status": "covered"
+    }
+  }
+}

@@ -379,8 +379,8 @@ Covers: F-PE-1 through F-PE-6
 **Acceptance Criteria**:
 
 1. **Given** a set of prompts with `depends-on` declarations from the `web-app` profile,
-   **When** `scripts/resolve-deps.sh` runs with the prompt list and frontmatter,
-   **Then** it outputs a topologically sorted array where every prompt appears after all its dependencies.
+   **When** the `init` orchestration command performs dependency resolution (using Kahn's algorithm as specified in the prompt instructions, with `scripts/resolve-deps.sh` available as a test utility),
+   **Then** it produces a topologically sorted array where every prompt appears after all its dependencies.
 
 2. **Given** the sorted output,
    **When** a verification step runs,
@@ -402,9 +402,10 @@ Covers: F-PE-1 through F-PE-6
 
 **Data/State Requirements**:
 - Input: Array of prompt names + frontmatter `depends-on` fields
-- Output: Sorted array to stdout (JSON)
+- Output: Sorted array written to `.scaffold/config.json` `prompts` field
 - Algorithm: Kahn's algorithm per PRD F-PE-1
-- Script: `scripts/resolve-deps.sh`
+- Runtime: Implemented as natural-language instructions in orchestration command prompts (per PRD Section 6). Claude Code executes the algorithm using its tools.
+- Test utility: `scripts/resolve-deps.sh` — standalone validation script for CI/testing; NOT the production runtime path
 - Test: `tests/resolve-deps.bats`
 
 **PRD Trace**: F-PE-1
@@ -420,8 +421,8 @@ Covers: F-PE-1 through F-PE-6
 **Acceptance Criteria**:
 
 1. **Given** prompt A depends on prompt B and prompt B depends on prompt A,
-   **When** `scripts/resolve-deps.sh` runs,
-   **Then** it exits with code 1 and outputs to stderr: "Circular dependency detected: A → B → A. Remove one dependency to proceed."
+   **When** dependency resolution runs (via orchestration command prompt or `scripts/resolve-deps.sh` test utility),
+   **Then** it reports an error: "Circular dependency detected: A → B → A. Remove one dependency to proceed."
 
 2. **Given** a longer cycle: A → B → C → A,
    **When** resolution detects the cycle,
@@ -759,6 +760,7 @@ Covers: F-UX-2, F-UX-4, F-UX-5, F-UX-6, F-UX-9, F-UX-11, Flow 2
      /scaffold:new-enhancement — Add features
      /scaffold:single-agent-start — Begin implementation
    ```
+   **Computation rules**: Artifact list = union of all completed prompts' `produces` fields. Decisions count = length of `.scaffold/decisions.json` array. Total time = last entry in `completed` array `.at` timestamp minus `config.json` `.created` timestamp, formatted as hours and minutes.
 
 4. **Given** `.scaffold/config.json` doesn't exist,
    **When** the user runs `/scaffold:resume`,
@@ -925,9 +927,12 @@ Covers: F-UX-2, F-UX-4, F-UX-5, F-UX-6, F-UX-9, F-UX-11, Flow 2
 
 1. **Given** `design-system` is the next pending prompt,
    **When** the user runs `/scaffold:skip design-system`,
-   **Then** Scaffold prompts for a reason via `AskUserQuestion`: "Why skip `design-system`?" with a free-text option.
+   **Then** Scaffold prompts via `AskUserQuestion`: "Skip `design-system`?" with options:
+   - **Skip without reason** — records skip with empty reason
+   - **Skip with reason** — user provides reason via "Other" free-text input
+   If the `AskUserQuestion` interaction is interrupted, no state change occurs.
 
-2. **Given** the user provides a reason (or leaves it blank),
+2. **Given** the user selects either option (with or without reason),
    **When** the skip is recorded,
    **Then** `.scaffold/config.json` `skipped` array contains:
    ```json
@@ -1271,7 +1276,7 @@ Covers: F-PS-1, F-PS-2, F-PS-3, Flow 3
    **When** parsing runs,
    **Then** defaults are applied:
    - `depends-on`: `[]` (no dependencies)
-   - `phase`: `1` (if no dependencies) or phase of last dependency
+   - `phase`: `1` (if no dependencies) or `max(phase of each dependency)` — the highest phase number among all dependencies, ensuring the prompt appears in a phase at or after all its prerequisites
    - `produces`: `[]` (no artifact detection)
    - `reads`: `[]` (no auto-loading)
    - `argument-hint`: `""` (no hint)
@@ -1714,9 +1719,9 @@ Covers: F-UX-10, F-UX-12, F-V1-1, Flow 6
    **When** mapping runs,
    **Then** `create-prd` is marked complete.
 
-3. **Given** existing `jest.config.ts` is found,
+3. **Given** existing `jest.config.ts` is found but `docs/tdd-standards.md` does not exist,
    **When** mapping runs,
-   **Then** `tdd` is flagged as partially complete (test config exists but `docs/tdd-standards.md` may not).
+   **Then** `tdd` is NOT marked complete (binary completion — ALL `produces` artifacts must exist). The scan notes the existing test config as context for when `tdd` runs in brownfield mode.
 
 4. **Given** scanning finds 5/18 artifacts,
    **When** config.json is generated,
@@ -1884,6 +1889,68 @@ Covers: F-SC-1
 
 ---
 
+## Epic 10: Non-Functional Compliance
+
+Covers: Section 6 (Implementation Architecture), Section 7 (NFRs)
+
+### US-10.1: Non-Functional Requirements Compliance
+
+**As** a Scaffold maintainer, **I want** the system to satisfy all non-functional requirements from the PRD, **so that** Scaffold v2 is performant, reliable, compatible, maintainable, and secure by design.
+
+**Priority**: Must-have
+
+**Acceptance Criteria**:
+
+1. **Given** all pipeline logic (dependency resolution, state tracking, prompt execution),
+   **When** implementation is reviewed,
+   **Then** it is expressed as natural-language instructions within command prompt files executed by Claude using its tools — not as compiled code or required runtime scripts. Helper scripts may exist as test utilities only. (REQ-185, REQ-186)
+
+2. **Given** the plugin manifest (`.claude-plugin/plugin.json`),
+   **When** v2 is released,
+   **Then** it reflects the correct v2 version number, updated description, and lists all new commands. (REQ-187)
+
+3. **Given** prompt resolution runs across all 4 tiers (profile override → project → user → built-in),
+   **When** benchmarked,
+   **Then** loading completes in under 100ms. (REQ-193)
+
+4. **Given** `.scaffold/config.json` at expected size (under 10KB),
+   **When** read/write operations are measured,
+   **Then** they complete in under 100ms. (REQ-194)
+
+5. **Given** any Scaffold command execution,
+   **When** it finishes,
+   **Then** no background processes, daemons, or watchers remain running. All operations are synchronous. (REQ-195)
+
+6. **Given** any built-in prompt is run twice with identical inputs,
+   **When** the second run completes,
+   **Then** artifacts and config state are valid and non-duplicated — prompts are idempotent. (REQ-198)
+
+7. **Given** a system without Node.js installed,
+   **When** core Scaffold orchestration commands run,
+   **Then** Scaffold operates correctly. Node.js is required only for Beads, not Scaffold core. (REQ-201)
+
+8. **Given** Scaffold v2 requires Claude Code with plugin support,
+   **When** the environment lacks plugin support,
+   **Then** Scaffold warns with concrete upgrade guidance. macOS and Linux are supported; Windows via WSL is expected to work but untested. (REQ-199, REQ-200)
+
+9. **Given** any single prompt file,
+   **When** its content or frontmatter is modified (excluding `depends-on` changes),
+   **Then** no changes are required to other prompt files, profiles, or the pipeline engine. Prompts are self-contained. (REQ-202)
+
+10. **Given** the Scaffold plugin package,
+    **When** runtime dependencies are audited,
+    **Then** no external runtime dependencies are required. The plugin remains small with all logic in prompt files. (REQ-204)
+
+**Scope Boundary**: This story consolidates non-functional requirements that are design constraints enforced during implementation review, not functional features requiring separate user-facing stories.
+
+**Data/State Requirements**:
+- Performance benchmarks in CI tests
+- Architecture review checklist for prompt-driven design
+
+**PRD Trace**: Section 6 (Implementation Architecture), Section 7 (Performance, Reliability, Compatibility, Maintainability, Security)
+
+---
+
 ## Feature-to-Story Traceability Matrix
 
 | PRD Feature | Stories | Priority |
@@ -1914,6 +1981,8 @@ Covers: F-SC-1
 | F-UX-12: scaffold adopt | US-7.4 | Should-have |
 | F-V1-1: v1 Project Detection | US-7.3 | Should-have |
 | F-SC-1: Standalone Commands | US-9.1, US-9.2 | Must-have |
+| Section 6: Implementation Architecture | US-10.1 | Must-have |
+| Section 7: Non-Functional Requirements | US-10.1 | Must-have |
 
 ## User Flow Coverage
 
@@ -1930,5 +1999,5 @@ Covers: F-SC-1
 
 | Priority | Count | Stories |
 |----------|-------|---------|
-| Must-have | 31 | US-1.1–1.6, US-2.1–2.6, US-3.1–3.7, US-4.1–4.5, US-5.1–5.5, US-6.2, US-8.1, US-9.1–9.2 |
+| Must-have | 32 | US-1.1–1.6, US-2.1–2.6, US-3.1–3.7, US-4.1–4.5, US-5.1–5.5, US-6.2, US-8.1, US-9.1–9.2, US-10.1 |
 | Should-have | 13 | US-1.7–1.8, US-2.7–2.8, US-6.1, US-6.3, US-7.1–7.4, US-8.2 |

@@ -1,0 +1,231 @@
+{
+  "missing_requirements": [
+    {
+      "requirement_id": "REQ-185",
+      "requirement_text": "All pipeline logic expressed as natural-language in prompt files (not compiled code)",
+      "prd_section": "Section 6",
+      "suggested_story": {
+        "title": "Architectural Compliance: Natural Language Pipeline Logic",
+        "story": "As a system architect, I want all pipeline logic to be expressed as natural-language instructions within prompt files, so that the system remains flexible and transparent.",
+        "acceptance_criteria": [
+          "Given a pipeline orchestration step (e.g., dependency resolution, state management), When examining its implementation, Then it is solely comprised of natural-language instructions in prompt files, executing via Claude's tools (Bash, Read, Write, etc.), not compiled code."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-186",
+      "requirement_text": "Instructions must be precise with verification steps",
+      "prd_section": "Section 6",
+      "suggested_story": {
+        "title": "Prompt Quality: Precise Instructions with Verification",
+        "story": "As a prompt author, I want to ensure my instructions are precise and include verification steps, so that Claude executes them reliably and consistently.",
+        "acceptance_criteria": [
+          "Given any prompt within the system, When reviewing its content, Then it includes explicit steps for Claude to follow, along with verification checks (e.g., 'After X, verify Y') to confirm successful execution."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-187",
+      "requirement_text": "Plugin manifest updated with new version and description",
+      "prd_section": "Section 6",
+      "suggested_story": {
+        "title": "Infrastructure: Update Plugin Manifest for V2",
+        "story": "As a release engineer, I want the plugin manifest to be updated with the new version and description for Scaffold v2, so that users can correctly install and understand the plugin.",
+        "acceptance_criteria": [
+          "Given the plugin release process, When the plugin is packaged for v2, Then the `.claude-plugin/plugin.json` file reflects the correct v2 version number and an updated description reflecting Scaffold v2's capabilities."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-193",
+      "requirement_text": "Prompt loading from any tier in under 100ms",
+      "prd_section": "NFR-Perf",
+      "suggested_story": {
+        "title": "Performance: Fast Prompt Loading",
+        "story": "As a user, I want prompt loading to be fast, so that there's no noticeable delay when the system retrieves a prompt for execution.",
+        "acceptance_criteria": [
+          "Given any prompt file (built-in, user-level, project-level, or profile override), When Scaffold loads the prompt content, Then the loading operation completes within 100 milliseconds."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-194",
+      "requirement_text": "Config reads/writes in under 100ms",
+      "prd_section": "NFR-Perf",
+      "suggested_story": {
+        "title": "Performance: Fast Configuration I/O",
+        "story": "As a user, I want configuration reads and writes to be fast, so that the pipeline state management doesn't introduce delays.",
+        "acceptance_criteria": [
+          "Given the `.scaffold/config.json` file, When Scaffold reads or writes its content, Then the operation completes within 100 milliseconds."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-195",
+      "requirement_text": "No background processes, daemons, or watchers",
+      "prd_section": "NFR-Perf",
+      "suggested_story": {
+        "title": "Architectural Constraint: No Background Processes",
+        "story": "As a system administrator, I want Scaffold to operate without background processes, daemons, or watchers, so that its resource consumption is predictable and ephemeral.",
+        "acceptance_criteria": [
+          "Given Scaffold is running, When inspecting active processes or services, Then no Scaffold-related background processes, daemons, or watchers are present outside of active command execution."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-198",
+      "requirement_text": "Idempotent prompts: running twice does not produce corrupt state",
+      "prd_section": "NFR-Rel",
+      "suggested_story": {
+        "title": "Reliability: Idempotent Prompt Execution",
+        "story": "As a user, I want prompts to be idempotent, so that re-running a prompt multiple times does not corrupt my project state.",
+        "acceptance_criteria": [
+          "Given any prompt that modifies the file system, When the prompt is executed twice sequentially with the same inputs, Then the resulting project state is identical to running the prompt once."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-199",
+      "requirement_text": "Requires Claude Code with plugin support",
+      "prd_section": "NFR-Compat",
+      "suggested_story": {
+        "title": "Compatibility: Claude Code Plugin Support",
+        "story": "As a user, I want Scaffold v2 to be compatible with Claude Code versions that support plugins, so that I can install and use it.",
+        "acceptance_criteria": [
+          "Given a Claude Code environment, When attempting to install Scaffold v2, Then the installation succeeds if and only if the Claude Code version provides plugin support."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-200",
+      "requirement_text": "macOS and Linux supported; Windows via WSL expected to work",
+      "prd_section": "NFR-Compat",
+      "suggested_story": {
+        "title": "Compatibility: Cross-Platform Support",
+        "story": "As a user, I want Scaffold to work on common development operating systems, so that I can use it regardless of my preferred OS.",
+        "acceptance_criteria": [
+          "Given a macOS or Linux environment, When executing any Scaffold command, Then it functions as expected; Given a Windows environment with WSL, When executing any Scaffold command within WSL, Then it functions as expected."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-201",
+      "requirement_text": "No Node.js dependency for Scaffold itself",
+      "prd_section": "NFR-Compat",
+      "suggested_story": {
+        "title": "Dependency Management: No Direct Node.js Requirement for Scaffold",
+        "story": "As a developer, I want Scaffold itself to have no direct Node.js dependency, so that its runtime environment is minimal and independent of Node.js for core operations.",
+        "acceptance_criteria": [
+          "Given a system without Node.js installed, When installing and running core Scaffold commands (excluding any optional features like Beads that explicitly state Node.js as a prerequisite), Then Scaffold operates correctly without reporting missing Node.js dependencies."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-202",
+      "requirement_text": "Each prompt is self-contained \u2014 modifying one doesn't require changes to others",
+      "prd_section": "NFR-Maint",
+      "suggested_story": {
+        "title": "Maintainability: Self-Contained Prompts",
+        "story": "As a prompt author, I want each prompt to be self-contained, so that I can modify one without affecting the engine or other prompts.",
+        "acceptance_criteria": [
+          "Given any single prompt file, When its content or frontmatter (excluding explicit `depends-on` declarations) is modified, Then no changes are required to other prompt files, profiles, or the core pipeline engine logic for the system to remain functional."
+        ],
+        "priority": "Must"
+      }
+    },
+    {
+      "requirement_id": "REQ-204",
+      "requirement_text": "Plugin remains small with no external runtime dependencies",
+      "prd_section": "NFR-Maint",
+      "suggested_story": {
+        "title": "Maintainability: Lean Plugin Footprint",
+        "story": "As a system administrator, I want the Scaffold plugin to remain small with no external runtime dependencies, so that it's easy to deploy and manage.",
+        "acceptance_criteria": [
+          "Given the Scaffold plugin, When its size and declared runtime dependencies are evaluated, Then it conforms to a minimal footprint, avoiding bundled external runtime dependencies beyond core system utilities."
+        ],
+        "priority": "Must"
+      }
+    }
+  ],
+  "story_issues": [],
+  "contradictions": [],
+  "duplication_or_overlap": [
+    {
+      "story_ids": [
+        "US-1.6",
+        "US-2.1"
+      ],
+      "overlap_description": "Both stories involve dependency resolution and topological sorting. US-2.1 focuses on the core algorithm's mechanics and verification, while US-1.6 addresses the user experience of auto-including dependencies during the init flow.",
+      "recommendation": "keep_separate"
+    },
+    {
+      "story_ids": [
+        "US-2.3",
+        "US-2.4"
+      ],
+      "overlap_description": "Both stories describe mechanisms for determining prompt completion. US-2.3 covers the orchestrator-recorded completion in `config.json`, and US-2.4 covers the artifact-based detection as a recovery mechanism.",
+      "recommendation": "keep_separate"
+    },
+    {
+      "story_ids": [
+        "US-3.3",
+        "US-3.4"
+      ],
+      "overlap_description": "Both stories pertain to displaying pipeline progress. US-3.3 details the interactive progress display after a prompt completes, including the 'Run it now?' prompt. US-3.4 specifies the read-only behavior of the `/scaffold:status` command.",
+      "recommendation": "keep_separate"
+    },
+    {
+      "story_ids": [
+        "US-1.7",
+        "US-1.8"
+      ],
+      "overlap_description": "Both stories describe smart profile suggestion during `init`. US-1.7 focuses on keyword analysis from idea text, while US-1.8 focuses on file-based detection and includes the conflict resolution between the two signal types.",
+      "recommendation": "keep_separate"
+    },
+    {
+      "story_ids": [
+        "US-1.3",
+        "US-1.4"
+      ],
+      "overlap_description": "Both stories address the scenario where `.scaffold/config.json` already exists. US-1.3 defines the default warning behavior when `/scaffold:init` is run. US-1.4 defines the explicit `--force` override behavior to reinitialize the project.",
+      "recommendation": "keep_separate"
+    },
+    {
+      "story_ids": [
+        "US-3.6",
+        "US-1.4"
+      ],
+      "overlap_description": "Both stories involve deleting `config.json`, `context.json`, and `decisions.json` while preserving custom prompts/profiles. US-3.6 is a standalone `reset` command for starting over. US-1.4 is part of the `init` flow, allowing re-initialization.",
+      "recommendation": "keep_separate"
+    }
+  ],
+  "coverage_assertion": {
+    "total_requirements": 221,
+    "covered_count": 209,
+    "uncovered_ids": [
+      "REQ-185",
+      "REQ-186",
+      "REQ-187",
+      "REQ-193",
+      "REQ-194",
+      "REQ-195",
+      "REQ-198",
+      "REQ-199",
+      "REQ-200",
+      "REQ-201",
+      "REQ-202",
+      "REQ-204"
+    ],
+    "confidence": 0.98
+  }
+}

@@ -297,7 +297,6 @@ $REVIEW_PROMPT"
 
     if codex exec \
         --sandbox read-only \
-        --ask-for-approval never \
         --ephemeral \
         --color never \
         --output-schema "$SCHEMA_PATH" \
@@ -328,7 +327,7 @@ run_gemini() {
     if gemini -p "$REVIEW_PROMPT" \
         --output-format json \
         --yolo \
-        -m gemini-2.5-pro \
+        -m "${GEMINI_MODEL:-gemini-2.5-pro}" \
         < "$BUNDLE_FILE" > "$GEMINI_WRAPPER"; then
         echo "Gemini CLI completed, extracting review JSON..."
 
@@ -350,7 +349,7 @@ CRITICAL: Your previous response was not valid JSON. Return ONLY a raw JSON obje
         if gemini -p "$retry_prompt" \
             --output-format json \
             --yolo \
-            -m gemini-2.5-pro \
+            -m "${GEMINI_MODEL:-gemini-2.5-pro}" \
             < "$BUNDLE_FILE" > "$GEMINI_WRAPPER"; then
 
             if extract_gemini_review_json "$GEMINI_WRAPPER" "$GEMINI_OUT"; then
