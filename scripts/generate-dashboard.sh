@@ -238,12 +238,21 @@ fi
 
 # ─── Section 5: Build final JSON payload with jq ─────────────────
 
+# Write large JSON values to temp files to avoid ARG_MAX limits on CI
+PROMPT_CONTENT_FILE=$(mktemp "${TMPDIR:-/tmp}/scaffold-pc-XXXXXX.json")
+LONG_DESC_FILE=$(mktemp "${TMPDIR:-/tmp}/scaffold-ld-XXXXXX.json")
+BEADS_TASKS_FILE=$(mktemp "${TMPDIR:-/tmp}/scaffold-bt-XXXXXX.json")
+echo "$PROMPT_CONTENT_JSON" > "$PROMPT_CONTENT_FILE"
+echo "$LONG_DESCRIPTIONS_JSON" > "$LONG_DESC_FILE"
+echo "$BEADS_TASKS_JSON" > "$BEADS_TASKS_FILE"
+trap 'rm -f "$PROMPT_CONTENT_FILE" "$LONG_DESC_FILE" "$BEADS_TASKS_FILE"' EXIT
+
 PAYLOAD=$(jq -n \
     --argjson pipeline "$PIPELINE_JSON" \
     --argjson detection "$DETECTION_JSON" \
     --argjson descriptions "$DESCRIPTIONS_JSON" \
-    --argjson longDescriptions "$LONG_DESCRIPTIONS_JSON" \
-    --argjson promptContent "$PROMPT_CONTENT_JSON" \
+    --slurpfile longDescriptions "$LONG_DESC_FILE" \
+    --slurpfile promptContent "$PROMPT_CONTENT_FILE" \
     --argjson deps "$DEPS_JSON" \
     --argjson config "$CONFIG_JSON" \
     --argjson fileStatus "$FILE_STATUS_JSON" \
@@ -253,7 +262,7 @@ PAYLOAD=$(jq -n \
     --argjson beadsTotal "$BEADS_TOTAL" \
     --argjson beadsOpen "$BEADS_OPEN" \
     --argjson beadsClosed "$BEADS_CLOSED" \
-    --argjson beadsTasks "$BEADS_TASKS_JSON" \
+    --slurpfile beadsTasks "$BEADS_TASKS_FILE" \
     --arg timestamp "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
     --arg projectDir "$PROJECT_DIR" \
     '
@@ -270,8 +279,8 @@ PAYLOAD=$(jq -n \
         status: resolveStatus(.slug; .step),
         description: ($descriptions[.slug] // ""),
         deps: ($deps[.slug] // []),
-        longDescription: ($longDescriptions[.slug] // ""),
-        promptContent: ($promptContent[.slug] // ""),
+        longDescription: ($longDescriptions[0][.slug] // ""),
+        promptContent: ($promptContent[0][.slug] // ""),
         optional: ((.notes // "") | test("optional")),
         checkFile: ((.step) as $s | ($detection | map(select(.step == $s)) | .[0].checkFile) // "")
     })) as $prompts |
@@ -312,7 +321,7 @@ PAYLOAD=$(jq -n \
             total: $beadsTotal,
             open: $beadsOpen,
             closed: $beadsClosed,
-            tasks: $beadsTasks
+            tasks: $beadsTasks[0]
         },
         timestamp: $timestamp,
         projectDir: $projectDir
