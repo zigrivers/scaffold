@@ -681,24 +681,93 @@ Flaky tests (tests that fail intermittently) are bugs.
 }
 ```
 
-## 7. E2E / Visual Testing
+## 7. Dashboard Visual Testing (Playwright MCP)
 
-Scaffold is a CLI plugin and prompt pipeline — not a web or mobile application. E2E testing in the traditional sense (browser automation, mobile flow testing) does not apply to the core project.
+Scaffold is a CLI plugin — not a web app. However, the **pipeline dashboard** (`scripts/generate-dashboard.sh`) is a browser-rendered HTML artifact with interactive JS, light/dark mode, and responsive layout. Visual testing ensures dashboard changes don't break the UI.
 
-**Placeholder** — to be completed by:
+### When to Use Visual Testing
 
-- **`/scaffold:add-playwright`** — for web apps using Playwright (browser automation, visual regression)
-- **`/scaffold:add-maestro`** — for Expo/mobile apps using Maestro (flow testing, screenshot verification)
+**Use it** when modifying:
+- Dashboard HTML structure or layout
+- CSS in `lib/dashboard-theme.css` or inline styles
+- JavaScript behavior (expand/collapse, theme toggle, filtering)
 
-When those prompts run on a target project, they will add E2E-specific sections to that project's TDD standards covering:
+**Don't use it** for:
+- Prompt text changes — use bats
+- Script logic changes — use bats
+- Data/config changes — use bats
 
-- E2E test file organization
-- Page object / screen object patterns
-- Visual regression baselines
-- CI integration for E2E suites
-- Performance budgets
+### Relationship to TDD
 
-Until then, TDD efforts focus on unit and script tests using bats-core.
+Visual testing is **verification after implementation**, not part of Red-Green-Refactor. The workflow:
+
+1. Write bats tests for any structural/logic changes (standard TDD)
+2. Implement the change
+3. Run visual verification via Playwright MCP to confirm rendering
+
+### Visual Test Procedure
+
+```bash
+# 1. Generate test-ready HTML
+make dashboard-test
+
+# 2. Navigate to the dashboard
+# Use: browser_navigate → file:///path/to/tests/screenshots/dashboard-test.html
+
+# 3. Desktop verification (1280×800)
+# browser_resize → 1280×800
+# browser_take_screenshot → tests/screenshots/current/dashboard_desktop_default.png
+
+# 4. Mobile verification (375×812)
+# browser_resize → 375×812
+# browser_take_screenshot → tests/screenshots/current/dashboard_mobile_default.png
+
+# 5. Dark mode — emulate prefers-color-scheme: dark
+# browser_run_code → async (page) => { await page.emulateMedia({ colorScheme: 'dark' }); }
+# browser_take_screenshot → tests/screenshots/current/dashboard_desktop_dark.png
+# browser_resize → 375×812
+# browser_take_screenshot → tests/screenshots/current/dashboard_mobile_dark.png
+
+# 6. Interaction testing
+# browser_click → expand/collapse sections, filters, navigation
+# browser_snapshot → verify accessibility tree
+
+# 7. Close
+# browser_close
+```
+
+### Screenshot Naming Convention
+
+```
+{feature}_{viewport}_{state}.png
+```
+
+| Component | Values |
+|-----------|--------|
+| `feature` | `dashboard`, `filters`, `phase-detail`, etc. |
+| `viewport` | `desktop` (1280×800), `mobile` (375×812) |
+| `state` | `default`, `dark`, `expanded`, `filtered`, etc. |
+
+Examples: `dashboard_desktop_default.png`, `dashboard_mobile_dark.png`, `filters_desktop_expanded.png`
+
+### Baseline Management
+
+- **Baselines live in**: `tests/screenshots/baseline/` (committed to git)
+- **Current screenshots**: `tests/screenshots/current/` (gitignored)
+- **Update baselines** only when visual changes are intentional
+- To update: copy from `current/` to `baseline/` and commit
+- Never update baselines without reviewing the visual diff
+
+### Minimum Verification Checklist
+
+Every dashboard CSS/HTML/JS change requires:
+
+- [ ] Desktop (1280×800) — light mode
+- [ ] Desktop (1280×800) — dark mode
+- [ ] Mobile (375×812) — light mode
+- [ ] Mobile (375×812) — dark mode
+- [ ] Interactive elements (expand/collapse sections)
+- [ ] Compare against baselines in `tests/screenshots/baseline/`
 
 ## Quick Reference
 

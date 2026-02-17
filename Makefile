@@ -1,4 +1,4 @@
-.PHONY: help test lint validate check setup hooks install uninstall extract
+.PHONY: help test lint validate check setup hooks install uninstall extract dashboard-test
 
 help: ## Show available targets
 	@grep -E '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -32,3 +32,9 @@ uninstall: ## Remove scaffold commands from ~/.claude/commands/
 
 extract: ## Extract commands from prompts.md
 	./scripts/extract-commands.sh
+
+dashboard-test: ## Generate test-ready dashboard HTML
+	@mkdir -p tests/screenshots/current tests/screenshots/diff
+	bash scripts/generate-dashboard.sh --no-open --output tests/screenshots/dashboard-test.html
+	@echo "Dashboard ready at: tests/screenshots/dashboard-test.html"
+	@echo "Navigate with: file://$(CURDIR)/tests/screenshots/dashboard-test.html"

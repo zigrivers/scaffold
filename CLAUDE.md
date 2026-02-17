@@ -104,6 +104,7 @@ bd sync                                  # Force sync to git
 | `gh pr diff` | Review PR diff before merging |
 | `gh pr checks` | Check CI status on current PR |
 | `git push --force-with-lease` | Safe force push after rebase (feature branches only) |
+| `make dashboard-test` | Generate test-ready dashboard HTML for visual verification |
 
 **NEVER** use `bd edit` — it opens an interactive editor and breaks AI agents.
 
@@ -225,6 +226,51 @@ Before modifying any dashboard HTML/CSS, review `docs/design-system.md`.
 - Always provide both light and dark mode token values
 - Config: `lib/dashboard-theme.css`
 
+## Browser Testing with Playwright MCP
+
+Use Playwright MCP tools to visually verify the pipeline dashboard after modifying dashboard CSS, HTML, or JS.
+
+### When to Use
+
+After any change to:
+- `scripts/generate-dashboard.sh` (HTML structure, inline JS)
+- `lib/dashboard-theme.css` (styles, theme tokens)
+- Dashboard-related bats tests that affect rendered output
+
+### Setup & Verification Process
+
+```bash
+make dashboard-test    # Generates tests/screenshots/dashboard-test.html
+```
+
+Then use Playwright MCP tools:
+1. `browser_navigate` to `file://` path from make output
+2. `browser_resize` to 1280×800 (desktop) → `browser_take_screenshot`
+3. `browser_resize` to 375×812 (mobile) → `browser_take_screenshot`
+4. `browser_run_code` to emulate dark mode → repeat screenshots
+5. `browser_click` interactive elements (expand/collapse, filters)
+6. `browser_snapshot` to verify accessibility
+7. `browser_close`
+
+### Screenshot Convention
+
+Save to `tests/screenshots/current/` with naming: `{feature}_{viewport}_{state}.png`
+
+Examples: `dashboard_desktop_default.png`, `dashboard_mobile_dark.png`
+
+### Baseline Management
+
+- Baselines: `tests/screenshots/baseline/` (committed)
+- Current: `tests/screenshots/current/` (gitignored)
+- Update baselines only for intentional visual changes — copy from `current/` to `baseline/` and commit
+
+### Minimum Checks Per Dashboard Change
+
+- Desktop + mobile light mode
+- Desktop + mobile dark mode
+- Interactive elements (expand/collapse sections)
+- Compare against baselines
+
 ## When to Consult Other Docs
 
 | Question | Document |
@@ -234,4 +280,5 @@ Before modifying any dashboard HTML/CSS, review `docs/design-system.md`.
 | How is the project structured? | `docs/project-structure.md` |
 | How do I set up my dev environment? | `docs/dev-setup.md` |
 | How should dashboard HTML/CSS look? | `docs/design-system.md` |
+| How do I visually test the dashboard? | `docs/tdd-standards.md` Section 7 |
 | What's the prompt pipeline order? | `prompts.md` (Setup Order table at top) |

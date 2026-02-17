@@ -31,8 +31,12 @@ scaffold/
 │   ├── test_helper/
 │   │   ├── common-setup.bash  # Shared setup: temp dirs, fixtures, source lib
 │   │   └── .gitkeep
-│   └── fixtures/              # Test data files (configs, frontmatter samples)
-│       └── .gitkeep
+│   ├── fixtures/              # Test data files (configs, frontmatter samples)
+│   │   └── .gitkeep
+│   └── screenshots/           # Dashboard visual testing (Playwright MCP)
+│       ├── baseline/          # Committed — known-good reference screenshots
+│       ├── current/           # Gitignored — current verification run
+│       └── diff/              # Gitignored — visual comparison outputs
 ├── skills/                    # Auto-activated skills
 │   └── scaffold-pipeline/
 │       └── SKILL.md
@@ -195,7 +199,10 @@ tests/
 | Config files (`.editorconfig`, `.shellcheckrc`) | `.DS_Store` (already ignored) |
 | `plugin.json`, `marketplace.json` | `.history/` (already ignored) |
 | `tests/fixtures/` (test data) | `*~` (editor backup files) |
-| `.gitkeep` files (empty dir placeholders) | `*.bak` (editor backup files) |
+| `tests/screenshots/baseline/` (reference screenshots) | `*.bak` (editor backup files) |
+| `.gitkeep` files (empty dir placeholders) | `tests/screenshots/current/` (verification runs) |
+| | `tests/screenshots/diff/` (comparison outputs) |
+| | `.playwright-mcp/` (Playwright MCP cache) |
 
 ## 8. Root-Level File Policy
 

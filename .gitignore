@@ -10,3 +10,9 @@ coverage/
 # Editor backups
 *~
 *.bak
+
+# Playwright MCP test artifacts
+tests/screenshots/current/
+tests/screenshots/diff/
+tests/screenshots/dashboard-test.html
+.playwright-mcp/
