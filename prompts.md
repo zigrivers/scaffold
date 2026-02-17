@@ -50,7 +50,7 @@ These set up the working environment. Dev Setup creates the commands that everyt
 | 9 | **Dev Environment Setup** | `docs/dev-setup.md`, Makefile/scripts, `.env.example` | Creates lint/test/install commands used by workflow |
 | 10 | **Design System** | `docs/design-system.md`, theme config | **(optional)** Only for projects with a frontend |
 | 11 | **Git Workflow** | `docs/git-workflow.md`, `scripts/setup-agent-worktree.sh`, CI config | References dev-setup.md for lint/test commands |
-| 11.5 | **Multi-Model Code Review** | `AGENTS.md`, `.github/workflows/code-review-trigger.yml`, `.github/workflows/code-review-handler.yml`, `.github/review-prompts/`, `docs/review-standards.md` | **(optional)** Adds Codex Cloud review loop on PRs. Requires ChatGPT subscription (credits) + `ANTHROPIC_API_KEY` for fixes |
+| 11.5 | **Multi-Model Code Review** | `AGENTS.md`, `.github/workflows/code-review-trigger.yml`, `.github/workflows/code-review-handler.yml`, `.github/workflows/post-merge-followup.yml`, `.github/review-prompts/`, `docs/review-standards.md` | **(optional)** Adds Codex Cloud review loop on PRs. Requires ChatGPT subscription (credits) + `ANTHROPIC_API_KEY` for fixes |
 
 ---
 
@@ -2651,7 +2651,7 @@ Before starting, check if `AGENTS.md` already exists:
 **If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
 
 **If the file exists → UPDATE MODE**:
-1. **Read & analyze**: Read `AGENTS.md`, all workflow files in `.github/workflows/code-review-*.yml`, `docs/review-standards.md`, and `.github/review-prompts/fix-prompt.md` completely. Check for a tracking comment on line 1 of `AGENTS.md`: `<!-- scaffold:multi-model-review v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
+1. **Read & analyze**: Read `AGENTS.md`, all workflow files in `.github/workflows/code-review-*.yml`, `.github/workflows/post-merge-followup.yml`, `docs/review-standards.md`, `.github/review-prompts/fix-prompt.md`, and `.github/review-prompts/followup-fix-prompt.md` completely. Check for a tracking comment on line 1 of `AGENTS.md`: `<!-- scaffold:multi-model-review v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
 2. **Diff against current structure**: Compare the existing files against what this prompt would produce fresh. Categorize every piece of content:
    - **ADD** — Required by current prompt but missing from existing files
    - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
@@ -2673,8 +2673,8 @@ Before starting, check if `AGENTS.md` already exists:
 
 ### Update Mode Specifics
 - **Primary output**: `AGENTS.md`
-- **Secondary output**: `.github/workflows/code-review-trigger.yml`, `.github/workflows/code-review-handler.yml`, `.github/workflows/codex-timeout.yml`, `docs/review-standards.md`, `.github/review-prompts/fix-prompt.md`
-- **Preserve**: Custom review rules in `AGENTS.md`, `CODEX_BOT_NAME` env var, `MAX_REVIEW_ROUNDS` setting, repository-specific secrets configuration, custom severity rules in `docs/review-standards.md`
+- **Secondary output**: `.github/workflows/code-review-trigger.yml`, `.github/workflows/code-review-handler.yml`, `.github/workflows/codex-timeout.yml`, `.github/workflows/post-merge-followup.yml`, `docs/review-standards.md`, `.github/review-prompts/fix-prompt.md`, `.github/review-prompts/followup-fix-prompt.md`
+- **Preserve**: Custom review rules in `AGENTS.md`, `CODEX_BOT_NAME` env var, `MAX_REVIEW_ROUNDS` setting, `FOLLOWUP_ON_CAP` env var setting, repository-specific secrets configuration, custom severity rules in `docs/review-standards.md`
 - **Related docs**: `docs/coding-standards.md`, `docs/tdd-standards.md`, `docs/git-workflow.md`, `CLAUDE.md`
 - **Special rules**: Never change `CODEX_BOT_NAME` without verifying the actual bot username. Preserve all "What NOT to flag" customizations in `AGENTS.md`. Each secondary file should be checked independently for existence (update vs. create).
 
@@ -2699,6 +2699,14 @@ TIER 2: EXTERNAL CODEX CLOUD REVIEW (after PR — optional, credit-based)
   • Otherwise → Claude Code Action fixes (needs ANTHROPIC_API_KEY)
        ↓
   Push fixes → re-triggers Codex Cloud review
+
+TIER 3: POST-MERGE FOLLOW-UP (after merge — catches escaped findings)
+  PR merges with unresolved P0/P1 (capped, timed out, or late review)
+       ↓
+  post-merge-followup.yml detects unresolved findings
+  • Creates Beads task (P1) + GitHub Issue for tracking
+  • Claude Code auto-fixes on a follow-up branch
+  • Follow-up PR created targeting main
 ```
 
 **Tier 1 (self-review)** is built into the Git Workflow prompt and applies to ALL projects. It is inserted as a step in the PR workflow — see the Git Workflow prompt for the exact command.
@@ -2717,6 +2725,9 @@ The loop is fully event-driven via two GitHub Actions workflows — no polling, 
 6. **Findings remain and rounds < cap** → Claude Code Action reads P0/P1 findings, fixes, pushes
 7. **New push on PR branch** → re-triggers step 1
 8. *(Optional)* `codex-timeout.yml` runs on a cron schedule — finds PRs with stale `awaiting-codex-review` label (>15 min) and auto-approves them
+9. **PR merged with unresolved findings** → `post-merge-followup.yml` fires on `pull_request: [closed]`
+10. **Late Codex review on already-merged PR** → `post-merge-followup.yml` fires on `pull_request_review: [submitted]`
+11. Follow-up workflow creates Beads task, GitHub Issue, fix branch, and follow-up PR
 
 ### Safety Rails
 
@@ -2728,6 +2739,11 @@ The loop is fully event-driven via two GitHub Actions workflows — no polling, 
 - **Human override**: Any repo member comment with `/lgtm` or `/skip-review` bypasses the loop and allows merge (verified via `author_association`).
 - **File filter**: Gate job uses the GitHub API to check changed files and skips review if only docs/config files changed (markdown, yaml, json, toml, lock files).
 - **Usage-limit detection**: If Codex Cloud hits its credit limit and posts a usage-limit message instead of a review, the handler adds an `ai-review-blocked` label and requires human merge (does NOT auto-approve).
+- **Follow-up dedup**: `followup-created` label on original PR prevents duplicate follow-ups
+- **Recursion prevention**: `followup-fix` label on follow-up PRs prevents follow-ups-of-follow-ups
+- **Code-change gate**: Follow-up PR is only created if Claude Code produces actual non-`.beads/` file changes
+- **Graceful degradation**: If Claude Code can't fix the findings, the Beads task + GitHub Issue still exist for manual pickup
+- **Follow-up cost**: Each follow-up uses Opus (~$1.40) with 15 max turns. Follow-ups are rare — expect 0-2 per week
 
 ---
 
@@ -2848,6 +2864,50 @@ You are the engineer who wrote this PR. Codex Cloud has posted review findings.
 - Keep changes minimal and surgical.
 - If a reviewer finding contradicts project standards (in docs/coding-standards.md or docs/tdd-standards.md), follow the project standards and explain why in a comment.
 - After fixing, post a summary comment listing what you fixed and what you declined (with reasons).
+
+## Project Standards
+- `CLAUDE.md` — Workflow rules, Key Commands for lint/test
+- `docs/coding-standards.md` — Conventions to follow
+- `docs/tdd-standards.md` — Test requirements
+- `docs/review-standards.md` — Severity definitions
+```
+
+### 3b. Follow-Up Fix Prompt (`.github/review-prompts/followup-fix-prompt.md`)
+
+```markdown
+You are fixing unresolved P0/P1 findings from a PR that has already merged to main.
+
+## Context
+- The original PR (#ORIGINAL_PR) merged with unresolved findings (capped, timed out, or late review)
+- You are working on a follow-up branch checked out from main
+- Line numbers from the original review may have shifted — use `diff_hunk` context to locate code
+- A Beads task (BEADS_TASK) and GitHub Issue (ISSUE_URL) track this work
+
+## Available Variables
+These are passed by the workflow:
+- `REPO` — The repository (owner/name)
+- `ORIGINAL_PR` — The PR number that merged with unresolved findings
+- `BEADS_TASK` — The Beads task ID for this follow-up
+- `ISSUE_URL` — The GitHub Issue URL tracking this follow-up
+
+## Your Task
+1. Read the findings from `/tmp/followup-findings.json` (pre-collected by the workflow). Each finding has `path`, `line`, `start_line`, `body`, and `diff_hunk`.
+2. For each **P0** or **P1** finding:
+   - Locate the code using `diff_hunk` context (line numbers may have shifted since merge)
+   - If the code still exists and the finding is valid: fix it
+   - If the code no longer exists (refactored/removed since merge): skip it and note why
+   - If the finding is a false positive: skip it and note why
+3. Run the project's lint and test commands (see CLAUDE.md Key Commands) to verify fixes.
+4. Commit your fixes with message: `[BD-BEADS_TASK] fix: address unresolved findings from #ORIGINAL_PR`
+5. Do NOT push — the workflow handles pushing.
+6. Do NOT create a PR — the workflow handles PR creation.
+7. Do NOT run `bd close` — the workflow handles task closure.
+
+## Rules
+- Fix P0 and P1 issues only.
+- Do NOT refactor unrelated code.
+- Keep changes minimal and surgical.
+- If a finding contradicts project standards (in docs/coding-standards.md or docs/tdd-standards.md), follow the project standards and note why.
 
 ## Project Standards
 - `CLAUDE.md` — Workflow rules, Key Commands for lint/test
@@ -2980,6 +3040,7 @@ on:
 env:
   MAX_REVIEW_ROUNDS: 3
   CODEX_BOT_NAME: "chatgpt-codex-connector[bot]"
+  FOLLOWUP_ON_CAP: "auto-merge-followup"  # or "block-merge"
 
 jobs:
   # ─── Handle Codex usage-limit comments ─────────────────
@@ -3096,8 +3157,13 @@ jobs:
 
           # 3. Check round cap
           if [ "$ROUND" -ge "$MAX_REVIEW_ROUNDS" ]; then
-            echo "verdict=capped" >> $GITHUB_OUTPUT
-            echo "Max rounds reached — auto-merging"
+            if [ "$FOLLOWUP_ON_CAP" = "block-merge" ]; then
+              echo "verdict=capped-blocked" >> $GITHUB_OUTPUT
+              echo "Max rounds reached — blocking merge (FOLLOWUP_ON_CAP=block-merge)"
+            else
+              echo "verdict=capped" >> $GITHUB_OUTPUT
+              echo "Max rounds reached — auto-merging with follow-up"
+            fi
             exit 0
           fi
 
@@ -3129,12 +3195,25 @@ jobs:
             gh pr comment "$PR" --repo "$REPO" --body "## Code Review: AUTO-MERGING (round cap)
 
           After $MAX_REVIEW_ROUNDS rounds, some findings may remain.
-          Auto-merging — self-review and $MAX_REVIEW_ROUNDS rounds of external review have run.
+          Auto-merging — a follow-up PR will address remaining findings.
 
           _Reached maximum review rounds._"
 
             gh api "repos/$REPO/issues/$PR/labels" \
               -X POST -f "labels[]=ai-review-capped" || true
+
+          elif [ "$VERDICT" = "capped-blocked" ]; then
+            gh pr comment "$PR" --repo "$REPO" --body "## Code Review: NEEDS HUMAN REVIEW (round cap)
+
+          After $MAX_REVIEW_ROUNDS rounds, P0/P1 findings remain.
+          \`FOLLOWUP_ON_CAP\` is set to \`block-merge\` — a human must review and merge.
+
+          _Reached maximum review rounds._"
+
+            gh api "repos/$REPO/issues/$PR/labels" \
+              -X POST -f "labels[]=ai-review-capped" || true
+            gh api "repos/$REPO/issues/$PR/labels" \
+              -X POST -f "labels[]=needs-human-review" || true
           fi
 
   # ─── Auto-merge (approved or capped) ────────────────────
@@ -3264,6 +3343,337 @@ jobs:
           done
 ```
 
+#### 4d. Post-Merge Follow-Up Workflow (`.github/workflows/post-merge-followup.yml`)
+
+When a PR merges with unresolved P0/P1 findings (round cap, timeout, or late Codex review), this workflow creates a Beads task, GitHub Issue, and follow-up PR to address the escaped findings.
+
+```yaml
+name: "Code Review: Post-Merge Follow-Up"
+
+on:
+  pull_request:
+    types: [closed]
+  pull_request_review:
+    types: [submitted]
+
+concurrency:
+  group: followup-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  # ─── Check if follow-up is needed ─────────────────────
+  check-followup-needed:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      should_followup: ${{ steps.gate.outputs.should_followup }}
+      trigger_reason: ${{ steps.gate.outputs.trigger_reason }}
+      original_pr: ${{ steps.gate.outputs.original_pr }}
+      review_commit: ${{ steps.gate.outputs.review_commit }}
+    steps:
+      - name: Check follow-up gates
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CODEX_BOT_NAME: "chatgpt-codex-connector[bot]"
+        run: |
+          # Defensive default
+          should_followup=false
+
+          PR=${{ github.event.pull_request.number }}
+          REPO=${{ github.repository }}
+
+          # Gate 1: PR must be merged (not just closed)
+          MERGED=${{ github.event.pull_request.merged }}
+          if [ "$MERGED" != "true" ]; then
+            echo "should_followup=false" >> $GITHUB_OUTPUT
+            echo "PR not merged — skipping"
+            exit 0
+          fi
+
+          # Gate 2: Not a follow-up PR (recursion prevention)
+          LABELS=$(gh api "repos/$REPO/issues/$PR/labels" --jq '.[].name')
+          if echo "$LABELS" | grep -q "followup-fix"; then
+            echo "should_followup=false" >> $GITHUB_OUTPUT
+            echo "Follow-up PR — skipping to prevent recursion"
+            exit 0
+          fi
+
+          # Gate 3: No duplicate follow-up
+          if echo "$LABELS" | grep -q "followup-created"; then
+            echo "should_followup=false" >> $GITHUB_OUTPUT
+            echo "Follow-up already created — skipping"
+            exit 0
+          fi
+
+          # Gate 4: Not a fork PR
+          if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
+            echo "should_followup=false" >> $GITHUB_OUTPUT
+            echo "Fork PR — skipping"
+            exit 0
+          fi
+
+          # Gate 5: Trigger-specific checks
+          EVENT="${{ github.event_name }}"
+          if [ "$EVENT" = "pull_request" ]; then
+            # Fired on merge — check for capped or timeout labels
+            if echo "$LABELS" | grep -qE "ai-review-capped|codex-review-timeout"; then
+              TRIGGER_REASON="capped-or-timeout"
+            else
+              echo "should_followup=false" >> $GITHUB_OUTPUT
+              echo "Merged without cap/timeout — no follow-up needed"
+              exit 0
+            fi
+          elif [ "$EVENT" = "pull_request_review" ]; then
+            # Late Codex review on already-merged PR
+            REVIEWER="${{ github.event.review.user.login }}"
+            if [ "$REVIEWER" != "$CODEX_BOT_NAME" ]; then
+              echo "should_followup=false" >> $GITHUB_OUTPUT
+              echo "Review not from Codex — skipping"
+              exit 0
+            fi
+            TRIGGER_REASON="late-review"
+          fi
+
+          # Gate 6: Check for P0/P1 findings
+          MERGE_SHA="${{ github.event.pull_request.merge_commit_sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          BOT="$CODEX_BOT_NAME"
+
+          # Check for findings on the last PR commit (before merge)
+          FINDING_COUNT=$(gh api "repos/$REPO/pulls/$PR/comments" \
+            --jq "[.[] | select(.user.login == \"$BOT\" and .commit_id == \"$HEAD_SHA\")] | length")
+
+          if [ "$FINDING_COUNT" -eq 0 ]; then
+            echo "should_followup=false" >> $GITHUB_OUTPUT
+            echo "No P0/P1 findings on last commit — no follow-up needed"
+            exit 0
+          fi
+
+          # All gates passed
+          should_followup=true
+          echo "should_followup=true" >> $GITHUB_OUTPUT
+          echo "trigger_reason=$TRIGGER_REASON" >> $GITHUB_OUTPUT
+          echo "original_pr=$PR" >> $GITHUB_OUTPUT
+          echo "review_commit=$HEAD_SHA" >> $GITHUB_OUTPUT
+          echo "Follow-up needed: $FINDING_COUNT finding(s), trigger=$TRIGGER_REASON"
+
+  # ─── Create follow-up ─────────────────────────────────
+  create-followup:
+    needs: [check-followup-needed]
+    if: needs.check-followup-needed.outputs.should_followup == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install Beads
+        run: |
+          npm install -g @beads/bd
+          bd --version
+
+      - name: Collect findings
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CODEX_BOT_NAME: "chatgpt-codex-connector[bot]"
+        run: |
+          PR=${{ needs.check-followup-needed.outputs.original_pr }}
+          REPO=${{ github.repository }}
+          COMMIT=${{ needs.check-followup-needed.outputs.review_commit }}
+          BOT="$CODEX_BOT_NAME"
+
+          gh api "repos/$REPO/pulls/$PR/comments" \
+            --jq "[.[] | select(.user.login == \"$BOT\" and .commit_id == \"$COMMIT\") | {path, line, start_line, body, diff_hunk}]" \
+            > /tmp/followup-findings.json
+
+          FINDING_COUNT=$(jq length /tmp/followup-findings.json)
+          echo "Collected $FINDING_COUNT findings"
+
+          if [ "$FINDING_COUNT" -eq 0 ]; then
+            echo "No findings to follow up on"
+            exit 1
+          fi
+
+      - name: Create Beads task
+        id: beads
+        run: |
+          PR=${{ needs.check-followup-needed.outputs.original_pr }}
+          TASK_OUTPUT=$(bd --no-db --no-daemon q "fix: unresolved P0/P1 from #$PR" -p 1 2>&1)
+          TASK_ID=$(echo "$TASK_OUTPUT" | grep -oE '[a-z]+-[a-z0-9]+' | head -1)
+          echo "task_id=$TASK_ID" >> $GITHUB_OUTPUT
+          echo "Created Beads task: $TASK_ID"
+
+      - name: Create branch and commit Beads state
+        id: branch
+        run: |
+          PR=${{ needs.check-followup-needed.outputs.original_pr }}
+          TASK_ID=${{ steps.beads.outputs.task_id }}
+          BRANCH="bd-${TASK_ID}/followup-pr-${PR}"
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+
+          git checkout -b "$BRANCH"
+          git add .beads/ || true
+          git commit -m "[BD-${TASK_ID}] chore: create follow-up task for #${PR}" --allow-empty || true
+          git push -u origin "$BRANCH"
+
+      - name: Create GitHub Issue
+        id: issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR=${{ needs.check-followup-needed.outputs.original_pr }}
+          REPO=${{ github.repository }}
+          TASK_ID=${{ steps.beads.outputs.task_id }}
+          TRIGGER=${{ needs.check-followup-needed.outputs.trigger_reason }}
+          FINDING_COUNT=$(jq length /tmp/followup-findings.json)
+
+          cat > /tmp/issue-body.md << 'ISSUE_EOF'
+          ## Unresolved P0/P1 Findings
+
+          **Original PR**: #PRNUM
+          **Trigger**: TRIGGER_REASON
+          **Findings**: FCOUNT unresolved P0/P1 finding(s)
+          **Beads task**: TASK
+
+          ### Findings
+
+          ISSUE_EOF
+
+          sed -i.bak "s/PRNUM/$PR/g; s/TRIGGER_REASON/$TRIGGER/g; s/FCOUNT/$FINDING_COUNT/g; s/TASK/$TASK_ID/g" /tmp/issue-body.md
+
+          jq -r '.[] | "- **\(.path)** (line \(.line // "N/A")): \(.body | split("\n")[0])"' /tmp/followup-findings.json >> /tmp/issue-body.md
+
+          ISSUE_URL=$(gh issue create \
+            --repo "$REPO" \
+            --title "[BD-${TASK_ID}] fix: unresolved P0/P1 from #${PR}" \
+            --body-file /tmp/issue-body.md \
+            --label "followup-fix" 2>&1 | tail -1)
+
+          echo "issue_url=$ISSUE_URL" >> $GITHUB_OUTPUT
+          echo "Created issue: $ISSUE_URL"
+
+      - name: Label original PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR=${{ needs.check-followup-needed.outputs.original_pr }}
+          REPO=${{ github.repository }}
+
+          gh api "repos/$REPO/issues/$PR/labels" \
+            -X POST -f "labels[]=followup-created" || true
+
+      - name: Comment on original PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR=${{ needs.check-followup-needed.outputs.original_pr }}
+          REPO=${{ github.repository }}
+          TASK_ID=${{ steps.beads.outputs.task_id }}
+          ISSUE_URL=${{ steps.issue.outputs.issue_url }}
+          BRANCH=${{ steps.branch.outputs.branch }}
+
+          gh pr comment "$PR" --repo "$REPO" --body "## Post-Merge Follow-Up
+
+          This PR merged with unresolved P0/P1 findings. A follow-up has been created:
+          - **Beads task**: $TASK_ID
+          - **Issue**: $ISSUE_URL
+          - **Branch**: \`$BRANCH\`
+
+          Claude Code will attempt to fix the findings automatically."
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          allowed_bots: 'claude[bot]'
+          prompt: |
+            REPO: ${{ github.repository }}
+            ORIGINAL_PR: ${{ needs.check-followup-needed.outputs.original_pr }}
+            BEADS_TASK: ${{ steps.beads.outputs.task_id }}
+            ISSUE_URL: ${{ steps.issue.outputs.issue_url }}
+
+            Read .github/review-prompts/followup-fix-prompt.md for your full instructions.
+
+            Findings are in /tmp/followup-findings.json. Fix the P0/P1 issues.
+            Run lint and test commands from CLAUDE.md Key Commands to verify.
+            Commit your fixes but do NOT push and do NOT create a PR.
+          claude_args: |
+            --model claude-opus-4-6
+            --allowedTools "Bash(git:*),Bash(gh:*),Bash(make:*),Bash(npm:*),Read,Write,Edit,Bash(pip:*),Bash(cd:*),Bash(uv:*),Bash(pnpm:*),Bash(bd:*)"
+            --max-turns 15
+
+      - name: Check for code changes
+        id: changes
+        run: |
+          # Check for actual code changes (not just .beads/ files)
+          CHANGED=$(git diff --name-only origin/main..HEAD | grep -v '^\\.beads/' || true)
+          if [ -z "$CHANGED" ]; then
+            echo "has_code_changes=false" >> $GITHUB_OUTPUT
+            echo "No code changes — Claude Code could not fix the findings"
+          else
+            echo "has_code_changes=true" >> $GITHUB_OUTPUT
+            echo "Code changes detected:"
+            echo "$CHANGED"
+          fi
+
+      - name: Push changes
+        if: steps.changes.outputs.has_code_changes == 'true'
+        run: |
+          git push origin ${{ steps.branch.outputs.branch }}
+
+      - name: Create follow-up PR
+        if: steps.changes.outputs.has_code_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR=${{ needs.check-followup-needed.outputs.original_pr }}
+          REPO=${{ github.repository }}
+          TASK_ID=${{ steps.beads.outputs.task_id }}
+          ISSUE_URL=${{ steps.issue.outputs.issue_url }}
+          FINDING_COUNT=$(jq length /tmp/followup-findings.json)
+
+          cat > /tmp/pr-body.md << 'PR_EOF'
+          ## Follow-Up: Unresolved P0/P1 Findings
+
+          Fixes findings from #PRNUM that merged with unresolved P0/P1 issues.
+
+          **Beads task**: TASK
+          **Issue**: ISSUE
+          **Findings addressed**: FCOUNT
+
+          _Auto-generated by post-merge follow-up workflow._
+          PR_EOF
+
+          sed -i.bak "s/PRNUM/$PR/g; s|TASK|$TASK_ID|g; s|ISSUE|$ISSUE_URL|g; s/FCOUNT/$FINDING_COUNT/g" /tmp/pr-body.md
+
+          gh pr create \
+            --repo "$REPO" \
+            --title "[BD-${TASK_ID}] fix: address unresolved findings from #${PR}" \
+            --body-file /tmp/pr-body.md \
+            --label "followup-fix" \
+            --base main
+
+      - name: Close Beads task if no changes
+        if: steps.changes.outputs.has_code_changes == 'false'
+        run: |
+          TASK_ID=${{ steps.beads.outputs.task_id }}
+          bd close "$TASK_ID" 2>/dev/null || true
+          echo "Closed Beads task $TASK_ID — no code changes needed"
+```
+
 ### 5. Update CLAUDE.md
 
 Add this section to CLAUDE.md (the Workflow Audit and Claude.md Optimization prompts will pick it up):
@@ -3289,6 +3699,19 @@ If Codex Cloud is configured, PRs are automatically reviewed by Codex Cloud when
 - The `ai-review-approved` label means Codex Cloud approved
 - The `ai-review-capped` label means the loop hit its round cap and auto-merged
 - The `ai-review-blocked` label means Codex Cloud hit its usage limit — human merge required
+- The `followup-created` label means a follow-up PR was created for unresolved findings
+- The `followup-fix` label marks follow-up PRs and issues
+- The `needs-human-review` label means FOLLOWUP_ON_CAP=block-merge blocked auto-merge
+
+### Post-Merge Follow-Up
+When a PR merges with unresolved P0/P1 findings (round cap, timeout, or late review):
+1. A Beads task (P1) and GitHub Issue are created automatically
+2. Claude Code fixes the findings on a follow-up branch
+3. A follow-up PR is created targeting main
+
+Configure with `FOLLOWUP_ON_CAP` in `code-review-handler.yml`:
+- `"auto-merge-followup"` (default) — merge capped PRs, follow up later
+- `"block-merge"` — block merge, add `needs-human-review` label
 
 ### What Reviewers Check
 See `docs/review-standards.md` for the full review criteria. Reviewers check against your project's documented standards, not generic best practices.
@@ -3317,6 +3740,13 @@ Change the `MAX_REVIEW_ROUNDS` env var in both `code-review-trigger.yml` and `co
 
 Edit `AGENTS.md` to change what Codex Cloud looks for. Add "What NOT to flag" examples from real reviews to reduce false positives. Adjust severity definitions in `docs/review-standards.md` to calibrate what gets caught.
 
+### Configuring Cap Behavior (FOLLOWUP_ON_CAP)
+
+The `FOLLOWUP_ON_CAP` env var in `code-review-handler.yml` controls what happens when the review loop hits its round cap with unresolved findings:
+
+- **`"auto-merge-followup"` (default)**: Auto-merges the PR, then the follow-up workflow creates a Beads task, GitHub Issue, and fix PR. Best for fast-moving projects.
+- **`"block-merge"`**: Adds `needs-human-review` label and does NOT auto-merge. A human must review remaining findings. Best for projects where every finding must be resolved before merge.
+
 ---
 
 ## Process
@@ -3325,11 +3755,14 @@ Edit `AGENTS.md` to change what Codex Cloud looks for. Add "What NOT to flag" ex
 
 2. **Create `AGENTS.md`** at the repo root with the content above. This is what Codex Cloud reads for review instructions.
 
-3. **Create the fix prompt** (`.github/review-prompts/fix-prompt.md`) with the content above.
+3. **Create the fix prompts**:
+   - `.github/review-prompts/fix-prompt.md`
+   - `.github/review-prompts/followup-fix-prompt.md`
 
-4. **Create the GitHub Actions workflows** — create all three files from the workflow sections above:
+4. **Create the GitHub Actions workflows** — create all four files from the workflow sections above:
    - `.github/workflows/code-review-trigger.yml` (runs on PR open/push)
    - `.github/workflows/code-review-handler.yml` (runs on Codex review/comment)
+   - `.github/workflows/post-merge-followup.yml` (post-merge follow-up for escaped findings)
    - `.github/workflows/codex-timeout.yml` (optional — cron-based timeout fallback)
 
 5. **Configure repository secret**: Run `gh secret set ANTHROPIC_API_KEY` in your terminal and paste the key when prompted (the only API key needed — Codex Cloud uses credits from your ChatGPT subscription).
@@ -3347,10 +3780,13 @@ Edit `AGENTS.md` to change what Codex Cloud looks for. Add "What NOT to flag" ex
    - Claude Code Action fixes the P0/P1 issues
    - Second review round approves
    - The PR auto-merges with the `ai-review-approved` label
+   - Test follow-up: merge a capped PR with findings, verify Beads task + Issue + follow-up PR created
+   - Verify `followup-fix` label prevents recursion on follow-up PRs
+   - Verify `followup-created` label prevents duplicate follow-ups
 
 9. **Commit everything** to the repo:
    ```bash
-   git add docs/review-standards.md AGENTS.md .github/review-prompts/ .github/workflows/code-review-trigger.yml .github/workflows/code-review-handler.yml .github/workflows/codex-timeout.yml CLAUDE.md
+   git add docs/review-standards.md AGENTS.md .github/review-prompts/ .github/workflows/code-review-trigger.yml .github/workflows/code-review-handler.yml .github/workflows/post-merge-followup.yml .github/workflows/codex-timeout.yml CLAUDE.md
    git commit -m "[BD-<id>] feat: add code review loop (Codex Cloud + Claude fix)"
    ```
 

@@ -2,6 +2,25 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.8.0] — 2026-02-17
+
+### Added
+- **Post-Merge Follow-Up** system integrated into `multi-model-review` command — when PRs merge with unresolved P0/P1 findings (round cap, timeout, or late Codex review), automatically creates a Beads task, GitHub Issue, and follow-up PR to address escaped findings
+- New workflow template: `.github/workflows/post-merge-followup.yml` — fires on `pull_request: [closed]` and `pull_request_review: [submitted]` with 6 safety gates (merged, not-followup, no-duplicate, not-fork, trigger-specific, findings-exist)
+- New fix prompt template: `.github/review-prompts/followup-fix-prompt.md` — instructs Claude Code to fix findings using `diff_hunk` context (line numbers may shift after merge)
+- `FOLLOWUP_ON_CAP` env var in handler workflow — configurable cap behavior: `"auto-merge-followup"` (default) merges and follows up, `"block-merge"` blocks merge and adds `needs-human-review` label
+- New labels: `followup-created` (dedup), `followup-fix` (recursion prevention), `needs-human-review` (block-merge mode)
+- Tier 3 added to architecture diagram showing the post-merge follow-up flow
+- "Configuring Cap Behavior" customization section
+- Follow-up test scenarios added to Process step 8
+
+### Changed
+- Handler workflow convergence check now splits `capped` verdict into `capped` (auto-merge + follow-up) and `capped-blocked` (block merge) based on `FOLLOWUP_ON_CAP` setting
+- `capped` verdict message updated to mention follow-up PR
+- CLAUDE.md template updated with Post-Merge Follow-Up subsection and 3 new label descriptions
+- Mode Detection read list expanded to include `post-merge-followup.yml` and `followup-fix-prompt.md`
+- Update Mode Specifics expanded with new secondary outputs and `FOLLOWUP_ON_CAP` preserve rule
+
 ## [1.7.2] — 2026-02-16
 
 ### Fixed
