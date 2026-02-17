@@ -137,15 +137,21 @@ Test structure:
 ```
 tests/
 ├── test_helper/
-│   └── common-setup.bash    # Shared setup: temp dirs, fixtures, source lib/common.sh
-├── resolve-deps.bats        # Tests for topological sort
-├── resolve-profile.bats     # Tests for profile inheritance
-├── resolve-prompt.bats      # Tests for 4-tier prompt lookup
-├── check-artifacts.bats     # Tests for artifact verification
-├── detect-completion.bats   # Tests for completion detection
-├── validate-config.bats     # Tests for config validation
-├── validate-frontmatter.bats # Tests for frontmatter parsing
-└── common.bats              # Tests for lib/common.sh
+│   └── common-setup.bash       # Shared setup: temp dirs, load helpers, source lib
+├── fixtures/                    # Test data files (configs, frontmatter samples)
+├── common.bats                  # Tests for lib/common.sh
+├── install.bats                 # Tests for scripts/install.sh
+├── uninstall.bats               # Tests for scripts/uninstall.sh
+├── update.bats                  # Tests for scripts/update.sh
+├── extract-commands.bats        # Tests for scripts/extract-commands.sh
+├── user-stories-mmr.bats        # Tests for scripts/user-stories-mmr.sh
+├── resolve-deps.bats            # Tests for topological sort
+├── resolve-profile.bats         # Tests for profile inheritance
+├── resolve-prompt.bats          # Tests for 4-tier prompt lookup
+├── check-artifacts.bats         # Tests for artifact verification
+├── detect-completion.bats       # Tests for completion detection
+├── validate-config.bats         # Tests for config validation
+└── validate-frontmatter.bats    # Tests for frontmatter parsing
 ```
 
 ### Prompt Validation — Manual Checklist
