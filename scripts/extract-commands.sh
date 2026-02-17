@@ -47,6 +47,7 @@ declare -a FRONTMATTER=(
     'workflow-audit|Verify workflow consistency across all docs|'
     'implementation-plan|Create task graph from stories and standards|'
     'implementation-plan-review|Review task quality, coverage, and dependencies|'
+    'multi-model-review-tasks|Multi-model review of implementation plan tasks for coverage and quality|'
     'single-agent-start|Start single-agent execution loop|'
     'single-agent-resume|Resume work after a break|'
     'multi-agent-start|Start multi-agent execution loop in a worktree|<agent-name>'
@@ -83,6 +84,7 @@ HEADING_TO_SLUG["Claude.md Optimization"]="claude-md-optimization"
 HEADING_TO_SLUG["Workflow Audit"]="workflow-audit"
 HEADING_TO_SLUG["Implementation Plan"]="implementation-plan"
 HEADING_TO_SLUG["Implementation Plan Review"]="implementation-plan-review"
+HEADING_TO_SLUG["Implementation Plan Multi-Model Review"]="multi-model-review-tasks"
 HEADING_TO_SLUG["New Enhancement"]="new-enhancement"
 # shellcheck disable=SC2034 # Array used via ${HEADING_TO_SLUG[$key]} below
 HEADING_TO_SLUG["Quick Task"]="quick-task"
@@ -475,6 +477,27 @@ When this step is complete, tell the user:
 
 ---
 **Phase 7 in progress** — Tasks reviewed, gaps filled, dependencies verified.
+
+**Next:**
+- If you have **Codex CLI and/or Gemini CLI**: Run `/scaffold:multi-model-review-tasks` — Independent multi-model review of implementation tasks for coverage and quality.
+- Otherwise: Choose an execution mode:
+  - **Single agent:** Run `/scaffold:single-agent-start` — Start execution from the main repo.
+  - **Multiple agents:** Set up worktrees per `docs/git-workflow.md`, then run `/scaffold:multi-agent-start <agent-name>` in each worktree.
+
+**Pipeline reference:** `/scaffold:prompt-pipeline`
+
+---
+NEXTSTEP
+            ;;
+        multi-model-review-tasks)
+            cat <<'NEXTSTEP'
+
+## After This Step
+
+When this step is complete, tell the user:
+
+---
+**Phase 7 in progress** — Implementation tasks reviewed by independent models, coverage verified, dependencies corrected.
 
 **Next:** Choose an execution mode:
 - **Single agent:** Run `/scaffold:single-agent-start` — Start execution from the main repo.

@@ -303,9 +303,11 @@ When this step is complete, tell the user:
 ---
 **Phase 7 in progress** — Tasks reviewed, gaps filled, dependencies verified.
 
-**Next:** Choose an execution mode:
-- **Single agent:** Run `/scaffold:single-agent-start` — Start execution from the main repo.
-- **Multiple agents:** Set up worktrees per `docs/git-workflow.md`, then run `/scaffold:multi-agent-start <agent-name>` in each worktree.
+**Next:**
+- If you have **Codex CLI and/or Gemini CLI**: Run `/scaffold:multi-model-review-tasks` — Independent multi-model review of implementation tasks for coverage and quality.
+- Otherwise: Choose an execution mode:
+  - **Single agent:** Run `/scaffold:single-agent-start` — Start execution from the main repo.
+  - **Multiple agents:** Set up worktrees per `docs/git-workflow.md`, then run `/scaffold:multi-agent-start <agent-name>` in each worktree.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

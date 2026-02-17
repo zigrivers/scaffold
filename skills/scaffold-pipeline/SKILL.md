@@ -33,6 +33,7 @@ This skill provides context about the scaffold prompt pipeline ordering. When th
 | 18 | Consolidation | `/scaffold:workflow-audit` | Run AFTER claude-md-optimization |
 | 19 | Implementation | `/scaffold:implementation-plan` | Creates full task graph |
 | 20 | Implementation | `/scaffold:implementation-plan-review` | Second pass for quality |
+| 20.5 | Implementation | `/scaffold:multi-model-review-tasks` | **(optional)** Requires Codex/Gemini CLI |
 | 21 | Implementation | `/scaffold:single-agent-start` | Single-agent execution loop |
 | 21 | Implementation | `/scaffold:multi-agent-start` | Multi-agent — one per worktree |
 
@@ -94,6 +95,7 @@ When checking pipeline status, use these detection criteria:
 | 18 | Workflow Audit | `CLAUDE.md` | `<!-- scaffold:workflow-audit ` |
 | 19 | Implementation Plan | `docs/implementation-plan.md` | `<!-- scaffold:implementation-plan ` |
 | 20 | Impl Plan Review | `docs/implementation-plan.md` | `<!-- scaffold:implementation-plan-review ` |
+| 20.5 | Impl Plan MMR | `docs/reviews/implementation-plan/review-summary.md` | `<!-- scaffold:implementation-plan-mmr ` |
 
 **Detection rules:**
 - If the file exists → step was likely run (even without tracking comment — older projects lack them)

@@ -65,6 +65,7 @@ Display the prompt pipeline order below. Do not read any files or run any comman
 |---|--------|---------|-------|
 | 19 | **Implementation Plan** | `/scaffold:implementation-plan` | Creates full task graph |
 | 20 | **Implementation Plan Review** | `/scaffold:implementation-plan-review` | Second pass for quality |
+| 20.5 | **Implementation Plan Multi-Model Review** | `/scaffold:multi-model-review-tasks` | **(optional)** Requires Codex/Gemini CLI |
 | 21 | **Execution (single)** | `/scaffold:single-agent-start` | Single-agent execution loop |
 | 21 | **Execution (multi)** | `/scaffold:multi-agent-start <agent-name>` | One per worktree |
 

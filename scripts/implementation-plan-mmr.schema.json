@@ -1,0 +1,277 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Implementation Plan Multi-Model Review",
+  "description": "Structured output schema for Codex/Gemini review of implementation tasks against user stories and architecture",
+  "type": "object",
+  "required": [
+    "coverage_gaps",
+    "description_issues",
+    "dependency_issues",
+    "sizing_issues",
+    "architecture_issues",
+    "review_summary"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "coverage_gaps": {
+      "type": "array",
+      "description": "Acceptance criteria with no task coverage",
+      "items": {
+        "type": "object",
+        "required": ["story_id", "criterion_text", "severity", "suggested_task"],
+        "additionalProperties": false,
+        "properties": {
+          "story_id": {
+            "type": "string",
+            "description": "User story ID (e.g., US-003)"
+          },
+          "criterion_text": {
+            "type": "string",
+            "description": "The acceptance criterion text that lacks task coverage"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"],
+            "description": "Impact severity of the coverage gap"
+          },
+          "suggested_task": {
+            "type": "object",
+            "required": ["title", "description", "priority"],
+            "additionalProperties": false,
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "Suggested task title (imperative, specific)"
+              },
+              "description": {
+                "type": "string",
+                "description": "Task description with file paths, test requirements, and acceptance criteria"
+              },
+              "priority": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3,
+                "description": "Beads priority (0=blocking, 1=must-have, 2=should-have, 3=nice-to-have)"
+              }
+            }
+          }
+        }
+      }
+    },
+    "description_issues": {
+      "type": "array",
+      "description": "Tasks with descriptions insufficient for AI agent implementation",
+      "items": {
+        "type": "object",
+        "required": ["task_id", "task_title", "severity", "issue_type", "description", "suggested_fix"],
+        "additionalProperties": false,
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Beads task ID (e.g., BD-scaffold-abc)"
+          },
+          "task_title": {
+            "type": "string",
+            "description": "Current task title"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"],
+            "description": "Impact severity"
+          },
+          "issue_type": {
+            "type": "string",
+            "enum": [
+              "missing_acceptance_criteria",
+              "missing_file_paths",
+              "vague_file_paths",
+              "missing_test_requirements",
+              "missing_mock_strategy",
+              "missing_interfaces",
+              "vague_title",
+              "ambiguous_scope",
+              "other"
+            ],
+            "description": "Category of the description issue"
+          },
+          "description": {
+            "type": "string",
+            "description": "What is wrong with the task description"
+          },
+          "suggested_fix": {
+            "type": "string",
+            "description": "Concrete suggestion for how to fix the description"
+          }
+        }
+      }
+    },
+    "dependency_issues": {
+      "type": "array",
+      "description": "Problems in the dependency graph",
+      "items": {
+        "type": "object",
+        "required": ["issue_type", "severity", "task_ids", "description", "suggested_fix"],
+        "additionalProperties": false,
+        "properties": {
+          "issue_type": {
+            "type": "string",
+            "enum": [
+              "missing_logical_dependency",
+              "missing_file_contention_dependency",
+              "over_constrained",
+              "circular_risk",
+              "bottleneck",
+              "orphan_without_dependency"
+            ],
+            "description": "Category of the dependency issue"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"],
+            "description": "Impact severity"
+          },
+          "task_ids": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Task IDs involved in the dependency issue"
+          },
+          "description": {
+            "type": "string",
+            "description": "What is wrong with the dependency relationship"
+          },
+          "suggested_fix": {
+            "type": "string",
+            "description": "Concrete suggestion (e.g., 'bd dep add BD-X BD-Y')"
+          }
+        }
+      }
+    },
+    "sizing_issues": {
+      "type": "array",
+      "description": "Tasks too large for a single agent session",
+      "items": {
+        "type": "object",
+        "required": ["task_id", "task_title", "severity", "reason", "suggested_split"],
+        "additionalProperties": false,
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Beads task ID"
+          },
+          "task_title": {
+            "type": "string",
+            "description": "Current task title"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"],
+            "description": "Impact severity"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why this task is too large"
+          },
+          "suggested_split": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "required": ["title", "description"],
+              "additionalProperties": false,
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "Title for the split task"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Description for the split task"
+                }
+              }
+            },
+            "description": "How to split the oversized task"
+          }
+        }
+      }
+    },
+    "architecture_issues": {
+      "type": "array",
+      "description": "Tasks inconsistent with documented architecture",
+      "items": {
+        "type": "object",
+        "required": ["task_id", "task_title", "severity", "issue_type", "description", "evidence", "suggested_fix"],
+        "additionalProperties": false,
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Beads task ID"
+          },
+          "task_title": {
+            "type": "string",
+            "description": "Current task title"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"],
+            "description": "Impact severity"
+          },
+          "issue_type": {
+            "type": "string",
+            "enum": [
+              "wrong_pattern",
+              "wrong_boundary",
+              "missing_infrastructure",
+              "inconsistent_technology",
+              "contradicts_architecture",
+              "other"
+            ],
+            "description": "Category of the architecture issue"
+          },
+          "description": {
+            "type": "string",
+            "description": "What is inconsistent with the documented architecture"
+          },
+          "evidence": {
+            "type": "string",
+            "description": "Quote or reference from architecture docs supporting this finding"
+          },
+          "suggested_fix": {
+            "type": "string",
+            "description": "Concrete suggestion for how to fix the inconsistency"
+          }
+        }
+      }
+    },
+    "review_summary": {
+      "type": "object",
+      "required": ["total_tasks", "total_criteria", "covered_criteria", "uncovered_criteria_ids", "confidence"],
+      "additionalProperties": false,
+      "description": "Overall assessment of the implementation plan",
+      "properties": {
+        "total_tasks": {
+          "type": "integer",
+          "description": "Total number of Beads tasks reviewed"
+        },
+        "total_criteria": {
+          "type": "integer",
+          "description": "Total number of acceptance criteria across all user stories"
+        },
+        "covered_criteria": {
+          "type": "integer",
+          "description": "Number of acceptance criteria with at least one task"
+        },
+        "uncovered_criteria_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Story IDs + criterion identifiers that lack coverage"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Confidence score (0-1) in the overall assessment"
+        }
+      }
+    }
+  }
+}
