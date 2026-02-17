@@ -657,6 +657,24 @@ These constraints are reflected throughout the init flow, profile selection, cus
   - Suggests running remaining prompts in brownfield mode: "Found 5/18 artifacts already in place. Remaining prompts will document your existing code. Run `/scaffold:resume` to continue."
   - User confirms before any config is created.
 
+#### F-UX-13: `scaffold dashboard` Command
+
+- **What**: A visual HTML dashboard (`/scaffold:dashboard`) that generates a self-contained HTML file and opens it in the browser, showing the full pipeline with completion status, descriptions, dependency indicators, and "what's next" guidance.
+- **Why**: Users lose track of pipeline progress, especially first-timers (Sam) and team leads (Jordan). The text-based `prompt-pipeline` command lacks status detection and visual hierarchy. A browser-based dashboard provides an at-a-glance overview that serves all three personas.
+- **Priority**: Should-have (v2.0)
+- **Business rules**:
+  - Invoked as `/scaffold:dashboard` or `bash scripts/generate-dashboard.sh`.
+  - Generates a single self-contained HTML file (all CSS/JS/data inline, no external resources).
+  - Opens in default browser via `open` (macOS) / `xdg-open` (Linux).
+  - Zero new dependencies — only requires `bash` + `jq` (already required by Scaffold).
+  - **Dual mode**: Without `.scaffold/` directory, shows full pipeline as a reference guide (all pending). With `.scaffold/`, shows actual progress from `config.json` and artifact detection.
+  - Detects completion status via: (1) `.scaffold/config.json` completed/skipped arrays, (2) artifact file existence per SKILL.md completion detection table, (3) tracking comment presence.
+  - Shows "What's Next" — the first pending prompt whose dependencies are all satisfied.
+  - Integrates Beads task counts when `bd` is available.
+  - Supports `--no-open`, `--json-only`, `--output FILE` flags.
+  - Output written to `.scaffold/dashboard.html` (stable refreshable URL) or temp file if `.scaffold/` doesn't exist.
+  - Automatic dark/light mode via `prefers-color-scheme`.
+
 ### v1 Compatibility
 
 #### F-V1-1: v1 Project Detection

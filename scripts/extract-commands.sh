@@ -57,6 +57,7 @@ declare -a FRONTMATTER=(
     'prompt-pipeline|Show the full pipeline reference|'
     'update|Check for and apply scaffold updates|'
     'version|Show installed and latest scaffold version|'
+    'dashboard|Open visual pipeline dashboard in browser|'
 )
 
 # ─── Heading-to-slug mapping ───────────────────────────────────────

@@ -1951,6 +1951,130 @@ Covers: Section 6 (Implementation Architecture), Section 7 (NFRs)
 
 ---
 
+## Epic 11: Visual Dashboard
+
+Covers: F-UX-13
+
+### US-11.1: Generate and Open HTML Dashboard
+
+**As** Sam (first-time user), **I want to** run `/scaffold:dashboard` and see a visual overview of the pipeline in my browser, **so that** I can understand what steps exist, what order they run in, and what each one does — without reading documentation.
+
+**Priority**: Should-have
+
+**Acceptance Criteria**:
+
+1. **Given** the user runs `/scaffold:dashboard`,
+   **When** the script executes,
+   **Then** a self-contained HTML file is generated with all CSS/JS/data inline (no external resource references) and opened in the default browser.
+
+2. **Given** a directory without `.scaffold/`,
+   **When** the dashboard is generated,
+   **Then** it shows all pipeline prompts as "pending" in overview mode with the note "Overview mode (no .scaffold/ detected)".
+
+3. **Given** the `--no-open` flag is passed,
+   **When** the script completes,
+   **Then** the HTML file is generated but the browser is not opened.
+
+4. **Given** the `--json-only` flag is passed,
+   **When** the script completes,
+   **Then** valid JSON is written to stdout containing `prompts`, `phases`, and `summary` fields, and no HTML file is created.
+
+5. **Given** the `--output FILE` flag is passed,
+   **When** the script completes,
+   **Then** the HTML is written to the specified file path.
+
+**Scope Boundary**: Does NOT cover status detection logic (US-11.2), dependency computation (US-11.3), or Beads integration (US-11.4).
+
+**PRD Trace**: F-UX-13
+
+---
+
+### US-11.2: Display Pipeline Progress with Status Detection
+
+**As** Alex (power user), **I want to** see which prompts are completed, skipped, or pending at a glance, **so that** I can quickly assess pipeline progress without running individual status checks.
+
+**Priority**: Should-have
+
+**Acceptance Criteria**:
+
+1. **Given** `.scaffold/config.json` exists with `"completed": ["create-prd", "tech-stack"]`,
+   **When** the dashboard is generated,
+   **Then** `create-prd` and `tech-stack` show green "completed" status dots.
+
+2. **Given** `.scaffold/config.json` exists with `"skipped": ["design-system"]`,
+   **When** the dashboard is generated,
+   **Then** `design-system` shows gray "skipped" status dot.
+
+3. **Given** an artifact file exists (e.g., `docs/plan.md`) with the corresponding tracking comment (e.g., `<!-- scaffold:prd `),
+   **When** the dashboard is generated and the slug is not in config.json,
+   **Then** the prompt shows "completed" status via artifact detection fallback.
+
+4. **Given** prompts are grouped by phase,
+   **When** the dashboard renders,
+   **Then** each phase section is collapsible, shows a mini-progress indicator (e.g., "3/6"), and contains prompt cards with name, step number, description, and click-to-copy command.
+
+5. **Given** a full-width progress bar at the top,
+   **When** the dashboard renders,
+   **Then** the bar shows color-coded segments: green for completed, blue for likely-completed, gray for skipped.
+
+**Scope Boundary**: Does NOT cover dependency-aware "What's Next" logic (US-11.3).
+
+**PRD Trace**: F-UX-13
+
+---
+
+### US-11.3: Show What's Next Recommendation with Dependency Awareness
+
+**As** Sam (first-time user), **I want to** see which prompt I should run next and whether any prompts are blocked, **so that** I don't run things out of order or get confused about prerequisites.
+
+**Priority**: Should-have
+
+**Acceptance Criteria**:
+
+1. **Given** the pipeline has pending prompts,
+   **When** the dashboard computes "What's Next",
+   **Then** it selects the first pending prompt (by step order) whose dependency prompts are all completed, likely-completed, or skipped.
+
+2. **Given** "What's Next" is determined,
+   **When** the dashboard renders,
+   **Then** a highlighted banner card shows the recommended command, its description, and a copy button.
+
+3. **Given** a pending prompt whose dependencies are not all satisfied,
+   **When** the dashboard renders that prompt's card,
+   **Then** it shows "Blocked by: <dependency-slugs>" in yellow text.
+
+4. **Given** all prompts are completed or skipped,
+   **When** the dashboard renders,
+   **Then** the banner shows "Pipeline Complete — All prompts have been executed."
+
+**Scope Boundary**: Does NOT cover Beads task integration (US-11.4).
+
+**PRD Trace**: F-UX-13
+
+---
+
+### US-11.4: Integrate Beads Task Summary
+
+**As** Jordan (team lead), **I want to** see Beads task counts in the dashboard, **so that** I can assess implementation progress alongside pipeline progress.
+
+**Priority**: Should-have
+
+**Acceptance Criteria**:
+
+1. **Given** `bd` is installed and tasks exist,
+   **When** the dashboard is generated,
+   **Then** the summary cards section includes a "Beads Open" card showing open/total task counts.
+
+2. **Given** `bd` is not installed or returns an error,
+   **When** the dashboard is generated,
+   **Then** no Beads card is shown and no error occurs.
+
+**Scope Boundary**: Does NOT include task-level detail or links to individual tasks.
+
+**PRD Trace**: F-UX-13
+
+---
+
 ## Feature-to-Story Traceability Matrix
 
 | PRD Feature | Stories | Priority |
@@ -1979,6 +2103,7 @@ Covers: Section 6 (Implementation Architecture), Section 7 (NFRs)
 | F-UX-10: Brownfield Mode | US-7.1, US-7.2 | Should-have |
 | F-UX-11: scaffold next | US-3.7 | Must-have |
 | F-UX-12: scaffold adopt | US-7.4 | Should-have |
+| F-UX-13: scaffold dashboard | US-11.1, US-11.2, US-11.3, US-11.4 | Should-have |
 | F-V1-1: v1 Project Detection | US-7.3 | Should-have |
 | F-SC-1: Standalone Commands | US-9.1, US-9.2 | Must-have |
 | Section 6: Implementation Architecture | US-10.1 | Must-have |
@@ -2000,4 +2125,4 @@ Covers: Section 6 (Implementation Architecture), Section 7 (NFRs)
 | Priority | Count | Stories |
 |----------|-------|---------|
 | Must-have | 32 | US-1.1–1.6, US-2.1–2.6, US-3.1–3.7, US-4.1–4.5, US-5.1–5.5, US-6.2, US-8.1, US-9.1–9.2, US-10.1 |
-| Should-have | 13 | US-1.7–1.8, US-2.7–2.8, US-6.1, US-6.3, US-7.1–7.4, US-8.2 |
+| Should-have | 17 | US-1.7–1.8, US-2.7–2.8, US-6.1, US-6.3, US-7.1–7.4, US-8.2, US-11.1–11.4 |
