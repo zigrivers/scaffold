@@ -17,6 +17,8 @@ setup() {
 
     # Clone it so we have a working repo
     git clone --quiet "$ORIG_DIR" "$CLONE_DIR"
+    git -C "$CLONE_DIR" config user.email "test@test.com"
+    git -C "$CLONE_DIR" config user.name "Test"
     git -C "$CLONE_DIR" commit --allow-empty -m "initial" --quiet
     git -C "$CLONE_DIR" push --quiet 2>/dev/null
 
