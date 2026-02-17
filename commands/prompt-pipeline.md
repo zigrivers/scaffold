@@ -79,3 +79,4 @@ Display the prompt pipeline order below. Do not read any files or run any comman
 | **Implementation Plan Review** | `/scaffold:implementation-plan-review` | After creating 5+ new tasks |
 | **Platform Parity Review** | `/scaffold:platform-parity-review` | After adding platform-specific features |
 | **Multi-Model Code Review** | `/scaffold:multi-model-review` | Runs automatically on every PR |
+| **Visual Dashboard** | `/scaffold:dashboard` | Visual HTML pipeline overview in browser |

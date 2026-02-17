@@ -2,6 +2,17 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.10.0] — 2026-02-17
+
+### Added
+- **Visual Pipeline Dashboard** command (`/scaffold:dashboard`) — generates a self-contained HTML file and opens it in the browser, showing a visual overview of the full pipeline with completion status, descriptions, dependency indicators, "what's next" guidance, and optional Beads task counts
+- `scripts/generate-dashboard.sh` — Bash 3.2-compatible script that parses pipeline metadata from SKILL.md, detects completion status from `.scaffold/config.json` and artifact files, computes dependency-aware "what's next", and generates inline HTML/CSS/JS with automatic dark/light mode
+- 16 bats tests covering exit codes, HTML validation, JSON payload structure, status detection, and all CLI flags
+- F-UX-13 feature requirement in `docs/plan.md`
+- Epic 11 with 4 user stories (US-11.1–11.4) in `docs/user-stories.md`
+- Dual mode: overview mode (no `.scaffold/`) shows full pipeline as reference; progress mode (with `.scaffold/`) shows actual completion status
+- CLI flags: `--no-open` (generate only), `--json-only` (JSON to stdout), `--output FILE` (custom path)
+
 ## [1.9.0] — 2026-02-17
 
 ### Added
