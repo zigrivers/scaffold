@@ -1,5 +1,6 @@
 ---
 description: "Define and scaffold project directory structure"
+long-description: "Designs the directory layout in docs/project-structure.md and scaffolds the actual folders and placeholder files to match the documented structure."
 ---
 
 Research best practices for project structure based on our tech stack and standards. Review docs/tech-stack.md, docs/coding-standards.md, docs/tdd-standards.md, and docs/plan.md, then create docs/project-structure.md and scaffold the actual directory structure.

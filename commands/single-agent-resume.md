@@ -1,5 +1,6 @@
 ---
 description: "Resume work after a break"
+long-description: "Recovers session context by reading CLAUDE.md, checking Beads status, reviewing git state, and resuming the execution loop from where you left off."
 ---
 
 Follow the workflow in CLAUDE.md.

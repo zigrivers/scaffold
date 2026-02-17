@@ -1,5 +1,6 @@
 ---
 description: "Analyze PRD for gaps, then innovate"
+long-description: "Performs a structured analysis of docs/plan.md to identify missing requirements, edge cases, and UX gaps, then proposes innovations for user approval before updating the PRD."
 ---
 Deeply research docs/plan.md and perform a systematic gap analysis, then identify innovation opportunities. This is our last chance to strengthen the PRD before it drives every downstream document (tech stack, coding standards, user stories, implementation plan).
 

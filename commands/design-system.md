@@ -1,5 +1,6 @@
 ---
 description: "Create a cohesive design system for frontend"
+long-description: "Generates docs/design-system.md with color palettes, typography scales, spacing tokens, and component patterns for consistent frontend styling."
 ---
 
 Create a cohesive design system for this project that AI agents will use for all frontend work. The goal is a professional, polished UI without requiring design expertise from me.

@@ -1,5 +1,6 @@
 ---
 description: "Research and document tech stack decisions"
+long-description: "Researches frameworks, languages, and tools that fit your PRD requirements, documenting each decision with rationale in docs/tech-stack.md."
 ---
 Thoroughly review and analyze docs/plan.md to understand every feature, integration, and technical requirement of this project. Then deeply research tech stack options and create docs/tech-stack.md as the definitive technology reference for this project.
 

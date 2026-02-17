@@ -1,5 +1,6 @@
 ---
 description: "Show the full pipeline reference"
+long-description: "Displays the complete scaffold pipeline order, dependencies, and status — useful for understanding where you are and what comes next."
 ---
 
 Display the prompt pipeline order below. Do not read any files or run any commands — just print this reference directly.

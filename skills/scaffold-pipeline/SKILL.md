@@ -76,7 +76,7 @@ When checking pipeline status, use these detection criteria:
 |---|------|-------------------|-------------------------------|
 | 1 | PRD Creation | `docs/plan.md` | `<!-- scaffold:prd ` |
 | 2 | PRD Gap Analysis | `docs/plan.md` | `<!-- scaffold:prd-gap-analysis ` |
-| 3 | Beads Setup | `.beads/` directory | N/A |
+| 3 | Beads Setup | `.beads/config.yaml` | N/A |
 | 4 | Tech Stack | `docs/tech-stack.md` | `<!-- scaffold:tech-stack ` |
 | 5 | Claude Code Permissions | `.claude/settings.json` | N/A |
 | 6 | Coding Standards | `docs/coding-standards.md` | `<!-- scaffold:coding-standards ` |
@@ -85,8 +85,8 @@ When checking pipeline status, use these detection criteria:
 | 9 | Dev Env Setup | `docs/dev-setup.md` | `<!-- scaffold:dev-setup ` |
 | 10 | Design System | `docs/design-system.md` | `<!-- scaffold:design-system ` |
 | 11 | Git Workflow | `docs/git-workflow.md` | `<!-- scaffold:git-workflow ` |
-| 11.5 | Multi-Model Review | `AGENTS.md` + `.github/workflows/code-review-*.yml` | `<!-- scaffold:multi-model-review ` |
-| 12 | Playwright | Playwright config file | `// scaffold:playwright ` |
+| 11.5 | Multi-Model Review | `AGENTS.md` | `<!-- scaffold:multi-model-review ` |
+| 12 | Playwright | `playwright.config.ts` | `// scaffold:playwright ` |
 | 13 | Maestro | `maestro/config.yaml` | `# scaffold:maestro ` |
 | 14 | User Stories | `docs/user-stories.md` | `<!-- scaffold:user-stories ` |
 | 15 | User Stories Gaps | `docs/user-stories.md` | `<!-- scaffold:user-stories-gaps ` |

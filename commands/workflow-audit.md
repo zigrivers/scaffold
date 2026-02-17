@@ -1,5 +1,6 @@
 ---
 description: "Verify workflow consistency across all docs"
+long-description: "Cross-references all documentation files to detect contradictions, stale references, and workflow inconsistencies, then fixes any found issues."
 ---
 
 Review all project documentation to ensure the standard feature workflow is clearly documented, consistent across all files, and provides unambiguous guidance for AI agents and human developers.

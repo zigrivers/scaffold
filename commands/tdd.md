@@ -1,5 +1,6 @@
 ---
 description: "Create TDD standards for the tech stack"
+long-description: "Creates docs/tdd-standards.md defining test structure, coverage thresholds, testing patterns, and CI integration specific to the project's tech stack."
 ---
 
 Deeply research test-driven development (TDD) best practices for our tech stack — review docs/tech-stack.md and docs/coding-standards.md — then create docs/tdd-standards.md as the definitive testing reference for this project.

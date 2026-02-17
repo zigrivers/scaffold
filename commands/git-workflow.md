@@ -1,5 +1,6 @@
 ---
 description: "Configure git workflow for parallel agents"
+long-description: "Sets up docs/git-workflow.md with branching strategy, PR workflow, CI configuration, and worktree scripts for parallel agent execution."
 ---
 
 Create `docs/git-workflow.md` and configure the repository to support parallel Claude Code sessions working simultaneously without conflicts.

@@ -1,5 +1,6 @@
 ---
 description: "Initialize Beads task tracking in this project"
+long-description: "Sets up the Beads issue tracker (.beads/ directory), creates CLAUDE.md with project conventions, and establishes task management workflow for AI agents."
 ---
 Set up **Beads** (https://github.com/steveyegge/beads) in this project for AI-friendly task tracking. Beads is already installed on the system (the `bd` CLI should be available).
 

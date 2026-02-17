@@ -1,5 +1,6 @@
 ---
 description: "Open visual pipeline dashboard in browser"
+long-description: "Generates and opens a self-contained HTML dashboard showing pipeline progress, prompt status, beads tasks, and what to do next."
 ---
 
 Generate and open a self-contained HTML dashboard showing the full Scaffold pipeline with completion status, descriptions, and "what's next" guidance.

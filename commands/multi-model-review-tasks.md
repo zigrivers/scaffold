@@ -1,5 +1,6 @@
 ---
 description: "Multi-model review of implementation plan tasks for coverage and quality"
+long-description: "Dispatches implementation tasks to independent AI models for parallel quality and coverage audits, then synthesizes findings into actionable improvements."
 ---
 
 Run independent Codex and Gemini reviews of the implementation plan task graph to catch coverage gaps, description issues, dependency problems, sizing mismatches, and architecture inconsistencies. This is a quality gate that enforces agent-implementable tasks with full acceptance criteria coverage.

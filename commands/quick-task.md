@@ -1,5 +1,6 @@
 ---
 description: "Create a focused Beads task for a bug fix, refactor, or small improvement"
+long-description: "Creates a single well-defined Beads task with acceptance criteria, test plan, and implementation notes for a focused code change."
 argument-hint: "<task description>"
 ---
 

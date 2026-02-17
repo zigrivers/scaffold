@@ -1,5 +1,6 @@
 ---
 description: "Start multi-agent execution loop in a worktree"
+long-description: "Initializes a named agent in a git worktree, claims a Beads task, and begins the TDD execution loop with worktree-aware branching and rebasing."
 argument-hint: "<agent-name>"
 ---
 

@@ -1,5 +1,6 @@
 ---
 description: "Show installed and latest scaffold version"
+long-description: "Displays the currently installed scaffold version alongside the latest available version to help you decide whether to update."
 ---
 
 Show the installed scaffold version and check if a newer version is available. Follow these steps exactly:

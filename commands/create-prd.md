@@ -1,5 +1,6 @@
 ---
 description: "Create a product requirements document from an idea"
+long-description: "Interactively builds a comprehensive PRD (docs/plan.md) from your idea, including target audience, core features, MVP scope, and success metrics. Supports both fresh creation and updating existing PRDs."
 argument-hint: "<idea or @files>"
 ---
 I have an idea for an application and I want you to help me create a thorough and detailed product requirements document that AI will use to build user stories, define the tech stack, and create an implementation plan.

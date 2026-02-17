@@ -1,5 +1,6 @@
 ---
 description: "Set up multi-model code review on PRs"
+long-description: "Configures GitHub Actions workflows and AGENTS.md to enable automated code review by multiple AI models (Claude, Codex, Gemini) on pull requests."
 ---
 
 Set up a two-tier automated code review system: a local self-review before every PR (required for all projects), and an optional external Codex Cloud review loop that auto-fixes findings and auto-merges.
