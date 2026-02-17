@@ -51,6 +51,7 @@ Display the prompt pipeline order below. Do not read any files or run any comman
 |---|--------|---------|-------|
 | 14 | **User Stories** | `/scaffold:user-stories` | Covers every PRD feature |
 | 15 | **User Stories Gap Analysis** | `/scaffold:user-stories-gaps` | UX improvements |
+| 15.5 | **User Stories Multi-Model Review** | `/scaffold:user-stories-multi-model-review` | **(optional)** Requires Codex/Gemini CLI |
 | 16 | **Platform Parity Review** | `/scaffold:platform-parity-review` | **(optional)** Multi-platform projects |
 
 ### Phase 6 — Consolidation & Verification

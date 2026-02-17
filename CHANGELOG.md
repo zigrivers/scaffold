@@ -2,6 +2,11 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.7.1] — 2026-02-16
+
+### Fixed
+- `prompt-pipeline` command now includes step 15.5 (User Stories Multi-Model Review) in the Phase 5 table — was missing from the quick-reference display despite being defined everywhere else
+
 ## [1.7.0] — 2026-02-16
 
 ### Added

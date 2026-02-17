@@ -1,6 +1,6 @@
 {
   "name": "scaffold",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "27-prompt pipeline for scaffolding new software projects with Claude Code",
   "author": {
     "name": "zigrivers"
