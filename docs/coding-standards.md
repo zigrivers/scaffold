@@ -500,7 +500,17 @@ Match the conventions in the file you're editing. Don't introduce new patterns f
 [BD-0] chore: initialize project structure
 ```
 
-## 10. Code Review Checklist
+## 10. Styling / Dashboard Design System
+
+- **Use ONLY CSS custom properties** from `lib/dashboard-theme.css` — no hardcoded hex colors or arbitrary pixel values
+- **Reference component patterns** from `docs/design-system.md` before modifying or extending the dashboard
+- **Always provide both light and dark mode values** when adding new CSS custom properties
+- **Dashboard CSS location**: `lib/dashboard-theme.css` (embedded into generated HTML by `scripts/generate-dashboard.sh`)
+- **Generated HTML must remain self-contained** — no external resource references (CDN fonts, stylesheets, scripts)
+
+For the full design system reference, see `docs/design-system.md`.
+
+## 11. Code Review Checklist
 
 Before merging any change, verify:
 

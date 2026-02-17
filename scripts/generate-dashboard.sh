@@ -290,8 +290,15 @@ fi
 # Ensure output directory exists
 mkdir -p "$(dirname "$OUTPUT_FILE")"
 
-# Generate HTML
-cat > "$OUTPUT_FILE" <<'HTMLHEAD'
+# Resolve CSS file path
+CSS_FILE="$REPO_DIR/lib/dashboard-theme.css"
+if [ ! -f "$CSS_FILE" ]; then
+    echo "Error: dashboard theme not found at $CSS_FILE" >&2
+    exit 1
+fi
+
+# Generate HTML — split around <style> tag to embed external CSS
+cat > "$OUTPUT_FILE" <<'HTMLPRE'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -299,206 +306,18 @@ cat > "$OUTPUT_FILE" <<'HTMLHEAD'
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Scaffold Pipeline Dashboard</title>
 <style>
-:root {
-    --bg: #ffffff;
-    --bg-card: #f8f9fa;
-    --bg-hover: #e9ecef;
-    --text: #212529;
-    --text-muted: #6c757d;
-    --border: #dee2e6;
-    --accent: #4361ee;
-    --green: #2d6a4f;
-    --green-bg: #d8f3dc;
-    --blue: #1971c2;
-    --blue-bg: #d0ebff;
-    --yellow: #e67700;
-    --yellow-bg: #fff3bf;
-    --gray: #868e96;
-    --gray-bg: #e9ecef;
-    --next-bg: #edf2ff;
-    --next-border: #4361ee;
-    --progress-bg: #e9ecef;
-    --shadow: 0 1px 3px rgba(0,0,0,0.08);
-    --radius: 8px;
-}
-@media (prefers-color-scheme: dark) {
-    :root {
-        --bg: #1a1b26;
-        --bg-card: #24283b;
-        --bg-hover: #343b58;
-        --text: #c0caf5;
-        --text-muted: #565f89;
-        --border: #343b58;
-        --accent: #7aa2f7;
-        --green: #9ece6a;
-        --green-bg: #1a2e1a;
-        --blue: #7dcfff;
-        --blue-bg: #1a2638;
-        --yellow: #e0af68;
-        --yellow-bg: #2e2a1a;
-        --gray: #565f89;
-        --gray-bg: #343b58;
-        --next-bg: #1e2340;
-        --next-border: #7aa2f7;
-        --progress-bg: #343b58;
-        --shadow: 0 1px 3px rgba(0,0,0,0.3);
-    }
-}
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.5;
-    padding: 24px;
-    max-width: 960px;
-    margin: 0 auto;
-}
-h1 { font-size: 1.5rem; font-weight: 700; }
-h2 { font-size: 1.15rem; font-weight: 600; margin-bottom: 12px; }
-.header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 8px;
-    flex-wrap: wrap;
-}
-.header-meta {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin-bottom: 20px;
-}
-.badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    background: var(--accent);
-    color: #fff;
-}
-.badge-optional {
-    background: var(--yellow-bg);
-    color: var(--yellow);
-}
-.progress-bar {
-    width: 100%;
-    height: 8px;
-    background: var(--progress-bg);
-    border-radius: 4px;
-    overflow: hidden;
-    margin-bottom: 20px;
-    display: flex;
-}
-.progress-bar .seg-done { background: var(--green); }
-.progress-bar .seg-likely { background: var(--blue); }
-.progress-bar .seg-skip { background: var(--gray); }
-.cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 12px;
-    margin-bottom: 24px;
-}
-.card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px 16px;
-    box-shadow: var(--shadow);
-}
-.card-num { font-size: 1.5rem; font-weight: 700; }
-.card-lbl { font-size: 0.8rem; color: var(--text-muted); }
-.next-banner {
-    background: var(--next-bg);
-    border: 2px solid var(--next-border);
-    border-radius: var(--radius);
-    padding: 16px 20px;
-    margin-bottom: 24px;
-}
-.next-banner h2 { color: var(--accent); margin-bottom: 4px; }
-.next-cmd {
-    font-family: "SF Mono", "Fira Code", monospace;
-    background: var(--bg-card);
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.9rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 8px;
-}
-.phase { margin-bottom: 20px; }
-.phase-hdr {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    padding: 8px 0;
-    user-select: none;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 8px;
-}
-.phase-hdr:hover { color: var(--accent); }
-.phase-hdr .arr { transition: transform 0.2s; font-size: 0.8rem; }
-.phase-hdr.closed .arr { transform: rotate(-90deg); }
-.phase-cnt { font-size: 0.75rem; color: var(--text-muted); margin-left: auto; }
-.plist { display: flex; flex-direction: column; gap: 8px; }
-.pcard {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px 16px;
-    box-shadow: var(--shadow);
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    gap: 8px 12px;
-    align-items: start;
-}
-.pcard:hover { background: var(--bg-hover); }
-.dot {
-    width: 10px; height: 10px;
-    border-radius: 50%;
-    margin-top: 5px;
-    flex-shrink: 0;
-}
-.st-completed { background: var(--green); }
-.st-likely-completed { background: var(--blue); }
-.st-skipped { background: var(--gray); }
-.st-pending { background: var(--border); }
-.pinfo { min-width: 0; }
-.pname { font-weight: 600; font-size: 0.95rem; }
-.pstep { font-size: 0.75rem; color: var(--text-muted); }
-.pdesc { font-size: 0.85rem; color: var(--text-muted); margin-top: 2px; }
-.pdeps { font-size: 0.75rem; color: var(--yellow); margin-top: 4px; }
-.pcmd {
-    font-family: "SF Mono", "Fira Code", monospace;
-    font-size: 0.8rem;
-    background: var(--bg);
-    padding: 2px 6px;
-    border-radius: 4px;
-    cursor: pointer;
-    border: 1px solid var(--border);
-    white-space: nowrap;
-    align-self: center;
-}
-.pcmd:hover { border-color: var(--accent); }
-.pcmd.copied { border-color: var(--green); color: var(--green); }
-.ongoing { margin-top: 32px; }
-.footer {
-    text-align: center;
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    margin-top: 40px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border);
-}
-.hidden { display: none; }
+HTMLPRE
+
+cat "$CSS_FILE" >> "$OUTPUT_FILE"
+
+cat >> "$OUTPUT_FILE" <<'HTMLPOST'
 </style>
 </head>
 <body>
+<div class="wrap">
 <script>
 const DASHBOARD_DATA =
-HTMLHEAD
+HTMLPOST
 
 # Inject JSON payload
 echo "$PAYLOAD" >> "$OUTPUT_FILE"
@@ -622,7 +441,7 @@ cat >> "$OUTPUT_FILE" <<'HTMLTAIL'
     h += '</div></div>';
 
     h += '<div class="footer">Generated by Scaffold</div>';
-    document.body.innerHTML = h;
+    document.querySelector('.wrap').innerHTML = h;
 })();
 
 function togglePhase(el) {
@@ -640,6 +459,7 @@ function copyCmd(el) {
     }
 }
 </script>
+</div>
 </body>
 </html>
 HTMLTAIL
