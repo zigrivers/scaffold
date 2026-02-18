@@ -101,7 +101,9 @@ If the file already exists, **MERGE** these entries into the existing allow/deny
       "Grep(~/**)",
       "WebFetch(*)",
       "WebSearch",
-      "mcp__*"
+      "mcp__*",
+      "mcp__plugin_playwright_playwright",
+      "mcp__plugin_context7_context7"
     ],
     "deny": [
       "Bash(rm -rf *)",
@@ -117,7 +119,13 @@ If the file already exists, **MERGE** these entries into the existing allow/deny
 
 **The bare `Bash` entry is the most important line.** It auto-approves all bash commands including compound commands with shell operators (`&&`, `||`, pipes, redirects, `$(...)`, backgrounding). Deny rules still block destructive operations — deny always wins over allow. Without the bare `Bash` entry, agents will be prompted for every compound command and autonomous workflows become impractical.
 
-**The `mcp__*` entry auto-approves all MCP (plugin) tools.** MCP servers are explicitly installed by the user — if you trust the plugin, you trust its tools. Without this entry, agents will be prompted for every Context7 lookup, every Playwright browser action, and every other MCP tool call. For granular control, use per-server wildcards instead (e.g., `mcp__plugin_context7_context7__*`, `mcp__plugin_playwright_playwright__*`).
+**The `mcp__*` entry is a broad MCP wildcard.** Due to known matching issues, also add bare server-name entries for each installed MCP plugin. Check `~/.claude/settings.json` for `enabledPlugins` — each plugin that provides MCP tools needs a bare server-name entry. The format is `mcp__plugin_<slug>_<server>` where `<slug>` is the plugin identifier and `<server>` is the MCP server name from the plugin's `.mcp.json`.
+
+Common entries:
+- `mcp__plugin_playwright_playwright` — all Playwright browser tools
+- `mcp__plugin_context7_context7` — all Context7 documentation tools
+
+The bare server-name format (without `__*` suffix) matches ALL tools from that server. This is more reliable than the `mcp__*` wildcard.
 
 **Important**: Expand `~/**` to your actual home directory path (e.g., `/Users/username/**`).
 
@@ -134,7 +142,7 @@ The bare `Bash` entry covers all of the following (and their compound combinatio
 - **Containers**: docker compose, docker ps, docker logs
 - **Shell utilities**: curl, ls, cat, find, grep, head, tail, sort, wc, pwd, echo, which, tree, mkdir, cp, mv, rm, touch, chmod, diff, sed, awk, tee, xargs
 
-**MCP (`mcp__*`)**: All tools from all installed MCP servers (plugins). Common servers include Context7 (documentation lookup), Playwright (browser automation), and any custom MCP servers configured in your environment.
+**MCP (`mcp__*` + bare server names)**: All tools from all installed MCP servers (plugins). The `mcp__*` wildcard is kept as a fallback, but bare server-name entries (e.g., `mcp__plugin_playwright_playwright`) are more reliable due to known wildcard matching issues. Common servers include Context7 (documentation lookup), Playwright (browser automation), and any custom MCP servers configured in your environment.
 
 ### Cautious Mode (alternative)
 
@@ -214,8 +222,8 @@ If you cannot use the bare `Bash` entry (org policy, shared machines, etc.), you
 "Bash(printenv *)",
 "Bash(cd *)",
 "Bash(./scripts/*)",
-"mcp__plugin_context7_context7__*",
-"mcp__plugin_playwright_playwright__*"
+"mcp__plugin_context7_context7",
+"mcp__plugin_playwright_playwright"
 ```
 
 </details>
@@ -310,7 +318,11 @@ Test that these commands (used in the canonical workflow) don't prompt:
 | `make lint` | Verification |
 | `make test` | Verification |
 
-If MCP plugins are installed, verify that MCP tool calls (e.g., Context7 `resolve-library-id`, Playwright `browser_snapshot`) execute without prompting.
+If MCP plugins are installed, run a quick smoke test for each:
+- Playwright: Use `browser_navigate` to open a `file:///tmp/test.html` page, then `browser_close`
+- Context7: Use `resolve-library-id` for any library
+
+If these prompt for approval, the MCP entries are missing or incorrect.
 
 Clean up after testing:
 ```bash
@@ -320,13 +332,14 @@ git branch -D test-branch
 
 ### 5. Still Getting Prompted?
 
-Five common causes:
+Six common causes:
 
 1. **Missing bare `Bash`** — open `~/.claude/settings.json` and check for a standalone `"Bash"` entry (not `"Bash(something)"`). It must be present in the allow array.
 2. **Conflicting deny rule** — deny always wins over allow. Check both user-level and project-level deny arrays for rules that match the command being prompted.
 3. **Unexpanded `~/**` paths** — Claude Code may not expand `~`. Replace `~` with your actual home directory path (e.g., `/Users/username/**`).
 4. **Session not restarted** — permission changes require restarting Claude Code (`/exit` and relaunch, or start a new session).
 5. **Missing `mcp__*`** — the bare `Bash` entry does NOT cover MCP tools. MCP tools need their own allow entry. Check for `"mcp__*"` in the user-level allow array.
+6. **`mcp__*` wildcard bug** — `mcp__*` doesn't reliably match all MCP tools. Add explicit bare server-name entries alongside it: `mcp__plugin_playwright_playwright`, `mcp__plugin_context7_context7`, etc. The bare server-name format (no `__*` suffix) matches all tools from that server.
 
 ### 6. Commit Project Settings
 
@@ -344,6 +357,11 @@ git commit -m "[BD-0] chore: configure Claude Code permissions"
   present after writing the file
 - Do NOT include specific `Bash(...)` patterns alongside the bare `"Bash"` — they
   are redundant and create confusion about what's actually needed
+- **MCP detection**: Read `~/.claude/settings.json` `enabledPlugins` to discover
+  installed MCP-providing plugins. For each plugin, check
+  `~/.claude/plugins/cache/<org>/<name>/<version>/.mcp.json` for server names.
+  Add `mcp__plugin_<slug>_<server>` entries for each discovered server. Keep
+  `mcp__*` as a fallback (in case the bug is fixed).
 - Run the verification checklist (Tier 1 first). If any compound command prompts,
   the bare `"Bash"` entry is missing — fix before continuing
 - When both files are created, verified, and committed: `bd close <id>`

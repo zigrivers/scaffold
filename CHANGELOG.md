@@ -2,6 +2,24 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.12.1] — 2026-02-17
+
+### Fixed
+- **MCP `mcp__*` wildcard bug** — `mcp__*` doesn't reliably match all MCP tools ([known issue](https://github.com/anthropics/claude-code/issues/3107)); added bare server-name entries (`mcp__plugin_playwright_playwright`, `mcp__plugin_context7_context7`) alongside the wildcard as a more reliable alternative
+- **Incorrect Playwright tool names** — `browser_fill`, `browser_select`, `browser_scroll`, `browser_get_text`, `browser_get_attribute` replaced with actual MCP tool names (`browser_fill_form`, `browser_select_option`, `browser_evaluate`, etc.)
+- **Incomplete Playwright tool list** — `.claude/settings.local.json` listed 8 of 22 tools; now includes all 22 Playwright MCP tools
+
+### Added
+- MCP detection step in permissions Process section — discovers installed plugins and adds bare server-name entries
+- Playwright Permissions section (section 7) in `add-playwright` command with complete 22-tool fallback list
+- Troubleshooting item 6 for `mcp__*` wildcard bug in permissions command
+- MCP smoke test instructions in Tier 2 verification
+
+### Changed
+- Permissions command JSON example includes bare server-name entries alongside `mcp__*`
+- Cautious mode MCP entries changed from `__*` suffix to bare server names
+- Playwright "Available MCP Commands" expanded from 13 to 22 tools across 3 reorganized categories
+
 ## [1.12.0] — 2026-02-17
 
 ### Fixed
