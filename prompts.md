@@ -2692,7 +2692,7 @@ Before starting, check if `AGENTS.md` already exists:
 
 ### Update Mode Specifics
 - **Primary output**: `AGENTS.md`
-- **Secondary output**: `.github/workflows/code-review-trigger.yml`, `.github/workflows/code-review-handler.yml`, `.github/workflows/codex-timeout.yml`, `.github/workflows/post-merge-followup.yml`, `docs/review-standards.md`, `.github/review-prompts/fix-prompt.md`, `.github/review-prompts/followup-fix-prompt.md`
+- **Secondary output**: `.github/workflows/code-review-trigger.yml`, `.github/workflows/code-review-handler.yml`, `.github/workflows/codex-timeout.yml`, `.github/workflows/post-merge-followup.yml`, `docs/review-standards.md`, `.github/review-prompts/fix-prompt.md`, `.github/review-prompts/followup-fix-prompt.md`, `scripts/await-pr-review.sh`, `docs/git-workflow.md`
 - **Preserve**: Custom review rules in `AGENTS.md`, `CODEX_BOT_NAME` env var, `MAX_REVIEW_ROUNDS` setting, `FOLLOWUP_ON_CAP` env var setting, repository-specific secrets configuration, custom severity rules in `docs/review-standards.md`
 - **Related docs**: `docs/coding-standards.md`, `docs/tdd-standards.md`, `docs/git-workflow.md`, `CLAUDE.md`
 - **Special rules**: Never change `CODEX_BOT_NAME` without verifying the actual bot username. Preserve all "What NOT to flag" customizations in `AGENTS.md`. Each secondary file should be checked independently for existence (update vs. create).
@@ -2740,7 +2740,7 @@ The loop is fully event-driven via two GitHub Actions workflows — no polling, 
 2. **Codex Cloud posts PR review** (event-driven — no polling, no wait job)
 3. **`pull_request_review` event** → `code-review-handler.yml` fires, filters to Codex bot only
 4. Handler checks review freshness (SHA match), runs convergence, labels result
-5. **Approved or round cap** → auto-merge runs `gh pr merge --squash --auto --delete-branch`
+5. **Approved or round cap** → auto-merge (tries `--auto`, falls back to direct merge if auto-merge is not enabled on the repo)
 6. **Findings remain and rounds < cap** → Claude Code Action reads P0/P1 findings, fixes, pushes
 7. **New push on PR branch** → re-triggers step 1
 8. *(Optional)* `codex-timeout.yml` runs on a cron schedule — finds PRs with stale `awaiting-codex-review` label (>15 min) and auto-approves them
@@ -2763,6 +2763,8 @@ The loop is fully event-driven via two GitHub Actions workflows — no polling, 
 - **Code-change gate**: Follow-up PR is only created if Claude Code produces actual non-`.beads/` file changes
 - **Graceful degradation**: If Claude Code can't fix the findings, the Beads task + GitHub Issue still exist for manual pickup
 - **Follow-up cost**: Each follow-up uses Opus (~$1.40) with 15 max turns. Follow-ups are rare — expect 0-2 per week
+- **Agent merge gate**: `scripts/await-pr-review.sh` forces agents to wait for the Codex review before merging. Without this, agents race the review when `--auto` is unavailable. The script polls for the review and returns distinct exit codes for approved/findings/timeout/skipped/error.
+- **No `--admin`**: Agents are explicitly prohibited from using `gh pr merge --admin` in the CLAUDE.md workflow. The `--admin` flag bypasses all protections including Codex Cloud review.
 
 ---
 
@@ -3250,9 +3252,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh pr merge ${{ github.event.pull_request.number }} \
-            --repo ${{ github.repository }} \
-            --squash --auto --delete-branch
+          PR=${{ github.event.pull_request.number }}
+          REPO=${{ github.repository }}
+
+          # Try --auto first (works if allow_auto_merge is enabled on repo)
+          if gh pr merge "$PR" --repo "$REPO" --squash --auto --delete-branch 2>/dev/null; then
+            echo "Auto-merge queued — will merge when CI passes"
+          else
+            echo "Auto-merge not available — merging directly"
+            gh pr merge "$PR" --repo "$REPO" --squash --delete-branch
+          fi
 
   # ─── Claude Code Fix (only if findings remain) ──────────
   claude-fix:
@@ -3357,7 +3366,9 @@ jobs:
 
           _Self-review (Tier 1) already ran before this PR was created._"
 
-              gh pr merge "$PR" --repo "$REPO" --squash --auto --delete-branch || true
+              if ! gh pr merge "$PR" --repo "$REPO" --squash --auto --delete-branch 2>/dev/null; then
+                gh pr merge "$PR" --repo "$REPO" --squash --delete-branch || true
+              fi
             fi
           done
 ```
@@ -3531,7 +3542,7 @@ jobs:
         id: beads
         run: |
           PR=${{ needs.check-followup-needed.outputs.original_pr }}
-          TASK_OUTPUT=$(bd --no-db --no-daemon q "fix: unresolved P0/P1 from #$PR" -p 1 2>&1)
+          TASK_OUTPUT=$(bd --no-db --no-daemon create "fix: unresolved P0/P1 from #$PR" -p 1 2>&1)
           TASK_ID=$(echo "$TASK_OUTPUT" | grep -oE '[a-z]+-[a-z0-9]+' | head -1)
           echo "task_id=$TASK_ID" >> $GITHUB_OUTPUT
           echo "Created Beads task: $TASK_ID"
@@ -3693,24 +3704,164 @@ jobs:
           echo "Closed Beads task $TASK_ID — no code changes needed"
 ```
 
-### 5. Update CLAUDE.md
+### 5. Await PR Review Script (`scripts/await-pr-review.sh`)
 
-Add this section to CLAUDE.md (the Workflow Audit and Claude.md Optimization prompts will pick it up):
+Create a polling script agents call to wait for Codex Cloud review before merging. This bridges the gap between CI passing and merge — without it, agents race the review when auto-merge is unavailable.
+
+```bash
+#!/usr/bin/env bash
+# Polls for Codex Cloud PR review matching HEAD SHA.
+# Called by agents after CI passes, before merging.
+#
+# Usage: scripts/await-pr-review.sh <pr-number> [--timeout <minutes>] [--interval <seconds>]
+#
+# Exit codes:
+#   0 — Approved (no P0/P1 findings)
+#   1 — Findings (P0/P1 issues found — do NOT merge)
+#   2 — Timeout (no review within timeout window)
+#   3 — Skipped (/skip-review or /lgtm comment found)
+#   4 — Error (API failure, missing arguments)
+#
+# Defaults: 15-minute timeout, 30-second poll interval.
+# Status output goes to stderr; stdout stays clean for scripting.
+
+set -euo pipefail
+
+# ─── Arguments ──────────────────────────────────────────
+PR_NUMBER="${1:-}"
+TIMEOUT_MINUTES=15
+POLL_INTERVAL=30
+
+if [ -z "$PR_NUMBER" ]; then
+  echo "Usage: $0 <pr-number> [--timeout <minutes>] [--interval <seconds>]" >&2
+  exit 4
+fi
+shift
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --timeout)  TIMEOUT_MINUTES="$2"; shift 2 ;;
+    --interval) POLL_INTERVAL="$2"; shift 2 ;;
+    *) echo "Unknown option: $1" >&2; exit 4 ;;
+  esac
+done
+
+# ─── Derive repo ───────────────────────────────────────
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null) || {
+  echo "error: could not determine repository (is gh authenticated?)" >&2
+  exit 4
+}
+
+# ─── Get HEAD SHA ──────────────────────────────────────
+HEAD_SHA=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.head.sha' 2>/dev/null) || {
+  echo "error: could not fetch PR #$PR_NUMBER" >&2
+  exit 4
+}
+
+echo "Awaiting Codex review for PR #$PR_NUMBER (SHA: ${HEAD_SHA:0:7})..." >&2
+echo "Timeout: ${TIMEOUT_MINUTES}m | Poll interval: ${POLL_INTERVAL}s" >&2
+
+CODEX_BOT="chatgpt-codex-connector[bot]"
+DEADLINE=$((SECONDS + TIMEOUT_MINUTES * 60))
+
+while [ $SECONDS -lt $DEADLINE ]; do
+  # Check for human override (/skip-review or /lgtm)
+  OVERRIDE=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" \
+    --jq '[.[] | select(
+      (.author_association | IN("OWNER","MEMBER","COLLABORATOR"))
+      and (.body | test("(^|\\s)/(skip-review|lgtm)(\\s|$)"; "i"))
+    )] | length' 2>/dev/null) || OVERRIDE=0
+
+  if [ "$OVERRIDE" -gt 0 ]; then
+    echo "Human override detected — skipping review wait" >&2
+    exit 3
+  fi
+
+  # Check for Codex Cloud PR reviews on HEAD SHA
+  REVIEW_BODY=$(gh api "repos/$REPO/pulls/$PR_NUMBER/reviews" \
+    --jq "[.[] | select(.user.login == \"$CODEX_BOT\" and .commit_id == \"$HEAD_SHA\")] | last | .body // \"\"" \
+    2>/dev/null) || {
+    echo "warning: API call failed, retrying..." >&2
+    sleep "$POLL_INTERVAL"
+    continue
+  }
+
+  # No review yet
+  if [ -z "$REVIEW_BODY" ] || [ "$REVIEW_BODY" = "null" ]; then
+    REMAINING=$(( (DEADLINE - SECONDS) / 60 ))
+    echo "No review yet (${REMAINING}m remaining)..." >&2
+    sleep "$POLL_INTERVAL"
+    continue
+  fi
+
+  # Review exists — check for approval
+  if echo "$REVIEW_BODY" | grep -q "APPROVED: No P0/P1 issues found"; then
+    echo "Codex Cloud approved — no P0/P1 issues" >&2
+    exit 0
+  fi
+
+  # Review exists with findings
+  echo "Codex Cloud posted findings — do NOT merge" >&2
+  exit 1
+done
+
+echo "Codex review did not arrive within ${TIMEOUT_MINUTES}m" >&2
+echo "Options: comment /skip-review on the PR, or wait longer" >&2
+exit 2
+```
+
+Make executable: `chmod +x scripts/await-pr-review.sh`
+
+### 6. Update CLAUDE.md
+
+Add (or replace) the Code Review section in CLAUDE.md. This section **replaces** the PR workflow from the Git Workflow prompt since multi-model-review runs after git-workflow and adds the Codex review waiting step. The Workflow Audit and Claude.md Optimization prompts will pick it up.
 
 ```markdown
 ## Code Review
 
 ### Self-Review (before every PR)
-Before pushing, run a review subagent to check changes against `docs/review-standards.md`. Fix any P0/P1/P2 issues found. This is built into the PR workflow (see step 2 below).
+Before pushing, run a review subagent to check changes against `docs/review-standards.md`. Fix any P0/P1/P2 issues found. This is built into the PR workflow (step 3 below).
 
-### External Review (optional — Codex Cloud)
-If Codex Cloud is configured, PRs are automatically reviewed by Codex Cloud when opened or updated. Codex Cloud flags P0/P1 issues only (P2/P3 are handled by self-review).
+### PR Workflow (with Codex Cloud review)
 
-1. You create the PR as normal (push branch, `gh pr create`)
-2. Codex Cloud auto-reviews (reads `AGENTS.md` for instructions)
-3. If it finds P0/P1 issues, Claude Code Action automatically fixes them
-4. The loop repeats until Codex approves or 3 rounds are reached
-5. After approval or 3 rounds, the PR auto-merges
+This replaces the basic PR workflow from the Git Workflow section above. If Codex Cloud is NOT configured, skip steps 7-8 and merge directly after CI passes.
+
+1. Run `make check` to verify all quality gates pass
+2. Rebase on latest main: `git fetch origin && git rebase origin/main`
+3. Run self-review subagent: check changes against `docs/review-standards.md`, fix any P0/P1/P2 issues
+4. Push branch: `git push -u origin HEAD`
+5. Create PR: `gh pr create --title "[BD-<id>] type(scope): description"`
+6. Wait for CI: `gh pr checks --watch`
+7. Wait for Codex review (only if `awaiting-codex-review` label is present):
+   ```bash
+   scripts/await-pr-review.sh <pr-number>
+   # Exit 0 = approved, 1 = findings (do NOT merge), 2 = timeout, 3 = skipped
+   ```
+   - If exit 1 (findings): The CI fix loop handles this automatically. Do NOT merge.
+   - If exit 2 (timeout): The timeout workflow will handle it, or comment `/skip-review` on the PR.
+   - If exit 3 (skipped): A human approved — proceed to merge.
+8. Merge (check if handler already merged first):
+   ```bash
+   STATE=$(gh pr view <pr-number> --json state -q .state)
+   if [ "$STATE" = "MERGED" ]; then
+     echo "Already merged by handler"
+   else
+     gh pr merge <pr-number> --squash --delete-branch
+   fi
+   ```
+9. Close Beads task: `bd close <id> && bd sync`
+
+**NEVER use `gh pr merge --admin`** — it bypasses all protections including Codex Cloud review, branch protection rules, and CI checks. If merge is blocked, check the error and use one of the recovery options below.
+
+### Error Recovery
+
+| Problem | Solution |
+|---------|----------|
+| `--auto` fails ("auto-merge not allowed") | This is expected if repo has `allow_auto_merge: false`. The CI workflows already handle this with a direct merge fallback. Agents should use direct merge (step 8 above), not `--auto`. |
+| Merge blocked by branch protection | Check `gh pr checks` — wait for failing checks to pass. If a required review is missing, wait for Codex review (step 7). |
+| Codex review times out | The `codex-timeout.yml` workflow handles this automatically. Alternatively, comment `/skip-review` on the PR. |
+| Merge blocked by `needs-human-review` label | `FOLLOWUP_ON_CAP=block-merge` is configured — a human must review. Do NOT force merge. |
+| `gh pr merge` returns "not mergeable" | Rebase on main (`git fetch origin && git rebase origin/main && git push --force-with-lease`) and retry. |
 
 ### Human Controls
 - Comment `/skip-review` to bypass Codex review entirely
@@ -3735,6 +3886,8 @@ Configure with `FOLLOWUP_ON_CAP` in `code-review-handler.yml`:
 ### What Reviewers Check
 See `docs/review-standards.md` for the full review criteria. Reviewers check against your project's documented standards, not generic best practices.
 ```
+
+Also update `docs/git-workflow.md` Section 4 (PR Workflow) to mirror the 9-step workflow above. Add a note that when Codex Cloud review is configured, steps 7-8 replace the simpler merge step.
 
 ---
 
@@ -3784,30 +3937,36 @@ The `FOLLOWUP_ON_CAP` env var in `code-review-handler.yml` controls what happens
    - `.github/workflows/post-merge-followup.yml` (post-merge follow-up for escaped findings)
    - `.github/workflows/codex-timeout.yml` (optional — cron-based timeout fallback)
 
-5. **Configure repository secret**: Run `gh secret set ANTHROPIC_API_KEY` in your terminal and paste the key when prompted (the only API key needed — Codex Cloud uses credits from your ChatGPT subscription).
+5. **Create the await script** (`scripts/await-pr-review.sh`) from the artifact above and make it executable (`chmod +x`).
 
-6. **Configure repository settings**:
+6. **Configure repository secret**: Run `gh secret set ANTHROPIC_API_KEY` in your terminal and paste the key when prompted (the only API key needed — Codex Cloud uses credits from your ChatGPT subscription).
+
+7. **Configure repository settings**:
    - Settings → Actions → General → Workflow permissions → Read and write
    - Settings → Actions → General → Allow GitHub Actions to create and approve pull requests
 
-7. **Update CLAUDE.md** with the Code Review section so agents understand the review process exists.
+8. **Update CLAUDE.md** with the Code Review section (Section 6 above). This replaces the basic PR workflow from git-workflow with the full 9-step workflow that includes Codex review waiting and `--admin` prohibition.
 
-8. **Test with a small PR** that has intentional issues (unused variable, missing error handling, hardcoded secret). Verify:
-   - The trigger workflow labels the round and adds `awaiting-codex-review`
-   - Codex Cloud posts a PR review with findings (check the bot username — the default `chatgpt-codex-connector[bot]` is correct for the standard Codex Cloud GitHub App; update `CODEX_BOT_NAME` in the handler workflow if it differs)
-   - The handler workflow fires on the review event, checks freshness, and runs convergence
-   - Claude Code Action fixes the P0/P1 issues
-   - Second review round approves
-   - The PR auto-merges with the `ai-review-approved` label
-   - Test follow-up: merge a capped PR with findings, verify Beads task + Issue + follow-up PR created
-   - Verify `followup-fix` label prevents recursion on follow-up PRs
-   - Verify `followup-created` label prevents duplicate follow-ups
+9. **Update `docs/git-workflow.md`** Section 4 (PR Workflow) to mirror the 9-step workflow from the CLAUDE.md section. Add a note that when Codex Cloud review is configured, steps 7-8 replace the simpler merge step.
 
-9. **Commit everything** to the repo:
-   ```bash
-   git add docs/review-standards.md AGENTS.md .github/review-prompts/ .github/workflows/code-review-trigger.yml .github/workflows/code-review-handler.yml .github/workflows/post-merge-followup.yml .github/workflows/codex-timeout.yml CLAUDE.md
-   git commit -m "[BD-<id>] feat: add code review loop (Codex Cloud + Claude fix)"
-   ```
+10. **Test with a small PR** that has intentional issues (unused variable, missing error handling, hardcoded secret). Verify:
+    - The trigger workflow labels the round and adds `awaiting-codex-review`
+    - Codex Cloud posts a PR review with findings (check the bot username — the default `chatgpt-codex-connector[bot]` is correct for the standard Codex Cloud GitHub App; update `CODEX_BOT_NAME` in the handler workflow if it differs)
+    - The handler workflow fires on the review event, checks freshness, and runs convergence
+    - Claude Code Action fixes the P0/P1 issues
+    - Second review round approves
+    - The PR auto-merges with the `ai-review-approved` label
+    - Test `scripts/await-pr-review.sh` exits correctly for each scenario (approved, findings, timeout, skipped)
+    - Test `--auto` fallback: on a repo with `allow_auto_merge: false`, verify the handler falls back to direct merge
+    - Test follow-up: merge a capped PR with findings, verify Beads task + Issue + follow-up PR created
+    - Verify `followup-fix` label prevents recursion on follow-up PRs
+    - Verify `followup-created` label prevents duplicate follow-ups
+
+11. **Commit everything** to the repo:
+    ```bash
+    git add docs/review-standards.md AGENTS.md .github/review-prompts/ .github/workflows/code-review-trigger.yml .github/workflows/code-review-handler.yml .github/workflows/post-merge-followup.yml .github/workflows/codex-timeout.yml scripts/await-pr-review.sh docs/git-workflow.md CLAUDE.md
+    git commit -m "[BD-<id>] feat: add code review loop (Codex Cloud + Claude fix)"
+    ```
 
 
 __________________________________________________________
