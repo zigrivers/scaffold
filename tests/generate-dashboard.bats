@@ -314,3 +314,13 @@ teardown() {
     grep -q 'bead-meta-grid' "$TEST_OUT/dashboard.html"
     grep -q 'bead-dep-link' "$TEST_OUT/dashboard.html"
 }
+
+# ─── mktemp TMPDIR trailing-slash fix ───────────────────────────────
+
+@test "default output path does not contain literal XXXXXX" {
+    # Simulate macOS TMPDIR with trailing slash
+    run bash -c "TMPDIR='${TMPDIR}' bash '$SCRIPT' --no-open"
+    [ "$status" -eq 0 ]
+    # The reported path must not contain the literal template string
+    [[ "$output" != *"XXXXXX"* ]]
+}
