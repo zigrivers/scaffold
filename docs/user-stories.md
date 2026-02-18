@@ -2075,6 +2075,264 @@ Covers: F-UX-13
 
 ---
 
+## Epic 12: Release Management
+
+Covers: F-SC-2
+
+### US-12.1: Create a Release with Auto-Detected Version Bump
+
+**As** Alex (power user), **I want to** run `/scaffold:release` and have Claude analyze my commits to suggest a version bump, **so that** I can cut a release without manually figuring out the right version number.
+
+**Priority**: Must-have
+
+**Acceptance Criteria**:
+
+1. **Given** the project has at least one existing `v*` tag and new commits since that tag,
+   **When** the user runs `/scaffold:release`,
+   **Then** Claude parses commits since the last tag using conventional commit format (`feat:` → minor, `fix:` → patch, `BREAKING CHANGE` → major) with highest-wins rule, and presents a summary: "Found 3 feat commits, 5 fix commits. Suggested bump: minor (v1.2.0 → v1.3.0). Confirm or override?"
+
+2. **Given** no conventional commits are found since the last tag,
+   **When** Claude attempts to suggest a bump,
+   **Then** Claude falls back to asking the user: "No conventional commits found. What type of bump? (major / minor / patch)"
+
+3. **Given** the user runs `/scaffold:release minor`,
+   **When** an explicit bump type is provided,
+   **Then** Claude skips the auto-suggestion and uses the specified bump type directly.
+
+4. **Given** the user confirms or specifies a bump,
+   **When** the release proceeds,
+   **Then** Claude updates version numbers in all detected version files, stages and commits as `chore(release): vX.Y.Z`, creates tag `vX.Y.Z`, pushes, and creates a GitHub release.
+
+**Scope Boundary**: Does NOT cover quality gate execution (US-12.3), changelog generation (US-12.4), or dry-run mode (US-12.6).
+
+**PRD Trace**: F-SC-2
+
+---
+
+### US-12.2: Detect Project Type for Version File Sync
+
+**As** Alex (power user), **I want to** have the release command automatically find and update all version files in my project, **so that** I don't have to remember which files contain version numbers.
+
+**Priority**: Must-have
+
+**Acceptance Criteria**:
+
+1. **Given** the project root is scanned,
+   **When** Claude detects version files,
+   **Then** it checks for: `package.json`, `package-lock.json`, `pyproject.toml`, `Cargo.toml`, `Cargo.lock`, `.claude-plugin/plugin.json`, `pubspec.yaml`, `setup.cfg`, `version.txt`.
+
+2. **Given** multiple version files exist (e.g., `package.json` and `.claude-plugin/plugin.json`),
+   **When** the version bump executes,
+   **Then** all detected files are updated to the new version.
+
+3. **Given** lock files exist (`package-lock.json`, `Cargo.lock`),
+   **When** the version bump executes,
+   **Then** Claude runs the appropriate sync command (`npm install --package-lock-only` or `cargo update -w`) after bumping.
+
+4. **Given** no version files are detected,
+   **When** the release proceeds,
+   **Then** Claude creates a tag-only release and informs the user: "No version files found — creating tag-only release."
+
+**Scope Boundary**: Does NOT cover version files in monorepo sub-packages.
+
+**PRD Trace**: F-SC-2
+
+---
+
+### US-12.3: Run Pre-Release Quality Gates
+
+**As** Alex (power user), **I want to** have tests run automatically before a release is cut, **so that** I don't accidentally release broken code.
+
+**Priority**: Must-have
+
+**Acceptance Criteria**:
+
+1. **Given** the project has a detectable quality gate command (`make check`, `npm test`, `cargo test`, `pytest`, etc.),
+   **When** the release reaches the validation phase,
+   **Then** Claude runs the quality gate and reports the result.
+
+2. **Given** the quality gate fails,
+   **When** Claude reports the failure,
+   **Then** the release is blocked with: "Quality gates failed. Fix the issues and re-run `/scaffold:release`, or use `--force` to proceed anyway (not recommended)."
+
+3. **Given** the user passes `--force` with a failing quality gate,
+   **When** the release proceeds,
+   **Then** Claude warns: "Proceeding despite quality gate failure. The release may contain issues." and continues.
+
+4. **Given** no quality gate command is detected,
+   **When** the validation phase runs,
+   **Then** Claude warns: "No quality gate command detected. Proceeding without pre-release validation."
+
+**Scope Boundary**: Does NOT cover custom quality gate configuration.
+
+**PRD Trace**: F-SC-2
+
+---
+
+### US-12.4: Generate Changelog from Conventional Commits
+
+**As** Alex (power user), **I want to** have a changelog automatically generated from my commits, **so that** I have a clear record of what changed in each release.
+
+**Priority**: Must-have
+
+**Acceptance Criteria**:
+
+1. **Given** commits since the last tag exist,
+   **When** the changelog phase runs,
+   **Then** Claude groups commits by type in Keep a Changelog format: Added (feat), Fixed (fix), Changed (refactor, perf), Other (remaining).
+
+2. **Given** `CHANGELOG.md` already exists,
+   **When** the changelog is generated,
+   **Then** the new release entry is prepended after the `# Changelog` heading, before existing entries.
+
+3. **Given** `CHANGELOG.md` does not exist,
+   **When** the changelog is generated,
+   **Then** Claude creates a new `CHANGELOG.md` with the standard Keep a Changelog header and the first release entry.
+
+4. **Given** the changelog is generated,
+   **When** a GitHub release is created,
+   **Then** the same grouped content is used as the GitHub release notes body.
+
+**Scope Boundary**: Does NOT cover Beads task integration in release notes (US-12.5).
+
+**PRD Trace**: F-SC-2
+
+---
+
+### US-12.5: Include Beads Tasks in Release Notes
+
+**As** Alex (power user), **I want to** see completed Beads tasks referenced in release notes, **so that** stakeholders can connect releases to tracked work items.
+
+**Priority**: Should-have
+
+**Acceptance Criteria**:
+
+1. **Given** `.beads/` exists and closed tasks match the commit range,
+   **When** the changelog is generated,
+   **Then** a "Completed Tasks" section is appended with task IDs and titles.
+
+2. **Given** `.beads/` does not exist,
+   **When** the changelog phase runs,
+   **Then** Beads integration is silently skipped — no error, no mention.
+
+3. **Given** `.beads/` exists but no closed tasks match the commit range,
+   **When** the changelog is generated,
+   **Then** the "Completed Tasks" section is omitted.
+
+**Scope Boundary**: Does NOT cover linking tasks to specific commits.
+
+**PRD Trace**: F-SC-2
+
+---
+
+### US-12.6: Dry-Run Mode Preview
+
+**As** Alex (power user), **I want to** preview what a release would do without actually changing anything, **so that** I can verify the version bump, changelog, and affected files before committing.
+
+**Priority**: Must-have
+
+**Acceptance Criteria**:
+
+1. **Given** the user runs `/scaffold:release --dry-run`,
+   **When** the release analysis completes,
+   **Then** Claude displays: suggested version bump, changelog preview, list of version files that would be updated, and the tag that would be created.
+
+2. **Given** dry-run mode is active,
+   **When** any phase would normally modify files, create commits, push, or create a GitHub release,
+   **Then** zero mutations occur — no files changed, no git operations, no GitHub API calls.
+
+3. **Given** dry-run completes,
+   **When** Claude presents the summary,
+   **Then** it ends with: "This was a dry run. No changes were made. Run `/scaffold:release` to execute."
+
+**Scope Boundary**: Does NOT cover interactive modification of the dry-run preview.
+
+**PRD Trace**: F-SC-2
+
+---
+
+### US-12.7: First-Release Bootstrapping
+
+**As** Sam (first-time user), **I want to** run `/scaffold:release` on a project with no previous releases, **so that** I can create my first release without manual setup.
+
+**Priority**: Should-have
+
+**Acceptance Criteria**:
+
+1. **Given** the project has no `v*` tags,
+   **When** the user runs `/scaffold:release`,
+   **Then** Claude detects first-release mode and asks: "No previous releases found. What should the initial version be?" with suggestions: `0.1.0` (pre-release) or `1.0.0` (stable).
+
+2. **Given** the user chooses an initial version,
+   **When** the release proceeds,
+   **Then** `CHANGELOG.md` is created from scratch with all commits (not just since a tag), and the release continues through normal phases.
+
+3. **Given** first-release mode is active,
+   **When** Claude would normally analyze "commits since last tag",
+   **Then** it skips that analysis and uses all commits instead.
+
+**Scope Boundary**: Does NOT cover migrating from non-semver versioning schemes.
+
+**PRD Trace**: F-SC-2
+
+---
+
+### US-12.8: Context-Dependent Flow (Main vs Feature Branch)
+
+**As** Alex (power user), **I want to** run `/scaffold:release` from any branch and have the command adapt its behavior, **so that** I can prepare releases from feature branches without force-pushing to main.
+
+**Priority**: Should-have
+
+**Acceptance Criteria**:
+
+1. **Given** the user is on `main` or `master`,
+   **When** the release reaches the publish phase,
+   **Then** Claude tags the commit, pushes the tag, and creates a GitHub release directly.
+
+2. **Given** the user is on a feature branch,
+   **When** the release reaches the publish phase,
+   **Then** Claude pushes the branch, creates a release PR titled `chore(release): vX.Y.Z`, and provides post-merge tagging instructions: "After merging, run `/scaffold:release` from main to create the tag and GitHub release."
+
+3. **Given** the push to main fails (e.g., protected branch),
+   **When** Claude detects the failure,
+   **Then** it falls back to the feature branch flow: "Push to main failed (likely branch protection). Creating a release PR instead."
+
+**Scope Boundary**: Does NOT cover release branch strategies (e.g., `release/v1.x`).
+
+**PRD Trace**: F-SC-2
+
+---
+
+### US-12.9: Rollback Last Release
+
+**As** Alex (power user), **I want to** undo the most recent release if something went wrong, **so that** I can recover without manual cleanup of tags, releases, and version bumps.
+
+**Priority**: Should-have
+
+**Acceptance Criteria**:
+
+1. **Given** the user runs `/scaffold:release rollback`,
+   **When** Claude identifies the most recent tag,
+   **Then** Claude asks: "To confirm rollback, type the exact tag name (e.g., v1.3.0):" — not just "yes".
+
+2. **Given** the user types the correct tag name,
+   **When** the rollback executes,
+   **Then** Claude deletes the GitHub release, deletes the tag (local + remote), reverts the version bump commit, and pushes.
+
+3. **Given** a partial failure during rollback (e.g., GitHub release deleted but tag deletion fails),
+   **When** Claude encounters the error,
+   **Then** it continues remaining rollback steps and reports: "Rollback partially completed. GitHub release deleted. Tag deletion failed: <error>. Manual cleanup needed: `git tag -d vX.Y.Z && git push origin :refs/tags/vX.Y.Z`"
+
+4. **Given** the user types an incorrect tag name,
+   **When** Claude compares the input,
+   **Then** the rollback is aborted: "Tag name does not match. Rollback cancelled."
+
+**Scope Boundary**: Does NOT cover rolling back releases older than the most recent one.
+
+**PRD Trace**: F-SC-2
+
+---
+
 ## Feature-to-Story Traceability Matrix
 
 | PRD Feature | Stories | Priority |
@@ -2106,6 +2364,7 @@ Covers: F-UX-13
 | F-UX-13: scaffold dashboard | US-11.1, US-11.2, US-11.3, US-11.4 | Should-have |
 | F-V1-1: v1 Project Detection | US-7.3 | Should-have |
 | F-SC-1: Standalone Commands | US-9.1, US-9.2 | Must-have |
+| F-SC-2: Release Management | US-12.1, US-12.2, US-12.3, US-12.4, US-12.5, US-12.6, US-12.7, US-12.8, US-12.9 | Must-have / Should-have |
 | Section 6: Implementation Architecture | US-10.1 | Must-have |
 | Section 7: Non-Functional Requirements | US-10.1 | Must-have |
 
@@ -2124,5 +2383,5 @@ Covers: F-UX-13
 
 | Priority | Count | Stories |
 |----------|-------|---------|
-| Must-have | 32 | US-1.1–1.6, US-2.1–2.6, US-3.1–3.7, US-4.1–4.5, US-5.1–5.5, US-6.2, US-8.1, US-9.1–9.2, US-10.1 |
-| Should-have | 17 | US-1.7–1.8, US-2.7–2.8, US-6.1, US-6.3, US-7.1–7.4, US-8.2, US-11.1–11.4 |
+| Must-have | 37 | US-1.1–1.6, US-2.1–2.6, US-3.1–3.7, US-4.1–4.5, US-5.1–5.5, US-6.2, US-8.1, US-9.1–9.2, US-10.1, US-12.1–12.4, US-12.6 |
+| Should-have | 21 | US-1.7–1.8, US-2.7–2.8, US-6.1, US-6.3, US-7.1–7.4, US-8.2, US-11.1–11.4, US-12.5, US-12.7–12.9 |
