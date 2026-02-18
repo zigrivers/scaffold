@@ -1,6 +1,6 @@
 # Scaffold
 
-A guided AI pipeline that takes you from "I have an idea" to working software. Scaffold walks you through 27 structured prompts — run them in order, and Claude Code handles the research, planning, and implementation for you.
+A guided AI pipeline that takes you from "I have an idea" to working software. Scaffold walks you through 29 structured prompts — run them in order, and Claude Code handles the research, planning, and implementation for you.
 
 By the end, you'll have a fully planned, standards-documented, implementation-ready project with working code.
 
@@ -297,7 +297,8 @@ Once your project is scaffolded and you're building features, these commands are
 |---------|-------------|
 | `/scaffold:new-enhancement` | You want to add a new feature to an already-scaffolded project. It updates the PRD, creates new user stories, and sets up Beads tasks with proper dependencies. |
 | `/scaffold:quick-task` | You need a focused Beads task for a bug fix, refactor, performance improvement, or small refinement — work that needs clear acceptance criteria and a test plan but not full enhancement discovery. |
-| `/scaffold:release` | You're ready to ship a new version. It analyzes your commits, suggests a version bump (major/minor/patch), updates the changelog, bumps the version number in your project files, and creates a Git tag and GitHub release. Supports `--dry-run` to preview changes and `rollback` to undo a bad release. |
+| `/scaffold:version-bump` | You've completed a set of user stories or reached a milestone and want to mark it with a version number — but you're not ready to create a tag or GitHub release yet. It bumps the version, updates the changelog, and commits. No tags, no push, no release ceremony. |
+| `/scaffold:release` | You're ready to ship a new version. It analyzes your commits, suggests a version bump (major/minor/patch), updates the changelog, bumps the version number in your project files, and creates a Git tag and GitHub release. Supports `--dry-run` to preview changes, `current` to release an already-bumped version, and `rollback` to undo a bad release. |
 | `/scaffold:single-agent-resume` | You closed Claude Code and want to pick up where you left off. It checks your current git state, finds in-progress tasks, and resumes the workflow. |
 | `/scaffold:prompt-pipeline` | Quick reference — prints the full pipeline table so you can see where you are and what's next. |
 | `/scaffold:implementation-plan-review` | Re-run after creating 5+ new tasks to audit quality and dependencies. |
@@ -305,6 +306,18 @@ Once your project is scaffolded and you're building features, these commands are
 | `/scaffold:multi-model-review` | Runs automatically on every PR once configured. |
 
 ## Releasing Your Project
+
+### Version bumps (development milestones)
+
+During development, you may want to mark milestones — like completing a set of user stories — without the full release ceremony:
+
+```
+/scaffold:version-bump
+```
+
+This bumps the version number and updates the changelog, but doesn't create tags, push, or publish a GitHub release. Think of it as a checkpoint. You can specify the bump type explicitly (`/scaffold:version-bump minor`) or let Claude analyze your commits to suggest one.
+
+### Creating a release
 
 Once you've built features and are ready to ship a version, use the release command:
 
@@ -345,6 +358,16 @@ Skip the auto-suggestion and tell Claude exactly what type of bump you want: `ma
 ```
 
 Made a mistake? This deletes the GitHub release, removes the Git tag, and reverts the version bump commit. You'll need to confirm by typing the exact tag name as a safety measure.
+
+### Release an already-bumped version
+
+If you already bumped the version with `/scaffold:version-bump`, the release command detects this and offers to release that version as-is — no double-bumping. You can also be explicit:
+
+```
+/scaffold:release current
+```
+
+This tags and publishes the version already in your files without bumping further.
 
 ### First release
 
@@ -389,7 +412,7 @@ Every command prints "After This Step" guidance when it finishes, telling you ex
 Run `/scaffold:update` (or `/user:update`) from a Claude Code session. This fetches the latest version and updates your command files. You can also run `./scripts/update.sh` from the terminal. See [Updating](#updating) for details.
 
 **How do I create a release?**
-Run `/scaffold:release`. It analyzes your commits, suggests a version number, and handles the changelog, Git tag, and GitHub release for you. Use `--dry-run` first if you want to preview what will happen.
+Run `/scaffold:release`. It analyzes your commits, suggests a version number, and handles the changelog, Git tag, and GitHub release for you. Use `--dry-run` first if you want to preview what will happen. For lighter-weight milestone markers (no tags or GitHub release), use `/scaffold:version-bump` instead.
 
 **Can I use this for an existing project?**
 Scaffold is designed for new projects. For existing projects, you can use `/scaffold:new-enhancement` to add features or `/scaffold:quick-task` for bug fixes and small improvements, both using the same structured approach. The full pipeline assumes a fresh start.
@@ -398,7 +421,7 @@ Scaffold is designed for new projects. For existing projects, you can use `/scaf
 
 The pipeline lives in a few key places:
 
-- **`prompts.md`** — The source of truth. Contains all 28 prompts in a single file with a setup order table at the top and individual prompt sections below.
+- **`prompts.md`** — The source of truth. Contains all 29 prompts in a single file with a setup order table at the top and individual prompt sections below.
 - **`commands/`** — Individual `.md` files (one per command) with YAML frontmatter and "After This Step" guidance. These are what Claude Code actually executes when you run a slash command.
 - **`.claude-plugin/plugin.json`** — Plugin manifest that tells Claude Code the plugin's name and metadata.
 - **`skills/scaffold-pipeline/SKILL.md`** — Auto-activated skill that provides pipeline context.

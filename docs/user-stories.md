@@ -2333,6 +2333,74 @@ Covers: F-SC-2
 
 ---
 
+### US-12.10: Bump Version as a Development Milestone
+
+**As** Alex (power user), **I want to** bump the version number and update the changelog without creating a tag or GitHub release, **so that** I can mark development milestones (e.g., completing a set of user stories) without the overhead of a full release ceremony.
+
+**Priority**: Should-have
+
+**Acceptance Criteria**:
+
+1. **Given** the user runs `/scaffold:version-bump`,
+   **When** the project has conventional commits since the last tag (or version bump commit),
+   **Then** Claude analyzes commits to suggest a bump level (major/minor/patch) and presents a summary for confirmation.
+
+2. **Given** the user runs `/scaffold:version-bump minor`,
+   **When** an explicit bump type is provided,
+   **Then** Claude skips commit analysis and applies the specified bump directly.
+
+3. **Given** the user confirms a bump,
+   **When** the version update executes,
+   **Then** Claude updates all detected version files, updates `CHANGELOG.md` in Keep a Changelog format, syncs lock files, and commits as `chore(version): vX.Y.Z` — no tags, no push, no GitHub release.
+
+4. **Given** the project has no version files and no existing tags,
+   **When** the user runs `/scaffold:version-bump`,
+   **Then** Claude detects the project type and offers to create the appropriate version file (e.g., adds `"version"` to an existing `package.json`, or creates `version.txt`).
+
+5. **Given** the user runs `/scaffold:version-bump --dry-run`,
+   **When** the analysis completes,
+   **Then** Claude shows what would change but makes zero mutations — no file writes, no commits.
+
+6. **Given** the working tree has uncommitted changes,
+   **When** the user runs `/scaffold:version-bump`,
+   **Then** Claude warns about the dirty working tree but proceeds (does not block).
+
+**Scope Boundary**: Does NOT cover quality gates (use `/scaffold:release` for that), tags, push, or GitHub release creation.
+
+**PRD Trace**: F-SC-2
+
+---
+
+### US-12.11: Release Detects Pre-Bumped Version
+
+**As** Alex (power user), **I want to** run `/scaffold:release` after already bumping the version with `/scaffold:version-bump`, **so that** the release command tags and publishes the existing version instead of bumping again.
+
+**Priority**: Should-have
+
+**Acceptance Criteria**:
+
+1. **Given** the version in files (e.g., 0.2.0) is greater than the version from the last tag (e.g., v0.1.0),
+   **When** the user runs `/scaffold:release`,
+   **Then** Claude detects the mismatch and asks: "Version files show `0.2.0` but the last tag is `v0.1.0`. It looks like the version was already bumped. Release `0.2.0` as-is, or analyze commits for a further bump?"
+
+2. **Given** the user chooses "Release 0.2.0 as-is",
+   **When** the release proceeds,
+   **Then** Claude skips version analysis and version bump phases, and proceeds directly to quality gates, changelog verification, tagging, and publishing.
+
+3. **Given** the user runs `/scaffold:release current`,
+   **When** the `current` mode is specified,
+   **Then** Claude uses the version already in files without any analysis or bump, proceeding directly to quality gates and publishing.
+
+4. **Given** the user chooses "Bump further",
+   **When** the release proceeds,
+   **Then** Claude runs normal commit analysis and bumps from the current file version (not from the last tag).
+
+**Scope Boundary**: Does NOT cover resolving version conflicts across files (assumes all files were updated together by version-bump).
+
+**PRD Trace**: F-SC-2
+
+---
+
 ## Feature-to-Story Traceability Matrix
 
 | PRD Feature | Stories | Priority |
@@ -2364,7 +2432,7 @@ Covers: F-SC-2
 | F-UX-13: scaffold dashboard | US-11.1, US-11.2, US-11.3, US-11.4 | Should-have |
 | F-V1-1: v1 Project Detection | US-7.3 | Should-have |
 | F-SC-1: Standalone Commands | US-9.1, US-9.2 | Must-have |
-| F-SC-2: Release Management | US-12.1, US-12.2, US-12.3, US-12.4, US-12.5, US-12.6, US-12.7, US-12.8, US-12.9 | Must-have / Should-have |
+| F-SC-2: Release Management | US-12.1, US-12.2, US-12.3, US-12.4, US-12.5, US-12.6, US-12.7, US-12.8, US-12.9, US-12.10, US-12.11 | Must-have / Should-have |
 | Section 6: Implementation Architecture | US-10.1 | Must-have |
 | Section 7: Non-Functional Requirements | US-10.1 | Must-have |
 
@@ -2384,4 +2452,4 @@ Covers: F-SC-2
 | Priority | Count | Stories |
 |----------|-------|---------|
 | Must-have | 37 | US-1.1–1.6, US-2.1–2.6, US-3.1–3.7, US-4.1–4.5, US-5.1–5.5, US-6.2, US-8.1, US-9.1–9.2, US-10.1, US-12.1–12.4, US-12.6 |
-| Should-have | 21 | US-1.7–1.8, US-2.7–2.8, US-6.1, US-6.3, US-7.1–7.4, US-8.2, US-11.1–11.4, US-12.5, US-12.7–12.9 |
+| Should-have | 23 | US-1.7–1.8, US-2.7–2.8, US-6.1, US-6.3, US-7.1–7.4, US-8.2, US-11.1–11.4, US-12.5, US-12.7–12.11 |

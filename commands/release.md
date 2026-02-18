@@ -53,6 +53,7 @@ Parse `$ARGUMENTS` to determine the mode:
 |----------|------|
 | _(empty)_ | **Standard** — auto-suggest bump, confirm, execute |
 | `major`, `minor`, or `patch` | **Explicit** — use specified bump, skip suggestion |
+| `current` | **Current** — tag and release the version already in files, no bump |
 | `--dry-run` | **Dry Run** — all analysis, zero mutations |
 | `rollback` | **Rollback** — jump directly to the Rollback section |
 
@@ -67,6 +68,21 @@ If **no** `v*` tags exist:
 1. Tell the user: "No previous releases found. This will be your first release."
 2. Ask: "What should the initial version be?" Suggest `0.1.0` (pre-release) or `1.0.0` (stable).
 3. Record the chosen version. Skip Phase 1 (version analysis) — go directly to Phase 2.
+
+### 0.6 Version Mismatch Detection
+
+**Skip if:** First-release mode (Phase 0.5) or `current` mode.
+
+If `current` mode was specified: use the version from files as the release version, skip Phase 1 and Phase 4 (version bump) — proceed directly to Phase 2 (quality gates).
+
+Otherwise, compare the version in files against the last tag:
+
+- If the version in files **is greater than** the version from the last tag (e.g., files say `0.2.0`, last tag is `v0.1.0`):
+  1. Ask: "Version files show `<file-version>` but the last tag is `<last-tag>`. It looks like the version was already bumped (perhaps via `/scaffold:version-bump`). Release `<file-version>` as-is, or analyze commits for a further bump?"
+  2. **"Release as-is"**: Use `<file-version>` as the release version. Skip Phase 1 and Phase 4 — proceed to Phase 2.
+  3. **"Bump further"**: Proceed normally through Phase 1, bumping from the current file version.
+
+- If the versions match or files are less than/equal to the last tag: proceed normally.
 
 ---
 
@@ -381,6 +397,7 @@ When this step is complete, tell the user:
 **Next (if applicable):**
 - If follow-up tasks are needed: Run `/scaffold:quick-task` — Create a focused task for post-release work.
 - If the release needs undoing: Run `/scaffold:release rollback` — Undo the most recent release.
+- For development milestone checkpoints without releasing: Run `/scaffold:version-bump` — Bump version and changelog only.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

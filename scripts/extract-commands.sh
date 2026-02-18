@@ -54,6 +54,7 @@ declare -a FRONTMATTER=(
     'multi-agent-resume|Resume multi-agent work after a break|<agent-name>'
     'new-enhancement|Add a new feature to an existing project|<enhancement description>'
     'quick-task|Create a focused Beads task for a bug fix, refactor, or small improvement|<task description>'
+    'version-bump|Bump version and update changelog without tagging or releasing|<major|minor|patch or --dry-run>'
     'release|Create a versioned release with changelog and GitHub release|<version or --dry-run or rollback>'
     'prompt-pipeline|Show the full pipeline reference|'
     'update|Check for and apply scaffold updates|'
@@ -89,6 +90,7 @@ HEADING_TO_SLUG["Implementation Plan Review"]="implementation-plan-review"
 HEADING_TO_SLUG["Implementation Plan Multi-Model Review"]="multi-model-review-tasks"
 HEADING_TO_SLUG["New Enhancement"]="new-enhancement"
 HEADING_TO_SLUG["Quick Task"]="quick-task"
+HEADING_TO_SLUG["Version Bump"]="version-bump"
 # shellcheck disable=SC2034 # Array used via ${HEADING_TO_SLUG[$key]} below
 HEADING_TO_SLUG["Release"]="release"
 
@@ -548,6 +550,25 @@ When this step is complete, tell the user:
 ---
 NEXTSTEP
             ;;
+        version-bump)
+            cat <<'NEXTSTEP'
+
+## After This Step
+
+When this step is complete, tell the user:
+
+---
+**Version bump complete** — version files updated, changelog written, commit created.
+
+**Next (if applicable):**
+- When ready for a formal release: Run `/scaffold:release current` — Tag, publish, and create a GitHub release for the version already in files.
+- If follow-up tasks are needed: Run `/scaffold:quick-task` — Create a focused task for post-bump work.
+
+**Pipeline reference:** `/scaffold:prompt-pipeline`
+
+---
+NEXTSTEP
+            ;;
         release)
             cat <<'NEXTSTEP'
 
@@ -561,6 +582,7 @@ When this step is complete, tell the user:
 **Next (if applicable):**
 - If follow-up tasks are needed: Run `/scaffold:quick-task` — Create a focused task for post-release work.
 - If the release needs undoing: Run `/scaffold:release rollback` — Undo the most recent release.
+- For development milestone checkpoints without releasing: Run `/scaffold:version-bump` — Bump version and changelog only.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

@@ -697,7 +697,7 @@ v1 deprecated migration prompts in favor of universal update mode (all document-
 
 #### F-SC-1: Commands Outside the Pipeline
 
-- **What**: Certain commands remain standalone and are not part of any profile's pipeline: `quick-task`, `new-enhancement`, `release`, `single-agent-start`, `single-agent-resume`, `multi-agent-start`, `multi-agent-resume`, `prompt-pipeline`, `update`, `version`, `status`, `next`, `skip`, `validate`, `reset`, `adopt`, and all migration commands. Additionally, `user-stories-multi-model-review` and `platform-parity-review` are available as opt-in pipeline prompts (addable via `add-prompts` in a profile or `extra-prompts` in config.json) but are not included in any built-in profile.
+- **What**: Certain commands remain standalone and are not part of any profile's pipeline: `quick-task`, `new-enhancement`, `release`, `version-bump`, `single-agent-start`, `single-agent-resume`, `multi-agent-start`, `multi-agent-resume`, `prompt-pipeline`, `update`, `version`, `status`, `next`, `skip`, `validate`, `reset`, `adopt`, and all migration commands. Additionally, `user-stories-multi-model-review` and `platform-parity-review` are available as opt-in pipeline prompts (addable via `add-prompts` in a profile or `extra-prompts` in config.json) but are not included in any built-in profile.
 - **Why**: These are used after the pipeline completes or for ongoing project work. They don't belong in the scaffolding sequence.
 - **Priority**: Must-have (v2.0)
 - **Business rules**:
@@ -709,21 +709,30 @@ v1 deprecated migration prompts in favor of universal update mode (all document-
 
 #### F-SC-2: Release Management
 
-- **What**: A standalone command `/scaffold:release` that automates versioned releases. Analyzes conventional commits since the last tag to suggest a version bump (major/minor/patch), runs quality gates, generates a changelog, bumps version numbers in detected project files, creates a git tag, and publishes a GitHub release.
-- **Why**: Users building projects with Scaffold have no standardized way to cut releases. Version bumping, changelog generation, git tagging, and GitHub release creation are all manual and error-prone. A guided release command fills this gap.
+- **What**: Two companion commands for version management: `/scaffold:version-bump` (lightweight milestone marker) and `/scaffold:release` (full release ceremony). `version-bump` bumps version numbers and updates the changelog without tagging, pushing, or creating GitHub releases. `release` handles the full flow: quality gates, changelog, version bump, git tag, GitHub release, and rollback. When `version-bump` has already been run, `release` detects the pre-bumped version and offers to release it as-is.
+- **Why**: Users building projects with Scaffold need both lightweight milestone markers (during development) and formal releases (for production). Separating these concerns keeps the common case simple while retaining full ceremony when needed.
 - **Priority**: Should-have (v2.x)
 - **Business rules**:
-  - Supports four modes: standard (auto-suggest bump), explicit (`major`/`minor`/`patch`), dry-run (`--dry-run` — analysis only, zero mutations), and rollback (undo the most recent release).
-  - Auto-detects version files: `package.json`, `pyproject.toml`, `Cargo.toml`, `.claude-plugin/plugin.json`, `pubspec.yaml`, `setup.cfg`, `version.txt`.
-  - Parses conventional commits (`feat:` → minor, `fix:` → patch, `BREAKING CHANGE` → major) with highest-wins rule. Falls back to asking the user if no conventional commits are found.
-  - Runs the project's quality gates (`make check`, `npm test`, `cargo test`, etc.) before proceeding. Blocks on failure unless the user explicitly forces.
-  - Generates changelog in Keep a Changelog format, grouped by type (Added/Fixed/Changed/Other). Prepends to existing `CHANGELOG.md` or creates a new one.
-  - If `.beads/` exists, cross-references closed Beads tasks with the commit range and includes them in release notes.
-  - First-release bootstrapping: if no `v*` tags exist, guides the user through choosing an initial version and creates `CHANGELOG.md` from scratch.
-  - Branch-aware flow: on `main`/`master`, tags and pushes directly; on feature branches, creates a release PR with post-merge tagging instructions.
-  - Tag format is always `vX.Y.Z`.
-  - Rollback requires the user to type the exact tag name (not just "yes") as a safety measure. Deletes GitHub release, removes tag (local + remote), reverts version bump commit.
-  - Dry-run mode performs all analysis but makes zero file, git, or GitHub changes.
+  - **`/scaffold:release`**:
+    - Supports five modes: standard (auto-suggest bump), explicit (`major`/`minor`/`patch`), current (release the version already in files, no bump), dry-run (`--dry-run` — analysis only, zero mutations), and rollback (undo the most recent release).
+    - Auto-detects version files: `package.json`, `pyproject.toml`, `Cargo.toml`, `.claude-plugin/plugin.json`, `pubspec.yaml`, `setup.cfg`, `version.txt`.
+    - Parses conventional commits (`feat:` → minor, `fix:` → patch, `BREAKING CHANGE` → major) with highest-wins rule. Falls back to asking the user if no conventional commits are found.
+    - Runs the project's quality gates (`make check`, `npm test`, `cargo test`, etc.) before proceeding. Blocks on failure unless the user explicitly forces.
+    - Generates changelog in Keep a Changelog format, grouped by type (Added/Fixed/Changed/Other). Prepends to existing `CHANGELOG.md` or creates a new one.
+    - If `.beads/` exists, cross-references closed Beads tasks with the commit range and includes them in release notes.
+    - First-release bootstrapping: if no `v*` tags exist, guides the user through choosing an initial version and creates `CHANGELOG.md` from scratch.
+    - Branch-aware flow: on `main`/`master`, tags and pushes directly; on feature branches, creates a release PR with post-merge tagging instructions.
+    - Version mismatch detection: if version in files exceeds the last tag, asks whether to release as-is or bump further.
+    - Tag format is always `vX.Y.Z`.
+    - Rollback requires the user to type the exact tag name (not just "yes") as a safety measure. Deletes GitHub release, removes tag (local + remote), reverts version bump commit.
+    - Dry-run mode performs all analysis but makes zero file, git, or GitHub changes.
+  - **`/scaffold:version-bump`**:
+    - Supports three modes: auto (analyze commits, suggest bump), explicit (`major`/`minor`/`patch`), dry-run (`--dry-run`).
+    - Uses the same version file detection as `release`.
+    - Bumps version numbers and updates `CHANGELOG.md` only — no quality gates, no tags, no push, no GitHub release.
+    - First-bump detection: if no version files and no tags exist, detects project type and offers to create the appropriate version file.
+    - Commits as `chore(version): vX.Y.Z` (distinct from release's `chore(release):` prefix).
+    - Warns on dirty working tree but does not block.
 
 ## 5. Data Model Overview
 
