@@ -54,6 +54,7 @@ declare -a FRONTMATTER=(
     'multi-agent-resume|Resume multi-agent work after a break|<agent-name>'
     'new-enhancement|Add a new feature to an existing project|<enhancement description>'
     'quick-task|Create a focused Beads task for a bug fix, refactor, or small improvement|<task description>'
+    'release|Create a versioned release with changelog and GitHub release|<version or --dry-run or rollback>'
     'prompt-pipeline|Show the full pipeline reference|'
     'update|Check for and apply scaffold updates|'
     'version|Show installed and latest scaffold version|'
@@ -87,8 +88,9 @@ HEADING_TO_SLUG["Implementation Plan"]="implementation-plan"
 HEADING_TO_SLUG["Implementation Plan Review"]="implementation-plan-review"
 HEADING_TO_SLUG["Implementation Plan Multi-Model Review"]="multi-model-review-tasks"
 HEADING_TO_SLUG["New Enhancement"]="new-enhancement"
-# shellcheck disable=SC2034 # Array used via ${HEADING_TO_SLUG[$key]} below
 HEADING_TO_SLUG["Quick Task"]="quick-task"
+# shellcheck disable=SC2034 # Array used via ${HEADING_TO_SLUG[$key]} below
+HEADING_TO_SLUG["Release"]="release"
 
 # ─── Next steps mapping ────────────────────────────────────────────
 # These are appended after the extracted prompt content.
@@ -540,6 +542,25 @@ When this step is complete, tell the user:
 **Quick task created** — Beads task ready with acceptance criteria, test plan, and implementation notes.
 
 **Next:** Run `/scaffold:single-agent-start` or `/scaffold:single-agent-resume` to begin implementation (or `/scaffold:multi-agent-start <agent-name>` / `/scaffold:multi-agent-resume <agent-name>` for worktree agents).
+
+**Pipeline reference:** `/scaffold:prompt-pipeline`
+
+---
+NEXTSTEP
+            ;;
+        release)
+            cat <<'NEXTSTEP'
+
+## After This Step
+
+When this step is complete, tell the user:
+
+---
+**Release complete** — version bumped, changelog updated, tag created, GitHub release published.
+
+**Next (if applicable):**
+- If follow-up tasks are needed: Run `/scaffold:quick-task` — Create a focused task for post-release work.
+- If the release needs undoing: Run `/scaffold:release rollback` — Undo the most recent release.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

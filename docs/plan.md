@@ -697,7 +697,7 @@ v1 deprecated migration prompts in favor of universal update mode (all document-
 
 #### F-SC-1: Commands Outside the Pipeline
 
-- **What**: Certain commands remain standalone and are not part of any profile's pipeline: `quick-task`, `new-enhancement`, `single-agent-start`, `single-agent-resume`, `multi-agent-start`, `multi-agent-resume`, `prompt-pipeline`, `update`, `version`, `status`, `next`, `skip`, `validate`, `reset`, `adopt`, and all migration commands. Additionally, `user-stories-multi-model-review` and `platform-parity-review` are available as opt-in pipeline prompts (addable via `add-prompts` in a profile or `extra-prompts` in config.json) but are not included in any built-in profile.
+- **What**: Certain commands remain standalone and are not part of any profile's pipeline: `quick-task`, `new-enhancement`, `release`, `single-agent-start`, `single-agent-resume`, `multi-agent-start`, `multi-agent-resume`, `prompt-pipeline`, `update`, `version`, `status`, `next`, `skip`, `validate`, `reset`, `adopt`, and all migration commands. Additionally, `user-stories-multi-model-review` and `platform-parity-review` are available as opt-in pipeline prompts (addable via `add-prompts` in a profile or `extra-prompts` in config.json) but are not included in any built-in profile.
 - **Why**: These are used after the pipeline completes or for ongoing project work. They don't belong in the scaffolding sequence.
 - **Priority**: Must-have (v2.0)
 - **Business rules**:
@@ -706,6 +706,24 @@ v1 deprecated migration prompts in favor of universal update mode (all document-
   - They do not require `.scaffold/config.json` to exist (except `resume`, which does).
   - `prompt-pipeline` is updated to show the resolved pipeline from config.json if it exists, or the built-in pipeline reference if not.
   - `update` and `version` commands are updated to reference the v2 plugin manifest and version scheme.
+
+#### F-SC-2: Release Management
+
+- **What**: A standalone command `/scaffold:release` that automates versioned releases. Analyzes conventional commits since the last tag to suggest a version bump (major/minor/patch), runs quality gates, generates a changelog, bumps version numbers in detected project files, creates a git tag, and publishes a GitHub release.
+- **Why**: Users building projects with Scaffold have no standardized way to cut releases. Version bumping, changelog generation, git tagging, and GitHub release creation are all manual and error-prone. A guided release command fills this gap.
+- **Priority**: Should-have (v2.x)
+- **Business rules**:
+  - Supports four modes: standard (auto-suggest bump), explicit (`major`/`minor`/`patch`), dry-run (`--dry-run` — analysis only, zero mutations), and rollback (undo the most recent release).
+  - Auto-detects version files: `package.json`, `pyproject.toml`, `Cargo.toml`, `.claude-plugin/plugin.json`, `pubspec.yaml`, `setup.cfg`, `version.txt`.
+  - Parses conventional commits (`feat:` → minor, `fix:` → patch, `BREAKING CHANGE` → major) with highest-wins rule. Falls back to asking the user if no conventional commits are found.
+  - Runs the project's quality gates (`make check`, `npm test`, `cargo test`, etc.) before proceeding. Blocks on failure unless the user explicitly forces.
+  - Generates changelog in Keep a Changelog format, grouped by type (Added/Fixed/Changed/Other). Prepends to existing `CHANGELOG.md` or creates a new one.
+  - If `.beads/` exists, cross-references closed Beads tasks with the commit range and includes them in release notes.
+  - First-release bootstrapping: if no `v*` tags exist, guides the user through choosing an initial version and creates `CHANGELOG.md` from scratch.
+  - Branch-aware flow: on `main`/`master`, tags and pushes directly; on feature branches, creates a release PR with post-merge tagging instructions.
+  - Tag format is always `vX.Y.Z`.
+  - Rollback requires the user to type the exact tag name (not just "yes") as a safety measure. Deletes GitHub release, removes tag (local + remote), reverts version bump commit.
+  - Dry-run mode performs all analysis but makes zero file, git, or GitHub changes.
 
 ## 5. Data Model Overview
 
