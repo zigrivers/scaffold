@@ -2,6 +2,35 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.15.0] — 2026-02-17
+
+### Added
+- **Version Bump** command (`/scaffold:version-bump`) — lightweight companion to `/scaffold:release` for marking development milestones; bumps version numbers and updates changelog without tags, push, or GitHub release; supports auto (commit analysis), explicit (`major`/`minor`/`patch`), and `--dry-run` modes; first-bump detection creates version files for new projects
+- **`current` mode** for `/scaffold:release` — tag and release the version already in files without bumping further; ideal after `/scaffold:version-bump`
+- **Version mismatch detection** in `/scaffold:release` (Phase 0.6) — when version in files exceeds the last tag, asks whether to release as-is or bump further
+- US-12.10 (version bump milestone) and US-12.11 (release detects pre-bumped version) user stories in Epic 12
+
+### Changed
+- F-SC-2 (Release Management) expanded to cover both `version-bump` and `release` commands with interaction patterns
+- F-SC-1 standalone commands list updated to include `version-bump`
+- Release command "After This Step" updated to mention `/scaffold:version-bump`
+- Prompt count updated from 28 to 29 across README, plugin.json, and prompts.md
+- Plugin version bumped from 1.14.0 to 1.15.0
+
+## [1.14.0] — 2026-02-17
+
+### Added
+- **Release** command (`/scaffold:release`) — automates versioned releases with conventional commit analysis, quality gates, changelog generation, version file detection and bump, git tagging, and GitHub release creation
+- 7-phase release flow: project detection → version analysis → pre-release validation → changelog & release notes → version bump & commit → tag & publish → post-release summary
+- 4 modes: standard (auto-suggest bump), explicit (`major`/`minor`/`patch`), dry-run (`--dry-run`), and rollback
+- Version file auto-detection for `package.json`, `pyproject.toml`, `Cargo.toml`, `.claude-plugin/plugin.json`, `pubspec.yaml`, `setup.cfg`, `version.txt`
+- Branch-aware publishing: direct flow on `main`/`master`, PR flow on feature branches with fallback
+- Rollback with exact-tag-name safety confirmation, partial-failure reporting, and manual cleanup instructions
+- Beads task integration in release notes (conditional on `.beads/` presence)
+- First-release bootstrapping for projects with no existing tags
+- Epic 12 (Release Management) with 9 user stories (US-12.1–12.9) in `docs/user-stories.md`
+- F-SC-2 feature requirement in `docs/plan.md`
+
 ## [1.13.0] — 2026-02-17
 
 ### Fixed
