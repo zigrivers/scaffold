@@ -52,24 +52,33 @@ Before starting, check if Playwright config files already exist (e.g., `playwrig
 
 You have access to these Playwright MCP tools:
 
-### Navigation & Waiting
+### Navigation & Page Management
 - `browser_navigate` — Navigate to a URL
-- `browser_wait_for` — Wait for an element, network idle, or timeout
+- `browser_navigate_back` — Go back to the previous page in history
+- `browser_wait_for` — Wait for text to appear/disappear or a specified time to pass
 - `browser_close` — Close the browser session
+- `browser_tabs` — List, create, close, or select browser tabs
+- `browser_install` — Install the browser if not already installed
 
 ### Interaction
-- `browser_click` — Click an element
-- `browser_type` — Type text into an input field
-- `browser_fill` — Fill a form field (clears existing content first)
-- `browser_select` — Select an option from a dropdown
+- `browser_click` — Click an element (left, right, or middle button; supports double-click)
+- `browser_type` — Type text into an editable element (supports slow typing and submit)
+- `browser_fill_form` — Fill multiple form fields (textbox, checkbox, radio, combobox, slider)
+- `browser_select_option` — Select an option in a dropdown
 - `browser_hover` — Hover over an element
-- `browser_scroll` — Scroll the page or an element
+- `browser_drag` — Drag and drop between two elements
+- `browser_press_key` — Press a keyboard key (e.g., `ArrowLeft`, `Enter`)
+- `browser_file_upload` — Upload one or multiple files
+- `browser_handle_dialog` — Accept or dismiss browser dialogs (alert, confirm, prompt)
 
 ### Inspection & Verification
-- `browser_take_screenshot` — Capture a screenshot (full page or element)
+- `browser_take_screenshot` — Capture a screenshot (viewport, full page, or element)
+- `browser_snapshot` — Capture accessibility snapshot (better than screenshot for actions)
 - `browser_evaluate` — Execute JavaScript in the browser context
-- `browser_get_text` — Get text content of an element
-- `browser_get_attribute` — Get an attribute value from an element
+- `browser_resize` — Resize the browser window
+- `browser_run_code` — Run a Playwright code snippet directly
+- `browser_console_messages` — Return all console messages (filterable by level)
+- `browser_network_requests` — Return all network requests since page load
 
 ## What to Configure
 
@@ -110,7 +119,7 @@ Document reusable patterns for common scenarios:
 **User Flow Verification**
 ```
 1. browser_navigate to starting point
-2. browser_fill / browser_click through the flow
+2. browser_fill_form / browser_click through the flow
 3. browser_wait_for expected outcome
 4. browser_take_screenshot at key states
 5. browser_evaluate to assert DOM state if needed
@@ -130,7 +139,7 @@ For each viewport (desktop, tablet, mobile):
 2. Trigger error condition (invalid input, failed request)
 3. browser_wait_for error UI
 4. browser_take_screenshot
-5. browser_get_text to verify error message content
+5. browser_evaluate to verify error message content
 ```
 
 ### 4. Integration with TDD Workflow
@@ -161,7 +170,7 @@ When implementing frontend features, use Playwright MCP for visual verification:
 3. Use `browser_wait_for` to ensure content is loaded
 4. Use `browser_take_screenshot` to capture the current state
 5. Review screenshot to verify correctness
-6. For interactive flows: use `browser_click`, `browser_fill`, etc. to simulate user actions
+6. For interactive flows: use `browser_click`, `browser_fill_form`, etc. to simulate user actions
 7. Capture screenshots at key states throughout the flow
 
 ### Screenshot Naming
@@ -208,6 +217,49 @@ Example: `US-012_checkout_desktop_success.png`
 **Baseline management:**
 - Baseline screenshots committed to `tests/screenshots/baseline/`
 - Current run screenshots in `tests/screenshots/current/` (gitignored)
+```
+
+### 7. Playwright Permissions
+
+Ensure Playwright MCP tools run without prompting. Add the bare server-name entry to `~/.claude/settings.json` allow array:
+
+```json
+"mcp__plugin_playwright_playwright"
+```
+
+This single entry covers ALL Playwright tools (navigate, click, screenshot, evaluate, etc.).
+
+For reference, create/update `.claude/settings.local.json` with the complete individual tool list as a fallback:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_playwright_playwright__browser_click",
+      "mcp__plugin_playwright_playwright__browser_close",
+      "mcp__plugin_playwright_playwright__browser_console_messages",
+      "mcp__plugin_playwright_playwright__browser_drag",
+      "mcp__plugin_playwright_playwright__browser_evaluate",
+      "mcp__plugin_playwright_playwright__browser_file_upload",
+      "mcp__plugin_playwright_playwright__browser_fill_form",
+      "mcp__plugin_playwright_playwright__browser_handle_dialog",
+      "mcp__plugin_playwright_playwright__browser_hover",
+      "mcp__plugin_playwright_playwright__browser_install",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__plugin_playwright_playwright__browser_navigate_back",
+      "mcp__plugin_playwright_playwright__browser_network_requests",
+      "mcp__plugin_playwright_playwright__browser_press_key",
+      "mcp__plugin_playwright_playwright__browser_resize",
+      "mcp__plugin_playwright_playwright__browser_run_code",
+      "mcp__plugin_playwright_playwright__browser_select_option",
+      "mcp__plugin_playwright_playwright__browser_snapshot",
+      "mcp__plugin_playwright_playwright__browser_tabs",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot",
+      "mcp__plugin_playwright_playwright__browser_type",
+      "mcp__plugin_playwright_playwright__browser_wait_for"
+    ]
+  }
+}
 ```
 
 ## What NOT to Do
