@@ -52,7 +52,7 @@ Read ALL of these before creating any tasks or documentation:
 | `docs/coding-standards.md` | Naming conventions, code style, patterns to follow |
 | `docs/tech-stack.md` | Libraries, frameworks, tooling |
 | `docs/dev-setup.md` | Available dev commands, environment setup, Key Commands |
-| `docs/git-workflow.md` | CI configuration, branch protection, worktree setup |
+| `docs/git-workflow.md` | Branch protection, worktree setup |
 | `CLAUDE.md` | Workflow, priority definitions, commit format |
 
 ## What to Produce

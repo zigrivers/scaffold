@@ -308,8 +308,8 @@ Test that these commands (used in the canonical workflow) don't prompt:
 | `git branch -d test-branch` | Task closure cleanup |
 | `git fetch origin --prune` | Task closure cleanup |
 | `gh pr create --title "test" --body "test"` | PR workflow |
-| `gh pr merge --squash --auto --delete-branch` | PR workflow |
-| `gh pr checks --watch --fail-fast` | CI watch (long-running) |
+| `gh pr merge --squash --delete-branch` | PR workflow |
+| `gh pr diff` | PR self-review |
 | `gh pr view --json state -q .state` | Merge confirmation |
 | `bd ready` | Task selection |
 | `bd create "test" -p 3` | Task creation |

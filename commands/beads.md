@@ -55,7 +55,7 @@ This project can use parallel Claude Code sessions. Beads provides:
    ```bash
    bd hooks install
    ```
-   Note: These are Beads data-sync hooks only (not code quality hooks). They ensure task data is committed alongside code changes. This is separate from CI checks which handle linting and tests.
+   Note: These are Beads data-sync hooks only (not code quality hooks). They ensure task data is committed alongside code changes. Code quality checks run via `make check` and git hooks.
 
 3. **Verify setup**:
    ```bash
@@ -207,11 +207,10 @@ The following are handled by separate prompts that run later:
 - **Git workflow** (branching, PRs, merge strategy) → Git Workflow prompt
 - **Full development workflow** (session start → implementation → PR → task closure → next task) → CLAUDE.md Optimization + Workflow Audit prompts
 - **Parallel agent worktrees** → Git Workflow prompt
-- **CI/CD pipeline** → Git Workflow prompt
 - **TDD standards** → TDD prompt
 - **Coding standards** → Coding Standards prompt
 
-This prompt establishes Beads as the task tracking system and adds the Beads reference to CLAUDE.md. The full workflow that ties Beads into git, PRs, and CI is composed by later prompts.
+This prompt establishes Beads as the task tracking system and adds the Beads reference to CLAUDE.md. The full workflow that ties Beads into git and PRs is composed by later prompts.
 
 ## After Setup
 

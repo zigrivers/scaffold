@@ -11,6 +11,9 @@ coverage/
 *~
 *.bak
 
+# Git worktrees
+.worktrees/
+
 # Playwright MCP test artifacts
 tests/screenshots/current/
 tests/screenshots/diff/

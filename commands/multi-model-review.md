@@ -84,7 +84,7 @@ The loop is fully event-driven via two GitHub Actions workflows — no polling, 
 2. **Codex Cloud posts PR review** (event-driven — no polling, no wait job)
 3. **`pull_request_review` event** → `code-review-handler.yml` fires, filters to Codex bot only
 4. Handler checks review freshness (SHA match), runs convergence, labels result
-5. **Approved or round cap** → auto-merge (tries `--auto`, falls back to direct merge if auto-merge is not enabled on the repo)
+5. **Approved or round cap** → direct merge (`gh pr merge --squash --delete-branch`)
 6. **Findings remain and rounds < cap** → Claude Code Action reads P0/P1 findings, fixes, pushes
 7. **New push on PR branch** → re-triggers step 1
 8. *(Optional)* `codex-timeout.yml` runs on a cron schedule — finds PRs with stale `awaiting-codex-review` label (>15 min) and auto-approves them
@@ -107,7 +107,7 @@ The loop is fully event-driven via two GitHub Actions workflows — no polling, 
 - **Code-change gate**: Follow-up PR is only created if Claude Code produces actual non-`.beads/` file changes
 - **Graceful degradation**: If Claude Code can't fix the findings, the Beads task + GitHub Issue still exist for manual pickup
 - **Follow-up cost**: Each follow-up uses Opus (~$1.40) with 15 max turns. Follow-ups are rare — expect 0-2 per week
-- **Agent merge gate**: `scripts/await-pr-review.sh` forces agents to wait for the Codex review before merging. Without this, agents race the review when `--auto` is unavailable. The script polls for the review and returns distinct exit codes for approved/findings/timeout/skipped/error.
+- **Agent merge gate**: `scripts/await-pr-review.sh` forces agents to wait for the Codex review before merging. The script polls for the review and returns distinct exit codes for approved/findings/timeout/skipped/error.
 - **No `--admin`**: Agents are explicitly prohibited from using `gh pr merge --admin` in the CLAUDE.md workflow. The `--admin` flag bypasses all protections including Codex Cloud review.
 
 ---
@@ -599,13 +599,7 @@ jobs:
           PR=${{ github.event.pull_request.number }}
           REPO=${{ github.repository }}
 
-          # Try --auto first (works if allow_auto_merge is enabled on repo)
-          if gh pr merge "$PR" --repo "$REPO" --squash --auto --delete-branch 2>/dev/null; then
-            echo "Auto-merge queued — will merge when CI passes"
-          else
-            echo "Auto-merge not available — merging directly"
-            gh pr merge "$PR" --repo "$REPO" --squash --delete-branch
-          fi
+          gh pr merge "$PR" --repo "$REPO" --squash --delete-branch
 
   # ─── Claude Code Fix (only if findings remain) ──────────
   claude-fix:
@@ -710,9 +704,7 @@ jobs:
 
           _Self-review (Tier 1) already ran before this PR was created._"
 
-              if ! gh pr merge "$PR" --repo "$REPO" --squash --auto --delete-branch 2>/dev/null; then
-                gh pr merge "$PR" --repo "$REPO" --squash --delete-branch || true
-              fi
+              gh pr merge "$PR" --repo "$REPO" --squash --delete-branch || true
             fi
           done
 ```
@@ -1055,7 +1047,7 @@ Create a polling script agents call to wait for Codex Cloud review before mergin
 ```bash
 #!/usr/bin/env bash
 # Polls for Codex Cloud PR review matching HEAD SHA.
-# Called by agents after CI passes, before merging.
+# Called by agents before merging to wait for Codex review.
 #
 # Usage: scripts/await-pr-review.sh <pr-number> [--timeout <minutes>] [--interval <seconds>]
 #
@@ -1168,15 +1160,14 @@ Before pushing, run a review subagent to check changes against `docs/review-stan
 
 ### PR Workflow (with Codex Cloud review)
 
-This replaces the basic PR workflow from the Git Workflow section above. If Codex Cloud is NOT configured, skip steps 7-8 and merge directly after CI passes.
+This replaces the basic PR workflow from the Git Workflow section above. If Codex Cloud is NOT configured, skip the Codex review step and merge directly.
 
 1. Run `make check` to verify all quality gates pass
 2. Rebase on latest main: `git fetch origin && git rebase origin/main`
 3. Run self-review subagent: check changes against `docs/review-standards.md`, fix any P0/P1/P2 issues
 4. Push branch: `git push -u origin HEAD`
 5. Create PR: `gh pr create --title "[BD-<id>] type(scope): description"`
-6. Wait for CI: `gh pr checks --watch`
-7. Wait for Codex review (only if `awaiting-codex-review` label is present):
+6. Wait for Codex review (only if `awaiting-codex-review` label is present):
    ```bash
    scripts/await-pr-review.sh <pr-number>
    # Exit 0 = approved, 1 = findings (do NOT merge), 2 = timeout, 3 = skipped
@@ -1195,14 +1186,13 @@ This replaces the basic PR workflow from the Git Workflow section above. If Code
    ```
 9. Close Beads task: `bd close <id> && bd sync`
 
-**NEVER use `gh pr merge --admin`** — it bypasses all protections including Codex Cloud review, branch protection rules, and CI checks. If merge is blocked, check the error and use one of the recovery options below.
+**NEVER use `gh pr merge --admin`** — it bypasses all protections including Codex Cloud review and branch protection rules. If merge is blocked, check the error and use one of the recovery options below.
 
 ### Error Recovery
 
 | Problem | Solution |
 |---------|----------|
-| `--auto` fails ("auto-merge not allowed") | This is expected if repo has `allow_auto_merge: false`. The CI workflows already handle this with a direct merge fallback. Agents should use direct merge (step 8 above), not `--auto`. |
-| Merge blocked by branch protection | Check `gh pr checks` — wait for failing checks to pass. If a required review is missing, wait for Codex review (step 7). |
+| Merge blocked by branch protection | If a required review is missing, wait for Codex review (step 6). |
 | Codex review times out | The `codex-timeout.yml` workflow handles this automatically. Alternatively, comment `/skip-review` on the PR. |
 | Merge blocked by `needs-human-review` label | `FOLLOWUP_ON_CAP=block-merge` is configured — a human must review. Do NOT force merge. |
 | `gh pr merge` returns "not mergeable" | Rebase on main (`git fetch origin && git rebase origin/main && git push --force-with-lease`) and retry. |
@@ -1301,7 +1291,6 @@ The `FOLLOWUP_ON_CAP` env var in `code-review-handler.yml` controls what happens
     - Second review round approves
     - The PR auto-merges with the `ai-review-approved` label
     - Test `scripts/await-pr-review.sh` exits correctly for each scenario (approved, findings, timeout, skipped)
-    - Test `--auto` fallback: on a repo with `allow_auto_merge: false`, verify the handler falls back to direct merge
     - Test follow-up: merge a capped PR with findings, verify Beads task + Issue + follow-up PR created
     - Verify `followup-fix` label prevents recursion on follow-up PRs
     - Verify `followup-created` label prevents duplicate follow-ups

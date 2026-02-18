@@ -19,7 +19,7 @@ Read ALL of these before starting the review:
 | `docs/coding-standards.md` | Tasks reference correct conventions |
 | `docs/dev-setup.md` | Available dev commands, environment setup |
 | `docs/design-system.md` (if exists) | Design tokens, component patterns for frontend tasks |
-| `docs/git-workflow.md` | CI configuration, high-contention file awareness |
+| `docs/git-workflow.md` | Branch protection, high-contention file awareness |
 | `CLAUDE.md` | Workflow, priority definitions |
 
 Then load ALL existing Beads tasks:

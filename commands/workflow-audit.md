@@ -59,23 +59,26 @@ Catches issues before external review. Runs once before push — cheaper and mor
 git fetch origin && git rebase origin/main    # Rebase onto latest main
 git push -u origin HEAD
 gh pr create --title "[BD-<id>] type(scope): description" --body "Closes BD-<id>"
-gh pr merge --squash --auto --delete-branch
 ```
-Auto-merge is set immediately — the PR merges itself once CI passes. The `--delete-branch` flag automatically removes the remote branch after merge (local branch is cleaned up in step 9).
 
-**6. Watch CI**
+**6. Self-review diff**
 ```bash
-gh pr checks --watch --fail-fast
+gh pr diff
 ```
-This blocks until all checks pass or one fails. If a check fails: fix locally, commit, push, re-run the watch command.
 
-**7. Confirm merge**
+**7. Merge**
+```bash
+gh pr merge --squash --delete-branch
+```
+The `--delete-branch` flag automatically removes the remote branch after merge (local branch is cleaned up in step 9).
+
+**8. Confirm merge**
 ```bash
 gh pr view --json state -q .state   # Must show "MERGED"
 ```
 Never close the task until this shows MERGED.
 
-**8. Close task and clean up**
+**9. Close task and clean up**
 
 *Single agent (main repo):*
 ```bash
@@ -190,15 +193,17 @@ CLAUDE.md must contain the complete workflow. Check for:
 - [ ] `git fetch origin && git rebase origin/main` before push
 - [ ] `git push -u origin HEAD`
 - [ ] `gh pr create` with title format matching `[BD-<id>] type(scope): description`
-- [ ] `gh pr merge --squash --auto --delete-branch` immediately after create
+- [ ] `gh pr diff` self-review step documented
+- [ ] `gh pr merge --squash --delete-branch` documented
 - [ ] `--delete-branch` explained (removes remote branch after merge)
-- [ ] Explanation that auto-merge triggers after CI passes
 
-**Step 6: CI Watch**:
-- [ ] `gh pr checks --watch --fail-fast` documented
-- [ ] Failure handling: fix → commit → push → re-watch
+**Step 6: Self-Review**:
+- [ ] `gh pr diff` documented
 
-**Step 7: Confirm Merge**:
+**Step 7: Merge**:
+- [ ] `gh pr merge --squash --delete-branch` documented
+
+**Step 8: Confirm Merge**:
 - [ ] `gh pr view --json state -q .state` documented
 - [ ] "Must show MERGED" requirement
 - [ ] "Never close task until MERGED" rule
@@ -250,7 +255,8 @@ CLAUDE.md must contain the complete workflow. Check for:
 - [ ] Rebase onto origin/main before push documented
 - [ ] Commit format matches: `[BD-<id>] type(scope): description`
 - [ ] Squash merge with `--delete-branch` documented
-- [ ] CI watch step documented
+- [ ] Self-review step (`gh pr diff`) documented
+- [ ] Merge step (`gh pr merge --squash --delete-branch`) documented
 - [ ] Merge confirmation step documented
 - [ ] Task closure with `bd close` documented
 - [ ] Protected main documented
@@ -275,7 +281,7 @@ Cross-reference all documents for contradictions:
 |---------|----------------------|
 | Commit format | `[BD-<id>] type(scope): description` everywhere |
 | Branch naming | `bd-<task-id>/<short-desc>` from `origin/main` everywhere |
-| Merge strategy | `--squash --auto --delete-branch` stated consistently |
+| Merge strategy | `--squash --delete-branch` stated consistently |
 | Required checks | Lint and test commands consistent across CLAUDE.md Key Commands, dev-setup.md, and Makefile/package.json |
 | Task ID format | `[BD-<id>]` consistent (not `BD-<id>` without brackets, not `(bd-<id>)` suffix) |
 | Close command | `bd close` consistently (not `bd update --status completed`) |
@@ -292,8 +298,7 @@ Create a table of findings:
 
 | Document | Issue Type | Problem | Fix |
 |----------|------------|---------|-----|
-| CLAUDE.md | Missing step | No CI watch step (step 6) | Add `gh pr checks --watch` section |
-| CLAUDE.md | Incomplete | Says "create PR" but no auto-merge | Add `gh pr merge --squash --auto --delete-branch` |
+| CLAUDE.md | Incomplete | Says "create PR" but no merge step | Add `gh pr merge --squash --delete-branch` |
 | CLAUDE.md | Missing | No merge confirmation step | Add `gh pr view --json state` check |
 | CLAUDE.md | Missing | No task closure commands | Add `bd close`, `bd sync`, branch cleanup |
 | CLAUDE.md | Missing | No reference to tasks/lessons.md | Add to step 2 |
@@ -309,7 +314,7 @@ Create a table of findings:
 - Wrong or missing git workflow (push to main, wrong branch naming)
 - Missing task ID requirement (commits without `[BD-<id>]`)
 - Wrong merge strategy (merge instead of squash, missing --delete-branch)
-- Missing verification steps (no CI watch, no merge confirmation)
+- Missing verification steps (no merge confirmation)
 - Wrong commit format (task ID at end instead of prefix, missing brackets)
 - Missing task closure (`bd close` not documented)
 
@@ -393,23 +398,26 @@ Catches issues before external review. Runs once before push — not a hook.
 git fetch origin && git rebase origin/main    # Rebase onto latest main
 git push -u origin HEAD
 gh pr create --title "[BD-<id>] type(scope): description" --body "Closes BD-<id>"
-gh pr merge --squash --auto --delete-branch
 ```
-Auto-merge triggers once CI passes. `--delete-branch` removes the remote branch automatically.
 
-### 6. Watch CI
+### 6. Self-review Diff
 ```bash
-gh pr checks --watch --fail-fast
+gh pr diff
 ```
-If a check fails: fix locally, commit, push, re-run watch.
 
-### 7. Confirm Merge
+### 7. Merge
+```bash
+gh pr merge --squash --delete-branch
+```
+`--delete-branch` removes the remote branch automatically.
+
+### 8. Confirm Merge
 ```bash
 gh pr view --json state -q .state   # Must show "MERGED"
 ```
 **Never close task until this shows MERGED.**
 
-### 8. Close Task and Clean Up
+### 9. Close Task and Clean Up
 
 **Single agent (main repo):**
 ```bash
@@ -571,10 +579,11 @@ bd create "Create PR template with task ID format" -p 2
 - Step 4 (TDD loop): [✓ / ⚠️ / ✗]
 - Step 4.5 (Self-review): [✓ / ⚠️ / ✗]
 - Step 5 (PR creation): [✓ / ⚠️ / ✗]
-- Step 6 (CI watch): [✓ / ⚠️ / ✗]
-- Step 7 (Confirm merge): [✓ / ⚠️ / ✗]
-- Step 8 (Cleanup): [✓ / ⚠️ / ✗]
-- Step 9 (Next task): [✓ / ⚠️ / ✗]
+- Step 6 (Self-review diff): [✓ / ⚠️ / ✗]
+- Step 7 (Merge): [✓ / ⚠️ / ✗]
+- Step 8 (Confirm merge): [✓ / ⚠️ / ✗]
+- Step 9 (Cleanup): [✓ / ⚠️ / ✗]
+- Step 10 (Next task): [✓ / ⚠️ / ✗]
 - Key constraints: [✓ / ⚠️ / ✗]
 
 ### Consistency Issues
@@ -651,11 +660,12 @@ After updates, verify:
 | 3 | Think through approach (3+ steps), write specs, do NOT use `/plan`, re-plan if stuck |
 | 4 | Red/Green/Refactor, verify command (project's lint+test from Key Commands), commit format `[BD-<id>]` |
 | 4.5 | Self-review: `claude -p` subagent checks against `docs/review-standards.md` for P0/P1/P2, fixes issues, runs lint+test |
-| 5 | Rebase onto origin/main, push, PR create with title, auto-merge with `--delete-branch` |
-| 6 | `gh pr checks --watch`, failure handling |
-| 7 | Merge confirmation command, "never close until MERGED" |
-| 8 | `bd close`, `bd sync`. Single: return to main, delete branch, `--prune`. Worktree: fetch, prune, clean (no checkout main) |
-| 9 | `bd ready`, continue or stop. Worktree: branch from `origin/main`, batch-clean merged branches |
+| 5 | Rebase onto origin/main, push, PR create with title |
+| 6 | `gh pr diff` self-review |
+| 7 | `gh pr merge --squash --delete-branch` |
+| 8 | Merge confirmation command, "never close until MERGED" |
+| 9 | `bd close`, `bd sync`. Single: return to main, delete branch, `--prune`. Worktree: fetch, prune, clean (no checkout main) |
+| 10 | `bd ready`, continue or stop. Worktree: branch from `origin/main`, batch-clean merged branches |
 | Constraints | No push to main, `[BD-<id>]` required, lint+test before commit, force-with-lease, subagents |
 
 ## After This Step

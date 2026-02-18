@@ -213,7 +213,7 @@ Get the dev server running and set up collaboration infrastructure.
 |---|---------|-------------|-------|
 | 9 | `/scaffold:dev-env-setup` | Sets up dev server, database, environment variables, and `docs/dev-setup.md` | |
 | 10 | `/scaffold:design-system` | Creates a design system with components, colors, and typography | **Optional** — frontend projects only |
-| 11 | `/scaffold:git-workflow` | Configures branching strategy, CI pipeline, and parallel agent worktrees in `docs/git-workflow.md` | |
+| 11 | `/scaffold:git-workflow` | Configures branching strategy, branch protection, and parallel agent worktrees in `docs/git-workflow.md` | |
 | 11.5 | `/scaffold:multi-model-review` | Sets up automated code review using Claude and OpenAI Codex on PRs | **Optional** — requires ChatGPT subscription (credits) |
 
 ### Phase 4 — Testing Integration

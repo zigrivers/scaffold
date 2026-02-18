@@ -181,7 +181,7 @@ Create `docs/dev-setup.md` covering:
 
 Add a Dev Environment section AND populate the Key Commands table. The Key Commands table is the single source of truth for project-specific commands — the entire workflow references it instead of hardcoding commands.
 
-**Add Key Commands table** to the Quick Reference section of CLAUDE.md. This is the single source of truth for project-specific commands — the entire workflow, CI pipeline, and worktree cleanup reference this table instead of hardcoding commands.
+**Add Key Commands table** to the Quick Reference section of CLAUDE.md. This is the single source of truth for project-specific commands — the entire workflow and worktree cleanup reference this table instead of hardcoding commands.
 
 If a "Beads Commands" table exists (from Beads Setup), merge those commands into this table and remove the old table.
 ```markdown
@@ -225,7 +225,7 @@ If any step fails, fix it before considering this complete.
 
 - Don't require Docker unless the tech stack specifically needs it — adds complexity for beginners
 - Don't set up production deployment — this is dev only
-- Don't configure CI/CD here — that's in git-workflow.md
+- Don't configure GitHub Actions — quality gates run locally via `make check` and git hooks
 - Don't add optional tooling "nice-to-haves" — keep it minimal and working
 
 ## Process
