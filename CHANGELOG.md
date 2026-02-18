@@ -2,6 +2,33 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.16.0] — 2026-02-18
+
+### Added
+- **Remove CI as merge gate** — scaffold pipeline no longer generates a CI workflow; local verification (`make check` + git hooks) is the authoritative quality gate for all scaffolded projects
+- **Dashboard task modals** — click any Beads task to see full detail, dependencies, priority, and status in a pop-up; standalone command cards now also show the full prompt on click ([BD-scaffold-06k])
+
+### Changed
+- `gh pr merge` commands throughout drop `--auto` (which required CI status checks) in favor of direct squash-merge
+- Branch protection config changed from `required_status_checks` to `null` — PRs required, no CI gate
+- Section 9 "Repository Hygiene" updated: code quality git hooks (`make hooks`) are now the quality gate
+- Git Workflow prompt removes the CI workflow file template entirely
+- Multi-Model Review agent workflow updated: "Wait for CI" step removed
+
+### Fixed
+- Standalone command modals now show prompt content when clicked ([BD-scaffold-906])
+- `mktemp` on macOS no longer fails when template has extension after XXXXXX ([BD-scaffold-ojr])
+
+### Other
+- Relocated loose root files (`add-multi-model-review.md`, research docs) to `docs/` ([BD-scaffold-9ot])
+
+### Completed Tasks
+- [BD-scaffold-33d] Remove CI as merge gate from scaffold pipeline
+- [BD-scaffold-06k] Dashboard: task modals, status tags, command pop-ups
+- [BD-scaffold-906] fix(dashboard): standalone command modals show nothing when clicked
+- [BD-scaffold-ojr] fix(dashboard): mktemp uses literal XXXXXX on macOS due to trailing slash in TMPDIR
+- [BD-scaffold-9ot] chore: relocate loose root files to docs/
+
 ## [1.15.0] — 2026-02-17
 
 ### Added
