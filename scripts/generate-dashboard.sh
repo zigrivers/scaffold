@@ -13,6 +13,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$SCRIPT_DIR/.."
 
+# Normalize TMPDIR — macOS sets it with a trailing slash which breaks mktemp path templates
+_TMPDIR="${TMPDIR%/}"
+_TMPDIR="${_TMPDIR:-/tmp}"
+
 # Flags
 NO_OPEN=false
 JSON_ONLY=false
@@ -246,7 +250,7 @@ if command -v bd &>/dev/null; then
         # Enrich tasks with descriptions and dependencies (guard: skip if > 50 tasks)
         task_count=$(echo "$BEADS_TASKS_JSON" | jq 'length')
         if [[ "$task_count" -le 50 ]]; then
-            ENRICHED_FILE=$(mktemp "${TMPDIR:-/tmp}/scaffold-enriched-XXXXXX.json")
+            _tmp=$(mktemp "$_TMPDIR/scaffold-enriched-XXXXXX"); ENRICHED_FILE="${_tmp}.json"; mv "$_tmp" "$ENRICHED_FILE"
             echo "$BEADS_TASKS_JSON" > "$ENRICHED_FILE"
 
             task_ids=$(echo "$BEADS_TASKS_JSON" | jq -r '.[].id')
@@ -285,9 +289,9 @@ fi
 # ─── Section 5: Build final JSON payload with jq ─────────────────
 
 # Write large JSON values to temp files to avoid ARG_MAX limits on CI
-PROMPT_CONTENT_FILE=$(mktemp "${TMPDIR:-/tmp}/scaffold-pc-XXXXXX.json")
-LONG_DESC_FILE=$(mktemp "${TMPDIR:-/tmp}/scaffold-ld-XXXXXX.json")
-BEADS_TASKS_FILE=$(mktemp "${TMPDIR:-/tmp}/scaffold-bt-XXXXXX.json")
+_tmp=$(mktemp "$_TMPDIR/scaffold-pc-XXXXXX"); PROMPT_CONTENT_FILE="${_tmp}.json"; mv "$_tmp" "$PROMPT_CONTENT_FILE"
+_tmp=$(mktemp "$_TMPDIR/scaffold-ld-XXXXXX"); LONG_DESC_FILE="${_tmp}.json"; mv "$_tmp" "$LONG_DESC_FILE"
+_tmp=$(mktemp "$_TMPDIR/scaffold-bt-XXXXXX"); BEADS_TASKS_FILE="${_tmp}.json"; mv "$_tmp" "$BEADS_TASKS_FILE"
 echo "$PROMPT_CONTENT_JSON" > "$PROMPT_CONTENT_FILE"
 echo "$LONG_DESCRIPTIONS_JSON" > "$LONG_DESC_FILE"
 echo "$BEADS_TASKS_JSON" > "$BEADS_TASKS_FILE"
@@ -385,7 +389,10 @@ if [[ -z "$OUTPUT_FILE" ]]; then
     if [[ -d "$PROJECT_DIR/.scaffold" ]]; then
         OUTPUT_FILE="$PROJECT_DIR/.scaffold/dashboard.html"
     else
-        OUTPUT_FILE=$(mktemp "${TMPDIR:-/tmp}/scaffold-dashboard-XXXXXX.html")
+        # macOS mktemp requires XXXXXX at end of template (no extension suffix)
+        _tmp=$(mktemp "$_TMPDIR/scaffold-dashboard-XXXXXX")
+        OUTPUT_FILE="${_tmp}.html"
+        mv "$_tmp" "$OUTPUT_FILE"
     fi
 fi
 
