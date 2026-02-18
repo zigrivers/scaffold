@@ -242,15 +242,21 @@ teardown() {
 # ─── Dashboard enhancement: task modals, status tags, filters ────
 
 @test "enriched beads data includes owner and issueType fields" {
+    if ! command -v bd &>/dev/null; then skip "bd not installed"; fi
     run bash "$SCRIPT" --json-only
     [ "$status" -eq 0 ]
+    task_count=$(echo "$output" | jq '.beads.tasks | length')
+    if [ "$task_count" -eq 0 ]; then skip "no beads tasks available"; fi
     # Enriched tasks should have owner, issueType, dependencyCount fields
     echo "$output" | jq -e '.beads.tasks[0] | has("owner", "issueType", "dependencyCount")' >/dev/null
 }
 
 @test "enriched beads tasks have deps object with blockedBy and blocks" {
+    if ! command -v bd &>/dev/null; then skip "bd not installed"; fi
     run bash "$SCRIPT" --json-only
     [ "$status" -eq 0 ]
+    task_count=$(echo "$output" | jq '.beads.tasks | length')
+    if [ "$task_count" -eq 0 ]; then skip "no beads tasks available"; fi
     echo "$output" | jq -e '.beads.tasks[0].deps | has("blockedBy", "blocks")' >/dev/null
 }
 
