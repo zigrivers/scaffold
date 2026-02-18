@@ -102,7 +102,6 @@ bd sync                                  # Force sync to git
 | `gh pr create` | Create pull request from current branch |
 | `gh pr merge --squash --delete-branch` | Squash-merge PR and clean up branch |
 | `gh pr diff` | Review PR diff before merging |
-| `gh pr checks` | Check CI status on current PR |
 | `git push --force-with-lease` | Safe force push after rebase (feature branches only) |
 | `make dashboard-test` | Generate test-ready dashboard HTML for visual verification |
 
@@ -127,9 +126,8 @@ This keeps Beads as the single source of truth for all changes.
 2. Rebase on latest main: `git fetch origin && git rebase origin/main`
 3. Push branch: `git push -u origin HEAD`
 4. Create PR: `gh pr create --title "[BD-<id>] type(scope): description"`
-5. Wait for CI (`check` job) to pass
-6. Self-review: `gh pr diff`
-7. Merge: `gh pr merge --squash --delete-branch`
+5. Self-review: `gh pr diff`
+6. Merge: `gh pr merge --squash --delete-branch`
 
 See `docs/git-workflow.md` for the full PR workflow.
 

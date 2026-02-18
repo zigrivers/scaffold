@@ -39,7 +39,7 @@ Before starting, check if `docs/coding-standards.md` already exists:
 - **Secondary output**: Linter/formatter config files (`.eslintrc`, `.prettierrc`, etc.)
 - **Preserve**: Naming conventions, lint rule customizations, commit message format, project-specific patterns and examples
 - **Related docs**: `docs/tech-stack.md`, `docs/tdd-standards.md`, `docs/project-structure.md`, `docs/git-workflow.md`
-- **Special rules**: Never change the commit message format without checking `docs/git-workflow.md` and CI config for references. Preserve all linter/formatter config customizations.
+- **Special rules**: Never change the commit message format without checking `docs/git-workflow.md` for references. Preserve all linter/formatter config customizations.
 
 ## What the Document Must Cover
 
@@ -125,7 +125,7 @@ Rules:
 - Scope should be the feature or module being changed
 - Description should be imperative ("add", "fix", "update" — not "added", "fixed", "updated")
 
-This format is referenced by the git workflow, CLAUDE.md, and CI pipeline. It must be consistent everywhere.
+This format is referenced by the git workflow and CLAUDE.md. It must be consistent everywhere.
 
 ### 10. Code Review Checklist
 

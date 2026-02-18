@@ -112,16 +112,15 @@ If rebase produces conflicts:
    EOF
    )"
    ```
-5. Wait for CI (`check` job) to pass
-6. Self-review the diff:
+5. Self-review the diff:
    ```bash
    gh pr diff
    ```
-7. Merge when CI is green:
+6. Merge:
    ```bash
    gh pr merge --squash --delete-branch
    ```
-8. Pull updated main:
+7. Pull updated main:
    ```bash
    git checkout main && git pull origin main
    ```
@@ -197,20 +196,15 @@ git fetch --prune
 
 ## 7. Branch Protection
 
-CI is required on PRs to main. The `check` job in `.github/workflows/ci.yml` runs `make check` (lint + validate + test).
+Branch protection prevents direct pushes to main. Quality gates run locally via `make check` and git hooks — there is no CI workflow.
 
-### Setup (After First CI Run)
-
-Branch protection can only reference status checks that have run at least once. After the first PR triggers CI:
+### Setup
 
 ```bash
 gh api repos/{owner}/{repo}/branches/main/protection -X PUT \
   --input - <<'EOF'
 {
-  "required_status_checks": {
-    "strict": true,
-    "contexts": ["check"]
-  },
+  "required_status_checks": null,
   "enforce_admins": false,
   "required_pull_request_reviews": null,
   "restrictions": null
@@ -218,11 +212,11 @@ gh api repos/{owner}/{repo}/branches/main/protection -X PUT \
 EOF
 ```
 
-Fallback: GitHub web UI (Settings > Branches > Add rule).
+Fallback: GitHub web UI (Settings > Branches > Add rule). Do NOT check "Require status checks".
 
 ### Current Configuration
 
-- **Required checks**: `check` (CI job)
+- **Required checks**: None (quality gates are local)
 - **Review required**: No (single-developer project with AI agents)
 - **Admin enforcement**: No (allows emergency merges)
 
@@ -265,9 +259,9 @@ No additions needed for the current stack.
 
 These are local-only (not committed to `.git/hooks/`). Each developer/agent runs `make hooks` after cloning.
 
-### CI by Design
+### Local Verification by Design
 
-Quality gates run both locally (`make check`) and in CI (`.github/workflows/ci.yml`). The CI workflow is the authoritative gate — local hooks are a convenience.
+Quality gates run locally via `make check` and git hooks. There is no CI workflow — local verification is the authoritative gate.
 
 ## 10. Parallel Agent Setup
 

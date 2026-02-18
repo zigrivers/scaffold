@@ -1,6 +1,6 @@
 ---
 description: "Configure git workflow for parallel agents"
-long-description: "Sets up docs/git-workflow.md with branching strategy, PR workflow, CI configuration, and worktree scripts for parallel agent execution."
+long-description: "Sets up docs/git-workflow.md with branching strategy, PR workflow, and worktree scripts for parallel agent execution."
 ---
 
 Create `docs/git-workflow.md` and configure the repository to support parallel Claude Code sessions working simultaneously without conflicts.
@@ -38,10 +38,10 @@ Before starting, check if `docs/git-workflow.md` already exists:
 
 ### Update Mode Specifics
 - **Primary output**: `docs/git-workflow.md`
-- **Secondary output**: `scripts/setup-agent-worktree.sh`, CI config files, CLAUDE.md workflow sections
-- **Preserve**: CI job names (branch protection references these), worktree script customizations, branch naming conventions, PR template customizations
+- **Secondary output**: `scripts/setup-agent-worktree.sh`, CLAUDE.md workflow sections
+- **Preserve**: Worktree script customizations, branch naming conventions, PR template customizations
 - **Related docs**: `CLAUDE.md`, `docs/dev-setup.md`, `docs/coding-standards.md`
-- **Special rules**: Never rename CI jobs without checking branch protection rules. Preserve worktree directory naming conventions. Keep the setup-agent-worktree.sh script's customizations intact.
+- **Special rules**: Preserve worktree directory naming conventions. Keep the setup-agent-worktree.sh script's customizations intact.
 
 ## The Core Problem
 
@@ -145,7 +145,7 @@ cd ../project-agent-3 && BD_ACTOR="Agent-3" claude
 ```bash
 git fetch origin
 git checkout -b bd-<task-id>/<description> origin/main
-# work, commit, push, PR, watch CI, confirm merge...
+# work, commit, push, PR, self-review, merge, confirm merge...
 bd close <task-id>
 bd sync
 git fetch origin --prune
@@ -241,12 +241,11 @@ git push -u origin HEAD
 # 5. Create PR
 gh pr create --title "[BD-<id>] type(scope): description" --body "Closes BD-<id>"
 
-# 6. Enable auto-merge (merges after CI passes, deletes remote branch)
-gh pr merge --squash --auto --delete-branch
+# 6. Self-review diff
+gh pr diff
 
-# 7. Watch CI (blocks until checks pass or fail)
-gh pr checks --watch --fail-fast
-# If a check fails: fix locally, commit, push, re-run watch
+# 7. Merge
+gh pr merge --squash --delete-branch
 
 # 8. Confirm merge
 gh pr view --json state -q .state   # Must show "MERGED"
@@ -258,19 +257,13 @@ gh pr view --json state -q .state   # Must show "MERGED"
 | Command | Purpose |
 |---------|---------|
 | `gh pr create --title "..." --body "..."` | Create PR from current branch |
-| `gh pr merge --squash --auto --delete-branch` | Queue auto-merge after CI passes |
-| `gh pr checks --watch --fail-fast` | Watch CI, block until pass or fail |
+| `gh pr merge --squash --delete-branch` | Squash-merge and delete remote branch |
 | `gh pr view --json state -q .state` | Confirm merge completed |
 | `gh pr list` | List open PRs |
 
-**Why `--squash --auto --delete-branch`:**
+**Why `--squash --delete-branch`:**
 - `--squash`: All branch commits become one clean commit on main
-- `--auto`: Queues merge for when CI passes
 - `--delete-branch`: Removes remote branch after merge (local cleaned up in task closure)
-
-**If merge is blocked:**
-- Don't use `--admin` to bypass CI
-- Watch with `gh pr checks --watch --fail-fast`, fix failures, push, re-watch
 
 ### 5. Task Closure and Cleanup
 
@@ -334,31 +327,24 @@ When an agent session dies mid-task:
 
 ### 7. Main Branch Protection
 
-Configure branch protection on main with **CI checks required, but no human review gate** (since you're the sole developer orchestrating agents):
+Configure branch protection on main to **require PRs, but no CI checks** — quality gates run locally via `make check` and git hooks:
 
 ```bash
 # Configure via GitHub CLI (run once)
 gh api repos/{owner}/{repo}/branches/main/protection -X PUT -f \
-  required_status_checks='{"strict":true,"contexts":["check"]}' \
+  required_status_checks=null \
   enforce_admins=false \
   required_pull_request_reviews=null \
   restrictions=null
 ```
 
-**Important:** The `contexts` value must match the CI job name. The CI template (above) uses job name `check`, so use `"contexts":["check"]`. If your CI uses a different job name, update the context to match. After the first PR triggers CI, verify the exact status check context name with:
-```bash
-gh api repos/{owner}/{repo}/commits/$(git rev-parse HEAD)/check-runs --jq '.check_runs[].name'
-```
-
 **If the `gh api` command fails**, configure branch protection via the GitHub web UI:
 1. Go to Settings → Branches → Add branch protection rule
 2. Branch name pattern: `main`
-3. Check: "Require status checks to pass before merging"
-4. Search and add status check: `check` (or your CI job name)
-5. Uncheck: "Require a pull request before merging" (or set required reviewers to 0)
+3. Do NOT check "Require status checks to pass before merging"
+4. Uncheck: "Require a pull request before merging" (or set required reviewers to 0)
 
 What this gives you:
-- PRs must pass CI before merging
 - No review approval required (you're the only human)
 - `enforce_admins=false` lets you push directly in emergencies
 - Agents cannot accidentally push to main
@@ -379,8 +365,8 @@ Additional guardrails:
 ### 9. .gitignore and Repository Hygiene
 - Ensure .gitignore is comprehensive for the project's tech stack
 - Files that must be tracked vs. generated
-- No code quality git hooks (linting, type checking, test runs) — let CI be the gatekeeper
-- **Exception:** Beads data-sync hooks (`bd hooks install`) are allowed — these sync task tracking data, not code quality checks
+- Code quality git hooks (`make hooks`) are the quality gate — pre-commit runs lint, pre-push runs the full test suite
+- Beads data-sync hooks (`bd hooks install`) sync task tracking data
 
 ### 10. Update CLAUDE.md
 
@@ -401,8 +387,8 @@ Add the following sections to CLAUDE.md:
 2. Rebase: `git fetch origin && git rebase origin/main`
 3. Push: `git push -u origin HEAD`
 4. Create PR: `gh pr create --title "[BD-<id>] type(scope): description" --body "Closes BD-<id>"`
-5. Auto-merge: `gh pr merge --squash --auto --delete-branch`
-6. Watch CI: `gh pr checks --watch --fail-fast` (fix failures, push, re-watch)
+5. Self-review: `gh pr diff`
+6. Merge: `gh pr merge --squash --delete-branch`
 7. Confirm: `gh pr view --json state -q .state` — must show "MERGED"
 ```
 
@@ -489,8 +475,7 @@ If you are in a permanent worktree:
 | `git worktree list` | List all active worktrees |
 | `BD_ACTOR="Agent-1" claude` | Launch agent with Beads identity |
 | `gh pr create --title "..." --body "..."` | Create PR from current branch |
-| `gh pr merge --squash --auto --delete-branch` | Queue auto-merge after CI passes |
-| `gh pr checks --watch --fail-fast` | Watch CI until pass or fail |
+| `gh pr merge --squash --delete-branch` | Squash-merge and delete remote branch |
 | `gh pr view --json state -q .state` | Confirm merge completed |
 | `bd close <id>` | Close completed task |
 
@@ -503,43 +488,10 @@ If you are in a permanent worktree:
 
 After creating the documentation, actually set up:
 - [ ] `scripts/setup-agent-worktree.sh` for permanent agent worktrees
-- [ ] Branch protection on main: CI required, no review required (use `gh api` command from Section 7)
+- [ ] Branch protection on main: PRs required, no CI (use `gh api` command from Section 7)
 - [ ] PR template (`.github/pull_request_template.md`)
 - [ ] .gitignore appropriate for the project's tech stack
-- [ ] CI workflow file for automated checks on PRs (see below)
 - [ ] `tasks/lessons.md` — if it doesn't already exist, create it (Beads Setup should have created this, but verify)
-
-### CI Workflow File
-
-Create `.github/workflows/ci.yml` using the project's actual lint and test commands from CLAUDE.md Key Commands table. The template below uses placeholders — replace them with the real commands from `docs/dev-setup.md`:
-
-```yaml
-name: CI
-on:
-  pull_request:
-    branches: [main]
-
-jobs:
-  check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup environment
-        # Add language/runtime setup per docs/tech-stack.md
-        # e.g., uses: actions/setup-node@v4 / actions/setup-python@v5
-
-      - name: Install dependencies
-        run: <install-deps>
-
-      - name: Lint
-        run: <lint>
-
-      - name: Test
-        run: <test>
-```
-
-The `check` job name must match what's referenced in branch protection rules (Section 7). If the status check context name is different (e.g., `check / check`), update the branch protection accordingly.
 
 ### PR Template
 
@@ -571,14 +523,14 @@ Create `.github/pull_request_template.md`:
 
 ## Process
 - After creating docs and configuration, commit everything to the repo
-- Test the workflow by verifying branch protection and CI checks are active
+- Test the workflow by verifying branch protection is active and `make check` passes locally
 
 ## After This Step
 
 When this step is complete, tell the user:
 
 ---
-**Phase 3 in progress** — `docs/git-workflow.md` created, CI configured, worktree script ready.
+**Phase 3 in progress** — `docs/git-workflow.md` created, branch protection configured, worktree script ready.
 
 **Next (choose one):**
 - **(Optional)** Run `/scaffold:multi-model-review` — Set up multi-model code review on PRs (requires ChatGPT Pro subscription).
