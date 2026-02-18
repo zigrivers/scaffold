@@ -449,9 +449,9 @@ Full-screen overlay modal showing complete prompt content for any pipeline step.
 
 ### 3.15 Beads Task Section
 
-**Classes:** `.beads-section`, `.beads-filters`, `.beads-filter`, `.beads-filter.active`
+**Classes:** `.beads-section`, `.beads-filters`, `.beads-filter`, `.beads-filter.active`, `.beads-filter-sep`, `.beads-prio-filter`, `.beads-prio-filter.active`
 
-Collapsible section showing all Beads tasks with open/closed/all filter buttons.
+Collapsible section showing all Beads tasks with status filter buttons and priority toggle buttons. Task cards open a detail modal on click.
 
 ```html
 <div class="beads-section">
@@ -462,11 +462,15 @@ Collapsible section showing all Beads tasks with open/closed/all filter buttons.
     </div>
     <div class="plist">
         <div class="beads-filters">
-            <button class="beads-filter active">Open (7)</button>
-            <button class="beads-filter">Closed (5)</button>
-            <button class="beads-filter">All (12)</button>
+            <button class="beads-filter active" onclick="filterBeads('open',this)">Open (7)</button>
+            <button class="beads-filter" onclick="filterBeads('in_progress',this)">In Progress (2)</button>
+            <button class="beads-filter" onclick="filterBeads('closed',this)">Closed (5)</button>
+            <button class="beads-filter" onclick="filterBeads('all',this)">All (12)</button>
+            <span class="beads-filter-sep"></span>
+            <button class="beads-prio-filter" onclick="filterBeadsPrio(0,this)">P0 (1)</button>
+            <button class="beads-prio-filter" onclick="filterBeadsPrio(1,this)">P1 (4)</button>
         </div>
-        <!-- Task cards using .pcard pattern -->
+        <!-- Task cards using .pcard pattern, each with onclick="openBeadModal('id')" -->
     </div>
 </div>
 ```
@@ -475,12 +479,106 @@ Collapsible section showing all Beads tasks with open/closed/all filter buttons.
 
 **Design details:**
 - Uses same `.phase-hdr` pattern as pipeline phases for collapsible header
-- Filter buttons: pill-shaped (99px radius), extra-small text with wide letter-spacing
+- Status filter buttons: pill-shaped (99px radius), extra-small text with wide letter-spacing; only shown when count > 0
+- Priority filter buttons (`.beads-prio-filter`): same pill shape, toggle independently (additive filter)
+- `.beads-filter-sep`: 1px vertical divider separating status and priority filter groups
 - Active filter: accent background with white text
 - Hover: border and text transition to accent
-- Task cards reuse `.pcard` grid layout
+- Task cards reuse `.pcard` grid layout; `data-bead-status` and `data-bead-priority` attributes drive filtering
+- "Open" filter means "not closed" (shows open + in_progress + blocked + deferred)
 - Priority badges (P0-P3) use colored `.badge` with priority-specific colors
+- Clicking a task card opens the beads task detail modal (`openBeadModal(id)`)
 - Positioned between pipeline phases and standalone commands
+
+### 3.17 Beads Status Badge
+
+**Classes:** `.status-badge.st-bead-open`, `.st-bead-progress`, `.st-bead-blocked`, `.st-bead-deferred`, `.st-bead-closed`
+
+Pill-shaped status badges for Beads tasks, distinct from pipeline status badges (which use `st-completed`, `st-pending`, etc.).
+
+| Class | Icon | Label | Color token |
+|-------|------|-------|-------------|
+| `.st-bead-open` | ○ | Open | `--accent` |
+| `.st-bead-progress` | ► | In Progress | `--blue` |
+| `.st-bead-blocked` | ■ | Blocked | `--yellow` |
+| `.st-bead-deferred` | ⧖ | Deferred | `--gray` |
+| `.st-bead-closed` | ✓ | Closed | `--green` |
+
+```html
+<span class="status-badge st-bead-open">○&nbsp;Open</span>
+<span class="status-badge st-bead-progress">►&nbsp;In Progress</span>
+<span class="status-badge st-bead-blocked">■&nbsp;Blocked</span>
+<span class="status-badge st-bead-closed">✓&nbsp;Closed</span>
+```
+
+**Tokens used:** Status color tokens (`--accent`, `--blue`, `--yellow`, `--gray`, `--green`) + their `-bg` and `-border` variants
+
+**Design details:**
+- Uses `st-bead-*` prefix to avoid collision with pipeline's `st-completed`, `st-pending`, etc.
+- Reuses base `.status-badge` styles (pill shape, letter-spacing, font-weight)
+- Background uses the color's `-bg` token, text uses color token, border uses `-border` token
+
+### 3.18 Beads Task Detail Modal
+
+**Classes:** `.bead-meta-grid`, `.bead-meta-item`, `.bead-meta-label`, `.bead-meta-value`, `.bead-description`, `.bead-deps`, `.bead-dep-group`, `.bead-dep-label`, `.bead-dep-link`, `.bead-timestamps`, `.bead-ts-item`, `.bead-ts-label`, `.bead-ts-value`
+
+Full-screen overlay modal showing complete task details for a Beads task. Opened by clicking any task card in the Beads Task Section.
+
+```html
+<div class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="status-badge st-bead-open">○&nbsp;Open</span>
+            <h3>Task Title</h3>
+            <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <!-- Metadata grid -->
+            <div class="bead-meta-grid">
+                <div class="bead-meta-item">
+                    <span class="bead-meta-label">ID</span>
+                    <span class="bead-meta-value">scaffold-abc</span>
+                </div>
+                <div class="bead-meta-item">
+                    <span class="bead-meta-label">Priority</span>
+                    <span class="bead-meta-value"><span class="badge" style="background:var(--blue)">P1</span></span>
+                </div>
+            </div>
+            <!-- Description (shown only if present) -->
+            <div class="bead-description">Full description text...</div>
+            <!-- Dependencies (shown only if present) -->
+            <div class="bead-deps">
+                <div class="bead-dep-group">
+                    <span class="bead-dep-label">Blocked By</span>
+                    <span class="bead-dep-link" onclick="closeModal();openBeadModal('scaffold-xyz')">scaffold-xyz</span>
+                </div>
+            </div>
+            <!-- Timestamps -->
+            <div class="bead-timestamps">
+                <div class="bead-ts-item">
+                    <span class="bead-ts-label">Created</span>
+                    <span class="bead-ts-value" title="2026-02-18T10:00:00Z">2d ago</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+```
+
+**Tokens used:** `--bg-card`, `--border`, `--border-light`, `--radius`, `--shadow-lg`, `--accent`, `--text-faint`, `--sp-*`
+
+**Design details:**
+- Reuses `.modal-overlay`, `.modal`, `.modal-header`, `.modal-body`, `.modal-close` from the prompt modal
+- Status badge shown in header next to title
+- Metadata grid: 2-column CSS grid with `gap: var(--sp-3)`, label/value flex pairs
+- Labels: uppercase, `--text-xs`, `--text-faint`; values: `--text-sm`, `--fw-medium`
+- Description section: `pre-wrap` whitespace, only shown if description is non-null
+- Dependencies section: only shown if blockedBy or blocks arrays are non-empty
+- Dependency links (`.bead-dep-link`): monospace accent-colored pill; click navigates to linked task's modal
+- `.bead-dep-link:hover`: fills accent background for clear affordance
+- Timestamps: relative time string (e.g. "2d ago") with full ISO date in `title` attribute (dotted underline indicates hover tooltip)
+- Sections separated by `border-bottom: 1px solid var(--border-light)`
+- Close: X button, Escape key, or backdrop click (same as prompt modal)
 
 ### 3.16 Long Description
 
@@ -550,10 +648,17 @@ All interactive surfaces respond to hover:
 
 ### 6.3 Adding a New Status Color
 
+**For pipeline statuses** (completed, pending, etc.):
 1. Add `--<status>`, `--<status>-bg`, and `--<status>-border` tokens (light + dark)
-2. Add `.st-<status>` dot style with matching `box-shadow` ring
-3. Update `stLbl()` in the JS to include the display label
+2. Add `.st-<status>` badge style using those tokens
+3. Update `statusMap` and `stBadge()` in the JS to include the display label and icon
 4. Document in section 2.1 (status colors table)
+
+**For Beads task statuses** (open, in_progress, blocked, deferred, closed):
+1. Add `.st-bead-<status>` to `lib/dashboard-theme.css` (after the Beads Status Badges block)
+2. Update `beadsStatusMap` in the JS to include icon, label, and class name
+3. Document in section 3.17 (Beads Status Badge table)
+4. Use the `st-bead-*` prefix to avoid collision with pipeline status classes
 
 ## 7. Do's and Don'ts
 

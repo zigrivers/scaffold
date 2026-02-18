@@ -238,3 +238,79 @@ teardown() {
     run grep 'as \$s' "$BATS_TEST_DIRNAME/../scripts/generate-dashboard.sh"
     [ "$status" -eq 0 ]
 }
+
+# ─── Dashboard enhancement: task modals, status tags, filters ────
+
+@test "enriched beads data includes owner and issueType fields" {
+    if ! command -v bd &>/dev/null; then skip "bd not installed"; fi
+    run bash "$SCRIPT" --json-only
+    [ "$status" -eq 0 ]
+    task_count=$(echo "$output" | jq '.beads.tasks | length')
+    if [ "$task_count" -eq 0 ]; then skip "no beads tasks available"; fi
+    # Enriched tasks should have owner, issueType, dependencyCount fields
+    echo "$output" | jq -e '.beads.tasks[0] | has("owner", "issueType", "dependencyCount")' >/dev/null
+}
+
+@test "enriched beads tasks have deps object with blockedBy and blocks" {
+    if ! command -v bd &>/dev/null; then skip "bd not installed"; fi
+    run bash "$SCRIPT" --json-only
+    [ "$status" -eq 0 ]
+    task_count=$(echo "$output" | jq '.beads.tasks | length')
+    if [ "$task_count" -eq 0 ]; then skip "no beads tasks available"; fi
+    echo "$output" | jq -e '.beads.tasks[0].deps | has("blockedBy", "blocks")' >/dev/null
+}
+
+@test "HTML contains openBeadModal function" {
+    run bash "$SCRIPT" --no-open --output "$TEST_OUT/dashboard.html"
+    [ "$status" -eq 0 ]
+    grep -q 'function openBeadModal' "$TEST_OUT/dashboard.html"
+}
+
+@test "HTML contains relTime function" {
+    run bash "$SCRIPT" --no-open --output "$TEST_OUT/dashboard.html"
+    [ "$status" -eq 0 ]
+    grep -q 'function relTime' "$TEST_OUT/dashboard.html"
+}
+
+@test "HTML contains beads status CSS classes" {
+    run bash "$SCRIPT" --no-open --output "$TEST_OUT/dashboard.html"
+    [ "$status" -eq 0 ]
+    grep -q 'st-bead-open' "$TEST_OUT/dashboard.html"
+    grep -q 'st-bead-progress' "$TEST_OUT/dashboard.html"
+    grep -q 'st-bead-blocked' "$TEST_OUT/dashboard.html"
+    grep -q 'st-bead-closed' "$TEST_OUT/dashboard.html"
+}
+
+@test "standalone command cards have openModal onclick" {
+    run bash "$SCRIPT" --no-open --output "$TEST_OUT/dashboard.html"
+    [ "$status" -eq 0 ]
+    # Standalone cards are rendered via JS template: openModal(\' + esc(sp.s) + \')
+    grep -q "onclick=\"openModal" "$TEST_OUT/dashboard.html"
+    # Verify the standalone section's pcard generation includes openModal
+    grep -q "openModal.*esc(sp.s)" "$TEST_OUT/dashboard.html"
+}
+
+@test "HTML contains priority filter buttons" {
+    run bash "$SCRIPT" --no-open --output "$TEST_OUT/dashboard.html"
+    [ "$status" -eq 0 ]
+    grep -q 'beads-prio-filter' "$TEST_OUT/dashboard.html"
+}
+
+@test "HTML contains applyBeadFilters function" {
+    run bash "$SCRIPT" --no-open --output "$TEST_OUT/dashboard.html"
+    [ "$status" -eq 0 ]
+    grep -q 'function applyBeadFilters' "$TEST_OUT/dashboard.html"
+}
+
+@test "beads task cards have data-bead-priority attribute" {
+    run bash "$SCRIPT" --no-open --output "$TEST_OUT/dashboard.html"
+    [ "$status" -eq 0 ]
+    grep -q 'data-bead-priority' "$TEST_OUT/dashboard.html"
+}
+
+@test "HTML contains bead modal CSS classes" {
+    run bash "$SCRIPT" --no-open --output "$TEST_OUT/dashboard.html"
+    [ "$status" -eq 0 ]
+    grep -q 'bead-meta-grid' "$TEST_OUT/dashboard.html"
+    grep -q 'bead-dep-link' "$TEST_OUT/dashboard.html"
+}
