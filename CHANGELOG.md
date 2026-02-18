@@ -2,6 +2,28 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.13.0] — 2026-02-17
+
+### Fixed
+- **`bd q` bug** — post-merge follow-up workflow used `bd q` (non-existent command) instead of `bd create` for creating Beads tasks from unresolved findings
+
+### Added
+- **Await PR review script** (`scripts/await-pr-review.sh`) — new artifact in multi-model-review prompt; polling script that agents call to wait for Codex Cloud review before merging, with distinct exit codes for approved/findings/timeout/skipped/error
+- **Agent merge gate** safety rail — forces agents to wait for Codex review when `--auto` is unavailable, preventing race conditions between agents and the review loop
+- **`--admin` prohibition** — agents are explicitly prohibited from using `gh pr merge --admin` in the CLAUDE.md workflow to prevent bypassing all protections
+- **9-step PR workflow** in CLAUDE.md section — replaces the basic 5-step workflow with full Codex review waiting (step 7), merge-state checking (step 8), and error recovery table
+- **`--auto` fallback** in handler and timeout workflows — tries `--auto` first, falls back to direct merge when `allow_auto_merge` is disabled on the repo
+- Error Recovery table in CLAUDE.md section covering `--auto` failures, branch protection blocks, review timeouts, and merge conflicts
+- Process steps for await script creation (step 5) and `docs/git-workflow.md` update (step 9)
+- Test verification items for await script exit codes and `--auto` fallback behavior
+
+### Changed
+- Architecture "What Triggers What" step 5 updated from hardcoded `--auto` command to fallback description
+- CLAUDE.md section expanded from simple overview to complete PR workflow that replaces git-workflow's basic version
+- Process section renumbered from 9 to 11 steps to include await script and git-workflow.md update
+- Commit step updated to include `scripts/await-pr-review.sh` and `docs/git-workflow.md` in staged files
+- Secondary outputs list updated to include `scripts/await-pr-review.sh` and `docs/git-workflow.md`
+
 ## [1.12.1] — 2026-02-17
 
 ### Fixed
