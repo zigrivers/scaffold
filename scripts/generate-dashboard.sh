@@ -335,6 +335,25 @@ PAYLOAD=$(jq -n \
         checkFile: ((.step) as $s | ($detection | map(select(.step == $s)) | .[0].checkFile) // "")
     })) as $prompts |
 
+    # Append standalone commands not already in pipeline
+    ($promptContent[0] | to_entries |
+     map(select(.key as $k | $prompts | map(.slug) | index($k) | not)) |
+     map({
+         slug: .key,
+         promptContent: .value,
+         status: "pending",
+         phase: "Standalone",
+         step: "99",
+         notes: "",
+         isStandalone: true,
+         description: ($descriptions[.key] // ""),
+         deps: [],
+         longDescription: ($longDescriptions[0][.key] // ""),
+         optional: false,
+         checkFile: ""
+     })) as $standalonePrompts |
+    ($prompts + $standalonePrompts) as $allPrompts |
+
     # Unique phases in order
     ($prompts | [.[].phase] | unique) as $rawPhases |
     ($pipeline | [.[].phase] | reduce .[] as $p ([]; if (. | index($p)) then . else . + [$p] end)) as $orderedPhases |
@@ -354,7 +373,7 @@ PAYLOAD=$(jq -n \
         )] | .[0] // null) as $next |
 
     {
-        prompts: $prompts,
+        prompts: $allPrompts,
         phases: ($orderedPhases | map({name: .})),
         summary: {
             total: $total,

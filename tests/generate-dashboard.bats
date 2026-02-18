@@ -324,3 +324,13 @@ teardown() {
     # The reported path must not contain the literal template string
     [[ "$output" != *"XXXXXX"* ]]
 }
+
+# ─── Standalone commands in JSON payload ─────────────────────────
+
+@test "standalone commands have promptContent in JSON payload" {
+    run bash "$SCRIPT" --json-only
+    [ "$status" -eq 0 ]
+    # quick-task is a standalone command not in the pipeline table
+    pc=$(echo "$output" | jq -r '.prompts[] | select(.slug == "quick-task") | .promptContent | length')
+    [ "$pc" -gt 100 ]
+}
