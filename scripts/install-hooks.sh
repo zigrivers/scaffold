@@ -73,9 +73,12 @@ else
 fi
 
 # 2. Run full test suite
+# Unset git hook environment variables that interfere with git operations
+# inside tests (e.g. git clone fails when GIT_DIR is set by the hook env)
 if command -v bats >/dev/null 2>&1; then
     script_dir="$(cd "$(dirname "$0")" && pwd)"
     repo_dir="$script_dir/../.."
+    unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
     bats "$repo_dir/tests/" || exit 1
 else
     echo "Warning: bats not installed, skipping test suite" >&2
