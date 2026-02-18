@@ -229,10 +229,56 @@ if command -v bd &>/dev/null; then
             status: .status,
             priority: (.priority // null),
             assignee: (.assignee // null),
+            owner: (.owner // null),
+            createdBy: (.created_by // null),
+            issueType: (.issue_type // null),
+            closeReason: (.close_reason // null),
+            dependencyCount: (.dependency_count // 0),
+            dependentCount: (.dependent_count // 0),
+            commentCount: (.comment_count // 0),
             createdAt: (.created_at // null),
             updatedAt: (.updated_at // null),
-            closedAt: (.closed_at // null)
+            closedAt: (.closed_at // null),
+            description: null,
+            deps: {blockedBy: [], blocks: []}
         }]' 2>/dev/null || echo "[]")
+
+        # Enrich tasks with descriptions and dependencies (guard: skip if > 50 tasks)
+        task_count=$(echo "$BEADS_TASKS_JSON" | jq 'length')
+        if [[ "$task_count" -le 50 ]]; then
+            ENRICHED_FILE=$(mktemp "${TMPDIR:-/tmp}/scaffold-enriched-XXXXXX.json")
+            echo "$BEADS_TASKS_JSON" > "$ENRICHED_FILE"
+
+            task_ids=$(echo "$BEADS_TASKS_JSON" | jq -r '.[].id')
+            while IFS= read -r tid; do
+                [[ -z "$tid" ]] && continue
+
+                # Get description from bd show
+                desc=$(bd show "$tid" --json 2>/dev/null | jq -r '.description // empty' 2>/dev/null || true)
+
+                # Get dependencies
+                blocked_by="[]"
+                blocks="[]"
+                dep_count=$(echo "$BEADS_TASKS_JSON" | jq -r --arg id "$tid" '.[] | select(.id == $id) | .dependencyCount // 0')
+                dependent_count=$(echo "$BEADS_TASKS_JSON" | jq -r --arg id "$tid" '.[] | select(.id == $id) | .dependentCount // 0')
+
+                if [[ "${dep_count:-0}" -gt 0 ]]; then
+                    blocked_by=$(bd dep list "$tid" --json 2>/dev/null | jq '[.[].id // empty]' 2>/dev/null || echo "[]")
+                fi
+                if [[ "${dependent_count:-0}" -gt 0 ]]; then
+                    blocks=$(bd dep list "$tid" --direction=up --json 2>/dev/null | jq '[.[].id // empty]' 2>/dev/null || echo "[]")
+                fi
+
+                # Merge into enriched JSON
+                BEADS_TASKS_JSON=$(echo "$BEADS_TASKS_JSON" | jq --arg id "$tid" \
+                    --arg desc "$desc" \
+                    --argjson bb "${blocked_by:-[]}" \
+                    --argjson bl "${blocks:-[]}" \
+                    '[.[] | if .id == $id then .description = (if $desc == "" then null else $desc end) | .deps = {blockedBy: $bb, blocks: $bl} else . end]')
+            done <<< "$task_ids"
+
+            rm -f "$ENRICHED_FILE"
+        fi
     fi
 fi
 
@@ -384,6 +430,17 @@ echo "$PAYLOAD" >> "$OUTPUT_FILE"
 cat >> "$OUTPUT_FILE" <<'HTMLTAIL'
 ;
 
+function relTime(isoStr) {
+    if (!isoStr) return '';
+    var now = new Date(), then = new Date(isoStr);
+    var diff = Math.floor((now - then) / 1000);
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+    if (diff < 2592000) return Math.floor(diff / 604800) + 'w ago';
+    return then.toLocaleDateString();
+}
 (function() {
     var d = DASHBOARD_DATA;
     function esc(s) {
@@ -397,6 +454,17 @@ cat >> "$OUTPUT_FILE" <<'HTMLTAIL'
         skipped:           {icon:'\u2192', label:'Skipped'},
         pending:           {icon:'\u25CB', label:'Pending'}
     };
+    var beadsStatusMap = {
+        'open':        {icon:'\u25CB', label:'Open',        cls:'st-bead-open'},
+        'in_progress': {icon:'\u25BA', label:'In Progress', cls:'st-bead-progress'},
+        'blocked':     {icon:'\u25A0', label:'Blocked',     cls:'st-bead-blocked'},
+        'deferred':    {icon:'\u29D6', label:'Deferred',    cls:'st-bead-deferred'},
+        'closed':      {icon:'\u2713', label:'Closed',      cls:'st-bead-closed'}
+    };
+    function beadBadge(s) {
+        var m = beadsStatusMap[s] || {icon:'?', label:s, cls:'st-bead-open'};
+        return '<span class="status-badge ' + m.cls + '">' + m.icon + '&nbsp;' + m.label + '</span>';
+    }
     function stLbl(s) {
         var m = statusMap[s];
         return m ? m.icon + ' ' + m.label : s;
@@ -496,6 +564,19 @@ cat >> "$OUTPUT_FILE" <<'HTMLTAIL'
 
     // ─── Beads Task Section ─────────────────────────
     if (d.beads.available && d.beads.tasks.length > 0) {
+        // Compute status counts
+        var beadCounts = {open:0, in_progress:0, blocked:0, deferred:0, closed:0};
+        var prioCounts = {'0':0, '1':0, '2':0, '3':0};
+        for (var ci = 0; ci < d.beads.tasks.length; ci++) {
+            var ct = d.beads.tasks[ci];
+            if (beadCounts[ct.status] !== undefined) beadCounts[ct.status]++;
+            if (ct.priority != null) {
+                var pk = String(ct.priority);
+                if (prioCounts[pk] !== undefined) prioCounts[pk]++;
+            }
+        }
+        var notClosed = d.beads.total - beadCounts.closed;
+
         h += '<div class="beads-section">';
         h += '<div class="phase-hdr" onclick="togglePhase(this)">';
         h += '<span class="arr">&#9660;</span>';
@@ -505,9 +586,17 @@ cat >> "$OUTPUT_FILE" <<'HTMLTAIL'
         h += '<div class="plist" id="beads-list">';
 
         h += '<div class="beads-filters">';
-        h += '<button class="beads-filter active" onclick="filterBeads(\'open\',this)">Open (' + d.beads.open + ')</button>';
-        h += '<button class="beads-filter" onclick="filterBeads(\'closed\',this)">Closed (' + d.beads.closed + ')</button>';
+        if (notClosed > 0) h += '<button class="beads-filter active" onclick="filterBeads(\'open\',this)">Open (' + notClosed + ')</button>';
+        if (beadCounts.in_progress > 0) h += '<button class="beads-filter" onclick="filterBeads(\'in_progress\',this)">In Progress (' + beadCounts.in_progress + ')</button>';
+        if (beadCounts.blocked > 0) h += '<button class="beads-filter" onclick="filterBeads(\'blocked\',this)">Blocked (' + beadCounts.blocked + ')</button>';
+        if (beadCounts.closed > 0) h += '<button class="beads-filter" onclick="filterBeads(\'closed\',this)">Closed (' + beadCounts.closed + ')</button>';
         h += '<button class="beads-filter" onclick="filterBeads(\'all\',this)">All (' + d.beads.total + ')</button>';
+        h += '<span class="beads-filter-sep"></span>';
+        for (var pk2 = 0; pk2 <= 3; pk2++) {
+            if (prioCounts[String(pk2)] > 0) {
+                h += '<button class="beads-prio-filter" onclick="filterBeadsPrio(' + pk2 + ',this)">P' + pk2 + ' (' + prioCounts[String(pk2)] + ')</button>';
+            }
+        }
         h += '</div>';
 
         var prioColors = {'0':'var(--yellow)','1':'var(--blue)','2':'var(--green)','3':'var(--text-faint)'};
@@ -515,12 +604,9 @@ cat >> "$OUTPUT_FILE" <<'HTMLTAIL'
         for (var bi = 0; bi < d.beads.tasks.length; bi++) {
             var bt = d.beads.tasks[bi];
             var isClosed = bt.status === 'closed';
-            h += '<div class="pcard beads-task" data-bead-status="' + (isClosed ? 'closed' : 'open') + '"' + (isClosed ? ' style="display:none"' : '') + '>';
-            if (isClosed) {
-                h += stBadge('completed');
-            } else {
-                h += '<span class="status-badge" style="background:var(--accent-glow);color:var(--accent);border:1px solid var(--accent)">\u25CF</span>';
-            }
+            var showByDefault = !isClosed;
+            h += '<div class="pcard beads-task" data-bead-status="' + esc(bt.status) + '" data-bead-priority="' + (bt.priority != null ? bt.priority : '') + '" style="cursor:pointer' + (!showByDefault ? ';display:none' : '') + '" onclick="openBeadModal(\'' + esc(bt.id) + '\')">';
+            h += beadBadge(bt.status);
             h += '<div class="pinfo">';
             h += '<span class="pname">' + esc(bt.title) + '</span>';
             h += ' <span class="pstep">' + esc(bt.id) + '</span>';
@@ -552,11 +638,11 @@ cat >> "$OUTPUT_FILE" <<'HTMLTAIL'
     h += '<div class="ongoing"><h2>Standalone Commands</h2><div class="plist">';
     for (var si = 0; si < standalone.length; si++) {
         var sp = standalone[si];
-        h += '<div class="pcard">';
+        h += '<div class="pcard" style="cursor:pointer" onclick="openModal(\'' + esc(sp.s) + '\')">';
         h += '<span class="status-badge" style="background:var(--accent-glow);color:var(--accent);border:1px solid var(--accent)">\u2605</span>';
         h += '<div class="pinfo"><span class="pname">' + esc(sp.s) + '</span>';
         h += '<div class="pdesc">' + esc(sp.d) + '</div></div>';
-        h += '<div class="pcmd" onclick="copyCmd(this)" data-cmd="/scaffold:' + esc(sp.s) + '">/scaffold:' + esc(sp.s) + '</div>';
+        h += '<div class="pcmd" onclick="event.stopPropagation();copyCmd(this)" data-cmd="/scaffold:' + esc(sp.s) + '">/scaffold:' + esc(sp.s) + '</div>';
         h += '</div>';
     }
     h += '</div></div>';
@@ -615,15 +701,91 @@ function copyPrompt(btn, slug) {
         });
     }
 }
+var _beadStatusFilter = 'open';
+var _beadPrioFilters = [];
 function filterBeads(filter, btn) {
-    var tasks = document.querySelectorAll('.beads-task');
-    for (var i = 0; i < tasks.length; i++) {
-        var s = tasks[i].getAttribute('data-bead-status');
-        tasks[i].style.display = (filter === 'all' || s === filter) ? '' : 'none';
-    }
+    _beadStatusFilter = filter;
     var btns = document.querySelectorAll('.beads-filter');
     for (var j = 0; j < btns.length; j++) btns[j].classList.remove('active');
     btn.classList.add('active');
+    applyBeadFilters();
+}
+function filterBeadsPrio(prio, btn) {
+    var idx = _beadPrioFilters.indexOf(prio);
+    if (idx === -1) { _beadPrioFilters.push(prio); btn.classList.add('active'); }
+    else { _beadPrioFilters.splice(idx, 1); btn.classList.remove('active'); }
+    applyBeadFilters();
+}
+function applyBeadFilters() {
+    var tasks = document.querySelectorAll('.beads-task');
+    for (var i = 0; i < tasks.length; i++) {
+        var s = tasks[i].getAttribute('data-bead-status');
+        var p = tasks[i].getAttribute('data-bead-priority');
+        var statusMatch = _beadStatusFilter === 'all' || (_beadStatusFilter === 'open' ? s !== 'closed' : s === _beadStatusFilter);
+        var prioMatch = _beadPrioFilters.length === 0 || _beadPrioFilters.indexOf(Number(p)) !== -1;
+        tasks[i].style.display = (statusMatch && prioMatch) ? '' : 'none';
+    }
+}
+function openBeadModal(id) {
+    var bt = null;
+    for (var i = 0; i < DASHBOARD_DATA.beads.tasks.length; i++) {
+        if (DASHBOARD_DATA.beads.tasks[i].id === id) { bt = DASHBOARD_DATA.beads.tasks[i]; break; }
+    }
+    if (!bt) return;
+    function esc2(s) { var d2 = document.createElement('div'); d2.textContent = s || ''; return d2.innerHTML; }
+    var beadBadgeFn = function(s) {
+        var m = {open:{icon:'\u25CB',label:'Open',cls:'st-bead-open'},in_progress:{icon:'\u25BA',label:'In Progress',cls:'st-bead-progress'},blocked:{icon:'\u25A0',label:'Blocked',cls:'st-bead-blocked'},deferred:{icon:'\u29D6',label:'Deferred',cls:'st-bead-deferred'},closed:{icon:'\u2713',label:'Closed',cls:'st-bead-closed'}}[s] || {icon:'?',label:s,cls:'st-bead-open'};
+        return '<span class="status-badge ' + m.cls + '">' + m.icon + '&nbsp;' + m.label + '</span>';
+    };
+    var prioColors2 = {'0':'var(--yellow)','1':'var(--blue)','2':'var(--green)','3':'var(--text-faint)'};
+    var html = '<div class="modal">';
+    html += '<div class="modal-header">' + beadBadgeFn(bt.status) + '<h3>' + esc2(bt.title) + '</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>';
+    html += '<div class="modal-body">';
+    html += '<div class="bead-meta-grid">';
+    html += '<div class="bead-meta-item"><span class="bead-meta-label">ID</span><span class="bead-meta-value">' + esc2(bt.id) + '</span></div>';
+    if (bt.priority != null) {
+        var pc2 = prioColors2[String(bt.priority)] || 'var(--text-faint)';
+        html += '<div class="bead-meta-item"><span class="bead-meta-label">Priority</span><span class="bead-meta-value"><span class="badge" style="background:' + pc2 + '">P' + bt.priority + '</span></span></div>';
+    }
+    if (bt.issueType) html += '<div class="bead-meta-item"><span class="bead-meta-label">Type</span><span class="bead-meta-value">' + esc2(bt.issueType) + '</span></div>';
+    if (bt.assignee) html += '<div class="bead-meta-item"><span class="bead-meta-label">Assignee</span><span class="bead-meta-value">' + esc2(bt.assignee) + '</span></div>';
+    if (bt.owner) html += '<div class="bead-meta-item"><span class="bead-meta-label">Owner</span><span class="bead-meta-value">' + esc2(bt.owner) + '</span></div>';
+    if (bt.closeReason) html += '<div class="bead-meta-item"><span class="bead-meta-label">Close Reason</span><span class="bead-meta-value">' + esc2(bt.closeReason) + '</span></div>';
+    html += '</div>';
+    if (bt.description) {
+        html += '<div class="bead-description">' + esc2(bt.description) + '</div>';
+    }
+    var deps = bt.deps || {blockedBy:[], blocks:[]};
+    if ((deps.blockedBy && deps.blockedBy.length > 0) || (deps.blocks && deps.blocks.length > 0)) {
+        html += '<div class="bead-deps">';
+        if (deps.blockedBy && deps.blockedBy.length > 0) {
+            html += '<div class="bead-dep-group"><span class="bead-dep-label">Blocked By</span>';
+            for (var di = 0; di < deps.blockedBy.length; di++) {
+                html += '<span class="bead-dep-link" onclick="closeModal();openBeadModal(\'' + esc2(deps.blockedBy[di]) + '\')">' + esc2(deps.blockedBy[di]) + '</span>';
+            }
+            html += '</div>';
+        }
+        if (deps.blocks && deps.blocks.length > 0) {
+            html += '<div class="bead-dep-group"><span class="bead-dep-label">Blocks</span>';
+            for (var di2 = 0; di2 < deps.blocks.length; di2++) {
+                html += '<span class="bead-dep-link" onclick="closeModal();openBeadModal(\'' + esc2(deps.blocks[di2]) + '\')">' + esc2(deps.blocks[di2]) + '</span>';
+            }
+            html += '</div>';
+        }
+        html += '</div>';
+    }
+    html += '<div class="bead-timestamps">';
+    if (bt.createdAt) html += '<div class="bead-ts-item"><span class="bead-ts-label">Created</span><span class="bead-ts-value" title="' + esc2(bt.createdAt) + '">' + relTime(bt.createdAt) + '</span></div>';
+    if (bt.updatedAt) html += '<div class="bead-ts-item"><span class="bead-ts-label">Updated</span><span class="bead-ts-value" title="' + esc2(bt.updatedAt) + '">' + relTime(bt.updatedAt) + '</span></div>';
+    if (bt.closedAt) html += '<div class="bead-ts-item"><span class="bead-ts-label">Closed</span><span class="bead-ts-value" title="' + esc2(bt.closedAt) + '">' + relTime(bt.closedAt) + '</span></div>';
+    html += '</div>';
+    html += '</div></div>';
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+    document.addEventListener('keydown', modalEscHandler);
 }
 function toggleTheme() {
     var html = document.documentElement;
