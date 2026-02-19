@@ -55,7 +55,7 @@ All task tracking lives in Beads — no separate todo files.
 ### Creating Tasks
 ```bash
 bd create "Imperative, specific title" -p <0-3>
-bd update <id> --claim                   # Always claim after creating (task starts as 'open'; --claim sets the actor)
+bd update <id> --claim                   # Always claim after creating
 bd dep add <child> <parent>              # Child blocked by parent
 ```
 
@@ -71,7 +71,7 @@ Bad titles: `"Backend stuff"`
 ### Closing Tasks
 ```bash
 bd close <id>                            # Marks complete — use this, not bd update --status completed
-bd sync                                  # Export JSONL for git persistence (safe to run after every close)
+bd sync                                  # Force sync to git
 ```
 
 ### Key Commands
@@ -94,13 +94,15 @@ bd sync                                  # Export JSONL for git persistence (saf
 | `bd dep add <child> <parent>` | Add dependency |
 | `bd dep tree <id>` | View dependency graph |
 | `bd show <id>` | Full task details |
-| `bd sync` | Export task data to JSONL (for git persistence) |
+| `bd sync` | Force sync to git |
 | `bd list` | List all tasks |
 | `bd dep cycles` | Debug stuck/circular dependencies |
 | `scripts/setup-agent-worktree.sh <name>` | Create permanent worktree for parallel agent |
 | `git worktree list` | List all active worktrees |
 | `gh pr create` | Create pull request from current branch |
 | `gh pr merge --squash --delete-branch` | Squash-merge PR and clean up branch |
+| `gh pr diff` | Review PR diff before merging |
+| `gh pr checks` | Check CI status on current PR |
 | `git push --force-with-lease` | Safe force push after rebase (feature branches only) |
 | `make dashboard-test` | Generate test-ready dashboard HTML for visual verification |
 
@@ -119,18 +121,18 @@ bd close <id>
 ```
 This keeps Beads as the single source of truth for all changes.
 
-### Feature Workflow
+### Committing and Creating PRs
 
-| Step | Action | Commands |
-|------|--------|----------|
-| 1 | Pick task | `bd ready` → `bd update <id> --status in_progress --claim` |
-| 2 | Create branch | `git checkout -b bd-<id>/<desc> origin/main` |
-| 3 | Implement (TDD) | Red/Green/Refactor/Verify/Commit — `make check` before push |
-| 4 | Push + PR | `git fetch origin && git rebase origin/main && git push -u origin HEAD && gh pr create --title "[BD-<id>] type(scope): desc" --body "Closes BD-<id>"` |
-| 5 | Merge + close | `gh pr merge --squash --delete-branch && bd close <id> && bd sync` |
-| 6 | Next task | `bd ready` (if tasks remain, go to step 1) |
+1. Run `make check` to verify all quality gates pass
+2. AI review: spawn a review subagent to check `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md — fix P0/P1 findings, re-run `make check`, log recurring patterns to tasks/lessons.md
+3. Rebase on latest main: `git fetch origin && git rebase origin/main`
+4. Push branch: `git push -u origin HEAD`
+5. Create PR: `gh pr create --title "[BD-<id>] type(scope): description"`
+6. Wait for CI (`check` job) to pass
+7. Self-review: `gh pr diff`
+8. Merge: `gh pr merge --squash --delete-branch`
 
-See `docs/git-workflow.md` for rationale, branch naming, and edge cases.
+See `docs/git-workflow.md` for the full PR workflow.
 
 ### Task Closure and Next Task
 
@@ -141,14 +143,12 @@ bd sync
 bd ready                # Pick next task
 ```
 
-In a worktree (cannot `git checkout main` — it's checked out in the main repo):
+In a worktree, also update main first:
 ```bash
 bd close <id>
 bd sync
-git fetch origin --prune
+git checkout main && git pull origin main
 bd ready
-# Branch directly from origin/main for next task:
-git checkout -b bd-<next-id>/<desc> origin/main
 ```
 
 ### Parallel Sessions (Worktrees)
@@ -156,7 +156,7 @@ git checkout -b bd-<next-id>/<desc> origin/main
 Each parallel agent runs in its own git worktree — an independent working directory sharing the same `.git` repository.
 
 ```bash
-# Create a worktree for a new agent (sets up shared Beads database via redirect)
+# Create a worktree for a new agent
 scripts/setup-agent-worktree.sh agent-1
 
 # Set agent identity for Beads attribution
@@ -166,15 +166,9 @@ export BD_ACTOR="agent-1"
 make setup
 ```
 
-With `bd worktree create`, all agents share one Beads database — task state is visible immediately across worktrees, no `bd sync` needed between agents.
-
-> `bd sync` only exports task data to JSONL — it doesn't do git operations. The pre-commit hook and auto-flush handle this automatically, but explicit `bd sync` before commits is a safe habit.
-
 ### Worktree Awareness
 
 When running in a worktree:
-- **Never run `git checkout main`** — main is checked out in the main repo; this will fail
-- **Always branch from remote**: `git checkout -b bd-<id>/<desc> origin/main`
 - **Always check `bd ready`** before starting work — another agent may have claimed your next task
 - **Rebase frequently** — other agents are merging to main
 - **Never edit high-contention files** (`prompts.md`, `CLAUDE.md`) without rebasing first
@@ -188,11 +182,14 @@ When running in a worktree:
 
 ## Autonomous Behavior
 
-- **Fix bugs on sight**: When encountering bugs, errors, or failing tests — create a Beads task and fix them. Zero hand-handling required.
+- **Fix bugs on sight**: When encountering bugs, errors, or failing tests — create a Beads task and fix them. Zero hand-holding required.
 - **Use subagents**: Offload research, exploration, and parallel analysis to subagents. Keeps main context clean.
 - **Keep working**: Continue until `bd ready` returns no available tasks.
 - **Re-plan when stuck**: If implementation goes sideways, stop and rethink your approach rather than pushing through. (Do NOT enter interactive `/plan` mode — just think through the problem and adjust.)
-- **When work is complete**: Always push and create a PR without asking — run `git push -u origin HEAD && gh pr create`. Do not ask which option to use.
+
+## Code Review
+
+Before pushing, spawn a review subagent to check `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md. Fix P0/P1 findings, re-run `make check`. Log recurring patterns to tasks/lessons.md.
 
 ## Project Structure Quick Reference
 

@@ -557,19 +557,18 @@ jobs:
 
 ## Phase 3: Update Existing Documents
 
-### 3.1 Add Self-Review to PR Workflow
+### 3.1 Update AI Review Step in PR Workflow
 
-Find the PR workflow in `docs/git-workflow.md`. Insert the self-review step between the "Commit changes" step and the "Rebase" step. The self-review step should use the project's actual lint and test commands from the CLAUDE.md Key Commands table:
+The base AI review step was already added to `docs/git-workflow.md` and CLAUDE.md by the Git Workflow prompt. This prompt upgrades the review to also check against `docs/review-standards.md`.
 
-```bash
-# Self-review (catch issues before external review)
-# Spawn a review subagent to check changes against project standards
-claude -p "Review changes on this branch vs origin/main. Check against docs/review-standards.md for P0/P1/P2 issues. Fix any issues found. Run <lint> and <test> after fixes. Commit fixes with [BD-<id>] fix: address self-review findings"
+Find the AI review step in `docs/git-workflow.md` (step 2 in the PR workflow) and update it to reference `docs/review-standards.md`:
+
 ```
-
-Replace `<lint>` and `<test>` with the actual commands from CLAUDE.md Key Commands (e.g., `make lint` and `make test`, or `npm run lint` and `npm test`).
-
-Renumber subsequent steps if the document uses numbered steps.
+2. AI review — spawn a review subagent to check `git diff origin/main...HEAD`:
+   - Check against docs/review-standards.md (P0/P1/P2 issues), CLAUDE.md, and docs/coding-standards.md
+   - Fix P0/P1/P2 findings, re-run quality gates
+   - Log recurring patterns to tasks/lessons.md
+```
 
 If the same PR workflow appears in CLAUDE.md (it usually does), update it there too.
 
@@ -610,9 +609,9 @@ Also add these entries to the "When to Consult Other Docs" table in CLAUDE.md (i
 | Codex Cloud review instructions | AGENTS.md |
 ```
 
-### 3.3 Update `.claude/settings.json`
+### 3.3 Verify Claude Code Permissions
 
-If the project has `.claude/settings.json`, verify that `claude -p` (used for self-review subagent) is not blocked by deny rules. The self-review step spawns a subagent — this should work without additional permissions, but verify.
+If the project has `.claude/settings.json`, verify that the Task tool (used to spawn review subagents) is not blocked by deny rules. Review subagents use the Task tool — this should work without additional permissions in all standard Claude Code setups.
 
 ---
 
