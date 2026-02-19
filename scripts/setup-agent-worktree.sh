@@ -42,4 +42,11 @@ fi
 
 git -C "$REPO_DIR" worktree add "$worktree_dir" "$branch_name"
 
+# ─── Set up shared Beads database ───────────────────────────
+
+if command -v bd >/dev/null 2>&1; then
+    (cd "$worktree_dir" && bd worktree create 2>/dev/null) || true
+fi
+
 echo "Created worktree at $worktree_dir on branch $branch_name"
+echo "All agents share one Beads database — task state is visible immediately across worktrees."

@@ -87,43 +87,26 @@ If rebase produces conflicts:
 
 ## 4. PR Workflow
 
-### Creating a PR
+### Creating and Merging a PR
 
-1. Ensure all quality gates pass:
+1. Run quality gates and rebase:
    ```bash
    make check
-   ```
-2. Rebase on latest main:
-   ```bash
    git fetch origin && git rebase origin/main
    ```
-3. Push branch:
+2. Push and create PR:
    ```bash
    git push -u origin HEAD
+   gh pr create --title "[BD-<id>] type(scope): description" --body "Closes BD-<id>"
    ```
-4. Create PR:
-   ```bash
-   gh pr create --title "[BD-<id>] type(scope): description" --body "$(cat <<'EOF'
-   ## Summary
-   - <what changed and why>
-
-   ## Test plan
-   - [ ] `make check` passes
-   EOF
-   )"
-   ```
-5. Self-review the diff:
-   ```bash
-   gh pr diff
-   ```
-6. Merge:
+3. Squash-merge and close:
    ```bash
    gh pr merge --squash --delete-branch
+   bd close <id>
+   bd sync
    ```
-7. Pull updated main:
-   ```bash
-   git checkout main && git pull origin main
-   ```
+
+`--delete-branch` removes the remote branch automatically. Local branches are cleaned up periodically.
 
 ### PR Title Convention
 
@@ -143,11 +126,13 @@ bd ready                # Pick next task
 ### Worktree-Agent Flow
 
 ```bash
-# In the worktree
+# In the worktree (cannot git checkout main — it's checked out in the main repo)
 bd close <id>
 bd sync
-git checkout main && git pull origin main
+git fetch origin --prune
 bd ready                # Pick next task
+# Branch directly from origin/main for next task:
+git checkout -b bd-<next-id>/<desc> origin/main
 ```
 
 ### Rules
@@ -179,9 +164,9 @@ ls ../scaffold-<agent>/.git/rebase-merge 2>/dev/null && echo "rebase in progress
 # Abort any in-progress rebase
 git -C ../scaffold-<agent> rebase --abort
 
-# Reset to clean state
-git -C ../scaffold-<agent> checkout main
-git -C ../scaffold-<agent> pull origin main
+# Reset to clean state (use workspace branch — cannot checkout main in a worktree)
+git -C ../scaffold-<agent> checkout <agent>-workspace
+git -C ../scaffold-<agent> fetch origin --prune
 ```
 
 ### Branch Cleanup
@@ -283,7 +268,7 @@ Each parallel agent gets a permanent git worktree — an independent working dir
 scripts/setup-agent-worktree.sh <agent-name>
 ```
 
-This creates `../<repo-name>-<agent-suffix>` with a `<agent-suffix>-workspace` branch.
+This creates `../<repo-name>-<agent-suffix>` with a `<agent-suffix>-workspace` branch and runs `bd worktree create` to set up a shared Beads database (all agents see task state immediately — no `bd sync` needed between agents).
 
 ### Agent Identity
 
