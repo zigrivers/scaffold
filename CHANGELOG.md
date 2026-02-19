@@ -2,6 +2,28 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.17.0] — 2026-02-19
+
+### Added
+- **AI review subagent step** — Git Workflow prompt now includes an AI review step (step 4.5) in the PR workflow: spawn a review subagent to check `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md; P0/P1 findings block push; recurring patterns feed into `tasks/lessons.md`
+- **Code Review section in CLAUDE.md** — scaffold's own CLAUDE.md now documents the review subagent approach as a dedicated section
+
+### Fixed
+- **Inaccurate Tier 1 claim** — Multi-Model Code Review prompt previously claimed `claude -p` was built into the Git Workflow prompt; replaced with the correct subagent approach using the Task tool (available in all Claude Code sessions)
+- Removed all `claude -p` references from active workflow steps across `prompts.md`, `commands/`, `docs/`, and `CLAUDE.md`
+
+### Changed
+- Git Workflow Section 4 PR workflow updated: step 2 is now AI review (subagent), not `claude -p`
+- CLAUDE.md Optimization Implementation Loop updated: references AI review subagent, not `claude -p`
+- Workflow Audit canonical step 4.5 updated: describes review subagent approach and compound learning loop
+- Multi-Model Code Review Tier 1 architecture diagram and description updated for accuracy
+- `docs/add-multi-model-review.md` Phase 3.1 and 3.3 updated: subagent approach replaces `claude -p`
+- PR workflow sub-step count updated from 7 to 8 (commit + AI review + rebase + push + create + auto-merge + watch + confirm)
+
+### Completed Tasks
+- [BD-scaffold-smx] fix(workflow): streamline Beads workflow docs and fix friction points
+- [BD-scaffold-cga] feat(workflow): add AI review subagent step to pipeline
+
 ## [1.16.0] — 2026-02-18
 
 ### Added
