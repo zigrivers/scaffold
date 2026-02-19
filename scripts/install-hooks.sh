@@ -32,7 +32,7 @@ cat > "${HOOKS_DIR}/pre-commit" << 'HOOK'
 
 # 1. Run Beads pre-commit hook
 if command -v bd >/dev/null 2>&1; then
-    bd hook pre-commit "$@"
+    bd hooks run pre-commit "$@"
 else
     echo "Warning: bd command not found in PATH, skipping Beads hook" >&2
 fi

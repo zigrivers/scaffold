@@ -146,7 +146,7 @@ Bad titles: `"Backend stuff"`
 ### Closing Tasks
 ```bash
 bd close <id>                            # Marks complete — use this, not bd update --status completed
-bd sync                                  # Force sync to git
+bd sync                                  # Export JSONL for git persistence (safe to run after every close)
 ```
 
 ### Beads Commands
@@ -160,7 +160,7 @@ bd sync                                  # Force sync to git
 | `bd dep add <child> <parent>` | Add dependency |
 | `bd dep tree <id>` | View dependency graph |
 | `bd show <id>` | Full task details |
-| `bd sync` | Force sync to git |
+| `bd sync` | Export task data to JSONL (for git persistence) |
 | `bd list` | List all tasks |
 | `bd dep cycles` | Debug stuck/circular dependencies |
 

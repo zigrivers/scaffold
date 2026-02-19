@@ -100,7 +100,13 @@ git worktree add "$WORKTREE_DIR" -b "$WORKSPACE_BRANCH" origin/main
 
 # Set up shared Beads database (all agents share one SQLite DB via redirect)
 if command -v bd >/dev/null 2>&1; then
-    (cd "$WORKTREE_DIR" && bd worktree create 2>/dev/null) || true
+    if (cd "$WORKTREE_DIR" && bd worktree create 2>&1); then
+        echo "Shared Beads database configured — task state visible across all worktrees."
+    else
+        echo "Warning: 'bd worktree create' failed. Agents will need 'bd sync' for cross-worktree visibility." >&2
+    fi
+else
+    echo "Warning: bd not found. Install Beads for task tracking: https://github.com/steveyegge/beads" >&2
 fi
 
 echo ""

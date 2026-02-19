@@ -502,7 +502,7 @@ Bad titles: `"Backend stuff"`
 ### Closing Tasks
 ```bash
 bd close <id>                            # Marks complete — use this, not bd update --status completed
-bd sync                                  # Force sync to git
+bd sync                                  # Export JSONL for git persistence (safe to run after every close)
 ```
 
 ### Beads Commands
@@ -516,7 +516,7 @@ bd sync                                  # Force sync to git
 | `bd dep add <child> <parent>` | Add dependency |
 | `bd dep tree <id>` | View dependency graph |
 | `bd show <id>` | Full task details |
-| `bd sync` | Force sync to git |
+| `bd sync` | Export task data to JSONL (for git persistence) |
 | `bd list` | List all tasks |
 | `bd dep cycles` | Debug stuck/circular dependencies |
 
@@ -2183,7 +2183,13 @@ git worktree add "$WORKTREE_DIR" -b "$WORKSPACE_BRANCH" origin/main
 
 # Set up shared Beads database (all agents share one SQLite DB via redirect)
 if command -v bd >/dev/null 2>&1; then
-    (cd "$WORKTREE_DIR" && bd worktree create 2>/dev/null) || true
+    if (cd "$WORKTREE_DIR" && bd worktree create 2>&1); then
+        echo "Shared Beads database configured — task state visible across all worktrees."
+    else
+        echo "Warning: 'bd worktree create' failed. Agents will need 'bd sync' for cross-worktree visibility." >&2
+    fi
+else
+    echo "Warning: bd not found. Install Beads for task tracking: https://github.com/steveyegge/beads" >&2
 fi
 
 echo ""
@@ -6893,6 +6899,7 @@ cd ../project-agent-3 && BD_ACTOR="Agent-3" claude
 ```
 You are Agent-1. Verify your setup:
 - `echo $BD_ACTOR` should show "Agent-1"
+  - If empty: `export BD_ACTOR="Agent-1"`
 - `git rev-parse --git-dir` should contain "/worktrees/" (confirms you're in a worktree)
 
 Follow the workflow in CLAUDE.md. Key differences for worktree agents:
@@ -6927,6 +6934,7 @@ Keep working until `bd ready` shows no available tasks.
 ```
 You are Agent-N. Verify your setup:
 - `echo $BD_ACTOR` should show your agent name
+  - If empty: `export BD_ACTOR="Agent-N"`
 - `git rev-parse --git-dir` should contain "/worktrees/"
 
 Check your current state:

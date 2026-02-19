@@ -55,7 +55,7 @@ All task tracking lives in Beads — no separate todo files.
 ### Creating Tasks
 ```bash
 bd create "Imperative, specific title" -p <0-3>
-bd update <id> --claim                   # Always claim after creating
+bd update <id> --claim                   # Always claim after creating (task starts as 'open'; --claim sets the actor)
 bd dep add <child> <parent>              # Child blocked by parent
 ```
 
@@ -71,7 +71,7 @@ Bad titles: `"Backend stuff"`
 ### Closing Tasks
 ```bash
 bd close <id>                            # Marks complete — use this, not bd update --status completed
-bd sync                                  # Force sync to git
+bd sync                                  # Export JSONL for git persistence (safe to run after every close)
 ```
 
 ### Key Commands
@@ -94,7 +94,7 @@ bd sync                                  # Force sync to git
 | `bd dep add <child> <parent>` | Add dependency |
 | `bd dep tree <id>` | View dependency graph |
 | `bd show <id>` | Full task details |
-| `bd sync` | Force sync to git |
+| `bd sync` | Export task data to JSONL (for git persistence) |
 | `bd list` | List all tasks |
 | `bd dep cycles` | Debug stuck/circular dependencies |
 | `scripts/setup-agent-worktree.sh <name>` | Create permanent worktree for parallel agent |
@@ -168,6 +168,8 @@ make setup
 
 With `bd worktree create`, all agents share one Beads database — task state is visible immediately across worktrees, no `bd sync` needed between agents.
 
+> `bd sync` only exports task data to JSONL — it doesn't do git operations. The pre-commit hook and auto-flush handle this automatically, but explicit `bd sync` before commits is a safe habit.
+
 ### Worktree Awareness
 
 When running in a worktree:
@@ -186,10 +188,11 @@ When running in a worktree:
 
 ## Autonomous Behavior
 
-- **Fix bugs on sight**: When encountering bugs, errors, or failing tests — create a Beads task and fix them. Zero hand-holding required.
+- **Fix bugs on sight**: When encountering bugs, errors, or failing tests — create a Beads task and fix them. Zero hand-handling required.
 - **Use subagents**: Offload research, exploration, and parallel analysis to subagents. Keeps main context clean.
 - **Keep working**: Continue until `bd ready` returns no available tasks.
 - **Re-plan when stuck**: If implementation goes sideways, stop and rethink your approach rather than pushing through. (Do NOT enter interactive `/plan` mode — just think through the problem and adjust.)
+- **When work is complete**: Always push and create a PR without asking — run `git push -u origin HEAD && gh pr create`. Do not ask which option to use.
 
 ## Project Structure Quick Reference
 

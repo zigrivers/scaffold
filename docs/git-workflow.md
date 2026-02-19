@@ -139,7 +139,7 @@ git checkout -b bd-<next-id>/<desc> origin/main
 
 - Only close a task after the PR is merged (not just created)
 - `bd close` is the only way to close — never use `bd update --status completed`
-- Always `bd sync` after closing to persist state
+- Run `bd sync` after closing to ensure JSONL is fresh before committing. (With auto-flush enabled, this is redundant but safe.)
 
 ## 6. Crash Recovery
 
@@ -249,6 +249,8 @@ These are local-only (not committed to `.git/hooks/`). Each developer/agent runs
 Quality gates run locally via `make check` and git hooks. There is no CI workflow — local verification is the authoritative gate.
 
 ## 10. Parallel Agent Setup
+
+> **Note:** Claude Code Agent Teams (experimental) offers an alternative native coordination mechanism. The worktree + Beads model documented here is compatible with both approaches.
 
 ### Worktree Model
 
