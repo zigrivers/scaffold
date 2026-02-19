@@ -87,26 +87,48 @@ If rebase produces conflicts:
 
 ## 4. PR Workflow
 
-### Creating and Merging a PR
+### Creating a PR
 
-1. Run quality gates and rebase:
+1. Ensure all quality gates pass:
    ```bash
    make check
+   ```
+2. AI review — spawn a review subagent to check `git diff origin/main...HEAD`:
+   - Check against CLAUDE.md and docs/coding-standards.md
+   - Fix P0/P1 findings, re-run `make check`
+   - Log recurring patterns to tasks/lessons.md
+3. Rebase on latest main:
+   ```bash
    git fetch origin && git rebase origin/main
    ```
-2. Push and create PR:
+4. Push branch:
    ```bash
    git push -u origin HEAD
-   gh pr create --title "[BD-<id>] type(scope): description" --body "Closes BD-<id>"
    ```
-3. Squash-merge and close:
+5. Create PR:
+   ```bash
+   gh pr create --title "[BD-<id>] type(scope): description" --body "$(cat <<'EOF'
+   ## Summary
+   - <what changed and why>
+
+   ## Test plan
+   - [ ] `make check` passes
+   EOF
+   )"
+   ```
+6. Wait for CI (`check` job) to pass
+7. Self-review the diff:
+   ```bash
+   gh pr diff
+   ```
+8. Merge when CI is green:
    ```bash
    gh pr merge --squash --delete-branch
-   bd close <id>
-   bd sync
    ```
-
-`--delete-branch` removes the remote branch automatically. Local branches are cleaned up periodically.
+9. Pull updated main:
+   ```bash
+   git checkout main && git pull origin main
+   ```
 
 ### PR Title Convention
 
@@ -126,13 +148,11 @@ bd ready                # Pick next task
 ### Worktree-Agent Flow
 
 ```bash
-# In the worktree (cannot git checkout main — it's checked out in the main repo)
+# In the worktree
 bd close <id>
 bd sync
-git fetch origin --prune
+git checkout main && git pull origin main
 bd ready                # Pick next task
-# Branch directly from origin/main for next task:
-git checkout -b bd-<next-id>/<desc> origin/main
 ```
 
 ### Rules
@@ -164,9 +184,9 @@ ls ../scaffold-<agent>/.git/rebase-merge 2>/dev/null && echo "rebase in progress
 # Abort any in-progress rebase
 git -C ../scaffold-<agent> rebase --abort
 
-# Reset to clean state (use workspace branch — cannot checkout main in a worktree)
-git -C ../scaffold-<agent> checkout <agent>-workspace
-git -C ../scaffold-<agent> fetch origin --prune
+# Reset to clean state
+git -C ../scaffold-<agent> checkout main
+git -C ../scaffold-<agent> pull origin main
 ```
 
 ### Branch Cleanup
@@ -181,15 +201,20 @@ git fetch --prune
 
 ## 7. Branch Protection
 
-Branch protection prevents direct pushes to main. Quality gates run locally via `make check` and git hooks — there is no CI workflow.
+CI is required on PRs to main. The `check` job in `.github/workflows/ci.yml` runs `make check` (lint + validate + test).
 
-### Setup
+### Setup (After First CI Run)
+
+Branch protection can only reference status checks that have run at least once. After the first PR triggers CI:
 
 ```bash
 gh api repos/{owner}/{repo}/branches/main/protection -X PUT \
   --input - <<'EOF'
 {
-  "required_status_checks": null,
+  "required_status_checks": {
+    "strict": true,
+    "contexts": ["check"]
+  },
   "enforce_admins": false,
   "required_pull_request_reviews": null,
   "restrictions": null
@@ -197,11 +222,11 @@ gh api repos/{owner}/{repo}/branches/main/protection -X PUT \
 EOF
 ```
 
-Fallback: GitHub web UI (Settings > Branches > Add rule). Do NOT check "Require status checks".
+Fallback: GitHub web UI (Settings > Branches > Add rule).
 
 ### Current Configuration
 
-- **Required checks**: None (quality gates are local)
+- **Required checks**: `check` (CI job)
 - **Review required**: No (single-developer project with AI agents)
 - **Admin enforcement**: No (allows emergency merges)
 
@@ -244,9 +269,9 @@ No additions needed for the current stack.
 
 These are local-only (not committed to `.git/hooks/`). Each developer/agent runs `make hooks` after cloning.
 
-### Local Verification by Design
+### CI by Design
 
-Quality gates run locally via `make check` and git hooks. There is no CI workflow — local verification is the authoritative gate.
+Quality gates run both locally (`make check`) and in CI (`.github/workflows/ci.yml`). The CI workflow is the authoritative gate — local hooks are a convenience.
 
 ## 10. Parallel Agent Setup
 
@@ -268,7 +293,7 @@ Each parallel agent gets a permanent git worktree — an independent working dir
 scripts/setup-agent-worktree.sh <agent-name>
 ```
 
-This creates `../<repo-name>-<agent-suffix>` with a `<agent-suffix>-workspace` branch and runs `bd worktree create` to set up a shared Beads database (all agents see task state immediately — no `bd sync` needed between agents).
+This creates `../<repo-name>-<agent-suffix>` with a `<agent-suffix>-workspace` branch.
 
 ### Agent Identity
 

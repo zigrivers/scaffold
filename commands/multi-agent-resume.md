@@ -6,6 +6,7 @@ argument-hint: "<agent-name>"
 
 You are $ARGUMENTS. Verify your setup:
 - `echo $BD_ACTOR` should show "$ARGUMENTS"
+  - If empty: `export BD_ACTOR="$ARGUMENTS"`
 - `git rev-parse --git-dir` should contain "/worktrees/"
 
 Check your current state:

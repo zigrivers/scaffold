@@ -50,7 +50,7 @@ Read and cross-reference ALL of these:
 - Are there workflow scenarios not covered? (What if tests fail? What if there's a merge conflict? What if `bd ready` returns nothing? What if push to main is rejected? What if an agent session crashes mid-task?)
 - Are the most common agent mistakes addressed with explicit rules?
 - Is the parallel agent workflow clear? (Permanent worktrees with workspace branches, BD_ACTOR, agents cannot checkout main, always branch from origin/main)
-- Is the PR workflow explicit and complete? (Rebase, push, create PR, self-review with `gh pr diff`, merge with `--delete-branch`, confirm merge)
+- Is the PR workflow explicit and complete? (Rebase, push, create PR, auto-merge with --delete-branch, watch CI, confirm merge)
 - Is task closure documented with both variants? (Single agent: checkout main, delete branch, prune. Worktree: fetch, prune, clean. Both: `bd close`, `bd sync`)
 - Is the continuous work loop clear? (Keep working until `bd ready` returns nothing)
 - Is it clear that every commit requires a Beads task? (All fixes and enhancements need a task for the commit message)
@@ -79,7 +79,7 @@ After analysis, restructure CLAUDE.md to follow this format:
 [3-5 non-negotiable rules - the things that matter most]
 
 ## Git Workflow (CRITICAL)
-[Never commit to main, full PR workflow: rebase → push → create PR → self-review with `gh pr diff` → merge with `--delete-branch` → confirm merge, key commands]
+[Never commit to main, full PR workflow: rebase → push → create PR → auto-merge with --delete-branch → watch CI → confirm merge, key commands]
 
 ## Workflow
 
@@ -90,10 +90,10 @@ After analysis, restructure CLAUDE.md to follow this format:
 [Think through approach for non-trivial work. Write specs upfront. CRITICAL: Do NOT enter Claude Code's interactive `/plan` mode — it blocks autonomous execution. Just think through the problem internally.]
 
 ### Implementation Loop
-[TDD cycle repeating per piece of functionality, verification using Key Commands lint+test, commits with [BD-<id>] format. Multiple commits per task are normal — they squash-merge. Rebase onto origin/main before push. One clear flow.]
+[TDD cycle repeating per piece of functionality, verification using Key Commands lint+test, AI review subagent before push (checks diff against CLAUDE.md + coding-standards.md, fix P0/P1), commits with [BD-<id>] format. Multiple commits per task are normal — they squash-merge. Rebase onto origin/main before push. One clear flow.]
 
 ### Task Closure and Next Task
-[`gh pr merge --squash --delete-branch`, then `bd close`, `bd sync`. Single agent: `git fetch origin --prune`. Worktree agent: same + branch from `origin/main` for next task (cannot checkout main). Keep working until no tasks remain.]
+[Confirm merge, bd close, bd sync. Single agent: checkout main, delete branch, prune. Worktree agent: fetch, prune, clean, branch from origin/main (cannot checkout main). Keep working until no tasks remain]
 
 ### Session End
 [Exact steps - mandatory, in order]
@@ -135,7 +135,7 @@ After analysis, restructure CLAUDE.md to follow this format:
 [High-conflict files and how to handle them]
 
 ### Error Recovery
-[What to do when things go wrong - test failures, merge conflicts, blocked tasks, hook failures, crashed agent sessions, orphaned worktree work]
+[What to do when things go wrong - test failures, merge conflicts, blocked tasks, CI failures, crashed agent sessions, orphaned worktree work]
 
 ## Browser/E2E Testing
 [Playwright MCP or Maestro usage - keep brief, patterns only]
@@ -171,7 +171,7 @@ Every sentence should either be:
 Remove any "philosophy" or "background" that doesn't directly change agent behavior.
 
 ### Key Commands Is Source of Truth
-The Key Commands table in Quick Reference is the single source of truth for project-specific commands (lint, test, install, dev server). The canonical workflow, git workflow, and worktree cleanup all reference this table instead of hardcoding commands. Do NOT remove, rename, or split this table. Ensure all project commands are present and match the actual Makefile/package.json/pyproject.toml.
+The Key Commands table in Quick Reference is the single source of truth for project-specific commands (lint, test, install, dev server). The canonical workflow, git workflow, CI pipeline, and worktree cleanup all reference this table instead of hardcoding commands. Do NOT remove, rename, or split this table. Ensure all project commands are present and match the actual Makefile/package.json/pyproject.toml.
 
 ## What to Deliver
 
@@ -193,13 +193,14 @@ The Key Commands table in Quick Reference is the single source of truth for proj
 Before finalizing, verify CLAUDE.md explicitly covers:
 
 1. **Never push to main** — main is protected, all changes via PR
-2. **6-step workflow** — pick task → branch from `origin/main` → TDD → push + `gh pr create` → `gh pr merge --squash --delete-branch` + `bd close` → `bd ready`
-3. **Task closure** — single agent: `bd close`, `bd sync`, `git fetch origin --prune`. Worktree agent: same but NO `git checkout main` — cannot checkout main. Both branch from `origin/main` for next task.
-4. **Continuous work loop** — keep working until `bd ready` returns nothing
-5. **Parallel agent setup** — permanent worktrees, `bd worktree create` for shared Beads database, BD_ACTOR, agents always branch from `origin/main`, never `git checkout main`
-6. **TDD always** — failing test before implementation, loop repeats per piece of functionality, multiple commits per task squash-merge
-7. **Every commit needs a Beads task** — commit messages require `[BD-<id>]` format
-8. **Error recovery** — test failures, merge conflicts, hook failures, crashed sessions, orphaned worktree work
+2. **PR workflow** — rebase onto origin/main, then `gh pr create`, then `gh pr merge --squash --auto --delete-branch`, then `gh pr checks --watch --fail-fast`, then `gh pr view --json state -q .state` must show "MERGED"
+3. **AI review before push** — spawn review subagent to check diff against CLAUDE.md + docs/coding-standards.md, fix P0/P1 findings, re-run lint+test, log recurring patterns to tasks/lessons.md
+4. **Task closure** — two variants: single agent (checkout main, delete branch, prune) and worktree agent (fetch, prune, clean — cannot checkout main). Both use `bd close`, `bd sync`
+5. **Continuous work loop** — clean workspace between tasks, keep working until `bd ready` returns nothing
+6. **Parallel agent setup** — permanent worktrees with workspace branches, BD_ACTOR, agents always branch from `origin/main`, never `git checkout main`
+7. **TDD always** — failing test before implementation, loop repeats per piece of functionality, multiple commits per task squash-merge
+8. **Every commit needs a Beads task** — commit messages require `[BD-<id>]` format
+9. **Error recovery** — test failures, merge conflicts, CI failures, crashed sessions, orphaned worktree work
 
 ## After This Step
 

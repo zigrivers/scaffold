@@ -6,6 +6,7 @@ argument-hint: "<agent-name>"
 
 You are $ARGUMENTS. Verify your setup:
 - `echo $BD_ACTOR` should show "$ARGUMENTS"
+  - If empty: `export BD_ACTOR="$ARGUMENTS"`
 - `git rev-parse --git-dir` should contain "/worktrees/" (confirms you're in a worktree)
 
 This worktree uses a shared Beads database (set up by `scripts/setup-agent-worktree.sh`). Task state is visible across all agents immediately — no `bd sync` needed between agents for visibility.
