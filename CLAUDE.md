@@ -101,7 +101,6 @@ bd sync                                  # Force sync to git
 | `git worktree list` | List all active worktrees |
 | `gh pr create` | Create pull request from current branch |
 | `gh pr merge --squash --delete-branch` | Squash-merge PR and clean up branch |
-| `gh pr diff` | Review PR diff before merging |
 | `git push --force-with-lease` | Safe force push after rebase (feature branches only) |
 | `make dashboard-test` | Generate test-ready dashboard HTML for visual verification |
 
@@ -120,16 +119,18 @@ bd close <id>
 ```
 This keeps Beads as the single source of truth for all changes.
 
-### Committing and Creating PRs
+### Feature Workflow
 
-1. Run `make check` to verify all quality gates pass
-2. Rebase on latest main: `git fetch origin && git rebase origin/main`
-3. Push branch: `git push -u origin HEAD`
-4. Create PR: `gh pr create --title "[BD-<id>] type(scope): description"`
-5. Self-review: `gh pr diff`
-6. Merge: `gh pr merge --squash --delete-branch`
+| Step | Action | Commands |
+|------|--------|----------|
+| 1 | Pick task | `bd ready` → `bd update <id> --status in_progress --claim` |
+| 2 | Create branch | `git checkout -b bd-<id>/<desc> origin/main` |
+| 3 | Implement (TDD) | Red/Green/Refactor/Verify/Commit — `make check` before push |
+| 4 | Push + PR | `git fetch origin && git rebase origin/main && git push -u origin HEAD && gh pr create --title "[BD-<id>] type(scope): desc" --body "Closes BD-<id>"` |
+| 5 | Merge + close | `gh pr merge --squash --delete-branch && bd close <id> && bd sync` |
+| 6 | Next task | `bd ready` (if tasks remain, go to step 1) |
 
-See `docs/git-workflow.md` for the full PR workflow.
+See `docs/git-workflow.md` for rationale, branch naming, and edge cases.
 
 ### Task Closure and Next Task
 
@@ -140,12 +141,14 @@ bd sync
 bd ready                # Pick next task
 ```
 
-In a worktree, also update main first:
+In a worktree (cannot `git checkout main` — it's checked out in the main repo):
 ```bash
 bd close <id>
 bd sync
-git checkout main && git pull origin main
+git fetch origin --prune
 bd ready
+# Branch directly from origin/main for next task:
+git checkout -b bd-<next-id>/<desc> origin/main
 ```
 
 ### Parallel Sessions (Worktrees)
@@ -153,7 +156,7 @@ bd ready
 Each parallel agent runs in its own git worktree — an independent working directory sharing the same `.git` repository.
 
 ```bash
-# Create a worktree for a new agent
+# Create a worktree for a new agent (sets up shared Beads database via redirect)
 scripts/setup-agent-worktree.sh agent-1
 
 # Set agent identity for Beads attribution
@@ -163,9 +166,13 @@ export BD_ACTOR="agent-1"
 make setup
 ```
 
+With `bd worktree create`, all agents share one Beads database — task state is visible immediately across worktrees, no `bd sync` needed between agents.
+
 ### Worktree Awareness
 
 When running in a worktree:
+- **Never run `git checkout main`** — main is checked out in the main repo; this will fail
+- **Always branch from remote**: `git checkout -b bd-<id>/<desc> origin/main`
 - **Always check `bd ready`** before starting work — another agent may have claimed your next task
 - **Rebase frequently** — other agents are merging to main
 - **Never edit high-contention files** (`prompts.md`, `CLAUDE.md`) without rebasing first

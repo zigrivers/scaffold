@@ -13,101 +13,26 @@ The workflow below is the canonical source of truth. Your job is to ensure every
 
 ## Canonical Workflow
 
+See `CLAUDE.md` for the authoritative workflow. The 6-step workflow below is the source of truth for auditing — ensure every document aligns to it.
+
 ### Step-by-step Feature Workflow
 
-**1a. Pick a task (for existing tasks)**
+| Step | Action | Commands |
+|------|--------|----------|
+| 1 | Pick task | `bd ready` → `bd update <id> --status in_progress --claim` |
+| 2 | Create branch | `git checkout -b bd-<id>/<desc> origin/main` |
+| 3 | Implement (TDD) | Red/Green/Refactor/Verify/Commit — `make check` before push |
+| 4 | Push + PR | `git fetch origin && git rebase origin/main && git push -u origin HEAD && gh pr create --title "[BD-<id>] type(scope): desc" --body "Closes BD-<id>"` |
+| 5 | Merge + close | `gh pr merge --squash --delete-branch && bd close <id> && bd sync` |
+| 6 | Next task | `bd ready` (if tasks remain, go to step 1) |
+
+**Worktree agents** (cannot `git checkout main` — it's checked out in the main repo):
 ```bash
-bd ready                    # See what's available
-bd update <id> --status in_progress --claim
-```
-Always pick the lowest-ID unblocked task.
-
-**1b. Create a task (for ad-hoc requests)**
-```bash
-bd create "<task type>: <desc>" -p 1
-bd update <id> --claim
-```
-
-**2. Create a feature branch**
-```bash
-git fetch origin
-git checkout -b bd-<task-id>/<short-desc> origin/main
-```
-Review `tasks/lessons.md` for patterns learned from past mistakes.
-
-**3. Plan before building**
-Think through your approach for anything non-trivial (3+ steps or architectural decisions). Write specs upfront. **Do NOT enter Claude Code's interactive plan mode** (`/plan`) — it blocks autonomous execution. If things go sideways mid-implementation, stop and re-plan rather than pushing through.
-
-**4. TDD loop (Red → Green → Refactor)**
-Repeat for each piece of functionality in the task:
-1. **Red** — Write a failing test that defines expected behavior
-2. **Green** — Write the minimum code to make it pass
-3. **Refactor** — Clean up while tests stay green
-4. **Verify** — Run the project's lint and test commands (see CLAUDE.md Key Commands table)
-5. **Commit** — `git commit -m "[BD-<id>] type(scope): description"`
-
-Continue until all acceptance criteria for the task are met. Multiple commits per task are normal — they'll be squash-merged into one commit on main.
-
-**4.5. Self-review (before push)**
-```bash
-claude -p "Review changes on this branch vs origin/main. Check against docs/review-standards.md for P0/P1/P2 issues. Fix any issues found. Run <lint> and <test> after fixes. Commit fixes with [BD-<id>] fix: address self-review findings"
-```
-Catches issues before external review. Runs once before push — cheaper and more targeted than a hook.
-
-**5. Rebase, push, and open a PR**
-```bash
-git fetch origin && git rebase origin/main    # Rebase onto latest main
-git push -u origin HEAD
-gh pr create --title "[BD-<id>] type(scope): description" --body "Closes BD-<id>"
-```
-
-**6. Self-review diff**
-```bash
-gh pr diff
-```
-
-**7. Merge**
-```bash
-gh pr merge --squash --delete-branch
-```
-The `--delete-branch` flag automatically removes the remote branch after merge (local branch is cleaned up in step 9).
-
-**8. Confirm merge**
-```bash
-gh pr view --json state -q .state   # Must show "MERGED"
-```
-Never close the task until this shows MERGED.
-
-**9. Close task and clean up**
-
-*Single agent (main repo):*
-```bash
-bd close <id>
-bd sync
-git checkout main && git pull --rebase origin main
-git branch -d bd-<task-id>/<short-desc>              # Local branch (remote already deleted by --delete-branch)
-git fetch origin --prune                              # Clean up stale remote refs
-```
-
-*Worktree agent (cannot checkout main):*
-```bash
-bd close <id>
-bd sync
+# After merge (step 5):
+bd close <id> && bd sync
 git fetch origin --prune
-git clean -fd
-<install-deps>  # Use project's install command from CLAUDE.md Key Commands
-```
-Worktree agents cannot `git checkout main` — it's checked out in the main repo. They branch directly from `origin/main`. Merged local branches are batch-cleaned periodically.
-
-**9. Next task or done**
-```bash
-bd ready
-```
-If tasks remain, go back to step 1. If none remain, the session is complete.
-
-*Worktree agents:* Create the next feature branch directly from `origin/main`:
-```bash
-git checkout -b bd-<next-task>/<desc> origin/main
+# Branch from origin/main for next task:
+git checkout -b bd-<next-id>/<desc> origin/main
 ```
 
 ### Key Constraints (Always Apply)
@@ -116,7 +41,6 @@ git checkout -b bd-<next-task>/<desc> origin/main
 - Lint and test must pass before any commit (use the project's lint and test commands from CLAUDE.md Key Commands)
 - Only `--force-with-lease` on feature branches, never force push to main
 - Use subagents for research/exploration to keep the main context clean
-- Review `tasks/lessons.md` before starting work
 - If a task requires human action or is outside your capability, skip it: `bd update <id> --status blocked` with a note, then pick the next task
 
 ---
@@ -151,76 +75,37 @@ For each document, extract:
 CLAUDE.md must contain the complete workflow. Check for:
 
 **Workflow Section Exists**:
-- [ ] Dedicated section for feature workflow (e.g., "## Feature Workflow" or "## Development Workflow")
-- [ ] Steps are numbered and in correct order
-- [ ] All 9 steps are present (pick task → next task), plus step 4.5 (self-review)
+- [ ] Dedicated section for feature workflow (e.g., "## Feature Workflow")
+- [ ] All 6 steps present (pick task → next task)
 - [ ] Commands are copy-pasteable (not pseudo-code)
 
 **Step 1: Task Selection**:
 - [ ] `bd ready` documented
 - [ ] `bd update <id> --status in_progress --claim` documented
-- [ ] "Pick lowest-ID unblocked task" rule stated
-- [ ] Ad-hoc task creation documented (`bd create`)
 
 **Step 2: Branch Creation**:
-- [ ] `git fetch origin` before branching
 - [ ] Branch naming format: `bd-<task-id>/<short-desc>`
 - [ ] Branch from `origin/main` (not checkout main, pull, then branch)
-- [ ] Reference to `tasks/lessons.md` review
 
-**Step 3: Planning**:
-- [ ] Planning approach mentioned for non-trivial work (think through, write specs — NOT interactive `/plan` mode)
-- [ ] Explicit warning not to enter Claude Code's interactive plan mode (`/plan`)
-- [ ] "3+ steps or architectural decisions" trigger documented
-- [ ] Re-plan guidance if implementation goes sideways
-
-**Step 4: TDD Loop**:
+**Step 3: TDD Implementation**:
 - [ ] Red → Green → Refactor cycle documented
-- [ ] Each phase explained (not just "do TDD")
-- [ ] Clear that loop repeats per piece of functionality until all acceptance criteria are met
-- [ ] Multiple commits per task acknowledged (squash-merged later)
-- [ ] Lint and test verification step (using project's commands from CLAUDE.md Key Commands table)
+- [ ] `make check` (or equivalent) run before push
 - [ ] Commit message format: `[BD-<id>] type(scope): description`
 
-**Step 4.5: Self-Review**:
-- [ ] `claude -p` subagent command documented
-- [ ] Reviews against `docs/review-standards.md` for P0/P1/P2 issues
-- [ ] Runs lint and test after fixes
-- [ ] Commits fixes with `[BD-<id>] fix: address self-review findings`
-- [ ] Runs once before push (not a hook)
-
-**Step 5: Rebase, Push, PR Creation**:
+**Step 4: Push + PR**:
 - [ ] `git fetch origin && git rebase origin/main` before push
 - [ ] `git push -u origin HEAD`
-- [ ] `gh pr create` with title format matching `[BD-<id>] type(scope): description`
-- [ ] `gh pr diff` self-review step documented
+- [ ] `gh pr create` with title format matching `[BD-<id>] type(scope): description` and `--body "Closes BD-<id>"`
+
+**Step 5: Merge + Close**:
 - [ ] `gh pr merge --squash --delete-branch` documented
-- [ ] `--delete-branch` explained (removes remote branch after merge)
+- [ ] `bd close <id>` documented (not `bd update --status completed`)
+- [ ] `bd sync` documented
+- [ ] Worktree variant explicitly documented (cannot `git checkout main`; use `git fetch origin --prune` then branch from `origin/main`)
 
-**Step 6: Self-Review**:
-- [ ] `gh pr diff` documented
-
-**Step 7: Merge**:
-- [ ] `gh pr merge --squash --delete-branch` documented
-
-**Step 8: Confirm Merge**:
-- [ ] `gh pr view --json state -q .state` documented
-- [ ] "Must show MERGED" requirement
-- [ ] "Never close task until MERGED" rule
-
-**Step 8: Cleanup**:
-- [ ] `bd close <id>` (not `bd update --status completed`)
-- [ ] `bd sync`
-- [ ] Single agent: return to main and pull with rebase, delete local feature branch
-- [ ] Worktree agent: `git fetch origin --prune`, `git clean -fd`, reinstall deps using project's install command (no checkout main — it's checked out in main repo)
-- [ ] `git fetch origin --prune` to clean up stale remote refs
-- [ ] Worktree variant explicitly documented (agents cannot checkout main)
-
-**Step 9: Continue or Stop**:
+**Step 6: Next Task**:
 - [ ] `bd ready` to check for more work
 - [ ] "Keep working until no tasks remain" stated
-- [ ] Worktree agents: branch directly from `origin/main` for next task
-- [ ] Batch branch cleanup documented for worktree agents
 
 **Key Constraints Section**:
 - [ ] Never push directly to main
@@ -251,16 +136,11 @@ CLAUDE.md must contain the complete workflow. Check for:
 **docs/git-workflow.md** (if exists):
 - [ ] Branch naming matches: `bd-<task-id>/<short-desc>`
 - [ ] Branching from `origin/main` (not checkout-pull-branch)
-- [ ] Self-review step documented (step 4.5 — `claude -p` subagent before push)
 - [ ] Rebase onto origin/main before push documented
 - [ ] Commit format matches: `[BD-<id>] type(scope): description`
-- [ ] Squash merge with `--delete-branch` documented
-- [ ] Self-review step (`gh pr diff`) documented
-- [ ] Merge step (`gh pr merge --squash --delete-branch`) documented
-- [ ] Merge confirmation step documented
+- [ ] `gh pr merge --squash --delete-branch` documented
 - [ ] Task closure with `bd close` documented
-- [ ] Protected main documented
-- [ ] Worktree workflow variant documented (workspace cleanup between tasks)
+- [ ] Worktree workflow variant documented (cannot `git checkout main`)
 - [ ] Agent crash recovery documented
 - [ ] No contradictory merge strategy or commit format
 
@@ -285,8 +165,8 @@ Cross-reference all documents for contradictions:
 | Required checks | Lint and test commands consistent across CLAUDE.md Key Commands, dev-setup.md, and Makefile/package.json |
 | Task ID format | `[BD-<id>]` consistent (not `BD-<id>` without brackets, not `(bd-<id>)` suffix) |
 | Close command | `bd close` consistently (not `bd update --status completed`) |
-| Pull strategy | `git pull --rebase origin main` consistently |
-| PR workflow | All 7 sub-steps (commit, rebase, push, create, auto-merge, watch, confirm) |
+| PR workflow | 6-step workflow consistent (pick → branch → TDD → push+PR → merge+close → next) |
+| Worktree variant | No `git checkout main` in worktree context — always branch from `origin/main` |
 
 ---
 
@@ -349,106 +229,22 @@ If CLAUDE.md is missing the workflow or has gaps, provide the complete section:
 ```markdown
 ## Feature Workflow
 
-### 1. Pick or Create a Task
+| Step | Action | Commands |
+|------|--------|----------|
+| 1 | Pick task | `bd ready` → `bd update <id> --status in_progress --claim` |
+| 2 | Create branch | `git checkout -b bd-<task-id>/<short-desc> origin/main` |
+| 3 | Implement (TDD) | Red/Green/Refactor/Verify/Commit — `make check` (or equivalent) before push |
+| 4 | Push + PR | `git fetch origin && git rebase origin/main && git push -u origin HEAD && gh pr create --title "[BD-<id>] type(scope): desc" --body "Closes BD-<id>"` |
+| 5 | Merge + close | `gh pr merge --squash --delete-branch && bd close <id> && bd sync` |
+| 6 | Next task | `bd ready` (if tasks remain, go to step 1) |
 
-**Existing task:**
+**Worktree agents (cannot `git checkout main`):**
 ```bash
-bd ready                                          # See available tasks
-bd update <id> --status in_progress --claim       # Claim lowest-ID task
-```
-
-**Ad-hoc request (no existing task):**
-```bash
-bd create "<type>: <description>" -p 1
-bd update <id> --claim
-```
-
-### 2. Create Feature Branch
-```bash
-git fetch origin
-git checkout -b bd-<task-id>/<short-desc> origin/main
-```
-Review `tasks/lessons.md` for patterns from past mistakes.
-
-### 3. Plan Before Building
-For non-trivial work (3+ steps or architectural decisions):
-- Think through your approach before coding
-- **Do NOT enter interactive plan mode** (`/plan`) — it blocks autonomous execution
-- Write specs upfront
-- If implementation goes sideways, stop and re-plan
-
-### 4. TDD Loop
-Repeat for each piece of functionality in the task:
-1. **Red**: Write a failing test that defines expected behavior
-2. **Green**: Write minimum code to make it pass
-3. **Refactor**: Clean up while tests stay green
-4. **Verify**: Run lint and test commands (see Key Commands below)
-5. **Commit**: `git commit -m "[BD-<id>] type(scope): description"`
-
-Continue until all acceptance criteria are met. Multiple commits are normal — they squash-merge.
-
-### 4.5. Self-Review
-```bash
-claude -p "Review changes on this branch vs origin/main. Check against docs/review-standards.md for P0/P1/P2 issues. Fix any issues found. Run <lint> and <test> after fixes. Commit fixes with [BD-<id>] fix: address self-review findings"
-```
-Catches issues before external review. Runs once before push — not a hook.
-
-### 5. Rebase, Push, and Open PR
-```bash
-git fetch origin && git rebase origin/main    # Rebase onto latest main
-git push -u origin HEAD
-gh pr create --title "[BD-<id>] type(scope): description" --body "Closes BD-<id>"
-```
-
-### 6. Self-review Diff
-```bash
-gh pr diff
-```
-
-### 7. Merge
-```bash
-gh pr merge --squash --delete-branch
-```
-`--delete-branch` removes the remote branch automatically.
-
-### 8. Confirm Merge
-```bash
-gh pr view --json state -q .state   # Must show "MERGED"
-```
-**Never close task until this shows MERGED.**
-
-### 9. Close Task and Clean Up
-
-**Single agent (main repo):**
-```bash
-bd close <id>
-bd sync
-git checkout main && git pull --rebase origin main
-git branch -d bd-<task-id>/<short-desc>    # Local only; remote deleted by --delete-branch
-git fetch origin --prune                    # Clean up stale remote refs
-```
-
-**Worktree agent (cannot checkout main):**
-```bash
-bd close <id>
-bd sync
+# After merge:
+bd close <id> && bd sync
 git fetch origin --prune
-git clean -fd
-<install-deps>  # Use project's install command from Key Commands
-```
-
-### 9. Next Task or Done
-```bash
-bd ready
-```
-If tasks remain, return to step 1. If none, session is complete.
-
-**Worktree agents:** Create the next feature branch directly from `origin/main`:
-```bash
 git checkout -b bd-<next-task>/<desc> origin/main
 ```
-
-Merged local branches in worktrees are batch-cleaned periodically.
 
 ---
 
@@ -459,12 +255,11 @@ Merged local branches in worktrees are batch-cleaned periodically.
 - **Verify before commit** — lint and test must pass (see Key Commands)
 - **Force push safely** — only `--force-with-lease`, only on feature branches
 - **Branch from origin** — always `git checkout -b <branch> origin/main`
+- **Worktree agents** — never `git checkout main`; always branch from `origin/main`
 
 ## Working Practices
 
 - **Subagents for research** — keeps main context clean
-- **Review lessons learned** — check `tasks/lessons.md` before starting
-- **Re-plan when stuck** — if implementation goes sideways, pause and rethink your approach (do NOT use `/plan`)
 - **Keep working** — continue until `bd ready` returns nothing
 ```
 
@@ -575,15 +370,11 @@ bd create "Create PR template with task ID format" -p 2
 ### Workflow Coverage in CLAUDE.md
 - Step 1 (Task selection): [✓ Complete / ⚠️ Partial / ✗ Missing]
 - Step 2 (Branch creation): [✓ / ⚠️ / ✗]
-- Step 3 (Planning): [✓ / ⚠️ / ✗]
-- Step 4 (TDD loop): [✓ / ⚠️ / ✗]
-- Step 4.5 (Self-review): [✓ / ⚠️ / ✗]
-- Step 5 (PR creation): [✓ / ⚠️ / ✗]
-- Step 6 (Self-review diff): [✓ / ⚠️ / ✗]
-- Step 7 (Merge): [✓ / ⚠️ / ✗]
-- Step 8 (Confirm merge): [✓ / ⚠️ / ✗]
-- Step 9 (Cleanup): [✓ / ⚠️ / ✗]
-- Step 10 (Next task): [✓ / ⚠️ / ✗]
+- Step 3 (TDD implementation): [✓ / ⚠️ / ✗]
+- Step 4 (Push + PR): [✓ / ⚠️ / ✗]
+- Step 5 (Merge + close): [✓ / ⚠️ / ✗]
+- Step 6 (Next task): [✓ / ⚠️ / ✗]
+- Worktree variant: [✓ / ⚠️ / ✗]
 - Key constraints: [✓ / ⚠️ / ✗]
 
 ### Consistency Issues
@@ -621,20 +412,17 @@ After approval:
 
 After updates, verify:
 
-- [ ] CLAUDE.md has complete workflow (9 steps + step 4.5 self-review)
+- [ ] CLAUDE.md has complete 6-step Feature Workflow
 - [ ] All commands are copy-pasteable
 - [ ] Commit format `[BD-<id>] type(scope): description` is consistent everywhere
 - [ ] Branch naming `bd-<task-id>/<short-desc>` from `origin/main` is consistent everywhere
-- [ ] PR workflow includes all 7 sub-steps (commit, rebase, push, create, auto-merge, watch, confirm)
-- [ ] `--delete-branch` flag present on merge command
+- [ ] `gh pr merge --squash --delete-branch` present on merge command
 - [ ] Task closure uses `bd close` (not `bd update --status completed`)
 - [ ] Makefile/package.json has lint, test, and install commands
 - [ ] CLAUDE.md Key Commands table has correct lint, test, and install commands matching actual scripts
-- [ ] tasks/lessons.md exists and is referenced
 - [ ] No document contradicts the canonical workflow
 - [ ] Key constraints section exists in CLAUDE.md
-- [ ] Worktree cleanup between tasks is documented
-- [ ] Worktree variant of task closure documented (cannot checkout main, batch branch cleanup)
+- [ ] Worktree variant documented — no `git checkout main` in worktree context
 - [ ] Agent crash recovery is documented (in git-workflow.md)
 
 ---
@@ -655,18 +443,13 @@ After updates, verify:
 
 | Step | Required Elements |
 |------|-------------------|
-| 1 | `bd ready`, `bd update --claim`, lowest-ID rule, ad-hoc creation |
-| 2 | `git fetch`, branch format, `origin/main`, lessons.md reference |
-| 3 | Think through approach (3+ steps), write specs, do NOT use `/plan`, re-plan if stuck |
-| 4 | Red/Green/Refactor, verify command (project's lint+test from Key Commands), commit format `[BD-<id>]` |
-| 4.5 | Self-review: `claude -p` subagent checks against `docs/review-standards.md` for P0/P1/P2, fixes issues, runs lint+test |
-| 5 | Rebase onto origin/main, push, PR create with title |
-| 6 | `gh pr diff` self-review |
-| 7 | `gh pr merge --squash --delete-branch` |
-| 8 | Merge confirmation command, "never close until MERGED" |
-| 9 | `bd close`, `bd sync`. Single: return to main, delete branch, `--prune`. Worktree: fetch, prune, clean (no checkout main) |
-| 10 | `bd ready`, continue or stop. Worktree: branch from `origin/main`, batch-clean merged branches |
-| Constraints | No push to main, `[BD-<id>]` required, lint+test before commit, force-with-lease, subagents |
+| 1 | `bd ready`, `bd update --status in_progress --claim` |
+| 2 | Branch format `bd-<id>/<desc>`, branch from `origin/main` |
+| 3 | Red/Green/Refactor, verify (project's lint+test), commit format `[BD-<id>]`, `make check` before push |
+| 4 | Rebase onto `origin/main`, push, `gh pr create` with `[BD-<id>]` title and `Closes BD-<id>` body |
+| 5 | `gh pr merge --squash --delete-branch`, `bd close <id>`, `bd sync` |
+| 6 | `bd ready`, continue or stop; worktree: branch from `origin/main` for next task |
+| Constraints | No push to main, `[BD-<id>]` required, lint+test before commit, force-with-lease only |
 
 ## After This Step
 

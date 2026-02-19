@@ -98,6 +98,11 @@ git fetch origin
 WORKSPACE_BRANCH="${DIR_SUFFIX}-workspace"
 git worktree add "$WORKTREE_DIR" -b "$WORKSPACE_BRANCH" origin/main
 
+# Set up shared Beads database (all agents share one SQLite DB via redirect)
+if command -v bd >/dev/null 2>&1; then
+    (cd "$WORKTREE_DIR" && bd worktree create 2>/dev/null) || true
+fi
+
 echo ""
 echo "✅ Permanent worktree created: $WORKTREE_DIR"
 echo ""
@@ -107,7 +112,6 @@ echo ""
 echo "This worktree is reusable across tasks. Do NOT remove it between tasks."
 echo ""
 echo "Agents create feature branches from origin/main:"
-echo "  git fetch origin"
 echo "  git checkout -b bd-<task-id>/<desc> origin/main"
 ```
 
@@ -228,28 +232,17 @@ If running only ONE Claude Code session at a time, worktrees are not needed. Sta
 git add .
 git commit -m "[BD-<id>] type(scope): description"
 
-# 2. Self-review (catch issues before external review)
-# Spawn a review subagent to check changes against project standards
-claude -p "Review changes on this branch vs origin/main. Check against docs/review-standards.md for P0/P1/P2 issues. Fix any issues found. Run <lint> and <test> after fixes. Commit fixes with [BD-<id>] fix: address self-review findings"
-
-# 3. Rebase onto latest main
+# 2. Rebase onto latest main and push
 git fetch origin && git rebase origin/main
-
-# 4. Push feature branch
 git push -u origin HEAD
 
-# 5. Create PR
+# 3. Create PR
 gh pr create --title "[BD-<id>] type(scope): description" --body "Closes BD-<id>"
 
-# 6. Self-review diff
-gh pr diff
-
-# 7. Merge
+# 4. Merge and close task
 gh pr merge --squash --delete-branch
-
-# 8. Confirm merge
-gh pr view --json state -q .state   # Must show "MERGED"
-# NEVER close the task until this shows MERGED
+bd close <id>
+bd sync
 ```
 
 **Key PR commands:**
@@ -258,7 +251,6 @@ gh pr view --json state -q .state   # Must show "MERGED"
 |---------|---------|
 | `gh pr create --title "..." --body "..."` | Create PR from current branch |
 | `gh pr merge --squash --delete-branch` | Squash-merge and delete remote branch |
-| `gh pr view --json state -q .state` | Confirm merge completed |
 | `gh pr list` | List open PRs |
 
 **Why `--squash --delete-branch`:**
@@ -267,29 +259,26 @@ gh pr view --json state -q .state   # Must show "MERGED"
 
 ### 5. Task Closure and Cleanup
 
-After merge is confirmed:
+After merge:
 
 **Single agent (main repo):**
 ```bash
 bd close <id>
 bd sync
-git checkout main && git pull --rebase origin main
-git branch -d bd-<task-id>/<short-desc>    # Local only; remote deleted by --delete-branch
-git fetch origin --prune                    # Clean up stale remote refs
+git fetch origin --prune
+bd ready     # Pick next task
 ```
 
-**Worktree agent:**
+**Worktree agent (cannot `git checkout main` — it's checked out in the main repo):**
 ```bash
 bd close <id>
 bd sync
-git fetch origin --prune                    # Clean up stale remote refs
-git clean -fd
-<install-deps>
+git fetch origin --prune
 # Next task branches directly from origin/main:
 git checkout -b bd-<next-task>/<desc> origin/main
 ```
 
-Worktree agents cannot checkout main (it's checked out in the main repo). They always branch from `origin/main`. Merged local branches accumulate and are batch-cleaned periodically (see Worktree Maintenance).
+Merged local branches in worktrees accumulate and are batch-cleaned periodically (see Worktree Maintenance).
 
 ### 6. Agent Crash / Stale Work Recovery
 
@@ -307,15 +296,11 @@ When an agent session dies mid-task:
 
 3. **If work should be discarded:**
    ```bash
-   # Single agent (main repo):
-   git checkout main && git pull --rebase origin main
-   git branch -D <stale-branch>
-
-   # Worktree agent (use the workspace branch created during setup):
+   # Single agent or worktree agent — switch to workspace branch, discard stale branch:
    git checkout <agent-name>-workspace
    git branch -D <stale-branch>
 
-   # Either way, unclaim the task:
+   # Unclaim the task:
    bd update <task-id> --status ready
    ```
 
@@ -377,54 +362,20 @@ Add the following sections to CLAUDE.md:
 **If running multiple agents in parallel**: Each agent MUST be in its own permanent worktree with BD_ACTOR set. See docs/git-workflow.md for setup.
 ```
 
-**Add Committing and PR Workflow section:**
+**Add Feature Workflow section:**
 ```markdown
-### Committing and Creating PRs
+### Feature Workflow
 
-**NEVER push directly to main** — it's protected. Always use feature branches and PRs:
+| Step | Action | Commands |
+|------|--------|----------|
+| 1 | Pick task | `bd ready` → `bd update <id> --status in_progress --claim` |
+| 2 | Create branch | `git checkout -b bd-<id>/<desc> origin/main` |
+| 3 | Implement (TDD) | Red/Green/Refactor/Verify/Commit — `make check` before push |
+| 4 | Push + PR | `git fetch origin && git rebase origin/main && git push -u origin HEAD && gh pr create --title "[BD-<id>] type(scope): desc" --body "Closes BD-<id>"` |
+| 5 | Merge + close | `gh pr merge --squash --delete-branch && bd close <id> && bd sync` |
+| 6 | Next task | `bd ready` (if tasks remain, go to step 1) |
 
-1. Commit: `git add . && git commit -m "[BD-<id>] type(scope): description"`
-2. Rebase: `git fetch origin && git rebase origin/main`
-3. Push: `git push -u origin HEAD`
-4. Create PR: `gh pr create --title "[BD-<id>] type(scope): description" --body "Closes BD-<id>"`
-5. Self-review: `gh pr diff`
-6. Merge: `gh pr merge --squash --delete-branch`
-7. Confirm: `gh pr view --json state -q .state` — must show "MERGED"
-```
-
-**Add Task Closure and Next Task section:**
-```markdown
-### Task Closure and Next Task
-
-After merge is confirmed (step 7 above):
-
-**Single agent (main repo):**
-```bash
-bd close <id>
-bd sync
-git checkout main && git pull --rebase origin main
-git branch -d bd-<task-id>/<short-desc>
-git fetch origin --prune
-bd ready
-```
-
-**Worktree agent:**
-```bash
-bd close <id>
-bd sync
-git fetch origin --prune
-git clean -fd
-<install-deps>
-bd ready
-# Next task branches directly from origin/main:
-git checkout -b bd-<next-task>/<desc> origin/main
-```
-
-- If tasks remain: pick the lowest-ID, create a feature branch, and implement it
-- If none remain: session is complete
-- **Keep working until `bd ready` returns no available tasks**
-
-**Note:** Worktree agents cannot checkout main (it's checked out in the main repo). They always branch from `origin/main`. Merged branches are batch-cleaned periodically.
+**Worktree agents (cannot `git checkout main`):** After merge, run `git fetch origin --prune` then branch from `origin/main` for the next task.
 ```
 
 **Add Parallel Sessions section:**
@@ -476,7 +427,6 @@ If you are in a permanent worktree:
 | `BD_ACTOR="Agent-1" claude` | Launch agent with Beads identity |
 | `gh pr create --title "..." --body "..."` | Create PR from current branch |
 | `gh pr merge --squash --delete-branch` | Squash-merge and delete remote branch |
-| `gh pr view --json state -q .state` | Confirm merge completed |
 | `bd close <id>` | Close completed task |
 
 **Add row to "When to Consult Other Docs" table:**

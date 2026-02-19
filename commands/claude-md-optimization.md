@@ -90,10 +90,10 @@ After analysis, restructure CLAUDE.md to follow this format:
 [Think through approach for non-trivial work. Write specs upfront. CRITICAL: Do NOT enter Claude Code's interactive `/plan` mode — it blocks autonomous execution. Just think through the problem internally.]
 
 ### Implementation Loop
-[TDD cycle repeating per piece of functionality, verification using Key Commands lint+test, commits with [BD-<id>] format. Multiple commits per task are normal — they squash-merge. Self-review before push (claude -p subagent checks against docs/review-standards.md for P0/P1/P2). Rebase onto origin/main before push. One clear flow.]
+[TDD cycle repeating per piece of functionality, verification using Key Commands lint+test, commits with [BD-<id>] format. Multiple commits per task are normal — they squash-merge. Rebase onto origin/main before push. One clear flow.]
 
 ### Task Closure and Next Task
-[Confirm merge, bd close, bd sync. Single agent: checkout main, delete branch, prune. Worktree agent: fetch, prune, clean, branch from origin/main (cannot checkout main). Keep working until no tasks remain]
+[`gh pr merge --squash --delete-branch`, then `bd close`, `bd sync`. Single agent: `git fetch origin --prune`. Worktree agent: same + branch from `origin/main` for next task (cannot checkout main). Keep working until no tasks remain.]
 
 ### Session End
 [Exact steps - mandatory, in order]
@@ -193,14 +193,13 @@ The Key Commands table in Quick Reference is the single source of truth for proj
 Before finalizing, verify CLAUDE.md explicitly covers:
 
 1. **Never push to main** — main is protected, all changes via PR
-2. **PR workflow** — rebase onto origin/main, then `gh pr create`, then `gh pr diff` (self-review), then `gh pr merge --squash --delete-branch`, then `gh pr view --json state -q .state` must show "MERGED"
-3. **Self-review before push** — `claude -p` subagent checks against `docs/review-standards.md` for P0/P1/P2 issues, fixes them, runs lint+test
-4. **Task closure** — two variants: single agent (checkout main, delete branch, prune) and worktree agent (fetch, prune, clean — cannot checkout main). Both use `bd close`, `bd sync`
-5. **Continuous work loop** — clean workspace between tasks, keep working until `bd ready` returns nothing
-6. **Parallel agent setup** — permanent worktrees with workspace branches, BD_ACTOR, agents always branch from `origin/main`, never `git checkout main`
-7. **TDD always** — failing test before implementation, loop repeats per piece of functionality, multiple commits per task squash-merge
-8. **Every commit needs a Beads task** — commit messages require `[BD-<id>]` format
-9. **Error recovery** — test failures, merge conflicts, hook failures, crashed sessions, orphaned worktree work
+2. **6-step workflow** — pick task → branch from `origin/main` → TDD → push + `gh pr create` → `gh pr merge --squash --delete-branch` + `bd close` → `bd ready`
+3. **Task closure** — single agent: `bd close`, `bd sync`, `git fetch origin --prune`. Worktree agent: same but NO `git checkout main` — cannot checkout main. Both branch from `origin/main` for next task.
+4. **Continuous work loop** — keep working until `bd ready` returns nothing
+5. **Parallel agent setup** — permanent worktrees, `bd worktree create` for shared Beads database, BD_ACTOR, agents always branch from `origin/main`, never `git checkout main`
+6. **TDD always** — failing test before implementation, loop repeats per piece of functionality, multiple commits per task squash-merge
+7. **Every commit needs a Beads task** — commit messages require `[BD-<id>]` format
+8. **Error recovery** — test failures, merge conflicts, hook failures, crashed sessions, orphaned worktree work
 
 ## After This Step
 
