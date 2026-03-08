@@ -2,6 +2,23 @@
 
 All notable changes to Scaffold are documented here.
 
+## [1.18.0] — 2026-03-08
+
+### Added
+- **Session Analyzer command** (`/scaffold:session-analyzer`) — analyzes Claude Code session history across all projects to identify repeated tasks and workflows, then recommends what to automate as skills, plugins, agents, and CLAUDE.md rules
+- **CI workflow** — `.github/workflows/ci.yml` runs `make check` on all pull requests to the scaffold repo itself
+
+### Fixed
+- `bd hook` invocation corrected (`bd hooks run` → `bd hook pre-commit`)
+- Removed broken `bd worktree create` call from `setup-agent-worktree.sh`
+
+### Changed
+- `AGENTS.md` simplified: removed `--claim` flag from `bd update`, streamlined landing-the-plane workflow to focus on pushing
+- Minor wording updates across `commands/` and `README.md`
+
+### Completed Tasks
+- [BD-scaffold-smx] fix(workflow): streamline workflow docs and fix friction points
+
 ## [1.17.0] — 2026-02-19
 
 ### Added
