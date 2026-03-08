@@ -55,7 +55,7 @@ This project can use parallel Claude Code sessions. Beads provides:
    ```bash
    bd hooks install
    ```
-   Note: These are Beads data-sync hooks only (not code quality hooks). They ensure task data is committed alongside code changes. Code quality checks run via `make check` and git hooks.
+   Note: These are Beads data-sync hooks only (not code quality hooks). They ensure task data is committed alongside code changes. This is separate from CI checks which handle linting and tests.
 
 3. **Verify setup**:
    ```bash
@@ -146,7 +146,7 @@ Bad titles: `"Backend stuff"`
 ### Closing Tasks
 ```bash
 bd close <id>                            # Marks complete — use this, not bd update --status completed
-bd sync                                  # Export JSONL for git persistence (safe to run after every close)
+bd sync                                  # Force sync to git
 ```
 
 ### Beads Commands
@@ -160,7 +160,7 @@ bd sync                                  # Export JSONL for git persistence (saf
 | `bd dep add <child> <parent>` | Add dependency |
 | `bd dep tree <id>` | View dependency graph |
 | `bd show <id>` | Full task details |
-| `bd sync` | Export task data to JSONL (for git persistence) |
+| `bd sync` | Force sync to git |
 | `bd list` | List all tasks |
 | `bd dep cycles` | Debug stuck/circular dependencies |
 
@@ -207,10 +207,11 @@ The following are handled by separate prompts that run later:
 - **Git workflow** (branching, PRs, merge strategy) → Git Workflow prompt
 - **Full development workflow** (session start → implementation → PR → task closure → next task) → CLAUDE.md Optimization + Workflow Audit prompts
 - **Parallel agent worktrees** → Git Workflow prompt
+- **CI/CD pipeline** → Git Workflow prompt
 - **TDD standards** → TDD prompt
 - **Coding standards** → Coding Standards prompt
 
-This prompt establishes Beads as the task tracking system and adds the Beads reference to CLAUDE.md. The full workflow that ties Beads into git and PRs is composed by later prompts.
+This prompt establishes Beads as the task tracking system and adds the Beads reference to CLAUDE.md. The full workflow that ties Beads into git, PRs, and CI is composed by later prompts.
 
 ## After Setup
 

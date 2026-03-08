@@ -88,7 +88,7 @@ This project will be built and maintained entirely by AI agents. Every technolog
 
 ### 5. Infrastructure & DevOps
 - Hosting / deployment target recommendation
-- Local quality gates (make check, git hooks)
+- CI/CD approach
 - Environment management (local, staging, production)
 - Environment variable / secrets management
 
