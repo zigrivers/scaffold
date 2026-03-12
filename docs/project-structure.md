@@ -1,4 +1,4 @@
-<!-- scaffold:project-structure v1 2026-02-16 -->
+<!-- scaffold:project-structure v2 2026-03-12 -->
 # Project Structure
 
 Authoritative map of the Scaffold repository — where every file goes, why, and how directories relate to each other. All other docs (coding-standards, tech-stack, tdd-standards) reference this structure and must stay in sync with it.
@@ -7,32 +7,52 @@ Authoritative map of the Scaffold repository — where every file goes, why, and
 
 ```
 scaffold/
-├── commands/                  # Individual command .md files (generated from prompts.md)
+├── commands/                  # Individual command .md files (36, generated from prompts.md)
 │   ├── add-maestro.md
 │   ├── add-playwright.md
-│   ├── ...
+│   ├── beads.md
+│   ├── ...                    # 30 more command files
+│   ├── version-bump.md
+│   ├── version.md
 │   └── workflow-audit.md
-├── scripts/                   # Bash utility scripts called by prompts
+├── scripts/                   # Bash utility scripts and JSON schemas
 │   ├── extract-commands.sh
+│   ├── generate-dashboard.sh
+│   ├── implementation-plan-mmr.sh
+│   ├── implementation-plan-mmr.schema.json
+│   ├── install-hooks.sh
 │   ├── install.sh
+│   ├── setup-agent-worktree.sh
 │   ├── uninstall.sh
 │   ├── update.sh
-│   └── user-stories-mmr.sh
-├── lib/                       # Shared bash libraries and assets
-│   ├── .gitkeep
+│   ├── user-stories-mmr.schema.json
+│   ├── user-stories-mmr.sh
+│   └── validate-frontmatter.sh
+├── lib/                       # Shared assets
 │   └── dashboard-theme.css    # Dashboard CSS (embedded into generated HTML)
 ├── docs/                      # Project documentation and standards
 │   ├── coding-standards.md
 │   ├── design-system.md       # Dashboard visual design system
+│   ├── dev-setup.md           # Development environment setup
+│   ├── git-workflow.md        # Git branching and PR workflow
+│   ├── plan.md                # Product requirements document (PRD)
 │   ├── project-structure.md   # This file
+│   ├── scaffold-overview.md   # High-level project overview
 │   ├── tdd-standards.md
-│   └── tech-stack.md
-├── tests/                     # bats-core test files [NEW — scaffolded]
-│   ├── test_helper/
-│   │   ├── common-setup.bash  # Shared setup: temp dirs, fixtures, source lib
-│   │   └── .gitkeep
-│   ├── fixtures/              # Test data files (configs, frontmatter samples)
-│   │   └── .gitkeep
+│   ├── tech-stack.md
+│   ├── user-stories.md
+│   ├── add-multi-model-review.md
+│   ├── multi-model-stories-review-setup.md
+│   ├── reviews/               # Multi-model review artifacts
+│   │   └── user-stories/      # Codex/Gemini review data, coverage analysis
+│   └── superpowers/           # Superpowers integration specs
+│       └── specs/
+├── tests/                     # bats-core test files
+│   ├── generate-dashboard.bats
+│   ├── setup-agent-worktree.bats
+│   ├── validate-frontmatter.bats
+│   ├── test_helper/           # Shared test setup (placeholder)
+│   ├── fixtures/              # Test data files (placeholder)
 │   └── screenshots/           # Dashboard visual testing (Playwright MCP)
 │       ├── baseline/          # Committed — known-good reference screenshots
 │       ├── current/           # Gitignored — current verification run
@@ -43,11 +63,25 @@ scaffold/
 ├── .claude-plugin/            # Plugin manifest
 │   ├── plugin.json
 │   └── marketplace.json
-├── .beads/                    # Beads issue database (committed, managed by bd CLI)
-│   └── issues.jsonl
+├── .github/                   # GitHub CI and templates
+│   ├── workflows/
+│   │   └── ci.yml             # Runs make check on PRs
+│   └── pull_request_template.md
+├── .claude/                   # Claude Code configuration
+│   ├── settings.json          # Project-level permissions
+│   └── settings.local.json    # Local machine overrides
+├── .beads/                    # Beads task database (managed by bd CLI)
+│   ├── config.yaml            # Beads project configuration
+│   ├── beads.db               # SQLite database
+│   ├── issues.jsonl           # Issue log
+│   ├── interactions.jsonl     # Interaction history
+│   ├── metadata.json          # Database metadata
+│   ├── sync-state.json        # Git sync state
+│   └── dolt/                  # Distributed database storage
 ├── tasks/                     # Session-specific task notes
 │   └── lessons.md
 ├── prompts.md                 # Source of truth for all prompts
+├── Makefile                   # Build automation (test, lint, validate, check)
 ├── CLAUDE.md                  # AI agent guidance
 ├── AGENTS.md                  # Multi-agent coordination
 ├── README.md                  # Project overview
@@ -79,14 +113,17 @@ Scaffold uses a **role-based** organization. Each directory has a single clear p
 | Role | Directory | Contents |
 |------|-----------|----------|
 | Prompts (source of truth) | `prompts.md` | All prompt text, extracted to `commands/` |
-| Commands (distributed) | `commands/` | Individual `.md` files with YAML frontmatter |
-| Scripts (deterministic ops) | `scripts/` | Bash utilities called by prompts |
-| Shared library & assets | `lib/` | `common.sh` (sourced by scripts), `dashboard-theme.css` (embedded into HTML) |
+| Commands (distributed) | `commands/` | Individual `.md` files with YAML frontmatter (36 files) |
+| Scripts (deterministic ops) | `scripts/` | Bash utilities and JSON schemas called by prompts |
+| Shared assets | `lib/` | `dashboard-theme.css` (embedded into generated HTML) |
 | Tests | `tests/` | bats-core `.bats` files, one per script |
-| Documentation | `docs/` | Standards docs, reviews, this file |
+| Documentation | `docs/` | Standards docs, reviews, specs, this file |
 | Skills | `skills/` | Auto-activated skill files |
 | Plugin manifest | `.claude-plugin/` | `plugin.json`, `marketplace.json` |
-| Task tracking | `.beads/` | Beads issue database (committed) |
+| CI/CD & templates | `.github/` | GitHub Actions workflows, PR template |
+| Claude Code config | `.claude/` | Project and local permissions (`settings.json`) |
+| Task tracking | `.beads/` | Beads SQLite database (managed by `bd` CLI) |
+| Session notes | `tasks/` | Learning log (`lessons.md`) |
 
 **Why role-based**: Scaffold isn't a feature-driven app — it's a tool pipeline. Each directory has a single clear purpose. There's no "auth module" or "sessions feature." Merge conflicts are minimized because prompt work, script work, and doc work happen in separate directories.
 
@@ -94,23 +131,23 @@ Scaffold uses a **role-based** organization. Each directory has a single clear p
 
 | File Type | Location | Naming Convention | Example |
 |-----------|----------|-------------------|---------|
-| Bash scripts | `scripts/` | `<name>.sh` (kebab-case) | `scripts/resolve-deps.sh` |
-| Shared library functions | `lib/` | `common.sh` | `lib/common.sh` |
+| Bash scripts | `scripts/` | `<name>.sh` (kebab-case) | `scripts/generate-dashboard.sh` |
+| JSON schemas | `scripts/` | `<name>.schema.json` | `scripts/user-stories-mmr.schema.json` |
 | Command prompts | `commands/` | `<slug>.md` (generated from `prompts.md`) | `commands/tech-stack.md` |
 | Documentation | `docs/` | `<topic>.md` (kebab-case) | `docs/coding-standards.md` |
-| Test files | `tests/` | `<script-name>.bats` | `tests/resolve-deps.bats` |
+| Test files | `tests/` | `<script-name>.bats` | `tests/generate-dashboard.bats` |
 | Test fixtures | `tests/fixtures/` | `<descriptive-name>.<ext>` | `tests/fixtures/valid-config.json` |
 | Test helpers | `tests/test_helper/` | `common-setup.bash` | `tests/test_helper/common-setup.bash` |
-| JSON schemas | `scripts/` | `<name>.schema.json` | `scripts/user-stories-mmr.schema.json` |
 | CSS / theme files | `lib/` | `<name>.css` (kebab-case) | `lib/dashboard-theme.css` |
 | Skills | `skills/<skill-name>/` | `SKILL.md` | `skills/scaffold-pipeline/SKILL.md` |
+| GitHub workflows | `.github/workflows/` | `<name>.yml` (kebab-case) | `.github/workflows/ci.yml` |
 | Config files | repo root | standard names | `.editorconfig`, `.shellcheckrc`, `.gitignore` |
 
 **Rules:**
 
 - **No barrel/index files** — Every file is imported directly by path.
 - **No nested script directories** — All scripts live flat in `scripts/`. If the count grows beyond ~15, revisit.
-- **One `.bats` file per script** — Mirrors the script it tests. `lib/common.sh` → `tests/common.bats`.
+- **One `.bats` file per script** — Mirrors the script it tests.
 - **kebab-case everywhere** — Files, directories, command slugs. No camelCase, no snake_case in filenames.
 
 ## 4. Shared Code Strategy
@@ -119,18 +156,17 @@ Scaffold uses a **role-based** organization. Each directory has a single clear p
 
 | File | Risk | Mitigation |
 |------|------|------------|
-| `prompts.md` | Single source of truth, ~3000 lines | Only one agent edits at a time. Extract to `commands/` after editing. |
-| `lib/common.sh` | Sourced by every script | Add functions at the bottom. Each function is independent. |
+| `prompts.md` | Single source of truth, ~8500 lines | Only one agent edits at a time. Extract to `commands/` after editing. |
 | `CLAUDE.md` | Project guidance | Sections are independent — agents edit specific sections only. |
-| `.beads/issues.jsonl` | Task tracking database | Managed by `bd` CLI — never edit directly. |
+| `.beads/beads.db` | Task tracking database | Managed by `bd` CLI — never edit directly. |
 
-### Shared Utility Rule
+### Shared Utility Rule (future)
 
-A function goes in `lib/common.sh` only when used by 2+ scripts. Until then, keep it local in the script that needs it.
+When scripts share common functions, extract them to `lib/common.sh` — but only when used by 2+ scripts. Until then, keep functions local in the script that needs them. Currently no shared bash library exists; `lib/` contains only CSS assets.
 
 ## 5. Import Conventions
 
-Bash `source` ordering — shared library first, after error flags and path resolution:
+Bash script preamble — error flags and path resolution:
 
 ```bash
 #!/usr/bin/env bash
@@ -138,7 +174,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$SCRIPT_DIR/.."
+```
 
+When a shared library (`lib/common.sh`) is introduced in the future, source it after path resolution:
+
+```bash
 source "$REPO_DIR/lib/common.sh"    # Shared library — always first
 ```
 
@@ -149,60 +189,54 @@ source "$REPO_DIR/lib/common.sh"    # Shared library — always first
 
 ## 6. Test File Location
 
-**Mirrored** strategy — each source file has a corresponding test file:
+**Mirrored** strategy — each source script should have a corresponding test file:
 
 | Source | Test |
 |--------|------|
 | `scripts/<name>.sh` | `tests/<name>.bats` |
-| `lib/common.sh` | `tests/common.bats` |
 
 Supporting files:
 
 | File | Purpose |
 |------|---------|
-| `tests/test_helper/common-setup.bash` | Shared setup: temp dirs, load bats helpers, source `lib/common.sh` |
-| `tests/fixtures/` | Test data files: sample configs, frontmatter, prompts snippets |
+| `tests/test_helper/` | Shared test setup (placeholder — populate as test suite grows) |
+| `tests/fixtures/` | Test data files (placeholder — add configs, frontmatter samples as needed) |
 
-Full test directory structure (from tdd-standards.md):
+Current test directory structure:
 
 ```
 tests/
-├── test_helper/
-│   └── common-setup.bash       # Shared setup: temp dirs, load helpers, source lib
-├── fixtures/
-│   ├── valid-config.json        # Valid .scaffold/config.json for testing
-│   ├── invalid-config.json      # Malformed config for error path tests
-│   ├── sample-frontmatter.md    # Command file with valid frontmatter
-│   ├── bad-frontmatter.md       # Command file with invalid/missing frontmatter
-│   └── prompts-snippet.md       # Minimal prompts.md for extract-commands tests
-├── common.bats                  # Tests for lib/common.sh
-├── install.bats                 # Tests for scripts/install.sh
-├── uninstall.bats               # Tests for scripts/uninstall.sh
-├── update.bats                  # Tests for scripts/update.sh
-├── extract-commands.bats        # Tests for scripts/extract-commands.sh
-├── user-stories-mmr.bats        # Tests for scripts/user-stories-mmr.sh
-├── resolve-deps.bats            # Tests for scripts/resolve-deps.sh
-├── resolve-profile.bats         # Tests for scripts/resolve-profile.sh
-├── resolve-prompt.bats          # Tests for scripts/resolve-prompt.sh
-├── check-artifacts.bats         # Tests for scripts/check-artifacts.sh
-├── detect-completion.bats       # Tests for scripts/detect-completion.sh
-├── validate-config.bats         # Tests for scripts/validate-config.sh
-└── validate-frontmatter.bats    # Tests for scripts/validate-frontmatter.sh
+├── generate-dashboard.bats      # Tests for scripts/generate-dashboard.sh
+├── setup-agent-worktree.bats    # Tests for scripts/setup-agent-worktree.sh
+├── validate-frontmatter.bats    # Tests for scripts/validate-frontmatter.sh
+├── test_helper/                 # Shared test setup (placeholder)
+├── fixtures/                    # Test data files (placeholder)
+└── screenshots/                 # Dashboard visual testing (Playwright MCP)
+    ├── baseline/                # Committed — known-good reference screenshots
+    ├── current/                 # Gitignored — current verification run
+    ├── diff/                    # Gitignored — visual comparison outputs
+    └── dashboard-test.html      # Generated by make dashboard-test (gitignored)
 ```
+
+Additional `.bats` files should be added as scripts are created or modified, following the mirrored naming convention.
 
 ## 7. Generated vs. Committed Files
 
 | Committed | Not Committed (in .gitignore) |
 |-----------|-------------------------------|
 | All source files (scripts, commands, docs, lib) | `coverage/` (kcov output) |
-| `.beads/issues.jsonl` (task database) | `*.tmp` (atomic write temp files) |
-| Config files (`.editorconfig`, `.shellcheckrc`) | `.DS_Store` (already ignored) |
-| `plugin.json`, `marketplace.json` | `.history/` (already ignored) |
-| `tests/fixtures/` (test data) | `*~` (editor backup files) |
-| `tests/screenshots/baseline/` (reference screenshots) | `*.bak` (editor backup files) |
-| `.gitkeep` files (empty dir placeholders) | `tests/screenshots/current/` (verification runs) |
+| `.beads/config.yaml`, `issues.jsonl`, `metadata.json` | `.beads/beads.db-wal`, `.beads/beads.db-shm` (WAL files) |
+| `.beads/beads.db` (task database) | `.beads/daemon.*` (daemon lock/pid/log) |
+| Config files (`.editorconfig`, `.shellcheckrc`) | `.beads/ephemeral.sqlite3` |
+| `plugin.json`, `marketplace.json` | `*.tmp` (atomic write temp files) |
+| `tests/fixtures/` (test data) | `.DS_Store` (already ignored) |
+| `tests/screenshots/baseline/` (reference screenshots) | `.history/` (already ignored) |
+| `.github/` (CI workflows, PR template) | `*~`, `*.bak` (editor backup files) |
+| | `tests/screenshots/current/` (verification runs) |
 | | `tests/screenshots/diff/` (comparison outputs) |
+| | `tests/screenshots/dashboard-test.html` (generated) |
 | | `.playwright-mcp/` (Playwright MCP cache) |
+| | `.worktrees/` (git worktree working dirs) |
 
 ## 8. Root-Level File Policy
 
@@ -211,9 +245,8 @@ Root level is reserved for project-wide config and documentation:
 | Category | Files |
 |----------|-------|
 | Source of truth | `prompts.md` |
+| Build automation | `Makefile` |
 | Project docs | `CLAUDE.md`, `AGENTS.md`, `README.md`, `CHANGELOG.md`, `LICENSE` |
 | Tooling config | `.editorconfig`, `.shellcheckrc`, `.gitignore`, `.gitattributes` |
 
 **No feature code, research notes, or ad-hoc files at root.**
-
-> **Note**: Three loose files currently at root (`add-multi-model-review.md`, `Multi Model Review Cost Analysis.md`, `Multi Model Review Research.md`) predate this policy and should be relocated. Tracked in Beads.

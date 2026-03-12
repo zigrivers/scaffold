@@ -2,7 +2,7 @@
 
 ## What is Scaffold
 
-Scaffold is a prompt pipeline for scaffolding new software projects with Claude Code. It provides a curated sequence of 25+ structured prompts that guide you from a raw product idea through to working software, producing documentation, standards, task graphs, and implementation along the way.
+Scaffold is a prompt pipeline for scaffolding new software projects with Claude Code. It provides a curated sequence of 29 structured prompts that guide you from a raw product idea through to working software, producing documentation, standards, task graphs, and implementation along the way.
 
 Scaffold is distributed as a **Claude Code plugin** (installable via `/plugin marketplace add`) and also as standalone **user commands** (copyable to `~/.claude/commands/`).
 
@@ -19,9 +19,11 @@ Phases are run in order, with explicit dependency constraints between prompts. S
 - **Parallel agent execution** — git worktrees enable multiple Claude Code sessions working simultaneously
 - **Multi-model code review** (optional) — automated PR review using Codex Cloud with Claude-powered fixes
 - **Project type awareness** — optional prompts for web apps (Playwright), mobile/Expo (Maestro), and multi-platform projects
-- **Migration support** — dedicated prompts for updating projects created with older pipeline versions
+- **Update mode** — all document-creating prompts auto-detect fresh vs. update mode, replacing dedicated migration prompts
 - **Auto-activated pipeline skill** — provides ordering context so Claude Code knows which command to suggest next
 - **Enhancement workflow** — add features to existing projects without re-running the full pipeline
+- **Interactive dashboard** — Beads task dashboard with light/dark theme, filters, and modal task details
+- **Release management** — versioned release workflow with changelog, GitHub release, and rollback support
 
 ## Pipeline Phases & Commands
 
@@ -72,6 +74,7 @@ Phases are run in order, with explicit dependency constraints between prompts. S
 |---|---------|-------------|----------|
 | 14 | `user-stories` | Create user stories covering every PRD feature | |
 | 15 | `user-stories-gaps` | Gap analysis and UX innovation for user stories | |
+| 15.5 | `user-stories-multi-model-review` | Multi-model review of user stories for PRD coverage | **(optional)** Requires Codex/Gemini CLI |
 | 16 | `platform-parity-review` | Audit platform coverage across all docs | **(optional)** Multi-platform projects only |
 
 ### Phase 6 — Consolidation & Verification
@@ -87,8 +90,18 @@ Phases are run in order, with explicit dependency constraints between prompts. S
 |---|---------|-------------|----------|
 | 19 | `implementation-plan` | Create task graph from stories and standards | |
 | 20 | `implementation-plan-review` | Review task quality, coverage, and dependencies | |
+| 20.5 | `multi-model-review-tasks` | Multi-model review of implementation plan tasks | **(optional)** Requires Codex/Gemini CLI |
 | 21 | `single-agent-start` | Start single-agent execution loop | |
 | 21 | `multi-agent-start` | Start multi-agent execution loop in a worktree | |
+
+### Ongoing — After Initial Setup
+
+| Command | Description |
+|---------|-------------|
+| `new-enhancement` | Add a new feature to an existing project |
+| `quick-task` | Bug fixes, refactors, and small improvements without full discovery |
+| `version-bump` | Bump version and update changelog without tagging or releasing |
+| `release` | Create a versioned release with changelog and GitHub release |
 
 ### Standalone Commands
 
@@ -96,29 +109,26 @@ Phases are run in order, with explicit dependency constraints between prompts. S
 |---------|-------------|
 | `single-agent-resume` | Resume work after a break |
 | `multi-agent-resume` | Resume multi-agent work after a break |
-| `new-enhancement` | Add a new feature to an existing project |
+| `dashboard` | Open visual pipeline dashboard in browser |
+| `session-analyzer` | Analyze Claude Code session history |
 | `prompt-pipeline` | Show the full pipeline reference |
 | `update` | Check for and apply scaffold updates |
 | `version` | Show installed and latest scaffold version |
 
-### Migration Commands
+### Update Mode — Replaces Migrations
 
-| Command | Description |
-|---------|-------------|
-| Beads Migration | Updates bd commands, commit format, removes duplicate workflow |
-| Workflow Migration | Updates git commands, PR workflow, worktree patterns |
-| Permissions Migration | Restructures project/user settings layers |
+All document-creating prompts now include **Mode Detection** — they automatically detect whether their output file already exists and switch between fresh (create from scratch) and update (preserve project-specific content, add missing sections) modes. This replaces the previous dedicated migration prompts.
 
 ## Key Dependencies
 
 ```
-PRD --> Tech Stack --> Coding Standards --> TDD Standards --> Project Structure
-                                                                  |
-PRD --> User Stories --> Implementation Plan --> Execution
-                                    |
-Dev Setup --> Git Workflow --> Claude.md Optimization --> Workflow Audit
-                                                                  |
-                                                  Implementation Plan Review
+PRD → Tech Stack → Coding Standards → TDD Standards → Project Structure
+                                                            ↓
+PRD → User Stories → Implementation Plan → Execution
+                                    ↓
+Dev Setup → Git Workflow → Claude.md Optimization → Workflow Audit
+                                                            ↓
+                                              Implementation Plan Review
 ```
 
 **Critical ordering constraints:**
@@ -148,7 +158,9 @@ The pipeline generates the following project documents:
 | `AGENTS.md` | Multi-Model Review (#11.5) | Codex Cloud review configuration |
 | `docs/review-standards.md` | Multi-Model Review (#11.5) | Code review criteria |
 | `docs/user-stories.md` | User Stories (#14) | Implementable user stories |
+| `docs/reviews/user-stories/` | User Stories Multi-Model Review (#15.5) | Codex/Gemini review data, coverage analysis |
 | `docs/implementation-plan.md` | Implementation Plan (#19) | Full task graph with dependencies |
+| `docs/reviews/implementation-plan/` | Implementation Plan Multi-Model Review (#20.5) | Codex/Gemini review of task quality |
 
 ## Installation
 
@@ -184,3 +196,7 @@ Use `./scripts/install.sh -f` to force overwrite existing files.
 | **TDD** | Test-Driven Development — the pipeline enforces writing tests before implementation |
 | **Frontmatter** | YAML metadata at the top of command files, containing name, description, and argument hints |
 | **Pipeline Skill** | Auto-activated skill that gives Claude Code awareness of pipeline ordering so it can suggest the next command |
+| **Dashboard** | Interactive Beads task dashboard generated by `make dashboard-test`, visually verified with Playwright MCP |
+| **Update Mode** | All document-creating prompts auto-detect if output exists and switch between fresh/update modes — replaces dedicated migrations |
+| **Quick Task** | Lightweight workflow for bug fixes, refactors, and small improvements without full discovery |
+| **Release** | Versioned release workflow with changelog generation, GitHub release, and rollback support |
