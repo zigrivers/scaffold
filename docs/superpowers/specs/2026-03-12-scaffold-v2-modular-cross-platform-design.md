@@ -11,6 +11,7 @@
 | 2026-03-12 | Initial draft |
 | 2026-03-12 | Address spec review: decomposition strategy, optional prompts, reconfiguration, error handling, prompt classification, resolve open questions |
 | 2026-03-12 | Integrate features from plan.md: runtime orchestration, UX commands, prompt customization, brownfield mode, personas, NFRs, metrics, risks |
+| 2026-03-12 | Integrate agent ergonomics audit: structured CLI output, state.json redesign, prompt structure conventions, interaction-style mixin, artifact schemas, session continuity, merge-safe formats |
 
 ## User Personas
 
@@ -96,14 +97,16 @@ Base prompts use generic verbs that mixins replace with concrete commands:
 
 | Abstract Verb | Beads Mixin | GitHub Issues Mixin | None Mixin |
 |---------------|-------------|---------------------|------------|
-| `{task:create "Title" priority=N}` | `bd create "Title" -p N` | `gh issue create --title "Title" --label "priority:N"` | Add to TODO.md |
-| `{task:list}` | `bd list` | `gh issue list` | Review TODO.md |
-| `{task:ready}` | `bd ready` | `gh issue list --label "ready"` | Check TODO.md for unblocked items |
-| `{task:claim ID}` | `bd update ID --claim` | `gh issue edit ID --add-assignee @me` | Mark as in-progress in TODO.md |
-| `{task:close ID}` | `bd close ID` | `gh issue close ID` | Strike through in TODO.md |
-| `{task:dep-add CHILD PARENT}` | `bd dep add CHILD PARENT` | Add "blocked by #PARENT" to CHILD | Note dependency in TODO.md |
-| `{task:show ID}` | `bd show ID` | `gh issue view ID` | Read TODO.md entry |
-| `{task:sync}` | `bd sync` | _(no-op, GitHub is remote)_ | `git add TODO.md && git commit` |
+| `<!-- scaffold:task-create "Title" priority=N -->` | `bd create "Title" -p N` | `gh issue create --title "Title" --label "priority:N"` | Add to TODO.md |
+| `<!-- scaffold:task-list -->` | `bd list` | `gh issue list` | Review TODO.md |
+| `<!-- scaffold:task-ready -->` | `bd ready` | `gh issue list --label "ready"` | Check TODO.md for unblocked items |
+| `<!-- scaffold:task-claim ID -->` | `bd update ID --claim` | `gh issue edit ID --add-assignee @me` | Mark as in-progress in TODO.md |
+| `<!-- scaffold:task-close ID -->` | `bd close ID` | `gh issue close ID` | Strike through in TODO.md |
+| `<!-- scaffold:task-dep-add CHILD PARENT -->` | `bd dep add CHILD PARENT` | Add "blocked by #PARENT" to CHILD | Note dependency in TODO.md |
+| `<!-- scaffold:task-show ID -->` | `bd show ID` | `gh issue view ID` | Read TODO.md entry |
+| `<!-- scaffold:task-sync -->` | `bd sync` | _(no-op, GitHub is remote)_ | `git add TODO.md && git commit` |
+
+HTML comments are universally ignored by execution engines, shells, and AI agent tool-use parsers. An agent encountering an unresolved marker will skip it rather than attempting to execute it. The `scaffold:` prefix makes it immediately identifiable as a scaffold system marker.
 
 During `scaffold build`, the mixin injection replaces these abstract verbs with concrete commands. This means:
 - Base prompts never reference `bd`, `gh issue`, or any specific tool directly
@@ -352,6 +355,10 @@ mixins/
     multi.md              # Parallel worktrees, BD_ACTOR, task claiming
     single.md             # Single agent loop
     manual.md             # Human-driven, no agent loop
+  interaction-style/
+    claude-code.md        # AskUserQuestionTool, subagent delegation
+    codex.md              # Autonomous decisions with NEEDS_USER_REVIEW tagging
+    universal.md          # Present options as text, ask user to choose
 ```
 
 **Injection mechanics:**
@@ -362,6 +369,16 @@ During `scaffold build`, the build step:
 3. Scans for `<!-- mixin:<axis-name> -->` markers
 4. Replaces each marker with the content of the selected mixin file
 5. Passes the resolved prompt to platform adapters
+
+**interaction-style** — Controls how prompts interact with the user during execution.
+
+| Option | Behavior |
+|--------|----------|
+| `claude-code` | Uses `AskUserQuestionTool` for decisions. Delegates parallel research to subagents via the `Agent` tool. Conversational multi-phase workflows with context carryover between phases. |
+| `codex` | Makes autonomous best-judgment decisions based on project context and PRD. Tags high-stakes decisions (database choice, auth approach, infrastructure) with `NEEDS_USER_REVIEW` in `decisions.jsonl` for post-execution review. Performs research sequentially inline rather than via subagents. Includes explicit "carry forward" context summaries between prompt phases since Codex may not retain conversational memory. |
+| `universal` | Presents options as numbered text lists. Asks the user to choose before proceeding. If running in an automated context, chooses options marked `(recommended)` and documents the choice. No tool-specific references. |
+
+The interaction-style axis is distinct from tool-name mapping in the platform adapter. Tool mapping handles surface-level name translation (`Read tool` → `read the file`). The interaction-style mixin handles **behavioral differences**: how the agent makes decisions, whether it delegates to subagents, how it communicates with the user, and how it carries context across multi-phase workflows. Both mechanisms are needed — tool mapping catches incidental tool references in prose, while the interaction-style mixin shapes the instructional structure.
 
 ### Configuration
 
@@ -375,6 +392,7 @@ mixins:
   tdd: strict
   git-workflow: full-pr
   agent-mode: multi
+  interaction-style: claude-code
 platforms:
   - claude-code
   - codex
@@ -423,6 +441,7 @@ Proceed? [y/N]
 - Each `mixins.<axis>` value must match an installed mixin file (`mixins/<axis>/<value>.md`)
 - Each `platforms` entry must match an installed adapter (`claude-code`, `codex`)
 - `project` traits must be known condition names
+- Each `extra-prompts` entry must resolve to an existing file (`.scaffold/prompts/<name>.md` or `~/.scaffold/prompts/<name>.md`) with valid YAML frontmatter. Missing files or invalid frontmatter are errors
 
 **Manifest validation:**
 - Every prompt reference (`base:X`, `override:X`, `ext:X`) must resolve to an existing file
@@ -432,7 +451,8 @@ Proceed? [y/N]
 
 **Mixin validation:**
 - Every `<!-- mixin:<axis> -->` marker in a resolved prompt must have a corresponding axis in the config
-- Warn (not error) if a prompt has no markers for an axis that would logically apply
+- **Unresolved mixin markers are errors by default.** If a resolved prompt contains a `<!-- mixin:<axis> -->` marker that was not replaced during injection (because the axis is not configured or the mixin file has no matching section), `scaffold build` reports an error. An unresolved marker in a prompt that an agent executes would be silently ignored or misinterpreted — this is worse than a build failure. Use `--allow-unresolved-markers` to downgrade to warnings during development.
+- Warn (not error) if a prompt has no markers for an axis that would logically apply — this is the inverse case (missing marker, not unresolved marker) and is less dangerous
 
 **Incompatible combination warnings:**
 - `agent-mode: manual` + `git-workflow: full-pr` — warn: full PR flow assumes automated agent execution
@@ -461,20 +481,52 @@ Each adapter reads the resolved prompt set and packages it for a specific platfo
 
 **Tool mapping concept:**
 
-Prompts may reference platform-specific tool names (e.g., "use the Read tool to examine the file"). The Codex adapter applies a mapping table to translate these references. The mapping lives in `adapters/codex/tool-map.yml`:
+Prompts may reference platform-specific tool names (e.g., "use the Read tool to examine the file"). The Codex adapter applies a mapping table to translate these references. The mapping lives in `adapters/codex/tool-map.yml` and uses **phrase-level patterns** rather than single-word replacements to avoid grammatically broken output:
 
 ```yaml
-# Claude Code tool -> Codex equivalent
-Read: "read the file"           # Codex uses natural language file access
-Edit: "edit the file"
-Write: "write the file"
-Glob: "find files matching"
-Grep: "search for"
-Bash: "run the command"
-Agent: "use a subagent"         # Codex may not have equivalent; mapped to inline instruction
+# adapters/codex/tool-map.yml — phrase-level pattern matching
+patterns:
+  - match: "Use AskUserQuestionTool to"
+    replace: "Present to the user and"
+  - match: "use AskUserQuestionTool"
+    replace: "ask the user"
+  - match: "use the Read tool"
+    replace: "read"
+  - match: "Use the Edit tool"
+    replace: "Edit"
+  - match: "use the Write tool"
+    replace: "write"
+  - match: "use subagents to"
+    replace: "research the following topics (sequentially if needed) to"
+  - match: "spawn a review subagent"
+    replace: "perform a review"
+  - match: "Use the Bash tool to run"
+    replace: "Run the command"
+  - match: "Use the Glob tool"
+    replace: "Find files matching"
+  - match: "Use the Grep tool"
+    replace: "Search for"
 ```
 
-Mapping is applied as string replacement during the adapter's output generation step. Base prompts and mixins should prefer abstract language where possible (e.g., "examine the file" rather than "use the Read tool"), reserving tool-specific references for cases where the exact tool matters. The mapping handles cases where tool-specific language slips through.
+Patterns are matched longest-first to avoid partial replacements. Each pattern is a complete phrase, not a single word — this prevents grammatically broken output. Base prompts and mixins should prefer abstract language where possible (e.g., "examine the file" rather than "use the Read tool"), reserving tool-specific references for cases where the exact tool matters. The mapping handles cases where tool-specific language slips through.
+
+**MCP tool handling:** Prompts that reference MCP tools (Playwright MCP, etc.) are handled via the interaction-style mixin and platform adapter together. The Claude Code adapter preserves MCP references. The Codex adapter replaces MCP tool instructions with equivalent direct-command alternatives (e.g., Playwright MCP screenshot instructions become `npx playwright screenshot` CLI commands). If no equivalent exists, the adapter wraps the section in a comment: `<!-- Platform note: this section requires MCP tools not available in Codex. Skip or adapt manually. -->`.
+
+**AGENTS.md section structure** (one section per pipeline phase):
+
+```markdown
+## Phase 2 — Project Foundation
+
+### tech-stack
+**Produces:** docs/tech-stack.md
+**Reads:** docs/plan.md
+**Run:** `codex "Follow the instructions in codex-prompts/tech-stack.md"`
+
+[Condensed prompt summary — first 500 tokens of the resolved prompt,
+ending with "See codex-prompts/tech-stack.md for full instructions."]
+```
+
+Each section includes the run command, artifact references, and a condensed summary. Full prompt content lives in `codex-prompts/*.md`, not in AGENTS.md — this keeps AGENTS.md scannable.
 
 #### Universal Adapter (always generated)
 
@@ -511,51 +563,175 @@ scaffold dashboard         # Generate and open visual HTML dashboard
 scaffold preview           # Dry-run: resolve and display pipeline without executing
 ```
 
+#### Agent-Friendly CLI Modes
+
+Every CLI command supports two flags for agent consumption:
+
+**`--format json`** — All output (success, errors, warnings, progress) is emitted as a single JSON object to stdout. Human-readable messages go to stderr only. The envelope format:
+
+```json
+{
+  "success": true,
+  "command": "resume",
+  "data": { },
+  "errors": [],
+  "warnings": [],
+  "exit_code": 0
+}
+```
+
+**`--auto`** — Suppresses all interactive prompts. Decisions that would require user input are resolved automatically:
+- Missing predecessor artifacts: run the dependency automatically
+- Methodology change confirmation: proceed with warning in output
+- Skip confirmation: skip without prompting
+- Reset confirmation: requires explicit `--auto --confirm-reset` (destructive actions are never auto-confirmed without a second flag)
+
+When `--auto` is used without `--format json`, the CLI still prints human-readable output but never blocks on interactive prompts.
+
+**Exit codes** (consistent across all commands):
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success |
+| 1 | Validation error (bad config, invalid manifest, malformed frontmatter) |
+| 2 | Missing dependency (predecessor artifact not found) |
+| 3 | State corruption (state.json unreadable, artifact/state mismatch) |
+| 4 | User cancellation (interactive prompt declined) |
+| 5 | Build error (mixin injection failed, adapter error) |
+
+**Fuzzy matching in error messages** — When a value doesn't match any valid option (methodology names, mixin values, prompt names), the CLI computes Levenshtein distance and suggests the closest match if the distance is ≤ 2. Example:
+
+```
+Error: methodology 'clasic' not found.
+Did you mean 'classic'? Valid options: classic, classic-lite
+```
+
+In `--format json` mode, suggestions appear in the error object:
+```json
+{
+  "code": "INVALID_METHODOLOGY",
+  "field": "methodology",
+  "value": "clasic",
+  "suggestion": "classic",
+  "valid_options": ["classic", "classic-lite"],
+  "file": ".scaffold/config.yml",
+  "line": 2
+}
+```
+
 ### Pipeline State Tracking
 
 The CLI tracks pipeline execution state in `.scaffold/state.json` (separate from `config.yml` which is the build configuration):
 
 ```json
 {
+  "schema-version": 1,
   "scaffold-version": "2.0.0",
   "methodology": "classic",
+  "init-mode": "greenfield",
   "created": "2026-03-12T10:30:00Z",
-  "prompts": ["create-prd", "prd-gap-analysis", "beads-setup", "..."],
-  "completed": [
-    { "prompt": "create-prd", "at": "2026-03-12T10:35:00Z" },
-    { "prompt": "prd-gap-analysis", "at": "2026-03-12T10:42:00Z" }
-  ],
-  "skipped": [
-    { "prompt": "design-system", "at": "2026-03-12T11:00:00Z", "reason": "No frontend" }
-  ],
-  "mode": "greenfield",
+  "in_progress": null,
+  "prompts": {
+    "create-prd": {
+      "status": "completed",
+      "source": "base",
+      "at": "2026-03-12T10:35:00Z",
+      "produces": ["docs/plan.md"],
+      "artifacts_verified": true,
+      "completed_by": "ken"
+    },
+    "prd-gap-analysis": {
+      "status": "completed",
+      "source": "base",
+      "at": "2026-03-12T10:42:00Z",
+      "produces": ["docs/plan.md"],
+      "artifacts_verified": true,
+      "completed_by": "ken"
+    },
+    "design-system": {
+      "status": "skipped",
+      "source": "base",
+      "at": "2026-03-12T11:00:00Z",
+      "reason": "No frontend"
+    },
+    "dev-env-setup": {
+      "status": "pending",
+      "source": "base",
+      "produces": ["docs/dev-setup.md", "Makefile"]
+    }
+  },
+  "next_eligible": ["dev-env-setup"],
   "extra-prompts": []
 }
 ```
 
+Each prompt entry includes:
+- `status`: One of `pending`, `in_progress`, `skipped`, `completed`
+- `source`: Resolution source — `base`, `override`, or `ext`
+- `at`: ISO 8601 timestamp (set when completed or skipped)
+- `produces`: Copied from prompt frontmatter so agents don't need to load prompt files to verify artifacts
+- `artifacts_verified`: Boolean, set after artifact existence check
+- `completed_by`: Actor identity for multi-agent attribution
+- `reason`: Explanation for skipped prompts
+
+The top-level `in_progress` field (nullable) tracks the currently executing prompt, its start time, and any partial artifacts written so far. This enables crash detection on resume.
+
+#### State Schema Design Rationale
+
+1. **Map-based for git merge safety** — prompt-keyed maps merge cleanly in git when two team members complete different prompts concurrently. Array-based schemas (append to `completed[]`) cause merge conflicts on the closing bracket.
+2. **Self-describing for agent consumption** — an agent can determine what's been done, what's next, and which artifacts to verify without loading any other files or running dependency resolution.
+3. **Crash-recoverable** — the `in_progress` field enables `scaffold resume` to detect exactly which prompt was interrupted and offer targeted recovery.
+
 **Completion detection** uses a dual mechanism:
 1. **Artifact-based** (primary): Check whether a prompt's `produces` artifacts exist on disk. If all files in the `produces` list exist, the prompt is considered complete.
-2. **State-recorded** (secondary): The `scaffold resume` command records completion after a prompt finishes by adding it to the `completed` array.
+2. **State-recorded** (secondary): The `scaffold resume` command records completion after a prompt finishes by updating the prompt's `status` to `completed`.
 
-When both mechanisms disagree (artifact exists but not in `completed`), the artifact takes precedence — the prompt succeeded even if state wasn't updated (likely a session crash). When `completed` says done but artifacts are missing, `resume` warns and offers to re-run.
+When both mechanisms disagree (artifact exists but status is not `completed`), the artifact takes precedence — the prompt succeeded even if state wasn't updated (likely a session crash). When status says `completed` but artifacts are missing, `resume` warns and offers to re-run.
 
-**State file is committed to git** — enables team sharing and pipeline resumption across machines.
+When `in_progress` is non-null on resume, the CLI checks whether the in-progress prompt's `produces` artifacts all exist. If yes, mark completed and clear `in_progress`. If not, warn and offer to re-run.
+
+**State file is committed to git** — enables team sharing and pipeline resumption across machines. The `init-mode` field records whether the project was initialized as `greenfield` or `brownfield` (distinct from `config.yml`'s `mode` field which controls brownfield-adapted prompt behavior).
+
+### Pipeline Execution Locking
+
+`scaffold resume` acquires a lightweight advisory lock before executing a prompt. The lock prevents two team members from accidentally running the same prompt concurrently.
+
+**Lock file:** `.scaffold/lock.json` (gitignored — local only):
+
+```json
+{
+  "holder": "ken-macbook",
+  "prompt": "dev-env-setup",
+  "started": "2026-03-12T11:00:00Z",
+  "pid": 12345
+}
+```
+
+**Behavior:**
+- On entry: check for `.scaffold/lock.json`. If it exists and the PID is still running, warn: 'Pipeline is in use by {holder} (running {prompt}). Use --force to override.' If the PID is dead, clear the stale lock and proceed.
+- On prompt completion: delete the lock file.
+- On crash: lock file remains (stale PID). Next `scaffold resume` detects the dead process and clears it automatically.
+- `--force` flag: override the lock (for legitimate concurrent use or stuck locks).
+
+**Git safety:** The lock file is listed in `.gitignore` — it is purely local and never committed. Cross-machine coordination relies on git's own merge behavior on `state.json` (which is map-based and merge-safe per the State Schema Design Rationale above).
 
 ### Decision Log
 
-An append-only JSON log (`.scaffold/decisions.json`) persists key decisions across sessions:
+An append-only JSONL log (`.scaffold/decisions.jsonl`) persists key decisions across sessions. JSONL (one JSON object per line, no wrapping array) is used because it is append-only at the line level, which means git merges are trivial when multiple team members append decisions concurrently. JSON arrays conflict on every append because the closing bracket moves.
 
-```json
-[
-  { "prompt": "tech-stack", "decision": "Chose Vitest over Jest for speed", "at": "2026-03-12T10:40:00Z" },
-  { "prompt": "coding-standards", "decision": "Using Biome instead of ESLint+Prettier", "at": "2026-03-12T10:55:00Z" }
-]
+Each entry includes a sequential ID, actor identity, and a `prompt_completed` flag indicating whether the decision was logged after prompt completion or during execution (which may indicate a crashed session):
+
+```
+{"id":"D-001","prompt":"tech-stack","decision":"Chose Vitest over Jest for speed","at":"2026-03-12T10:40:00Z","completed_by":"ken","prompt_completed":true}
+{"id":"D-002","prompt":"coding-standards","decision":"Using Biome instead of ESLint+Prettier","at":"2026-03-12T10:55:00Z","completed_by":"ken","prompt_completed":true}
 ```
 
-- Created as empty array by `scaffold init`
+Downstream prompts should treat `prompt_completed: false` decisions as provisional — they may be from a crashed session where the agent's reasoning was incomplete.
+
+- Created as empty file by `scaffold init`
 - Each prompt optionally records 1-3 key decisions after execution
 - Read by subsequent prompts for cross-session context continuity
-- Deleted by `scaffold reset`
+- Deleted by `scaffold reset`. Decisions from re-run prompts (`scaffold resume --from X`) are not removed — new decisions are appended with the same prompt name, and consumers use the latest entry per prompt.
 - Committed to git
 
 ### Prompt Frontmatter
@@ -579,7 +755,118 @@ Fields:
 - `phase` (optional): Phase number for display grouping. Defaults to phase of last dependency, or 1
 - `argument-hint` (optional): Hint for argument substitution, shown in help
 - `produces` (required for built-in, optional for custom): Expected output file paths. Used by completion detection, v1 detection, and step gating
-- `reads` (optional): Input file paths this prompt needs. Used to pre-load predecessor documents into context before execution
+- `reads` (optional): Input file paths this prompt needs. Supports both full-file and section-level references. Used to pre-load predecessor documents into context before execution
+- `artifact-schema` (optional): Defines the expected structure of produced artifacts for downstream validation
+- `requires-capabilities` (optional): Declares platform capabilities the prompt needs
+
+**`reads` with section targeting** — The `reads` field supports both full-file and section-level references:
+
+```yaml
+reads:
+  - "docs/plan.md"
+  - path: "docs/tech-stack.md"
+    sections: ["Quick Reference"]
+  - path: "docs/project-structure.md"
+    sections: ["High-Contention Files", "Module Organization Strategy"]
+  - path: "CLAUDE.md"
+    sections: ["Key Commands"]
+```
+
+When section targeting is used, the CLI extracts only the specified sections (matched by heading text) and presents them as context before the prompt content. This reduces context window consumption for prompts that need specific data from large predecessor documents. The `implementation-plan` prompt, which reads 9 documents, benefits most — estimated reduction from ~15,000 tokens to ~5,000 tokens of predecessor context.
+
+Plain string entries (`"docs/plan.md"`) load the full file (backward compatible with the existing spec).
+
+**`artifact-schema`** — Defines the expected structure of produced artifacts so downstream agents and `scaffold validate` can verify them:
+
+```yaml
+artifact-schema:
+  "docs/tech-stack.md":
+    required-sections:
+      - "## Architecture Overview"
+      - "## Backend"
+      - "## Database"
+      - "## Frontend"
+      - "## Infrastructure & DevOps"
+      - "## Developer Tooling"
+      - "## Third-Party Services"
+      - "## Quick Reference"
+    id-format: null
+  "docs/user-stories.md":
+    required-sections:
+      - "## Best Practices Summary"
+      - "## User Personas"
+      - "## Story Index"
+    id-format: "US-\\d{3}"
+    index-table: true
+```
+
+Fields within each artifact entry:
+- `required-sections`: Exact markdown heading strings (level and text) that must appear in the artifact. `scaffold validate` checks for their presence.
+- `id-format`: Regex pattern for entity IDs within the artifact (e.g., `FR-\\d{3}` for PRD features, `US-\\d{3}` for user stories). Null if no IDs are expected.
+- `index-table`: Boolean — if true, the artifact must contain a summary table within the first 50 lines listing all entities by ID.
+
+Mixins may inject content within existing sections but must not add new heading-level sections (`##` or above) to artifacts. This ensures that artifact schemas remain stable regardless of which mixins are active.
+
+**`requires-capabilities`** — Declares platform capabilities the prompt needs:
+
+```yaml
+requires-capabilities:
+  - user-interaction
+  - filesystem-write
+  - subagent
+```
+
+Valid capabilities: `user-interaction` (prompt asks the user questions), `filesystem-write` (prompt creates files), `subagent` (prompt delegates to subagents), `mcp` (prompt uses MCP tools), `git` (prompt runs git commands). The platform adapter checks declared capabilities against platform support. Missing capabilities produce a warning with adaptation guidance, not a hard error.
+
+### Prompt Structure Convention
+
+All prompts (base, override, extension) follow a standard section ordering convention that front-loads the most critical information for agent consumption:
+
+```markdown
+---
+(frontmatter)
+---
+
+## What to Produce
+[The deliverable — 2-3 sentences maximum. The agent should know exactly
+what file(s) to create and their purpose after reading this section.]
+
+## Completion Criteria
+- [ ] `docs/<artifact>.md` exists
+- [ ] Contains required sections: [list from artifact-schema]
+- [ ] Tracking comment present on line 1
+- [ ] [Any additional machine-checkable criteria]
+
+## Process
+[Execution rules — what order to work in, how to handle decision points,
+when to ask the user vs. decide autonomously. This section appears early
+because it contains critical workflow constraints the agent must know
+before starting detailed work.]
+
+## Detailed Specifications
+[The full specification — section-by-section content requirements,
+formatting rules, examples. This is the bulk of the prompt.]
+
+## Update Mode Specifics
+[Only the per-prompt rules for update mode. The shared update mode
+procedure (detect existing file, diff against structure, categorize
+as ADD/RESTRUCTURE/PRESERVE, preview changes) is handled by the CLI
+via `scaffold resume`, which tells the agent whether it's in fresh or
+update mode and provides the diff. Prompts include only their unique
+update rules here.]
+```
+
+**Rationale for this ordering:**
+
+1. **What to Produce** first — the agent knows its goal in the first 50 tokens.
+2. **Completion Criteria** second — the agent knows the finish line before starting. These criteria also feed `scaffold validate`.
+3. **Process** third — execution constraints before detailed specs, so agents that start executing before reading the full prompt still follow the right workflow.
+4. **Detailed Specifications** fourth — the bulk of the content, read as reference during execution.
+5. **Update Mode Specifics** last — only relevant when updating, and the agent already knows from `scaffold resume` output whether it's in update mode.
+
+**Removed from prompts (handled by CLI instead):**
+- **Mode Detection block** (~300-400 tokens per prompt of identical boilerplate). The CLI determines fresh vs. update mode by checking artifact existence and communicates this to the agent in the `scaffold resume` output. Saves ~4,000 tokens across the full pipeline.
+- **'After This Step' navigation** (~50 tokens per prompt). Replaced by `scaffold next`, which computes the next step dynamically from state. Saves ~800 tokens across the pipeline.
 
 ### Predecessor Artifact Verification (Step Gating)
 
@@ -610,9 +897,62 @@ Resolution happens once at `scaffold build` time and is cached. Re-resolved when
 
 **`scaffold resume`:**
 - Reads `.scaffold/state.json` to determine next uncompleted prompt
-- Shows progress: "8/18 prompts complete. Next: `dev-env-setup`. Run it now?"
 - `--from <prompt-name>` re-runs a specific prompt (marks previous completion as superseded)
 - If all complete, suggests next actions (enhancement, implementation)
+
+When `scaffold resume` runs, it first outputs a **session bootstrap summary** — a structured context block that tells the agent (or user) exactly what state the pipeline is in and which files to read:
+
+```
+=== Pipeline Status ===
+Methodology: classic (8/18 complete, 2 skipped)
+Last completed: project-structure (2026-03-12T10:42:00Z)
+Next eligible: dev-env-setup
+
+=== Context Files ===
+Load these for session context:
+  1. CLAUDE.md
+  2. .scaffold/decisions.jsonl (2 decisions)
+  3. docs/project-structure.md (predecessor output)
+
+=== Recent Decisions ===
+  - [tech-stack] Chose Vitest over Jest for speed
+  - [coding-standards] Using Biome instead of ESLint+Prettier
+
+=== Crash Recovery ===
+  (none — last session completed cleanly)
+
+Ready to run dev-env-setup? [Y/n]
+```
+
+In `--format json` mode, this becomes a structured object under `"data"`:
+
+```json
+{
+  "success": true,
+  "command": "resume",
+  "data": {
+    "pipeline_progress": { "completed": 8, "skipped": 2, "total": 18 },
+    "last_completed": { "prompt": "project-structure", "at": "2026-03-12T10:42:00Z" },
+    "next_eligible": ["dev-env-setup"],
+    "context_files": ["CLAUDE.md", ".scaffold/decisions.jsonl", "docs/project-structure.md"],
+    "recent_decisions": [
+      {"id": "D-001", "prompt": "tech-stack", "decision": "Chose Vitest over Jest"},
+      {"id": "D-002", "prompt": "coding-standards", "decision": "Using Biome"}
+    ],
+    "crash_recovery": null
+  }
+}
+```
+
+When `in_progress` is non-null in state.json (previous session crashed), the crash recovery section reports what was interrupted and which partial artifacts exist:
+
+```
+=== Crash Recovery ===
+  Previous session crashed during: coding-standards
+  Started at: 2026-03-12T10:55:00Z
+  Partial artifacts found: docs/coding-standards.md (exists, possibly incomplete)
+  Recommended action: Re-run coding-standards
+```
 
 **`scaffold status`:**
 - Read-only progress display (no offer to execute):
@@ -646,10 +986,15 @@ Resolution happens once at `scaffold build` time and is cached. Re-resolved when
 **`scaffold validate`:**
 - Validates config, manifests, and prompt files for errors without modifying anything
 - Checks: valid methodology, mixin values, prompt references resolve, no circular deps, valid frontmatter, prompt-override paths exist
+- Produced artifacts match their `artifact-schema` (required sections present with exact heading text, ID format matches regex, index table present if required)
+- Tracking comments on line 1 of produced artifacts are well-formed
+- No unresolved `<!-- scaffold:task-*` or `<!-- mixin:* -->` markers in produced artifacts
+- `state.json` schema version matches CLI expectation
+- All `decisions.jsonl` entries are valid JSON with required fields
 - Output: list of errors grouped by source file, or "All valid"
 
 **`scaffold reset`:**
-- Deletes `.scaffold/state.json` and `.scaffold/decisions.json`
+- Deletes `.scaffold/state.json` and `.scaffold/decisions.jsonl`
 - Preserves `.scaffold/config.yml` (build config) and `.scaffold/prompts/` (customizations)
 - Requires explicit confirmation
 - After reset, re-run `scaffold init` or `scaffold resume` to start fresh
@@ -687,6 +1032,85 @@ extra-prompts:
 ```
 
 Custom prompts are included in the pipeline at the position determined by their `depends-on` and `phase` declarations, resolved alongside built-in prompts.
+
+### CLAUDE.md Management
+
+The CLAUDE.md file in the target project is the primary agent instruction file for Claude Code. It accumulates content from multiple pipeline prompts, which creates two risks: unbounded growth (CLAUDE.md is loaded into every agent session, consuming context window) and structural drift (each prompt adds sections with ad-hoc naming).
+
+**Size budget:** CLAUDE.md should not exceed ~2,000 tokens (~1,500 words). The file is a quick-reference pointer, not comprehensive documentation. Detailed standards live in their dedicated docs files.
+
+**Reserved structure:** The Beads/tracking setup prompt (or equivalent methodology extension) creates CLAUDE.md with all section headings pre-defined. Later prompts fill their reserved sections rather than appending new ones:
+
+```markdown
+# CLAUDE.md
+
+## Core Principles
+<!-- Reserved for: tracking-setup -->
+
+## Task Management
+<!-- Reserved for: tracking-setup -->
+
+## Key Commands
+<!-- Reserved for: dev-env-setup -->
+
+## Project Structure Quick Reference
+<!-- Reserved for: project-structure -->
+
+## Coding Standards Summary
+<!-- Reserved for: coding-standards (brief — see docs/coding-standards.md) -->
+
+## Git Workflow
+<!-- Reserved for: git-workflow (brief — see docs/git-workflow.md) -->
+
+## Testing
+<!-- Reserved for: tdd (brief — see docs/tdd-standards.md) -->
+
+## Design System
+<!-- Reserved for: design-system (optional — only if frontend) -->
+
+## Self-Improvement
+<!-- Reserved for: tracking-setup -->
+```
+
+**Rules:**
+- Each section has a named owner (the prompt that fills it).
+- Prompts fill their sections with a concise summary (2-5 bullet points) and a pointer to the full document (`see docs/X.md`).
+- No prompt may add new `##`-level sections to CLAUDE.md — if a prompt needs to add agent guidance, it goes under an existing section or into its own `docs/` file.
+- The `claude-md-optimization` prompt (Phase 6) enforces the size budget and consolidates any drift.
+- The `<!-- Reserved for: X -->` comments are replaced by actual content when the owning prompt runs. If a prompt is skipped, the placeholder is removed by `claude-md-optimization`.
+- Implementation agents should treat `<!-- scaffold:managed -->` markers as read-only — scaffold owns those sections. Implementation agents add their own content only to unmarked sections or to a dedicated `## Project-Specific Notes` section at the bottom.
+
+**Pipeline ordering info:** CLAUDE.md does NOT contain a pipeline reference table. Pipeline ordering is the CLI's responsibility (`scaffold status`, `scaffold next`). This avoids duplicating ordering info across manifest, state.json, CLAUDE.md, and the skill file.
+
+### Artifact Ownership Markers
+
+Artifacts produced by scaffold prompts include tracking comments on line 1 and may include section-level ownership markers. These serve both the Mode Detection system (for update mode) and implementation agents (to know which sections scaffold manages vs. which are safe to edit).
+
+**Tracking comment format** (line 1 of every scaffold artifact):
+
+```
+<!-- scaffold:<prompt-name> v<version> <date> <methodology>/<mixin-summary> -->
+```
+
+Example:
+```
+<!-- scaffold:tech-stack v1 2026-03-12 classic/strict-tdd/beads -->
+```
+
+The methodology and mixin context enable Mode Detection to handle artifacts created under a different configuration — if the user switched from `classic` to `classic-lite`, the update mode knows which sections may no longer apply.
+
+Validation rule: tracking comments must match the regex `<!-- scaffold:[a-z-]+ v\d+ \d{4}-\d{2}-\d{2}( [a-z0-9/-]+)? -->`. Malformed tracking comments cause Mode Detection to warn rather than silently falling into legacy mode.
+
+**Section ownership markers** (in CLAUDE.md and other multi-writer artifacts):
+
+```markdown
+<!-- scaffold:managed by coding-standards -->
+## Coding Standards Summary
+...content...
+<!-- /scaffold:managed -->
+```
+
+Implementation agents should not modify content between `<!-- scaffold:managed -->` markers. They may add content outside managed blocks or in a dedicated unmanaged section.
 
 ### Brownfield Mode
 
@@ -840,7 +1264,7 @@ The existing Claude Code plugin continues to work as-is:
 - Implement pipeline state tracking (`state.json`)
 - Implement: `scaffold resume`, `scaffold status`, `scaffold next`, `scaffold skip`
 - Implement: `scaffold validate`, `scaffold reset`, `scaffold preview`
-- Implement decision log (`decisions.json`)
+- Implement decision log (`decisions.jsonl`)
 - Implement predecessor artifact verification (step gating)
 - Implement prompt customization layer (project/user override precedence)
 
@@ -928,6 +1352,7 @@ The config file includes a `version` field (starting at `1`) that tracks the con
 - **State integrity**: `state.json` is written atomically (write to temp file, rename). If corrupted, `scaffold resume` falls back to artifact-based completion detection and regenerates state
 - **Idempotent builds**: `scaffold build` produces identical output given identical inputs. Running it twice is safe
 - **Idempotent prompts**: Running a prompt twice overwrites outputs cleanly (Mode Detection handles fresh vs. update)
+- **Merge-safe file formats**: All scaffold state files (`state.json`, `decisions.jsonl`, `config.yml`) are designed for conflict-free git merges when multiple team members work concurrently. `state.json` uses a map-keyed-by-prompt-name structure. `decisions.jsonl` uses JSONL (one object per line, append-only). `config.yml` is a flat structure with no arrays that grow over time.
 
 ### Compatibility
 
@@ -958,6 +1383,9 @@ The config file includes a `version` field (starting at `1`) that tracks the con
 
 5. **npm package name conflict.** The "scaffold" name is generic and may conflict with existing packages.
    - **Mitigation**: Research npm namespace availability as a Phase 1 prerequisite. Have backup candidates ready.
+
+6. **Agent ergonomics gaps in prompt design.** Prompts designed for human reading may not be optimally structured for AI agent execution — agents need front-loaded instructions, machine-checkable completion criteria, and minimal boilerplate.
+   - **Mitigation**: Enforce the Prompt Structure Convention (What to Produce → Completion Criteria → Process → Specs → Update Mode) for all prompts during the v1-to-v2 prompt decomposition. Extract shared boilerplate (Mode Detection, After This Step navigation) into CLI behavior rather than prompt content. Validate prompt structure as part of `scaffold validate`.
 
 ## Success Metrics
 
