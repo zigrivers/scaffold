@@ -1,7 +1,7 @@
 # Scaffold v2 — JSON Output Schemas
 
 **Phase**: 5 — API Contract Specification
-**Depends on**: [CLI Contract](cli-contract.md), [Architecture Section 7](../architecture/system-architecture.md)
+**Depends on**: [CLI Contract](cli-contract.md), [Architecture Section 7](../architecture/system-architecture.md), [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md), [ADR-043](../adrs/ADR-043-depth-scale.md), [ADR-044](../adrs/ADR-044-runtime-prompt-generation.md), [ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md), [ADR-048](../adrs/ADR-048-update-mode-diff-over-regeneration.md), [ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md)
 **Informed by**: Phase 4 data schemas ([state](../data/state-json-schema.md), [config](../data/config-yml-schema.md), [decisions](../data/decisions-jsonl-schema.md)) — output schemas are self-contained for API consumers but structurally aligned with internal file schemas
 **Last updated**: 2026-03-14
 **Status**: draft
@@ -510,7 +510,8 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
 {
   "step": "tech-stack",
   "methodology": "deep",
-  "depth": "comprehensive",
+  "depth": 3,
+  "update_mode": false,
   "pipeline_progress": {
     "completed": 3,
     "skipped": 0,
@@ -532,7 +533,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
   "$id": "https://scaffold-cli.dev/schemas/data/run.json",
   "title": "RunData",
   "type": "object",
-  "required": ["step", "methodology", "depth", "pipeline_progress", "outputs_produced", "next_eligible"],
+  "required": ["step", "methodology", "depth", "update_mode", "pipeline_progress", "outputs_produced", "next_eligible"],
   "additionalProperties": true,
   "properties": {
     "step": {
@@ -544,8 +545,14 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
       "description": "The methodology used for assembly (e.g., 'deep', 'mvp')."
     },
     "depth": {
-      "type": "string",
-      "description": "The depth level used for this step's execution (e.g., 'comprehensive', 'standard', 'minimal')."
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Depth level (1-5) used for this step's execution. See ADR-043."
+    },
+    "update_mode": {
+      "type": "boolean",
+      "description": "Whether this execution was in update mode (re-running a completed step with diff-based updates per ADR-048). False for first-time execution."
     },
     "pipeline_progress": {
       "type": "object",
@@ -752,14 +759,16 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
         {
           "slug": "create-prd",
           "status": "completed",
-          "source": "base",
+          "source": "pipeline",
+          "depth": 3,
           "at": "2026-03-10T14:00:00.000Z",
           "completed_by": "ken"
         },
         {
           "slug": "tech-stack",
           "status": "completed",
-          "source": "override",
+          "source": "pipeline",
+          "depth": 5,
           "at": "2026-03-10T16:30:00.000Z",
           "completed_by": "ken"
         }
@@ -772,14 +781,15 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
         {
           "slug": "coding-standards",
           "status": "completed",
-          "source": "base",
+          "source": "pipeline",
+          "depth": 3,
           "at": "2026-03-12T18:42:00.000Z",
           "completed_by": "ken"
         },
         {
           "slug": "add-playwright",
           "status": "skipped",
-          "source": "base",
+          "source": "pipeline",
           "at": "2026-03-12T19:00:00.000Z",
           "reason": "Using Vitest browser mode instead"
         }
@@ -836,7 +846,8 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
               "properties": {
                 "slug": { "type": "string" },
                 "status": { "type": "string", "enum": ["completed", "skipped", "pending", "in_progress"] },
-                "source": { "type": "string", "enum": ["base", "override", "ext", "project-custom", "user-custom", "extra"] },
+                "source": { "type": "string", "enum": ["pipeline", "extra"], "description": "Where this step originates: 'pipeline' for built-in methodology steps, 'extra' for user-added extra prompts." },
+                "depth": { "type": "integer", "minimum": 1, "maximum": 5, "description": "Depth level (1-5) at which this step was executed. Only present when status is 'completed'. See ADR-043." },
                 "at": { "type": "string", "format": "date-time" },
                 "completed_by": { "type": "string" },
                 "reason": { "type": "string", "description": "Skip reason. Only present when status is 'skipped'." },
@@ -898,7 +909,8 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
       "produces": ["docs/git-workflow.md"],
       "reads": ["docs/tech-stack.md"],
       "depends_on": ["coding-standards"],
-      "source": "base",
+      "source": "pipeline",
+      "depth": 3,
       "argument_hint": null
     },
     {
@@ -909,7 +921,8 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
       "produces": ["docs/dev-setup.md"],
       "reads": ["docs/tech-stack.md", "docs/project-structure.md"],
       "depends_on": ["project-structure"],
-      "source": "base",
+      "source": "pipeline",
+      "depth": 3,
       "argument_hint": null
     }
   ],
@@ -977,8 +990,14 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
           },
           "source": {
             "type": "string",
-            "enum": ["base", "override", "ext", "project-custom", "user-custom", "extra"],
-            "description": "Where this prompt was resolved from in the three-layer resolution chain."
+            "enum": ["pipeline", "extra"],
+            "description": "Where this step originates: 'pipeline' for built-in methodology steps, 'extra' for user-added extra prompts."
+          },
+          "depth": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "Depth level (1-5) that will be used for this step's execution. See ADR-043."
           },
           "argument_hint": {
             "oneOf": [{ "type": "string" }, { "type": "null" }],
@@ -1250,7 +1269,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
   "step": "tech-stack",
   "description": "Define the technology stack",
   "methodology": "deep",
-  "depth": "comprehensive",
+  "depth": 3,
   "produces": ["docs/tech-stack.md"],
   "reads": ["docs/plan.md"],
   "depends_on": ["create-prd"],
@@ -1328,7 +1347,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
     "step": { "type": "string", "description": "Step slug." },
     "description": { "type": "string", "description": "Step description from meta-prompt." },
     "methodology": { "type": "string", "description": "Active methodology." },
-    "depth": { "type": "string", "description": "Depth level for this step." },
+    "depth": { "type": "integer", "minimum": 1, "maximum": 5, "description": "Depth level (1-5) for this step. See ADR-043." },
     "produces": { "type": "array", "items": { "type": "string" }, "description": "Output artifact paths." },
     "reads": { "type": "array", "items": { "type": "string" }, "description": "Input artifact paths." },
     "depends_on": { "type": "array", "items": { "type": "string" }, "description": "Prerequisite step slugs." },
@@ -1759,7 +1778,7 @@ The following tables map every error code to its expected `details` object shape
 | `CONFIG_NOT_OBJECT` | `actual_type: string` | Root YAML is not a mapping |
 | `CONFIG_INVALID_VERSION` | `config_version: number, cli_max: number` | Config version exceeds CLI support |
 | `CONFIG_INVALID_METHODOLOGY` | `value: string, valid_options: string[]` | Unknown methodology |
-| `CONFIG_INVALID_MIXIN` | `axis: string, value: string, valid_options: string[]` | Unknown mixin value (legacy, preserved for backward compatibility) |
+| ~~`CONFIG_INVALID_MIXIN`~~ | `axis: string, value: string, valid_options: string[]` | ~~Superseded by ADR-041 (meta-prompt architecture eliminates mixins). Retained in code for v1 migration error messages only.~~ |
 | `CONFIG_INVALID_PLATFORM` | `value: string, valid_options: string[]` | Unknown platform |
 | `CONFIG_INVALID_TRAIT` | `value: string` | Unknown project trait |
 | `CONFIG_MISSING_REQUIRED` | `field: string` | Required field absent |
@@ -1769,7 +1788,7 @@ The following tables map every error code to its expected `details` object shape
 | `CONFIG_MIGRATE_FAILED` | `from_version: number, to_version: number, error: string` | Schema migration failed |
 | `CONFIG_UNKNOWN_FIELD` | `field: string` | Unrecognized top-level field (warning) |
 
-**Prompt Resolver (domain 01) — exit code 1**:
+**Meta-Prompt & Manifest Resolver (domains 01/15) — exit code 1**:
 
 | Code | `details` fields | Description |
 |------|-----------------|-------------|
