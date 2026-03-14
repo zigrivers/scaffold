@@ -5,8 +5,8 @@
 **Domain ID**: 04
 **Phase**: 1 — Deep Domain Modeling
 **Depends on**: None — first-pass modeling (consumed by [12-mixin-injection.md](12-mixin-injection.md) during build)
-**Last updated**: 2026-03-12
-**Status**: draft
+**Last updated**: 2026-03-14
+**Status**: superseded
 
 ---
 

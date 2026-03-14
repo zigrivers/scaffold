@@ -1,3 +1,7 @@
+**Status: Superseded** by `docs/v2/scaffold-v2-prd.md`. Architecture, pipeline, config, and CLI sections replaced by meta-prompt architecture. Non-conflicting content carried forward into the PRD. This document is preserved as historical reference.
+
+---
+
 # Scaffold v2: Modular, Cross-Platform Pipeline
 
 **Date:** 2026-03-12
