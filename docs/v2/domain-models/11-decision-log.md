@@ -12,7 +12,7 @@
 
 The Decision Log domain governs `.scaffold/decisions.jsonl` — an append-only JSONL file that persists key decisions made during pipeline execution across sessions. Every time a prompt completes, the executing agent may record 1–3 decisions capturing the reasoning behind significant choices (technology selections, architectural patterns, process trade-offs). These entries form a lightweight audit trail that downstream prompts consume for cross-session context continuity.
 
-**Role in the v2 architecture**: The decision log sits downstream of the pipeline state machine ([domain 03](03-pipeline-state-machine.md)) and is orchestrated by the CLI ([domain 09](09-cli-architecture.md)). When the state machine transitions a prompt to `completed`, the CLI triggers decision recording as a post-completion side effect. Downstream prompts read the decision log via the session bootstrap summary (produced by `scaffold resume`) to understand prior choices without re-reading all predecessor artifacts. Platform adapters ([domain 05](05-platform-adapters.md)) determine how decisions are logged in practice: Claude Code agents interact with the user and record decisions conversationally; Codex agents make autonomous decisions and tag high-stakes ones with `NEEDS_USER_REVIEW`.
+**Role in the v2 architecture**: The decision log sits downstream of the pipeline state machine ([domain 03](03-pipeline-state-machine.md)) and is orchestrated by the CLI ([domain 09](09-cli-architecture.md)). When the state machine transitions a step to `completed`, the CLI triggers decision recording as a post-completion side effect. Downstream steps read the decision log via the session bootstrap context (gathered by the assembly engine during `scaffold run`) to understand prior choices without re-reading all predecessor artifacts. The AI platform determines how decisions are logged in practice: Claude Code agents interact with the user and record decisions conversationally; Codex agents make autonomous decisions and tag high-stakes ones with `NEEDS_USER_REVIEW`.
 
 **Central design challenge**: Decisions are produced by AI agents with filesystem write access, yet the decision log must remain consistent, queryable, and merge-safe. The agent may crash mid-execution, leaving provisional entries. Multiple agents (in worktree-based parallel execution) may append concurrently. Re-running a prompt appends new decisions without removing old ones. The domain must define clear write semantics, a reliable "latest per prompt" query, and a crash recovery strategy that handles provisional entries gracefully — all while keeping the file format simple enough that `git merge` resolves concurrent appends without conflicts.
 
@@ -42,7 +42,7 @@ The Decision Log domain governs `.scaffold/decisions.jsonl` — an append-only J
 
 **decision category** — A classification of the decision type (technology, architecture, process, convention, infrastructure). Aids filtering and downstream consumption.
 
-**session bootstrap** — The structured context block output by `scaffold resume` that includes recent decisions for the agent's context. Defined in [domain 09](09-cli-architecture.md).
+**session bootstrap** — The structured context block output by `scaffold run` that includes recent decisions for the agent's context. Defined in [domain 09](09-cli-architecture.md).
 
 **superseded decision** — A decision from a previous execution of the same prompt that has been replaced by a newer decision from a re-run. The old entry remains in the file (append-only) but is no longer returned by the "latest per prompt" query.
 
@@ -533,7 +533,7 @@ Since JSONL is append-only, "transitions" are modeled by appending new entries:
 
 1. **Provisional → Confirmed**: After the prompt completes, the CLI appends new entries with `prompt_completed: true` containing the same decisions. The provisional entries remain but are superseded by the newer confirmed entries in the "latest per prompt" query.
 
-2. **Confirmed → Superseded**: When a prompt is re-run (`scaffold resume --from X`), new decisions are appended. The old confirmed entries remain but are no longer returned by the "latest per prompt" query.
+2. **Confirmed → Superseded**: When a prompt is re-run (`scaffold run --from X`), new decisions are appended. The old confirmed entries remain but are no longer returned by the "latest per prompt" query.
 
 3. **PendingReview → Approved/Rejected/Revised**: A new entry is appended with a new sequential ID, updated `review_status`, and the reviewer's identity in `completed_by`. The original entry remains in the file but is superseded by the review entry in the "latest per prompt" query.
 
@@ -1130,23 +1130,23 @@ function reviewDecision(
 
 **Direction**: Bidirectional
 **Data flow**:
-- **CLI → Domain 11**: `scaffold resume` loads decisions for the session bootstrap summary. `scaffold validate` calls the validation algorithm. `scaffold reset` deletes decisions.jsonl.
+- **CLI → Domain 11**: `scaffold run` loads decisions for the session bootstrap summary. `scaffold validate` calls the validation algorithm. `scaffold reset` deletes decisions.jsonl.
 - **Domain 11 → CLI**: Decision entries are included in `ProjectContext.decisions` (loaded by `loadProjectContext`). Recent decisions appear in `ResumeData.recent_decisions`.
 
 **Lifecycle stage**: Runtime (during CLI command execution)
 **Contract**: Domain 09 defines `DecisionEntry` as a simplified interface in its `ProjectContext`. Domain 11's `DecisionEntry` is the authoritative schema. The CLI should use domain 11's full type internally and project to domain 09's subset for output.
 **Assumption**: The CLI is the only writer to decisions.jsonl (no direct filesystem writes by agents during normal operation — see MQ2 for the full mechanism).
 
-### Domain 05 — Platform Adapter System
+### Platform Delivery
 
-**Direction**: Domain 05 → Domain 11 (adapters influence decision writing behavior)
-**Data flow**: The platform adapter determines how decisions are collected from agent output:
+**Direction**: Platform → Domain 11 (platform influences decision writing behavior)
+**Data flow**: The AI platform determines how decisions are collected from agent output:
 - **Claude Code**: Decisions may be explicitly stated in conversational output. The CLI extracts them from the agent's structured response or the agent uses a tool call to record them.
 - **Codex**: Decisions are made autonomously. High-stakes decisions are tagged `NEEDS_USER_REVIEW`. The CLI extracts decision markers from the agent's output and appends with appropriate tags.
 - **Universal**: Decisions are presented as text in the agent's output and manually copied by the CLI.
 
-**Lifecycle stage**: Build time (adapter determines collection mechanism) + Runtime (collection happens during prompt execution)
-**Contract**: The adapter does not write to decisions.jsonl directly. It shapes the prompt text to include decision-recording instructions, and the CLI handles the actual write.
+**Lifecycle stage**: Runtime (collection happens during step execution)
+**Contract**: The platform wrapper does not write to decisions.jsonl directly. The assembled prompt includes decision-recording instructions, and the CLI handles the actual write.
 
 ### Domain 06 — Config Schema & Validation
 
@@ -1438,14 +1438,14 @@ In Claude Code, the agent interacts with the user for decisions (`AskUserQuestio
 
 They are stored in decisions.jsonl — the same file as all other decisions. They surface through multiple channels:
 
-1. **Session bootstrap** (`scaffold resume`): The "Recent Decisions" section flags pending reviews:
+1. **Session bootstrap** (`scaffold run`): The "Recent Decisions" section flags pending reviews:
    ```
    === Recent Decisions ===
      - [tech-stack] Chose PostgreSQL for ACID compliance
      - [tech-stack] ⚠️ NEEDS REVIEW: Using Firebase Auth for authentication (by codex-main)
    ```
 
-2. **JSON output** (`scaffold resume --format json`): The `recent_decisions` array includes `review_status: "pending"` for flagged entries, enabling automated tooling to detect unreviewed decisions.
+2. **JSON output** (`scaffold run --format json`): The `recent_decisions` array includes `review_status: "pending"` for flagged entries, enabling automated tooling to detect unreviewed decisions.
 
 3. **Validation** (`scaffold validate`): Produces `DECISION_PENDING_REVIEW` warning listing all unreviewed decisions.
 
@@ -1514,12 +1514,12 @@ echo '{"id":"D-005","prompt":"tech-stack","decision":"Using Auth0 instead of Fir
 | Scenario | Domains | What to verify |
 |----------|---------|---------------|
 | Prompt completion triggers decision write | 03, 09, 11 | State transition to `completed` → CLI calls `writeDecisions()` → entries appear in decisions.jsonl with `prompt_completed: true` |
-| Session bootstrap includes recent decisions | 09, 11 | `scaffold resume` loads decisions and includes the latest 5 in the session bootstrap summary |
+| Session bootstrap includes recent decisions | 09, 11 | `scaffold run` loads decisions and includes the latest 5 in the session bootstrap summary |
 | `scaffold validate` checks decision log | 09, 11 | Malformed entries produce `VALIDATE_DECISIONS_INVALID` error in the validation report |
-| `scaffold reset` deletes decision log | 03, 09, 11 | After reset, decisions.jsonl is deleted; `scaffold resume` starts with an empty decision set |
+| `scaffold reset` deletes decision log | 03, 09, 11 | After reset, decisions.jsonl is deleted; `scaffold run` starts with an empty decision set |
 | `scaffold adopt` generates brownfield decisions | 07, 11 | Adopt scans codebase, generates detected decisions, user confirms, entries written |
 | Crash recovery with provisional decisions | 03, 11 | Session crashes → provisional entries remain → re-run appends confirmed entries → latest query returns confirmed |
-| Codex NEEDS_USER_REVIEW in session bootstrap | 05, 09, 11 | Codex-tagged decisions appear with review flag in `scaffold resume` output |
+| Codex NEEDS_USER_REVIEW in session bootstrap | 05, 09, 11 | Codex-tagged decisions appear with review flag in `scaffold run` output |
 
 ---
 
@@ -1543,7 +1543,7 @@ Current design uses simple sequential `D-NNN` IDs. A compound format like `D-{ac
 
 **OQ3: Should there be a dedicated `scaffold decisions` command?**
 
-Current design surfaces decisions through `scaffold resume` (session bootstrap), `scaffold validate` (validation), and `scaffold status` (summary). A dedicated `scaffold decisions` command could offer:
+Current design surfaces decisions through `scaffold run` (session bootstrap), `scaffold validate` (validation), and `scaffold status` (summary). A dedicated `scaffold decisions` command could offer:
 - `scaffold decisions list` — show all decisions
 - `scaffold decisions list --latest` — show latest per prompt
 - `scaffold decisions review` — interactive review of NEEDS_USER_REVIEW entries
@@ -1590,7 +1590,7 @@ A user runs three prompts, each recording decisions.
 {"id":"D-005","prompt":"project-structure","decision":"Using path aliases (@app/, @shared/) for clean imports","at":"2026-03-12T11:10:01Z","completed_by":"ken","prompt_completed":true,"category":"convention"}
 ```
 
-**Session bootstrap output for the next prompt** (`scaffold resume`):
+**Session bootstrap output for the next prompt** (`scaffold run`):
 ```
 === Recent Decisions ===
   - [tech-stack] Chose Vitest over Jest for speed

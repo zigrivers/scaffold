@@ -12,7 +12,7 @@
 
 The Pipeline State Machine domain governs the runtime lifecycle of a scaffold pipeline execution. It centers on `.scaffold/state.json` — a file-based, git-committed state store that records which prompts have been completed, which were skipped, which are pending, and which (if any) was interrupted mid-execution. The domain defines the schema of this file, the valid state transitions for individual prompts (pending → in_progress → completed/skipped), the dual completion detection mechanism (artifact existence + state record), crash recovery semantics, multi-user merge behavior, and the initialization strategies for greenfield, brownfield, and v1 migration scenarios.
 
-**Role in the v2 architecture**: The pipeline state machine sits between dependency resolution ([domain 02](02-dependency-resolution.md)) and pipeline execution locking ([domain 13](13-pipeline-locking.md)). Domain 02 produces a `DependencyResult` containing the topologically sorted prompt list and dependency graph. This domain initializes `state.json` from that ordered list, then manages prompt status transitions as the user progresses through the pipeline. Every CLI command that reads or mutates pipeline progress (`scaffold resume`, `scaffold status`, `scaffold next`, `scaffold skip`, `scaffold reset`, `scaffold dashboard`) operates on the state machine. The decision log ([domain 11](11-decision-log.md)) is written as a side effect of prompt completion. Platform adapters ([domain 05](05-platform-adapters.md)) and the CLAUDE.md management system ([domain 10](10-claude-md-management.md)) are downstream consumers of completion status.
+**Role in the v2 architecture**: The pipeline state machine sits between dependency resolution ([domain 02](02-dependency-resolution.md)) and pipeline execution locking ([domain 13](13-pipeline-locking.md)). Domain 02 produces a `DependencyResult` containing the topologically sorted prompt list and dependency graph. This domain initializes `state.json` from that ordered list, then manages prompt status transitions as the user progresses through the pipeline. Every CLI command that reads or mutates pipeline progress (`scaffold run`, `scaffold status`, `scaffold next`, `scaffold skip`, `scaffold reset`, `scaffold dashboard`) operates on the state machine. The decision log ([domain 11](11-decision-log.md)) is written as a side effect of prompt completion. Platform adapters ([domain 05](05-platform-adapters.md)) and the CLAUDE.md management system ([domain 10](10-claude-md-management.md)) are downstream consumers of completion status.
 
 **Central design challenge**: Reconciling two independent sources of truth — the state file and the filesystem artifacts. A prompt may succeed (artifacts written) but the state file may not be updated (session crash). Conversely, state may record completion but artifacts may be deleted. The dual detection mechanism must handle every combination gracefully, favoring artifact presence as the primary signal while using state records for metadata (timestamps, actor identity, skip reasons).
 
@@ -30,13 +30,13 @@ The Pipeline State Machine domain governs the runtime lifecycle of a scaffold pi
 
 **artifact-based detection** — Checking whether all files listed in a prompt's `produces` field exist on disk. File existence implies the prompt ran successfully.
 
-**state-recorded detection** — Checking the `status` field in state.json. Updated by `scaffold resume` after a prompt finishes.
+**state-recorded detection** — Checking the `status` field in state.json. Updated by `scaffold run` after a prompt finishes.
 
 **crash recovery** — The process of detecting and handling an interrupted session. Triggered when `in_progress` is non-null on resume.
 
 **init mode** — One of `greenfield`, `brownfield`, or `v1-migration`, recorded in state.json to indicate how the pipeline was initialized.
 
-**session bootstrap summary** — The structured context block output by `scaffold resume` before executing a prompt, giving the agent pipeline state, context files, recent decisions, and crash recovery info.
+**session bootstrap summary** — The structured context block output by `scaffold run` before executing a prompt, giving the agent pipeline state, context files, recent decisions, and crash recovery info.
 
 **atomic write** — Writing state.json to a temporary file first, then renaming it into place. Prevents corruption from partial writes during crashes.
 
@@ -44,7 +44,7 @@ The Pipeline State Machine domain governs the runtime lifecycle of a scaffold pi
 
 **eligible prompt** — A prompt whose status is `pending` and whose dependencies are all `completed` or `skipped`. Computed by combining domain 02's dependency graph with current state.
 
-**superseded completion** — When `scaffold resume --from X` re-runs a previously completed prompt, the old completion data is overwritten with new data.
+**superseded completion** — When `scaffold run --from X` re-runs a previously completed prompt, the old completion data is overwritten with new data.
 
 **partial artifact** — A file listed in a prompt's `produces` that exists on disk but may be incomplete (e.g., truncated due to a crash).
 
@@ -401,7 +401,7 @@ interface CrashRecoveryAnalysis {
 }
 
 /**
- * Input for the `scaffold resume --from X` operation.
+ * Input for the `scaffold run --from X` operation.
  * Re-runs a specific prompt regardless of its current status.
  */
 interface ResumeFromInput {
@@ -500,16 +500,16 @@ StateMutationResult
 stateDiagram-v2
     [*] --> pending : state.json initialized
 
-    pending --> in_progress : scaffold resume (prompt execution starts)
+    pending --> in_progress : scaffold run (prompt execution starts)
     pending --> skipped : scaffold skip <prompt>
 
     in_progress --> completed : prompt execution finishes successfully
     in_progress --> pending : crash recovery (artifacts absent, user chooses re-run)
     in_progress --> completed : crash recovery (all artifacts present)
 
-    skipped --> in_progress : scaffold resume --from <prompt> (un-skip)
+    skipped --> in_progress : scaffold run --from <prompt> (un-skip)
 
-    completed --> in_progress : scaffold resume --from <prompt> (re-run)
+    completed --> in_progress : scaffold run --from <prompt> (re-run)
 
     note right of pending
         Initial state for all prompts.
@@ -539,23 +539,23 @@ stateDiagram-v2
 
 | Transition | Trigger | Guard Conditions | Side Effects |
 |-----------|---------|-----------------|-------------|
-| pending → in_progress | `scaffold resume` begins executing this prompt | All dependencies completed/skipped; lock acquired (domain 13); no other prompt in_progress | Set `in_progress` top-level field; update prompt `status` and `at`; write state atomically |
+| pending → in_progress | `scaffold run` begins executing this prompt | All dependencies completed/skipped; lock acquired (domain 13); no other prompt in_progress | Set `in_progress` top-level field; update prompt `status` and `at`; write state atomically |
 | pending → skipped | `scaffold skip <prompt>` | Prompt exists and is pending | Set status to `skipped`; record `at`, `completed_by`, optional `reason`; recompute `next_eligible` |
 | in_progress → completed | Prompt execution finishes | Prompt was the current `in_progress` prompt | Verify artifacts; set `artifacts_verified`; record `at`, `completed_by`; clear `in_progress`; log decisions; recompute `next_eligible`; release lock |
 | in_progress → pending | Crash recovery: artifacts absent | `in_progress` non-null; artifacts check fails; user confirms re-run | Clear `in_progress`; reset prompt status to `pending`; recompute `next_eligible` |
 | in_progress → completed | Crash recovery: artifacts present | `in_progress` non-null; all `produces` artifacts exist | Mark completed; set `artifacts_verified: true`; clear `in_progress`; recompute `next_eligible` |
-| skipped → in_progress | `scaffold resume --from <prompt>` | Prompt was previously skipped | Clear `reason`; set `in_progress` field; update status; begin execution |
-| completed → in_progress | `scaffold resume --from <prompt>` | Prompt was previously completed | Overwrite previous completion data; set `in_progress` field; begin execution |
+| skipped → in_progress | `scaffold run --from <prompt>` | Prompt was previously skipped | Clear `reason`; set `in_progress` field; update status; begin execution |
+| completed → in_progress | `scaffold run --from <prompt>` | Prompt was previously completed | Overwrite previous completion data; set `in_progress` field; begin execution |
 
 ### Invalid Transitions
 
 | Transition | Why Invalid |
 |-----------|-------------|
 | pending → completed | A prompt cannot be completed without going through in_progress. The state machine requires execution (even if brief) to record actor identity and verify artifacts. |
-| completed → pending | Reverting a completed prompt to pending has no use case. Use `scaffold resume --from X` to re-run (goes through in_progress). Use `scaffold reset` to reset everything. |
+| completed → pending | Reverting a completed prompt to pending has no use case. Use `scaffold run --from X` to re-run (goes through in_progress). Use `scaffold reset` to reset everything. |
 | completed → skipped | A completed prompt cannot be retroactively skipped. This would break downstream prompts that consumed its artifacts. |
-| skipped → completed | A skipped prompt cannot be marked completed without execution. Use `scaffold resume --from X` to execute it. |
-| skipped → pending | While conceptually valid, skipped prompts are un-skipped via `scaffold resume --from X` which transitions through in_progress. There is no "revert to pending" command. |
+| skipped → completed | A skipped prompt cannot be marked completed without execution. Use `scaffold run --from X` to execute it. |
+| skipped → pending | While conceptually valid, skipped prompts are un-skipped via `scaffold run --from X` which transitions through in_progress. There is no "revert to pending" command. |
 | in_progress → skipped | Cannot skip a prompt that is actively executing. Complete or crash-recover first. |
 
 ### Pipeline-Level State Diagram
@@ -565,13 +565,13 @@ stateDiagram-v2
     [*] --> uninitialized : project has no .scaffold/
 
     uninitialized --> initialized : scaffold init / scaffold adopt
-    initialized --> executing : scaffold resume (first prompt)
+    initialized --> executing : scaffold run (first prompt)
     executing --> executing : prompt completes, more pending
     executing --> interrupted : session crash (in_progress non-null)
     interrupted --> executing : crash recovery → resume
     interrupted --> initialized : crash recovery → reset to pending
     executing --> complete : all prompts completed/skipped
-    complete --> executing : scaffold resume --from X (re-run)
+    complete --> executing : scaffold run --from X (re-run)
 
     initialized --> reset : scaffold reset
     executing --> reset : scaffold reset
@@ -708,7 +708,7 @@ FUNCTION detectCompletion(slug, state, produces) -> CompletionDetectionResult:
 
 ### Algorithm 3: Crash Recovery
 
-Handles the case where `in_progress` is non-null when `scaffold resume` starts.
+Handles the case where `in_progress` is non-null when `scaffold run` starts.
 
 **Input**: `state: PipelineState`
 **Output**: `CrashRecoveryAnalysis`
@@ -889,7 +889,7 @@ FUNCTION computeEligible(state, depGraph) -> string[]:
 
 ### Algorithm 6: Resume From Specific Prompt
 
-Handles `scaffold resume --from X` which re-runs a previously completed or skipped prompt.
+Handles `scaffold run --from X` which re-runs a previously completed or skipped prompt.
 
 **Input**: `input: ResumeFromInput`, `state: PipelineState`
 **Output**: `StateMutationResult`
@@ -991,7 +991,7 @@ FUNCTION regenerateStateFromArtifacts(ordered_prompts, methodology) -> PipelineS
 | Code | Severity | Message Template | Context |
 |------|----------|-----------------|---------|
 | `PSM_ARTIFACTS_WITHOUT_STATE` | warning | `Prompt '{slug}' has all expected artifacts but status is '{status}'. Marking as completed.` | Artifact takes precedence; auto-corrects state |
-| `PSM_STATE_WITHOUT_ARTIFACTS` | warning | `Prompt '{slug}' is marked completed but {count} artifact(s) are missing: {paths}. Consider re-running with 'scaffold resume --from {slug}'.` | Presents to user; does not auto-correct |
+| `PSM_STATE_WITHOUT_ARTIFACTS` | warning | `Prompt '{slug}' is marked completed but {count} artifact(s) are missing: {paths}. Consider re-running with 'scaffold run --from {slug}'.` | Presents to user; does not auto-correct |
 | `PSM_SKIP_HAS_DEPENDENTS` | warning | `Skipping '{slug}' may affect dependent prompts: {dependents}. They will still be eligible to run.` | Informational; skipped prompts satisfy dependencies |
 | `PSM_OVERWRITING_COMPLETION` | warning | `Re-running '{slug}' will overwrite previous completion (completed by {actor} at {timestamp}).` | Confirmation prompt in interactive mode |
 | `PSM_CRASH_DETECTED` | warning | `Previous session crashed during '{slug}' (started {timestamp}).` | Followed by crash recovery analysis |
@@ -1059,7 +1059,7 @@ This domain also calls `computeEligible()` at runtime, which requires the depend
 ### Domain 09 — CLI Command Architecture
 
 **Direction**: Bidirectional
-**Data flow**: CLI commands (`resume`, `status`, `next`, `skip`, `reset`) call state machine algorithms. State machine returns `StateMutationResult` which CLI formats for output.
+**Data flow**: CLI commands (`run`, `status`, `next`, `skip`, `reset`) call state machine algorithms. State machine returns `StateMutationResult` which CLI formats for output.
 **Lifecycle stage**: Runtime
 **Contract**: CLI passes `TransitionMetadata` (actor, reason, etc.) to state transitions. State machine returns structured results including warnings and updated eligible list. Exit codes are defined in domain 09 and referenced here.
 **Assumption**: CLI ensures locking (domain 13) before calling mutation functions.
@@ -1105,7 +1105,7 @@ This domain also calls `computeEligible()` at runtime, which requires the depend
 The complete state transition diagram for a single prompt's status is provided in Section 4. The diagram shows all four states (pending, in_progress, completed, skipped), all valid transitions with their triggers and guards, and explicitly lists the six invalid transitions with explanations.
 
 Key design points:
-- **Single entry to execution**: Only `pending → in_progress` starts normal execution. `skipped → in_progress` and `completed → in_progress` both go through `scaffold resume --from`, making re-runs explicit.
+- **Single entry to execution**: Only `pending → in_progress` starts normal execution. `skipped → in_progress` and `completed → in_progress` both go through `scaffold run --from`, making re-runs explicit.
 - **No direct completion**: `pending → completed` is invalid — every completion goes through `in_progress` to ensure execution tracking.
 - **Crash recovery creates two exit paths from in_progress**: to `completed` (artifacts present) or back to `pending` (artifacts absent, user chooses re-run).
 
@@ -1147,7 +1147,7 @@ The spec states "artifact takes precedence" but does not define content validati
 Detailed crash recovery flow (Algorithm 3 in Section 5):
 
 ```
-1. scaffold resume starts
+1. scaffold run starts
 2. Load state.json
 3. Check: state.in_progress is non-null?
    ├── No → Normal resume flow (find next eligible, execute)
@@ -1237,7 +1237,7 @@ Detailed crash recovery flow (Algorithm 3 in Section 5):
 
 **Why this merges cleanly**: Alice and Bob modified different keys in the `prompts` map. Git's merge algorithm handles this because the changes are in non-overlapping regions of the file. The map-keyed structure means each prompt's state is on distinct lines that don't interfere with each other.
 
-**Potential conflict point**: The `next_eligible` field is a derived array that both would update. This is the only realistic merge conflict. **Resolution**: `next_eligible` is a cached convenience field that is recomputed on every state mutation. After merge, the first `scaffold resume` or `scaffold status` recomputes it. If a git conflict occurs on this field, either version can be accepted — the CLI will fix it.
+**Potential conflict point**: The `next_eligible` field is a derived array that both would update. This is the only realistic merge conflict. **Resolution**: `next_eligible` is a cached convenience field that is recomputed on every state mutation. After merge, the first `scaffold run` or `scaffold status` recomputes it. If a git conflict occurs on this field, either version can be accepted — the CLI will fix it.
 
 **If Alice and Bob completed the SAME prompt**: This is prevented by the locking mechanism (domain 13) on the same machine. Across machines, the lock is local-only, so it's theoretically possible. The merge would produce a conflict on the same prompt key. Resolution: accept the later completion (higher timestamp), or accept either since both produced the same artifacts.
 
@@ -1248,7 +1248,7 @@ Detailed crash recovery flow (Algorithm 3 in Section 5):
 **Exact interaction flow:**
 
 ```
-$ scaffold resume
+$ scaffold run
 
 === Pipeline Status ===
 Methodology: classic (5/18 complete, 0 skipped)
@@ -1281,9 +1281,9 @@ Next eligible: project-structure
 
 **In `--auto` mode**: Option 1 is selected automatically — re-run the prompt.
 
-### MQ7: `scaffold resume --from X` on Completed Prompt
+### MQ7: `scaffold run --from X` on Completed Prompt
 
-**Scenario**: `create-prd` was completed in a previous session. User runs `scaffold resume --from create-prd` to re-do the PRD.
+**Scenario**: `create-prd` was completed in a previous session. User runs `scaffold run --from create-prd` to re-do the PRD.
 
 **State changes:**
 
@@ -1299,7 +1299,7 @@ Next eligible: project-structure
 
 **Old completion data is NOT preserved.** The spec says "marks previous completion as superseded" — the new execution fully replaces the old record. The old timestamp and actor are lost from state.json. If auditability is important, the decision log (domain 11) retains decisions from both runs (they're append-only, not overwritten).
 
-**Downstream prompts are NOT automatically re-run.** If `create-prd` was re-run because the PRD changed, downstream prompts (`tech-stack`, `coding-standards`, etc.) still show as `completed`. The user must explicitly re-run them with `scaffold resume --from <downstream>` if they want to propagate changes. This is intentional — the user knows which downstream prompts are affected by their change.
+**Downstream prompts are NOT automatically re-run.** If `create-prd` was re-run because the PRD changed, downstream prompts (`tech-stack`, `coding-standards`, etc.) still show as `completed`. The user must explicitly re-run them with `scaffold run --from <downstream>` if they want to propagate changes. This is intentional — the user knows which downstream prompts are affected by their change.
 
 ### MQ8: In_progress vs Lock Interaction
 
@@ -1312,17 +1312,17 @@ Next eligible: project-structure
 
 When `in_progress` is non-null but `lock.json` is absent:
 
-1. `scaffold resume` detects `in_progress` non-null → enters crash recovery flow (MQ4)
+1. `scaffold run` detects `in_progress` non-null → enters crash recovery flow (MQ4)
 2. No lock check needed for crash recovery — the lock is advisory and machine-local
 3. If recovery decides to re-run the prompt, it acquires a new lock before execution
 4. If recovery marks as completed, no lock needed (state update only)
 
 **When BOTH are present (same machine, PID dead)**:
-1. `scaffold resume` checks lock → finds stale PID → clears lock
+1. `scaffold run` checks lock → finds stale PID → clears lock
 2. Then detects `in_progress` non-null → enters crash recovery
 3. Normal recovery flow proceeds
 
-**When lock is live but `in_progress` is null**: This means a prompt is currently running in another terminal. The lock prevents starting a new prompt. `scaffold resume` warns: "Pipeline is in use by {holder}."
+**When lock is live but `in_progress` is null**: This means a prompt is currently running in another terminal. The lock prevents starting a new prompt. `scaffold run` warns: "Pipeline is in use by {holder}."
 
 **When lock is live AND `in_progress` is non-null from a DIFFERENT prompt**: This is a consistency violation. The lock holder is running prompt A, but `in_progress` says prompt B was interrupted. The lock takes precedence for the current session — don't interfere with the live session. After the live session finishes, crash recovery for prompt B can proceed.
 
@@ -1611,7 +1611,7 @@ Some prompts don't create new files — they modify existing ones (e.g., `prd-ga
 
 User accidentally deletes `.scaffold/state.json` mid-pipeline.
 
-**Handling**: Next `scaffold resume` call fails with `PSM_STATE_NOT_FOUND`. User can either:
+**Handling**: Next `scaffold run` call fails with `PSM_STATE_NOT_FOUND`. User can either:
 1. Run `scaffold init` to re-create (enters greenfield mode, losing progress tracking)
 2. Run `scaffold adopt` to scan for artifacts and rebuild state (brownfield mode)
 3. Recover from git: `git checkout -- .scaffold/state.json`
@@ -1631,7 +1631,7 @@ User manually sets a prompt's status to `completed` to skip ahead.
 
 #### EC-4: Concurrent Prompt Execution on Same Machine
 
-User opens two terminals and tries to run `scaffold resume` simultaneously.
+User opens two terminals and tries to run `scaffold run` simultaneously.
 
 **Handling**: The locking mechanism (domain 13) prevents this. The second terminal sees `lock.json` with a live PID and warns: "Pipeline is in use." The state machine's `PSM_ALREADY_IN_PROGRESS` error also prevents setting `in_progress` when it's already non-null.
 
@@ -1672,7 +1672,7 @@ User updates scaffold CLI from v2.0 (schema-version 1) to v2.5 (schema-version 2
 
 1. **Crash recovery with all artifacts present** — Most common crash scenario; must auto-recover
 2. **Crash recovery with partial artifacts** — Ambiguous case; must present options to user
-3. **`resume --from` on completed prompt** — Must correctly overwrite completion data
+3. **`run <step>` on completed step** — Must correctly overwrite completion data
 4. **`skip` with downstream dependents** — Must warn but allow; skipped prompt satisfies dependencies
 5. **State regeneration from corrupt state.json** — Must rebuild accurately from filesystem
 6. **Concurrent state modification (mock merge)** — Must produce mergeable JSON
@@ -1696,7 +1696,7 @@ User updates scaffold CLI from v2.0 (schema-version 1) to v2.5 (schema-version 2
 
 | Scenario | Domains | What to verify |
 |----------|---------|---------------|
-| Full init → resume → complete flow | 02, 03, 09, 13 | Dependencies resolve, state initializes, lock acquired, prompt completes, state updates, lock released |
+| Full init → run → complete flow | 02, 03, 09, 13 | Dependencies resolve, state initializes, lock acquired, prompt completes, state updates, lock released |
 | Crash recovery with lock cleanup | 03, 13 | Stale lock detected, cleared, crash recovery proceeds, new lock acquired for re-run |
 | `scaffold validate` on inconsistent state | 03, 09 | Completed prompt with missing artifacts produces validation error with clear message |
 | Brownfield adoption | 03, 08 | Existing artifacts detected via `produces` field, state pre-populated correctly |
@@ -1755,7 +1755,7 @@ Multi-prompt concurrency would require:
 
 **R2: Add `last_modified` top-level field.** Record the ISO 8601 timestamp of the most recent mutation for quick staleness checks.
 
-**R3: Consider a `history` field for completed prompts.** When `scaffold resume --from X` re-runs a completed prompt, the old completion data is lost. If auditability is important, consider storing previous completions in a `history: CompletionRecord[]` array within the prompt entry.
+**R3: Consider a `history` field for completed prompts.** When `scaffold run --from X` re-runs a completed prompt, the old completion data is lost. If auditability is important, consider storing previous completions in a `history: CompletionRecord[]` array within the prompt entry.
 
 **ADR CANDIDATE: R4: Map-keyed structure vs. separate files per prompt.** The current design uses a single `state.json` with a map. An alternative is one file per prompt (`state/create-prd.json`, `state/tech-stack.json`, etc.). Per-file would eliminate all merge conflicts but increase filesystem complexity and make atomic pipeline-level operations harder. The map-keyed approach is simpler and merge conflicts are rare enough to not warrant the added complexity.
 
@@ -1791,7 +1791,7 @@ Multi-prompt concurrency would require:
 }
 ```
 
-**Step 1: `scaffold resume` — starts create-prd**
+**Step 1: `scaffold run` — starts create-prd**
 
 State after prompt begins:
 ```json
@@ -1877,7 +1877,7 @@ Warning emitted: `PSM_SKIP_HAS_DEPENDENTS` — but in this case, `design-system`
 
 **File on disk**: `docs/coding-standards.md` exists (written by the agent before crash).
 
-**Developer starts new session: `scaffold resume`**
+**Developer starts new session: `scaffold run`**
 
 CLI output:
 ```
@@ -1920,9 +1920,9 @@ State after recovery:
 
 ### Example 3: Error Path — Missing Artifacts on Completed Prompt
 
-**Scenario**: Developer accidentally deletes `docs/tech-stack.md` after it was marked completed. They run `scaffold resume`.
+**Scenario**: Developer accidentally deletes `docs/tech-stack.md` after it was marked completed. They run `scaffold run`.
 
-**State before resume:**
+**State before run:**
 ```json
 {
   "prompts": {
