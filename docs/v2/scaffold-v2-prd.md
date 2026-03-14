@@ -14,8 +14,8 @@
 
 | Document | Disposition |
 |----------|-------------|
-| `docs/superpowers/specs/2026-03-12-scaffold-v2-modular-cross-platform-design.md` | Original v2 spec. Non-conflicting content (personas, NFRs, state management, brownfield, distribution, risks, success metrics) carried forward into this PRD. Architecture, pipeline, config, and CLI sections superseded by meta-prompt architecture. |
-| `docs/superpowers/specs/2026-03-14-meta-prompt-architecture-design.md` | Meta-prompt architecture design. All architectural content carried forward as authoritative. This PRD consolidates and extends it. |
+| `docs/v2/archive/superpowers-specs/2026-03-12-scaffold-v2-modular-cross-platform-design.md` | Original v2 spec (archived). Non-conflicting content carried forward into this PRD. Architecture, pipeline, config, and CLI sections superseded by meta-prompt architecture. |
+| `docs/v2/archive/superpowers-specs/2026-03-14-meta-prompt-architecture-design.md` | Meta-prompt architecture design (archived). All architectural content carried forward as authoritative. This PRD consolidates and extends it. |
 
 ### Revision History
 

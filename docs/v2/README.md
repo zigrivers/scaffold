@@ -17,20 +17,17 @@ docs/v2/
 ├── README.md                              # This file — index of all v2 docs
 ├── scaffold-v2-prd.md                     # Product Requirements Document (SINGLE SOURCE OF TRUTH)
 ├── domain-models/                         # Phase 1: Deep domain modeling
-│   ├── 01-prompt-resolution.md
-│   ├── 02-dependency-resolution.md
-│   ├── 03-pipeline-state-machine.md
-│   ├── 04-abstract-task-verbs.md
-│   ├── 05-platform-adapters.md
-│   ├── 06-config-validation.md
-│   ├── 07-brownfield-adopt.md
-│   ├── 08-prompt-frontmatter.md
-│   ├── 09-cli-architecture.md
-│   ├── 10-claude-md-management.md
-│   ├── 11-decision-log.md
-│   ├── 12-mixin-injection.md
-│   ├── 13-pipeline-locking.md
-│   └── 14-init-wizard.md
+│   ├── 02-dependency-resolution.md            # Current
+│   ├── 03-pipeline-state-machine.md            # Current
+│   ├── 05-platform-adapters.md                 # Transformed
+│   ├── 06-config-validation.md                 # Transformed
+│   ├── 07-brownfield-adopt.md                  # Current
+│   ├── 08-prompt-frontmatter.md                # Transformed
+│   ├── 09-cli-architecture.md                  # Transformed
+│   ├── 10-claude-md-management.md              # Current
+│   ├── 11-decision-log.md                      # Current
+│   ├── 13-pipeline-locking.md                  # Current
+│   └── 14-init-wizard.md                       # Transformed
 ├── adrs/                                  # Phase 2: Architecture Decision Records
 │   ├── template.md
 │   ├── ADR-001-cli-language-nodejs.md
@@ -49,8 +46,7 @@ docs/v2/
 │   └── lock-json-schema.md
 ├── api/                                   # Phase 5: API / CLI contracts
 │   ├── cli-contract.md                    # All CLI commands, args, flags, exit codes
-│   ├── adapter-interface.md               # Platform adapter contract
-│   ├── mixin-injection-interface.md       # Mixin system interface
+│   ├── adapter-interface.md               # Platform adapter contract (transformed)
 │   └── json-output-schemas.md             # --format json envelope per command
 ├── ux/                                    # Phase 6: UX specification
 │   ├── init-wizard-flow.md                # Wizard screens, branching, defaults
@@ -84,6 +80,11 @@ docs/v2/
 │   └── scope-creep-check.md
 ├── reference/                             # Historical reference documents
 │   └── scaffold-v2-spec.md               # Original v2 spec (superseded by PRD)
+├── archive/                               # Superseded documents (historical reference)
+│   ├── domain-models/                     # Superseded domain models (01, 04, 12)
+│   ├── api/                               # Superseded API contracts (mixin-injection)
+│   ├── superpowers-specs/                 # Design specs consolidated into PRD
+│   └── superpowers-plans/                 # Completed implementation plans
 └── final/                                 # Finalization phase
     ├── developer-onboarding.md
     └── implementation-playbook.md
