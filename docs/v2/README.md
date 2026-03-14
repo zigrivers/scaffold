@@ -27,7 +27,9 @@ docs/v2/
 │   ├── 10-claude-md-management.md              # Current
 │   ├── 11-decision-log.md                      # Current
 │   ├── 13-pipeline-locking.md                  # Current
-│   └── 14-init-wizard.md                       # Transformed
+│   ├── 14-init-wizard.md                       # Transformed
+│   ├── 15-assembly-engine.md                   # Current
+│   └── 16-methodology-depth-resolution.md      # Current
 ├── adrs/                                  # Phase 2: Architecture Decision Records
 │   ├── template.md
 │   ├── ADR-001-cli-language-nodejs.md
@@ -93,7 +95,7 @@ docs/v2/
 ## Naming Conventions
 
 - All filenames: **kebab-case**, `.md` extension
-- Domain model files: prefixed with two-digit number matching the domain ID (01-14)
+- Domain model files: prefixed with two-digit number matching the domain ID (01-16)
 - ADRs: prefixed with `ADR-NNN-` and a short slug
 - No nested subdirectories beyond what's shown above
 
@@ -157,3 +159,5 @@ Apply all validation fixes. Freeze docs (set status to `frozen`). Produce the on
 | 12 | Mixin Injection Mechanics | `domain-models/12-mixin-injection.md` | **superseded** (ADR-041) |
 | 13 | Pipeline Execution Locking | `domain-models/13-pipeline-locking.md` | current |
 | 14 | Init Wizard & Methodology Selection | `domain-models/14-init-wizard.md` | **transformed** (ADR-041, ADR-043) |
+| 15 | Assembly Engine | `domain-models/15-assembly-engine.md` | current |
+| 16 | Methodology & Depth Resolution | `domain-models/16-methodology-depth-resolution.md` | current |
