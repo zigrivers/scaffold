@@ -1,9 +1,9 @@
 # Scaffold v2 — Error Message Catalog
 
 **Phase**: 6 — UX Specification
-**Depends on**: Phase 5 CLI contract (error conditions), Phase 4 data schemas (validation rules), Architecture Section 7 (error codes)
-**Last updated**: 2026-03-13
-**Status**: superseded
+**Depends on**: Phase 5 CLI contract (error conditions), Phase 4 data schemas (validation rules), Architecture Section 7 (error codes), [ADR-043](../adrs/ADR-043-depth-scale.md) (depth scale), [ADR-048](../adrs/ADR-048-update-mode-diff-over-regeneration.md) (update mode), [ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md) (methodology changes)
+**Last updated**: 2026-03-14
+**Status**: draft
 
 ---
 
@@ -45,8 +45,8 @@ Every error message in Scaffold v2 follows these principles:
 1. **Lead with what went wrong**, not what the code did: "Config file not found" not "Failed to load config"
 2. **Include the specific value that's wrong**: "Unknown methodology 'clasic'" not "Invalid methodology"
 3. **Include the file and location**: "in .scaffold/config.yml (line 3)" when possible
-4. **End with how to fix it**: "Valid options: classic, classic-lite" or "Run 'scaffold init' to create one"
-5. **Suggest fuzzy matches for typos**: "Did you mean 'classic'?" when Levenshtein distance ≤ 2
+4. **End with how to fix it**: "Valid options: deep, mvp, custom" or "Run 'scaffold init' to create one"
+5. **Suggest fuzzy matches for typos**: "Did you mean 'deep'?" when Levenshtein distance ≤ 2
 6. **Use consistent structure**: What happened → Where → How to fix
 7. **Never blame the user**: "Unexpected value" not "You entered an invalid value"
 
@@ -150,7 +150,7 @@ The architecture error registry (system-architecture.md Section 7c) uses compone
 ✗ Scaffold is already configured in this project.
 
   Found: .scaffold/config.yml
-  Methodology: classic, 8/18 prompts completed
+  Methodology: deep, 8/32 steps completed
 
   To reconfigure from scratch: scaffold init --force
   To resume the current pipeline: scaffold run
@@ -270,7 +270,7 @@ The architecture error registry (system-architecture.md Section 7c) uses compone
 ⚠ Unknown field '{field}' in .scaffold/config.yml
 
   {suggestion}
-  Known fields: version, methodology, mixins, platforms, project, extra-prompts
+  Known fields: version, methodology, depth, platforms, project, instructions, extra-prompts
 ```
 
 **Variables**: `{field}` — unrecognized field name, `{suggestion}` — fuzzy match suggestion or empty string
@@ -280,7 +280,7 @@ The architecture error registry (system-architecture.md Section 7c) uses compone
 ⚠ Unknown field 'methology' in .scaffold/config.yml
 
   Did you mean 'methodology'?
-  Known fields: version, methodology, mixins, platforms, project, extra-prompts
+  Known fields: version, methodology, depth, platforms, project, instructions, extra-prompts
 ```
 
 #### CONFIG_INVALID_TRAIT
@@ -405,10 +405,10 @@ The architecture error registry (system-architecture.md Section 7c) uses compone
 
 **Example**:
 ```
-✗ Unknown methodology 'clasic' in .scaffold/config.yml
+✗ Unknown methodology 'deap' in .scaffold/config.yml
 
-  Did you mean 'classic'?
-  Valid options: classic, classic-lite
+  Did you mean 'deep'?
+  Valid options: deep, mvp, custom
   Run 'scaffold list' to see all available methodologies.
 ```
 
@@ -648,7 +648,7 @@ The architecture error registry (system-architecture.md Section 7c) uses compone
 ```
 ✗ Prompt file not found: content/base/create-prd.md
 
-  Referenced by methodology manifest: content/methodologies/classic/manifest.yml
+  Referenced by pipeline manifest: pipeline/manifest.yml
   Prompt slug: create-prd
 
   Verify the file exists or remove the reference from the manifest.
@@ -736,7 +736,7 @@ The architecture error registry (system-architecture.md Section 7c) uses compone
 
 **Example**:
 ```
-✗ Invalid methodology manifest: content/methodologies/classic/manifest.yml
+✗ Invalid methodology manifest: pipeline/manifest.yml
 
   Missing required field 'phases' in manifest
 
@@ -762,10 +762,10 @@ The architecture error registry (system-architecture.md Section 7c) uses compone
 
 **Example**:
 ```
-✗ Methodology directory not found: content/methodologies/clasic/
+✗ Methodology directory not found: content/methodologies/deap/
 
-  Did you mean 'classic'?
-  Available methodologies: classic, classic-lite
+  Did you mean 'deep'?
+  Available methodologies: deep, mvp, custom
 ```
 
 > **Cross-reference**: See also `FIELD_INVALID_METHODOLOGY` in [Section 3.3](#33-field-validation), which fires during config validation. `RESOLUTION_METHODOLOGY_NOT_FOUND` fires during prompt resolution when the methodology directory itself is missing, while `FIELD_INVALID_METHODOLOGY` fires during config field validation when the value does not match any installed methodology.
@@ -1221,6 +1221,131 @@ The architecture error registry (system-architecture.md Section 7c) uses compone
   Check .scaffold/config.yml depth configuration.
 ```
 
+#### ASM_DEPTH_CHANGED
+
+**Severity**: Warning
+**Exit code**: 0
+**Component**: Assembly Engine
+**Trigger**: Step is being executed at a different depth than the configured methodology default (per [ADR-043](../adrs/ADR-043-depth-scale.md))
+
+**Template**:
+```
+⚠ Step '{step}' will execute at depth {actualDepth} (methodology default: {defaultDepth}).
+
+  Depth was overridden by per-step configuration.
+```
+
+**Variables**: `{step}` — step slug, `{actualDepth}` — depth level being used, `{defaultDepth}` — methodology default depth
+
+**Example**:
+```
+⚠ Step 'create-prd' will execute at depth 3 (methodology default: 5).
+
+  Depth was overridden by per-step configuration.
+```
+
+#### ASM_DEPTH_DOWNGRADE
+
+**Severity**: Warning
+**Exit code**: 0
+**Component**: Assembly Engine
+**Trigger**: Re-running a step at a lower depth than the original execution (per [ADR-048](../adrs/ADR-048-update-mode-diff-over-regeneration.md))
+
+**Template**:
+```
+⚠ Step '{step}' was previously completed at depth {originalDepth}.
+  Re-running at depth {newDepth} (lower) — some detail may be lost.
+
+  The update will modify the existing artifact with diff-based changes.
+```
+
+**Variables**: `{step}` — step slug, `{originalDepth}` — depth at first completion, `{newDepth}` — current depth
+
+**Example**:
+```
+⚠ Step 'tech-stack' was previously completed at depth 5.
+  Re-running at depth 3 (lower) — some detail may be lost.
+
+  The update will modify the existing artifact with diff-based changes.
+```
+
+#### ASM_COMPLETED_AT_LOWER_DEPTH
+
+**Severity**: Warning
+**Exit code**: 0
+**Component**: Assembly Engine
+**Trigger**: A completed step's recorded depth is lower than the current methodology depth (per [ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md))
+
+**Template**:
+```
+⚠ Step '{step}' was completed at depth {completedDepth}, current methodology depth is {currentDepth}.
+
+  The step's artifacts may be less detailed than expected at the current depth.
+  Consider re-running: scaffold run {step}
+```
+
+**Variables**: `{step}` — step slug, `{completedDepth}` — depth at completion, `{currentDepth}` — current methodology depth
+
+**Example**:
+```
+⚠ Step 'create-prd' was completed at depth 1, current methodology depth is 5.
+
+  The step's artifacts may be less detailed than expected at the current depth.
+  Consider re-running: scaffold run create-prd
+```
+
+#### ASM_METHODOLOGY_CHANGED
+
+**Severity**: Warning
+**Exit code**: 0
+**Component**: Assembly Engine
+**Trigger**: Methodology has changed since the last step was executed (per [ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md))
+
+**Template**:
+```
+⚠ Methodology changed: {previousMethodology} → {currentMethodology}
+
+  {completedCount} completed step(s) were executed under '{previousMethodology}'.
+  These steps are preserved as-is. Pending steps will be resolved under '{currentMethodology}'.
+  {orphanedCount} step(s) are now orphaned (no longer in the pipeline).
+```
+
+**Variables**: `{previousMethodology}` — previous methodology, `{currentMethodology}` — current methodology, `{completedCount}` — number of completed steps under old methodology, `{orphanedCount}` — number of orphaned steps
+
+**Example**:
+```
+⚠ Methodology changed: deep → mvp
+
+  8 completed step(s) were executed under 'deep'.
+  These steps are preserved as-is. Pending steps will be resolved under 'mvp'.
+  3 step(s) are now orphaned (no longer in the pipeline).
+```
+
+#### ASM_INSTRUCTION_EMPTY
+
+**Severity**: Warning
+**Exit code**: 0
+**Component**: Assembly Engine
+**Trigger**: User instruction file exists but is empty or whitespace-only (per [ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md))
+
+**Template**:
+```
+⚠ User instruction file is empty: {path}
+
+  The file exists but contains no content. It will be skipped during assembly.
+  Add instructions or remove the empty file.
+```
+
+**Variables**: `{path}` — instruction file path
+
+**Example**:
+```
+⚠ User instruction file is empty: .scaffold/instructions/global.md
+
+  The file exists but contains no content. It will be skipped during assembly.
+  Add instructions or remove the empty file.
+```
+
 ---
 
 ### 3.8 State Manager
@@ -1442,7 +1567,7 @@ The architecture error registry (system-architecture.md Section 7c) uses compone
 ```
 ⚠ Methodology changed since last build.
 
-  State: classic → Config: classic-lite
+  State: deep → Config: mvp
   3 prompt(s) in state are no longer in the resolved pipeline.
 
   Run 'scaffold build' to regenerate outputs for the new methodology.
@@ -2550,7 +2675,7 @@ The architecture error registry (system-architecture.md Section 7c) uses compone
 ✗ Cannot adopt — no methodology specified.
 
   Run 'scaffold init' instead, which includes methodology selection.
-  Or specify: scaffold adopt --methodology classic
+  Or specify: scaffold adopt --methodology deep
 ```
 
 **Variables**: none
@@ -2560,7 +2685,7 @@ The architecture error registry (system-architecture.md Section 7c) uses compone
 ✗ Cannot adopt — no methodology specified.
 
   Run 'scaffold init' instead, which includes methodology selection.
-  Or specify: scaffold adopt --methodology classic
+  Or specify: scaffold adopt --methodology deep
 ```
 
 #### ADOPT_NO_SIGNALS
@@ -2998,17 +3123,17 @@ Adoption cancelled. No files were modified.
 ```
 ✗ Artifact {path} is missing a tracking comment on line 1.
 
-  Expected: <!-- scaffold:{slug} v{version} {date} {methodology} {mixinSummary} -->
+  Expected: <!-- scaffold:{slug} v{version} {date} {methodology} depth:{depth} -->
   This comment is required for mode detection and provenance tracking.
 ```
 
-**Variables**: `{path}` — artifact file path, `{slug}` — expected prompt slug, `{version}` — expected version, `{date}` — expected date, `{methodology}` — methodology name, `{mixinSummary}` — mixin summary string
+**Variables**: `{path}` — artifact file path, `{slug}` — expected prompt slug, `{version}` — expected version, `{date}` — expected date, `{methodology}` — methodology name, `{depth}` — depth level (integer 1-5)
 
 **Example**:
 ```
 ✗ Artifact docs/tech-stack.md is missing a tracking comment on line 1.
 
-  Expected: <!-- scaffold:tech-stack v1 2026-03-13 classic task-tracking:beads/tdd:strict -->
+  Expected: <!-- scaffold:tech-stack v1 2026-03-13 deep depth:5 -->
   This comment is required for mode detection and provenance tracking.
 ```
 
@@ -3081,16 +3206,16 @@ Adoption cancelled. No files were modified.
 ```
 ✗ Tracking comment missing from line 1 of {path}
 
-  Expected format: <!-- scaffold:{slug} v{version} {date} {methodology} {mixinSummary} -->
+  Expected format: <!-- scaffold:{slug} v{version} {date} {methodology} depth:{depth} -->
 ```
 
-**Variables**: `{path}` — file path, `{slug}` — expected prompt slug, `{version}` — expected version, `{date}` — expected date, `{methodology}` — methodology name, `{mixinSummary}` — mixin summary
+**Variables**: `{path}` — file path, `{slug}` — expected prompt slug, `{version}` — expected version, `{date}` — expected date, `{methodology}` — methodology name, `{depth}` — depth level (integer 1-5)
 
 **Example**:
 ```
 ✗ Tracking comment missing from line 1 of docs/tech-stack.md
 
-  Expected format: <!-- scaffold:tech-stack v1 2026-03-13 classic task-tracking:beads/tdd:strict -->
+  Expected format: <!-- scaffold:tech-stack v1 2026-03-13 deep depth:5 -->
 ```
 
 #### TRK_MALFORMED
@@ -3105,7 +3230,7 @@ Adoption cancelled. No files were modified.
 ✗ Malformed tracking comment on line 1 of {path}
 
   Found: {rawComment}
-  Expected format: <!-- scaffold:<slug> v<N> <YYYY-MM-DD> <methodology> <mixin-summary> -->
+  Expected format: <!-- scaffold:<slug> v<N> <YYYY-MM-DD> <methodology> depth:<N> -->
 ```
 
 **Variables**: `{path}` — file path, `{rawComment}` — actual line 1 content
@@ -3115,7 +3240,7 @@ Adoption cancelled. No files were modified.
 ✗ Malformed tracking comment on line 1 of docs/tech-stack.md
 
   Found: <!-- scaffold:tech-stack v1 -->
-  Expected format: <!-- scaffold:<slug> v<N> <YYYY-MM-DD> <methodology> <mixin-summary> -->
+  Expected format: <!-- scaffold:<slug> v<N> <YYYY-MM-DD> <methodology> depth:<N> -->
 ```
 
 #### TRK_SLUG_MISMATCH
@@ -3479,19 +3604,9 @@ Warnings use `⚠` (yellow) and do not block operations (exit code 0). They foll
   The file will not be mapped to any pipeline prompt.
 ```
 
-#### ADOPT_MIXIN_INFERENCE_WEAK
+#### ADOPT_MIXIN_INFERENCE_WEAK (REMOVED)
 
-**Severity**: Warning
-**Exit code**: 0
-**Component**: Project Detector (Domain 07)
-**Trigger**: Mixin inference has low confidence
-
-```
-⚠ Low-confidence inference for mixin axis '{axis}': {value}
-
-  Signals: {signals}
-  Verify this selection in .scaffold/config.yml after adoption.
-```
+> **Removed**: Mixin axes have been eliminated from the architecture. See ADR-041.
 
 #### ADOPT_EXTRA_ARTIFACTS
 
@@ -3585,10 +3700,10 @@ When a string value fails validation and the closest valid option has Levenshtei
 When exactly one valid option is within distance 2:
 
 ```
-✗ Unknown methodology 'clasic' in .scaffold/config.yml
+✗ Unknown methodology 'deap' in .scaffold/config.yml
 
-  Did you mean 'classic'?
-  Valid options: classic, classic-lite
+  Did you mean 'deep'?
+  Valid options: deep, mvp, custom
 ```
 
 ### Multiple Close Matches
@@ -3596,13 +3711,13 @@ When exactly one valid option is within distance 2:
 When two or more valid options are within distance 2:
 
 ```
-✗ Unknown mixin value 'strit' for axis 'tdd'
+✗ Unknown platform 'claud' in .scaffold/config.yml
 
   Did you mean one of:
-    • strict
+    • claude-code
     • (no other matches within threshold)
 
-  Valid options: strict, relaxed
+  Valid options: claude-code, codex
 ```
 
 ### No Close Match
@@ -3612,7 +3727,7 @@ When no valid option is within distance 2:
 ```
 ✗ Unknown methodology 'mycompany' in .scaffold/config.yml
 
-  Valid options: classic, classic-lite
+  Valid options: deep, mvp, custom
   Run 'scaffold list' to see all available methodologies.
 ```
 
@@ -3624,13 +3739,10 @@ The following error codes include fuzzy match suggestions via the `{suggestion}`
 |-----------|-------------------|
 | `CONFIG_UNKNOWN_FIELD` | Top-level config field names |
 | `FIELD_INVALID_METHODOLOGY` | Installed methodology directory names |
-| `FIELD_INVALID_MIXIN_AXIS` | Methodology manifest axis names |
-| `FIELD_INVALID_MIXIN_VALUE` | Installed mixin files for the specific axis |
 | `FIELD_INVALID_PLATFORM` | Registered platform adapter names |
 | `FIELD_INVALID_PROJECT_PLATFORM` | Project platform names (web, mobile, desktop) |
 | `RESOLUTION_METHODOLOGY_NOT_FOUND` | Installed methodology directory names |
 | `DEP_TARGET_MISSING` | Resolved prompt slugs |
-| `INJ_SECTION_NOT_FOUND` | Section names in the target mixin file |
 
 ### Suggestion Variable Format
 

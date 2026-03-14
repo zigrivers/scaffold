@@ -1,8 +1,8 @@
 # Scaffold v2 — Dashboard Specification
 
 **Phase**: 6 — UX Specification
-**Depends on**: Phase 5 CLI contract (`scaffold dashboard`), v1 dashboard (FR-26 in prd-v1.md)
-**Last updated**: 2026-03-13
+**Depends on**: Phase 5 CLI contract (`scaffold dashboard`), v1 dashboard (FR-26 in prd-v1.md), [ADR-043](../adrs/ADR-043-depth-scale.md) (depth scale), [ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md) (methodology changes)
+**Last updated**: 2026-03-14
 **Status**: draft
 
 ---
@@ -68,9 +68,10 @@ A fixed-height bar at the top of the page containing project-level metadata and 
 | Element | Source | Position | Notes |
 |---------|--------|----------|-------|
 | Project name | `package.json` `name` field, or directory name if no `package.json` | Left | Plain text, monospace font |
-| Methodology name | `config.yml` `methodology` field | Left, after project name | Displayed as a badge (e.g., `classic`) |
-| Scaffold Version | `state.json` `scaffold-version` | Left, after methodology | Displayed as secondary text |
-| Pipeline progress summary | Computed from `state.json` `prompts` map | Center | Text format: `{completed} of {total} complete — {percentage}%`. Example: `8 of 18 complete — 44%` |
+| Methodology name | `config.yml` `methodology` field | Left, after project name | Displayed as a badge (e.g., `deep`) |
+| Depth level | `config.yml` `depth` field | Left, after methodology | Displayed as secondary text (e.g., `Depth: 5`). Per [ADR-043](../adrs/ADR-043-depth-scale.md). |
+| Scaffold Version | `state.json` `scaffold-version` | Left, after depth | Displayed as secondary text |
+| Pipeline progress summary | Computed from `state.json` `prompts` map | Center | Text format: `{completed} of {total} complete — {percentage}%`. Example: `8 of 32 complete — 25%` |
 | Light/dark mode toggle | User preference | Right | Icon button (sun/moon). See Section 1 for persistence behavior |
 
 ### 2b: Progress Overview
@@ -122,6 +123,7 @@ Each phase accordion header shows:
 | Status badge | `prompts.{slug}.status` | Icon + text badge. See badge design in Section 3b. |
 | Prompt slug | Prompt key | Displayed in monospace font |
 | Description | `prompts.{slug}` description or prompt frontmatter | Short description text |
+| Depth | `prompts.{slug}.depth` | Shown for completed steps only (integer 1-5). Per [ADR-043](../adrs/ADR-043-depth-scale.md). Displayed as a small badge (e.g., `D5`). Omitted for pending/in-progress/skipped. |
 | Timestamp | `prompts.{slug}.at` | Shown for completed, skipped, and in-progress prompts. Omitted for pending. Relative format preferred (e.g., "2 hours ago") with ISO timestamp on hover tooltip. |
 | Skip reason | `prompts.{slug}.reason` | Shown inline (italic, muted) for skipped prompts only |
 
@@ -130,6 +132,10 @@ Each phase accordion header shows:
 | Detail Field | Source | Description |
 |--------------|--------|-------------|
 | Description | Prompt metadata | Full description of what the prompt does |
+| Depth | `prompts.{slug}.depth` or `config.yml` `depth` | For completed steps: depth at which the step was executed (integer 1-5). For pending steps: configured depth level. Per [ADR-043](../adrs/ADR-043-depth-scale.md). |
+| Meta-prompt | Computed at generation time | Path to the meta-prompt file (e.g., `pipeline/tech-stack.md`) |
+| Knowledge base | Computed at generation time | Path to the knowledge base file (e.g., `knowledge/tech-stack.md`) |
+| Instructions loaded | Computed at generation time | Which instruction files were found: global, per-step. Per [ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md). |
 | Produces | `prompts.{slug}.produces[]` | List of output file paths |
 | Dependencies | Dependency graph from manifest | List of prerequisite prompt slugs |
 | Completed by | `prompts.{slug}.completed_by` | Actor identity (for completed/skipped prompts) |
@@ -180,19 +186,20 @@ A chronological display of decisions recorded in `.scaffold/decisions.jsonl`.
 
 ### 2f: Orphaned Entries Section (Conditional)
 
-This section is rendered only when the state contains prompt entries whose slugs do not appear in the current resolved pipeline — typically after a methodology change.
+This section is rendered only when the state contains prompt entries whose slugs do not appear in the current resolved pipeline — typically after a methodology change (per [ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md)).
 
 **Visibility condition**: Shown when one or more keys in `state.json` `prompts` map do not match any prompt in the resolved pipeline (as computed at dashboard generation time).
 
 **Content**:
 - Heading: "Orphaned Entries"
-- Explanatory text: "These prompts were completed or skipped under a previous methodology configuration but are no longer part of the current pipeline."
+- Explanatory text: "These prompts were completed or skipped under a previous methodology configuration but are no longer part of the current pipeline. Completed steps retain their original depth level."
 - Table of orphaned prompts:
 
 | Column | Description |
 |--------|-------------|
 | Slug | The prompt slug (monospace) |
 | Status | Last known status (completed/skipped) with badge |
+| Depth | Depth level at which the step was executed (integer 1-5, from `prompts.{slug}.depth`) |
 | Completed at | Timestamp from `prompts.{slug}.at` |
 | Actor | `prompts.{slug}.completed_by` |
 
@@ -394,8 +401,9 @@ At generation time, the Dashboard Generator reads all data sources and embeds th
 ```html
 <script id="scaffold-data" type="application/json">
 {
-  "methodology": "classic",
-  "progress": { "completed": 6, "skipped": 1, "pending": 17, "total": 24 },
+  "methodology": "deep",
+  "depth": 5,
+  "progress": { "completed": 6, "skipped": 1, "pending": 25, "total": 32 },
   "phases": [ ... ],
   "decisions": [ ... ],
   "config": { ... },
