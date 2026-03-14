@@ -1,20 +1,30 @@
 # Domain Model: CLI Command Architecture & Output Modes
 
+**Status: Transformed** — Commands updated per meta-prompt architecture (ADR-041).
+
 **Domain ID**: 09
 **Phase**: 1 — Deep Domain Modeling
 **Depends on**: None — first-pass modeling (the CLI shell orchestrates all other domains)
-**Last updated**: 2026-03-12
-**Status**: draft
+**Last updated**: 2026-03-14
+**Status**: transformed
 
 ---
 
 ## Section 1: Domain Overview
 
-The CLI Command Architecture & Output Modes domain defines the Node.js application shell that all Scaffold v2 functionality is delivered through. This domain covers the command dispatch system, argument parsing, the three interaction modes (interactive, `--format json`, `--auto`), exit code contract, project root detection, session bootstrap assembly, error propagation framework, and the orchestration layer that composes business logic from other domains into user-facing commands.
+The CLI Command Architecture & Output Modes domain defines the Node.js application shell that all Scaffold v2 functionality is delivered through. This domain covers the command dispatch system, argument parsing, the three interaction modes (interactive, `--format json`, `--auto`), exit code contract, project root detection, the assembly engine orchestration, error propagation framework, and the orchestration layer that composes business logic from other domains into user-facing commands.
 
-**Role in the v2 architecture**: The CLI is the **outermost orchestration layer** — every other domain provides business logic that the CLI invokes, formats, and surfaces to the user or agent. Prompt resolution ([domain 01](01-prompt-resolution.md)) resolves which prompts to run. Dependency resolution ([domain 02](02-dependency-resolution.md)) determines execution order. The pipeline state machine ([domain 03](03-pipeline-state-machine.md)) tracks execution progress. Config validation ([domain 06](06-config-validation.md)) validates inputs. The CLI is responsible for composing these subsystems into coherent commands, dispatching to the right subsystem, translating subsystem results into the appropriate output mode, and propagating errors with consistent codes and formatting.
+**Command changes under the meta-prompt architecture:**
 
-**Central design challenge**: Every CLI command must behave correctly in three modes — interactive (human at a terminal), JSON (agent consuming structured output), and auto (agent or CI running non-interactively). This cross-cutting concern must be uniform without every command individually implementing mode logic. The output mode abstraction must be simple enough that adding a new command requires minimal boilerplate, yet flexible enough to handle commands with radically different output shapes (a simple `scaffold version` vs. the complex session bootstrap of `scaffold resume`).
+- **Added**: `scaffold run <step> [--instructions "..."]` — Runs a pipeline step by loading its meta-prompt, assembling it with knowledge base + project context + user instructions, and passing the assembled prompt to the AI for generation and execution.
+- **Removed**: `scaffold add <axis> <value>` — Mixin axis configuration is no longer needed; the meta-prompt architecture eliminates mixin axes.
+- **Modified**: `scaffold build` — Now generates thin command wrappers from meta-prompts (for plugin delivery) rather than performing full prompt resolution and mixin injection.
+- **Modified**: `scaffold init` — Now runs a methodology wizard (Deep/MVP/Custom selection) instead of collecting mixin axis values.
+- **Kept**: `scaffold status`, `scaffold next`, `scaffold skip`, `scaffold list`, `scaffold validate`, `scaffold info`, `scaffold version`, `scaffold update`, `scaffold dashboard`, `scaffold decisions`, `scaffold adopt`, `scaffold reset`.
+
+**Role in the v2 architecture**: The CLI is the **outermost orchestration layer** — every other domain provides business logic that the CLI invokes, formats, and surfaces to the user or agent. The assembly engine loads meta-prompts and knowledge base entries. Dependency resolution ([domain 02](02-dependency-resolution.md)) determines execution order. The pipeline state machine ([domain 03](03-pipeline-state-machine.md)) tracks execution progress. Config validation ([domain 06](06-config-validation.md)) validates inputs. The CLI is responsible for composing these subsystems into coherent commands, dispatching to the right subsystem, translating subsystem results into the appropriate output mode, and propagating errors with consistent codes and formatting.
+
+**Central design challenge**: Every CLI command must behave correctly in three modes — interactive (human at a terminal), JSON (agent consuming structured output), and auto (agent or CI running non-interactively). This cross-cutting concern must be uniform without every command individually implementing mode logic. The output mode abstraction must be simple enough that adding a new command requires minimal boilerplate, yet flexible enough to handle commands with radically different output shapes (a simple `scaffold version` vs. the assembly and execution flow of `scaffold run`).
 
 ---
 
@@ -483,11 +493,19 @@ type ErrorCode =
   | 'FRONTMATTER_INVALID_FIELD'
   | 'FRONTMATTER_INVALID_READS'
   | 'FRONTMATTER_INVALID_SCHEMA'
+  | 'FRONTMATTER_PRODUCES_MISSING'
+  // --- Decision errors (exit code 2) ---
+  | 'DECISION_UNKNOWN_PROMPT'
   // --- Dependency errors (exit code 2) ---
   | 'DEPENDENCY_MISSING_ARTIFACT'
   | 'DEPENDENCY_UNMET'
   | 'DEPENDENCY_PROMPT_NOT_FOUND'
+  | 'DEP_RERUN_STALE_DOWNSTREAM'
+  // --- Init errors (exit code 1) ---
+  | 'INIT_SCAFFOLD_EXISTS'
   // --- State errors (exit code 3) ---
+  | 'PSM_ALREADY_IN_PROGRESS'
+  | 'PSM_WRITE_FAILED'
   | 'STATE_PARSE_ERROR'
   | 'STATE_VERSION_MISMATCH'
   | 'STATE_CORRUPTED'
@@ -499,7 +517,7 @@ type ErrorCode =
   | 'BUILD_ADAPTER_ERROR'
   | 'BUILD_PROMPT_RESOLUTION_ERROR'
   | 'BUILD_INJECTION_ERROR'
-  // --- Lock errors (exit code 5) ---
+  // --- Lock errors (exit code 3) ---
   | 'LOCK_HELD'
   // --- Validation errors (exit code 1) ---
   | 'VALIDATE_ARTIFACT_MISSING_SECTION'
@@ -971,7 +989,7 @@ function executeCommand(def: CommandDefinition, args: ParsedArgs): CommandResult
 | Pipeline state ([domain 03](03-pipeline-state-machine.md)) | Corrupted state, version mismatch | `STATE_*` | 3 |
 | Mixin injection ([domain 12](12-mixin-injection.md)) | Unresolved markers | `BUILD_MIXIN_UNRESOLVED`, `BUILD_INJECTION_ERROR` | 5 |
 | Platform adapters ([domain 05](05-platform-adapters.md)) | Adapter generation failures | `BUILD_ADAPTER_ERROR` | 5 |
-| Pipeline locking ([domain 13](13-pipeline-locking.md)) | Lock held by another process | `LOCK_HELD` | 5 |
+| Pipeline locking ([domain 13](13-pipeline-locking.md)) | Lock held by another process | `LOCK_HELD` | 3 |
 | User interaction | User declined prompt | `USER_CANCELLED` | 4 |
 
 ### Algorithm 5: Validate Command Orchestration
@@ -1259,10 +1277,10 @@ Each command's signature (arguments, flags) and output contract (JSON data field
 | Command | Signature | Requires Project | Requires State | JSON `data` Type |
 |---------|-----------|:---:|:---:|:---|
 | `init` | `scaffold init [idea]` `--methodology <name>` | No | No | `InitData` |
-| `build` | `scaffold build` `--allow-unresolved-markers` | Yes | No | `BuildData` |
+| `run` | `scaffold run <step>` `--instructions "..."` | Yes | Yes | `RunData` |
+| `build` | `scaffold build` | Yes | No | `BuildData` |
 | `list` | `scaffold list` `--verbose` | No | No | `ListData` |
 | `info` | `scaffold info` | Yes | No | `InfoData` |
-| `add` | `scaffold add <axis> <value>` | Yes | No | `AddData` |
 | `update` | `scaffold update` `--check-only` | No | No | `UpdateData` |
 | `version` | `scaffold version` | No | No | `VersionData` |
 | `resume` | `scaffold resume` `--from <prompt>` | Yes | Yes* | `ResumeData` |
@@ -1345,7 +1363,7 @@ Every decision point across all commands, with its `--auto` resolution:
 | `build` | Methodology change confirmation | Proceed with warning |
 | `build` | Rebuild confirmation | Always rebuild |
 | `resume` | "Ready to run X?" confirmation | Yes (proceed) |
-| `resume` | Missing predecessor: "Run X first / Proceed / Cancel" | Run predecessor automatically |
+| `resume` | Missing predecessor: "Run X first / Proceed / Cancel" | Exit 2 (DEPENDENCY_UNMET) — auto mode does not execute prerequisites |
 | `resume` | Crash recovery: "Re-run X?" | Re-run the crashed prompt |
 | `skip` | Reason text prompt | Use "Skipped via --auto" as reason |
 | `reset` | Confirmation | **Requires explicit `--confirm-reset`** — destructive action never auto-confirmed |

@@ -1,10 +1,12 @@
-# Domain Model: Init Wizard & Smart Methodology Suggestion
+# Domain Model: Init Wizard & Methodology Selection
+
+**Status: Transformed** — Wizard simplified to methodology selection (ADR-043).
 
 **Domain ID**: 14
 **Phase**: 1 — Deep Domain Modeling
 **Depends on**: [06-config-validation.md](06-config-validation.md) (wizard output must be valid config), [07-brownfield-adopt.md](07-brownfield-adopt.md) (wizard triggers brownfield/v1 detection)
-**Last updated**: 2026-03-13
-**Status**: draft
+**Last updated**: 2026-03-14
+**Status**: transformed
 
 ---
 
@@ -12,26 +14,33 @@
 
 The init wizard is the entry point for every new scaffold project. It runs as `scaffold init` (optionally with idea text: `scaffold init "I want to build a CLI tool..."`) and produces `.scaffold/config.yml` — the configuration file that drives all subsequent scaffold operations.
 
+The wizard has been simplified under the meta-prompt architecture. Instead of collecting mixin axis values (task-tracking, tdd, git-workflow, agent-mode, interaction-style), the wizard now focuses on methodology selection:
+
+- **Asks methodology**: Deep Domain Modeling, MVP, or Custom
+- **For Custom**: Presents the step list with toggle (enabled/disabled) and depth (1-5) for each step
+- **Detects existing project files**: Examines the codebase for signals (database files, API routes, frontend frameworks, `project.platforms` config) to suggest which conditional steps (database, API, UI/UX) should be enabled
+- **Writes `.scaffold/config.yml`**: With the selected methodology, depth configuration, platform targets, and project metadata
+
 ### Role in the v2 architecture
 
-The wizard sits at the boundary between user intent and the pipeline engine. It collects choices through interactive questions, analyzes existing code for smart defaults, and produces a valid `ScaffoldConfig` (domain 06). It also triggers brownfield/v1 detection (domain 07) and hands off to `scaffold build` for platform-specific output generation.
+The wizard sits at the boundary between user intent and the pipeline engine. It collects methodology choices through interactive questions, analyzes existing code for smart defaults on conditional steps, and produces a valid config (domain 06). It also triggers brownfield/v1 detection (domain 07).
 
 ### What this domain covers
 
-- The complete question flow as a state machine
+- Methodology selection (Deep/MVP/Custom)
+- Custom methodology step and depth configuration
+- Conditional step detection from existing project files
 - Smart methodology suggestion (keyword + file-based signal analysis)
-- Adaptive question behavior (later questions depend on earlier answers)
 - Brownfield and v1 detection triggers and their effect on the wizard flow
 - The `--auto` mode for non-interactive initialization
 - The `--force` flag for reinitializing existing projects
-- The init-to-build handoff after config is written
 - Config.yml generation for all init scenarios
 
 ### What this domain does NOT cover
 
 - The config schema itself (domain 06 — [06-config-validation.md](06-config-validation.md))
 - Brownfield adaptation logic and adopt scanning (domain 07 — [07-brownfield-adopt.md](07-brownfield-adopt.md))
-- The build system that consumes config.yml (domains 01 and 12)
+- The assembly engine that generates prompts at runtime
 - Prompt resolution and dependency ordering (domain 02 — [02-dependency-resolution.md](02-dependency-resolution.md))
 - Platform adapter output generation (domain 05 — [05-platform-adapters.md](05-platform-adapters.md))
 

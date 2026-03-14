@@ -1,20 +1,30 @@
 # Domain Model: Config Schema & Validation System
 
+**Status: Transformed** — Simplified schema per meta-prompt architecture. Mixin axes removed, methodology + depth configuration added (ADR-043).
+
 **Domain ID**: 06
 **Phase**: 1 — Deep Domain Modeling
 **Depends on**: None — first-pass modeling (config is consumed by nearly all other domains)
-**Last updated**: 2026-03-12
-**Status**: draft
+**Last updated**: 2026-03-14
+**Status**: transformed
 
 ---
 
 ## Section 1: Domain Overview
 
-The Config Schema & Validation System defines the structure, constraints, and validation logic for `.scaffold/config.yml` — the per-project configuration file that drives every other Scaffold v2 subsystem. This domain covers the complete config schema, all validation rules (type checks, value validation, cross-field constraints, incompatible combination detection), the version migration system for schema evolution, fuzzy matching for typo correction, and error surfacing in both interactive and JSON output modes.
+The Config Schema & Validation System defines the structure, constraints, and validation logic for `.scaffold/config.yml` — the per-project configuration file that drives every other Scaffold v2 subsystem. This domain covers the complete config schema, all validation rules (type checks, value validation, cross-field constraints), the version migration system for schema evolution, fuzzy matching for typo correction, and error surfacing in both interactive and JSON output modes.
 
-**Role in the v2 architecture**: Config validation is the **first gate** in the `scaffold build` pipeline. Before prompt resolution ([domain 01](01-prompt-resolution.md)) can select files, before mixin injection ([domain 12](12-mixin-injection.md)) can perform replacements, before platform adapters ([domain 05](05-platform-adapters.md)) can generate outputs — the config must be valid. The config also feeds the pipeline state machine ([domain 03](03-pipeline-state-machine.md)) for tracking execution, the init wizard ([domain 14](14-init-wizard.md)) for initial creation, and the CLI architecture ([domain 09](09-cli-architecture.md)) for command routing. Nearly every domain has a read dependency on this one.
+The config schema has been simplified under the meta-prompt architecture. The previous mixin axis system (`task-tracking`, `tdd`, `git-workflow`, `agent-mode`, `interaction-style`) has been removed. The new schema centers on methodology selection and depth configuration:
 
-**Central design challenge**: Balancing strictness (catching errors early, preventing confusing build failures downstream) with permissiveness (allowing users to experiment, not blocking valid but unusual configurations). The system must produce error messages good enough that users never need to consult documentation — every error includes what went wrong, where, why it matters, and how to fix it. The dual output modes (interactive text and structured JSON) must carry identical semantic content.
+- `version: 2` — schema version
+- `methodology: deep | mvp | custom` — methodology preset selection
+- `custom:` block (only when `methodology: custom`) — contains `default_depth` (1-5) and per-step overrides with `enabled` and `depth` fields
+- `platforms: [claude-code]` — target platform(s) for delivery wrappers
+- `project:` — project metadata (`name`, `platforms` for conditional step detection)
+
+**Role in the v2 architecture**: Config validation is the **first gate** in the pipeline. Before the assembly engine can load meta-prompts, before the methodology system can determine which steps are active and at what depth — the config must be valid. The config feeds the pipeline state machine ([domain 03](03-pipeline-state-machine.md)) for tracking execution, the init wizard ([domain 14](14-init-wizard.md)) for initial creation, and the CLI architecture ([domain 09](09-cli-architecture.md)) for command routing. Nearly every domain has a read dependency on this one.
+
+**Central design challenge**: Balancing strictness (catching errors early, preventing confusing failures downstream) with permissiveness (allowing users to experiment, not blocking valid but unusual configurations). The system must produce error messages good enough that users never need to consult documentation — every error includes what went wrong, where, why it matters, and how to fix it. The dual output modes (interactive text and structured JSON) must carry identical semantic content.
 
 ---
 
