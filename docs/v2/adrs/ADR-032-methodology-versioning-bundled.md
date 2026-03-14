@@ -3,7 +3,7 @@
 **Status**: accepted
 **Date**: 2026-03-13
 **Deciders**: v2 spec (Resolved Design Questions)
-**Domain(s)**: 01
+**Domain(s)**: 06, 16
 **Phase**: 2 — Architecture Decision Records
 
 ---

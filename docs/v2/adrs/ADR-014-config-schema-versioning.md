@@ -91,7 +91,7 @@ Four interrelated decisions govern `.scaffold/config.yml`:
 - Config MUST be YAML with the `.yml` extension at the path `.scaffold/config.yml`
 - Config MUST include a `version` field (integer, starting at 1)
 - Migrations MUST be forward-only — no downgrade path (v1 to v2 to v3, never v3 to v2)
-- `scaffold build` MUST auto-run migration if the config version is older than the CLI expects
+- Any command that reads config.yml (especially scaffold run, scaffold init, scaffold validate) must auto-run migration if the config version is older than the CLI's current schema version
 - Validation MUST happen at build time (during `scaffold build`), not at runtime during prompt execution
 - Fuzzy matching MUST use Levenshtein distance with a threshold of 2
 - Incompatibility issues MUST be surfaced as warnings, not errors — the build proceeds but the user is informed

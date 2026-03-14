@@ -83,6 +83,10 @@ This replaces the v2 three-layer resolution system (ADR-005), mixin injection (A
 - The `commands/` directory continues to exist as thin wrappers that trigger assembly, maintaining plugin compatibility
 - Users can still inspect the assembled prompt via CLI flags for transparency
 
+## Reversibility
+
+Effectively irreversible. Reverting would require reimplementing the three-layer resolution system, mixin injection mechanics, and build-time assembly — the systems this decision explicitly eliminates. All downstream ADRs (042-046), domain models (15, 16), and the assembly engine depend on this decision.
+
 ## Constraints and Compliance
 
 - Meta-prompts MUST NOT contain actual prompt text — they declare intent (purpose, inputs, outputs, criteria, scaling guidance)
@@ -105,3 +109,5 @@ This replaces the v2 three-layer resolution system (ADR-005), mixin injection (A
 - [ADR-042](ADR-042-knowledge-base-domain-expertise.md) — Knowledge base design (companion decision)
 - [ADR-044](ADR-044-runtime-prompt-generation.md) — Runtime assembly mechanism (companion decision)
 - [ADR-045](ADR-045-assembled-prompt-structure.md) — Assembled prompt structure (companion decision)
+- Domain 15 ([15-assembly-engine.md](../domain-models/15-assembly-engine.md)) — Runtime assembly engine implementing the meta-prompt architecture
+- Domain 16 ([16-methodology-depth-resolution.md](../domain-models/16-methodology-depth-resolution.md)) — Methodology and depth resolution system

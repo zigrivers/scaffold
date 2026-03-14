@@ -76,6 +76,10 @@ Three interrelated decisions govern the design of `.scaffold/state.json`:
 - The `next_eligible` cached field in state.json (domain 03, Section 3) is a derived value recomputed on every mutation — its presence in committed state is a convenience, not a source of truth
 - Schema versioning (`schema-version` field) is orthogonal to this decision but travels with the committed file
 
+## Reversibility
+
+Reversible with migration tooling. Existing `state.json` files would need automated migration, and the map-keyed structure is embedded in users' git history. Any format change must be forward-compatible. Moderate effort.
+
 ## Constraints and Compliance
 
 - State entries MUST be keyed by prompt slug in a `prompts` map — never stored as an array
