@@ -1,4 +1,4 @@
-<!-- scaffold:testing-strategy v1 2026-03-14 -->
+<!-- scaffold:testing-strategy v2 2026-03-14 -->
 
 # Scaffold v2 — Testing & Quality Strategy
 
@@ -128,6 +128,14 @@ src/
 
 ```
 tests/
+  integration/             → component-to-component tests
+    assembly-frontmatter.test.ts
+    assembly-state.test.ts
+    state-lock.test.ts
+    validator-schemas.test.ts
+    dashboard-integration.test.ts
+    error-handling.test.ts
+    config-pipeline.test.ts
   e2e/                     → end-to-end scenarios
     full-pipeline.test.ts
     init-wizard.test.ts
@@ -207,6 +215,15 @@ Pattern: `describe('<ModuleName>')` → `describe('<methodName>()')` → `it('<v
 - Test PID recycling: `processStartedAt` mismatch > 2 seconds → stale
 - Test `EPERM`: different user → treat as stale
 - **Mock boundary**: Mock `process.kill()` for PID checks; mock `os.hostname()` for holder field; use real filesystem via temp directories
+
+**Methodology Preset Loader** (`src/core/methodology/preset-loader.ts`):
+- Test against fixture preset YAML files in `tests/fixtures/presets/`
+- Fixtures: `deep.yml` (all 32 steps enabled, `default_depth: 5`), `mvp.yml` (4 steps enabled, `default_depth: 1`), `custom-defaults.yml` (all steps enabled, `default_depth: 3`)
+- Verify step name validation: all step names in preset must match meta-prompt names → `PRESET_INVALID_STEP` on mismatch
+- Verify warning when meta-prompt exists but is not listed in preset → `PRESET_MISSING_STEP`
+- Verify `default_depth` validation: 0 or 6 → error; 1-5 → valid
+- Verify conditional step handling: `conditional: "if-needed"` parsed correctly
+- **Mock boundary**: Mock `fs.readFile` to return fixture content; mock meta-prompt directory listing for cross-reference validation
 
 ### 4b. Core Engine (T-011 through T-018)
 
@@ -332,6 +349,40 @@ describe('StatusCommand', () => {
 - Test token budget warning at 2,000 tokens
 - Test that no new `##`-level sections are added
 - **Mock boundary**: Use real filesystem via temp directories
+
+### 4g. Project Services & Utilities (T-032, T-033, T-036, T-037)
+
+**Project Detector** (`src/project/detector.ts`):
+- Test greenfield detection: empty directory → `{ mode: 'greenfield' }`
+- Test brownfield detection: directory with `package.json` + `src/` → `{ mode: 'brownfield', signals: [...] }`
+- Test v1 migration detection: directory with v1 tracking comments in `.md` files → `{ mode: 'v1-migration', matchedSteps: [...] }`
+- Test signal priority: file signals override keyword signals when they conflict (ADR-027)
+- Test artifact mapping: existing `docs/prd.md` maps to `create-prd` step via meta-prompt `outputs` field
+- **Mock boundary**: Use real filesystem via temp directories with fixture project structures
+
+**Init Wizard** (`src/wizard/init.ts`):
+- Test smart methodology suggestion: idea text "REST API with PostgreSQL" → suggests `deep` with confidence score
+- Test `--auto` mode: all questions resolved with safe defaults, no prompts emitted
+- Test `--methodology` flag: pre-selects methodology, skips selection question
+- Test re-initialization guard: existing `.scaffold/config.yml` without `--force` → `INIT_SCAFFOLD_EXISTS` error
+- Test config generation: wizard output produces valid `ScaffoldConfig` with selected methodology, platforms, and project traits
+- Test state initialization: generated `state.json` has all enabled steps as `pending`
+- **Mock boundary**: Mock `@inquirer/prompts` for interactive questions; use real filesystem via temp directories for output verification
+
+**Validator** (`src/cli/commands/validate.ts`):
+- Test cross-cutting validation orchestration: config + frontmatter + dependency graph + state validated together
+- Test error accumulation (ADR-040): multiple errors across different files reported in a single run, grouped by source file
+- Test `--fix` flag: duplicate decision IDs reassigned, truncated JSONL lines removed
+- Test config ↔ state consistency: `config.methodology` differs from `state.methodology` → `PSM_METHODOLOGY_MISMATCH` warning
+- Test dependency ↔ frontmatter consistency: dependency target missing → `DEP_TARGET_MISSING` error
+- **Mock boundary**: Use real filesystem via temp directories with multi-file fixture projects
+
+**Dashboard Generator** (`src/dashboard/generator.ts`):
+- Test HTML generation from state + config: produces self-contained HTML with correct step counts and progress percentage
+- Test phase grouping: steps grouped by phase in output HTML
+- Test light/dark mode: CSS custom properties present for both themes
+- Test with empty state (all pending) and full state (all completed)
+- **Mock boundary**: Use real filesystem via temp directories; assert HTML content via string matching (not DOM parsing)
 
 ---
 
@@ -634,6 +685,46 @@ it('proceeds when lock is held with --auto --force', async () => {
 
 ## 7. Integration / E2E Testing Strategy
 
+### Integration Tests (`tests/integration/`)
+
+Integration tests verify component-to-component interactions using real implementations (not mocks) for both sides of a boundary. They sit between unit tests and E2E tests in the test pyramid — faster than E2E but broader than unit tests.
+
+**Assembly Engine ↔ Frontmatter Parser** (`assembly-frontmatter.test.ts`):
+- Load a real meta-prompt fixture, parse its frontmatter, and pass to the assembly engine
+- Verify the assembled prompt includes knowledge base entries referenced in frontmatter
+- Verify missing knowledge base entry produces `FRONTMATTER_KB_ENTRY_MISSING`
+
+**Assembly Engine ↔ State Manager** (`assembly-state.test.ts`):
+- Create a project with completed steps, invoke assembly for a step with dependencies
+- Verify the assembled prompt includes prior artifacts as context
+- Verify update mode: re-running a completed step includes existing artifact content
+
+**State Manager ↔ Lock Manager** (`state-lock.test.ts`):
+- Verify lock acquired before state mutation and released after
+- Verify state remains unchanged when lock acquisition fails (EEXIST)
+- Verify lock is released even when state write throws
+
+**Validator ↔ Schema Validators** (`validator-schemas.test.ts`):
+- Create a project with errors across config, frontmatter, and state files
+- Run validator and verify errors accumulated from all sources, grouped by file
+- Verify exit code reflects worst error across all validators
+
+**Dashboard Generator ↔ State + Config** (`dashboard-integration.test.ts`):
+- Create a project with realistic state (mix of completed/pending/skipped steps)
+- Generate dashboard HTML and verify step counts, phase grouping, and progress data
+
+**Error Handling Philosophy (ADR-040)** (`error-handling.test.ts`):
+- Build-time accumulation: run `scaffold validate` against a project with 3+ distinct errors → all reported in output
+- Build-time short-circuit: config with invalid YAML (Phase 1 failure) → no value validation errors reported (Phases 4-6 skipped)
+- Runtime fail-fast: `scaffold run` with corrupt `state.json` → single error, immediate exit, no cascading errors
+
+**Config Validation Pipeline Ordering** (`config-pipeline.test.ts`):
+- Structural failure short-circuits: missing `version` field (Phase 3) → no `FIELD_INVALID_METHODOLOGY` errors from Phase 5
+- Value errors accumulate: invalid methodology AND invalid platform both reported in single run
+- Phase order: `CONFIG_PARSE_ERROR` (Phase 1) preempts `FIELD_MISSING` (Phase 3)
+
+### E2E Tests (`tests/e2e/`)
+
 Five end-to-end scenarios, each in `tests/e2e/`:
 
 ### Scenario 1: Full Pipeline (`full-pipeline.test.ts`)
@@ -759,6 +850,27 @@ Report p50/p95/p99 for each benchmark. Run against realistic fixture data (32 me
 
 Coverage enforcement: CI fails if any module group drops below its target. No coverage decrease allowed from base branch.
 
+### Coverage Enforcement Mechanism
+
+Per-module-group thresholds are enforced via vitest's `coverage.thresholds` configuration in `vitest.config.ts`:
+
+```typescript
+coverage: {
+  provider: 'v8',
+  thresholds: {
+    branches: 80,  // project-wide floor
+    perFile: true,  // enforce per-file to prevent one large uncovered file from hiding
+  },
+  // Per-directory overrides for module groups
+  '100': { statements: 90, branches: 90, include: ['src/core/**', 'src/state/**', 'src/config/**', 'src/utils/**'] },
+  '80': { statements: 80, branches: 80, include: ['src/cli/commands/**', 'src/cli/output/**'] },
+  '70': { statements: 70, branches: 70, include: ['src/wizard/**', 'src/core/adapters/**'] },
+  '60': { statements: 60, branches: 60, include: ['src/dashboard/**'] },
+}
+```
+
+Coverage decrease detection: CI compares coverage percentages against the base branch using `vitest --coverage` output parsed by a CI script. The script fails the check if any module group's branch coverage drops from the base branch value.
+
 ---
 
 ## 10. Quality Gates
@@ -772,21 +884,24 @@ Coverage enforcement: CI fails if any module group drops below its target. No co
 ### CI Pipeline (< 3 minutes)
 
 - All pre-commit checks (redundant but catches bypassed hooks)
-- Full unit test suite with coverage report
+- Full unit + integration test suite with coverage report
 - E2E test suite
-- Coverage threshold enforcement (fail if below targets in Section 9)
+- Coverage threshold enforcement (fail if below targets in Section 9, via vitest `coverage.thresholds`)
+- `npm audit --audit-level=high` — dependency vulnerability scanning (fail on high/critical)
 - No performance benchmarks in CI (environment-dependent timing)
+
+If the CI pipeline exceeds the 3-minute budget, investigate before adding parallelization — the budget is a gate, not an aspiration.
 
 ### Pre-Merge
 
 - All CI checks pass
-- No decrease in coverage from base branch
+- No decrease in coverage from base branch (CI script compares `vitest --coverage` output against base)
 - PR review approved
 
 ### Periodic (Manual/Scheduled)
 
 - Performance benchmarks (Section 8) against realistic data
-- Mutation testing to assess test suite quality (Stryker)
+- Mutation testing to assess test suite quality (Stryker) — aspirational for v2.1; adopt when test suite stabilizes after initial implementation
 - Visual dashboard verification via Playwright MCP (if dashboard changes)
 
 ---
