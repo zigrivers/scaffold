@@ -16,8 +16,8 @@
 |--------|-------|
 | **Total tasks** | 55 |
 | **Phases** | 8 (0-7) |
-| **Critical path length** | 12 tasks (T-001 → T-002 → T-004 → T-006 → T-012 → T-017 → T-019 → T-020 → T-029 → T-034 → T-039 → T-052) |
-| **Max parallelism** | Phase 1: 5 concurrent / Phase 4: 10 concurrent / Phase 6: 8 concurrent |
+| **Critical path length** | 10 tasks (T-001 → T-002 → T-004 → T-006 → T-012 → T-017 → T-018 → T-029 → T-052 → T-053) |
+| **Max parallelism** | Phase 1: 5 concurrent / Phase 4: 10+ concurrent / Phase 6: 6 concurrent |
 | **Code tasks** | 43 |
 | **Content tasks** | 8 |
 | **Integration tasks** | 4 |
@@ -47,6 +47,7 @@ graph TD
     end
 
     T002 --> T004
+    T003 --> T004
     T002 --> T005
     T002 --> T007
     T002 --> T009
@@ -117,10 +118,13 @@ graph TD
     T011 --> T023
     T021 --> T024
     T011 --> T024
+    T007 --> T024
     T021 --> T025
     T013 --> T025
+    T007 --> T025
     T021 --> T026
     T006 --> T026
+    T007 --> T026
     T021 --> T027
     T009 --> T027
     T021 --> T028
@@ -135,12 +139,14 @@ graph TD
     T018 --> T029
     T010 --> T029
     T008 --> T029
+    T011 --> T029
     T021 --> T029
     T022 --> T029
     T010 --> T030
     T007 --> T030
     T021 --> T030
     T007 --> T031
+    T010 --> T031
     T021 --> T031
 
     subgraph Phase4C["Phase 4C — Setup Commands"]
@@ -162,6 +168,7 @@ graph TD
     T032 --> T035
     T007 --> T035
     T009 --> T035
+    T010 --> T035
     T021 --> T035
 
     subgraph Phase4D["Phase 4D — Utility Commands"]
@@ -215,6 +222,7 @@ graph TD
     T045 --> T048
     T045 --> T049
     T045 --> T050
+    T047 --> T050
     T046 --> T051
 
     subgraph Phase7["Phase 7 — Integration"]
@@ -253,6 +261,7 @@ Phase 0 establishes the TypeScript project infrastructure. Zero spec-specific lo
 - Create: `vitest.config.ts`
 - Create: `eslint.config.js`
 - Create: `src/index.ts` (entry point stub)
+- Create: `tests/helpers/test-utils.ts` (shared test utilities)
 - Create: `.gitignore` (update for dist/, node_modules/)
 
 **Description**: Set up the TypeScript project with strict compiler settings, ES2022 target, vitest for testing, and eslint for linting. Configure `package.json` with `bin.scaffold` pointing to the compiled entry point, `engines.node >= 18`, and scripts for build/test/lint. This task produces zero business logic — just the build toolchain.
@@ -263,6 +272,7 @@ Phase 0 establishes the TypeScript project infrastructure. Zero spec-specific lo
 - [ ] `npm run lint` runs eslint and reports 0 errors
 - [ ] `tsconfig.json` has `strict: true`, `target: "ES2022"`, `module: "Node16"`
 - [ ] `package.json` has `engines.node: ">=18"` and `bin.scaffold` field
+- [ ] `tests/helpers/test-utils.ts` exports shared utilities (temp directory creation, fixture loading)
 - [ ] `node dist/index.js` prints a placeholder message without errors
 
 ---
@@ -290,7 +300,7 @@ Phase 0 establishes the TypeScript project infrastructure. Zero spec-specific lo
 - Create: `src/types/index.ts`
 - Create: `src/types/enums.test.ts`
 
-**Description**: Define all shared TypeScript types, interfaces, and enums extracted from the v2 specification documents. This is the type foundation that every module imports. Key enums: `MethodologyName` (deep/mvp/custom), `DepthLevel` (1-5 branded integer), `PromptSource` (pipeline/extra), `StepStatus` (pending/in_progress/completed/skipped), `ExitCode` (0-5), `OutputMode` (interactive/json/auto). Key interfaces: `ScaffoldConfig`, `PipelineState`, `PromptStateEntry`, `AssembledPrompt`, `DependencyGraph`, `MetaPromptFrontmatter`, `DecisionEntry`, `LockFile`, `PlatformAdapter`. No business logic — pure type definitions with JSDoc comments referencing source specs.
+**Description**: Define all shared TypeScript types, interfaces, and enums extracted from the v2 specification documents. This is the type foundation that every module imports. Key enums: `MethodologyName` (deep/mvp/custom), `DepthLevel` (1-5 branded integer), `PromptSource` (pipeline/extra), `StepStatus` (pending/in_progress/completed/skipped), `ExitCode` (0-5), `OutputMode` (interactive/json/auto). Key interfaces: `ScaffoldConfig`, `PipelineState`, `PromptStateEntry`, `AssembledPrompt`, `DependencyGraph`, `MetaPromptFrontmatter`, `DecisionEntry`, `LockFile`, `PlatformAdapter`. No business logic — pure type definitions with JSDoc comments referencing source specs. **Context management note**: This task creates 15 files but all are pure type definitions (no business logic). Agent should work through reference documents in groups: (1) data schemas for config/state/decisions/lock types, (2) domain models 08+15 for assembly/frontmatter types, (3) domain models 02+03+09 for dependency/state/CLI types. Each type file is 30-80 lines.
 
 **Acceptance Criteria**:
 - [ ] All enums match exact values from specs: MethodologyName = 'deep' | 'mvp' | 'custom'; DepthLevel = 1-5; PromptSource = 'pipeline' | 'extra'; StepStatus = 'pending' | 'in_progress' | 'completed' | 'skipped'; ExitCode = 0-5
@@ -307,7 +317,7 @@ Phase 0 establishes the TypeScript project infrastructure. Zero spec-specific lo
 
 **Implements**: ADR-040 (error handling philosophy), ADR-025 (exit codes), cli-contract (exit codes 0-5), error-messages.md (error code registry)
 **Depends on**: T-001
-**Enables**: T-005, T-007, T-009, T-010, T-016, T-019
+**Enables**: T-004, T-005, T-007, T-009, T-010, T-016, T-019
 
 **Files**:
 - Create: `src/utils/fs.ts`
@@ -416,7 +426,7 @@ Pure data modules with no CLI dependency. Each reads/writes one file format. Hea
 
 **Implements**: Domain 03 (pipeline state machine), state-json-schema, ADR-012 (state file design), ADR-018 (completion detection)
 **Depends on**: T-002, T-003
-**Enables**: T-008, T-015, T-018, T-023, T-029, T-030, T-031, T-033, T-035, T-036, T-037, T-043
+**Enables**: T-008, T-015, T-018, T-023, T-024, T-025, T-026, T-029, T-030, T-031, T-033, T-035, T-036, T-037, T-043
 
 **Files**:
 - Create: `src/state/state-manager.ts`
@@ -490,7 +500,7 @@ Pure data modules with no CLI dependency. Each reads/writes one file format. Hea
 
 **Implements**: Domain 13 (pipeline locking), lock-json-schema, ADR-019, ADR-036
 **Depends on**: T-002, T-003
-**Enables**: T-029, T-030
+**Enables**: T-029, T-030, T-031, T-035
 
 **Files**:
 - Create: `src/state/lock-manager.ts`
@@ -518,7 +528,7 @@ The assembly engine and its dependencies. Tasks T-011 through T-016 can run in p
 
 **Implements**: Domain 02 (dependency resolution), ADR-009 (Kahn's algorithm), ADR-011 (depends-on semantics)
 **Depends on**: T-004
-**Enables**: T-023, T-024, T-034, T-036
+**Enables**: T-023, T-024, T-029, T-034, T-036
 
 **Files**:
 - Create: `src/core/dependency/resolver.ts`
@@ -587,6 +597,7 @@ The assembly engine and its dependencies. Tasks T-011 through T-016 can run in p
 - [ ] `discoverMetaPrompts()` scans pipeline/ and returns list of all available meta-prompts
 - [ ] Validates that filename stem matches frontmatter `name` field
 - [ ] Returns structured body with identifiable sections (purpose, inputs, outputs, quality criteria, scaling)
+- [ ] Returns error for meta-prompt file with invalid or missing frontmatter
 - [ ] All tests pass
 
 ---
@@ -609,6 +620,7 @@ The assembly engine and its dependencies. Tasks T-011 through T-016 can run in p
 - [ ] Reports error when referenced entry doesn't exist (FRONTMATTER_KB_ENTRY_MISSING)
 - [ ] `discoverEntries()` scans knowledge/ and returns list of all available entries
 - [ ] Returns full markdown content (after frontmatter) for each entry
+- [ ] Returns empty map when knowledge/ directory doesn't exist (graceful degradation)
 - [ ] All tests pass
 
 ---
@@ -738,6 +750,7 @@ The command-line interface framework. T-019 can start as soon as T-002 and T-003
 - [ ] Global flags (--format, --auto, --verbose, --root, --force) are parsed and available to handlers
 - [ ] Each command stub handler is callable and returns exit code 0
 - [ ] `scaffold run --format json` sets output mode correctly
+- [ ] Commands registered via file imports from src/cli/commands/ (not inline handlers) to enable parallel implementation
 - [ ] All tests pass
 
 ---
@@ -825,7 +838,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 ### T-023: Implement scaffold status command
 
-**Implements**: Domain 09 (status command), cli-contract (status), cli-output-formats.md (status output)
+**Implements**: Domain 09 (status command), cli-contract (status), cli-output-formats.md (status output), error-messages.md
 **Depends on**: T-021, T-022, T-007, T-011
 **Enables**: T-052
 
@@ -840,16 +853,17 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - [ ] Shows per-phase completion (e.g., "Phase 1 — Product Definition: 2/5 complete")
 - [ ] Lists each step with status icon and description
 - [ ] Shows next eligible steps at bottom
-- [ ] JSON mode returns StatusResult with all fields
-- [ ] Exit code 0 on success
+- [ ] JSON mode returns StatusResult with pipeline, progress, phases, nextEligible fields
+- [ ] Exit code 0 on success, exit code 1 if state.json invalid
+- [ ] Interactive mode uses status icons and colored formatting; auto mode suppresses prompts
 - [ ] All tests pass
 
 ---
 
 ### T-024: Implement scaffold next command
 
-**Implements**: Domain 09 (next command), cli-contract (next), cli-output-formats.md (next output)
-**Depends on**: T-021, T-011
+**Implements**: Domain 09 (next command), cli-contract (next), cli-output-formats.md (next output), error-messages.md
+**Depends on**: T-021, T-011, T-007
 **Enables**: T-052
 
 **Files**:
@@ -862,16 +876,17 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - [ ] Lists eligible steps when dependencies are met
 - [ ] Shows "Pipeline complete" when all steps done/skipped
 - [ ] Shows "Blocked" when remaining steps have unmet dependencies
-- [ ] Each eligible step shows depth level
+- [ ] Each eligible step shows depth level and `scaffold run <step>` command
 - [ ] JSON mode returns NextResult with eligible array
+- [ ] Exit code 0 on success, exit code 1 if state or config invalid
 - [ ] All tests pass
 
 ---
 
 ### T-025: Implement scaffold info command
 
-**Implements**: Domain 09 (info command), cli-contract (info), cli-output-formats.md (info output)
-**Depends on**: T-021, T-013
+**Implements**: Domain 09 (info command), cli-contract (info), cli-output-formats.md (info output), error-messages.md
+**Depends on**: T-021, T-013, T-007
 **Enables**: T-052
 
 **Files**:
@@ -887,14 +902,15 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - [ ] For completed steps: shows timestamp and artifacts
 - [ ] Suggests fuzzy match when step slug not found
 - [ ] JSON mode returns InfoResult
+- [ ] Exit code 0 on success, exit code 1 if step not found
 - [ ] All tests pass
 
 ---
 
 ### T-026: Implement scaffold list command
 
-**Implements**: Domain 09 (list command), cli-contract (list), cli-output-formats.md (list output)
-**Depends on**: T-021, T-006
+**Implements**: Domain 09 (list command), cli-contract (list), cli-output-formats.md (list output), error-messages.md
+**Depends on**: T-021, T-006, T-007
 **Enables**: T-052
 
 **Files**:
@@ -909,13 +925,14 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - [ ] `--platforms` shows registered adapters
 - [ ] Shows enabled/disabled step counts
 - [ ] JSON mode returns ListResult
+- [ ] Exit code 0 on success
 - [ ] All tests pass
 
 ---
 
 ### T-027: Implement scaffold decisions command
 
-**Implements**: Domain 09 (decisions command), cli-contract (decisions)
+**Implements**: Domain 09 (decisions command), cli-contract (decisions), error-messages.md, cli-output-formats.md
 **Depends on**: T-021, T-009
 **Enables**: T-052
 
@@ -932,13 +949,14 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - [ ] Provisional decisions highlighted differently
 - [ ] Shows category badge when present
 - [ ] JSON mode returns DecisionsResult
+- [ ] Exit code 0 on success
 - [ ] All tests pass
 
 ---
 
 ### T-028: Implement scaffold version command
 
-**Implements**: Domain 09 (version command), cli-contract (version)
+**Implements**: Domain 09 (version command), cli-contract (version), cli-output-formats.md, error-messages.md
 **Depends on**: T-021
 **Enables**: T-052
 
@@ -953,14 +971,15 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - [ ] Interactive output: `scaffold v2.0.0`
 - [ ] JSON output: VersionResult with current version
 - [ ] No network requests
+- [ ] Exit code 0 always (no failure mode)
 - [ ] All tests pass
 
 ---
 
 ### T-029: Implement scaffold run command
 
-**Implements**: Domain 09 (run command), Domain 15 (assembly engine), cli-contract (run), cli-output-formats.md (run output)
-**Depends on**: T-017, T-018, T-010, T-008, T-021, T-022
+**Implements**: Domain 09 (run command), Domain 15 (assembly engine), cli-contract (run), cli-output-formats.md (run output), error-messages.md, ADR-048 (update mode), ADR-049 (methodology changeable)
+**Depends on**: T-017, T-018, T-010, T-008, T-011, T-021, T-022
 **Enables**: T-052, T-054
 
 **Files**:
@@ -987,7 +1006,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 ### T-030: Implement scaffold skip command
 
-**Implements**: Domain 09 (skip command), cli-contract (skip)
+**Implements**: Domain 09 (skip command), cli-contract (skip), error-messages.md, cli-output-formats.md
 **Depends on**: T-010, T-007, T-021
 **Enables**: T-052
 
@@ -1004,14 +1023,15 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - [ ] Errors if step already completed
 - [ ] Errors if step slug not found (with fuzzy match suggestion)
 - [ ] JSON output returns SkipResult
+- [ ] Exit code 0 on success, exit code 1 if step not found or already completed, exit code 3 if lock held
 - [ ] All tests pass
 
 ---
 
 ### T-031: Implement scaffold reset command
 
-**Implements**: Domain 09 (reset command), cli-contract (reset)
-**Depends on**: T-007, T-021
+**Implements**: Domain 09 (reset command), cli-contract (reset), error-messages.md, cli-output-formats.md
+**Depends on**: T-007, T-010, T-021
 **Enables**: T-052
 
 **Files**:
@@ -1058,7 +1078,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 ### T-033: Implement init wizard and scaffold init command
 
-**Implements**: Domain 14 (init wizard), cli-contract (init), init-wizard-flow.md, ADR-027
+**Implements**: Domain 14 (init wizard), cli-contract (init), init-wizard-flow.md, ADR-027, error-messages.md, cli-output-formats.md
 **Depends on**: T-032, T-006, T-007, T-021
 **Enables**: T-052
 
@@ -1084,13 +1104,14 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - [ ] `--methodology deep` skips methodology question
 - [ ] Errors on existing .scaffold/ without --force (exit 1)
 - [ ] JSON output returns InitResult
+- [ ] Exit code 0 on success, exit code 1 if .scaffold/ exists without --force
 - [ ] All tests pass
 
 ---
 
 ### T-034: Implement scaffold build command
 
-**Implements**: Domain 09 (build command), Domain 05 (platform adapters), cli-contract (build)
+**Implements**: Domain 09 (build command), Domain 05 (platform adapters), cli-contract (build), error-messages.md, cli-output-formats.md
 **Depends on**: T-011, T-006, T-021
 **Enables**: T-039, T-052
 
@@ -1108,14 +1129,15 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - [ ] `--force` overwrites existing outputs
 - [ ] Build completes within 2s performance budget
 - [ ] JSON output returns BuildResult with file counts
+- [ ] Exit code 0 on success, exit code 1 if config invalid or dependency cycle detected
 - [ ] All tests pass
 
 ---
 
 ### T-035: Implement scaffold adopt command
 
-**Implements**: Domain 07 (brownfield adopt), cli-contract (adopt)
-**Depends on**: T-032, T-007, T-009, T-021
+**Implements**: Domain 07 (brownfield adopt), cli-contract (adopt), error-messages.md, cli-output-formats.md
+**Depends on**: T-032, T-007, T-009, T-010, T-021
 **Enables**: T-052
 
 **Files**:
@@ -1140,7 +1162,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 ### T-036: Implement scaffold validate command
 
-**Implements**: Domain 09 (validate command), cli-contract (validate), ADR-040 (accumulate and report)
+**Implements**: Domain 09 (validate command), cli-contract (validate), ADR-040 (accumulate and report), error-messages.md, cli-output-formats.md
 **Depends on**: T-005, T-007, T-011, T-004, T-021
 **Enables**: T-052
 
@@ -1154,7 +1176,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - Create: `src/validation/index.test.ts`
 - Create: `src/cli/commands/validate.test.ts`
 
-**Description**: Comprehensive validation of all scaffold configuration and state files. Validates: (1) config.yml schema and field values, (2) state.json structure and status values, (3) meta-prompt frontmatter in all pipeline/*.md files, (4) dependency graph (no cycles, no missing targets), (5) methodology preset consistency, (6) cross-file consistency (state references valid steps, decision references valid prompts). Accumulate-and-report pattern (ADR-040): process all files before reporting. Group errors by source file, errors before warnings. `--verbose`: show file-by-file detail with component tags. Exit 0 if valid (warnings OK), exit 1 if errors found.
+**Description**: Comprehensive validation of all scaffold configuration and state files. Validates: (1) config.yml schema and field values, (2) state.json structure and status values, (3) meta-prompt frontmatter in all pipeline/*.md files, (4) dependency graph (no cycles, no missing targets), (5) methodology preset consistency, (6) cross-file consistency (state references valid steps, decision references valid prompts). Accumulate-and-report pattern (ADR-040): process all files before reporting. Group errors by source file, errors before warnings. `--verbose`: show file-by-file detail with component tags. Exit 0 if valid (warnings OK), exit 1 if errors found. Note: validators are internal modules testable independently; the command handler orchestrates them. Agent should implement validators first, then wire into command handler.
 
 **Acceptance Criteria**:
 - [ ] Validates config.yml schema and methodology
@@ -1172,7 +1194,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 ### T-037: Implement scaffold dashboard command
 
-**Implements**: dashboard-spec.md, Domain 09 (dashboard command)
+**Implements**: dashboard-spec.md, Domain 09 (dashboard command), cli-output-formats.md, error-messages.md
 **Depends on**: T-007, T-005, T-009, T-021
 **Enables**: T-052
 
@@ -1196,13 +1218,14 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - [ ] `--no-open` skips browser launch
 - [ ] `--json-only` outputs data as JSON to stdout
 - [ ] Responsive at 768px breakpoint
+- [ ] Exit code 0 on success
 - [ ] All tests pass
 
 ---
 
 ### T-038: Implement scaffold update command
 
-**Implements**: Domain 09 (update command), ADR-002 (distribution), cli-contract (update)
+**Implements**: Domain 09 (update command), ADR-002 (distribution), cli-contract (update), error-messages.md, cli-output-formats.md
 **Depends on**: T-021
 **Enables**: T-052
 
@@ -1218,6 +1241,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - [ ] `--dry-run` shows update info without installing
 - [ ] Default mode checks and installs
 - [ ] JSON output returns UpdateResult
+- [ ] Exit code 0 on success, exit code 1 on network or install failure
 - [ ] All tests pass
 
 ---
@@ -1366,7 +1390,7 @@ Content tasks — meta-prompts, knowledge base files, and methodology presets. T
 
 ### T-045: Author core domain expertise knowledge base files
 
-**Implements**: ADR-042 (knowledge base), ADR-041 (meta-prompt architecture)
+**Implements**: ADR-042 (knowledge base), ADR-041 (meta-prompt architecture), prompts.md (v1 source material)
 **Depends on**: none (content task)
 **Enables**: T-048, T-049, T-050
 
@@ -1397,7 +1421,7 @@ Content tasks — meta-prompts, knowledge base files, and methodology presets. T
 
 ### T-046: Author phase-specific review knowledge base files
 
-**Implements**: ADR-046 (phase-specific review criteria), ADR-042
+**Implements**: ADR-046 (phase-specific review criteria), ADR-042, prompts.md (v1 source material)
 **Depends on**: none (content task)
 **Enables**: T-051
 
@@ -1428,7 +1452,7 @@ Content tasks — meta-prompts, knowledge base files, and methodology presets. T
 
 ### T-047: Author validation and product knowledge base files
 
-**Implements**: ADR-042 (knowledge base categories)
+**Implements**: ADR-042 (knowledge base categories), prompts.md (v1 source material)
 **Depends on**: none (content task)
 **Enables**: T-050
 
@@ -1667,18 +1691,25 @@ The critical path (longest sequential dependency chain) determines minimum calen
 
 ```
 T-001 (scaffold) → T-002 (types) → T-004 (frontmatter) → T-006 (presets)
-→ T-012 (depth resolution) → T-017 (assembly engine) → T-029 (run command)
-→ T-052 (e2e tests) → T-053 (npm packaging)
+→ T-012 (depth resolution) → T-017 (assembly engine) → T-018 (update/change detection)
+→ T-029 (run command) → T-052 (e2e tests) → T-053 (npm packaging)
 ```
 
-**Critical path length**: 9 tasks
-**Estimated critical path duration**: 9 × 3 hours average = ~27 hours of sequential work
+**Critical path length**: 10 tasks
+**Estimated critical path duration**: 10 × 3 hours average = ~30 hours of sequential work
 
-### Non-critical but long chains
+### Near-critical paths (length 9, 1 task shorter)
 
 ```
-T-001 → T-003 → T-007 → T-008 → T-029 (5 tasks — merges at T-029)
-T-001 → T-002 → T-019 → T-020 → T-021 → T-029 (6 tasks — merges at T-029)
+T-001 → T-002 → T-019 → T-020 → T-021 → T-034 → T-039 → T-040 → T-053 (9 tasks — adapter chain)
+T-001 → T-002 → T-004 → T-006 → T-012 → T-017 → T-018 → T-029 → T-054 (9 tasks — migration guide terminal)
+```
+
+### Other long chains
+
+```
+T-001 → T-002 → T-019 → T-020 → T-021 → T-029 (6 tasks — CLI shell merges at T-029)
+T-001 → T-003 → T-007 → T-008 → T-029 (5 tasks — state chain merges at T-029)
 T-045 → T-048 → T-052 (3 tasks — content chain)
 ```
 
