@@ -1,7 +1,7 @@
 # config.yml Schema
 
 **Phase**: 4 — Data Schemas
-**Depends on**: [domain-models/06-config-validation.md](../domain-models/06-config-validation.md), [adrs/ADR-014-config-schema-versioning.md](../adrs/ADR-014-config-schema-versioning.md), [adrs/ADR-033-forward-compatibility-unknown-fields.md](../adrs/ADR-033-forward-compatibility-unknown-fields.md), [architecture/system-architecture.md](../architecture/system-architecture.md) §5
+**Depends on**: [domain-models/06-config-validation.md](../domain-models/06-config-validation.md), [domain-models/16-methodology-depth-resolution.md](../domain-models/16-methodology-depth-resolution.md), [adrs/ADR-014-config-schema-versioning.md](../adrs/ADR-014-config-schema-versioning.md), [adrs/ADR-033-forward-compatibility-unknown-fields.md](../adrs/ADR-033-forward-compatibility-unknown-fields.md), [adrs/ADR-043-depth-scale.md](../adrs/ADR-043-depth-scale.md), [adrs/ADR-047-user-instruction-three-layer-precedence.md](../adrs/ADR-047-user-instruction-three-layer-precedence.md), [adrs/ADR-049-methodology-changeable-mid-pipeline.md](../adrs/ADR-049-methodology-changeable-mid-pipeline.md), [architecture/system-architecture.md](../architecture/system-architecture.md) §5
 **Last updated**: 2026-03-14
 **Status**: draft
 
@@ -523,11 +523,31 @@ unknownField: something        # WARNING: CONFIG_UNKNOWN_FIELD
 
 `config.yml` sits at layer 2 of the three-layer configuration precedence chain:
 
-1. **CLI flags** (highest) — e.g., `--instructions "..."` overrides per-step instructions
+1. **CLI flags** (highest) — e.g., `--instructions "..."` overrides per-step instructions ([ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md))
 2. **`.scaffold/config.yml`** — project-level settings, shared across team
 3. **Methodology preset defaults** (lowest) — fallback values from `methodology/<name>.yml`
 
 When `config.yml` does not specify a value for an optional field, the system falls through to methodology preset defaults. For required fields (`version`, `methodology`, `platforms`), no fallback exists — the field must be present.
+
+### User Instructions Directory
+
+User instructions live outside `config.yml` in a dedicated directory ([ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md)):
+
+- **`.scaffold/instructions/global.md`** — applies to all steps (team-shared, git-committed)
+- **`.scaffold/instructions/<step-name>.md`** — applies to one specific step
+- **`--instructions "..."`** (CLI flag) — applies to current invocation only (ephemeral)
+
+The Assembly Engine loads these at runtime. They are not part of `config.yml` but interact with the config through the depth and methodology settings: the assembled prompt combines config-driven depth/methodology with instruction-driven customization.
+
+### Methodology Changeability
+
+The `methodology` field in `config.yml` can be changed at any time ([ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md)). When `config.yml` methodology differs from `state.json` methodology (the init-time value), the State Manager:
+
+1. Preserves all completed steps (no rollback).
+2. Keeps orphaned state entries for steps no longer in the new methodology.
+3. Adds new steps from the new methodology as `pending`.
+4. Re-resolves pending steps with the new methodology's depth and enablement configuration.
+5. Emits `PSM_METHODOLOGY_MISMATCH` warning.
 
 ### Reset Behavior
 

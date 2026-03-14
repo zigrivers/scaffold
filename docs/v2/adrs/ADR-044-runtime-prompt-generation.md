@@ -28,20 +28,21 @@ The build-time approach from ADR-010 was designed for a system with static promp
 Prompt assembly happens at **runtime** when `scaffold run <step>` is invoked. The CLI performs the following assembly sequence:
 
 1. **Load the meta-prompt** for the requested step (`pipeline/<step>.md`)
-2. **Load knowledge base entries** referenced in the meta-prompt's `knowledge-base` frontmatter field
-3. **Gather project context:**
+2. **Check prerequisites** — verify that all `depends-on` steps are completed in `state.json`, that the step has not already been completed (unless `--force` or update mode), and that no other process holds the step lock
+3. **Load knowledge base entries** referenced in the meta-prompt's `knowledge-base` frontmatter field
+4. **Gather project context:**
    - Completed artifacts (files listed in `produces` fields of completed steps)
    - `.scaffold/config.yml` (methodology, depth, project metadata)
    - `.scaffold/state.json` (pipeline completion status)
    - `.scaffold/decisions.jsonl` (prior architectural decisions)
-4. **Load user instructions** (three layers, in precedence order):
+5. **Load user instructions** (three layers, in precedence order):
    - `.scaffold/instructions/global.md` (persistent, all steps)
    - `.scaffold/instructions/<step>.md` (persistent, this step only)
    - `--instructions` flag value (inline, this invocation only)
-5. **Determine depth level** for this step from methodology preset or custom config
-6. **Construct the assembled prompt** in the fixed-order structure defined by ADR-045
-
-The assembled prompt is then passed to the AI, which generates a working prompt tailored to the project and methodology, and executes it in a single turn.
+6. **Determine depth level** for this step from methodology preset or custom config
+7. **Construct the assembled prompt** in the fixed-order structure defined by ADR-045
+8. **AI generates and executes the working prompt** — the assembled prompt is passed to the AI, which generates a working prompt tailored to the project and methodology and executes it in a single turn
+9. **Update state** — mark the step as completed in `state.json`, record any architectural decisions to `decisions.jsonl`, and display next available steps to the user
 
 **What remains at "build time":** Dependency ordering (computing which steps are available based on completed prerequisites) and command wrapper generation (producing thin `commands/*.md` files for plugin delivery) can still happen at build time or on-demand — these are structural operations that do not depend on project context.
 
@@ -96,6 +97,10 @@ The assembled prompt is then passed to the AI, which generates a working prompt 
 - The `scaffold build` command's role changes from "resolve and compose all prompts" to "generate command wrappers and validate pipeline structure"
 - ADR-010's idempotency guarantee ("same build always produces same output") is preserved at the assembly level — same inputs produce same assembled prompt — but the AI's output from that prompt is non-deterministic (bounded by quality criteria, per ADR-041)
 
+## Reversibility
+
+Reversible with significant effort. Would require reintroducing a build step, accepting stale context in assembled prompts, and redesigning user instructions to be build-time only. The meta-prompt architecture (ADR-041) assumes runtime assembly, so reversal here would cascade to ADR-045 and domain 15.
+
 ## Constraints and Compliance
 
 - Prompt assembly MUST happen at runtime when `scaffold run <step>` is invoked — not at build time
@@ -113,3 +118,4 @@ The assembled prompt is then passed to the AI, which generates a working prompt 
 - [ADR-045](ADR-045-assembled-prompt-structure.md) — Structure of the assembled prompt produced by runtime assembly
 - [ADR-012](ADR-012-state-file-design.md) — State file that tracks step completion, used to determine available context
 - [ADR-018](ADR-018-completion-detection-crash-recovery.md) — Completion detection used to identify available artifacts for context gathering
+- Domain 15 ([15-assembly-engine.md](../domain-models/15-assembly-engine.md)) — Assembly engine domain model defining the full 9-step execution sequence

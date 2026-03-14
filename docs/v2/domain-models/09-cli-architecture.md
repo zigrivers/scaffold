@@ -1166,6 +1166,8 @@ The CLI orchestrates nearly every other domain. This section maps which subsyste
 | `version` | | | | | | | | | | | | |
 | `update` | | | | | | | | | | | | |
 
+**Note:** Domain 16 (Methodology & Depth Resolution) is consumed by multiple commands: `scaffold list` shows enablement status and depth for each step, `scaffold info <step>` shows effective configuration with provenance, `scaffold next` filters eligible steps to only enabled steps, `scaffold status` shows depth alongside completion status, and `scaffold run` queries domain 16 for step enablement and effective depth before assembly.
+
 **Legend:** R = reads from domain, W = writes/mutates via domain
 
 ### 7.2 External Dependencies

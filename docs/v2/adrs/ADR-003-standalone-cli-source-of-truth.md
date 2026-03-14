@@ -10,6 +10,8 @@
 
 ## Context
 
+> **Architecture update:** This ADR predates the meta-prompt architecture (ADR-041). References to domain 01 (prompt resolution) and domain 12 (mixin injection) below reflect the original v2 design — both domains are now retired. The core data flow has been updated by ADR-044 (runtime assembly) and domain 15 (assembly engine). The principle — standalone CLI as source of truth — remains fully valid.
+
 Scaffold v2 targets multiple AI platforms: Claude Code (via plugin), Codex (via generated instruction files), and a universal markdown adapter for any other AI tool. Core logic includes prompt resolution (domain 01), dependency resolution (domain 02), pipeline state management (domain 03), mixin injection (domain 12), config validation (domain 06), and the init wizard (domain 14). This logic must produce consistent results regardless of which platform consumes the output.
 
 The architectural question is: where does this core logic live? Options include embedding it in each platform's native extension format, building a shared library consumed by platform-specific frontends, or centralizing everything in a standalone CLI that platform integrations simply wrap.
@@ -21,18 +23,19 @@ In v1, scaffold is a Claude Code plugin with command files — tightly coupled t
 The standalone `scaffold` CLI contains **all** core business logic. Platform integrations (Claude Code plugin, Codex instruction generator, universal markdown adapter) are **thin wrappers** that format the CLI's output for their respective platforms. They contain no business logic of their own.
 
 The data flow is:
-1. User runs `scaffold build` (or `scaffold build --platform claude-code`)
-2. CLI executes prompt resolution, mixin injection, dependency ordering, and produces an `InjectionPipelineResult` (domain 05) — a fully-resolved, mixin-injected set of prompts with metadata
-3. Platform adapter receives this result and transforms it into platform-specific output format (Claude Code command files, Codex instruction markdown files, universal markdown files)
-4. The adapter's transformation is purely structural (reformatting, adding platform-specific frontmatter/navigation) — it never modifies prompt content semantics
+1. User runs `scaffold run <step>` (or a platform wrapper that invokes it)
+2. CLI assembly engine loads meta-prompt, checks prerequisites, gathers knowledge base + project context + user instructions, determines depth, and constructs a 7-section assembled prompt (ADR-045, domain 15)
+3. AI generates a working prompt from the assembled prompt and executes it in a single turn
+4. CLI updates pipeline state (domain 03)
+5. For platform delivery: `scaffold build` generates thin command wrappers that invoke `scaffold run` — adapters contain no business logic
 
 ## Rationale
 
 - **Single codebase to maintain and test**: All prompt resolution, mixin injection, dependency ordering, config validation, and state management logic exists in exactly one place. Bug fixes and feature additions propagate to all platforms automatically.
-- **Platform adapters become trivially simple**: Each adapter is a format translator — it takes the `InjectionPipelineResult` (which contains fully-injected prompt content, resolved metadata, and dependency ordering) and writes it to the platform's expected file structure. Domain 05, Section 2 defines the adapter interface as a single `generate()` method that receives the pipeline result and writes output files.
+- **Platform adapters become trivially simple**: Each adapter is a format translator — it takes the `assembled prompt` (which contains fully-injected prompt content, resolved metadata, and dependency ordering) and writes it to the platform's expected file structure. Domain 05, Section 2 defines the adapter interface as a single `generate()` method that receives the pipeline result and writes output files.
 - **New platforms without touching core logic**: When a new AI tool emerges, adding support requires only a new adapter implementing the `PlatformAdapter` interface (domain 05, Section 2). No changes to resolution, injection, or state management.
 - **Universal fallback**: Users can always run `scaffold` directly from their terminal, regardless of platform. If a platform integration breaks or a platform is unsupported, the universal markdown adapter provides a working escape hatch.
-- **Testability**: Core logic can be tested independently of any platform. Platform adapters can be tested with mock `InjectionPipelineResult` inputs, verifying only the format transformation.
+- **Testability**: Core logic can be tested independently of any platform. Platform adapters can be tested with mock `assembled prompt` inputs, verifying only the format transformation.
 
 ## Alternatives Considered
 
@@ -72,17 +75,17 @@ The data flow is:
 
 ## Constraints and Compliance
 
-- All business logic MUST live in the CLI — prompt resolution, mixin injection, dependency resolution, config validation, state management, and the init wizard are CLI responsibilities
-- Platform adapters may ONLY format output received from the CLI's `InjectionPipelineResult` — they MUST NOT implement custom resolution, injection, or validation logic
-- Adapters receive `InjectionPipelineResult` (fully-injected prompts + resolved metadata + dependency ordering) from the CLI pipeline and transform it into platform-specific file structures
+- All business logic MUST live in the CLI — prompt assembly, dependency resolution, config validation, state management, methodology resolution, and the init wizard are CLI responsibilities
+- Platform adapters may ONLY format output received from the CLI's `assembled prompt` — they MUST NOT implement custom resolution, injection, or validation logic
+- Adapters receive `assembled prompt` (fully-injected prompts + resolved metadata + dependency ordering) from the CLI pipeline and transform it into platform-specific file structures
 - No inter-adapter communication — adapters run independently and do not share state or call each other (domain 05, Section 7)
 - The universal markdown adapter MUST always be generated alongside any platform-specific adapter, providing a fallback for unsupported platforms
-- See domain 05 ([05-platform-adapters.md](../domain-models/05-platform-adapters.md)) for the `PlatformAdapter` interface, `InjectionPipelineResult` type, and adapter implementation constraints
+- See domain 05 ([05-platform-adapters.md](../domain-models/05-platform-adapters.md)) for the `PlatformAdapter` interface, `assembled prompt` type, and adapter implementation constraints
 
 ## Related Decisions
 
 - [ADR-001](ADR-001-cli-implementation-language.md) — Node.js as implementation language for the CLI
 - [ADR-002](ADR-002-distribution-strategy.md) — npm/Homebrew distribution of the CLI package
 - [ADR-022](ADR-022-three-platform-adapters.md) — Three platform adapters (Claude Code, Codex, Universal)
-- Domain 05 ([05-platform-adapters.md](../domain-models/05-platform-adapters.md)) — Platform adapter architecture and InjectionPipelineResult contract
+- Domain 05 ([05-platform-adapters.md](../domain-models/05-platform-adapters.md)) — Platform adapter architecture and assembled prompt contract
 - Domain 09 ([09-cli-architecture.md](../domain-models/09-cli-architecture.md)) — CLI command architecture that hosts all business logic

@@ -1,7 +1,7 @@
 # Meta-Prompt Frontmatter Schema
 
 **Phase**: 4 — Data Schemas
-**Depends on**: [domain-models/08-prompt-frontmatter.md](../domain-models/08-prompt-frontmatter.md), [architecture/system-architecture.md](../architecture/system-architecture.md) §4a
+**Depends on**: [domain-models/08-prompt-frontmatter.md](../domain-models/08-prompt-frontmatter.md), [domain-models/15-assembly-engine.md](../domain-models/15-assembly-engine.md), [adrs/ADR-041-meta-prompt-architecture.md](../adrs/ADR-041-meta-prompt-architecture.md), [adrs/ADR-044-runtime-prompt-generation.md](../adrs/ADR-044-runtime-prompt-generation.md), [adrs/ADR-045-assembled-prompt-structure.md](../adrs/ADR-045-assembled-prompt-structure.md), [architecture/system-architecture.md](../architecture/system-architecture.md) §4a
 **Last updated**: 2026-03-14
 **Status**: draft
 

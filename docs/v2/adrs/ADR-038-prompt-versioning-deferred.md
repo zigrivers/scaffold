@@ -3,7 +3,7 @@
 **Status**: accepted (deferred — Scope & Deferral)
 **Date**: 2026-03-13
 **Deciders**: v2 spec, domain modeling phase 1
-**Domain(s)**: 01, 05
+**Domain(s)**: 08, 15
 **Phase**: 2 — Architecture Decision Records
 
 ---

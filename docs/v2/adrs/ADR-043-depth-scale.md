@@ -118,3 +118,4 @@ custom:
 - [ADR-041](ADR-041-meta-prompt-architecture.md) — Meta-prompt architecture that depth scaling operates within
 - [ADR-004](ADR-004-methodology-as-top-level-organizer.md) — Methodology as top-level organizer (principle preserved, mechanism amended by this ADR)
 - [ADR-014](ADR-014-config-schema-versioning.md) — Config schema that carries methodology and depth settings
+- Domain 16 ([16-methodology-depth-resolution.md](../domain-models/16-methodology-depth-resolution.md)) — Resolution logic for depth precedence (preset default < custom default < per-step override)

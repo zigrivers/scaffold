@@ -131,7 +131,9 @@ graph TB
     %% ── Assembly Engine ──
     CL["Config Loader<br/>─────────<br/>Reads config.yml<br/>Schema validation<br/>Fuzzy error suggestions<br/>Migration support<br/>─────────<br/>Domain 06<br/>ADR-014, ADR-033"]
 
-    AE["Assembly Engine<br/>─────────<br/>Loads meta-prompt<br/>Loads knowledge base<br/>Gathers project context<br/>Loads user instructions<br/>Determines depth<br/>Constructs 7-section prompt<br/>─────────<br/>ADR-041, ADR-045"]
+    AE["Assembly Engine<br/>─────────<br/>Loads meta-prompt<br/>Loads knowledge base<br/>Gathers project context<br/>Loads user instructions<br/>Determines depth<br/>Constructs 7-section prompt<br/>Detects update mode<br/>─────────<br/>Domain 15<br/>ADR-041, ADR-044, ADR-045<br/>ADR-047, ADR-048"]
+
+    MR["Methodology &amp; Depth<br/>Resolver<br/>─────────<br/>Preset default resolution<br/>Per-step depth override<br/>Step enablement<br/>Methodology change detection<br/>─────────<br/>Domain 16<br/>ADR-043, ADR-049"]
 
     DR["Dependency Resolver<br/>─────────<br/>Kahn's algorithm<br/>Phase tiebreaker<br/>Cycle detection<br/>Eligibility computation<br/>─────────<br/>Domain 02<br/>ADR-009, ADR-011"]
 
@@ -143,7 +145,7 @@ graph TB
     DL["Decision Logger<br/>─────────<br/>decisions.jsonl<br/>Append-only writes<br/>Latest-per-step query<br/>─────────<br/>Domain 11<br/>ADR-013"]
 
     %% ── Project Services ──
-    FP["Frontmatter Parser<br/>─────────<br/>YAML extraction<br/>Section targeting<br/>Artifact schema defs<br/>─────────<br/>Domain 08<br/>ADR-015, ADR-029"]
+    FP["Frontmatter Parser<br/>─────────<br/>YAML extraction<br/>Meta-prompt metadata<br/>Artifact schema defs<br/>─────────<br/>Domain 08<br/>ADR-045, ADR-029"]
 
     CM["CLAUDE.md Manager<br/>─────────<br/>Section registry<br/>Fill/replace algorithm<br/>Token budget tracking<br/>─────────<br/>Domain 10<br/>ADR-026"]
 
@@ -158,6 +160,7 @@ graph TB
     %% ── Assembly Engine Flow ──
     CLI -->|"run cmd"| CL
     CL --> AE
+    AE --> MR
     AE --> DR
 
     %% ── Runtime Flow ──
@@ -171,12 +174,14 @@ graph TB
 
     %% ── Internal Dependencies ──
     AE --> FP
+    MR --> CL
     SM --> FP
     PD --> FP
     IW --> PD
     IW --> CL
     VL --> CL
     VL --> DR
+    VL --> MR
     SM --> LM
     DG --> SM
     DG --> CL
@@ -189,7 +194,8 @@ graph TB
 | Component | Reads | Writes |
 |-----------|-------|--------|
 | Config Loader | `.scaffold/config.yml` | — |
-| Assembly Engine | `pipeline/<step>.md`, `knowledge/*.md`, `methodology/*.yml`, `.scaffold/instructions/*.md`, `.scaffold/config.yml`, `.scaffold/state.json`, `.scaffold/decisions.jsonl`, prior artifacts | — (assembled prompt is passed to AI) |
+| Assembly Engine | `pipeline/<step>.md`, `knowledge/*.md`, `.scaffold/instructions/*.md`, `.scaffold/config.yml`, `.scaffold/state.json`, `.scaffold/decisions.jsonl`, prior artifacts | — (assembled prompt is passed to AI) |
+| Methodology & Depth Resolver | `.scaffold/config.yml` (methodology, depth, custom overrides) | — |
 | Dependency Resolver | (in-memory: meta-prompt frontmatter dependencies) | — |
 | State Manager | `.scaffold/state.json` | `.scaffold/state.json` (atomic via temp+rename) |
 | Lock Manager | `.scaffold/lock.json` | `.scaffold/lock.json` |
@@ -207,7 +213,8 @@ graph TB
 |-----------|-----------|----------|--------------|
 | CLI Shell | All components (orchestrates) | User / AI agent | — |
 | Config Loader | Frontmatter Parser | CLI Shell (`run`, `validate`, `init`), Init Wizard, Validator, Dashboard Generator | `.scaffold/config.yml` |
-| Assembly Engine | Config Loader, Frontmatter Parser, Dependency Resolver | CLI Shell (`run`) | — |
+| Assembly Engine | Config Loader, Frontmatter Parser, Dependency Resolver, Methodology & Depth Resolver | CLI Shell (`run`) | — |
+| Methodology & Depth Resolver | Config Loader | Assembly Engine, Validator, CLI Shell (`build`) | — |
 | Dependency Resolver | (receives meta-prompt frontmatter in-memory) | Assembly Engine, Validator, State Manager (for eligibility) | — |
 | State Manager | Lock Manager, Frontmatter Parser (for `produces` fields) | CLI Shell (`run`, `next`, `status`, `skip`, `reset`), Dashboard Generator | `.scaffold/state.json` |
 | Lock Manager | — | State Manager (acquires before mutation), CLI Shell (`run`) | `.scaffold/lock.json` |
@@ -338,7 +345,8 @@ src/
 
 | Domain | Module(s) | Primary File(s) | Types File | Estimated Complexity |
 |--------|----------|-----------------|------------|---------------------|
-| Assembly Engine | `src/core/assembly/` | `engine.ts`, `meta-prompt-loader.ts`, `knowledge-loader.ts`, `context-gatherer.ts`, `instruction-loader.ts`, `depth-resolver.ts` | `src/types/assembly.ts` | Medium — 7-section prompt construction from meta-prompts + knowledge + context |
+| 15 — Assembly Engine | `src/core/assembly/` | `engine.ts`, `meta-prompt-loader.ts`, `knowledge-loader.ts`, `context-gatherer.ts`, `instruction-loader.ts`, `depth-resolver.ts` | `src/types/assembly.ts` | Medium — 9-step assembly sequence, 7-section prompt construction from meta-prompts + knowledge + context + instructions |
+| 16 — Methodology & Depth Resolution | `src/core/assembly/` | `depth-resolver.ts`, `methodology-resolver.ts` | `src/types/assembly.ts` | Medium — 3-level depth precedence, step enablement, methodology change detection |
 | 02 — Dependency Resolution | `src/core/dependency/` | `dependency.ts`, `graph.ts`, `eligibility.ts` | `src/types/dependency.ts` | Medium — Kahn's algorithm + cycle detection |
 | 03 — Pipeline State Machine | `src/state/` | `state-manager.ts`, `context.ts`, `completion.ts` | `src/types/state.ts` | High — state transitions, crash recovery, dual detection |
 | 06 — Config & Validation | `src/config/`, `src/validation/` | `loader.ts`, `schema.ts`, `migration.ts`, `*-validator.ts` | `src/types/config.ts` | Medium — schema validation + migration + fuzzy matching |
@@ -356,6 +364,7 @@ src/
 - Domain 03 session context assembly lives in `src/state/context.ts`, separate from `state-manager.ts` because it is a read-only aggregation concern — it reads `state.json`, `decisions.jsonl`, and predecessor artifacts to produce the run bootstrap summary — whereas `state-manager.ts` handles state mutations.
 - Domain 06 validation logic is split across `src/config/` (config loading and migration) and `src/validation/` (cross-cutting validation). The `scaffold validate` CLI command (`src/cli/commands/validate.ts`) delegates to `src/validation/index.ts`, which orchestrates all validators. Config-level validation during `scaffold run` uses `src/config/loader.ts` directly.
 - The Validator component spans multiple domains — it orchestrates validation calls via `src/validation/index.ts`, which composes config, meta-prompt, frontmatter, artifact, and state validators. The `scaffold validate` command handler (`src/cli/commands/validate.ts`) invokes this orchestrator.
+- Domain 16 (Methodology & Depth Resolution) shares `src/core/assembly/` with Domain 15. `depth-resolver.ts` handles the three-level depth precedence; `methodology-resolver.ts` handles step enablement and methodology change detection. Both are consumed by the assembly engine during step 6 of the 9-step sequence.
 - Dashboard Generator has no dedicated domain model; it lives in `src/dashboard/generator.ts` as a utility that reads state and config.
 
 ### Section 3c: Content Directory Structure
@@ -439,45 +448,38 @@ content/
 
 **Content directory conventions:**
 
-- Every `.md` file in `base/` and methodology subdirectories has YAML frontmatter conforming to the Prompt Frontmatter Schema ([domain 08](../domain-models/08-prompt-frontmatter.md), [ADR-015](../adrs/ADR-015-prompt-frontmatter-schema.md)).
-- Mixin files under `mixins/<axis>/` contain markdown content fragments — no frontmatter. They are injected verbatim at marker positions.
-- Methodology manifests (`manifest.yml`) conform to the Methodology Manifest Format ([ADR-016](../adrs/ADR-016-methodology-manifest-format.md)).
-- Optional prompts in manifests declare their `requires` condition (e.g., `optional: { requires: frontend }`). The condition is evaluated against `config.yml`'s `project` section during prompt resolution.
-- The `adapters/codex/tool-map.yml` contains phrase-level patterns matched longest-first to avoid partial replacements ([ADR-023](../adrs/ADR-023-phrase-level-tool-mapping.md)).
+> **Architecture note:** The meta-prompt architecture ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)) transformed the content structure. The `base/` directory now contains **meta-prompts** (compact intent declarations with frontmatter) rather than fully-assembled prompts. The `mixins/` directory is retained for backward-compatible reference but mixin injection at build time is superseded — methodology-specific content is now expressed through depth scaling in meta-prompt frontmatter. The `knowledge/` directory (not shown above) contains domain expertise files loaded by the assembly engine at runtime.
+
+- Every `.md` file in `base/` and methodology subdirectories has YAML frontmatter conforming to the Meta-Prompt Frontmatter Schema ([domain 08](../domain-models/08-prompt-frontmatter.md), [ADR-045](../adrs/ADR-045-assembled-prompt-structure.md)).
+- Methodology presets define which steps are active and at what depth level ([ADR-043](../adrs/ADR-043-depth-scale.md)).
+- Optional steps in methodology presets declare their `requires` condition (e.g., `optional: { requires: frontend }`). The condition is evaluated against `config.yml`'s `project` section during step resolution.
 
 ---
 
 ## Section 4: Data Flow Diagrams
 
-Three critical data paths collectively exercise every component in the system. The **assembly engine** (4a) is the core runtime component — constructing tailored prompts from meta-prompts, knowledge base, project context, and user instructions. The **run flow** (4b) handles runtime state tracking, crash recovery, and the agent execution boundary. The **init flow** (4c) bootstraps new projects. The coverage table (4d) verifies every component from Section 2 appears in at least one path.
+Three critical data paths collectively exercise every component in the system. The **build pipeline** (4a) generates thin platform command wrappers from meta-prompt metadata. The **run flow** (4b) is the core runtime path — assembling tailored prompts, executing them via AI agents, and tracking state. The **init flow** (4c) bootstraps new projects. The coverage table (4d) verifies every component from Section 2 appears in at least one path.
 
 ### Section 4a: Build Pipeline (`scaffold build`)
 
-The deterministic transformation from `config.yml` + prompt library to platform-specific output files ([ADR-010](../adrs/ADR-010-build-time-resolution.md)). This is the most component-dense path, exercising 10 of the system's 17 components.
+> **Architecture note:** The meta-prompt architecture ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)) replaced the original build-time resolution and mixin injection pipeline. `scaffold build` no longer resolves prompts, injects mixins, or produces fully-assembled prompt content. That work happens at runtime via the assembly engine (`scaffold run` — see Section 4b). `scaffold build` now generates thin platform command wrappers — files that invoke `scaffold run <step>` — from meta-prompt metadata (frontmatter fields like `description`, `phase`, `depends-on`, `produces`).
+
+The deterministic transformation from `config.yml` + meta-prompt metadata to platform-specific wrapper files. This is a lightweight text transformation exercising 6 components.
 
 ```mermaid
 flowchart TD
     A["scaffold build<br/>(CLI Shell)"] --> B["Read + validate<br/>.scaffold/config.yml<br/>(Config Loader)"]
     B -->|"invalid"| ERR1["Exit 1<br/>CONFIG_*"]
-    B -->|"valid"| C["Load methodology<br/>manifest.yml<br/>(Prompt Resolver)"]
-    C --> D["Flatten prompt refs<br/>from manifest phases<br/>(Prompt Resolver)"]
-    D --> E["Evaluate optional prompt<br/>conditions vs project traits<br/>(Prompt Resolver)"]
-    E --> F["Exclude unmet<br/>optional prompts<br/>(Prompt Resolver)"]
-    F --> G["Resolve each prompt:<br/>project > user > built-in<br/>(Prompt Resolver)"]
-    G --> H["Parse + merge frontmatter<br/>per prompt — union deps<br/>(Frontmatter Parser)"]
-    H --> I["Integrate extra-prompts<br/>from config<br/>(Prompt Resolver)"]
-    I --> J["Per prompt — Pass 1:<br/>Replace axis markers<br/>(Mixin Injector)"]
-    J --> K["Per prompt — Pass 2:<br/>Replace task verb markers<br/>(Mixin Injector)"]
-    K --> L{"Unresolved<br/>markers?"}
-    L -->|"yes"| ERR5["Exit 5<br/>INJ_UNRESOLVED_*"]
-    L -->|"no"| M["Merge dependencies:<br/>manifest + frontmatter union<br/>(Dependency Resolver)"]
-    M --> N["Topological sort:<br/>Kahn's + phase tiebreaker<br/>(Dependency Resolver)"]
-    N -->|"cycle"| ERR1B["Exit 1<br/>DEP_CYCLE_DETECTED"]
-    N -->|"sorted"| O["Sorted prompt list<br/>+ parallel sets"]
-    O --> P["Generate commands/*.md<br/>+ CLAUDE.md sections<br/>(Claude Code Adapter)"]
-    O --> Q["Generate AGENTS.md +<br/>codex-prompts/*.md<br/>(Codex Adapter)"]
-    O --> R["Generate prompts/*.md +<br/>scaffold-pipeline.md<br/>(Universal Adapter)"]
-    P & Q & R --> S["Print build summary<br/>(CLI Shell)"]
+    B -->|"valid"| C["Scan pipeline/*.md<br/>meta-prompts<br/>(Frontmatter Parser)"]
+    C --> D["Resolve methodology<br/>step enablement + depth<br/>(Methodology Resolver)"]
+    D --> E["Filter optional steps<br/>vs project traits"]
+    E --> F["Topological sort:<br/>Kahn's + phase tiebreaker<br/>(Dependency Resolver)"]
+    F -->|"cycle"| ERR1B["Exit 1<br/>DEP_CYCLE_DETECTED"]
+    F -->|"sorted"| G["Sorted step list<br/>+ parallel sets"]
+    G --> H["Generate commands/*.md<br/>wrappers + CLAUDE.md sections<br/>(Claude Code Adapter)"]
+    G --> I["Generate AGENTS.md +<br/>codex-prompts/*.md wrappers<br/>(Codex Adapter)"]
+    G --> J["Generate prompts/*.md +<br/>scaffold-pipeline.md<br/>(Universal Adapter)"]
+    H & I & J --> K["Print build summary<br/>(CLI Shell)"]
 ```
 
 **Step annotations:**
@@ -485,29 +487,23 @@ flowchart TD
 | Step | Component | Reads | Writes | ADR(s) | Error Conditions |
 |------|-----------|-------|--------|--------|------------------|
 | Validate config | Config Loader | `.scaffold/config.yml` | — | [ADR-014](../adrs/ADR-014-config-schema-versioning.md), [ADR-033](../adrs/ADR-033-forward-compatibility-unknown-fields.md) | `CONFIG_PARSE_ERROR`, `CONFIG_UNKNOWN_FIELD` → exit 1 |
-| Load manifest | Prompt Resolver | `content/methodologies/<m>/manifest.yml` | — | [ADR-016](../adrs/ADR-016-methodology-manifest-format.md) | Manifest file missing → exit 1 |
-| Filter optionals | Prompt Resolver | — (config `project` traits in memory) | — | [ADR-020](../adrs/ADR-020-skip-vs-exclude-semantics.md) | Invalid trait reference → exit 1 |
-| 3-layer resolution | Prompt Resolver | `.scaffold/prompts/*.md`, `~/.scaffold/prompts/*.md`, `content/base/*.md`, methodology `overrides/*.md` and `extensions/*.md` | — | [ADR-005](../adrs/ADR-005-three-layer-prompt-resolution.md) | `RESOLUTION_FILE_MISSING`, `RESOLUTION_CUSTOMIZATION_NO_BUILTIN` → exit 1 |
-| Parse frontmatter | Frontmatter Parser | (already-loaded `.md` content) | — | [ADR-015](../adrs/ADR-015-prompt-frontmatter-schema.md), [ADR-011](../adrs/ADR-011-depends-on-union-semantics.md) | Invalid YAML, type mismatches → exit 1 |
-| Extra-prompts | Prompt Resolver | `.scaffold/prompts/<name>.md`, `~/.scaffold/prompts/<name>.md` | — | [ADR-005](../adrs/ADR-005-three-layer-prompt-resolution.md) | `RESOLUTION_DUPLICATE_SLUG` → exit 1 |
-| Pass 1: axis markers | Mixin Injector | `content/mixins/<axis>/<value>.md` | — | [ADR-006](../adrs/ADR-006-mixin-injection-over-templating.md), [ADR-007](../adrs/ADR-007-mixin-markers-subsection-targeting.md) | Missing mixin file → exit 5 |
-| Pass 2: task verbs | Mixin Injector | (verb registry from task-tracking mixin) | — | [ADR-008](../adrs/ADR-008-abstract-task-verbs.md), [ADR-037](../adrs/ADR-037-task-verb-global-scope.md) | Unknown verb → exit 5 |
-| Unresolved check | Mixin Injector | — | — | [ADR-035](../adrs/ADR-035-non-recursive-injection.md) | `INJ_UNRESOLVED_AXIS_MARKER`, `INJ_UNRESOLVED_VERB_MARKER` → exit 5 |
-| Merge deps | Dependency Resolver | — (in-memory frontmatter + manifest edges) | — | [ADR-011](../adrs/ADR-011-depends-on-union-semantics.md) | Dependency target missing → exit 1 |
-| Kahn's sort | Dependency Resolver | — | — | [ADR-009](../adrs/ADR-009-kahns-algorithm-dependency-resolution.md) | `DEP_CYCLE_DETECTED` → exit 1 |
-| Claude Code output | Claude Code Adapter | — | `commands/*.md`, CLAUDE.md sections (via CLAUDE.md Manager) | [ADR-022](../adrs/ADR-022-three-platform-adapters.md), [ADR-026](../adrs/ADR-026-claude-md-section-registry.md) | Write failure → exit 5 |
-| Codex output | Codex Adapter | `content/adapters/codex/tool-map.yml` | `AGENTS.md`, `codex-prompts/*.md` | [ADR-022](../adrs/ADR-022-three-platform-adapters.md), [ADR-023](../adrs/ADR-023-phrase-level-tool-mapping.md) | Write failure → exit 5 |
+| Scan meta-prompts | Frontmatter Parser | `pipeline/*.md` (frontmatter only — description, phase, depends-on, produces, optional) | — | [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md), [ADR-045](../adrs/ADR-045-assembled-prompt-structure.md) | Missing or invalid frontmatter → exit 1 |
+| Resolve methodology | Methodology Resolver | Methodology preset config, custom overrides | — | [ADR-043](../adrs/ADR-043-depth-scale.md) | Invalid methodology → exit 1 |
+| Filter optionals | Methodology Resolver | — (config `project` traits in memory) | — | [ADR-020](../adrs/ADR-020-skip-vs-exclude-semantics.md) | Invalid trait reference → exit 1 |
+| Kahn's sort | Dependency Resolver | — (in-memory frontmatter dependencies) | — | [ADR-009](../adrs/ADR-009-kahns-algorithm-dependency-resolution.md), [ADR-011](../adrs/ADR-011-depends-on-union-semantics.md) | `DEP_CYCLE_DETECTED` → exit 1 |
+| Claude Code output | Claude Code Adapter | — | `commands/*.md` (wrappers), CLAUDE.md sections (via CLAUDE.md Manager) | [ADR-022](../adrs/ADR-022-three-platform-adapters.md), [ADR-026](../adrs/ADR-026-claude-md-section-registry.md) | Write failure → exit 5 |
+| Codex output | Codex Adapter | — | `AGENTS.md`, `codex-prompts/*.md` (wrappers) | [ADR-022](../adrs/ADR-022-three-platform-adapters.md) | Write failure → exit 5 |
 | Universal output | Universal Adapter | `content/adapters/universal/pipeline-template.md` | `prompts/*.md`, `scaffold-pipeline.md` | [ADR-022](../adrs/ADR-022-three-platform-adapters.md) | Write failure → exit 5 |
 
 **Walkthrough — non-obvious behaviors:**
 
-**Two-pass injection ordering.** Axis markers are replaced before task verb markers because mixin content may itself contain task verb markers (e.g., a `task-tracking/beads.md` mixin introduces `<!-- scaffold:task-create -->` markers). The reverse order would miss these injected verb markers. After Pass 1 injects mixin content, Pass 2 rescans the entire prompt — including newly-injected content — for verb markers. This is the only "expansion" that occurs; the process is non-recursive ([ADR-035](../adrs/ADR-035-non-recursive-injection.md)). Content injected during Pass 2 is never re-scanned for additional markers.
+**Build produces wrappers, not prompts.** The wrapper files generated by `scaffold build` are thin shell invocations (e.g., a `commands/create-prd.md` file with YAML frontmatter pointing to `scaffold run create-prd`). The actual prompt content is assembled at runtime by the assembly engine (Section 4b). This separation means build output can be regenerated cheaply and doesn't contain methodology-specific or depth-specific content — that's determined at run time based on current config ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md), [ADR-044](../adrs/ADR-044-runtime-prompt-generation.md)).
 
-**Universal adapter always runs.** Regardless of the `platforms` configuration, the Universal adapter generates output ([ADR-022](../adrs/ADR-022-three-platform-adapters.md)). This ensures every project has a platform-agnostic escape hatch — plain markdown prompts that work with any AI tool, current or future. The Claude Code and Codex adapters only run if their platform is listed in `config.yml`.
+**Universal adapter always runs.** Regardless of the `platforms` configuration, the Universal adapter generates output ([ADR-022](../adrs/ADR-022-three-platform-adapters.md)). This ensures every project has a platform-agnostic escape hatch — plain markdown references that work with any AI tool, current or future. The Claude Code and Codex adapters only run if their platform is listed in `config.yml`.
 
-**Optional prompt exclusion and the dependency graph.** When optional prompts are excluded (their `requires` condition is unmet), they are removed from the resolved prompt set entirely — they never enter the dependency graph ([ADR-020](../adrs/ADR-020-skip-vs-exclude-semantics.md)). Any dependency edges pointing to excluded prompts are silently removed. This means the dependency graph can have different shapes for different project configurations. A project without `frontend: true` will never see `design-system` in its graph, and prompts that depend on `design-system` lose that dependency edge. This is safe because excluded prompts produce no artifacts, so no downstream prompt could meaningfully depend on their output.
+**Optional step exclusion and the dependency graph.** When optional steps are excluded (their `requires` condition is unmet), they are removed from the step set entirely — they never enter the dependency graph ([ADR-020](../adrs/ADR-020-skip-vs-exclude-semantics.md)). Any dependency edges pointing to excluded steps are silently removed. This means the dependency graph can have different shapes for different project configurations.
 
-**Build is deterministic and idempotent.** Given identical `config.yml`, prompt files, and mixin files, `scaffold build` always produces identical output ([ADR-010](../adrs/ADR-010-build-time-resolution.md)). It regenerates everything from scratch — there is no incremental build. This simplicity is a deliberate choice: the full build is fast enough (text transformation, not compilation) that incremental complexity isn't justified.
+**Build is deterministic and idempotent.** Given identical `config.yml` and meta-prompt files, `scaffold build` always produces identical wrapper output. It regenerates everything from scratch — there is no incremental build. The full build is fast (metadata extraction + text generation, not prompt assembly) and completes well under the 500ms performance target ([ADR-001](../adrs/ADR-001-cli-implementation-language.md)).
 
 ---
 
@@ -677,7 +673,7 @@ flowchart TD
 | Init state | State Manager | — | `.scaffold/state.json` | [ADR-012](../adrs/ADR-012-state-file-design.md) | — |
 | Pre-complete (v1) | State Manager | V1 artifact files | `.scaffold/state.json` | [ADR-028](../adrs/ADR-028-detection-priority.md) | Artifact verification failure → warning |
 | Create decisions | Init Wizard | — | `.scaffold/decisions.jsonl` (empty) | [ADR-013](../adrs/ADR-013-decision-log-jsonl-format.md) | — |
-| Auto-build | Build Pipeline | (full build — see 4a) | (full build — see 4a) | [ADR-010](../adrs/ADR-010-build-time-resolution.md), [ADR-027](../adrs/ADR-027-init-wizard-smart-suggestion.md) | Build errors → exit 5 |
+| Auto-build | Build Pipeline | (full build — see 4a) | (full build — see 4a) | [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md), [ADR-027](../adrs/ADR-027-init-wizard-smart-suggestion.md) | Build errors → exit 5 |
 
 **Walkthrough — non-obvious behaviors:**
 
@@ -695,21 +691,21 @@ flowchart TD
 
 Every component from Section 2 must appear in at least one critical path. Components not exercised by the three main flows are standalone commands with their own entry points.
 
-| Component | Build (4a) | Resume (4b) | Init (4c) | Notes |
+| Component | Build (4a) | Run (4b) | Init (4c) | Notes |
 |-----------|:----------:|:-----------:|:---------:|-------|
 | CLI Shell | ✓ | ✓ | ✓ | Entry point for all commands |
 | Config Loader | ✓ | ✓ | ✓ | Validates config in every path |
-| Prompt Resolver | ✓ | — | ✓ (via build) | Build-time only |
-| Mixin Injector | ✓ | — | ✓ (via build) | Build-time only |
-| Dependency Resolver | ✓ | ✓ | ✓ (via build) | Build: ordering; Resume: eligibility |
-| Claude Code Adapter | ✓ | — | ✓ (via build) | Build-time only; uses CLAUDE.md Manager |
-| Codex Adapter | ✓ | — | ✓ (via build) | Build-time only |
+| Assembly Engine | — | ✓ | — | Run-time only: constructs assembled prompt |
+| Methodology & Depth Resolver | ✓ | ✓ | — | Build: step enablement; Run: depth resolution |
+| Dependency Resolver | ✓ | ✓ | ✓ (via build) | Build: ordering; Run: eligibility |
+| Claude Code Adapter | ✓ | — | ✓ (via build) | Build: generates wrapper files |
+| Codex Adapter | ✓ | — | ✓ (via build) | Build: generates wrapper files |
 | Universal Adapter | ✓ | — | ✓ (via build) | Always runs during build |
-| State Manager | — | ✓ | ✓ | Resume: state CRUD; Init: state creation |
-| Lock Manager | — | ✓ | — | Resume only; read-only commands skip locking |
-| Decision Logger | — | ✓ | — | Resume: append after prompt completion |
-| Frontmatter Parser | ✓ | ✓ | ✓ | Build: frontmatter merge; Resume: dependency graph reconstruction; Init: v1 artifact mapping |
-| CLAUDE.md Manager | ✓ | ✓ | ✓ (via build) | Build: section reservation; Resume: section fill |
+| State Manager | — | ✓ | ✓ | Run: state CRUD; Init: state creation |
+| Lock Manager | — | ✓ | — | Run only; read-only commands skip locking |
+| Decision Logger | — | ✓ | — | Run: append after step completion |
+| Frontmatter Parser | ✓ | ✓ | ✓ | Build: metadata extraction; Run: dependency graph; Init: v1 artifact mapping |
+| CLAUDE.md Manager | ✓ | ✓ | ✓ (via build) | Build: section reservation; Run: section fill |
 | Project Detector | — | — | ✓ | Init only: v1/brownfield/greenfield detection |
 | Init Wizard | — | — | ✓ | Init only: interactive config generation |
 | Dashboard Generator | — | — | — | Standalone: `scaffold dashboard` command |
@@ -717,8 +713,8 @@ Every component from Section 2 must appear in at least one critical path. Compon
 
 **Standalone component notes:**
 
-- **Dashboard Generator** is exercised by `scaffold dashboard`, which reads `state.json` and `config.yml` to produce an HTML progress dashboard. It has no role in the assembly, run, or init paths.
-- **Validator** is exercised by `scaffold validate`, a read-only command that orchestrates validation calls to Config Loader, Prompt Resolver, Dependency Resolver, and Mixin Injector. It reports diagnostics without modifying any files.
+- **Dashboard Generator** is exercised by `scaffold dashboard`, which reads `state.json` and `config.yml` to produce an HTML progress dashboard. It has no role in the build, run, or init paths.
+- **Validator** is exercised by `scaffold validate`, a read-only command that orchestrates validation calls to Config Loader, Methodology Resolver, Dependency Resolver, and Frontmatter Parser. It reports diagnostics without modifying any files.
 
 ---
 
@@ -736,7 +732,7 @@ Scaffold v2 manages all state through the file system — there are no databases
 | `.scaffold/lock.json` | Execution lock — prevents concurrent write operations on same machine | Lock Manager | Resume, skip, init, reset (before acquiring) | Gitignored | Full rewrite (`wx` flag), delete on release | [ADR-019](../adrs/ADR-019-advisory-locking.md) |
 | `CLAUDE.md` | Agent instructions — reserved sections with scaffold-managed content | CLAUDE.md Manager (run: section fill) | Claude Code agents | Committed | Section replace (find heading → replace managed block) | [ADR-026](../adrs/ADR-026-claude-md-section-registry.md) |
 | `AGENTS.md` | Codex agent instructions | Codex Adapter | Codex agents | Committed | Full rewrite on build | [ADR-022](../adrs/ADR-022-three-platform-adapters.md) |
-| Build outputs (`commands/*.md`, `codex-prompts/*.md`, `prompts/*.md`, `scaffold-pipeline.md`) | Platform-specific prompt files — deterministic from config + content | Platform Adapters (build) | AI agents during prompt execution | Committed | Full rewrite on build | [ADR-010](../adrs/ADR-010-build-time-resolution.md), [ADR-022](../adrs/ADR-022-three-platform-adapters.md) |
+| Build outputs (`commands/*.md`, `codex-prompts/*.md`, `prompts/*.md`, `scaffold-pipeline.md`) | Platform-specific wrapper files — deterministic from config + meta-prompt metadata | Platform Adapters (build) | AI agents (invoke `scaffold run`) | Committed | Full rewrite on build | [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md), [ADR-022](../adrs/ADR-022-three-platform-adapters.md) |
 | Produced artifacts (e.g., `docs/plan.md`, `docs/tech-stack.md`) | Documents created by prompt execution — tracked via `produces` in frontmatter | AI agents (outside scaffold) | State Manager (dual completion detection — see Section 4b for the detection algorithm), downstream prompts (via `reads` frontmatter) | Committed | Agent-controlled (scaffold has no visibility into agent writes) | [ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md) |
 
 **Per-file lifecycle details:**
@@ -963,21 +959,19 @@ Two operational modes, each with a distinct error handling strategy ([ADR-040](.
 
 Errors originate in domain-specific components and propagate outward through the build pipeline or runtime engine to the CLI Shell, which formats output via the OutputContext Strategy pattern ([ADR-025](../adrs/ADR-025-cli-output-contract.md)).
 
-**Example 1: Build-time error propagation** — Frontmatter parse failure during mixin injection
+**Example 1: Build-time error propagation** — Frontmatter parse failure during wrapper generation
 
 ```mermaid
 sequenceDiagram
     participant FP as Frontmatter Parser
-    participant MI as Mixin Injector
     participant BP as Build Pipeline
     participant CS as CLI Shell
 
-    FP->>MI: throws FrontmatterParseError
+    FP->>BP: throws FrontmatterParseError
     Note right of FP: file, line, message
-    MI->>BP: catches, wraps as InjectionError
-    Note right of MI: prompt, stage: frontmatter, cause
+    BP->>BP: catches, wraps with step context
     BP->>BP: adds to ErrorAccumulator
-    Note over BP: continues processing<br/>remaining prompts
+    Note over BP: continues processing<br/>remaining meta-prompts
     BP->>CS: returns accumulated errors + warnings
     alt Interactive mode
         CS->>CS: colored error with file path and line number
@@ -989,7 +983,7 @@ sequenceDiagram
     Note over CS: exit code 5 (build error)
 ```
 
-The build pipeline catches errors from each component, wraps them with context (which prompt, which stage), adds them to the accumulator, and continues processing remaining prompts. Only after all prompts have been processed does the pipeline check the accumulator and propagate errors to the CLI Shell for output formatting.
+The build pipeline catches errors from each component, wraps them with context (which step, which stage), adds them to the accumulator, and continues processing remaining meta-prompts. Only after all steps have been processed does the pipeline check the accumulator and propagate errors to the CLI Shell for output formatting.
 
 **Example 2: Runtime error propagation** — Missing predecessor artifact during `scaffold run`
 
@@ -1025,11 +1019,11 @@ Runtime commands do not accumulate — the first structural error terminates the
 | Code | Meaning | Triggered By | Example Scenario |
 |------|---------|-------------|------------------|
 | 0 | Success | All commands on success | `scaffold build` completes with no errors (warnings permitted) |
-| 1 | Validation error | Config Loader, Prompt Resolver, Frontmatter Parser, Validator | Malformed `config.yml`, invalid manifest, bad frontmatter |
+| 1 | Validation error | Config Loader, Meta-Prompt Loader, Frontmatter Parser, Validator | Malformed `config.yml`, invalid meta-prompt, bad frontmatter |
 | 2 | Missing dependency | Dependency Resolver, State Manager | Predecessor artifact not found when running `scaffold run` |
 | 3 | State / lock error | State Manager, Lock Manager | `state.json` unreadable; lock held by another process |
 | 4 | User cancellation | CLI Shell (interactive layer) | User presses Ctrl+C or declines an interactive prompt |
-| 5 | Build error | Mixin Injector, Platform Adapters | Unresolved mixin marker, adapter initialization failure |
+| 5 | Build error | Platform Adapters | Adapter initialization failure, output write failure |
 
 Exit code 4 is produced by the CLI Shell's interactive layer, not by domain-specific error codes. It signals that the user chose not to proceed — no error occurred in the system.
 
@@ -1062,7 +1056,7 @@ Each error code appears in the JSON envelope's `errors` array (in `--format json
 | `CONFIG_EXTRA_SLUG_CONFLICT` | Extra-prompt slug collides with a built-in prompt name |
 | `CONFIG_MIGRATE_FAILED` | Schema migration function threw or produced invalid output |
 
-**Prompt Resolver** (Domain 01) — Exit code 1:
+**Meta-Prompt Loader** (Domain 15, formerly Prompt Resolver — Domain 01 superseded) — Exit code 1:
 
 | Code | Description |
 |------|-------------|
@@ -1084,18 +1078,7 @@ Each error code appears in the JSON envelope's `errors` array (in `--format json
 | `DEPENDENCY_MISSING_ARTIFACT` | 2 | Predecessor prompt's `produces` artifact not found on disk |
 | `DEPENDENCY_UNMET` | 2 | Prompt depends on a prompt that has not been completed or skipped |
 
-**Mixin Injector** (Domain 12) — Exit code 5:
-
-| Code | Description |
-|------|-------------|
-| `INJ_UNRESOLVED_AXIS_MARKER` | Axis marker (`<!-- mixin:<axis> -->`) survived both injection passes |
-| `INJ_MIXIN_CONTAINS_AXIS_MARKER` | Mixin file itself contains unresolved axis markers (sub-code of `INJ_UNRESOLVED_AXIS_MARKER`) |
-| `INJ_UNRESOLVED_VERB_MARKER` | Task verb marker (`<!-- scaffold:task-* -->`) survived both passes |
-| `INJ_SECTION_NOT_FOUND` | Mixin file lacks the sub-section referenced by the marker |
-| `INJ_MIXIN_FILE_NOT_FOUND` | Mixin file does not exist at expected path |
-| `INJ_MIXIN_FILE_READ_ERROR` | Mixin file exists but cannot be read (permissions, encoding) |
-| `INJ_INVALID_MARKER_SYNTAX` | Malformed marker syntax at a specific line |
-| `INJ_VERB_UNSUPPORTED` | Task verb not supported by mixin and has no fallback |
+**~~Mixin Injector~~ (Domain 12 — superseded by ADR-041):** All `INJ_*` error codes are retired. Mixin injection has been replaced by the assembly engine's runtime prompt construction. The `--allow-unresolved-markers` escape hatch is no longer applicable.
 
 **State Manager** (Domain 03) — Exit code 3:
 
@@ -1156,7 +1139,7 @@ Each error code appears in the JSON envelope's `errors` array (in `--format json
 | `VALIDATE_DECISIONS_INVALID` | Entry in `decisions.jsonl` is malformed JSON |
 | `BUILD_OUTPUTS_STALE` | Warning, exit 0 — build outputs are older than their source inputs |
 
-**Adopt Scanner** (Domain 15):
+**Adopt Scanner** (Domain 07):
 
 | Code | Exit | Description |
 |------|------|-------------|
@@ -1178,8 +1161,8 @@ Each error code appears in the JSON envelope's `errors` array (in `--format json
 
 | Code | Component | Description |
 |------|-----------|-------------|
-| `RESOLUTION_CUSTOM_OVERRIDE_ACTIVE` | Prompt Resolver | A customization file overrides a built-in prompt |
-| `RESOLUTION_UNKNOWN_TRAIT` | Prompt Resolver | Optional prompt's `requires` references unknown trait |
+| `RESOLUTION_CUSTOM_OVERRIDE_ACTIVE` | Meta-Prompt Loader | A customization file overrides a built-in meta-prompt |
+| `RESOLUTION_UNKNOWN_TRAIT` | Meta-Prompt Loader | Optional step's `requires` references unknown trait |
 | `DEP_ON_EXCLUDED` | Dependency Resolver | Prompt depends on a prompt that was excluded |
 | `DEP_RERUN_STALE_DOWNSTREAM` | Dependency Resolver | Re-run may leave downstream artifacts stale |
 | `DEP_PHASE_CONFLICT` | Dependency Resolver | Dependency-derived position is earlier than declared phase |
@@ -1188,10 +1171,7 @@ Each error code appears in the JSON envelope's `errors` array (in `--format json
 | `PSM_SKIP_HAS_DEPENDENTS` | State Manager | Skipping a prompt may affect dependent prompts |
 | `PSM_STATE_WITHOUT_ARTIFACTS` | State Manager | Prompt marked completed but artifacts missing |
 | `PSM_ARTIFACTS_WITHOUT_STATE` | State Manager | Artifacts exist but prompt status is not completed |
-| `INJ_AXIS_NOT_REFERENCED` | Mixin Injector | Axis configured but prompt has no markers for it |
-| `INJ_DUPLICATE_SECTION_NAME` | Mixin Injector | Duplicate section name detected in mixin |
-| `INJ_UNRESOLVED_DOWNGRADED` | Mixin Injector | Unresolved marker downgraded by `--allow-unresolved-markers` |
-| `INJ_EMPTY_SECTION` | Mixin Injector | Mixin section is empty; marker replaced with empty string |
+| ~~`INJ_*` codes~~ | ~~Mixin Injector~~ | ~~All INJ_* warning codes retired — mixin injection superseded by ADR-041~~ |
 | `CAPABILITY_UNSUPPORTED` | Platform Adapters | Prompt requires capability not supported by platform |
 | `DUPLICATE_PATTERN` | Platform Adapters | Duplicate file patterns detected in adapter output |
 | `EMPTY_PROMPT_CONTENT` | Platform Adapters | Prompt content is empty after transformation |
@@ -1212,7 +1192,7 @@ Each error code appears in the JSON envelope's `errors` array (in `--format json
 | `ADOPT_MIXIN_INFERENCE_WEAK` | Adopt Scanner | Mixin axis inferred with low confidence |
 | `ADOPT_EXTRA_ARTIFACTS` | Adopt Scanner | Project contains artifacts not accounted for by any known prompt |
 
-The complete domain-specific error taxonomies — including additional field-level validation codes, artifact schema codes, and section targeting codes — are documented in each domain model's Section 6 (domains 01, 02, 03, 05, 06, 08, 09, 12).
+The complete domain-specific error taxonomies — including additional field-level validation codes, artifact schema codes, and assembly error codes — are documented in each domain model's Section 6 (domains 02, 03, 05, 06, 08, 09, 15, 16). Domains 01, 04, and 12 are superseded by ADR-041.
 
 **Note**: Full error message templates with contextual variables, suggested fixes, and examples are defined in the Phase 6 UX specification (`docs/v2/ux/error-messages.md`). This registry defines the error code taxonomy and component ownership.
 
@@ -1226,13 +1206,13 @@ Every error category that has an escape hatch documents it in the relevant ADR. 
 
 | Flag | Overrides | Risk | Safety | Legitimate Use | ADR |
 |------|----------|------|--------|---------------|-----|
-| `--allow-unresolved-markers` | Unresolved mixin/verb markers during `scaffold build` | **Low** — prompts may contain raw `<!-- mixin:* -->` markers that confuse AI agents | Affects prompt quality, not data integrity; build outputs are regenerated on every `scaffold build` | Mixin author developing incrementally — testing partial content before all sections are written | [ADR-035](../adrs/ADR-035-non-recursive-injection.md) |
+| ~~`--allow-unresolved-markers`~~ | ~~Unresolved mixin markers during build~~ | — | — | **Retired** — mixin injection superseded by ADR-041. No equivalent escape hatch needed in meta-prompt architecture. | ~~[ADR-035](../adrs/ADR-035-non-recursive-injection.md)~~ |
 | `--force` | Lock acquisition when `lock.json` exists and PID appears alive | **Medium** — may override a legitimately running process, causing concurrent state mutations | Lock Manager logs the override; `state.json` atomic writes prevent file corruption but completion data from the overridden process may be lost | Stale lock from a killed terminal session that PID detection missed; known-safe override during solo development | [ADR-019](../adrs/ADR-019-advisory-locking.md) |
 | `--auto --confirm-reset` | Reset confirmation prompt (normally requires interactive "yes") | **High** — deletes `state.json` and `decisions.jsonl` irreversibly | Requires both `--auto` AND `--confirm-reset` — neither alone triggers deletion; `config.yml` and produced artifacts are preserved; git history preserves deleted files | CI pipeline that reinitializes pipeline state as part of a clean rebuild; scripted test harness that resets between test runs | [ADR-036](../adrs/ADR-036-auto-does-not-imply-force.md) |
 
 **What can go wrong with each escape hatch:**
 
-- **`--allow-unresolved-markers`**: Built prompts contain literal marker text (e.g., `<!-- mixin:tdd -->`) in output files. If an AI agent encounters this text, it may ignore it, attempt to interpret it, or produce incomplete output. The fix: run `scaffold build` without the flag once all mixin content is ready.
+- ~~**`--allow-unresolved-markers`**~~: Retired — no longer applicable under meta-prompt architecture.
 - **`--force`**: If two `scaffold run` processes run concurrently on the same worktree (one overriding the lock), both may set `in_progress` and write to `state.json`. The atomic write strategy (temp + rename) prevents file corruption, but the last writer wins — one process's completion data may be overwritten. `decisions.jsonl` is more resilient (both appends are preserved), but the state machine may record an inconsistent final state.
 - **`--auto --confirm-reset`**: All pipeline progress is permanently lost from the working tree (though `git show HEAD:.scaffold/state.json` recovers the last committed state). If run accidentally in a CI pipeline, all prompt completion tracking must be rebuilt from scratch via `scaffold init`. Produced artifacts survive because reset does not touch them.
 
@@ -1240,32 +1220,23 @@ Every error category that has an escape hatch documents it in the relevant ADR. 
 
 ## Section 8: Extension Points
 
-Users extend Scaffold at six distinct points, spanning three architectural zones (core, content, user space). No extension requires modifying core CLI source code except new platform adapters.
+Users extend Scaffold at three distinct points, spanning three architectural zones (core, content, user space). No extension requires modifying core CLI source code except new platform adapters.
 
 ### Section 8a: Extension Point Inventory
 
 | Extension Point | What's Extended | Mechanism | Discovery | Constraints | ADR |
 |----------------|----------------|-----------|-----------|-------------|-----|
-| **Custom prompt overrides** | Replace built-in prompts | `.scaffold/prompts/<name>.md` (project-level) or `~/.scaffold/prompts/<name>.md` (user-level) with same slug as built-in | Filename match during three-layer resolution: project > user > built-in | Must have corresponding built-in prompt; full file-level replacement; frontmatter `depends-on` uses union merge, all other fields use replacement | [ADR-005](../adrs/ADR-005-three-layer-prompt-resolution.md) |
-| **Extra prompts** | Add new pipeline steps | `.scaffold/prompts/<name>.md` + slug listed in `extra-prompts` in `config.yml` | Config Loader reads `extra-prompts` list; Prompt Resolver loads each file from resolution paths | Must have valid frontmatter with `description`; slug must not collide with any manifest prompt; enters dependency graph via `depends-on`; defaults to phase 7 if `phase` omitted | [ADR-005](../adrs/ADR-005-three-layer-prompt-resolution.md) |
-| **Custom methodologies** | New pipeline shapes | `content/methodologies/<name>/manifest.yml` + `overrides/` + `extensions/` subdirectories | Listed by `scaffold list`; selectable via `methodology: <name>` in config | Must conform to manifest schema ([ADR-016](../adrs/ADR-016-methodology-manifest-format.md)); acyclic prompt dependencies; must declare valid axes with defaults and allowed values | [ADR-004](../adrs/ADR-004-methodology-as-top-level-organizer.md) |
-| **New mixin values** | New options for existing axes | `content/mixins/<axis>/<name>.md` | Referenced in config as `mixins.<axis>: <name>` | Must provide replacement content for all markers in prompts that reference the axis; section headings must match the axis's marker vocabulary | [ADR-006](../adrs/ADR-006-mixin-injection-over-templating.md) |
-| **New platform adapters** | Support new AI tools | `src/core/adapters/<name>.ts` implementing the `PlatformAdapter` interface | Registered in adapter factory; activated by `platforms` config entry | Must implement `initialize()`, `transformPrompt()`, and `finalize()`; must not modify prompt content semantics (format transformation only) | [ADR-022](../adrs/ADR-022-three-platform-adapters.md) |
-| **Tool map** | Codex tool-name mappings | Built-in only (`content/adapters/codex/tool-map.yml`). **No project or user-level override.** Users who need custom mappings should create a prompt override that hard-codes the desired tool references instead of relying on mapping. | Loaded by Codex adapter during `initialize()` | Phrase-level patterns with longest-first matching; non-overlapping match detection; changes affect all Codex output | [ADR-023](../adrs/ADR-023-phrase-level-tool-mapping.md) |
+| **User instructions** | Customize prompt behavior per-project or per-step | `.scaffold/instructions/global.md` (all steps), `.scaffold/instructions/<step>.md` (per-step), `--instructions` flag (inline) | Assembly engine loads during step 5 of 9-step sequence | Later layers override earlier: inline > per-step > global. All layers are optional. Included in Instructions section of assembled prompt | [ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md) |
+| **Custom methodology presets** | New pipeline shapes and depth configurations | YAML preset files in `methodology/` controlling which steps are active and at what depth | Listed by `scaffold list`; selectable via `methodology: <name>` in config | Must define step enablement and depth defaults; acyclic step dependencies | [ADR-004](../adrs/ADR-004-methodology-as-top-level-organizer.md), [ADR-043](../adrs/ADR-043-depth-scale.md) |
+| **New platform adapters** | Support new AI tools | `src/core/adapters/<name>.ts` implementing the `PlatformAdapter` interface | Registered in adapter factory; activated by `platforms` config entry | Must implement `initialize()`, `transformPrompt()`, and `finalize()`; must not modify prompt content semantics (wrapper generation only) | [ADR-022](../adrs/ADR-022-three-platform-adapters.md) |
 
 **User workflow for each extension:**
 
-1. **Override a prompt**: Create `.scaffold/prompts/tech-stack.md` with full prompt content and valid frontmatter. Run `scaffold build`. The override replaces the built-in `tech-stack` prompt entirely. `scaffold validate` confirms the override is active (`RESOLUTION_CUSTOM_OVERRIDE_ACTIVE` warning).
+1. **Add user instructions**: Create `.scaffold/instructions/global.md` for instructions that apply to all steps, or `.scaffold/instructions/<step>.md` for step-specific instructions. Run `scaffold run <step>` — instructions are automatically loaded by the assembly engine and included in the assembled prompt's Instructions section.
 
-2. **Add an extra prompt**: Create `.scaffold/prompts/security-audit.md` with frontmatter including `description`, `depends-on`, and optionally `phase` and `produces`. Add `security-audit` to `extra-prompts` in `config.yml`. Run `scaffold build`. The prompt appears in the pipeline at the position determined by its dependency declarations.
+2. **Create a methodology preset**: Create a YAML preset file in `methodology/` defining step enablement, depth defaults, and phase ordering. Run `scaffold list` to verify the preset appears. Users select it via `methodology: <name>` in `config.yml`.
 
-3. **Create a methodology**: Create `content/methodologies/<name>/manifest.yml` defining phases, prompt ordering, dependencies, and axis configuration. Add override and extension prompts in `overrides/` and `extensions/` subdirectories. Run `scaffold list` to verify the methodology appears. Users select it via `methodology: <name>` in `config.yml`.
-
-4. **Add a mixin value**: Create `content/mixins/<axis>/<name>.md` with sections matching the axis vocabulary (headings that correspond to markers in prompts). Reference it in config as `mixins.<axis>: <name>`. Run `scaffold build` to inject the new content into all prompts that reference that axis.
-
-5. **Create a platform adapter**: Implement the `PlatformAdapter` interface in `src/core/adapters/<name>.ts`. Register it in the adapter factory. Add the platform ID to the supported platforms list. This requires a CLI code change and release — it is the only extension point that cannot be exercised without modifying core source.
-
-6. **Customize tool mappings**: Edit `content/adapters/codex/tool-map.yml` to add or modify phrase-level tool-name mappings for Codex output. Run `scaffold build` to apply the updated mappings to all `codex-prompts/*.md` files.
+3. **Create a platform adapter**: Implement the `PlatformAdapter` interface in `src/core/adapters/<name>.ts`. Register it in the adapter factory. Add the platform ID to the supported platforms list. This requires a CLI code change and release — it is the only extension point that cannot be exercised without modifying core source.
 
 ---
 
@@ -1276,8 +1247,8 @@ graph TB
     subgraph CoreZone["Core — CLI source code, not user-modifiable"]
         CS[CLI Shell]
         CL[Config Loader]
-        PR[Prompt Resolver]
-        MI[Mixin Injector]
+        AEng[Assembly Engine]
+        MRe[Methodology Resolver]
         DR[Dependency Resolver]
         SM[State Manager]
         LM[Lock Manager]
@@ -1287,10 +1258,10 @@ graph TB
     end
 
     subgraph ContentZone["Content — shipped with CLI, replaceable via overrides"]
-        BP[Base Prompts<br/>content/base/*.md]
-        MT[Methodologies<br/>content/methodologies/*/]
-        MX[Mixin Files<br/>content/mixins/*/*.md]
-        TM[Tool Map<br/>content/adapters/codex/tool-map.yml]
+        BP[Meta-Prompts<br/>pipeline/*.md]
+        KB[Knowledge Base<br/>knowledge/*.md]
+        MT[Methodology Presets<br/>methodology/*/]
+        TM[Adapter Assets<br/>content/adapters/]
     end
 
     subgraph UserZone["User Space — project-specific, fully user-controlled"]
@@ -1302,14 +1273,14 @@ graph TB
         AR[Produced Artifacts<br/>docs/*.md, etc.]
     end
 
-    %% User Space overrides Content
-    UC -->|"overrides by slug match"| BP
+    %% User Space feeds into Core
+    UC -->|"user instructions for"| AEng
     EP -->|"extends pipeline"| MT
 
     %% Content feeds into Core
-    BP -->|"resolved by"| PR
-    MT -->|"defines pipeline for"| PR
-    MX -->|"injected by"| MI
+    BP -->|"loaded by"| AEng
+    KB -->|"loaded by"| AEng
+    MT -->|"defines pipeline for"| MRe
     TM -->|"loaded by"| PA
 
     %% User Space feeds into Core
@@ -1323,8 +1294,8 @@ graph TB
 
 **Zone boundaries:**
 
-- **Core / Content boundary**: Core code discovers and processes content files at well-known paths (`content/base/`, `content/methodologies/`, `content/mixins/`). Adding new content files — methodologies, mixins, tool-map entries — does not require core code changes. Content files must conform to schemas validated by core at build time.
-- **Content / User Space boundary**: User-space files override content-zone files via the three-layer precedence chain: `.scaffold/prompts/` (project) > `~/.scaffold/prompts/` (user) > built-in content. Override is a complete file-level replacement — no partial patching or content-level merging of prompt bodies ([ADR-005](../adrs/ADR-005-three-layer-prompt-resolution.md)).
+- **Core / Content boundary**: Core code discovers and processes content files at well-known paths (`pipeline/`, `knowledge/`, `methodology/`). Adding new content files — methodology presets, knowledge base entries — does not require core code changes. Content files must conform to schemas validated by core at build time and assembly time.
+- **Content / User Space boundary**: User-space files extend content-zone files via user instructions (`.scaffold/instructions/`) which are layered into the assembled prompt at runtime ([ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md)). Users do not replace meta-prompt files directly — they add instructions that modify AI behavior during execution.
 - **Core / User Space boundary**: Core reads user config and state through well-defined file schemas. Core writes state files through atomic operations. Core never modifies user-produced artifacts — those are created by AI agents during `scaffold run`, outside scaffold's process boundary (Section 6a).
 
 ---
@@ -1335,15 +1306,10 @@ All user-provided extensions are validated at build time (`scaffold build` and `
 
 | Extension Type | Validation | When | Error on Failure |
 |---------------|-----------|------|------------------|
-| **Custom prompt overrides** | Frontmatter validated (same rules as built-in: `description` required, valid `depends-on` slugs, known field names). Warning if override's frontmatter omits fields the built-in had. | `scaffold build`, `scaffold validate` | `RESOLUTION_FRONTMATTER_PARSE_ERROR` (exit 1) |
-| **Extra prompts** | File existence at resolution path; frontmatter validated (must include `description`); slug uniqueness enforced across all layers (built-in + extra). | Config loading during `scaffold build` | `CONFIG_EXTRA_PROMPT_NOT_FOUND`, `CONFIG_EXTRA_PROMPT_INVALID`, `CONFIG_EXTRA_SLUG_CONFLICT` (exit 1) |
-| **Custom methodologies** | Manifest schema validated (required fields: phases, prompts, dependencies). All prompt references resolved to existing files. Dependency graph checked for cycles. Axis declarations validated (known axis names, valid default values). | `scaffold build`, `scaffold validate` | `RESOLUTION_MANIFEST_INVALID`, `DEP_CYCLE_DETECTED` (exit 1) |
-| **Custom mixin values** | Marker completeness checked — if a prompt references axis `<X>` and the mixin file for value `<V>` has no section matching the marker target, injection fails. | `scaffold build` (during injection pass) | `INJ_SECTION_NOT_FOUND`, `INJ_MIXIN_FILE_NOT_FOUND` (exit 5) |
-| **Tool map customization** | YAML structure validated. Duplicate patterns detected (`DUPLICATE_PATTERN` warning). Cascade risk analysis — pattern replacing with text that contains another pattern (`CASCADE_RISK` warning). | `scaffold build` (Codex adapter `initialize()`) | `TOOL_MAP_INVALID` (exit 5) |
+| **User instructions** | File existence checked. Instruction content validated as valid markdown. | `scaffold run` (assembly step 5) | Missing file referenced by `--instructions` → exit 1 |
+| **Custom methodology presets** | Preset schema validated (required fields: step enablement, depth defaults). All step references resolved to existing meta-prompt files. Dependency graph checked for cycles. Depth values validated against 1-5 scale. | `scaffold build`, `scaffold validate` | `CONFIG_INVALID_METHODOLOGY`, `DEP_CYCLE_DETECTED` (exit 1) |
 
 `scaffold validate` provides on-demand validation of all extensions without producing output files. It uses the same validation logic as `scaffold build` but operates in read-only mode, reporting all issues via the error accumulation pattern ([ADR-040](../adrs/ADR-040-error-handling-philosophy.md)).
-
-**Tool-map.yml is not user-customizable** in v2. Unlike prompts, which support three-layer precedence (project → user → built-in), adapter configuration assets like `tool-map.yml` are shipped as part of the scaffold package. Users who need different tool-name mappings should create prompt overrides that use the desired tool references directly, bypassing the mapping system. Three-layer precedence for adapter assets is a candidate for a future release if demand materializes.
 
 ---
 
@@ -1361,10 +1327,9 @@ All user-provided extensions are validated at build time (`scaffold build` and `
 │   │   ├── commands/                    One handler per command (mirrors Section 3a)
 │   │   ├── output/                      OutputContext implementations
 │   │   └── middleware/                  yargs middleware hooks
-│   ├── core/                            Build pipeline stages
-│   │   ├── resolver/                    Prompt resolution (domain 01)
+│   ├── core/                            Assembly engine and pipeline stages
+│   │   ├── assembly/                    Assembly engine (domain 15) + methodology resolution (domain 16)
 │   │   ├── dependency/                  Dependency resolution (domain 02)
-│   │   ├── injector/                    Mixin injection (domains 04, 12)
 │   │   └── adapters/                    Platform adapters (domain 05)
 │   ├── state/                           Runtime state management
 │   │   ├── state-manager.js             Pipeline state machine (domain 03)
@@ -1463,7 +1428,7 @@ This works identically for npm-installed packages, Homebrew installations, and d
 | Lint | `eslint src/` | Code quality and style checks |
 | Full check | `npm run check` | `tsc --noEmit && eslint src/ && vitest run` |
 
-**Content directory handling**: The `content/` directory is NOT compiled — it contains markdown, YAML, and other non-TypeScript files that are read at runtime by the Prompt Resolver, Mixin Injector, Config Loader, and Platform Adapters. It is included in the npm package via the `files` field in `package.json`. During development, `content/` is read from the same relative path — the resolution logic works identically because `dist/` and `content/` are sibling directories in both contexts.
+**Content directory handling**: The `content/` directory is NOT compiled — it contains markdown, YAML, and other non-TypeScript files that are read at runtime by the Assembly Engine, Config Loader, and Platform Adapters. It is included in the npm package via the `files` field in `package.json`. During development, `content/` is read from the same relative path — the resolution logic works identically because `dist/` and `content/` are sibling directories in both contexts.
 
 ---
 
@@ -1568,8 +1533,8 @@ Every configurable value in the system follows a four-layer precedence chain. Hi
 
 **Layer 3: Methodology manifest defaults**
 
-- Each manifest's axis configuration includes a `defaults` section with default values for each mixin axis ([ADR-016](../adrs/ADR-016-methodology-manifest-format.md))
-- Used when `config.yml` doesn't specify a value for an axis
+- Each methodology preset includes default depth levels and step enablement ([ADR-043](../adrs/ADR-043-depth-scale.md))
+- Used when `config.yml` doesn't specify a custom depth override
 
 **Layer 4 (lowest priority): Scaffold built-in defaults**
 
@@ -1577,21 +1542,20 @@ Every configurable value in the system follows a four-layer precedence chain. Hi
 - Output mode defaults to `interactive`; `--auto` defaults to `false`; `--force` defaults to `false`
 - Used when no manifest default exists for a given setting
 
-**Concrete resolution example** — the `tdd` mixin axis:
+**Concrete resolution example** — depth for the `tech-stack` step:
 
-1. CLI flag: no `--tdd` flag exists → pass to layer 2
-2. `config.yml`: `mixins.tdd: relaxed` → **resolved: `relaxed`**
-3. (If `config.yml` didn't specify): manifest defaults: `tdd: strict` → resolved: `strict`
-4. (If manifest didn't specify): built-in default: `strict` → resolved: `strict`
+1. CLI flag: no `--depth` flag exists → pass to layer 2
+2. `config.yml`: `custom_overrides.tech-stack.depth: 4` → **resolved: depth 4**
+3. (If `config.yml` didn't specify): methodology preset default: depth 3 → resolved: depth 3
+4. (If preset didn't specify): built-in default: depth 3 → resolved: depth 3
 
-**Prompt customization precedence** (separate from config — governs which prompt file is loaded):
+**User instruction precedence** (governs instruction content loaded into assembled prompt):
 
-1. `.scaffold/prompts/<name>.md` (project-level override) — highest priority ([ADR-005](../adrs/ADR-005-three-layer-prompt-resolution.md))
-2. `~/.scaffold/prompts/<name>.md` (user-level override)
-3. Methodology override/extension (in methodology's `overrides/` or `extensions/` directory)
-4. Base prompt (in `content/base/` directory) — lowest priority
+1. `--instructions "inline text"` (inline via CLI flag) — highest priority ([ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md))
+2. `.scaffold/instructions/<step>.md` (per-step file)
+3. `.scaffold/instructions/global.md` (global file) — lowest priority
 
-First match wins. Override is complete file-level replacement — no partial content merging of prompt bodies. Frontmatter `depends-on` uses union merge; all other frontmatter fields use replacement ([ADR-011](../adrs/ADR-011-depends-on-union-semantics.md)).
+All layers are optional. Later layers override earlier layers. Instructions are concatenated into the Instructions section of the assembled prompt ([ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md)).
 
 ---
 
@@ -1625,17 +1589,14 @@ Naming rules that apply across the system:
 | **File extensions** | Standard | File type identification | `.md` for prompts, `.yml` for manifests and config, `.json` for state and lock, `.jsonl` for decision log |
 | **Decision IDs** | `D-NNN` (zero-padded three-digit) | `decisions.jsonl` `id` field, human reference in pipeline reviews | `D-001`, `D-042` |
 | **Tracking comments** | `<!-- scaffold:<prompt-slug> v<N> <date> <methodology> <mixins> -->` | Line 1 of produced artifacts ([ADR-017](../adrs/ADR-017-tracking-comments-artifact-provenance.md)) | `<!-- scaffold:tech-stack v1 2026-03-13 classic tdd:strict/git:full-pr -->` |
-| **Mixin markers** | `<!-- mixin:<axis> -->` or `<!-- mixin:<axis>:<section> -->` | Injection points in prompt source files ([ADR-006](../adrs/ADR-006-mixin-injection-over-templating.md)) | `<!-- mixin:task-tracking -->`, `<!-- mixin:tdd:testing-rules -->` |
-| **Task verb markers** | `<!-- scaffold:task-<verb> [args] -->` | Task operation placeholders in prompts ([ADR-008](../adrs/ADR-008-abstract-task-verbs.md)) | `<!-- scaffold:task-create "Fix bug" priority=1 -->` |
-| **Sub-section names** | `[a-z][a-z0-9-]*` | Section delimiters within mixin files ([ADR-007](../adrs/ADR-007-mixin-markers-subsection-targeting.md)) | `close-workflow`, `testing-rules` |
+| ~~**Mixin markers**~~ | ~~`<!-- mixin:<axis> -->`~~ | ~~Superseded by ADR-041 — mixin injection removed~~ | — |
+| ~~**Task verb markers**~~ | ~~`<!-- scaffold:task-<verb> -->`~~ | ~~Superseded by ADR-041 — task verbs removed~~ | — |
 | **Ownership markers** | `<!-- scaffold:managed by <slug> -->` / `<!-- /scaffold:managed -->` | CLAUDE.md section ownership ([ADR-026](../adrs/ADR-026-claude-md-section-registry.md)) | `<!-- scaffold:managed by coding-standards -->` |
 
 **Key naming constraints:**
 
 - Tracking comment prompt names must match the prompt name exactly — the same string used in `state.json` and manifest dependencies ([ADR-017](../adrs/ADR-017-tracking-comments-artifact-provenance.md))
-- Extra-prompt slugs must not collide with any manifest prompt name ([ADR-005](../adrs/ADR-005-three-layer-prompt-resolution.md))
-- Verb names must match the `VerbName` type exactly — the 13 defined verbs are the complete vocabulary ([ADR-008](../adrs/ADR-008-abstract-task-verbs.md))
-- Prompt names are derived from filenames without extension — `create-prd.md` produces the slug `create-prd`
+- Step names are derived from meta-prompt filenames without extension — `create-prd.md` produces the slug `create-prd`
 
 ---
 
@@ -1643,13 +1604,13 @@ Naming rules that apply across the system:
 
 **Test framework**: Jest or Vitest (to be decided in implementation; both are compatible with the TypeScript + Node.js stack).
 
-**Test placement**: Mirrored structure — `tests/` directory mirrors `src/` directory. Each source file `src/core/resolver/resolver.ts` has a corresponding `tests/core/resolver/resolver.test.ts`.
+**Test placement**: Mirrored structure — `tests/` directory mirrors `src/` directory. Each source file `src/core/assembly/engine.ts` has a corresponding `tests/core/assembly/engine.test.ts`.
 
 **Unit test boundary**: Each component from Section 2 is unit-testable in isolation. File system access is the primary mock boundary — all file reads/writes go through `src/utils/fs.ts`, which can be mocked for deterministic tests. Components depend on interfaces, not concrete implementations.
 
 **Integration test boundary**: The three critical paths (assembly, run, init) are the primary integration test scenarios. Each creates a real `.scaffold/` directory in a temp folder, populates it with test fixtures, runs the flow, and verifies file outputs. No mocking of the file system at this level.
 
-**Fixture strategy**: Test fixtures live in `tests/fixtures/` and include: sample `config.yml` files, sample methodology manifests with known prompt sets, sample base prompts with mixin markers, pre-populated `state.json` files at various pipeline stages.
+**Fixture strategy**: Test fixtures live in `tests/fixtures/` and include: sample `config.yml` files, sample methodology presets with known step sets, sample meta-prompts with frontmatter, sample knowledge base entries, pre-populated `state.json` files at various pipeline stages.
 
 **Coverage targets**: Defined in Phase 8 (Testing & Quality Strategy). The architecture establishes the test boundaries; Phase 8 defines the coverage requirements.
 
@@ -1676,16 +1637,25 @@ These are the rules that implementation agents must never violate. Violating an 
 
 - `config.yml` `version` field matches or is migratable to the CLI's expected version. Migrations are forward-only — no downgrade path ([ADR-014](../adrs/ADR-014-config-schema-versioning.md))
 - `config.yml` specifies exactly one methodology — multi-methodology configurations are not supported ([ADR-004](../adrs/ADR-004-methodology-as-top-level-organizer.md))
-- Every mixin axis value in `config.yml` matches an installed mixin file for the selected methodology's declared axes ([ADR-004](../adrs/ADR-004-methodology-as-top-level-organizer.md), [ADR-006](../adrs/ADR-006-mixin-injection-over-templating.md))
+- Depth level in `config.yml` is an integer 1-5 per the depth scale ([ADR-043](../adrs/ADR-043-depth-scale.md))
+- Every methodology preset referenced in `config.yml` must be an installed preset ([ADR-004](../adrs/ADR-004-methodology-as-top-level-organizer.md))
 
 **Build invariants:**
 
 - The dependency graph has no cycles — Kahn's algorithm must complete successfully ([ADR-009](../adrs/ADR-009-kahns-algorithm-dependency-resolution.md))
-- Every prompt in the resolved set has a unique name — no slug collisions across built-in, override, extension, and extra-prompt sources ([ADR-005](../adrs/ADR-005-three-layer-prompt-resolution.md))
-- After injection, no `<!-- mixin:* -->` or `<!-- scaffold:task-* -->` markers remain unless `--allow-unresolved-markers` is active ([ADR-035](../adrs/ADR-035-non-recursive-injection.md))
-- `scaffold build` is idempotent and deterministic — identical inputs always produce identical outputs ([ADR-010](../adrs/ADR-010-build-time-resolution.md))
+- Every step in the pipeline has a unique name — no slug collisions across meta-prompt filenames ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md))
+- `scaffold build` is idempotent and deterministic — identical `config.yml` + meta-prompt files always produce identical wrapper output
 - The dependency graph is immutable after build — runtime eligibility is computed against the static graph ([ADR-009](../adrs/ADR-009-kahns-algorithm-dependency-resolution.md))
-- **Phase tiebreaker determinism**: The phase tiebreaker used by Kahn's algorithm is `(phaseIndex ASC, slug ASC)` — prompts from lower-numbered phases are dequeued first, with alphabetical slug as the secondary tiebreaker. Phase indices are zero-indexed and come from the methodology manifest's phase ordering. This tiebreaker is immutable — changing it would alter the resolved execution order for all methodologies, breaking build determinism. [Ref: Section 4a, [ADR-009](../adrs/ADR-009-kahns-algorithm-dependency-resolution.md), [domain 02](../domain-models/02-dependency-resolution.md)]
+- **Phase tiebreaker determinism**: The phase tiebreaker used by Kahn's algorithm is `(phaseIndex ASC, slug ASC)` — steps from lower-numbered phases are dequeued first, with alphabetical slug as the secondary tiebreaker. Phase indices are zero-indexed and come from the methodology preset's phase ordering. This tiebreaker is immutable — changing it would alter the resolved execution order for all methodologies, breaking determinism. [Ref: Section 4a, [ADR-009](../adrs/ADR-009-kahns-algorithm-dependency-resolution.md), [domain 02](../domain-models/02-dependency-resolution.md)]
+
+**Assembly engine invariants:**
+
+- The assembled prompt always contains exactly 7 sections in order: System, Meta-prompt, Knowledge base, Context, Methodology, Instructions, Execution instruction ([ADR-045](../adrs/ADR-045-assembled-prompt-structure.md))
+- Assembly follows the 9-step sequence: load meta-prompt → check prerequisites → load knowledge base → gather context → load instructions → determine depth → construct prompt → AI executes → update state ([ADR-044](../adrs/ADR-044-runtime-prompt-generation.md), [domain 15](../domain-models/15-assembly-engine.md))
+- Depth precedence: per-step custom override > methodology preset default > global default (depth 3). Later sources override earlier ones ([ADR-043](../adrs/ADR-043-depth-scale.md), [domain 16](../domain-models/16-methodology-depth-resolution.md))
+- User instruction precedence: inline (--instructions) > per-step (.scaffold/instructions/<step>.md) > global (.scaffold/instructions/global.md). Later layers override earlier layers ([ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md))
+- When a completed step is re-run, the existing artifact is included in the assembled prompt's context section for diff-based updating — automatic detection, no CLI flag required ([ADR-048](../adrs/ADR-048-update-mode-diff-over-regeneration.md))
+- When methodology changes mid-pipeline: completed steps are preserved, pending steps are re-resolved against the new methodology, no auto-re-runs. Steps completed at a lower depth than the new methodology's default emit `COMPLETED_AT_LOWER_DEPTH` warnings ([ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md))
 
 **Process model invariants:**
 
@@ -1706,7 +1676,7 @@ These are the rules that implementation agents must never violate. Violating an 
 - Always append single-line JSON to `decisions.jsonl` — never modify existing lines. Each entry < 4KB for line-level atomicity ([ADR-013](../adrs/ADR-013-decision-log-jsonl-format.md))
 - Never use YAML aliases, anchors, or multi-document streams in `config.yml` or `manifest.yml` ([ADR-014](../adrs/ADR-014-config-schema-versioning.md))
 - Tracking comments must be on line 1 — no blank lines before them ([ADR-017](../adrs/ADR-017-tracking-comments-artifact-provenance.md))
-- Frontmatter must start on line 1 with exactly `---` and end with a matching `---` ([ADR-015](../adrs/ADR-015-prompt-frontmatter-schema.md))
+- Frontmatter must start on line 1 with exactly `---` and end with a matching `---` ([ADR-045](../adrs/ADR-045-assembled-prompt-structure.md))
 - Decision IDs follow the `D-NNN` format (zero-padded to 3 digits, monotonically increasing) ([ADR-013](../adrs/ADR-013-decision-log-jsonl-format.md))
 
 **Write safety:**
@@ -1736,9 +1706,8 @@ These are the rules that implementation agents must never violate. Violating an 
 
 - Unknown fields in `config.yml`, frontmatter, and manifests produce warnings, not errors. Unknown fields must be preserved in memory and on disk when writing back ([ADR-033](../adrs/ADR-033-forward-compatibility-unknown-fields.md))
 - Config migration is forward-only and automatic on load — no downgrade path ([ADR-014](../adrs/ADR-014-config-schema-versioning.md))
-- Override prompts fully replace the base — no implicit merging of prompt body content ([ADR-005](../adrs/ADR-005-three-layer-prompt-resolution.md))
-- `depends-on` is union-merged between manifest and frontmatter; all other frontmatter fields use replace semantics ([ADR-011](../adrs/ADR-011-depends-on-union-semantics.md))
-- Custom prompts must not be able to remove built-in dependencies through any frontmatter mechanism ([ADR-011](../adrs/ADR-011-depends-on-union-semantics.md))
+- `depends-on` is union-merged between methodology preset and meta-prompt frontmatter; all other frontmatter fields use replace semantics ([ADR-011](../adrs/ADR-011-depends-on-union-semantics.md))
+- Custom configurations must not be able to remove built-in dependencies through any frontmatter mechanism ([ADR-011](../adrs/ADR-011-depends-on-union-semantics.md))
 - Prompt slugs are immutable identifiers. Methodologies must not rename slugs across versions — deprecate and create new prompts instead. [Ref: Section 5b state consistency]
 
 **Execution:**
@@ -1751,17 +1720,19 @@ These are the rules that implementation agents must never violate. Violating an 
 - Skipped prompts are treated as "done" for dependency resolution — their dependents are unblocked ([ADR-020](../adrs/ADR-020-skip-vs-exclude-semantics.md))
 - Excluded prompts do not appear in `state.json` or the runtime dependency graph; users cannot exclude at runtime ([ADR-020](../adrs/ADR-020-skip-vs-exclude-semantics.md))
 
-**Injection:**
+**Assembly engine:** *(replaces the former "Injection" subsection — mixin injection was superseded by [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md))*
 
-- Injection is exactly two passes: axis markers (Pass 1), then task verb markers (Pass 2). No recursion, no configurable pass order ([ADR-035](../adrs/ADR-035-non-recursive-injection.md))
-- Pass 2 operates on the entire prompt content after Pass 1 — no region excluded from task verb replacement ([ADR-037](../adrs/ADR-037-task-verb-global-scope.md))
-- Markers must be processed in reverse document order within each pass to preserve character offsets ([ADR-006](../adrs/ADR-006-mixin-injection-over-templating.md))
-- Mixin files must not contain `##` or higher-level headings — preserves artifact-schema stability ([ADR-006](../adrs/ADR-006-mixin-injection-over-templating.md))
-- `INJ_SECTION_NOT_FOUND` and `INJ_MIXIN_FILE_NOT_FOUND` remain fatal regardless of `--allow-unresolved-markers` ([ADR-006](../adrs/ADR-006-mixin-injection-over-templating.md))
+- The assembly engine must follow the 9-step sequence exactly: load meta-prompt → check prerequisites → load knowledge base → gather context → load instructions → determine depth → construct prompt → AI executes → update state ([ADR-044](../adrs/ADR-044-runtime-prompt-generation.md), [domain 15](../domain-models/15-assembly-engine.md))
+- The assembled prompt must contain exactly 7 sections in the defined order ([ADR-045](../adrs/ADR-045-assembled-prompt-structure.md))
+- Depth is resolved with three-level precedence: per-step custom override > methodology preset default > global default (depth 3) ([ADR-043](../adrs/ADR-043-depth-scale.md), [domain 16](../domain-models/16-methodology-depth-resolution.md))
+- User instructions are layered: global → per-step → inline, with later layers overriding earlier ones. All three layers are optional ([ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md))
+- Update mode (re-running a completed step) is detected automatically — no CLI flag. The existing artifact is included as `ExistingArtifact` in the context section, and the methodology section includes diff-based update instructions ([ADR-048](../adrs/ADR-048-update-mode-diff-over-regeneration.md))
+- Methodology changes mid-pipeline preserve completed steps. Pending steps are re-resolved. No auto-re-runs. `METHODOLOGY_CHANGED` and `COMPLETED_AT_LOWER_DEPTH` warnings are emitted as appropriate ([ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md))
+- Assembly must complete within the 500ms performance target for `scaffold run` ([ADR-001](../adrs/ADR-001-cli-implementation-language.md))
 
 **Platform adapters:**
 
-- All business logic lives in the CLI — adapters may only format output received from `InjectionPipelineResult` ([ADR-003](../adrs/ADR-003-standalone-cli-source-of-truth.md))
+- All business logic lives in the CLI — adapters may only format output from assembled prompts ([ADR-003](../adrs/ADR-003-standalone-cli-source-of-truth.md))
 - Adapters must not communicate with each other or share intermediate state ([ADR-022](../adrs/ADR-022-three-platform-adapters.md))
 - The Universal adapter must always generate output, regardless of platform selection ([ADR-022](../adrs/ADR-022-three-platform-adapters.md))
 - Adding a new adapter must not require modifications to existing adapters ([ADR-022](../adrs/ADR-022-three-platform-adapters.md))
@@ -1798,7 +1769,7 @@ These are the rules that implementation agents must never violate. Violating an 
 - No community methodology marketplace — all methodology loading from local paths and npm packages only ([ADR-031](../adrs/ADR-031-community-marketplace-deferred.md))
 - No per-prompt version history, rollback commands, or version pinning ([ADR-038](../adrs/ADR-038-prompt-versioning-deferred.md))
 - No `context.json` or context API — cross-prompt data sharing uses `reads` field and `decisions.jsonl` only ([ADR-039](../adrs/ADR-039-pipeline-context-deferred.md))
-- No incremental or partial build modes — `scaffold build` always regenerates from scratch ([ADR-010](../adrs/ADR-010-build-time-resolution.md))
+- No incremental or partial build modes — `scaffold build` always regenerates wrapper files from scratch
 
 ---
 
@@ -1808,50 +1779,67 @@ This section maps every major architectural element to its governing ADR(s) and 
 
 ### Section 12a: Traceability Matrix
 
-| Architectural Element | Domain Model(s) | ADR(s) | Architecture Section(s) |
-|----------------------|-----------------|--------|------------------------|
-| Three-layer prompt resolution | [01](../domain-models/01-prompt-resolution.md) | [ADR-005](../adrs/ADR-005-three-layer-prompt-resolution.md) | 2, 3, 4a |
-| Methodology as top-level organizer | [01](../domain-models/01-prompt-resolution.md), [14](../domain-models/14-init-wizard.md) | [ADR-004](../adrs/ADR-004-methodology-as-top-level-organizer.md), [ADR-016](../adrs/ADR-016-methodology-manifest-format.md) | 2, 3, 4a, 10b |
-| Kahn's algorithm for dependency ordering | [02](../domain-models/02-dependency-resolution.md) | [ADR-009](../adrs/ADR-009-kahns-algorithm-dependency-resolution.md) | 2, 4a |
-| Depends-on union merge semantics | [01](../domain-models/01-prompt-resolution.md), [02](../domain-models/02-dependency-resolution.md) | [ADR-011](../adrs/ADR-011-depends-on-union-semantics.md) | 4a, 10b, 11b |
-| Map-keyed state.json with atomic writes | [03](../domain-models/03-pipeline-state-machine.md) | [ADR-012](../adrs/ADR-012-state-file-design.md) | 5, 6, 11a |
-| Dual completion detection and crash recovery | [03](../domain-models/03-pipeline-state-machine.md) | [ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md) | 4b, 5b |
-| Abstract task verbs | [04](../domain-models/04-abstract-task-verbs.md) | [ADR-008](../adrs/ADR-008-abstract-task-verbs.md) | 2, 4a, 10d |
-| Three platform adapters with Universal always generated | [05](../domain-models/05-platform-adapters.md) | [ADR-003](../adrs/ADR-003-standalone-cli-source-of-truth.md), [ADR-022](../adrs/ADR-022-three-platform-adapters.md) | 2, 4a, 8, 11b |
-| Phrase-level tool-name mapping | [05](../domain-models/05-platform-adapters.md) | [ADR-023](../adrs/ADR-023-phrase-level-tool-mapping.md) | 2, 8a |
-| Capabilities as warnings | [05](../domain-models/05-platform-adapters.md) | [ADR-024](../adrs/ADR-024-capabilities-as-warnings.md) | 7c |
-| Config schema with integer versioning and migration | [06](../domain-models/06-config-validation.md) | [ADR-014](../adrs/ADR-014-config-schema-versioning.md) | 2, 5, 10b |
-| Forward compatibility (unknown fields as warnings) | [06](../domain-models/06-config-validation.md), [08](../domain-models/08-prompt-frontmatter.md) | [ADR-033](../adrs/ADR-033-forward-compatibility-unknown-fields.md) | 7c, 11b |
-| Brownfield detection and scaffold adopt | [07](../domain-models/07-brownfield-adopt.md) | [ADR-017](../adrs/ADR-017-tracking-comments-artifact-provenance.md), [ADR-028](../adrs/ADR-028-detection-priority.md) | 2, 4c |
-| Prompt frontmatter schema with section targeting | [08](../domain-models/08-prompt-frontmatter.md) | [ADR-015](../adrs/ADR-015-prompt-frontmatter-schema.md), [ADR-029](../adrs/ADR-029-prompt-structure-convention.md) | 2, 4a, 4b, 11b |
-| CLI output modes (interactive, JSON, auto) | [09](../domain-models/09-cli-architecture.md) | [ADR-025](../adrs/ADR-025-cli-output-contract.md) | 2, 7, 10a |
-| Node.js implementation language | [09](../domain-models/09-cli-architecture.md) | [ADR-001](../adrs/ADR-001-cli-implementation-language.md) | 9 |
-| CLAUDE.md section ownership and token budget | [10](../domain-models/10-claude-md-management.md) | [ADR-026](../adrs/ADR-026-claude-md-section-registry.md) | 2, 5, 10d |
-| JSONL decision log (append-only) | [11](../domain-models/11-decision-log.md) | [ADR-013](../adrs/ADR-013-decision-log-jsonl-format.md) | 2, 5, 6 |
-| Two-pass mixin injection (non-recursive) | [12](../domain-models/12-mixin-injection.md) | [ADR-006](../adrs/ADR-006-mixin-injection-over-templating.md), [ADR-035](../adrs/ADR-035-non-recursive-injection.md) | 2, 4a, 11b |
-| Mixin markers with sub-section targeting | [12](../domain-models/12-mixin-injection.md) | [ADR-007](../adrs/ADR-007-mixin-markers-subsection-targeting.md) | 4a, 10d |
-| Task verb global scope (Pass 2) | [04](../domain-models/04-abstract-task-verbs.md), [12](../domain-models/12-mixin-injection.md) | [ADR-037](../adrs/ADR-037-task-verb-global-scope.md) | 4a, 11b |
-| Advisory PID-based locking | [13](../domain-models/13-pipeline-locking.md) | [ADR-019](../adrs/ADR-019-advisory-locking.md) | 2, 5, 6, 11b |
-| Smart init wizard with methodology suggestion | [14](../domain-models/14-init-wizard.md) | [ADR-027](../adrs/ADR-027-init-wizard-smart-suggestion.md) | 2, 4c |
-| Build-time resolution and injection | [01](../domain-models/01-prompt-resolution.md), [12](../domain-models/12-mixin-injection.md) | [ADR-010](../adrs/ADR-010-build-time-resolution.md) | 1, 4a, 11b |
-| Error handling philosophy (accumulate / fail-fast) | Cross-cutting | [ADR-040](../adrs/ADR-040-error-handling-philosophy.md) | 7, 11b |
-| Skip vs exclude semantics | [02](../domain-models/02-dependency-resolution.md), [03](../domain-models/03-pipeline-state-machine.md) | [ADR-020](../adrs/ADR-020-skip-vs-exclude-semantics.md) | 4a, 4b, 11b |
-| Re-runs don't cascade | [02](../domain-models/02-dependency-resolution.md), [03](../domain-models/03-pipeline-state-machine.md) | [ADR-034](../adrs/ADR-034-rerun-no-cascade.md) | 4b, 11b |
-| --auto / --force independence | [09](../domain-models/09-cli-architecture.md), [13](../domain-models/13-pipeline-locking.md) | [ADR-036](../adrs/ADR-036-auto-does-not-imply-force.md) | 7d, 11b |
-| Sequential prompt execution | [03](../domain-models/03-pipeline-state-machine.md) | [ADR-021](../adrs/ADR-021-sequential-prompt-execution.md) | 6, 11b |
-| npm primary distribution | [09](../domain-models/09-cli-architecture.md) | [ADR-002](../adrs/ADR-002-distribution-strategy.md) | 9a, 9d |
-| CLI as source of truth | [05](../domain-models/05-platform-adapters.md), [09](../domain-models/09-cli-architecture.md) | [ADR-003](../adrs/ADR-003-standalone-cli-source-of-truth.md) | 1, 9c, 11b |
-| Tracking comments for artifact provenance | [07](../domain-models/07-brownfield-adopt.md), [10](../domain-models/10-claude-md-management.md) | [ADR-017](../adrs/ADR-017-tracking-comments-artifact-provenance.md) | 4c, 10d, 11a |
-| Methodology versioning bundled with CLI | [01](../domain-models/01-prompt-resolution.md) | [ADR-032](../adrs/ADR-032-methodology-versioning-bundled.md) | 9c |
-| Deferred: config inheritance | [06](../domain-models/06-config-validation.md) | [ADR-030](../adrs/ADR-030-config-inheritance-deferred.md) | 10b, 11b |
-| Deferred: community marketplace | [01](../domain-models/01-prompt-resolution.md) | [ADR-031](../adrs/ADR-031-community-marketplace-deferred.md) | 11b |
-| Deferred: prompt versioning | [01](../domain-models/01-prompt-resolution.md) | [ADR-038](../adrs/ADR-038-prompt-versioning-deferred.md) | 11b |
-| Deferred: pipeline context store | [11](../domain-models/11-decision-log.md) | [ADR-039](../adrs/ADR-039-pipeline-context-deferred.md) | 11b |
+| Architectural Element | Domain Model(s) | ADR(s) | Architecture Section(s) | Status |
+|----------------------|-----------------|--------|------------------------|--------|
+| **Meta-prompt architecture** | [15](../domain-models/15-assembly-engine.md), [16](../domain-models/16-methodology-depth-resolution.md) | [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md) | 1, 2, 4a, 4b, 11a, 11b | current |
+| Runtime prompt assembly (9-step sequence) | [15](../domain-models/15-assembly-engine.md) | [ADR-044](../adrs/ADR-044-runtime-prompt-generation.md) | 1, 4b, 11a, 11b | current |
+| 7-section assembled prompt structure | [15](../domain-models/15-assembly-engine.md), [08](../domain-models/08-prompt-frontmatter.md) | [ADR-045](../adrs/ADR-045-assembled-prompt-structure.md) | 1, 4b, 11a | current |
+| Knowledge base as domain expertise layer | [15](../domain-models/15-assembly-engine.md) | [ADR-042](../adrs/ADR-042-knowledge-base-domain-expertise.md) | 1, 4b | current |
+| Depth scale (1-5) | [16](../domain-models/16-methodology-depth-resolution.md), [06](../domain-models/06-config-validation.md), [14](../domain-models/14-init-wizard.md) | [ADR-043](../adrs/ADR-043-depth-scale.md) | 11a, 11b | current |
+| Phase-specific review criteria | [08](../domain-models/08-prompt-frontmatter.md) | [ADR-046](../adrs/ADR-046-phase-specific-review-criteria.md) | — | current |
+| User instruction three-layer precedence | [09](../domain-models/09-cli-architecture.md), [15](../domain-models/15-assembly-engine.md) | [ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md) | 1, 4b, 11a, 11b | current |
+| Update mode (diff over regeneration) | [03](../domain-models/03-pipeline-state-machine.md), [15](../domain-models/15-assembly-engine.md) | [ADR-048](../adrs/ADR-048-update-mode-diff-over-regeneration.md) | 4b, 11a, 11b | current |
+| Methodology changeable mid-pipeline | [03](../domain-models/03-pipeline-state-machine.md), [06](../domain-models/06-config-validation.md), [16](../domain-models/16-methodology-depth-resolution.md) | [ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md) | 11a, 11b | current |
+| Methodology & depth resolution algorithms | [16](../domain-models/16-methodology-depth-resolution.md) | [ADR-043](../adrs/ADR-043-depth-scale.md) | 2, 4a, 11a | current |
+| Methodology as top-level organizer | [06](../domain-models/06-config-validation.md), [14](../domain-models/14-init-wizard.md), [16](../domain-models/16-methodology-depth-resolution.md) | [ADR-004](../adrs/ADR-004-methodology-as-top-level-organizer.md) | 2, 3, 4a, 10b | current |
+| Kahn's algorithm for dependency ordering | [02](../domain-models/02-dependency-resolution.md) | [ADR-009](../adrs/ADR-009-kahns-algorithm-dependency-resolution.md) | 2, 4a | current |
+| Depends-on union merge semantics | [02](../domain-models/02-dependency-resolution.md), [08](../domain-models/08-prompt-frontmatter.md) | [ADR-011](../adrs/ADR-011-depends-on-union-semantics.md) | 4a, 10b, 11b | current |
+| Map-keyed state.json with atomic writes | [03](../domain-models/03-pipeline-state-machine.md) | [ADR-012](../adrs/ADR-012-state-file-design.md) | 5, 6, 11a | current |
+| Dual completion detection and crash recovery | [03](../domain-models/03-pipeline-state-machine.md) | [ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md) | 4b, 5b | current |
+| Three platform adapters with Universal always generated | [05](../domain-models/05-platform-adapters.md) | [ADR-003](../adrs/ADR-003-standalone-cli-source-of-truth.md), [ADR-022](../adrs/ADR-022-three-platform-adapters.md) | 2, 4a, 8, 11b | current |
+| Capabilities as warnings | [05](../domain-models/05-platform-adapters.md) | [ADR-024](../adrs/ADR-024-capabilities-as-warnings.md) | 7c | current |
+| Config schema with integer versioning and migration | [06](../domain-models/06-config-validation.md) | [ADR-014](../adrs/ADR-014-config-schema-versioning.md) | 2, 5, 10b | current |
+| Forward compatibility (unknown fields as warnings) | [06](../domain-models/06-config-validation.md), [08](../domain-models/08-prompt-frontmatter.md) | [ADR-033](../adrs/ADR-033-forward-compatibility-unknown-fields.md) | 7c, 11b | current |
+| Brownfield detection and scaffold adopt | [07](../domain-models/07-brownfield-adopt.md) | [ADR-017](../adrs/ADR-017-tracking-comments-artifact-provenance.md), [ADR-028](../adrs/ADR-028-detection-priority.md) | 2, 4c | current |
+| Meta-prompt frontmatter schema | [08](../domain-models/08-prompt-frontmatter.md) | [ADR-045](../adrs/ADR-045-assembled-prompt-structure.md), [ADR-029](../adrs/ADR-029-prompt-structure-convention.md) | 2, 4a, 4b, 11b | current |
+| CLI output modes (interactive, JSON, auto) | [09](../domain-models/09-cli-architecture.md) | [ADR-025](../adrs/ADR-025-cli-output-contract.md) | 2, 7, 10a | current |
+| Node.js implementation language | [09](../domain-models/09-cli-architecture.md) | [ADR-001](../adrs/ADR-001-cli-implementation-language.md) | 9 | current |
+| CLAUDE.md section ownership and token budget | [10](../domain-models/10-claude-md-management.md) | [ADR-026](../adrs/ADR-026-claude-md-section-registry.md) | 2, 5, 10d | current |
+| JSONL decision log (append-only) | [11](../domain-models/11-decision-log.md) | [ADR-013](../adrs/ADR-013-decision-log-jsonl-format.md) | 2, 5, 6 | current |
+| Advisory PID-based locking | [13](../domain-models/13-pipeline-locking.md) | [ADR-019](../adrs/ADR-019-advisory-locking.md) | 2, 5, 6, 11b | current |
+| Smart init wizard with methodology suggestion | [14](../domain-models/14-init-wizard.md) | [ADR-027](../adrs/ADR-027-init-wizard-smart-suggestion.md) | 2, 4c | current |
+| Error handling philosophy (accumulate / fail-fast) | Cross-cutting (01-16) | [ADR-040](../adrs/ADR-040-error-handling-philosophy.md) | 7, 11b | current |
+| Skip vs exclude semantics | [02](../domain-models/02-dependency-resolution.md), [03](../domain-models/03-pipeline-state-machine.md) | [ADR-020](../adrs/ADR-020-skip-vs-exclude-semantics.md) | 4a, 4b, 11b | current |
+| Re-runs don't cascade | [02](../domain-models/02-dependency-resolution.md), [03](../domain-models/03-pipeline-state-machine.md) | [ADR-034](../adrs/ADR-034-rerun-no-cascade.md) | 4b, 11b | current |
+| --auto / --force independence | [09](../domain-models/09-cli-architecture.md), [13](../domain-models/13-pipeline-locking.md) | [ADR-036](../adrs/ADR-036-auto-does-not-imply-force.md) | 7d, 11b | current |
+| Sequential prompt execution | [03](../domain-models/03-pipeline-state-machine.md) | [ADR-021](../adrs/ADR-021-sequential-prompt-execution.md) | 6, 11b | current |
+| npm primary distribution | [09](../domain-models/09-cli-architecture.md) | [ADR-002](../adrs/ADR-002-distribution-strategy.md) | 9a, 9d | current |
+| CLI as source of truth | [05](../domain-models/05-platform-adapters.md), [09](../domain-models/09-cli-architecture.md) | [ADR-003](../adrs/ADR-003-standalone-cli-source-of-truth.md) | 1, 9c, 11b | current |
+| Tracking comments for artifact provenance | [07](../domain-models/07-brownfield-adopt.md), [10](../domain-models/10-claude-md-management.md) | [ADR-017](../adrs/ADR-017-tracking-comments-artifact-provenance.md) | 4c, 10d, 11a | current |
+| Methodology versioning bundled with CLI | [06](../domain-models/06-config-validation.md), [16](../domain-models/16-methodology-depth-resolution.md) | [ADR-032](../adrs/ADR-032-methodology-versioning-bundled.md) | 9c | current |
+| Deferred: config inheritance | [06](../domain-models/06-config-validation.md) | [ADR-030](../adrs/ADR-030-config-inheritance-deferred.md) | 10b, 11b | current |
+| Deferred: community marketplace | [06](../domain-models/06-config-validation.md), [14](../domain-models/14-init-wizard.md), [16](../domain-models/16-methodology-depth-resolution.md) | [ADR-031](../adrs/ADR-031-community-marketplace-deferred.md) | 11b | current |
+| Deferred: prompt versioning | [08](../domain-models/08-prompt-frontmatter.md), [15](../domain-models/15-assembly-engine.md) | [ADR-038](../adrs/ADR-038-prompt-versioning-deferred.md) | 11b | current |
+| Deferred: pipeline context store | [11](../domain-models/11-decision-log.md) | [ADR-039](../adrs/ADR-039-pipeline-context-deferred.md) | 11b | current |
+| ~~Three-layer prompt resolution~~ | ~~01~~ | ~~ADR-005~~ | — | **superseded** (ADR-041) |
+| ~~Abstract task verbs~~ | ~~04~~ | ~~ADR-008~~ | — | **superseded** (ADR-041) |
+| ~~Two-pass mixin injection~~ | ~~12~~ | ~~ADR-006, ADR-035~~ | — | **superseded** (ADR-041) |
+| ~~Mixin markers with sub-section targeting~~ | ~~12~~ | ~~ADR-007~~ | — | **superseded** (ADR-041) |
+| ~~Task verb global scope~~ | ~~04, 12~~ | ~~ADR-037~~ | — | **superseded** (ADR-041) |
+| ~~Build-time resolution and injection~~ | ~~01, 12~~ | ~~ADR-010~~ | — | **superseded** (ADR-044) |
+| ~~Phrase-level tool-name mapping~~ | ~~05~~ | ~~ADR-023~~ | — | **superseded** (ADR-041) |
+| ~~Prompt frontmatter section targeting~~ | ~~08~~ | ~~ADR-015~~ | — | **superseded** (ADR-045) |
+| ~~Methodology manifest YAML format~~ | ~~01, 02~~ | ~~ADR-016~~ | — | **superseded** (ADR-043) |
+| Proposed: context window management | [15](../domain-models/15-assembly-engine.md) | [ADR-050](../adrs/ADR-050-context-window-management.md) | — | **proposed** |
+| Proposed: depth downgrade policy | [09](../domain-models/09-cli-architecture.md), [16](../domain-models/16-methodology-depth-resolution.md) | [ADR-051](../adrs/ADR-051-depth-downgrade-policy.md) | — | **proposed** |
+| Proposed: decision recording interface | [11](../domain-models/11-decision-log.md), [15](../domain-models/15-assembly-engine.md) | [ADR-052](../adrs/ADR-052-decision-recording-interface.md) | — | **proposed** |
+| Proposed: artifact context scope | [15](../domain-models/15-assembly-engine.md) | [ADR-053](../adrs/ADR-053-artifact-context-scope.md) | — | **proposed** |
+| Proposed: state methodology tracking | [03](../domain-models/03-pipeline-state-machine.md), [16](../domain-models/16-methodology-depth-resolution.md) | [ADR-054](../adrs/ADR-054-state-methodology-tracking.md) | — | **proposed** |
 
 **Coverage verification:**
 
-- All 14 domain models (01-14) appear at least once in the Domain Model(s) column
-- All 40 ADRs (001-040) are referenced — accepted ADRs appear in the ADR(s) column; deferred ADRs appear in the deferred features rows
+- All 16 domain models (01-16) appear at least once — domains 01, 04, 12 in superseded rows; domains 15, 16 in current meta-prompt architecture rows
+- All 54 ADRs (001-054) are referenced — 39 accepted ADRs in current rows, 10 superseded ADRs in superseded rows, 5 proposed ADRs in proposed rows
 - Every architecture section (1-11) is referenced at least once in the Architecture Section(s) column
 
 ---
@@ -1862,8 +1850,8 @@ The following diagram shows how design decisions flow from domain analysis throu
 
 ```mermaid
 graph TD
-    DM["Domain Models (14)<br/>─────────<br/>Define entities, algorithms,<br/>edge cases, and error taxonomies"]
-    ADR["Architecture Decision Records (40)<br/>─────────<br/>Record decisions about<br/>those entities with rationale"]
+    DM["Domain Models (16)<br/>─────────<br/>Define entities, algorithms,<br/>edge cases, and error taxonomies<br/>(3 superseded: 01, 04, 12)"]
+    ADR["Architecture Decision Records (54)<br/>─────────<br/>Record decisions about<br/>those entities with rationale<br/>(10 superseded, 5 proposed)"]
     ARCH["System Architecture (this document)<br/>─────────<br/>Maps decisions to components,<br/>modules, and data flows"]
     IMPL["Implementation Artifacts<br/>─────────<br/>Data schemas, API contracts,<br/>source code, tests"]
 

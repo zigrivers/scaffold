@@ -1,7 +1,7 @@
 # Scaffold v2 — CLI Contract
 
 **Phase**: 5 — API Contract Specification
-**Depends on**: Phase 3 ([system-architecture](../architecture/system-architecture.md)), Phase 4 ([data schemas](../data/)), Phase 2 ([ADR-025](../adrs/ADR-025-cli-output-contract.md), [ADR-040](../adrs/ADR-040-error-handling-philosophy.md))
+**Depends on**: Phase 3 ([system-architecture](../architecture/system-architecture.md)), Phase 4 ([data schemas](../data/)), Phase 2 ([ADR-025](../adrs/ADR-025-cli-output-contract.md), [ADR-040](../adrs/ADR-040-error-handling-philosophy.md), [ADR-043](../adrs/ADR-043-depth-scale.md), [ADR-044](../adrs/ADR-044-runtime-prompt-generation.md), [ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md), [ADR-048](../adrs/ADR-048-update-mode-diff-over-regeneration.md), [ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md))
 **Last updated**: 2026-03-14
 **Status**: draft
 
@@ -187,6 +187,7 @@ In JSON mode, `data` contains `{ mode, methodology, config_path, platforms, proj
 - Creates `.scaffold/config.yml` (wizard output)
 - Creates `.scaffold/state.json` (all prompts `pending`; v1 migration pre-completes matched prompts)
 - Creates `.scaffold/decisions.jsonl` (empty for greenfield/brownfield; may be pre-populated for v1 migration)
+- Creates `.scaffold/instructions/` directory for user instruction files ([ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md))
 - Invokes full `scaffold build` pipeline (writes `commands/*.md`, `prompts/*.md`, `CLAUDE.md` sections, `AGENTS.md`, etc.)
 
 **Examples**:
@@ -375,10 +376,10 @@ scaffold adopt --force
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--instructions <text>` | string | (none) | Inline user instructions for this invocation. Appended as the highest-priority layer in the instruction hierarchy (global < per-step < inline). Ephemeral — not persisted. |
+| `--instructions <text>` | string | (none) | Inline user instructions for this invocation. Appended as the highest-priority layer in the instruction hierarchy (global < per-step < inline per [ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md)). Ephemeral — not persisted. |
 | `--force` | boolean | false | Override lock contention. Clears a held lock and proceeds. |
 
-**Assembly sequence** (per PRD Section 9):
+**Assembly sequence** (per PRD Section 9, [ADR-044](../adrs/ADR-044-runtime-prompt-generation.md)):
 
 1. **Load meta-prompt**: Read `pipeline/<step>.md` — the step's purpose, inputs, outputs, quality criteria, methodology scaling rules.
 2. **Check prerequisites**: Pipeline state (already completed? offer re-run in update mode), dependencies (all prior steps completed?), lock (another step running?).
@@ -399,10 +400,11 @@ scaffold adopt --force
    - Partial artifacts → presents "Re-run <step> (safer) / Accept partial output / Cancel".
    - Note: Zero-byte artifact files are treated as 'present' for crash recovery purposes but produce a `PSM_ZERO_BYTE_ARTIFACT` warning.
 3. **Prerequisite check**: Verifies predecessor `produces` artifacts exist on disk. If missing → offers "Run prerequisite first / Proceed anyway / Cancel".
-4. **Update mode**: If the step is already `completed`, the assembled prompt includes existing artifacts as additional context, and the meta-prompt's Mode Detection section instructs the AI to diff and propose targeted updates rather than regenerating from scratch.
-5. **Execution**: Sets `in_progress` in state.json, outputs assembled prompt content to stdout for agent consumption.
-6. **Post-completion**: Marks `completed`, clears `in_progress`, appends decisions to `decisions.jsonl`, fills CLAUDE.md section if applicable, releases lock.
-7. **Downstream warning** (for re-runs on completed steps): Emits warning listing all downstream steps that may be stale, with suggested `scaffold run <slug>` commands ([ADR-034](../adrs/ADR-034-rerun-no-cascade.md)).
+4. **Update mode** ([ADR-048](../adrs/ADR-048-update-mode-diff-over-regeneration.md)): If the step is already `completed`, the assembled prompt includes existing artifacts as additional context, and the meta-prompt's Mode Detection section instructs the AI to diff and propose targeted updates rather than regenerating from scratch.
+5. **Methodology change check** ([ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md)): If the methodology has changed since the last step was executed, emits a warning listing completed steps that were executed under the previous methodology. Pending steps are resolved under the new methodology; completed steps are preserved as-is.
+6. **Execution**: Sets `in_progress` in state.json, outputs assembled prompt content to stdout for agent consumption.
+7. **Post-completion**: Marks `completed` with depth level recorded, clears `in_progress`, appends decisions to `decisions.jsonl`, fills CLAUDE.md section if applicable, releases lock.
+8. **Downstream warning** (for re-runs on completed steps): Emits warning listing all downstream steps that may be stale, with suggested `scaffold run <slug>` commands ([ADR-034](../adrs/ADR-034-rerun-no-cascade.md)).
 
 Steps execute sequentially — at most one step at a time ([ADR-021](../adrs/ADR-021-sequential-prompt-execution.md)). Even in `--auto` mode, the user must have initiated `scaffold run`; the CLI does not self-invoke.
 
@@ -439,7 +441,7 @@ After the agent completes and the user confirms completion:
   Run: scaffold run user-stories-gaps
 ```
 
-In JSON mode, `data` contains `{ step, methodology, depth, pipeline_progress, outputs_produced, next_eligible }` with optional `instructions_loaded` (layers of instructions applied) and `auto_decisions` (present in `--auto` mode).
+In JSON mode, `data` contains `{ step, methodology, depth, update_mode, pipeline_progress, outputs_produced, next_eligible }` with optional `instructions_loaded` (layers of instructions applied per [ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md)) and `auto_decisions` (present in `--auto` mode). `depth` is integer 1-5 ([ADR-043](../adrs/ADR-043-depth-scale.md)); `update_mode` is boolean ([ADR-048](../adrs/ADR-048-update-mode-diff-over-regeneration.md)).
 
 **Error conditions:**
 
@@ -674,7 +676,7 @@ Phase 2 — Architecture
 Next eligible: user-stories
 ```
 
-In JSON mode, `data` contains `{ methodology, progress: { completed, skipped, in_progress, pending, total }, phases: [{ name, index, prompts: [...] }], next_eligible: string[], orphaned_entries: string[] }`.
+In JSON mode, `data` contains `{ methodology, progress: { completed, skipped, in_progress, pending, total }, phases: [{ name, index, prompts: [{ slug, status, source, depth, ... }] }], next_eligible: string[], orphaned_entries: string[] }`. Per-step `depth` (integer 1-5, [ADR-043](../adrs/ADR-043-depth-scale.md)) is present for completed steps.
 
 **Error conditions:**
 
@@ -796,7 +798,7 @@ Checks are organized by category:
 - **Manifests (4 checks):** manifest loads/parses, all prompt references resolve to files, no circular dependencies, all dependency targets exist
 - **Frontmatter (5 checks):** YAML valid, required fields present (description), reads entries are valid paths, produces entries are valid, depends_on slugs exist in pipeline
 - **Artifacts (5 checks):** required sections present, ID format patterns valid, index table present in first 50 lines, tracking comment on line 1, no unresolved markers in content
-- **State (3 checks):** schema version matches, all referenced slugs exist in pipeline, completed prompts have produces artifacts on disk
+- **State (5 checks):** schema version matches, all referenced slugs exist in pipeline, completed prompts have produces artifacts on disk, completed steps have valid depth (V19 per [state-json-schema](../data/state-json-schema.md)), completed steps have depth within configured range (V20)
 - **Decisions (3 checks):** entries parse as valid JSON, IDs sequential and unique, prompt references exist in pipeline
 
 **Success output** (no issues):

@@ -1096,6 +1096,14 @@ This domain also calls `computeEligible()` at runtime, which requires the depend
 **Contract**: When a prompt completes, the CLAUDE.md manager checks whether that prompt owns any CLAUDE.md sections and fills them
 **Assumption**: CLAUDE.md section filling is a side effect of prompt execution, not a state machine responsibility. The state machine only records completion.
 
+### Domain 16 — Methodology & Depth Resolution
+
+**Direction**: Domain 16 → Domain 03 (this domain records depth from domain 16)
+**Data flow**: When a step completes, the depth level resolved by domain 16 is recorded in `PromptStateEntry.depth`. This enables methodology change detection — domain 16 compares the recorded depth against the current config to identify steps completed at a different depth than currently configured. Domain 16 emits `COMPLETED_AT_LOWER_DEPTH` warnings when a step was completed at a lower depth than the current methodology specifies.
+**Lifecycle stage**: Runtime (during step completion and methodology change detection)
+**Contract**: `PromptStateEntry.depth` is a `DepthLevel` (integer 1-5), set once at completion time and not modified afterward. If a step is re-run at a different depth, the depth field is overwritten with the new value.
+**Assumption**: Depth is informational in state — it records what happened, not what should happen. The authoritative depth for future runs comes from domain 16's resolution, not from state.
+
 ---
 
 ## Section 8: Edge Cases & Failure Modes

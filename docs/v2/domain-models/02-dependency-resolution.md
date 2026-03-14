@@ -775,6 +775,13 @@ FUNCTION findAffectedDownstream(
 - **Data flow**: The frontmatter `depends-on` field (an array of prompt slug strings) is parsed by domain 01, merged with manifest deps, and passed to domain 02 via `ResolvedPrompt.frontmatter.dependsOn`.
 - **Contract**: `depends-on` values are prompt slugs (not prefixed references). Domain 02 validates that each slug exists in the resolved set or excluded set.
 
+### Methodology & Depth Resolution (Domain 16) → Dependency Resolution
+
+- **Direction**: Domain 16 outputs affect domain 02's input set
+- **Data flow**: Step enablement resolved by domain 16 determines which steps are active in the pipeline. Steps that domain 16 reports as disabled are excluded from the active step set and added to `DependencyInput.excludedSlugs`. This changes the dependency graph — dependents of disabled steps may become unblocked if the disabled step was their only remaining dependency.
+- **Contract**: Domain 02 expects domain 16's enablement decisions to be final before dependency resolution runs. Disabled steps are removed from the graph entirely (not treated as skipped).
+- **Assumption**: Enablement is resolved before dependency resolution. If methodology config changes, dependency resolution must be re-run with the updated active step set.
+
 ---
 
 ## Section 8: Edge Cases & Failure Modes

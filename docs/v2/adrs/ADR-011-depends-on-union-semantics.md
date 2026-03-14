@@ -10,6 +10,8 @@
 
 ## Context
 
+> **Architecture update:** This ADR was written for the original three-layer prompt resolution system (domain 01). The meta-prompt architecture (ADR-041) eliminated custom prompts, extension prompts, and methodology manifest dependency sections. However, the core decision — union semantics for `depends-on` — remains valid for meta-prompt frontmatter (domain 08): meta-prompts declare dependencies in frontmatter, and the assembly engine (domain 15) uses these for prerequisite checking. The merge question now applies if users create project-local meta-prompt overrides.
+
 In Scaffold v2, dependencies between prompts can be declared in two places: the methodology manifest's `dependencies` section and individual prompt frontmatter `depends-on` fields. When a custom prompt (project-level or user-level override) declares its own `depends-on`, the system must decide whether those dependencies **replace** or **merge with** the built-in prompt's dependencies.
 
 This is flagged as an ADR CANDIDATE in three domain models:
@@ -38,7 +40,7 @@ No `depends-on-override` or `depends-on-replace` escape hatch is provided. Custo
 - **Safety-first for dependency integrity**: A custom prompt that removes a dependency like `create-prd -> tech-stack` would allow `tech-stack` to execute without the PRD existing. The agent running `tech-stack` would receive an empty or missing predecessor artifact, producing garbage output. Union semantics prevent this class of error entirely. The cost — inability to simplify the graph — is low because the dependency graph is typically well-designed by methodology authors and rarely needs simplification (domain 02, Section 10, ADR CANDIDATE 5).
 - **Asymmetry matches risk profile**: Replacing `description` affects what users see in `scaffold list`. Replacing `produces` affects completion detection. Replacing `artifact-schema` affects validation strictness. None of these can break the pipeline's execution ordering. But removing a dependency edge can cause a prompt to execute out of order with missing inputs. The asymmetry between union (for the safety-critical field) and replace (for non-critical fields) matches the risk profile of each field type (domain 01, Section 8, MQ2).
 - **No escape hatch reduces complexity**: A `depends-on-replace` field would add a new frontmatter key, new merge logic, new validation rules, and a new decision point for every custom prompt author. For the rare case where a user genuinely needs to remove a dependency, they can create a methodology fork or modify the manifest directly. The simplicity of "depends-on is always additive" is worth the loss of an edge-case escape hatch (domain 01, Section 10, ADR CANDIDATE 7).
-- **Warning for floating extensions catches common mistakes**: An extension prompt in Phase 3 with no dependencies would be eligible to run immediately (position 1 in its phase), likely before the prompts that produce its required inputs. The warning catches this at build time rather than allowing a confusing runtime failure (domain 08, Section 10, Recommendation 4).
+- **Warning for floating extensions catches common mistakes**: An extension prompt in Phase 3 with no dependencies would be eligible to run immediately (position 1 in its phase), likely before the prompts that produce its required inputs. The warning catches this at validation time (scaffold validate) rather than allowing a confusing runtime failure (domain 08, Section 10, Recommendation 4).
 
 ## Alternatives Considered
 
@@ -75,11 +77,11 @@ No `depends-on-override` or `depends-on-replace` escape hatch is provided. Custo
 
 ## Constraints and Compliance
 
-- The resolution algorithm MUST merge `depends-on` using set union when both a built-in prompt and a custom prompt declare dependencies (domain 01, Section 5, Algorithm 2, Step 6)
+- The resolution algorithm MUST merge `depends-on` using set union when both a built-in prompt and a custom prompt declare dependencies (domain 02, Section 5 (dependency graph construction))
 - Custom prompts MUST NOT be able to remove built-in dependencies through any frontmatter mechanism
-- For all frontmatter fields other than `depends-on`, custom values MUST replace built-in values entirely (domain 01, Section 8, MQ2)
-- Extension prompts without `depends-on` in frontmatter and no manifest dependency entry MUST emit a warning at build time (domain 08, Section 10, Recommendation 4)
-- Extra prompts' `depends-on` fields are included in the dependency graph directly — they have no built-in equivalent to merge with (domain 01, Section 8, MQ4)
+- For all frontmatter fields other than `depends-on`, custom values MUST replace built-in values entirely (domain 08 (meta-prompt frontmatter schema))
+- Extension prompts without `depends-on` in frontmatter and no manifest dependency entry MUST emit a warning at validation time (scaffold validate) (domain 08, Section 10, Recommendation 4)
+- Extra prompts' `depends-on` fields are included in the dependency graph directly — they have no built-in equivalent to merge with (domain 08 (meta-prompt frontmatter schema))
 - Implementers MUST NOT add `depends-on-replace`, `depends-on-override`, or any similar escape hatch field to the frontmatter schema
 - The `DependencyEdge.source` field MUST track whether each edge came from `manifest`, `frontmatter`, or `both`, enabling diagnostics about why a dependency exists (domain 02, Section 3)
 - Non-`depends-on` array fields (`produces`, `reads`, `artifact-schema`) use REPLACE strategy when a custom prompt provides them — the custom values completely replace the base values with no merging. Only `depends-on` receives union semantics.
@@ -89,6 +91,5 @@ No `depends-on-override` or `depends-on-replace` escape hatch is provided. Custo
 - [ADR-005](ADR-005-three-layer-prompt-resolution.md) — Three-layer resolution that triggers frontmatter merging
 - [ADR-009](ADR-009-kahns-algorithm-dependency-resolution.md) — Dependency sorting that consumes the merged dependency graph
 - ADR-015 — Frontmatter schema defining the fields subject to these merge rules
-- Domain 01 ([01-prompt-resolution.md](../domain-models/01-prompt-resolution.md)) — Merge algorithm in Section 5, Algorithm 2
+- Domain 08 ([08-prompt-frontmatter.md](../domain-models/08-prompt-frontmatter.md)) — Meta-prompt frontmatter schema defining depends-on field
 - Domain 02 ([02-dependency-resolution.md](../domain-models/02-dependency-resolution.md)) — Dependency graph construction from merged dependencies
-- Domain 08 ([08-prompt-frontmatter.md](../domain-models/08-prompt-frontmatter.md)) — Frontmatter schema and merge rules

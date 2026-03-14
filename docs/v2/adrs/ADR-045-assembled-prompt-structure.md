@@ -142,3 +142,4 @@ The assembled prompt follows a **fixed-order section structure** with clear sect
 - [ADR-042](ADR-042-knowledge-base-domain-expertise.md) — Knowledge base entries that populate section 3
 - [ADR-044](ADR-044-runtime-prompt-generation.md) — Runtime assembly that produces the assembled prompt in this structure
 - [ADR-043](ADR-043-depth-scale.md) — Depth scale that populates section 5 (methodology)
+- Domain 15 ([15-assembly-engine.md](../domain-models/15-assembly-engine.md)) — Assembly engine that constructs the 7-section assembled prompt

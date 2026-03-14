@@ -72,11 +72,15 @@ Specifically:
 - Breaks the all-bash convention established in v1 — CLAUDE.md, coding-standards, and test infrastructure must be updated for the v2 codebase
 - Development team needs Node.js familiarity (TypeScript specifically, per domain 09)
 - Bash scripts may still exist for git/shell-heavy utilities, creating a mixed-language codebase
-- Node.js startup time (~100ms) is slower than bash for trivial commands, though well within the 2-second performance target for `scaffold build`
+- Node.js startup time (~100ms) is slower than bash for trivial commands, though well within the 500ms assembly performance target for `scaffold run` (PRD §18)
 
 ### Neutral
 - Test framework shifts from bats-core to a Node-based runner (jest or vitest) — different but not inherently better or worse for the test patterns needed
 - Minimum Node.js version must be documented and enforced (18+ per spec, though Codex requires 22+)
+
+## Reversibility
+
+Effectively irreversible once implementation begins. Changing the CLI language requires a complete rewrite of every module. The choice of Node.js is locked in by the first line of production code.
 
 ## Constraints and Compliance
 

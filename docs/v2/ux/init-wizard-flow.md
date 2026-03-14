@@ -1,9 +1,9 @@
 # Scaffold v2 — Init Wizard UX Flow
 
 **Phase**: 6 — UX Specification
-**Depends on**: Phase 5 CLI contract (`scaffold init`), Domain model 14 (wizard state machine)
-**Last updated**: 2026-03-13
-**Status**: superseded
+**Depends on**: Phase 5 CLI contract (`scaffold init`), Domain model 14 (wizard state machine), [ADR-043](../adrs/ADR-043-depth-scale.md) (depth scale), [ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md) (user instructions)
+**Last updated**: 2026-03-14
+**Status**: draft
 
 ---
 
@@ -168,7 +168,7 @@ Displayed when keyword analysis produces a clear suggestion (confidence: medium 
 ```
   Based on your project description:
     Keywords detected: "web app" (web), "task" (general)
-    Recommended methodology: Scaffold Classic
+    Recommended methodology: Deep Domain Modeling
 
 ```
 
@@ -183,13 +183,13 @@ Displayed when file signals in the project directory contradict the keyword sugg
 ```
   Based on your project description:
     Keywords detected: "cli tool" (cli)
-    Keyword suggestion: Scaffold Lite
+    Keyword suggestion: MVP
 
   However, file analysis found:
     - package.json: React dependency detected
     - next.config.ts: Next.js configuration
 
-  Adjusted recommendation: Scaffold Classic
+  Adjusted recommendation: Deep Domain Modeling
     (file evidence indicates a web project, overriding CLI keyword)
 
 ```
@@ -205,7 +205,7 @@ Displayed when idea text is provided but no keywords match the keyword map.
 ```
   Based on your project description:
     No specific project type detected from your description.
-    Defaulting to Scaffold Classic.
+    Defaulting to Deep Domain Modeling.
 
 ```
 
@@ -214,8 +214,8 @@ Displayed when idea text is provided but no keywords match the keyword map.
 In `--auto` mode, the smart suggestion result directly determines the methodology without displaying any output. The suggestion algorithm runs identically, but the result is applied as the final answer rather than as a default for an interactive question.
 
 - **With idea text + signals**: Suggested methodology is used.
-- **With idea text + no signals**: `classic` is used.
-- **Without idea text**: `classic` is used.
+- **With idea text + no signals**: `deep` is used.
+- **Without idea text**: `deep` is used.
 - **File signal override**: File methodology wins, same as interactive mode.
 
 In `--format json` mode, the full `MethodologySuggestion` object (sources, confidence, keyword list) is included in the response envelope for auditability.
@@ -348,7 +348,7 @@ If `codex` is selected but the `codex` CLI is not found on PATH, a warning is di
 │    signal detection                                              │
 │  --auto: Inferred from smart suggestion traits                   │
 │  Skipped when: methodology has no optional prompts with trait    │
-│    conditions (e.g., classic-lite)                                │
+│    conditions (e.g., mvp)                                        │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -368,7 +368,7 @@ Selecting both `web` and `mobile` additionally derives the `multi-platform` trai
 
 **Validation**: Empty selection is valid. Selecting no project platforms means no optional prompts with trait conditions are included in the pipeline.
 
-**Adaptive rules**: This question is **skipped entirely** when the selected methodology has no optional prompts with trait conditions (`MethodologyInfo.hasOptionalPrompts === false`). For `classic-lite`, which has no optional prompts, this screen is never shown.
+**Adaptive rules**: This question is **skipped entirely** when the selected methodology has no optional prompts with trait conditions (`MethodologyInfo.hasOptionalPrompts === false`). For `mvp`, which has no optional prompts, this screen is never shown.
 
 **`--auto` behavior**: Project platforms are inferred from smart suggestion traits. If suggestion traits include `web`, `web` is selected. If traits include `mobile`, `mobile` is selected. If no traits are detected, no project platforms are selected (empty array).
 
@@ -457,6 +457,7 @@ Warnings do not block confirmation. The user can proceed despite warnings.
 
 ```
   ✓ Config saved to .scaffold/config.yml
+  ✓ .scaffold/instructions/ directory created ([ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md))
 ```
 
 ### 4d: V1 Adopt Scan (Conditional)
@@ -516,17 +517,18 @@ The final output after a successful init + build.
 ```
   === Your Pipeline ===
 
-  Methodology: Scaffold Classic (22 resolved of 24 defined, 7 phases)
+  Methodology: Deep Domain Modeling (29 enabled of 32 defined, 7 phases)
   Mode:        greenfield
+  Depth:       5
   Platforms:   Claude Code
 
-  Phase 0  Prerequisites       ░░░░░░░░░░  0/3
-  Phase 1  Product Definition  ░░░░░░░░░░  0/4
-  Phase 2  Technical Design    ░░░░░░░░░░  0/3
-  Phase 3  Quality Standards   ░░░░░░░░░░  0/3
-  Phase 4  Development Setup   ░░░░░░░░░░  0/4
-  Phase 5  Planning            ░░░░░░░░░░  0/2
-  Phase 6  Implementation      ░░░░░░░░░░  0/3
+  Phase 0  Prerequisites       ░░░░░░░░░░  0/1
+  Phase 1  Product Definition  ░░░░░░░░░░  0/5
+  Phase 2  Technical Design    ░░░░░░░░░░  0/6
+  Phase 3  System Architecture ░░░░░░░░░░  0/5
+  Phase 4  Quality Standards   ░░░░░░░░░░  0/4
+  Phase 5  Development Setup   ░░░░░░░░░░  0/5
+  Phase 6  Planning            ░░░░░░░░░░  0/3
 
   Next step: Run scaffold run to start executing prompts.
 
@@ -537,20 +539,21 @@ The final output after a successful init + build.
 ```
   === Your Pipeline ===
 
-  Methodology: Scaffold Classic (22 resolved of 24 defined, 7 phases)
+  Methodology: Deep Domain Modeling (29 enabled of 32 defined, 7 phases)
   Mode:        v1-migration
+  Depth:       5
   Platforms:   Claude Code
 
-  Phase 0  Prerequisites       ██████░░░░  2/3
-  Phase 1  Product Definition  ██████████  4/4
-  Phase 2  Technical Design    █████░░░░░  1/3
-  Phase 3  Quality Standards   ██████████  3/3
-  Phase 4  Development Setup   █████░░░░░  2/4
-  Phase 5  Planning            ░░░░░░░░░░  0/2
-  Phase 6  Implementation      ░░░░░░░░░░  0/3
+  Phase 0  Prerequisites       ██████████  1/1
+  Phase 1  Product Definition  ██████████  5/5
+  Phase 2  Technical Design    ████░░░░░░  2/6
+  Phase 3  System Architecture ░░░░░░░░░░  0/5
+  Phase 4  Quality Standards   ██████████  4/4
+  Phase 5  Development Setup   █████░░░░░  2/5
+  Phase 6  Planning            ░░░░░░░░░░  0/3
 
-  Pre-completed: 8 prompts (from existing v1 artifacts)
-  Remaining:     14 prompts
+  Pre-completed: 8 steps (from existing v1 artifacts)
+  Remaining:     21 steps
   Next eligible: dev-env-setup
 
   Next step: Run scaffold run to continue from where v1 left off.
@@ -562,19 +565,20 @@ The final output after a successful init + build.
 ```
   === Your Pipeline ===
 
-  Methodology: Scaffold Classic (22 resolved of 24 defined, 7 phases)
+  Methodology: Deep Domain Modeling (29 enabled of 32 defined, 7 phases)
   Mode:        brownfield
+  Depth:       5
   Platforms:   Claude Code
 
-  Phase 0  Prerequisites       ░░░░░░░░░░  0/3
-  Phase 1  Product Definition  ░░░░░░░░░░  0/4
-  Phase 2  Technical Design    ░░░░░░░░░░  0/3
-  Phase 3  Quality Standards   ░░░░░░░░░░  0/3
-  Phase 4  Development Setup   ░░░░░░░░░░  0/4
-  Phase 5  Planning            ░░░░░░░░░░  0/2
-  Phase 6  Implementation      ░░░░░░░░░░  0/3
+  Phase 0  Prerequisites       ░░░░░░░░░░  0/1
+  Phase 1  Product Definition  ░░░░░░░░░░  0/5
+  Phase 2  Technical Design    ░░░░░░░░░░  0/6
+  Phase 3  System Architecture ░░░░░░░░░░  0/5
+  Phase 4  Quality Standards   ░░░░░░░░░░  0/4
+  Phase 5  Development Setup   ░░░░░░░░░░  0/5
+  Phase 6  Planning            ░░░░░░░░░░  0/3
 
-  Brownfield mode: 4 prompts will adapt to your existing code
+  Brownfield mode: 4 steps will adapt to your existing code
     (create-prd, tech-stack, project-structure, dev-env-setup)
 
   Next step: Run scaffold run to start executing prompts.
@@ -598,6 +602,7 @@ In JSON mode, no human-readable progress output is shown. The entire result is r
     "platforms": ["claude-code"],
     "stepCount": 32,
     "enabledSteps": 29,
+    "instructionsDir": ".scaffold/instructions/",
     "buildResult": {
       "stepCount": 29,
       "platforms": ["claude-code"],
@@ -627,7 +632,7 @@ Fires when the wizard cannot load methodology manifests at startup (corrupt inst
 ```
   Error: Failed to load methodology manifests.
 
-  Could not read methodologies/classic/manifest.yml:
+  Could not read pipeline/manifest.yml:
     ENOENT: no such file or directory
 
   Recovery:
@@ -650,7 +655,7 @@ Fires when the wizard cannot load methodology manifests at startup (corrupt inst
   "data": null,
   "errors": [{
     "code": "INIT_MANIFEST_LOAD_FAILED",
-    "message": "Failed to load methodology manifests: ENOENT: methodologies/classic/manifest.yml not found",
+    "message": "Failed to load methodology manifests: ENOENT: pipeline/manifest.yml not found",
     "recovery": "Run scaffold update to repair the installation."
   }],
   "warnings": [],
@@ -684,7 +689,7 @@ Fires when `scaffold build` fails after config has been successfully written. Th
 
   Error: Build failed.
 
-  manifest parse error in classic/manifest.yml: unexpected token at line 42
+  manifest parse error in pipeline/manifest.yml: unexpected token at line 42
 
   Your config was saved successfully. The build step failed separately.
 
@@ -710,13 +715,14 @@ The key UX decision here is that config write and build are treated as separate 
   "data": {
     "configPath": ".scaffold/config.yml",
     "statePath": null,
-    "methodology": "classic",
+    "methodology": "deep",
     "mode": "greenfield",
+    "depth": 5,
     "buildResult": null
   },
   "errors": [{
     "code": "INIT_BUILD_FAILED",
-    "message": "Build failed: manifest parse error in classic/manifest.yml.",
+    "message": "Build failed: manifest parse error in pipeline/manifest.yml.",
     "recovery": "Run scaffold build manually to retry."
   }],
   "warnings": [],

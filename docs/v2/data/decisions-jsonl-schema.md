@@ -2,7 +2,7 @@
 
 **Phase**: 4 — Data Schemas
 **Depends on**: [domain-models/11-decision-log.md](../domain-models/11-decision-log.md), [adrs/ADR-013-decision-log-jsonl-format.md](../adrs/ADR-013-decision-log-jsonl-format.md), [architecture/system-architecture.md](../architecture/system-architecture.md) §5
-**Last updated**: 2026-03-13
+**Last updated**: 2026-03-14
 **Status**: draft
 
 ---
@@ -51,8 +51,8 @@ Each line in `decisions.jsonl` MUST be a valid JSON object conforming to the fol
     },
     "prompt": {
       "type": "string",
-      "minLength": 1,
-      "description": "The slug of the prompt that produced this decision. Must match a prompt key in the resolved pipeline (state.json prompts map)."
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "The step name (kebab-case slug) that produced this decision. Must match a step name in the resolved pipeline (state.json prompts map)."
     },
     "decision": {
       "type": "string",
@@ -91,6 +91,12 @@ Each line in `decisions.jsonl` MUST be a valid JSON object conforming to the fol
       "type": "string",
       "enum": ["pending", "approved", "rejected", "revised"],
       "description": "Review status for decisions tagged NEEDS_USER_REVIEW. Only present when tags includes NEEDS_USER_REVIEW. Defaults to pending when first written."
+    },
+    "depth": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Depth level (1-5) at which the step was executing when this decision was recorded. Enables downstream steps to understand the rigor level of prior decisions. Scale: 1 (MVP floor) through 5 (deep ceiling). See ADR-043."
     }
   },
   "additionalProperties": true
@@ -120,7 +126,7 @@ Each line in `decisions.jsonl` MUST be a valid JSON object conforming to the fol
 | Field | Type | Required | Default | Constraints | Description |
 |---|---|---|---|---|---|
 | `id` | `string` | Yes | — | Pattern: `^D-\d{3,}$`. Monotonically increasing. Unique within file (SHOULD; duplicates are warnings, not errors). | Sequential decision identifier. Assigned by CLI, never by agents. |
-| `prompt` | `string` | Yes | — | Non-empty. Should match a key in `state.json` `prompts` map. | Slug of the prompt that produced this decision. |
+| `prompt` | `string` | Yes | — | kebab-case (`^[a-z][a-z0-9-]*$`). Should match a step name in `state.json` `prompts` map. | Step name (kebab-case slug) that produced this decision. |
 | `decision` | `string` | Yes | — | Non-empty after trimming (minLength: 1). Recommended max: 500 characters (semantic warning, not structural). | Human-readable decision text describing what was decided and why. |
 | `at` | `string` | Yes | — | Valid ISO 8601 date-time. Example: `2026-03-13T14:30:00.000Z` | Timestamp of when the CLI recorded this entry. |
 | `completed_by` | `string` | Yes | — | Non-empty after trimming. | Actor identity: username, `BD_ACTOR` value, or `scaffold-adopt`. |
@@ -128,6 +134,7 @@ Each line in `decisions.jsonl` MUST be a valid JSON object conforming to the fol
 | `category` | `string` | No | *(absent)* | One of: `technology`, `architecture`, `process`, `convention`, `infrastructure`. | Decision classification. Aids filtering and downstream consumption. |
 | `tags` | `string[]` | No | *(absent)* | Array of unique strings. Currently only `NEEDS_USER_REVIEW` is defined. | Tags for special handling. |
 | `review_status` | `string` | No | *(absent)* | One of: `pending`, `approved`, `rejected`, `revised`. Only meaningful when `tags` includes `NEEDS_USER_REVIEW`. | Review lifecycle state for autonomous high-stakes decisions. |
+| `depth` | `integer` | No | *(absent)* | 1-5 ([ADR-043](../adrs/ADR-043-depth-scale.md)). | Depth level at which the step was executing when this decision was recorded. Enables downstream steps to assess the rigor level behind prior decisions. |
 
 **Field name convention**: This file uses `snake_case` for field names (`completed_by`, `prompt_completed`, `review_status`), matching the serialized JSON convention established in Domain 11.
 
@@ -313,9 +320,9 @@ The smallest valid entry, using only required fields:
 A file after completing several prompts, showing typical usage with categories, a provisional entry, and a re-run scenario:
 
 ```jsonl
-{"id":"D-001","prompt":"product-definition","decision":"Building a task management CLI tool targeting developers who want offline-first task tracking","at":"2026-03-13T10:00:00.000Z","completed_by":"user-1","prompt_completed":true,"category":"architecture"}
-{"id":"D-002","prompt":"product-definition","decision":"MVP scope: create, list, update, delete tasks with local SQLite storage","at":"2026-03-13T10:00:01.000Z","completed_by":"user-1","prompt_completed":true,"category":"process"}
-{"id":"D-003","prompt":"tech-stack","decision":"Chose Rust for CLI implementation — compile-time safety, single binary distribution, fast startup","at":"2026-03-13T11:15:00.000Z","completed_by":"user-1","prompt_completed":true,"category":"technology"}
+{"id":"D-001","prompt":"product-definition","decision":"Building a task management CLI tool targeting developers who want offline-first task tracking","at":"2026-03-13T10:00:00.000Z","completed_by":"user-1","prompt_completed":true,"category":"architecture","depth":5}
+{"id":"D-002","prompt":"product-definition","decision":"MVP scope: create, list, update, delete tasks with local SQLite storage","at":"2026-03-13T10:00:01.000Z","completed_by":"user-1","prompt_completed":true,"category":"process","depth":5}
+{"id":"D-003","prompt":"tech-stack","decision":"Chose Rust for CLI implementation — compile-time safety, single binary distribution, fast startup","at":"2026-03-13T11:15:00.000Z","completed_by":"user-1","prompt_completed":true,"category":"technology","depth":5}
 {"id":"D-004","prompt":"tech-stack","decision":"SQLite via rusqlite for local storage — zero-config, single-file database, embedded","at":"2026-03-13T11:15:01.000Z","completed_by":"user-1","prompt_completed":true,"category":"technology"}
 {"id":"D-005","prompt":"tech-stack","decision":"Using clap for argument parsing — derive macros reduce boilerplate","at":"2026-03-13T11:15:02.000Z","completed_by":"user-1","prompt_completed":true,"category":"technology"}
 {"id":"D-006","prompt":"project-structure","decision":"Flat module layout with lib.rs re-exports — avoid deep nesting for a small CLI","at":"2026-03-13T12:30:00.000Z","completed_by":"agent-1","prompt_completed":false,"category":"architecture"}
@@ -406,7 +413,7 @@ Each line below is invalid. Annotations explain what is wrong.
 
 ### config.yml
 
-**Relationship**: Indirect. `config.yml` defines the methodology and mixin configuration that determines which prompts exist in the resolved pipeline. The set of valid prompt slugs in `decisions.jsonl` is derived from the resolved pipeline, which is derived from `config.yml`.
+**Relationship**: Indirect. `config.yml` defines the methodology and depth configuration that determines which steps are enabled in the pipeline. The set of valid step names in `decisions.jsonl` is derived from the resolved pipeline, which is derived from `config.yml`.
 
 **Impact of config changes**: If a methodology change removes a prompt that has decisions, those decisions become orphaned. If a methodology change adds a prompt, new decisions will be recorded as the prompt is executed. No migration of existing decisions is needed.
 

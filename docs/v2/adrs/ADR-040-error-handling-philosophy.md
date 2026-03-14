@@ -3,18 +3,18 @@
 **Status**: accepted
 **Date**: 2026-03-13
 **Deciders**: v2 spec, domain modeling phase 1
-**Domain(s)**: All (01-14)
+**Domain(s)**: All (01-16)
 **Phase**: 2 — Architecture Decision Records
 
 ---
 
 ## Context
 
-Scaffold v2 has multiple operational modes — build-time commands (`scaffold build`, `scaffold validate`) that process prompt files and configuration, and runtime commands (`scaffold resume`, `scaffold skip`, `scaffold reset`) that execute prompts and modify pipeline state. Each mode encounters different categories of errors: missing files, invalid schemas, circular dependencies, unresolved markers, stale artifacts, lock contention, and more.
+Scaffold v2 has multiple operational modes — validation commands (`scaffold validate`) and assembly commands (`scaffold run`) that process prompt files and configuration, and state-management commands (`scaffold skip`, `scaffold reset`) and read-only commands (`scaffold list`, `scaffold status`, `scaffold next`) that modify or query pipeline state. Each mode encounters different categories of errors: missing files, invalid schemas, circular dependencies, unresolved markers, stale artifacts, lock contention, and more.
 
 Without a consistent error handling philosophy, each command and each domain would invent its own approach — some failing on the first error, some accumulating errors, some treating warnings as errors. This inconsistency would confuse users who cannot predict whether a command will fail fast or report multiple issues, and would complicate implementation as each domain makes ad-hoc error handling decisions.
 
-This ADR establishes a cross-cutting error handling philosophy that applies to all 14 domains, providing consistent behavior that users can learn once and apply everywhere. It draws on decisions already made in individual ADRs (ADR-006 for injection errors, ADR-014 for config validation, ADR-019 for lock errors, ADR-025 for exit codes, ADR-033 for unknown field warnings) and unifies them into a coherent framework.
+This ADR establishes a cross-cutting error handling philosophy that applies to all 16 domains, providing consistent behavior that users can learn once and apply everywhere. It draws on decisions already made in individual ADRs (ADR-006 for injection errors, ADR-014 for config validation, ADR-019 for lock errors, ADR-025 for exit codes, ADR-033 for unknown field warnings) and unifies them into a coherent framework.
 
 ## Decision
 
@@ -67,7 +67,7 @@ Escape hatches always downgrade an error to a warning — they never silence the
 
 ## Rationale
 
-**Build-time accumulation saves user time**: Build-time commands process multiple files (prompts, mixins, manifests) and can encounter errors in any of them. If `scaffold build` fails on the first error, the user fixes one error, re-runs, discovers the next error, fixes it, re-runs again — this cycle is frustrating and time-consuming. Accumulating all errors and reporting them at once lets the user fix everything in a single editing session. This is the established pattern in compilers (GCC, Clang), linters (ESLint, ShellCheck), and type checkers (TypeScript), which all accumulate errors by default.
+**Validation-time accumulation saves user time**: Validation commands process multiple files (prompts, manifests, configuration) and can encounter errors in any of them. If `scaffold validate` fails on the first error, the user fixes one error, re-runs, discovers the next error, fixes it, re-runs again — this cycle is frustrating and time-consuming. Accumulating all errors and reporting them at once lets the user fix everything in a single editing session. This is the established pattern in compilers (GCC, Clang), linters (ESLint, ShellCheck), and type checkers (TypeScript), which all accumulate errors by default.
 
 **Runtime fail-fast prevents cascading confusion**: Runtime commands modify state and execute prompts. If state.json is corrupt and the command continues, subsequent state reads produce garbage, leading to secondary errors that obscure the root cause. Failing fast on the first structural error gives the user a clear, actionable error message without the noise of cascading failures. This is the established pattern in runtime environments (Node.js throws on corrupt state, databases abort on integrity violations).
 
@@ -113,7 +113,7 @@ Escape hatches always downgrade an error to a warning — they never silence the
 - Error grouping by source file makes it easy to navigate from error output to the file that needs fixing
 
 ### Negative
-- Build-time accumulation adds implementation complexity — the build pipeline must be designed to continue processing after errors, which requires careful error handling in each domain
+- Validation-time accumulation adds implementation complexity — the validation pipeline must be designed to continue processing after errors, which requires careful error handling in each domain
 - Some build-time errors may prevent processing of subsequent files (e.g., if `config.yml` is invalid, mixin resolution cannot proceed for any prompt) — the accumulation must handle these "blocking" errors gracefully by reporting what it can and noting what it could not process
 - The error/warning classification must be maintained as new features are added — each new issue type must be explicitly classified as error or warning
 
@@ -135,6 +135,7 @@ Escape hatches always downgrade an error to a warning — they never silence the
 - Error messages MUST include: the issue description, the affected file or resource, and a suggested fix or next step
 - Warning messages MUST follow the format defined in ADR-025 (CLI output contract)
 - Each domain MUST classify its issues as errors or warnings according to the structural/advisory principle — ad-hoc classification is not permitted
+- Domains 15 (assembly engine) and 16 (methodology resolution) error taxonomies MUST follow this philosophy: fatal assembly/resolution errors fail-fast; validation warnings accumulate
 
 ## Related Decisions
 

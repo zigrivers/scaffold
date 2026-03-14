@@ -1,7 +1,7 @@
 # Scaffold v2 — Platform Adapter Interface
 
 **Phase**: 5 — API Contract Specification
-**Depends on**: [Domain Model 05](../domain-models/05-platform-adapters.md), [ADR-022](../adrs/ADR-022-three-platform-adapters.md), [Architecture Sections 4a, 8](../architecture/system-architecture.md)
+**Depends on**: [Domain Model 05](../domain-models/05-platform-adapters.md), [ADR-022](../adrs/ADR-022-three-platform-adapters.md), [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md), [ADR-044](../adrs/ADR-044-runtime-prompt-generation.md), [ADR-045](../adrs/ADR-045-assembled-prompt-structure.md), [Architecture Sections 4a, 8](../architecture/system-architecture.md)
 **Last updated**: 2026-03-14
 **Status**: draft
 

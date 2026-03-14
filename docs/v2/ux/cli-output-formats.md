@@ -1,9 +1,9 @@
 # Scaffold v2 — CLI Output Formats
 
 **Phase**: 6 — UX Specification
-**Depends on**: Phase 5 CLI contract (all commands), Phase 5 JSON output schemas
-**Last updated**: 2026-03-13
-**Status**: superseded
+**Depends on**: Phase 5 CLI contract (all commands), Phase 5 JSON output schemas, [ADR-043](../adrs/ADR-043-depth-scale.md) (depth scale), [ADR-044](../adrs/ADR-044-runtime-prompt-generation.md) (runtime assembly), [ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md) (user instructions), [ADR-048](../adrs/ADR-048-update-mode-diff-over-regeneration.md) (update mode), [ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md) (methodology changes)
+**Last updated**: 2026-03-14
+**Status**: draft
 
 ---
 
@@ -157,10 +157,11 @@ The init wizard output is defined in [init-wizard-flow.md](init-wizard-flow.md).
 
 ```
 ✓ Config written to .scaffold/config.yml
-✓ Pipeline initialized (23 prompts, all pending)
+✓ Pipeline initialized (32 steps, 29 enabled, all pending)
+✓ .scaffold/instructions/ directory created
 ✓ Build complete:
-    Claude Code:  23 commands  → commands/
-    Universal:    23 prompts   → prompts/
+    Claude Code:  29 commands  → commands/
+    Universal:    29 prompts   → prompts/
 
 Next step: scaffold run <step>
 ```
@@ -169,11 +170,12 @@ When both `claude-code` and `codex` platforms are selected:
 
 ```
 ✓ Config written to .scaffold/config.yml
-✓ Pipeline initialized (24 prompts, all pending)
+✓ Pipeline initialized (32 steps, 29 enabled, all pending)
+✓ .scaffold/instructions/ directory created
 ✓ Build complete:
-    Claude Code:  24 commands  → commands/
-    Codex:        25 prompts   → codex-prompts/
-    Universal:    24 prompts   → prompts/
+    Claude Code:  29 commands  → commands/
+    Codex:        29 prompts   → codex-prompts/
+    Universal:    29 prompts   → prompts/
 
 Next step: scaffold run <step>
 ```
@@ -195,10 +197,11 @@ Re-initialization with `--force` (existing project):
 ```
 ⚠ Existing .scaffold/ directory found. Backing up to .scaffold.backup/
 ✓ Config written to .scaffold/config.yml
-✓ Pipeline initialized (23 prompts, all pending)
+✓ Pipeline initialized (32 steps, 29 enabled, all pending)
+✓ .scaffold/instructions/ directory created
 ✓ Build complete:
-    Claude Code:  23 commands  → commands/
-    Universal:    23 prompts   → prompts/
+    Claude Code:  29 commands  → commands/
+    Universal:    29 prompts   → prompts/
 
 Next step: scaffold run <step>
 ```
@@ -208,10 +211,11 @@ v1 migration detected:
 ```
 ✓ v1 scaffold detected — migrating to v2 format
 ✓ Config written to .scaffold/config.yml
-✓ Pipeline initialized (23 prompts, 8 pre-done from v1 history)
+✓ Pipeline initialized (32 steps, 29 enabled, 8 pre-done from v1 history)
+✓ .scaffold/instructions/ directory created
 ✓ Build complete:
-    Claude Code:  23 commands  → commands/
-    Universal:    23 prompts   → prompts/
+    Claude Code:  29 commands  → commands/
+    Universal:    29 prompts   → prompts/
 
 Next step: scaffold run <step>
 ```
@@ -455,23 +459,33 @@ Prerequisite check failure (interactive):
   ○ Cancel
 ```
 
-Re-running a done step:
+Re-running a done step (update mode per [ADR-048](../adrs/ADR-048-update-mode-diff-over-regeneration.md)):
 
 ```
-⚠ tech-stack was already done on 2026-03-11.
-? Re-run this step? Downstream steps will not be automatically re-run. [y/N]
+⚠ tech-stack was already done on 2026-03-11 (depth 5).
+  This will run in update mode — diff-based updates to the existing artifact.
+? Re-run this step in update mode? Downstream steps will not be automatically re-run. [y/N]
 ```
 
 After re-run completes:
 
 ```
-✓ tech-stack marked done (re-run)
+✓ tech-stack marked done (update mode)
 ⚠ The following downstream steps may now be stale:
-    coding-standards (done 2026-03-12)
-    project-structure (done 2026-03-12)
+    coding-standards (done 2026-03-12, depth 5)
+    project-structure (done 2026-03-12, depth 5)
   Consider re-running: scaffold run coding-standards
 → Next eligible: user-stories
   Run: scaffold run <step>
+```
+
+Methodology change warning (per [ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md)):
+
+```
+⚠ Methodology changed since last execution.
+  Previous: deep → Current: mvp
+  3 completed step(s) were executed under the previous methodology.
+  These steps are preserved as-is. Pending steps will be resolved under 'mvp'.
 ```
 
 Pipeline complete:
@@ -488,12 +502,15 @@ Pipeline complete:
 [LockManager] Acquiring lock: .scaffold/lock.json
 [LockManager] Lock acquired (PID 54321, holder: ken)
 [StateManager] Reading .scaffold/state.json (version: 1)
-[StateManager] Progress: 6 done, 1 skipped, 25 pending, 0 in_progress
+[StateManager] Progress: 6 done, 1 skipped, 24 pending, 0 in_progress
 [DependencyResolver] Checking prerequisites for git-workflow
 [AssemblyEngine] Loading meta-prompt: pipeline/git-workflow.md
 [AssemblyEngine] Loading knowledge base: knowledge/git-workflow.md
 [AssemblyEngine] Depth level: 5
-[AssemblyEngine] Assembling prompt (7 sections)
+[AssemblyEngine] Loading user instructions: global.md (found), git-workflow.md (not found)
+[AssemblyEngine] Instruction precedence: global → per-step → inline ([ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md))
+[AssemblyEngine] Update mode: false (first execution)
+[AssemblyEngine] Assembling prompt (7 sections per [ADR-045](../adrs/ADR-045-assembled-prompt-structure.md))
 [DecisionLog] Loading .scaffold/decisions.jsonl (12 entries)
 [DecisionLog] Last 3 decisions: D-012, D-011, D-010
 ```
@@ -617,28 +634,28 @@ Next step: scaffold build (to reinitialize state)
 **Success output:**
 
 ```
-Pipeline: classic | 8/23 complete (35%)
-████████████░░░░░░░░░░░░░░░░░░ 35%
+Pipeline: deep | 8/32 complete (25%) | Depth: 5
+████████░░░░░░░░░░░░░░░░░░░░░░ 25%
 
 Phase 0 — Prerequisites
-  ✓ claude-code-permissions           done        2026-03-10
+  ✓ claude-code-permissions           done        2026-03-10  depth 5
 
 Phase 1 — Planning
-  ✓ create-prd                        done        2026-03-10
-  ✓ prd-gap-analysis                  done        2026-03-11
-  ✓ tech-stack                        done        2026-03-11
+  ✓ create-prd                        done        2026-03-10  depth 5
+  ✓ prd-gap-analysis                  done        2026-03-11  depth 5
+  ✓ tech-stack                        done        2026-03-11  depth 5
   ○ user-stories                      pending     [blocked by: prd-gap-analysis → done]
   ○ user-stories-gaps                 pending     [blocked by: user-stories]
 
 Phase 2 — Standards
-  ✓ coding-standards                  done        2026-03-12
-  ✓ tdd-standards                     done        2026-03-12
+  ✓ coding-standards                  done        2026-03-12  depth 5
+  ✓ tdd-standards                     done        2026-03-12  depth 5
   → add-playwright                    skipped     "Using Vitest browser mode"
   ○ design-system                     pending
 
 Phase 3 — Setup
-  ✓ project-structure                 done        2026-03-12
-  ✓ dev-env-setup                     done        2026-03-12
+  ✓ project-structure                 done        2026-03-12  depth 5
+  ✓ dev-env-setup                     done        2026-03-12  depth 5
   ○ git-workflow                      pending
 
 Phase 4 — Architecture
@@ -655,23 +672,24 @@ What's Next
 
 **Edge cases:**
 
-Orphaned entries detected (methodology changed):
+Orphaned entries detected (methodology changed, [ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md)):
 
 ```
-Pipeline: classic-lite | 5/16 complete (31%)
-██████████░░░░░░░░░░░░░░░░░░░░ 31%
+Pipeline: mvp | 2/4 complete (50%) | Depth: 1
+███████████████░░░░░░░░░░░░░░░ 50%
 
 Phase 1 — Planning
-  ✓ create-prd                        done        2026-03-10
+  ✓ create-prd                        done        2026-03-10  depth 3
   ...
 
 Orphaned (no longer in pipeline)
-  ! multi-agent-setup                 done        2026-03-11
-  ! add-maestro                       done        2026-03-12
+  ! multi-agent-setup                 done        2026-03-11  depth 5
+  ! add-maestro                       done        2026-03-12  depth 5
 
-⚠ 2 orphaned entries from a previous methodology. These prompts are no longer
-  in the resolved pipeline. Their state is preserved but they will not appear
-  in the active pipeline.
+⚠ 2 orphaned entries from a previous methodology (was: deep, now: mvp).
+  These prompts are no longer in the resolved pipeline. Their state is
+  preserved but they will not appear in the active pipeline.
+  Completed steps retain their original depth level.
 
 What's Next
 → Next eligible: tech-stack
@@ -690,10 +708,10 @@ Phase 2 — Standards
 **Verbose additions:**
 
 ```
-[StateManager] Loaded state: 8 done, 1 skipped, 14 pending, 0 in_progress
+[StateManager] Loaded state: 8 done, 1 skipped, 23 pending, 0 in_progress
 [StateManager] Orphaned entries: 0
 [DependencyResolver] Next eligible cache: [user-stories, design-system, git-workflow]
-[StateManager] create-prd: done at 2026-03-10T14:00:00Z by ken
+[StateManager] create-prd: done at 2026-03-10T14:00:00Z by ken, depth 5
 [StateManager] create-prd: artifact docs/plan.md verified (present, 4.2 KB)
 ```
 
@@ -706,6 +724,7 @@ Phase 2 — Standards
 ```
 Next: user-stories (Phase 1 — Planning)
   Description:  Create user stories from the PRD
+  Depth:        5
   Depends on:   create-prd ✓, prd-gap-analysis ✓
   Produces:     docs/user-stories.md
   Reads:        docs/plan.md, docs/tech-stack.md
@@ -720,16 +739,19 @@ Next eligible (3 of 5):
 
   1. user-stories (Phase 1 — Planning)
      Description:  Create user stories from the PRD
+     Depth:        5
      Depends on:   create-prd ✓, prd-gap-analysis ✓
      Produces:     docs/user-stories.md
 
   2. design-system (Phase 2 — Standards)
      Description:  Define the UI design system
+     Depth:        5
      Depends on:   tech-stack ✓
      Produces:     docs/design-system.md
 
   3. git-workflow (Phase 3 — Setup)
      Description:  Configure Git branching strategy and PR conventions
+     Depth:        5
      Depends on:   coding-standards ✓
      Produces:     docs/git-workflow.md
 
@@ -743,7 +765,7 @@ Run: scaffold run <step>
 Pipeline complete:
 
 ```
-Pipeline complete. All 23 prompts finished.
+Pipeline complete. All 32 steps finished.
 Run scaffold status for a full summary.
 ```
 
@@ -762,10 +784,10 @@ Run: scaffold status to see the full pipeline.
 **Verbose additions:**
 
 ```
-[DependencyResolver] Computing eligibility from state (8 done, 1 skipped, 14 pending)
+[DependencyResolver] Computing eligibility from state (8 done, 1 skipped, 23 pending)
 [DependencyResolver] user-stories: all 2 dependencies satisfied (create-prd, prd-gap-analysis)
 [DependencyResolver] user-stories: produces=[docs/user-stories.md], reads=[docs/plan.md, docs/tech-stack.md]
-[DependencyResolver] user-stories: source=base, has CLAUDE.md section: no
+[DependencyResolver] user-stories: source=pipeline, depth=5, has CLAUDE.md section: no
 ```
 
 ---
@@ -776,10 +798,10 @@ Run: scaffold status to see the full pipeline.
 
 ```
 ✓ Config valid
-✓ Methodology manifest valid (classic, 24 defined / 22 resolved)
-✓ 23 prompts — frontmatter valid
-✓ 23 build outputs — no unresolved markers
-✓ state.json consistent (8 done, all artifacts present on disk)
+✓ Pipeline manifest valid (deep, 32 defined / 29 enabled)
+✓ 29 prompts — frontmatter valid
+✓ 29 build outputs — no unresolved markers
+✓ state.json consistent (8 done, all artifacts present on disk, depths valid)
 ✓ decisions.jsonl — 47 entries, IDs sequential, no duplicates
 
 0 errors, 0 warnings
@@ -792,7 +814,7 @@ Run: scaffold status to see the full pipeline.
   ✗ [CONFIG_INVALID_METHODOLOGY] Unknown methodology 'deap'. Did you mean 'deep'?
   ⚠ [CONFIG_UNKNOWN_FIELD] Unknown field "extra_settings" (possible typo, or from a newer scaffold version)
 
-content/base/create-prd.md
+pipeline/create-prd.md
   ✗ [FRONTMATTER_PRODUCES_MISSING] Required 'produces' field absent
 
 .scaffold/state.json
@@ -805,8 +827,8 @@ content/base/create-prd.md
 
 ```
 ⠋ Validating config...
-⠋ Checking methodology manifest...
-⠋ Validating prompt frontmatter (23 files)...
+⠋ Checking pipeline manifest...
+⠋ Validating prompt frontmatter (29 files)...
 ⠋ Checking build outputs...
 ⠋ Verifying state consistency...
 ⠋ Checking decision log...
@@ -820,7 +842,7 @@ Scoped validation (`--scope config,state`):
 
 ```
 ✓ Config valid
-✓ state.json consistent (8 done, all artifacts present)
+✓ state.json consistent (8 done, all artifacts present, depths valid)
 
 0 errors, 0 warnings (scoped: config, state)
 ```
@@ -845,9 +867,11 @@ Validation with auto-fix (`--fix`):
 [Validator:config] Checking depth: 5 (valid range 1-5)
 [Validator:pipeline] Loading pipeline definition: 32 steps
 [Validator:pipeline] Dependency cycle check: 29 nodes, 42 edges, no cycles
-[Validator:frontmatter] Checking commands/create-prd.md... pass
+[Validator:frontmatter] Checking pipeline/create-prd.md... pass
 [Validator:artifacts] Checking docs/plan.md against create-prd artifact schema... pass
-[Validator:state] Checking slug consistency: 23 state entries, 23 pipeline prompts, 0 orphaned
+[Validator:state] Checking slug consistency: 32 state entries, 32 pipeline prompts, 0 orphaned
+[Validator:state] Checking completed step depths: 8 completed, all depths within range (V19 pass)
+[Validator:state] Checking depth within configured range: 8 completed, all within 1-5 (V20 pass)
 [Validator:decisions] Checking .scaffold/decisions.jsonl: 47 entries, IDs sequential
 ```
 
@@ -896,16 +920,17 @@ Filtered by section (`--section methodologies`):
 ```
 Methodologies
 ─────────────
-  classic         Full pipeline — parallel agents, Beads, comprehensive docs (24 prompts)
-  classic-lite    Streamlined pipeline — fewer phases, lighter process (16 prompts)
+  deep       Deep Domain Modeling — all 32 steps at depth 5
+  mvp        MVP — get to code fast, 4 steps at depth 1
+  custom     Custom — pick your own steps and depth levels
 ```
 
 **Verbose additions:**
 
 ```
-[ContentRegistry] Scanning content/methodologies/ for installed methodologies
-[ContentRegistry] Found: classic (24 prompts), classic-lite (16 prompts)
 [ContentRegistry] Scanning pipeline/ for step definitions
+[ContentRegistry] Found: 32 steps defined
+[ContentRegistry] Methodologies: deep (32 steps, depth 5), mvp (4 steps, depth 1), custom (user-configured)
 [ContentRegistry] Project config detected: .scaffold/config.yml (highlighting current selections)
 ```
 
@@ -945,6 +970,40 @@ Progress:   0/32 complete (0%)
 Last build: 2026-03-13 10:00 UTC
 ```
 
+**Step-level output** (`scaffold info <step>`):
+
+```
+Step: git-workflow (Phase 3 — System Architecture)
+  Description:     Configure Git branching strategy and PR conventions
+  Status:          pending
+  Depth:           5
+  Source:          pipeline
+  Meta-prompt:     pipeline/git-workflow.md
+  Knowledge base:  knowledge/git-workflow.md
+  Depends on:      coding-standards ✓
+  Produces:        docs/git-workflow.md
+  Reads:           docs/coding-standards.md
+
+Instructions loaded:
+  Global:          .scaffold/instructions/global.md (found)
+  Per-step:        .scaffold/instructions/git-workflow.md (not found)
+```
+
+When the step is completed:
+
+```
+Step: tech-stack (Phase 1 — Planning)
+  Description:     Research and document technology decisions
+  Status:          done (2026-03-11, depth 5)
+  Depth:           5
+  Source:          pipeline
+  Meta-prompt:     pipeline/tech-stack.md
+  Knowledge base:  knowledge/tech-stack.md
+  Depends on:      create-prd ✓
+  Produces:        docs/tech-stack.md (verified present)
+  Completed by:    ken
+```
+
 **Verbose additions:**
 
 ```
@@ -952,7 +1011,7 @@ Last build: 2026-03-13 10:00 UTC
 [ConfigLoader] Schema version: 1 (current)
 [ConfigLoader] Unknown fields: none
 [StateManager] State path: /Users/ken/projects/acme-web/.scaffold/state.json
-[StateManager] Progress: 8 done, 1 skipped, 14 pending
+[StateManager] Progress: 8 done, 1 skipped, 23 pending
 [BuildMetadata] Last build: 2026-03-12T14:23:00Z
 [BuildMetadata] Config mtime: 2026-03-12T14:20:00Z (not stale)
 ```
@@ -1019,7 +1078,7 @@ Changelog:
 
 ⠋ Downloading v2.1.0...
 ✓ scaffold updated: v2.0.0 → v2.1.0
-✓ Rebuilt project (classic, 23 prompts)
+✓ Rebuilt project (deep, 32 steps)
   Changed: 2 modified (create-prd, tech-stack)
 ```
 
@@ -1120,8 +1179,8 @@ Browser launch failure:
 **Verbose additions:**
 
 ```
-[DashboardGenerator] Reading .scaffold/state.json (8 done, 1 skipped, 14 pending)
-[DashboardGenerator] Reading .scaffold/config.yml (methodology: classic)
+[DashboardGenerator] Reading .scaffold/state.json (8 done, 1 skipped, 23 pending)
+[DashboardGenerator] Reading .scaffold/config.yml (methodology: deep, depth: 5)
 [DashboardGenerator] Reading .scaffold/decisions.jsonl (47 entries)
 [DashboardGenerator] Writing .scaffold/dashboard.html (42 KB, self-contained)
 [DashboardGenerator] Launching browser: open .scaffold/dashboard.html
@@ -1253,9 +1312,10 @@ The capital letter indicates the default when the user presses Enter without typ
 Format: Arrow-key navigable list with `●` for selected and `○` for unselected. Default selection is pre-highlighted.
 
 ```
-? Select methodology:
-  ● classic          Full pipeline — parallel agents, Beads, comprehensive docs
-  ○ classic-lite     Streamlined pipeline — fewer phases, lighter process
+? Choose a methodology:
+  ● Deep Domain Modeling    Comprehensive — all 32 steps at depth 5
+  ○ MVP                     Get to code fast — 4 steps at depth 1
+  ○ Custom                  Pick your own steps and depth levels
 ```
 
 Arrow keys move the `●` indicator. Enter confirms the selection.
@@ -1311,7 +1371,7 @@ Format: Radio selection with descriptive options.
 ### 4a: `scaffold status` before any prompts done
 
 ```
-Pipeline: classic | 0/23 complete (0%)
+Pipeline: deep | 0/32 complete (0%) | Depth: 5
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 0%
 
 Phase 0 — Prerequisites
@@ -1333,7 +1393,7 @@ What's Next
 ### 4b: `scaffold next` when pipeline is complete
 
 ```
-Pipeline complete. All 23 prompts finished.
+Pipeline complete. All 32 prompts finished.
 
 Your project scaffolding is done. Suggested next actions:
   scaffold dashboard   — View the progress dashboard
@@ -1345,9 +1405,9 @@ Your project scaffolding is done. Suggested next actions:
 
 ```
 ✓ Config valid
-✓ Methodology manifest valid (classic, 24 defined / 22 resolved)
-✓ 23 prompts — frontmatter valid
-✓ 23 build outputs — no unresolved markers
+✓ Pipeline manifest valid (deep, 32 defined / 29 enabled)
+✓ 29 prompts — frontmatter valid
+✓ 29 build outputs — no unresolved markers
 ✓ state.json consistent (0 done, no artifacts to verify)
 ✓ decisions.jsonl — 0 entries (empty, no issues)
 
@@ -1373,7 +1433,7 @@ No special messaging. A single methodology is displayed the same way as multiple
 ### 4e: `scaffold run` when all steps done
 
 ```
-✓ Pipeline complete — all 23 prompts finished.
+✓ Pipeline complete — all 32 prompts finished.
 
 Your project scaffolding is done. Suggested next actions:
   scaffold dashboard   — View the progress dashboard

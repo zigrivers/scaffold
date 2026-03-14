@@ -1,14 +1,14 @@
 # Architecture Decision Records — Index
 
 **Phase**: 2 — Architecture Decision Records
-**Last updated**: 2026-03-13
+**Last updated**: 2026-03-14
 **Status**: draft
 
 ---
 
 ## Summary
 
-46 Architecture Decision Records covering the complete architectural foundation for Scaffold v2 — from CLI implementation language through platform adapters to deferred scope decisions, plus the meta-prompt architecture (ADR-041 through ADR-046) that supersedes the original three-layer resolution, mixin injection, and build-time resolution systems. Cross-cutting policies on forward compatibility, error handling, and runtime safety are also recorded. Every significant design choice from the v2 spec, 14 domain models, and PRD is captured with rationale, alternatives considered, consequences, and compliance constraints.
+54 Architecture Decision Records covering the complete architectural foundation for Scaffold v2 — from CLI implementation language through platform adapters to deferred scope decisions, plus the meta-prompt architecture (ADR-041 through ADR-046) that supersedes the original three-layer resolution, mixin injection, and build-time resolution systems. Cross-cutting policies on forward compatibility, error handling, runtime safety, user instruction layering, update mode behavior, and methodology changeability are also recorded. Every significant design choice from the v2 spec, 16 domain models, and PRD is captured with rationale, alternatives considered, consequences, and compliance constraints.
 
 ## Decision Log
 
@@ -44,22 +44,30 @@
 | [ADR-028](ADR-028-detection-priority.md) | Detection Priority — v1 > Brownfield > Greenfield | accepted | 07, 14 | UX & Output |
 | [ADR-029](ADR-029-prompt-structure-convention.md) | Prompt Structure Convention — Agent-Optimized Ordering | accepted | 08, 09 | UX & Output |
 | [ADR-030](ADR-030-config-inheritance-deferred.md) | Config Inheritance Deferred | accepted | 06 | Scope & Deferral |
-| [ADR-031](ADR-031-community-marketplace-deferred.md) | Community Methodology Marketplace Deferred | accepted | 01, 04 | Scope & Deferral |
-| [ADR-032](ADR-032-methodology-versioning-bundled.md) | Methodology Versioning Bundled with CLI | accepted | 01 | Scope & Deferral |
+| [ADR-031](ADR-031-community-marketplace-deferred.md) | Community Methodology Marketplace Deferred | accepted | 06, 14, 16 | Scope & Deferral |
+| [ADR-032](ADR-032-methodology-versioning-bundled.md) | Methodology Versioning Bundled with CLI | accepted | 06, 16 | Scope & Deferral |
 | [ADR-033](ADR-033-forward-compatibility-unknown-fields.md) | Forward Compatibility — Unknown Fields as Warnings | accepted | 06, 08 | Data Formats |
 | [ADR-034](ADR-034-rerun-no-cascade.md) | Re-runs Do Not Cascade to Downstream Prompts | accepted | 02, 03 | Runtime Behavior |
 | [ADR-035](ADR-035-non-recursive-injection.md) | Mixin Injection Is Non-Recursive (Two-Pass Bounded) | superseded (by ADR-041) | 12 | Core Engine |
 | [ADR-036](ADR-036-auto-does-not-imply-force.md) | --auto Does Not Imply --force | accepted | 09, 13 | Runtime Behavior |
 | [ADR-037](ADR-037-task-verb-global-scope.md) | Abstract Task Verb Replacement Scope Is Global | superseded (by ADR-041) | 04, 12 | Core Engine |
-| [ADR-038](ADR-038-prompt-versioning-deferred.md) | Prompt Versioning and Rollback Not Supported | accepted | 01, 05 | Scope & Deferral |
+| [ADR-038](ADR-038-prompt-versioning-deferred.md) | Prompt Versioning and Rollback Not Supported | accepted | 08, 15 | Scope & Deferral |
 | [ADR-039](ADR-039-pipeline-context-deferred.md) | Pipeline Context (context.json) Deferred | accepted | 08, 11 | Scope & Deferral |
-| [ADR-040](ADR-040-error-handling-philosophy.md) | Error Handling Philosophy | accepted | 01-14 | Cross-Cutting |
+| [ADR-040](ADR-040-error-handling-philosophy.md) | Error Handling Philosophy | accepted | 01-16 | Cross-Cutting |
 | [ADR-041](ADR-041-meta-prompt-architecture.md) | Meta-Prompt Architecture Over Hard-Coded Prompts | accepted | 01, 04, 05, 12 | Meta-Prompt Architecture |
 | [ADR-042](ADR-042-knowledge-base-domain-expertise.md) | Knowledge Base as Domain Expertise Layer | accepted | 01 | Meta-Prompt Architecture |
 | [ADR-043](ADR-043-depth-scale.md) | Depth Scale (1-5) Over Methodology-Specific Prompt Variants | accepted | 06, 14 | Meta-Prompt Architecture |
 | [ADR-044](ADR-044-runtime-prompt-generation.md) | Runtime Prompt Generation Over Build-Time Resolution | accepted | 01, 12 | Meta-Prompt Architecture |
 | [ADR-045](ADR-045-assembled-prompt-structure.md) | Assembled Prompt Structure | accepted | 08 | Meta-Prompt Architecture |
 | [ADR-046](ADR-046-phase-specific-review-criteria.md) | Phase-Specific Review Criteria Over Generic Review Template | accepted | 08 | Meta-Prompt Architecture |
+| [ADR-047](ADR-047-user-instruction-three-layer-precedence.md) | User Instruction Three-Layer Precedence | accepted | 09, 15 | Runtime Behavior |
+| [ADR-048](ADR-048-update-mode-diff-over-regeneration.md) | Update Mode — Diff Over Regeneration | accepted | 03, 15 | Runtime Behavior |
+| [ADR-049](ADR-049-methodology-changeable-mid-pipeline.md) | Methodology Changeable Mid-Pipeline | accepted | 03, 06, 16 | Runtime Behavior |
+| [ADR-050](ADR-050-context-window-management.md) | Context Window Management Strategy | proposed | 15 | Core Engine |
+| [ADR-051](ADR-051-depth-downgrade-policy.md) | Depth Downgrade Policy | proposed | 09, 16 | Runtime Behavior |
+| [ADR-052](ADR-052-decision-recording-interface.md) | Decision Recording Interface | proposed | 11, 15 | Data Formats |
+| [ADR-053](ADR-053-artifact-context-scope.md) | Artifact Context Scope | proposed | 15 | Core Engine |
+| [ADR-054](ADR-054-state-methodology-tracking.md) | State Methodology Tracking | proposed | 03, 16 | Data Formats |
 
 ## By Category
 
@@ -79,6 +87,8 @@
 - [ADR-011](ADR-011-depends-on-union-semantics.md) — Frontmatter Depends-On Union Semantics
 - [ADR-035](ADR-035-non-recursive-injection.md) — Mixin Injection Is Non-Recursive (Two-Pass Bounded) *(superseded by ADR-041)*
 - [ADR-037](ADR-037-task-verb-global-scope.md) — Abstract Task Verb Replacement Scope Is Global *(superseded by ADR-041)*
+- [ADR-050](ADR-050-context-window-management.md) — Context Window Management Strategy *(proposed)*
+- [ADR-053](ADR-053-artifact-context-scope.md) — Artifact Context Scope *(proposed)*
 
 ### Data Formats
 - [ADR-012](ADR-012-state-file-design.md) — State File Design — Map-Keyed, Committed, Atomic
@@ -88,6 +98,8 @@
 - [ADR-016](ADR-016-methodology-manifest-format.md) — Methodology Manifest YAML Format *(superseded by ADR-043)*
 - [ADR-017](ADR-017-tracking-comments-artifact-provenance.md) — Tracking Comments for Artifact Provenance
 - [ADR-033](ADR-033-forward-compatibility-unknown-fields.md) — Forward Compatibility — Unknown Fields as Warnings
+- [ADR-052](ADR-052-decision-recording-interface.md) — Decision Recording Interface *(proposed)*
+- [ADR-054](ADR-054-state-methodology-tracking.md) — State Methodology Tracking *(proposed)*
 
 ### Runtime Behavior
 - [ADR-018](ADR-018-completion-detection-crash-recovery.md) — Completion Detection and Crash Recovery
@@ -96,6 +108,10 @@
 - [ADR-021](ADR-021-sequential-prompt-execution.md) — Sequential Prompt Execution
 - [ADR-034](ADR-034-rerun-no-cascade.md) — Re-runs Do Not Cascade to Downstream Prompts
 - [ADR-036](ADR-036-auto-does-not-imply-force.md) — --auto Does Not Imply --force
+- [ADR-047](ADR-047-user-instruction-three-layer-precedence.md) — User Instruction Three-Layer Precedence
+- [ADR-048](ADR-048-update-mode-diff-over-regeneration.md) — Update Mode — Diff Over Regeneration
+- [ADR-049](ADR-049-methodology-changeable-mid-pipeline.md) — Methodology Changeable Mid-Pipeline
+- [ADR-051](ADR-051-depth-downgrade-policy.md) — Depth Downgrade Policy *(proposed)*
 
 ### Platform & Adapters
 - [ADR-022](ADR-022-three-platform-adapters.md) — Three Platform Adapters with Universal Always Generated
@@ -129,7 +145,13 @@
 
 ## Proposed (Pending Review)
 
-No ADRs are currently in `proposed` status. All 46 decisions are `accepted` (10 of which are superseded by newer ADRs).
+5 ADRs are in `proposed` status, awaiting resolution of open questions from domain models 15 and 16:
+
+- [ADR-050](ADR-050-context-window-management.md) — Context Window Management Strategy
+- [ADR-051](ADR-051-depth-downgrade-policy.md) — Depth Downgrade Policy
+- [ADR-052](ADR-052-decision-recording-interface.md) — Decision Recording Interface
+- [ADR-053](ADR-053-artifact-context-scope.md) — Artifact Context Scope
+- [ADR-054](ADR-054-state-methodology-tracking.md) — State Methodology Tracking
 
 Note: ADR-008 includes a sub-decision about the `create-and-claim` compound verb that remains under consideration (documented within the ADR as a proposed element).
 
@@ -200,11 +222,19 @@ graph TD
     ADR014 --> ADR040
     ADR019 --> ADR040
     ADR025 --> ADR040
+
+    ADR045[ADR-045: Assembled Prompt] --> ADR047[ADR-047: User Instructions]
+    ADR044[ADR-044: Runtime Assembly] --> ADR047
+    ADR034 --> ADR048[ADR-048: Update Mode]
+    ADR045 --> ADR048
+    ADR043[ADR-043: Depth Scale] --> ADR049[ADR-049: Methodology Changeable]
+    ADR034 --> ADR049
+    ADR012 --> ADR049
 ```
 
 ## ADR Candidate Coverage
 
-All explicit ADR candidates from the 14 domain models are covered:
+All explicit ADR candidates from the 16 domain models are covered:
 
 | Source | ADR Candidate | Covered By |
 |--------|--------------|------------|
@@ -220,3 +250,9 @@ All explicit ADR candidates from the 14 domain models are covered:
 | Domain 09, Section 10 | yargs as CLI framework | ADR-001 |
 | Domain 09, Section 10 | OutputContext strategy pattern | ADR-025 |
 | Domain 12, Section 10 | Verb registry in YAML vs. embedded in markdown | ADR-008 |
+| Domain 15, Section 10 | Context window management strategy | ADR-050 (proposed) |
+| Domain 15, Section 10 | Decision recording interface | ADR-052 (proposed) |
+| Domain 15, Section 10 | Artifact verification timing | Deferred — low risk, can be decided during implementation |
+| Domain 16, Section 10 | Depth downgrade policy | ADR-051 (proposed) |
+| Domain 16, Section 10 | Methodology field in state.json | ADR-054 (proposed) |
+| Domain 16, Section 10 | Conditional step re-evaluation | Deferred — additive feature, can be added post-v2 |
