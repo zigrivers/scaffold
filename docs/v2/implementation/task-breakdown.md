@@ -422,7 +422,7 @@ Pure data modules with no CLI dependency. Each reads/writes one file format. Hea
 - Create: `src/state/state-manager.ts`
 - Create: `src/state/state-manager.test.ts`
 
-**Description**: CRUD operations on `.scaffold/state.json` with atomic writes. Core operations: `loadState()` reads and validates state file; `initializeState(enabledSteps)` creates initial state with all steps pending; `setInProgress(step)` marks step as in_progress and sets `in_progress` record; `markCompleted(step, outputs)` marks step completed with timestamp and outputs, clears `in_progress`; `markSkipped(step, reason)` marks step skipped with timestamp and reason; `getStepStatus(step)` returns current status. All write operations use atomic temp-file-then-rename pattern. State validation: schema_version must be 2, all required fields present, status values valid, timestamps valid ISO 8601. Map-keyed structure for merge-safe git operations.
+**Description**: CRUD operations on `.scaffold/state.json` with atomic writes. Core operations: `loadState()` reads and validates state file; `initializeState(enabledSteps)` creates initial state with all steps pending; `setInProgress(step)` marks step as in_progress and sets `in_progress` record; `markCompleted(step, outputs)` marks step completed with timestamp and outputs, clears `in_progress`; `markSkipped(step, reason)` marks step skipped with timestamp and reason; `getStepStatus(step)` returns current status. Support `extra_prompts` array for ExtraPromptEntry objects (steps not in active pipeline but tracked for methodology change recovery). All write operations use atomic temp-file-then-rename pattern. State validation: schema_version must be 2, all required fields present, status values valid, timestamps valid ISO 8601. Map-keyed structure for merge-safe git operations.
 
 **Acceptance Criteria**:
 - [ ] `initializeState()` creates valid state.json with all steps pending, schema_version 2
@@ -1124,7 +1124,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - Create: `src/project/adopt.test.ts`
 - Create: `src/cli/commands/adopt.test.ts`
 
-**Description**: Brownfield adoption — scan existing codebase artifacts, map to pipeline steps, pre-populate state. Uses project detector signals + meta-prompt `outputs` fields to match existing files to steps. For v1 migration: detect tracking comments, map v1 artifacts to v2 step slugs. `--dry-run`: show matches without writing state. Writes state.json with matched steps pre-completed. Acquires lock. JSON output: AdoptResult with found matches, skipped, stateWritten.
+**Description**: Brownfield adoption — scan existing codebase artifacts, map to pipeline steps, pre-populate state. Uses project detector signals + meta-prompt `outputs` fields to match existing files to steps. For each matched step, determine AdaptationStrategy: 'update-mode' (artifacts detected, step should re-run with existing context), 'skip-recommended' (artifacts fully satisfy requirements), 'context-only' (use artifacts as context but still run), 'full-run' (no artifacts detected). For v1 migration: detect tracking comments, map v1 artifacts to v2 step slugs. `--dry-run`: show matches without writing state. Writes state.json with matched steps pre-completed. Acquires lock. JSON output: AdoptResult with found matches, adaptation strategies, skipped, stateWritten.
 
 **Acceptance Criteria**:
 - [ ] Scans for existing artifacts matching meta-prompt outputs
@@ -1323,7 +1323,7 @@ Thin wrappers that generate platform-specific command files at build time. T-039
 - Create: `src/project/claude-md.ts`
 - Create: `src/project/claude-md.test.ts`
 
-**Description**: Manage reserved sections in CLAUDE.md with ownership markers. Section registry maps step slugs to section names. Ownership markers: `<!-- scaffold:managed by <slug> -->` / `<!-- /scaffold:managed -->` delimit managed sections. Operations: `fillSection(slug, content)` inserts content between ownership markers (replaces existing content), `readSection(slug)` extracts content, `listSections()` returns all managed sections. Token budget: 2000 tokens per section (warn PSM_SECTION_OVER_BUDGET). Preserve unmanaged content outside markers. Handle CLAUDE.md not existing (create with managed sections). Reservation placeholders for sections not yet filled.
+**Description**: Manage reserved sections in CLAUDE.md with ownership markers. Section registry maps step slugs to section names with per-section token budgets (200-300 tokens each, 2000 tokens total across all scaffold-managed sections). Ownership markers: `<!-- scaffold:managed by <slug> -->` / `<!-- /scaffold:managed -->` delimit managed sections. Operations: `fillSection(slug, content)` inserts content between ownership markers (replaces existing content), `readSection(slug)` extracts content, `listSections()` returns all managed sections with budget utilization, `getBudgetStatus()` returns per-section and total token usage. Token budget enforcement: warn PSM_SECTION_OVER_BUDGET when per-section or total budget exceeded. Preserve unmanaged content outside markers. Handle CLAUDE.md not existing (create with managed sections). Reservation placeholders for sections not yet filled.
 
 **Acceptance Criteria**:
 - [ ] Fills managed section between ownership markers
