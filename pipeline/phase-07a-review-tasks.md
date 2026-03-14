@@ -1,0 +1,37 @@
+---
+name: phase-07a-review-tasks
+description: Review implementation tasks for coverage and feasibility
+phase: "7a"
+dependencies: [phase-07-implementation-tasks]
+outputs: [docs/reviews/phase-07a-review.md]
+conditional: null
+knowledge-base: [review-methodology, review-implementation-tasks]
+---
+
+## Purpose
+Review implementation tasks targeting task-specific failure modes: architecture
+coverage gaps, missing dependencies, tasks too large or too vague for agents,
+critical path inaccuracy, and invalid parallelization assumptions.
+
+## Inputs
+- docs/implementation-tasks.md (required) — tasks to review
+- docs/system-architecture.md (required) — for coverage checking
+- docs/domain-models/ (required) — for completeness
+
+## Expected Outputs
+- docs/reviews/phase-07a-review.md — findings and resolution log
+- docs/implementation-tasks.md — updated with fixes
+
+## Quality Criteria
+- Architecture coverage verified (every component has tasks)
+- Dependency graph is valid DAG
+- No task is too large for a single agent session
+- Critical path is accurate
+- Parallelization assumptions are valid
+
+## Methodology Scaling
+- **deep**: Full multi-pass review. **mvp**: Coverage check only.
+- **custom:depth(1-5)**: Scale passes with depth.
+
+## Mode Detection
+Re-review mode if previous review exists.
