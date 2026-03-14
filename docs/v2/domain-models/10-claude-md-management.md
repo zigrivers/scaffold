@@ -2,7 +2,7 @@
 
 **Domain ID**: 10
 **Phase**: 1 — Deep Domain Modeling
-**Depends on**: [01-prompt-resolution.md](01-prompt-resolution.md) (methodology determines section structure), [08-prompt-frontmatter.md](08-prompt-frontmatter.md) (prompts declare which sections they own)
+**Depends on**: Methodology configuration (determines section structure), [08-prompt-frontmatter.md](08-prompt-frontmatter.md) (meta-prompts declare which sections they own)
 **Last updated**: 2026-03-12
 **Status**: draft
 
@@ -18,7 +18,7 @@ CLAUDE.md is the primary agent instruction file for Claude Code in target projec
 
 This domain models the management system that addresses all three risks: a **reserved section registry** with named owners, **ownership markers** that delineate scaffold-managed content from user-managed content, a **2000-token size budget** enforced by the optimization prompt, and the **section fill/replace algorithm** that prompts use to update their reserved sections without disturbing other content.
 
-**Role in the v2 architecture**: CLAUDE.md management sits at the intersection of prompt execution and platform adaptation. After `scaffold build` resolves and injects prompts ([domain 12](12-mixin-injection.md)), the Claude Code adapter generates the initial CLAUDE.md with all reserved sections. As prompts execute (via `scaffold resume`), each prompt fills its section using the fill algorithm defined here. The optimization prompt ([Phase 6](01-prompt-resolution.md)) consolidates the result. For non-Claude-Code platforms, a parallel system exists for AGENTS.md (Codex) with different structural conventions.
+**Role in the v2 architecture**: CLAUDE.md management sits at the intersection of prompt execution and platform adaptation. After `scaffold build` resolves and injects prompts ([domain 12](12-mixin-injection.md)), the Claude Code adapter generates the initial CLAUDE.md with all reserved sections. As prompts execute (via `scaffold run`), each prompt fills its section using the fill algorithm defined here. The optimization prompt ([Phase 6](01-prompt-resolution.md)) consolidates the result. For non-Claude-Code platforms, a parallel system exists for AGENTS.md (Codex) with different structural conventions.
 
 **What this domain covers**:
 - The complete reserved section registry and ownership model
@@ -33,7 +33,7 @@ This domain models the management system that addresses all three risks: a **res
 **What this domain does NOT cover**:
 - The actual prose content of individual CLAUDE.md sections (that's prompt-specific)
 - The `claude-md-optimization` prompt's consolidation logic (that's a specific prompt within the classic methodology)
-- Prompt resolution mechanics ([domain 01](01-prompt-resolution.md))
+- Meta-prompt loading mechanics (assembly engine)
 - Artifact schema validation rules ([domain 08](08-prompt-frontmatter.md))
 
 ---
@@ -46,7 +46,7 @@ This domain models the management system that addresses all three risks: a **res
 
 **ownership marker** — An HTML comment pair (`<!-- scaffold:managed by <slug> -->` / `<!-- /scaffold:managed -->`) that delineates scaffold-managed content within CLAUDE.md. Content between these markers is read-only for implementation agents.
 
-**tracking comment** — A line-1 HTML comment on scaffold artifacts that records the prompt name, version, date, methodology, and mixin summary. Format: `<!-- scaffold:<prompt-name> v<version> <date> <methodology>/<mixin-summary> -->`. Used by Mode Detection for update-mode awareness.
+**tracking comment** — A line-1 HTML comment on scaffold artifacts that records the step name, version, date, and methodology. Format: `<!-- scaffold:<step-name> v<version> <date> <methodology> -->`. Used by Mode Detection for update-mode awareness.
 
 **reservation placeholder** — An HTML comment (`<!-- Reserved for: <slug> -->`) that marks an unfilled reserved section. Replaced when the owning prompt runs, or removed by `claude-md-optimization` if the prompt was skipped.
 
@@ -151,8 +151,8 @@ interface TrackingComment {
   /** Methodology active when the artifact was produced */
   methodology: string;
 
-  /** Slash-separated mixin summary (e.g., "beads/strict-tdd/full-pr") */
-  mixinSummary: string;
+  /** Methodology name (e.g., "deep", "mvp") */
+  methodology: string;
 }
 
 /**
@@ -415,7 +415,7 @@ interface PlatformConventions {
 ```
 SectionRegistry
   ├── contains → ReservedSection[] (ordered)
-  ├── derived from → MethodologyManifest (domain 01)
+  ├── derived from → Methodology configuration
   └── constrains → ClaudeMdDocument (structure)
 
 ClaudeMdDocument
@@ -713,13 +713,13 @@ Called by the tracking-setup prompt (or equivalent) to create CLAUDE.md with all
 FUNCTION generateInitialClaudeMd(
   methodology: string,
   registry: SectionRegistry,
-  mixinSummary: string
+  methodology: string
 ) → string:
   lines ← []
 
   // Line 1: tracking comment
   trackingComment ← "<!-- scaffold:tracking-setup v1 "
-    + today() + " " + methodology + "/" + mixinSummary + " -->"
+    + today() + " " + methodology + " -->"
   lines.push(trackingComment)
   lines.push("")
 
@@ -825,7 +825,7 @@ All error codes use the prefix `CMD_` (CLAUDE.md Management Domain).
 | `CMD_SECTION_OVER_BUDGET` | warning | `Section "{heading}" uses {actual} tokens (budget: {budget}). Consider condensing.` | Reduce content to bullet points and pointers. The optimization prompt will address this in Phase 6. |
 | `CMD_FILE_OVER_BUDGET` | warning | `CLAUDE.md is ~{total} tokens (budget: 2000). The optimization prompt will consolidate.` | Let the pipeline continue — `claude-md-optimization` addresses this in Phase 6. |
 | `CMD_TRACKING_COMMENT_MISSING` | warning | `CLAUDE.md has no tracking comment on line 1. Mode Detection may not work correctly.` | Re-run the tracking-setup prompt, or manually add a tracking comment. |
-| `CMD_TRACKING_COMMENT_MALFORMED` | warning | `Tracking comment on line 1 of CLAUDE.md does not match expected format.` | Check the tracking comment syntax. Expected: `<!-- scaffold:<name> v<N> <date> <meth>/<mixins> -->` |
+| `CMD_TRACKING_COMMENT_MALFORMED` | warning | `Tracking comment on line 1 of CLAUDE.md does not match expected format.` | Check the tracking comment syntax. Expected: `<!-- scaffold:<name> v<N> <date> <methodology> -->` |
 | `CMD_UNKNOWN_SECTION` | warning | `Section "{heading}" in CLAUDE.md is not in the section registry for methodology "{methodology}".` | This section may have been added manually or by a different methodology. The optimization prompt will evaluate it. |
 | `CMD_PLACEHOLDER_STALE` | warning | `Section "{heading}" still has a reservation placeholder after prompt "{owner}" has completed.` | The owning prompt may have failed to fill its section. Re-run it. |
 | `CMD_MARKERS_CORRUPTED` | warning | `Section "{heading}" has mismatched ownership markers. Content may be unprotected.` | Re-run the owning prompt to rebuild markers, or manually fix the marker syntax. |
@@ -854,22 +854,22 @@ All error codes use the prefix `CMD_` (CLAUDE.md Management Domain).
 
 **Contract**: When a prompt's `produces` list includes `CLAUDE.md`, it is a multi-writer artifact. The prompt does not "own" the entire file — it owns only its designated section. The `artifact-schema` for CLAUDE.md, if declared, should include `required-sections` listing all non-optional section headings from the registry.
 
-### Domain 12: Mixin Injection
+### Assembly Engine
 
 | Direction | Data | Purpose |
 |-----------|------|---------|
-| Domain 12 → Domain 10 | Injected prompt content | After mixin injection, prompts contain concrete task-tracking commands that become part of CLAUDE.md section content |
+| Assembly Engine → Domain 10 | Assembled prompt output | After a step executes, its output may include content destined for CLAUDE.md sections |
 
-**Contract**: Mixin injection happens before prompts execute. When a prompt fills its CLAUDE.md section, the content it writes may include tool-specific commands that were injected from mixins (e.g., `bd create` vs. `gh issue create`).
+**Contract**: The assembly engine constructs prompts at runtime. When a step fills its CLAUDE.md section, the content it writes includes tool-specific commands determined by the project's user instructions and methodology configuration.
 
 ### Domain 09: CLI Architecture
 
 | Direction | Data | Purpose |
 |-----------|------|---------|
 | Domain 10 → Domain 09 | `scaffold validate` rules | CLI validates CLAUDE.md structure against the registry |
-| Domain 09 → Domain 10 | `scaffold resume` context | CLI includes CLAUDE.md in context files list for session bootstrap |
+| Domain 09 → Domain 10 | `scaffold run` context | CLI includes CLAUDE.md in context files list for session bootstrap |
 
-**Contract**: The CLI's `scaffold validate` command checks CLAUDE.md against the section registry — verifying that all expected sections exist, ownership markers are well-formed, and the tracking comment is present. The CLI's `scaffold resume` command includes CLAUDE.md in the session bootstrap context files.
+**Contract**: The CLI's `scaffold validate` command checks CLAUDE.md against the section registry — verifying that all expected sections exist, ownership markers are well-formed, and the tracking comment is present. The CLI's `scaffold run` command includes CLAUDE.md in the session bootstrap context files.
 
 ### Platform Adapters
 
@@ -1087,7 +1087,7 @@ When the next scaffold prompt (e.g., `git-workflow` re-running in update mode) t
 **What if the user replaced CLAUDE.md entirely with custom content?**
 
 1. No reserved sections are found → all `CMD_SECTION_NOT_FOUND` errors.
-2. The tracking-setup prompt (or `scaffold resume`) detects that CLAUDE.md exists but has no scaffold structure.
+2. The tracking-setup prompt (or `scaffold run`) detects that CLAUDE.md exists but has no scaffold structure.
 3. It offers: "CLAUDE.md exists but has no scaffold-managed sections. Recreate with scaffold structure (your content will be moved to Project-Specific Notes)?"
 
 ### MQ9: Pointer Pattern — Concrete Examples
@@ -1683,4 +1683,4 @@ A `classic-lite` project uses `simple-tracking` instead of `beads-setup`, and us
 _Implementation agents: add project-specific guidance here._
 ```
 
-Note the differences from classic: "Task Tracking" instead of "Task Management", lighter principles, no Design System section, different content reflecting the `none` task-tracking mixin and `relaxed` TDD approach.
+Note the differences from classic: "Task Tracking" instead of "Task Management", lighter principles, no Design System section, different content reflecting methodology depth and user instruction choices.

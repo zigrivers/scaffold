@@ -2,7 +2,7 @@
 
 **Domain ID**: 02
 **Phase**: 1 — Deep Domain Modeling
-**Depends on**: [01-prompt-resolution.md](01-prompt-resolution.md) (consumes its output — the resolved prompt set)
+**Depends on**: Meta-prompts in the `pipeline/` directory (consumes their frontmatter for dependency declarations)
 **Last updated**: 2026-03-12
 **Status**: draft
 
@@ -10,11 +10,11 @@
 
 ## Section 1: Domain Overview
 
-The Dependency Resolution & Pipeline Ordering domain takes the resolved prompt set produced by the Layered Prompt Resolution System ([domain 01](01-prompt-resolution.md)) and computes a valid execution order. It merges dependency declarations from two sources — the methodology manifest's `dependencies` section and each prompt's frontmatter `depends-on` field — into a unified directed acyclic graph (DAG), then applies Kahn's algorithm for topological sorting with manifest phase order as the tiebreaker. The domain also detects cycles, validates that all dependency targets exist in the resolved set, handles the effects of optional prompt exclusion and runtime skipping on the dependency graph, and identifies parallelizable prompts.
+The Dependency Resolution & Pipeline Ordering domain takes the meta-prompts in the `pipeline/` directory and computes a valid execution order. It merges dependency declarations from two sources — the methodology configuration's step definitions and each meta-prompt's frontmatter `depends-on` field — into a unified directed acyclic graph (DAG), then applies Kahn's algorithm for topological sorting with phase order as the tiebreaker. The domain also detects cycles, validates that all dependency targets exist in the active step set, handles the effects of conditional step disabling and runtime skipping on the dependency graph, and identifies parallelizable steps.
 
-**Role in the v2 architecture**: Dependency resolution is the ordering step between prompt resolution ([domain 01](01-prompt-resolution.md)) and pipeline state tracking ([domain 03](03-pipeline-state-machine.md)). Domain 01 produces a set of `ResolvedPrompt` records in manifest phase order (not dependency order). This domain reorders them into a valid execution sequence. Domain 03 then tracks progress through that ordered sequence at runtime. The CLI commands `scaffold resume`, `scaffold next`, `scaffold status`, and `scaffold skip` all consume the dependency-sorted order produced here. Platform adapters ([domain 05](05-platform-adapters.md)) use it to generate navigation hints ("After This Step" sections). The `scaffold validate` command uses it to verify the dependency graph is well-formed.
+**Role in the v2 architecture**: Dependency resolution is the ordering step between meta-prompt loading and pipeline state tracking ([domain 03](03-pipeline-state-machine.md)). The assembly engine reads meta-prompts from `pipeline/` and their frontmatter declares dependencies. This domain computes a valid execution sequence from those declarations. Domain 03 then tracks progress through that ordered sequence at runtime. The CLI commands `scaffold run`, `scaffold next`, `scaffold status`, and `scaffold skip` all consume the dependency-sorted order produced here. The `scaffold validate` command uses it to verify the dependency graph is well-formed.
 
-**Central design challenge**: The dependency graph has two authoritative sources (manifest and frontmatter) that must be merged without contradiction, plus three runtime disruptions — optional prompt exclusion, runtime skipping, and re-running via `scaffold resume --from X` — each of which affects the graph differently. Getting the semantics of these three disruptions wrong would either block the pipeline unnecessarily (over-constraining) or allow prompts to run without their prerequisites (under-constraining).
+**Central design challenge**: The dependency graph has two authoritative sources (methodology config and frontmatter) that must be merged without contradiction, plus three runtime disruptions — conditional step disabling, runtime skipping, and re-running via `scaffold run <step>` — each of which affects the graph differently. Getting the semantics of these three disruptions wrong would either block the pipeline unnecessarily (over-constraining) or allow steps to run without their prerequisites (under-constraining).
 
 ---
 
@@ -32,7 +32,7 @@ The Dependency Resolution & Pipeline Ordering domain takes the resolved prompt s
 
 **eligible prompt** — A prompt whose status is `pending` and all of whose dependencies have been satisfied (completed or skipped). Eligible prompts can be executed next.
 
-**excluded prompt** — A prompt removed from the resolved set during domain 01's optional prompt filtering because a required project trait was not satisfied. Excluded prompts are not in the dependency graph at all — they never existed from this domain's perspective.
+**excluded step** — A step disabled in the methodology configuration because a required condition was not satisfied (e.g., conditional steps like database or API phases). Excluded steps are not in the dependency graph at all — they never existed from this domain's perspective.
 
 **in-degree** — The number of unsatisfied incoming dependency edges for a prompt. A prompt with in-degree 0 has no remaining prerequisites and is ready for execution (or queueing).
 
@@ -40,7 +40,7 @@ The Dependency Resolution & Pipeline Ordering domain takes the resolved prompt s
 
 **manifest dependencies** — Dependencies declared in the methodology manifest's `dependencies` section. Keyed by prompt slug, values are arrays of prerequisite slugs. These are the methodology author's view of the pipeline's structural ordering.
 
-**frontmatter dependencies** — Dependencies declared in individual prompt files via the `depends-on` frontmatter field. These are the prompt author's view of what prerequisites the prompt needs. Merged (union) with manifest dependencies by domain 01.
+**frontmatter dependencies** — Dependencies declared in individual meta-prompt files via the `depends-on` frontmatter field. These are the meta-prompt author's view of what prerequisites the step needs. Merged (union) with methodology configuration dependencies.
 
 **parallel set** — The set of prompts that are simultaneously eligible for execution at a given point in the pipeline. These prompts have no dependency relationships between them and could theoretically run concurrently.
 
@@ -118,13 +118,13 @@ interface DependencyGraph {
 
 /**
  * The primary input to the dependency resolver.
- * Constructed from domain 01's ResolutionResult.
+ * Constructed from meta-prompts in the pipeline/ directory.
  */
 interface DependencyInput {
   /**
-   * Resolved prompts from domain 01, each with merged dependencies.
+   * Meta-prompts from the pipeline directory, each with merged dependencies.
    * The frontmatter.dependsOn array already contains the union of
-   * manifest deps and frontmatter deps (merged in domain 01 Step 6).
+   * methodology config deps and frontmatter deps (merged during loading).
    */
   prompts: ResolvedPrompt[];
 
@@ -326,7 +326,7 @@ EligibilityResult (runtime, computed on demand)
 
 ## Section 4: State Transitions
 
-N/A — Dependency resolution is a stateless computation. It takes the resolved prompt set (from domain 01) as input and produces a sorted order as output in a single pass. There is no persistent state within this domain.
+N/A — Dependency resolution is a stateless computation. It takes the meta-prompt set (from the `pipeline/` directory) as input and produces a sorted order as output in a single pass. There is no persistent state within this domain.
 
 The *runtime* state of individual prompts (pending → in_progress → completed/skipped) belongs to the Pipeline State Machine ([domain 03](03-pipeline-state-machine.md)). This domain produces the static ordering; domain 03 tracks progress through that ordering.
 
@@ -581,13 +581,13 @@ FUNCTION computeEligibility(
   RETURN { eligible, blocked, completedCount, skippedCount, pendingCount }
 ```
 
-**Complexity**: O(P + E) where P is nodes and E is edges. Called on every `scaffold resume`, `scaffold next`, and `scaffold status` invocation.
+**Complexity**: O(P + E) where P is nodes and E is edges. Called on every `scaffold run`, `scaffold next`, and `scaffold status` invocation.
 
 **Key semantic**: Both "completed" and "skipped" prompts satisfy dependency edges. This is by design — when a user skips a prompt, they are asserting that they don't need its output, and downstream prompts should not be blocked.
 
 ### Algorithm 5: Re-run Dependency Validation
 
-When `scaffold resume --from X` is used, determines whether re-running prompt X should trigger warnings about downstream prompts that may have stale inputs.
+When `scaffold run --from X` is used, determines whether re-running prompt X should trigger warnings about downstream prompts that may have stale inputs.
 
 **Input**: prompt slug to re-run, `DependencyGraph`, prompt statuses from `state.json`
 **Output**: list of affected downstream prompts
@@ -713,7 +713,7 @@ FUNCTION findAffectedDownstream(
 
 #### `DEP_RERUN_STALE_DOWNSTREAM`
 - **Severity**: Warning
-- **When**: `scaffold resume --from X` is used and completed downstream prompts may have stale inputs
+- **When**: `scaffold run --from X` is used and completed downstream prompts may have stale inputs
 - **Message template**: `Re-running "{slug}" may invalidate {count} completed downstream prompt(s): {affectedSlugs}. Consider re-running them as well.`
 - **JSON structure**:
   ```json
@@ -753,7 +753,7 @@ FUNCTION findAffectedDownstream(
 ### Dependency Resolution → CLI Architecture (Domain 09)
 
 - **Direction**: Domain 02 outputs are consumed by CLI commands
-- **Data flow**: `scaffold resume` uses `computeEligibility()` to find the next runnable prompt. `scaffold next` uses `parallelSets` and eligibility to show all currently-runnable prompts. `scaffold status` uses `sortedOrder` to display prompts in execution sequence. `scaffold skip` uses `graph.successors` to determine the impact of skipping. `scaffold resume --from X` uses `findAffectedDownstream()` to warn about stale outputs.
+- **Data flow**: `scaffold run` uses `computeEligibility()` to find the next runnable prompt. `scaffold next` uses `parallelSets` and eligibility to show all currently-runnable prompts. `scaffold status` uses `sortedOrder` to display prompts in execution sequence. `scaffold skip` uses `graph.successors` to determine the impact of skipping. `scaffold run --from X` uses `findAffectedDownstream()` to warn about stale outputs.
 - **Contract**: CLI commands treat `DependencyResult` as read-only. They combine it with `state.json` (domain 03) to compute runtime eligibility.
 - **Assumption**: The `DependencyResult` is cached after `scaffold build` and reused across CLI invocations. It is recomputed only when `config.yml` or prompt files change.
 
@@ -836,7 +836,7 @@ If `design-system` is excluded (no `frontend` trait), `git-workflow`'s effective
 
 **The key difference**: Exclusion removes the node from the graph entirely (it was never part of the pipeline). Skipping keeps the node in the graph but marks it as satisfied. Both unblock dependents, but the mechanism is different.
 
-**Implications for re-running**: A skipped prompt can be un-skipped via `scaffold resume --from <prompt>`. This changes its status from `"skipped"` to `"in_progress"` and runs it. Since the dependency graph still has the node and all its edges, the re-run is valid — the prompt's own prerequisites are already satisfied (they were satisfied when the user originally had the option to skip).
+**Implications for re-running**: A skipped prompt can be un-skipped via `scaffold run --from <prompt>`. This changes its status from `"skipped"` to `"in_progress"` and runs it. Since the dependency graph still has the node and all its edges, the re-run is valid — the prompt's own prerequisites are already satisfied (they were satisfied when the user originally had the option to skip).
 
 **Example:**
 
@@ -844,7 +844,7 @@ If `design-system` is excluded (no `frontend` trait), `git-workflow`'s effective
 Pipeline: create-prd → tech-stack → coding-standards → tdd → project-structure
 User skips: tdd
 Effect: project-structure becomes eligible (tdd is "done" as skipped)
-Later: scaffold resume --from tdd  (un-skip and run tdd)
+Later: scaffold run --from tdd  (un-skip and run tdd)
 ```
 
 **Category**: (a) Handled by design.
@@ -952,9 +952,9 @@ See Algorithm 2 in Section 5 for the complete pseudocode. The key implementation
 
 **Category**: (a) Handled by design.
 
-### MQ7: `scaffold resume --from X` re-run semantics
+### MQ7: `scaffold run --from X` re-run semantics
 
-When `scaffold resume --from X` is used, **only prompt X is re-run. Its dependents are NOT automatically re-run.**
+When `scaffold run --from X` is used, **only prompt X is re-run. Its dependents are NOT automatically re-run.**
 
 **The re-run process:**
 
@@ -974,7 +974,7 @@ When `scaffold resume --from X` is used, **only prompt X is re-run. Its dependen
 - When the user eventually re-runs a downstream prompt, it reads the updated artifact and adjusts.
 - `scaffold status` could optionally show a "may be stale" indicator for downstream prompts whose predecessor was re-run after they completed.
 
-**Special case — un-skipping**: `scaffold resume --from X` where X was previously skipped changes status from `"skipped"` to `"in_progress"`. All of X's prerequisites are already satisfied (they were when X was originally offered to the user). Dependents of X that were already completed may have run without X's output — the stale-downstream warning applies here too.
+**Special case — un-skipping**: `scaffold run --from X` where X was previously skipped changes status from `"skipped"` to `"in_progress"`. All of X's prerequisites are already satisfied (they were when X was originally offered to the user). Dependents of X that were already completed may have run without X's output — the stale-downstream warning applies here too.
 
 **Category**: (a) Handled by design.
 
@@ -991,7 +991,7 @@ Next eligible prompts (2 can run in parallel):
   1. prd-gap-analysis — Analyze PRD for gaps, then innovate
   2. beads-setup — Initialize task tracking
 
-Run: scaffold resume
+Run: scaffold run
      (runs the first eligible prompt)
 ```
 
@@ -1006,9 +1006,9 @@ Pipeline: classic (2/18 complete)
   ...
 ```
 
-**Sequential execution**: Despite multiple prompts being eligible, `scaffold resume` (without `--from`) runs only the first eligible prompt (per the phase tiebreaker order). The user must run `scaffold resume` again for the next one. This is by design — prompts run sequentially in a single CLI session.
+**Sequential execution**: Despite multiple prompts being eligible, `scaffold run` (without `--from`) runs only the first eligible prompt (per the phase tiebreaker order). The user must run `scaffold run` again for the next one. This is by design — prompts run sequentially in a single CLI session.
 
-**Parallel execution with worktrees**: In a multi-agent setup, each agent runs `scaffold resume` in its own worktree. With proper locking ([domain 13](13-pipeline-locking.md)), two agents could execute `prd-gap-analysis` and `beads-setup` simultaneously if both are eligible. The lock prevents two agents from picking the *same* prompt.
+**Parallel execution with worktrees**: In a multi-agent setup, each agent runs `scaffold run` in its own worktree. With proper locking ([domain 13](13-pipeline-locking.md)), two agents could execute `prd-gap-analysis` and `beads-setup` simultaneously if both are eligible. The lock prevents two agents from picking the *same* prompt.
 
 **The `parallelSets` structure:**
 
@@ -1319,7 +1319,7 @@ If the user skips all prompts except the last one, the last prompt becomes eligi
 
 ### Open Questions
 
-1. **Should `scaffold resume --from X` auto-invalidate downstream prompts in state.json?**
+1. **Should `scaffold run --from X` auto-invalidate downstream prompts in state.json?**
    Currently, re-running X only warns about stale downstream prompts. An alternative is to reset downstream prompts' status to `"pending"` (or a new `"stale"` status) to force re-execution. This is more aggressive but prevents silently stale artifacts. The spec does not address this explicitly.
 
 2. **Should the dependency graph support "soft" vs. "hard" dependencies?**
@@ -1337,13 +1337,13 @@ If the user skips all prompts except the last one, the last prompt becomes eligi
 
 2. **Include dependency graph visualization in `scaffold preview`.** Output a Mermaid diagram or ASCII dependency tree so users can visually inspect the pipeline structure before executing. This would help catch dependency issues early.
 
-3. **Add a `--cascade` flag to `scaffold resume --from X`.** When specified, automatically re-run all downstream prompts that were previously completed. This addresses Open Question 1 without changing the default (non-cascading) behavior.
+3. **Add a `--cascade` flag to `scaffold run --from X`.** When specified, automatically re-run all downstream prompts that were previously completed. This addresses Open Question 1 without changing the default (non-cascading) behavior.
 
 4. **Emit the full `parallelSets` structure in `scaffold status --format json`.** This lets external tools (dashboard, CI scripts) understand which prompts are truly independent and could be parallelized with proper worktree setup.
 
 5. **ADR CANDIDATE: Dependency union vs. replacement for custom prompts.** The current design unions `depends-on` from custom prompts with built-in dependencies. This prevents removing dependencies, which is safe but restrictive. A user who wants to *replace* a prompt's dependencies (not just add to them) must edit the manifest. An ADR should evaluate whether a `depends-on-replace` frontmatter field is warranted.
 
-6. **ADR CANDIDATE: Runtime dependency graph mutation.** The current design treats the dependency graph as static after `scaffold build`. But `scaffold skip` and `scaffold resume --from` effectively mutate the runtime semantics without changing the graph. An ADR should evaluate whether the graph should be mutable at runtime (e.g., dynamically removing edges when a prompt is skipped) or remain static with the state machine handling skip semantics.
+6. **ADR CANDIDATE: Runtime dependency graph mutation.** The current design treats the dependency graph as static after `scaffold build`. But `scaffold skip` and `scaffold run --from` effectively mutate the runtime semantics without changing the graph. An ADR should evaluate whether the graph should be mutable at runtime (e.g., dynamically removing edges when a prompt is skipped) or remain static with the state machine handling skip semantics.
 
 ---
 

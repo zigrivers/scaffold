@@ -6,6 +6,8 @@ This document defines the directory structure, naming conventions, and workflow 
 
 Every document produced during these phases will be consumed by AI agents during implementation. Write for that audience: precise, unambiguous, machine-parseable where possible, with explicit cross-references between documents.
 
+> **Single Source of Truth**: `scaffold-v2-prd.md` is the authoritative PRD for scaffold v2. All other v2 documents (domain models, ADRs, data schemas, API contracts, UX specs) are subordinate. When any v2 document conflicts with the PRD, the PRD wins. The PRD consolidates the original v2 spec with the meta-prompt architecture design.
+
 ## Directory Structure
 
 All v2 documentation lives under `docs/v2/`. This directory is separate from the existing `docs/` which contains v1 pipeline output documents.
@@ -13,21 +15,19 @@ All v2 documentation lives under `docs/v2/`. This directory is separate from the
 ```
 docs/v2/
 ├── README.md                              # This file — index of all v2 docs
+├── scaffold-v2-prd.md                     # Product Requirements Document (SINGLE SOURCE OF TRUTH)
 ├── domain-models/                         # Phase 1: Deep domain modeling
-│   ├── 01-prompt-resolution.md
-│   ├── 02-dependency-resolution.md
-│   ├── 03-pipeline-state-machine.md
-│   ├── 04-abstract-task-verbs.md
-│   ├── 05-platform-adapters.md
-│   ├── 06-config-validation.md
-│   ├── 07-brownfield-adopt.md
-│   ├── 08-prompt-frontmatter.md
-│   ├── 09-cli-architecture.md
-│   ├── 10-claude-md-management.md
-│   ├── 11-decision-log.md
-│   ├── 12-mixin-injection.md
-│   ├── 13-pipeline-locking.md
-│   └── 14-init-wizard.md
+│   ├── 02-dependency-resolution.md            # Current
+│   ├── 03-pipeline-state-machine.md            # Current
+│   ├── 05-platform-adapters.md                 # Transformed
+│   ├── 06-config-validation.md                 # Transformed
+│   ├── 07-brownfield-adopt.md                  # Current
+│   ├── 08-prompt-frontmatter.md                # Transformed
+│   ├── 09-cli-architecture.md                  # Transformed
+│   ├── 10-claude-md-management.md              # Current
+│   ├── 11-decision-log.md                      # Current
+│   ├── 13-pipeline-locking.md                  # Current
+│   └── 14-init-wizard.md                       # Transformed
 ├── adrs/                                  # Phase 2: Architecture Decision Records
 │   ├── template.md
 │   ├── ADR-001-cli-language-nodejs.md
@@ -46,8 +46,7 @@ docs/v2/
 │   └── lock-json-schema.md
 ├── api/                                   # Phase 5: API / CLI contracts
 │   ├── cli-contract.md                    # All CLI commands, args, flags, exit codes
-│   ├── adapter-interface.md               # Platform adapter contract
-│   ├── mixin-injection-interface.md       # Mixin system interface
+│   ├── adapter-interface.md               # Platform adapter contract (transformed)
 │   └── json-output-schemas.md             # --format json envelope per command
 ├── ux/                                    # Phase 6: UX specification
 │   ├── init-wizard-flow.md                # Wizard screens, branching, defaults
@@ -79,6 +78,13 @@ docs/v2/
 │   ├── implementability-dry-run.md
 │   ├── dependency-graph-validation.md
 │   └── scope-creep-check.md
+├── reference/                             # Historical reference documents
+│   └── scaffold-v2-spec.md               # Original v2 spec (superseded by PRD)
+├── archive/                               # Superseded documents (historical reference)
+│   ├── domain-models/                     # Superseded domain models (01, 04, 12)
+│   ├── api/                               # Superseded API contracts (mixin-injection)
+│   ├── superpowers-specs/                 # Design specs consolidated into PRD
+│   └── superpowers-plans/                 # Completed implementation plans
 └── final/                                 # Finalization phase
     ├── developer-onboarding.md
     └── implementation-playbook.md
@@ -135,19 +141,19 @@ Apply all validation fixes. Freeze docs (set status to `frozen`). Produce the on
 
 ## Domain ID Reference
 
-| ID | Domain | File |
-|----|--------|------|
-| 01 | Layered Prompt Resolution System | `domain-models/01-prompt-resolution.md` |
-| 02 | Dependency Resolution & Pipeline Ordering | `domain-models/02-dependency-resolution.md` |
-| 03 | Pipeline State Machine | `domain-models/03-pipeline-state-machine.md` |
-| 04 | Abstract Task Verb System | `domain-models/04-abstract-task-verbs.md` |
-| 05 | Platform Adapter System | `domain-models/05-platform-adapters.md` |
-| 06 | Config Schema & Validation System | `domain-models/06-config-validation.md` |
-| 07 | Brownfield Mode & scaffold adopt | `domain-models/07-brownfield-adopt.md` |
-| 08 | Prompt Frontmatter Schema & Section Targeting | `domain-models/08-prompt-frontmatter.md` |
-| 09 | CLI Command Architecture | `domain-models/09-cli-architecture.md` |
-| 10 | CLAUDE.md Management Model | `domain-models/10-claude-md-management.md` |
-| 11 | Decision Log Lifecycle | `domain-models/11-decision-log.md` |
-| 12 | Mixin Injection Mechanics | `domain-models/12-mixin-injection.md` |
-| 13 | Pipeline Execution Locking | `domain-models/13-pipeline-locking.md` |
-| 14 | Init Wizard & Smart Suggestion | `domain-models/14-init-wizard.md` |
+| ID | Domain | File | Status |
+|----|--------|------|--------|
+| 01 | Layered Prompt Resolution System | `domain-models/01-prompt-resolution.md` | **superseded** (ADR-041) |
+| 02 | Dependency Resolution & Pipeline Ordering | `domain-models/02-dependency-resolution.md` | current |
+| 03 | Pipeline State Machine | `domain-models/03-pipeline-state-machine.md` | current |
+| 04 | Abstract Task Verb System | `domain-models/04-abstract-task-verbs.md` | **superseded** (ADR-041) |
+| 05 | Platform Adapter System | `domain-models/05-platform-adapters.md` | **transformed** (ADR-041) |
+| 06 | Config Schema & Validation System | `domain-models/06-config-validation.md` | **transformed** (ADR-041, ADR-043) |
+| 07 | Brownfield Mode & scaffold adopt | `domain-models/07-brownfield-adopt.md` | current |
+| 08 | Meta-Prompt Frontmatter Schema | `domain-models/08-prompt-frontmatter.md` | **transformed** (ADR-041, ADR-045) |
+| 09 | CLI Command Architecture | `domain-models/09-cli-architecture.md` | **transformed** (ADR-041) |
+| 10 | CLAUDE.md Management Model | `domain-models/10-claude-md-management.md` | current |
+| 11 | Decision Log Lifecycle | `domain-models/11-decision-log.md` | current |
+| 12 | Mixin Injection Mechanics | `domain-models/12-mixin-injection.md` | **superseded** (ADR-041) |
+| 13 | Pipeline Execution Locking | `domain-models/13-pipeline-locking.md` | current |
+| 14 | Init Wizard & Methodology Selection | `domain-models/14-init-wizard.md` | **transformed** (ADR-041, ADR-043) |

@@ -32,7 +32,7 @@ The CLI Command Architecture & Output Modes domain defines the Node.js applicati
 
 **CLI application** — The Node.js executable (`scaffold`) that serves as the entry point for all Scaffold v2 operations. Distributed via npm and Homebrew.
 
-**command** — A named subcommand of the `scaffold` CLI (e.g., `scaffold init`, `scaffold build`, `scaffold resume`). Each command has a defined signature (arguments, flags), an output contract (JSON envelope fields), and an exit code mapping.
+**command** — A named subcommand of the `scaffold` CLI (e.g., `scaffold init`, `scaffold build`, `scaffold run`). Each command has a defined signature (arguments, flags), an output contract (JSON envelope fields), and an exit code mapping.
 
 **command handler** — The function that implements a command's business logic. Receives parsed arguments and an `OutputContext`, returns a `CommandResult`. Does not directly write to stdout/stderr.
 
@@ -44,7 +44,7 @@ The CLI Command Architecture & Output Modes domain defines the Node.js applicati
 
 **output context** — The injected dependency that commands use to emit output. Abstracts the three modes — commands call `outputContext.info()`, `outputContext.prompt()`, `outputContext.table()`, etc., and the context routes to the appropriate formatter.
 
-**session bootstrap summary** — The structured context block produced by `scaffold resume` before prompt execution. Assembles pipeline status, context files, recent decisions, and crash recovery information from multiple data sources.
+**session bootstrap summary** — The structured context block produced by `scaffold run` before prompt execution. Assembles pipeline status, context files, recent decisions, and crash recovery information from multiple data sources.
 
 **project root** — The directory containing `.scaffold/`, detected by walking up from the current working directory. Some commands (`init`, `version`, `list`) do not require a project root.
 
@@ -362,7 +362,7 @@ interface ProjectContext {
 
   /**
    * Pipeline state from .scaffold/state.json.
-   * Null if state.json does not exist yet (e.g., before first `scaffold resume`).
+   * Null if state.json does not exist yet (e.g., before first `scaffold run`).
    */
   state: import('./03-pipeline-state-machine').PipelineState | null;
 
@@ -646,7 +646,7 @@ interface VersionData {
   platform: string;
 }
 
-/** scaffold resume */
+/** scaffold run */
 interface ResumeData {
   pipeline_progress: {
     completed: number;
@@ -891,7 +891,7 @@ function createOutputContext(mode: OutputMode): OutputContext
 
 ### Algorithm 3: Session Bootstrap Assembly
 
-The `scaffold resume` command assembles its session bootstrap summary from multiple sources:
+The `scaffold run` command assembles its session bootstrap summary from multiple sources:
 
 ```
 function assembleBootstrapSummary(project: ProjectContext): ResumeData
@@ -1137,7 +1137,7 @@ function runValidation(project: ProjectContext): ValidateData
 |------|-----------------|-------------------|
 | `PROMPT_NOT_FOUND` | `Prompt '{name}' is not in the resolved pipeline.` | Check the prompt name. Use `scaffold status` to see available prompts |
 | `NO_ELIGIBLE_PROMPT` | `No eligible prompts. All prompts are completed or have unmet dependencies.` | Use `scaffold status` to check pipeline state. Use `scaffold reset` if needed |
-| `ALREADY_COMPLETED` | `Prompt '{name}' is already completed. Use `scaffold resume --from {name}` to re-run.` | Use `--from` flag to re-run a completed prompt |
+| `ALREADY_COMPLETED` | `Prompt '{name}' is already completed. Use `scaffold run --from {name}` to re-run.` | Use `--from` flag to re-run a completed prompt |
 
 ---
 
@@ -1196,7 +1196,7 @@ graph LR
     H --> K[prompts/*.md]
 ```
 
-### 7.4 Data Flow: `scaffold resume`
+### 7.4 Data Flow: `scaffold run`
 
 ```mermaid
 graph LR
@@ -1261,7 +1261,7 @@ export const commands: CommandDefinition[] = [
 2. Resolve output mode from `--format`, `--auto`, and TTY detection
 3. Look up command handler from registry
 4. If `requiresProject`: detect project root, load `ProjectContext`
-5. If `requiresState` and no state.json: error with guidance to run `scaffold resume` first
+5. If `requiresState` and no state.json: error with guidance to run `scaffold run` first
 6. Create `OutputContext` for the resolved mode
 7. Build `ExecutionContext` with output + project context
 8. Invoke command handler
@@ -1283,7 +1283,7 @@ Each command's signature (arguments, flags) and output contract (JSON data field
 | `info` | `scaffold info` | Yes | No | `InfoData` |
 | `update` | `scaffold update` `--check-only` | No | No | `UpdateData` |
 | `version` | `scaffold version` | No | No | `VersionData` |
-| `resume` | `scaffold resume` `--from <prompt>` | Yes | Yes* | `ResumeData` |
+| `resume` | `scaffold run` `--from <prompt>` | Yes | Yes* | `ResumeData` |
 | `status` | `scaffold status` | Yes | Yes | `StatusData` |
 | `next` | `scaffold next` | Yes | Yes | `NextData` |
 | `skip` | `scaffold skip <prompt>` `--reason <text>` | Yes | Yes | `SkipData` |
@@ -1307,7 +1307,7 @@ The three output modes are implemented as a **strategy pattern** via the `Output
 
 **User question handling across modes:**
 
-When a command needs to ask the user a question (e.g., `scaffold resume` asking "Ready to run dev-env-setup?"):
+When a command needs to ask the user a question (e.g., `scaffold run` asking "Ready to run dev-env-setup?"):
 
 | Mode | Behavior |
 |------|----------|
@@ -1597,7 +1597,7 @@ JSON envelopes should be snapshot-tested to catch unintended changes to the API 
 
 ### Open Questions
 
-1. **Should `scaffold resume` automatically execute the next prompt, or just show the bootstrap summary and wait?** The spec implies it both shows status and offers to execute. The model above has it show the bootstrap and ask for confirmation before executing. An alternative is splitting into `scaffold resume` (show + execute) and `scaffold resume --dry-run` (show only, equivalent to `scaffold status` with bootstrap info). **Recommendation**: Keep the current design — `resume` shows bootstrap and asks to execute, `status` is read-only.
+1. **Should `scaffold run` automatically execute the next prompt, or just show the bootstrap summary and wait?** The spec implies it both shows status and offers to execute. The model above has it show the bootstrap and ask for confirmation before executing. An alternative is splitting into `scaffold run` (show + execute) and `scaffold run --dry-run` (show only, equivalent to `scaffold status` with bootstrap info). **Recommendation**: Keep the current design — `resume` shows bootstrap and asks to execute, `status` is read-only.
 
 2. **How should `scaffold build` handle prompts with `requires-capabilities` that the selected platforms don't support?** Currently this is a warning from the platform adapter. Should `build` surface these warnings to the user, or only `validate`? **Recommendation**: `build` should surface capability warnings at build time — waiting until `validate` is too late. The warning should appear in the build summary and in the JSON envelope's `warnings[]`.
 
@@ -1621,14 +1621,14 @@ JSON envelopes should be snapshot-tested to catch unintended changes to the API 
 
 ## Section 11: Concrete Examples
 
-### Example 1: `scaffold resume` — All Three Output Modes
+### Example 1: `scaffold run` — All Three Output Modes
 
 **Scenario:** Project has completed 8 of 18 prompts. Next eligible is `dev-env-setup`. No crash recovery needed.
 
 **Interactive mode:**
 
 ```
-$ scaffold resume
+$ scaffold run
 
 === Pipeline Status ===
 Methodology: classic (8/18 complete, 2 skipped)
@@ -1655,7 +1655,7 @@ Executing dev-env-setup...
 **JSON mode:**
 
 ```
-$ scaffold resume --format json
+$ scaffold run --format json
 {
   "success": true,
   "command": "resume",
@@ -1680,7 +1680,7 @@ $ scaffold resume --format json
 **Auto mode:**
 
 ```
-$ scaffold resume --auto
+$ scaffold run --auto
 [auto] Ready to run dev-env-setup? → Yes (default)
 Methodology: classic (8/18 complete, 2 skipped)
 Executing dev-env-setup...
@@ -1820,14 +1820,14 @@ Exit code: 1
 }
 ```
 
-### Example 4: `scaffold resume` with Crash Recovery
+### Example 4: `scaffold run` with Crash Recovery
 
 **Scenario:** Previous session crashed during `coding-standards`. The partial artifact exists.
 
 **Interactive mode:**
 
 ```
-$ scaffold resume
+$ scaffold run
 
 === Pipeline Status ===
 Methodology: classic (5/18 complete, 0 skipped)
@@ -1857,7 +1857,7 @@ Executing coding-standards...
 **Auto mode:**
 
 ```
-$ scaffold resume --auto
+$ scaffold run --auto
 [auto] Re-run coding-standards? → Yes (default)
 Methodology: classic (5/18 complete, 0 skipped)
 Crash recovery: re-running coding-standards
@@ -1948,7 +1948,7 @@ Running scaffold build...
   Generated 14 Claude Code commands
   Generated universal prompts
 
-Run `scaffold resume` to start the pipeline.
+Run `scaffold run` to start the pipeline.
 ```
 
 **JSON mode:**

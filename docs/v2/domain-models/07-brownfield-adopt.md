@@ -23,7 +23,6 @@ This domain sits at the very beginning of the Scaffold lifecycle, governing how 
 - The four brownfield-adapted prompts and how their behavior changes
 - The `scaffold adopt` command: scanning algorithm, artifact-to-prompt mapping, partial match handling
 - V1 artifact detection and mapping to v2 prompt completions
-- Mixin inference from existing tooling (task tracker, test framework, CI)
 - User interaction flow for both `scaffold init` brownfield path and `scaffold adopt`
 - Policy when `.scaffold/` already exists
 
@@ -49,13 +48,12 @@ This domain sits at the very beginning of the Scaffold lifecycle, governing how 
 
 **artifact match** — A mapping from an existing file on disk to a Scaffold prompt, established by matching the file path against a prompt's `produces` field. The match may be exact (same path) or fuzzy (same filename in a different directory).
 
-**tracking comment** — A structured HTML comment on line 1 of a Scaffold-produced artifact. V2 format: `<!-- scaffold:<prompt-name> v<version> <date> <methodology>/<mixin-summary> -->`. V1 format: `<!-- scaffold:<prompt-name> v<version> <date> -->` (no methodology/mixin suffix).
+**tracking comment** — A structured HTML comment on line 1 of a Scaffold-produced artifact. V2 format: `<!-- scaffold:<step-name> v<version> <date> <methodology> -->`. V1 format: `<!-- scaffold:<prompt-name> v<version> <date> -->`.
 
 **codebase signal** — An observable indicator in the project directory that informs mode detection. Examples: a `package.json` with dependencies (brownfield signal), a `docs/plan.md` with a v1 tracking comment (v1 migration signal).
 
-**mixin inference** — The process of guessing appropriate mixin selections from existing project tooling. For example, detecting `.beads/` suggests `task-tracking: beads`; detecting Jest in `package.json` suggests `tdd: strict`.
 
-**pre-completed prompt** — A prompt that adopt marks as `completed` in `state.json` because its `produces` artifacts already exist on disk. These prompts are skipped when the user runs `scaffold resume`.
+**pre-completed prompt** — A prompt that adopt marks as `completed` in `state.json` because its `produces` artifacts already exist on disk. These prompts are skipped when the user runs `scaffold run`.
 
 **partial match** — An artifact that exists on disk and maps to a prompt's `produces` field, but fails artifact-schema validation (e.g., missing required sections). The file is present but the content may be incomplete.
 
@@ -200,8 +198,8 @@ interface TrackingCommentInfo {
   date: string | null;
 
   /**
-   * Methodology/mixin context (v2 only).
-   * E.g., "classic/strict-tdd/beads". Null for v1 format.
+   * Methodology context (v2 only).
+   * E.g., "deep". Null for v1 format.
    */
   methodology: string | null;
 }
@@ -273,9 +271,6 @@ interface AdoptScanResult {
   /** Total prompts in the resolved pipeline */
   totalPrompts: number;
 
-  /** Inferred mixin selections from existing tooling */
-  inferredMixins: MixinInference;
-
   /** Non-fatal issues found during scanning */
   warnings: AdoptWarning[];
 
@@ -283,37 +278,6 @@ interface AdoptScanResult {
   errors: AdoptError[];
 }
 
-/**
- * Inferred mixin selections based on existing project tooling.
- * Each axis has a suggested value with the signals that informed it.
- */
-interface MixinInference {
-  taskTracking: InferredMixinValue;
-  tdd: InferredMixinValue;
-  gitWorkflow: InferredMixinValue;
-  agentMode: InferredMixinValue;
-  /** Always defaults to the current platform — not inferred from codebase */
-  interactionStyle: InferredMixinValue;
-}
-
-/**
- * A single inferred mixin value with supporting evidence.
- */
-interface InferredMixinValue {
-  /** The suggested mixin value (e.g., "beads", "strict", "full-pr") */
-  value: string;
-
-  /** Signals that informed this inference */
-  signals: string[];
-
-  /**
-   * Whether this inference is speculative or confident.
-   * High = strong evidence (e.g., .beads/ directory exists).
-   * Low = weak evidence (e.g., test framework present but unclear approach).
-   * None = no evidence, using methodology default.
-   */
-  confidence: 'high' | 'low' | 'none';
-}
 ```
 
 ### Brownfield Prompt Adaptation
@@ -383,9 +347,6 @@ interface AdoptReport {
   /** Per-artifact details for the report table */
   artifacts: AdoptReportArtifact[];
 
-  /** Inferred mixin suggestions */
-  mixinSuggestions: AdoptReportMixin[];
-
   /** Suggested next command after adoption */
   nextStep: string;
 }
@@ -407,19 +368,6 @@ interface AdoptReportArtifact {
   note: string | null;
 }
 
-/**
- * A mixin suggestion in the adopt report.
- */
-interface AdoptReportMixin {
-  /** Mixin axis (e.g., "task-tracking") */
-  axis: string;
-
-  /** Suggested value */
-  value: string;
-
-  /** Why this was suggested */
-  reason: string;
-}
 ```
 
 ### Error and Warning Types
@@ -479,7 +427,6 @@ BrownfieldDetectionResult
 
 AdoptScanResult
   ├── contains → ArtifactMatch[] (per-produces-path matches)
-  ├── contains → MixinInference (tooling-based suggestions)
   ├── produces → pre_completed map (fed to domain 03 StateInitInput)
   ├── produces → config.yml (fed to domain 06)
   └── presented as → AdoptReport (user-facing)
@@ -521,15 +468,14 @@ stateDiagram-v2
     V1Detection --> ArtifactMapping: map v1 files\nto v2 prompts
     BrownfieldScan --> ArtifactMapping: map existing files\nto v2 prompts
 
-    ArtifactMapping --> MixinInference: infer mixin\nselections
-    MixinInference --> ReportGeneration: generate\nadopt report
+    ArtifactMapping --> ReportGeneration: generate\nadopt report
 
     ReportGeneration --> AwaitConfirmation: present report\nto user
     AwaitConfirmation --> StateCreation: user confirms
     AwaitConfirmation --> Cancelled: user declines
 
     StateCreation --> Adopted: write config.yml\n+ state.json
-    Adopted --> [*]: "Run scaffold resume\nto continue"
+    Adopted --> [*]: "Run scaffold run\nto continue"
 
     Error_ScaffoldExists --> [*]: exit with error
     Error_NothingFound --> [*]: exit with error
@@ -588,11 +534,10 @@ stateDiagram-v2
 | V1Detection | V1 artifacts found, applying v1-specific mapping logic | Map v1 files to v2 prompts |
 | BrownfieldScan | Existing code found, scanning against all prompt produces fields | Build artifact match list |
 | ArtifactMapping | Matching discovered files to prompt produces fields | Validate matches with artifact-schema |
-| MixinInference | Analyzing tooling signals to suggest mixin values | Build inference report |
 | ReportGeneration | Compiling scan results into user-facing report | Format and display |
 | AwaitConfirmation | Report displayed, waiting for user to accept or decline | User decision |
 | StateCreation | Writing config.yml and state.json | Atomic file writes |
-| Adopted | Pipeline initialized with pre-completed prompts | User runs `scaffold resume` |
+| Adopted | Pipeline initialized with pre-completed prompts | User runs `scaffold run` |
 
 ---
 
@@ -861,9 +806,6 @@ FUNCTION scanArtifacts(
     END IF
   END FOR
 
-  // Infer mixin selections
-  inferredMixins ← inferMixins(projectRoot)
-
   RETURN {
     mode: detectV1Signals(matches) ? 'v1-migration' : 'brownfield',
     matches,
@@ -871,7 +813,6 @@ FUNCTION scanArtifacts(
     pendingPrompts,
     partialPrompts,
     totalPrompts: orderedPrompts.length,
-    inferredMixins,
     warnings,
     errors: []
   }
@@ -932,79 +873,7 @@ FUNCTION detectV1Artifacts(projectRoot: string) → V1ArtifactMapping[]:
 END FUNCTION
 ```
 
-### Algorithm 4: Mixin Inference
-
-```
-FUNCTION inferMixins(projectRoot: string) → MixinInference:
-  // Analyzes existing project tooling to suggest mixin selections.
-  // Each axis is inferred independently.
-
-  // Task Tracking
-  taskTracking ← { value: 'none', signals: [], confidence: 'none' }
-  IF DIR_EXISTS(projectRoot + '/.beads')
-    taskTracking ← { value: 'beads', signals: ['.beads/ directory exists'], confidence: 'high' }
-  ELSE IF DIR_EXISTS(projectRoot + '/.github/ISSUE_TEMPLATE')
-        OR FILE_EXISTS(projectRoot + '/.github/ISSUE_TEMPLATE.md')
-    taskTracking ← {
-      value: 'github-issues',
-      signals: ['GitHub issue templates found'],
-      confidence: 'high'
-    }
-  END IF
-
-  // TDD
-  tdd ← { value: 'relaxed', signals: [], confidence: 'none' }
-  IF FILE_EXISTS(projectRoot + '/jest.config.js')
-    OR FILE_EXISTS(projectRoot + '/jest.config.ts')
-    OR FILE_EXISTS(projectRoot + '/vitest.config.ts')
-    OR FILE_EXISTS(projectRoot + '/pytest.ini')
-    tdd ← {
-      value: 'strict',
-      signals: ['Test framework configuration found'],
-      confidence: 'low'
-    }
-    // Stronger signal: check for test files
-    testFiles ← GLOB(projectRoot + '/**/*.test.{ts,tsx,js,jsx}')
-                + GLOB(projectRoot + '/**/*.spec.{ts,tsx,js,jsx}')
-                + GLOB(projectRoot + '/**/test_*.py')
-    IF testFiles.length > 5
-      tdd.confidence ← 'high'
-      tdd.signals.push(testFiles.length + ' test files found')
-    END IF
-  END IF
-
-  // Git Workflow
-  gitWorkflow ← { value: 'simple', signals: [], confidence: 'none' }
-  IF DIR_EXISTS(projectRoot + '/.github/workflows')
-    workflowFiles ← GLOB(projectRoot + '/.github/workflows/*.yml')
-    IF workflowFiles.length > 0
-      gitWorkflow ← {
-        value: 'full-pr',
-        signals: [workflowFiles.length + ' GitHub Actions workflows found'],
-        confidence: 'high'
-      }
-    END IF
-  END IF
-
-  // Agent Mode — cannot be reliably inferred from codebase
-  agentMode ← {
-    value: 'single',
-    signals: ['Default — cannot infer agent mode from codebase'],
-    confidence: 'none'
-  }
-
-  // Interaction Style — defaults to current platform, not inferred
-  interactionStyle ← {
-    value: 'claude-code',
-    signals: ['Default — set to current platform'],
-    confidence: 'none'
-  }
-
-  RETURN { taskTracking, tdd, gitWorkflow, agentMode, interactionStyle }
-END FUNCTION
-```
-
-### Algorithm 5: State Initialization from Adopt
+### Algorithm 4: State Initialization from Adopt
 
 ```
 FUNCTION initializeFromAdopt(
@@ -1026,7 +895,7 @@ FUNCTION initializeFromAdopt(
     errors.push({
       code: 'ADOPT_SCAFFOLD_EXISTS',
       message: '.scaffold/ directory already exists. Use scaffold init --force to reinitialize.',
-      recovery: 'Run scaffold init --force to overwrite, or scaffold resume to continue existing pipeline.'
+      recovery: 'Run scaffold init --force to overwrite, or scaffold run to continue existing pipeline.'
     })
     RETURN  // cannot proceed
   END IF
@@ -1046,16 +915,9 @@ FUNCTION initializeFromAdopt(
   // NOTE: Cross-domain dependency — domain 06's ScaffoldConfig must be
   // extended to include a `mode` field. See domain 06 open question 1.
   config ← {
-    version: 1,
+    version: 2,
     methodology: methodology,
     mode: 'brownfield',
-    mixins: {
-      'task-tracking': scanResult.inferredMixins.taskTracking.value,
-      'tdd': scanResult.inferredMixins.tdd.value,
-      'git-workflow': scanResult.inferredMixins.gitWorkflow.value,
-      'agent-mode': scanResult.inferredMixins.agentMode.value,
-      'interaction-style': scanResult.inferredMixins.interactionStyle.value
-    },
     platforms: ['claude-code']  // default, user can change
   }
 
@@ -1190,13 +1052,13 @@ END FUNCTION
 - **Severity**: error
 - **Fires when**: `scaffold adopt` is invoked in a directory that already has a `.scaffold/` directory
 - **Message**: `.scaffold/ directory already exists. Use scaffold init --force to reinitialize.`
-- **Recovery**: Run `scaffold init --force` to overwrite, or `scaffold resume` to continue the existing pipeline
+- **Recovery**: Run `scaffold init --force` to overwrite, or `scaffold run` to continue the existing pipeline
 - **JSON**:
   ```json
   {
     "code": "ADOPT_SCAFFOLD_EXISTS",
     "message": ".scaffold/ directory already exists. Use scaffold init --force to reinitialize.",
-    "recovery": "Run scaffold init --force to overwrite, or scaffold resume to continue existing pipeline."
+    "recovery": "Run scaffold init --force to overwrite, or scaffold run to continue existing pipeline."
   }
   ```
 
@@ -1299,18 +1161,13 @@ END FUNCTION
 
 #### `ADOPT_V1_TRACKING_FORMAT`
 - **Severity**: warning
-- **Fires when**: An artifact has a v1-format tracking comment (without methodology/mixin suffix)
+- **Fires when**: An artifact has a v1-format tracking comment
 - **Message**: `{path} has v1 tracking comment (will be updated on next run)`
 
 #### `ADOPT_STALE_TRACKING`
 - **Severity**: warning
 - **Fires when**: A tracking comment references a prompt slug that doesn't exist in the current methodology
 - **Message**: `{path}: tracking comment references unknown prompt "{name}"`
-
-#### `ADOPT_MIXIN_INFERENCE_WEAK`
-- **Severity**: warning
-- **Fires when**: A mixin inference has `confidence: 'low'` and may not match the user's intent
-- **Message**: `Inferred {axis}: {value} (low confidence — please verify)`
 
 #### `ADOPT_EXTRA_ARTIFACTS`
 - **Severity**: warning
@@ -1335,11 +1192,10 @@ END FUNCTION
 
 | Direction | Data | Purpose |
 |-----------|------|---------|
-| Domain 07 → Domain 06 | `ScaffoldConfig` with inferred mixins | Adopt writes initial config.yml |
+| Domain 07 → Domain 06 | `ScaffoldConfig` with methodology | Adopt writes initial config.yml |
 | Domain 06 → Domain 07 | Validation result | Config is validated after writing |
-| Domain 06 → Domain 07 | `MixinSelections` type definition | Adopt produces mixin values conforming to domain 06's schema |
 
-**Contract**: Adopt writes a valid `config.yml` that conforms to domain 06's `ScaffoldConfig` schema. The `mode` field is set to `'brownfield'`. Mixin values come from `MixinInference` but must be valid values for each axis (e.g., `task-tracking` must be `'beads'`, `'github-issues'`, or `'none'`). After writing, `scaffold build` validates the config via domain 06 before generating prompts.
+**Contract**: Adopt writes a valid `config.yml` that conforms to domain 06's `ScaffoldConfig` schema. The `mode` field is set to `'brownfield'`. The `methodology` field is set to the user-selected methodology (deep, mvp, or custom). After writing, the CLI validates the config via domain 06 before proceeding.
 
 **Cross-domain update required**: Domain 06's `ScaffoldConfig` interface does not currently include a `mode` field. Domain 06 lists this as open question 1 ("Should `project.mode` (brownfield/greenfield) be an explicit config field?"). This must be resolved before implementation — domain 07 requires `mode: 'brownfield'` to be a valid config field that brownfield-adapted prompts can read at runtime. Recommended addition: `mode?: 'greenfield' | 'brownfield'` on `ScaffoldConfig` (optional, defaults to `'greenfield'` when absent).
 
@@ -1359,7 +1215,7 @@ END FUNCTION
 |-----------|------|---------|
 | Domain 07 → Domain 14 | `BrownfieldDetectionResult` | Init wizard uses detection results to present mode choice |
 | Domain 14 → Domain 07 | User's mode selection | Wizard passes the chosen `InitMode` back for state creation |
-| Domain 14 → Domain 07 | Methodology + mixin selections | Wizard finalizes config choices (may override inferred mixins) |
+| Domain 14 → Domain 07 | Methodology selection | Wizard finalizes config choices |
 
 **Contract**: The init wizard (domain 14, not yet modeled) calls `detectCodebase()` early in the flow and uses the result to determine whether to present the greenfield/brownfield choice and v1 migration option. If the user selects brownfield or v1 migration, the wizard may trigger adopt-style scanning to determine pre-completed prompts before calling `initializeState`.
 
@@ -1418,7 +1274,7 @@ Complete list of detection signals and their interpretation:
 | `jest.config.*`, `vitest.config.*`, `pytest.ini` | test-config | Test framework configured | Informational |
 | `.github/workflows/`, `.gitlab-ci.yml`, etc. | ci-config | CI/CD configured | Informational |
 
-**Key distinction**: Only `package-manifest` and `source-directory` signals are sufficient to trigger the brownfield prompt ("This directory has existing code. Scaffold around it or start fresh?"). Other signals (documentation, test-config, ci-config) are collected for mixin inference but do not by themselves trigger brownfield mode. A directory with only `docs/README.md` and no code is treated as greenfield.
+**Key distinction**: Only `package-manifest` and `source-directory` signals are sufficient to trigger the brownfield prompt ("This directory has existing code. Scaffold around it or start fresh?"). Other signals (documentation, test-config, ci-config) are collected for context but do not by themselves trigger brownfield mode. A directory with only `docs/README.md` and no code is treated as greenfield.
 
 **Empty manifests**: A `package.json` with `{}` or only `name`/`version` but no dependencies is NOT a brownfield signal. The `manifestHasDependencies` check (Algorithm 7) specifically validates that actual dependencies exist.
 
@@ -1534,10 +1390,10 @@ V1 detection is triggered when `scaffold init` runs in a directory with v1 artif
 | `.claude/settings.json` | `claude-code-permissions` | File existence |
 
 **V1 vs V2 tracking comment format**:
-- V1: `<!-- scaffold:prd v1 2026-03-12 -->` (no methodology/mixin suffix)
-- V2: `<!-- scaffold:prd v1 2026-03-12 classic/strict-tdd/beads -->` (with suffix)
+- V1: `<!-- scaffold:prd v1 2026-03-12 -->` (no methodology suffix)
+- V2: `<!-- scaffold:prd v1 2026-03-12 deep -->` (with methodology suffix)
 
-The absence of the methodology/mixin suffix is what distinguishes v1 from v2. When a v1 tracking comment is detected, the `ADOPT_V1_TRACKING_FORMAT` warning is emitted. The tracking comment will be updated to v2 format on the next prompt re-run (Mode Detection handles this).
+The absence of the methodology suffix is what distinguishes v1 from v2. When a v1 tracking comment is detected, the `ADOPT_V1_TRACKING_FORMAT` warning is emitted. The tracking comment will be updated to v2 format on the next step re-run (Mode Detection handles this).
 
 **V1 artifacts that don't directly map**: Some v1 artifacts (`CLAUDE.md`, `tasks/lessons.md`) don't have a clean 1:1 mapping because they're produced by `beads-setup` alongside other files. The `.beads/` directory is the primary signal for `beads-setup` completion.
 
@@ -1546,9 +1402,9 @@ The absence of the methodology/mixin suffix is what distinguishes v1 from v2. Wh
 - **User confirms before migration** — the detection result is shown and the user must approve
 - **Pipeline continues with remaining prompts** — only pre-completed prompts are skipped
 
-### MQ7: After Adopt + scaffold resume
+### MQ7: After Adopt + scaffold run
 
-**Scenario**: A codebase with `docs/plan.md`, `docs/tech-stack.md`, `docs/coding-standards.md`, `docs/project-structure.md`, and `docs/dev-setup.md` present (5 of 18 prompts satisfied). User runs `scaffold adopt`, then `scaffold resume`.
+**Scenario**: A codebase with `docs/plan.md`, `docs/tech-stack.md`, `docs/coding-standards.md`, `docs/project-structure.md`, and `docs/dev-setup.md` present (5 of 18 prompts satisfied). User runs `scaffold adopt`, then `scaffold run`.
 
 **Step 1 — scaffold adopt**:
 ```
@@ -1577,10 +1433,10 @@ Found 5/18 artifacts already in place. Confirm adoption? [Y/n]
 Created .scaffold/config.yml
 Created .scaffold/state.json (5 completed, 13 pending)
 
-Run `scaffold resume` to continue pipeline.
+Run `scaffold run` to continue pipeline.
 ```
 
-**Step 4 — scaffold resume**:
+**Step 4 — scaffold run**:
 ```
 Resuming pipeline...
 Methodology: classic (brownfield mode)
@@ -1600,13 +1456,13 @@ Next eligible prompts:
 Executing: beads-setup
 ```
 
-The `scaffold resume` command uses domain 03's state machine to determine next eligible prompts. Since `create-prd` and `tech-stack` are already completed, prompts that depend on them (like `prd-gap-analysis`, `tdd`, `coding-standards`) become eligible. The dependency graph from the methodology manifest drives the ordering.
+The `scaffold run` command uses domain 03's state machine to determine next eligible prompts. Since `create-prd` and `tech-stack` are already completed, prompts that depend on them (like `prd-gap-analysis`, `tdd`, `coding-standards`) become eligible. The dependency graph from the methodology manifest drives the ordering.
 
-**Key behavior**: Pre-completed prompts are truly skipped — they don't re-execute. Their `produces` paths are already verified. The user can manually re-run any prompt with `scaffold resume --prompt tech-stack` if they want to regenerate it (Mode Detection will use update mode).
+**Key behavior**: Pre-completed prompts are truly skipped — they don't re-execute. Their `produces` paths are already verified. The user can manually re-run any prompt with `scaffold run --prompt tech-stack` if they want to regenerate it (Mode Detection will use update mode).
 
 ### MQ8: Brownfield Mode and Mixin Interaction
 
-Adopt detects existing tooling and suggests mixin selections via the `inferMixins` algorithm ([Algorithm 4](#algorithm-4-mixin-inference)).
+Adopt detects existing tooling signals to inform methodology suggestion during the init wizard flow.
 
 **Concrete example**: A project already uses GitHub Issues (not Beads):
 
@@ -1624,7 +1480,7 @@ Adopt detects existing tooling and suggests mixin selections via the `inferMixin
 - **TDD style** (strict vs relaxed) is inferred from test file count: >5 test files → `strict`, otherwise `relaxed`. This is approximate — the user should verify.
 - **Git workflow** is inferred from CI presence: GitHub Actions → `full-pr`, no CI → `simple`.
 
-**After mixin selection**: The chosen mixins are written to `config.yml`. When `scaffold build` runs (triggered by `scaffold resume`), the mixin injection system (domain 12) processes the resolved prompts with the selected mixins. Brownfield-adapted prompts receive the same mixin injection as greenfield — the mixins replace abstract task verbs regardless of mode.
+**After methodology selection**: The chosen methodology is written to `config.yml`. When `scaffold run` is invoked, the assembly engine constructs prompts using the methodology's depth settings and the project's user instructions. Brownfield-adapted steps receive the same assembly treatment as greenfield — the assembly engine adapts output based on project context regardless of mode.
 
 ### MQ9: Adopt on Existing .scaffold/ Directory
 
@@ -1641,7 +1497,7 @@ Exit code: 1 (ADOPT_SCAFFOLD_EXISTS)
 **Rationale**: Adopt's purpose is one-time initialization. If `.scaffold/` exists, the pipeline is already set up. Running adopt again would overwrite existing state (losing completion records, decision log, etc.).
 
 **Available actions**:
-1. `scaffold resume` — continue the existing pipeline
+1. `scaffold run` — continue the existing pipeline
 2. `scaffold init --force` — reinitialize (destructive: deletes existing state.json, decisions.jsonl)
 3. `scaffold status` — check current pipeline state
 
@@ -1678,7 +1534,7 @@ Step 3: Inferred configuration
 
 Step 4: Summary
   Found 6/18 artifacts. 1 partial match (will be marked complete with warning).
-  Run `scaffold resume` to continue with remaining 12 prompts.
+  Run `scaffold run` to continue with remaining 12 prompts.
 
 Confirm? [Y/n] _
 ```
@@ -1715,7 +1571,7 @@ Select methodology:
     ...
 ```
 
-The init wizard (domain 14) handles the remaining interactive flow. Brownfield detection provides the initial mode suggestion; the wizard handles methodology selection, mixin configuration, and build.
+The init wizard (domain 14) handles the remaining interactive flow. Brownfield detection provides the initial mode suggestion; the wizard handles methodology selection and configuration.
 
 ---
 
@@ -1896,7 +1752,7 @@ Scaffold around existing code (brownfield) or start fresh (greenfield)?
     Greenfield — start from scratch
 ```
 
-**After wizard completes and user runs `scaffold resume`**:
+**After wizard completes and user runs `scaffold run`**:
 ```
 Resuming pipeline...
 Methodology: classic (brownfield mode)
@@ -2073,15 +1929,14 @@ Inferred configuration:
   agent-mode:    single         (default)
 
 Found 0/18 artifacts. All prompts will start from pending.
-Run `scaffold resume` to start pipeline in brownfield mode.
+Run `scaffold run` to start pipeline in brownfield mode.
 
 Confirm? [Y/n]
 ```
 
 **Key insight**: Even with zero artifact matches, adopt is still useful because it:
-1. Sets `mode: brownfield` so the four adapted prompts read existing code
-2. Infers mixin selections from project tooling
-3. Creates the `.scaffold/` directory and pipeline state
+1. Sets `mode: brownfield` so the four adapted steps read existing code
+2. Creates the `.scaffold/` directory and pipeline state
 
 The user could achieve the same with `scaffold init` (choosing brownfield), but `scaffold adopt` is faster (non-interactive, one command).
 

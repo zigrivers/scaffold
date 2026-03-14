@@ -5,8 +5,8 @@
 **Domain ID**: 01
 **Phase**: 1 — Deep Domain Modeling
 **Depends on**: None — first-pass modeling
-**Last updated**: 2026-03-12
-**Status**: draft
+**Last updated**: 2026-03-14
+**Status**: superseded
 
 ---
 

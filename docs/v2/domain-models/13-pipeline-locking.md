@@ -10,13 +10,13 @@
 
 ## 1. Domain Overview
 
-Pipeline Execution Locking is the advisory lock mechanism that prevents concurrent prompt execution within the same project on the same machine. When a user runs `scaffold resume`, the CLI writes a small JSON file (`.scaffold/lock.json`) containing the holder identity, the prompt being executed, the process ID, and a timestamp. Any subsequent attempt to run a mutating scaffold command checks for this file and — if the PID is still alive — refuses to proceed unless `--force` is supplied.
+Pipeline Execution Locking is the advisory lock mechanism that prevents concurrent step execution within the same project on the same machine. When a user runs `scaffold run`, the CLI writes a small JSON file (`.scaffold/lock.json`) containing the holder identity, the step being executed, the process ID, and a timestamp. Any subsequent attempt to run a mutating scaffold command checks for this file and — if the PID is still alive — refuses to proceed unless `--force` is supplied.
 
 The lock is **local-only** (gitignored) and **advisory** (can be overridden). It does not prevent concurrent execution across machines; cross-machine coordination relies on git's merge behavior on `state.json` and `decisions.jsonl`, which are designed to be merge-safe (see [domain 03](03-pipeline-state-machine.md) and [domain 11](11-decision-log.md)).
 
 ### Role in the v2 architecture
 
-The lock sits at the outermost edge of the CLI execution lifecycle. It is the first thing acquired after project context is loaded and the last thing released after a prompt completes (or on crash, left for the next process to clean up). It does not participate in the build pipeline (config → prompt resolution → mixin injection → platform adaptation) but guards the runtime execution that the build pipeline feeds into.
+The lock sits at the outermost edge of the CLI execution lifecycle. It is the first thing acquired after project context is loaded and the last thing released after a step completes (or on crash, left for the next process to clean up). It guards the runtime execution performed by the assembly engine.
 
 ### What this domain covers
 
@@ -56,7 +56,7 @@ The lock sits at the outermost edge of the CLI execution lifecycle. It is the fi
 
 **force override** — Using `--force` to acquire a lock even when another process appears to hold it. Appropriate for stuck locks or legitimate concurrent use; risky if the other process is genuinely running.
 
-**lockable command** — A CLI command that mutates scaffold state and therefore requires the lock before execution (e.g., `resume`, `init`, `reset`).
+**lockable command** — A CLI command that mutates scaffold state and therefore requires the lock before execution (e.g., `run`, `init`, `reset`, `adopt`).
 
 **read-only command** — A CLI command that only reads scaffold state and does not require the lock (e.g., `status`, `validate`, `build`).
 
@@ -100,7 +100,7 @@ interface LockFile {
   processStartedAt: string;
 
   /**
-   * The CLI command that acquired the lock (e.g., "resume", "init", "reset").
+   * The CLI command that acquired the lock (e.g., "run", "init", "reset").
    * Helps users understand what operation is in progress.
    */
   command: string;
@@ -224,7 +224,7 @@ interface LockReleaseResult {
  * Commands that mutate scaffold state and require the lock.
  * Only these commands call acquireLock() / releaseLock().
  */
-type LockableCommand = 'resume' | 'init' | 'reset';
+type LockableCommand = 'run' | 'init' | 'reset' | 'skip' | 'adopt';
 
 /**
  * Commands that only read state and never acquire the lock.
@@ -285,7 +285,7 @@ interface LockWarning {
 LockFile (on disk: .scaffold/lock.json)
   ├── loaded into → LockInfo (runtime, in ProjectContext)
   ├── assessed via → PidCheckResult (PID liveness + identity)
-  ├── acquired by → LockableCommand (resume, init, reset)
+  ├── acquired by → LockableCommand (run, init, reset, skip, adopt)
   └── ignored by → ReadOnlyCommand (status, validate, build)
 
 LockAcquisitionResult
@@ -751,7 +751,7 @@ END FUNCTION
       "started": "2026-03-13T11:00:00Z",
       "pid": 12345,
       "processStartedAt": "2026-03-13T10:58:32Z",
-      "command": "resume"
+      "command": "run"
     }
   }
   ```
@@ -885,7 +885,7 @@ The lock and `in_progress` serve different purposes: the lock prevents concurren
 The complete lock file schema is defined in [Section 3](#lock-file-schema). It extends the spec's four fields (`holder`, `prompt`, `started`, `pid`) with two additional fields:
 
 - **`processStartedAt`**: ISO 8601 timestamp of the locking process's creation time. Essential for PID recycling detection (see [MQ5](#mq5-pid-recycling-scenario)).
-- **`command`**: The CLI command that acquired the lock (e.g., `"resume"`). Provides context in error messages so users understand what operation is blocked.
+- **`command`**: The CLI command that acquired the lock (e.g., `"run"`). Provides context in error messages so users understand what operation is blocked.
 
 A machine identifier beyond `holder` (hostname) is not needed because the lock is gitignored and never shared across machines. The hostname is sufficient for error messages when a user has multiple terminal windows open.
 
@@ -897,7 +897,7 @@ Example lock file:
   "started": "2026-03-13T11:00:00Z",
   "pid": 12345,
   "processStartedAt": "2026-03-13T10:58:32Z",
-  "command": "resume"
+  "command": "run"
 }
 ```
 
@@ -933,13 +933,13 @@ PID liveness is checked via `process.kill(pid, 0)` in Node.js, which sends signa
 
 ### MQ4: Stale Lock Scenario
 
-**Scenario**: Process A acquires the lock, then crashes (e.g., `kill -9`, OOM kill, power loss). Process B starts and runs `scaffold resume`.
+**Scenario**: Process A acquires the lock, then crashes (e.g., `kill -9`, OOM kill, power loss). Process B starts and runs `scaffold run`.
 
 Step-by-step walkthrough:
 
-1. **Process A** runs `scaffold resume`:
+1. **Process A** runs `scaffold run`:
    - Checks for `.scaffold/lock.json` — does not exist
-   - Creates lock atomically: `{ holder: "ken-macbook", prompt: "tech-stack", started: "2026-03-13T11:00:00Z", pid: 42000, processStartedAt: "2026-03-13T10:59:55Z", command: "resume" }`
+   - Creates lock atomically: `{ holder: "ken-macbook", prompt: "tech-stack", started: "2026-03-13T11:00:00Z", pid: 42000, processStartedAt: "2026-03-13T10:59:55Z", command: "run" }`
    - Sets `in_progress` in `state.json` for prompt `tech-stack`
    - Begins executing the prompt
 
@@ -947,7 +947,7 @@ Step-by-step walkthrough:
    - No cleanup runs — `lock.json` remains on disk
    - `state.json` still has `in_progress` set for `tech-stack`
 
-3. **Process B** runs `scaffold resume`:
+3. **Process B** runs `scaffold run`:
    - Loads `ProjectContext`, which calls `assessLockStatus()`
    - Reads `.scaffold/lock.json`: PID 42000, started at 2026-03-13T11:00:00Z
    - Calls `checkPid(42000, "2026-03-13T10:59:55Z")`
@@ -1049,18 +1049,18 @@ Step-by-step walkthrough:
 
 ### MQ8: Cross-Machine Concurrent Execution
 
-**Scenario**: Two team members on different machines both run `scaffold resume` on the same project (checked out via git).
+**Scenario**: Two team members on different machines both run `scaffold run` on the same project (checked out via git).
 
 Since `lock.json` is gitignored, the lock provides no protection here. Both processes acquire their local lock successfully and proceed independently.
 
 **Step-by-step**:
 
-1. **Machine A** (ken-macbook): runs `scaffold resume`, completes `dev-env-setup`
+1. **Machine A** (ken-macbook): runs `scaffold run`, completes `dev-env-setup`
    - Updates `state.json`: sets `dev-env-setup` status to `completed`
    - Appends to `decisions.jsonl`
    - Commits and pushes
 
-2. **Machine B** (sarah-laptop): runs `scaffold resume`, completes `coding-standards` (different prompt)
+2. **Machine B** (sarah-laptop): runs `scaffold run`, completes `coding-standards` (different prompt)
    - Updates `state.json`: sets `coding-standards` status to `completed`
    - Appends to `decisions.jsonl`
    - Commits and attempts to push
@@ -1089,7 +1089,7 @@ The full algorithm is defined in [Algorithm 4](#algorithm-4-lock-release). Three
    - A dedicated `unlock` command adds API surface for an edge case that's already handled
    - Users who want to manually clear a lock can simply `rm .scaffold/lock.json`
 
-**Design rationale for no `scaffold unlock`**: Adding an explicit unlock command creates a risk of misuse — a user might routinely `scaffold unlock && scaffold resume` as a habit, defeating the purpose of the lock. The current design forces users to either (a) let stale detection work automatically or (b) consciously supply `--force`, which makes the override visible in their command history.
+**Design rationale for no `scaffold unlock`**: Adding an explicit unlock command creates a risk of misuse — a user might routinely `scaffold unlock && scaffold run` as a habit, defeating the purpose of the lock. The current design forces users to either (a) let stale detection work automatically or (b) consciously supply `--force`, which makes the override visible in their command history.
 
 ### MQ10: Lock Scope
 
@@ -1101,7 +1101,7 @@ The lock is **per-project, command-class scoped**:
 **Lockable commands** (mutate state):
 | Command | Why it needs the lock |
 |---------|----------------------|
-| `resume` | Executes prompts, updates `state.json`, appends to `decisions.jsonl` |
+| `run` | Executes steps, updates `state.json`, appends to `decisions.jsonl` |
 | `init` | Creates `.scaffold/` directory and initial files |
 | `reset` | Deletes `state.json`, `decisions.jsonl`, and other scaffold files |
 
@@ -1112,7 +1112,7 @@ The lock is **per-project, command-class scoped**:
 | `validate` | Only reads and validates files — no mutations |
 | `build` | Builds resolved prompts from source files — no runtime state changes |
 
-**Practical implication**: A user can run `scaffold status` while another terminal has `scaffold resume` running. The status output will show that the pipeline is locked:
+**Practical implication**: A user can run `scaffold status` while another terminal has `scaffold run` running. The status output will show that the pipeline is locked:
 
 ```
 Pipeline: locked by ken-macbook (running dev-env-setup, PID 12345)
@@ -1145,10 +1145,10 @@ This is explicitly supported and useful — users should be able to check progre
 
 | Test Case | Setup | Verification |
 |-----------|-------|-------------|
-| Full lifecycle: acquire → execute → release | Run `scaffold resume` on a simple prompt | lock.json exists during execution, absent after |
-| Crash simulation | Acquire lock, kill process, run new `scaffold resume` | New process clears stale lock, acquires its own |
-| Concurrent local processes | Two `scaffold resume` in parallel (same project) | One succeeds, other gets `LOCK_HELD` |
-| Status during locked execution | `scaffold resume` in background, then `scaffold status` | Status shows lock info, does not block |
+| Full lifecycle: acquire → execute → release | Run `scaffold run` on a simple prompt | lock.json exists during execution, absent after |
+| Crash simulation | Acquire lock, kill process, run new `scaffold run` | New process clears stale lock, acquires its own |
+| Concurrent local processes | Two `scaffold run` in parallel (same project) | One succeeds, other gets `LOCK_HELD` |
+| Status during locked execution | `scaffold run` in background, then `scaffold status` | Status shows lock info, does not block |
 | Force override | First process locks, second uses `--force` | Second process acquires lock, first process may produce state conflicts |
 
 ### Test Utilities
@@ -1190,7 +1190,7 @@ function mockPidCheck(pid: number, behavior: 'alive' | 'dead' | 'eperm'): void;
 
 2. **Lock timeout**: Should locks have a maximum age? A lock older than, say, 24 hours is almost certainly stale regardless of PID status (the user walked away, the terminal disconnected). **Recommendation**: Add a 24-hour heuristic in a future iteration. For v2 launch, PID-based detection is sufficient. A timeout adds complexity (what if a prompt legitimately takes a long time?) and the PID check already handles the common cases.
 
-3. **`scaffold unlock` command**: Should there be an explicit unlock command? Currently, stale locks are auto-cleared and active locks can be overridden with `--force`. **Recommendation**: Do not add `scaffold unlock` for v2. It encourages cargo-cult usage (`scaffold unlock && scaffold resume`) that defeats the lock's purpose. Users who need manual cleanup can `rm .scaffold/lock.json`. Revisit if user feedback indicates the current approach is confusing.
+3. **`scaffold unlock` command**: Should there be an explicit unlock command? Currently, stale locks are auto-cleared and active locks can be overridden with `--force`. **Recommendation**: Do not add `scaffold unlock` for v2. It encourages cargo-cult usage (`scaffold unlock && scaffold run`) that defeats the lock's purpose. Users who need manual cleanup can `rm .scaffold/lock.json`. Revisit if user feedback indicates the current approach is confusing.
 
 4. **Cross-machine lock visibility**: Should `scaffold status` show a warning when `state.json` has `in_progress` set by a different machine (indicating a remote user is actively running a prompt)? This is outside the lock domain but related to concurrent execution awareness. **Recommendation**: Yes — `scaffold status` should check `in_progress.actor` against `os.hostname()` and warn if they differ: "Prompt {prompt} may be in progress on {actor}". This belongs in domain 03's status rendering, not in the lock domain.
 
@@ -1214,7 +1214,7 @@ function mockPidCheck(pid: number, behavior: 'alive' | 'dead' | 'eperm'): void;
 
 ### Example 1: Normal Lock Lifecycle
 
-A user runs `scaffold resume` to execute the `tech-stack` prompt.
+A user runs `scaffold run` to execute the `tech-stack` prompt.
 
 **Step 1 — Acquire lock**:
 ```json
@@ -1225,7 +1225,7 @@ A user runs `scaffold resume` to execute the `tech-stack` prompt.
   "started": "2026-03-13T14:30:00Z",
   "pid": 54321,
   "processStartedAt": "2026-03-13T14:29:45Z",
-  "command": "resume"
+  "command": "run"
 }
 ```
 
@@ -1246,7 +1246,7 @@ Executing: tech-stack (prompt 4 of 12)
 
 ### Example 2: Stale Lock from Crash
 
-Process A was running `scaffold resume` for `coding-standards` but was killed by OOM.
+Process A was running `scaffold run` for `coding-standards` but was killed by OOM.
 
 **State on disk**:
 ```json
@@ -1257,7 +1257,7 @@ Process A was running `scaffold resume` for `coding-standards` but was killed by
   "started": "2026-03-13T10:00:00Z",
   "pid": 42000,
   "processStartedAt": "2026-03-13T09:59:50Z",
-  "command": "resume"
+  "command": "run"
 }
 ```
 
@@ -1279,7 +1279,7 @@ Process A was running `scaffold resume` for `coding-standards` but was killed by
 }
 ```
 
-**Process B runs `scaffold resume`**:
+**Process B runs `scaffold run`**:
 ```
 ⚠ Cleared stale lock from ken-macbook (PID 42000 is no longer running)
 ⚠ Crash detected: coding-standards was in progress but did not complete.
@@ -1292,7 +1292,7 @@ Executing: coding-standards (prompt 5 of 12)
 
 ### Example 3: Lock Contention
 
-User has two terminal windows open. Terminal 1 is running `scaffold resume`. Terminal 2 tries to run `scaffold resume`.
+User has two terminal windows open. Terminal 1 is running `scaffold run`. Terminal 2 tries to run `scaffold run`.
 
 **Terminal 1 output** (running normally):
 ```
@@ -1326,11 +1326,11 @@ Process A (PID 12345) acquired the lock at 10:58 and crashed. Hours later, the O
   "started": "2026-03-13T10:58:40Z",
   "pid": 12345,
   "processStartedAt": "2026-03-13T10:58:32Z",
-  "command": "resume"
+  "command": "run"
 }
 ```
 
-**Process B runs `scaffold resume`**:
+**Process B runs `scaffold run`**:
 ```
 ⚠ Cleared stale lock: PID 12345 is alive but belongs to a different process
   (started at 2026-03-13T14:22:17Z, lock recorded 2026-03-13T10:58:32Z)
@@ -1341,7 +1341,7 @@ The algorithm detects the 3+ hour gap between the lock's `processStartedAt` and 
 
 ### Example 5: Read-Only Command During Active Lock
 
-Terminal 1 is running `scaffold resume` (lock held). Terminal 2 runs `scaffold status`.
+Terminal 1 is running `scaffold run` (lock held). Terminal 2 runs `scaffold status`.
 
 **Terminal 2 output** (no lock contention):
 ```

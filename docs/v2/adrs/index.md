@@ -8,7 +8,7 @@
 
 ## Summary
 
-40 Architecture Decision Records covering the complete architectural foundation for Scaffold v2 — from CLI implementation language through platform adapters to deferred scope decisions, plus cross-cutting policies on forward compatibility, error handling, and runtime safety. Every significant design choice from the v2 spec and 14 domain models is recorded with rationale, alternatives considered, consequences, and compliance constraints.
+46 Architecture Decision Records covering the complete architectural foundation for Scaffold v2 — from CLI implementation language through platform adapters to deferred scope decisions, plus the meta-prompt architecture (ADR-041 through ADR-046) that supersedes the original three-layer resolution, mixin injection, and build-time resolution systems. Cross-cutting policies on forward compatibility, error handling, and runtime safety are also recorded. Every significant design choice from the v2 spec, 14 domain models, and PRD is captured with rationale, alternatives considered, consequences, and compliance constraints.
 
 ## Decision Log
 
@@ -18,25 +18,25 @@
 | [ADR-002](ADR-002-distribution-strategy.md) | Distribution Strategy — npm Primary, Homebrew Secondary | accepted | 09 | Foundation |
 | [ADR-003](ADR-003-standalone-cli-source-of-truth.md) | Standalone CLI as Source of Truth | accepted | 05, 09 | Foundation |
 | [ADR-004](ADR-004-methodology-as-top-level-organizer.md) | Methodology as Top-Level Organizer | accepted | 01, 06, 14 | Foundation |
-| [ADR-005](ADR-005-three-layer-prompt-resolution.md) | Three-Layer Prompt Resolution with Customization Precedence | accepted | 01 | Core Engine |
-| [ADR-006](ADR-006-mixin-injection-over-templating.md) | Mixin Injection over Templating | accepted | 12, 01 | Core Engine |
-| [ADR-007](ADR-007-mixin-markers-subsection-targeting.md) | Multiple Mixin Markers with Sub-Section Targeting | accepted | 12 | Core Engine |
-| [ADR-008](ADR-008-abstract-task-verbs.md) | Abstract Task Verbs as HTML Comments | accepted | 04, 12 | Core Engine |
+| [ADR-005](ADR-005-three-layer-prompt-resolution.md) | Three-Layer Prompt Resolution with Customization Precedence | superseded (by ADR-041) | 01 | Core Engine |
+| [ADR-006](ADR-006-mixin-injection-over-templating.md) | Mixin Injection over Templating | superseded (by ADR-041) | 12, 01 | Core Engine |
+| [ADR-007](ADR-007-mixin-markers-subsection-targeting.md) | Multiple Mixin Markers with Sub-Section Targeting | superseded (by ADR-041) | 12 | Core Engine |
+| [ADR-008](ADR-008-abstract-task-verbs.md) | Abstract Task Verbs as HTML Comments | superseded (by ADR-041) | 04, 12 | Core Engine |
 | [ADR-009](ADR-009-kahns-algorithm-dependency-resolution.md) | Kahn's Algorithm with Phase Tiebreaker | accepted | 02 | Core Engine |
-| [ADR-010](ADR-010-build-time-resolution.md) | Build-Time Resolution and Injection | accepted | 01, 12 | Core Engine |
+| [ADR-010](ADR-010-build-time-resolution.md) | Build-Time Resolution and Injection | superseded (by ADR-044) | 01, 12 | Core Engine |
 | [ADR-011](ADR-011-depends-on-union-semantics.md) | Frontmatter Depends-On Union Semantics | accepted | 01, 02, 08 | Core Engine |
 | [ADR-012](ADR-012-state-file-design.md) | State File Design — Map-Keyed, Committed, Atomic | accepted | 03 | Data Formats |
 | [ADR-013](ADR-013-decision-log-jsonl-format.md) | Decision Log — JSONL Append-Only Format | accepted | 11 | Data Formats |
 | [ADR-014](ADR-014-config-schema-versioning.md) | Config Schema — YAML with Integer Versioning | accepted | 06 | Data Formats |
-| [ADR-015](ADR-015-prompt-frontmatter-schema.md) | Prompt Frontmatter Schema with Section Targeting | accepted | 08 | Data Formats |
-| [ADR-016](ADR-016-methodology-manifest-format.md) | Methodology Manifest YAML Format | accepted | 01, 02 | Data Formats |
+| [ADR-015](ADR-015-prompt-frontmatter-schema.md) | Prompt Frontmatter Schema with Section Targeting | superseded (by ADR-045) | 08 | Data Formats |
+| [ADR-016](ADR-016-methodology-manifest-format.md) | Methodology Manifest YAML Format | superseded (by ADR-043) | 01, 02 | Data Formats |
 | [ADR-017](ADR-017-tracking-comments-artifact-provenance.md) | Tracking Comments for Artifact Provenance | accepted | 03, 07, 10 | Data Formats |
 | [ADR-018](ADR-018-completion-detection-crash-recovery.md) | Completion Detection and Crash Recovery | accepted | 03, 08 | Runtime Behavior |
 | [ADR-019](ADR-019-advisory-locking.md) | Advisory Locking — PID-Based, Local-Only, Gitignored | accepted | 13 | Runtime Behavior |
 | [ADR-020](ADR-020-skip-vs-exclude-semantics.md) | Skip vs Exclude Semantics for Optional Prompts | accepted | 01, 02, 03 | Runtime Behavior |
 | [ADR-021](ADR-021-sequential-prompt-execution.md) | Sequential Prompt Execution | accepted | 02, 03 | Runtime Behavior |
 | [ADR-022](ADR-022-three-platform-adapters.md) | Three Platform Adapters with Universal Always Generated | accepted | 05 | Platform & Adapters |
-| [ADR-023](ADR-023-phrase-level-tool-mapping.md) | Phrase-Level Tool-Name Mapping | accepted | 05 | Platform & Adapters |
+| [ADR-023](ADR-023-phrase-level-tool-mapping.md) | Phrase-Level Tool-Name Mapping | superseded (by ADR-041) | 05 | Platform & Adapters |
 | [ADR-024](ADR-024-capabilities-as-warnings.md) | Requires-Capabilities as Warnings Not Hard Errors | accepted | 05, 08 | Platform & Adapters |
 | [ADR-025](ADR-025-cli-output-contract.md) | CLI Output Contract — Modes, JSON Envelope, Exit Codes | accepted | 09 | UX & Output |
 | [ADR-026](ADR-026-claude-md-section-registry.md) | CLAUDE.md Section Registry with Token Budget | accepted | 10 | UX & Output |
@@ -48,12 +48,18 @@
 | [ADR-032](ADR-032-methodology-versioning-bundled.md) | Methodology Versioning Bundled with CLI | accepted | 01 | Scope & Deferral |
 | [ADR-033](ADR-033-forward-compatibility-unknown-fields.md) | Forward Compatibility — Unknown Fields as Warnings | accepted | 06, 08 | Data Formats |
 | [ADR-034](ADR-034-rerun-no-cascade.md) | Re-runs Do Not Cascade to Downstream Prompts | accepted | 02, 03 | Runtime Behavior |
-| [ADR-035](ADR-035-non-recursive-injection.md) | Mixin Injection Is Non-Recursive (Two-Pass Bounded) | accepted | 12 | Core Engine |
+| [ADR-035](ADR-035-non-recursive-injection.md) | Mixin Injection Is Non-Recursive (Two-Pass Bounded) | superseded (by ADR-041) | 12 | Core Engine |
 | [ADR-036](ADR-036-auto-does-not-imply-force.md) | --auto Does Not Imply --force | accepted | 09, 13 | Runtime Behavior |
-| [ADR-037](ADR-037-task-verb-global-scope.md) | Abstract Task Verb Replacement Scope Is Global | accepted | 04, 12 | Core Engine |
+| [ADR-037](ADR-037-task-verb-global-scope.md) | Abstract Task Verb Replacement Scope Is Global | superseded (by ADR-041) | 04, 12 | Core Engine |
 | [ADR-038](ADR-038-prompt-versioning-deferred.md) | Prompt Versioning and Rollback Not Supported | accepted | 01, 05 | Scope & Deferral |
 | [ADR-039](ADR-039-pipeline-context-deferred.md) | Pipeline Context (context.json) Deferred | accepted | 08, 11 | Scope & Deferral |
 | [ADR-040](ADR-040-error-handling-philosophy.md) | Error Handling Philosophy | accepted | 01-14 | Cross-Cutting |
+| [ADR-041](ADR-041-meta-prompt-architecture.md) | Meta-Prompt Architecture Over Hard-Coded Prompts | accepted | 01, 04, 05, 12 | Meta-Prompt Architecture |
+| [ADR-042](ADR-042-knowledge-base-domain-expertise.md) | Knowledge Base as Domain Expertise Layer | accepted | 01 | Meta-Prompt Architecture |
+| [ADR-043](ADR-043-depth-scale.md) | Depth Scale (1-5) Over Methodology-Specific Prompt Variants | accepted | 06, 14 | Meta-Prompt Architecture |
+| [ADR-044](ADR-044-runtime-prompt-generation.md) | Runtime Prompt Generation Over Build-Time Resolution | accepted | 01, 12 | Meta-Prompt Architecture |
+| [ADR-045](ADR-045-assembled-prompt-structure.md) | Assembled Prompt Structure | accepted | 08 | Meta-Prompt Architecture |
+| [ADR-046](ADR-046-phase-specific-review-criteria.md) | Phase-Specific Review Criteria Over Generic Review Template | accepted | 08 | Meta-Prompt Architecture |
 
 ## By Category
 
@@ -64,22 +70,22 @@
 - [ADR-004](ADR-004-methodology-as-top-level-organizer.md) — Methodology as Top-Level Organizer
 
 ### Core Engine
-- [ADR-005](ADR-005-three-layer-prompt-resolution.md) — Three-Layer Prompt Resolution with Customization Precedence
-- [ADR-006](ADR-006-mixin-injection-over-templating.md) — Mixin Injection over Templating
-- [ADR-007](ADR-007-mixin-markers-subsection-targeting.md) — Multiple Mixin Markers with Sub-Section Targeting
-- [ADR-008](ADR-008-abstract-task-verbs.md) — Abstract Task Verbs as HTML Comments
+- [ADR-005](ADR-005-three-layer-prompt-resolution.md) — Three-Layer Prompt Resolution with Customization Precedence *(superseded by ADR-041)*
+- [ADR-006](ADR-006-mixin-injection-over-templating.md) — Mixin Injection over Templating *(superseded by ADR-041)*
+- [ADR-007](ADR-007-mixin-markers-subsection-targeting.md) — Multiple Mixin Markers with Sub-Section Targeting *(superseded by ADR-041)*
+- [ADR-008](ADR-008-abstract-task-verbs.md) — Abstract Task Verbs as HTML Comments *(superseded by ADR-041)*
 - [ADR-009](ADR-009-kahns-algorithm-dependency-resolution.md) — Kahn's Algorithm with Phase Tiebreaker
-- [ADR-010](ADR-010-build-time-resolution.md) — Build-Time Resolution and Injection
+- [ADR-010](ADR-010-build-time-resolution.md) — Build-Time Resolution and Injection *(superseded by ADR-044)*
 - [ADR-011](ADR-011-depends-on-union-semantics.md) — Frontmatter Depends-On Union Semantics
-- [ADR-035](ADR-035-non-recursive-injection.md) — Mixin Injection Is Non-Recursive (Two-Pass Bounded)
-- [ADR-037](ADR-037-task-verb-global-scope.md) — Abstract Task Verb Replacement Scope Is Global
+- [ADR-035](ADR-035-non-recursive-injection.md) — Mixin Injection Is Non-Recursive (Two-Pass Bounded) *(superseded by ADR-041)*
+- [ADR-037](ADR-037-task-verb-global-scope.md) — Abstract Task Verb Replacement Scope Is Global *(superseded by ADR-041)*
 
 ### Data Formats
 - [ADR-012](ADR-012-state-file-design.md) — State File Design — Map-Keyed, Committed, Atomic
 - [ADR-013](ADR-013-decision-log-jsonl-format.md) — Decision Log — JSONL Append-Only Format
 - [ADR-014](ADR-014-config-schema-versioning.md) — Config Schema — YAML with Integer Versioning
-- [ADR-015](ADR-015-prompt-frontmatter-schema.md) — Prompt Frontmatter Schema with Section Targeting
-- [ADR-016](ADR-016-methodology-manifest-format.md) — Methodology Manifest YAML Format
+- [ADR-015](ADR-015-prompt-frontmatter-schema.md) — Prompt Frontmatter Schema with Section Targeting *(superseded by ADR-045)*
+- [ADR-016](ADR-016-methodology-manifest-format.md) — Methodology Manifest YAML Format *(superseded by ADR-043)*
 - [ADR-017](ADR-017-tracking-comments-artifact-provenance.md) — Tracking Comments for Artifact Provenance
 - [ADR-033](ADR-033-forward-compatibility-unknown-fields.md) — Forward Compatibility — Unknown Fields as Warnings
 
@@ -93,7 +99,7 @@
 
 ### Platform & Adapters
 - [ADR-022](ADR-022-three-platform-adapters.md) — Three Platform Adapters with Universal Always Generated
-- [ADR-023](ADR-023-phrase-level-tool-mapping.md) — Phrase-Level Tool-Name Mapping
+- [ADR-023](ADR-023-phrase-level-tool-mapping.md) — Phrase-Level Tool-Name Mapping *(superseded by ADR-041)*
 - [ADR-024](ADR-024-capabilities-as-warnings.md) — Requires-Capabilities as Warnings Not Hard Errors
 
 ### UX & Output
@@ -113,9 +119,17 @@
 ### Cross-Cutting
 - [ADR-040](ADR-040-error-handling-philosophy.md) — Error Handling Philosophy
 
+### Meta-Prompt Architecture
+- [ADR-041](ADR-041-meta-prompt-architecture.md) — Meta-Prompt Architecture Over Hard-Coded Prompts
+- [ADR-042](ADR-042-knowledge-base-domain-expertise.md) — Knowledge Base as Domain Expertise Layer
+- [ADR-043](ADR-043-depth-scale.md) — Depth Scale (1-5) Over Methodology-Specific Prompt Variants
+- [ADR-044](ADR-044-runtime-prompt-generation.md) — Runtime Prompt Generation Over Build-Time Resolution
+- [ADR-045](ADR-045-assembled-prompt-structure.md) — Assembled Prompt Structure
+- [ADR-046](ADR-046-phase-specific-review-criteria.md) — Phase-Specific Review Criteria Over Generic Review Template
+
 ## Proposed (Pending Review)
 
-No ADRs are currently in `proposed` status. All 40 decisions are `accepted`.
+No ADRs are currently in `proposed` status. All 46 decisions are `accepted` (10 of which are superseded by newer ADRs).
 
 Note: ADR-008 includes a sub-decision about the `create-and-claim` compound verb that remains under consideration (documented within the ADR as a proposed element).
 
