@@ -1,5 +1,7 @@
 # Domain Model: Mixin Injection Mechanics
 
+**Status: Superseded** by meta-prompt architecture (ADR-041). Mixin injection is unnecessary; the AI adapts prompt content natively based on project context.
+
 **Domain ID**: 12
 **Phase**: 1 — Deep Domain Modeling
 **Depends on**: [01-prompt-resolution.md](01-prompt-resolution.md) (receives resolved prompts), [04-abstract-task-verbs.md](04-abstract-task-verbs.md) (verb vocabulary for task verb replacement), [06-config-validation.md](06-config-validation.md) (config determines which mixins to use)

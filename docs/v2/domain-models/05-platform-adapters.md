@@ -1,26 +1,28 @@
 # Domain Model: Platform Adapter System
 
+**Status: Transformed** — Simplified from full content transformation to thin delivery wrappers per meta-prompt architecture (ADR-041).
+
 **Domain ID**: 05
 **Phase**: 1 — Deep Domain Modeling
-**Depends on**: [01-prompt-resolution.md](01-prompt-resolution.md), [12-mixin-injection.md](12-mixin-injection.md) (adapters consume fully-injected prompts)
-**Last updated**: 2026-03-12
-**Status**: draft
+**Depends on**: [09-cli-architecture.md](09-cli-architecture.md) (adapters wrap the assembly trigger for platform delivery)
+**Last updated**: 2026-03-14
+**Status**: transformed
 
 ---
 
 ## Section 1: Domain Overview
 
-The Platform Adapter System is the final transformation stage in the `scaffold build` pipeline. It receives fully-injected prompt content (from [domain 12](12-mixin-injection.md)) and transforms it into platform-specific output files that AI tools can consume natively. Three adapters are defined: **Claude Code** (generates `commands/*.md` with YAML frontmatter), **Codex** (generates `AGENTS.md` sections and `codex-prompts/*.md` with tool-name mapping), and **Universal** (generates `prompts/*.md` as plain markdown plus a `scaffold-pipeline.md` reference).
+The Platform Adapter System provides thin delivery wrappers that expose the meta-prompt assembly pipeline to different AI platforms. Adapters no longer transform prompt content — the assembly engine (which loads meta-prompts, knowledge base entries, and project context at runtime) produces platform-neutral assembled prompts. Each adapter simply wraps the assembly trigger in the platform's native format: **Claude Code** (generates `commands/*.md` that invoke `scaffold run <step>`), **Codex** (generates `AGENTS.md` entries pointing to the assembly pipeline), and **Universal** (outputs assembled prompts to stdout or file via `scaffold run <step>`).
 
-**Role in the v2 architecture**: Platform adaptation is the fourth and final stage of the build pipeline:
+**Role in the v2 architecture**: Platform adaptation is now a thin wrapper layer around the runtime assembly engine:
 
 ```
-config.yml → [Config Validation (06)] → [Prompt Resolution (01)] → [Mixin Injection (12)] → [Platform Adapters (05)]
+scaffold run <step> → [Assembly Engine] → [Platform Adapter wraps trigger] → AI executes assembled prompt
 ```
 
-Each configured platform in `config.yml` triggers its adapter. All adapters receive the same `InjectionPipelineResult` (from domain 12) as input and produce independent output files. Adapters do NOT interact with each other — they are parallel, isolated transformations of the same input.
+Each configured platform in `config.yml` triggers its adapter. Adapters produce platform-specific entry points that invoke the assembly pipeline — they do NOT transform prompt content themselves. Content transformation is handled entirely by the assembly engine at runtime.
 
-**Central design challenge**: The Codex adapter must translate Claude Code-centric tool references into Codex-compatible language without breaking grammar or altering instructional meaning. This requires a phrase-level pattern matching system (not simple word substitution) applied longest-first to avoid partial replacements. Additionally, all three adapters must generate appropriate "After This Step" navigation and phase ordering metadata from the methodology manifest — information that originates in domain 01 but is formatted differently for each platform.
+**Central design challenge**: Adapters must correctly invoke the assembly pipeline in each platform's idiom while remaining thin enough that adding a new platform requires minimal code. The previous complexity around phrase-level tool-name mapping and mixin injection is eliminated — the AI handles tool adaptation natively based on project context in the assembled prompt.
 
 ---
 

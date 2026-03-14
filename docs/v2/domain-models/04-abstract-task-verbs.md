@@ -1,5 +1,7 @@
 # Domain Model: Abstract Task Verb System
 
+**Status: Superseded** by meta-prompt architecture (ADR-041). Abstract task verb markers are unnecessary; the AI knows tool preferences from project configuration.
+
 **Domain ID**: 04
 **Phase**: 1 — Deep Domain Modeling
 **Depends on**: None — first-pass modeling (consumed by [12-mixin-injection.md](12-mixin-injection.md) during build)
@@ -416,7 +418,7 @@ args        = arg (ws arg)*
 arg         = quoted_arg | named_arg | bare_arg
 quoted_arg  = '"' (CHAR - '"' | '\\"')* '"'
 named_arg   = key "=" value
-key         = ALPHA (ALPHA | DIGIT | "-")*
+key         = ALPHA (ALPHA | DIGIT | "-" | "_")*
 value       = quoted_arg | bare_value
 bare_value  = (CHAR - WS)+
 bare_arg    = (CHAR - WS - "=")+

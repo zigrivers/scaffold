@@ -1,27 +1,38 @@
-# Domain Model: Prompt Frontmatter Schema & Section Targeting
+# Domain Model: Meta-Prompt Frontmatter Schema
+
+**Status: Transformed** — Rewritten for meta-prompt frontmatter (ADR-045). Section targeting removed.
 
 **Domain ID**: 08
 **Phase**: 1 — Deep Domain Modeling
-**Depends on**: None — first-pass modeling (defines schema consumed by domains 01, 02, 03, 05, 06, 07)
-**Last updated**: 2026-03-12
-**Status**: draft
+**Depends on**: None — first-pass modeling (defines schema consumed by domains 02, 03, 05, 06, 07)
+**Last updated**: 2026-03-14
+**Status**: transformed
 
 ---
 
 ## Section 1: Domain Overview
 
-The Prompt Frontmatter Schema & Section Targeting domain defines the YAML metadata contract that every prompt file (base, override, extension, custom) must satisfy. Frontmatter is the declarative interface between prompt authors and the scaffold CLI — it tells the CLI what a prompt depends on, what it produces, what predecessor artifacts it needs to read, what structure its output must have, and what platform capabilities it requires.
+The Meta-Prompt Frontmatter Schema domain defines the YAML metadata contract that every meta-prompt file in the `pipeline/` directory must satisfy. Frontmatter is the declarative interface between meta-prompt authors and the scaffold CLI — it tells the assembly engine what a step depends on, what it produces, what knowledge base entries to load, and whether the step is conditional.
 
-**Role in the v2 architecture**: Frontmatter is the metadata glue that enables nearly every other domain:
+The frontmatter schema has been rewritten for the meta-prompt architecture. The previous fields (`reads` with section targeting, `artifact-schema`, `requires-capabilities`, mixin markers) have been removed. The new schema fields are:
 
-- **Prompt resolution** ([domain 01](01-prompt-resolution.md)) reads frontmatter to merge metadata across override layers and resolve the effective prompt configuration.
-- **Dependency resolution** ([domain 02](02-dependency-resolution.md)) reads `depends-on` to build the execution DAG.
-- **Pipeline state machine** ([domain 03](03-pipeline-state-machine.md)) reads `produces` for completion detection and step gating.
-- **Platform adapters** ([domain 05](05-platform-adapters.md)) read `requires-capabilities` to determine adapter compatibility.
-- **Config validation** ([domain 06](06-config-validation.md)) validates `extra-prompts` entries resolve to files with valid frontmatter.
-- **Brownfield/adopt** ([domain 07](07-brownfield-adopt.md)) uses `produces` to map existing files to completed prompts during v1 detection.
+- `name` — Step identifier (e.g., `phase-03-system-architecture`)
+- `description` — One-line purpose
+- `phase` — Pipeline phase (pre, 1-10, validation, finalization)
+- `dependencies` — Steps that must complete first (string array)
+- `outputs` — Artifact paths this step produces (string array)
+- `conditional` — `"if-needed"` or null; controls whether the step is evaluated for relevance
+- `knowledge-base` — Knowledge base entries to load during assembly (string array)
 
-**Central design challenge**: Frontmatter must be simple enough for prompt authors to write by hand, yet precise enough for machine parsing and validation. The `reads` field with section targeting introduces a sub-language for extracting content from predecessor documents — this requires a well-defined heading-matching algorithm with clear behavior for edge cases (duplicate headings, nested headings, missing sections). The `artifact-schema` field introduces a validation DSL that must be expressive enough to catch real structural errors without becoming a full schema language.
+**Role in the v2 architecture**: Frontmatter is the metadata glue that enables the assembly engine and pipeline management:
+
+- **Dependency resolution** ([domain 02](02-dependency-resolution.md)) reads `dependencies` to build the execution DAG.
+- **Pipeline state machine** ([domain 03](03-pipeline-state-machine.md)) reads `outputs` for completion detection and step gating.
+- **Assembly engine** reads `knowledge-base` to load relevant domain expertise during prompt assembly.
+- **Platform adapters** ([domain 05](05-platform-adapters.md)) use frontmatter to generate platform-specific wrapper files.
+- **Brownfield/adopt** ([domain 07](07-brownfield-adopt.md)) uses `outputs` to map existing files to completed steps during detection.
+
+**Central design challenge**: Frontmatter must be simple enough for meta-prompt authors to write by hand, yet precise enough for machine parsing and validation. The simplified schema reduces the barrier to adding new pipeline steps while maintaining enough structure for the assembly engine and dependency resolver to function correctly.
 
 ---
 

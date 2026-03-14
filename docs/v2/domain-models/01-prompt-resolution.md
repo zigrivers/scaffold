@@ -1,5 +1,7 @@
 # Domain Model: Layered Prompt Resolution System
 
+**Status: Superseded** by meta-prompt architecture (ADR-041). The three-layer prompt resolution system has been replaced by runtime prompt generation from meta-prompts + knowledge base.
+
 **Domain ID**: 01
 **Phase**: 1 — Deep Domain Modeling
 **Depends on**: None — first-pass modeling
@@ -120,6 +122,28 @@ interface MethodologyManifest {
    * Authoritative for ordering; phases are for display only.
    */
   dependencies: Record<string, string[]>;
+
+  /** Semver version of this methodology definition. Built-in methodologies omit this (ADR-032). */
+  version?: string;
+
+  /** Mixin axes this methodology declares, with allowed values */
+  axes?: AxisDeclaration[];
+}
+
+/**
+ * Explicit axis declaration with allowed values.
+ * When present in the manifest, enables stricter validation
+ * of mixin selections against the methodology's supported options.
+ */
+interface AxisDeclaration {
+  /** Axis name (e.g., 'task-tracking', 'tdd') */
+  name: string;
+
+  /** Allowed values for this axis */
+  values: string[];
+
+  /** Default value — must be one of the values */
+  default: string;
 }
 
 /**
