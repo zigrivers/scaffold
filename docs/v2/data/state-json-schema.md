@@ -1,8 +1,8 @@
 # state.json Schema
 
 **Phase**: 4 — Data Schemas
-**Depends on**: [domain-models/03-pipeline-state-machine.md](../domain-models/03-pipeline-state-machine.md), [adrs/ADR-012-state-file-design.md](../adrs/ADR-012-state-file-design.md), [adrs/ADR-018-completion-detection-crash-recovery.md](../adrs/ADR-018-completion-detection-crash-recovery.md), [architecture/system-architecture.md](../architecture/system-architecture.md) §5
-**Last updated**: 2026-03-13
+**Depends on**: [domain-models/03-pipeline-state-machine.md](../domain-models/03-pipeline-state-machine.md), [domain-models/15-assembly-engine.md](../domain-models/15-assembly-engine.md), [domain-models/16-methodology-depth-resolution.md](../domain-models/16-methodology-depth-resolution.md), [adrs/ADR-012-state-file-design.md](../adrs/ADR-012-state-file-design.md), [adrs/ADR-018-completion-detection-crash-recovery.md](../adrs/ADR-018-completion-detection-crash-recovery.md), [adrs/ADR-043-depth-scale.md](../adrs/ADR-043-depth-scale.md), [adrs/ADR-048-update-mode-diff-over-regeneration.md](../adrs/ADR-048-update-mode-diff-over-regeneration.md), [adrs/ADR-049-methodology-changeable-mid-pipeline.md](../adrs/ADR-049-methodology-changeable-mid-pipeline.md), [architecture/system-architecture.md](../architecture/system-architecture.md) §5
+**Last updated**: 2026-03-14
 **Status**: draft
 
 ---
@@ -31,6 +31,9 @@
 | [ADR-012](../adrs/ADR-012-state-file-design.md) | Map-keyed structure, git-committed, atomic writes |
 | [ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md) | Dual completion detection, `in_progress` crash recovery |
 | [ADR-033](../adrs/ADR-033-forward-compatibility-unknown-fields.md) | Unknown fields produce warnings, not errors; preserved on write-back |
+| [ADR-043](../adrs/ADR-043-depth-scale.md) | Depth level (1-5) recorded per completed step |
+| [ADR-048](../adrs/ADR-048-update-mode-diff-over-regeneration.md) | Update mode detection: re-running completed steps uses diff-based updates |
+| [ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md) | Methodology changeable mid-pipeline: completed steps preserved, pending re-resolved |
 
 ### Design rationale summary
 
@@ -78,8 +81,8 @@ JSON Schema draft 2020-12 for `.scaffold/state.json`.
     "methodology": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*$",
-      "description": "The methodology used for this pipeline (e.g., 'classic', 'classic-lite'). Copied from config.yml at initialization time. Immutable after creation — changing methodology requires scaffold reset.",
-      "examples": ["classic", "classic-lite"]
+      "description": "The methodology active when this state file was initialized. Copied from config.yml at init time. If config.yml methodology changes later, completed steps are preserved, orphaned entries are kept (not deleted), and pending steps are re-resolved against the new methodology (ADR-049). The methodology field in state.json records the original init-time value; config.yml is the source of truth for the current methodology.",
+      "examples": ["deep", "mvp", "custom"]
     },
     "init-mode": {
       "type": "string",
@@ -134,8 +137,8 @@ JSON Schema draft 2020-12 for `.scaffold/state.json`.
     },
     "PromptSource": {
       "type": "string",
-      "enum": ["base", "override", "ext", "extra"],
-      "description": "Where a prompt was resolved from. base = base prompt directory, override = methodology override, ext = methodology extension, extra = loaded from project or user custom prompt directory via extra-prompts config."
+      "enum": ["pipeline", "extra"],
+      "description": "Where a step was loaded from. pipeline = standard meta-prompt from pipeline/ directory, extra = user-added custom prompt via extra-prompts config. (Note: the original values 'base', 'override', 'ext' from the three-layer prompt resolution system are superseded by ADR-041. Meta-prompt architecture uses a single pipeline/ directory.)"
     },
     "PromptStateEntry": {
       "type": "object",
@@ -170,6 +173,12 @@ JSON Schema draft 2020-12 for `.scaffold/state.json`.
         "reason": {
           "type": "string",
           "description": "Human-readable reason for skipping. Only present when status is skipped."
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Depth level (1-5) at which this step was executed. Recorded when status transitions to completed. Used for update mode detection (ADR-048) and depth change warnings (ADR-049). Scale: 1 (MVP floor) through 5 (deep ceiling)."
         }
       },
       "allOf": [
@@ -178,7 +187,7 @@ JSON Schema draft 2020-12 for `.scaffold/state.json`.
             "properties": { "status": { "const": "completed" } }
           },
           "then": {
-            "required": ["status", "source", "at", "completed_by"]
+            "required": ["status", "source", "at", "completed_by", "depth"]
           }
         },
         {
@@ -274,7 +283,7 @@ JSON Schema draft 2020-12 for `.scaffold/state.json`.
 |-------|------|----------|---------|-------------|-------------|-----------|
 | `schema-version` | `integer` | Yes | — | Must equal `1` | Schema version for compatibility gating. CLI refuses to operate on mismatched versions. | State Manager (version check on load) |
 | `scaffold-version` | `string` | Yes | — | Semver format (`N.N.N`). Pattern permits leading zeros; scaffold versions never use them. | CLI version that created the file. Informational only. | Debugging, `scaffold status` display |
-| `methodology` | `string` | Yes | — | kebab-case (`[a-z][a-z0-9-]*`); must match `config.yml` `methodology` | Active methodology name. Immutable after creation. | State Manager (methodology mismatch check), Dashboard Generator |
+| `methodology` | `string` | Yes | — | kebab-case (`[a-z][a-z0-9-]*`) | Methodology name at init time. Records the original choice; `config.yml` is the source of truth for the *current* methodology ([ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md)). | State Manager (methodology change detection), Dashboard Generator |
 | `init-mode` | `string` | Yes | — | One of: `greenfield`, `brownfield`, `v1-migration` | How state was initialized. Recorded for auditability. | `scaffold status` display, Dashboard Generator |
 | `created` | `string` | Yes | — | ISO 8601 date-time | When state.json was first created. | `scaffold status` display |
 | `in_progress` | `InProgressRecord \| null` | Yes | `null` | At most one; see InProgressRecord | Currently executing prompt or `null`. Non-null triggers crash recovery on resume. | State Manager (crash detection), `scaffold status` |
@@ -287,12 +296,13 @@ JSON Schema draft 2020-12 for `.scaffold/state.json`.
 | Field | Type | Required | Default | Constraints | Description | Consumers |
 |-------|------|----------|---------|-------------|-------------|-----------|
 | `status` | `string` | Yes | `"pending"` | One of: `pending`, `in_progress`, `completed`, `skipped` | Current lifecycle status. See state transition rules in domain model 03. | State Manager, Dashboard Generator, `scaffold status`, `scaffold validate` |
-| `source` | `string` | Yes | — | One of: `base`, `override`, `ext`, `extra` | Where the prompt was resolved from in the layered prompt system. | `scaffold status` display |
+| `source` | `string` | Yes | — | One of: `pipeline`, `extra` | Where the step was loaded from. `pipeline` = standard meta-prompt from `pipeline/` directory. `extra` = user-added custom prompt. (Supersedes the original `base`/`override`/`ext` values from the three-layer resolution system — [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md).) | `scaffold status` display |
 | `at` | `string` | Conditional | — | ISO 8601 date-time. Required when status is `completed`, `skipped`, or `in_progress`. Absent when `pending`. | Timestamp whose meaning varies by status: execution start (in_progress), completion (completed), or skip (skipped). | `scaffold status`, Dashboard Generator, crash recovery (staleness detection) |
 | `produces` | `string[]` | No | `[]` | File paths relative to project root | Expected output file paths from prompt frontmatter. Used for artifact-based completion detection. | State Manager (dual completion detection), `scaffold validate` |
 | `artifacts_verified` | `boolean` | No | `false` | Only meaningful when status is `completed` | Whether all `produces` artifacts have been verified to exist on disk. | `scaffold validate`, Dashboard Generator |
 | `completed_by` | `string` | Conditional | — | Required when status is `completed` or `skipped` | Identity of the actor (user, agent, or system). System values: `scaffold-adopt`, `v1-migration`, `state-recovery`. | `scaffold status` display, crash recovery analysis |
 | `reason` | `string` | Conditional | — | Only present when status is `skipped` | Required when status is `skipped`. Human-readable explanation for why the prompt was skipped. | `scaffold status` display, Dashboard Generator |
+| `depth` | `integer` | Conditional | — | 1-5. Required when status is `completed`. | Depth level at which this step was executed ([ADR-043](../adrs/ADR-043-depth-scale.md)). Recorded at completion time. Used by update mode detection ([ADR-048](../adrs/ADR-048-update-mode-diff-over-regeneration.md)) to determine if depth changed, and by methodology change warnings ([ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md)) to flag steps completed at a different depth than the current config. | Assembly Engine (update mode), `scaffold status`, `scaffold validate` |
 
 ### InProgressRecord fields
 
@@ -321,7 +331,7 @@ JSON Schema draft 2020-12 for `.scaffold/state.json`.
 | `methodology` | `methodology` field in `.scaffold/config.yml` | [config-yml-schema.md](config-yml-schema.md) | Must match exactly. Mismatch produces `PSM_METHODOLOGY_MISMATCH` error. | State Manager on load |
 | `prompts.{key}` | Resolved prompt set from `manifest.yml` + config `extra-prompts` | [manifest-yml-schema.md](manifest-yml-schema.md) | Every key must exist in the resolved prompt set at time of state initialization. Orphaned keys (from methodology change) are preserved but ignored. | `scaffold validate` (warning: orphaned entries) |
 | `prompts.{key}.produces[]` | `produces` field in prompt frontmatter YAML | [frontmatter-schema.md](frontmatter-schema.md) | Copied verbatim from frontmatter at init time. Paths are relative to project root. | State Manager (dual completion detection checks file existence at these paths) |
-| `prompts.{key}.source` | Resolution source determined by Prompt Resolver (domain 01) | [manifest-yml-schema.md](manifest-yml-schema.md) | Must reflect actual resolution layer: `base`, `override`, or `ext`. | State Manager at initialization |
+| `prompts.{key}.source` | Source of step: `pipeline` (meta-prompt from `pipeline/` directory) or `extra` (user-added custom prompt) | [frontmatter-schema.md](frontmatter-schema.md) | Must reflect actual source. | State Manager at initialization |
 | `in_progress.prompt` | A key in the `prompts` map | (self) | Must be a valid key in `prompts`. If the referenced key is missing, state is corrupt. | State Manager on load |
 | `next_eligible[]` items | Keys in the `prompts` map | (self) | Every slug must be a key in `prompts` with status `pending` and all dependencies satisfied. | State Manager (recomputed on mutation; stale values are harmless) |
 | `extra-prompts[].slug` | May appear as a key in `prompts` | (self) | If the extra prompt was included in the resolved pipeline, it has a corresponding `prompts` entry. | State Manager at initialization |
@@ -418,7 +428,7 @@ Checked during `scaffold validate` and opportunistically during `scaffold run`. 
 
 | ID | Rule | Error Code | Severity | Message Template | `scaffold validate` |
 |----|------|-----------|----------|-----------------|---------------------|
-| V1 | `methodology` matches `config.yml` `methodology` | `PSM_METHODOLOGY_MISMATCH` | warning | `Methodology in state.json ('{state_method}') differs from config.yml ('{config_method}'). Orphaned prompt entries will be preserved. New prompts added as pending. Run 'scaffold build' to regenerate platform outputs.` | Yes |
+| V1 | `methodology` in state.json differs from `config.yml` `methodology` (methodology changed mid-pipeline per [ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md)) | `PSM_METHODOLOGY_MISMATCH` | warning | `Methodology changed: state.json was initialized with '{state_method}', config.yml now says '{config_method}'. Completed steps preserved. Orphaned entries kept. Pending steps re-resolved against new methodology.` | Yes |
 | V2 | If `in_progress` is non-null, `in_progress.prompt` must be a key in `prompts` | `STATE_CORRUPTED` | error | `in_progress references unknown prompt '{slug}'` | Yes |
 | V3 | If `in_progress` is non-null, exactly one prompt must have status `in_progress` | `STATE_CORRUPTED` | error | `in_progress is set but no prompt has status 'in_progress' (or multiple do)` | Yes |
 | V4 | If `in_progress` is non-null, the prompt it references must have status `in_progress` | `STATE_CORRUPTED` | error | `in_progress references prompt '{slug}' but its status is '{status}'` | Yes |
@@ -436,6 +446,8 @@ Checked during `scaffold validate` and opportunistically during `scaffold run`. 
 | V16 | Skipped prompts must have a `reason` field | `STATE_MISSING_SKIP_REASON` | error | `Prompt '{key}' has status 'skipped' but no reason. Use 'scaffold skip <prompt> --reason <text>' to provide one.` | Yes |
 | V17 | `produces` paths must be relative (no leading `/`), must not contain `..` traversal, and must use forward slashes | `STATE_PATH_FORMAT_INVALID` | error | `Path '{path}' in produces for prompt '{slug}' contains invalid characters or traversal. Paths must be relative with forward slashes and no '..' segments.` | Yes |
 | V18 | `extra-prompts[].depends-on[]` slugs should exist in the resolved prompt set | `STATE_EXTRA_PROMPT_UNKNOWN_DEP` | warning | `Extra prompt '{name}' depends on '{dep}' which is not in the resolved prompt set.` | Yes |
+| V19 | Completed prompts must have `depth` set (integer 1-5) | `STATE_MISSING_DEPTH` | warning | `Prompt '{slug}' is marked completed but has no depth field. The completion may predate depth tracking.` | Yes |
+| V20 | Completed prompts whose `depth` differs from the current config depth | `PSM_DEPTH_MISMATCH` | warning | `Prompt '{slug}' was completed at depth {completed_depth} but current config specifies depth {config_depth}. Re-run with 'scaffold run {slug}' to update.` | Yes |
 
 ---
 
@@ -449,19 +461,19 @@ A freshly initialized greenfield pipeline with two prompts. Represents the simpl
 {
   "schema-version": 1,
   "scaffold-version": "2.0.0",
-  "methodology": "classic-lite",
+  "methodology": "deep",
   "init-mode": "greenfield",
   "created": "2026-03-13T10:00:00Z",
   "in_progress": null,
   "prompts": {
     "create-prd": {
       "status": "pending",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/plan.md"]
     },
     "tech-stack": {
       "status": "pending",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/tech-stack.md"]
     }
   },
@@ -472,13 +484,13 @@ A freshly initialized greenfield pipeline with two prompts. Represents the simpl
 
 ### Example 2: Complete realistic instance (mid-pipeline)
 
-A classic methodology pipeline partway through execution. Three prompts completed, one in progress, several pending. Demonstrates all status types and the in_progress record.
+A deep methodology pipeline partway through execution. Three prompts completed, one in progress, several pending. Demonstrates all status types, the in_progress record, and per-step depth tracking.
 
 ```json
 {
   "schema-version": 1,
   "scaffold-version": "2.0.0",
-  "methodology": "classic",
+  "methodology": "deep",
   "init-mode": "greenfield",
   "created": "2026-03-12T09:00:00Z",
   "in_progress": {
@@ -490,31 +502,34 @@ A classic methodology pipeline partway through execution. Three prompts complete
   "prompts": {
     "create-prd": {
       "status": "completed",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/plan.md"],
       "at": "2026-03-12T09:45:00Z",
       "artifacts_verified": true,
-      "completed_by": "ken"
+      "completed_by": "ken",
+      "depth": 5
     },
     "prd-gap-analysis": {
       "status": "completed",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/plan.md"],
       "at": "2026-03-12T10:15:00Z",
       "artifacts_verified": true,
-      "completed_by": "ken"
+      "completed_by": "ken",
+      "depth": 5
     },
     "tech-stack": {
       "status": "completed",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/tech-stack.md"],
       "at": "2026-03-12T11:00:00Z",
       "artifacts_verified": true,
-      "completed_by": "ken"
+      "completed_by": "ken",
+      "depth": 5
     },
     "coding-standards": {
       "status": "skipped",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/coding-standards.md"],
       "at": "2026-03-12T11:30:00Z",
       "completed_by": "ken",
@@ -522,33 +537,33 @@ A classic methodology pipeline partway through execution. Three prompts complete
     },
     "tdd": {
       "status": "pending",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/tdd-standards.md"]
     },
     "project-structure": {
       "status": "in_progress",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/project-structure.md"],
       "at": "2026-03-13T14:30:00Z"
     },
     "dev-env-setup": {
       "status": "pending",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/dev-setup.md", "Makefile"]
     },
     "design-system": {
       "status": "pending",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/design-system.md"]
     },
     "user-stories-gaps": {
       "status": "pending",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/user-stories.md"]
     },
     "git-workflow": {
       "status": "pending",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/git-workflow.md"]
     }
   },
@@ -565,7 +580,7 @@ Brownfield initialization with extra prompts, a completed re-run, and every opti
 {
   "schema-version": 1,
   "scaffold-version": "2.1.3",
-  "methodology": "classic",
+  "methodology": "deep",
   "init-mode": "brownfield",
   "created": "2026-03-10T08:00:00Z",
   "in_progress": {
@@ -577,39 +592,43 @@ Brownfield initialization with extra prompts, a completed re-run, and every opti
   "prompts": {
     "create-prd": {
       "status": "completed",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/plan.md"],
       "at": "2026-03-10T08:00:00Z",
       "artifacts_verified": true,
-      "completed_by": "scaffold-adopt"
+      "completed_by": "scaffold-adopt",
+      "depth": 5
     },
     "prd-gap-analysis": {
       "status": "completed",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/plan.md"],
       "at": "2026-03-11T09:30:00Z",
       "artifacts_verified": true,
-      "completed_by": "ken"
+      "completed_by": "ken",
+      "depth": 5
     },
     "tech-stack": {
       "status": "completed",
-      "source": "override",
+      "source": "pipeline",
       "produces": ["docs/tech-stack.md"],
       "at": "2026-03-10T08:00:00Z",
       "artifacts_verified": true,
-      "completed_by": "scaffold-adopt"
+      "completed_by": "scaffold-adopt",
+      "depth": 5
     },
     "coding-standards": {
       "status": "completed",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/coding-standards.md"],
       "at": "2026-03-12T14:00:00Z",
       "artifacts_verified": true,
-      "completed_by": "alice"
+      "completed_by": "alice",
+      "depth": 5
     },
     "tdd": {
       "status": "skipped",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/tdd-standards.md"],
       "at": "2026-03-12T14:30:00Z",
       "completed_by": "ken",
@@ -617,34 +636,36 @@ Brownfield initialization with extra prompts, a completed re-run, and every opti
     },
     "project-structure": {
       "status": "completed",
-      "source": "ext",
+      "source": "pipeline",
       "produces": ["docs/project-structure.md"],
       "at": "2026-03-13T10:00:00Z",
       "artifacts_verified": true,
-      "completed_by": "agent-1"
+      "completed_by": "agent-1",
+      "depth": 5
     },
     "dev-env-setup": {
       "status": "completed",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/dev-setup.md", "Makefile"],
       "at": "2026-03-13T11:00:00Z",
       "artifacts_verified": true,
-      "completed_by": "agent-1"
+      "completed_by": "agent-1",
+      "depth": 5
     },
     "design-system": {
       "status": "pending",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/design-system.md"]
     },
     "user-stories-gaps": {
       "status": "in_progress",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/user-stories.md"],
       "at": "2026-03-13T16:00:00Z"
     },
     "git-workflow": {
       "status": "pending",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/git-workflow.md"]
     },
     "custom-api-design": {
@@ -673,7 +694,7 @@ The following instance contains five deliberate errors, annotated with their err
 {
   "schema-version": 2,
   "scaffold-version": "2.0.0",
-  "methodology": "classic",
+  "methodology": "deep",
   "init-mode": "greenfield",
   "created": "2026-03-13T10:00:00Z",
   "in_progress": {
@@ -685,17 +706,17 @@ The following instance contains five deliberate errors, annotated with their err
   "prompts": {
     "create-prd": {
       "status": "completed",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/plan.md"]
     },
     "tech-stack": {
       "status": "finished",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/tech-stack.md"]
     },
     "coding-standards": {
       "status": "in_progress",
-      "source": "base",
+      "source": "pipeline",
       "produces": ["docs/coding-standards.md"],
       "at": "2026-03-13T13:00:00Z"
     }
@@ -728,7 +749,7 @@ manifest.yml ─────────────┘ (resolved prompt set + d
 ```
 
 1. **Config Loader** reads `.scaffold/config.yml` to determine the active methodology.
-2. **Prompt Resolver** + **Dependency Resolver** produce the ordered prompt list with dependency graph, `produces` fields, and source annotations.
+2. **Methodology & Depth Resolver** (domain 16) + **Dependency Resolver** (domain 02) produce the ordered step list with dependency graph, `produces` fields (from meta-prompt frontmatter), and enablement status.
 3. **State Manager** calls `initializeState()`:
    - Creates the `prompts` map with one entry per resolved prompt, all set to `pending`.
    - For **brownfield** (`scaffold adopt`): scans the filesystem for existing artifacts. Prompts whose `produces` files all exist are pre-completed with `completed_by: "scaffold-adopt"`.
@@ -753,12 +774,13 @@ lock.json              decisions.jsonl        produced artifacts
    - Run dual completion detection on the interrupted prompt (check `produces` artifacts on disk).
    - All artifacts present: auto-mark completed, clear `in_progress`, continue.
    - Partial/no artifacts: prompt user for recovery action (re-run, accept, or skip).
-4. **Methodology mismatch check**: Compare `state.json` `methodology` against `config.yml` `methodology`. Mismatch is a fatal error.
+4. **Methodology change check** ([ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md)): Compare `state.json` `methodology` against `config.yml` `methodology`. If they differ, emit `PSM_METHODOLOGY_MISMATCH` warning. Completed steps are preserved. Steps in state.json that no longer appear in the new methodology become orphaned entries (preserved, not deleted). New steps from the new methodology are added as `pending`. Pending steps are re-resolved against the new methodology's depth and enablement configuration.
 5. **Artifact reconciliation**: For each prompt with status `pending`, check if all `produces` artifacts exist on disk. If so, auto-mark completed with `completed_by: "artifact"` and emit `PSM_ARTIFACTS_WITHOUT_STATE` warning.
 6. **Eligibility**: Read `next_eligible` (or recompute if stale). Select next prompt.
+6a. **Update mode detection** ([ADR-048](../adrs/ADR-048-update-mode-diff-over-regeneration.md)): If the selected step's status is `completed` and its `produces` artifacts exist on disk, the step enters update mode. The Assembly Engine includes the existing artifact content and previous `depth` in the assembled prompt for diff-based updates rather than full regeneration. If the current config depth differs from the recorded `depth`, a depth change context is provided.
 7. **Transition to in_progress**: Set `in_progress` record. Update the prompt's status to `in_progress` with `at` timestamp. Write atomically.
 8. **Agent executes** (outside scaffold control). Agent may produce artifacts listed in `produces`.
-9. **Transition to completed**: Verify artifacts exist. Set `artifacts_verified`, `at`, `completed_by`. Clear `in_progress`. Recompute `next_eligible`. Write atomically.
+9. **Transition to completed**: Verify artifacts exist. Set `artifacts_verified`, `at`, `completed_by`, `depth` (the depth level used for this execution, from config/methodology — [ADR-043](../adrs/ADR-043-depth-scale.md)). Clear `in_progress`. Recompute `next_eligible`. Write atomically.
 10. **Decision Logger** appends 0-3 decision entries to `decisions.jsonl` with `prompt_completed: true`.
 11. **Lock Manager** releases `.scaffold/lock.json`.
 

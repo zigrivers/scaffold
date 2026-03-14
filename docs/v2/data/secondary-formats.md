@@ -1,15 +1,17 @@
 # Secondary Format Schemas
 
 **Phase**: 4 — Data Schemas
-**Depends on**: [domain-models/04-abstract-task-verbs.md](../domain-models/04-abstract-task-verbs.md), [domain-models/05-platform-adapters.md](../domain-models/05-platform-adapters.md), [domain-models/10-claude-md-management.md](../domain-models/10-claude-md-management.md), [domain-models/12-mixin-injection.md](../domain-models/12-mixin-injection.md), [adrs/ADR-008-abstract-task-verbs.md](../adrs/ADR-008-abstract-task-verbs.md), [adrs/ADR-017-tracking-comments-artifact-provenance.md](../adrs/ADR-017-tracking-comments-artifact-provenance.md), [adrs/ADR-023-phrase-level-tool-mapping.md](../adrs/ADR-023-phrase-level-tool-mapping.md), [adrs/ADR-026-claude-md-section-registry.md](../adrs/ADR-026-claude-md-section-registry.md), [architecture/system-architecture.md](../architecture/system-architecture.md) §5, §11
-**Last updated**: 2026-03-13
+**Depends on**: [domain-models/05-platform-adapters.md](../domain-models/05-platform-adapters.md), [domain-models/10-claude-md-management.md](../domain-models/10-claude-md-management.md), [adrs/ADR-017-tracking-comments-artifact-provenance.md](../adrs/ADR-017-tracking-comments-artifact-provenance.md), [adrs/ADR-026-claude-md-section-registry.md](../adrs/ADR-026-claude-md-section-registry.md), [adrs/ADR-041-meta-prompt-architecture.md](../adrs/ADR-041-meta-prompt-architecture.md), [architecture/system-architecture.md](../architecture/system-architecture.md) §5, §11
+**Last updated**: 2026-03-14
 **Status**: draft
+
+**Status: Partially Transformed** — Sections 2.3 (Mixin Section Delimiters) and 2.4 (Task Verb Markers) are superseded by the meta-prompt architecture ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)). Sections 2.1 (Tracking Comments) and 2.2 (Ownership Markers) remain current. Section 2.5 (Tool-map.yml) remains current for platform adapters.
 
 ---
 
 ## Section 1: Overview
 
-This document specifies five secondary format schemas used throughout the Scaffold v2 pipeline. These formats are "secondary" because they are embedded within other artifacts (markdown files, mixin content, CLAUDE.md, YAML configs) rather than being standalone state files like `state.json` or `decisions.jsonl`. Each format is small enough that it does not warrant a dedicated data schema document, but each requires precise formal definitions for implementation agents.
+This document specifies five secondary format schemas used throughout the Scaffold v2 pipeline. These formats are "secondary" because they are embedded within other artifacts (markdown files, CLAUDE.md, YAML configs) rather than being standalone state files like `state.json` or `decisions.jsonl`. Each format is small enough that it does not warrant a dedicated data schema document, but each requires precise formal definitions for implementation agents.
 
 The five formats are:
 
@@ -17,13 +19,13 @@ The five formats are:
 
 2. **CLAUDE.md Ownership Markers** — Open/close HTML comment pairs that delimit scaffold-managed sections within CLAUDE.md. The fill/replace algorithm uses these markers to perform section-level replacement without overwriting user content. Defined by [ADR-026](../adrs/ADR-026-claude-md-section-registry.md); consumed by domain 10.
 
-3. **Mixin Section Delimiters** — Named section boundaries inside mixin `.md` files. Enable sub-section targeting so that prompts can inject specific portions of a mixin rather than its entire content. Defined by [ADR-007](../adrs/ADR-007-mixin-markers-subsection-targeting.md); consumed by domain 12.
+3. **~~Mixin Section Delimiters~~** — **Superseded** by meta-prompt architecture ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)). Preserved as historical reference.
 
-4. **Abstract Task Verb Markers** — HTML comment markers embedded in base prompts and mixin content that represent task-tracking operations. Replaced during build Pass 2 with concrete commands from the selected task-tracking mixin's verb registry. Defined by [ADR-008](../adrs/ADR-008-abstract-task-verbs.md) and [ADR-037](../adrs/ADR-037-task-verb-global-scope.md); consumed by domains 04 and 12.
+4. **~~Abstract Task Verb Markers~~** — **Superseded** by meta-prompt architecture ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)). Preserved as historical reference.
 
 5. **Tool-map.yml** — YAML configuration file for the Codex (and Universal) platform adapter's phrase-level tool-name mapping. Translates Claude Code tool references into platform-appropriate language during the adapter stage. Defined by [ADR-023](../adrs/ADR-023-phrase-level-tool-mapping.md); consumed by domain 05.
 
-**Why these are grouped**: All five are line-level or section-level embedded formats (not standalone files with their own lifecycle). They share a common implementation pattern: regex-based detection, positional constraints (line 1, own line, etc.), and HTML comment syntax (four of five use `<!-- ... -->`). Grouping them provides a single reference for the injection engine, state manager, and adapter system, which each touch multiple formats during processing.
+**Why these are grouped**: All five are line-level or section-level embedded formats (not standalone files with their own lifecycle). They share a common implementation pattern: regex-based detection, positional constraints (line 1, own line, etc.), and HTML comment syntax. Grouping them provides a single reference for the assembly engine, state manager, and adapter system.
 
 ---
 
@@ -178,7 +180,7 @@ The version in a tracking comment is an integer counter (v1, v2, v3...) indicati
 | `date` | string | ISO 8601 date `YYYY-MM-DD` | Date the artifact was produced or last updated. |
 | `methodology` | string | `[a-z][a-z0-9-]*` (kebab-case) | The methodology name active when the artifact was produced (e.g., `deep`, `mvp`). **v2 only.** |
 
-**v1 vs. v2 discrimination**: A tracking comment is v1 format if and only if it matches the v1 regex (exactly three space-separated fields after `scaffold:` before `-->`). The absence of the methodology field is the distinguishing signal. The v2 format has exactly four space-separated fields.
+**v1 vs. v2 discrimination**: A tracking comment is v1 format if and only if it matches the v1 regex (exactly three space-separated fields after `scaffold:` before `-->`). The absence of the methodology field is the distinguishing signal. The v2 format has exactly four space-separated fields (slug, version, date, methodology). Mixin summary was eliminated by the meta-prompt architecture ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)).
 
 ### 3.2 CLAUDE.md Ownership Marker Fields
 
@@ -335,17 +337,16 @@ This section maps every cross-reference between the five formats and other Scaff
 |---------------|---------|----------------|
 | Codex adapter initialization (domain 05) | Loaded during `initialize()`. Missing file produces `TOOL_MAP_NOT_FOUND`. | File load |
 | Universal adapter (domain 05) | Uses its own `adapters/universal/tool-map.yml` with the same schema | Parallel instance |
-| `InjectionPipelineResult` (domain 12) | Tool mapping is applied to fully-injected content received from the injection pipeline | Input dependency: applied AFTER mixin injection |
+| Assembly Engine (domain 15) | Tool mapping is applied to assembled prompt content during platform-specific output generation | Input dependency: applied to assembled output |
 | `scaffold build` (domain 09) | Build orchestrator invokes adapters which load tool-map.yml | Transitive dependency via adapter |
 
 ### 4.6 Cross-Format Interactions
 
-Two formats interact directly within the same file:
-
 | File | Format 1 | Format 2 | Interaction |
 |------|----------|----------|-------------|
 | CLAUDE.md | Tracking comment (line 1) | Ownership markers (body) | Non-overlapping. Tracking comment occupies line 1 only. Ownership markers appear in the document body under `##` headings. The fill/replace algorithm never touches line 1. |
-| Mixin `.md` files | Section delimiters | Task verb markers | Section delimiters structure the mixin file. Task verb markers may appear within section content. During build, section delimiters are resolved in Pass 1 (axis injection) and task verb markers within the injected content are resolved in Pass 2 (verb replacement). |
+
+(The original mixin file interaction between section delimiters and task verb markers is superseded — [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md).)
 
 ---
 
@@ -364,7 +365,7 @@ Tool-map.yml also has no explicit version field. Its schema is implicitly versio
 | Era | Format | Detection Signal |
 |-----|--------|-----------------|
 | v1 (scaffold v1.x) | `<!-- scaffold:<slug> v<ver> <date> -->` | 3 space-separated fields after `scaffold:`, no methodology or mixin suffix |
-| v2 (scaffold v2.0+) | `<!-- scaffold:<slug> v<ver> <date> <methodology> <mixin-summary> -->` | 5 space-separated fields after `scaffold:`, methodology and mixin_summary present |
+| v2 (scaffold v2.0+) | `<!-- scaffold:<slug> v<ver> <date> <methodology> -->` | 4 space-separated fields after `scaffold:`, methodology present (mixin summary eliminated by [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)) |
 
 Migration: The CLI must recognize both formats. v1 tracking comments trigger v1-migration mode in domain 07. No automated rewriting of v1 comments to v2 format occurs — v2 tracking comments are written when a prompt re-runs in update mode and produces new artifacts. The `scaffold adopt` command reads v1 comments but does NOT write tracking comments (read-only operation per [ADR-017](../adrs/ADR-017-tracking-comments-artifact-provenance.md)).
 
@@ -382,8 +383,8 @@ If any of these formats change in a future version:
 
 - **Tracking comments**: The `version` field in the comment tracks artifact schema version, not comment format version. A comment format change would require a new invariant regex and a detection mechanism to distinguish the old and new comment formats (similar to v1/v2 discrimination).
 - **Ownership markers**: A format change would require updating the fill/replace algorithm in domain 10 and all validation regexes. The close marker's fixed literal form makes it particularly brittle to change.
-- **Section delimiters**: A format change would require updating the mixin file parser in domain 12.
-- **Verb markers**: A format change would require updating both the marker parser (domain 12) and every verb registry in every task-tracking mixin.
+- **Section delimiters**: Superseded by [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md). No future changes expected.
+- **Verb markers**: Superseded by [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md). No future changes expected.
 - **Tool-map.yml**: A schema change would require a JSON Schema version bump and migration logic in the adapter loader.
 
 ---
@@ -406,16 +407,10 @@ If any of these formats change in a future version:
 **Serialization template** (v2):
 
 ```
-<!-- scaffold:{prompt_slug} v{version} {date} {methodology} {mixin_summary} -->
+<!-- scaffold:{prompt_slug} v{version} {date} {methodology} -->
 ```
 
-**Mixin summary serialization**: Mixin axis-value pairs are joined with `/` separators. Each pair is formatted as `axis:value`. The axis order is alphabetical by axis name.
-
-Example: if mixins are `{ "task-tracking": "beads", "tdd": "strict", "git-workflow": "full-pr" }`, the summary is:
-
-```
-git-workflow:full-pr/task-tracking:beads/tdd:strict
-```
+The v2 tracking comment has exactly four space-separated fields after `scaffold:`: the step slug, the version counter, the date, and the methodology name. (The original v2 design included a fifth `{mixin_summary}` field, but mixin axes were eliminated by the meta-prompt architecture — [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md).)
 
 ### 6.2 CLAUDE.md Ownership Markers
 
@@ -580,10 +575,10 @@ Each format defines validation rules with unique error codes. Error codes follow
 **Valid v2 tracking comment**:
 
 ```html
-<!-- scaffold:tech-stack v1 2026-03-12 classic git-workflow:full-pr/task-tracking:beads/tdd:strict -->
+<!-- scaffold:tech-stack v1 2026-03-12 deep -->
 ```
 
-Fields: `prompt_slug=tech-stack`, `version=1`, `date=2026-03-12`, `methodology=classic`, `mixin_summary=git-workflow:full-pr/task-tracking:beads/tdd:strict`.
+Fields: `prompt_slug=tech-stack`, `version=1`, `date=2026-03-12`, `methodology=deep`.
 
 **Valid v1 tracking comment** (legacy):
 
@@ -591,12 +586,12 @@ Fields: `prompt_slug=tech-stack`, `version=1`, `date=2026-03-12`, `methodology=c
 <!-- scaffold:tech-stack v1 2026-01-15 -->
 ```
 
-Fields: `prompt_slug=tech-stack`, `version=1`, `date=2026-01-15`. No methodology or mixin_summary.
+Fields: `prompt_slug=tech-stack`, `version=1`, `date=2026-01-15`. No methodology field.
 
 **Invalid: missing version prefix**:
 
 ```html
-<!-- scaffold:tech-stack 1 2026-03-12 classic task-tracking:beads -->
+<!-- scaffold:tech-stack 1 2026-03-12 deep -->
 ```
 
 Fails regex: version field must start with `v`.
@@ -604,7 +599,7 @@ Fails regex: version field must start with `v`.
 **Invalid: spaces in prompt slug**:
 
 ```html
-<!-- scaffold:tech stack v1 2026-03-12 classic task-tracking:beads -->
+<!-- scaffold:tech stack v1 2026-03-12 deep -->
 ```
 
 Fails regex: `prompt_slug` must be kebab-case (no spaces). The parser would misinterpret field boundaries.
@@ -614,7 +609,7 @@ Fails regex: `prompt_slug` must be kebab-case (no spaces). The parser would misi
 ```markdown
 # Tech Stack
 
-<!-- scaffold:tech-stack v1 2026-03-12 classic task-tracking:beads -->
+<!-- scaffold:tech-stack v1 2026-03-12 deep -->
 ```
 
 Even though the comment matches the regex, it is not on line 1. Mode detection treats this as "no tracking comment present" (fresh mode).
@@ -622,7 +617,7 @@ Even though the comment matches the regex, it is not on line 1. Mode detection t
 **Invalid: extra whitespace between fields**:
 
 ```html
-<!--  scaffold:tech-stack  v1  2026-03-12  classic  task-tracking:beads  -->
+<!--  scaffold:tech-stack  v1  2026-03-12  deep  -->
 ```
 
 Fails regex: exactly one space is required between fields and after `<!--`.
@@ -942,17 +937,17 @@ This section documents how the five secondary formats interact with Scaffold v2'
 
 | Format | Interaction | Direction | When |
 |--------|-------------|-----------|------|
-| Tracking comments | `methodology` field in the tracking comment is populated from `config.yml`'s methodology selection. `mixin_summary` is derived from `config.yml`'s mixin selections. | config.yml -> tracking comment | Prompt completion (CLI writes tracking comment) |
-| Ownership markers | The section registry that determines which sections exist (and their owners) is derived from the methodology manifest, which is selected by `config.yml`. | config.yml -> methodology manifest -> section registry -> markers | `scaffold build` (section reservation) |
-| Section delimiters | Which mixin files are loaded (and therefore which sections are available) depends on `config.yml`'s mixin selections. | config.yml -> mixin selection -> mixin file parsing | `scaffold build` (Pass 1) |
-| Verb markers | Which verb registry is used depends on `config.yml`'s `task-tracking` mixin selection. | config.yml -> mixin selection -> verb registry | `scaffold build` (Pass 2) |
+| Tracking comments | `methodology` field in the tracking comment is populated from `config.yml`'s methodology selection. | config.yml -> tracking comment | Step completion (CLI writes tracking comment) |
+| Ownership markers | The section registry that determines which sections exist (and their owners) is derived from the methodology manifest, which is selected by `config.yml`. | config.yml -> methodology manifest -> section registry -> markers | `scaffold run` (section fill) |
+| ~~Section delimiters~~ | **Superseded** ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)). | — | — |
+| ~~Verb markers~~ | **Superseded** ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)). | — | — |
 | Tool-map.yml | Which tool-map.yml files are loaded depends on `config.yml`'s `platforms` selection. Codex platform loads `adapters/codex/tool-map.yml`; Universal loads `adapters/universal/tool-map.yml`. | config.yml -> platform selection -> adapter initialization | `scaffold build` (adapter stage) |
 
 ### 9.2 Interactions with state.json
 
 | Format | Interaction | Direction | When |
 |--------|-------------|-----------|------|
-| Tracking comments | Dual completion detection reads tracking comments on `produces` targets to confirm scaffold provenance. A file with a valid tracking comment + matching slug is `confirmed_complete`. | state.json <- tracking comment | `scaffold resume` (completion detection) |
+| Tracking comments | Dual completion detection reads tracking comments on `produces` targets to confirm scaffold provenance. A file with a valid tracking comment + matching slug is `confirmed_complete`. | state.json <- tracking comment | `scaffold run` (completion detection) |
 | Tracking comments | v1 tracking comments detected during `scaffold adopt` populate `state.json` with pre-completed entries for matching v2 prompts. | state.json <- tracking comment (v1) | `scaffold adopt` |
 | Ownership markers | `scaffold validate` cross-references ownership marker presence against state.json completion status. Completed prompt with unfilled section produces `CMD_SECTION_NOT_FILLED`. | state.json <-> ownership markers | `scaffold validate` |
 
@@ -968,8 +963,8 @@ No other formats directly interact with decisions.jsonl.
 
 | Format | Interaction | Direction | When |
 |--------|-------------|-----------|------|
-| Verb markers | Build outputs (e.g., `commands/*.md`, `codex-prompts/*.md`) contain the resolved text from verb marker replacement. The markers themselves are absent from build output — only concrete commands appear. | verb markers -> resolved text in output | `scaffold build` (Pass 2 -> adapter) |
-| Section delimiters | Build outputs contain the injected section content. The delimiter lines themselves are stripped during injection. | section delimiters -> injected content in output | `scaffold build` (Pass 1 -> adapter) |
+| ~~Verb markers~~ | **Superseded** ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)). | — | — |
+| ~~Section delimiters~~ | **Superseded** ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)). | — | — |
 | Tool-map.yml | Codex and Universal build outputs contain tool-mapped text. Claude Code build outputs are NOT tool-mapped (they use native tool names). | tool-map.yml -> modified text in Codex/Universal output | `scaffold build` (adapter stage) |
 | Tracking comments | Build outputs for platform-specific prompts (e.g., `commands/*.md`) do NOT receive tracking comments. Tracking comments are written to *produced artifacts* (e.g., `docs/tech-stack.md`), which are created by agents during prompt execution, not by the build system. | No interaction with build outputs | N/A |
 
@@ -979,13 +974,13 @@ No other formats directly interact with decisions.jsonl.
 |--------|-------------|-----------|------|
 | Tracking comments | CLAUDE.md has a tracking comment on line 1 (if scaffold-managed). The tracking comment records the last prompt that touched the file's structure (typically the tracking-setup prompt). | tracking comment -> line 1 of CLAUDE.md | `scaffold build` (section reservation) |
 | Ownership markers | Ownership markers delimit scaffold-managed sections within CLAUDE.md's body. Multiple marker pairs exist (one per managed section). | markers -> CLAUDE.md body | `scaffold build` (reservation), prompt execution (fill) |
-| Verb markers | Verb markers do NOT appear in CLAUDE.md. CLAUDE.md is a produced artifact managed by the section registry, not a prompt file. | No interaction | N/A |
-| Section delimiters | Section delimiters do NOT appear in CLAUDE.md. They are a mixin file internal format. | No interaction | N/A |
+| ~~Verb markers~~ | **Superseded** ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)). | — | — |
+| ~~Section delimiters~~ | **Superseded** ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)). | — | — |
 | Tool-map.yml | Tool-map.yml does NOT affect CLAUDE.md. CLAUDE.md is written by the Claude Code adapter (no tool mapping) or the CLAUDE.md Manager (section fill during runtime, no adapter transformation). | No interaction | N/A |
 
 ### 9.6 Pipeline Processing Order
 
-The five formats are processed at different stages of the `scaffold build` pipeline. Understanding the processing order is critical for implementation:
+The active formats are processed at different stages. Understanding the processing order is critical for implementation:
 
 ```
 config.yml
@@ -994,17 +989,12 @@ config.yml
 [Config Validation (domain 06)]
     |
     v
-[Prompt Resolution (domain 01)]
+[Methodology & Depth Resolution (domain 16)]
     |
     v
-[Mixin Injection - Pass 1 (domain 12)]
-    |  - Section delimiters parsed from mixin files
-    |  - Axis markers replaced with mixin content
-    |  - Section delimiters consumed (not present in output)
-    v
-[Mixin Injection - Pass 2 (domain 12)]
-    |  - Task verb markers replaced with concrete commands
-    |  - Verb markers consumed (not present in output)
+[Assembly Engine (domain 15)]
+    |  - Meta-prompt loaded, knowledge base gathered
+    |  - 7-section assembled prompt constructed (ADR-045)
     v
 [Platform Adapters (domain 05)]
     |  - Tool-map.yml loaded and applied (Codex, Universal only)
@@ -1021,8 +1011,8 @@ config.yml
 ```
 
 Key ordering constraints:
-- Section delimiters are resolved BEFORE verb markers (Pass 1 before Pass 2).
-- Verb markers are resolved BEFORE tool mapping (injection before adaptation).
-- Tool mapping is applied AFTER all mixin injection is complete.
-- Tracking comments are written at RUNTIME (prompt completion), not at build time.
-- Ownership markers are created at BUILD time (reservation) and filled at RUNTIME (prompt execution).
+- Tool mapping is applied AFTER assembly is complete.
+- Tracking comments are written at RUNTIME (step completion), not at build time.
+- Ownership markers are created at BUILD time (reservation) and filled at RUNTIME (step execution).
+
+(The original processing order included mixin injection Pass 1/Pass 2 and verb marker replacement, which are superseded by the meta-prompt architecture — [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md).)

@@ -1,7 +1,7 @@
 # manifest.yml Schema (Methodology Preset)
 
 **Phase**: 4 — Data Schemas
-**Depends on**: [domain-models/06-config-validation.md](../domain-models/06-config-validation.md), [architecture/system-architecture.md](../architecture/system-architecture.md) §3c
+**Depends on**: [domain-models/06-config-validation.md](../domain-models/06-config-validation.md), [domain-models/16-methodology-depth-resolution.md](../domain-models/16-methodology-depth-resolution.md), [adrs/ADR-041-meta-prompt-architecture.md](../adrs/ADR-041-meta-prompt-architecture.md), [adrs/ADR-043-depth-scale.md](../adrs/ADR-043-depth-scale.md), [architecture/system-architecture.md](../architecture/system-architecture.md) §3c
 **Last updated**: 2026-03-14
 **Status**: draft
 
