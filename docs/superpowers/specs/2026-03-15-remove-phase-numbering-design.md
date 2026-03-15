@@ -96,7 +96,7 @@ dependencies: [testing-strategy, operations, security]
 
 These steps are NOT renamed. Their `name` and `phase` fields are unchanged. They receive:
 - An `order` field addition
-- `dependencies` field updates where they reference old `phase-NN-` step names (e.g., validation steps that depend on `phase-10a-review-security` become `review-security`)
+- `dependencies` field updates where they reference old `phase-NN-` step names (e.g., validation steps that depend on `phase-10a-review-security` become `[review-tasks, review-security]` — both branches must complete since PR #28 created a parallel planning branch)
 
 ---
 
