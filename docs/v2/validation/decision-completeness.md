@@ -71,14 +71,14 @@
 | 52 | Community marketplace deferred | PRD non-goal | ADR-031 | Covered | Share via git/npm instead |
 | 53 | Prompt versioning deferred | architecture (implied) | ADR-038 | Covered | Use git for history; pin CLI version |
 | 54 | Pipeline context store deferred | architecture (implied) | ADR-039 | Covered | Use `reads` field + decisions.jsonl instead |
-| | **Proposed (unresolved, with ADRs)** | | | | |
-| 55 | Context window management strategy | PRD §9, domain 15 | ADR-050 | Incomplete | TBD; resolution rec: Option D (reads field) |
-| 56 | Depth downgrade policy | domain 16 | ADR-051 | Incomplete | TBD; resolution rec: Option C (interactive confirm) |
-| 57 | Decision recording interface | domain 11, 15 | ADR-052 | Incomplete | TBD; resolution rec: Option A (AI writes directly) |
-| 58 | Artifact context scope | domain 15 | ADR-053 | Incomplete | TBD; resolution rec: Option C (deps + reads) |
-| 59 | State methodology tracking fields | domain 03, 16 | ADR-054 | Incomplete | TBD; resolution rec: Option C (dual fields) |
-| | **Unresolved (no ADR)** | | | | |
-| 60 | Package name: `scaffold` vs `@scaffold-cli/scaffold` | task-breakdown T-053 | — | Missing | TBD in T-053 acceptance criteria |
+| | **Resolved (formerly proposed)** | | | | |
+| 55 | Context window management: reads field + dependency-chain defaults | PRD §9, domain 15 | ADR-050 | Covered | Resolved — accepted Option D |
+| 56 | Depth downgrade: interactive confirmation, --auto warns | domain 16 | ADR-051 | Covered | Resolved — accepted Option C |
+| 57 | Decision recording: AI writes directly to decisions.jsonl | domain 11, 15 | ADR-052 | Covered | Resolved — accepted Option A |
+| 58 | Artifact context scope: dependency artifacts + explicit reads | domain 15 | ADR-053 | Covered | Resolved — accepted Option C |
+| 59 | State methodology tracking: dual fields (init + config) | domain 03, 16 | ADR-054 | Covered | Resolved — accepted Option C |
+| | **Resolved (formerly unresolved)** | | | | |
+| 60 | Package name: `@scaffold-cli/scaffold` | task-breakdown T-053 | ADR-002 | Covered | Resolved as `@scaffold-cli/scaffold`; covered by ADR-002 distribution strategy |
 
 ### 1a. Coverage Summary
 
@@ -91,11 +91,11 @@
 | User Customization | 3 | 3 | 0 | 0 | 0 |
 | Quality & Process | 6 | 0 | 0 | 0 | 6 |
 | Deferred | 4 | 4 | 0 | 0 | 0 |
-| Proposed (unresolved) | 5 | 0 | 5 | 0 | 0 |
-| Unresolved (no ADR) | 1 | 0 | 0 | 1 | 0 |
-| **Total** | **60** | **44** | **5** | **1** | **10** |
+| Resolved (formerly proposed) | 5 | 5 | 0 | 0 | 0 |
+| Resolved (formerly unresolved) | 1 | 1 | 0 | 0 | 0 |
+| **Total** | **60** | **50** | **0** | **0** | **10** |
 
-**ADR coverage: 73% covered (44/60), 8% partial (5/60), 2% missing (1/60), 17% implied (10/60)**
+**ADR coverage: 83% covered (50/60), 0% partial (0/60), 0% missing (0/60), 17% implied (10/60)**
 
 > **Note on implied decisions:** The 10 implied decisions (test framework, TDD policy, YAML conventions, etc.) are all well-documented in specification artifacts — they simply lack dedicated ADRs. For a CLI tool, these are standard engineering choices that don't typically warrant formal ADRs. No action needed unless the team prefers ADR coverage for these items.
 
@@ -105,37 +105,21 @@
 
 ### 2a. Complete ADRs (all sections filled)
 
-**Accepted (35):** ADR-001, ADR-002, ADR-003, ADR-004, ADR-009, ADR-011, ADR-012, ADR-013, ADR-014, ADR-017, ADR-018, ADR-019, ADR-020, ADR-021, ADR-022, ADR-024, ADR-025, ADR-026, ADR-027, ADR-028, ADR-029, ADR-032, ADR-033, ADR-034, ADR-036, ADR-040, ADR-041, ADR-042, ADR-043, ADR-044, ADR-045, ADR-046, ADR-047, ADR-048, ADR-049
+**Accepted (40):** ADR-001, ADR-002, ADR-003, ADR-004, ADR-009, ADR-011, ADR-012, ADR-013, ADR-014, ADR-017, ADR-018, ADR-019, ADR-020, ADR-021, ADR-022, ADR-024, ADR-025, ADR-026, ADR-027, ADR-028, ADR-029, ADR-032, ADR-033, ADR-034, ADR-036, ADR-040, ADR-041, ADR-042, ADR-043, ADR-044, ADR-045, ADR-046, ADR-047, ADR-048, ADR-049, ADR-050, ADR-051, ADR-052, ADR-053, ADR-054
 
 **Accepted-deferred (4):** ADR-030, ADR-031, ADR-038, ADR-039
 
 **Superseded (10):** ADR-005, ADR-006, ADR-007, ADR-008, ADR-010, ADR-015, ADR-016, ADR-023, ADR-035, ADR-037
 
-All 49 non-proposed ADRs have complete Context, Decision, Rationale, Alternatives Considered, and Consequences sections.
+All 54 ADRs have complete Context, Decision, Rationale, Alternatives Considered, and Consequences sections.
 
 ### 2b. Incomplete ADRs (TBD in required sections)
 
-| ADR | Missing Sections | Severity |
-|-----|-----------------|----------|
-| ADR-050 | Decision, Rationale, Alternatives, Consequences all TBD | Major — blocks T-015, T-017 |
-| ADR-051 | Decision, Rationale, Alternatives, Consequences all TBD | Minor — blocks T-012, T-029 |
-| ADR-052 | Decision, Rationale, Alternatives, Consequences all TBD | Major — blocks T-009, T-017 |
-| ADR-053 | Decision, Rationale, Alternatives, Consequences all TBD | Major — blocks T-015, T-017 |
-| ADR-054 | Decision, Rationale, Alternatives, Consequences all TBD | Major — blocks T-007, T-018 |
-
-All 5 incomplete ADRs have Options listed and Resolution Recommendations appended (added by traceability gap analysis).
+None — all proposed ADRs resolved.
 
 ### 2c. Proposed/Unresolved ADRs
 
-| ADR | Topic | Blocks Tasks | Has Resolution Recommendation? |
-|-----|-------|-------------|-------------------------------|
-| ADR-050 | Context window management | T-015, T-017 (Phase 2) | Yes — Option D (reads field + dependency-chain defaults) |
-| ADR-051 | Depth downgrade policy | T-012, T-029 (Phase 2) | Yes — Option C (interactive confirmation; --auto warns) |
-| ADR-052 | Decision recording interface | T-009, T-017 (Phase 1) | Yes — Option A (AI writes directly to decisions.jsonl) |
-| ADR-053 | Artifact context scope | T-015, T-017 (Phase 2) | Yes — Option C (dependency artifacts + explicit reads) |
-| ADR-054 | State methodology tracking | T-007, T-018 (Phase 1) | Yes — Option C (dual fields: init + config methodology) |
-
-**Resolution priority:** ADR-052 and ADR-054 block Phase 1 tasks and should be resolved first. ADR-050, ADR-051, ADR-053 block Phase 2 tasks.
+None — all 5 proposed ADRs accepted (ADR-050 through ADR-054).
 
 ---
 
@@ -161,15 +145,11 @@ All 5 incomplete ADRs have Options listed and Resolution Recommendations appende
 
 **Recommended Resolution:** Already tracked in cross-phase-consistency-report.md. Complete the system-architecture.md cleanup per that report's recommendations. No new action needed.
 
-### 3.3 Package name unresolved
+### 3.3 Package name — resolved
 
-**Decision A:** task-breakdown.md T-053 line 1633: "Set `package.json` fields: `name` (TBD -- scaffold or @scaffold/cli)"
+**Previously:** task-breakdown.md T-053 had TBD for package name ("scaffold or @scaffold/cli").
 
-**Decision B:** No ADR or other artifact resolves this. The name appears variously as "scaffold" in the PRD and CLI contract.
-
-**Analysis:** This is an unresolved decision, not a contradiction. It's a packaging detail that doesn't affect architecture but must be resolved before npm publish (T-053).
-
-**Recommended Resolution:** Decide on `@scaffold-cli/scaffold` (scoped, avoids npm name conflicts) or `scaffold-cli` (unscoped, simpler). Create a brief ADR or resolve inline in T-053.
+**Resolution:** Resolved as `@scaffold-cli/scaffold` (scoped package avoids npm namespace conflicts). Updated inline in T-053; covered by ADR-002 (distribution strategy). No separate ADR needed.
 
 ### 3.4 No further contradictions detected
 
@@ -194,40 +174,38 @@ The following areas were checked and found consistent:
 | D-003 | Parallel step execution | PRD §2 non-goal | N/A — explicit non-goal | No | No action needed |
 | D-004 | Config inheritance (global defaults) | ADR-030 | Yes (deferred by design) | No — per-project config covers Phase 1 | No action needed for v2 launch |
 | D-005 | Pipeline context store (context.json) | ADR-039 | Yes (deferred by design) | No — `reads` field and decisions.jsonl suffice | No action needed for v2 launch |
-| D-006 | Context window management strategy | ADR-050 (proposed) | **Yes** | **Yes** — T-015, T-017 (Phase 2) | Resolve ADR-050 before Phase 2; accept recommended Option D |
-| D-007 | Depth downgrade policy | ADR-051 (proposed) | **Yes** | **Yes** — T-012, T-029 (Phase 2) | Resolve ADR-051 before Phase 2; accept recommended Option C |
-| D-008 | Decision recording interface | ADR-052 (proposed) | **Yes** | **Yes** — T-009, T-017 (Phase 1) | **Resolve before Phase 1**; accept recommended Option A |
-| D-009 | Artifact context scope | ADR-053 (proposed) | **Yes** | **Yes** — T-015, T-017 (Phase 2) | Resolve with ADR-050 before Phase 2; accept recommended Option C |
-| D-010 | State methodology tracking fields | ADR-054 (proposed) | **Yes** | **Yes** — T-007, T-018 (Phase 1) | **Resolve before Phase 1**; accept recommended Option C |
-| D-011 | Package name for npm | T-053 (TBD) | **Yes** | **Yes** — T-053 (Phase 4) | Decide before T-053; recommend scoped `@scaffold-cli/scaffold` |
-| D-012 | Test framework (Jest vs Vitest) | architecture §12 line 1559 | **No** — resolved as Vitest | No | Fix stale reference in system-architecture.md |
+| D-006 | Context window management strategy | ADR-050 (accepted) | No — resolved | No | Resolved: ADR-050 accepted (reads field + dependency-chain defaults) |
+| D-007 | Depth downgrade policy | ADR-051 (accepted) | No — resolved | No | Resolved: ADR-051 accepted (interactive confirmation; --auto warns) |
+| D-008 | Decision recording interface | ADR-052 (accepted) | No — resolved | No | Resolved: ADR-052 accepted (AI writes directly to decisions.jsonl) |
+| D-009 | Artifact context scope | ADR-053 (accepted) | No — resolved | No | Resolved: ADR-053 accepted (dependency artifacts + explicit reads) |
+| D-010 | State methodology tracking fields | ADR-054 (accepted) | No — resolved | No | Resolved: ADR-054 accepted (dual fields: init + config methodology) |
+| D-011 | Package name for npm | T-053 | No — resolved as `@scaffold-cli/scaffold` | No | Resolved inline in T-053; covered by ADR-002 |
+| D-012 | Test framework (Jest vs Vitest) | architecture §12 line 1559 | No — resolved as Vitest | No | Stale reference fixed in system-architecture.md |
 
-> **Note:** D-011 and D-012 were newly discovered by this audit. D-012 is already resolved in practice (Vitest chosen) but has a stale reference.
+> **Note:** D-006 through D-012 were all resolved in the decision completeness address-findings pass (2026-03-14).
 
 ---
 
 ## 5. Summary & Recommendations
 
 - **Total decisions extracted:** 60
-- **ADR coverage:** 73% covered (44), 8% partial/proposed (5), 2% missing (1), 17% implied (10)
-- **Incomplete ADRs:** 5 (all proposed: ADR-050 through ADR-054)
-- **Contradictions found:** 2 (1 stale reference, 1 documentation hygiene — both minor)
-- **Unresolved deferred decisions:** 10 (5 deferred by design, 5 proposed with recommendations)
-- **Newly discovered unresolved items:** 2 (package name, stale test framework reference)
+- **ADR coverage:** 83% covered (50), 0% partial (0), 0% missing (0), 17% implied (10)
+- **Incomplete ADRs:** 0
+- **Contradictions found:** 1 (documentation hygiene — mixin references, already tracked)
+- **Unresolved deferred decisions:** 5 (all deferred by design: D-001 through D-005)
+- **Resolved in this pass:** 7 items (ADR-050 through ADR-054, package name, stale test framework reference)
 
-### Critical findings (must resolve before implementation)
+### Resolved findings
 
-1. **ADR-052 (decision recording interface) and ADR-054 (state methodology tracking) block Phase 1 tasks.** Both have resolution recommendations. Accept the recommended options and update ADR status to `accepted` before starting T-007, T-009, or T-017.
+1. **~~ADR-052 and ADR-054 (Phase 1 blockers)~~** — Resolved. Both accepted with complete sections. No longer blocks T-007, T-009, T-017, T-018.
 
-### Major findings (resolve during Phase 0-1)
+2. **~~ADR-050, ADR-051, ADR-053 (Phase 2 blockers)~~** — Resolved. All three accepted with complete sections. No longer blocks T-012, T-015, T-017, T-029.
 
-2. **ADR-050, ADR-051, ADR-053 block Phase 2 tasks.** All have resolution recommendations. Resolve before starting Phase 2 (T-012, T-015, T-017, T-029). ADR-050 and ADR-053 should be resolved together (complementary `reads` field approach).
+3. **~~Package name (D-011)~~** — Resolved as `@scaffold-cli/scaffold` in T-053. Covered by ADR-002 distribution strategy.
 
-3. **Package name (D-011) must be decided before T-053 (Phase 4).** Recommend `@scaffold-cli/scaffold` to avoid npm namespace conflicts.
+4. **~~system-architecture.md stale "Jest or Vitest" text~~** — Fixed. Now reads "Vitest" consistently with all other docs.
 
-### Minor findings (resolve as encountered)
-
-4. **system-architecture.md line 1559 — stale "Jest or Vitest" text.** Fix to say Vitest. One-line edit.
+### Remaining minor findings
 
 5. **system-architecture.md residual mixin references — already tracked.** The cross-phase-consistency-report.md has P0/P1/P2 findings for this. No new action needed.
 
@@ -235,4 +213,4 @@ The following areas were checked and found consistent:
 
 ### Decision architecture assessment
 
-The scaffold v2 ADR system is **well-structured**. The 44 covered decisions form a coherent, interconnected network with clear cross-references. The supersession chain (ADR-041 replacing 7 earlier ADRs, ADR-044 replacing ADR-010, etc.) demonstrates healthy architectural evolution. The 5 proposed ADRs are genuine open questions with well-analyzed resolution recommendations. No systemic gaps were found — the missing/implied items are standard engineering choices that don't typically require formal decision records.
+The scaffold v2 ADR system is **well-structured**. The 50 covered decisions form a coherent, interconnected network with clear cross-references. The supersession chain (ADR-041 replacing 7 earlier ADRs, ADR-044 replacing ADR-010, etc.) demonstrates healthy architectural evolution. All 54 ADRs are now in terminal states (accepted, accepted-deferred, or superseded) — no proposed or incomplete ADRs remain. No systemic gaps were found — the remaining implied items are standard engineering choices that don't typically require formal decision records.
