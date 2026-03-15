@@ -865,11 +865,11 @@ Later: scaffold run --from tdd  (un-skip and run tdd)
 
 **What if a prompt's dependencies place it earlier than its declared phase?**
 
-Consider: `user-stories` is declared in Phase 5 (Stories & Planning) but depends only on `create-prd` (Phase 1). All of `create-prd`'s dependencies resolve in Phase 1. After `create-prd` completes, `user-stories` has in-degree 0 and is eligible.
+Consider: `user-stories` is declared in Phase 5 (Stories & Planning) but depends only on `review-prd` (Phase 1). After `review-prd` completes (which itself depends on `create-prd`), `user-stories` has in-degree 0 and is eligible.
 
 In Kahn's algorithm, `user-stories` would be enqueued alongside Phase 2 prompts (like `tech-stack`). The phase tiebreaker makes `tech-stack` (Phase 2) dequeue before `user-stories` (Phase 5), so `user-stories` appears later in the sorted order — but it's still eligible earlier than most Phase 5 prompts.
 
-**Dependencies always win.** If `user-stories` were mistakenly given a Phase 1 declaration, it would still execute after `create-prd` (its dependency), not before. The phase is a tiebreaker, not a constraint.
+**Dependencies always win.** If `user-stories` were mistakenly given a Phase 1 declaration, it would still execute after `review-prd` (its dependency), not before. The phase is a tiebreaker, not a constraint.
 
 **What if a prompt's dependencies force it later than its declared phase?**
 
@@ -1025,14 +1025,14 @@ Pipeline: classic (2/18 complete)
 parallelSets = [
   ["create-prd"],                           // Level 0: no prerequisites
   ["review-prd", "beads-setup"],            // Level 1: both depend only on create-prd
-  ["innovate-prd", "tech-stack", "user-stories"], // Level 2: innovate-prd depends on review-prd; tech-stack on beads-setup; user-stories on create-prd
+  ["innovate-prd", "tech-stack", "user-stories"], // Level 2: innovate-prd depends on review-prd; tech-stack on beads-setup; user-stories on review-prd
   ["claude-code-permissions", "coding-standards", "tdd"],  // Level 3
   ["project-structure"],                    // Level 4
   // ... etc
 ]
 ```
 
-Note: `user-stories` depends only on `create-prd`, so it appears at level 2 alongside `tech-stack` — even though `user-stories` is in Phase 5 and `tech-stack` in Phase 2. Dependencies, not phases, determine the level.
+Note: `user-stories` depends only on `review-prd`, so it appears at level 2 alongside `tech-stack` — even though `user-stories` is in Phase 5 and `tech-stack` in Phase 2. Dependencies, not phases, determine the level.
 
 **Category**: (a) Handled by design.
 
@@ -1377,7 +1377,7 @@ dependencies:
   dev-env-setup: [project-structure]
   design-system: [dev-env-setup]
   git-workflow: [dev-env-setup]
-  user-stories: [create-prd]
+  user-stories: [review-prd]
   user-stories-gaps: [user-stories]
   claude-md-optimization: [git-workflow]
   workflow-audit: [claude-md-optimization]
@@ -1397,10 +1397,10 @@ dependencies:
 
 | Step | Dequeue | Parallel Set | New zero-in-degree nodes |
 |------|---------|-------------|--------------------------|
-| 1 | create-prd, beads-setup | [create-prd, beads-setup] | review-prd, tech-stack, user-stories |
-| 2 | review-prd, tech-stack, user-stories | [review-prd, tech-stack, user-stories] | innovate-prd, claude-code-permissions, coding-standards, tdd, user-stories-gaps |
-| 3 | innovate-prd, claude-code-permissions, coding-standards, tdd, user-stories-gaps | [innovate-prd, claude-code-permissions, coding-standards, tdd, user-stories-gaps] | project-structure |
-| 4 | project-structure | [project-structure] | dev-env-setup, implementation-plan |
+| 1 | create-prd, beads-setup | [create-prd, beads-setup] | review-prd, tech-stack |
+| 2 | review-prd, tech-stack | [review-prd, tech-stack] | innovate-prd, user-stories, claude-code-permissions, coding-standards, tdd |
+| 3 | innovate-prd, user-stories, claude-code-permissions, coding-standards, tdd | [innovate-prd, user-stories, claude-code-permissions, coding-standards, tdd] | user-stories-gaps, project-structure |
+| 4 | user-stories-gaps, project-structure | [user-stories-gaps, project-structure] | dev-env-setup, implementation-plan |
 | 5 | dev-env-setup, implementation-plan | [dev-env-setup, implementation-plan] | design-system, git-workflow, implementation-plan-review |
 | 6 | design-system, git-workflow, implementation-plan-review | [design-system, git-workflow, implementation-plan-review] | claude-md-optimization |
 | 7 | claude-md-optimization | [claude-md-optimization] | workflow-audit |
@@ -1408,20 +1408,20 @@ dependencies:
 
 4. **Final sorted order**:
 ```
-create-prd, beads-setup, review-prd, tech-stack, user-stories,
-innovate-prd, claude-code-permissions, coding-standards, tdd, user-stories-gaps,
-project-structure, dev-env-setup, implementation-plan, design-system,
-git-workflow, implementation-plan-review, claude-md-optimization,
-workflow-audit
+create-prd, beads-setup, review-prd, tech-stack,
+innovate-prd, claude-code-permissions, coding-standards, tdd, user-stories,
+user-stories-gaps, project-structure, dev-env-setup, implementation-plan,
+design-system, git-workflow, implementation-plan-review,
+claude-md-optimization, workflow-audit
 ```
 
 5. **Parallel sets**:
 ```typescript
 [
   ["create-prd", "beads-setup"],
-  ["review-prd", "tech-stack", "user-stories"],
-  ["innovate-prd", "claude-code-permissions", "coding-standards", "tdd", "user-stories-gaps"],
-  ["project-structure"],
+  ["review-prd", "tech-stack"],
+  ["innovate-prd", "user-stories", "claude-code-permissions", "coding-standards", "tdd"],
+  ["user-stories-gaps", "project-structure"],
   ["dev-env-setup", "implementation-plan"],
   ["design-system", "git-workflow", "implementation-plan-review"],
   ["claude-md-optimization"],
@@ -1434,7 +1434,7 @@ workflow-audit
 {
   sortedOrder: ["create-prd", "beads-setup", "review-prd", ...],
   graph: { nodes: [...], edges: [...], successors: {...}, predecessors: {...}, inDegree: {...} },
-  parallelSets: [["create-prd", "beads-setup"], ["review-prd", "tech-stack", "user-stories"], ...],
+  parallelSets: [["create-prd", "beads-setup"], ["review-prd", "tech-stack"], ["innovate-prd", "user-stories", "claude-code-permissions", "coding-standards", "tdd"], ...],
   warnings: [],
   errors: [],
   success: true

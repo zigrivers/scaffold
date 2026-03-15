@@ -303,7 +303,7 @@ dependencies:
   dev-env-setup: [project-structure]
   design-system: [dev-env-setup]
   git-workflow: [dev-env-setup]
-  user-stories: [create-prd]
+  user-stories: [review-prd]
   user-stories-gaps: [user-stories]
   claude-md-optimization: [git-workflow]
   workflow-audit: [claude-md-optimization]

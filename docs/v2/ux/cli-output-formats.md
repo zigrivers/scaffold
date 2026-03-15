@@ -726,7 +726,7 @@ Phase 2 — Standards
 Next: user-stories (Phase 1 — Planning)
   Description:  Create user stories from the PRD
   Depth:        5
-  Depends on:   create-prd ✓, review-prd ✓, innovate-prd ✓
+  Depends on:   review-prd ✓
   Produces:     docs/user-stories.md
   Reads:        docs/plan.md, docs/tech-stack.md
 
@@ -741,7 +741,7 @@ Next eligible (3 of 5):
   1. user-stories (Phase 1 — Planning)
      Description:  Create user stories from the PRD
      Depth:        5
-     Depends on:   create-prd ✓, review-prd ✓, innovate-prd ✓
+     Depends on:   review-prd ✓
      Produces:     docs/user-stories.md
 
   2. design-system (Phase 2 — Standards)
@@ -786,7 +786,7 @@ Run: scaffold status to see the full pipeline.
 
 ```
 [DependencyResolver] Computing eligibility from state (8 done, 1 skipped, 23 pending)
-[DependencyResolver] user-stories: all 3 dependencies satisfied (create-prd, review-prd, innovate-prd)
+[DependencyResolver] user-stories: dependency satisfied (review-prd)
 [DependencyResolver] user-stories: produces=[docs/user-stories.md], reads=[docs/plan.md, docs/tech-stack.md]
 [DependencyResolver] user-stories: source=pipeline, depth=5, has CLAUDE.md section: no
 ```
@@ -815,7 +815,7 @@ Run: scaffold status to see the full pipeline.
   ✗ [CONFIG_INVALID_METHODOLOGY] Unknown methodology 'deap'. Did you mean 'deep'?
   ⚠ [CONFIG_UNKNOWN_FIELD] Unknown field "extra_settings" (possible typo, or from a newer scaffold version)
 
-pipeline/create-prd.md
+pipeline/pre/create-prd.md
   ✗ [FRONTMATTER_PRODUCES_MISSING] Required 'produces' field absent
 
 .scaffold/state.json
@@ -868,7 +868,7 @@ Validation with auto-fix (`--fix`):
 [Validator:config] Checking depth: 5 (valid range 1-5)
 [Validator:pipeline] Loading pipeline definition: 32 steps
 [Validator:pipeline] Dependency cycle check: 29 nodes, 42 edges, no cycles
-[Validator:frontmatter] Checking pipeline/create-prd.md... pass
+[Validator:frontmatter] Checking pipeline/pre/create-prd.md... pass
 [Validator:artifacts] Checking docs/plan.md against create-prd artifact schema... pass
 [Validator:state] Checking slug consistency: 32 state entries, 32 pipeline prompts, 0 orphaned
 [Validator:state] Checking completed step depths: 8 completed, all depths within range (V19 pass)
