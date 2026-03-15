@@ -222,6 +222,15 @@ Event storming is a collaborative modeling technique that maps out domain events
 5. **Read Models** — Identify what information users need to make decisions that trigger commands (green sticky notes). These inform query design.
 6. **Bounded Contexts** — Draw boundaries around clusters of aggregates that share language and models. Where language changes, a context boundary exists.
 
+### Discovering Domains from User Stories
+
+User stories (`docs/user-stories.md`) are a primary input for domain discovery. User actions in acceptance criteria reveal entities (nouns), events (state transitions), and aggregate boundaries (transactional consistency requirements). For example, "Given a teacher assigns homework to a class" reveals Teacher, Homework, and Class entities, an AssignmentCreated event, and a Classroom aggregate.
+
+- Extract nouns from story acceptance criteria — these are candidate entities
+- Extract state changes ("when X happens, Y changes to Z") — these are candidate domain events
+- Identify where multiple entities must change atomically in acceptance criteria — these suggest aggregate boundaries
+- Group stories by the entities they reference — entity clusters suggest bounded contexts
+
 ### Identifying Bounded Contexts from Requirements
 
 When event storming isn't practical (e.g., solo development or AI-driven development), use these heuristics:
