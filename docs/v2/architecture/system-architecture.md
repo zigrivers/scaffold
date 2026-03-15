@@ -420,8 +420,8 @@ content/
 │       └── implementation-playbook.md
 │
 ├── methodology/                      # Methodology preset YAML files (ADR-043)
-│   ├── deep.yml                      # Deep Domain Modeling — all 32 steps enabled, default_depth: 5
-│   ├── mvp.yml                       # MVP — 4 core steps enabled, default_depth: 1
+│   ├── deep.yml                      # Deep Domain Modeling — all 36 steps enabled, default_depth: 5
+│   ├── mvp.yml                       # MVP — 7 steps enabled, default_depth: 1
 │   └── custom-defaults.yml           # Custom — all steps enabled, default_depth: 3, user overrides via config.yml
 │
 └── adapters/                         # Adapter-specific assets
@@ -1794,6 +1794,7 @@ These are the rules that implementation agents must never violate. Violating an 
 - `--auto --confirm-reset` is required for destructive operations in auto mode; `--auto` alone must fail ([ADR-036](../adrs/ADR-036-auto-does-not-imply-force.md))
 - Skipped prompts are treated as "done" for dependency resolution — their dependents are unblocked ([ADR-020](../adrs/ADR-020-skip-vs-exclude-semantics.md))
 - Excluded prompts do not appear in `state.json` or the runtime dependency graph; users cannot exclude at runtime ([ADR-020](../adrs/ADR-020-skip-vs-exclude-semantics.md))
+- Disabled steps (steps with `enabled: false` in the active methodology preset) are treated as satisfied for dependency resolution. The engine checks whether a predecessor is either completed or disabled — if either condition is true, the dependency is met. This allows methodology presets like MVP to enable steps that transitively depend on disabled steps (e.g., enabling `testing-strategy` even though its dependency `system-architecture` is disabled in that preset).
 
 **Assembly engine:** *(replaces the former "Injection" subsection — mixin injection was superseded by [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md))*
 

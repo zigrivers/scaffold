@@ -12,7 +12,7 @@
 
 Users working on multiple scaffold projects may want global defaults (`~/.scaffold/defaults.yml`) that apply to all projects, overridden by project-specific `.scaffold/config.yml`. This would enable team-wide or personal default methodologies, mixin preferences, and platform selections without repeating them in every project.
 
-For example, a developer who always uses `methodology: classic`, `task-tracking: github-issues`, and `tdd: strict` would define these once in their global defaults and only override per-project when needed. A team lead could distribute a shared defaults file that standardizes methodology choices across the organization.
+For example, a developer who always uses `methodology: deep`, `task-tracking: github-issues`, and `tdd: strict` would define these once in their global defaults and only override per-project when needed. A team lead could distribute a shared defaults file that standardizes methodology choices across the organization.
 
 However, config inheritance introduces complexity in merge semantics, conflict resolution, and debugging — users need to understand which config source contributed which value, and tooling needs to surface this provenance clearly.
 
@@ -44,7 +44,7 @@ This is a conscious scope decision, not a rejection of the feature. The design o
 
 ### Environment Variables as Defaults
 
-- **Description**: Allow environment variables (e.g., `SCAFFOLD_METHODOLOGY=classic`) to serve as defaults, overridden by config file values.
+- **Description**: Allow environment variables (e.g., `SCAFFOLD_METHODOLOGY=deep`) to serve as defaults, overridden by config file values.
 - **Pros**: Familiar pattern for developers. Works with existing shell profile infrastructure. No new file format to define.
 - **Cons**: Invisible configuration — environment variables are not visible in the project directory, making it hard to understand why a project behaves a certain way. Nested values (mixins, platforms) are awkward to express as environment variables. Hard to document the full set of supported variables and their mapping to config fields.
 

@@ -12,8 +12,8 @@
 
 | ID | Requirement | PRD Ref |
 |----|-------------|---------|
-| F-001 | Meta-prompt architecture: 32 meta-prompt files declaring step intent (purpose, inputs, outputs, quality criteria, methodology-scaling rules) | §4 |
-| F-002 | Knowledge base: 32 domain expertise files organized by topic, reusable across steps | §4 |
+| F-001 | Meta-prompt architecture: 36 meta-prompt files declaring step intent (purpose, inputs, outputs, quality criteria, methodology-scaling rules) | §4 |
+| F-002 | Knowledge base: 37 domain expertise files organized by topic, reusable across steps | §4 |
 | F-003 | Methodology presets: 3 YAML preset files (Deep/MVP/Custom) controlling step enablement and depth | §4, §6 |
 | F-004 | Runtime assembly: CLI assembles prompt at runtime from meta-prompt + knowledge + context + instructions + depth | §4, §9 |
 | F-005 | 32-step pipeline with phased execution and dependency ordering (Kahn's algorithm) | §5 |
@@ -22,7 +22,7 @@
 | F-008 | Validation phase: 7 parallel validation steps (cross-phase, traceability, decisions, critical path, implementability, dependency graph, scope creep) | §5 |
 | F-009 | Finalization phase: 3 steps (apply fixes and freeze, developer onboarding guide, implementation playbook) | §5 |
 | F-010 | Depth scale 1-5: five levels from MVP floor to Deep ceiling, with preset defaults and per-step overrides | §6 |
-| F-011 | MVP methodology: 4 steps enabled (create-prd, testing-strategy, implementation-tasks, implementation-playbook) at depth 1 | §6 |
+| F-011 | MVP methodology: 7 steps enabled (create-prd, review-prd, user-stories, review-user-stories, testing-strategy, implementation-tasks, implementation-playbook) at depth 1 | §6 |
 | F-012 | Methodology changeable mid-pipeline: re-run at higher depth, enable skipped steps, switch methodology | §6 |
 | F-013 | Config file (.scaffold/config.yml): methodology, custom overrides, platforms, project metadata | §7 |
 | F-014 | Config versioning: version field with auto-migration for old configs, error for newer-than-CLI | §7 |
@@ -127,8 +127,8 @@ Legend:
 
 | Req | Requirement (short) | Domain | ADR | Arch | Data | CLI | Task | Test |
 |-----|---------------------|--------|-----|------|------|-----|------|------|
-| F-001 | Meta-prompt architecture (32 files) | 08, 15 | 041, 044, 045 | §2, §3c, §4b | fm | `run`, `info`, `build` | T-004, T-013, T-048–T-051 | §4a, §4b |
-| F-002 | Knowledge base (32 files) | 15 | 042 | §2, §3c | — | `run`, `info` | T-014, T-045–T-047 | §4b |
+| F-001 | Meta-prompt architecture (36 files) | 08, 15 | 041, 044, 045 | §2, §3c, §4b | fm | `run`, `info`, `build` | T-004, T-013, T-048–T-051 | §4a, §4b |
+| F-002 | Knowledge base (37 files) | 15 | 042 | §2, §3c | — | `run`, `info` | T-014, T-045–T-047 | §4b |
 | F-003 | Methodology presets (Deep/MVP/Custom) | 16 | 043 | §3b, §3c | mfst | `init` | T-006, T-044 | §4a |
 | F-004 | Runtime assembly engine | 15 | 044 | §4b | — | `run` | T-015, T-017 | §4b, §7, §8 |
 | F-005 | 32-step pipeline with dependencies | 02, 08 | 009, 021 | §3c, §4a | fm | `list`, `next`, `run` | T-011, T-048–T-051 | §4b, §8 |
@@ -137,7 +137,7 @@ Legend:
 | F-008 | Validation phase (7 steps) | — | — | §3c | — | `run` | T-047 | — |
 | F-009 | Finalization phase (3 steps) | — | — | §3c | — | `run` | T-050 | — |
 | F-010 | Depth scale 1-5 | 16 | 043 | §3b | cfg, mfst | `run --depth`, `info` | T-012 | §4a, §4b |
-| F-011 | MVP methodology (4 steps, depth 1) | 16 | 043 | §3c | mfst | `init` | T-044 | §4a |
+| F-011 | MVP methodology (7 steps, depth 1) | 16 | 043 | §3c | mfst | `init` | T-044 | §4a |
 | F-012 | Methodology changeable mid-pipeline | 16 | 049 | — | state, cfg | `run` | T-018 | §4b, §8 |
 | F-013 | Config file schema & validation | 06 | 014, 033 | §5a | cfg | `init`, `validate` | T-005 | §4a, §7 |
 | F-014 | Config versioning & auto-migration | 06 | 014 | §5a | cfg | `init` | T-005 | §4a |

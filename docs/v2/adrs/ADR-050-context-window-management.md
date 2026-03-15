@@ -45,7 +45,7 @@ The meta-prompt `knowledge-base` frontmatter field already scopes which KB entri
 - Meta-prompt authors must think about which artifacts to declare in `reads`
 - Undeclared artifacts are invisible to the AI — omitting a `reads` entry means the AI lacks that context
 - New frontmatter field (`reads`) to validate in the build pipeline
-- Initial authoring overhead to audit all 32 meta-prompts and set correct `reads` lists
+- Initial authoring overhead to audit all 36 meta-prompts and set correct `reads` lists
 
 ## Reversibility
 

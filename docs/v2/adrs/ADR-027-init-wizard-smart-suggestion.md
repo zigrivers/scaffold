@@ -32,7 +32,7 @@ A `--auto` mode resolves all questions with defaults and smart suggestions witho
 
 **Interactive wizard over manual template**: Templates require users to understand all configuration options before they begin, which violates the "easy to get started" goal. A wizard presents one question at a time with explanations, defaults, and smart suggestions. Users who know what they want can accept defaults quickly; users who need guidance get it contextually. Domain 14, Section 1 identifies the wizard as the boundary between user intent and the pipeline engine.
 
-**Smart suggestion over pure auto-detection**: Pure auto-detection produces a config without user confirmation, which can be wrong (especially for idea-text-only projects with no codebase to analyze). Smart suggestion combines analysis with user confirmation: "Based on your project description, I suggest 'classic' — is that right?" The user always has the final say. Domain 14, Section 4 specifies that file signals beat keywords (concrete evidence over aspirational text) and that the default methodology is `classic` when no signals are detected.
+**Smart suggestion over pure auto-detection**: Pure auto-detection produces a config without user confirmation, which can be wrong (especially for idea-text-only projects with no codebase to analyze). Smart suggestion combines analysis with user confirmation: "Based on your project description, I suggest 'deep' — is that right?" The user always has the final say. Domain 14, Section 4 specifies that file signals beat keywords (concrete evidence over aspirational text) and that the default methodology is `deep` when no signals are detected.
 
 **@inquirer/prompts over raw readline**: inquirer provides consistent UX patterns (select lists, checkboxes, confirmations) across platforms, handles terminal edge cases, supports validation, and is the de facto standard for Node.js CLI wizards. Raw readline would require reimplementing all of this.
 
@@ -62,9 +62,9 @@ A `--auto` mode resolves all questions with defaults and smart suggestions witho
 
 ### Scaffold Init --Preset Shorthand
 
-- **Description**: Allow `scaffold init --preset classic` to skip the wizard entirely and use a predefined config.
+- **Description**: Allow `scaffold init --preset deep` to skip the wizard entirely and use a predefined config.
 - **Pros**: Fast for experienced users who know what they want. One-liner setup.
-- **Cons**: Still needs the wizard for customization (preset doesn't cover axis selection). Presets are methodology-specific and would need to be maintained alongside methodologies. This is effectively `--auto` with a methodology override, which the current design supports via `scaffold init --auto --methodology classic`.
+- **Cons**: Still needs the wizard for customization (preset doesn't cover axis selection). Presets are methodology-specific and would need to be maintained alongside methodologies. This is effectively `--auto` with a methodology override, which the current design supports via `scaffold init --auto --methodology deep`.
 
 ## Consequences
 
@@ -92,7 +92,7 @@ A `--auto` mode resolves all questions with defaults and smart suggestions witho
 - Existing config MUST produce error `INIT_SCAFFOLD_EXISTS` without `--force` — no silent overwrite
 - `scaffold build` MUST auto-run after init completes successfully (domain 14, Section 8)
 - `--auto` mode MUST resolve all questions without user interaction, using smart suggestions and methodology defaults
-- `--auto` methodology/mixin resolution: `classic` default when no signals detected, manifest defaults for axes, auto-detect platforms
+- `--auto` methodology/mixin resolution: `deep` default when no signals detected, manifest defaults for axes, auto-detect platforms
 - In smart methodology suggestion, file-based signals (existing `package.json`, Expo config, framework-specific files, etc.) MUST override keyword signals from the idea text when they conflict. A project with an Express `package.json` and idea text mentioning "mobile app" is classified based on the existing codebase, not the aspirational text.
 - Smart suggestion algorithm: file signals MUST beat keyword signals when both are present (concrete evidence over aspirational text)
 - See domain 14, Sections 3-5 for the complete wizard state machine, smart suggestion algorithm, and adaptive question logic

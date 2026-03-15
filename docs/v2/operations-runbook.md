@@ -374,8 +374,8 @@ What `npm pack` **includes** (configured via `files` in `package.json`):
 | Directory | Content |
 |-----------|---------|
 | `dist/` | Compiled JavaScript (from `src/`) |
-| `pipeline/` | Meta-prompt markdown files (32 files) |
-| `knowledge/` | Knowledge base markdown files (32 files) |
+| `pipeline/` | Meta-prompt markdown files (36 files) |
+| `knowledge/` | Knowledge base markdown files (37 files) |
 | `methodology/` | Methodology preset YAML files (3 files) |
 | `package.json` | Package manifest with `bin.scaffold` entry |
 | `README.md` | npm landing page |

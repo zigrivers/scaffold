@@ -10,7 +10,7 @@
 
 ## Context
 
-Each methodology (e.g., "classic", "classic-lite", "lean") needs a machine-readable definition that specifies its pipeline shape: which prompts are included, what order they execute in, what phases they belong to, what dependencies exist between them, what axis defaults apply, and which prompts are conditional on project traits. The manifest is the methodology's blueprint — it controls the full pipeline that `scaffold build` produces.
+Each methodology (e.g., "deep", "mvp", "lean") needs a machine-readable definition that specifies its pipeline shape: which prompts are included, what order they execute in, what phases they belong to, what dependencies exist between them, what axis defaults apply, and which prompts are conditional on project traits. The manifest is the methodology's blueprint — it controls the full pipeline that `scaffold build` produces.
 
 The manifest interacts with two other metadata sources: prompt frontmatter (`depends-on` field, ADR-015) provides per-prompt dependency declarations, and the project config (`config.yml`, ADR-014) provides user-selected axis values and project traits. The manifest must integrate with both without creating conflicting sources of truth.
 
@@ -40,7 +40,7 @@ Methodology manifests use **YAML format** with explicit phase definitions, depen
 
 **Explicit phase definitions over implicit ordering**: Phases provide a human-readable grouping that helps users understand pipeline progress ("you're in Phase 2: Architecture"). Without explicit phases, the pipeline is a flat list of prompts — users can't gauge how far along they are or what comes next at a conceptual level. Phases also enable parallel execution within a phase when dependencies allow.
 
-**Union semantics for dependencies**: A prompt's frontmatter may declare `depends-on: [tech-stack]` because it always needs the tech stack decisions. A methodology manifest may add an additional dependency `user-stories -> product-brief` that only applies in the "classic" methodology. Union semantics means both sources contribute to the effective dependency graph without conflicting — the implementation collects all declared dependencies from all sources. This is specified in ADR-011.
+**Union semantics for dependencies**: A prompt's frontmatter may declare `depends-on: [tech-stack]` because it always needs the tech stack decisions. A methodology manifest may add an additional dependency `user-stories -> product-brief` that only applies in the "deep" methodology. Union semantics means both sources contribute to the effective dependency graph without conflicting — the implementation collects all declared dependencies from all sources. This is specified in ADR-011.
 
 **Declarative conditions over arbitrary code**: Conditional prompt inclusion (`expo-setup` only when `platform: mobile`) uses a declarative syntax that can be statically analyzed. The CLI can determine the full pipeline shape at build time without executing any user code. Arbitrary JavaScript conditions would make static analysis impossible and introduce security risks.
 

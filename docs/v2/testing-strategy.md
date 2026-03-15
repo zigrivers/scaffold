@@ -223,7 +223,7 @@ Pattern: `describe('<ModuleName>')` → `describe('<methodName>()')` → `it('<v
 
 **Methodology Preset Loader** (`src/core/assembly/preset-loader.ts`):
 - Test against fixture preset YAML files in `tests/fixtures/presets/`
-- Fixtures: `deep.yml` (all 32 steps enabled, `default_depth: 5`), `mvp.yml` (4 steps enabled, `default_depth: 1`), `custom-defaults.yml` (all steps enabled, `default_depth: 3`)
+- Fixtures: `deep.yml` (all 36 steps enabled, `default_depth: 5`), `mvp.yml` (7 steps enabled, `default_depth: 1`), `custom-defaults.yml` (all steps enabled, `default_depth: 3`)
 - Verify step name validation: all step names in preset must match meta-prompt names → `PRESET_INVALID_STEP` on mismatch
 - Verify warning when meta-prompt exists but is not listed in preset → `PRESET_MISSING_STEP`
 - Verify `default_depth` validation: 0 or 6 → error; 1-5 → valid
@@ -809,11 +809,11 @@ Vitest benchmark mode with realistic fixture data. Performance tests live in `te
 
 | Benchmark | p95 Budget | Test File | Fixture Data |
 |-----------|-----------|-----------|-------------|
-| Assembly (9-step sequence) | < 500ms | `assembly-benchmark.test.ts` | 32 meta-prompts, 32 KB entries, populated state |
-| Step listing (status/list/next) | < 200ms | `state-io-benchmark.test.ts` | 32-step state with mixed statuses |
+| Assembly (9-step sequence) | < 500ms | `assembly-benchmark.test.ts` | 36 meta-prompts, 37 KB entries, populated state |
+| Step listing (status/list/next) | < 200ms | `state-io-benchmark.test.ts` | 36-step state with mixed statuses |
 | State I/O (read + write) | < 100ms | `state-io-benchmark.test.ts` | Realistic state.json (~100KB) |
-| Dependency resolution (Kahn's) | < 10ms | `state-io-benchmark.test.ts` | 32-node graph with 31 edges (realistic pipeline topology) |
-| Build (all platforms) | < 2s | `build-benchmark.test.ts` | 32 meta-prompts, 3 platforms |
+| Dependency resolution (Kahn's) | < 10ms | `state-io-benchmark.test.ts` | 36-node graph with 35 edges (realistic pipeline topology) |
+| Build (all platforms) | < 2s | `build-benchmark.test.ts` | 36 meta-prompts, 3 platforms |
 
 ### Benchmark Pattern
 
@@ -821,7 +821,7 @@ Vitest benchmark mode with realistic fixture data. Performance tests live in `te
 import { bench, describe } from 'vitest';
 
 describe('Assembly Engine Performance', () => {
-  const fixtures = loadRealisticFixtures(); // 32 meta-prompts, knowledge base, state
+  const fixtures = loadRealisticFixtures(); // 36 meta-prompts, knowledge base, state
 
   bench('assembles a single step', async () => {
     await assemblyEngine.assemble('create-prd', fixtures);
@@ -835,7 +835,36 @@ describe('Assembly Engine Performance', () => {
 });
 ```
 
-Report p50/p95/p99 for each benchmark. Run against realistic fixture data (32 meta-prompts, not 3).
+Report p50/p95/p99 for each benchmark. Run against realistic fixture data (36 meta-prompts, not 3).
+
+### Performance Budget Enforcement
+
+p95 budgets that CI enforces once benchmark infrastructure is in place:
+
+- **Assembly (full 36-step pipeline)**: < 500ms — tests all steps sequentially with realistic meta-prompts, knowledge entries, and populated state
+- **Step listing (status/list/next)**: < 200ms — queries against a 36-step state with mixed statuses and dependency edges
+- **State I/O (read + write cycle)**: < 100ms — round-trip a realistic `state.json` (~100KB) through read, modify, and atomic write
+- **Build (all platforms)**: < 2s — assembles 36 meta-prompts for 3 platform adapters and writes output files
+
+### Idempotent Assembly
+
+Verify that identical inputs always produce identical assembled prompts:
+
+- Same meta-prompt + same knowledge entries + same config must produce byte-identical output
+- Run assembly twice consecutively with no state changes; `diff` the outputs (expect zero differences)
+- Cover all 36 steps — idempotency failures in any single step fail the suite
+- Test with each methodology preset to catch preset-specific template divergence
+- Guard against timestamp injection, random ordering, or non-deterministic Map iteration in assembled output
+
+### Cross-Platform Quality
+
+Assembled prompts must produce structurally equivalent results on Claude Code and Codex:
+
+- Run the same assembled step on both platforms; compare output structure (sections present, heading hierarchy, coverage of acceptance criteria)
+- Assert structural equivalence — not verbatim match (wording and formatting will differ between platforms)
+- Focus verification on high-signal steps: `create-prd`, `system-architecture`, `task-breakdown` (if these are equivalent, simpler steps follow)
+- Capture platform output samples as snapshot fixtures in `tests/fixtures/cross-platform/` for regression detection
+- Run cross-platform verification manually/periodically — not in CI (requires live platform access)
 
 ---
 

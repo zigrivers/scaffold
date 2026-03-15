@@ -42,13 +42,13 @@ Concretely:
 
 ### Independent Methodology Versioning
 
-- **Description**: Each methodology has its own version number (e.g., `classic v2.1.0`). The CLI declares which methodology versions it supports. Users pin methodology versions in config.
+- **Description**: Each methodology has its own version number (e.g., `deep v2.1.0`). The CLI declares which methodology versions it supports. Users pin methodology versions in config.
 - **Pros**: Clear compatibility matrix — users know exactly which methodology version they are using. Safe upgrades — upgrading the CLI doesn't change methodology behavior until the user explicitly upgrades the methodology. Enables methodology authors to iterate independently of CLI releases.
 - **Cons**: Version proliferation — users must track CLI version AND methodology version. Migration matrix complexity — every CLI version must declare compatibility with every methodology version. Pinned versions create stale pipelines (user on methodology v1 while v3 is current). Overkill for Phase 1-3 when all methodologies are built-in and tightly coupled to the CLI.
 
 ### Semantic Versioning on Methodologies
 
-- **Description**: Each methodology uses semver (e.g., `classic 1.2.3`) with breaking changes in major, new prompts in minor, and bug fixes in patch.
+- **Description**: Each methodology uses semver (e.g., `deep 1.2.3`) with breaking changes in major, new prompts in minor, and bug fixes in patch.
 - **Pros**: Communicates the nature of changes clearly. Users can adopt minor/patch updates with confidence and evaluate major updates carefully.
 - **Cons**: Semver granularity is overkill for a bundled methodology — what constitutes a "patch" vs. "minor" change in a methodology? Is a rewording of a prompt a patch or a minor? Is adding an optional prompt a minor or a major? The semantic boundaries are unclear for pipeline configurations. Requires maintaining semver discipline for each methodology independently.
 

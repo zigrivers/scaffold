@@ -735,8 +735,8 @@ FUNCTION checkIncompatibleCombinations(config: ScaffoldConfig): ValidationDiagno
   END IF
 
   // Rule 6: agent-mode:manual + agent-mode:multi is impossible by schema,
-  // but agent-mode:manual with methodology:classic is worth warning about
-  // since classic methodology expects multi-agent extensions
+  // but agent-mode:manual with methodology:deep is worth warning about
+  // since deep methodology expects multi-agent extensions
   // (This is actually a manifest-level concern, checked separately.)
 
   RETURN warnings
@@ -1012,7 +1012,7 @@ This section catalogs every error and warning the config validation system can p
 
 #### FIELD_WRONG_TYPE
 - **Severity**: error
-- **Fires when**: A field has the wrong YAML type (e.g., `methodology: [classic]` instead of `methodology: classic`)
+- **Fires when**: A field has the wrong YAML type (e.g., `methodology: [deep]` instead of `methodology: deep`)
 - **Message**: `Field "{field}" must be a {expectedType}, got {actualType}.`
 - **Recovery**: Change the value to the correct type
 
@@ -1033,11 +1033,11 @@ This section catalogs every error and warning the config validation system can p
   {
     "code": "FIELD_INVALID_METHODOLOGY",
     "severity": "error",
-    "message": "Methodology \"clasic\" not found. Did you mean \"classic\"? Valid options: classic, classic-lite.",
+    "message": "Methodology \"depe\" not found. Did you mean \"deep\"? Valid options: deep, mvp.",
     "field": "methodology",
-    "value": "clasic",
-    "suggestion": "classic",
-    "validOptions": ["classic", "classic-lite"],
+    "value": "depe",
+    "suggestion": "deep",
+    "validOptions": ["deep", "mvp"],
     "file": ".scaffold/config.yml",
     "line": 2
   }
@@ -1236,9 +1236,9 @@ All validation errors and warnings are surfaced in both output modes:
 
 **Interactive mode** (default):
 ```
-Error: Methodology "clasic" not found.
-  Did you mean "classic"?
-  Valid options: classic, classic-lite
+Error: Methodology "depe" not found.
+  Did you mean "deep"?
+  Valid options: deep, mvp
   File: .scaffold/config.yml, line 2
 
 Warning: agent-mode "manual" with git-workflow "full-pr" may cause friction.
@@ -1258,11 +1258,11 @@ Found 1 error and 1 warning.
     {
       "code": "FIELD_INVALID_METHODOLOGY",
       "severity": "error",
-      "message": "Methodology \"clasic\" not found.",
+      "message": "Methodology \"depe\" not found.",
       "field": "methodology",
-      "value": "clasic",
-      "suggestion": "classic",
-      "validOptions": ["classic", "classic-lite"],
+      "value": "depe",
+      "suggestion": "deep",
+      "validOptions": ["deep", "mvp"],
       "file": ".scaffold/config.yml",
       "line": 2
     }
@@ -1347,7 +1347,7 @@ Suppose in a future release, the `interaction-style` axis is renamed to `agent-s
 **v1 schema** (current):
 ```yaml
 version: 1
-methodology: classic
+methodology: deep
 mixins:
   task-tracking: beads
   tdd: strict
@@ -1361,7 +1361,7 @@ platforms:
 **v2 schema** (hypothetical future):
 ```yaml
 version: 2
-methodology: classic
+methodology: deep
 mixins:
   task-tracking: beads
   tdd: strict
@@ -1472,13 +1472,13 @@ scaffold build
 **Algorithm**: Standard Levenshtein distance (insertions, deletions, substitutions). Not Damerau-Levenshtein (no transposition bonus). This is simpler and sufficient for short strings like methodology/mixin names.
 
 **Threshold**: ≤ 2. This catches common typos:
-- Single character errors: `clasic` → `classic` (distance 1)
+- Single character errors: `depp` → `deep` (distance 1)
 - Doubled/missing characters: `beeads` → `beads` (distance 1)
 - Adjacent key swaps: `stricy` → `strict` (distance 1)
-- Two-character errors: `clasik` → `classic` (distance 2)
+- Two-character errors: `depe` → `deep` (distance 2)
 
 **Ranking when multiple matches are within threshold**:
-1. **Lowest distance first** — `classic` at distance 1 beats `classic-lite` at distance 2
+1. **Lowest distance first** — `deep` at distance 1 beats `mvp` at distance 2
 2. **Longest common prefix** as tiebreaker — if `a` and `b` are equidistant, prefer the one sharing more leading characters with the input
 3. **Alphabetical** as final tiebreaker — deterministic output
 
@@ -1486,9 +1486,9 @@ scaffold build
 
 **Output format — interactive**:
 ```
-Error: Methodology "clasic" not found.
-  Did you mean "classic"?
-  Valid options: classic, classic-lite
+Error: Methodology "depe" not found.
+  Did you mean "deep"?
+  Valid options: deep, mvp
 ```
 
 **Output format — JSON**:
@@ -1496,9 +1496,9 @@ Error: Methodology "clasic" not found.
 {
   "code": "FIELD_INVALID_METHODOLOGY",
   "field": "methodology",
-  "value": "clasic",
-  "suggestion": "classic",
-  "validOptions": ["classic", "classic-lite"],
+  "value": "depe",
+  "suggestion": "deep",
+  "validOptions": ["deep", "mvp"],
   "file": ".scaffold/config.yml",
   "line": 2
 }
@@ -1583,7 +1583,7 @@ All config validation errors map to **exit code 1** (validation error). Warnings
 
 ```yaml
 version: 1
-methodolgy: classic    # Typo — warning with suggestion "methodology"
+methodolgy: deep    # Typo — warning with suggestion "methodology"
 mixins: { ... }
 platforms: [claude-code]
 custom-field: true     # Unknown — warning, no suggestion (distance > 2 from all known fields)
@@ -1705,18 +1705,18 @@ Fully defined in Algorithm 4 (Section 5). The validation chain is:
    Make `produces` required for extra-prompts. This enables completion detection, artifact verification, and dashboard display for custom prompts. Authors who don't know their output files yet can use `produces: []` (empty array) as an explicit "no artifacts" declaration.
 
 5. **Consider Damerau-Levenshtein for fuzzy matching**
-   Standard Levenshtein treats transpositions as two operations (delete + insert). Damerau-Levenshtein counts them as one. For typos like `calssic` → `classic`, Damerau gives distance 1 (transposition) vs. standard Levenshtein distance 2. This makes suggestions more generous for common typing errors. The implementation cost is minimal (one additional check in the DP matrix).
+   Standard Levenshtein treats transpositions as two operations (delete + insert). Damerau-Levenshtein counts them as one. For typos like `depe` → `deep`, Damerau gives distance 1 (transposition) vs. standard Levenshtein distance 2. This makes suggestions more generous for common typing errors. The implementation cost is minimal (one additional check in the DP matrix).
 
 ---
 
 ## Section 11: Concrete Examples
 
-### Example 1: Happy Path — Valid Classic Config
+### Example 1: Happy Path — Valid Deep Config
 
 **Input** (`config.yml`):
 ```yaml
 version: 1
-methodology: classic
+methodology: deep
 mixins:
   task-tracking: beads
   tdd: strict
@@ -1847,7 +1847,7 @@ Note: Because `methodology` and `mixins` are missing (the typo'd versions are un
 **Input** (`config.yml`):
 ```yaml
 version: 1
-methodology: classic
+methodology: deep
 mixins:
   task-tracking: none
   tdd: strict
@@ -1919,7 +1919,7 @@ This example triggers 4 of the 5 defined incompatible combinations. The build pr
 **Input** (`config.yml`) — hypothetical v1 config being read by a CLI that supports v2:
 ```yaml
 version: 1
-methodology: classic
+methodology: deep
 mixins:
   task-tracking: beads
   tdd: strict
@@ -1971,7 +1971,7 @@ Proceeding with build...
 **Input** (`config.yml`):
 ```yaml
 version: 1
-methodology: classic
+methodology: deep
 mixins:
   task-tracking: beads
   tdd: strict

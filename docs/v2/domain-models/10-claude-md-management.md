@@ -32,7 +32,7 @@ This domain models the management system that addresses all three risks: a **res
 
 **What this domain does NOT cover**:
 - The actual prose content of individual CLAUDE.md sections (that's prompt-specific)
-- The `claude-md-optimization` prompt's consolidation logic (that's a specific prompt within the classic methodology)
+- The `claude-md-optimization` prompt's consolidation logic (that's a specific prompt within the deep methodology)
 - Meta-prompt loading mechanics (assembly engine)
 - Artifact schema validation rules ([domain 08](08-prompt-frontmatter.md))
 
@@ -110,7 +110,7 @@ interface ReservedSection {
  * Derived from the methodology manifest and the prompt set.
  */
 interface SectionRegistry {
-  /** Methodology name (e.g., "classic", "classic-lite") */
+  /** Methodology name (e.g., "deep", "mvp") */
   methodology: string;
 
   /** Ordered list of all reserved sections */
@@ -886,7 +886,7 @@ All error codes use the prefix `CMD_` (CLAUDE.md Management Domain).
 
 ### MQ1: Complete CLAUDE.md Reserved Section Structure
 
-The reserved section structure for the `classic` methodology:
+The reserved section structure for the `deep` methodology:
 
 | # | Section Heading | Owner Prompt | Budget (tokens) | Pointer Target | Optional |
 |---|----------------|-------------|-----------------|----------------|----------|
@@ -941,9 +941,9 @@ If a user manually edits content within a managed block:
 
 Different methodologies need different sections because they have different prompts. The section registry is **derived from the methodology**, not hardcoded.
 
-**Classic methodology** (shown in MQ1): Full registry with 9 sections covering task management, standards, workflow, and testing.
+**Deep methodology** (shown in MQ1): Full registry with 9 sections covering task management, standards, workflow, and testing.
 
-**Classic-lite methodology**: A lighter variant that uses `simple-tracking` instead of `beads-setup` and has fewer prompts. Its registry would differ:
+**MVP methodology**: A lighter variant that uses `simple-tracking` instead of `beads-setup` and has fewer prompts. Its registry would differ:
 
 | # | Section Heading | Owner Prompt | Notes |
 |---|----------------|-------------|-------|
@@ -952,11 +952,11 @@ Different methodologies need different sections because they have different prom
 | 3 | Key Commands | `dev-env-setup` | Same |
 | 4 | Project Structure Quick Reference | `project-structure` | Same |
 | 5 | Coding Standards Summary | `coding-standards` | Same |
-| 6 | Git Workflow | `git-workflow` | May differ if classic-lite uses `simple` git workflow |
+| 6 | Git Workflow | `git-workflow` | May differ if mvp uses `simple` git workflow |
 | 7 | Testing | `tdd` | Same |
 | 8 | Self-Improvement | `simple-tracking` | Different owner |
 
-Note: `classic-lite` likely omits the optional Design System section entirely (not relevant to its target audience).
+Note: `mvp` likely omits the optional Design System section entirely (not relevant to its target audience).
 
 **How the registry varies by methodology:**
 
@@ -1236,7 +1236,7 @@ No. AGENTS.md uses a fundamentally different management model:
 | Update mode re-fill | Fill a section, then re-fill with different content | Previous content returned, new content in place |
 | Skipped optional section lifecycle | Skip design-system, then run optimization | Design System section removed from file |
 | Corrupted marker recovery | Manually corrupt markers, then re-run owning prompt | Markers rebuilt, content restored |
-| Cross-methodology switch | Create with classic, switch to classic-lite, re-run tracking | Sections updated to new registry |
+| Cross-methodology switch | Create with deep, switch to mvp, re-run tracking | Sections updated to new registry |
 | Project-Specific Notes preserved | Fill all sections, add user content to notes, re-run a prompt | User content in Project-Specific Notes unchanged |
 
 ### Property-Based Tests
@@ -1311,12 +1311,12 @@ No. AGENTS.md uses a fundamentally different management model:
 
 ## Section 11: Concrete Examples
 
-### Example 1: Fresh CLAUDE.md (After Tracking-Setup, Classic Methodology)
+### Example 1: Fresh CLAUDE.md (After Tracking-Setup, Deep Methodology)
 
 This is what CLAUDE.md looks like immediately after the tracking-setup prompt creates it. Three sections are filled (owned by tracking-setup), and the rest have placeholders.
 
 ```markdown
-<!-- scaffold:tracking-setup v1 2026-03-12 classic/beads/strict/full-pr -->
+<!-- scaffold:tracking-setup v1 2026-03-12 deep/beads/strict/full-pr -->
 
 # CLAUDE.md
 
@@ -1371,7 +1371,7 @@ _Implementation agents: add project-specific guidance here._
 After running tech-stack, coding-standards, tdd, project-structure, dev-env-setup, and git-workflow. Design System was skipped (no frontend).
 
 ```markdown
-<!-- scaffold:tracking-setup v1 2026-03-12 classic/beads/strict/full-pr -->
+<!-- scaffold:tracking-setup v1 2026-03-12 deep/beads/strict/full-pr -->
 
 # CLAUDE.md
 
@@ -1460,7 +1460,7 @@ _Implementation agents: add project-specific guidance here._
 After `claude-md-optimization` runs: the skipped Design System section is removed, content is consolidated within budget, and the tracking comment is updated.
 
 ```markdown
-<!-- scaffold:claude-md-optimization v1 2026-03-12 classic/beads/strict/full-pr -->
+<!-- scaffold:claude-md-optimization v1 2026-03-12 deep/beads/strict/full-pr -->
 
 # CLAUDE.md
 
@@ -1540,7 +1540,7 @@ Note: The Design System section was removed (prompt was skipped). The `claude-md
 After implementation begins, agents add project-specific notes:
 
 ```markdown
-<!-- scaffold:claude-md-optimization v1 2026-03-12 classic/beads/strict/full-pr -->
+<!-- scaffold:claude-md-optimization v1 2026-03-12 deep/beads/strict/full-pr -->
 
 # CLAUDE.md
 
@@ -1636,12 +1636,12 @@ Prompt "tdd" attempts to fill section "Coding Standards Summary"
   Recovery: Use the correct section. The "tdd" prompt should fill the "Testing" section.
 ```
 
-### Example 6: Classic-Lite CLAUDE.md (Different Methodology)
+### Example 6: MVP CLAUDE.md (Different Methodology)
 
-A `classic-lite` project uses `simple-tracking` instead of `beads-setup`, and uses `TODO.md` instead of Beads:
+An `mvp` project uses `simple-tracking` instead of `beads-setup`, and uses `TODO.md` instead of Beads:
 
 ```markdown
-<!-- scaffold:simple-tracking v1 2026-03-12 classic-lite/none/relaxed/simple -->
+<!-- scaffold:simple-tracking v1 2026-03-12 mvp/none/relaxed/simple -->
 
 # CLAUDE.md
 
@@ -1683,4 +1683,4 @@ A `classic-lite` project uses `simple-tracking` instead of `beads-setup`, and us
 _Implementation agents: add project-specific guidance here._
 ```
 
-Note the differences from classic: "Task Tracking" instead of "Task Management", lighter principles, no Design System section, different content reflecting methodology depth and user instruction choices.
+Note the differences from deep: "Task Tracking" instead of "Task Management", lighter principles, no Design System section, different content reflecting methodology depth and user instruction choices.

@@ -154,7 +154,7 @@ The following JSON Schema (draft 2020-12) defines the structure that the parsed 
 | Level | Name | Description |
 |-------|------|-------------|
 | 1 | MVP floor | Minimum viable artifact. Core decisions only, no alternatives analysis, brief rationale. |
-| 2 | Lean | Key trade-offs noted but not explored in depth. |
+| 2 | Lightweight | Key trade-offs noted but not explored in depth. |
 | 3 | Balanced | Solid documentation. Alternatives considered for major decisions. Team-onboardable. |
 | 4 | Thorough | Thorough analysis. Edge cases, risk assessment, detailed rationale. |
 | 5 | Deep ceiling | Comprehensive. Full evaluation matrices, domain modeling, gap analysis, migration paths, operational considerations. |

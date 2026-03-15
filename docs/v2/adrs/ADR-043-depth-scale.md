@@ -13,7 +13,7 @@
 
 Scaffold must support different levels of documentation rigor for different project types. A solo hackathon project and a complex enterprise system should go through fundamentally different levels of preparation. The v2 design addressed this through methodology manifests (ADR-016) that define per-methodology pipeline shapes — which prompts are included, what phases they belong to, what axis defaults apply, and which prompts are conditional on project traits.
 
-The methodology manifest approach creates a combinatorial maintenance problem. Each methodology (classic, classic-lite, lean, etc.) requires its own manifest with its own prompt overrides and extensions. Adding a new pipeline step requires updating every methodology manifest. Adding a new methodology requires writing overrides and extensions for every step. The interaction between methodology manifests, mixin axes, and project traits creates a configuration surface that is difficult to reason about and expensive to maintain.
+The methodology manifest approach creates a combinatorial maintenance problem. Each methodology (deep, mvp, lean, etc.) requires its own manifest with its own prompt overrides and extensions. Adding a new pipeline step requires updating every methodology manifest. Adding a new methodology requires writing overrides and extensions for every step. The interaction between methodology manifests, mixin axes, and project traits creates a configuration surface that is difficult to reason about and expensive to maintain.
 
 The meta-prompt architecture (ADR-041) eliminates hard-coded prompt variants. The remaining question is: how does a user control the depth and rigor of output across the pipeline?
 

@@ -75,6 +75,10 @@ Specifically:
 ### Neutral
 - Parallel sets are informational only — v2 does not execute prompts in parallel automatically. Parallel execution requires separate worktrees and agent coordination, which is a user-managed workflow.
 
+## Disabled Step Handling
+
+When a step is disabled in the active methodology preset (`enabled: false`), it is treated as satisfied for dependency resolution purposes — equivalent to a completed step from the graph's perspective. This allows presets like MVP to enable steps that transitively depend on disabled steps without triggering `DEPENDENCY_UNMET` errors. The eligibility check evaluates: `step.status === 'completed' OR step.enabled === false`. The dependency graph itself remains static and unmodified; disabled-step handling is purely an eligibility-time concern, consistent with the static graph principle described above.
+
 ## Constraints and Compliance
 
 - Dependency resolution MUST use Kahn's algorithm with a priority queue tiebreaker ordered by `(phaseIndex, slug)` (domain 02, Section 5, Algorithm 2)

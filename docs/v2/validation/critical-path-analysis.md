@@ -443,7 +443,7 @@ None — this journey is fully specified across all artifacts.
 #### Step 1: User runs `scaffold init --methodology mvp`
 - **CLI:** `scaffold init [idea] --methodology mvp` — found in cli-contract.md
 - **Component:** Init Wizard — found
-- **State:** Created with 4 steps (MVP preset), all `pending` — found
+- **State:** Created with 7 steps (MVP preset), all `pending` — found
 - **Config:** `methodology: mvp` — found
 - **Task:** T-033 — found
 - **Error path:** Standard init errors — found

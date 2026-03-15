@@ -136,21 +136,21 @@ Not all current prompts can be base prompts. Prompts that are deeply intertwined
 | User Stories Gaps | base | Universal concern |
 | Add Playwright | base (optional) | Universal for web projects |
 | Add Maestro | base (optional) | Universal for mobile projects |
-| Beads Setup | classic extension | Beads-specific; other methodologies use different tracking setup |
-| Implementation Plan | classic override | Deeply Beads-integrated; each methodology needs its own version |
-| Implementation Plan Review | classic extension | Assumes Beads task graph structure |
-| Claude.md Optimization | classic extension | Assumes CLAUDE.md structure from classic pipeline |
-| Workflow Audit | classic extension | Verifies classic-specific doc set |
-| Single Agent Start | classic extension | Assumes Beads execution loop |
-| Multi Agent Start | classic extension | Assumes worktrees + Beads |
-| Single Agent Resume | classic extension | Assumes Beads state |
-| Multi Agent Resume | classic extension | Assumes worktrees + Beads |
+| Beads Setup | deep extension | Beads-specific; other methodologies use different tracking setup |
+| Implementation Plan | deep override | Deeply Beads-integrated; each methodology needs its own version |
+| Implementation Plan Review | deep extension | Assumes Beads task graph structure |
+| Claude.md Optimization | deep extension | Assumes CLAUDE.md structure from deep pipeline |
+| Workflow Audit | deep extension | Verifies deep-specific doc set |
+| Single Agent Start | deep extension | Assumes Beads execution loop |
+| Multi Agent Start | deep extension | Assumes worktrees + Beads |
+| Single Agent Resume | deep extension | Assumes Beads state |
+| Multi Agent Resume | deep extension | Assumes worktrees + Beads |
 | Claude Code Permissions | base | Universal Claude Code configuration |
-| New Enhancement | classic extension | Assumes Beads for task creation |
-| Quick Task | classic extension | Assumes Beads for tracking |
+| New Enhancement | deep extension | Assumes Beads for task creation |
+| Quick Task | deep extension | Assumes Beads for tracking |
 | Multi-Model Code Review | base (optional) | Universal, requires Codex/Gemini CLIs |
 | User Stories Multi-Model Review | base (optional) | Universal review process |
-| Implementation Plan Multi-Model Review | classic extension | Reviews Beads-specific task structure |
+| Implementation Plan Multi-Model Review | deep extension | Reviews Beads-specific task structure |
 | Platform Parity Review | base (optional) | Universal for multi-platform |
 | Session Analyzer | utility | Not part of pipeline; standalone analysis tool |
 
@@ -208,7 +208,7 @@ Each methodology defines its own pipeline shape — which base prompts to includ
 
 ```
 methodologies/
-  classic/
+  deep/
     manifest.yml
     overrides/
       implementation-plan.md
@@ -220,7 +220,7 @@ methodologies/
       single-agent-resume.md
       claude-md-optimization.md
       workflow-audit.md
-  classic-lite/
+  mvp/
     manifest.yml
     overrides/
       implementation-plan.md
@@ -236,10 +236,10 @@ methodologies/
       ubiquitous-language.md
 ```
 
-**Manifest format** (`methodologies/classic/manifest.yml`):
+**Manifest format** (`methodologies/deep/manifest.yml`):
 
 ```yaml
-name: Scaffold Classic
+name: Scaffold Deep
 description: Full pipeline with parallel agents, Beads tracking, and comprehensive standards
 phases:
   - name: Product Definition
@@ -393,7 +393,7 @@ The interaction-style axis is distinct from tool-name mapping in the platform ad
 
 ```yaml
 version: 1
-methodology: classic
+methodology: deep
 mixins:
   task-tracking: beads
   tdd: strict
@@ -430,12 +430,12 @@ If the user changes methodology or task-tracking mixin after already running pro
 
 ```
 $ scaffold build
-Warning: Methodology changed from 'classic' to 'classic-lite'.
-Previously generated project artifacts may reference concepts from 'classic'.
+Warning: Methodology changed from 'deep' to 'mvp'.
+Previously generated project artifacts may reference concepts from 'deep'.
 Re-run affected prompts to update artifacts. Changed prompts:
-  - implementation-plan (was: classic override, now: classic-lite override)
-  - beads-setup (removed — not in classic-lite)
-  + simple-tracking (added — new in classic-lite)
+  - implementation-plan (was: deep override, now: mvp override)
+  - beads-setup (removed — not in mvp)
+  + simple-tracking (added — new in mvp)
 Proceed? [y/N]
 ```
 
@@ -610,7 +610,7 @@ When `--auto` is used without `--format json`, the CLI still prints human-readab
 
 ```
 Error: methodology 'clasic' not found.
-Did you mean 'classic'? Valid options: classic, classic-lite
+Did you mean 'deep'? Valid options: deep, mvp
 ```
 
 In `--format json` mode, suggestions appear in the error object:
@@ -619,8 +619,8 @@ In `--format json` mode, suggestions appear in the error object:
   "code": "INVALID_METHODOLOGY",
   "field": "methodology",
   "value": "clasic",
-  "suggestion": "classic",
-  "valid_options": ["classic", "classic-lite"],
+  "suggestion": "deep",
+  "valid_options": ["deep", "mvp"],
   "file": ".scaffold/config.yml",
   "line": 2
 }
@@ -634,7 +634,7 @@ The CLI tracks pipeline execution state in `.scaffold/state.json` (separate from
 {
   "schema-version": 1,
   "scaffold-version": "2.0.0",
-  "methodology": "classic",
+  "methodology": "deep",
   "init-mode": "greenfield",
   "created": "2026-03-12T10:30:00Z",
   "in_progress": null,
@@ -920,7 +920,7 @@ When `scaffold resume` runs, it first outputs a **session bootstrap summary** �
 
 ```
 === Pipeline Status ===
-Methodology: classic (8/18 complete, 2 skipped)
+Methodology: deep (8/18 complete, 2 skipped)
 Last completed: project-structure (2026-03-12T10:42:00Z)
 Next eligible: dev-env-setup
 
@@ -973,7 +973,7 @@ When `in_progress` is non-null in state.json (previous session crashed), the cra
 **`scaffold status`:**
 - Read-only progress display (no offer to execute):
   ```
-  Pipeline: classic (9/19 complete)
+  Pipeline: deep (9/19 complete)
   Phase 3 — Development Environment
   + create-prd
   + review-prd
@@ -1111,10 +1111,10 @@ Artifacts produced by scaffold prompts include tracking comments on line 1 and m
 
 Example:
 ```
-<!-- scaffold:tech-stack v1 2026-03-12 classic/strict-tdd/beads -->
+<!-- scaffold:tech-stack v1 2026-03-12 deep/strict-tdd/beads -->
 ```
 
-The methodology and mixin context enable Mode Detection to handle artifacts created under a different configuration — if the user switched from `classic` to `classic-lite`, the update mode knows which sections may no longer apply.
+The methodology and mixin context enable Mode Detection to handle artifacts created under a different configuration — if the user switched from `deep` to `mvp`, the update mode knows which sections may no longer apply.
 
 Validation rule: tracking comments must match the regex `<!-- scaffold:[a-z-]+ v\d+ \d{4}-\d{2}-\d{2}( [a-z0-9/-]+)? -->`. Malformed tracking comments cause Mode Detection to warn rather than silently falling into legacy mode.
 
@@ -1189,7 +1189,7 @@ The recommended methodology appears first in the selection with "(Recommended)".
 Welcome to Scaffold!
 
 ? Choose a methodology:
-  > Scaffold Classic -- Full pipeline, parallel agents, comprehensive standards
+  > Scaffold Deep -- Full pipeline, parallel agents, comprehensive standards
     Scaffold Lite -- Streamlined pipeline for solo developers
     (more added over time)
 
@@ -1259,8 +1259,8 @@ Formula pulls from npm or GitHub releases.
 
 The existing Claude Code plugin continues to work as-is:
 - Plugin commands become thin wrappers: `/scaffold:init` calls `scaffold init`
-- Users who never run `scaffold init` get current behavior unchanged (classic methodology, all defaults)
-- The existing `commands/` directory in the scaffold repo serves as the "classic + all defaults" pre-built output
+- Users who never run `scaffold init` get current behavior unchanged (deep methodology, all defaults)
+- The existing `commands/` directory in the scaffold repo serves as the "deep + all defaults" pre-built output
 
 ### Migration Path
 
@@ -1269,7 +1269,7 @@ The existing Claude Code plugin continues to work as-is:
 **Build system:**
 - Build the CLI shell (Node.js, `@inquirer/prompts`)
 - Implement: `scaffold init`, `scaffold build`, `scaffold list`, `scaffold info`, `scaffold version`
-- Decompose current `prompts.md` into `base/` + `methodologies/classic/`
+- Decompose current `prompts.md` into `base/` + `methodologies/deep/`
 - Add frontmatter (`produces`, `reads`, `depends-on`, `phase`) to all prompts
 - Identify and extract mixin insertion points from existing prompts
 - Create mixin content files for each axis
@@ -1305,7 +1305,7 @@ The existing Claude Code plugin continues to work as-is:
 
 #### Phase 3: New Content
 
-- Add `classic-lite` methodology (streamlined pipeline for solo devs)
+- Add `mvp` methodology (streamlined pipeline for solo devs)
 - Add additional mixin options as needed
 - Write methodology authoring guide for future methodologies (DDD, Lean MVP, etc.)
 - Add new methodologies
@@ -1414,7 +1414,7 @@ The config file includes a `version` field (starting at `1`) that tracks the con
 
 ### Efficiency
 
-- **Time to first implementation task**: Under 60 minutes for lite methodologies, under 120 minutes for full classic
+- **Time to first implementation task**: Under 60 minutes for lite methodologies, under 120 minutes for full deep
 - **Zero manual prompt skipping**: When using a built-in methodology, users should never need to manually skip prompts
 
 ### Quality

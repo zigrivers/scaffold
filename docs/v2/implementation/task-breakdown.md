@@ -419,8 +419,8 @@ Note: "T-006 tests require fixture preset YAML files. The production preset file
 **Description**: Load methodology preset YAML files from `methodology/` directory (deep.yml, mvp.yml, custom-defaults.yml). Each preset defines: `name` (display name), `description`, `default_depth` (1-5), and `steps` map (step name → `{enabled: boolean, conditional?: 'if-needed'}`). Validate that all step names in the preset match known meta-prompt names. Validate preset structure. Report PRESET_MISSING, PRESET_PARSE_ERROR, PRESET_INVALID_STEP, PRESET_MISSING_STEP warnings. Return structured `MethodologyPreset` object with resolved step list and depth defaults. Preset files are resolved relative to the scaffold package installation directory (not the user's project root). In development, use `import.meta.url` or `__dirname` to locate bundled content. The preset loader receives a list of known step names as a parameter (from a pipeline directory scan performed by the caller). T-006 tests use fixture preset files in `tests/fixtures/methodology/`. Actual preset content is authored by T-044.
 
 **Acceptance Criteria**:
-- [ ] Loads deep.yml preset with all 32 steps enabled, default_depth 5
-- [ ] Loads mvp.yml preset with 4 steps enabled, default_depth 1
+- [ ] Loads deep.yml preset with all 36 steps enabled, default_depth 5
+- [ ] Loads mvp.yml preset with 7 steps enabled, default_depth 1
 - [ ] Loads custom-defaults.yml with all steps enabled, default_depth 3
 - [ ] Rejects preset with invalid step name (PRESET_INVALID_STEP)
 - [ ] Warns when meta-prompt exists but is not listed in preset (PRESET_MISSING_STEP)
@@ -552,7 +552,7 @@ The assembly engine and its dependencies. Tasks T-011 through T-016 can run in p
 **Description**: Topological sort of pipeline steps using Kahn's algorithm. Build adjacency list from meta-prompt `dependencies` fields. Algorithm: (1) count in-degrees, (2) enqueue nodes with in-degree 0, (3) process queue — for each node, output it and decrement successors' in-degrees, enqueue when zero. Phase-based tiebreaker for deterministic ordering within same in-degree level. Cycle detection: if any node unvisited after algorithm completes, cycle exists (DEP_CYCLE_DETECTED, exit code 1). `computeEligible(state)` returns steps whose dependencies are all completed and that are not themselves completed/in_progress. `getParallelSets()` groups eligible steps by phase for parallel execution display. Validate: DEP_TARGET_MISSING (dependency references non-existent step), DEP_SELF_REFERENCE. Phase sort order (ascending): pre < 1 < 1a < 2 < 2a < ... < 10 < 10a < validation < finalization. Define a `PHASE_SORT_ORDER: Record<string, number>` constant mapping each valid phase string to a numeric sort key.
 
 **Acceptance Criteria**:
-- [ ] Topological sort of 32 steps produces valid ordering (no step before its dependencies)
+- [ ] Topological sort of 36 steps produces valid ordering (no step before its dependencies)
 - [ ] Detects cycles and returns DEP_CYCLE_DETECTED error with cycle path
 - [ ] `computeEligible(state)` returns only steps whose deps are all completed
 - [ ] Phase tiebreaker produces deterministic output (same input → same order)
@@ -586,8 +586,8 @@ The assembly engine and its dependencies. Tasks T-011 through T-016 can run in p
 - [ ] Custom methodology with per-step overrides correctly merges with defaults
 - [ ] Detects methodology change between state and config (ASM_METHODOLOGY_CHANGED) (Note: methodology change detection moved to T-018)
 - [ ] Warns when completed step depth < current config depth (ASM_COMPLETED_AT_LOWER_DEPTH) (Note: methodology change detection moved to T-018)
-- [ ] MVP preset enables exactly 4 steps at depth 1
-- [ ] Deep preset enables all 32 steps at depth 5
+- [ ] MVP preset enables exactly 7 steps at depth 1
+- [ ] Deep preset enables all 36 steps at depth 5
 - [ ] All tests pass
 
 ---
@@ -708,7 +708,7 @@ The assembly engine and its dependencies. Tasks T-011 through T-016 can run in p
 - [ ] Execution instruction is always the final section
 - [ ] Assembly is deterministic (same inputs produce identical output)
 - [ ] Returns AssemblyResult with prompt text and metadata
-- [ ] Assembly completes within 500ms performance budget (for typical 32-step pipeline)
+- [ ] Assembly completes within 500ms performance budget (for typical 36-step pipeline)
 - [ ] All tests pass
 
 ---
@@ -935,7 +935,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - Create: `src/cli/commands/list.ts`
 - Create: `src/cli/commands/list.test.ts`
 
-**Description**: List installed methodologies and pipeline steps. Default (no flags): Display available methodology presets and registered platform adapters. Does not require a project (no `.scaffold/` needed). `--section <name>` flag (valid values: `methodologies`, `platforms`): Filter to show only the specified section. Interactive output: formatted table. JSON output: ListResult with methodologies and/or steps arrays. Shows step count: "32 defined / 29 enabled (3 conditional disabled)".
+**Description**: List installed methodologies and pipeline steps. Default (no flags): Display available methodology presets and registered platform adapters. Does not require a project (no `.scaffold/` needed). `--section <name>` flag (valid values: `methodologies`, `platforms`): Filter to show only the specified section. Interactive output: formatted table. JSON output: ListResult with methodologies and/or steps arrays. Shows step count: "36 defined / 33 enabled (3 conditional disabled)".
 
 **Acceptance Criteria**:
 - [ ] Default shows available methodology presets and registered platform adapters
@@ -1405,12 +1405,12 @@ Content tasks — meta-prompts, knowledge base files, and methodology presets. T
 - Create: `methodology/mvp.yml`
 - Create: `methodology/custom-defaults.yml`
 
-**Description**: Author three methodology preset YAML files. (1) `deep.yml`: name "Deep Domain Modeling", description for complex systems, default_depth 5, all 32 steps enabled. (2) `mvp.yml`: name "MVP", description for fast start, default_depth 1, only 4 steps enabled (create-prd, testing-strategy, implementation-tasks, implementation-playbook). (3) `custom-defaults.yml`: name "Custom", description for user configuration, default_depth 3, all 32 steps enabled with conditional steps marked. Each preset must list every known step with enabled/disabled status. Use manifest-yml-schema.md §8.1 (`deep.yml` example) as the canonical list of all 32 step names. `custom-defaults.yml` uses the same conditional markers as `deep.yml` (database-schema, review-database, api-contracts, review-api, ux-spec, review-ux marked `conditional: 'if-needed'`).
+**Description**: Author three methodology preset YAML files. (1) `deep.yml`: name "Deep Domain Modeling", description for complex systems, default_depth 5, all 36 steps enabled. (2) `mvp.yml`: name "MVP", description for fast start, default_depth 1, only 7 steps enabled (create-prd, testing-strategy, implementation-tasks, implementation-playbook). (3) `custom-defaults.yml`: name "Custom", description for user configuration, default_depth 3, all 36 steps enabled with conditional steps marked. Each preset must list every known step with enabled/disabled status. Use manifest-yml-schema.md §8.1 (`deep.yml` example) as the canonical list of all 36 step names. `custom-defaults.yml` uses the same conditional markers as `deep.yml` (database-schema, review-database, api-contracts, review-api, ux-spec, review-ux marked `conditional: 'if-needed'`).
 
 **Acceptance Criteria**:
-- [ ] deep.yml has all 32 steps enabled, default_depth 5
-- [ ] mvp.yml has exactly 4 steps enabled, default_depth 1
-- [ ] custom-defaults.yml has all steps enabled, default_depth 3, conditionals marked
+- [ ] deep.yml has all 36 steps enabled, default_depth 5
+- [ ] mvp.yml has exactly 7 steps enabled, default_depth 1
+- [ ] custom-defaults.yml has all 36 steps enabled, default_depth 3, conditionals marked
 - [ ] All step names match meta-prompt filenames (kebab-case)
 - [ ] YAML parses without errors
 - [ ] Validated against manifest-yml-schema
@@ -1707,7 +1707,7 @@ Final integration testing, packaging, and validation against performance budgets
 - Create: `tests/performance/state-io-benchmark.test.ts`
 - Create: `tests/performance/build-benchmark.test.ts`
 
-**Description**: Performance benchmarks validating PRD requirements. (1) Assembly time: < 500ms for 9-step assembly sequence with typical 32-step pipeline, (2) Step listing: < 200ms for status/list/next commands, (3) State I/O: < 100ms for read/write operations on state.json, (4) Build time: < 2s for full build across all platforms. Use vitest benchmark mode. Run against realistic fixture data (32 meta-prompts, 32 KB entries, populated state). Report p50, p95, p99 latencies. The 500ms budget covers the assembly engine's `assemble()` method (steps 1-7 of the 9-step sequence — everything before AI execution). Use production content files (meta-prompts from T-048-T-051, KB from T-045-T-047, presets from T-044) if available. If not yet authored, use size-realistic stubs: 50-line meta-prompts, 300-line KB entries, 100-line state.json.
+**Description**: Performance benchmarks validating PRD requirements. (1) Assembly time: < 500ms for 9-step assembly sequence with typical 36-step pipeline, (2) Step listing: < 200ms for status/list/next commands, (3) State I/O: < 100ms for read/write operations on state.json, (4) Build time: < 2s for full build across all platforms. Use vitest benchmark mode. Run against realistic fixture data (36 meta-prompts, 37 KB entries, populated state). Report p50, p95, p99 latencies. The 500ms budget covers the assembly engine's `assemble()` method (steps 1-7 of the 9-step sequence — everything before AI execution). Use production content files (meta-prompts from T-048-T-051, KB from T-045-T-047, presets from T-044) if available. If not yet authored, use size-realistic stubs: 50-line meta-prompts, 300-line KB entries, 100-line state.json.
 
 **Acceptance Criteria**:
 - [ ] Assembly benchmark: p95 < 500ms

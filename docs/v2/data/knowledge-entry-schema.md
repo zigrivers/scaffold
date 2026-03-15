@@ -1,7 +1,7 @@
 # Knowledge Base Entry Schema
 
 **Phase**: 4 — Data Schemas
-**Depends on**: [adrs/ADR-042-knowledge-base-design.md](../adrs/ADR-042-knowledge-base-design.md), [adrs/ADR-033-forward-compatibility-unknown-fields.md](../adrs/ADR-033-forward-compatibility-unknown-fields.md)
+**Depends on**: [adrs/ADR-042-knowledge-base-domain-expertise.md](../adrs/ADR-042-knowledge-base-domain-expertise.md), [adrs/ADR-033-forward-compatibility-unknown-fields.md](../adrs/ADR-033-forward-compatibility-unknown-fields.md)
 **Last updated**: 2026-03-15
 **Status**: draft
 
@@ -67,7 +67,7 @@ Knowledge base entries are shipped expert knowledge consumed by the assembly eng
 
 ## Section 4: Directory Structure
 
-Knowledge base entries are organized by category per [ADR-042](../adrs/ADR-042-knowledge-base-design.md):
+Knowledge base entries are organized by category per [ADR-042](../adrs/ADR-042-knowledge-base-domain-expertise.md):
 
 ```
 knowledge/

@@ -71,7 +71,7 @@ Two additional insights drive the v2 architecture:
 
 - **Goals**: Scaffold a new project quickly, get to implementation fast, use Claude Code or Codex agents for all coding work. Wants every document and configuration to be AI-optimized so agents can work autonomously.
 - **Pain points with v1**: Has to manually skip optional prompts by remembering which ones don't apply. Runs the full pipeline even for a CLI tool that doesn't need half the prompts. Locked into Claude Code — can't use Codex.
-- **Scaffold v2 value**: Pick MVP methodology (depth 1), get exactly the steps needed, run from either tool. Four steps to implementation handoff.
+- **Scaffold v2 value**: Pick MVP methodology (depth 1), get exactly the steps needed, run from either tool. Seven steps to implementation handoff.
 
 ### Team Lead Adopting AI Workflows ("Jordan")
 
@@ -91,9 +91,9 @@ Two additional insights drive the v2 architecture:
 
 ### Three Core Components
 
-**Meta-Prompts** (32 files in `pipeline/`) — One per pipeline step. Each is a compact declaration (30-80 lines) of what the step should accomplish: purpose, inputs, outputs, quality criteria, and methodology-scaling rules. They do NOT contain the actual prompt text the AI executes.
+**Meta-Prompts** (36 files in `pipeline/`) — One per pipeline step. Each is a compact declaration (30-80 lines) of what the step should accomplish: purpose, inputs, outputs, quality criteria, and methodology-scaling rules. They do NOT contain the actual prompt text the AI executes.
 
-**Knowledge Base** (32 files in `knowledge/`) — Domain expertise organized by topic. Contains what makes a good PRD, how to review an architecture document, what failure modes to check in API contracts, etc. Reusable across steps — multiple meta-prompts can reference the same knowledge entry.
+**Knowledge Base** (37 files in `knowledge/`) — Domain expertise organized by topic. Contains what makes a good PRD, how to review an architecture document, what failure modes to check in API contracts, etc. Reusable across steps — multiple meta-prompts can reference the same knowledge entry.
 
 **Methodology Configuration** (3 YAML preset files in `methodology/`) — Controls which pipeline steps are active and the depth level (1-5) for each. Three presets: Deep Domain Modeling (all steps, depth 5), MVP (minimal steps, depth 1), Custom (user picks steps and depth per step).
 
@@ -145,7 +145,7 @@ User invokes: scaffold run <step> [--instructions "..."]
 
 Get the user from idea to the point where AI agents can begin implementation with comprehensive context.
 
-### Complete Pipeline (35 steps)
+### Complete Pipeline (36 steps)
 
 #### Pre-Pipeline: Project Definition
 
@@ -248,7 +248,7 @@ The v1 pipeline includes project-setup steps that are not separate phases in the
 | | Deep Domain Modeling | MVP | Custom |
 |---|---|---|---|
 | **Who it's for** | Teams building complex/long-lived systems | Solo devs, hackathons, proofs of concept | Everyone else |
-| **Steps** | All 35 steps active | 6 steps only | User chooses |
+| **Steps** | All 36 steps active | 7 steps only | User chooses |
 | **Depth** | 5 (maximum) at every step | 1 (minimum) at every step | User sets per step (1-5) |
 | **Output volume** | Comprehensive docs, full analysis | Lean docs, just enough to start | Varies |
 
@@ -266,10 +266,11 @@ The v1 pipeline includes project-setup steps that are not separate phases in the
 
 **Enabled** (depth 1):
 - `create-prd`
+- `review-prd`
 - `user-stories`
 - `review-user-stories`
-- `implementation-tasks`
 - `testing-strategy`
+- `implementation-tasks`
 - `implementation-playbook`
 
 **Skipped**: All other steps (gap analysis, innovation, phases 1-6, all phase reviews, all validation, operations, security, developer onboarding, apply-fixes).
@@ -603,8 +604,8 @@ The assembled prompt is platform-neutral. The delivery adapter determines how it
 **2. Methodology selection** (interactive):
 ```
 ? Choose a methodology:
-  > Deep Domain Modeling -- Comprehensive, all 32 steps at depth 5
-    MVP -- Get to code fast, 4 steps at depth 1
+  > Deep Domain Modeling -- Comprehensive, all 36 steps at depth 5
+    MVP -- Get to code fast, 7 steps at depth 1
     Custom -- Pick your own steps and depth levels
 ```
 
@@ -708,8 +709,8 @@ Package structure:
 ```
 @scaffold-cli/scaffold/
   bin/scaffold             # CLI entry point
-  pipeline/                # Meta-prompts (32 files)
-  knowledge/               # Knowledge base (32 files)
+  pipeline/                # Meta-prompts (36 files)
+  knowledge/               # Knowledge base (37 files)
   methodology/             # Methodology presets (3 files)
   adapters/                # Platform adapter logic
   lib/                     # Shared utilities (assembly engine, state manager, etc.)
@@ -856,14 +857,14 @@ For full ADR text, see `docs/v2/adrs/`.
 
 ## 19. Risks
 
-1. **Knowledge base quality is critical.** The 32 knowledge base documents are the highest-effort, highest-value artifacts. The quality of the entire system depends on the domain expertise encoded in these files. They must be written with the same rigor as domain models — comprehensive expertise documents, not summaries or checklists.
+1. **Knowledge base quality is critical.** The 37 knowledge base documents are the highest-effort, highest-value artifacts. The quality of the entire system depends on the domain expertise encoded in these files. They must be written with the same rigor as domain models — comprehensive expertise documents, not summaries or checklists.
    - **Mitigation**: Extract content from existing `prompts.md` (which contains deep domain knowledge). Write knowledge base entries iteratively, testing output quality at each step.
 
 2. **Runtime prompt generation variability.** Different AI models or even different runs of the same model may produce different working prompts from the same assembled prompt. Output quality could vary.
    - **Mitigation**: Meta-prompt quality criteria and knowledge base expertise provide strong guardrails. The 7-section assembled prompt structure gives the AI sufficient scaffolding. Monitor output quality across runs and tighten quality criteria where variance is observed.
 
 3. **Complexity for first-time users.** v2 adds concepts (methodologies, depth levels, user instructions) that did not exist in v1.
-   - **Mitigation**: The default experience (`scaffold init`) is simpler than v1 — choose a methodology and go. MVP methodology gets users to implementation in 4 steps. Advanced features are opt-in.
+   - **Mitigation**: The default experience (`scaffold init`) is simpler than v1 — choose a methodology and go. MVP methodology gets users to implementation in 7 steps. Advanced features are opt-in.
 
 4. **Cross-platform prompt quality divergence.** Assembled prompts optimized for Claude Code's tool-use capabilities may work poorly when used with Codex.
    - **Mitigation**: Assembled prompts are platform-neutral. Test on both platforms. The knowledge base can encode platform-specific guidance when needed.
@@ -923,8 +924,8 @@ Build the core CLI and assembly engine. This is what we build next.
 
 ### Phase 3: Content
 
-- Write all 32 meta-prompt files (extracting structure from existing `prompts.md`)
-- Write all 32 knowledge base documents (extracting expertise from existing `prompts.md` and domain models)
+- Write all 36 meta-prompt files (extracting structure from existing `prompts.md`)
+- Write all 37 knowledge base documents (extracting expertise from existing `prompts.md` and domain models)
 - Test each step end-to-end on real projects
 - Write methodology authoring guide for future presets
 
@@ -939,6 +940,9 @@ scaffold/
       create-prd.md
       review-prd.md
       innovate-prd.md
+      user-stories.md
+      review-user-stories.md
+      innovate-user-stories.md
     modeling/
       domain-modeling.md
       review-domain-modeling.md
@@ -986,18 +990,22 @@ scaffold/
       database-design.md
       api-design.md
       ux-specification.md
+      user-stories.md
+      user-story-innovation.md
       task-decomposition.md
       testing-strategy.md
       operations-runbook.md
       security-review.md
     review/
       review-methodology.md
+      review-prd.md
       review-domain-modeling.md
       review-adr.md
       review-system-architecture.md
       review-database-schema.md
       review-api-contracts.md
       review-ux-spec.md
+      review-user-stories.md
       review-implementation-tasks.md
       review-testing-strategy.md
       review-operations.md
@@ -1012,6 +1020,7 @@ scaffold/
       scope-management.md
     product/
       prd-craft.md
+      prd-innovation.md
       gap-analysis.md
     finalization/
       developer-onboarding.md

@@ -1234,7 +1234,7 @@ This is the `implementation-plan` prompt's frontmatter — the most complex `rea
 Given a `docs/tech-stack.md` containing:
 
 ```markdown
-<!-- scaffold:tech-stack v1 2026-03-12 classic/strict-tdd/beads -->
+<!-- scaffold:tech-stack v1 2026-03-12 deep/strict-tdd/beads -->
 # Tech Stack
 
 ## Architecture Overview
@@ -1313,7 +1313,7 @@ The custom prompt adds `docs/approved-vendors.md` to its reads list while keepin
 
 ### Example 4: Extension Prompt Frontmatter
 
-A methodology extension prompt `methodologies/classic/extensions/security-audit.md`:
+A methodology extension prompt `methodologies/deep/extensions/security-audit.md`:
 
 ```yaml
 ---
@@ -1358,7 +1358,7 @@ artifact-schema:
 
 And a `docs/user-stories.md` artifact:
 ```markdown
-<!-- scaffold:user-stories v1 2026-03-12 classic/strict-tdd/beads -->
+<!-- scaffold:user-stories v1 2026-03-12 deep/strict-tdd/beads -->
 # User Stories
 
 ## User Personas

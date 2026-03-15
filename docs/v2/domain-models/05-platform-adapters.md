@@ -1312,7 +1312,7 @@ Extension prompts (`ext:` prefix in manifest) are prompts with no base equivalen
 - Capability checking applies to extensions.
 - Navigation generation includes extensions in the dependency graph (they have `depends-on` like any prompt).
 
-**The only visible difference**: Extensions may not appear in other methodologies. If a user switches from `classic` to `classic-lite`, extension prompts defined only in `classic` disappear. But the adapter is not responsible for this — prompt resolution (domain 01) handles inclusion/exclusion. By the time content reaches the adapter, all surviving prompts are equal.
+**The only visible difference**: Extensions may not appear in other methodologies. If a user switches from `deep` to `mvp`, extension prompts defined only in `deep` disappear. But the adapter is not responsible for this — prompt resolution (domain 01) handles inclusion/exclusion. By the time content reaches the adapter, all surviving prompts are equal.
 
 ---
 
@@ -1568,7 +1568,7 @@ Create docs/tech-stack.md...
 ```markdown
 # Scaffold Pipeline Reference
 
-**Methodology:** classic
+**Methodology:** deep
 
 ## Phase 2 — Project Foundation
 
@@ -1581,7 +1581,7 @@ Create docs/tech-stack.md...
 
 ### Example 4: Extension Prompt Through All Adapters
 
-**Input**: An extension prompt `ext:parallel-agent-checklist` that exists only in the `classic` methodology (no base equivalent).
+**Input**: An extension prompt `ext:parallel-agent-checklist` that exists only in the `deep` methodology (no base equivalent).
 
 ```typescript
 {

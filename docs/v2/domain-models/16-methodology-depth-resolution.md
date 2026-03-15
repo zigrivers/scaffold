@@ -38,7 +38,7 @@ The Methodology & Depth Resolution domain models the runtime resolution logic th
 
 **per-step depth override** — An explicit depth value (1-5) set for a specific step in the custom config block. Overrides both the preset default and the custom default depth.
 
-**resolved pipeline** — The complete set of effective step configurations for all 32 pipeline steps. The output of full pipeline resolution.
+**resolved pipeline** — The complete set of effective step configurations for all 36 pipeline steps. The output of full pipeline resolution.
 
 **step config** — The raw configuration for a single step from a methodology preset YAML file. Contains `enabled` (boolean) and optionally `conditional` (string). Does not contain depth — depth comes from `default_depth` or per-step override.
 
@@ -90,7 +90,7 @@ type EnablementProvenance =
  * Invariants:
  * - name matches one of the three built-in presets
  * - default_depth is in range [1, 5]
- * - steps map contains an entry for every pipeline step (32 entries)
+ * - steps map contains an entry for every pipeline step (36 entries)
  * - every step entry has an 'enabled' boolean field
  */
 interface MethodologyPreset {
@@ -233,7 +233,7 @@ interface StepEnablementResult {
  * The output of full pipeline resolution.
  *
  * Invariants:
- * - Contains exactly one entry per pipeline step (32 entries for the standard pipeline)
+ * - Contains exactly one entry per pipeline step (36 entries for the standard pipeline)
  * - Every step has a resolved depth and enablement status
  * - The ordered list matches the dependency-sorted order from domain 02
  */
@@ -487,7 +487,7 @@ Precedence chain:
 
 ### Algorithm 4: Full Pipeline Resolution
 
-Resolves the complete pipeline — all 32 steps' effective configurations.
+Resolves the complete pipeline — all 36 steps' effective configurations.
 
 ```
 function resolvePipeline(
@@ -543,7 +543,7 @@ function resolvePipeline(
   }
 ```
 
-Complexity: O(S) where S = number of pipeline steps (32). Each step requires constant-time lookups.
+Complexity: O(S) where S = number of pipeline steps (36). Each step requires constant-time lookups.
 
 ### Algorithm 5: Methodology Change Detection
 
@@ -729,12 +729,12 @@ Multiple CLI commands query this domain:
 ### 1. Custom methodology with no explicit step overrides
 
 **Scenario**: User selects `custom` methodology but provides no `custom.steps` block in config.yml.
-**Expected behavior**: All steps inherit from `custom-defaults.yml`. All 32 steps are enabled at depth 3 (the custom-defaults preset's default_depth). This is equivalent to the balanced preset.
+**Expected behavior**: All steps inherit from `custom-defaults.yml`. All 36 steps are enabled at depth 3 (the custom-defaults preset's default_depth). This is equivalent to the balanced preset.
 
 ### 2. Step not listed in custom config
 
 **Scenario**: config.yml has `custom.steps` but only lists 5 steps.
-**Expected behavior**: The 5 listed steps get their overrides applied. The remaining 27 steps inherit entirely from the preset (enabled status from `custom-defaults.yml`, depth from `custom.default_depth` or preset `default_depth`).
+**Expected behavior**: The 5 listed steps get their overrides applied. The remaining 31 steps inherit entirely from the preset (enabled status from `custom-defaults.yml`, depth from `custom.default_depth` or preset `default_depth`).
 
 ### 3. Depth override of 0
 
@@ -803,8 +803,8 @@ Multiple CLI commands query this domain:
 
 ### Boundary Conditions
 
-- All 32 steps enabled (deep preset)
-- Only 4 steps enabled (mvp preset)
+- All 36 steps enabled (deep preset)
+- Only 7 steps enabled (mvp preset)
 - All steps disabled via custom overrides (pathological but valid)
 - Depth 1 everywhere (mvp default)
 - Depth 5 everywhere (deep default)
@@ -849,7 +849,7 @@ Multiple CLI commands query this domain:
 Load preset: methodology/deep.yml
   - name: "Deep Domain Modeling"
   - default_depth: 5
-  - steps: all 32 steps enabled
+  - steps: all 36 steps enabled
 
 Resolve each step:
   create-prd:
@@ -875,12 +875,12 @@ Resolve each step:
     conditional: true (if-needed)
     conditionalResolved: false (not yet evaluated by init wizard)
 
-  ... (all 32 steps at depth 5, enabled)
+  ... (all 36 steps at depth 5, enabled)
 
 Result:
   methodology: "deep"
   effectiveDefaultDepth: 5
-  enabledCount: 32
+  enabledCount: 36
   disabledCount: 0
   conditionalCount: 6 (database-schema, review-database, api-contracts, review-api, ux-spec, review-ux)
 ```
@@ -955,7 +955,7 @@ custom:
 ```
 Load preset: methodology/custom-defaults.yml
   - default_depth: 3 (overridden by custom.default_depth: 3 — same value)
-  - steps: all 32 enabled
+  - steps: all 36 enabled
 
 Apply custom overrides:
 

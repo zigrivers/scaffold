@@ -26,7 +26,7 @@ Every produced artifact gets an **HTML comment on line 1** containing provenance
 
 Example:
 ```
-<!-- scaffold:tech-stack v1 2026-03-13 classic agent-mode:single/git-workflow:simple-push -->
+<!-- scaffold:tech-stack v1 2026-03-13 deep agent-mode:single/git-workflow:simple-push -->
 ```
 
 **Key design points**:

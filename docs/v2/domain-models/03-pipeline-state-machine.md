@@ -83,7 +83,7 @@ interface PipelineState {
   "scaffold-version": string;
 
   /**
-   * The methodology used for this pipeline (e.g., "classic", "classic-lite").
+   * The methodology used for this pipeline (e.g., "deep", "mvp").
    * Copied from config.yml at initialization time.
    * Immutable after creation — changing methodology requires `scaffold reset`.
    */
@@ -1200,7 +1200,7 @@ Detailed crash recovery flow (Algorithm 3 in Section 5):
 {
   "schema-version": 1,
   "scaffold-version": "2.0.0",
-  "methodology": "classic",
+  "methodology": "deep",
   "init-mode": "greenfield",
   "created": "2026-03-12T10:00:00Z",
   "in_progress": null,
@@ -1259,7 +1259,7 @@ Detailed crash recovery flow (Algorithm 3 in Section 5):
 $ scaffold run
 
 === Pipeline Status ===
-Methodology: classic (5/18 complete, 0 skipped)
+Methodology: deep (5/18 complete, 0 skipped)
 Last completed: tdd (2026-03-12T11:05:00Z)
 Next eligible: project-structure
 
@@ -1355,7 +1355,7 @@ Fresh project, no existing code. All prompts start as `pending`.
 {
   "schema-version": 1,
   "scaffold-version": "2.0.0",
-  "methodology": "classic",
+  "methodology": "deep",
   "init-mode": "greenfield",
   "created": "2026-03-12T10:00:00Z",
   "in_progress": null,
@@ -1457,7 +1457,7 @@ Existing codebase with some artifacts already in place. `scaffold adopt` scanned
 {
   "schema-version": 1,
   "scaffold-version": "2.0.0",
-  "methodology": "classic",
+  "methodology": "deep",
   "init-mode": "brownfield",
   "created": "2026-03-12T10:00:00Z",
   "in_progress": null,
@@ -1512,7 +1512,7 @@ Existing v1 project with `.beads/` and v1 docs but no `.scaffold/` directory. `s
 {
   "schema-version": 1,
   "scaffold-version": "2.0.0",
-  "methodology": "classic",
+  "methodology": "deep",
   "init-mode": "v1-migration",
   "created": "2026-03-12T10:00:00Z",
   "in_progress": null,
@@ -1789,7 +1789,7 @@ Multi-prompt concurrency would require:
 {
   "schema-version": 1,
   "scaffold-version": "2.0.0",
-  "methodology": "classic",
+  "methodology": "deep",
   "init-mode": "greenfield",
   "created": "2026-03-12T10:00:00Z",
   "in_progress": null,
@@ -1896,7 +1896,7 @@ Warning emitted: `PSM_SKIP_HAS_DEPENDENTS` — but in this case, `design-system`
 CLI output:
 ```
 === Pipeline Status ===
-Methodology: classic (4/18 complete, 1 skipped)
+Methodology: deep (4/18 complete, 1 skipped)
 Last completed: tech-stack (2026-03-12T10:55:00Z)
 
 === Crash Recovery ===
@@ -1963,7 +1963,7 @@ State after recovery:
 **CLI output:**
 ```
 === Pipeline Status ===
-Methodology: classic (5/18 complete, 1 skipped)
+Methodology: deep (5/18 complete, 1 skipped)
 
 ⚠ Warning [PSM_STATE_WITHOUT_ARTIFACTS]:
   Prompt 'tech-stack' is marked completed but 1 artifact(s) are missing:
