@@ -30,6 +30,8 @@
    - 3.15 [Tracking Comments](#315-tracking-comments)
    - 3.16 [CLAUDE.md Ownership Markers](#316-claudemd-ownership-markers)
    - 3.17 [User Cancellation](#317-user-cancellation)
+   - 3.18 [Methodology Preset Loader](#318-methodology-preset-loader)
+   - 3.19 [Knowledge Base](#319-knowledge-base)
 4. [Warning Message Patterns](#section-4-warning-message-patterns)
    - 4.1 [Incompatible Combination Warnings](#41-incompatible-combination-warnings)
    - 4.2 [Adopt Warnings](#42-adopt-warnings)
@@ -1858,6 +1860,31 @@ The architecture error registry (system-architecture.md Section 7c) uses compone
   The dependency will be ignored.
 ```
 
+#### RESET_CONFIRM_REQUIRED
+
+**Severity**: Error
+**Exit code**: 1
+**Component**: State Manager / Reset Command (Domain 03)
+**Trigger**: `scaffold reset` invoked with `--auto` but without `--confirm-reset`
+
+**Template**:
+```
+✗ Reset is destructive and cannot be undone. Use "--auto --confirm-reset" to confirm, or run interactively.
+
+  In auto mode, reset requires explicit confirmation via the --confirm-reset flag.
+  This prevents accidental pipeline resets in automated scripts.
+```
+
+**Variables**: none
+
+**Example**:
+```
+✗ Reset is destructive and cannot be undone. Use "--auto --confirm-reset" to confirm, or run interactively.
+
+  In auto mode, reset requires explicit confirmation via the --confirm-reset flag.
+  This prevents accidental pipeline resets in automated scripts.
+```
+
 ---
 
 ### 3.9 Lock Manager
@@ -3492,6 +3519,29 @@ Adoption cancelled. No files were modified.
   The section will not be updated by any prompt.
 ```
 
+#### CMD_SECTION_OVER_BUDGET
+
+**Severity**: Warning
+**Exit code**: 0
+**Component**: CLAUDE.md Manager (Domain 10)
+**Trigger**: A managed CLAUDE.md section exceeds its token budget
+
+**Template**:
+```
+⚠ CLAUDE.md section "{section}" owned by "{owner}" is {actual} tokens (budget: {budget}). Total scaffold budget: {totalActual}/{totalBudget} tokens.
+
+  Consider condensing the section content. Run 'scaffold validate' to see all budget violations.
+```
+
+**Variables**: `{section}` — section heading, `{owner}` — step slug that owns the section, `{actual}` — actual token count, `{budget}` — per-section budget, `{totalActual}` — total tokens across all scaffold sections, `{totalBudget}` — total scaffold token budget
+
+**Example**:
+```
+⚠ CLAUDE.md section "Pipeline Status" owned by "create-prd" is 350 tokens (budget: 300). Total scaffold budget: 2100/2000 tokens.
+
+  Consider condensing the section content. Run 'scaffold validate' to see all budget violations.
+```
+
 ---
 
 ### 3.17 User Cancellation
@@ -3532,6 +3582,239 @@ Wizard cancelled — no files were created.
 **Example**:
 ```
 Wizard cancelled — no files were created.
+```
+
+---
+
+### 3.18 Methodology Preset Loader
+
+#### PRESET_MISSING
+
+**Severity**: Error
+**Exit code**: 1
+**Component**: Methodology Preset Loader (Domain 16)
+**Trigger**: Methodology preset file not found when resolving methodology
+
+**Template**:
+```
+✗ Methodology preset file not found: methodology/{name}.yml
+
+  Check that the preset name matches an installed methodology.
+  Available presets: deep, mvp, custom-defaults
+```
+
+**Variables**: `{name}` — methodology name from config
+
+**Example**:
+```
+✗ Methodology preset file not found: methodology/agile.yml
+
+  Check that the preset name matches an installed methodology.
+  Available presets: deep, mvp, custom-defaults
+```
+
+---
+
+#### PRESET_PARSE_ERROR
+
+**Severity**: Error
+**Exit code**: 1
+**Component**: Methodology Preset Loader (Domain 16)
+**Trigger**: YAML syntax error in methodology preset file
+
+**Template**:
+```
+✗ Methodology preset methodology/{name}.yml has invalid YAML: {parseError}
+
+  Fix the YAML syntax error in the preset file.
+```
+
+**Variables**: `{name}` — methodology name, `{parseError}` — YAML parser error message
+
+**Example**:
+```
+✗ Methodology preset methodology/deep.yml has invalid YAML: unexpected end of the stream (12:1)
+
+  Fix the YAML syntax error in the preset file.
+```
+
+---
+
+#### PRESET_INVALID_STEP
+
+**Severity**: Error
+**Exit code**: 1
+**Component**: Methodology Preset Loader (Domain 16)
+**Trigger**: Preset references a step name that does not exist in the pipeline/ directory
+
+**Template**:
+```
+✗ Preset "{preset}" references step "{step}" which does not exist in the pipeline.
+
+  {suggestion}
+  Remove the unknown step from methodology/{preset}.yml or create pipeline/{step}.md.
+```
+
+**Variables**: `{preset}` — preset name, `{step}` — invalid step name, `{suggestion}` — fuzzy match suggestion or empty string
+
+**Example**:
+```
+✗ Preset "deep" references step "create-pdr" which does not exist in the pipeline.
+
+  Did you mean 'create-prd'?
+  Remove the unknown step from methodology/deep.yml or create pipeline/create-pdr.md.
+```
+
+---
+
+#### PRESET_MISSING_STEP
+
+**Severity**: Warning
+**Exit code**: 0
+**Component**: Methodology Preset Loader (Domain 16)
+**Trigger**: A meta-prompt exists in pipeline/ but is not listed in the preset's steps map
+
+**Template**:
+```
+⚠ Meta-prompt "{step}" exists in pipeline/ but is not listed in preset "{preset}". It will use the preset's default_depth.
+
+  Add an explicit entry to methodology/{preset}.yml to control this step's enablement and depth.
+```
+
+**Variables**: `{step}` — meta-prompt name not in preset, `{preset}` — preset name
+
+**Example**:
+```
+⚠ Meta-prompt "phase-11-accessibility" exists in pipeline/ but is not listed in preset "deep". It will use the preset's default_depth.
+
+  Add an explicit entry to methodology/deep.yml to control this step's enablement and depth.
+```
+
+---
+
+### 3.19 Knowledge Base
+
+#### KB_NAME_MISSING
+
+**Severity**: Error
+**Exit code**: 1
+**Component**: Knowledge Loader (Domain 15)
+**Trigger**: Knowledge base entry file is missing required `name` field in frontmatter
+
+**Template**:
+```
+✗ Knowledge base entry {file} is missing required "name" field.
+
+  Add a 'name' field (kebab-case) to the YAML frontmatter.
+```
+
+**Variables**: `{file}` — file path of the KB entry
+
+**Example**:
+```
+✗ Knowledge base entry knowledge/core/system-architecture.md is missing required "name" field.
+
+  Add a 'name' field (kebab-case) to the YAML frontmatter.
+```
+
+---
+
+#### KB_NAME_INVALID
+
+**Severity**: Error
+**Exit code**: 1
+**Component**: Knowledge Loader (Domain 15)
+**Trigger**: Knowledge base entry `name` field is not valid kebab-case or does not match filename stem
+
+**Template**:
+```
+✗ Knowledge base entry {file} name "{value}" is not valid kebab-case.
+
+  Name must match pattern ^[a-z][a-z0-9-]*$ and match the filename stem.
+```
+
+**Variables**: `{file}` — file path, `{value}` — invalid name value
+
+**Example**:
+```
+✗ Knowledge base entry knowledge/core/System-Architecture.md name "System-Architecture" is not valid kebab-case.
+
+  Name must match pattern ^[a-z][a-z0-9-]*$ and match the filename stem.
+```
+
+---
+
+#### KB_DESCRIPTION_MISSING
+
+**Severity**: Error
+**Exit code**: 1
+**Component**: Knowledge Loader (Domain 15)
+**Trigger**: Knowledge base entry file is missing required `description` field in frontmatter
+
+**Template**:
+```
+✗ Knowledge base entry {file} is missing required "description" field.
+
+  Add a 'description' field (max 200 characters) to the YAML frontmatter.
+```
+
+**Variables**: `{file}` — file path
+
+**Example**:
+```
+✗ Knowledge base entry knowledge/core/api-design.md is missing required "description" field.
+
+  Add a 'description' field (max 200 characters) to the YAML frontmatter.
+```
+
+---
+
+#### KB_TOPICS_EMPTY
+
+**Severity**: Error
+**Exit code**: 1
+**Component**: Knowledge Loader (Domain 15)
+**Trigger**: Knowledge base entry `topics` field is missing or empty array
+
+**Template**:
+```
+✗ Knowledge base entry {file} must have at least one topic.
+
+  Add a 'topics' array with at least one topic label to the YAML frontmatter.
+```
+
+**Variables**: `{file}` — file path
+
+**Example**:
+```
+✗ Knowledge base entry knowledge/review/review-methodology.md must have at least one topic.
+
+  Add a 'topics' array with at least one topic label to the YAML frontmatter.
+```
+
+---
+
+#### KB_UNKNOWN_FIELD
+
+**Severity**: Warning
+**Exit code**: 0
+**Component**: Knowledge Loader (Domain 15)
+**Trigger**: Unrecognized field in knowledge base entry frontmatter
+
+**Template**:
+```
+⚠ Unknown field "{field}" in knowledge base entry {file}.
+
+  Known fields: name, description, topics
+```
+
+**Variables**: `{field}` — unrecognized field name, `{file}` — file path
+
+**Example**:
+```
+⚠ Unknown field "author" in knowledge base entry knowledge/core/domain-modeling.md.
+
+  Known fields: name, description, topics
 ```
 
 ---
