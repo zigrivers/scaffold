@@ -13,34 +13,38 @@ The assembly engine instructs the AI to record architectural decisions in `decis
 
 ## Decision
 
-AI writes directly to `decisions.jsonl` using file tools.
+The CLI's Decision Logger component writes decisions to `decisions.jsonl` as part of post-completion processing:
 
-The assembled prompt's execution instruction section tells the AI the JSONL format (per ADR-013) and the file path. The AI appends decision entries using its native file tools (Claude Code's `Write`/`Edit`, Codex's sandbox `fs`, etc.). The CLI's decision logger (T-009) reads and queries the file but does not write to it during prompt execution.
+1. During AI execution, the AI identifies key decisions and includes them in the step's output artifact (e.g., "Decision: Using PostgreSQL for primary storage" within the generated document).
+2. After the user confirms step completion, the CLI extracts decision entries from the assembled prompt's execution context and appends them to `decisions.jsonl` via the Decision Logger component.
+3. The CLI assigns sequential D-NNN IDs atomically, validates schema compliance, and handles append-only writes with crash safety (entries < 4KB for POSIX atomic write).
+
+This is consistent with the architecture's post-completion flow (system-architecture.md §4b step 9) and the Decision Logger component specification (domain 11).
 
 ## Rationale
 
-Direct file writes keep the assembly engine simple — it doesn't need to parse AI output or extract structured blocks. The assembled prompt already instructs the AI on the `decisions.jsonl` format (ADR-013), so the AI has the schema at execution time. AI tools across all supported platforms (Claude Code, Codex, Universal) can write files directly. This approach is consistent with how the AI writes other artifacts (documents, code) and avoids introducing a new communication channel between the AI and CLI.
+The CLI-mediated approach provides guarantees that direct AI writing cannot: atomic sequential ID assignment (no collisions across agents), schema validation before write, crash-safe append semantics, and consistent `prompt_completed` status tracking. The AI's role is to produce decisions in artifact content; the CLI's role is to record them in the structured log. This keeps the decision recording pipeline consistent with the architecture's post-completion flow, where the Decision Logger writes alongside state updates and CLAUDE.md fills.
 
 ## Alternatives Considered
 
-1. **CLI parses AI output for structured decisions block** — Requires the CLI to parse free-form AI output for a known delimiter or JSON block. Couples the CLI to the AI's output format, which is inherently non-deterministic. Fragile — formatting changes or AI model updates could break extraction.
-2. **AI outputs decisions in a known format; CLI extracts and persists post-execution** — Similar to Option B but with a more explicit contract (e.g., a fenced code block tagged `decisions`). Still requires output parsing and introduces a two-phase write (AI outputs, CLI persists). Adds latency and a failure mode if the CLI crashes between extraction and persistence.
+1. **AI writes directly to `decisions.jsonl` using file tools** — The AI appends JSONL entries directly using its native file tools (Claude Code's `Write`/`Edit`, Codex's sandbox `fs`, etc.). Simple for the assembly engine (no output parsing), but risks ID collisions when multiple agents write simultaneously, bypasses schema validation, and creates a split responsibility where the CLI reads and validates a file it doesn't control. Inconsistent with the architecture's post-completion flow where the Decision Logger is a CLI component.
+2. **CLI parses AI output for structured decisions block** — Requires the CLI to parse free-form AI output for a known delimiter or JSON block. Couples the CLI to the AI's output format, which is inherently non-deterministic. Fragile — formatting changes or AI model updates could break extraction.
 3. **AI calls a scaffold CLI subcommand** (`scaffold decisions add "..."`) — Requires the AI to shell out mid-execution, which is fragile across platforms. Codex sandboxes may not allow subprocess execution. Adds a CLI subcommand that exists solely for AI-to-CLI communication, not for human use.
 
 ## Consequences
 
 ### Positive
 
-- Simple assembly engine — no output parsing, no structured block extraction
-- Consistent with existing artifact writing pattern (AI writes files, CLI reads them)
-- Format is self-documenting — ADR-013's JSONL schema is the contract
-- Works across all platform adapters (file writes are universally supported)
+- Atomic sequential ID assignment — no collisions across concurrent agents
+- Schema validation at write time — malformed entries are rejected before persistence
+- Consistent with post-completion flow — Decision Logger writes alongside state updates
+- Crash-safe append semantics — entries < 4KB for POSIX atomic write guarantees
 
 ### Negative
 
-- AI must correctly produce valid JSONL (format errors possible)
-- No CLI-side validation at write time — malformed entries are detected on read
-- Potential for concurrent write conflicts if multiple AI sessions write simultaneously (mitigated by advisory locking, ADR-019)
+- CLI must extract decisions from artifact content — requires a parsing/extraction step during post-completion
+- AI must include decisions in a recognizable format within artifacts for the CLI to extract
+- Slightly more complex post-completion flow (extraction + validation + write)
 
 ## Reversibility
 
@@ -48,10 +52,12 @@ Easily reversible. Switching to CLI-mediated writing (Options B/C/D) would requi
 
 ## Constraints and Compliance
 
-- The assembly engine's execution instruction section (ADR-045, section 7) MUST instruct the AI on the `decisions.jsonl` path, format, and append-only semantics
-- The AI MUST append entries (not overwrite) to preserve existing decisions
-- The decision logger (T-009) MUST validate JSONL format on read and emit warnings for malformed entries
-- Platform adapters (ADR-022) MUST include file-write capability instructions appropriate to each platform
+- The assembly engine's execution instruction section (ADR-045, section 7) MUST instruct the AI to include key decisions in its output artifact content
+- The Decision Logger (T-009) MUST extract decision entries from artifact content during post-completion processing
+- The Decision Logger MUST assign sequential D-NNN IDs atomically (no gaps, no collisions)
+- The Decision Logger MUST validate entries against the JSONL schema (ADR-013) before writing
+- The Decision Logger MUST use append-only writes to preserve existing decisions
+- Platform adapters (ADR-022) do NOT need file-write capability for decisions — the CLI handles all writes
 
 ## Related Decisions
 
