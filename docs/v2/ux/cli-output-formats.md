@@ -815,7 +815,7 @@ Run: scaffold status to see the full pipeline.
   ✗ [CONFIG_INVALID_METHODOLOGY] Unknown methodology 'deap'. Did you mean 'deep'?
   ⚠ [CONFIG_UNKNOWN_FIELD] Unknown field "extra_settings" (possible typo, or from a newer scaffold version)
 
-pipeline/create-prd.md
+pipeline/pre/create-prd.md
   ✗ [FRONTMATTER_PRODUCES_MISSING] Required 'produces' field absent
 
 .scaffold/state.json
@@ -868,7 +868,7 @@ Validation with auto-fix (`--fix`):
 [Validator:config] Checking depth: 5 (valid range 1-5)
 [Validator:pipeline] Loading pipeline definition: 32 steps
 [Validator:pipeline] Dependency cycle check: 29 nodes, 42 edges, no cycles
-[Validator:frontmatter] Checking pipeline/create-prd.md... pass
+[Validator:frontmatter] Checking pipeline/pre/create-prd.md... pass
 [Validator:artifacts] Checking docs/plan.md against create-prd artifact schema... pass
 [Validator:state] Checking slug consistency: 32 state entries, 32 pipeline prompts, 0 orphaned
 [Validator:state] Checking completed step depths: 8 completed, all depths within range (V19 pass)

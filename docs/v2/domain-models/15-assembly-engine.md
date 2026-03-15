@@ -1081,7 +1081,7 @@ Domain 16 resolves the effective depth level for the current step. The assembly 
 
 ```
 Assembly sequence:
-1. Load meta-prompt: pipeline/create-prd.md
+1. Load meta-prompt: pipeline/pre/create-prd.md
    - dependencies: [] (none)
    - outputs: ["docs/prd.md"]
    - knowledge-base: ["core/product-requirements"]
@@ -1132,7 +1132,7 @@ Assembly sequence:
 
 ```
 Assembly sequence:
-1. Load meta-prompt: pipeline/create-prd.md
+1. Load meta-prompt: pipeline/pre/create-prd.md
 
 2. Check prerequisites:
    - Step status: completed (at depth 1)

@@ -1341,7 +1341,7 @@ T-052 (e2e tests) is the weakest at 3/5 — the AI execution boundary in tests i
    - Suggested fix: Align all filenames with manifest-yml-schema.md §8.1
 
 3. **[AMBIGUITY]** — apply-fixes-and-freeze step name not in manifest
-   - What the spec says: Task creates `pipeline/apply-fixes-and-freeze.md`; manifest example shows `apply-fixes-and-freeze` in step list
+   - What the spec says: Task creates `pipeline/finalization/apply-fixes-and-freeze.md`; manifest example shows `apply-fixes-and-freeze` in step list
    - What the implementer needs: Confirmation this name is in the manifest — it appears to be
    - Impact: None if confirmed
    - Suggested fix: Verify against canonical step list

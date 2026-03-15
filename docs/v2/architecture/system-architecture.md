@@ -482,7 +482,7 @@ Meta-prompt markdown bodies use level-2 headings (`##`) to delimit sections. The
 
 Sections not matching these headings are treated as additional body content and included verbatim in the assembled prompt.
 
-**Complete meta-prompt example** (`pipeline/create-prd.md`):
+**Complete meta-prompt example** (`pipeline/pre/create-prd.md`):
 
 ```yaml
 ---

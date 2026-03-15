@@ -605,7 +605,7 @@ The assembly engine and its dependencies. Tasks T-011 through T-016 can run in p
 **Description**: Load and parse a single meta-prompt file from `pipeline/<step>.md`. Uses the frontmatter parser (T-004) to extract structured metadata. The meta-prompt loader parses the markdown body by identifying level-2 headings (`## Purpose`, `## Inputs`, `## Expected Outputs`, `## Quality Criteria`, `## Methodology Scaling`, `## Mode Detection`) per the meta-prompt body convention in system-architecture.md §4a-1. Returns a `MetaPromptFile` object (matching Domain 15's interface) with `stepName: string`, `frontmatter: MetaPromptFrontmatter`, `body: string` (raw body), and `sections: Record<string, string>` (heading → content map for identified sections). Unrecognized headings are included in `body` but not in `sections`. Validates that the meta-prompt includes methodology scaling section with depth 1 and depth 5 specifics. Returns a `MetaPrompt` object containing both frontmatter and structured body sections. Scans `pipeline/` directory to discover all available meta-prompts. Validates that meta-prompt names match filenames (stem must equal `name` field).
 
 **Acceptance Criteria**:
-- [ ] Loads `pipeline/create-prd.md` and returns MetaPrompt object
+- [ ] Loads `pipeline/pre/create-prd.md` and returns MetaPrompt object
 - [ ] MetaPrompt contains frontmatter (name, phase, dependencies, outputs, knowledge-base) and body sections
 - [ ] `discoverMetaPrompts()` scans pipeline/ and returns list of all available meta-prompts
 - [ ] Validates that filename stem matches frontmatter `name` field
@@ -1517,9 +1517,9 @@ Content tasks — meta-prompts, knowledge base files, and methodology presets. T
 **Enables**: T-052
 
 **Files**:
-- Create: `pipeline/create-prd.md`
-- Create: `pipeline/review-prd.md`
-- Create: `pipeline/innovate-prd.md`
+- Create: `pipeline/pre/create-prd.md`
+- Create: `pipeline/pre/review-prd.md`
+- Create: `pipeline/pre/innovate-prd.md`
 - Create: `pipeline/phase-01-domain-modeling.md`
 - Create: `pipeline/phase-02-adrs.md`
 
@@ -1572,9 +1572,9 @@ Content tasks — meta-prompts, knowledge base files, and methodology presets. T
 - Create: `pipeline/phase-08-testing-strategy.md`
 - Create: `pipeline/phase-09-operations.md`
 - Create: `pipeline/phase-10-security.md`
-- Create: `pipeline/developer-onboarding-guide.md`
-- Create: `pipeline/implementation-playbook.md`
-- Create: `pipeline/apply-fixes-and-freeze.md`
+- Create: `pipeline/finalization/developer-onboarding-guide.md`
+- Create: `pipeline/finalization/implementation-playbook.md`
+- Create: `pipeline/finalization/apply-fixes-and-freeze.md`
 
 **Description**: Author 7 meta-prompts for implementation planning, testing, operations, security, onboarding, and finalization phases. Phase-09 and phase-10 may be conditional. Implementation-playbook is one of the 4 MVP-enabled steps. Apply-fixes-and-freeze is the final validation/finalization step. Each references appropriate KB entries. Filenames and corresponding frontmatter `name` fields must match manifest-yml-schema.md §8.1 step names.
 

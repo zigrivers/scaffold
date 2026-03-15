@@ -341,7 +341,7 @@ None — this journey is fully specified across all artifacts.
 - **Error path:** PSM_ALREADY_IN_PROGRESS (exit 3) if another step in progress — found
 - **Connection to next:** State set → assemble prompt — verified
 
-#### Step 10: Load meta-prompt from `pipeline/create-prd.md`
+#### Step 10: Load meta-prompt from `pipeline/pre/create-prd.md`
 - **CLI:** Internal to `scaffold run` — found
 - **Component:** Assembly Engine → Meta-Prompt Loader — found in system-architecture.md §4b
 - **State:** N/A
