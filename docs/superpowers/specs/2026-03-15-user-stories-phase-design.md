@@ -83,20 +83,37 @@ name: innovate-user-stories
 description: Discover UX-level enhancements and innovation opportunities in user stories
 phase: "pre"
 dependencies: [review-user-stories]
-outputs: [docs/user-stories.md]
+outputs: [docs/user-stories-innovation.md]
 conditional: "if-needed"
-knowledge-base: [user-stories, gap-analysis]
+knowledge-base: [user-stories, user-story-innovation]
 ```
+
+The innovation step produces `docs/user-stories-innovation.md` (findings and suggestions) as its tracked output, and modifies `docs/user-stories.md` as a side effect when enhancements are approved. This avoids a completion detection conflict — since the creation step also outputs `docs/user-stories.md`, using a distinct tracked output ensures the pipeline state machine can distinguish "innovation ran" from "creation ran." This follows the same pattern as `prd-gap-analysis`, which outputs `docs/prd-gap-analysis.md` while also updating `docs/prd.md`.
+
+**Mode Detection per step:**
+- **user-stories**: If `docs/user-stories.md` exists, operate in update mode — read existing stories, identify changes needed based on updated PRD, categorize as ADD/RESTRUCTURE/PRESERVE, get approval before modifying.
+- **review-user-stories**: If `docs/reviews/pre-review-user-stories.md` exists, this is a re-review — read previous findings, check which were addressed, run review passes again on updated stories.
+- **innovate-user-stories**: If `docs/user-stories-innovation.md` exists, this is a re-innovation pass — read previous suggestions and their disposition (accepted/rejected), focus on new opportunities from story changes since last run.
 
 ### Phase 1 Dependency Update
 
-`phase-01-domain-modeling` changes its dependencies from `[create-prd]` to `[review-user-stories]`. This ensures domain modeling waits for stories to be finalized. When innovation is enabled, the dependency chain naturally resolves (innovation depends on review, domain modeling depends on review — innovation runs between them when active).
+`phase-01-domain-modeling` changes its dependencies from `[create-prd]` to `[innovate-user-stories]`. When innovation is disabled, the dependency resolver skips it and falls back to the next satisfied dependency in the chain (`review-user-stories` → `user-stories` → `create-prd`). This ensures domain modeling always waits for the latest completed story step.
+
+**Note on ordering guarantee:** Because Phase 1 depends on `innovate-user-stories` (which depends on `review-user-stories`), Kahn's algorithm guarantees innovation runs before domain modeling when enabled. When disabled, the skip mechanism resolves to `review-user-stories`.
+
+### Always-On Enforcement
+
+`user-stories` and `review-user-stories` are **non-disableable** — methodology validation rejects configs that set `enabled: false` for these steps. This prevents Custom users from accidentally breaking the Phase 1 dependency chain. The innovation step remains disableable.
+
+**Late enablement note:** If a user enables innovation after domain modeling has already run, the enhanced stories will not automatically cascade to re-run domain modeling (per ADR-034: rerun-no-cascade). The user must manually re-run Phase 1 to pick up innovation enhancements. The CLI should surface a warning when innovation modifies stories that downstream phases have already consumed.
 
 ---
 
 ## 3. Depth Scaling (1-5)
 
 Depth scales the *detail per story*, not the *number of stories*. Even at depth 1, every PRD feature must have at least one story — coverage is non-negotiable. What changes is how thoroughly each story is specified.
+
+### Creation Depth
 
 | Depth | Name | Stories | Acceptance Criteria | Additional |
 |-------|------|---------|-------------------|------------|
@@ -105,6 +122,17 @@ Depth scales the *detail per story*, not the *number of stories*. Even at depth 
 | **3** | Balanced | Full story template: ID, title, story statement, priority. Persona definitions with goals and context. Epic structure mirrors PRD sections. | Given/When/Then format. 3-5 scenarios per story covering happy path, key error cases, and edge cases. | Scope boundaries, data/state requirements, cross-story dependencies noted. |
 | **4** | Thorough | Everything in 3, plus story dependency mapping and explicit traceability back to PRD requirement IDs. | Full Given/When/Then with parameterized examples. Negative scenarios. State preconditions explicit. | UI/UX notes per story. Story splitting rationale documented. |
 | **5** | Deep ceiling | Everything in 4, plus persona journey maps across story sequences. Cross-story interaction analysis. | Exhaustive scenarios including concurrency, permissions boundaries, data migration edge cases. | Cross-story dependency graph. Acceptance criteria directly map to test cases. Story-to-domain-event mapping for Phase 1 consumption. |
+
+### Review Depth
+
+Review passes scale with depth. All depths run Pass 1 (PRD Coverage) — coverage is non-negotiable.
+
+| Depth | Passes | Focus |
+|-------|--------|-------|
+| **1** | Pass 1 only | Blocking coverage gaps — PRD features with no story |
+| **2** | Passes 1-2 | Add acceptance criteria quality check |
+| **3** | Passes 1-4 | Add story independence and persona coverage |
+| **4-5** | All 6 passes | Full multi-pass review including sizing and downstream readiness |
 
 ---
 
@@ -197,7 +225,7 @@ Creation + review added at depth 1. Innovation skipped. Pipeline grows from 4 to
 create-prd → user-stories → review-user-stories → phase-07-tasks → phase-08-testing → implementation-playbook
 ```
 
-`prd-gap-analysis` remains skipped in MVP. Stories at depth 1 are lightweight enough that a gap analysis on the PRD first isn't necessary.
+`prd-gap-analysis` remains skipped in MVP. Stories at depth 1 are lightweight enough that a gap analysis on the PRD first isn't necessary. Note: Phase 7 depends on `[phase-03-system-architecture]` which is disabled in MVP — the existing dependency resolver already handles skipping disabled dependencies, so no special handling is needed for the new steps.
 
 ### Custom
 
@@ -277,4 +305,6 @@ custom:
 | 14 | Update critical-path-walkthrough validation | `pipeline/validation/critical-path-walkthrough.md` |
 | 15 | Update scope-creep-check validation | `pipeline/validation/scope-creep-check.md` |
 | 16 | Update v2 PRD (pipeline table, folding table, MVP steps, step counts) | `docs/v2/scaffold-v2-prd.md` |
-| 17 | Update methodology preset files | `methodology/deep.yml`, `methodology/mvp.yml`, `methodology/custom.yml` |
+| 17 | Update methodology preset files | `methodology/deep.yml`, `methodology/mvp.yml`, `methodology/custom-defaults.yml` |
+| 18 | Update manifest schema (step count constraint, step name table) | `docs/v2/data/manifest-yml-schema.md` |
+| 19 | Update frontmatter schema (valid step names cross-reference) | `docs/v2/data/frontmatter-schema.md` |
