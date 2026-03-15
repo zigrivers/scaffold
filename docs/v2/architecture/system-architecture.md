@@ -466,6 +466,70 @@ flowchart TD
 
 **Build is deterministic and idempotent.** Given identical `config.yml` and meta-prompt files, `scaffold build` always produces identical wrapper output. It regenerates everything from scratch — there is no incremental build. The full build is fast (metadata extraction + text generation, not prompt assembly) and completes well under the 500ms performance target ([ADR-001](../adrs/ADR-001-cli-implementation-language.md)).
 
+### Section 4a-1: Meta-Prompt Body Convention
+
+Meta-prompt markdown bodies use level-2 headings (`##`) to delimit sections. The Assembly Engine's meta-prompt loader identifies sections by these exact headings:
+
+| Heading                | Required | Purpose                                                                         |
+|------------------------|----------|---------------------------------------------------------------------------------|
+| ## Purpose             | Yes      | One-paragraph statement of what this step accomplishes                          |
+| ## Inputs              | Yes      | What artifacts/context this step consumes                                       |
+| ## Expected Outputs    | Yes      | What artifacts this step produces and their structure                           |
+| ## Quality Criteria    | Yes      | How to evaluate the output — specific, measurable checks                        |
+| ## Methodology Scaling | Yes      | How output changes across depth 1-5; must include depth 1 and depth 5 specifics |
+| ## Mode Detection      | Yes      | Create vs update behavior per ADR-048                                           |
+
+Sections not matching these headings are treated as additional body content and included verbatim in the assembled prompt.
+
+**Complete meta-prompt example** (`pipeline/create-prd.md`):
+
+```yaml
+---
+name: create-prd
+description: Create a product requirements document from a project idea
+phase: "1"
+dependencies: []
+outputs:
+  - docs/prd.md
+knowledge-base:
+  - prd-craft
+---
+```
+
+```markdown
+## Purpose
+
+Define the product's vision, scope, user personas, and requirements in a structured PRD that serves as the foundation for all downstream architecture and implementation decisions.
+
+## Inputs
+
+- Project idea (from user or `scaffold init` idea argument)
+- Config: methodology, platforms, project metadata
+
+## Expected Outputs
+
+- `docs/prd.md` — Structured PRD with sections: Vision, Problem Statement, User Personas, Functional Requirements, Non-Functional Requirements, Success Metrics, Out of Scope, Open Questions
+
+## Quality Criteria
+
+- Every functional requirement is testable (has a verification method)
+- User personas include goals, pain points, and technical proficiency
+- Non-functional requirements have measurable targets (latency < 200ms, not "fast")
+- Out of Scope section explicitly lists 3+ excluded features to prevent scope creep
+
+## Methodology Scaling
+
+- **Depth 1**: Vision + 5-10 bullet-point requirements + 1 persona. Fits on one page.
+- **Depth 5**: Full PRD with 3+ personas, 20+ requirements organized by domain, acceptance criteria per requirement, competitive analysis, risk assessment.
+
+## Mode Detection
+
+- **Create mode** (no existing `docs/prd.md`): Generate PRD from scratch using project idea and config.
+- **Update mode** (existing `docs/prd.md`): Review existing PRD, identify gaps, and produce an updated version preserving prior decisions. Include diff summary of changes.
+```
+
+Note: meta-prompts declare **intent** (what to accomplish), not **prompt instructions** (how to do it). The assembly engine wraps intent declarations with system framing, knowledge base content, project context, and execution instructions at runtime.
+
 ---
 
 ### Section 4b: Pipeline Execution (`scaffold run`)
@@ -572,6 +636,33 @@ In `--auto` mode, "all present" is auto-completed, "none present" triggers a re-
 **The agent execution boundary.** Scaffold's responsibility ends at outputting prompt content and begins again at recording completion. The "Agent executes prompt" step in the diagram represents work that happens **outside scaffold entirely** — in a Claude Code session, a Codex run, or a human copy-pasting from a universal prompt. Scaffold has no visibility into what happens during execution. It sets `in_progress` before outputting the prompt and expects to record completion when the agent finishes. If the process crashes during agent execution, the `in_progress` record persists, triggering crash recovery on the next resume.
 
 **Lock lifecycle.** The lock is acquired before any state mutation and released after all post-completion writes (state update, decision log, CLAUDE.md fill). This ensures that concurrent `scaffold run` invocations from different worktrees or terminals cannot corrupt shared state. The lock file is gitignored — it's local-only and never committed ([ADR-019](../adrs/ADR-019-advisory-locking.md)). `--auto` does not imply `--force` ([ADR-036](../adrs/ADR-036-auto-does-not-imply-force.md)): an active lock in `--auto` mode produces exit code 3 (lock contention), never silently overrides.
+
+### Section 4b-1: Assembled Prompt Boilerplate
+
+The assembly engine uses these templates for the system framing and execution instruction sections. Placeholders in `{curly braces}` are filled at runtime.
+
+**Section 1 — System Framing:**
+
+```
+You are an expert software architect and engineer working on {project_name}.
+This project uses the {methodology} methodology at depth {depth} (scale 1-5).
+Pipeline progress: {completed_count}/{total_count} steps completed.
+Your task is to execute the "{step_name}" step of the scaffold pipeline.
+Follow the Quality Criteria and Methodology Scaling guidance in the meta-prompt section below.
+```
+
+**Section 7 — Execution Instruction:**
+
+```
+Execute the task described in the Meta-Prompt section above.
+- Produce all artifacts listed in Expected Outputs, matching the structure described.
+- Follow the Quality Criteria — every criterion must be satisfied.
+- Respect depth {depth}: consult the Methodology Scaling section for depth-specific guidance.
+- Record significant decisions with rationale (these will be logged to decisions.jsonl).
+- When complete, signal that you have finished producing all outputs.
+```
+
+These templates are short by design — the meta-prompt body and knowledge base entries carry the domain expertise. The boilerplate provides structural framing only.
 
 ---
 

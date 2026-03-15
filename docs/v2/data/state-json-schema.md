@@ -285,6 +285,8 @@ JSON Schema draft 2020-12 for `.scaffold/state.json`.
 }
 ```
 
+> **Note on schema-version:** The state file schema version is `1` (the initial version for v2). This is distinct from the config.yml `version: 2` field. State schema version increments only when the state file structure has breaking changes. Task descriptions referencing `schema_version: 2` should read `schema-version: 1`.
+
 ---
 
 ## Section 3: Field Reference
