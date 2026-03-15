@@ -1,4 +1,4 @@
-<!-- scaffold:testing-strategy v3 2026-03-14 -->
+<!-- scaffold:testing-strategy v4 2026-03-14 -->
 
 # Scaffold v2 — Testing & Quality Strategy
 
@@ -94,24 +94,23 @@ src/
     errors.ts              → errors.test.ts
   config/
     loader.ts              → loader.test.ts
-    validator.ts           → validator.test.ts
     migration.ts           → migration.test.ts
+  validation/
+    config-validator.ts    → config-validator.test.ts
+  project/
+    frontmatter.ts         → frontmatter.test.ts
   state/
-    manager.ts             → manager.test.ts
+    state-manager.ts       → state-manager.test.ts
     completion.ts          → completion.test.ts
+    lock-manager.ts        → lock-manager.test.ts
+    decision-logger.ts     → decision-logger.test.ts
   core/
-    frontmatter/
-      parser.ts            → parser.test.ts
     dependency/
-      resolver.ts          → resolver.test.ts
-    depth/
-      resolver.ts          → resolver.test.ts
+      dependency.ts        → dependency.test.ts
     assembly/
       engine.ts            → engine.test.ts
-    lock/
-      manager.ts           → manager.test.ts
-    decisions/
-      logger.ts            → logger.test.ts
+      depth-resolver.ts    → depth-resolver.test.ts
+      preset-loader.ts     → preset-loader.test.ts
   cli/
     commands/
       init.ts              → init.test.ts
@@ -176,7 +175,7 @@ Pattern: `describe('<ModuleName>')` → `describe('<methodName>()')` → `it('<v
 
 ### 4a. Data Layer (T-004 through T-010)
 
-**Frontmatter Parser** (`src/core/frontmatter/parser.ts`):
+**Frontmatter Parser** (`src/project/frontmatter.ts`):
 - Test against fixture `.md` files in `tests/fixtures/frontmatter/`
 - Valid: all required fields, optional fields present, knowledge-base array
 - Invalid: missing `name`, non-kebab-case name, missing `outputs`, unclosed `---` delimiter
@@ -191,7 +190,7 @@ Pattern: `describe('<ModuleName>')` → `describe('<methodName>()')` → `it('<v
 - Verify migration: v1 config → v2 config (removes `mixins`, changes `methodology` to enum, sets `version: 2`)
 - **Mock boundary**: Mock `fs.readFile` to return fixture content; do not hit real filesystem
 
-**State Manager** (`src/state/manager.ts`):
+**State Manager** (`src/state/state-manager.ts`):
 - Test CRUD operations against temp files (use `createTestProject()`)
 - Verify atomic write pattern: write to `.tmp`, then `fs.rename()`
 - Verify `.tmp` file does not persist after successful write
@@ -205,7 +204,7 @@ Pattern: `describe('<ModuleName>')` → `describe('<methodName>()')` → `it('<v
   - Zero-byte artifact present → `confirmed_complete` with `PSM_ZERO_BYTE_ARTIFACT` warning (file existence is the check, not file size)
 - **Mock boundary**: Use real filesystem via temp directories; mock nothing
 
-**Decision Logger** (`src/core/decisions/logger.ts`):
+**Decision Logger** (`src/state/decision-logger.ts`):
 - Test append-only semantics: new entry appended, existing entries untouched
 - Verify JSONL line format: each entry is valid JSON, newline-terminated
 - Verify ID generation: sequential `D-NNN`, monotonically increasing
@@ -213,7 +212,7 @@ Pattern: `describe('<ModuleName>')` → `describe('<methodName>()')` → `it('<v
 - Test concurrent writes: verify line-level atomicity (< 4KB per line)
 - **Mock boundary**: Use real filesystem via temp directories
 
-**Lock Manager** (`src/core/lock/manager.ts`):
+**Lock Manager** (`src/state/lock-manager.ts`):
 - Test exclusive create: `{ flag: 'wx' }` fails with `EEXIST` if lock exists
 - Test PID liveness check: live PID → lock is held; dead PID → stale
 - Test stale detection: `process.kill(pid, 0)` throws `ESRCH` → auto-clear
@@ -222,7 +221,7 @@ Pattern: `describe('<ModuleName>')` → `describe('<methodName>()')` → `it('<v
 - **Platform-specific PID timestamp retrieval**: `processStartedAt` is obtained via platform-specific methods (macOS: `ps -o lstart=`, Linux: `/proc/PID/stat` field 22, fallback: `new Date().toISOString()`). Mock the platform detection layer (e.g., `getPlatform()` or `os.platform()`) — not `child_process.exec` directly — so unit tests exercise each platform branch independently. Provide fixtures for each platform's raw output format: a `ps -o lstart=` sample string, a `/proc/PID/stat` content string with field 22 populated, and a fallback path that returns an ISO timestamp.
 - **Mock boundary**: Mock `process.kill()` for PID checks; mock `os.hostname()` for holder field; mock platform detection for `processStartedAt` branches; use real filesystem via temp directories
 
-**Methodology Preset Loader** (`src/core/methodology/preset-loader.ts`):
+**Methodology Preset Loader** (`src/core/assembly/preset-loader.ts`):
 - Test against fixture preset YAML files in `tests/fixtures/presets/`
 - Fixtures: `deep.yml` (all 32 steps enabled, `default_depth: 5`), `mvp.yml` (4 steps enabled, `default_depth: 1`), `custom-defaults.yml` (all steps enabled, `default_depth: 3`)
 - Verify step name validation: all step names in preset must match meta-prompt names → `PRESET_INVALID_STEP` on mismatch
@@ -233,7 +232,7 @@ Pattern: `describe('<ModuleName>')` → `describe('<methodName>()')` → `it('<v
 
 ### 4b. Core Engine (T-011 through T-018)
 
-**Dependency Resolver** (`src/core/dependency/resolver.ts`):
+**Dependency Resolver** (`src/core/dependency/dependency.ts`):
 - Test with hand-crafted dependency graphs:
   - Linear chain: A → B → C
   - Diamond: A → B, A → C, B → D, C → D
@@ -244,7 +243,7 @@ Pattern: `describe('<ModuleName>')` → `describe('<methodName>()')` → `it('<v
 - Verify topological sort produces valid ordering
 - **Mock boundary**: None — pure algorithm, in-memory graph
 
-**Depth Resolver** (`src/core/depth/resolver.ts`):
+**Depth Resolver** (`src/core/assembly/depth-resolver.ts`):
 - Test 4-level precedence chain:
   1. CLI flag `--depth 3` (highest priority)
   2. `config.yml` `custom.steps.<step>.depth: 4`
@@ -265,7 +264,7 @@ Pattern: `describe('<ModuleName>')` → `describe('<methodName>()')` → `it('<v
 - **Mock boundary**: Mock filesystem reads for meta-prompts, knowledge base, instructions, artifacts
 
 **Methodology Change Detection**:
-- Test: `state.methodology === 'deep'`, `config.methodology === 'mvp'` → warning emitted
+- Test: `state.config_methodology === 'deep'`, `config.methodology === 'mvp'` → warning emitted
 - Test: completed steps preserved, orphaned steps preserved, new steps added as `pending`
 - **Mock boundary**: None — pure comparison logic
 
@@ -446,15 +445,15 @@ function createTestState(
   overrides?: Partial<PipelineState>,
   completedSteps?: string[]
 ): PipelineState {
-  const steps: Record<string, PromptStateEntry> = {};
+  const prompts: Record<string, PromptStateEntry> = {};
   for (const step of completedSteps ?? []) {
-    steps[step] = { status: 'completed', completed_at: new Date().toISOString() };
+    prompts[step] = { status: 'completed', completed_at: new Date().toISOString() };
   }
   return {
-    schema_version: 1,
-    methodology: 'deep',
+    schema_version: 2,
+    config_methodology: 'deep',
     in_progress: null,
-    steps,
+    prompts,
     ...overrides,
   };
 }
@@ -846,7 +845,7 @@ Report p50/p95/p99 for each benchmark. Run against realistic fixture data (32 me
 |-------------|:------------:|-----------|
 | Core engine (`src/core/`) | ≥ 90% | Assembly correctness is critical; depth/methodology resolution must handle all precedence paths |
 | State management (`src/state/`) | ≥ 90% | Crash recovery, atomic writes, dual detection must cover all paths |
-| Data layer (`src/config/`, `src/core/frontmatter/`) | ≥ 90% | Schema validation, migration, fuzzy matching — all branches matter |
+| Data layer (`src/config/`, `src/project/`, `src/validation/`) | ≥ 90% | Schema validation, migration, fuzzy matching — all branches matter |
 | CLI commands (`src/cli/commands/`) | ≥ 80% | Handler orchestration; error paths tested via exit codes |
 | CLI output (`src/cli/output/`) | ≥ 80% | Three modes must all work; formatting edge cases |
 | Platform adapters (`src/core/adapters/`) | ≥ 70% | Thin wrappers; determinism tested via snapshots |
