@@ -58,6 +58,8 @@ JSON Schema draft 2020-12 for `.scaffold/state.json`.
     "schema-version",
     "scaffold-version",
     "methodology",
+    "init_methodology",
+    "config_methodology",
     "init-mode",
     "created",
     "in_progress",
@@ -83,6 +85,16 @@ JSON Schema draft 2020-12 for `.scaffold/state.json`.
       "pattern": "^[a-z][a-z0-9-]*$",
       "description": "The methodology active when this state file was initialized. Copied from config.yml at init time. If config.yml methodology changes later, completed steps are preserved, orphaned entries are kept (not deleted), and pending steps are re-resolved against the new methodology (ADR-049). The methodology field in state.json records the original init-time value; config.yml is the source of truth for the current methodology.",
       "examples": ["deep", "mvp", "custom"]
+    },
+    "init_methodology": {
+      "type": "string",
+      "enum": ["deep", "mvp", "custom"],
+      "description": "Methodology selected at scaffold init time. Set once during initialization, never updated. Used with config_methodology to detect methodology changes (ADR-054)."
+    },
+    "config_methodology": {
+      "type": "string",
+      "enum": ["deep", "mvp", "custom"],
+      "description": "Current methodology from config.yml, copied into state on every scaffold run invocation. Compared against init_methodology to detect methodology changes (ADR-054)."
     },
     "init-mode": {
       "type": "string",
@@ -284,6 +296,8 @@ JSON Schema draft 2020-12 for `.scaffold/state.json`.
 | `schema-version` | `integer` | Yes | — | Must equal `1` | Schema version for compatibility gating. CLI refuses to operate on mismatched versions. | State Manager (version check on load) |
 | `scaffold-version` | `string` | Yes | — | Semver format (`N.N.N`). Pattern permits leading zeros; scaffold versions never use them. | CLI version that created the file. Informational only. | Debugging, `scaffold status` display |
 | `methodology` | `string` | Yes | — | kebab-case (`[a-z][a-z0-9-]*`) | Methodology name at init time. Records the original choice; `config.yml` is the source of truth for the *current* methodology ([ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md)). | State Manager (methodology change detection), Dashboard Generator |
+| `init_methodology` | `string` | Yes | — | One of: `deep`, `mvp`, `custom` | Methodology selected at `scaffold init` time. Set once during initialization, never updated. Used with `config_methodology` to detect methodology changes ([ADR-054](../adrs/ADR-054-state-methodology-tracking.md)). | Methodology Resolver (change detection) |
+| `config_methodology` | `string` | Yes | — | One of: `deep`, `mvp`, `custom` | Current methodology from `config.yml`, copied into state on every `scaffold run` invocation. Compared against `init_methodology` to detect methodology changes ([ADR-054](../adrs/ADR-054-state-methodology-tracking.md)). | Methodology Resolver (change detection), `scaffold status` |
 | `init-mode` | `string` | Yes | — | One of: `greenfield`, `brownfield`, `v1-migration` | How state was initialized. Recorded for auditability. | `scaffold status` display, Dashboard Generator |
 | `created` | `string` | Yes | — | ISO 8601 date-time | When state.json was first created. | `scaffold status` display |
 | `in_progress` | `InProgressRecord \| null` | Yes | `null` | At most one; see InProgressRecord | Currently executing prompt or `null`. Non-null triggers crash recovery on resume. | State Manager (crash detection), `scaffold status` |
@@ -375,6 +389,10 @@ A schema change is **non-breaking** if:
 3. **Migration is idempotent**: Running migration on an already-migrated file produces no changes.
 4. **Backup before migration**: The CLI writes a backup to `.scaffold/state.json.v{old}.bak` before performing migration.
 5. **schema-version bump**: Migration updates `schema-version` to the new value. `scaffold-version` is updated to the current CLI version.
+
+### Migration note: `init_methodology` and `config_methodology`
+
+Existing state files created before the introduction of `init_methodology` and `config_methodology` ([ADR-054](../adrs/ADR-054-state-methodology-tracking.md)) will not contain these fields. During migration, both fields should default to the value of the existing `methodology` field. This preserves the assumption that no methodology change has occurred for pre-existing state files.
 
 ### Forward compatibility (ADR-033)
 

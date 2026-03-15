@@ -403,8 +403,9 @@ scaffold adopt --force
 4. **Update mode** ([ADR-048](../adrs/ADR-048-update-mode-diff-over-regeneration.md)): If the step is already `completed`, the assembled prompt includes existing artifacts as additional context, and the meta-prompt's Mode Detection section instructs the AI to diff and propose targeted updates rather than regenerating from scratch.
 5. **Methodology change check** ([ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md)): If the methodology has changed since the last step was executed, emits a warning listing completed steps that were executed under the previous methodology. Pending steps are resolved under the new methodology; completed steps are preserved as-is.
 6. **Execution**: Sets `in_progress` in state.json, outputs assembled prompt content to stdout for agent consumption.
-7. **Post-completion**: Marks `completed` with depth level recorded, clears `in_progress`, appends decisions to `decisions.jsonl`, fills CLAUDE.md section if applicable, releases lock.
-8. **Downstream warning** (for re-runs on completed steps): Emits warning listing all downstream steps that may be stale, with suggested `scaffold run <slug>` commands ([ADR-034](../adrs/ADR-034-rerun-no-cascade.md)).
+7. **Completion gate**: After outputting the assembled prompt, scaffold blocks and waits for the agent to finish. In interactive mode, scaffold presents a completion confirmation: `"Step '<step>' complete? [Y/n/skip]"`. Answering `Y` (default) triggers post-completion processing. Answering `n` returns to the prompt output (re-display for copy-paste). Answering `skip` marks the step as skipped. In `--auto` mode, scaffold exits immediately after outputting the prompt (exit 0) — the step remains `in_progress`. On the next `scaffold run` invocation, crash recovery ([ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md)) detects the `in_progress` record and checks artifacts to determine completion. This makes crash recovery the primary completion mechanism in `--auto` mode.
+8. **Post-completion**: Marks `completed` with depth level recorded, clears `in_progress`, appends decisions to `decisions.jsonl`, fills CLAUDE.md section if applicable, releases lock.
+9. **Downstream warning** (for re-runs on completed steps): Emits warning listing all downstream steps that may be stale, with suggested `scaffold run <slug>` commands ([ADR-034](../adrs/ADR-034-rerun-no-cascade.md)).
 
 Steps execute sequentially — at most one step at a time ([ADR-021](../adrs/ADR-021-sequential-prompt-execution.md)). Even in `--auto` mode, the user must have initiated `scaffold run`; the CLI does not self-invoke.
 
@@ -417,6 +418,7 @@ Steps execute sequentially — at most one step at a time ([ADR-021](../adrs/ADR
   - Partial artifacts → re-run (safer default) with warning.
 - Missing prerequisites → exit 2 (`DEPENDENCY_UNMET`); does not proceed. Auto mode does not automatically execute prerequisite steps. Missing prerequisites produce exit 2 (`DEPENDENCY_UNMET`). This is the safe default for unattended operation per [ADR-021](../adrs/ADR-021-sequential-prompt-execution.md).
 - Already-completed step → proceeds without confirmation (update mode).
+- Completion gate → exits immediately after prompt output. Step remains `in_progress`. Next invocation triggers crash recovery for artifact-based completion detection.
 
 **Success output**:
 
