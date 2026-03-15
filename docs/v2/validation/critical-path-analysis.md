@@ -12,8 +12,8 @@
 |---------|-------------|-----------|---------------|------------|
 | 1. Fresh project initialization | 12 | 0 | 0 | Complete |
 | 2. Full pipeline execution | 8 | 2 | 1 | Mostly Complete |
-| 3. Single step execution | 17 | 3 | 1 | Needs Work |
-| 4. MVP-to-Deep upgrade | 9 | 3 | 1 | Needs Work |
+| 3. Single step execution | 17 | 3 | 1 | Complete |
+| 4. MVP-to-Deep upgrade | 9 | 3 | 1 | Complete |
 | 5. Multi-agent parallel execution | 8 | 1 | 0 | Mostly Complete |
 | 6. Brownfield adoption | 10 | 1 | 0 | Mostly Complete |
 | 7. Step re-run with update mode | 8 | 1 | 0 | Mostly Complete |
@@ -1127,28 +1127,28 @@ The specification should explicitly state which mechanism is used.
 
 ## Gap Inventory
 
-| # | Gap | Journey(s) | Type | Severity | Has Task? | Recommendation |
-|---|-----|-----------|------|----------|-----------|----------------|
-| G-001 | AI execution lifecycle: completion handoff mechanism between "prompt outputted" and "mark completed" is not explicitly specified | J2, J3, J8 | Underspecified behavior | Critical | Partially (T-008, T-029) | Explicitly document the completion mechanism in system-architecture.md §4b and cli-contract.md. If scaffold blocks for confirmation, add the interactive prompt to the run flow. If crash recovery is the primary path, document it as such. |
-| G-002 | `reads` field marked "Removed" in frontmatter-schema.md but re-introduced by ADR-050 and ADR-053 (both accepted) | J4 | Missing state transition | Major | No | Add `reads` field to frontmatter-schema.md §2 formal schema as optional `string[]`. Update §1 disposition table. Add validation rules in §7. |
-| G-003 | `init_methodology` field missing from state-json-schema.md despite ADR-054 (accepted) establishing dual methodology tracking | J4 | Missing state transition | Critical | No | Add `init_methodology` field to state-json-schema.md §2 formal schema. Set by `scaffold init`, never updated. Migration: default to `config_methodology` value. |
-| G-004 | Decision recording interface contradicts: ADR-052 says AI writes directly, architecture §4b and cli-contract.md show CLI Decision Logger writing post-completion | J2, J3 | Broken connection | Major | T-009 (CLI side) | Reconcile. Recommend updating ADR-052 to match CLI-writes approach (ensures atomic ID assignment, schema validation, crash safety). |
-| G-005 | `--depth` flag missing from CLI contract for `scaffold run` but referenced in architecture §10b and task T-029 | J3 | Missing endpoint/command | Major | T-012, T-029 | Add `--depth <1-5>` to scaffold run command-specific flags in cli-contract.md. |
-| G-006 | No scaffold command for worktree setup or multi-agent step coordination | J5 | Missing endpoint/command | Major | No | Document manual worktree setup pattern. Consider `scaffold worktree setup` for v2.1. Acceptable limitation for v2.0. |
-| G-007 | No batch/pipeline execution mode for CI; CI must script `next → run` loop | J9 | Missing endpoint/command | Minor | No | Document the loop pattern. Consider `scaffold run --all` for v2.1. |
-| G-008 | Depth downgrade confirmation (ADR-051) not in CLI contract interactive behavior for scaffold run | J4 | Missing error path | Major | T-012, T-029 | Add depth downgrade confirmation to cli-contract.md scaffold run interactive behavior section. |
-| G-009 | `scaffold adopt` config creation behavior ambiguous — "Requires project: No" but also errors on CONFIG_NOT_FOUND | J6 | Underspecified behavior | Minor | T-035 | Clarify in cli-contract.md whether adopt requires existing config or creates one. |
-| G-010 | User instruction "override" vs "concatenate" semantics slightly ambiguous across ADR-047, architecture, and task breakdown | J7, J10 | Underspecified behavior | Minor | T-016 | Add clarification note to ADR-047: all layers included with provenance, "override" means semantic priority for the AI. |
-| G-011 | System-architecture.md §12a traceability matrix still shows ADR-050 through ADR-054 as "proposed" despite all being accepted | — | Underspecified behavior | Minor | No | Update §12a status column for ADR-050-054 from "proposed" to "current". |
-| G-012 | Error-messages.md references removed mixin-related codes (FIELD_INVALID_MIXIN_AXIS, FIELD_INVALID_MIXIN_VALUE) with only "Removed" notes, and some RESOLUTION_* codes reference Domain 01 which is superseded | — | Underspecified behavior | Minor | No | Remove or clearly mark as superseded. Consistent with ADR-041 cleanup. |
+| # | Gap | Journey(s) | Type | Severity | Has Task? | Recommendation | Status |
+|---|-----|-----------|------|----------|-----------|----------------|--------|
+| G-001 | AI execution lifecycle: completion handoff mechanism between "prompt outputted" and "mark completed" is not explicitly specified | J2, J3, J8 | Underspecified behavior | Critical | Partially (T-008, T-029) | Explicitly document the completion mechanism in system-architecture.md §4b and cli-contract.md. | **Resolved** |
+| G-002 | `reads` field marked "Removed" in frontmatter-schema.md but re-introduced by ADR-050 and ADR-053 (both accepted) | J4 | Missing state transition | Major | No | Add `reads` field to frontmatter-schema.md §2 formal schema as optional `string[]`. Update §1 disposition table. Add validation rules in §7. | **Resolved** |
+| G-003 | `init_methodology` field missing from state-json-schema.md despite ADR-054 (accepted) establishing dual methodology tracking | J4 | Missing state transition | Critical | No | Add `init_methodology` field to state-json-schema.md §2 formal schema. Set by `scaffold init`, never updated. Migration: default to `config_methodology` value. | **Resolved** |
+| G-004 | Decision recording interface contradicts: ADR-052 says AI writes directly, architecture §4b and cli-contract.md show CLI Decision Logger writing post-completion | J2, J3 | Broken connection | Major | T-009 (CLI side) | Reconcile. Recommend updating ADR-052 to match CLI-writes approach (ensures atomic ID assignment, schema validation, crash safety). | **Resolved** |
+| G-005 | `--depth` flag missing from CLI contract for `scaffold run` but referenced in architecture §10b and task T-029 | J3 | Missing endpoint/command | Major | T-012, T-029 | Add `--depth <1-5>` to scaffold run command-specific flags in cli-contract.md. | **Resolved** |
+| G-006 | No scaffold command for worktree setup or multi-agent step coordination | J5 | Missing endpoint/command | Major | No | Document manual worktree setup pattern. Consider `scaffold worktree setup` for v2.1. Acceptable limitation for v2.0. | **Resolved** |
+| G-007 | No batch/pipeline execution mode for CI; CI must script `next → run` loop | J9 | Missing endpoint/command | Minor | No | Document the loop pattern. Consider `scaffold run --all` for v2.1. | **Resolved** |
+| G-008 | Depth downgrade confirmation (ADR-051) not in CLI contract interactive behavior for scaffold run | J4 | Missing error path | Major | T-012, T-029 | Add depth downgrade confirmation to cli-contract.md scaffold run interactive behavior section. | **Resolved** |
+| G-009 | `scaffold adopt` config creation behavior ambiguous — "Requires project: No" but also errors on CONFIG_NOT_FOUND | J6 | Underspecified behavior | Minor | T-035 | Clarify in cli-contract.md whether adopt requires existing config or creates one. | **Resolved** |
+| G-010 | User instruction "override" vs "concatenate" semantics slightly ambiguous across ADR-047, architecture, and task breakdown | J7, J10 | Underspecified behavior | Minor | T-016 | Add clarification note to ADR-047: all layers included with provenance, "override" means semantic priority for the AI. | **Resolved** |
+| G-011 | System-architecture.md §12a traceability matrix still shows ADR-050 through ADR-054 as "proposed" despite all being accepted | — | Underspecified behavior | Minor | No | Update §12a status column for ADR-050-054 from "proposed" to "current". | **Resolved** |
+| G-012 | Error-messages.md references removed mixin-related codes (FIELD_INVALID_MIXIN_AXIS, FIELD_INVALID_MIXIN_VALUE) with only "Removed" notes, and some RESOLUTION_* codes reference Domain 01 which is superseded | — | Underspecified behavior | Minor | No | Remove or clearly mark as superseded. Consistent with ADR-041 cleanup. | **Resolved** |
 
 ### Gap Statistics
 - Total gaps: 12
 - Critical: 2 (G-001 completion lifecycle, G-003 init_methodology)
 - Major: 5 (G-002 reads field, G-004 decision recording, G-005 --depth flag, G-006 multi-agent, G-008 depth downgrade)
 - Minor: 5 (G-007 batch mode, G-009 adopt config, G-010 instruction semantics, G-011 traceability matrix, G-012 stale error codes)
-- Gaps with existing tasks: 6 / 12 (G-001 partial, G-004 partial, G-005, G-008, G-009, G-010)
-- Gaps needing new tasks: 4 (G-002, G-003, G-006, G-011/G-012 as doc cleanup)
+- **Resolved: 12 / 12** — all gaps addressed by spec edits
+- Gaps needing new tasks: 0
 
 ---
 
@@ -1182,11 +1182,21 @@ The specification should explicitly state which mechanism is used.
 
 11. **G-011, G-012 — Update stale documentation references.** Update traceability matrix status and clean up removed mixin error code references. These can be bundled into a documentation cleanup task.
 
-### New Tasks Needed
+### Resolution Record
 
-| Gap | Suggested Task | Phase |
-|-----|---------------|-------|
-| G-001 | Update system-architecture.md §4b and cli-contract.md scaffold run to explicitly specify the completion handoff mechanism (blocking confirmation prompt, auto-mode behavior, and connection to crash recovery as backup) | Pre-implementation (Phase 0) |
-| G-002 | Add `reads` field to frontmatter-schema.md formal schema, validation rules, and update disposition table per ADR-050/053 | Phase 4 (data schemas) |
-| G-003 | Add `init_methodology` field to state-json-schema.md formal schema, field reference, and migration section per ADR-054 | Phase 4 (data schemas) |
-| G-011/G-012 | Documentation cleanup: update traceability matrix ADR-050-054 status, clean up removed mixin error code references in error-messages.md | Phase 6 (content) |
+All 12 gaps were resolved by direct spec edits (no new implementation tasks needed):
+
+| Gap | Resolution | Commit |
+|-----|-----------|--------|
+| G-001 | Added completion gate to cli-contract.md scaffold run and system-architecture.md §4b | `[BD-scaffold-v2] docs(v2): specify completion handoff and add init_methodology to state schema` |
+| G-002 | Re-introduced `reads` field to frontmatter-schema.md (disposition table, formal schema, field reference, validation rules, examples) | `[BD-scaffold-v2] docs(v2): add reads field, --depth flag, and depth downgrade to specs` |
+| G-003 | Added `init_methodology` and `config_methodology` to state-json-schema.md (formal schema, field reference, migration note) | `[BD-scaffold-v2] docs(v2): specify completion handoff and add init_methodology to state schema` |
+| G-004 | Rewrote ADR-052 to match CLI-mediated decision recording (Decision, Rationale, Alternatives, Consequences, Constraints) | `[BD-scaffold-v2] docs(v2): reconcile ADR-052 decision recording with CLI-writes approach` |
+| G-005 | Added `--depth <1-5>` flag and `depth_source` to cli-contract.md scaffold run | `[BD-scaffold-v2] docs(v2): add reads field, --depth flag, and depth downgrade to specs` |
+| G-006 | Added multi-agent worktree setup pattern to cli-contract.md §2b | `[BD-scaffold-v2] docs(v2): document operational patterns and resolve minor spec gaps` |
+| G-007 | Added CI/CD pipeline loop pattern to cli-contract.md §2b | `[BD-scaffold-v2] docs(v2): document operational patterns and resolve minor spec gaps` |
+| G-008 | Added depth downgrade check to cli-contract.md scaffold run interactive behavior and auto mode | `[BD-scaffold-v2] docs(v2): add reads field, --depth flag, and depth downgrade to specs` |
+| G-009 | Clarified scaffold adopt requires config.yml (Partial project requirement) | `[BD-scaffold-v2] docs(v2): document operational patterns and resolve minor spec gaps` |
+| G-010 | Added semantics note to ADR-047 (override = priority, not deletion) | `[BD-scaffold-v2] docs(v2): document operational patterns and resolve minor spec gaps` |
+| G-011 | Updated system-architecture.md §12a — ADR-050-054 status from proposed to current | `[BD-scaffold-v2] docs(v2): document operational patterns and resolve minor spec gaps` |
+| G-012 | Added supersession note to error-messages.md §3.5 (Domain 01 → Domain 15) | `[BD-scaffold-v2] docs(v2): document operational patterns and resolve minor spec gaps` |
