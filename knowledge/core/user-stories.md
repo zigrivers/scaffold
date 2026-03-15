@@ -296,7 +296,7 @@ Some stories must be implemented before others. Document these explicitly.
 Only blocked-by dependencies should be formal constraints. Informed-by relationships are noted but don't block.
 
 **How dependencies feed into task decomposition:**
-- Story dependencies become task dependencies in Phase 7
+- Story dependencies become task dependencies in the implementation tasks step
 - Chains of 3+ dependent stories should be reviewed — long chains limit parallelization
 - If many stories depend on the same story, that story is on the critical path and should be prioritized
 

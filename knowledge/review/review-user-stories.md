@@ -20,7 +20,7 @@ Every PRD feature, flow, and requirement has at least one corresponding user sto
 
 ### Why This Matters
 
-Missing stories mean missing implementation tasks downstream. A PRD feature with no story will not appear in the task breakdown, will not be implemented, and will be discovered only during validation or user testing. Coverage gaps are the highest-severity story failure because they propagate silently through the entire pipeline.
+Missing stories mean missing implementation tasks downstream. A PRD feature with no story will not appear in the implementation tasks, will not be implemented, and will be discovered only during validation or user testing. Coverage gaps are the highest-severity story failure because they propagate silently through the entire pipeline.
 
 ### How to Check
 
@@ -151,11 +151,11 @@ Oversized stories produce oversized tasks that exceed an agent's context window 
 
 ### What to Check
 
-Phase 1 (domain modeling) can consume these stories productively. Entities, events, and aggregate boundaries should be discoverable from story acceptance criteria without guesswork.
+The domain modeling step can consume these stories productively. Entities, events, and aggregate boundaries should be discoverable from story acceptance criteria without guesswork.
 
 ### Why This Matters
 
-Stories are the primary input to domain discovery in Phase 1. If acceptance criteria are written at too high a level (no mention of data entities, no state transitions, no business rules), domain modeling has to infer the domain model from vague descriptions. This produces weaker domain models and increases the chance of misalignment between stories and architecture.
+Stories are the primary input to domain discovery in the domain modeling step. If acceptance criteria are written at too high a level (no mention of data entities, no state transitions, no business rules), domain modeling has to infer the domain model from vague descriptions. This produces weaker domain models and increases the chance of misalignment between stories and architecture.
 
 ### How to Check
 

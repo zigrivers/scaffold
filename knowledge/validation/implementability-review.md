@@ -148,7 +148,7 @@ If these patterns are not in the specification, each agent will invent their own
 
 ### Role-Play Method
 
-For each task in the implementation plan:
+For each task in the implementation tasks document:
 
 1. **Read only what the task says to read.** Do not bring in knowledge from other tasks or general experience. The agent will only have what it is told to read.
 2. **Attempt to write pseudocode.** Try to outline the implementation based solely on the specification.

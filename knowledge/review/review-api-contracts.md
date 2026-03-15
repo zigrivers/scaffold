@@ -206,7 +206,7 @@ Unpaginated list endpoints return unbounded result sets. In development this wor
 
 ### What to Check
 
-UX specification (Phase 6) and implementation tasks (Phase 7) can proceed with these API contracts. The API provides everything needed to build frontend interactions and define backend tasks.
+The UX spec and implementation tasks steps can proceed with these API contracts. The API provides everything needed to build frontend interactions and define backend tasks.
 
 ### Why This Matters
 
@@ -214,13 +214,13 @@ The UX spec needs to know what data is available from the API to design screens.
 
 ### How to Check
 
-Phase 6 (UX Spec) needs:
+The UX spec step needs:
 1. Every user-facing action has a corresponding API endpoint
 2. Response shapes are detailed enough to design screen layouts (know what fields are available)
 3. Error responses are documented enough to design error states
 4. Loading states are inferable: which operations are fast (synchronous) vs. slow (async with polling)?
 
-Phase 7 (Implementation Tasks) needs:
+The implementation tasks step needs:
 1. Endpoint complexity is visible: which endpoints are simple CRUD, which require complex business logic?
 2. Dependencies between endpoints are clear: which endpoints must be built first?
 3. Integration points with external services are specified

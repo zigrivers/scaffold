@@ -110,7 +110,7 @@ The following JSON Schema describes the structure of a parsed methodology preset
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `enabled` | `boolean` | Yes | -- | Whether this step is active in the pipeline. |
-| `conditional` | `string` | No | (absent) | When `"if-needed"`, step is evaluated based on project signals during `scaffold init`. Only applicable to phases 4, 5, 6 and their review steps. |
+| `conditional` | `string` | No | (absent) | When `"if-needed"`, step is evaluated based on project signals during `scaffold init`. Applicable to innovate steps (innovate-prd, innovate-user-stories) and specification steps (database-schema, api-contracts, ux-spec) and their review steps. |
 
 ---
 
@@ -276,6 +276,9 @@ steps:
   create-prd: { enabled: true }
   review-prd: { enabled: true }
   innovate-prd: { enabled: true, conditional: "if-needed" }
+  user-stories: { enabled: true }
+  review-user-stories: { enabled: true }
+  innovate-user-stories: { enabled: true, conditional: "if-needed" }
   domain-modeling: { enabled: true }
   review-domain-modeling: { enabled: true }
   adrs: { enabled: true }
@@ -320,8 +323,11 @@ default_depth: 1
 
 steps:
   create-prd: { enabled: true }
-  review-prd: { enabled: false }
-  innovate-prd: { enabled: false, conditional: "if-needed" }
+  review-prd: { enabled: true }
+  innovate-prd: { enabled: false }
+  user-stories: { enabled: true }
+  review-user-stories: { enabled: true }
+  innovate-user-stories: { enabled: false }
   domain-modeling: { enabled: false }
   review-domain-modeling: { enabled: false }
   adrs: { enabled: false }
@@ -368,10 +374,13 @@ default_depth: 3
 steps:
   create-prd: { enabled: true }
   review-prd: { enabled: true }
-  innovate-prd: { enabled: true, conditional: "if-needed" }
+  innovate-prd: { enabled: false }
+  user-stories: { enabled: true }
+  review-user-stories: { enabled: true }
+  innovate-user-stories: { enabled: false }
   domain-modeling: { enabled: true }
   review-domain-modeling: { enabled: true }
-  # ... (all 33 steps listed with enabled: true)
+  # ... (all 36 steps listed)
   # conditional steps include: conditional: "if-needed"
 ```
 

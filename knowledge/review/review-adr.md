@@ -177,7 +177,7 @@ Broken cross-references make it impossible to follow decision chains. When ADR-0
 
 ### What to Check
 
-Phase 3 (System Architecture) needs technology choices and pattern decisions finalized. All architecture-constraining decisions must be in "accepted" status with clear rationale.
+The system architecture step needs technology choices and pattern decisions finalized. All architecture-constraining decisions must be in "accepted" status with clear rationale.
 
 ### Why This Matters
 
@@ -185,7 +185,7 @@ The architecture document translates ADR decisions into component structure. If 
 
 ### How to Check
 
-Phase 3 specifically needs:
+The system architecture step specifically needs:
 1. **Technology stack decisions** — Language, framework, database, key infrastructure, all accepted
 2. **Architectural pattern decisions** — Monolith vs. services, synchronous vs. asynchronous, state management approach
 3. **Integration pattern decisions** — How components communicate, what protocols, what data formats
@@ -197,7 +197,7 @@ For each category, verify at least one accepted ADR covers it. If a category is 
 
 ### What a Finding Looks Like
 
-- P0: "No accepted ADR covers database technology selection. Phase 3 cannot design data storage components without this decision."
-- P0: "The monolith-vs-services question has two proposed ADRs (ADR-003, ADR-004) but neither is accepted. Phase 3 cannot define component boundaries."
-- P1: "Authentication approach is not covered by any ADR. Phase 3 needs to know the auth pattern to design the auth component."
-- P2: "Monitoring strategy has no ADR. This could be deferred to Phase 9 but should be noted."
+- P0: "No accepted ADR covers database technology selection. The system architecture step cannot design data storage components without this decision."
+- P0: "The monolith-vs-services question has two proposed ADRs (ADR-003, ADR-004) but neither is accepted. The system architecture step cannot define component boundaries."
+- P1: "Authentication approach is not covered by any ADR. The system architecture step needs to know the auth pattern to design the auth component."
+- P2: "Monitoring strategy has no ADR. This could be deferred to the operations step but should be noted."

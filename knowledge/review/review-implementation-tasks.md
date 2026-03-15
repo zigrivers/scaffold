@@ -1,12 +1,12 @@
 ---
 name: review-implementation-tasks
-description: Failure modes and review passes specific to implementation task breakdown artifacts
+description: Failure modes and review passes specific to implementation tasks artifacts
 topics: [review, tasks, planning, decomposition, agents]
 ---
 
 # Review: Implementation Tasks
 
-The implementation task breakdown translates the architecture into discrete, actionable work items that AI agents can execute. Each task must be self-contained enough for a single agent session, correctly ordered by dependency, and clear enough to implement without asking questions. This review uses 7 passes targeting the specific ways task breakdowns fail.
+The implementation tasks document translates the architecture into discrete, actionable work items that AI agents can execute. Each task must be self-contained enough for a single agent session, correctly ordered by dependency, and clear enough to implement without asking questions. This review uses 7 passes targeting the specific ways implementation tasks fail.
 
 Follows the review process defined in `review-methodology.md`.
 

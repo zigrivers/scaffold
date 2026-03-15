@@ -238,7 +238,7 @@ Every success criterion should have a **target value** and a **measurement metho
 Each constraint should be traceable to architectural decisions:
 - "Must use PostgreSQL" → ADR for database choice.
 - "Must comply with GDPR" → Data model includes consent tracking, API includes data export/delete.
-- "Team of 3 developers" → Task breakdown sized for 3 parallel workers.
+- "Team of 3 developers" → Implementation tasks sized for 3 parallel workers.
 - "Launch by March 1" → Feature scope fits within timeline.
 
 ## Non-Functional Requirements
