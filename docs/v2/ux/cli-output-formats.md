@@ -256,7 +256,7 @@ Build complete in 0.4s
 ✓ Dependency graph: 29 nodes, 42 edges, no cycles
 ✓ Claude Code: 29 thin wrappers written to commands/
 ✓ Universal: 29 prompts written to prompts/
-  Changed: 3 modified (phase-03, phase-04, phase-05)
+  Changed: 3 modified (system-architecture, database-schema, api-contracts)
   Added:   0
   Removed: 0
 Build complete in 0.5s
@@ -291,7 +291,7 @@ Build complete in 0.5s
 [ConfigLoader] Reading .scaffold/config.yml (version: 1)
 [ConfigLoader] Methodology: deep, schema valid
 [StepResolver] 32 steps defined, 29 enabled, 3 conditional disabled
-[DependencyResolver] Topological order: create-prd → review-prd → innovate-prd → phase-01-domain-modeling → ...
+[DependencyResolver] Topological order: create-prd → review-prd → innovate-prd → domain-modeling → ...
 [ClaudeCodeAdapter] Writing commands/create-prd.md (thin wrapper, 0.3 KB)
 [UniversalAdapter] Writing prompts/create-prd.md (thin wrapper, 0.3 KB)
 ```

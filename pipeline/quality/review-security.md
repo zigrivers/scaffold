@@ -1,9 +1,10 @@
 ---
-name: phase-10a-review-security
+name: review-security
 description: Review security document for coverage and correctness
-phase: "10a"
-dependencies: [phase-10-security]
-outputs: [docs/reviews/phase-10a-review.md]
+phase: "quality"
+order: 24
+dependencies: [security]
+outputs: [docs/reviews/review-security.md]
 conditional: null
 knowledge-base: [review-methodology, review-security]
 ---
@@ -20,7 +21,7 @@ classification gaps.
 - docs/system-architecture.md (required) — for attack surface coverage
 
 ## Expected Outputs
-- docs/reviews/phase-10a-review.md — findings and resolution log
+- docs/reviews/review-security.md — findings and resolution log
 - docs/security-review.md — updated with fixes
 
 ## Quality Criteria

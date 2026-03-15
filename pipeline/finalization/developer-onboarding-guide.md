@@ -2,6 +2,7 @@
 name: developer-onboarding-guide
 description: Create a guide for developers (human or AI) joining the project
 phase: "finalization"
+order: 35
 dependencies: [apply-fixes-and-freeze]
 outputs: [docs/onboarding-guide.md]
 conditional: null

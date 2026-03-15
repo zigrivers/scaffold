@@ -1,8 +1,9 @@
 ---
-name: phase-10-security
+name: security
 description: Security review and documentation
-phase: "10"
-dependencies: [phase-09-operations]
+phase: "quality"
+order: 23
+dependencies: [operations]
 outputs: [docs/security-review.md]
 conditional: null
 knowledge-base: [security-review]

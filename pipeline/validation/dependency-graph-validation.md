@@ -2,7 +2,8 @@
 name: dependency-graph-validation
 description: Verify task dependency graphs are acyclic, complete, correctly ordered
 phase: "validation"
-dependencies: [phase-10a-review-security]
+order: 32
+dependencies: [review-tasks, review-security]
 outputs: [docs/validation/dependency-graph-validation.md]
 conditional: null
 knowledge-base: [dependency-validation]

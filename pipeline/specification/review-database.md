@@ -1,9 +1,10 @@
 ---
-name: phase-04a-review-database
+name: review-database
 description: Review database schema for correctness and completeness
-phase: "4a"
-dependencies: [phase-04-database-schema]
-outputs: [docs/reviews/phase-04a-review.md]
+phase: "specification"
+order: 14
+dependencies: [database-schema]
+outputs: [docs/reviews/review-database.md]
 conditional: "if-needed"
 knowledge-base: [review-methodology, review-database-schema]
 ---
@@ -19,7 +20,7 @@ referential integrity vs. domain invariants.
 - docs/system-architecture.md (required) — for query pattern coverage
 
 ## Expected Outputs
-- docs/reviews/phase-04a-review.md — findings and resolution log
+- docs/reviews/review-database.md — findings and resolution log
 - docs/database-schema.md — updated with fixes
 
 ## Quality Criteria

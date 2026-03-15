@@ -2,6 +2,7 @@
 name: review-prd
 description: Multi-pass review of the PRD for completeness, clarity, and downstream readiness
 phase: "pre"
+order: 2
 dependencies: [create-prd]
 outputs: [docs/reviews/pre-review-prd.md]
 conditional: null

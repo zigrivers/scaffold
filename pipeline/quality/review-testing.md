@@ -1,9 +1,10 @@
 ---
-name: phase-08a-review-testing
+name: review-testing
 description: Review testing strategy for coverage gaps and feasibility
-phase: "8a"
-dependencies: [phase-08-testing-strategy]
-outputs: [docs/reviews/phase-08a-review.md]
+phase: "quality"
+order: 20
+dependencies: [testing-strategy]
+outputs: [docs/reviews/review-testing.md]
 conditional: null
 knowledge-base: [review-methodology, review-testing-strategy]
 ---
@@ -19,7 +20,7 @@ assumptions, inadequate performance test coverage, and missing integration bound
 - docs/system-architecture.md (required) — for layer coverage
 
 ## Expected Outputs
-- docs/reviews/phase-08a-review.md — findings and resolution log
+- docs/reviews/review-testing.md — findings and resolution log
 - docs/testing-strategy.md — updated with fixes
 
 ## Quality Criteria

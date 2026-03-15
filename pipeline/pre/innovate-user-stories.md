@@ -2,6 +2,7 @@
 name: innovate-user-stories
 description: Discover UX-level enhancements and innovation opportunities in user stories
 phase: "pre"
+order: 6
 dependencies: [review-user-stories]
 outputs: [docs/user-stories-innovation.md]
 conditional: "if-needed"

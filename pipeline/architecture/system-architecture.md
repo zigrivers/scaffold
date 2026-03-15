@@ -1,8 +1,9 @@
 ---
-name: phase-03-system-architecture
+name: system-architecture
 description: Design and document system architecture
-phase: "3"
-dependencies: [phase-02-adrs]
+phase: "architecture"
+order: 11
+dependencies: [adrs]
 outputs: [docs/system-architecture.md]
 conditional: null
 knowledge-base: [system-architecture]

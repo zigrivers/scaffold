@@ -1,8 +1,9 @@
 ---
-name: phase-09-operations
+name: operations
 description: Define operations, deployment, and dev environment strategy
-phase: "9"
-dependencies: [phase-08-testing-strategy]
+phase: "quality"
+order: 21
+dependencies: [testing-strategy]
 outputs: [docs/operations-runbook.md]
 conditional: null
 knowledge-base: [operations-runbook]

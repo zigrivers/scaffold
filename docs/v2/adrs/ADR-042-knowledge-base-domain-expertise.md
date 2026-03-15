@@ -70,7 +70,7 @@ Create a **knowledge base** of topic-organized domain expertise documents (32 ma
 
 - **Description**: Create a knowledge document for each pipeline step rather than organizing by topic.
 - **Pros**: Clear 1:1 mapping between meta-prompt and knowledge document. No ambiguity about which knowledge supports which step.
-- **Cons**: Duplicates expertise across creation and review steps. System architecture knowledge appears in both `phase-03-knowledge.md` and `phase-03a-review-knowledge.md`. Updates must be synchronized. As pipeline steps are added or reorganized, knowledge documents must follow — coupling knowledge organization to pipeline structure.
+- **Cons**: Duplicates expertise across creation and review steps. System architecture knowledge appears in both `system-architecture-knowledge.md` and `review-architecture-knowledge.md`. Updates must be synchronized. As pipeline steps are added or reorganized, knowledge documents must follow — coupling knowledge organization to pipeline structure.
 
 ### Knowledge Embedded in Methodology Presets
 

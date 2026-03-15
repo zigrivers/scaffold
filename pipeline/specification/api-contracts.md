@@ -1,8 +1,9 @@
 ---
-name: phase-05-api-contracts
+name: api-contracts
 description: Specify API contracts for all system interfaces
-phase: "5"
-dependencies: [phase-03-system-architecture]
+phase: "specification"
+order: 15
+dependencies: [system-architecture]
 outputs: [docs/api-contracts.md]
 conditional: "if-needed"
 knowledge-base: [api-design]

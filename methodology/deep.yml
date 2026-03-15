@@ -10,26 +10,26 @@ steps:
   user-stories: { enabled: true }
   review-user-stories: { enabled: true }
   innovate-user-stories: { enabled: true }
-  phase-01-domain-modeling: { enabled: true }
-  phase-01a-review-domain-modeling: { enabled: true }
-  phase-02-adrs: { enabled: true }
-  phase-02a-review-adrs: { enabled: true }
-  phase-03-system-architecture: { enabled: true }
-  phase-03a-review-architecture: { enabled: true }
-  phase-04-database-schema: { enabled: true, conditional: "if-needed" }
-  phase-04a-review-database: { enabled: true, conditional: "if-needed" }
-  phase-05-api-contracts: { enabled: true, conditional: "if-needed" }
-  phase-05a-review-api: { enabled: true, conditional: "if-needed" }
-  phase-06-ux-spec: { enabled: true, conditional: "if-needed" }
-  phase-06a-review-ux: { enabled: true, conditional: "if-needed" }
-  phase-08-testing-strategy: { enabled: true }
-  phase-08a-review-testing: { enabled: true }
-  phase-09-operations: { enabled: true }
-  phase-09a-review-operations: { enabled: true }
-  phase-10-security: { enabled: true }
-  phase-10a-review-security: { enabled: true }
-  phase-07-implementation-tasks: { enabled: true }
-  phase-07a-review-tasks: { enabled: true }
+  domain-modeling: { enabled: true }
+  review-domain-modeling: { enabled: true }
+  adrs: { enabled: true }
+  review-adrs: { enabled: true }
+  system-architecture: { enabled: true }
+  review-architecture: { enabled: true }
+  database-schema: { enabled: true, conditional: "if-needed" }
+  review-database: { enabled: true, conditional: "if-needed" }
+  api-contracts: { enabled: true, conditional: "if-needed" }
+  review-api: { enabled: true, conditional: "if-needed" }
+  ux-spec: { enabled: true, conditional: "if-needed" }
+  review-ux: { enabled: true, conditional: "if-needed" }
+  testing-strategy: { enabled: true }
+  review-testing: { enabled: true }
+  operations: { enabled: true }
+  review-operations: { enabled: true }
+  security: { enabled: true }
+  review-security: { enabled: true }
+  implementation-tasks: { enabled: true }
+  review-tasks: { enabled: true }
   cross-phase-consistency: { enabled: true }
   traceability-matrix: { enabled: true }
   decision-completeness: { enabled: true }

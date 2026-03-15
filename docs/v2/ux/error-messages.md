@@ -1124,20 +1124,20 @@ The architecture error registry (system-architecture.md Section 7c) uses compone
 
 **Template**:
 ```
-✗ Meta-prompt not found: pipeline/{step}.md
+✗ Meta-prompt not found: pipeline/{group}/{step}.md
 
   Step '{step}' is defined in the pipeline but its meta-prompt file is missing.
 
   Verify the scaffold installation or run 'scaffold update' to repair.
 ```
 
-**Variables**: `{step}` — step slug
+**Variables**: `{step}` — step slug, `{group}` — pipeline group directory
 
 **Example**:
 ```
-✗ Meta-prompt not found: pipeline/phase-03-system-architecture.md
+✗ Meta-prompt not found: pipeline/architecture/system-architecture.md
 
-  Step 'phase-03-system-architecture' is defined in the pipeline but its meta-prompt file is missing.
+  Step 'system-architecture' is defined in the pipeline but its meta-prompt file is missing.
 
   Verify the scaffold installation or run 'scaffold update' to repair.
 ```
@@ -1153,19 +1153,19 @@ The architecture error registry (system-architecture.md Section 7c) uses compone
 ```
 ✗ Knowledge base entry not found: knowledge/{entry}.md
 
-  Referenced by meta-prompt: pipeline/{step}.md
+  Referenced by meta-prompt: pipeline/{group}/{step}.md
   Field: knowledge-base
 
   Verify the scaffold installation or run 'scaffold update' to repair.
 ```
 
-**Variables**: `{entry}` — knowledge base entry name, `{step}` — step slug
+**Variables**: `{entry}` — knowledge base entry name, `{step}` — step slug, `{group}` — pipeline group directory
 
 **Example**:
 ```
 ✗ Knowledge base entry not found: knowledge/system-architecture.md
 
-  Referenced by meta-prompt: pipeline/phase-03-system-architecture.md
+  Referenced by meta-prompt: pipeline/architecture/system-architecture.md
   Field: knowledge-base
 
   Verify the scaffold installation or run 'scaffold update' to repair.
@@ -1192,12 +1192,12 @@ The architecture error registry (system-architecture.md Section 7c) uses compone
 
 **Example**:
 ```
-✗ Failed to assemble prompt for step 'phase-01-domain-modeling'.
+✗ Failed to assemble prompt for step 'domain-modeling'.
 
   Meta-prompt frontmatter is missing required field 'knowledge-base'
 
   Check the meta-prompt and knowledge base files for this step.
-  Run 'scaffold info phase-01-domain-modeling' to inspect the step configuration.
+  Run 'scaffold info domain-modeling' to inspect the step configuration.
 ```
 
 #### ASM_INVALID_DEPTH
@@ -3685,7 +3685,7 @@ Wizard cancelled — no files were created.
 
 **Example**:
 ```
-⚠ Meta-prompt "phase-11-accessibility" exists in pipeline/ but is not listed in preset "deep". It will use the preset's default_depth.
+⚠ Meta-prompt "accessibility" exists in pipeline/ but is not listed in preset "deep". It will use the preset's default_depth.
 
   Add an explicit entry to methodology/deep.yml to control this step's enablement and depth.
 ```

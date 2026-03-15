@@ -1,8 +1,9 @@
 ---
-name: phase-07-implementation-tasks
+name: implementation-tasks
 description: Break architecture into implementable tasks with dependencies
-phase: "7"
-dependencies: [phase-08-testing-strategy, phase-09-operations, phase-10-security]
+phase: "planning"
+order: 25
+dependencies: [testing-strategy, operations, security]
 outputs: [docs/implementation-tasks.md]
 conditional: null
 knowledge-base: [task-decomposition]

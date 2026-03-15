@@ -16,7 +16,7 @@ The Meta-Prompt Frontmatter Schema domain defines the YAML metadata contract tha
 
 The frontmatter schema has been rewritten for the meta-prompt architecture. The previous fields (`reads` with section targeting, `artifact-schema`, `requires-capabilities`, mixin markers) have been removed. The new schema fields are:
 
-- `name` — Step identifier (e.g., `phase-03-system-architecture`)
+- `name` — Step identifier (e.g., `system-architecture`)
 - `description` — One-line purpose
 - `phase` — Pipeline phase (pre, 1-10, validation, finalization)
 - `dependencies` — Steps that must complete first (string array)
@@ -1165,7 +1165,7 @@ Fully defined in Algorithm 2 (Section Extraction). Summary of edge case handling
 ---
 description: "Research and document technology decisions"
 depends-on: [create-prd, beads-setup]
-phase: 2
+phase: decisions
 argument-hint: "<tech constraints or preferences>"
 produces: ["docs/tech-stack.md"]
 reads: ["docs/plan.md"]
@@ -1195,7 +1195,7 @@ This is the `tech-stack` prompt's frontmatter. It depends on `create-prd` and `b
 ---
 description: "Create task graph from stories and standards"
 depends-on: [user-stories, coding-standards, tdd, project-structure, dev-env-setup, git-workflow]
-phase: 7
+phase: planning
 produces: ["docs/implementation-plan.md"]
 reads:
   - "docs/plan.md"
@@ -1319,7 +1319,7 @@ A methodology extension prompt `methodologies/classic/extensions/security-audit.
 ---
 description: "Run security audit on project dependencies and configurations"
 depends-on: [tech-stack, project-structure]
-phase: 4
+phase: specification
 produces: ["docs/security-audit.md"]
 reads:
   - "docs/tech-stack.md"

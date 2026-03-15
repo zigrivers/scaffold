@@ -1,7 +1,8 @@
 ---
-name: phase-01-domain-modeling
+name: domain-modeling
 description: Deep domain modeling across all identified project domains
-phase: "1"
+phase: "modeling"
+order: 7
 dependencies: [innovate-user-stories]
 outputs: [docs/domain-models/]
 conditional: null

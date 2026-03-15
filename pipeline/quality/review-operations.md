@@ -1,9 +1,10 @@
 ---
-name: phase-09a-review-operations
+name: review-operations
 description: Review operations runbook for completeness and safety
-phase: "9a"
-dependencies: [phase-09-operations]
-outputs: [docs/reviews/phase-09a-review.md]
+phase: "quality"
+order: 22
+dependencies: [operations]
+outputs: [docs/reviews/review-operations.md]
 conditional: null
 knowledge-base: [review-methodology, review-operations]
 ---
@@ -18,7 +19,7 @@ alerting thresholds, missing runbook scenarios, and DR coverage gaps.
 - docs/system-architecture.md (required) — for deployment coverage
 
 ## Expected Outputs
-- docs/reviews/phase-09a-review.md — findings and resolution log
+- docs/reviews/review-operations.md — findings and resolution log
 - docs/operations-runbook.md — updated with fixes
 
 ## Quality Criteria

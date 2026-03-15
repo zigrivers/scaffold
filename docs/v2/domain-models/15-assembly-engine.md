@@ -971,7 +971,7 @@ Domain 16 resolves the effective depth level for the current step. The assembly 
 
 ### 2. Running a step whose dependencies are skipped
 
-**Scenario**: User skipped `review-prd` and runs `phase-01-domain-modeling` which depends on it.
+**Scenario**: User skipped `review-prd` and runs `domain-modeling` which depends on it.
 **Expected behavior**: Assembly proceeds. Skipped steps are treated as "done" for dependency resolution (ADR-020). The skipped step's artifacts will not be in the project context (they don't exist). The AI generates output without that context.
 
 ### 3. Missing knowledge base file referenced in meta-prompt frontmatter
@@ -991,7 +991,7 @@ Domain 16 resolves the effective depth level for the current step. The assembly 
 
 ### 6. Conditional step force-enabled by user
 
-**Scenario**: `phase-04-database-schema` is conditional (`if-needed`) and was auto-disabled by init wizard, but user manually enables it in config.yml and runs `scaffold run phase-04-database-schema`.
+**Scenario**: `database-schema` is conditional (`if-needed`) and was auto-disabled by init wizard, but user manually enables it in config.yml and runs `scaffold run database-schema`.
 **Expected behavior**: Assembly proceeds normally. The assembly engine checks enablement via domain 16, which respects user overrides. The step assembles and executes as if it were always enabled.
 
 ### 7. Crash during state update after successful AI execution
@@ -1164,11 +1164,11 @@ Assembly sequence:
 
 ### Example 3: Step with Missing Knowledge Base Entry
 
-**Input**: `scaffold run phase-01-domain-modeling`
+**Input**: `scaffold run domain-modeling`
 
 ```
 Assembly sequence:
-1. Load meta-prompt: pipeline/phase-01-domain-modeling.md
+1. Load meta-prompt: pipeline/modeling/domain-modeling.md
    - knowledge-base: ["core/domain-modeling", "core/ddd-patterns"]
 
 3. Load knowledge base:

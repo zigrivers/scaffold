@@ -1,9 +1,10 @@
 ---
-name: phase-02a-review-adrs
+name: review-adrs
 description: Review ADRs for completeness, consistency, and decision quality
-phase: "2a"
-dependencies: [phase-02-adrs]
-outputs: [docs/reviews/phase-02a-review.md]
+phase: "decisions"
+order: 10
+dependencies: [adrs]
+outputs: [docs/reviews/review-adrs.md]
 conditional: null
 knowledge-base: [review-methodology, review-adr]
 ---
@@ -19,7 +20,7 @@ trade-offs.
 - docs/prd.md (required) — for requirement tracing
 
 ## Expected Outputs
-- docs/reviews/phase-02a-review.md — findings and resolution log
+- docs/reviews/review-adrs.md — findings and resolution log
 - docs/adrs/ — updated with fixes
 
 ## Quality Criteria

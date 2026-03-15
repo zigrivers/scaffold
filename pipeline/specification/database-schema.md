@@ -1,8 +1,9 @@
 ---
-name: phase-04-database-schema
+name: database-schema
 description: Design database schema from domain models
-phase: "4"
-dependencies: [phase-03-system-architecture]
+phase: "specification"
+order: 13
+dependencies: [system-architecture]
 outputs: [docs/database-schema.md]
 conditional: "if-needed"
 knowledge-base: [database-design]

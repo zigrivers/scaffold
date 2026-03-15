@@ -577,7 +577,7 @@ The assembly engine and its dependencies. Tasks T-011 through T-016 can run in p
 - Create: `src/core/assembly/depth-resolver.test.ts`
 - Create: `src/core/assembly/methodology-resolver.test.ts`
 
-**Description**: Two resolvers. (1) Depth resolver: four-level precedence chain — CLI `--depth` flag (highest) > custom per-step override in config.yml > methodology preset default_depth > built-in default (3). Returns integer 1-5. (2) Methodology resolver: determines which steps are enabled and their effective depth. Loads preset, applies custom overrides, evaluates conditional steps against project traits. Handles methodology change detection: compares `state.json.config_methodology` with `config.yml.methodology`; emits ASM_METHODOLOGY_CHANGED warning on mismatch. Emits ASM_COMPLETED_AT_LOWER_DEPTH warning when completed step's depth < current config depth. Config is source of truth for current methodology; state is historical record. The `resolveDepth` function accepts an optional `cliDepthOverride?: DepthLevel` parameter for the CLI `--depth` flag. Four-level precedence chain handled within this function: CLI flag (highest) > custom per-step override > methodology preset `default_depth` > built-in fallback (3). The built-in fallback of 3 applies only when no preset is loaded. Methodology change detection is delegated to T-018's methodology-change.ts. Tests use fixture preset data. MVP step names: create-prd, phase-08-testing-strategy, phase-07-implementation-tasks, implementation-playbook.
+**Description**: Two resolvers. (1) Depth resolver: four-level precedence chain — CLI `--depth` flag (highest) > custom per-step override in config.yml > methodology preset default_depth > built-in default (3). Returns integer 1-5. (2) Methodology resolver: determines which steps are enabled and their effective depth. Loads preset, applies custom overrides, evaluates conditional steps against project traits. Handles methodology change detection: compares `state.json.config_methodology` with `config.yml.methodology`; emits ASM_METHODOLOGY_CHANGED warning on mismatch. Emits ASM_COMPLETED_AT_LOWER_DEPTH warning when completed step's depth < current config depth. Config is source of truth for current methodology; state is historical record. The `resolveDepth` function accepts an optional `cliDepthOverride?: DepthLevel` parameter for the CLI `--depth` flag. Four-level precedence chain handled within this function: CLI flag (highest) > custom per-step override > methodology preset `default_depth` > built-in fallback (3). The built-in fallback of 3 applies only when no preset is loaded. Methodology change detection is delegated to T-018's methodology-change.ts. Tests use fixture preset data. MVP step names: create-prd, testing-strategy, implementation-tasks, implementation-playbook.
 
 **Acceptance Criteria**:
 - [ ] Depth resolution follows precedence: CLI flag > custom override > preset default > built-in
@@ -1405,7 +1405,7 @@ Content tasks — meta-prompts, knowledge base files, and methodology presets. T
 - Create: `methodology/mvp.yml`
 - Create: `methodology/custom-defaults.yml`
 
-**Description**: Author three methodology preset YAML files. (1) `deep.yml`: name "Deep Domain Modeling", description for complex systems, default_depth 5, all 32 steps enabled. (2) `mvp.yml`: name "MVP", description for fast start, default_depth 1, only 4 steps enabled (create-prd, phase-08-testing-strategy, phase-07-implementation-tasks, implementation-playbook). (3) `custom-defaults.yml`: name "Custom", description for user configuration, default_depth 3, all 32 steps enabled with conditional steps marked. Each preset must list every known step with enabled/disabled status. Use manifest-yml-schema.md §8.1 (`deep.yml` example) as the canonical list of all 32 step names. `custom-defaults.yml` uses the same conditional markers as `deep.yml` (phases 4, 4a, 5, 5a, 6, 6a marked `conditional: 'if-needed'`).
+**Description**: Author three methodology preset YAML files. (1) `deep.yml`: name "Deep Domain Modeling", description for complex systems, default_depth 5, all 32 steps enabled. (2) `mvp.yml`: name "MVP", description for fast start, default_depth 1, only 4 steps enabled (create-prd, testing-strategy, implementation-tasks, implementation-playbook). (3) `custom-defaults.yml`: name "Custom", description for user configuration, default_depth 3, all 32 steps enabled with conditional steps marked. Each preset must list every known step with enabled/disabled status. Use manifest-yml-schema.md §8.1 (`deep.yml` example) as the canonical list of all 32 step names. `custom-defaults.yml` uses the same conditional markers as `deep.yml` (database-schema, review-database, api-contracts, review-api, ux-spec, review-ux marked `conditional: 'if-needed'`).
 
 **Acceptance Criteria**:
 - [ ] deep.yml has all 32 steps enabled, default_depth 5
@@ -1520,8 +1520,8 @@ Content tasks — meta-prompts, knowledge base files, and methodology presets. T
 - Create: `pipeline/pre/create-prd.md`
 - Create: `pipeline/pre/review-prd.md`
 - Create: `pipeline/pre/innovate-prd.md`
-- Create: `pipeline/phase-01-domain-modeling.md`
-- Create: `pipeline/phase-02-adrs.md`
+- Create: `pipeline/modeling/domain-modeling.md`
+- Create: `pipeline/decisions/adrs.md`
 
 **Description**: Author 5 meta-prompts for product definition and early domain phases. Each meta-prompt has YAML frontmatter (name, description, phase, dependencies, outputs, knowledge-base) and body sections: Purpose, Inputs, Expected Outputs, Quality Criteria, Methodology Scaling (with specific guidance for depth 1 and depth 5), Mode Detection (create vs update behavior per ADR-048). Meta-prompts declare intent — they do NOT contain actual prompt text. 30-80 lines each. Reference appropriate knowledge base entries. See system-architecture.md §4a-1 for the meta-prompt body section convention and a complete example. Each meta-prompt body uses `## Purpose`, `## Inputs`, `## Expected Outputs`, `## Quality Criteria`, `## Methodology Scaling`, `## Mode Detection` headings. Intent vs prompt text: 'Analyze domain boundaries and identify bounded contexts' (intent — good). 'You are a domain modeling expert. Read the PRD and produce a domain model following DDD principles. Start by identifying...' (prompt text — bad).
 
@@ -1544,17 +1544,17 @@ Content tasks — meta-prompts, knowledge base files, and methodology presets. T
 **Enables**: T-052
 
 **Files**:
-- Create: `pipeline/phase-03-system-architecture.md`
-- Create: `pipeline/phase-04-database-schema.md`
-- Create: `pipeline/phase-05-api-contracts.md`
-- Create: `pipeline/phase-06-ux-spec.md`
+- Create: `pipeline/architecture/system-architecture.md`
+- Create: `pipeline/specification/database-schema.md`
+- Create: `pipeline/specification/api-contracts.md`
+- Create: `pipeline/specification/ux-spec.md`
 
-**Description**: Author 4 meta-prompts for architecture and data phases. Phase-04 and phase-06 should be marked conditional (`conditional: "if-needed"`) for projects that don't need database or UI. Each references appropriate core domain KB entries and includes methodology scaling guidance. Dependencies chain: phase-03 depends on phase-02, phase-04/05/06 depend on phase-03. Filenames and corresponding frontmatter `name` fields must match manifest-yml-schema.md §8.1 step names.
+**Description**: Author 4 meta-prompts for architecture and data phases. database-schema and ux-spec should be marked conditional (`conditional: "if-needed"`) for projects that don't need database or UI. Each references appropriate core domain KB entries and includes methodology scaling guidance. Dependencies chain: system-architecture depends on adrs, database-schema/api-contracts/ux-spec depend on system-architecture. Filenames and corresponding frontmatter `name` fields must match manifest-yml-schema.md §8.1 step names.
 
 **Acceptance Criteria**:
 - [ ] All 4 files have valid frontmatter
-- [ ] phase-04 and phase-06 marked `conditional: "if-needed"`
-- [ ] Correct dependency chain (phase-03 → phase-02, phase-04/05/06 → phase-03)
+- [ ] database-schema and ux-spec marked `conditional: "if-needed"`
+- [ ] Correct dependency chain (system-architecture → adrs, database-schema/api-contracts/ux-spec → system-architecture)
 - [ ] Methodology scaling with depth 1 and depth 5 specifics
 - [ ] Mode Detection blocks included
 - [ ] 30-80 lines each
@@ -1568,15 +1568,15 @@ Content tasks — meta-prompts, knowledge base files, and methodology presets. T
 **Enables**: T-052
 
 **Files**:
-- Create: `pipeline/phase-07-implementation-tasks.md`
-- Create: `pipeline/phase-08-testing-strategy.md`
-- Create: `pipeline/phase-09-operations.md`
-- Create: `pipeline/phase-10-security.md`
+- Create: `pipeline/planning/implementation-tasks.md`
+- Create: `pipeline/quality/testing-strategy.md`
+- Create: `pipeline/quality/operations.md`
+- Create: `pipeline/quality/security.md`
 - Create: `pipeline/finalization/developer-onboarding-guide.md`
 - Create: `pipeline/finalization/implementation-playbook.md`
 - Create: `pipeline/finalization/apply-fixes-and-freeze.md`
 
-**Description**: Author 7 meta-prompts for implementation planning, testing, operations, security, onboarding, and finalization phases. Phase-09 and phase-10 may be conditional. Implementation-playbook is one of the 4 MVP-enabled steps. Apply-fixes-and-freeze is the final validation/finalization step. Each references appropriate KB entries. Filenames and corresponding frontmatter `name` fields must match manifest-yml-schema.md §8.1 step names.
+**Description**: Author 7 meta-prompts for implementation planning, testing, operations, security, onboarding, and finalization phases. operations and security may be conditional. Implementation-playbook is one of the 4 MVP-enabled steps. Apply-fixes-and-freeze is the final validation/finalization step. Each references appropriate KB entries. Filenames and corresponding frontmatter `name` fields must match manifest-yml-schema.md §8.1 step names.
 
 **Acceptance Criteria**:
 - [ ] All 7 files have valid frontmatter
@@ -1595,18 +1595,18 @@ Content tasks — meta-prompts, knowledge base files, and methodology presets. T
 **Enables**: T-052
 
 **Files**:
-- Create: `pipeline/phase-01a-review-domain-modeling.md`
-- Create: `pipeline/phase-02a-review-adrs.md`
-- Create: `pipeline/phase-03a-review-architecture.md`
-- Create: `pipeline/phase-04a-review-database.md`
-- Create: `pipeline/phase-05a-review-api.md`
-- Create: `pipeline/phase-06a-review-ux.md`
-- Create: `pipeline/phase-07a-review-tasks.md`
-- Create: `pipeline/phase-08a-review-testing.md`
-- Create: `pipeline/phase-09a-review-operations.md`
-- Create: `pipeline/phase-10a-review-security.md`
+- Create: `pipeline/modeling/review-domain-modeling.md`
+- Create: `pipeline/decisions/review-adrs.md`
+- Create: `pipeline/architecture/review-architecture.md`
+- Create: `pipeline/specification/review-database.md`
+- Create: `pipeline/specification/review-api.md`
+- Create: `pipeline/specification/review-ux.md`
+- Create: `pipeline/planning/review-tasks.md`
+- Create: `pipeline/quality/review-testing.md`
+- Create: `pipeline/quality/review-operations.md`
+- Create: `pipeline/quality/review-security.md`
 
-**Description**: Author 10 review meta-prompts, one per creation phase. Each review meta-prompt references two KB entries: the shared `review-methodology.md` AND the artifact-specific review entry (e.g., `review-domain-modeling.md`). Each depends on its corresponding creation phase (phase-01a depends on phase-01). Review meta-prompts include methodology scaling: depth 1 = critical failures only; depth 5 = comprehensive multi-pass review with cross-artifact validation.
+**Description**: Author 10 review meta-prompts, one per creation phase. Each review meta-prompt references two KB entries: the shared `review-methodology.md` AND the artifact-specific review entry (e.g., `review-domain-modeling.md`). Each depends on its corresponding creation step (review-domain-modeling depends on domain-modeling). Review meta-prompts include methodology scaling: depth 1 = critical failures only; depth 5 = comprehensive multi-pass review with cross-artifact validation.
 
 **Acceptance Criteria**:
 - [ ] All 10 review files have valid frontmatter
