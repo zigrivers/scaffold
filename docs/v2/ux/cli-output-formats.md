@@ -726,7 +726,7 @@ Phase 2 — Standards
 Next: user-stories (Phase 1 — Planning)
   Description:  Create user stories from the PRD
   Depth:        5
-  Depends on:   create-prd ✓, review-prd ✓, innovate-prd ✓
+  Depends on:   review-prd ✓
   Produces:     docs/user-stories.md
   Reads:        docs/plan.md, docs/tech-stack.md
 
@@ -741,7 +741,7 @@ Next eligible (3 of 5):
   1. user-stories (Phase 1 — Planning)
      Description:  Create user stories from the PRD
      Depth:        5
-     Depends on:   create-prd ✓, review-prd ✓, innovate-prd ✓
+     Depends on:   review-prd ✓
      Produces:     docs/user-stories.md
 
   2. design-system (Phase 2 — Standards)
@@ -786,7 +786,7 @@ Run: scaffold status to see the full pipeline.
 
 ```
 [DependencyResolver] Computing eligibility from state (8 done, 1 skipped, 23 pending)
-[DependencyResolver] user-stories: all 3 dependencies satisfied (create-prd, review-prd, innovate-prd)
+[DependencyResolver] user-stories: dependency satisfied (review-prd)
 [DependencyResolver] user-stories: produces=[docs/user-stories.md], reads=[docs/plan.md, docs/tech-stack.md]
 [DependencyResolver] user-stories: source=pipeline, depth=5, has CLAUDE.md section: no
 ```
