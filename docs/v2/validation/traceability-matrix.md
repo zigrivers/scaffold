@@ -177,8 +177,8 @@ Legend:
 | F-048 | `scaffold adopt` scan & map | 07 | 028 | — | state | `adopt` | T-035 | §4g, §8 |
 | F-049 | v1 project detection | 07 | 017 | §4c | state | `init` | T-032, T-033, T-054 | §4g, §8 |
 | F-050 | CLAUDE.md management | 10 | 017, 026 | §5a | sec | `build`, `run` | T-043 | §4f |
-| F-051 | npm distribution | — | 002 | §9 | — | — | T-053 | — |
-| F-052 | Homebrew distribution | — | 002 | §9 | — | — | T-053 | — |
+| F-051 | npm distribution | — | 002 | §9 | — | — | T-053 | §10 |
+| F-052 | Homebrew distribution | — | 002 | §9 | — | — | T-053 | §10 |
 
 ### Non-Functional Requirements
 
@@ -195,8 +195,8 @@ Legend:
 | NF-009 | Merge-safe file formats | 03, 11 | 012, 013 | §5a | state, dec | — | T-007, T-009 | §5 |
 | NF-010 | macOS + Linux | — | 001 | — | — | — | T-001, T-053 | — |
 | NF-011 | Node.js 18+ | — | 001 | — | — | — | T-001 | §10 |
-| NF-012 | No credential storage | — | — | — | — | — | — | — |
-| NF-013 | No network access (except update) | — | — | — | — | `update` | — | — |
+| NF-012 | No credential storage | — | — | — | — | — | — | §11 |
+| NF-013 | No network access (except update) | — | — | — | — | `update` | — | §11 |
 | NF-014 | User instructions local & visible | — | 047 | — | — | — | T-016 | §4b |
 
 ### Constraints
@@ -222,17 +222,17 @@ Legend:
 | F-025 | `scaffold reset` | ADR | Minor | No dedicated ADR for `reset` — straightforward state mutation. Acceptable. |
 | F-026 | `scaffold info` | ADR | Minor | No dedicated ADR — simple read-only display command. Acceptable. |
 | F-028 | `scaffold dashboard` | Domain, ADR | Minor | Dashboard is a utility; no domain model or ADR needed. |
-| F-051 | npm distribution | Domain, Test | Major | No test section for distribution packaging. Add `npm pack` / install smoke test to E2E or CI. |
-| F-052 | Homebrew distribution | Domain, Test | Major | No test section for Homebrew formula. Add formula validation to CI. |
+| F-051 | npm distribution | Domain, Test | Major | **Addressed**: Added §10 Distribution Verification Tests to testing-strategy.md; updated T-053 acceptance criteria with smoke tests. |
+| F-052 | Homebrew distribution | Domain, Test | Major | **Addressed**: Added Homebrew formula verification to testing-strategy.md §10. |
 | NF-004 | No background processes | Task, Test | Minor | Architectural constraint enforced by design (synchronous I/O). No explicit task needed. |
 | NF-010 | macOS + Linux | Test | Minor | No explicit cross-platform test section. CI matrix handles this implicitly but testing-strategy.md doesn't document it. |
-| NF-012 | No credential storage | Task, Test | Minor | Security constraint enforced by design. Consider adding a code scanning rule. |
-| NF-013 | No network access | Task, Test | Minor | Constraint enforced by design. Consider network-isolation smoke test. |
+| NF-012 | No credential storage | Task, Test | Minor | **Addressed**: Added CI enforcement script and checklist to security-practices.md §8; added to testing-strategy.md §11 CI gates. |
+| NF-013 | No network access | Task, Test | Minor | **Addressed**: Added CI enforcement script (`check-no-network.sh`) to security-practices.md §8; added to testing-strategy.md §11 CI gates. |
 
 **Summary:**
 - **Critical gaps (no task AND no test)**: 0
-- **Major gaps (task but no test, or test but no task)**: 2 (F-051, F-052 — distribution testing)
-- **Minor gaps (missing intermediate trace)**: 10
+- **Major gaps (task but no test, or test but no task)**: 0 (F-051, F-052 addressed — distribution testing added to §10)
+- **Minor gaps (missing intermediate trace)**: 10 (6 acceptable implicit traces, 4 addressed via enforcement scripts)
 
 ### 3b. Backward Gaps (Implementation → Requirement)
 
@@ -325,24 +325,24 @@ Legend:
 | — Constraints (C-NNN) | 4 |
 | — Deferred (D-NNN) | 10 |
 | Active requirements (F + NF + C) | 70 |
-| Fully traced (all applicable cells filled) | 56 |
-| Partially traced (some cells missing) | 14 |
+| Fully traced (all applicable cells filled) | 60 |
+| Partially traced (some cells missing) | 10 |
 | Not traced (no downstream references) | 0 |
 | Orphaned tasks (no requirement) | 0 |
 | Deferred items with downstream traces | 0 |
 
-**Trace completeness for active requirements: 80% fully traced, 20% partially traced, 0% untraced.**
+**Trace completeness for active requirements: 86% fully traced, 14% partially traced, 0% untraced.**
 
 ---
 
 ## 5. Observations
 
-- **Strong overall traceability.** Every active requirement traces to at least one task and most trace through all applicable columns (domain → ADR → architecture → data → CLI → task → test). Zero requirements are untraced.
+- **Strong overall traceability (86% fully traced).** Every active requirement traces to at least one task and most trace through all applicable columns (domain → ADR → architecture → data → CLI → task → test). Zero requirements are untraced. Coverage improved from 80% to 86% after addressing distribution and security enforcement gaps.
 
-- **Distribution testing is the most significant gap.** F-051 (npm) and F-052 (Homebrew) have tasks (T-053) but no test coverage defined in the testing strategy. Recommend adding a CI job for `npm pack` verification and Homebrew formula linting.
+- **Distribution testing gap addressed.** F-051 (npm) and F-052 (Homebrew) now have test coverage via §10 (Distribution Verification Tests) in testing-strategy.md. T-053 acceptance criteria updated with smoke test requirements. No remaining major gaps.
 
 - **Content-phase steps (F-008, F-009) lack test coverage by design.** The validation and finalization phases are content-authored meta-prompts (T-047, T-050). Testing them requires authored content + E2E execution, which is appropriate for Phase 3 of the migration plan. Not a gap — just sequencing.
 
-- **Security NFRs (NF-012, NF-013) are enforced by architectural constraint, not code.** The "no credential storage" and "no network access" requirements are implicit in the design. Consider adding a CI audit step (e.g., `grep` for `fetch`/`http`/`net` imports) to make enforcement explicit.
+- **Security NFRs (NF-012, NF-013) now have automated enforcement.** CI scripts (`check-no-credentials.sh`, `check-no-network.sh`) documented in security-practices.md §8 and added to testing-strategy.md §11 CI pipeline quality gates. These make the architectural constraints explicitly verifiable.
 
-- **5 proposed ADRs (050-054) remain undecided.** These are appropriately deferred from the task breakdown but represent design decisions that must be resolved before or during implementation. D-006 (context window management) and D-008 (decision recording interface) are the most architecturally impactful — they affect the assembly engine (T-017) and decision logger (T-009) respectively. Recommend resolving these ADRs before starting the corresponding tasks.
+- **5 proposed ADRs (050-054) have resolution recommendations.** Each ADR now includes a "Resolution Recommendation" section with recommended decision, rationale, impact analysis, blocking tasks, and timing guidance. ADR statuses remain "proposed" — recommendations are advisory pending user review. ADR-050/053 (context management) and ADR-052 (decision recording) are the most architecturally impactful and should be resolved before Phase 2.
