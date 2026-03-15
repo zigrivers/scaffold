@@ -8,66 +8,66 @@
 
 ## Summary
 
-| Task | Title | Score | Gaps | Critical | Assessment |
-|------|-------|-------|------|----------|------------|
-| T-001 | Initialize TypeScript project scaffolding | 4/5 | 3 | 0 | Minor clarifications needed |
-| T-002 | Define core shared type definitions | 3/5 | 6 | 1 | Schema version conflict; massive scope without per-file guidance |
-| T-003 | Implement utility modules and error system | 4/5 | 3 | 0 | Minor clarifications needed |
-| T-004 | Implement frontmatter parser | 4/5 | 4 | 0 | Missing `reads` field; kebab-to-camelCase conversion |
-| T-005 | Implement config loader and validator | 4/5 | 4 | 0 | Validation pipeline phasing; v1 migration format |
-| T-006 | Implement methodology preset loader | 3/5 | 5 | 1 | Preset files don't exist; path resolution unclear |
-| T-007 | Implement state manager with atomic writes | 3/5 | 6 | 1 | Schema version conflict (1 vs 2); missing required fields |
-| T-008 | Implement completion detection and crash recovery | 4/5 | 3 | 0 | "Ask user" behavior undefined at data layer |
-| T-009 | Implement decision logger | 4/5 | 3 | 0 | Minor gaps in write mechanism |
-| T-010 | Implement lock manager with PID liveness detection | 3/5 | 5 | 1 | Cross-platform PID detection; incomplete error coverage |
-| T-011 | Implement dependency resolver with Kahn's algorithm | 4/5 | 2 | 0 | Phase sort order unspecified |
-| T-012 | Implement methodology and depth resolution | 4/5 | 3 | 0 | Depth precedence confusion; overlap with T-018 |
-| T-013 | Implement meta-prompt loader | 3/5 | 3 | 1 | Body section parsing algorithm undefined |
-| T-014 | Implement knowledge base loader | 3/5 | 3 | 1 | Name-to-file resolution missing; KB schema missing |
-| T-015 | Implement context gatherer | 4/5 | 2 | 0 | Artifact scope ambiguous |
-| T-016 | Implement user instruction loader | 5/5 | 0 | 0 | Ready to implement |
-| T-017 | Implement assembly engine orchestrator | 3/5 | 4 | 1 | System framing/execution instruction content missing |
-| T-018 | Implement update mode and methodology change detection | 4/5 | 3 | 0 | Ownership overlap with T-012 |
-| T-019 | Set up CLI framework with yargs | 5/5 | 0 | 0 | Ready to implement |
-| T-020 | Implement output context system | 4/5 | 2 | 0 | Progress indicator API undefined |
-| T-021 | Implement error display and formatting | 4/5 | 2 | 0 | Accumulator responsibility ambiguous |
-| T-022 | Implement CLI middleware | 5/5 | 0 | 0 | Ready to implement |
-| T-023 | Implement scaffold status command | 4/5 | 2 | 0 | Missing `--phase` flag; orphaned entries |
-| T-024 | Implement scaffold next command | 4/5 | 2 | 0 | Missing `--count` flag |
-| T-025 | Implement scaffold info command | 4/5 | 2 | 0 | Missing project-info mode |
-| T-026 | Implement scaffold list command | 4/5 | 3 | 0 | Flag design contradicts CLI contract |
-| T-027 | Implement scaffold decisions command | 5/5 | 0 | 0 | Ready to implement |
-| T-028 | Implement scaffold version command | 4/5 | 2 | 0 | Task contradicts contract on network check |
-| T-029 | Implement scaffold run command | 3/5 | 5 | 2 | Phantom `--no-confirm` flag; missing completion gate |
-| T-030 | Implement scaffold skip command | 4/5 | 3 | 0 | Task/contract conflict on completed-step behavior |
-| T-031 | Implement scaffold reset command | 3/5 | 4 | 2 | Major task/contract divergence |
-| T-032 | Implement project detector | 4/5 | 3 | 0 | DetectionResult type undefined |
-| T-033 | Implement init wizard and scaffold init command | 3/5 | 5 | 1 | Wizard questions mismatch CLI contract |
-| T-034 | Implement scaffold build command | 4/5 | 2 | 0 | Universal adapter build-time behavior ambiguous |
-| T-035 | Implement scaffold adopt command | 3/5 | 4 | 1 | AdaptationStrategy enum conflicts with domain model |
-| T-036 | Implement scaffold validate command | 4/5 | 3 | 0 | Missing `--fix` and `--scope` flags |
-| T-037 | Implement scaffold dashboard command | 4/5 | 3 | 0 | Staleness notice missing from acceptance criteria |
-| T-038 | Implement scaffold update command | 3/5 | 5 | 1 | Flag names mismatched; install detection unspecified |
-| T-039 | Define adapter interface and factory | 5/5 | 0 | 0 | Ready to implement |
-| T-040 | Implement Claude Code adapter | 5/5 | 0 | 0 | Ready to implement |
-| T-041 | Implement Codex adapter | 5/5 | 0 | 0 | Ready to implement |
-| T-042 | Implement Universal adapter | 4/5 | 1 | 0 | Task conflicts with spec on file generation |
-| T-043 | Implement CLAUDE.md manager | 4/5 | 4 | 0 | Error code mismatch; token counting unspecified |
-| T-044 | Author methodology preset files | 4/5 | 2 | 0 | Minor: step name cross-reference |
-| T-045 | Author core domain expertise KB files | 3/5 | 3 | 1 | File path mismatch; no KB schema; no content example |
-| T-046 | Author phase-specific review KB files | 3/5 | 4 | 0 | No KB schema; vague detection heuristic definition |
-| T-047 | Author validation and product KB files | 3/5 | 3 | 0 | Directory placement ambiguity; thin content guidance |
-| T-048 | Author pipeline meta-prompts — product/domain | 4/5 | 2 | 0 | No meta-prompt body example |
-| T-049 | Author pipeline meta-prompts — architecture/data | 4/5 | 3 | 0 | Step name mismatches with manifest |
-| T-050 | Author pipeline meta-prompts — impl/finalization | 4/5 | 3 | 0 | Step name mismatches with manifest |
-| T-051 | Author pipeline meta-prompts — review steps | 5/5 | 0 | 0 | Ready to implement |
-| T-052 | Implement end-to-end integration tests | 3/5 | 4 | 1 | AI execution boundary undefined; no fixture spec |
-| T-053 | Configure npm packaging and distribution | 4/5 | 2 | 0 | Package name unconfirmed |
-| T-054 | Write v1 to v2 migration guide | 4/5 | 2 | 0 | V1 methodology mapping confirmation needed |
-| T-055 | Validate performance against PRD budgets | 4/5 | 3 | 0 | Assembly sequence scope ambiguous |
+| Task | Title | Score | Gaps | Critical | Assessment | Status |
+|------|-------|-------|------|----------|------------|--------|
+| T-001 | Initialize TypeScript project scaffolding | 4→5 | 3 | 0 | Minor clarifications needed | Resolved |
+| T-002 | Define core shared type definitions | 3→4 | 6 | 1 | Schema version conflict; massive scope without per-file guidance | Resolved |
+| T-003 | Implement utility modules and error system | 4→5 | 3 | 0 | Minor clarifications needed | Resolved |
+| T-004 | Implement frontmatter parser | 4→5 | 4 | 0 | Missing `reads` field; kebab-to-camelCase conversion | Resolved |
+| T-005 | Implement config loader and validator | 4→5 | 4 | 0 | Validation pipeline phasing; v1 migration format | Resolved |
+| T-006 | Implement methodology preset loader | 3→4 | 5 | 1 | Preset files don't exist; path resolution unclear | Resolved |
+| T-007 | Implement state manager with atomic writes | 3→4 | 6 | 1 | Schema version conflict (1 vs 2); missing required fields | Resolved |
+| T-008 | Implement completion detection and crash recovery | 4→5 | 3 | 0 | "Ask user" behavior undefined at data layer | Resolved |
+| T-009 | Implement decision logger | 4→5 | 3 | 0 | Minor gaps in write mechanism | Resolved |
+| T-010 | Implement lock manager with PID liveness detection | 3→4 | 5 | 1 | Cross-platform PID detection; incomplete error coverage | Resolved |
+| T-011 | Implement dependency resolver with Kahn's algorithm | 4→5 | 2 | 0 | Phase sort order unspecified | Resolved |
+| T-012 | Implement methodology and depth resolution | 4→5 | 3 | 0 | Depth precedence confusion; overlap with T-018 | Resolved |
+| T-013 | Implement meta-prompt loader | 3→4 | 3 | 1 | Body section parsing algorithm undefined | Resolved |
+| T-014 | Implement knowledge base loader | 3→4 | 3 | 1 | Name-to-file resolution missing; KB schema missing | Resolved |
+| T-015 | Implement context gatherer | 4→5 | 2 | 0 | Artifact scope ambiguous | Resolved |
+| T-016 | Implement user instruction loader | 5/5 | 0 | 0 | Ready to implement | No changes needed |
+| T-017 | Implement assembly engine orchestrator | 3→4 | 4 | 1 | System framing/execution instruction content missing | Resolved |
+| T-018 | Implement update mode and methodology change detection | 4→5 | 3 | 0 | Ownership overlap with T-012 | Resolved |
+| T-019 | Set up CLI framework with yargs | 5/5 | 0 | 0 | Ready to implement | No changes needed |
+| T-020 | Implement output context system | 4→5 | 2 | 0 | Progress indicator API undefined | Resolved |
+| T-021 | Implement error display and formatting | 4→5 | 2 | 0 | Accumulator responsibility ambiguous | Resolved |
+| T-022 | Implement CLI middleware | 5/5 | 0 | 0 | Ready to implement | No changes needed |
+| T-023 | Implement scaffold status command | 4→5 | 2 | 0 | Missing `--phase` flag; orphaned entries | Resolved |
+| T-024 | Implement scaffold next command | 4→5 | 2 | 0 | Missing `--count` flag | Resolved |
+| T-025 | Implement scaffold info command | 4→5 | 2 | 0 | Missing project-info mode | Resolved |
+| T-026 | Implement scaffold list command | 4→5 | 3 | 0 | Flag design contradicts CLI contract | Resolved |
+| T-027 | Implement scaffold decisions command | 5/5 | 0 | 0 | Ready to implement | No changes needed |
+| T-028 | Implement scaffold version command | 4→5 | 2 | 0 | Task contradicts contract on network check | Resolved |
+| T-029 | Implement scaffold run command | 3→4 | 5 | 2 | Phantom `--no-confirm` flag; missing completion gate | Resolved |
+| T-030 | Implement scaffold skip command | 4→5 | 3 | 0 | Task/contract conflict on completed-step behavior | Resolved |
+| T-031 | Implement scaffold reset command | 3→4 | 4 | 2 | Major task/contract divergence | Resolved |
+| T-032 | Implement project detector | 4/5 | 3 | 0 | DetectionResult type undefined | No changes (type defined in T-002) |
+| T-033 | Implement init wizard and scaffold init command | 3→4 | 5 | 1 | Wizard questions mismatch CLI contract | Resolved |
+| T-034 | Implement scaffold build command | 4/5 | 2 | 0 | Universal adapter build-time behavior ambiguous | No changes (resolved via T-042) |
+| T-035 | Implement scaffold adopt command | 3→4 | 4 | 1 | AdaptationStrategy enum conflicts with domain model | Resolved |
+| T-036 | Implement scaffold validate command | 4→5 | 3 | 0 | Missing `--fix` and `--scope` flags | Resolved |
+| T-037 | Implement scaffold dashboard command | 4→5 | 3 | 0 | Staleness notice missing from acceptance criteria | Resolved |
+| T-038 | Implement scaffold update command | 3→4 | 5 | 1 | Flag names mismatched; install detection unspecified | Resolved |
+| T-039 | Define adapter interface and factory | 5/5 | 0 | 0 | Ready to implement | No changes needed |
+| T-040 | Implement Claude Code adapter | 5/5 | 0 | 0 | Ready to implement | No changes needed |
+| T-041 | Implement Codex adapter | 5/5 | 0 | 0 | Ready to implement | No changes needed |
+| T-042 | Implement Universal adapter | 4→5 | 1 | 0 | Task conflicts with spec on file generation | Resolved |
+| T-043 | Implement CLAUDE.md manager | 4→5 | 4 | 0 | Error code mismatch; token counting unspecified | Resolved |
+| T-044 | Author methodology preset files | 4→5 | 2 | 0 | Minor: step name cross-reference | Resolved |
+| T-045 | Author core domain expertise KB files | 3→4 | 3 | 1 | File path mismatch; no KB schema; no content example | Resolved |
+| T-046 | Author phase-specific review KB files | 3→4 | 4 | 0 | No KB schema; vague detection heuristic definition | Resolved |
+| T-047 | Author validation and product KB files | 3→4 | 3 | 0 | Directory placement ambiguity; thin content guidance | Resolved |
+| T-048 | Author pipeline meta-prompts — product/domain | 4→5 | 2 | 0 | No meta-prompt body example | Resolved |
+| T-049 | Author pipeline meta-prompts — architecture/data | 4→5 | 3 | 0 | Step name mismatches with manifest | Resolved |
+| T-050 | Author pipeline meta-prompts — impl/finalization | 4→5 | 3 | 0 | Step name mismatches with manifest | Resolved |
+| T-051 | Author pipeline meta-prompts — review steps | 5/5 | 0 | 0 | Ready to implement | No changes needed |
+| T-052 | Implement end-to-end integration tests | 3→4 | 4 | 1 | AI execution boundary undefined; no fixture spec | Resolved |
+| T-053 | Configure npm packaging and distribution | 4→5 | 2 | 0 | Package name unconfirmed | Resolved |
+| T-054 | Write v1 to v2 migration guide | 4/5 | 2 | 0 | V1 methodology mapping confirmation needed | No changes needed |
+| T-055 | Validate performance against PRD budgets | 4→5 | 3 | 0 | Assembly sequence scope ambiguous | Resolved |
 
-**Overall:** 8/55 tasks ready (5/5), 31 tasks need minor fixes (4/5), 16 tasks need work (≤3/5)
-**Target:** All tasks ≥ 4/5 before implementation begins
+**Overall (post-fix):** 33/55 tasks at 5/5, 22 tasks at 4/5, 0 tasks below 4/5. All 55 tasks ≥ 4/5.
+**Target:** All tasks ≥ 4/5 before implementation begins — **MET**
 
 ---
 
@@ -1554,6 +1554,7 @@ T-052 (e2e tests) is the weakest at 3/5 — the AI execution boundary in tests i
 
 ## Statistics
 
+### Pre-fix
 - Tasks ready (5/5): 8
 - Tasks with minor gaps (4/5): 31
 - Tasks with moderate gaps (3/5): 16
@@ -1564,3 +1565,22 @@ T-052 (e2e tests) is the weakest at 3/5 — the AI execution boundary in tests i
 - Pattern gaps: 4
 - Handoff gaps: 5
 - Missing tasks identified: 4
+
+### Post-fix
+- Tasks ready (5/5): 33
+- Tasks with minor gaps (4/5): 22
+- Tasks with moderate gaps (3/5): 0
+- Total findings resolved: 120
+- Pattern gaps resolved: 4
+- Handoff gaps resolved: 5
+- Missing tasks addressed: 4 (3 folded into existing tasks, 1 new document created)
+
+---
+
+## Resolution Record
+
+| Commit | Scope | Resolved |
+|--------|-------|----------|
+| 1: Spec fixes + schemas | state-json-schema.md, system-architecture.md, new knowledge-entry-schema.md | Critical #1 (schema-version), Critical #4 (system framing), Pattern Gap #1 (KB schema), Pattern Gap #2 (body convention), Missing Task #2, #4 |
+| 2: Error codes | error-messages.md | Pattern Gap #3 (incomplete error catalog): 11 codes added across 4 component groups |
+| 3: Task descriptions | task-breakdown.md (T-001–T-055) | All 120 per-task findings, 5 handoff gaps, 4 ordering risks. Key fixes: schema-version refs, CLI contract alignment (T-029, T-031, T-038), adapter reconciliation (T-042), file path corrections (T-045, T-047, T-049, T-050), ownership boundaries (T-012/T-018) |
