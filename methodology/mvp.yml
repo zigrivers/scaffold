@@ -6,6 +6,9 @@ default_depth: 1
 steps:
   create-prd: { enabled: true }
   prd-gap-analysis: { enabled: false }
+  user-stories: { enabled: true }
+  review-user-stories: { enabled: true }
+  innovate-user-stories: { enabled: false }
   phase-01-domain-modeling: { enabled: false }
   phase-01a-review-domain-modeling: { enabled: false }
   phase-02-adrs: { enabled: false }
