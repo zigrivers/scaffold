@@ -1639,6 +1639,8 @@ Final integration testing, packaging, and validation against performance budgets
 - [ ] `engines.node >= 18` specified
 - [ ] Prepublish script runs build and tests
 - [ ] Package installs and runs with `npx`
+- [ ] Distribution smoke test: `npm install -g` from packed tarball, `scaffold --version` succeeds
+- [ ] CI job validates `npm pack --dry-run` output (no dev artifacts, all content dirs present)
 
 ---
 
