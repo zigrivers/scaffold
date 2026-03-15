@@ -1,4 +1,4 @@
-<!-- scaffold:security-practices v2 2026-03-14 -->
+<!-- scaffold:security-practices v3 2026-03-14 -->
 
 # Scaffold v2 — Security Practices
 
@@ -345,6 +345,10 @@ Verify before every release: `npm pack --dry-run` lists exactly what will be pub
 | `.scaffold/lock.json` | Advisory lock | Create on lock acquire, delete on release |
 | `commands/*.md` | Platform wrappers (Claude Code) | `scaffold build` |
 | `AGENTS.md` | Platform wrapper (Codex) | `scaffold build` |
+| `codex-prompts/*.md` | Platform wrappers (Codex) | `scaffold build` |
+| `prompts/*.md` | Platform wrappers (Universal) | `scaffold build` |
+| `scaffold-pipeline.md` | Pipeline reference (Universal) | `scaffold build` |
+| `CLAUDE.md` | Agent instructions (managed sections) | `scaffold build`, `scaffold run` |
 
 ### Security Constraints
 
