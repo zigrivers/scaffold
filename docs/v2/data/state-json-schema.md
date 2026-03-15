@@ -529,11 +529,20 @@ A deep methodology pipeline partway through execution. Three prompts completed, 
       "completed_by": "ken",
       "depth": 5
     },
-    "prd-gap-analysis": {
+    "review-prd": {
       "status": "completed",
       "source": "pipeline",
-      "produces": ["docs/plan.md"],
+      "produces": ["docs/reviews/pre-review-prd.md"],
       "at": "2026-03-12T10:15:00Z",
+      "artifacts_verified": true,
+      "completed_by": "ken",
+      "depth": 5
+    },
+    "innovate-prd": {
+      "status": "completed",
+      "source": "pipeline",
+      "produces": ["docs/prd-innovation.md"],
+      "at": "2026-03-12T10:30:00Z",
       "artifacts_verified": true,
       "completed_by": "ken",
       "depth": 5
@@ -619,11 +628,20 @@ Brownfield initialization with extra prompts, a completed re-run, and every opti
       "completed_by": "scaffold-adopt",
       "depth": 5
     },
-    "prd-gap-analysis": {
+    "review-prd": {
       "status": "completed",
       "source": "pipeline",
-      "produces": ["docs/plan.md"],
+      "produces": ["docs/reviews/pre-review-prd.md"],
       "at": "2026-03-11T09:30:00Z",
+      "artifacts_verified": true,
+      "completed_by": "ken",
+      "depth": 5
+    },
+    "innovate-prd": {
+      "status": "completed",
+      "source": "pipeline",
+      "produces": ["docs/prd-innovation.md"],
+      "at": "2026-03-11T09:45:00Z",
       "artifacts_verified": true,
       "completed_by": "ken",
       "depth": 5

@@ -152,7 +152,8 @@ Get the user from idea to the point where AI agents can begin implementation wit
 | Step | Description | Conditional |
 |------|-------------|-------------|
 | `create-prd` | Product requirements document | No |
-| `prd-gap-analysis` | Find gaps in requirements | No |
+| `review-prd` | Review PRD for quality and completeness | No |
+| `innovate-prd` | Discover innovation and competitive opportunities | if-needed |
 | `user-stories` | Translate PRD features into user stories with acceptance criteria | No |
 | `review-user-stories` | Multi-pass review of user stories for PRD coverage, quality, downstream readiness | No |
 | `innovate-user-stories` | Discover UX-level enhancements and innovation opportunities | if-needed |
@@ -302,7 +303,9 @@ custom:
     create-prd:
       enabled: true
       depth: 4
-    prd-gap-analysis:
+    review-prd:
+      enabled: false
+    innovate-prd:
       enabled: false
     phase-03-system-architecture:
       enabled: true
@@ -934,7 +937,8 @@ scaffold/
   pipeline/                           # Meta-prompts (one per step)
     pre/
       create-prd.md
-      prd-gap-analysis.md
+      review-prd.md
+      innovate-prd.md
     phase-01-domain-modeling.md
     phase-01a-review-domain-modeling.md
     phase-02-adrs.md

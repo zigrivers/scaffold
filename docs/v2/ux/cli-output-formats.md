@@ -291,7 +291,7 @@ Build complete in 0.5s
 [ConfigLoader] Reading .scaffold/config.yml (version: 1)
 [ConfigLoader] Methodology: deep, schema valid
 [StepResolver] 32 steps defined, 29 enabled, 3 conditional disabled
-[DependencyResolver] Topological order: create-prd → prd-gap-analysis → phase-01-domain-modeling → ...
+[DependencyResolver] Topological order: create-prd → review-prd → innovate-prd → phase-01-domain-modeling → ...
 [ClaudeCodeAdapter] Writing commands/create-prd.md (thin wrapper, 0.3 KB)
 [UniversalAdapter] Writing prompts/create-prd.md (thin wrapper, 0.3 KB)
 ```
@@ -642,9 +642,10 @@ Phase 0 — Prerequisites
 
 Phase 1 — Planning
   ✓ create-prd                        done        2026-03-10  depth 5
-  ✓ prd-gap-analysis                  done        2026-03-11  depth 5
+  ✓ review-prd                        done        2026-03-11  depth 5
+  ✓ innovate-prd                      done        2026-03-11  depth 5  (if-needed)
   ✓ tech-stack                        done        2026-03-11  depth 5
-  ○ user-stories                      pending     [blocked by: prd-gap-analysis → done]
+  ○ user-stories                      pending     [blocked by: innovate-prd → done]
   ○ user-stories-gaps                 pending     [blocked by: user-stories]
 
 Phase 2 — Standards
@@ -725,7 +726,7 @@ Phase 2 — Standards
 Next: user-stories (Phase 1 — Planning)
   Description:  Create user stories from the PRD
   Depth:        5
-  Depends on:   create-prd ✓, prd-gap-analysis ✓
+  Depends on:   create-prd ✓, review-prd ✓, innovate-prd ✓
   Produces:     docs/user-stories.md
   Reads:        docs/plan.md, docs/tech-stack.md
 
@@ -740,7 +741,7 @@ Next eligible (3 of 5):
   1. user-stories (Phase 1 — Planning)
      Description:  Create user stories from the PRD
      Depth:        5
-     Depends on:   create-prd ✓, prd-gap-analysis ✓
+     Depends on:   create-prd ✓, review-prd ✓, innovate-prd ✓
      Produces:     docs/user-stories.md
 
   2. design-system (Phase 2 — Standards)
@@ -785,7 +786,7 @@ Run: scaffold status to see the full pipeline.
 
 ```
 [DependencyResolver] Computing eligibility from state (8 done, 1 skipped, 23 pending)
-[DependencyResolver] user-stories: all 2 dependencies satisfied (create-prd, prd-gap-analysis)
+[DependencyResolver] user-stories: all 3 dependencies satisfied (create-prd, review-prd, innovate-prd)
 [DependencyResolver] user-stories: produces=[docs/user-stories.md], reads=[docs/plan.md, docs/tech-stack.md]
 [DependencyResolver] user-stories: source=pipeline, depth=5, has CLAUDE.md section: no
 ```
@@ -1379,9 +1380,10 @@ Phase 0 — Prerequisites
 
 Phase 1 — Planning
   ○ create-prd                        pending
-  ○ prd-gap-analysis                  pending     [blocked by: create-prd]
+  ○ review-prd                        pending     [blocked by: create-prd]
+  ○ innovate-prd                      pending     [blocked by: review-prd]  (if-needed)
   ○ tech-stack                        pending     [blocked by: create-prd]
-  ○ user-stories                      pending     [blocked by: prd-gap-analysis]
+  ○ user-stories                      pending     [blocked by: innovate-prd]
   ○ user-stories-gaps                 pending     [blocked by: user-stories]
   ...
 

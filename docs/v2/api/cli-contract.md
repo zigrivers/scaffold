@@ -670,7 +670,8 @@ Phase 0 — Prerequisites
 
 Phase 1 — Planning
   ✓ create-prd                completed  2026-03-10
-  ✓ prd-gap-analysis          completed  2026-03-11
+  ✓ review-prd                completed  2026-03-11
+  ✓ innovate-prd              completed  2026-03-11
   ✓ tech-stack                completed  2026-03-11
   ○ user-stories              pending
   ○ user-stories-gaps         pending    [blocked by user-stories]
@@ -738,7 +739,7 @@ Same output. No decisions.
 ```
 Next: user-stories (Phase 1 — Planning)
   Description: Create user stories from the PRD
-  Depends on: create-prd ✓, prd-gap-analysis ✓
+  Depends on: create-prd ✓, review-prd ✓
   Produces: docs/user-stories.md
 
 Run: scaffold run

@@ -1875,7 +1875,8 @@ Pipeline: classic (8/18 complete, 2 skipped)
 
   Phase 1 — Product Definition
     ✓ create-prd
-    ✓ prd-gap-analysis
+    ✓ review-prd
+    ✓ innovate-prd
 
   Phase 2 — Project Foundation
     ✓ beads-setup

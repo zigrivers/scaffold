@@ -446,7 +446,7 @@ Note: "T-006 tests require fixture preset YAML files. The production preset file
 - [ ] `initializeState()` creates valid state.json with all steps pending, schema-version 1 (per state-json-schema.md)
 - [ ] `setInProgress('create-prd')` sets step to in_progress and populates in_progress record
 - [ ] `markCompleted('create-prd', ['docs/prd.md'])` sets status to completed, records timestamp and outputs, clears in_progress
-- [ ] `markSkipped('prd-gap-analysis', 'Not needed for MVP')` sets status to skipped with reason
+- [ ] `markSkipped('review-prd', 'Not needed for MVP')` sets status to skipped with reason
 - [ ] Writes are atomic: state.json.tmp → rename to state.json
 - [ ] Rejects state with invalid schema_version
 - [ ] Only one step can be in_progress at a time
@@ -1518,14 +1518,15 @@ Content tasks — meta-prompts, knowledge base files, and methodology presets. T
 
 **Files**:
 - Create: `pipeline/create-prd.md`
-- Create: `pipeline/prd-gap-analysis.md`
+- Create: `pipeline/review-prd.md`
+- Create: `pipeline/innovate-prd.md`
 - Create: `pipeline/phase-01-domain-modeling.md`
 - Create: `pipeline/phase-02-adrs.md`
 
-**Description**: Author 4 meta-prompts for product definition and early domain phases. Each meta-prompt has YAML frontmatter (name, description, phase, dependencies, outputs, knowledge-base) and body sections: Purpose, Inputs, Expected Outputs, Quality Criteria, Methodology Scaling (with specific guidance for depth 1 and depth 5), Mode Detection (create vs update behavior per ADR-048). Meta-prompts declare intent — they do NOT contain actual prompt text. 30-80 lines each. Reference appropriate knowledge base entries. See system-architecture.md §4a-1 for the meta-prompt body section convention and a complete example. Each meta-prompt body uses `## Purpose`, `## Inputs`, `## Expected Outputs`, `## Quality Criteria`, `## Methodology Scaling`, `## Mode Detection` headings. Intent vs prompt text: 'Analyze domain boundaries and identify bounded contexts' (intent — good). 'You are a domain modeling expert. Read the PRD and produce a domain model following DDD principles. Start by identifying...' (prompt text — bad).
+**Description**: Author 5 meta-prompts for product definition and early domain phases. Each meta-prompt has YAML frontmatter (name, description, phase, dependencies, outputs, knowledge-base) and body sections: Purpose, Inputs, Expected Outputs, Quality Criteria, Methodology Scaling (with specific guidance for depth 1 and depth 5), Mode Detection (create vs update behavior per ADR-048). Meta-prompts declare intent — they do NOT contain actual prompt text. 30-80 lines each. Reference appropriate knowledge base entries. See system-architecture.md §4a-1 for the meta-prompt body section convention and a complete example. Each meta-prompt body uses `## Purpose`, `## Inputs`, `## Expected Outputs`, `## Quality Criteria`, `## Methodology Scaling`, `## Mode Detection` headings. Intent vs prompt text: 'Analyze domain boundaries and identify bounded contexts' (intent — good). 'You are a domain modeling expert. Read the PRD and produce a domain model following DDD principles. Start by identifying...' (prompt text — bad).
 
 **Acceptance Criteria**:
-- [ ] All 4 files have valid frontmatter per frontmatter-schema
+- [ ] All 5 files have valid frontmatter per frontmatter-schema
 - [ ] Each includes Purpose, Inputs, Expected Outputs, Quality Criteria sections
 - [ ] Each includes Methodology Scaling with depth 1 and depth 5 specifics
 - [ ] Each includes Mode Detection block (create vs update)

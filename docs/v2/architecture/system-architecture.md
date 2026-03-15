@@ -374,7 +374,8 @@ The `content/` directory contains all shipped prompt, mixin, and methodology con
 content/
 ├── base/                             # Base prompts — shared across all methodologies
 │   ├── create-prd.md                 # Product requirements document creation
-│   ├── prd-gap-analysis.md           # PRD gap analysis and innovation
+│   ├── review-prd.md                 # PRD quality review
+│   ├── innovate-prd.md               # PRD innovation opportunities
 │   ├── tech-stack.md                 # Technology stack research
 │   ├── claude-code-permissions.md    # Claude Code permission configuration
 │   ├── coding-standards.md           # Code quality rules and conventions

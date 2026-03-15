@@ -169,7 +169,8 @@ Not all current prompts can be base prompts. Prompts that are deeply intertwined
 ```
 base/
   create-prd.md
-  prd-gap-analysis.md
+  review-prd.md
+  innovate-prd.md
   tech-stack.md
   claude-code-permissions.md
   coding-standards.md
@@ -244,7 +245,8 @@ phases:
   - name: Product Definition
     prompts:
       - base:create-prd
-      - base:prd-gap-analysis
+      - base:review-prd
+      - base:innovate-prd
   - name: Project Foundation
     prompts:
       - ext:beads-setup
@@ -290,7 +292,8 @@ defaults:
   agent-mode: multi
 dependencies:
   create-prd: []
-  prd-gap-analysis: [create-prd]
+  review-prd: [create-prd]
+  innovate-prd: [review-prd]
   beads-setup: []
   tech-stack: [beads-setup]
   claude-code-permissions: [tech-stack]
@@ -644,13 +647,22 @@ The CLI tracks pipeline execution state in `.scaffold/state.json` (separate from
       "artifacts_verified": true,
       "completed_by": "ken"
     },
-    "prd-gap-analysis": {
+    "review-prd": {
       "status": "completed",
       "source": "base",
       "at": "2026-03-12T10:42:00Z",
-      "produces": ["docs/plan.md"],
+      "produces": ["docs/reviews/pre-review-prd.md"],
       "artifacts_verified": true,
       "completed_by": "ken"
+    },
+    "innovate-prd": {
+      "status": "completed",
+      "source": "base",
+      "at": "2026-03-12T10:45:00Z",
+      "produces": ["docs/prd-innovation.md"],
+      "artifacts_verified": true,
+      "completed_by": "ken",
+      "conditional": "if-needed"
     },
     "design-system": {
       "status": "skipped",
@@ -961,10 +973,11 @@ When `in_progress` is non-null in state.json (previous session crashed), the cra
 **`scaffold status`:**
 - Read-only progress display (no offer to execute):
   ```
-  Pipeline: classic (8/18 complete)
+  Pipeline: classic (9/19 complete)
   Phase 3 — Development Environment
   + create-prd
-  + prd-gap-analysis
+  + review-prd
+  + innovate-prd
   + beads-setup
   + tech-stack
   + coding-standards

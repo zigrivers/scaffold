@@ -444,7 +444,9 @@ custom:
     create-prd:
       enabled: true
       depth: 4
-    prd-gap-analysis:
+    review-prd:
+      enabled: true
+    innovate-prd:
       enabled: false
     phase-03-system-architecture:
       enabled: true

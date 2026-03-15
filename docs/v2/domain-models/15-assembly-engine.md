@@ -971,7 +971,7 @@ Domain 16 resolves the effective depth level for the current step. The assembly 
 
 ### 2. Running a step whose dependencies are skipped
 
-**Scenario**: User skipped `prd-gap-analysis` and runs `phase-01-domain-modeling` which depends on it.
+**Scenario**: User skipped `review-prd` and runs `phase-01-domain-modeling` which depends on it.
 **Expected behavior**: Assembly proceeds. Skipped steps are treated as "done" for dependency resolution (ADR-020). The skipped step's artifacts will not be in the project context (they don't exist). The AI generates output without that context.
 
 ### 3. Missing knowledge base file referenced in meta-prompt frontmatter
@@ -1123,7 +1123,7 @@ Assembly sequence:
 9. Update state:
    - create-prd: completed, depth: 5, at: "2026-03-14T10:30:00Z"
    - artifacts_verified: true
-   - next_eligible: ["prd-gap-analysis"]
+   - next_eligible: ["review-prd"]
 ```
 
 ### Example 2: Re-Running a Step at Higher Depth (Update Mode)
