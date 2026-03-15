@@ -6,9 +6,11 @@ topics: [tasks, decomposition, dependencies, user-stories, parallelization, sizi
 
 ## User Stories to Tasks
 
-### From Features to Stories
+> **Note:** User stories are created as an upstream artifact in the pre-pipeline phase and available at `docs/user-stories.md`. This section covers how to consume stories and derive implementation tasks from them.
 
-User stories bridge the gap between what the business wants (PRD features) and what developers build (implementation tasks). Every PRD feature should map to one or more user stories, and every user story should map to one or more implementation tasks.
+### From Stories to Tasks
+
+User stories bridge the gap between what the business wants (PRD features) and what developers build (implementation tasks). Every PRD feature maps to one or more user stories (created in the pre-pipeline), and every user story should map to one or more implementation tasks.
 
 **Feature -> Story mapping:**
 
