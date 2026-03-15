@@ -28,7 +28,7 @@ The meta-prompt architecture replaces the original prompt frontmatter with a sim
 | `depends-on` | Replaced by `dependencies` | Same concept, aligned with meta-prompt terminology |
 | `phase` | Kept | Pipeline phase for ordering and display |
 | `argument-hint` | Removed | User instructions replace argument hints (`--instructions` flag) |
-| `reads` | Removed | The Assembly Engine loads all relevant artifacts automatically based on dependency graph and meta-prompt inputs section. Section targeting is unnecessary — AI extracts what it needs from full artifacts. |
+| `reads` | Re-introduced ([ADR-050](../adrs/ADR-050-context-window-management.md), [ADR-053](../adrs/ADR-053-artifact-context-scope.md)) | Optional field declaring cross-cutting artifact references beyond the dependency chain. The Assembly Engine loads dependency-chain artifacts by default; `reads` extends this with explicitly declared cross-cutting references. |
 | `artifact-schema` | Removed | Quality criteria in the meta-prompt body replace structural validation rules. AI validates against criteria rather than regex patterns. |
 | `requires-capabilities` | Removed | Platform adapters are thin delivery wrappers; capability negotiation is unnecessary. |
 
@@ -110,6 +110,17 @@ The following JSON Schema defines the structure that parsed YAML frontmatter mus
       "uniqueItems": true,
       "default": [],
       "description": "Knowledge base entries to load during assembly. The Assembly Engine loads the referenced knowledge documents and includes them in the assembled prompt."
+    },
+    "reads": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$",
+        "description": "Step name whose output artifact should be loaded into context, even if not in the transitive dependency chain."
+      },
+      "uniqueItems": true,
+      "default": [],
+      "description": "Cross-cutting artifact references. Steps listed here contribute their output artifacts to the assembled prompt's context section, in addition to dependency-chain artifacts. See ADR-050 and ADR-053."
     }
   }
 }
@@ -241,6 +252,25 @@ Conditional evaluation flag for steps that may not apply to all projects.
 
 **Example**: Phases 4, 5, 6 and their reviews are conditional (`"if-needed"`).
 
+### `reads` (string[])
+
+Cross-cutting artifact references beyond the dependency chain.
+
+| Property | Value |
+|----------|-------|
+| Type | `array` of `string` |
+| Required | No |
+| Default | `[]` (empty — no cross-cutting references) |
+| Pattern | `^[a-z][a-z0-9-]*$` (kebab-case step names) |
+| Uniqueness | Items must be unique |
+| Used by | Context Gatherer (assembly step 4), `scaffold validate` |
+| Error code | `FRONTMATTER_READS_INVALID_STEP` (exit 1) when an entry does not match any meta-prompt's `name` field |
+| ADR | [ADR-050](../adrs/ADR-050-context-window-management.md), [ADR-053](../adrs/ADR-053-artifact-context-scope.md) |
+
+**Example values**:
+- `["create-prd"]` (include the PRD artifact even if not a direct dependency)
+- `["tech-stack", "coding-standards"]`
+
 ### `knowledge-base` (string[])
 
 Knowledge base entries to load during assembly.
@@ -273,6 +303,7 @@ Frontmatter fields reference and are referenced by data in other files across th
 | `dependencies[]` | Other meta-prompt `name` fields | Runtime (assembly) | Each name must match a meta-prompt in `pipeline/`. Failure: `DEP_TARGET_MISSING` (exit 2). |
 | `outputs[]` | Filesystem paths at project root | Runtime | Files checked for existence during completion detection and step gating. |
 | `knowledge-base[]` | Knowledge base entries in `knowledge/` | Runtime (assembly) | Each entry must resolve to a knowledge base file. Failure: `FRONTMATTER_KB_ENTRY_MISSING` (exit 1). |
+| `reads[]` | Other meta-prompt `name` fields | Runtime (assembly) | Each name must match a meta-prompt in `pipeline/`. Failure: `FRONTMATTER_READS_INVALID_STEP` (exit 1). |
 
 ### Inbound References (other data points to frontmatter)
 
@@ -381,6 +412,7 @@ All frontmatter keys use **kebab-case**: lowercase letters, digits, and hyphens.
 | `outputs` | `outputs` |
 | `conditional` | `conditional` |
 | `knowledge-base` | `knowledgeBase` |
+| `reads` | `reads` |
 
 The Frontmatter Parser converts kebab-case YAML keys to camelCase TypeScript properties during parsing.
 
@@ -422,6 +454,7 @@ These checks run after all meta-prompts are parsed and require knowledge of the 
 | No self-dependency | A meta-prompt does not list its own name in `dependencies` | `DEP_SELF_REFERENCE` | Error | 1 | `{file} lists itself in dependencies. Self-dependencies are not allowed.` |
 | No dependency cycles | The dependency graph is acyclic | `DEP_CYCLE_DETECTED` | Error | 1 | `Dependency cycle detected: {cycle_path}.` |
 | `knowledge-base` entries exist | Each entry resolves to a file in `knowledge/` | `FRONTMATTER_KB_ENTRY_MISSING` | Error | 1 | `{file} references knowledge base entry '{entry}' which does not exist.` |
+| `reads` targets exist | Each name matches another meta-prompt's `name` field | `FRONTMATTER_READS_INVALID_STEP` | Error | 1 | `{file} reads entry '{name}' does not exist in the pipeline.` |
 | Name matches filename | `name` field matches the filename stem | `FRONTMATTER_NAME_MISMATCH` | Warning | 0 | `{file} name '{name}' does not match filename stem '{stem}'.` |
 | `outputs` path format | Paths must be relative, no `..` traversal, forward slashes only | `FRONTMATTER_PATH_FORMAT_INVALID` | Error | 1 | `Path '{path}' in outputs for {file} is invalid.` |
 
@@ -555,13 +588,12 @@ description: Create a product requirements document
 phase: "pre"
 outputs:
   - docs/prd.md
-reads:
-  - docs/existing-notes.md
+custom-field: some-value
 requires-capabilities:
   - filesystem-write
 ---
 ```
-Warnings: `FRONTMATTER_UNKNOWN_FIELD` for `reads` and `requires-capabilities`. These fields were part of the original frontmatter schema but are not recognized in the meta-prompt schema.
+Warnings: `FRONTMATTER_UNKNOWN_FIELD` for `custom-field` and `requires-capabilities`. These fields are not recognized in the meta-prompt schema. (Note: `reads` is a valid field — see §3.)
 
 ---
 

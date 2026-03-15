@@ -377,6 +377,7 @@ scaffold adopt --force
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--instructions <text>` | string | (none) | Inline user instructions for this invocation. Appended as the highest-priority layer in the instruction hierarchy (global < per-step < inline per [ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md)). Ephemeral — not persisted. |
+| `--depth <level>` | integer | (from config) | Override depth for this invocation. Must be 1-5 ([ADR-043](../adrs/ADR-043-depth-scale.md)). Takes highest precedence in the depth resolution chain (CLI flag > custom per-step > preset default > built-in). Ephemeral — not persisted to config. |
 | `--force` | boolean | false | Override lock contention. Clears a held lock and proceeds. |
 
 **Assembly sequence** (per PRD Section 9, [ADR-044](../adrs/ADR-044-runtime-prompt-generation.md)):
@@ -402,10 +403,11 @@ scaffold adopt --force
 3. **Prerequisite check**: Verifies predecessor `produces` artifacts exist on disk. If missing → offers "Run prerequisite first / Proceed anyway / Cancel".
 4. **Update mode** ([ADR-048](../adrs/ADR-048-update-mode-diff-over-regeneration.md)): If the step is already `completed`, the assembled prompt includes existing artifacts as additional context, and the meta-prompt's Mode Detection section instructs the AI to diff and propose targeted updates rather than regenerating from scratch.
 5. **Methodology change check** ([ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md)): If the methodology has changed since the last step was executed, emits a warning listing completed steps that were executed under the previous methodology. Pending steps are resolved under the new methodology; completed steps are preserved as-is.
-6. **Execution**: Sets `in_progress` in state.json, outputs assembled prompt content to stdout for agent consumption.
-7. **Completion gate**: After outputting the assembled prompt, scaffold blocks and waits for the agent to finish. In interactive mode, scaffold presents a completion confirmation: `"Step '<step>' complete? [Y/n/skip]"`. Answering `Y` (default) triggers post-completion processing. Answering `n` returns to the prompt output (re-display for copy-paste). Answering `skip` marks the step as skipped. In `--auto` mode, scaffold exits immediately after outputting the prompt (exit 0) — the step remains `in_progress`. On the next `scaffold run` invocation, crash recovery ([ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md)) detects the `in_progress` record and checks artifacts to determine completion. This makes crash recovery the primary completion mechanism in `--auto` mode.
-8. **Post-completion**: Marks `completed` with depth level recorded, clears `in_progress`, appends decisions to `decisions.jsonl`, fills CLAUDE.md section if applicable, releases lock.
-9. **Downstream warning** (for re-runs on completed steps): Emits warning listing all downstream steps that may be stale, with suggested `scaffold run <slug>` commands ([ADR-034](../adrs/ADR-034-rerun-no-cascade.md)).
+6. **Depth downgrade check** ([ADR-051](../adrs/ADR-051-depth-downgrade-policy.md)): If the step was previously completed at a higher depth than the current effective depth (e.g., completed at depth 5, current config depth is 1), the CLI prompts: `"Step '<step>' was completed at depth {previous}. Current depth is {current}. Re-run at lower depth? [y/N]"`. Declining aborts (exit 0). In `--auto` mode, emits `DEPTH_DOWNGRADE` warning and proceeds. In `--force` mode, proceeds without prompt or warning. Depth upgrades (re-running at higher depth) proceed without confirmation in all modes.
+7. **Execution**: Sets `in_progress` in state.json, outputs assembled prompt content to stdout for agent consumption.
+8. **Completion gate**: After outputting the assembled prompt, scaffold blocks and waits for the agent to finish. In interactive mode, scaffold presents a completion confirmation: `"Step '<step>' complete? [Y/n/skip]"`. Answering `Y` (default) triggers post-completion processing. Answering `n` returns to the prompt output (re-display for copy-paste). Answering `skip` marks the step as skipped. In `--auto` mode, scaffold exits immediately after outputting the prompt (exit 0) — the step remains `in_progress`. On the next `scaffold run` invocation, crash recovery ([ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md)) detects the `in_progress` record and checks artifacts to determine completion. This makes crash recovery the primary completion mechanism in `--auto` mode.
+9. **Post-completion**: Marks `completed` with depth level recorded, clears `in_progress`, appends decisions to `decisions.jsonl`, fills CLAUDE.md section if applicable, releases lock.
+10. **Downstream warning** (for re-runs on completed steps): Emits warning listing all downstream steps that may be stale, with suggested `scaffold run <slug>` commands ([ADR-034](../adrs/ADR-034-rerun-no-cascade.md)).
 
 Steps execute sequentially — at most one step at a time ([ADR-021](../adrs/ADR-021-sequential-prompt-execution.md)). Even in `--auto` mode, the user must have initiated `scaffold run`; the CLI does not self-invoke.
 
@@ -418,6 +420,7 @@ Steps execute sequentially — at most one step at a time ([ADR-021](../adrs/ADR
   - Partial artifacts → re-run (safer default) with warning.
 - Missing prerequisites → exit 2 (`DEPENDENCY_UNMET`); does not proceed. Auto mode does not automatically execute prerequisite steps. Missing prerequisites produce exit 2 (`DEPENDENCY_UNMET`). This is the safe default for unattended operation per [ADR-021](../adrs/ADR-021-sequential-prompt-execution.md).
 - Already-completed step → proceeds without confirmation (update mode).
+- Depth downgrade → emits `DEPTH_DOWNGRADE` warning, proceeds without prompting.
 - Completion gate → exits immediately after prompt output. Step remains `in_progress`. Next invocation triggers crash recovery for artifact-based completion detection.
 
 **Success output**:
@@ -443,7 +446,7 @@ After the agent completes and the user confirms completion:
   Run: scaffold run user-stories-gaps
 ```
 
-In JSON mode, `data` contains `{ step, methodology, depth, update_mode, pipeline_progress, outputs_produced, next_eligible }` with optional `instructions_loaded` (layers of instructions applied per [ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md)) and `auto_decisions` (present in `--auto` mode). `depth` is integer 1-5 ([ADR-043](../adrs/ADR-043-depth-scale.md)); `update_mode` is boolean ([ADR-048](../adrs/ADR-048-update-mode-diff-over-regeneration.md)).
+In JSON mode, `data` contains `{ step, methodology, depth, depth_source, update_mode, pipeline_progress, outputs_produced, next_eligible }` with optional `instructions_loaded` (layers of instructions applied per [ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md)) and `auto_decisions` (present in `--auto` mode). `depth` is integer 1-5 ([ADR-043](../adrs/ADR-043-depth-scale.md)); `depth_source` is one of `"cli-flag"`, `"custom-override"`, `"preset-default"`, `"built-in-default"` indicating which precedence layer determined the effective depth; `update_mode` is boolean ([ADR-048](../adrs/ADR-048-update-mode-diff-over-regeneration.md)).
 
 **Error conditions:**
 
@@ -459,6 +462,7 @@ In JSON mode, `data` contains `{ step, methodology, depth, update_mode, pipeline
 | `PSM_ALREADY_IN_PROGRESS` | 3 | Another step is `in_progress` | "Another step is already in progress: <slug>. Check for a crashed session." |
 | `ASSEMBLY_FAILED` | 5 | Assembly engine error (meta-prompt missing, knowledge base missing) | "Assembly failed for step '<slug>': <detail>" |
 | `USER_CANCELLED` | 4 | User cancels at any confirmation point | "Cancelled." |
+| `DEPTH_DOWNGRADE` | 0 (warning) | Step re-run at lower depth than original execution | "Step '<step>' was completed at depth {previous}. Re-running at depth {current}." |
 
 **Side effects**:
 - Acquires `.scaffold/lock.json`
