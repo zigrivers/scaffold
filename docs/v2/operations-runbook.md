@@ -1,4 +1,4 @@
-<!-- scaffold:operations-runbook v3 2026-03-14 -->
+<!-- scaffold:operations-runbook v4 2026-03-14 -->
 
 # Scaffold v2 — Operations & Deployment Runbook
 
@@ -66,8 +66,9 @@ Source and tests are co-located for unit tests:
 ```
 src/
   core/
-    assembly-engine.ts
-    assembly-engine.test.ts       # Unit test — co-located
+    assembly/
+      engine.ts
+      engine.test.ts              # Unit test — co-located
   state/
     state-manager.ts
     state-manager.test.ts
@@ -635,7 +636,7 @@ Track the [Node.js release schedule](https://nodejs.org/en/about/releases/):
 | Update `engines.node` minimum | When the oldest supported LTS reaches EOL |
 | Update `.nvmrc` | When the recommended development version changes |
 
-As of 2026: Node 18 is the minimum, Node 22 is the Codex target. When Node 18 reaches EOL (April 2025 — already EOL), update `engines.node` to `>=20` and drop Node 18 from the CI matrix.
+As of 2026: Node 18 is the minimum, Node 22 is the Codex target. Node 18 reached EOL in April 2025. The CI matrix retains Node 18 for the initial v2 release to support users who haven't upgraded. After v2 launches, update `engines.node` to `>=20` and drop Node 18 from the CI matrix.
 
 ### 7.4 Performance Regression Tracking
 
@@ -693,11 +694,11 @@ See CLAUDE.md for the full Beads workflow and commit message format.
 **Adding a new CLI command**:
 1. Create `src/cli/commands/<name>.ts` with yargs command module structure
 2. Create co-located test `src/cli/commands/<name>.test.ts`
-3. Register command in `src/cli/commands/index.ts`
+3. Register command in `src/cli/index.ts` (the yargs setup file)
 4. Write failing test → implement → verify
 
 **Modifying the assembly engine**:
-1. Read `src/core/assembly-engine.ts` and its test file
+1. Read `src/core/assembly/engine.ts` and its test file
 2. Write a failing test for the new behavior
 3. Implement the change
 4. Run `npm run test:e2e` — assembly changes often affect E2E tests
