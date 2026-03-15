@@ -1358,7 +1358,7 @@ Every decision point across all commands, with its `--auto` resolution:
 
 | Command | Decision Point | --auto Resolution |
 |---------|---------------|-------------------|
-| `init` | Methodology selection | Use `classic` (first option) |
+| `init` | Methodology selection | Use `deep` (first option) |
 | `init` | Each mixin axis selection | Use methodology defaults from manifest |
 | `init` | Platform selection | `['claude-code']` (primary platform) |
 | `init` | Brownfield vs. greenfield | Detect automatically: if package manifests exist → brownfield, else greenfield |
@@ -1390,9 +1390,9 @@ Command handlers wrap domain-specific errors into `CommandResult.errors[]`. If t
 
 | Mode | Error Formatting |
 |------|-----------------|
-| Interactive | Writes to stderr with color: `Error [CONFIG_INVALID_METHODOLOGY]: Methodology 'clasic' not found.\n  Did you mean 'classic'? Valid: classic, classic-lite\n  File: .scaffold/config.yml:2` |
+| Interactive | Writes to stderr with color: `Error [CONFIG_INVALID_METHODOLOGY]: Methodology 'clasic' not found.\n  Did you mean 'deep'? Valid: deep, mvp\n  File: .scaffold/config.yml:2` |
 | Auto | Same as interactive but without color/spinner cleanup |
-| JSON | Error appears in `errors[]` array: `{ "code": "CONFIG_INVALID_METHODOLOGY", "message": "...", "suggestion": "classic", "validOptions": [...], "file": ".scaffold/config.yml", "line": 2, "recovery": "...", "exitCode": 1 }` |
+| JSON | Error appears in `errors[]` array: `{ "code": "CONFIG_INVALID_METHODOLOGY", "message": "...", "suggestion": "deep", "validOptions": [...], "file": ".scaffold/config.yml", "line": 2, "recovery": "...", "exitCode": 1 }` |
 
 **Multiple errors:** When a command encounters multiple errors (e.g., `scaffold validate` finds 5 issues), all errors are accumulated in `CommandResult.errors[]`. The exit code is the highest severity exit code among all errors. In interactive mode, errors are printed one per line. In JSON mode, all appear in the array.
 
@@ -1462,7 +1462,7 @@ Validating...
 
 Config
   ✓ Schema version valid
-  ✓ Methodology 'classic' exists
+  ✓ Methodology 'deep' exists
   ✓ All mixin values valid
 
 Manifest
@@ -1516,7 +1516,7 @@ tests/
     output-modes.test.ts
   fixtures/
     configs/
-      valid-classic.yml
+      valid-deep.yml
       invalid-methodology.yml
       ...
     states/
@@ -1633,7 +1633,7 @@ JSON envelopes should be snapshot-tested to catch unintended changes to the API 
 $ scaffold run
 
 === Pipeline Status ===
-Methodology: classic (8/18 complete, 2 skipped)
+Methodology: deep (8/18 complete, 2 skipped)
 Last completed: project-structure (2026-03-12T10:42:00Z)
 Next eligible: dev-env-setup
 
@@ -1684,20 +1684,20 @@ $ scaffold run --format json
 ```
 $ scaffold run --auto
 [auto] Ready to run dev-env-setup? → Yes (default)
-Methodology: classic (8/18 complete, 2 skipped)
+Methodology: deep (8/18 complete, 2 skipped)
 Executing dev-env-setup...
 ```
 
 ### Example 2: `scaffold build` with Validation Error
 
-**Scenario:** User has a typo in `config.yml` — `methodology: clasic` instead of `classic`.
+**Scenario:** User has a typo in `config.yml` — `methodology: clasic` instead of `deep`.
 
 **Interactive mode:**
 
 ```
 $ scaffold build
 Error [CONFIG_INVALID_METHODOLOGY]: Methodology 'clasic' not found.
-  Did you mean 'classic'? Valid options: classic, classic-lite
+  Did you mean 'deep'? Valid options: deep, mvp
   File: .scaffold/config.yml:2
 
 Fix the methodology name and re-run scaffold build.
@@ -1718,8 +1718,8 @@ Exit code: 1
       "message": "Methodology 'clasic' not found.",
       "file": ".scaffold/config.yml",
       "line": 2,
-      "suggestion": "classic",
-      "validOptions": ["classic", "classic-lite"],
+      "suggestion": "deep",
+      "validOptions": ["deep", "mvp"],
       "recovery": "Fix the methodology name in .scaffold/config.yml and re-run scaffold build.",
       "exitCode": 1
     }
@@ -1740,7 +1740,7 @@ $ scaffold validate
 
 Config
   ✓ Schema version valid
-  ✓ Methodology 'classic' exists
+  ✓ Methodology 'deep' exists
   ✓ All mixin values valid
   ✓ All platforms valid
   ✓ Extra prompts resolve
@@ -1832,7 +1832,7 @@ Exit code: 1
 $ scaffold run
 
 === Pipeline Status ===
-Methodology: classic (5/18 complete, 0 skipped)
+Methodology: deep (5/18 complete, 0 skipped)
 Last completed: tdd (2026-03-12T10:50:00Z)
 Next eligible: project-structure (blocked by in-progress coding-standards)
 
@@ -1861,7 +1861,7 @@ Executing coding-standards...
 ```
 $ scaffold run --auto
 [auto] Re-run coding-standards? → Yes (default)
-Methodology: classic (5/18 complete, 0 skipped)
+Methodology: deep (5/18 complete, 0 skipped)
 Crash recovery: re-running coding-standards
 Executing coding-standards...
 ```
@@ -1871,7 +1871,7 @@ Executing coding-standards...
 ```
 $ scaffold status
 
-Pipeline: classic (8/18 complete, 2 skipped)
+Pipeline: deep (8/18 complete, 2 skipped)
 
   Phase 1 — Product Definition
     ✓ create-prd
@@ -1917,11 +1917,11 @@ $ scaffold init "I want to build a CLI tool that manages Docker containers"
 
 Analyzing your idea...
   Detected: CLI tool, infrastructure/DevOps focus
-  Recommended methodology: classic-lite
+  Recommended methodology: mvp
 
 ? Choose a methodology:
-  > Scaffold Classic Lite (recommended) — Streamlined pipeline for solo developers
-    Scaffold Classic — Full pipeline, parallel agents, comprehensive standards
+  > Scaffold MVP (recommended) — Streamlined pipeline for solo developers
+    Scaffold Deep — Full pipeline, parallel agents, comprehensive standards
 
 ? Task tracking:
   > GitHub Issues
@@ -1947,7 +1947,7 @@ Analyzing your idea...
 
 Config written to .scaffold/config.yml
 Running scaffold build...
-  Resolved 14 prompts (classic-lite)
+  Resolved 14 prompts (mvp)
   Generated 14 Claude Code commands
   Generated universal prompts
 
@@ -1962,7 +1962,7 @@ Run `scaffold run` to start the pipeline.
   "command": "init",
   "data": {
     "config_path": ".scaffold/config.yml",
-    "methodology": "classic-lite",
+    "methodology": "mvp",
     "mixins": {
       "task-tracking": "github-issues",
       "tdd": "strict",

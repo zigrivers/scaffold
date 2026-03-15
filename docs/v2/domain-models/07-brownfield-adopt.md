@@ -967,7 +967,7 @@ FUNCTION parseTrackingComment(line: string) → TrackingCommentInfo:
   // Parses a tracking comment from line 1 of an artifact.
   // Handles both v1 and v2 formats.
 
-  // V2 format: <!-- scaffold:prompt-name v1 2026-03-12 classic/strict-tdd/beads -->
+  // V2 format: <!-- scaffold:prompt-name v1 2026-03-12 deep/strict-tdd/beads -->
   v2Match ← MATCH(line, /^<!-- scaffold:([a-z-]+) v(\d+) (\d{4}-\d{2}-\d{2}) ([a-z0-9/-]+) -->$/)
   IF v2Match
     RETURN {
@@ -1066,13 +1066,13 @@ END FUNCTION
 - **Severity**: error
 - **Fires when**: `scaffold adopt` is invoked without specifying a methodology and no default can be inferred
 - **Message**: `No methodology specified. Use --methodology <name> or run scaffold init for interactive setup.`
-- **Recovery**: Supply `--methodology classic` (or another installed methodology) on the command line
+- **Recovery**: Supply `--methodology deep` (or another installed methodology) on the command line
 - **JSON**:
   ```json
   {
     "code": "ADOPT_NO_METHODOLOGY",
     "message": "No methodology specified. Use --methodology <name> or run scaffold init for interactive setup.",
-    "recovery": "Supply --methodology classic or run scaffold init for interactive setup."
+    "recovery": "Supply --methodology deep or run scaffold init for interactive setup."
   }
   ```
 
@@ -1439,7 +1439,7 @@ Run `scaffold run` to continue pipeline.
 **Step 4 — scaffold run**:
 ```
 Resuming pipeline...
-Methodology: classic (brownfield mode)
+Methodology: deep (brownfield mode)
 
 Completed prompts:
   ✓ create-prd
@@ -1508,7 +1508,7 @@ Exit code: 1 (ADOPT_SCAFFOLD_EXISTS)
 #### scaffold adopt flow
 
 ```
-$ scaffold adopt --methodology classic
+$ scaffold adopt --methodology deep
 
 Step 1: Scanning...
   Checking package manifests... ✓ (package.json with 23 dependencies)
@@ -1566,7 +1566,7 @@ Scaffold around existing code (brownfield) or start fresh (greenfield)?
 [User selects brownfield]
 
 Select methodology:
-  ❯ Scaffold Classic (Recommended)
+  ❯ Scaffold Deep (Recommended)
     Scaffold Lite
     ...
 ```
@@ -1681,7 +1681,7 @@ $ scaffold init
 No existing code detected. Starting fresh.
 
 Select methodology:
-  ❯ Scaffold Classic
+  ❯ Scaffold Deep
     Scaffold Lite
 ```
 
@@ -1690,7 +1690,7 @@ Select methodology:
 {
   "schema-version": 1,
   "scaffold-version": "2.0.0",
-  "methodology": "classic",
+  "methodology": "deep",
   "init-mode": "greenfield",
   "created": "2026-03-13T10:00:00Z",
   "in_progress": null,
@@ -1755,7 +1755,7 @@ Scaffold around existing code (brownfield) or start fresh (greenfield)?
 **After wizard completes and user runs `scaffold run`**:
 ```
 Resuming pipeline...
-Methodology: classic (brownfield mode)
+Methodology: deep (brownfield mode)
 
 Executing: create-prd
 
@@ -1846,7 +1846,7 @@ Mapping v1 artifacts to v2 pipeline...
 Mapped 10/18 prompts as completed.
 
 Select methodology:
-  ❯ Scaffold Classic (Recommended — matches v1 pipeline)
+  ❯ Scaffold Deep (Recommended — matches v1 pipeline)
 ```
 
 **state.json created**:
@@ -1854,7 +1854,7 @@ Select methodology:
 {
   "schema-version": 1,
   "scaffold-version": "2.0.0",
-  "methodology": "classic",
+  "methodology": "deep",
   "init-mode": "v1-migration",
   "created": "2026-03-13T10:00:00Z",
   "prompts": {
@@ -1910,7 +1910,7 @@ saas-platform/
 
 **Adopt scan**:
 ```
-$ scaffold adopt --methodology classic
+$ scaffold adopt --methodology deep
 
 Scanning project directory...
 
@@ -1955,7 +1955,7 @@ docs/
 
 **Adopt output**:
 ```
-$ scaffold adopt --methodology classic
+$ scaffold adopt --methodology deep
 
 Artifact matches:
   ⚠ docs/plan.md           → create-prd     (partial: missing "## Data Model", "## API Surface")

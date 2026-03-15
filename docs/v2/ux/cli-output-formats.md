@@ -133,11 +133,11 @@ CI environments (detected via `CI=true`, `GITHUB_ACTIONS`, `GITLAB_CI`, or simil
 
 ```
 Processing...
-✓ Config valid (methodology: deep, 32 steps)
-✓ 32 defined / 29 enabled (3 conditional disabled)
-✓ Dependency graph: 29 nodes, 42 edges, no cycles
-✓ Claude Code: 29 thin wrappers written to commands/
-✓ Universal: 29 prompts written to prompts/
+✓ Config valid (methodology: deep, 36 steps)
+✓ 36 defined / 33 enabled (3 conditional disabled)
+✓ Dependency graph: 33 nodes, 42 edges, no cycles
+✓ Claude Code: 33 thin wrappers written to commands/
+✓ Universal: 33 prompts written to prompts/
 Build complete in 0.4s
 ```
 
@@ -157,11 +157,11 @@ The init wizard output is defined in [init-wizard-flow.md](init-wizard-flow.md).
 
 ```
 ✓ Config written to .scaffold/config.yml
-✓ Pipeline initialized (32 steps, 29 enabled, all pending)
+✓ Pipeline initialized (36 steps, 33 enabled, all pending)
 ✓ .scaffold/instructions/ directory created
 ✓ Build complete:
-    Claude Code:  29 commands  → commands/
-    Universal:    29 prompts   → prompts/
+    Claude Code:  33 commands  → commands/
+    Universal:    33 prompts   → prompts/
 
 Next step: scaffold run <step>
 ```
@@ -170,12 +170,12 @@ When both `claude-code` and `codex` platforms are selected:
 
 ```
 ✓ Config written to .scaffold/config.yml
-✓ Pipeline initialized (32 steps, 29 enabled, all pending)
+✓ Pipeline initialized (36 steps, 33 enabled, all pending)
 ✓ .scaffold/instructions/ directory created
 ✓ Build complete:
-    Claude Code:  29 commands  → commands/
-    Codex:        29 prompts   → codex-prompts/
-    Universal:    29 prompts   → prompts/
+    Claude Code:  33 commands  → commands/
+    Codex:        33 prompts   → codex-prompts/
+    Universal:    33 prompts   → prompts/
 
 Next step: scaffold run <step>
 ```
@@ -197,11 +197,11 @@ Re-initialization with `--force` (existing project):
 ```
 ⚠ Existing .scaffold/ directory found. Backing up to .scaffold.backup/
 ✓ Config written to .scaffold/config.yml
-✓ Pipeline initialized (32 steps, 29 enabled, all pending)
+✓ Pipeline initialized (36 steps, 33 enabled, all pending)
 ✓ .scaffold/instructions/ directory created
 ✓ Build complete:
-    Claude Code:  29 commands  → commands/
-    Universal:    29 prompts   → prompts/
+    Claude Code:  33 commands  → commands/
+    Universal:    33 prompts   → prompts/
 
 Next step: scaffold run <step>
 ```
@@ -211,11 +211,11 @@ v1 migration detected:
 ```
 ✓ v1 scaffold detected — migrating to v2 format
 ✓ Config written to .scaffold/config.yml
-✓ Pipeline initialized (32 steps, 29 enabled, 8 pre-done from v1 history)
+✓ Pipeline initialized (36 steps, 33 enabled, 8 pre-done from v1 history)
 ✓ .scaffold/instructions/ directory created
 ✓ Build complete:
-    Claude Code:  29 commands  → commands/
-    Universal:    29 prompts   → prompts/
+    Claude Code:  33 commands  → commands/
+    Universal:    33 prompts   → prompts/
 
 Next step: scaffold run <step>
 ```
@@ -227,10 +227,10 @@ Next step: scaffold run <step>
 [InitWizard] File signals: package.json detected (brownfield)
 [InitWizard] Smart suggestion: deep (confidence: high, signals: 3 keyword + 1 file)
 [ConfigLoader] Writing .scaffold/config.yml (version: 1, methodology: deep)
-[StateManager] Initializing state: 32 steps, 0 pre-done
-[StepResolver] Resolved 32 steps from pipeline definition, 3 conditional disabled
-[ClaudeCodeAdapter] Wrote 29 thin wrappers to commands/
-[UniversalAdapter] Wrote 29 thin wrappers to prompts/
+[StateManager] Initializing state: 36 steps, 0 pre-done
+[StepResolver] Resolved 36 steps from pipeline definition, 3 conditional disabled
+[ClaudeCodeAdapter] Wrote 33 thin wrappers to commands/
+[UniversalAdapter] Wrote 33 thin wrappers to prompts/
 ```
 
 ---
@@ -240,22 +240,22 @@ Next step: scaffold run <step>
 **Success output (first build):**
 
 ```
-✓ Config valid (methodology: deep, 32 steps)
-✓ 32 defined / 29 enabled (3 conditional disabled)
-✓ Dependency graph: 29 nodes, 42 edges, no cycles
-✓ Claude Code: 29 thin wrappers written to commands/
-✓ Universal: 29 prompts written to prompts/
+✓ Config valid (methodology: deep, 36 steps)
+✓ 36 defined / 33 enabled (3 conditional disabled)
+✓ Dependency graph: 33 nodes, 42 edges, no cycles
+✓ Claude Code: 33 thin wrappers written to commands/
+✓ Universal: 33 prompts written to prompts/
 Build complete in 0.4s
 ```
 
 **Success output (rebuild with diff):**
 
 ```
-✓ Config valid (methodology: deep, 32 steps)
-✓ 32 defined / 29 enabled (3 conditional disabled)
-✓ Dependency graph: 29 nodes, 42 edges, no cycles
-✓ Claude Code: 29 thin wrappers written to commands/
-✓ Universal: 29 prompts written to prompts/
+✓ Config valid (methodology: deep, 36 steps)
+✓ 36 defined / 33 enabled (3 conditional disabled)
+✓ Dependency graph: 33 nodes, 42 edges, no cycles
+✓ Claude Code: 33 thin wrappers written to commands/
+✓ Universal: 33 prompts written to prompts/
   Changed: 3 modified (system-architecture, database-schema, api-contracts)
   Added:   0
   Removed: 0
@@ -267,7 +267,7 @@ Build complete in 0.5s
 ```
 ⠋ Validating config...
 ⠋ Resolving steps...
-Building ██████████████░░░░░░ 16/29 wrappers
+Building ██████████████░░░░░░ 16/33 wrappers
 ```
 
 The progress bar appears only during file writing when there are more than 10 steps.
@@ -277,11 +277,11 @@ The progress bar appears only during file writing when there are more than 10 st
 Build with no conditional steps disabled:
 
 ```
-✓ Config valid (methodology: deep, 32 steps)
-✓ 32 defined / 32 enabled
-✓ Dependency graph: 32 nodes, 48 edges, no cycles
-✓ Claude Code: 32 thin wrappers written to commands/
-✓ Universal: 32 prompts written to prompts/
+✓ Config valid (methodology: deep, 36 steps)
+✓ 36 defined / 36 enabled
+✓ Dependency graph: 36 nodes, 48 edges, no cycles
+✓ Claude Code: 36 thin wrappers written to commands/
+✓ Universal: 36 prompts written to prompts/
 Build complete in 0.5s
 ```
 
@@ -290,7 +290,7 @@ Build complete in 0.5s
 ```
 [ConfigLoader] Reading .scaffold/config.yml (version: 1)
 [ConfigLoader] Methodology: deep, schema valid
-[StepResolver] 32 steps defined, 29 enabled, 3 conditional disabled
+[StepResolver] 36 steps defined, 33 enabled, 3 conditional disabled
 [DependencyResolver] Topological order: create-prd → review-prd → innovate-prd → domain-modeling → ...
 [ClaudeCodeAdapter] Writing commands/create-prd.md (thin wrapper, 0.3 KB)
 [UniversalAdapter] Writing prompts/create-prd.md (thin wrapper, 0.3 KB)
@@ -374,7 +374,7 @@ Lock acquisition is silent on success. The assembly engine assembles and present
 
 ```
 === Scaffold: git-workflow (Phase 3 — System Architecture) ===
-Pipeline: deep | Progress: 6/32 complete (19%) | Depth: 5
+Pipeline: deep | Progress: 6/36 complete (17%) | Depth: 5
 Recent decisions:
   D-012: Use Biome for linting and formatting; target ES2022. (coding-standards)
   D-011: Enforce 100-character line limit; no semicolons. (coding-standards)
@@ -491,7 +491,7 @@ Methodology change warning (per [ADR-049](../adrs/ADR-049-methodology-changeable
 Pipeline complete:
 
 ```
-✓ Pipeline complete — all 32 steps finished.
+✓ Pipeline complete — all 36 steps finished.
   Run scaffold status for a full summary.
   Run scaffold dashboard to view the progress dashboard.
 ```
@@ -634,7 +634,7 @@ Next step: scaffold build (to reinitialize state)
 **Success output:**
 
 ```
-Pipeline: deep | 8/32 complete (25%) | Depth: 5
+Pipeline: deep | 8/36 complete (22%) | Depth: 5
 ████████░░░░░░░░░░░░░░░░░░░░░░ 25%
 
 Phase 0 — Prerequisites
@@ -676,7 +676,7 @@ What's Next
 Orphaned entries detected (methodology changed, [ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md)):
 
 ```
-Pipeline: mvp | 2/4 complete (50%) | Depth: 1
+Pipeline: mvp | 2/7 complete (29%) | Depth: 1
 ███████████████░░░░░░░░░░░░░░░ 50%
 
 Phase 1 — Planning
@@ -766,7 +766,7 @@ Run: scaffold run <step>
 Pipeline complete:
 
 ```
-Pipeline complete. All 32 steps finished.
+Pipeline complete. All 36 steps finished.
 Run scaffold status for a full summary.
 ```
 
@@ -799,9 +799,9 @@ Run: scaffold status to see the full pipeline.
 
 ```
 ✓ Config valid
-✓ Pipeline manifest valid (deep, 32 defined / 29 enabled)
-✓ 29 prompts — frontmatter valid
-✓ 29 build outputs — no unresolved markers
+✓ Pipeline manifest valid (deep, 36 defined / 33 enabled)
+✓ 33 prompts — frontmatter valid
+✓ 33 build outputs — no unresolved markers
 ✓ state.json consistent (8 done, all artifacts present on disk, depths valid)
 ✓ decisions.jsonl — 47 entries, IDs sequential, no duplicates
 
@@ -829,7 +829,7 @@ pipeline/pre/create-prd.md
 ```
 ⠋ Validating config...
 ⠋ Checking pipeline manifest...
-⠋ Validating prompt frontmatter (29 files)...
+⠋ Validating prompt frontmatter (33 files)...
 ⠋ Checking build outputs...
 ⠋ Verifying state consistency...
 ⠋ Checking decision log...
@@ -866,11 +866,11 @@ Validation with auto-fix (`--fix`):
 [Validator:config] Checking version field: 1 (current)
 [Validator:config] Checking methodology: deep (valid methodology)
 [Validator:config] Checking depth: 5 (valid range 1-5)
-[Validator:pipeline] Loading pipeline definition: 32 steps
-[Validator:pipeline] Dependency cycle check: 29 nodes, 42 edges, no cycles
+[Validator:pipeline] Loading pipeline definition: 36 steps
+[Validator:pipeline] Dependency cycle check: 33 nodes, 42 edges, no cycles
 [Validator:frontmatter] Checking pipeline/pre/create-prd.md... pass
 [Validator:artifacts] Checking docs/plan.md against create-prd artifact schema... pass
-[Validator:state] Checking slug consistency: 32 state entries, 32 pipeline prompts, 0 orphaned
+[Validator:state] Checking slug consistency: 36 state entries, 36 pipeline prompts, 0 orphaned
 [Validator:state] Checking completed step depths: 8 completed, all depths within range (V19 pass)
 [Validator:state] Checking depth within configured range: 8 completed, all within 1-5 (V20 pass)
 [Validator:decisions] Checking .scaffold/decisions.jsonl: 47 entries, IDs sequential
@@ -891,8 +891,8 @@ Validation with auto-fix (`--fix`):
 ```
 Methodologies
 ─────────────
-  deep       Deep Domain Modeling — all 32 steps at depth 5
-  mvp        MVP — get to code fast, 4 steps at depth 1
+  deep       Deep Domain Modeling — all 36 steps at depth 5
+  mvp        MVP — get to code fast, 7 steps at depth 1
   custom     Custom — pick your own steps and depth levels
 
 Platforms
@@ -907,8 +907,8 @@ When run inside an initialized project, current methodology and depth are highli
 ```
 Methodologies
 ─────────────
-  [deep]     Deep Domain Modeling — all 32 steps at depth 5
-  mvp        MVP — get to code fast, 4 steps at depth 1
+  [deep]     Deep Domain Modeling — all 36 steps at depth 5
+  mvp        MVP — get to code fast, 7 steps at depth 1
   custom     Custom — pick your own steps and depth levels
 ```
 
@@ -921,8 +921,8 @@ Filtered by section (`--section methodologies`):
 ```
 Methodologies
 ─────────────
-  deep       Deep Domain Modeling — all 32 steps at depth 5
-  mvp        MVP — get to code fast, 4 steps at depth 1
+  deep       Deep Domain Modeling — all 36 steps at depth 5
+  mvp        MVP — get to code fast, 7 steps at depth 1
   custom     Custom — pick your own steps and depth levels
 ```
 
@@ -930,8 +930,8 @@ Methodologies
 
 ```
 [ContentRegistry] Scanning pipeline/ for step definitions
-[ContentRegistry] Found: 32 steps defined
-[ContentRegistry] Methodologies: deep (32 steps, depth 5), mvp (4 steps, depth 1), custom (user-configured)
+[ContentRegistry] Found: 36 steps defined
+[ContentRegistry] Methodologies: deep (36 steps, depth 5), mvp (7 steps, depth 1), custom (user-configured)
 [ContentRegistry] Project config detected: .scaffold/config.yml (highlighting current selections)
 ```
 
@@ -948,8 +948,8 @@ Project: .scaffold/config.yml
   Platforms:         claude-code, (universal)
   Conditional:       database (enabled), api (enabled), ui-ux (disabled)
 
-Pipeline:   32 defined / 29 enabled (3 conditional disabled)
-Progress:   8/29 complete (28%)
+Pipeline:   36 defined / 33 enabled (3 conditional disabled)
+Progress:   8/33 complete (24%)
 Last build: 2026-03-12 14:23 UTC
 ```
 
@@ -966,8 +966,8 @@ Project: .scaffold/config.yml
   Platforms:         claude-code, (universal)
   Conditional:       database (enabled), api (enabled), ui-ux (enabled)
 
-Pipeline:   32 defined / 32 enabled
-Progress:   0/32 complete (0%)
+Pipeline:   36 defined / 36 enabled
+Progress:   0/36 complete (0%)
 Last build: 2026-03-13 10:00 UTC
 ```
 
@@ -1079,7 +1079,7 @@ Changelog:
 
 ⠋ Downloading v2.1.0...
 ✓ scaffold updated: v2.0.0 → v2.1.0
-✓ Rebuilt project (deep, 32 steps)
+✓ Rebuilt project (deep, 36 steps)
   Changed: 2 modified (create-prd, tech-stack)
 ```
 
@@ -1314,8 +1314,8 @@ Format: Arrow-key navigable list with `●` for selected and `○` for unselecte
 
 ```
 ? Choose a methodology:
-  ● Deep Domain Modeling    Comprehensive — all 32 steps at depth 5
-  ○ MVP                     Get to code fast — 4 steps at depth 1
+  ● Deep Domain Modeling    Comprehensive — all 36 steps at depth 5
+  ○ MVP                     Get to code fast — 7 steps at depth 1
   ○ Custom                  Pick your own steps and depth levels
 ```
 
@@ -1372,7 +1372,7 @@ Format: Radio selection with descriptive options.
 ### 4a: `scaffold status` before any prompts done
 
 ```
-Pipeline: deep | 0/32 complete (0%) | Depth: 5
+Pipeline: deep | 0/36 complete (0%) | Depth: 5
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 0%
 
 Phase 0 — Prerequisites
@@ -1395,7 +1395,7 @@ What's Next
 ### 4b: `scaffold next` when pipeline is complete
 
 ```
-Pipeline complete. All 32 prompts finished.
+Pipeline complete. All 36 prompts finished.
 
 Your project scaffolding is done. Suggested next actions:
   scaffold dashboard   — View the progress dashboard
@@ -1407,9 +1407,9 @@ Your project scaffolding is done. Suggested next actions:
 
 ```
 ✓ Config valid
-✓ Pipeline manifest valid (deep, 32 defined / 29 enabled)
-✓ 29 prompts — frontmatter valid
-✓ 29 build outputs — no unresolved markers
+✓ Pipeline manifest valid (deep, 36 defined / 33 enabled)
+✓ 33 prompts — frontmatter valid
+✓ 33 build outputs — no unresolved markers
 ✓ state.json consistent (0 done, no artifacts to verify)
 ✓ decisions.jsonl — 0 entries (empty, no issues)
 
@@ -1421,7 +1421,7 @@ Your project scaffolding is done. Suggested next actions:
 ```
 Methodologies
 ─────────────
-  deep       Deep Domain Modeling — all 32 steps at depth 5
+  deep       Deep Domain Modeling — all 36 steps at depth 5
 
 Platforms
 ─────────
@@ -1435,7 +1435,7 @@ No special messaging. A single methodology is displayed the same way as multiple
 ### 4e: `scaffold run` when all steps done
 
 ```
-✓ Pipeline complete — all 32 prompts finished.
+✓ Pipeline complete — all 36 prompts finished.
 
 Your project scaffolding is done. Suggested next actions:
   scaffold dashboard   — View the progress dashboard

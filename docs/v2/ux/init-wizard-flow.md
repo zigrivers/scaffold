@@ -237,10 +237,10 @@ All option values match the valid values defined in the config.yml schema (Secti
 │  ? Choose a methodology:                                         │
 │                                                                  │
 │    > Deep Domain Modeling (Recommended)                          │
-│      Comprehensive — all 32 steps at depth 5.                    │
+│      Comprehensive — all 36 steps at depth 5.                    │
 │                                                                  │
 │      MVP                                                         │
-│      Get to code fast — 4 steps at depth 1.                      │
+│      Get to code fast — 7 steps at depth 1.                      │
 │                                                                  │
 │      Custom                                                      │
 │      Pick your own steps and depth levels.                       │
@@ -257,8 +257,8 @@ All option values match the valid values defined in the config.yml schema (Secti
 
 | Value | Label | Description |
 |-------|-------|-------------|
-| `deep` | Deep Domain Modeling | Comprehensive — all 32 steps at depth 5 |
-| `mvp` | MVP | Get to code fast — 4 steps at depth 1 |
+| `deep` | Deep Domain Modeling | Comprehensive — all 36 steps at depth 5 |
+| `mvp` | MVP | Get to code fast — 7 steps at depth 1 |
 | `custom` | Custom | Pick your own steps and depth levels |
 
 For Custom: the wizard presents the step list with toggle (enabled/disabled) and depth (1-5) per step. See PRD Section 13 for details.
@@ -400,7 +400,7 @@ After all wizard questions are answered, the wizard displays a summary, asks for
   Methodology:   Deep Domain Modeling
   Mode:          greenfield
   Depth:         5
-  Steps:         32 enabled (of 32 defined)
+  Steps:         36 enabled (of 36 defined)
 
   Platforms:     Claude Code
   Conditional:   Database (enabled), API (enabled), UI/UX (enabled)
@@ -494,18 +494,18 @@ After config (and optionally state) are written, `scaffold build` runs automatic
 ```
   Running scaffold build...
 
-  ✓ Config valid (methodology: deep, 32 steps)
-  ✓ 32 steps resolved (29 enabled, 3 conditional disabled)
-  ✓ Claude Code: 29 thin wrappers written to commands/
-  ✓ Universal: 29 prompts written to prompts/
+  ✓ Config valid (methodology: deep, 36 steps)
+  ✓ 36 steps resolved (33 enabled, 3 conditional disabled)
+  ✓ Claude Code: 33 thin wrappers written to commands/
+  ✓ Universal: 33 prompts written to prompts/
 ```
 
 When multiple platforms are selected:
 
 ```
-  ✓ Claude Code: 29 thin wrappers written to commands/
-  ✓ Codex: 29 prompts written to codex-prompts/
-  ✓ Universal: 29 prompts written to prompts/
+  ✓ Claude Code: 33 thin wrappers written to commands/
+  ✓ Codex: 33 prompts written to codex-prompts/
+  ✓ Universal: 33 prompts written to prompts/
 ```
 
 ### 4f: Pipeline Overview
@@ -517,7 +517,7 @@ The final output after a successful init + build.
 ```
   === Your Pipeline ===
 
-  Methodology: Deep Domain Modeling (29 enabled of 32 defined, 7 phases)
+  Methodology: Deep Domain Modeling (33 enabled of 36 defined, 7 phases)
   Mode:        greenfield
   Depth:       5
   Platforms:   Claude Code
@@ -539,7 +539,7 @@ The final output after a successful init + build.
 ```
   === Your Pipeline ===
 
-  Methodology: Deep Domain Modeling (29 enabled of 32 defined, 7 phases)
+  Methodology: Deep Domain Modeling (33 enabled of 36 defined, 7 phases)
   Mode:        v1-migration
   Depth:       5
   Platforms:   Claude Code
@@ -565,7 +565,7 @@ The final output after a successful init + build.
 ```
   === Your Pipeline ===
 
-  Methodology: Deep Domain Modeling (29 enabled of 32 defined, 7 phases)
+  Methodology: Deep Domain Modeling (33 enabled of 36 defined, 7 phases)
   Mode:        brownfield
   Depth:       5
   Platforms:   Claude Code
@@ -600,11 +600,11 @@ In JSON mode, no human-readable progress output is shown. The entire result is r
     "mode": "greenfield",
     "depth": 5,
     "platforms": ["claude-code"],
-    "stepCount": 32,
-    "enabledSteps": 29,
+    "stepCount": 36,
+    "enabledSteps": 33,
     "instructionsDir": ".scaffold/instructions/",
     "buildResult": {
-      "stepCount": 29,
+      "stepCount": 33,
       "platforms": ["claude-code"],
       "generatedFiles": ["commands/*.md", "prompts/*.md"]
     }

@@ -671,7 +671,7 @@ function gatherProjectContext(input, metaPrompt, updateMode): ProjectContext
   return { config, state, artifacts, decisions, existingOutput }
 ```
 
-Complexity: O(S * O) where S = number of completed steps, O = average number of output artifacts per step. Bounded by the pipeline size (32 steps maximum).
+Complexity: O(S * O) where S = number of completed steps, O = average number of output artifacts per step. Bounded by the pipeline size (36 steps maximum).
 
 ### Algorithm 3: Assembled Prompt Construction
 
@@ -1097,7 +1097,7 @@ Assembly sequence:
 
 4. Gather project context:
    - config: { version: 2, methodology: "deep", project: { name: "BillingApp" } }
-   - state: { all 32 steps pending }
+   - state: { all 36 steps pending }
    - artifacts: [] (none completed)
    - decisions: [] (empty log)
    - existingOutput: null (not update mode)

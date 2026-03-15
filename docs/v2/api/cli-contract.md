@@ -15,7 +15,7 @@
    - [scaffold run](#scaffold-run-step-flags)
    - [scaffold build](#scaffold-build-flags)
    - [scaffold adopt](#scaffold-adopt-flags)
-   - [scaffold skip](#scaffold-skip-prompt-flags)
+   - [scaffold skip](#scaffold-skip-step-flags)
    - [scaffold reset](#scaffold-reset-flags)
    - [scaffold status](#scaffold-status-flags)
    - [scaffold next](#scaffold-next-flags)
@@ -25,7 +25,7 @@
    - [scaffold version](#scaffold-version)
    - [scaffold update](#scaffold-update-flags)
    - [scaffold dashboard](#scaffold-dashboard-flags)
-   - [scaffold decisions](#scaffold-decisions---prompt-slug---last-n-flags)
+   - [scaffold decisions](#scaffold-decisions---step-slug---last-n-flags)
 3. [Command Dependency Matrix](#section-3-command-dependency-matrix)
 4. [Flag Interaction Rules](#section-4-flag-interaction-rules)
 
@@ -163,8 +163,8 @@ All wizard questions are skipped. Selections use:
 
 ```
 ✓ Config written to .scaffold/config.yml
-✓ Pipeline initialized (22 steps, all pending)
-✓ Build complete — Claude Code: 22 commands, Universal: 22 prompts
+✓ Pipeline initialized (36 steps, all pending)
+✓ Build complete — Claude Code: 15 commands, Universal: 36 steps
 
 Next step: scaffold run <first-step>
 ```
@@ -176,7 +176,7 @@ In JSON mode, `data` contains `{ mode, methodology, config_path, platforms, proj
 | Error Code | Exit Code | Phase | Trigger | Message |
 |------------|-----------|-------|---------|---------|
 | `INIT_SCAFFOLD_EXISTS` | 1 | pre-wizard | `.scaffold/config.yml` already exists and `--force` not set | "Project already initialized. Use `--force` to reinitialize." |
-| `INIT_METHODOLOGY_NOT_FOUND` | 1 | wizard | `--methodology` value not installed (wizard-phase detection) | "Methodology '<name>' not found. Available: classic, classic-lite." |
+| `INIT_METHODOLOGY_NOT_FOUND` | 1 | wizard | `--methodology` value not installed (wizard-phase detection) | "Methodology '<name>' not found. Available: deep, mvp." |
 | `FIELD_INVALID_METHODOLOGY` | 1 | config validation | Methodology name fails config schema validation (post-wizard) | "Unknown methodology '<name>'. Run `scaffold list` to see available methodologies." |
 | `INIT_NO_PLATFORMS` | 1 | wizard | No platforms selected during wizard multi-select | "At least one target platform must be selected." |
 | `FIELD_MISSING` | 1 | config validation | Required config field absent after wizard completes | "Required field 'platforms' is missing from config." |
@@ -185,7 +185,7 @@ In JSON mode, `data` contains `{ mode, methodology, config_path, platforms, proj
 
 **Side effects**:
 - Creates `.scaffold/config.yml` (wizard output)
-- Creates `.scaffold/state.json` (all prompts `pending`; v1 migration pre-completes matched prompts)
+- Creates `.scaffold/state.json` (all steps `pending`; v1 migration pre-completes matched steps)
 - Creates `.scaffold/decisions.jsonl` (empty for greenfield/brownfield; may be pre-populated for v1 migration)
 - Creates `.scaffold/instructions/` directory for user instruction files ([ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md))
 - Invokes full `scaffold build` pipeline (writes `commands/*.md`, `prompts/*.md`, `CLAUDE.md` sections, `AGENTS.md`, etc.)
@@ -197,7 +197,7 @@ In JSON mode, `data` contains `{ mode, methodology, config_path, platforms, proj
 scaffold init "I want to build a REST API with Node.js and PostgreSQL"
 
 # Non-interactive with preset methodology
-scaffold init --auto --methodology classic
+scaffold init --auto --methodology deep
 
 # Re-initialize existing project
 scaffold init --force
@@ -231,11 +231,11 @@ Same as interactive — no decisions to resolve. `--auto` has no behavioral effe
 
 ```
 ✓ Config valid (methodology: deep)
-✓ 24 steps in pipeline (2 optional excluded: design-system, add-maestro)
-✓ Dependency graph: 22 nodes, 31 edges, no cycles
-✓ Claude Code: 22 commands written to commands/
-✓ Codex: AGENTS.md updated with 22 entries
-✓ Universal: scaffold run available for all 22 steps
+✓ 36 steps in pipeline (2 optional excluded: design-system, add-maestro)
+✓ Dependency graph: 34 nodes, 31 edges, no cycles
+✓ Claude Code: 15 commands written to commands/
+✓ Codex: AGENTS.md updated with 36 entries
+✓ Universal: scaffold run available for all 36 steps
 Build complete in 0.3s
 ```
 
@@ -271,14 +271,14 @@ In JSON mode, `data` contains `{ methodology, steps_total, steps_excluded, platf
 scaffold build
 
 # Build with JSON output for CI
-scaffold build --format json | jq '.data.prompts_resolved'
+scaffold build --format json | jq '.data.steps_resolved'
 ```
 
 ---
 
 ### `scaffold adopt [flags]`
 
-**Purpose**: Scan an existing codebase, map discovered files to scaffold prompt `produces` fields, and generate `.scaffold/state.json` with pre-completed entries. Distinct from `scaffold init` — adopt is purely analytical and does not run the wizard.
+**Purpose**: Scan an existing codebase, map discovered files to scaffold step `produces` fields, and generate `.scaffold/state.json` with pre-completed entries. Distinct from `scaffold init` — adopt is purely analytical and does not run the wizard.
 **Category**: init
 **Lock behavior**: Acquires lock (writes state.json)
 **Requires project**: Partial — requires `.scaffold/config.yml` to exist (for methodology and step resolution). Creates `.scaffold/state.json` and `.scaffold/decisions.jsonl`. If no config exists, use `scaffold init` instead, which includes brownfield detection.
@@ -295,12 +295,12 @@ scaffold build --format json | jq '.data.prompts_resolved'
 **Interactive behavior**:
 
 For each artifact discovered with a partial match (file exists but fails artifact-schema validation), adopt presents:
-- The file path and the prompt it maps to
+- The file path and the step it maps to
 - A choice: "Mark as completed" / "Mark as pending" / "Skip this artifact"
 
 For exact matches, adopt auto-completes without asking.
 
-For v1 tracking comments detected during scan, adopt presents a confirmation: "Found v1 artifacts. Pre-complete <N> prompts from v1 history?"
+For v1 tracking comments detected during scan, adopt presents a confirmation: "Found v1 artifacts. Pre-complete <N> steps from v1 history?"
 
 **Auto mode behavior**:
 
@@ -327,7 +327,7 @@ Scanning codebase...
 ✓ state.json written — 6 pre-completed, 17 pending
 ```
 
-In JSON mode, `data` contains `{ mode, artifacts_found, detected_artifacts, prompts_completed, prompts_remaining }` with optional `methodology`, `config_path`, `build_result`.
+In JSON mode, `data` contains `{ mode, artifacts_found, detected_artifacts, steps_completed, steps_remaining }` with optional `methodology`, `config_path`, `build_result`.
 
 **Error conditions:**
 
@@ -339,7 +339,7 @@ In JSON mode, `data` contains `{ mode, artifacts_found, detected_artifacts, prom
 | `USER_CANCELLED` | 4 | User cancels during partial match review | "Adopt cancelled." |
 
 **Side effects**:
-- Writes `.scaffold/state.json` with pre-completed prompt entries
+- Writes `.scaffold/state.json` with pre-completed step entries
 - Optionally updates `.scaffold/config.yml` based on inferred tooling (only if user confirms or in `--auto` mode)
 - Acquires and releases `.scaffold/lock.json`
 - Does NOT run `scaffold build` (unlike `scaffold init`)
@@ -491,9 +491,9 @@ scaffold run user-stories --force
 
 ---
 
-### `scaffold skip <prompt> [flags]`
+### `scaffold skip <step> [flags]`
 
-**Purpose**: Mark a prompt as skipped. The prompt is treated as resolved for dependency computation — its dependents become eligible. Skipped prompts remain in `state.json` with `status: skipped` ([ADR-020](../adrs/ADR-020-skip-vs-exclude-semantics.md)).
+**Purpose**: Mark a step as skipped. The step is treated as resolved for dependency computation — its dependents become eligible. Skipped steps remain in `state.json` with `status: skipped` ([ADR-020](../adrs/ADR-020-skip-vs-exclude-semantics.md)).
 **Category**: runtime
 **Lock behavior**: Acquires lock
 **Requires project**: Yes
@@ -502,7 +502,7 @@ scaffold run user-stories --force
 
 | Argument | Required | Type | Description |
 |----------|----------|------|-------------|
-| `prompt` | Yes | string | Slug of the prompt to skip. Must exist in the resolved pipeline (in `state.json`). |
+| `step` | Yes | string | Slug of the step to skip. Must exist in the resolved pipeline (in `state.json`). |
 
 **Command-specific flags:**
 
@@ -513,51 +513,51 @@ scaffold run user-stories --force
 
 **Interactive behavior**:
 
-Presents confirmation: "Skip '<prompt>'? This will unblock dependent prompts." with optional reason input if `--reason` not provided. On "no" → exit 4.
+Presents confirmation: "Skip '<step>'? This will unblock dependent steps." with optional reason input if `--reason` not provided. On "no" → exit 4.
 
-If the prompt is already `completed`, presents: "Prompt '<prompt>' is already completed. Re-mark as skipped? (Note: dependent prompts may have been run with its artifacts.)" This is an unusual workflow — warn but allow.
+If the step is already `completed`, presents: "Step '<step>' is already completed. Re-mark as skipped? (Note: dependent steps may have been run with its artifacts.)" This is an unusual workflow — warn but allow.
 
-If the prompt is `in_progress`, warns that a session may be actively executing it.
+If the step is `in_progress`, warns that a session may be actively executing it.
 
 **Auto mode behavior**:
 
 - Proceeds without confirmation (skipping is reversible — the step can be re-run via `scaffold run <slug>`).
 - If `--reason` not provided, `skip_reason` is set to `"auto-skipped"`.
-- If prompt is `in_progress` → emits warning and proceeds (does not block).
+- If step is `in_progress` → emits warning and proceeds (does not block).
 
 **Success output**:
 
 ```
 ✓ add-playwright skipped
   Reason: "Using Cypress instead"
-→ 2 prompts now unblocked: coding-standards, tdd-standards
+→ 2 steps now unblocked: coding-standards, tdd-standards
 ```
 
-In JSON mode, `data` contains `{ prompt, reason, newly_eligible }` with optional `previous_status`.
+In JSON mode, `data` contains `{ step, reason, newly_eligible }` with optional `previous_status`.
 
 **Error conditions:**
 
 | Error Code | Exit Code | Trigger | Message |
 |------------|-----------|---------|---------|
-| `DEP_TARGET_MISSING` | 2 | Prompt slug not in state.json | "Unknown prompt '<slug>'. Run `scaffold status` to see valid slugs." |
-| `PSM_INVALID_TRANSITION` | 3 | Prompt already completed | "Prompt already completed — use `--force` to re-skip." |
+| `DEP_TARGET_MISSING` | 2 | Step slug not in state.json | "Unknown step '<slug>'. Run `scaffold status` to see valid slugs." |
+| `PSM_INVALID_TRANSITION` | 3 | Step already completed | "Step already completed — use `--force` to re-skip." |
 | `LOCK_HELD` | 3 | Lock held in `--auto` | "Lock held by <holder>. Use `--force` to override." |
 | `STATE_PARSE_ERROR` | 3 | state.json corrupt | "state.json is corrupt. Run `scaffold validate`." |
 | `USER_CANCELLED` | 4 | User declines confirmation | "Skip cancelled." |
 
 **Side effects**:
 - Acquires `.scaffold/lock.json`
-- Updates prompt entry in `.scaffold/state.json` to `status: skipped`, sets `skip_reason` and `skipped_at` timestamp
+- Updates step entry in `.scaffold/state.json` to `status: skipped`, sets `skip_reason` and `skipped_at` timestamp
 - Updates `next_eligible` cache in state.json
 - Releases `.scaffold/lock.json`
 
 **Examples**:
 
 ```bash
-# Skip a prompt with a reason
+# Skip a step with a reason
 scaffold skip add-playwright --reason "Using Cypress instead"
 
-# Skip without prompting (auto mode)
+# Skip without confirmation (auto mode)
 scaffold skip design-system --auto --reason "No frontend"
 
 # Skip in CI with JSON output
@@ -637,7 +637,7 @@ scaffold reset --auto --confirm-reset --force
 
 ### `scaffold status [flags]`
 
-**Purpose**: Show the current pipeline progress — completed, skipped, in-progress, and pending prompts organized by phase, with counts and percentages.
+**Purpose**: Show the current pipeline progress — completed, skipped, in-progress, and pending steps organized by phase, with counts and percentages.
 **Category**: runtime
 **Lock behavior**: Read-only (no lock)
 **Requires project**: Yes
@@ -652,7 +652,7 @@ scaffold reset --auto --confirm-reset --force
 
 **Interactive behavior**:
 
-Displays a formatted table grouped by phase. Each row shows: prompt name, status indicator (✓ completed, ↷ skipped, ⚡ in_progress, ○ pending, ! orphaned), completion timestamp (for completed), skip reason (for skipped). An "Orphaned (methodology changed)" section appears if any state.json entries reference prompts no longer in the resolved pipeline.
+Displays a formatted table grouped by phase. Each row shows: step name, status indicator (✓ completed, ↷ skipped, ⚡ in_progress, ○ pending, ! orphaned), completion timestamp (for completed), skip reason (for skipped). An "Orphaned (methodology changed)" section appears if any state.json entries reference steps no longer in the resolved pipeline.
 
 **Auto mode behavior**:
 
@@ -663,7 +663,7 @@ Same as interactive — no decisions to resolve. Output goes to stderr if `--for
 **Success output**:
 
 ```
-Pipeline: classic | Methodology: classic | 8/22 complete (36%)
+Pipeline: deep | Methodology: deep | 8/22 complete (36%)
 
 Phase 0 — Prerequisites
   ✓ claude-code-permissions   completed  2026-03-10
@@ -683,7 +683,7 @@ Phase 2 — Architecture
 Next eligible: user-stories
 ```
 
-In JSON mode, `data` contains `{ methodology, progress: { completed, skipped, in_progress, pending, total }, phases: [{ name, index, prompts: [{ slug, status, source, depth, ... }] }], next_eligible: string[], orphaned_entries: string[] }`. Per-step `depth` (integer 1-5, [ADR-043](../adrs/ADR-043-depth-scale.md)) is present for completed steps.
+In JSON mode, `data` contains `{ methodology, progress: { completed, skipped, in_progress, pending, total }, phases: [{ name, index, steps: [{ slug, status, source, depth, ... }] }], next_eligible: string[], orphaned_entries: string[] }`. Per-step `depth` (integer 1-5, [ADR-043](../adrs/ADR-043-depth-scale.md)) is present for completed steps.
 
 **Error conditions:**
 
@@ -711,7 +711,7 @@ scaffold status --format json | jq '.data.completed / .data.total'
 
 ### `scaffold next [flags]`
 
-**Purpose**: Show the next eligible prompt(s) with full context — phase, dependencies satisfied, and a one-line description. Does not execute anything.
+**Purpose**: Show the next eligible step(s) with full context — phase, dependencies satisfied, and a one-line description. Does not execute anything.
 **Category**: runtime
 **Lock behavior**: Read-only (no lock)
 **Requires project**: Yes
@@ -722,17 +722,17 @@ scaffold status --format json | jq '.data.completed / .data.total'
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--count <n>` | integer | 1 | Show up to N next eligible prompts (parallel set). |
+| `--count <n>` | integer | 1 | Show up to N next eligible steps (parallel set). |
 
 **Interactive behavior**:
 
-Displays the next eligible prompt with its description, phase, and which dependencies were just satisfied that made it eligible.
+Displays the next eligible step with its description, phase, and which dependencies were just satisfied that made it eligible.
 
 **Auto mode behavior**:
 
 Same output. No decisions.
 
-**Verbose mode** adds: full dependency list for the next prompt, `produces` artifacts it will generate, `reads` artifacts it consumes, whether the prompt has a CLAUDE.md section.
+**Verbose mode** adds: full dependency list for the next step, `produces` artifacts it will generate, `reads` artifacts it consumes, whether the step has a CLAUDE.md section.
 
 **Success output**:
 
@@ -747,7 +747,7 @@ Run: scaffold run
 
 If pipeline is complete:
 ```
-Pipeline complete. All 22 prompts finished.
+Pipeline complete. All 36 steps finished.
 ```
 
 In JSON mode, `data` contains `{ eligible: [{ slug, description, phase, produces, reads, depends_on, source, argument_hint }], pipeline_complete: boolean }`.
@@ -773,7 +773,7 @@ scaffold next --format json
 
 ### `scaffold validate [flags]`
 
-**Purpose**: Cross-cutting validation of all scaffold files — config, manifests, prompt frontmatter, build outputs, state consistency, and artifact schemas. Accumulates all issues and reports them grouped by source file. Read-only; modifies nothing.
+**Purpose**: Cross-cutting validation of all scaffold files — config, manifests, step frontmatter, build outputs, state consistency, and artifact schemas. Accumulates all issues and reports them grouped by source file. Read-only; modifies nothing.
 **Category**: build-time
 **Lock behavior**: Read-only (no lock)
 **Requires project**: Yes
@@ -785,7 +785,7 @@ scaffold next --format json
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--scope <list>` | string | `config,manifests,frontmatter,artifacts,state` | Comma-separated list of validation scopes to run. Valid values: `config`, `manifests`, `frontmatter`, `artifacts`, `state`, `decisions`. |
-| `--fix` | boolean | false | Apply safe auto-fixes where available (e.g., reassign duplicate decision IDs). Does not modify prompt files or config. |
+| `--fix` | boolean | false | Apply safe auto-fixes where available (e.g., reassign duplicate decision IDs). Does not modify step files or config. |
 
 **Interactive behavior**:
 
@@ -802,18 +802,18 @@ Same as interactive. Output goes to stderr. With `--format json`, errors and war
 Checks are organized by category:
 
 - **Config (4 checks):** schema version valid, methodology name installed, platform values valid, required fields present
-- **Manifests (4 checks):** manifest loads/parses, all prompt references resolve to files, no circular dependencies, all dependency targets exist
+- **Manifests (4 checks):** manifest loads/parses, all step references resolve to files, no circular dependencies, all dependency targets exist
 - **Frontmatter (5 checks):** YAML valid, required fields present (description), reads entries are valid paths, produces entries are valid, depends_on slugs exist in pipeline
 - **Artifacts (5 checks):** required sections present, ID format patterns valid, index table present in first 50 lines, tracking comment on line 1, no unresolved markers in content
-- **State (5 checks):** schema version matches, all referenced slugs exist in pipeline, completed prompts have produces artifacts on disk, completed steps have valid depth (V19 per [state-json-schema](../data/state-json-schema.md)), completed steps have depth within configured range (V20)
-- **Decisions (3 checks):** entries parse as valid JSON, IDs sequential and unique, prompt references exist in pipeline
+- **State (5 checks):** schema version matches, all referenced slugs exist in pipeline, completed steps have produces artifacts on disk, completed steps have valid depth (V19 per [state-json-schema](../data/state-json-schema.md)), completed steps have depth within configured range (V20)
+- **Decisions (3 checks):** entries parse as valid JSON, IDs sequential and unique, step references exist in pipeline
 
 **Success output** (no issues):
 
 ```
 ✓ Config valid
-✓ Methodology manifest valid (classic)
-✓ 24 prompts — frontmatter valid
+✓ Methodology manifest valid (deep)
+✓ 24 steps — frontmatter valid
 ✓ 22 build outputs — no unresolved markers
 ✓ state.json consistent with artifacts on disk
 ✓ decisions.jsonl — 47 entries, no duplicates
@@ -842,14 +842,14 @@ All error codes from all domain components may appear (see Section 7c of [system
 | Error Code | Category | Description |
 |------------|----------|-------------|
 | `FIELD_*` | config | Config schema violations (canonical names; `CONFIG_*` aliases exist for backward compatibility) |
-| `RESOLUTION_*` | manifests | Prompt resolution failures |
+| `RESOLUTION_*` | manifests | Step resolution failures |
 | `FRONTMATTER_*` | frontmatter | Frontmatter schema violations |
 | `DEP_CYCLE_DETECTED` | manifests | Circular dependency |
 | `INJ_*` | build outputs | Unresolved markers in build output |
 | `VALIDATE_ARTIFACT_*` | artifacts | Artifact structural violations |
 | `STATE_*` | state | State consistency failures |
 | `VALIDATE_DECISIONS_INVALID` | decisions | Malformed decision entries |
-| (warning) `DECISION_UNKNOWN_PROMPT` | decisions | Decision references unknown prompt slug |
+| (warning) `DECISION_UNKNOWN_STEP` | decisions | Decision references unknown step slug |
 | (warning) `PSM_ZERO_BYTE_ARTIFACT` | state | Zero-byte artifact file |
 | (warning) `DEP_RERUN_STALE_DOWNSTREAM` | state | Re-run may have left downstream stale |
 
@@ -899,8 +899,8 @@ Displays formatted sections with descriptions for each option. Current project s
 ```
 Methodologies
 ─────────────
-  deep            Full pipeline — comprehensive documentation, parallel agents (24 steps)
-  mvp             Streamlined pipeline — fewer phases, lighter process (12 steps)
+  deep            Full pipeline — comprehensive documentation, parallel agents (36 steps)
+  mvp             Streamlined pipeline — fewer phases, lighter process (7 steps)
 
 Platforms
 ─────────
@@ -972,7 +972,7 @@ Step: tech-stack (Phase 1 — Foundation)
   Instructions:  global.md, tech-stack.md (2 layers loaded)
 ```
 
-In JSON mode (project info), `data` contains `{ methodology, platforms, project_traits, extra_prompts, prompt_count, config_path, project_root }` with optional `progress`.
+In JSON mode (project info), `data` contains `{ methodology, platforms, project_traits, extra_steps, step_count, config_path, project_root }` with optional `progress`.
 
 In JSON mode (step info), `data` contains `{ step, description, methodology, depth, produces, reads, depends_on, knowledge_base, status, instructions_loaded }`.
 
@@ -1062,7 +1062,7 @@ Proceeds without confirmation. Runs build if project present (unless `--skip-bui
 
 ```
 ✓ scaffold updated: v2.0.0 → v2.1.0
-✓ Rebuilt project (classic, 22 prompts)
+✓ Rebuilt project (deep, 36 steps)
 ```
 
 In JSON mode, `data` contains `{ current_version, latest_version, updated }` with optional `changelog`, `rebuild_result`.
@@ -1091,7 +1091,7 @@ scaffold update --auto
 
 ### `scaffold dashboard [flags]`
 
-**Purpose**: Generate a self-contained HTML dashboard showing pipeline progress, phase status, prompt details, and decision log. Opens in the default browser unless `--no-open` is specified.
+**Purpose**: Generate a self-contained HTML dashboard showing pipeline progress, phase status, step details, and decision log. Opens in the default browser unless `--no-open` is specified.
 **Category**: utility
 **Lock behavior**: Read-only (no lock)
 **Requires project**: Yes
@@ -1126,7 +1126,7 @@ With `--no-open`:
 ✓ Dashboard generated: .scaffold/dashboard.html
 ```
 
-In JSON mode (or `--json-only`), `data` contains `{ methodology, progress: { completed, skipped, pending, total }, phases: [{ name, index, prompts: [{ slug, status, description }] }], generated_at, output_path }` with optional `decisions` (array of recent decision entries) and `opened` (boolean).
+In JSON mode (or `--json-only`), `data` contains `{ methodology, progress: { completed, skipped, pending, total }, phases: [{ name, index, steps: [{ slug, status, description }] }], generated_at, output_path }` with optional `decisions` (array of recent decision entries) and `opened` (boolean).
 
 **Error conditions:**
 
@@ -1150,7 +1150,7 @@ scaffold dashboard --json-only --format json | jq '.data.progress'
 
 ---
 
-### `scaffold decisions [--prompt <slug>] [--last <n>] [flags]`
+### `scaffold decisions [--step <slug>] [--last <n>] [flags]`
 
 **Purpose**: Query the decision log.
 **Category**: Utility (read-only)
@@ -1163,14 +1163,14 @@ scaffold dashboard --json-only --format json | jq '.data.progress'
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--prompt <slug>` | string | (all) | Filter decisions by prompt slug. |
+| `--step <slug>` | string | (all) | Filter decisions by step slug. |
 | `--last <n>` | integer | (all) | Show last N entries. |
 
-**Interactive behavior**: Displays decision entries in reverse chronological order. Each entry shows prompt slug, timestamp, decision text, and actor.
+**Interactive behavior**: Displays decision entries in reverse chronological order. Each entry shows step slug, timestamp, decision text, and actor.
 
 **Auto mode**: Same as interactive — read-only commands have no decisions to make.
 
-**Success output**: Lists decision entries. In JSON mode, `data` contains `{ decisions, total }` where `decisions` is an array of `{ id, prompt, timestamp, decision, actor }` with optional `context`.
+**Success output**: Lists decision entries. In JSON mode, `data` contains `{ decisions, total }` where `decisions` is an array of `{ id, step, timestamp, decision, actor }` with optional `context`.
 
 **Error conditions:**
 
@@ -1178,7 +1178,7 @@ scaffold dashboard --json-only --format json | jq '.data.progress'
 |------------|-----------|---------|---------|
 | `CONFIG_NOT_FOUND` | 1 | No `.scaffold/` directory | "Config not found. Run `scaffold init`." |
 | `STATE_PARSE_ERROR` | 3 | `decisions.jsonl` malformed | "decisions.jsonl is malformed. Run `scaffold validate`." |
-| `DEP_TARGET_MISSING` | 2 | `--prompt` slug doesn't exist in pipeline | "Unknown prompt '<slug>'. Run `scaffold status` to see valid slugs." |
+| `DEP_TARGET_MISSING` | 2 | `--step` slug doesn't exist in pipeline | "Unknown step '<slug>'. Run `scaffold status` to see valid slugs." |
 
 **Side effects**: None (read-only).
 
@@ -1188,8 +1188,8 @@ scaffold dashboard --json-only --format json | jq '.data.progress'
 # Show all decisions
 scaffold decisions
 
-# Show decisions for a specific prompt
-scaffold decisions --prompt tech-stack
+# Show decisions for a specific step
+scaffold decisions --step tech-stack
 
 # Show last 5 decisions as JSON
 scaffold decisions --last 5 --format json

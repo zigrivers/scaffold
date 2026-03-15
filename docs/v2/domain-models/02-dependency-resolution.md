@@ -1005,7 +1005,7 @@ Run: scaffold run
 `scaffold status` marks all eligible prompts with the same indicator:
 
 ```
-Pipeline: classic (2/18 complete)
+Pipeline: deep (2/18 complete)
 + create-prd
 > review-prd (eligible)
 > beads-setup (eligible)
@@ -1021,7 +1021,7 @@ Pipeline: classic (2/18 complete)
 **The `parallelSets` structure:**
 
 ```typescript
-// Example for the classic methodology
+// Example for the deep methodology
 parallelSets = [
   ["create-prd"],                           // Level 0: no prerequisites
   ["review-prd", "beads-setup"],            // Level 1: both depend only on create-prd
@@ -1291,7 +1291,7 @@ If the user skips all prompts except the last one, the last prompt becomes eligi
 
 ### Most valuable test cases (by risk)
 
-1. **Cycle detection with the classic methodology manifest** — use the actual manifest from the `classic` methodology. Verify no false-positive cycles. (Risk: false positive blocks the entire pipeline.)
+1. **Cycle detection with the deep methodology manifest** — use the actual manifest from the `deep` methodology. Verify no false-positive cycles. (Risk: false positive blocks the entire pipeline.)
 2. **Optional prompt exclusion with dependents** — exclude `design-system`, verify `git-workflow` proceeds with remaining deps. (Risk: blocking core prompts due to optional dep exclusion.)
 3. **Extra prompt injection with chain** — two extra prompts where B depends on A. Verify both appear in sorted order with correct relative positioning. (Risk: extra prompts not properly integrated.)
 4. **Diamond dependency** — verify D waits for both B and C, not just one. (Risk: premature execution of a prompt.)
@@ -1316,7 +1316,7 @@ If the user skips all prompts except the last one, the last prompt becomes eligi
 
 ### Integration test scenarios
 
-1. **Domain 01 → Domain 02**: Feed the actual `classic` methodology through domain 01 resolution, then through domain 02 sorting. Verify the sorted order matches the expected pipeline sequence.
+1. **Domain 01 → Domain 02**: Feed the actual `deep` methodology through domain 01 resolution, then through domain 02 sorting. Verify the sorted order matches the expected pipeline sequence.
 2. **Domain 02 → Domain 03**: Simulate a full pipeline run — resolve, sort, then step through the sorted order updating state.json statuses, verifying eligibility at each step.
 3. **Domain 02 → Domain 09**: Verify that `scaffold validate` correctly reports cycle errors and missing dependency errors from domain 02.
 4. **Extra prompt end-to-end**: Create an extra prompt with `depends-on` referencing a built-in prompt. Run through domain 01 + domain 02. Verify the extra prompt appears at the correct position in the sorted order.
@@ -1334,7 +1334,7 @@ If the user skips all prompts except the last one, the last prompt becomes eligi
    Currently all dependencies are treated equally — the prerequisite must be completed or skipped. A "soft" dependency could mean "run after X if X is in the pipeline, but don't block if X is absent." This would be more expressive than the current binary (exists-as-edge or doesn't). The optional-prompt exclusion behavior is similar to soft deps but operates at build time, not runtime.
 
 3. **What is the maximum supported pipeline size?**
-   The current classic methodology has ~20 prompts. Kahn's algorithm is O(P + E) which scales trivially. But should there be a hard limit to prevent pathological cases (e.g., a custom methodology with 1000 prompts)? A validation warning at 100+ prompts might be appropriate.
+   The current deep methodology has ~20 prompts. Kahn's algorithm is O(P + E) which scales trivially. But should there be a hard limit to prevent pathological cases (e.g., a custom methodology with 1000 prompts)? A validation warning at 100+ prompts might be appropriate.
 
 4. **Should `scaffold next` differentiate between "eligible because prerequisites completed" and "eligible because prerequisites skipped"?**
    When a user skips several prompts, downstream prompts become eligible but may produce lower-quality output without their predecessors' artifacts. Showing a "prerequisites were skipped" indicator could help users make informed decisions.
@@ -1357,9 +1357,9 @@ If the user skips all prompts except the last one, the last prompt becomes eligi
 
 ## Section 11: Concrete Examples
 
-### Example 1: Happy Path — Classic Methodology Full Resolution
+### Example 1: Happy Path — Deep Methodology Full Resolution
 
-**Scenario**: The `classic` methodology with a web-only project (no mobile, no multi-model CLI). `design-system` is included (frontend trait satisfied). All optional prompts excluded except `design-system` and `multi-model-review`.
+**Scenario**: The `deep` methodology with a web-only project (no mobile, no multi-model CLI). `design-system` is included (frontend trait satisfied). All optional prompts excluded except `design-system` and `multi-model-review`.
 
 **Input (relevant subset of manifest dependencies):**
 

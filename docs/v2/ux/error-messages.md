@@ -152,7 +152,7 @@ The architecture error registry (system-architecture.md Section 7c) uses compone
 ✗ Scaffold is already configured in this project.
 
   Found: .scaffold/config.yml
-  Methodology: deep, 8/32 steps completed
+  Methodology: deep, 8/36 steps completed
 
   To reconfigure from scratch: scaffold init --force
   To resume the current pipeline: scaffold run

@@ -6,7 +6,7 @@ order: 34
 dependencies: [cross-phase-consistency, traceability-matrix, decision-completeness, critical-path-walkthrough, implementability-dry-run, dependency-graph-validation, scope-creep-check]
 outputs: [docs/validation/fix-log.md]
 conditional: null
-knowledge-base: []
+knowledge-base: [apply-fixes-and-freeze]
 ---
 
 ## Purpose

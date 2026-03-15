@@ -66,7 +66,7 @@ This replaces the v2 three-layer resolution system (ADR-005), mixin injection (A
 ## Consequences
 
 ### Positive
-- Dramatically reduces maintenance burden — 32 meta-prompts (30-80 lines each) replace 29+ hard-coded prompts (200-500 lines each)
+- Dramatically reduces maintenance burden — 36 meta-prompts (30-80 lines each) replace 29+ hard-coded prompts (200-500 lines each)
 - Domain knowledge is separated, reusable, and independently improvable via the knowledge base
 - New methodologies require only depth-scale configuration, not new prompt text
 - Each step naturally adapts to project context — no conditional logic or branching in prompt text

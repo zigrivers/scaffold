@@ -61,10 +61,10 @@ Failure envelope:
   "errors": [
     {
       "code": "CONFIG_INVALID_METHODOLOGY",
-      "message": "Methodology 'clasic' not found. Did you mean 'classic'?",
+      "message": "Methodology 'clasic' not found. Did you mean 'deep'?",
       "file": ".scaffold/config.yml",
       "line": 3,
-      "suggestion": "classic",
+      "suggestion": "deep",
       "recovery": "Update the 'methodology' field to one of the installed methodologies."
     }
   ],
@@ -94,7 +94,7 @@ Failure envelope:
 |------|---------|-------------|
 | `0` | Success | All commands on success (warnings do not affect exit code) |
 | `1` | Validation error | Bad config, invalid frontmatter, missing required field, circular dependency in manifest |
-| `2` | Missing dependency | Predecessor artifact not found; prerequisite prompt not completed |
+| `2` | Missing dependency | Predecessor artifact not found; prerequisite step not completed |
 | `3` | State / lock error | `state.json` unreadable or corrupt; `lock.json` held by another alive process |
 | `4` | User cancellation | User pressed Ctrl+C or declined an interactive confirmation |
 | `5` | Build/assembly error | Platform adapter failure, assembly engine error |
@@ -398,7 +398,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
 **Requires project**: No (creates the `.scaffold/` directory)
 **Requires state**: No
 
-`scaffold adopt` scans an existing codebase, maps discovered artifacts to scaffold prompts via their `produces` fields, writes `.scaffold/config.yml` and `state.json` with pre-completed entries for matched prompts, and runs `scaffold build`. See [domain 07](../domain-models/07-brownfield-adopt.md) for the scanning algorithm.
+`scaffold adopt` scans an existing codebase, maps discovered artifacts to scaffold steps via their `produces` fields, writes `.scaffold/config.yml` and `state.json` with pre-completed entries for matched steps, and runs `scaffold build`. See [domain 07](../domain-models/07-brownfield-adopt.md) for the scanning algorithm.
 
 **Example `data`**:
 
@@ -407,15 +407,15 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
   "mode": "brownfield",
   "artifacts_found": 5,
   "detected_artifacts": [
-    { "file": "docs/plan.md", "mapped_to_prompt": "create-prd" },
-    { "file": "docs/tech-stack.md", "mapped_to_prompt": "tech-stack" },
-    { "file": "docs/coding-standards.md", "mapped_to_prompt": "coding-standards" },
-    { "file": "docs/project-structure.md", "mapped_to_prompt": "project-structure" },
-    { "file": "docs/git-workflow.md", "mapped_to_prompt": "git-workflow" }
+    { "file": "docs/plan.md", "mapped_to_step": "create-prd" },
+    { "file": "docs/tech-stack.md", "mapped_to_step": "tech-stack" },
+    { "file": "docs/coding-standards.md", "mapped_to_step": "coding-standards" },
+    { "file": "docs/project-structure.md", "mapped_to_step": "project-structure" },
+    { "file": "docs/git-workflow.md", "mapped_to_step": "git-workflow" }
   ],
-  "prompts_completed": 5,
-  "prompts_remaining": 19,
-  "methodology": "classic",
+  "steps_completed": 5,
+  "steps_remaining": 19,
+  "methodology": "deep",
   "config_path": ".scaffold/config.yml",
   "build_result": { ... }
 }
@@ -428,7 +428,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
   "$id": "https://scaffold-cli.dev/schemas/data/adopt.json",
   "title": "AdoptData",
   "type": "object",
-  "required": ["mode", "artifacts_found", "detected_artifacts", "prompts_completed", "prompts_remaining"],
+  "required": ["mode", "artifacts_found", "detected_artifacts", "steps_completed", "steps_remaining"],
   "additionalProperties": true,
   "properties": {
     "mode": {
@@ -439,22 +439,22 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
     "artifacts_found": {
       "type": "integer",
       "minimum": 0,
-      "description": "Total number of existing files that matched a prompt's produces field."
+      "description": "Total number of existing files that matched a step's produces field."
     },
     "detected_artifacts": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["file", "mapped_to_prompt"],
+        "required": ["file", "mapped_to_step"],
         "additionalProperties": true,
         "properties": {
           "file": {
             "type": "string",
             "description": "Relative path of the existing file."
           },
-          "mapped_to_prompt": {
+          "mapped_to_step": {
             "type": "string",
-            "description": "Slug of the prompt whose produces field matched this file."
+            "description": "Slug of the step whose produces field matched this file."
           },
           "match_type": {
             "type": "string",
@@ -463,20 +463,20 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
           },
           "schema_valid": {
             "type": "boolean",
-            "description": "Whether the artifact passes the prompt's artifact-schema validation. Partial matches (present but invalid) are pre-completed with a warning."
+            "description": "Whether the artifact passes the step's artifact-schema validation. Partial matches (present but invalid) are pre-completed with a warning."
           }
         }
       }
     },
-    "prompts_completed": {
+    "steps_completed": {
       "type": "integer",
       "minimum": 0,
-      "description": "Number of prompts marked as completed in state.json because their artifacts were found."
+      "description": "Number of steps marked as completed in state.json because their artifacts were found."
     },
-    "prompts_remaining": {
+    "steps_remaining": {
       "type": "integer",
       "minimum": 0,
-      "description": "Number of prompts left as pending (artifacts not found)."
+      "description": "Number of steps left as pending (artifacts not found)."
     },
     "methodology": {
       "type": "string",
@@ -622,17 +622,17 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
 
 ### 2.5 scaffold skip
 
-**Signature**: `scaffold skip <prompt> [--reason <text>]`
+**Signature**: `scaffold skip <step> [--reason <text>]`
 **Requires project**: Yes
 **Requires state**: Yes
 
-`scaffold skip` marks a prompt as `skipped` in `state.json`. Skipped prompts are treated as satisfied for dependency purposes, unblocking their dependents. See [ADR-020](../adrs/ADR-020-skip-vs-exclude-semantics.md).
+`scaffold skip` marks a step as `skipped` in `state.json`. Skipped steps are treated as satisfied for dependency purposes, unblocking their dependents. See [ADR-020](../adrs/ADR-020-skip-vs-exclude-semantics.md).
 
 **Example `data`**:
 
 ```json
 {
-  "prompt": "add-playwright",
+  "step": "add-playwright",
   "reason": "Using Vitest browser mode instead",
   "previous_status": "pending",
   "newly_eligible": ["user-stories"]
@@ -646,12 +646,12 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
   "$id": "https://scaffold-cli.dev/schemas/data/skip.json",
   "title": "SkipData",
   "type": "object",
-  "required": ["prompt", "reason", "newly_eligible"],
+  "required": ["step", "reason", "newly_eligible"],
   "additionalProperties": true,
   "properties": {
-    "prompt": {
+    "step": {
       "type": "string",
-      "description": "Slug of the prompt that was skipped."
+      "description": "Slug of the step that was skipped."
     },
     "reason": {
       "type": "string",
@@ -660,12 +660,12 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
     "previous_status": {
       "type": "string",
       "enum": ["pending", "completed"],
-      "description": "Status of the prompt before it was skipped."
+      "description": "Status of the step before it was skipped."
     },
     "newly_eligible": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Prompt slugs that are now eligible to run because the skipped prompt unblocked them."
+      "description": "Step slugs that are now eligible to run because the skipped step unblocked them."
     }
   }
 }
@@ -675,8 +675,8 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
 
 | Code | Exit | Description |
 |------|------|-------------|
-| `DEP_TARGET_MISSING` | 2 | The specified prompt slug is not in the resolved pipeline |
-| `PSM_INVALID_TRANSITION` | 3 | The prompt is already completed and cannot be skipped; use `scaffold run <step>` to re-run |
+| `DEP_TARGET_MISSING` | 2 | The specified step slug is not in the resolved pipeline |
+| `PSM_INVALID_TRANSITION` | 3 | The step is already completed and cannot be skipped; use `scaffold run <step>` to re-run |
 
 ---
 
@@ -743,7 +743,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
 
 ```json
 {
-  "methodology": "classic",
+  "methodology": "deep",
   "progress": {
     "completed": 6,
     "skipped": 1,
@@ -755,7 +755,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
     {
       "name": "Foundation",
       "index": 1,
-      "prompts": [
+      "steps": [
         {
           "slug": "create-prd",
           "status": "completed",
@@ -777,7 +777,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
     {
       "name": "Standards",
       "index": 2,
-      "prompts": [
+      "steps": [
         {
           "slug": "coding-standards",
           "status": "completed",
@@ -822,22 +822,22 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
       "properties": {
         "completed": { "type": "integer", "minimum": 0 },
         "skipped": { "type": "integer", "minimum": 0 },
-        "in_progress": { "type": "integer", "minimum": 0, "description": "Number of prompts currently in progress." },
+        "in_progress": { "type": "integer", "minimum": 0, "description": "Number of steps currently in progress." },
         "pending": { "type": "integer", "minimum": 0 },
         "total": { "type": "integer", "minimum": 1 }
       }
     },
     "phases": {
       "type": "array",
-      "description": "Prompts grouped by pipeline phase in phase order.",
+      "description": "Steps grouped by pipeline phase in phase order.",
       "items": {
         "type": "object",
-        "required": ["name", "index", "prompts"],
+        "required": ["name", "index", "steps"],
         "additionalProperties": true,
         "properties": {
           "name": { "type": "string", "description": "Phase display name from the methodology manifest." },
           "index": { "type": "integer", "minimum": 0, "description": "Phase number (0-based). Phase 0 is 'Prerequisites'." },
-          "prompts": {
+          "steps": {
             "type": "array",
             "items": {
               "type": "object",
@@ -846,7 +846,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
               "properties": {
                 "slug": { "type": "string" },
                 "status": { "type": "string", "enum": ["completed", "skipped", "pending", "in_progress"] },
-                "source": { "type": "string", "enum": ["pipeline", "extra"], "description": "Where this step originates: 'pipeline' for built-in methodology steps, 'extra' for user-added extra prompts." },
+                "source": { "type": "string", "enum": ["pipeline", "extra"], "description": "Where this step originates: 'pipeline' for built-in methodology steps, 'extra' for user-added extra steps." },
                 "depth": { "type": "integer", "minimum": 1, "maximum": 5, "description": "Depth level (1-5) at which this step was executed. Only present when status is 'completed'. See ADR-043." },
                 "at": { "type": "string", "format": "date-time" },
                 "completed_by": { "type": "string" },
@@ -854,7 +854,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
                 "blocked_by": {
                   "type": "array",
                   "items": { "type": "string" },
-                  "description": "Slugs of prerequisite prompts that are not yet completed or skipped. Only present when status is 'pending' and the prompt has unmet dependencies."
+                  "description": "Slugs of prerequisite steps that are not yet completed or skipped. Only present when status is 'pending' and the step has unmet dependencies."
                 }
               }
             }
@@ -865,7 +865,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
     "next_eligible": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Prompt slugs currently eligible to run."
+      "description": "Step slugs currently eligible to run."
     },
     "orphaned_entries": {
       "type": "array",
@@ -874,13 +874,13 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
         "required": ["slug", "status", "at"],
         "additionalProperties": true,
         "properties": {
-          "slug": { "type": "string", "description": "Prompt slug present in state.json but absent from the current resolved pipeline." },
+          "slug": { "type": "string", "description": "Step slug present in state.json but absent from the current resolved pipeline." },
           "status": { "type": "string", "description": "The status of the orphaned entry in state.json (e.g., 'completed', 'skipped')." },
           "at": { "type": "string", "format": "date-time", "description": "Timestamp when the entry was last updated in state.json." },
-          "completed_by": { "type": "string", "description": "Identity of the user/agent who completed the prompt, if applicable." }
+          "completed_by": { "type": "string", "description": "Identity of the user/agent who completed the step, if applicable." }
         }
       },
-      "description": "State entries for prompts present in state.json but absent from the current resolved pipeline (e.g., after a methodology change). See architecture Section 5b."
+      "description": "State entries for steps present in state.json but absent from the current resolved pipeline (e.g., after a methodology change). See architecture Section 5b."
     }
   }
 }
@@ -894,7 +894,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
 **Requires project**: Yes
 **Requires state**: Yes
 
-`scaffold next` reports eligible prompts without executing any of them. It reads frontmatter for each eligible prompt to provide rich context.
+`scaffold next` reports eligible steps without executing any of them. It reads frontmatter for each eligible step to provide rich context.
 
 **Example `data`**:
 
@@ -942,56 +942,56 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
   "properties": {
     "pipeline_complete": {
       "type": "boolean",
-      "description": "Whether the entire pipeline is complete with no more eligible prompts."
+      "description": "Whether the entire pipeline is complete with no more eligible steps."
     },
-    "blocked_prompts": {
+    "blocked_steps": {
       "type": "array",
-      "description": "Prompts that are pending but blocked by unmet dependencies. Useful for diagnosing the 'all blocked' case where eligible is empty but pipeline_complete is false.",
+      "description": "Steps that are pending but blocked by unmet dependencies. Useful for diagnosing the 'all blocked' case where eligible is empty but pipeline_complete is false.",
       "items": {
         "type": "object",
         "required": ["slug", "blocked_by"],
         "additionalProperties": true,
         "properties": {
-          "slug": { "type": "string", "description": "Prompt identifier." },
+          "slug": { "type": "string", "description": "Step identifier." },
           "blocked_by": {
             "type": "array",
             "items": { "type": "string" },
-            "description": "Slugs of prerequisite prompts that are not yet completed or skipped."
+            "description": "Slugs of prerequisite steps that are not yet completed or skipped."
           }
         }
       }
     },
     "eligible": {
       "type": "array",
-      "description": "All currently eligible prompts with their frontmatter metadata.",
+      "description": "All currently eligible steps with their frontmatter metadata.",
       "items": {
         "type": "object",
         "required": ["slug", "description", "phase", "produces", "reads", "depends_on", "source"],
         "additionalProperties": true,
         "properties": {
-          "slug": { "type": "string", "description": "Prompt identifier." },
+          "slug": { "type": "string", "description": "Step identifier." },
           "description": { "type": "string", "description": "Short human-readable description from frontmatter." },
           "phase": { "type": "integer", "minimum": 0, "description": "Phase number for display grouping." },
           "phase_name": { "type": "string", "description": "Phase display name from the methodology manifest (e.g., 'Foundation', 'Standards')." },
           "produces": {
             "type": "array",
             "items": { "type": "string" },
-            "description": "Artifact file paths this prompt creates (relative to project root)."
+            "description": "Artifact file paths this step creates (relative to project root)."
           },
           "reads": {
             "type": "array",
             "items": { "type": "string" },
-            "description": "Files this prompt reads as context (resolved from frontmatter 'reads' field — full-file paths only, sections extracted to strings)."
+            "description": "Files this step reads as context (resolved from frontmatter 'reads' field — full-file paths only, sections extracted to strings)."
           },
           "depends_on": {
             "type": "array",
             "items": { "type": "string" },
-            "description": "Prerequisite prompt slugs (union of manifest and frontmatter dependencies)."
+            "description": "Prerequisite step slugs (union of manifest and frontmatter dependencies)."
           },
           "source": {
             "type": "string",
             "enum": ["pipeline", "extra"],
-            "description": "Where this step originates: 'pipeline' for built-in methodology steps, 'extra' for user-added extra prompts."
+            "description": "Where this step originates: 'pipeline' for built-in methodology steps, 'extra' for user-added extra steps."
           },
           "depth": {
             "type": "integer",
@@ -1012,7 +1012,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
 
 **Error codes** specific to `next`:
 
-`scaffold next` returns exit code 0 even when no prompts are eligible — the `data.eligible` array is simply empty and `data.pipeline_complete` is `true`. This is not an error condition; it indicates the pipeline is finished or all remaining prompts are blocked.
+`scaffold next` returns exit code 0 even when no steps are eligible — the `data.eligible` array is simply empty and `data.pipeline_complete` is `true`. This is not an error condition; it indicates the pipeline is finished or all remaining steps are blocked.
 
 ---
 
@@ -1059,7 +1059,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
       "category": "state",
       "name": "Orphaned state entries",
       "status": "warn",
-      "message": "2 state entries reference prompts not in the current resolved pipeline.",
+      "message": "2 state entries reference steps not in the current resolved pipeline.",
       "details": {
         "orphaned_slugs": ["old-setup", "deprecated-review"]
       }
@@ -1097,7 +1097,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
         "properties": {
           "category": {
             "type": "string",
-            "enum": ["config", "manifest", "prompts", "artifacts", "state", "decisions"],
+            "enum": ["config", "manifest", "steps", "artifacts", "state", "decisions"],
             "description": "Which validation phase produced this check."
           },
           "name": {
@@ -1134,7 +1134,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
     "scopes_active": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Validation scopes that were active for this run (e.g., 'config', 'manifest', 'prompts', 'artifacts', 'state', 'decisions')."
+      "description": "Validation scopes that were active for this run (e.g., 'config', 'manifest', 'steps', 'artifacts', 'state', 'decisions')."
     },
     "fixes_applied": {
       "type": "array",
@@ -1471,13 +1471,13 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
 **Requires project**: Yes
 **Requires state**: No
 
-`scaffold dashboard` reads `state.json` and `config.yml` to generate a self-contained HTML progress dashboard. The `data` field includes the methodology, structured progress, per-phase prompt status, generation timestamp, and the output file path.
+`scaffold dashboard` reads `state.json` and `config.yml` to generate a self-contained HTML progress dashboard. The `data` field includes the methodology, structured progress, per-phase step status, generation timestamp, and the output file path.
 
 **Example `data`**:
 
 ```json
 {
-  "methodology": "classic",
+  "methodology": "deep",
   "progress": {
     "completed": 6,
     "skipped": 1,
@@ -1488,7 +1488,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
     {
       "name": "Foundation",
       "index": 1,
-      "prompts": [
+      "steps": [
         { "slug": "create-prd", "status": "completed", "description": "Create the product requirements document." },
         { "slug": "tech-stack", "status": "completed", "description": "Define the technology stack." }
       ]
@@ -1496,7 +1496,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
     {
       "name": "Standards",
       "index": 2,
-      "prompts": [
+      "steps": [
         { "slug": "coding-standards", "status": "completed", "description": "Establish coding conventions." },
         { "slug": "git-workflow", "status": "pending", "description": "Configure Git branching strategy." }
       ]
@@ -1505,7 +1505,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
   "generated_at": "2026-03-13T10:30:00.000Z",
   "output_path": "/Users/ken/projects/acme-web/.scaffold/dashboard.html",
   "decisions": [
-    { "prompt": "tech-stack", "timestamp": "2026-03-11T16:30:00.000Z", "decision": "Node.js 22 LTS with TypeScript 5.4; Fastify for HTTP." }
+    { "step": "tech-stack", "timestamp": "2026-03-11T16:30:00.000Z", "decision": "Node.js 22 LTS with TypeScript 5.4; Fastify for HTTP." }
   ],
   "opened": true
 }
@@ -1538,15 +1538,15 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
     },
     "phases": {
       "type": "array",
-      "description": "Prompts grouped by pipeline phase.",
+      "description": "Steps grouped by pipeline phase.",
       "items": {
         "type": "object",
-        "required": ["name", "index", "prompts"],
+        "required": ["name", "index", "steps"],
         "additionalProperties": true,
         "properties": {
           "name": { "type": "string", "description": "Phase display name." },
           "index": { "type": "integer", "minimum": 0, "description": "Phase number (0-based). Phase 0 is 'Prerequisites'." },
-          "prompts": {
+          "steps": {
             "type": "array",
             "items": {
               "type": "object",
@@ -1576,10 +1576,10 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
       "description": "Recent decision entries included in the dashboard.",
       "items": {
         "type": "object",
-        "required": ["prompt", "timestamp", "decision"],
+        "required": ["step", "timestamp", "decision"],
         "additionalProperties": true,
         "properties": {
-          "prompt": { "type": "string", "description": "Slug of the prompt that recorded this decision." },
+          "step": { "type": "string", "description": "Slug of the step that recorded this decision." },
           "timestamp": { "type": "string", "format": "date-time", "description": "When the decision was recorded." },
           "decision": { "type": "string", "description": "Decision text." }
         }
@@ -1597,11 +1597,11 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
 
 ### 2.15 scaffold decisions
 
-**Signature**: `scaffold decisions [--prompt <slug>] [--last <n>] [--format json]`
+**Signature**: `scaffold decisions [--step <slug>] [--last <n>] [--format json]`
 **Requires project**: Yes
 **Requires state**: Yes
 
-`scaffold decisions` reads `.scaffold/decisions.jsonl` and returns the recorded project decisions, optionally filtered by prompt slug or limited to the most recent entries.
+`scaffold decisions` reads `.scaffold/decisions.jsonl` and returns the recorded project decisions, optionally filtered by step slug or limited to the most recent entries.
 
 **Example `data`**:
 
@@ -1610,7 +1610,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
   "decisions": [
     {
       "id": "D-012",
-      "prompt": "coding-standards",
+      "step": "coding-standards",
       "timestamp": "2026-03-12T18:41:00.000Z",
       "decision": "Use Biome for linting and formatting; target ES2022.",
       "actor": "ken",
@@ -1618,14 +1618,14 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
     },
     {
       "id": "D-011",
-      "prompt": "coding-standards",
+      "step": "coding-standards",
       "timestamp": "2026-03-12T18:40:00.000Z",
       "decision": "Enforce 100-character line limit; no semicolons.",
       "actor": "ken"
     },
     {
       "id": "D-010",
-      "prompt": "tech-stack",
+      "step": "tech-stack",
       "timestamp": "2026-03-12T17:22:00.000Z",
       "decision": "Node.js 22 LTS with TypeScript 5.4; Fastify for HTTP.",
       "actor": "ken"
@@ -1651,13 +1651,13 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
         "type": "object",
         "properties": {
           "id": { "type": "string", "pattern": "^D-\\d{3,}$", "description": "Decision ID (e.g., 'D-012')." },
-          "prompt": { "type": "string" },
+          "step": { "type": "string" },
           "timestamp": { "type": "string", "format": "date-time" },
           "decision": { "type": "string" },
           "actor": { "type": "string" },
           "context": { "type": "string" }
         },
-        "required": ["id", "prompt", "timestamp", "decision", "actor"]
+        "required": ["id", "step", "timestamp", "decision", "actor"]
       }
     },
     "total": {
@@ -1674,7 +1674,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
 |------|------|-------------|
 | `CONFIG_NOT_FOUND` | 1 | `.scaffold/config.yml` missing |
 | `STATE_PARSE_ERROR` | 3 | `state.json` or `decisions.jsonl` unreadable or corrupt |
-| `DEP_TARGET_MISSING` | 2 | `--prompt` slug not found in the resolved pipeline |
+| `DEP_TARGET_MISSING` | 2 | `--step` slug not found in the resolved pipeline |
 
 ---
 
@@ -1688,7 +1688,7 @@ Every entry in the `errors` and `warnings` arrays conforms to the following sche
 {
   "code": "MANIFEST_CIRCULAR_DEPENDENCY",
   "message": "Circular dependency detected: create-prd → tech-stack → create-prd",
-  "file": "content/methodologies/classic/manifest.yml",
+  "file": "content/methodologies/deep/manifest.yml",
   "line": null,
   "suggestion": null,
   "recovery": "Check the 'dependencies' section in your methodology manifest and remove the cycle.",
@@ -1707,7 +1707,7 @@ Every entry in the `errors` and `warnings` arrays conforms to the following sche
 | `message` | string | Yes | Human-readable error message with context variables substituted. |
 | `file` | string \| null | Yes | Relative path of the source file where the error originated. Null for errors not associated with a file. |
 | `line` | integer \| null | Yes | Line number within `file`, 1-based. Null if line is not known or not applicable. |
-| `suggestion` | string \| null | Yes | Fuzzy-match suggestion for typo correction (e.g., "Did you mean 'classic'?"). Null when no suggestion applies. Present when Levenshtein distance ≤ 2 between the invalid value and a valid option. |
+| `suggestion` | string \| null | Yes | Fuzzy-match suggestion for typo correction (e.g., "Did you mean 'deep'?"). Null when no suggestion applies. Present when Levenshtein distance ≤ 2 between the invalid value and a valid option. |
 | `recovery` | string | Yes | Actionable guidance on how to resolve the error. |
 | `details` | object | Yes | Structured supplemental data specific to the error code. May be an empty object. Never null. See Section 3.2. |
 | `exit_code` | integer | Yes | The exit code this error contributes to. One of 1, 2, 3, 4, 5. |
@@ -1782,9 +1782,9 @@ The following tables map every error code to its expected `details` object shape
 | `CONFIG_INVALID_PLATFORM` | `value: string, valid_options: string[]` | Unknown platform |
 | `CONFIG_INVALID_TRAIT` | `value: string` | Unknown project trait |
 | `CONFIG_MISSING_REQUIRED` | `field: string` | Required field absent |
-| `CONFIG_EXTRA_PROMPT_NOT_FOUND` | `slug: string, searched_paths: string[]` | Extra-prompt file not found |
-| `CONFIG_EXTRA_PROMPT_INVALID` | `slug: string, reason: string` | Extra-prompt frontmatter invalid |
-| `CONFIG_EXTRA_SLUG_CONFLICT` | `slug: string` | Extra-prompt slug collides with built-in |
+| `CONFIG_EXTRA_STEP_NOT_FOUND` | `slug: string, searched_paths: string[]` | Extra-step file not found |
+| `CONFIG_EXTRA_STEP_INVALID` | `slug: string, reason: string` | Extra-step frontmatter invalid |
+| `CONFIG_EXTRA_SLUG_CONFLICT` | `slug: string` | Extra-step slug collides with built-in |
 | `CONFIG_MIGRATE_FAILED` | `from_version: number, to_version: number, error: string` | Schema migration failed |
 | `CONFIG_UNKNOWN_FIELD` | `field: string` | Unrecognized top-level field (warning) |
 
@@ -1792,15 +1792,15 @@ The following tables map every error code to its expected `details` object shape
 
 | Code | `details` fields | Description |
 |------|-----------------|-------------|
-| `RESOLUTION_FILE_MISSING` | `slug: string, expected_paths: string[]` | Prompt file not found |
-| `RESOLUTION_EXTRA_PROMPT_MISSING` | `slug: string` | Extra-prompt cannot be resolved |
+| `RESOLUTION_FILE_MISSING` | `slug: string, expected_paths: string[]` | Step file not found |
+| `RESOLUTION_EXTRA_STEP_MISSING` | `slug: string` | Extra-step cannot be resolved |
 | `RESOLUTION_DUPLICATE_SLUG` | `slug: string, files: string[]` | Slug collision across resolution layers |
 | `RESOLUTION_MANIFEST_INVALID` | `reason: string` | Manifest is structurally invalid |
 | `RESOLUTION_METHODOLOGY_NOT_FOUND` | `name: string` | Methodology directory missing |
 | `RESOLUTION_FRONTMATTER_PARSE_ERROR` | `parse_error: string` | Frontmatter YAML invalid |
-| `RESOLUTION_EXTRA_PROMPT_INVALID_FRONTMATTER` | `slug: string, reason: string` | Extra-prompt frontmatter malformed |
+| `RESOLUTION_EXTRA_STEP_INVALID_FRONTMATTER` | `slug: string, reason: string` | Extra-step frontmatter malformed |
 | `RESOLUTION_CUSTOM_OVERRIDE_ACTIVE` | `slug: string, override_path: string` | Custom override replacing built-in (warning) |
-| `RESOLUTION_UNKNOWN_TRAIT` | `trait: string, prompt: string` | Prompt references an unknown project trait in its `requires` field (warning) |
+| `RESOLUTION_UNKNOWN_TRAIT` | `trait: string, step: string` | Step references an unknown project trait in its `requires` field (warning) |
 
 **Dependency Resolver (domain 02)**:
 
@@ -1808,12 +1808,12 @@ The following tables map every error code to its expected `details` object shape
 |------|------|-----------------|-------------|
 | `DEP_CYCLE_DETECTED` | 1 | `cycle: string[]` | Circular dependency in graph |
 | `DEP_TARGET_MISSING` | 2 | `slug: string, missing_dep: string` | `depends-on` target not in pipeline |
-| `DEP_SELF_REFERENCE` | 1 | `slug: string` | Prompt depends on itself |
-| `DEPENDENCY_MISSING_ARTIFACT` | 2 | `prompt: string, artifact: string, predecessor: string` | Predecessor artifact not on disk |
-| `DEPENDENCY_UNMET` | 2 | `prompt: string, unmet_dep: string` | Prerequisite not completed or skipped |
-| `DEP_ON_EXCLUDED` | 0 | `slug: string, excluded_dep: string` | Dependency on an excluded optional prompt (warning) |
-| `DEP_RERUN_STALE_DOWNSTREAM` | 0 | `rerun_prompt: string, stale_prompts: string[]` | Re-run may leave downstream prompts stale (warning) |
-| `DEP_PHASE_CONFLICT` | 0 | `slug: string, dep_slug: string, slug_phase: number, dep_phase: number` | Prompt depends on a prompt in a later phase (warning) |
+| `DEP_SELF_REFERENCE` | 1 | `slug: string` | Step depends on itself |
+| `DEPENDENCY_MISSING_ARTIFACT` | 2 | `step: string, artifact: string, predecessor: string` | Predecessor artifact not on disk |
+| `DEPENDENCY_UNMET` | 2 | `step: string, unmet_dep: string` | Prerequisite not completed or skipped |
+| `DEP_ON_EXCLUDED` | 0 | `slug: string, excluded_dep: string` | Dependency on an excluded optional step (warning) |
+| `DEP_RERUN_STALE_DOWNSTREAM` | 0 | `rerun_step: string, stale_steps: string[]` | Re-run may leave downstream steps stale (warning) |
+| `DEP_PHASE_CONFLICT` | 0 | `slug: string, dep_slug: string, slug_phase: number, dep_phase: number` | Step depends on a step in a later phase (warning) |
 
 **Assembly Engine — exit code 5**:
 
@@ -1830,22 +1830,22 @@ The following tables map every error code to its expected `details` object shape
 | `STATE_PARSE_ERROR` | `parse_error: string` | `state.json` invalid JSON |
 | `STATE_VERSION_MISMATCH` | `state_version: number, expected_version: number` | Schema version mismatch |
 | `STATE_CORRUPTED` | `reason: string` | Internally inconsistent state |
-| `STATE_ARTIFACT_MISMATCH` | `prompt: string, missing_artifact: string` | Completed prompt has missing artifact |
-| `PSM_INVALID_TRANSITION` | `prompt: string, from_status: string, to_status: string` | Invalid state transition |
-| `PSM_ALREADY_IN_PROGRESS` | `active_prompt: string` | Another prompt is already in_progress |
+| `STATE_ARTIFACT_MISMATCH` | `step: string, missing_artifact: string` | Completed step has missing artifact |
+| `PSM_INVALID_TRANSITION` | `step: string, from_status: string, to_status: string` | Invalid state transition |
+| `PSM_ALREADY_IN_PROGRESS` | `active_step: string` | Another step is already in_progress |
 | `PSM_WRITE_FAILED` | `reason: string` | Failed to write state.json |
 | `PSM_METHODOLOGY_MISMATCH` | `state_methodology: string, config_methodology: string` | Methodology mismatch between state and config |
-| `PSM_CRASH_DETECTED` | `prompt: string, started_at: string` | Previous session crashed (warning) |
-| `PSM_ZERO_BYTE_ARTIFACT` | `prompt: string, artifact: string` | Artifact exists but is 0 bytes (warning) |
-| `PSM_SKIP_HAS_DEPENDENTS` | `prompt: string, dependent_prompts: string[]` | Skipping prompt may affect dependents (warning) |
-| `PSM_STATE_WITHOUT_ARTIFACTS` | `prompt: string, missing_artifacts: string[]` | Prompt marked completed in state but expected artifacts are missing on disk (warning) |
-| `PSM_ARTIFACTS_WITHOUT_STATE` | `prompt: string, found_artifacts: string[]` | Prompt artifacts exist on disk but prompt is not marked completed in state (warning) |
+| `PSM_CRASH_DETECTED` | `step: string, started_at: string` | Previous session crashed (warning) |
+| `PSM_ZERO_BYTE_ARTIFACT` | `step: string, artifact: string` | Artifact exists but is 0 bytes (warning) |
+| `PSM_SKIP_HAS_DEPENDENTS` | `step: string, dependent_steps: string[]` | Skipping step may affect dependents (warning) |
+| `PSM_STATE_WITHOUT_ARTIFACTS` | `step: string, missing_artifacts: string[]` | Step marked completed in state but expected artifacts are missing on disk (warning) |
+| `PSM_ARTIFACTS_WITHOUT_STATE` | `step: string, found_artifacts: string[]` | Step artifacts exist on disk but step is not marked completed in state (warning) |
 
 **Lock Manager (domain 13) — exit code 3**:
 
 | Code | `details` fields | Description |
 |------|-----------------|-------------|
-| `LOCK_HELD` | `holder: string, prompt: string, pid: number, started: string` | Another process holds the lock |
+| `LOCK_HELD` | `holder: string, step: string, pid: number, started: string` | Another process holds the lock |
 | `LOCK_STALE_DETECTED` | `holder: string, pid: number` | Stale lock auto-cleared (warning) |
 | `LOCK_ACQUISITION_RACE` | — | Race on atomic create; retry recommended |
 
@@ -1857,7 +1857,7 @@ The following tables map every error code to its expected `details` object shape
 | `OUTPUT_WRITE_FAILED` | `path: string, reason: string` | Cannot write output file |
 | `AGENTS_MD_ASSEMBLY` | `reason: string` | AGENTS.md assembly failed |
 | `UNKNOWN_PLATFORM` | `platform: string` | Platform not registered |
-| `CASCADE_RISK` | `platform: string, prompt: string, affected_prompts: string[]` | Potential cascade risk from adapter transformation (warning) |
+| `CASCADE_RISK` | `platform: string, step: string, affected_steps: string[]` | Potential cascade risk from adapter transformation (warning) |
 
 **Frontmatter Parser (domain 08) — exit code 1**:
 
@@ -1868,7 +1868,7 @@ The following tables map every error code to its expected `details` object shape
 | `FRONTMATTER_YAML_ERROR` | `file: string, parse_error: string` | Malformed YAML in frontmatter |
 | `FRONTMATTER_DESCRIPTION_MISSING` | `file: string` | Required `description` field absent |
 | `FRONTMATTER_INVALID_FIELD` | `file: string, field: string` | Unknown field in frontmatter (warning) |
-| `FRONTMATTER_PRODUCES_MISSING` | `file: string` | Built-in prompt has no `produces` field |
+| `FRONTMATTER_PRODUCES_MISSING` | `file: string` | Built-in step has no `produces` field |
 | `FRONTMATTER_DEPENDS_INVALID_SLUG` | `file: string, slug: string` | `depends-on` entry is not valid |
 
 **Validator (cross-cutting) — exit code 1**:
@@ -1881,7 +1881,7 @@ The following tables map every error code to its expected `details` object shape
 | `VALIDATE_ARTIFACT_MISSING_TRACKING` | `file: string` | Artifact missing tracking comment on line 1 |
 | `VALIDATE_UNRESOLVED_MARKER` | `file: string, marker: string` | Build output has unresolved marker |
 | `VALIDATE_DECISIONS_INVALID` | `entry_number: number, reason: string` | Malformed entry in decisions.jsonl |
-| `DECISION_UNKNOWN_PROMPT` | `decision_id: string, prompt: string` | Decision references unknown prompt (warning) |
+| `DECISION_UNKNOWN_STEP` | `decision_id: string, step: string` | Decision references unknown step (warning) |
 | `COMBO_MANUAL_FULL_PR` | `agent_mode: string, git_workflow: string` | Configuration combines `agent-mode: manual` with `git-workflow: full-pr`, which may cause friction (warning) |
 | `COMBO_NONE_MULTI` | `task_tracking: string, agent_mode: string` | Configuration combines `task-tracking: none` with `agent-mode: multi`, which lacks task coordination (warning) |
 
@@ -1889,10 +1889,10 @@ The following tables map every error code to its expected `details` object shape
 
 | Code | Exit | `details` fields | Description |
 |------|------|-----------------|-------------|
-| `DEP_TARGET_MISSING` | 2 | `slug: string` | Prompt slug not in resolved pipeline |
-| `PSM_INVALID_TRANSITION` | 3 | `prompt: string, current_status: string, attempted_transition: string` | Invalid state transition (e.g., skipping a completed prompt) |
-| `DEPENDENCY_UNMET` | 2 | `prompt: string, blocking: string[]` | Prompt depends on uncompleted prompts |
-| `DEPENDENCY_MISSING_ARTIFACT` | 2 | `prompt: string, artifact: string` | Predecessor artifact not found on disk |
+| `DEP_TARGET_MISSING` | 2 | `slug: string` | Step slug not in resolved pipeline |
+| `PSM_INVALID_TRANSITION` | 3 | `step: string, current_status: string, attempted_transition: string` | Invalid state transition (e.g., skipping a completed step) |
+| `DEPENDENCY_UNMET` | 2 | `step: string, blocking: string[]` | Step depends on uncompleted steps |
+| `DEPENDENCY_MISSING_ARTIFACT` | 2 | `step: string, artifact: string` | Predecessor artifact not found on disk |
 
 **User cancellation — exit code 4**:
 

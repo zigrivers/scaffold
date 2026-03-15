@@ -33,7 +33,7 @@ Four interrelated decisions govern `.scaffold/config.yml`:
 
 **Three-tier validation**: Catching errors early and in a useful order improves the developer experience. Structural validation (type checks, required fields) catches obvious problems first. Manifest reference validation (does every prompt reference resolve?) catches configuration that is syntactically valid but semantically broken. Incompatibility warnings (agent-mode:manual + git-workflow:full-pr) catch subtle conflicts that might not surface until deep into the pipeline. Domain 06, Section 5 defines this pipeline in detail.
 
-**Fuzzy matching**: Typos in config values are common (e.g., "clasic" instead of "classic" for methodology). Without correction, the error message is "invalid value 'clasic'" — the user must search documentation for valid options. With fuzzy matching, the message becomes "invalid value 'clasic' — did you mean 'classic'? Valid options: classic, classic-lite, lean" — immediately actionable. Levenshtein distance 2 catches common single-character errors (transposition, insertion, deletion, substitution) without producing false matches on completely different strings.
+**Fuzzy matching**: Typos in config values are common (e.g., "clasic" instead of "deep" for methodology). Without correction, the error message is "invalid value 'clasic'" — the user must search documentation for valid options. With fuzzy matching, the message becomes "invalid value 'clasic' — did you mean 'deep'? Valid options: deep, mvp, lean" — immediately actionable. Levenshtein distance 2 catches common single-character errors (transposition, insertion, deletion, substitution) without producing false matches on completely different strings.
 
 ## Alternatives Considered
 

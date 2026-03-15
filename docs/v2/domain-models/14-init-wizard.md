@@ -54,7 +54,7 @@ The wizard sits at the boundary between user intent and the pipeline engine. It 
 | **Smart suggestion** | The algorithm that analyzes idea text and existing files to recommend a methodology and project traits. |
 | **Keyword signal** | A word or phrase extracted from idea text that maps to a methodology or trait suggestion. |
 | **File signal** | A file or directory detected in the project root that indicates technology choices (e.g., `package.json` with React → web trait). |
-| **Methodology** | A named pipeline configuration (e.g., `classic`, `classic-lite`) that defines which prompts to include and their ordering. Defined by a `manifest.yml`. |
+| **Methodology** | A named pipeline configuration (e.g., `deep`, `mvp`) that defines which prompts to include and their ordering. Defined by a `manifest.yml`. |
 | **Mixin axis** | One of 5 configurable dimensions: task-tracking, tdd, git-workflow, agent-mode, interaction-style. Each axis has 2–3 options. |
 | **Project trait** | A derived boolean flag (`frontend`, `web`, `mobile`, `multi-platform`, `multi-model-cli`) that controls optional prompt inclusion during build. |
 | **Adaptive default** | A question default that changes based on prior answers (e.g., methodology selection changes mixin defaults). |
@@ -168,7 +168,7 @@ interface WizardOption {
   /** Internal value stored in config */
   value: string;
 
-  /** Display label (e.g., "Scaffold Classic") */
+  /** Display label (e.g., "Scaffold Deep") */
   label: string;
 
   /** Description shown as hint text */
@@ -256,7 +256,7 @@ interface WizardContext {
  * The complete set of answers collected by the wizard.
  */
 interface WizardAnswers {
-  /** Selected methodology slug (e.g., "classic", "classic-lite") */
+  /** Selected methodology slug (e.g., "deep", "mvp") */
   methodology: string;
 
   /** Task tracking mixin value */
@@ -437,7 +437,7 @@ interface SuggestionSource {
   /** The specific signal (keyword text or file path) */
   signal: string;
 
-  /** What this signal contributed (e.g., "methodology: classic-lite") */
+  /** What this signal contributed (e.g., "methodology: mvp") */
   contribution: string;
 }
 ```
@@ -453,7 +453,7 @@ interface MethodologyInfo {
   /** Methodology slug (directory name under methodologies/) */
   slug: string;
 
-  /** Display name from manifest (e.g., "Scaffold Classic") */
+  /** Display name from manifest (e.g., "Scaffold Deep") */
   name: string;
 
   /** Short description from manifest */
@@ -773,9 +773,9 @@ FUNCTION analyzeIdeaText(ideaText: string) → IdeaAnalysisResult:
 
   IF categories.includes('cli') AND NOT categories.includes('web')
      AND NOT categories.includes('mobile'):
-    suggestedMethodology ← 'classic-lite'
+    suggestedMethodology ← 'mvp'
   ELSE IF categories.length > 0:
-    suggestedMethodology ← 'classic'
+    suggestedMethodology ← 'deep'
   END IF
 
   IF categories.includes('web'):
@@ -827,14 +827,14 @@ FUNCTION scanFileSignals(projectRoot: string) → FileSignal[]:
             path: 'package.json', signalType: 'expo-config',
             detail: 'Expo dependency found',
             impliedTraits: ['frontend', 'mobile'],
-            impliedMethodology: 'classic'
+            impliedMethodology: 'deep'
           })
         ELSE:
           signals.push({
             path: 'package.json', signalType: 'react-native-dep',
             detail: 'React Native dependency found',
             impliedTraits: ['frontend', 'mobile'],
-            impliedMethodology: 'classic'
+            impliedMethodology: 'deep'
           })
         END IF
       ELSE:
@@ -842,7 +842,7 @@ FUNCTION scanFileSignals(projectRoot: string) → FileSignal[]:
           path: 'package.json', signalType: 'react-dependency',
           detail: 'React dependency found',
           impliedTraits: ['frontend', 'web'],
-          impliedMethodology: 'classic'
+          impliedMethodology: 'deep'
         })
       END IF
     END IF
@@ -852,7 +852,7 @@ FUNCTION scanFileSignals(projectRoot: string) → FileSignal[]:
         path: 'package.json', signalType: 'vue-dependency',
         detail: 'Vue dependency found',
         impliedTraits: ['frontend', 'web'],
-        impliedMethodology: 'classic'
+        impliedMethodology: 'deep'
       })
     END IF
 
@@ -862,7 +862,7 @@ FUNCTION scanFileSignals(projectRoot: string) → FileSignal[]:
         path: 'package.json', signalType: 'cli-entry-point',
         detail: 'package.json has "bin" field',
         impliedTraits: [],
-        impliedMethodology: 'classic-lite'
+        impliedMethodology: 'mvp'
       })
     END IF
   END IF
@@ -875,7 +875,7 @@ FUNCTION scanFileSignals(projectRoot: string) → FileSignal[]:
       path: 'next.config.*', signalType: 'nextjs-config',
       detail: 'Next.js configuration found',
       impliedTraits: ['frontend', 'web'],
-      impliedMethodology: 'classic'
+      impliedMethodology: 'deep'
     })
   END IF
 
@@ -884,7 +884,7 @@ FUNCTION scanFileSignals(projectRoot: string) → FileSignal[]:
       path: 'svelte.config.js', signalType: 'svelte-config',
       detail: 'SvelteKit configuration found',
       impliedTraits: ['frontend', 'web'],
-      impliedMethodology: 'classic'
+      impliedMethodology: 'deep'
     })
   END IF
 
@@ -896,7 +896,7 @@ FUNCTION scanFileSignals(projectRoot: string) → FileSignal[]:
         path: 'app.json', signalType: 'expo-config',
         detail: 'Expo app configuration found',
         impliedTraits: ['frontend', 'mobile'],
-        impliedMethodology: 'classic'
+        impliedMethodology: 'deep'
       })
     END IF
   END IF
@@ -906,7 +906,7 @@ FUNCTION scanFileSignals(projectRoot: string) → FileSignal[]:
       path: 'app.config.*', signalType: 'expo-config',
       detail: 'Expo dynamic config found',
       impliedTraits: ['frontend', 'mobile'],
-      impliedMethodology: 'classic'
+      impliedMethodology: 'deep'
     })
   END IF
 
@@ -916,7 +916,7 @@ FUNCTION scanFileSignals(projectRoot: string) → FileSignal[]:
       path: 'bin/', signalType: 'bin-directory',
       detail: 'bin/ directory with executable scripts',
       impliedTraits: [],
-      impliedMethodology: 'classic-lite'
+      impliedMethodology: 'mvp'
     })
   END IF
 
@@ -992,10 +992,10 @@ FUNCTION computeMethodologySuggestion(
   END IF
 
   // Collect file sources and aggregate their implications.
-  // Methodology priority: 'classic' > 'classic-lite' when both are signaled,
+  // Methodology priority: 'deep' > 'mvp' when both are signaled,
   // because a project with frontend deps is more likely full-scale even if it
   // also has a CLI entry point.
-  METHODOLOGY_PRIORITY ← { 'classic': 2, 'classic-lite': 1 }
+  METHODOLOGY_PRIORITY ← { 'deep': 2, 'mvp': 1 }
 
   FOR EACH fs IN fileSignals:
     sources.push({
@@ -1013,12 +1013,12 @@ FUNCTION computeMethodologySuggestion(
   END FOR
 
   // Resolve methodology: file signals override keywords on conflict
-  finalMethodology ← 'classic'  // ultimate default
+  finalMethodology ← 'deep'  // ultimate default
   IF fileMethodology !== null:
     finalMethodology ← fileMethodology
     IF keywordMethodology !== null AND keywordMethodology !== fileMethodology:
       // File evidence overrides keyword suggestion
-      // e.g., user says "CLI tool" but files show React → classic wins
+      // e.g., user says "CLI tool" but files show React → deep wins
       EMIT_WARNING('INIT_FILE_OVERRIDES_KEYWORD',
         'File signals suggest ' + fileMethodology +
         ', overriding keyword suggestion of ' + keywordMethodology)
@@ -1435,7 +1435,7 @@ END FUNCTION
   ```json
   {
     "code": "INIT_METHODOLOGY_NOT_FOUND",
-    "message": "Methodology 'ddd' not found. Available: classic, classic-lite.",
+    "message": "Methodology 'ddd' not found. Available: deep, mvp.",
     "recovery": "Choose from the available methodologies."
   }
   ```
@@ -1505,7 +1505,7 @@ END FUNCTION
   ```json
   {
     "code": "INIT_BUILD_FAILED",
-    "message": "Build failed: manifest parse error in classic/manifest.yml. Config was written to .scaffold/config.yml.",
+    "message": "Build failed: manifest parse error in deep/manifest.yml. Config was written to .scaffold/config.yml.",
     "recovery": "Run scaffold build manually to retry."
   }
   ```
@@ -1519,7 +1519,7 @@ END FUNCTION
   ```json
   {
     "code": "INIT_MANIFEST_LOAD_FAILED",
-    "message": "Failed to load methodology manifests: ENOENT: methodologies/classic/manifest.yml not found",
+    "message": "Failed to load methodology manifests: ENOENT: methodologies/deep/manifest.yml not found",
     "recovery": "Run scaffold update to repair the installation."
   }
   ```
@@ -1652,29 +1652,30 @@ The algorithm has three stages:
 
 | Category | Keywords | Methodology | Traits |
 |----------|----------|-------------|--------|
-| `web` | "web app", "webapp", "dashboard", "frontend", "react", "vue", "angular", "next.js", "nuxt", "svelte", "website", "spa", "single page" | classic | frontend, web |
-| `cli` | "cli", "command-line", "command line", "library", "sdk", "package", "module", "tool" | classic-lite | (none) |
-| `mobile` | "mobile", "ios", "android", "expo", "react native", "app store", "play store", "phone" | classic | frontend, mobile |
-| `api` | "api", "backend", "microservice", "server", "rest", "graphql", "endpoint", "service" | classic | (none) |
+| `web` | "web app", "webapp", "dashboard", "frontend", "react", "vue", "angular", "next.js", "nuxt", "svelte", "website", "spa", "single page" | deep | frontend, web |
+| `cli` | "cli", "command-line", "command line", "library", "sdk", "package", "module", "tool" | mvp | (none) |
+| `mobile` | "mobile", "ios", "android", "expo", "react native", "app store", "play store", "phone" | deep | frontend, mobile |
+| `api` | "api", "backend", "microservice", "server", "rest", "graphql", "endpoint", "service" | deep | (none) |
 
 **Stage 2 — File scanning** (Algorithm 2): The project directory is scanned for framework-specific files:
 
 | Signal | File | Methodology | Traits |
 |--------|------|-------------|--------|
-| `react-dependency` | package.json with `react` | classic | frontend, web |
-| `nextjs-config` | next.config.* | classic | frontend, web |
-| `vue-dependency` | package.json with `vue` | classic | frontend, web |
-| `svelte-config` | svelte.config.js | classic | frontend, web |
-| `expo-config` | app.json with "expo", app.config.* | classic | frontend, mobile |
-| `react-native-dep` | package.json with `react-native` | classic | frontend, mobile |
-| `bin-directory` | bin/ with files | classic-lite | (none) |
-| `cli-entry-point` | package.json with "bin" field | classic-lite | (none) |
+| `react-dependency` | package.json with `react` | deep | frontend, web |
+| `nextjs-config` | next.config.* | deep | frontend, web |
+| `vue-dependency` | package.json with `vue` | deep | frontend, web |
+| `svelte-config` | svelte.config.js | deep | frontend, web |
+| `expo-config` | app.json with "expo", app.config.* | deep | frontend, mobile |
+| `react-native-dep` | package.json with `react-native` | deep | frontend, mobile |
+| `bin-directory` | bin/ with files | mvp | (none) |
+| `cli-entry-point` | package.json with "bin" field | mvp | (none) |
 
 **Stage 3 — Conflict resolution** (Algorithm 3): When keyword and file signals disagree:
 
-- **Methodology conflict**: File signals win. If keywords suggest `classic-lite` (user said "CLI tool") but files show React, `classic` is used. Rationale: file evidence is concrete; idea text may be aspirational.
+- **Methodology conflict**: File signals win. If keywords suggest `mvp` (user said "CLI tool") but files show React, `deep` is used. Rationale: file evidence is concrete; idea text may be aspirational.
 - **Trait conflict**: Traits are unioned, never removed. File signals add traits on top of keyword-derived traits.
-- **No signals at all**: Default to `classic` with no traits.
+- **No signals at all**: Default to `deep` with no traits.
+
 
 The recommended methodology appears first in the selection list with "(Recommended)" appended to its label.
 
@@ -1742,13 +1743,13 @@ The idea text is captured as a positional argument and analyzed at the `IdeaAnal
 - "cli" → category `cli`
 - "tool" → category `cli`
 
-Result: `suggestedMethodology: 'classic-lite'`, `suggestedTraits: []`, `confidence: 'medium'`
+Result: `suggestedMethodology: 'mvp'`, `suggestedTraits: []`, `confidence: 'medium'`
 
 **Stage 2 — File scanning**: `scanFileSignals()` runs independently. If files contradict the keyword suggestion (e.g., `package.json` has React), the file signal overrides (Algorithm 3).
 
 **Stage 3 — Defaults**: The merged `MethodologySuggestion` is used to:
-- Pre-select `classic-lite` (with "(Recommended)") in the methodology question
-- Pre-populate mixin defaults from classic-lite's manifest
+- Pre-select `mvp` (with "(Recommended)") in the methodology question
+- Pre-populate mixin defaults from mvp's manifest
 
 **User can still change everything**: The suggestion only affects defaults. The user sees all methodologies and can select any one. All subsequent questions still appear with their adaptive defaults.
 
@@ -1778,7 +1779,7 @@ In `--auto` mode, all questions are resolved deterministically without user prom
 
 | Question | Default (no idea text) | Default (with idea text) |
 |----------|----------------------|------------------------|
-| Methodology | `classic` | Smart suggestion result |
+| Methodology | `deep` | Smart suggestion result |
 | Task tracking | Methodology manifest default | Same |
 | TDD | Methodology manifest default | Same |
 | Git workflow | Methodology manifest default | Same |
@@ -1789,7 +1790,7 @@ In `--auto` mode, all questions are resolved deterministically without user prom
 | Brownfield/v1 | Auto-detect via codebase detection | Same |
 | Confirmation | Auto-confirmed | Same |
 
-**Classic methodology defaults**: `task-tracking: beads`, `tdd: strict`, `git-workflow: full-pr`, `agent-mode: multi`
+**Deep methodology defaults**: `task-tracking: beads`, `tdd: strict`, `git-workflow: full-pr`, `agent-mode: multi`
 
 **Auto mode + brownfield**: If codebase detection finds brownfield signals, `--auto` mode automatically uses brownfield mode (no prompt to choose greenfield).
 
@@ -1828,7 +1829,7 @@ Generated universal prompts
 **Step 5 — Pipeline display**:
 ```
 === Your Pipeline ===
-Methodology: Scaffold Classic (24 prompts, 7 phases)
+Methodology: Scaffold Deep (24 prompts, 7 phases)
 Mode: greenfield
 Platforms: Claude Code, Codex
 
@@ -1854,7 +1855,7 @@ In `--format json` mode, all of this is returned as a JSON envelope:
   "data": {
     "configPath": ".scaffold/config.yml",
     "statePath": null,
-    "methodology": "classic",
+    "methodology": "deep",
     "mode": "greenfield",
     "promptCount": 24,
     "platforms": ["claude-code", "codex"],
@@ -1878,21 +1879,21 @@ In `--format json` mode, all of this is returned as a JSON envelope:
 
 | Test Case | Input | Expected Output |
 |-----------|-------|-----------------|
-| Keyword extraction — web signals | `"I want to build a web app with React"` | keywords: [{keyword:"web app", category:"web"}, {keyword:"react", category:"web"}], methodology: "classic", traits: ["frontend","web"] |
-| Keyword extraction — CLI signals | `"Build a CLI tool for data processing"` | keywords: [{keyword:"cli", category:"cli"}, {keyword:"tool", category:"cli"}], methodology: "classic-lite", traits: [] |
-| Keyword extraction — mobile signals | `"Create a mobile app with Expo"` | keywords: [{keyword:"mobile", category:"mobile"}, {keyword:"expo", category:"mobile"}], methodology: "classic", traits: ["frontend","mobile"] |
-| Keyword extraction — mixed signals | `"Build a web app with a CLI admin tool"` | keywords from both categories; methodology: "classic" (web wins over cli) |
+| Keyword extraction — web signals | `"I want to build a web app with React"` | keywords: [{keyword:"web app", category:"web"}, {keyword:"react", category:"web"}], methodology: "deep", traits: ["frontend","web"] |
+| Keyword extraction — CLI signals | `"Build a CLI tool for data processing"` | keywords: [{keyword:"cli", category:"cli"}, {keyword:"tool", category:"cli"}], methodology: "mvp", traits: [] |
+| Keyword extraction — mobile signals | `"Create a mobile app with Expo"` | keywords: [{keyword:"mobile", category:"mobile"}, {keyword:"expo", category:"mobile"}], methodology: "deep", traits: ["frontend","mobile"] |
+| Keyword extraction — mixed signals | `"Build a web app with a CLI admin tool"` | keywords from both categories; methodology: "deep" (web wins over cli) |
 | Keyword extraction — no signals | `"Make something cool"` | keywords: [], methodology: null, traits: [] |
 | File signal — React project | package.json with `react` dep | signal: react-dependency, traits: ["frontend","web"] |
 | File signal — Expo project | app.json with "expo" key | signal: expo-config, traits: ["frontend","mobile"] |
-| File signal — CLI entry point | package.json with "bin" field | signal: cli-entry-point, methodology: "classic-lite" |
-| Conflict resolution — file overrides keyword | keyword: "cli" + file: react-dependency | methodology: "classic" (file wins), traits: ["frontend","web"] |
+| File signal — CLI entry point | package.json with "bin" field | signal: cli-entry-point, methodology: "mvp" |
+| Conflict resolution — file overrides keyword | keyword: "cli" + file: react-dependency | methodology: "deep" (file wins), traits: ["frontend","web"] |
 | Interaction style — single platform | platforms: ["claude-code"] | interactionStyle: "claude-code" |
 | Interaction style — codex only | platforms: ["codex"] | interactionStyle: "codex" |
 | Interaction style — both platforms | platforms: ["claude-code","codex"] | interactionStyle: "claude-code" |
-| Adaptive defaults — classic | methodology: "classic" | taskTracking: "beads", tdd: "strict", gitWorkflow: "full-pr", agentMode: "multi" |
-| Auto mode — no idea text | ideaText: null, auto: true | methodology: "classic", all defaults from classic manifest |
-| Auto mode — with idea text | ideaText: "CLI tool", auto: true | methodology: "classic-lite", defaults from classic-lite manifest |
+| Adaptive defaults — deep | methodology: "deep" | taskTracking: "beads", tdd: "strict", gitWorkflow: "full-pr", agentMode: "multi" |
+| Auto mode — no idea text | ideaText: null, auto: true | methodology: "deep", all defaults from deep manifest |
+| Auto mode — with idea text | ideaText: "CLI tool", auto: true | methodology: "mvp", defaults from mvp manifest |
 | Existing scaffold — no force | `.scaffold/` exists, force: false | error: INIT_SCAFFOLD_EXISTS |
 | Existing scaffold — with force | `.scaffold/` exists, force: true | backup created, proceeds normally |
 | Config generation — greenfield | mode: greenfield | no `project.mode` field |
@@ -1905,12 +1906,12 @@ In `--format json` mode, all of this is returned as a JSON envelope:
 
 | Test Case | Setup | Verification |
 |-----------|-------|-------------|
-| Full greenfield init | Empty directory, --auto | config.yml created with classic defaults, build produces command files |
+| Full greenfield init | Empty directory, --auto | config.yml created with deep defaults, build produces command files |
 | Full brownfield init | Directory with package.json + React, --auto | config.yml with `project.mode: brownfield`, traits: [frontend, web] |
 | Full v1 migration | Directory with docs/plan.md + .beads/, --auto | config.yml + state.json with pre-completed prompts |
 | Interactive flow cancellation | User presses Ctrl+C at methodology question | No files created, exit code non-zero |
 | Force reinitialize | Existing .scaffold/ + --force + --auto | .scaffold.backup exists, new config.yml written |
-| Idea text suggestion | `scaffold init "React dashboard" --auto` | methodology: classic, traits: [frontend, web] |
+| Idea text suggestion | `scaffold init "React dashboard" --auto` | methodology: deep, traits: [frontend, web] |
 | Dry run | `scaffold init --auto --dry-run` | No files created, output shows what would be created |
 | JSON output | `scaffold init --auto --format json` | Valid JSON envelope with all fields |
 
@@ -1956,7 +1957,7 @@ function simulateWizardAnswers(answers: string[]): void;
 
    **Recommendation**: Keep automatic derivation. The interaction-style is a technical detail most users shouldn't need to think about. Power users can edit config.yml after init. If needed, add an advanced question behind a `--verbose` flag in a future release.
 
-2. **Should `scaffold init` detect installed methodology plugins?** Currently the wizard only shows methodologies shipped with scaffold (classic, classic-lite). If third-party methodologies (DDD, Lean MVP) are installed as npm packages or in `~/.scaffold/methodologies/`, should they appear in the selection list?
+2. **Should `scaffold init` detect installed methodology plugins?** Currently the wizard only shows methodologies shipped with scaffold (deep, mvp). If third-party methodologies (DDD, Lean MVP) are installed as npm packages or in `~/.scaffold/methodologies/`, should they appear in the selection list?
 
    **Recommendation**: Yes, scan `~/.scaffold/methodologies/` in addition to the bundled ones. This enables the methodology extension story in Phase 3 without requiring CLI changes later.
 
@@ -1976,7 +1977,7 @@ function simulateWizardAnswers(answers: string[]): void;
 
 3. **Validate platform availability at init time.** When the user selects `codex` as a target platform, check if the `codex` CLI is on PATH. Emit `INIT_CODEX_NOT_DETECTED` warning if not found. Don't block — the user may be configuring for a CI environment.
 
-4. **Support `scaffold init --methodology classic --auto` shorthand.** Allow methodology to be specified as a CLI flag, skipping the methodology question in both interactive and auto modes. Other mixin values could also be passed as flags for scripting.
+4. **Support `scaffold init --methodology deep --auto` shorthand.** Allow methodology to be specified as a CLI flag, skipping the methodology question in both interactive and auto modes. Other mixin values could also be passed as flags for scripting.
 
 5. **Cache methodology manifest parsing.** Manifests are read once at wizard startup and stored in `WizardContext.availableMethodologies`. This avoids re-parsing during adaptive default resolution.
 
@@ -1986,13 +1987,13 @@ function simulateWizardAnswers(answers: string[]): void;
 
 ## 11. Concrete Examples
 
-### Example 1: Classic Web App, Greenfield
+### Example 1: Deep Web App, Greenfield
 
 **Setup**: Empty directory. User runs `scaffold init "I want to build a task management web app"`.
 
 **Step 1 — Idea analysis**:
 Keywords extracted: "web app" (web), "task" (none — not in keyword map)
-Suggestion: methodology=classic, traits=[frontend, web], confidence=medium
+Suggestion: methodology=deep, traits=[frontend, web], confidence=medium
 
 **Step 2 — Codebase detection**:
 No files found. Mode: greenfield.
@@ -2002,7 +2003,7 @@ No files found. Mode: greenfield.
 Welcome to Scaffold!
 
 ? Choose a methodology:
-  > Scaffold Classic (Recommended) -- Full pipeline, parallel agents, comprehensive standards
+  > Scaffold Deep (Recommended) -- Full pipeline, parallel agents, comprehensive standards
     Scaffold Lite -- Streamlined pipeline for solo developers
 
 ? Task tracking:
@@ -2036,7 +2037,7 @@ Welcome to Scaffold!
 **Step 4 — Summary and confirmation**:
 ```
 === Scaffold Configuration ===
-Methodology: Scaffold Classic
+Methodology: Scaffold Deep
 Mode: greenfield
 Task tracking: Beads
 TDD: Strict
@@ -2054,7 +2055,7 @@ Proceed? [Y/n]
 **Step 5 — Output config.yml**:
 ```yaml
 version: 1
-methodology: classic
+methodology: deep
 mixins:
   task-tracking: beads
   tdd: strict
@@ -2068,13 +2069,13 @@ project:
   multi-model-cli: false
 ```
 
-### Example 2: Classic-Lite CLI Tool, Greenfield
+### Example 2: MVP CLI Tool, Greenfield
 
 **Setup**: Empty directory. User runs `scaffold init "I need a CLI tool for processing CSV files"`.
 
 **Step 1 — Idea analysis**:
 Keywords: "cli" (cli), "tool" (cli)
-Suggestion: methodology=classic-lite, traits=[], confidence=medium
+Suggestion: methodology=mvp, traits=[], confidence=medium
 
 **Step 2 — Codebase detection**: No files. Greenfield.
 
@@ -2082,7 +2083,7 @@ Suggestion: methodology=classic-lite, traits=[], confidence=medium
 ```
 ? Choose a methodology:
   > Scaffold Lite (Recommended) -- Streamlined pipeline for solo developers
-    Scaffold Classic -- Full pipeline, parallel agents, comprehensive standards
+    Scaffold Deep -- Full pipeline, parallel agents, comprehensive standards
 
 ? Task tracking:
   > None
@@ -2107,12 +2108,12 @@ Suggestion: methodology=classic-lite, traits=[], confidence=medium
   [ ] Codex
 ```
 
-Note: No project-type question because classic-lite has no optional prompts with trait conditions.
+Note: No project-type question because mvp has no optional prompts with trait conditions.
 
 **Output config.yml**:
 ```yaml
 version: 1
-methodology: classic-lite
+methodology: mvp
 mixins:
   task-tracking: none
   tdd: relaxed
@@ -2154,17 +2155,17 @@ User chooses brownfield. Mode set to `brownfield`.
 **Step 4 — Methodology selection** (file signals inform smart suggestion):
 ```
 ? Choose a methodology:
-  > Scaffold Classic (Recommended) -- Full pipeline, parallel agents, comprehensive standards
+  > Scaffold Deep (Recommended) -- Full pipeline, parallel agents, comprehensive standards
     Scaffold Lite -- Streamlined pipeline for solo developers
 ```
-File signals (React + Next.js) suggest classic with web traits.
+File signals (React + Next.js) suggest deep with web traits.
 
 **Step 5 — Remaining questions**: User accepts defaults. Project type pre-selects "Web" from file signals.
 
 **Output config.yml**:
 ```yaml
 version: 1
-methodology: classic
+methodology: deep
 mixins:
   task-tracking: beads
   tdd: strict
@@ -2241,7 +2242,7 @@ State written to .scaffold/state.json (8 prompts pre-completed)
 **Output config.yml**:
 ```yaml
 version: 1
-methodology: classic
+methodology: deep
 mixins:
   task-tracking: beads
   tdd: strict
@@ -2261,7 +2262,7 @@ project:
 {
   "schema-version": 1,
   "scaffold-version": "2.0.0",
-  "methodology": "classic",
+  "methodology": "deep",
   "init-mode": "v1-migration",
   "created": "2026-03-13T14:00:00Z",
   "in_progress": null,
@@ -2300,7 +2301,7 @@ project:
 **Post-init output**:
 ```
 === Your Pipeline ===
-Methodology: Scaffold Classic (22 prompts, 7 phases)
+Methodology: Scaffold Deep (22 prompts, 7 phases)
 Mode: v1-migration (brownfield)
 Platforms: Claude Code
 
@@ -2318,8 +2319,8 @@ Run scaffold resume to continue from where v1 left off.
 
 **Flow**: No interactive prompts. All defaults computed:
 1. Codebase detection: no signals → greenfield
-2. Methodology: classic (hardcoded default)
-3. All mixins: classic manifest defaults
+2. Methodology: deep (hardcoded default)
+3. All mixins: deep manifest defaults
 4. Platforms: [claude-code] (codex not on PATH)
 5. Project platforms: [] (no signals)
 6. Interaction style: claude-code
@@ -2327,7 +2328,7 @@ Run scaffold resume to continue from where v1 left off.
 **Output config.yml**:
 ```yaml
 version: 1
-methodology: classic
+methodology: deep
 mixins:
   task-tracking: beads
   tdd: strict
@@ -2345,7 +2346,7 @@ project:
 ```
 scaffold init --auto
   Mode: greenfield
-  Methodology: classic (default)
+  Methodology: deep (default)
   Warning: All wizard questions resolved using computed defaults.
 
 Config written to .scaffold/config.yml

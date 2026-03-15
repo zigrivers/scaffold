@@ -294,7 +294,7 @@ T-052 (e2e tests) is the weakest at 3/5 — the AI execution boundary in tests i
    - What the spec says: "Migrates v1 config (removes mixins, maps methodology names)" without v1 format spec
    - What the implementer needs: What a v1 config looks like; what methodology name mappings exist
    - Impact: Cannot write correct migration logic
-   - Suggested fix: Add v1 config example and methodology mapping: `classic` → `deep`, `classic-lite` → `mvp`, others → `custom`
+   - Suggested fix: Add v1 config example and methodology mapping: `classic` (v1 name) → `deep`, `classic-lite` (v1 name) → `mvp`, others → `custom`
 
 4. **[MISSING]** — Error accumulation return type
    - What the spec says: "Returns validated ScaffoldConfig object or accumulated errors"
@@ -312,7 +312,7 @@ T-052 (e2e tests) is the weakest at 3/5 — the AI execution boundary in tests i
 #### Gaps
 
 1. **[AMBIGUITY]** — Acceptance criteria reference step counts not yet established
-   - What the spec says: "Loads deep.yml preset with all 32 steps enabled" — but preset files don't exist yet
+   - What the spec says: "Loads deep.yml preset with all 36 steps enabled" — but preset files don't exist yet
    - What the implementer needs: Are preset files created by T-006, T-044, or assumed to exist?
    - Impact: All tests fail without preset files
    - Suggested fix: Clarify that T-006 tests use fixture preset files; actual presets created by T-044
@@ -516,8 +516,8 @@ T-052 (e2e tests) is the weakest at 3/5 — the AI execution boundary in tests i
    - Suggested fix: Clarify function signature — does it accept `cliDepthFlag?` parameter?
 
 2. **[IMPLICIT]** — MVP step names not listed
-   - What the spec says: "MVP preset enables exactly 4 steps at depth 1"
-   - What the implementer needs: Preset files don't exist yet; specific 4 step names needed for testing
+   - What the spec says: "MVP preset enables exactly 7 steps at depth 1"
+   - What the implementer needs: Preset files don't exist yet; specific 7 step names needed for testing
    - Impact: Test criteria untestable without fixtures
    - Suggested fix: List the 4 MVP steps or depend on T-044
 
@@ -1185,7 +1185,7 @@ T-052 (e2e tests) is the weakest at 3/5 — the AI execution boundary in tests i
 #### Gaps
 
 1. **[AMBIGUITY]** — Step name canonical list not cross-referenced
-   - What the spec says: "All 32 steps enabled" but step names come from not-yet-created meta-prompts
+   - What the spec says: "All 36 steps enabled" but step names come from not-yet-created meta-prompts
    - What the implementer needs: Canonical step name list from manifest-yml-schema.md §8.1
    - Impact: Low — deep.yml example provides the list
    - Suggested fix: Cross-reference manifest-yml-schema.md §8.1 as canonical source
@@ -1410,7 +1410,7 @@ T-052 (e2e tests) is the weakest at 3/5 — the AI execution boundary in tests i
 #### Gaps
 
 1. **[VAGUE]** — v1 methodology name mapping unconfirmed
-   - What the spec says: "classic → deep, classic-lite → mvp"
+   - What the spec says: "classic (v1) → deep, classic-lite (v1) → mvp"
    - What the implementer needs: Confirmation from v1 source
    - Impact: Low — documentation can be verified
    - Suggested fix: Cross-reference with v1 prompts.md
@@ -1437,7 +1437,7 @@ T-052 (e2e tests) is the weakest at 3/5 — the AI execution boundary in tests i
    - Suggested fix: Clarify 500ms covers steps 1-7 (before AI execution)
 
 2. **[MISSING]** — Fixture data source
-   - What the spec says: "32 meta-prompts, 32 KB entries, populated state"
+   - What the spec says: "36 meta-prompts, 37 KB entries, populated state"
    - What the implementer needs: Production content or synthetic stubs
    - Impact: Low — depends on T-044-T-051 completion
    - Suggested fix: Note: use production content or size-realistic stubs
