@@ -2,7 +2,7 @@
 name: phase-01-domain-modeling
 description: Deep domain modeling across all identified project domains
 phase: "1"
-dependencies: [create-prd]
+dependencies: [innovate-user-stories]
 outputs: [docs/domain-models/]
 conditional: null
 knowledge-base: [domain-modeling]
@@ -12,10 +12,13 @@ knowledge-base: [domain-modeling]
 Identify and model all domains in the project. For each domain, define entities,
 value objects, aggregates, domain events, invariants, and bounded context
 boundaries. Establish the ubiquitous language that all subsequent phases use.
+Use user stories and their acceptance criteria to discover entities, events,
+and aggregate boundaries. User actions reveal the domain model.
 
 ## Inputs
 - docs/prd.md (required) — requirements defining the problem space
 - docs/prd-gap-analysis.md (optional) — refined requirements
+- docs/user-stories.md (required) — user stories with acceptance criteria for domain discovery
 
 ## Expected Outputs
 - docs/domain-models/ — one file per domain, each containing:
