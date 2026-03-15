@@ -1,8 +1,8 @@
 # ADR-054: State Methodology Tracking
 
-**Status:** proposed
+**Status:** accepted
 **Date:** 2026-03-14
-**Deciders:** TBD
+**Deciders:** PRD, domain modeling phase 1
 **Domain(s):** 03, 16
 
 ---
@@ -11,49 +11,56 @@
 
 `state.json` currently records a `methodology` field. When the user changes methodology in `config.yml`, should `state.json`'s field be updated to match, or should it remain as the originally-initialized value? Domain 16, Section 10, Open Question 2.
 
-## Options
-
-- **(A)** Keep original value as historical record; `config.yml` is source of truth for current methodology (Domain 16 recommendation)
-- **(B)** Update `state.json` to match `config.yml` on every command
-- **(C)** Add a separate `original_methodology` field and update `methodology` to current
-
 ## Decision
 
-TBD
+Dual fields in `state.json`:
+
+1. **`init_methodology`** — Set once at `scaffold init` time. Never updated. Records the methodology the project started with.
+2. **`config_methodology`** — Updated on every CLI command to match `config.yml`'s current `methodology` value.
+
+The state manager compares `init_methodology !== config_methodology` to detect methodology changes and emit `PSM_METHODOLOGY_MISMATCH` warnings (per ADR-049's change detection requirement).
 
 ## Rationale
 
-TBD
+Dual fields support methodology change detection without losing history. The state file remains self-describing — `config_methodology` reflects the user's current intent, `init_methodology` provides the historical baseline. The state manager can detect changes by comparing the two fields without reading `config.yml`, keeping state reads self-contained. This aligns with ADR-049 (methodology changeable mid-pipeline) by making the change explicitly visible in state, and supports the `PSM_METHODOLOGY_MISMATCH` warning logic that Domain 16 requires.
 
 ## Alternatives Considered
 
-TBD — see Options above for candidates.
+1. **Keep original value only; `config.yml` is source of truth for current** — The state manager must read `config.yml` to determine the current methodology, coupling state reads to config reads. Change detection requires cross-file comparison on every command. The state file is not self-describing for current methodology.
+2. **Update `methodology` to match `config.yml` on every command** — Loses the historical record of what methodology the project was initialized with. Cannot detect methodology changes (the field always matches config). Eliminates the ability to show "initialized as MVP, now running as Deep" in `scaffold status` output.
+3. **Single `methodology` field with a separate `methodology_history` array** — Over-engineered for the use case. Only the initial and current values matter for change detection and warnings. A full history adds schema complexity without clear benefit.
 
 ## Consequences
 
-TBD
+### Positive
+
+- Change detection via simple field comparison (`init !== config`)
+- Self-describing state — no need to read config for methodology context
+- Supports `scaffold status` showing methodology history ("initialized as mvp, currently deep")
+- Backward-compatible with v1 state if `init_methodology` defaults to the existing `methodology` value during migration
+
+### Negative
+
+- Two fields for one concept (methodology) — slight schema complexity increase
+- Migration from v1 state schema required (rename `methodology` → `init_methodology`, add `config_methodology`)
+- State file grows by one field (negligible size impact)
+
+## Reversibility
+
+Reversible with moderate effort. Collapsing to a single field would require a state migration to merge or drop one of the fields. The config.yml-as-source-of-truth principle (ADR-049) would need to be the fallback for current methodology.
 
 ## Constraints and Compliance
 
-TBD
+- The state manager (T-007) MUST set `init_methodology` at init and never update it afterward
+- The state manager MUST update `config_methodology` to match `config.yml` on every CLI command that reads state
+- Domain 16 MUST compare `init_methodology !== config_methodology` to emit `PSM_METHODOLOGY_MISMATCH` warnings
+- The `state-json-schema.md` MUST document both fields with their update semantics
+- State migration (from v1 `methodology` to dual fields) MUST be handled by the config migrator (ADR-014)
 
 ## Related Decisions
 
-- [ADR-049](ADR-049-methodology-changeable-mid-pipeline.md) — Methodology changeability decision
-- [ADR-012](ADR-012-state-file-design.md) — State file design
-- Domain 03 ([03-pipeline-state-machine.md](../domain-models/03-pipeline-state-machine.md)) — State machine
-- Domain 16 ([16-methodology-depth-resolution.md](../domain-models/16-methodology-depth-resolution.md)) — Section 10, Open Question 2
-
----
-
-## Resolution Recommendation (added by traceability gap analysis)
-
-**Recommended decision:** Option (C) — Dual fields: `init_methodology` (original) and `config_methodology` (current, updated on each command).
-
-**Rationale:** Dual fields support methodology change detection (F-012) without losing history. The state manager can compare `init_methodology !== config_methodology` to emit `PSM_METHODOLOGY_MISMATCH` warnings. Option (A) works but requires the state manager to read `config.yml` to determine the current methodology, coupling state reads to config reads. Option (C) keeps the state file self-describing — `config_methodology` reflects the user's current intent, `init_methodology` provides the historical baseline. This aligns with ADR-049 (methodology changeable mid-pipeline) by making the change explicitly visible in state.
-
-**Impact if unresolved:** The state manager (T-007), methodology change detection (T-018), and the `PSM_METHODOLOGY_MISMATCH` warning logic have no spec for which field to compare. The data schema (`state-json-schema.md`) needs to know the field names.
-
-**Blocking tasks:** T-007 (state manager), T-018 (update mode & methodology change detection)
-
-**Recommended resolution timing:** Before starting T-007 (Phase 1). This affects the state schema, which is foundational.
+- [ADR-049](ADR-049-methodology-changeable-mid-pipeline.md) — Methodology changeability; change detection requirement
+- [ADR-012](ADR-012-state-file-design.md) — State file design; field schema
+- [ADR-014](ADR-014-config-yaml-versioned.md) — Config YAML versioning; migration strategy
+- Domain 03 ([03-pipeline-state-machine.md](../domain-models/03-pipeline-state-machine.md)) — State machine; methodology tracking
+- Domain 16 ([16-methodology-depth-resolution.md](../domain-models/16-methodology-depth-resolution.md)) — Section 10, Open Question 2; PSM_METHODOLOGY_MISMATCH
