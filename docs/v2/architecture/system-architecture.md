@@ -1556,7 +1556,7 @@ Naming rules that apply across the system:
 
 ### Section 10e: Testing Approach
 
-**Test framework**: Jest or Vitest (to be decided in implementation; both are compatible with the TypeScript + Node.js stack).
+**Test framework**: Vitest — fast test execution with native TypeScript support. See operations-runbook.md for configuration.
 
 **Test placement**: Mirrored structure — `tests/` directory mirrors `src/` directory. Each source file `src/core/assembly/engine.ts` has a corresponding `tests/core/assembly/engine.test.ts`.
 

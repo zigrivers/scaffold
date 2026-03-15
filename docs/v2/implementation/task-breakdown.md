@@ -1630,7 +1630,7 @@ Final integration testing, packaging, and validation against performance budgets
 - Create: `.npmignore`
 - Create: `scripts/prepublish.sh`
 
-**Description**: Configure npm package for distribution. Set `package.json` fields: `name` (TBD — scaffold or @scaffold/cli), `files` (dist/, pipeline/, knowledge/, methodology/), `bin.scaffold`, `publishConfig`, `repository`, `keywords`, `license`. Create `.npmignore` excluding tests, docs, source TypeScript. Prepublish script runs build + test. Ensure all content files (meta-prompts, KB, presets) are included in npm package. Verify `npx scaffold --version` works from fresh install.
+**Description**: Configure npm package for distribution. Set `package.json` fields: `name` (`@scaffold-cli/scaffold`), `files` (dist/, pipeline/, knowledge/, methodology/), `bin.scaffold`, `publishConfig`, `repository`, `keywords`, `license`. Create `.npmignore` excluding tests, docs, source TypeScript. Prepublish script runs build + test. Ensure all content files (meta-prompts, KB, presets) are included in npm package. Verify `npx scaffold --version` works from fresh install.
 
 **Acceptance Criteria**:
 - [ ] `npm pack` creates tarball with dist/, pipeline/, knowledge/, methodology/
