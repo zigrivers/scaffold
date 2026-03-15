@@ -1,9 +1,10 @@
 ---
-name: phase-06a-review-ux
+name: review-ux
 description: Review UX specification for completeness and usability
-phase: "6a"
-dependencies: [phase-06-ux-spec]
-outputs: [docs/reviews/phase-06a-review.md]
+phase: "specification"
+order: 18
+dependencies: [ux-spec]
+outputs: [docs/reviews/review-ux.md]
 conditional: "if-needed"
 knowledge-base: [review-methodology, review-ux-spec]
 ---
@@ -19,7 +20,7 @@ and missing error states.
 - docs/api-contracts.md (optional) — for data shape alignment
 
 ## Expected Outputs
-- docs/reviews/phase-06a-review.md — findings and resolution log
+- docs/reviews/review-ux.md — findings and resolution log
 - docs/ux-spec.md — updated with fixes
 
 ## Quality Criteria

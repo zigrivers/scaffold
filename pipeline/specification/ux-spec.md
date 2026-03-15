@@ -1,8 +1,9 @@
 ---
-name: phase-06-ux-spec
+name: ux-spec
 description: Specify UI/UX design including design system
-phase: "6"
-dependencies: [phase-03-system-architecture]
+phase: "specification"
+order: 17
+dependencies: [system-architecture]
 outputs: [docs/ux-spec.md]
 conditional: "if-needed"
 knowledge-base: [ux-specification]

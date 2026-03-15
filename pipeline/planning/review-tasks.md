@@ -1,9 +1,10 @@
 ---
-name: phase-07a-review-tasks
+name: review-tasks
 description: Review implementation tasks for coverage and feasibility
-phase: "7a"
-dependencies: [phase-07-implementation-tasks]
-outputs: [docs/reviews/phase-07a-review.md]
+phase: "planning"
+order: 26
+dependencies: [implementation-tasks]
+outputs: [docs/reviews/review-tasks.md]
 conditional: null
 knowledge-base: [review-methodology, review-implementation-tasks]
 ---
@@ -19,7 +20,7 @@ critical path inaccuracy, and invalid parallelization assumptions.
 - docs/domain-models/ (required) — for completeness
 
 ## Expected Outputs
-- docs/reviews/phase-07a-review.md — findings and resolution log
+- docs/reviews/review-tasks.md — findings and resolution log
 - docs/implementation-tasks.md — updated with fixes
 
 ## Quality Criteria

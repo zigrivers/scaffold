@@ -1,9 +1,10 @@
 ---
-name: phase-05a-review-api
+name: review-api
 description: Review API contracts for completeness and consistency
-phase: "5a"
-dependencies: [phase-05-api-contracts]
-outputs: [docs/reviews/phase-05a-review.md]
+phase: "specification"
+order: 16
+dependencies: [api-contracts]
+outputs: [docs/reviews/review-api.md]
 conditional: "if-needed"
 knowledge-base: [review-methodology, review-api-contracts]
 ---
@@ -20,7 +21,7 @@ payload shape mismatches with domain entities, and idempotency gaps.
 - docs/system-architecture.md (required) — for interface coverage
 
 ## Expected Outputs
-- docs/reviews/phase-05a-review.md — findings and resolution log
+- docs/reviews/review-api.md — findings and resolution log
 - docs/api-contracts.md — updated with fixes
 
 ## Quality Criteria

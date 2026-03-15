@@ -1,9 +1,10 @@
 ---
-name: phase-03a-review-architecture
+name: review-architecture
 description: Review system architecture for completeness and downstream readiness
-phase: "3a"
-dependencies: [phase-03-system-architecture]
-outputs: [docs/reviews/phase-03a-review.md]
+phase: "architecture"
+order: 12
+dependencies: [system-architecture]
+outputs: [docs/reviews/review-architecture.md]
 conditional: null
 knowledge-base: [review-methodology, review-system-architecture]
 ---
@@ -21,7 +22,7 @@ and downstream readiness.
 - docs/prd.md (required) — for requirement tracing
 
 ## Expected Outputs
-- docs/reviews/phase-03a-review.md — findings and resolution log
+- docs/reviews/review-architecture.md — findings and resolution log
 - docs/system-architecture.md — updated with fixes
 
 ## Quality Criteria

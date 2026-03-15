@@ -1,8 +1,9 @@
 ---
-name: phase-02-adrs
+name: adrs
 description: Document architecture decisions as ADRs
-phase: "2"
-dependencies: [phase-01-domain-modeling]
+phase: "decisions"
+order: 9
+dependencies: [domain-modeling]
 outputs: [docs/adrs/]
 conditional: null
 knowledge-base: [adr-craft]

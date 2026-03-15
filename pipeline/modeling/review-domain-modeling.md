@@ -1,9 +1,10 @@
 ---
-name: phase-01a-review-domain-modeling
+name: review-domain-modeling
 description: Review domain models for completeness, consistency, and downstream readiness
-phase: "1a"
-dependencies: [phase-01-domain-modeling]
-outputs: [docs/reviews/phase-01a-review.md]
+phase: "modeling"
+order: 8
+dependencies: [domain-modeling]
+outputs: [docs/reviews/review-domain-modeling.md]
 conditional: null
 knowledge-base: [review-methodology, review-domain-modeling]
 ---
@@ -18,7 +19,7 @@ and re-validate.
 - docs/prd.md (required) — source requirements for coverage checking
 
 ## Expected Outputs
-- docs/reviews/phase-01a-review.md — review findings, fix plan, and resolution log
+- docs/reviews/review-domain-modeling.md — review findings, fix plan, and resolution log
 - docs/domain-models/ — updated with fixes
 
 ## Quality Criteria
@@ -36,5 +37,5 @@ and re-validate.
   and consistency passes. Depth 4-5: full multi-pass review.
 
 ## Mode Detection
-If docs/reviews/phase-01a-review.md exists, this is a re-review. Read previous
+If docs/reviews/review-domain-modeling.md exists, this is a re-review. Read previous
 findings, check which were addressed, run review passes again on updated models.
