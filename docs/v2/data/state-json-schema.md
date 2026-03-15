@@ -274,10 +274,9 @@ JSON Schema draft 2020-12 for `.scaffold/state.json`.
           "description": "Optional dependencies on manifest prompts or other extra prompts."
         },
         "phase": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 20,
-          "description": "Phase number for display grouping."
+          "type": "string",
+          "enum": ["pre", "modeling", "decisions", "architecture", "specification", "quality", "planning", "validation", "finalization"],
+          "description": "Named phase group for display grouping."
         }
       }
     }
@@ -336,7 +335,7 @@ JSON Schema draft 2020-12 for `.scaffold/state.json`.
 | `slug` | `string` | Yes | — | kebab-case; must not collide with manifest prompt slugs | Unique identifier for the custom prompt. | State Manager, Dependency Resolver |
 | `path` | `string` | Yes | — | Relative to project root | Path to the prompt file. | Build system, prompt resolution |
 | `depends-on` | `string[]` | No | `[]` | Each must be a valid prompt slug (manifest or extra) | Dependencies on other prompts. | Dependency Resolver |
-| `phase` | `integer` | No | — | 0-20 | Phase number for display grouping. | Dashboard Generator |
+| `phase` | `string` | No | — | One of: `pre`, `modeling`, `decisions`, `architecture`, `specification`, `quality`, `planning`, `validation`, `finalization` | Named phase group for display grouping. | Dashboard Generator |
 
 ---
 
@@ -718,7 +717,7 @@ Brownfield initialization with extra prompts, a completed re-run, and every opti
       "slug": "custom-api-design",
       "path": "prompts/custom/api-design.md",
       "depends-on": ["tech-stack", "project-structure"],
-      "phase": 4
+      "phase": "architecture"
     }
   ]
 }

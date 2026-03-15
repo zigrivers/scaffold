@@ -31,7 +31,7 @@ Specifically:
 
 ## Rationale
 
-- **Kahn's algorithm has a natural tiebreaker insertion point**: During each iteration, Kahn's selects from nodes with in-degree 0. When multiple nodes qualify, the algorithm must choose one. This is the exact point where the phase tiebreaker is inserted — a priority queue ordered by `(phaseIndex, manifestPosition)` replaces the simple FIFO queue. DFS-based topological sort has no analogous insertion point; its output order depends on traversal order, which is harder to control deterministically (domain 02, Section 5, Algorithm 2).
+- **Kahn's algorithm has a natural tiebreaker insertion point**: During each iteration, Kahn's selects from nodes with in-degree 0. When multiple nodes qualify, the algorithm must choose one. This is the exact point where the phase tiebreaker is inserted — a priority queue ordered by `(phaseIndex, slug)` replaces the simple FIFO queue. DFS-based topological sort has no analogous insertion point; its output order depends on traversal order, which is harder to control deterministically (domain 02, Section 5, Algorithm 2).
 - **Phase tiebreaker produces human-friendly ordering**: Without a tiebreaker, the output order varies with implementation details (hash map iteration order, array insertion order). With the phase tiebreaker, prompts from earlier phases consistently appear first when dependencies allow, matching user expectations. For example, "Create PRD" (Phase 1) always appears before "Tech Stack" (Phase 2) when neither depends on the other.
 - **Static graph simplifies reasoning**: A mutable graph that removes edges when prompts are skipped would require recalculating in-degrees after each skip, tracking which mutations correspond to which runtime events, and ensuring mutations are reversible if a skipped prompt is later un-skipped. The static approach is simpler: the graph is computed once at build time, and the state machine evaluates eligibility by checking predecessor statuses against the fixed graph (domain 02, Section 10, ADR CANDIDATE 6). Skip semantics are "skipped counts as done" — a lookup against `state.json`, not a graph modification.
 - **Dual adjacency list enables efficient eligibility checks**: At runtime, `scaffold next` needs to quickly determine which prompts are eligible. The `predecessors` map allows O(|deps|) eligibility checking per prompt by iterating the predecessor set and checking each predecessor's status in `state.json`. Without the reverse adjacency list, eligibility would require scanning all edges — O(|E|) per check (domain 02, Section 3).
@@ -77,7 +77,7 @@ Specifically:
 
 ## Constraints and Compliance
 
-- Dependency resolution MUST use Kahn's algorithm with a priority queue tiebreaker ordered by `(phaseIndex, manifestPosition)` (domain 02, Section 5, Algorithm 2)
+- Dependency resolution MUST use Kahn's algorithm with a priority queue tiebreaker ordered by `(phaseIndex, slug)` (domain 02, Section 5, Algorithm 2)
 - The dependency graph MUST be represented with dual adjacency lists: `successors` and `predecessors` (domain 02, Section 3, `DependencyGraph` interface)
 - Each `DependencyEdge` MUST track its source as `manifest`, `frontmatter`, or `both` (domain 02, Section 3)
 - Cycle detection MUST report the specific cycle chain via the `DependencyCycle` interface (domain 02, Section 3)

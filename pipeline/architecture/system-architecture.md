@@ -15,8 +15,8 @@ decisions into a concrete component structure, data flows, and module
 organization. Project directory structure and module organization are defined here.
 
 ## Inputs
-- docs/domain-models/ (required) — domain models from phase 1
-- docs/adrs/ (required) — architecture decisions from phase 2
+- docs/domain-models/ (required) — domain models from modeling phase
+- docs/adrs/ (required) — architecture decisions from decisions phase
 - docs/prd.md (required) — requirements driving architecture
 
 ## Expected Outputs

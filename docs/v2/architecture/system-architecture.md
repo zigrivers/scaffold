@@ -373,24 +373,51 @@ The `content/` directory contains all shipped prompt, mixin, and methodology con
 ```
 content/
 ├── base/                             # Base prompts — shared across all methodologies
-│   ├── create-prd.md                 # Product requirements document creation
-│   ├── review-prd.md                 # PRD quality review
-│   ├── innovate-prd.md               # PRD innovation opportunities
-│   ├── tech-stack.md                 # Technology stack research
-│   ├── claude-code-permissions.md    # Claude Code permission configuration
-│   ├── coding-standards.md           # Code quality rules and conventions
-│   ├── tdd.md                        # Test-driven development standards
-│   ├── project-structure.md          # Directory layout and file placement
-│   ├── dev-env-setup.md              # Development environment setup
-│   ├── design-system.md              # UI design system (optional: requires frontend)
-│   ├── git-workflow.md               # Git branching, PR, and merge workflow
-│   ├── user-stories.md               # User story creation from PRD
-│   ├── user-stories-gaps.md          # User story gap analysis
-│   ├── add-playwright.md             # Playwright configuration (optional: requires web)
-│   ├── add-maestro.md                # Maestro configuration (optional: requires mobile)
-│   ├── multi-model-review.md         # Multi-model code review (optional: requires multi-model-cli)
-│   ├── user-stories-multi-model-review.md  # Story coverage review (optional: requires multi-model-cli)
-│   └── platform-parity-review.md     # Platform coverage audit (optional: requires multi-platform)
+│   ├── pre/                          # Pre-pipeline: PRD, stories, reviews, innovation
+│   │   ├── create-prd.md
+│   │   ├── review-prd.md
+│   │   ├── innovate-prd.md
+│   │   ├── user-stories.md
+│   │   ├── review-user-stories.md
+│   │   └── innovate-user-stories.md
+│   ├── modeling/                     # Domain modeling
+│   │   ├── domain-modeling.md
+│   │   └── review-domain-modeling.md
+│   ├── decisions/                    # Architecture decision records
+│   │   ├── adrs.md
+│   │   └── review-adrs.md
+│   ├── architecture/                 # System architecture
+│   │   ├── system-architecture.md
+│   │   └── review-architecture.md
+│   ├── specification/                # Detailed specs (conditional)
+│   │   ├── database-schema.md
+│   │   ├── review-database.md
+│   │   ├── api-contracts.md
+│   │   ├── review-api.md
+│   │   ├── ux-spec.md
+│   │   └── review-ux.md
+│   ├── quality/                      # Testing, ops, security
+│   │   ├── testing-strategy.md
+│   │   ├── review-testing.md
+│   │   ├── operations.md
+│   │   ├── review-operations.md
+│   │   ├── security.md
+│   │   └── review-security.md
+│   ├── planning/                     # Implementation task decomposition
+│   │   ├── implementation-tasks.md
+│   │   └── review-tasks.md
+│   ├── validation/                   # Cross-phase validation
+│   │   ├── cross-phase-consistency.md
+│   │   ├── traceability-matrix.md
+│   │   ├── decision-completeness.md
+│   │   ├── critical-path-walkthrough.md
+│   │   ├── implementability-dry-run.md
+│   │   ├── dependency-graph-validation.md
+│   │   └── scope-creep-check.md
+│   └── finalization/                 # Final steps
+│       ├── apply-fixes-and-freeze.md
+│       ├── developer-onboarding-guide.md
+│       └── implementation-playbook.md
 │
 ├── methodology/                      # Methodology preset YAML files (ADR-043)
 │   ├── deep.yml                      # Deep Domain Modeling — all 32 steps enabled, default_depth: 5
@@ -1694,7 +1721,7 @@ These are the rules that implementation agents must never violate. Violating an 
 - Every step in the pipeline has a unique name — no slug collisions across meta-prompt filenames ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md))
 - `scaffold build` is idempotent and deterministic — identical `config.yml` + meta-prompt files always produce identical wrapper output
 - The dependency graph is immutable after build — runtime eligibility is computed against the static graph ([ADR-009](../adrs/ADR-009-kahns-algorithm-dependency-resolution.md))
-- **Phase tiebreaker determinism**: The phase tiebreaker used by Kahn's algorithm is `(phaseIndex ASC, slug ASC)` — steps from lower-numbered phases are dequeued first, with alphabetical slug as the secondary tiebreaker. Phase indices are zero-indexed and come from the methodology preset's phase ordering. This tiebreaker is immutable — changing it would alter the resolved execution order for all methodologies, breaking determinism. [Ref: Section 4a, [ADR-009](../adrs/ADR-009-kahns-algorithm-dependency-resolution.md), [domain 02](../domain-models/02-dependency-resolution.md)]
+- **Order tiebreaker determinism**: The tiebreaker used by Kahn's algorithm is `(order ASC, slug ASC)` — steps with lower `order` values are dequeued first, with alphabetical slug as the secondary tiebreaker. The `order` field is a unique integer per step (1-36), more granular than phase-level grouping. This tiebreaker is immutable — changing it would alter the resolved execution order for all methodologies, breaking determinism. [Ref: Section 4a, [ADR-009](../adrs/ADR-009-kahns-algorithm-dependency-resolution.md), [domain 02](../domain-models/02-dependency-resolution.md)]
 
 **Assembly engine invariants:**
 
