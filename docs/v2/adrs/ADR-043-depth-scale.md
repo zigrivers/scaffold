@@ -32,7 +32,7 @@ Replace methodology-specific prompt variants with a **depth scale from 1 to 5** 
 **Three methodology presets:**
 
 - **Deep Domain Modeling:** All pipeline steps active, depth 5 at every step. For teams building complex or long-lived systems.
-- **MVP:** Minimal step subset active (create-prd, implementation tasks, testing strategy, implementation playbook), depth 1. For solo developers, hackathons, proofs of concept.
+- **MVP:** Minimal step subset active (create-prd, testing strategy, implementation tasks, implementation playbook), depth 1. For solo developers, hackathons, proofs of concept.
 - **Custom:** User chooses which steps are active and sets depth per step (or accepts a default depth). For everyone else.
 
 **Scaling guidance in meta-prompts:** Each meta-prompt's "Methodology Scaling" section provides specific guidance for `deep` (depth 5) and `mvp` (depth 1) output, plus interpolation guidance for intermediate depths. This is not generic ("write more" vs. "write less") — it specifies what content sections to include or omit, what level of analysis to perform, and what artifacts to produce at each depth level.
