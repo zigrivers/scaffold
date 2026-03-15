@@ -54,7 +54,7 @@ pipeline/
 
 ## Section 2: Frontmatter Changes
 
-Each renamed meta-prompt file gets three frontmatter changes:
+Each renamed meta-prompt file gets four frontmatter changes:
 
 1. **`name`** — updated to new step name (e.g., `phase-07-implementation-tasks` → `implementation-tasks`)
 2. **`phase`** — changed from numeric string to named group (e.g., `"7"` → `"planning"`)
@@ -94,13 +94,15 @@ dependencies: [testing-strategy, operations, security]
 
 ### Existing steps (pre, validation, finalization)
 
-These steps are NOT renamed. They receive only an `order` field addition to their existing frontmatter. Their `name` and `phase` fields are unchanged.
+These steps are NOT renamed. Their `name` and `phase` fields are unchanged. They receive:
+- An `order` field addition
+- `dependencies` field updates where they reference old `phase-NN-` step names (e.g., validation steps that depend on `phase-10a-review-security` become `review-security`)
 
 ---
 
 ## Section 3: Review Output Paths
 
-Review meta-prompts produce findings in `docs/reviews/`. The `outputs` frontmatter field in each review step must be updated.
+Review meta-prompts produce findings in `docs/reviews/`. Both the `outputs` frontmatter field AND body-text references (in "Expected Outputs" and "Mode Detection" sections) in each review step must be updated.
 
 | Old output path | New output path |
 |---|---|
@@ -177,7 +179,7 @@ Files affected:
 
 After all changes, verify:
 
-1. **No stale references** — grep for `phase-\d{2}` across all non-archive files; expect zero matches
+1. **No stale references** — grep for `phase-\d{2}` across all non-archive files, excluding `prompts.md` (v1); expect zero matches
 2. **All step names consistent** — every `name` field in pipeline frontmatter matches the filename stem
 3. **All dependencies resolve** — every step referenced in a `dependencies` field exists as a `name` in another meta-prompt
 4. **Order values unique** — no two steps share the same `order` value
