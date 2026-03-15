@@ -262,7 +262,7 @@ custom:
 
 ### Phase 1 (Domain Modeling)
 
-- **Dependencies** change from `[create-prd]` to `[review-user-stories]`
+- **Dependencies** change from `[create-prd]` to `[innovate-user-stories]` (skips to `review-user-stories` when innovation is disabled)
 - **Inputs** adds `docs/user-stories.md (required)`
 - **Purpose** gains: "Use user stories and their acceptance criteria to discover entities, events, and aggregate boundaries"
 
