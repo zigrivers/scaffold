@@ -17,6 +17,7 @@ This is the visual and interaction blueprint for the frontend.
 - docs/prd.md (required) — user requirements and personas
 - docs/system-architecture.md (required) — frontend architecture
 - docs/api-contracts.md (optional) — data shapes for UI components
+- docs/user-stories.md (required) — user journeys driving flow design
 
 ## Expected Outputs
 - docs/ux-spec.md — UX specification with flows, components, design system
