@@ -288,14 +288,14 @@ steps:
   phase-05a-review-api: { enabled: true, conditional: "if-needed" }
   phase-06-ux-spec: { enabled: true, conditional: "if-needed" }
   phase-06a-review-ux: { enabled: true, conditional: "if-needed" }
-  phase-07-implementation-tasks: { enabled: true }
-  phase-07a-review-tasks: { enabled: true }
   phase-08-testing-strategy: { enabled: true }
   phase-08a-review-testing: { enabled: true }
   phase-09-operations: { enabled: true }
   phase-09a-review-operations: { enabled: true }
   phase-10-security: { enabled: true }
   phase-10a-review-security: { enabled: true }
+  phase-07-implementation-tasks: { enabled: true }
+  phase-07a-review-tasks: { enabled: true }
   cross-phase-consistency: { enabled: true }
   traceability-matrix: { enabled: true }
   decision-completeness: { enabled: true }
@@ -334,14 +334,14 @@ steps:
   phase-05a-review-api: { enabled: false }
   phase-06-ux-spec: { enabled: false }
   phase-06a-review-ux: { enabled: false }
-  phase-07-implementation-tasks: { enabled: true }
-  phase-07a-review-tasks: { enabled: false }
   phase-08-testing-strategy: { enabled: true }
   phase-08a-review-testing: { enabled: false }
   phase-09-operations: { enabled: false }
   phase-09a-review-operations: { enabled: false }
   phase-10-security: { enabled: false }
   phase-10a-review-security: { enabled: false }
+  phase-07-implementation-tasks: { enabled: true }
+  phase-07a-review-tasks: { enabled: false }
   cross-phase-consistency: { enabled: false }
   traceability-matrix: { enabled: false }
   decision-completeness: { enabled: false }

@@ -2,7 +2,7 @@
 name: phase-08-testing-strategy
 description: Define testing and quality strategy across all layers
 phase: "8"
-dependencies: [phase-07-implementation-tasks]
+dependencies: [phase-03-system-architecture]
 outputs: [docs/testing-strategy.md]
 conditional: null
 knowledge-base: [testing-strategy]

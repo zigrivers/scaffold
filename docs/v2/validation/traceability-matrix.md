@@ -22,7 +22,7 @@
 | F-008 | Validation phase: 7 parallel validation steps (cross-phase, traceability, decisions, critical path, implementability, dependency graph, scope creep) | §5 |
 | F-009 | Finalization phase: 3 steps (apply fixes and freeze, developer onboarding guide, implementation playbook) | §5 |
 | F-010 | Depth scale 1-5: five levels from MVP floor to Deep ceiling, with preset defaults and per-step overrides | §6 |
-| F-011 | MVP methodology: 4 steps enabled (create-prd, phase-07, phase-08, implementation-playbook) at depth 1 | §6 |
+| F-011 | MVP methodology: 4 steps enabled (create-prd, phase-08, phase-07, implementation-playbook) at depth 1 | §6 |
 | F-012 | Methodology changeable mid-pipeline: re-run at higher depth, enable skipped steps, switch methodology | §6 |
 | F-013 | Config file (.scaffold/config.yml): methodology, custom overrides, platforms, project metadata | §7 |
 | F-014 | Config versioning: version field with auto-migration for old configs, error for newer-than-CLI | §7 |
