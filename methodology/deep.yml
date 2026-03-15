@@ -5,7 +5,8 @@ default_depth: 5
 
 steps:
   create-prd: { enabled: true }
-  prd-gap-analysis: { enabled: true }
+  review-prd: { enabled: true }
+  innovate-prd: { enabled: true }
   user-stories: { enabled: true }
   review-user-stories: { enabled: true }
   innovate-user-stories: { enabled: true }
