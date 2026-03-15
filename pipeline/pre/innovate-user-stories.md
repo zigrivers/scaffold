@@ -10,8 +10,9 @@ knowledge-base: [user-stories, user-story-innovation]
 
 ## Purpose
 Discover UX-level enhancements and innovation opportunities within the existing
-user stories. This is NOT feature-level innovation (that belongs in PRD gap
-analysis) — it focuses on making existing features better through smart defaults,
+user stories. This is NOT feature-level innovation (that belongs in PRD
+innovation — `innovate-prd`) — it focuses on making existing features better
+through smart defaults,
 progressive disclosure, accessibility improvements, and AI-native capabilities.
 
 ## Inputs

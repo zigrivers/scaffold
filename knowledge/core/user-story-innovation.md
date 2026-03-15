@@ -6,7 +6,7 @@ topics: [innovation, ux-enhancements, user-stories, gap-analysis, differentiator
 
 ## Scope Boundary
 
-This knowledge covers UX-level improvements only — making existing features better, not adding new features. Feature-level innovation belongs in PRD gap analysis. If an enhancement requires a new PRD section, it is out of scope for user story innovation.
+This knowledge covers UX-level improvements only — making existing features better, not adding new features. Feature-level innovation belongs in PRD innovation (`innovate-prd`). If an enhancement requires a new PRD section, it is out of scope for user story innovation.
 
 **In scope:**
 - Smart defaults that reduce user effort on existing features
