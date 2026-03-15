@@ -1,4 +1,4 @@
-<!-- scaffold:operations-runbook v1 2026-03-14 -->
+<!-- scaffold:operations-runbook v2 2026-03-14 -->
 
 # Scaffold v2 — Operations & Deployment Runbook
 
@@ -116,10 +116,7 @@ No `.env` file, no `.env.example`, no secrets management. This is intentional (P
 }
 ```
 
-Recommended extensions:
-- `vitest.explorer` — test runner integration with inline results
-- `dbaeumer.vscode-eslint` — inline lint warnings
-- `esbenp.prettier-vscode` — consistent formatting
+Recommended extensions: `vitest.explorer` (test runner), `dbaeumer.vscode-eslint` (lint), `esbenp.prettier-vscode` (format).
 
 ### 2.7 Troubleshooting
 
@@ -140,7 +137,14 @@ node --version   # Should print 18.x or 22.x
 If you don't have `nvm`, install it or use `fnm`. The minimum version is enforced by `package.json` `engines.node`.
 
 **Tests pass locally but fail in CI:**
-Check the Node version matrix — CI runs Node 18 and 22. A test using a Node 22 API will fail on 18. Use feature detection or polyfills for cross-version compatibility.
+Check the Node version matrix — CI runs Node 18 and 22. A test using a Node 22 API will fail on 18. Use feature detection or polyfills for cross-version compatibility. To test both versions locally: `nvm install 18 && nvm use 18 && npm test`, then repeat for 22.
+
+**Platform differences (macOS local vs Ubuntu CI):**
+CI runs on `ubuntu-latest`. Known divergences:
+- **Filesystem**: macOS is case-insensitive by default; Ubuntu is case-sensitive. Import paths with wrong casing pass locally but fail in CI.
+- **Path separators**: Node's `path.sep` is `/` on both, but tools that shell out may behave differently.
+- **Shell**: CI uses `bash`; macOS defaults to `zsh`. Scripts should use `#!/usr/bin/env bash` and avoid zsh-isms.
+- **npm ci** vs **npm install**: CI always uses `npm ci` (lockfile only). If you see dependency errors in CI, run `npm ci` locally to reproduce.
 
 ---
 
@@ -299,6 +303,8 @@ The release workflow:
 2. Builds and publishes to npm with provenance attestation
 3. Creates a GitHub Release with auto-generated release notes
 
+**Partial release failure**: If npm publish succeeds but the GitHub Release step fails, the package is live on npm without a corresponding GitHub Release. Recovery: manually create the GitHub Release using `gh release create v<version> --generate-notes`, or re-run the failed workflow job. If the GitHub Release step fails repeatedly, the npm package is still usable — the GitHub Release is informational, not blocking.
+
 After a successful npm publish, update the Homebrew formula (see §4.7).
 
 ### 3.4 Branch Protection
@@ -368,17 +374,7 @@ What `npm pack` **includes** (configured via `files` in `package.json`):
 | `README.md` | npm landing page |
 | `LICENSE` | License file |
 
-What `npm pack` **excludes** (via `.npmignore`):
-
-| Excluded | Reason |
-|----------|--------|
-| `src/` | TypeScript source — consumers use compiled `dist/` |
-| `tests/` | Test files are development-only |
-| `docs/` | Documentation lives in the repo, not the package |
-| `*.ts` (root) | Config files (`tsconfig.json`, `vitest.config.ts`) |
-| `.scaffold/` | Project-specific scaffold state |
-| `.beads/` | Task tracking database |
-| `.github/` | CI workflows |
+What `npm pack` **excludes** (via `.npmignore`): `src/`, `tests/`, `docs/`, root `*.ts` configs, `.scaffold/`, `.beads/`, `.github/` — anything that is development-only or project-specific.
 
 ### 4.5 Verifying the Package Before Publish
 
@@ -418,11 +414,27 @@ This is the first experience for new users — it must work without errors.
 npm and Homebrew must publish the same version. Version drift between channels is not acceptable (ADR-002).
 
 **Homebrew formula update** (after npm publish):
-- If using a GitHub release tarball: update the formula's `url` and `sha256` to point to the new release
-- If using npm as source: update the formula's version and checksum
-- Verify: `brew install scaffold && scaffold --version` matches the npm version
 
-Homebrew formula maintenance is a manual step per release. Consider automating via a GitHub Action that creates a PR to the Homebrew tap repository after each release.
+```bash
+# 1. In the Homebrew tap repository (zigrivers/homebrew-scaffold):
+cd homebrew-scaffold
+
+# 2. Update formula to new version and SHA
+VERS="<new-version>"
+URL="https://registry.npmjs.org/@scaffold-cli/scaffold/-/scaffold-${VERS}.tgz"
+SHA=$(curl -sL "$URL" | shasum -a 256 | cut -d' ' -f1)
+# Edit Formula/scaffold.rb: update `url` and `sha256` with the values above
+
+# 3. Test locally
+brew install --build-from-source Formula/scaffold.rb
+scaffold --version   # Must match npm version
+
+# 4. Commit and push
+git commit -am "scaffold ${VERS}"
+git push origin main
+```
+
+Verify: `brew update && brew upgrade scaffold && scaffold --version` matches the npm version. Consider automating via a GitHub Action that creates a PR to the tap after each release.
 
 ---
 
@@ -430,21 +442,25 @@ Homebrew formula maintenance is a manual step per release. Consider automating v
 
 ### 5.1 Bad npm Release
 
-**Within 72 hours of publish**:
+**Within 72 hours of publish** (and the package has fewer than 300 weekly downloads and no dependents):
 ```bash
 npm unpublish @scaffold-cli/scaffold@<bad-version>
 ```
-Then fix the issue and publish a new patch version.
+If the package exceeds 300 weekly downloads or has dependents, npm blocks unpublish even within 72 hours. In that case, use deprecation (below).
 
-**After 72 hours** (npm prevents unpublish):
+**After 72 hours or when unpublish is blocked**:
 ```bash
 npm deprecate @scaffold-cli/scaffold@<bad-version> "Known issue: <description>. Use <good-version> instead."
 ```
 Deprecated versions show a warning on install but remain available.
 
-### 5.2 Homebrew Rollback
+### 5.2 Dual-Channel Rollback Sequencing
 
-Revert the Homebrew formula PR in the tap repository. Users receive the previous version on their next `brew update && brew upgrade`.
+**Order**: Roll back Homebrew **first**, then npm. Rationale: if the Homebrew formula sources from the npm registry, rolling back npm first could leave Homebrew pointing to a missing version.
+
+1. Revert the Homebrew formula PR in the tap repository — users receive the previous version on `brew update && brew upgrade`
+2. Unpublish or deprecate the npm version (see §5.1)
+3. Verify both channels serve the correct version
 
 ### 5.3 Breaking Change Shipped Accidentally
 
@@ -474,6 +490,36 @@ Fix `.npmignore` or `files` in `package.json`, then publish a patch.
 3. If no fix is available: evaluate the impact. For high/critical vulnerabilities, consider replacing the dependency or pinning a non-vulnerable version
 4. For vulnerabilities in scaffold itself: fix, patch release, and file an npm security advisory if the vulnerability affects end users
 
+### 5.6 User Communication for Bad Releases
+
+When a bad release is identified:
+1. **Deprecate immediately** with a descriptive message (see §5.1) — users see the warning on next install
+2. **Update the GitHub Release** notes to add a warning banner at the top
+3. **File a GitHub Issue** labeled `release-incident` with details and the fix timeline
+4. For security issues, use `npm audit advisory` and GitHub Security Advisories
+
+### 5.7 Failure Scenario Runbook
+
+Each scenario follows: **Symptoms** → **Diagnosis** → **Resolution** → **Verification**.
+
+**Scenario A: `npm publish` fails mid-stream**
+- *Symptoms*: Release workflow `publish` job fails. npm may or may not show the version.
+- *Diagnosis*: Check workflow logs for the error (auth failure, validation, network). Run `npm info @scaffold-cli/scaffold versions` to see if the version landed.
+- *Resolution*: If the version didn't land — fix the issue (usually `NPM_TOKEN` expired or `package.json` validation) and re-run the workflow. If the version partially landed (corrupt), unpublish and re-publish. `npm publish` is idempotent for the same content — re-running is safe if the version didn't land.
+- *Verification*: `npm info @scaffold-cli/scaffold version` returns expected version.
+
+**Scenario B: Release tag pushed but workflow doesn't trigger**
+- *Symptoms*: Tag visible in `git tag`, pushed to origin, but no GitHub Actions run appears.
+- *Diagnosis*: Check `.github/workflows/release.yml` syntax with `act` or the Actions UI. Check Actions quota (Settings → Billing). Verify tag matches the `v*` pattern.
+- *Resolution*: Fix the workflow file if there's a syntax error, then delete and re-push the tag: `git tag -d v<ver> && git push origin :refs/tags/v<ver> && git tag v<ver> && git push origin v<ver>`. If quota exceeded, wait or contact GitHub support.
+- *Verification*: Actions tab shows the release workflow running.
+
+**Scenario C: CI passes but package broken on a specific platform or Node version**
+- *Symptoms*: User-reported bug that doesn't reproduce in CI. Typically macOS vs Linux or Node 18 vs 22 behavior.
+- *Diagnosis*: Reproduce locally on the reported platform/Node version. Check for case-sensitive imports, platform-specific `path` behavior, or Node API differences.
+- *Resolution*: Write a test that catches the platform-specific failure, fix the code, publish a patch.
+- *Verification*: Test passes on both platforms/versions. Ask the reporting user to verify with the patched version.
+
 ---
 
 ## 6. Security Practices
@@ -486,12 +532,20 @@ Scaffold stores no API keys, tokens, or credentials (PRD §18). The CLI makes no
 
 The CLI makes no network requests except `scaffold update` (which checks the npm registry for newer versions). All operations are local filesystem reads and writes.
 
-### 6.3 CI Security
+### 6.3 CI Security & Publish Access
 
 - `npm audit --audit-level=high` runs in CI — fails the build on high or critical vulnerabilities
 - `npm ci` (not `npm install`) ensures deterministic builds from the lockfile
 - npm publish requires **2FA** enabled on the publishing npm account
 - npm provenance attestation (`--provenance`) links published packages to their source commit
+
+**npm token management**:
+- The `NPM_TOKEN` GitHub secret is a granular access token scoped to publish `@scaffold-cli/scaffold` only
+- Token is created by the npm org owner with `Automation` type (bypasses 2FA for CI while requiring 2FA for interactive use)
+- Rotate the token at least annually or immediately if a security incident is suspected
+- Limit npm org membership to maintainers who need publish access — use the `developer` role for contributors who don't
+
+**npm account compromise recovery**: If the token is leaked or the account is compromised: (1) revoke all tokens immediately on npmjs.com, (2) rotate the `NPM_TOKEN` GitHub secret, (3) run `npm audit signatures` on the last published version to verify package integrity, (4) contact npm support at security@npmjs.com if unauthorized versions were published
 
 ### 6.4 Package Hygiene
 
@@ -520,6 +574,13 @@ Scaffold is a CLI tool — there is no runtime to monitor. Release health is tra
 | Bug reports | GitHub Issues | Daily triage |
 | Feature requests | GitHub Discussions or Beads | Weekly review |
 | npm audit advisories | `npm audit` locally or Dependabot alerts | Continuous (CI) |
+
+**Post-release verification** (within 48 hours of a release):
+1. Verify `npx @scaffold-cli/scaffold --version` from a clean temp directory returns the new version
+2. Run `scaffold init --help` to confirm the CLI loads without errors
+3. Check GitHub Issues for reports tagged with the new version
+4. Monitor npm download stats — a sudden drop may indicate a broken release
+5. If a platform-specific issue is suspected, test on macOS and Linux (or ask a contributor to verify)
 
 ### 7.2 Dependency Updates
 
@@ -555,7 +616,16 @@ Periodic benchmark runs against `main` validate that performance stays within PR
 
 Benchmarks are **not** in CI (environment-dependent timing). Run manually or on a scheduled CI job with a dedicated runner for consistent results. See testing-strategy.md §8 for benchmark methodology and §10 for Phase 7+ CI integration plans.
 
-### 7.5 Documentation Drift
+### 7.5 Disaster Recovery
+
+Scaffold has no database, no persistent user data, and no server. Recovery concerns are limited to **source code** and **published packages**.
+
+- **Git repository**: GitHub is the single host. Maintainers should keep local clones current. For critical redundancy, mirror to a second Git host (e.g., `git push --mirror` to a GitLab or Codeberg remote on each release).
+- **npm registry**: If the npm package is removed (policy violation, legal claim, or account issue), the package can be re-published from a local build of any tagged commit. Provenance attestation would need to be re-established.
+- **Homebrew tap**: The tap repository is a small Git repo. If lost, recreate the formula from the npm package URL and SHA. Keep a local clone.
+- **GitHub Actions secrets**: If `NPM_TOKEN` is lost, generate a new one from npmjs.com and update the GitHub secret. No other secrets exist.
+
+### 7.6 Documentation Drift
 
 When CLI behavior changes, verify that these documents remain accurate:
 - `docs/v2/operations-runbook.md` (this file)
@@ -571,16 +641,14 @@ When CLI behavior changes, verify that these documents remain accurate:
 ### 8.1 Quick-Start
 
 ```bash
-git clone <repo-url>
-cd scaffold
-npm install                                       # Install dependencies
-npm test                                          # Verify setup works
-bd ready                                          # Find available work
-bd update <id> --claim                            # Claim a task
-# ... implement with TDD (write test → red → green → refactor) ...
-npm run check                                     # All quality gates
+git clone <repo-url> && cd scaffold
+npm install && npm test              # Install + verify
+bd ready                             # Find work
+bd update <id> --claim               # Claim it
+# Implement with TDD: write test → red → green → refactor
+npm run check                        # All quality gates
 git commit -m "[BD-<id>] type(scope): description"
-bd close <id>                                     # Mark task complete
+bd close <id>
 ```
 
 See CLAUDE.md for the full Beads workflow and commit message format.
