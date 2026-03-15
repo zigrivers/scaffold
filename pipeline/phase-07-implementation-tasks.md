@@ -2,7 +2,7 @@
 name: phase-07-implementation-tasks
 description: Break architecture into implementable tasks with dependencies
 phase: "7"
-dependencies: [phase-03-system-architecture]
+dependencies: [phase-08-testing-strategy, phase-09-operations, phase-10-security]
 outputs: [docs/implementation-tasks.md]
 conditional: null
 knowledge-base: [task-decomposition]
@@ -20,6 +20,9 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 - docs/adrs/ (required) — technology constraints
 - docs/prd.md (required) — features to trace tasks back to
 - docs/user-stories.md (required) — stories to derive tasks from
+- docs/testing-strategy.md (required) — testing requirements to incorporate into tasks
+- docs/operations-runbook.md (optional) — ops requirements to incorporate into tasks
+- docs/security-review.md (optional) — security requirements to incorporate into tasks
 - docs/database-schema.md (optional) — data layer tasks
 - docs/api-contracts.md (optional) — API implementation tasks
 - docs/ux-spec.md (optional) — frontend tasks
@@ -33,6 +36,9 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 - Task dependencies form a valid DAG (no cycles)
 - Each task is scoped for a single agent session (not too large, not too small)
 - Tasks include acceptance criteria (how to know it's done)
+- Tasks incorporate testing requirements from the testing strategy
+- Tasks incorporate security controls from the security review where applicable
+- Tasks incorporate operational requirements (monitoring, deployment) where applicable
 - Critical path is identified
 - Parallelization opportunities are marked
 - Every user story maps to at least one task
