@@ -2,7 +2,7 @@
 name: user-stories
 description: Translate PRD features into user stories with acceptance criteria
 phase: "pre"
-dependencies: [create-prd]
+dependencies: [review-prd]
 outputs: [docs/user-stories.md]
 conditional: null
 knowledge-base: [user-stories]
@@ -16,7 +16,8 @@ task decomposition downstream.
 
 ## Inputs
 - docs/prd.md (required) — features, personas, and requirements to translate
-- docs/prd-gap-analysis.md (optional) — refined requirements with gaps addressed
+- docs/reviews/pre-review-prd.md (optional) — review findings for context
+- docs/prd-innovation.md (optional) — innovation findings and approved enhancements
 
 ## Expected Outputs
 - docs/user-stories.md — user stories organized by epic, each with acceptance
