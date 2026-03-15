@@ -130,8 +130,8 @@ Every key in the `steps` object must correspond to a meta-prompt file in `pipeli
 | `user-stories` | `pipeline/pre/user-stories.md` |
 | `review-user-stories` | `pipeline/pre/review-user-stories.md` |
 | `innovate-user-stories` | `pipeline/pre/innovate-user-stories.md` |
-| `phase-NN-*` | `pipeline/phase-NN-*.md` |
-| `phase-NNa-*` | `pipeline/phase-NNa-*.md` |
+| `domain-modeling`, `adrs`, etc. | `pipeline/<group>/<name>.md` (see subdirectory mapping) |
+| `review-domain-modeling`, `review-adrs`, etc. | `pipeline/<group>/<name>.md` (see subdirectory mapping) |
 | `cross-phase-consistency` | `pipeline/validation/cross-phase-consistency.md` |
 | `apply-fixes-and-freeze` | `pipeline/finalization/apply-fixes-and-freeze.md` |
 
@@ -214,7 +214,7 @@ steps:
   create-prd: { enabled: true }
   review-prd: { enabled: true }
   innovate-prd: { enabled: true, conditional: "if-needed" }
-  phase-04-database-schema: { enabled: true, conditional: "if-needed" }
+  database-schema: { enabled: true, conditional: "if-needed" }
 ```
 
 Block style is also valid but less conventional for this file:
@@ -276,26 +276,26 @@ steps:
   create-prd: { enabled: true }
   review-prd: { enabled: true }
   innovate-prd: { enabled: true, conditional: "if-needed" }
-  phase-01-domain-modeling: { enabled: true }
-  phase-01a-review-domain-modeling: { enabled: true }
-  phase-02-adrs: { enabled: true }
-  phase-02a-review-adrs: { enabled: true }
-  phase-03-system-architecture: { enabled: true }
-  phase-03a-review-architecture: { enabled: true }
-  phase-04-database-schema: { enabled: true, conditional: "if-needed" }
-  phase-04a-review-database: { enabled: true, conditional: "if-needed" }
-  phase-05-api-contracts: { enabled: true, conditional: "if-needed" }
-  phase-05a-review-api: { enabled: true, conditional: "if-needed" }
-  phase-06-ux-spec: { enabled: true, conditional: "if-needed" }
-  phase-06a-review-ux: { enabled: true, conditional: "if-needed" }
-  phase-08-testing-strategy: { enabled: true }
-  phase-08a-review-testing: { enabled: true }
-  phase-09-operations: { enabled: true }
-  phase-09a-review-operations: { enabled: true }
-  phase-10-security: { enabled: true }
-  phase-10a-review-security: { enabled: true }
-  phase-07-implementation-tasks: { enabled: true }
-  phase-07a-review-tasks: { enabled: true }
+  domain-modeling: { enabled: true }
+  review-domain-modeling: { enabled: true }
+  adrs: { enabled: true }
+  review-adrs: { enabled: true }
+  system-architecture: { enabled: true }
+  review-architecture: { enabled: true }
+  database-schema: { enabled: true, conditional: "if-needed" }
+  review-database: { enabled: true, conditional: "if-needed" }
+  api-contracts: { enabled: true, conditional: "if-needed" }
+  review-api: { enabled: true, conditional: "if-needed" }
+  ux-spec: { enabled: true, conditional: "if-needed" }
+  review-ux: { enabled: true, conditional: "if-needed" }
+  testing-strategy: { enabled: true }
+  review-testing: { enabled: true }
+  operations: { enabled: true }
+  review-operations: { enabled: true }
+  security: { enabled: true }
+  review-security: { enabled: true }
+  implementation-tasks: { enabled: true }
+  review-tasks: { enabled: true }
   cross-phase-consistency: { enabled: true }
   traceability-matrix: { enabled: true }
   decision-completeness: { enabled: true }
@@ -322,26 +322,26 @@ steps:
   create-prd: { enabled: true }
   review-prd: { enabled: false }
   innovate-prd: { enabled: false, conditional: "if-needed" }
-  phase-01-domain-modeling: { enabled: false }
-  phase-01a-review-domain-modeling: { enabled: false }
-  phase-02-adrs: { enabled: false }
-  phase-02a-review-adrs: { enabled: false }
-  phase-03-system-architecture: { enabled: false }
-  phase-03a-review-architecture: { enabled: false }
-  phase-04-database-schema: { enabled: false }
-  phase-04a-review-database: { enabled: false }
-  phase-05-api-contracts: { enabled: false }
-  phase-05a-review-api: { enabled: false }
-  phase-06-ux-spec: { enabled: false }
-  phase-06a-review-ux: { enabled: false }
-  phase-08-testing-strategy: { enabled: true }
-  phase-08a-review-testing: { enabled: false }
-  phase-09-operations: { enabled: false }
-  phase-09a-review-operations: { enabled: false }
-  phase-10-security: { enabled: false }
-  phase-10a-review-security: { enabled: false }
-  phase-07-implementation-tasks: { enabled: true }
-  phase-07a-review-tasks: { enabled: false }
+  domain-modeling: { enabled: false }
+  review-domain-modeling: { enabled: false }
+  adrs: { enabled: false }
+  review-adrs: { enabled: false }
+  system-architecture: { enabled: false }
+  review-architecture: { enabled: false }
+  database-schema: { enabled: false }
+  review-database: { enabled: false }
+  api-contracts: { enabled: false }
+  review-api: { enabled: false }
+  ux-spec: { enabled: false }
+  review-ux: { enabled: false }
+  testing-strategy: { enabled: true }
+  review-testing: { enabled: false }
+  operations: { enabled: false }
+  review-operations: { enabled: false }
+  security: { enabled: false }
+  review-security: { enabled: false }
+  implementation-tasks: { enabled: true }
+  review-tasks: { enabled: false }
   cross-phase-consistency: { enabled: false }
   traceability-matrix: { enabled: false }
   decision-completeness: { enabled: false }
@@ -369,8 +369,8 @@ steps:
   create-prd: { enabled: true }
   review-prd: { enabled: true }
   innovate-prd: { enabled: true, conditional: "if-needed" }
-  phase-01-domain-modeling: { enabled: true }
-  phase-01a-review-domain-modeling: { enabled: true }
+  domain-modeling: { enabled: true }
+  review-domain-modeling: { enabled: true }
   # ... (all 33 steps listed with enabled: true)
   # conditional steps include: conditional: "if-needed"
 ```
@@ -385,7 +385,7 @@ description: Demonstrates validation errors.
 steps:
   nonexistent-step: { enabled: true }     # ERROR: PRESET_INVALID_STEP
   create-prd: { enabled: "yes" }          # ERROR: enabled must be boolean
-  phase-04-database-schema:
+  database-schema:
     enabled: true
     conditional: "always"                  # ERROR: conditional must be "if-needed"
 ```

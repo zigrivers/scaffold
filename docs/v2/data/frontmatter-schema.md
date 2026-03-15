@@ -64,7 +64,7 @@ The following JSON Schema defines the structure that parsed YAML frontmatter mus
     },
     "phase": {
       "type": "string",
-      "description": "Pipeline phase identifier. Values: 'pre', '1'-'10', '1a'-'10a', 'validation', 'finalization'. Used for display grouping and ordering."
+      "description": "Pipeline phase identifier. Values: 'pre', 'modeling', 'decisions', 'architecture', 'specification', 'planning', 'quality', 'validation', 'finalization'. Used for display grouping and ordering."
     },
     "dependencies": {
       "type": "array",
@@ -148,7 +148,7 @@ Step identifier matching the filename stem.
 
 **Example values**:
 - `"create-prd"`
-- `"phase-03-system-architecture"`
+- `"system-architecture"`
 - `"cross-phase-consistency"`
 
 ### `description` (string)
@@ -175,7 +175,7 @@ Pipeline phase for display grouping and ordering.
 |----------|-------|
 | Type | `string` |
 | Required | Yes |
-| Valid values | `"pre"`, `"1"` through `"10"`, `"1a"` through `"10a"`, `"validation"`, `"finalization"` |
+| Valid values | `"pre"`, `"modeling"`, `"decisions"`, `"architecture"`, `"specification"`, `"planning"`, `"quality"`, `"validation"`, `"finalization"` |
 | Used by | `scaffold status` phase grouping, `scaffold list` display, Kahn's algorithm phase tiebreaker |
 | Error code | `FRONTMATTER_PHASE_INVALID` (exit 1) when not a recognized phase identifier |
 
@@ -183,8 +183,8 @@ Pipeline phase for display grouping and ordering.
 
 **Example values**:
 - `"pre"` (project definition steps)
-- `"3"` (system architecture)
-- `"3a"` (system architecture review)
+- `"architecture"` (system architecture)
+- `"architecture"` (system architecture review)
 - `"validation"` (validation phase steps)
 - `"finalization"` (finalization phase steps)
 
@@ -206,8 +206,8 @@ Steps that must complete before this step can execute.
 
 **Example values**:
 - `["create-prd"]`
-- `["phase-02-adrs"]`
-- `["phase-01-domain-modeling", "phase-02-adrs"]`
+- `["adrs"]`
+- `["domain-modeling", "adrs"]`
 
 ### `outputs` (string[])
 
@@ -486,11 +486,11 @@ A typical meta-prompt with dependencies and knowledge base references:
 
 ```yaml
 ---
-name: phase-03-system-architecture
+name: system-architecture
 description: Design and document system architecture
-phase: "3"
+phase: "architecture"
 dependencies:
-  - phase-02-adrs
+  - adrs
 outputs:
   - docs/system-architecture.md
 knowledge-base:
@@ -504,11 +504,11 @@ A meta-prompt for a step that may not apply to all projects:
 
 ```yaml
 ---
-name: phase-04-database-schema
+name: database-schema
 description: Design database schema from domain models
-phase: "4"
+phase: "specification"
 dependencies:
-  - phase-03-system-architecture
+  - system-architecture
 outputs:
   - docs/database-schema.md
 conditional: "if-needed"
@@ -523,11 +523,11 @@ A review step with multiple knowledge base entries:
 
 ```yaml
 ---
-name: phase-01a-review-domain-modeling
+name: review-domain-modeling
 description: Review domain models for completeness, consistency, and downstream readiness
-phase: "1a"
+phase: "modeling"
 dependencies:
-  - phase-01-domain-modeling
+  - domain-modeling
 outputs:
   - docs/domain-models/review-findings.md
 knowledge-base:
@@ -546,7 +546,7 @@ name: cross-phase-consistency
 description: Audit consistency across all phases — naming, assumptions, data flows, interface contracts
 phase: "validation"
 dependencies:
-  - phase-10a-review-security
+  - review-security
 outputs:
   - docs/validation/cross-phase-consistency.md
 knowledge-base:
@@ -559,7 +559,7 @@ knowledge-base:
 **Missing required fields**:
 ```yaml
 ---
-phase: "3"
+phase: "architecture"
 outputs:
   - docs/architecture.md
 ---
@@ -569,9 +569,9 @@ Errors: `FRONTMATTER_NAME_MISSING`, `FRONTMATTER_DESCRIPTION_MISSING` — meta-p
 **Invalid dependency name**:
 ```yaml
 ---
-name: phase-03-system-architecture
+name: system-architecture
 description: Design system architecture
-phase: "3"
+phase: "architecture"
 dependencies:
   - Phase 02 ADRs
 outputs:

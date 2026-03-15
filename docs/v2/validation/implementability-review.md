@@ -1310,17 +1310,17 @@ T-052 (e2e tests) is the weakest at 3/5 — the AI execution boundary in tests i
 1. **[MISSING]** — Same meta-prompt body example gap as T-048
    - Lower impact since T-048 establishes the pattern
 
-2. **[AMBIGUITY]** — Step name: `phase-05-api-contract` (task) vs `phase-05-api-contracts` (manifest)
+2. **[AMBIGUITY]** — Step name: `api-contract` (task) vs `api-contracts` (manifest)
    - What the spec says: manifest-yml-schema.md §8.1 uses plural form
    - What the implementer needs: Canonical form; mismatch causes PRESET_INVALID_STEP
    - Impact: Validation failures
-   - Suggested fix: Use manifest's `phase-05-api-contracts`
+   - Suggested fix: Use manifest's `api-contracts`
 
-3. **[AMBIGUITY]** — Step name: `phase-06-ui-ux-specification` (task) vs `phase-06-ux-spec` (manifest)
+3. **[AMBIGUITY]** — Step name: `ui-ux-specification` (task) vs `ux-spec` (manifest)
    - What the spec says: manifest-yml-schema.md §8.1 uses shorter form
    - What the implementer needs: Canonical form
    - Impact: Same validation concern
-   - Suggested fix: Use manifest's `phase-06-ux-spec`
+   - Suggested fix: Use manifest's `ux-spec`
 
 ---
 
@@ -1334,8 +1334,8 @@ T-052 (e2e tests) is the weakest at 3/5 — the AI execution boundary in tests i
 1. **[MISSING]** — Same meta-prompt body example gap as T-048
 
 2. **[AMBIGUITY]** — Step name mismatches with manifest
-   - `phase-09-operations-runbook` (task) vs `phase-09-operations` (manifest)
-   - `phase-10-security-review` (task) vs `phase-10-security` (manifest)
+   - `operations-runbook` (task) vs `operations` (manifest)
+   - `security-review` (task) vs `security` (manifest)
    - `developer-onboarding` (task) vs `developer-onboarding-guide` (manifest)
    - Impact: Multiple PRESET_INVALID_STEP validation failures
    - Suggested fix: Align all filenames with manifest-yml-schema.md §8.1

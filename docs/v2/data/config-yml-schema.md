@@ -61,7 +61,7 @@ The following JSON Schema (draft 2020-12) defines the structure that the parsed 
         },
         "steps": {
           "type": "object",
-          "description": "Per-step overrides. Keys are step names (e.g., 'create-prd', 'phase-03-system-architecture'). Steps not listed inherit the methodology preset defaults.",
+          "description": "Per-step overrides. Keys are step names (e.g., 'create-prd', 'system-architecture'). Steps not listed inherit the methodology preset defaults.",
           "additionalProperties": {
             "type": "object",
             "properties": {
@@ -448,10 +448,10 @@ custom:
       enabled: true
     innovate-prd:
       enabled: false
-    phase-03-system-architecture:
+    system-architecture:
       enabled: true
       depth: 2
-    phase-07-implementation-tasks:
+    implementation-tasks:
       enabled: true
       depth: 4
     # Steps not listed inherit defaults from custom-defaults.yml

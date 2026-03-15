@@ -449,8 +449,8 @@ None — this journey is fully specified across all artifacts.
 - **Error path:** Standard init errors — found
 - **Connection to next:** MVP pipeline ready — verified
 
-#### Step 2: User completes 2 MVP steps (create-prd, phase-07-implementation-tasks)
-- **CLI:** `scaffold run create-prd`, `scaffold run phase-07-implementation-tasks` — found
+#### Step 2: User completes 2 MVP steps (create-prd, implementation-tasks)
+- **CLI:** `scaffold run create-prd`, `scaffold run implementation-tasks` — found
 - **Component:** Full run pipeline — found
 - **State:** 2 steps `completed` at depth 1 — found
 - **Config:** methodology: mvp, default_depth: 1 — found

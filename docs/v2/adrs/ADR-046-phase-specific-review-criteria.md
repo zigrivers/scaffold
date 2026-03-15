@@ -32,16 +32,16 @@ Each review phase (1a through 10a) has its **own meta-prompt AND its own knowled
 
 | Review Phase | Meta-Prompt | Knowledge Base Entry |
 |---|---|---|
-| 1a: Domain Modeling Review | `pipeline/phase-01a-review-domain-modeling.md` | `knowledge/review/review-domain-modeling.md` |
-| 2a: ADR Review | `pipeline/phase-02a-review-adrs.md` | `knowledge/review/review-adr.md` |
-| 3a: Architecture Review | `pipeline/phase-03a-review-architecture.md` | `knowledge/review/review-system-architecture.md` |
-| 4a: Database Review | `pipeline/phase-04a-review-database.md` | `knowledge/review/review-database-schema.md` |
-| 5a: API Review | `pipeline/phase-05a-review-api.md` | `knowledge/review/review-api-contracts.md` |
-| 6a: UX Review | `pipeline/phase-06a-review-ux.md` | `knowledge/review/review-ux-spec.md` |
-| 7a: Task Review | `pipeline/phase-07a-review-tasks.md` | `knowledge/review/review-implementation-tasks.md` |
-| 8a: Testing Review | `pipeline/phase-08a-review-testing.md` | `knowledge/review/review-testing-strategy.md` |
-| 9a: Operations Review | `pipeline/phase-09a-review-operations.md` | `knowledge/review/review-operations.md` |
-| 10a: Security Review | `pipeline/phase-10a-review-security.md` | `knowledge/review/review-security.md` |
+| 1a: Domain Modeling Review | `pipeline/modeling/review-domain-modeling.md` | `knowledge/review/review-domain-modeling.md` |
+| 2a: ADR Review | `pipeline/decisions/review-adrs.md` | `knowledge/review/review-adr.md` |
+| 3a: Architecture Review | `pipeline/architecture/review-architecture.md` | `knowledge/review/review-system-architecture.md` |
+| 4a: Database Review | `pipeline/specification/review-database.md` | `knowledge/review/review-database-schema.md` |
+| 5a: API Review | `pipeline/specification/review-api.md` | `knowledge/review/review-api-contracts.md` |
+| 6a: UX Review | `pipeline/specification/review-ux.md` | `knowledge/review/review-ux-spec.md` |
+| 7a: Task Review | `pipeline/planning/review-tasks.md` | `knowledge/review/review-implementation-tasks.md` |
+| 8a: Testing Review | `pipeline/quality/review-testing.md` | `knowledge/review/review-testing-strategy.md` |
+| 9a: Operations Review | `pipeline/quality/review-operations.md` | `knowledge/review/review-operations.md` |
+| 10a: Security Review | `pipeline/quality/review-security.md` | `knowledge/review/review-security.md` |
 
 **Additionally**, a shared `knowledge/review/review-methodology.md` entry encodes the review process itself — how to structure multi-pass reviews, prioritize findings, write fix plans, re-validate after fixes. This is shared process knowledge, not shared review content. Each review meta-prompt references both its artifact-specific review knowledge entry and the shared review methodology entry.
 

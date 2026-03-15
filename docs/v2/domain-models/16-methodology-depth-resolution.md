@@ -753,7 +753,7 @@ Multiple CLI commands query this domain:
 
 ### 5. Conditional step enabled by user override despite no detection signal
 
-**Scenario**: Init wizard did not detect database signals, so `phase-04-database-schema` was disabled. User manually sets `custom.steps.phase-04-database-schema.enabled: true`.
+**Scenario**: Init wizard did not detect database signals, so `database-schema` was disabled. User manually sets `custom.steps.database-schema.enabled: true`.
 **Expected behavior**: Step becomes enabled. Enablement provenance: `custom_override`. The conditional detection result is overridden. The step appears in `scaffold next` when its dependencies are met.
 
 ### 6. Preset file missing or malformed
@@ -869,7 +869,7 @@ Resolve each step:
     conditional: true (if-needed)
     conditionalResolved: false (not yet evaluated by init wizard)
 
-  phase-04-database-schema:
+  database-schema:
     enabled: true (provenance: preset)
     depth: 5 (provenance: preset_default)
     conditional: true (if-needed)
@@ -882,7 +882,7 @@ Result:
   effectiveDefaultDepth: 5
   enabledCount: 32
   disabledCount: 0
-  conditionalCount: 6 (phases 4, 4a, 5, 5a, 6, 6a)
+  conditionalCount: 6 (database-schema, review-database, api-contracts, review-api, ux-spec, review-ux)
 ```
 
 ### Example 2: MVP Methodology
@@ -910,11 +910,11 @@ Resolve each step:
     depth: 1 (provenance: preset_default)
     reason: "Disabled by MVP preset"
 
-  phase-07-implementation-tasks:
+  implementation-tasks:
     enabled: true (provenance: preset)
     depth: 1 (provenance: preset_default)
 
-  phase-08-testing-strategy:
+  testing-strategy:
     enabled: true (provenance: preset)
     depth: 1 (provenance: preset_default)
 
@@ -946,9 +946,9 @@ custom:
       enabled: true
     innovate-prd:
       enabled: false
-    phase-01-domain-modeling:
+    domain-modeling:
       depth: 5
-    phase-04-database-schema:
+    database-schema:
       enabled: true
 ```
 
@@ -972,17 +972,17 @@ Apply custom overrides:
     depth: 3 (provenance: custom_default)
     reason: "Disabled by custom configuration"
 
-  phase-01-domain-modeling:
+  domain-modeling:
     enabled: true (provenance: preset — not overridden)
     depth: 5 (provenance: step_override — per-step depth)
 
-  phase-04-database-schema:
+  database-schema:
     enabled: true (provenance: custom_override — user override)
     depth: 3 (provenance: custom_default)
     conditional: true (if-needed)
     conditionalResolved: true (overridden by custom_override)
 
-  phase-02-adrs:
+  adrs:
     enabled: true (provenance: preset — not listed in custom.steps)
     depth: 3 (provenance: custom_default)
 

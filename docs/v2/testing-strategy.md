@@ -646,8 +646,8 @@ describe('scaffold run exit codes', () => {
   });
 
   it('exits 2 when dependency is not met', async () => {
-    const result = await runCommand(['run', 'phase-03-system-architecture', '--auto'], { cwd: project });
-    // phase-03 depends on phase-02, which is not completed
+    const result = await runCommand(['run', 'system-architecture', '--auto'], { cwd: project });
+    // system-architecture depends on adrs, which is not completed
     expect(result.exitCode).toBe(2);
   });
 

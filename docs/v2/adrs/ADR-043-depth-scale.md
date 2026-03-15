@@ -48,7 +48,7 @@ custom:
     create-prd:
       enabled: true
       depth: 4
-    phase-03-system-architecture:
+    system-architecture:
       enabled: true
       depth: 2
 ```
