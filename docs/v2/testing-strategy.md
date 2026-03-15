@@ -927,6 +927,7 @@ If a Homebrew tap is maintained:
 - E2E test suite
 - Coverage threshold enforcement (fail if below targets in Section 9, via vitest `coverage.thresholds`)
 - `npm audit --audit-level=high` — dependency vulnerability scanning (fail on high/critical)
+- Architectural constraint verification (NF-012, NF-013): `scripts/check-no-credentials.sh` and `scripts/check-no-network.sh` — see security-practices.md §8
 - No performance benchmarks in CI (environment-dependent timing). **Phase 7+ addition**: after the test suite stabilizes, add a CI step that runs `npm run test:bench` and parses vitest benchmark JSON output against hardcoded p95 thresholds. Vitest benchmark mode does not support threshold assertions natively — the CI script reads the JSON output and fails if any p95 exceeds its budget from Section 8.
 
 If the CI pipeline exceeds the 3-minute budget, investigate before adding parallelization — the budget is a gate, not an aspiration.

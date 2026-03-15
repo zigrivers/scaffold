@@ -360,7 +360,52 @@ Verify before every release: `npm pack --dry-run` lists exactly what will be pub
 
 ---
 
-## 8. Security Review Checklist for Contributors
+## 8. Architectural Constraint Enforcement
+
+Two PRD constraints (NF-012, NF-013) are enforced by design but benefit from automated verification to catch accidental violations during development.
+
+### NF-012: No Credential Storage
+
+Scaffold must never store credentials, API keys, or secrets. This is an architectural constraint — no module should write to common credential paths or handle secret material.
+
+**CI enforcement**: A lightweight shell script (`scripts/check-no-credentials.sh`) or ESLint rule that scans `src/` for patterns indicating credential handling:
+
+```bash
+# Fail if any source file references credential-related paths or APIs
+grep -rn --include='*.ts' \
+  -e 'credentials' -e 'apiKey' -e 'api_key' -e 'secret' \
+  -e '\.env' -e 'dotenv' -e 'keychain' -e 'keytar' \
+  src/ && echo "FAIL: Credential-related code found in src/" && exit 1 || exit 0
+```
+
+**Exceptions**: The word "credential" appearing in error messages, comments, or documentation strings is acceptable. The grep pattern should be tuned to minimize false positives — flag only imports, variable declarations, and function calls.
+
+### NF-013: No Network Access (Except `scaffold update`)
+
+Scaffold must not make network requests except in the `scaffold update` command. This prevents telemetry, phone-home behavior, and accidental external dependencies.
+
+**CI enforcement**: A shell script (`scripts/check-no-network.sh`) that scans for network imports outside the update command:
+
+```bash
+# Allowed: src/cli/commands/update.ts may use network APIs
+# Forbidden: all other src/ files
+grep -rn --include='*.ts' \
+  -e "from 'http'" -e "from 'https'" -e "from 'net'" \
+  -e "from 'node:http'" -e "from 'node:https'" -e "from 'node:net'" \
+  -e 'require.*http' -e 'require.*https' -e 'require.*net' \
+  -e 'globalThis.fetch' -e 'global.fetch' \
+  --exclude='update.ts' \
+  src/ && echo "FAIL: Network imports found outside update command" && exit 1 || exit 0
+```
+
+**Implementation notes**:
+- These scripts run in CI alongside lint and test (< 1s each).
+- False positives from string literals or comments can be excluded with `--exclude` patterns or `# no-network-check` inline comments.
+- If ESLint custom rules are preferred over shell scripts, use `no-restricted-imports` with the same patterns.
+
+---
+
+## 9. Security Review Checklist for Contributors
 
 Before submitting a PR, review these questions for any new or modified feature:
 
