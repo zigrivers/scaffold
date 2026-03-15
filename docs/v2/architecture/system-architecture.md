@@ -216,12 +216,12 @@ graph TB
 | Assembly Engine | Config Loader, Frontmatter Parser, Dependency Resolver, Methodology & Depth Resolver | CLI Shell (`run`) | — |
 | Methodology & Depth Resolver | Config Loader | Assembly Engine, Validator, CLI Shell (`build`) | — |
 | Dependency Resolver | (receives meta-prompt frontmatter in-memory) | Assembly Engine, Validator, State Manager (for eligibility) | — |
-| State Manager | Lock Manager, Frontmatter Parser (for `produces` fields) | CLI Shell (`run`, `next`, `status`, `skip`, `reset`), Dashboard Generator | `.scaffold/state.json` |
+| State Manager | Lock Manager, Frontmatter Parser (for `outputs` fields) | CLI Shell (`run`, `next`, `status`, `skip`, `reset`), Dashboard Generator | `.scaffold/state.json` |
 | Lock Manager | — | State Manager (acquires before mutation), CLI Shell (`run`) | `.scaffold/lock.json` |
 | Decision Logger | — | CLI Shell (`run`, post-completion hook) | `.scaffold/decisions.jsonl` |
 | CLAUDE.md Manager | — | CLI Shell (`run`, post-completion hook) | `CLAUDE.md` |
 | Frontmatter Parser | — | Assembly Engine, State Manager, Project Detector, Config Loader, Validator | — (stateless) |
-| Project Detector | Frontmatter Parser (for `produces` field matching) | Init Wizard, CLI Shell (`adopt`) | — |
+| Project Detector | Frontmatter Parser (for `outputs` field matching) | Init Wizard, CLI Shell (`adopt`) | — |
 | Init Wizard | Project Detector, Config Loader (for validation) | CLI Shell (`init`) | `.scaffold/config.yml` |
 | Dashboard Generator | State Manager, Config Loader | CLI Shell (`dashboard`) | — |
 | Validator | Config Loader, Dependency Resolver, Frontmatter Parser | CLI Shell (`validate`) | — (read-only) |
@@ -249,8 +249,7 @@ src/
 │   │   ├── decisions.ts              # scaffold decisions — query decision log
 │   │   ├── dashboard.ts              # scaffold dashboard — generate HTML dashboard
 │   │   ├── list.ts                   # scaffold list — show methodologies and mixins
-│   │   ├── info.ts                   # scaffold info — show current project config
-│   │   ├── info.ts                   # scaffold info <step> — show step details
+│   │   ├── info.ts                   # scaffold info [<step>] — show project config or step details
 │   │   ├── version.ts               # scaffold version — show installed version
 │   │   └── update.ts                # scaffold update — update to latest version
 │   ├── output/                       # Output mode implementations (Strategy pattern)
@@ -338,7 +337,7 @@ src/
 - **One directory per domain cluster** — `core/` groups the assembly engine and dependency resolution; `state/` groups the three runtime state components; `project/` groups detection and management services.
 - **One file per component** where practical — avoids mega-files while keeping related logic co-located.
 - **Types are centralized** in `src/types/` — all TypeScript interfaces from domain model Section 3 entities live here. One file per domain's type surface.
-- **No barrel/index files** — every import uses a direct path (e.g., `import { resolve } from '../core/resolver/resolver'`). This follows the v1 coding convention (no barrel files) and avoids circular dependency issues.
+- **No barrel/index files** — every import uses a direct path (e.g., `import { resolve } from '../core/resolver/resolver'`). This follows the v1 coding convention (no barrel files) and avoids circular dependency issues. **Exception**: `src/types/index.ts` re-exports all shared type definitions. Types are imported frequently across every module, and direct path imports for 14 type files would add friction without benefit. This is the sole barrel file in the codebase.
 - **Utils are minimal** — only truly shared, stateless functions. If a function is used by only one module, it stays in that module.
 
 ### Section 3b: Domain-to-Module Mapping
@@ -346,7 +345,7 @@ src/
 | Domain | Module(s) | Primary File(s) | Types File | Estimated Complexity |
 |--------|----------|-----------------|------------|---------------------|
 | 15 — Assembly Engine | `src/core/assembly/` | `engine.ts`, `meta-prompt-loader.ts`, `knowledge-loader.ts`, `context-gatherer.ts`, `instruction-loader.ts`, `depth-resolver.ts` | `src/types/assembly.ts` | Medium — 9-step assembly sequence, 7-section prompt construction from meta-prompts + knowledge + context + instructions |
-| 16 — Methodology & Depth Resolution | `src/core/assembly/` | `depth-resolver.ts`, `methodology-resolver.ts` | `src/types/assembly.ts` | Medium — 3-level depth precedence, step enablement, methodology change detection |
+| 16 — Methodology & Depth Resolution | `src/core/assembly/` | `depth-resolver.ts`, `methodology-resolver.ts` | `src/types/assembly.ts` | Medium — 4-level depth precedence (CLI flag > custom per-step override > preset default_depth > built-in fallback of 3), step enablement, methodology change detection |
 | 02 — Dependency Resolution | `src/core/dependency/` | `dependency.ts`, `graph.ts`, `eligibility.ts` | `src/types/dependency.ts` | Medium — Kahn's algorithm + cycle detection |
 | 03 — Pipeline State Machine | `src/state/` | `state-manager.ts`, `context.ts`, `completion.ts` | `src/types/state.ts` | High — state transitions, crash recovery, dual detection |
 | 06 — Config & Validation | `src/config/`, `src/validation/` | `loader.ts`, `schema.ts`, `migration.ts`, `*-validator.ts` | `src/types/config.ts` | Medium — schema validation + migration + fuzzy matching |
@@ -364,7 +363,7 @@ src/
 - Domain 03 session context assembly lives in `src/state/context.ts`, separate from `state-manager.ts` because it is a read-only aggregation concern — it reads `state.json`, `decisions.jsonl`, and predecessor artifacts to produce the run bootstrap summary — whereas `state-manager.ts` handles state mutations.
 - Domain 06 validation logic is split across `src/config/` (config loading and migration) and `src/validation/` (cross-cutting validation). The `scaffold validate` CLI command (`src/cli/commands/validate.ts`) delegates to `src/validation/index.ts`, which orchestrates all validators. Config-level validation during `scaffold run` uses `src/config/loader.ts` directly.
 - The Validator component spans multiple domains — it orchestrates validation calls via `src/validation/index.ts`, which composes config, meta-prompt, frontmatter, artifact, and state validators. The `scaffold validate` command handler (`src/cli/commands/validate.ts`) invokes this orchestrator.
-- Domain 16 (Methodology & Depth Resolution) shares `src/core/assembly/` with Domain 15. `depth-resolver.ts` handles the three-level depth precedence; `methodology-resolver.ts` handles step enablement and methodology change detection. Both are consumed by the assembly engine during step 6 of the 9-step sequence.
+- Domain 16 (Methodology & Depth Resolution) shares `src/core/assembly/` with Domain 15. `depth-resolver.ts` handles the four-level depth precedence; `methodology-resolver.ts` handles step enablement and methodology change detection. Both are consumed by the assembly engine during step 6 of the 9-step sequence.
 - Dashboard Generator has no dedicated domain model; it lives in `src/dashboard/generator.ts` as a utility that reads state and config.
 
 ### Section 3c: Content Directory Structure
@@ -392,67 +391,29 @@ content/
 │   ├── user-stories-multi-model-review.md  # Story coverage review (optional: requires multi-model-cli)
 │   └── platform-parity-review.md     # Platform coverage audit (optional: requires multi-platform)
 │
-├── methodologies/                    # One directory per methodology
-│   ├── classic/                      # Full pipeline — parallel agents, Beads, comprehensive docs
-│   │   ├── manifest.yml              # Phases, prompt ordering, dependencies, axis config
-│   │   ├── overrides/                # Prompts that replace base prompts for this methodology
-│   │   │   └── implementation-plan.md  # Beads-integrated task graph version
-│   │   └── extensions/               # Prompts added by this methodology (no base equivalent)
-│   │       ├── beads-setup.md        # Beads task tracker initialization
-│   │       ├── implementation-plan-review.md  # Task quality gate
-│   │       ├── claude-md-optimization.md      # CLAUDE.md consolidation
-│   │       ├── workflow-audit.md     # Cross-document consistency verification
-│   │       ├── single-agent-start.md # Single-agent TDD execution loop
-│   │       ├── single-agent-resume.md  # Single-agent session recovery
-│   │       ├── multi-agent-start.md  # Multi-agent parallel execution
-│   │       ├── multi-agent-resume.md # Multi-agent session recovery
-│   │       ├── new-enhancement.md    # Add feature to existing project
-│   │       ├── quick-task.md         # Focused bug fix / small improvement
-│   │       └── implementation-plan-multi-model-review.md  # Task review via Codex/Gemini
-│   │
-│   └── classic-lite/                 # Streamlined pipeline — fewer phases, lighter process
-│       ├── manifest.yml
-│       ├── overrides/
-│       │   └── implementation-plan.md
-│       └── extensions/
-│           └── simple-tracking.md    # Lightweight task tracking setup
-│
-├── mixins/                           # Mixin content by axis — injected at build time
-│   ├── task-tracking/                # Task tracker integration
-│   │   ├── beads.md                  # Beads CLI setup, bd commands, task lifecycle
-│   │   ├── github-issues.md          # GitHub Issues integration, gh commands
-│   │   └── none.md                   # Manual tracking guidance (TODO.md)
-│   ├── tdd/                          # Test-driven development strictness
-│   │   ├── strict.md                 # Test-first always, no exceptions
-│   │   └── relaxed.md               # Tests encouraged for critical paths
-│   ├── git-workflow/                 # Git branching and merge strategy
-│   │   ├── full-pr.md               # Branches, PR review, squash merge
-│   │   └── simple.md                # Commit to main, lightweight
-│   ├── agent-mode/                   # Agent execution model
-│   │   ├── multi.md                  # Parallel worktrees, BD_ACTOR, task claiming
-│   │   ├── single.md                # Single agent loop
-│   │   └── manual.md                # Human-driven, no agent loop
-│   └── interaction-style/            # How prompts interact with the user
-│       ├── claude-code.md            # AskUserQuestionTool, subagent delegation
-│       ├── codex.md                  # Autonomous decisions, NEEDS_USER_REVIEW tagging
-│       └── universal.md             # Present numbered options as text
+├── methodology/                      # Methodology preset YAML files (ADR-043)
+│   ├── deep.yml                      # Deep Domain Modeling — all 32 steps enabled, default_depth: 5
+│   ├── mvp.yml                       # MVP — 4 core steps enabled, default_depth: 1
+│   └── custom-defaults.yml           # Custom — all steps enabled, default_depth: 3, user overrides via config.yml
 │
 └── adapters/                         # Adapter-specific assets
     ├── claude-code/                  # Claude Code adapter resources
     │   └── frontmatter-template.yml  # Default YAML frontmatter fields
     ├── codex/                        # Codex adapter resources
-    │   └── tool-map.yml              # Phrase-level tool-name mapping patterns
+    │   └── tool-map.yml              # Adapter-specific tool name conventions
     └── universal/                    # Universal adapter resources
         └── pipeline-template.md      # Template for scaffold-pipeline.md reference doc
 ```
 
 **Content directory conventions:**
 
-> **Architecture note:** The meta-prompt architecture ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)) transformed the content structure. The `base/` directory now contains **meta-prompts** (compact intent declarations with frontmatter) rather than fully-assembled prompts. The `mixins/` directory is retained for backward-compatible reference but mixin injection at build time is superseded — methodology-specific content is now expressed through depth scaling in meta-prompt frontmatter. The `knowledge/` directory (not shown above) contains domain expertise files loaded by the assembly engine at runtime.
+> **Architecture note:** The meta-prompt architecture ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)) transformed the content structure. The `base/` directory contains **meta-prompts** (compact intent declarations with frontmatter) rather than fully-assembled prompts. The `methodology/` directory contains flat YAML preset files per [ADR-043](../adrs/ADR-043-depth-scale.md) — not manifest.yml with overrides/extensions subdirectories. The `knowledge/` directory (not shown above) contains domain expertise files loaded by the assembly engine at runtime. Methodology-specific content is expressed through depth scaling in meta-prompt frontmatter, not through mixin injection.
 
-- Every `.md` file in `base/` and methodology subdirectories has YAML frontmatter conforming to the Meta-Prompt Frontmatter Schema ([domain 08](../domain-models/08-prompt-frontmatter.md), [ADR-045](../adrs/ADR-045-assembled-prompt-structure.md)).
-- Methodology presets define which steps are active and at what depth level ([ADR-043](../adrs/ADR-043-depth-scale.md)).
+- Every `.md` file in `base/` has YAML frontmatter conforming to the Meta-Prompt Frontmatter Schema ([domain 08](../domain-models/08-prompt-frontmatter.md), [ADR-045](../adrs/ADR-045-assembled-prompt-structure.md)).
+- Methodology presets (`methodology/*.yml`) define which steps are active and at what depth level ([ADR-043](../adrs/ADR-043-depth-scale.md)). Each preset is a flat YAML file with `name`, `description`, `default_depth` (1-5), and a `steps` map.
 - Optional steps in methodology presets declare their `requires` condition (e.g., `optional: { requires: frontend }`). The condition is evaluated against `config.yml`'s `project` section during step resolution.
+
+**Content-to-package mapping:** The `content/` source directory maps to the npm package as follows: `content/base/` → `pipeline/`, `knowledge/` → `knowledge/`, `content/methodology/` → `methodology/`. See operations-runbook.md §4.4 for the packaged directory listing.
 
 ---
 
@@ -462,7 +423,7 @@ Three critical data paths collectively exercise every component in the system. T
 
 ### Section 4a: Build Pipeline (`scaffold build`)
 
-> **Architecture note:** The meta-prompt architecture ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)) replaced the original build-time resolution and mixin injection pipeline. `scaffold build` no longer resolves prompts, injects mixins, or produces fully-assembled prompt content. That work happens at runtime via the assembly engine (`scaffold run` — see Section 4b). `scaffold build` now generates thin platform command wrappers — files that invoke `scaffold run <step>` — from meta-prompt metadata (frontmatter fields like `description`, `phase`, `depends-on`, `produces`).
+> **Architecture note:** The meta-prompt architecture ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)) replaced the original build-time resolution and mixin injection pipeline. `scaffold build` no longer resolves prompts, injects mixins, or produces fully-assembled prompt content. That work happens at runtime via the assembly engine (`scaffold run` — see Section 4b). `scaffold build` now generates thin platform command wrappers — files that invoke `scaffold run <step>` — from meta-prompt metadata (frontmatter fields like `description`, `phase`, `depends-on`, `outputs`).
 
 The deterministic transformation from `config.yml` + meta-prompt metadata to platform-specific wrapper files. This is a lightweight text transformation exercising 6 components.
 
@@ -487,7 +448,7 @@ flowchart TD
 | Step | Component | Reads | Writes | ADR(s) | Error Conditions |
 |------|-----------|-------|--------|--------|------------------|
 | Validate config | Config Loader | `.scaffold/config.yml` | — | [ADR-014](../adrs/ADR-014-config-schema-versioning.md), [ADR-033](../adrs/ADR-033-forward-compatibility-unknown-fields.md) | `CONFIG_PARSE_ERROR`, `CONFIG_UNKNOWN_FIELD` → exit 1 |
-| Scan meta-prompts | Frontmatter Parser | `pipeline/*.md` (frontmatter only — description, phase, depends-on, produces, optional) | — | [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md), [ADR-045](../adrs/ADR-045-assembled-prompt-structure.md) | Missing or invalid frontmatter → exit 1 |
+| Scan meta-prompts | Frontmatter Parser | `pipeline/*.md` (frontmatter only — description, phase, depends-on, outputs, optional) | — | [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md), [ADR-045](../adrs/ADR-045-assembled-prompt-structure.md) | Missing or invalid frontmatter → exit 1 |
 | Resolve methodology | Methodology Resolver | Methodology preset config, custom overrides | — | [ADR-043](../adrs/ADR-043-depth-scale.md) | Invalid methodology → exit 1 |
 | Filter optionals | Methodology Resolver | — (config `project` traits in memory) | — | [ADR-020](../adrs/ADR-020-skip-vs-exclude-semantics.md) | Invalid trait reference → exit 1 |
 | Kahn's sort | Dependency Resolver | — (in-memory frontmatter dependencies) | — | [ADR-009](../adrs/ADR-009-kahns-algorithm-dependency-resolution.md), [ADR-011](../adrs/ADR-011-depends-on-union-semantics.md) | `DEP_CYCLE_DETECTED` → exit 1 |
@@ -551,7 +512,7 @@ flowchart TD
     T -->|"yes"| V
     R --> V["Target prompt selected"]
 
-    V --> W["Check predecessor<br/>produces artifacts<br/>(State Manager)"]
+    V --> W["Check predecessor<br/>outputs artifacts<br/>(State Manager)"]
     W --> X{"Prerequisites<br/>met?"}
     X -->|"met"| Z
     X -->|"missing, interactive"| Y["Offer: run prereq /<br/>proceed / cancel"]
@@ -559,7 +520,7 @@ flowchart TD
     Y -->|"cancel"| ERR4["Exit 4:<br/>USER_CANCEL"]
     Y -->|"proceed"| Z
 
-    Z["Set in_progress<br/>(State Manager)"] --> AA["Assemble session context:<br/>progress, decisions, reads<br/>(Session Context Assembler<br/>src/state/context.ts)"]
+    Z["Set in_progress<br/>(State Manager)"] --> AA["Assemble session context:<br/>progress, decisions, predecessor outputs<br/>(Session Context Assembler<br/>src/state/context.ts)"]
     AA --> AB["OUTPUT: prompt content<br/>for agent execution"]
     AB --> AC["Agent executes prompt<br/>(outside scaffold)"]
 
@@ -581,11 +542,11 @@ flowchart TD
 | Read config | Config Loader | `.scaffold/config.yml` | — | [ADR-014](../adrs/ADR-014-config-schema-versioning.md) | `CONFIG_*` → exit 1 |
 | Read state | State Manager | `.scaffold/state.json` | — | [ADR-012](../adrs/ADR-012-state-file-design.md) | `STATE_CORRUPT` → exit 3 |
 | Crash check | State Manager | Artifact files on disk | `.scaffold/state.json` (if auto-marking) | [ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md) | — |
-| Compute eligible | Dependency Resolver | Methodology `manifest.yml`, prompt frontmatter | — | [ADR-009](../adrs/ADR-009-kahns-algorithm-dependency-resolution.md), [ADR-021](../adrs/ADR-021-sequential-prompt-execution.md) | — |
+| Compute eligible | Dependency Resolver | Methodology preset config, prompt frontmatter | — | [ADR-009](../adrs/ADR-009-kahns-algorithm-dependency-resolution.md), [ADR-021](../adrs/ADR-021-sequential-prompt-execution.md) | — |
 | `--from` validation | CLI Shell | — | — | [ADR-034](../adrs/ADR-034-rerun-no-cascade.md) | Prompt slug not found → exit 1 |
-| Prerequisite check | State Manager | Predecessor `produces` artifacts | — | [ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md) | Missing artifacts → exit 2 in `--auto` |
+| Prerequisite check | State Manager | Predecessor `outputs` artifacts | — | [ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md) | Missing artifacts → exit 2 in `--auto` |
 | Set in_progress | State Manager | — | `.scaffold/state.json` (atomic) | [ADR-012](../adrs/ADR-012-state-file-design.md), [ADR-021](../adrs/ADR-021-sequential-prompt-execution.md) | — |
-| Session context | State Manager | `.scaffold/decisions.jsonl`, `reads` artifacts | — | — | Missing reads → warning |
+| Session context | State Manager | `.scaffold/decisions.jsonl`, predecessor `outputs` artifacts | — | — | Missing predecessor outputs → warning |
 | Mark completed | State Manager | Artifact files on disk | `.scaffold/state.json` (atomic) | [ADR-012](../adrs/ADR-012-state-file-design.md), [ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md) | — |
 | Append decisions | Decision Logger | — | `.scaffold/decisions.jsonl` (append) | [ADR-013](../adrs/ADR-013-decision-log-jsonl-format.md) | — |
 | Fill CLAUDE.md | CLAUDE.md Manager | `CLAUDE.md` | `CLAUDE.md` | [ADR-026](../adrs/ADR-026-claude-md-section-registry.md) | — |
@@ -593,7 +554,7 @@ flowchart TD
 
 **Walkthrough — non-obvious behaviors:**
 
-**Crash recovery decision matrix.** When `in_progress` is non-null on `scaffold run`, the State Manager checks the in-progress prompt's `produces` artifacts against the file system ([ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md)). The full decision space:
+**Crash recovery decision matrix.** When `in_progress` is non-null on `scaffold run`, the State Manager checks the in-progress prompt's `outputs` artifacts against the file system ([ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md)). The full decision space:
 
 | `in_progress` | Artifacts Present | Action |
 |---------------|-------------------|--------|
@@ -664,7 +625,7 @@ flowchart TD
 | Check existing | CLI Shell | `.scaffold/` directory | — | [ADR-027](../adrs/ADR-027-init-wizard-smart-suggestion.md) | `INIT_SCAFFOLD_EXISTS` → exit 1 |
 | V1 detection | Project Detector | Project files for tracking comments (`docs/plan.md`, etc.) | — | [ADR-028](../adrs/ADR-028-detection-priority.md), [ADR-017](../adrs/ADR-017-tracking-comments-artifact-provenance.md) | — |
 | Brownfield detection | Project Detector | `package.json`, `pyproject.toml`, `go.mod`, `src/`, `lib/` | — | [ADR-028](../adrs/ADR-028-detection-priority.md) | — |
-| V1 artifact mapping | Project Detector | V1 artifact files, prompt `produces` frontmatter (via Frontmatter Parser) | — | [ADR-028](../adrs/ADR-028-detection-priority.md) | Ambiguous mapping → warning |
+| V1 artifact mapping | Project Detector | V1 artifact files, prompt `outputs` frontmatter (via Frontmatter Parser) | — | [ADR-028](../adrs/ADR-028-detection-priority.md) | Ambiguous mapping → warning |
 | Idea analysis | Init Wizard | User-provided idea text | — | [ADR-027](../adrs/ADR-027-init-wizard-smart-suggestion.md) | — |
 | File signals | Init Wizard | `package.json`, framework configs, `bin/`, `.github/` | — | [ADR-027](../adrs/ADR-027-init-wizard-smart-suggestion.md) | — |
 | Wizard questions | Init Wizard | (interactive input or `--auto` defaults) | — | [ADR-027](../adrs/ADR-027-init-wizard-smart-suggestion.md), [ADR-004](../adrs/ADR-004-methodology-as-top-level-organizer.md) | No platforms selected → exit 1 |
@@ -679,9 +640,9 @@ flowchart TD
 
 **Detection priority: v1 > brownfield > greenfield.** The Project Detector checks for v1 Scaffold artifacts first because a v1 project is also technically a brownfield project (it has existing code and dependencies). If v1 tracking comments are found (`<!-- scaffold:<name> v<N> <date> -->`), the v1 migration path takes priority over brownfield detection. If no v1 artifacts exist but the project has both a package manifest with dependencies *and* a source directory (`src/` or `lib/`), it qualifies as brownfield. Otherwise, it defaults to greenfield ([ADR-028](../adrs/ADR-028-detection-priority.md)). In `--auto` mode, v1 detection requires actual tracking comment presence — the mere existence of `.beads/` is not sufficient.
 
-**Wizard question adaptation.** The wizard adapts questions based on both detection results and prior answers. If brownfield detection found React in `package.json`, the methodology suggestion highlights `classic` with high confidence and pre-selects `web` as a platform. If the user selects `agent-mode: manual`, the wizard skips worktree-related questions since they only apply to multi-agent setups. Smart suggestions from idea text analysis are overridden by file signal analysis when they conflict — concrete evidence from the file system outweighs aspirational language in the idea text ([ADR-027](../adrs/ADR-027-init-wizard-smart-suggestion.md)).
+**Wizard question adaptation.** The wizard adapts questions based on both detection results and prior answers. If brownfield detection found React in `package.json`, the methodology suggestion highlights `deep` with high confidence and pre-selects `web` as a platform. If the user selects `agent-mode: manual`, the wizard skips worktree-related questions since they only apply to multi-agent setups. Smart suggestions from idea text analysis are overridden by file signal analysis when they conflict — concrete evidence from the file system outweighs aspirational language in the idea text ([ADR-027](../adrs/ADR-027-init-wizard-smart-suggestion.md)).
 
-**V1 migration state initialization.** For v1 projects, the State Manager pre-completes prompts whose `produces` artifacts already exist and pass verification. A v1 project that has already created `docs/plan.md`, `docs/tech-stack.md`, and `docs/coding-standards.md` will see those corresponding prompts marked `completed` in `state.json` after init. The user can then `scaffold run` to continue from where v1 left off, running only prompts whose artifacts don't yet exist.
+**V1 migration state initialization.** For v1 projects, the State Manager pre-completes prompts whose `outputs` artifacts already exist and pass verification. A v1 project that has already created `docs/plan.md`, `docs/tech-stack.md`, and `docs/coding-standards.md` will see those corresponding prompts marked `completed` in `state.json` after init. The user can then `scaffold run` to continue from where v1 left off, running only prompts whose artifacts don't yet exist.
 
 **Init-to-build handoff.** After writing config, state, and decisions files, `scaffold init` automatically invokes the full build pipeline (Section 4a). The user gets both configuration *and* platform-specific output files in a single command ([ADR-027](../adrs/ADR-027-init-wizard-smart-suggestion.md)). If the build fails (e.g., manifest references a missing file), the config and state files have already been written — the user can fix the issue and run `scaffold build` manually.
 
@@ -727,13 +688,13 @@ Scaffold v2 manages all state through the file system — there are no databases
 | File | Purpose | Written By | Read By | Git Status | Write Strategy | ADR |
 |------|---------|-----------|---------|------------|---------------|-----|
 | `.scaffold/config.yml` | Build configuration — methodology, depth, platforms, project metadata | Init Wizard | Run, validate, status, all commands | Committed | Full rewrite | [ADR-014](../adrs/ADR-014-config-schema-versioning.md) |
-| `.scaffold/state.json` | Pipeline progress — per-prompt status, in_progress tracking, next_eligible cache | State Manager | Resume, status, next, skip, dashboard, validate | Committed | Atomic (temp + `fs.rename()`) | [ADR-012](../adrs/ADR-012-state-file-design.md) |
-| `.scaffold/decisions.jsonl` | Key decisions — technology, architecture, process choices across sessions | Decision Logger (CLI-gated) | Resume (session bootstrap context), downstream prompts | Committed | Append (single-line JSON < 4KB) | [ADR-013](../adrs/ADR-013-decision-log-jsonl-format.md) |
-| `.scaffold/lock.json` | Execution lock — prevents concurrent write operations on same machine | Lock Manager | Resume, skip, init, reset (before acquiring) | Gitignored | Full rewrite (`wx` flag), delete on release | [ADR-019](../adrs/ADR-019-advisory-locking.md) |
+| `.scaffold/state.json` | Pipeline progress — per-prompt status, in_progress tracking, next_eligible cache | State Manager | Run, status, next, skip, dashboard, validate | Committed | Atomic (temp + `fs.rename()`) | [ADR-012](../adrs/ADR-012-state-file-design.md) |
+| `.scaffold/decisions.jsonl` | Key decisions — technology, architecture, process choices across sessions | Decision Logger (CLI-gated) | Run (session bootstrap context), downstream prompts | Committed | Append (single-line JSON < 4KB) | [ADR-013](../adrs/ADR-013-decision-log-jsonl-format.md) |
+| `.scaffold/lock.json` | Execution lock — prevents concurrent write operations on same machine | Lock Manager | Run, skip, init, reset (before acquiring) | Gitignored | Full rewrite (`wx` flag), delete on release | [ADR-019](../adrs/ADR-019-advisory-locking.md) |
 | `CLAUDE.md` | Agent instructions — reserved sections with scaffold-managed content | CLAUDE.md Manager (run: section fill) | Claude Code agents | Committed | Section replace (find heading → replace managed block) | [ADR-026](../adrs/ADR-026-claude-md-section-registry.md) |
 | `AGENTS.md` | Codex agent instructions | Codex Adapter | Codex agents | Committed | Full rewrite on build | [ADR-022](../adrs/ADR-022-three-platform-adapters.md) |
 | Build outputs (`commands/*.md`, `codex-prompts/*.md`, `prompts/*.md`, `scaffold-pipeline.md`) | Platform-specific wrapper files — deterministic from config + meta-prompt metadata | Platform Adapters (build) | AI agents (invoke `scaffold run`) | Committed | Full rewrite on build | [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md), [ADR-022](../adrs/ADR-022-three-platform-adapters.md) |
-| Produced artifacts (e.g., `docs/plan.md`, `docs/tech-stack.md`) | Documents created by prompt execution — tracked via `produces` in frontmatter | AI agents (outside scaffold) | State Manager (dual completion detection — see Section 4b for the detection algorithm), downstream prompts (via `reads` frontmatter) | Committed | Agent-controlled (scaffold has no visibility into agent writes) | [ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md) |
+| Produced artifacts (e.g., `docs/plan.md`, `docs/tech-stack.md`) | Documents created by prompt execution — tracked via `outputs` in frontmatter | AI agents (outside scaffold) | State Manager (dual completion detection — see Section 4b for the detection algorithm), downstream prompts (via dependency ordering) | Committed | Agent-controlled (scaffold has no visibility into agent writes) | [ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md) |
 
 **Per-file lifecycle details:**
 
@@ -758,9 +719,9 @@ Six file pairs can become inconsistent. For each pair, every known disagreement 
 
 | Disagreement | state.json Says | Disk Says | Resolution |
 |-------------|-----------------|-----------|------------|
-| Normal completion | `completed` | All `produces` files exist | `confirmed_complete` — both agree, no action |
-| Crashed after artifact creation | `in_progress` or `pending` | All `produces` files exist | `likely_complete` — artifact takes precedence; auto-mark completed. Rationale: the artifact is the deliverable; state is bookkeeping. |
-| Artifact deleted after completion | `completed`, `artifacts_verified: true` | One or more `produces` files missing | `conflict` — warn user; offer re-run, continue without, or cancel. In `--auto` mode: re-run. |
+| Normal completion | `completed` | All `outputs` files exist | `confirmed_complete` — both agree, no action |
+| Crashed after artifact creation | `in_progress` or `pending` | All `outputs` files exist | `likely_complete` — artifact takes precedence; auto-mark completed. Rationale: the artifact is the deliverable; state is bookkeeping. |
+| Artifact deleted after completion | `completed`, `artifacts_verified: true` | One or more `outputs` files missing | `conflict` — warn user; offer re-run, continue without, or cancel. In `--auto` mode: re-run. |
 | Zero-byte artifact | `completed` | File exists but is 0 bytes | Counts as "present" for completion detection (existence check only); `scaffold validate` emits `PSM_ZERO_BYTE_ARTIFACT` warning. Content validation is deferred to Completion Criteria ([ADR-029](../adrs/ADR-029-prompt-structure-convention.md)). |
 | Never started | `pending` | No artifacts | `incomplete` — prompt needs to be run. Normal case. |
 
@@ -865,7 +826,7 @@ sequenceDiagram
 **Reset behavior notes:**
 
 - `scaffold reset` deletes `state.json` and `decisions.jsonl` but preserves `config.yml`, `CLAUDE.md`, and all build outputs. The rationale: config represents the user's project choices (methodology, mixins, platforms); resetting pipeline progress should not erase those choices.
-- Produced artifacts (e.g., `docs/plan.md`) are NOT deleted by reset — they are the user's deliverables and may contain valuable work. After reset and re-initialization, prompts whose `produces` artifacts already exist will be detected via dual completion detection and can be marked as completed.
+- Produced artifacts (e.g., `docs/plan.md`) are NOT deleted by reset — they are the user's deliverables and may contain valuable work. After reset and re-initialization, prompts whose `outputs` artifacts already exist will be detected via dual completion detection and can be marked as completed.
 - `lock.json` is never explicitly deleted by reset — if a lock exists during reset, the reset command acquires the lock first (it's a lockable command) and releases it after.
 - Git history preserves all deleted files — `git show HEAD:.scaffold/state.json` recovers the last committed state.
 
@@ -995,7 +956,7 @@ sequenceDiagram
 
     SM->>SM: reads state.json, determines next prompt
     SM->>DR: check predecessor completion
-    DR->>DR: checks predecessor produces artifacts on disk
+    DR->>DR: checks predecessor outputs artifacts on disk
     DR->>CS: throws MissingPrerequisiteError
     Note right of DR: prompt, predecessor, missing_file
     Note over CS: no accumulation -<br/>fail fast on structural error
@@ -1075,7 +1036,7 @@ Each error code appears in the JSON envelope's `errors` array (in `--format json
 | `DEP_CYCLE_DETECTED` | 1 | Circular dependency in prompt graph (Kahn's algorithm cannot complete) |
 | `DEP_TARGET_MISSING` | 2 | `dependsOn` references a slug not in the resolved prompt set |
 | `DEP_SELF_REFERENCE` | 1 | Prompt declares a dependency on itself |
-| `DEPENDENCY_MISSING_ARTIFACT` | 2 | Predecessor prompt's `produces` artifact not found on disk |
+| `DEPENDENCY_MISSING_ARTIFACT` | 2 | Predecessor prompt's `outputs` artifact not found on disk |
 | `DEPENDENCY_UNMET` | 2 | Prompt depends on a prompt that has not been completed or skipped |
 
 **~~Mixin Injector~~ (Domain 12 — superseded by ADR-041):** All `INJ_*` error codes are retired. Mixin injection has been replaced by the assembly engine's runtime prompt construction. The `--allow-unresolved-markers` escape hatch is no longer applicable.
@@ -1124,7 +1085,7 @@ Each error code appears in the JSON envelope's `errors` array (in `--format json
 | `FRONTMATTER_YAML_ERROR` | Malformed YAML between frontmatter delimiters |
 | `FRONTMATTER_DESCRIPTION_MISSING` | Required `description` field absent |
 | `FRONTMATTER_INVALID_FIELD` | Unknown field in frontmatter |
-| `FRONTMATTER_PRODUCES_MISSING` | Built-in prompt has no `produces` field |
+| `FRONTMATTER_OUTPUTS_MISSING` | Built-in prompt has no `outputs` field |
 | `FRONTMATTER_DEPENDS_INVALID_SLUG` | `depends-on` entry is not a valid prompt slug |
 
 **Validator** (cross-cutting) — Exit code 1:
@@ -1344,18 +1305,13 @@ All user-provided extensions are validated at build time (`scaffold build` and `
 │   └── utils/                           Shared utilities (atomic writes, git ops, fuzzy match)
 ├── content/                             Shipped content (NOT compiled — read at runtime)
 │   ├── base/                            Base prompts (shared across methodologies)
-│   ├── methodologies/                   Methodology manifests + overrides + extensions
-│   │   ├── classic/                     Full pipeline methodology
-│   │   └── classic-lite/                Streamlined methodology
-│   ├── mixins/                          Mixin content by axis
-│   │   ├── task-tracking/               beads.md, github-issues.md, none.md
-│   │   ├── tdd/                         strict.md, relaxed.md
-│   │   ├── git-workflow/                full-pr.md, simple.md
-│   │   ├── agent-mode/                  multi.md, single.md, manual.md
-│   │   └── interaction-style/           claude-code.md, codex.md
+│   ├── methodology/                     Methodology preset YAML files (ADR-043)
+│   │   ├── deep.yml                     Deep Domain Modeling preset
+│   │   ├── mvp.yml                      MVP preset
+│   │   └── custom-defaults.yml          Custom preset defaults
 │   └── adapters/
 │       └── codex/
-│           └── tool-map.yml             Phrase-level tool-name mappings
+│           └── tool-map.yml             Adapter-specific tool name conventions
 ├── package.json
 └── README.md
 ```
@@ -1583,12 +1539,10 @@ Naming rules that apply across the system:
 | Entity | Format | Used As | Example |
 |--------|--------|---------|---------|
 | **Prompt names** | kebab-case (`[a-z][a-z0-9-]*`) | `state.json` keys, frontmatter `depends-on` values, manifest dependency keys, CLI `--from` argument | `create-prd`, `tech-stack`, `user-stories-gaps` |
-| **Methodology names** | kebab-case directory names | `config.yml` `methodology` value, `state.json` `methodology` field | `classic`, `classic-lite` |
-| **Mixin axis names** | kebab-case | `config.yml` keys under `mixins`, marker axis references (`<!-- mixin:<axis> -->`) | `task-tracking`, `tdd`, `git-workflow` |
-| **Mixin value names** | kebab-case | `config.yml` values under `mixins`, mixin file basenames (without `.md`) | `beads`, `strict`, `full-pr` |
+| **Methodology names** | kebab-case preset file basenames | `config.yml` `methodology` value, `state.json` `config_methodology` field | `deep`, `mvp`, `custom` |
 | **File extensions** | Standard | File type identification | `.md` for prompts, `.yml` for manifests and config, `.json` for state and lock, `.jsonl` for decision log |
 | **Decision IDs** | `D-NNN` (zero-padded three-digit) | `decisions.jsonl` `id` field, human reference in pipeline reviews | `D-001`, `D-042` |
-| **Tracking comments** | `<!-- scaffold:<prompt-slug> v<N> <date> <methodology> <mixins> -->` | Line 1 of produced artifacts ([ADR-017](../adrs/ADR-017-tracking-comments-artifact-provenance.md)) | `<!-- scaffold:tech-stack v1 2026-03-13 classic tdd:strict/git:full-pr -->` |
+| **Tracking comments** | `<!-- scaffold:<prompt-slug> v<N> <date> <methodology> -->` | Line 1 of produced artifacts ([ADR-017](../adrs/ADR-017-tracking-comments-artifact-provenance.md)) | `<!-- scaffold:tech-stack v1 2026-03-13 deep -->` |
 | ~~**Mixin markers**~~ | ~~`<!-- mixin:<axis> -->`~~ | ~~Superseded by ADR-041 — mixin injection removed~~ | — |
 | ~~**Task verb markers**~~ | ~~`<!-- scaffold:task-<verb> -->`~~ | ~~Superseded by ADR-041 — task verbs removed~~ | — |
 | **Ownership markers** | `<!-- scaffold:managed by <slug> -->` / `<!-- /scaffold:managed -->` | CLAUDE.md section ownership ([ADR-026](../adrs/ADR-026-claude-md-section-registry.md)) | `<!-- scaffold:managed by coding-standards -->` |
