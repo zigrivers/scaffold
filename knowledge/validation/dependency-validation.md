@@ -88,7 +88,7 @@ A cycle means task A depends on B, B depends on C, and C depends on A. No task i
 Every task referenced as a dependency must exist in the task list.
 
 **Process:**
-1. Collect all task IDs from the task breakdown.
+1. Collect all task IDs from the implementation tasks.
 2. Collect all task IDs referenced in dependency declarations.
 3. Any referenced ID not in the task list is an orphaned dependency.
 
@@ -227,7 +227,7 @@ Or as a dependency table:
 
 ## When to Run Dependency Validation
 
-- After the implementation task breakdown is complete.
+- After the implementation tasks are complete.
 - After any task is added, removed, or modified.
 - Before starting implementation — the dependency graph is the work scheduler.
 - When agents report being blocked — verify the blockage is real and not a missing dependency resolution.

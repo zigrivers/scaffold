@@ -6,7 +6,7 @@ topics: [review, security, owasp, auth, threat-modeling]
 
 # Review: Security
 
-The security review document assesses the system's security posture across authentication, authorization, data protection, and vulnerability management. It must address the OWASP top 10 for the project's technology stack, align security boundaries with API contracts and architecture, and ensure secrets management and dependency auditing are actionable. This review uses 7 passes targeting the specific ways security documentation fails.
+The security review document assesses the system's security posture across authentication, authorization, data protection, and vulnerability management. It must address the OWASP top 10 for the project's technology stack, align security boundaries with API contracts and architecture, and ensure secrets management and dependency auditing are actionable. This review uses 7 passes targeting the specific ways security reviewation fails.
 
 Follows the review process defined in `review-methodology.md`.
 
@@ -44,26 +44,26 @@ The OWASP Top 10 represents the most common and impactful web application securi
 
 ### What to Check
 
-Security boundaries (who can access what) align with the API contract's authentication and authorization requirements and the architecture's component boundaries. No access control gaps exist between what the security document specifies and what the API contract enforces.
+Security boundaries (who can access what) align with the API contract's authentication and authorization requirements and the architecture's component boundaries. No access control gaps exist between what the security review specifies and what the API contract enforces.
 
 ### Why This Matters
 
-Security boundaries that do not match API contracts mean either the API has endpoints with weaker access control than the security review intends, or the security review assumes protections that the API does not implement. Either way, the gap creates a vulnerability. This pass cross-references the security document with the API contract — it is a consistency check between two artifacts.
+Security boundaries that do not match API contracts mean either the API has endpoints with weaker access control than the security review intends, or the security review assumes protections that the API does not implement. Either way, the gap creates a vulnerability. This pass cross-references the security review with the API contract — it is a consistency check between two artifacts.
 
 ### How to Check
 
-1. List every security boundary defined in the security document (user roles, permission levels, resource ownership rules, service-to-service trust)
-2. For each API endpoint, verify its auth/authz requirement aligns with the security document's boundary definition
-3. Check for endpoints that the security document does not cover — are they intentionally public or accidentally unprotected?
+1. List every security boundary defined in the security review (user roles, permission levels, resource ownership rules, service-to-service trust)
+2. For each API endpoint, verify its auth/authz requirement aligns with the security review's boundary definition
+3. Check for endpoints that the security review does not cover — are they intentionally public or accidentally unprotected?
 4. Verify that resource-level authorization (user A cannot access user B's data) is specified in both documents consistently
-5. Check that service-to-service authentication matches: does the security document and the architecture agree on how services authenticate to each other?
+5. Check that service-to-service authentication matches: does the security review and the architecture agree on how services authenticate to each other?
 6. Verify that admin/elevated-privilege endpoints have additional protections specified in both documents
 
 ### What a Finding Looks Like
 
 - P0: "Security document defines role-based access with 'admin' and 'user' roles, but API contract endpoint DELETE /users/{id} has no authorization specification. Can a 'user' role delete other users?"
 - P1: "Security document specifies 'users can only access their own orders' but API contract GET /orders does not mention user-scoping. The endpoint may return all orders regardless of the requesting user."
-- P1: "Service-to-service communication is marked as 'internal, trusted' in the security document but the architecture shows services communicating over the public internet without mTLS."
+- P1: "Service-to-service communication is marked as 'internal, trusted' in the security review but the architecture shows services communicating over the public internet without mTLS."
 - P2: "Security document and API contract both specify auth requirements, but they use different terminology ('role: admin' vs. 'permission: manage_users'). Align the language."
 
 ---
@@ -80,7 +80,7 @@ Secrets in code or version control are the most common source of security breach
 
 ### How to Check
 
-1. Verify that the security document explicitly states: no secrets in code or version control
+1. Verify that the security review explicitly states: no secrets in code or version control
 2. Check for a secrets management approach: environment variables, vault (HashiCorp Vault, AWS Secrets Manager, etc.), encrypted configuration
 3. Verify that secrets rotation strategy is documented: how often are secrets rotated? What is the process?
 4. Check for secrets categories: API keys, database credentials, JWT signing keys, encryption keys, service account tokens — is each category addressed?
@@ -90,7 +90,7 @@ Secrets in code or version control are the most common source of security breach
 
 ### What a Finding Looks Like
 
-- P0: "No secrets management strategy exists. The security document does not address how secrets are stored, accessed, or rotated."
+- P0: "No secrets management strategy exists. The security review does not address how secrets are stored, accessed, or rotated."
 - P0: "Security document says 'secrets in environment variables' but does not specify how environment variables are populated in production. If they are in a plain-text config file on the server, that is not secrets management."
 - P1: "Secrets rotation is mentioned as 'periodic' without specifying the rotation period or process. When the JWT signing key is rotated, what happens to existing tokens?"
 - P2: "Local development uses a .env file but no .env.example template exists for new developers. They may create secrets with insecure defaults."
@@ -149,7 +149,7 @@ A threat model that says "attackers may try to compromise the system" is not a t
 
 ### What a Finding Looks Like
 
-- P0: "No threat model exists. The security document discusses mitigations but has not identified what threats those mitigations are defending against."
+- P0: "No threat model exists. The security review discusses mitigations but has not identified what threats those mitigations are defending against."
 - P1: "Threat model covers client-to-server boundary but ignores service-to-service trust boundaries. Internal services communicate without authentication — an attacker who compromises one service has unrestricted access to all others."
 - P1: "Threat model identifies threats but does not map them to mitigations. It is unclear whether identified threats are mitigated, partially mitigated, or accepted risks."
 - P2: "Insider threat is not addressed. What happens if a developer's machine is compromised and their credentials are stolen?"

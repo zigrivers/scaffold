@@ -96,7 +96,7 @@ Gaps take several forms:
 
 **Missing screen** — A step requires a UI screen or component that is not in the UX spec. Example: "User enters shipping address" requires an address form, but the UX spec jumps from cart to payment.
 
-**Missing task** — A step requires implementation work that has no task in the task breakdown.
+**Missing task** — A step requires implementation work that has no task in the implementation tasks.
 
 **Broken connection** — The output of one step does not connect to the input of the next. Example: The registration endpoint returns a session cookie, but the product catalog endpoint expects a Bearer token.
 
@@ -197,7 +197,7 @@ Each gap should be reported with:
 
 ## When to Run Critical Path Analysis
 
-- After all pipeline phases (1-10) are complete.
-- Before implementation task breakdown is finalized (gaps found here may require new tasks).
+- After all pipeline steps (modeling through planning) are complete.
+- Before implementation tasks are finalized (gaps found here may require new tasks).
 - When PRD changes significantly (new features may introduce new critical journeys).
 - As a final check before freezing docs in the finalization phase.

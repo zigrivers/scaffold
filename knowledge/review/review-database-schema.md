@@ -206,7 +206,7 @@ Multi-database architectures often evolve organically, with each database using 
 
 ### What to Check
 
-API contracts (Phase 5) can be built on this schema. The schema provides everything needed to design API endpoints, query patterns, and response shapes.
+The API contracts step can be built on this schema. The schema provides everything needed to design API endpoints, query patterns, and response shapes.
 
 ### Why This Matters
 
@@ -214,7 +214,7 @@ API endpoints translate database operations into client-facing contracts. If the
 
 ### How to Check
 
-Phase 5 (API Contracts) specifically needs:
+The API contracts step specifically needs:
 1. **CRUD operations** are straightforward on the schema — no endpoint requires a 5-table join for a basic read
 2. **List/search queries** have index support for filtering and pagination
 3. **Relationship traversal** is possible: "get order with its line items" does not require multiple disconnected queries

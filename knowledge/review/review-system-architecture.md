@@ -234,7 +234,7 @@ An invariant that requires two components to coordinate atomically cannot be enf
 
 ### What to Check
 
-Phases 4-7 (Database Schema, API Contracts, UX Spec, Implementation Tasks) can proceed with this architecture document.
+Downstream steps (database schema, API contracts, UX spec, implementation tasks) can proceed with this architecture document.
 
 ### Why This Matters
 
@@ -242,31 +242,31 @@ Four phases consume the architecture document simultaneously or in rapid success
 
 ### How to Check
 
-Phase 4 (Database Schema) needs:
+The database schema step needs:
 1. Data storage components identified with their technology and role
 2. Entity-to-storage mapping clear enough to design tables/collections
 3. Data relationships explicit enough to define foreign keys or references
 
-Phase 5 (API Contracts) needs:
+The API contracts step needs:
 1. Component interfaces defined at operation level
 2. Communication protocols specified (REST, GraphQL, gRPC)
 3. Auth/authz architecture clear enough to define per-endpoint requirements
 
-Phase 6 (UX Spec) needs:
+The UX spec step needs:
 1. Frontend component architecture defined
 2. State management approach specified
 3. API integration points identified from the frontend perspective
 
-Phase 7 (Implementation Tasks) needs:
+The implementation tasks step needs:
 1. Module boundaries clear enough to define task scope
 2. Dependencies between modules explicit enough to define task ordering
 3. Component complexity visible enough to estimate task sizing
 
 ### What a Finding Looks Like
 
-- P0: "No data storage architecture section. Phase 4 cannot begin database design without knowing what databases exist and what data each holds."
-- P1: "Frontend architecture section describes 'a React app' without component structure. Phase 6 needs at least a high-level component hierarchy."
-- P2: "Module dependencies are clear but not explicitly listed in a format that Phase 7 can directly use for task dependency ordering."
+- P0: "No data storage architecture section. The database schema step cannot begin database design without knowing what databases exist and what data each holds."
+- P1: "Frontend architecture section describes 'a React app' without component structure. The UX spec step needs at least a high-level component hierarchy."
+- P2: "Module dependencies are clear but not explicitly listed in a format that the implementation tasks step can directly use for task dependency ordering."
 
 ---
 

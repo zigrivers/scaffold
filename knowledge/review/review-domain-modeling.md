@@ -236,7 +236,7 @@ Implicit cross-domain relationships become implicit runtime dependencies. If Dom
 
 ### What to Check
 
-Phase 2 (ADRs) needs specific information from domain models. Verify that information is present and sufficient.
+The ADRs step needs specific information from domain models. Verify that information is present and sufficient.
 
 ### Why This Matters
 
@@ -244,7 +244,7 @@ ADRs make technology and pattern decisions informed by domain complexity. If dom
 
 ### How to Check
 
-Phase 2 specifically needs:
+The ADRs step specifically needs:
 1. **Clear domain boundaries** — To decide on module/service decomposition strategy
 2. **Technology-relevant constraints** — Real-time requirements, data volume projections, consistency requirements that influence technology selection
 3. **Performance-sensitive operations** — Operations with latency, throughput, or data volume requirements that affect architecture decisions
@@ -256,7 +256,7 @@ For each item, verify it is explicitly present in the domain models or can be re
 
 ### What a Finding Looks Like
 
-- P0: "No domain model mentions data volume or throughput characteristics. Phase 2 cannot make database technology decisions without this information."
+- P0: "No domain model mentions data volume or throughput characteristics. The ADRs step cannot make database technology decisions without this information."
 - P1: "Real-time requirements are mentioned in the PRD but not reflected in any domain model's constraints section."
 - P2: "Data storage patterns are implicit (relational structure visible) but not explicitly stated as a constraint or preference."
 

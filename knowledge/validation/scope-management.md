@@ -59,7 +59,7 @@ A requirement starts small in the PRD and grows during documentation. The PRD sa
 - Count the API endpoints per PRD feature. A single feature with 10+ endpoints may indicate inflation.
 - Count the database tables per domain entity. An entity with 5+ tables may indicate over-engineering.
 - Compare the PRD's feature description word count to the architecture's implementation description. If the implementation is 10x longer, scope may have inflated.
-- Check for features that only appear after Phase 3 (architecture) that were not in Phase 1 (domain modeling) or the PRD.
+- Check for features that only appear after the architecture step that were not in the domain modeling step or the PRD.
 
 **What findings look like:**
 - "PRD says 'users can update their profile.' Architecture specifies profile versioning with history, diff view, and rollback capability. This exceeds the PRD requirement."
@@ -161,7 +161,7 @@ For each scope finding, assess the impact of keeping vs removing it:
 **Effort to implement:** ~3 tasks, ~2 days
 **Impact of keeping:** Adds complexity to architecture, requires email service integration, adds operational burden
 **Impact of removing:** Users would not receive email notifications for order updates — but the PRD does not require this
-**Recommendation:** Defer to v2. Remove from architecture and task breakdown.
+**Recommendation:** Defer to v2. Remove from architecture and implementation tasks.
 ```
 
 ## Output Format
@@ -217,7 +217,7 @@ When in doubt, defer. It is always easier to add a feature later than to remove 
 
 ## When to Run Scope Validation
 
-- After all documentation phases are complete, before task breakdown.
-- After task breakdown, before implementation begins.
+- After all documentation phases are complete, before the implementation tasks step.
+- After the implementation tasks step, before implementation begins.
 - When the task list feels "too big" — scope validation often reveals why.
 - When stakeholders ask "why is this taking so long?" — scope validation quantifies the answer.

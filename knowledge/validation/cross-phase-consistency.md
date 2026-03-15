@@ -26,13 +26,13 @@ Trace every named concept through all artifacts where it appears.
 
 **Process:**
 1. Extract all named entities from the domain model (aggregates, entities, value objects, events, invariants).
-2. For each name, search every downstream artifact: ADRs, architecture, schema, API contracts, UX spec, task breakdown.
+2. For each name, search every downstream artifact: ADRs, architecture, schema, API contracts, UX spec, implementation tasks.
 3. Flag any spelling variations, abbreviations, or synonyms (e.g., "User" vs "Account" vs "Member" referring to the same concept).
 4. Flag any name that appears in a downstream artifact but not in the domain model (potential undocumented concept).
 
 **What findings look like:**
 - "Domain model uses `PaymentTransaction` but API contracts call it `Payment` and database schema calls it `payment_txn`."
-- "The entity `SubscriptionPlan` appears in the task breakdown but is not in the domain model."
+- "The entity `SubscriptionPlan` appears in the implementation tasks but is not in the domain model."
 
 **Resolution:** Establish one canonical name per concept. Update all artifacts to use it.
 
@@ -175,7 +175,7 @@ Findings should be structured as:
 1. **Enum drift** — Enum values defined in domain model, schema, API, and UX often diverge. One phase adds a new status value without updating others.
 2. **Optionality mismatch** — Domain model says a field is required, but API contract makes it optional, or vice versa.
 3. **Orphaned events** — Domain events defined but never consumed (or consumed but never published).
-4. **Ghost requirements** — Features appear in UX spec or task breakdown that trace to no PRD requirement.
+4. **Ghost requirements** — Features appear in UX spec or implementation tasks that trace to no PRD requirement.
 5. **Format divergence** — Dates, money, identifiers represented differently across layers without documented transformation rules.
 6. **Soft-delete vs hard-delete** — One phase assumes records are soft-deleted, another assumes they are gone.
 7. **Pagination assumptions** — API paginates but UX assumes all data is available; or API returns all but architecture assumed streaming.

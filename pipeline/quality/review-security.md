@@ -1,6 +1,6 @@
 ---
 name: review-security
-description: Review security document for coverage and correctness
+description: Review security review for coverage and correctness
 phase: "quality"
 order: 24
 dependencies: [security]
@@ -10,13 +10,13 @@ knowledge-base: [review-methodology, review-security]
 ---
 
 ## Purpose
-Review security document targeting security-specific failure modes: OWASP coverage
+Review security review targeting security-specific failure modes: OWASP coverage
 gaps, auth/authz boundary mismatches with API contracts, secrets management gaps,
 insufficient dependency audit coverage, missing threat model scenarios, and data
 classification gaps.
 
 ## Inputs
-- docs/security-review.md (required) — security doc to review
+- docs/security-review.md (required) — security review document
 - docs/api-contracts.md (optional) — for auth boundary alignment
 - docs/system-architecture.md (required) — for attack surface coverage
 
