@@ -2,6 +2,7 @@
 name: user-stories
 description: Translate PRD features into user stories with acceptance criteria
 phase: "pre"
+order: 4
 dependencies: [review-prd]
 outputs: [docs/user-stories.md]
 conditional: null

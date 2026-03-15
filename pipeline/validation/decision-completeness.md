@@ -2,7 +2,8 @@
 name: decision-completeness
 description: Verify all decisions are recorded, justified, non-contradictory
 phase: "validation"
-dependencies: [phase-10a-review-security]
+order: 29
+dependencies: [review-tasks, review-security]
 outputs: [docs/validation/decision-completeness.md]
 conditional: null
 knowledge-base: [decision-completeness]

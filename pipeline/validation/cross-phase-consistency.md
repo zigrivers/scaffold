@@ -2,7 +2,8 @@
 name: cross-phase-consistency
 description: Audit naming, assumptions, data flows, interface contracts across all phases
 phase: "validation"
-dependencies: [phase-10a-review-security]
+order: 27
+dependencies: [review-tasks, review-security]
 outputs: [docs/validation/cross-phase-consistency.md]
 conditional: null
 knowledge-base: [cross-phase-consistency]

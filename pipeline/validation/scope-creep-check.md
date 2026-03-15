@@ -2,7 +2,8 @@
 name: scope-creep-check
 description: Verify specs stay aligned to PRD boundaries
 phase: "validation"
-dependencies: [phase-10a-review-security]
+order: 33
+dependencies: [review-tasks, review-security]
 outputs: [docs/validation/scope-creep-check.md]
 conditional: null
 knowledge-base: [scope-management]
