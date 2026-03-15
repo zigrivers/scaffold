@@ -2282,10 +2282,16 @@ project:
       "artifacts_verified": true,
       "completed_by": "scaffold-adopt"
     },
-    "prd-gap-analysis": {
+    "review-prd": {
       "status": "pending",
       "source": "base",
-      "produces": ["docs/plan.md"]
+      "produces": ["docs/reviews/pre-review-prd.md"]
+    },
+    "innovate-prd": {
+      "status": "pending",
+      "source": "base",
+      "produces": ["docs/prd-innovation.md"],
+      "conditional": "if-needed"
     }
   }
 }
@@ -2301,7 +2307,7 @@ Platforms: Claude Code
 === V1 Migration ===
 Pre-completed: 8 prompts (from existing artifacts)
 Remaining: 14 prompts
-Next eligible: prd-gap-analysis, beads-setup
+Next eligible: review-prd, beads-setup
 
 Run scaffold resume to continue from where v1 left off.
 ```

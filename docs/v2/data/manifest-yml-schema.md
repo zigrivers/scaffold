@@ -103,7 +103,7 @@ The following JSON Schema describes the structure of a parsed methodology preset
 | `name` | `string` | Yes | -- | Human-readable methodology display name. Shown in `scaffold list`, `scaffold status`, and the init wizard. Must be non-empty. |
 | `description` | `string` | Yes | -- | Short description of the methodology. Shown in `scaffold init` when the user selects a methodology. Must be non-empty. |
 | `default_depth` | `integer` | Yes | -- | Default depth level (1-5) for all enabled steps in this methodology. |
-| `steps` | `Record<string, StepConfig>` | Yes | -- | Map of step names to step configurations. Must include all 32 pipeline steps. |
+| `steps` | `Record<string, StepConfig>` | Yes | -- | Map of step names to step configurations. Must include all 36 pipeline steps. |
 
 ### StepConfig Object
 
@@ -125,7 +125,11 @@ Every key in the `steps` object must correspond to a meta-prompt file in `pipeli
 | Step Name Pattern | Filesystem Path Template |
 |-------------------|--------------------------|
 | `create-prd` | `pipeline/pre/create-prd.md` |
-| `prd-gap-analysis` | `pipeline/pre/prd-gap-analysis.md` |
+| `review-prd` | `pipeline/pre/review-prd.md` |
+| `innovate-prd` | `pipeline/pre/innovate-prd.md` |
+| `user-stories` | `pipeline/pre/user-stories.md` |
+| `review-user-stories` | `pipeline/pre/review-user-stories.md` |
+| `innovate-user-stories` | `pipeline/pre/innovate-user-stories.md` |
 | `phase-NN-*` | `pipeline/phase-NN-*.md` |
 | `phase-NNa-*` | `pipeline/phase-NNa-*.md` |
 | `cross-phase-consistency` | `pipeline/validation/cross-phase-consistency.md` |
@@ -208,7 +212,8 @@ Step configs use YAML flow style for compactness:
 ```yaml
 steps:
   create-prd: { enabled: true }
-  prd-gap-analysis: { enabled: true }
+  review-prd: { enabled: true }
+  innovate-prd: { enabled: true, conditional: "if-needed" }
   phase-04-database-schema: { enabled: true, conditional: "if-needed" }
 ```
 
@@ -218,8 +223,11 @@ Block style is also valid but less conventional for this file:
 steps:
   create-prd:
     enabled: true
-  prd-gap-analysis:
+  review-prd:
     enabled: true
+  innovate-prd:
+    enabled: true
+    conditional: "if-needed"
 ```
 
 ---
@@ -266,7 +274,8 @@ default_depth: 5
 
 steps:
   create-prd: { enabled: true }
-  prd-gap-analysis: { enabled: true }
+  review-prd: { enabled: true }
+  innovate-prd: { enabled: true, conditional: "if-needed" }
   phase-01-domain-modeling: { enabled: true }
   phase-01a-review-domain-modeling: { enabled: true }
   phase-02-adrs: { enabled: true }
@@ -311,7 +320,8 @@ default_depth: 1
 
 steps:
   create-prd: { enabled: true }
-  prd-gap-analysis: { enabled: false }
+  review-prd: { enabled: false }
+  innovate-prd: { enabled: false, conditional: "if-needed" }
   phase-01-domain-modeling: { enabled: false }
   phase-01a-review-domain-modeling: { enabled: false }
   phase-02-adrs: { enabled: false }
@@ -357,10 +367,11 @@ default_depth: 3
 # All steps enabled by default at depth 3 — user overrides individual steps
 steps:
   create-prd: { enabled: true }
-  prd-gap-analysis: { enabled: true }
+  review-prd: { enabled: true }
+  innovate-prd: { enabled: true, conditional: "if-needed" }
   phase-01-domain-modeling: { enabled: true }
   phase-01a-review-domain-modeling: { enabled: true }
-  # ... (all 32 steps listed with enabled: true)
+  # ... (all 33 steps listed with enabled: true)
   # conditional steps include: conditional: "if-needed"
 ```
 

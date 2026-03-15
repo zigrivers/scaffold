@@ -39,7 +39,8 @@ Phases are run in order, with explicit dependency constraints between prompts. S
 | # | Command | Description | Optional |
 |---|---------|-------------|----------|
 | 1 | `create-prd` | Create a product requirements document from an idea | |
-| 2 | `prd-gap-analysis` | Analyze PRD for gaps, then innovate | |
+| 2 | `review-prd` | Review PRD for quality and completeness | |
+| 3 | `innovate-prd` | Discover innovation opportunities for the PRD | **(if-needed)** |
 
 ### Phase 2 — Project Foundation
 

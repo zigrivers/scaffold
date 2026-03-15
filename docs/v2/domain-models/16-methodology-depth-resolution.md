@@ -858,10 +858,16 @@ Resolve each step:
     conditional: false
     explanation: "Enabled by preset 'Deep Domain Modeling', depth 5 (preset default)"
 
-  prd-gap-analysis:
+  review-prd:
     enabled: true (provenance: preset)
     depth: 5 (provenance: preset_default)
     conditional: false
+
+  innovate-prd:
+    enabled: true (provenance: preset)
+    depth: 5 (provenance: preset_default)
+    conditional: true (if-needed)
+    conditionalResolved: false (not yet evaluated by init wizard)
 
   phase-04-database-schema:
     enabled: true (provenance: preset)
@@ -894,7 +900,12 @@ Resolve each step:
     enabled: true (provenance: preset)
     depth: 1 (provenance: preset_default)
 
-  prd-gap-analysis:
+  review-prd:
+    enabled: false (provenance: preset)
+    depth: 1 (provenance: preset_default)
+    reason: "Disabled by MVP preset"
+
+  innovate-prd:
     enabled: false (provenance: preset)
     depth: 1 (provenance: preset_default)
     reason: "Disabled by MVP preset"
@@ -931,7 +942,9 @@ custom:
     create-prd:
       enabled: true
       depth: 4
-    prd-gap-analysis:
+    review-prd:
+      enabled: true
+    innovate-prd:
       enabled: false
     phase-01-domain-modeling:
       depth: 5
@@ -950,7 +963,11 @@ Apply custom overrides:
     enabled: true (provenance: custom_override — explicitly set)
     depth: 4 (provenance: step_override — per-step depth)
 
-  prd-gap-analysis:
+  review-prd:
+    enabled: true (provenance: custom_override — explicitly set)
+    depth: 3 (provenance: custom_default)
+
+  innovate-prd:
     enabled: false (provenance: custom_override — explicitly disabled)
     depth: 3 (provenance: custom_default)
     reason: "Disabled by custom configuration"

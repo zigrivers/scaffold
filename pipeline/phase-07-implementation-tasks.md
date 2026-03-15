@@ -9,16 +9,17 @@ knowledge-base: [task-decomposition]
 ---
 
 ## Purpose
-Decompose the system architecture into concrete, implementable tasks suitable
-for AI agents. Each task should be independently executable, have clear inputs/
-outputs, and be small enough for a single agent session. User stories inform
-task creation — features map to stories map to tasks.
+Decompose user stories and system architecture into concrete, implementable
+tasks suitable for AI agents. Each task should be independently executable,
+have clear inputs/outputs, and be small enough for a single agent session.
+The primary mapping is Story → Task(s), with PRD as the traceability root.
 
 ## Inputs
 - docs/system-architecture.md (required) — components to implement
 - docs/domain-models/ (required) — domain logic to implement
 - docs/adrs/ (required) — technology constraints
 - docs/prd.md (required) — features to trace tasks back to
+- docs/user-stories.md (required) — stories to derive tasks from
 - docs/database-schema.md (optional) — data layer tasks
 - docs/api-contracts.md (optional) — API implementation tasks
 - docs/ux-spec.md (optional) — frontend tasks
@@ -34,6 +35,7 @@ task creation — features map to stories map to tasks.
 - Tasks include acceptance criteria (how to know it's done)
 - Critical path is identified
 - Parallelization opportunities are marked
+- Every user story maps to at least one task
 
 ## Methodology Scaling
 - **deep**: Detailed task breakdown with story-to-task tracing. Dependency graph.

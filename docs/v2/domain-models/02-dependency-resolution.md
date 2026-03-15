@@ -944,7 +944,7 @@ See Algorithm 2 in Section 5 for the complete pseudocode. The key implementation
 
 **Tiebreaker application:**
 - When multiple prompts reach in-degree 0 simultaneously, the phase tiebreaker ensures prompts from earlier phases are listed first.
-- Example: After `create-prd` completes, both `prd-gap-analysis` (Phase 1) and `beads-setup` (Phase 2) may reach in-degree 0. The tiebreaker orders `prd-gap-analysis` first because Phase 1 < Phase 2.
+- Example: After `create-prd` completes, both `review-prd` (Phase 1) and `beads-setup` (Phase 2) may reach in-degree 0. The tiebreaker orders `review-prd` first because Phase 1 < Phase 2.
 - The alphabetical secondary tiebreaker ensures deterministic output across runs.
 
 **Cycle detection reporting:**
@@ -995,7 +995,7 @@ When `scaffold run --from X` is used, **only prompt X is re-run. Its dependents 
 
 ```
 Next eligible prompts (2 can run in parallel):
-  1. prd-gap-analysis — Analyze PRD for gaps, then innovate
+  1. review-prd — Review PRD for quality
   2. beads-setup — Initialize task tracking
 
 Run: scaffold run
@@ -1007,15 +1007,16 @@ Run: scaffold run
 ```
 Pipeline: classic (2/18 complete)
 + create-prd
-> prd-gap-analysis (eligible)
+> review-prd (eligible)
 > beads-setup (eligible)
+  innovate-prd
   tech-stack
   ...
 ```
 
 **Sequential execution**: Despite multiple prompts being eligible, `scaffold run` (without `--from`) runs only the first eligible prompt (per the phase tiebreaker order). The user must run `scaffold run` again for the next one. This is by design — prompts run sequentially in a single CLI session.
 
-**Parallel execution with worktrees**: In a multi-agent setup, each agent runs `scaffold run` in its own worktree. With proper locking ([domain 13](13-pipeline-locking.md)), two agents could execute `prd-gap-analysis` and `beads-setup` simultaneously if both are eligible. The lock prevents two agents from picking the *same* prompt.
+**Parallel execution with worktrees**: In a multi-agent setup, each agent runs `scaffold run` in its own worktree. With proper locking ([domain 13](13-pipeline-locking.md)), two agents could execute `review-prd` and `beads-setup` simultaneously if both are eligible. The lock prevents two agents from picking the *same* prompt.
 
 **The `parallelSets` structure:**
 
@@ -1023,8 +1024,8 @@ Pipeline: classic (2/18 complete)
 // Example for the classic methodology
 parallelSets = [
   ["create-prd"],                           // Level 0: no prerequisites
-  ["prd-gap-analysis", "beads-setup"],      // Level 1: both depend only on create-prd
-  ["tech-stack", "user-stories"],           // Level 2: tech-stack depends on beads-setup; user-stories on create-prd
+  ["review-prd", "beads-setup"],            // Level 1: both depend only on create-prd
+  ["innovate-prd", "tech-stack", "user-stories"], // Level 2: innovate-prd depends on review-prd; tech-stack on beads-setup; user-stories on create-prd
   ["claude-code-permissions", "coding-standards", "tdd"],  // Level 3
   ["project-structure"],                    // Level 4
   // ... etc
@@ -1058,13 +1059,13 @@ interface DependencyInput {
 ```typescript
 interface DependencyResult {
   // The canonical execution sequence
-  sortedOrder: string[];      // e.g., ["create-prd", "prd-gap-analysis", "beads-setup", "tech-stack", ...]
+  sortedOrder: string[];      // e.g., ["create-prd", "beads-setup", "review-prd", "innovate-prd", "tech-stack", ...]
 
   // The full graph structure (retained for runtime use)
   graph: DependencyGraph;     // nodes, edges, successors, predecessors, inDegree
 
   // Groups of concurrently-eligible prompts
-  parallelSets: string[][];   // e.g., [["create-prd"], ["prd-gap-analysis", "beads-setup"], ...]
+  parallelSets: string[][];   // e.g., [["create-prd"], ["review-prd", "beads-setup"], ["innovate-prd", "tech-stack", "user-stories"], ...]
 
   // Non-fatal issues
   warnings: DependencyWarning[];
@@ -1167,7 +1168,7 @@ Error: Prompt "security-audit" depends on "threat-model" which is not in the res
 Did you mean "multi-model-review"? (Levenshtein distance: 5 — no close match)
 
 Valid prompt slugs:
-  create-prd, prd-gap-analysis, beads-setup, tech-stack, coding-standards,
+  create-prd, review-prd, innovate-prd, beads-setup, tech-stack, coding-standards,
   tdd, project-structure, dev-env-setup, git-workflow, user-stories, ...
 
 To fix:
@@ -1187,7 +1188,7 @@ To fix:
     "slug": "security-audit",
     "dependency": "threat-model",
     "suggestion": null,
-    "valid_slugs": ["create-prd", "prd-gap-analysis", "beads-setup", "tech-stack", "..."],
+    "valid_slugs": ["create-prd", "review-prd", "innovate-prd", "beads-setup", "tech-stack", "..."],
     "recovery": "Fix the dependency name or add the missing prompt to extra-prompts."
   }],
   "warnings": [],
@@ -1365,7 +1366,8 @@ If the user skips all prompts except the last one, the last prompt becomes eligi
 ```yaml
 dependencies:
   create-prd: []
-  prd-gap-analysis: [create-prd]
+  review-prd: [create-prd]
+  innovate-prd: [review-prd]
   beads-setup: []
   tech-stack: [beads-setup]
   claude-code-permissions: [tech-stack]
@@ -1385,7 +1387,7 @@ dependencies:
 
 **Step-by-step processing:**
 
-1. **Graph construction**: 17 nodes, 18 edges. No excluded dependencies. No missing targets. No self-references.
+1. **Graph construction**: 18 nodes, 20 edges. No excluded dependencies. No missing targets. No self-references.
 
 2. **Kahn's algorithm initialization**:
    - In-degree 0 nodes: `create-prd` (Phase 1), `beads-setup` (Phase 2)
@@ -1395,9 +1397,9 @@ dependencies:
 
 | Step | Dequeue | Parallel Set | New zero-in-degree nodes |
 |------|---------|-------------|--------------------------|
-| 1 | create-prd, beads-setup | [create-prd, beads-setup] | prd-gap-analysis, tech-stack, user-stories |
-| 2 | prd-gap-analysis, tech-stack, user-stories | [prd-gap-analysis, tech-stack, user-stories] | claude-code-permissions, coding-standards, tdd, user-stories-gaps |
-| 3 | claude-code-permissions, coding-standards, tdd, user-stories-gaps | [claude-code-permissions, coding-standards, tdd, user-stories-gaps] | project-structure |
+| 1 | create-prd, beads-setup | [create-prd, beads-setup] | review-prd, tech-stack, user-stories |
+| 2 | review-prd, tech-stack, user-stories | [review-prd, tech-stack, user-stories] | innovate-prd, claude-code-permissions, coding-standards, tdd, user-stories-gaps |
+| 3 | innovate-prd, claude-code-permissions, coding-standards, tdd, user-stories-gaps | [innovate-prd, claude-code-permissions, coding-standards, tdd, user-stories-gaps] | project-structure |
 | 4 | project-structure | [project-structure] | dev-env-setup, implementation-plan |
 | 5 | dev-env-setup, implementation-plan | [dev-env-setup, implementation-plan] | design-system, git-workflow, implementation-plan-review |
 | 6 | design-system, git-workflow, implementation-plan-review | [design-system, git-workflow, implementation-plan-review] | claude-md-optimization |
@@ -1406,8 +1408,8 @@ dependencies:
 
 4. **Final sorted order**:
 ```
-create-prd, beads-setup, prd-gap-analysis, tech-stack, user-stories,
-claude-code-permissions, coding-standards, tdd, user-stories-gaps,
+create-prd, beads-setup, review-prd, tech-stack, user-stories,
+innovate-prd, claude-code-permissions, coding-standards, tdd, user-stories-gaps,
 project-structure, dev-env-setup, implementation-plan, design-system,
 git-workflow, implementation-plan-review, claude-md-optimization,
 workflow-audit
@@ -1417,8 +1419,8 @@ workflow-audit
 ```typescript
 [
   ["create-prd", "beads-setup"],
-  ["prd-gap-analysis", "tech-stack", "user-stories"],
-  ["claude-code-permissions", "coding-standards", "tdd", "user-stories-gaps"],
+  ["review-prd", "tech-stack", "user-stories"],
+  ["innovate-prd", "claude-code-permissions", "coding-standards", "tdd", "user-stories-gaps"],
   ["project-structure"],
   ["dev-env-setup", "implementation-plan"],
   ["design-system", "git-workflow", "implementation-plan-review"],
@@ -1430,9 +1432,9 @@ workflow-audit
 **Output**:
 ```typescript
 {
-  sortedOrder: ["create-prd", "beads-setup", "prd-gap-analysis", ...],
+  sortedOrder: ["create-prd", "beads-setup", "review-prd", ...],
   graph: { nodes: [...], edges: [...], successors: {...}, predecessors: {...}, inDegree: {...} },
-  parallelSets: [["create-prd", "beads-setup"], ["prd-gap-analysis", "tech-stack", "user-stories"], ...],
+  parallelSets: [["create-prd", "beads-setup"], ["review-prd", "tech-stack", "user-stories"], ...],
   warnings: [],
   errors: [],
   success: true
@@ -1574,7 +1576,8 @@ security-audit, ..., compliance-check, ...
 ```json
 {
   "create-prd": { "status": "completed" },
-  "prd-gap-analysis": { "status": "completed" },
+  "review-prd": { "status": "completed" },
+  "innovate-prd": { "status": "completed" },
   "beads-setup": { "status": "completed" },
   "tech-stack": { "status": "completed" },
   "claude-code-permissions": { "status": "completed" },

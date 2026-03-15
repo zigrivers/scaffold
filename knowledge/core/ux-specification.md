@@ -8,7 +8,9 @@ topics: [ux, design-system, accessibility, wireframes, user-flows, responsive-de
 
 ### Journey Mapping
 
-A user flow documents every step a user takes to accomplish a goal, including all decision points, error states, and alternative paths. User flows are the bridge between PRD requirements and implementable UI specifications.
+User stories (`docs/user-stories.md`) define what users do — each story's acceptance criteria describe a user journey. UX specification defines what users see and how they interact while performing those journeys. Map each story's Given/When/Then scenarios to screen states and transitions.
+
+A user flow documents every step a user takes to accomplish a goal, including all decision points, error states, and alternative paths. User flows are the bridge between user stories and implementable UI specifications.
 
 **Structure of a user flow:**
 

@@ -1451,12 +1451,12 @@ Completed prompts:
 Next eligible prompts:
   ○ beads-setup (no dependencies on completed prompts)
   ○ tdd (depends on: tech-stack ✓)
-  ○ prd-gap-analysis (depends on: create-prd ✓)
+  ○ review-prd (depends on: create-prd ✓)
 
 Executing: beads-setup
 ```
 
-The `scaffold run` command uses domain 03's state machine to determine next eligible prompts. Since `create-prd` and `tech-stack` are already completed, prompts that depend on them (like `prd-gap-analysis`, `tdd`, `coding-standards`) become eligible. The dependency graph from the methodology manifest drives the ordering.
+The `scaffold run` command uses domain 03's state machine to determine next eligible prompts. Since `create-prd` and `tech-stack` are already completed, prompts that depend on them (like `review-prd`, `tdd`, `coding-standards`) become eligible. The dependency graph from the methodology manifest drives the ordering.
 
 **Key behavior**: Pre-completed prompts are truly skipped — they don't re-execute. Their `produces` paths are already verified. The user can manually re-run any prompt with `scaffold run --prompt tech-stack` if they want to regenerate it (Mode Detection will use update mode).
 
@@ -1868,11 +1868,12 @@ Select methodology:
     "user-stories": { "status": "completed", "source": "base", "artifacts_verified": true },
     "implementation-plan": { "status": "completed", "source": "override", "artifacts_verified": true },
     "claude-code-permissions": { "status": "completed", "source": "base", "artifacts_verified": true },
-    "prd-gap-analysis": { "status": "pending", "source": "base" },
+    "review-prd": { "status": "pending", "source": "base" },
+    "innovate-prd": { "status": "pending", "source": "base", "conditional": "if-needed" },
     "design-system": { "status": "pending", "source": "base" },
     "git-workflow": { "status": "pending", "source": "base" }
   },
-  "next_eligible": ["prd-gap-analysis", "design-system", "git-workflow"]
+  "next_eligible": ["review-prd", "design-system", "git-workflow"]
 }
 ```
 

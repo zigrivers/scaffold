@@ -30,7 +30,7 @@ All errors and warnings are accumulated during processing. After processing comp
 
 Accumulation continues even after encountering an error — the goal is to report as many issues as possible in a single run so the user can fix multiple problems before re-running the command.
 
-### Runtime (`scaffold resume`, `scaffold skip`, `scaffold reset`)
+### Runtime (`scaffold run`, `scaffold skip`, `scaffold reset`)
 
 The command fails fast on the first structural error — missing config file, corrupt state.json, missing dependency file, lock contention. The error message includes the specific failure, the affected file or resource, and a suggested fix. Warnings (stale artifacts, skipped predecessors, unknown fields) are reported but do not block execution.
 
@@ -126,7 +126,7 @@ Escape hatches always downgrade an error to a warning — they never silence the
 
 - Build-time commands (`scaffold build`, `scaffold validate`) MUST accumulate all errors and warnings, reporting them after processing completes
 - Build-time error output MUST be grouped by source file, with errors listed before warnings for each file
-- Runtime commands (`scaffold resume`, `scaffold skip`, `scaffold reset`) MUST fail fast on the first structural error
+- Runtime commands (`scaffold run`, `scaffold skip`, `scaffold reset`) MUST fail fast on the first structural error
 - Runtime commands MUST report warnings (stale artifacts, skipped predecessors) without blocking execution
 - Structural integrity violations (missing files, invalid schemas, circular dependencies, unresolved markers, corrupt state, lock contention) MUST be classified as errors
 - Advisory issues (unknown fields, stale references, incompatible mixin combinations, missing optional fields, deprecated syntax) MUST be classified as warnings

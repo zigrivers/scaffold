@@ -1,6 +1,9 @@
 .DS_Store
 .history
 
+# Beads local database
+.beads/
+
 # Coverage output (kcov)
 coverage/
 

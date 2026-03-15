@@ -6,7 +6,11 @@ default_depth: 3
 # All steps enabled by default at depth 3 — user overrides individual steps
 steps:
   create-prd: { enabled: true }
-  prd-gap-analysis: { enabled: true }
+  review-prd: { enabled: true }
+  innovate-prd: { enabled: false }
+  user-stories: { enabled: true }
+  review-user-stories: { enabled: true }
+  innovate-user-stories: { enabled: false }
   phase-01-domain-modeling: { enabled: true }
   phase-01a-review-domain-modeling: { enabled: true }
   phase-02-adrs: { enabled: true }

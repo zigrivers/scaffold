@@ -54,7 +54,7 @@ The lock file contains: `holder` (hostname), `prompt` (slug being executed), `st
 
 - **Description**: Commit the lock file to git so that all machines see it. Use a branch-based or tag-based protocol to coordinate cross-machine access.
 - **Pros**: Prevents concurrent writes across machines.
-- **Cons**: Massive complexity — requires network access for lock operations, introduces latency, and fails when offline. Git's merge behavior on state.json already handles cross-machine coordination safely. The scenarios where two developers run `scaffold resume` on the same project simultaneously are rare and better handled by git merge semantics than by distributed locking.
+- **Cons**: Massive complexity — requires network access for lock operations, introduces latency, and fails when offline. Git's merge behavior on state.json already handles cross-machine coordination safely. The scenarios where two developers run `scaffold run` on the same project simultaneously are rare and better handled by git merge semantics than by distributed locking.
 
 ### No Locking
 
@@ -82,7 +82,7 @@ The lock file contains: `holder` (hostname), `prompt` (slug being executed), `st
 ## Constraints and Compliance
 
 - `lock.json` MUST be gitignored — it MUST NOT be committed to version control
-- Write commands (`scaffold resume`, `scaffold skip`, `scaffold reset`) MUST acquire the lock before making state changes
+- Write commands (`scaffold run`, `scaffold skip`, `scaffold reset`) MUST acquire the lock before making state changes
 - Read-only commands (`scaffold status`, `scaffold list`, `scaffold dashboard`, `scaffold next`, `scaffold build`) MUST NOT acquire the lock. `scaffold build` is classified as read-only for locking purposes — it reads config and writes to output directories but does not modify pipeline state (`state.json`, `decisions.jsonl`).
 - Lock acquisition MUST use the `wx` flag (`O_CREAT | O_EXCL`) for atomic creation — if the file already exists, check for staleness rather than overwriting
 - Stale lock detection MUST check both PID liveness (`process.kill(pid, 0)`) AND process start time comparison

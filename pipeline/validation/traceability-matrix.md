@@ -9,9 +9,10 @@ knowledge-base: [traceability]
 ---
 
 ## Purpose
-Build traceability from PRD requirements through architecture to implementation
-tasks. Verify that every requirement has a path from PRD to domain model to
-architecture component to implementation task, with no orphans in either direction.
+Build traceability from PRD requirements through user stories and architecture
+to implementation tasks. Verify the full chain: PRD → User Stories → Domain
+Model → Architecture → Tasks, with no orphans in either direction. Every PRD
+requirement must trace to at least one story, every story to at least one task.
 
 ## Inputs
 - All phase output artifacts (docs/prd.md, docs/domain-models/, docs/adrs/,

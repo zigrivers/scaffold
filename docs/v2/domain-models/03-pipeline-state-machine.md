@@ -703,7 +703,7 @@ FUNCTION detectCompletion(slug, state, produces) -> CompletionDetectionResult:
 ```
 
 **Edge cases**:
-- Prompt with empty `produces` (no expected artifacts): artifact check is vacuously true. State is the only signal. This is valid for prompts that only modify existing files (e.g., prd-gap-analysis updates `docs/plan.md` rather than creating it).
+- Prompt with empty `produces` (no expected artifacts): artifact check is vacuously true. State is the only signal. This is valid for prompts that only modify existing files (e.g., review-prd updates `docs/plan.md` rather than creating it).
 - Artifact exists but is zero bytes: detected by `size_bytes == 0` in artifact details. The algorithm does not reject zero-byte files — they count as "present." Zero-byte detection is deferred to `scaffold validate` (domain 09).
 
 ### Algorithm 3: Crash Recovery
@@ -1365,10 +1365,15 @@ Fresh project, no existing code. All prompts start as `pending`.
       "source": "base",
       "produces": ["docs/plan.md"]
     },
-    "prd-gap-analysis": {
+    "review-prd": {
       "status": "pending",
       "source": "base",
-      "produces": ["docs/plan.md"]
+      "produces": ["docs/reviews/pre-review-prd.md"]
+    },
+    "innovate-prd": {
+      "status": "pending",
+      "source": "base",
+      "produces": ["docs/prd-innovation.md"]
     },
     "beads-setup": {
       "status": "pending",
@@ -1492,12 +1497,12 @@ Existing codebase with some artifacts already in place. `scaffold adopt` scanned
       "completed_by": "scaffold-adopt"
     }
   },
-  "next_eligible": ["prd-gap-analysis", "coding-standards", "tdd"],
+  "next_eligible": ["review-prd", "coding-standards", "tdd"],
   "extra-prompts": []
 }
 ```
 
-Note: `prd-gap-analysis` depends on `create-prd` (completed via adopt). `coding-standards` and `tdd` depend on `tech-stack` (completed via adopt). All three are immediately eligible.
+Note: `review-prd` depends on `create-prd` (completed via adopt). `coding-standards` and `tdd` depend on `tech-stack` (completed via adopt). All three are immediately eligible.
 
 #### V1 Migration
 
@@ -1609,7 +1614,7 @@ Note: v1 migration detects existing artifacts via the `produces` field. Prompts 
 
 #### EC-1: Prompt with No `produces` Field
 
-Some prompts don't create new files — they modify existing ones (e.g., `prd-gap-analysis` updates `docs/plan.md`, `workflow-audit` fixes issues across docs). These prompts have `produces` pointing to files that other prompts also produce.
+Some prompts don't create new files — they modify existing ones (e.g., `review-prd` updates `docs/plan.md`, `workflow-audit` fixes issues across docs). These prompts have `produces` pointing to files that other prompts also produce.
 
 **Handling**: For prompts where the `produces` list contains files also produced by earlier prompts, artifact-based detection is unreliable — the file exists because the earlier prompt created it, not because this prompt ran. State-recorded completion is the primary signal for these prompts.
 
@@ -1727,11 +1732,11 @@ It's a derived field that must be recomputed on every mutation and is the most l
 
 **OQ2: How should prompts with shared `produces` be handled?**
 
-Multiple prompts can list the same file in `produces` (e.g., `create-prd` and `prd-gap-analysis` both list `docs/plan.md`; `beads-setup` and `claude-md-optimization` both list `CLAUDE.md`). This makes artifact-based detection unreliable for the later prompt — the file exists because the earlier prompt created it.
+Multiple prompts can list the same file in `produces` (e.g., `create-prd` produces `docs/plan.md` and `review-prd` also references it; `beads-setup` and `claude-md-optimization` both list `CLAUDE.md`). This makes artifact-based detection unreliable for the later prompt — the file exists because the earlier prompt created it.
 
 Options:
 - **Accept ambiguity**: State-recorded detection is primary for these prompts. Artifact-based is a bonus.
-- **Add unique markers**: Each prompt could add a tracking comment (e.g., `<!-- scaffold:prd-gap-analysis v1 ... -->`) that distinguishes whether the file was updated by a specific prompt.
+- **Add unique markers**: Each prompt could add a tracking comment (e.g., `<!-- scaffold:review-prd v1 ... -->`) that distinguishes whether the file was updated by a specific prompt.
 - **Add a `modifies` vs `creates` distinction**: `creates` means the prompt produces a new file. `modifies` means it updates an existing one. Only `creates` is used for artifact detection.
 
 **Recommendation**: Introduce a `creates` vs `modifies` distinction in frontmatter. `produces` becomes the union of both for display, but only `creates` entries trigger artifact-based detection. `modifies` entries are verified by tracking comment presence (domain 10).
@@ -1790,7 +1795,8 @@ Multi-prompt concurrency would require:
   "in_progress": null,
   "prompts": {
     "create-prd": { "status": "pending", "source": "base", "produces": ["docs/plan.md"] },
-    "prd-gap-analysis": { "status": "pending", "source": "base", "produces": ["docs/plan.md"] },
+    "review-prd": { "status": "pending", "source": "base", "produces": ["docs/reviews/pre-review-prd.md"] },
+    "innovate-prd": { "status": "pending", "source": "base", "produces": ["docs/prd-innovation.md"] },
     "beads-setup": { "status": "pending", "source": "ext", "produces": [".beads/config.yaml", "CLAUDE.md", "tasks/lessons.md"] },
     "tech-stack": { "status": "pending", "source": "base", "produces": ["docs/tech-stack.md"] }
   },
@@ -1833,13 +1839,13 @@ State after completion:
       "artifacts_verified": true,
       "completed_by": "alex"
     },
-    "prd-gap-analysis": { "status": "pending", "source": "base", "produces": ["docs/plan.md"] }
+    "review-prd": { "status": "pending", "source": "base", "produces": ["docs/reviews/pre-review-prd.md"] }
   },
-  "next_eligible": ["prd-gap-analysis", "beads-setup"]
+  "next_eligible": ["review-prd", "beads-setup"]
 }
 ```
 
-Both `prd-gap-analysis` and `beads-setup` depend only on `create-prd`, so both become eligible.
+Both `review-prd` and `beads-setup` depend only on `create-prd`, so both become eligible.
 
 **Step 3: `scaffold skip design-system --reason "CLI tool, no frontend"`**
 

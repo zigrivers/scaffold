@@ -260,19 +260,6 @@ For each contradiction, the PRD should clarify:
 2. Under what conditions does each apply?
 3. Is there a design that satisfies both, and what are the trade-offs?
 
-## Innovation Opportunities
-
-Gap analysis also reveals opportunities — places where a modest addition would significantly improve the product.
-
-### How to Identify Innovation Opportunities
-
-1. **Workflow shortcuts** — Are there multi-step processes that could be one step? "Create order → add items → add shipping → add payment" could be "quick checkout from saved preferences."
-2. **Data insights** — Is data being collected but not surfaced? If you track all orders, a "best sellers this month" display adds value with minimal effort.
-3. **Proactive features** — Can the system anticipate user needs? "Low inventory alert" before stock runs out.
-4. **Integration points** — Are there natural integration opportunities not mentioned? Calendar integration for due dates, Slack notifications for team events.
-
-Innovation opportunities should be flagged but NOT added to scope. They go into the deferred/future list unless stakeholders explicitly approve them for the current release.
-
 ## Output Format
 
 ### Gap Report Structure
@@ -285,7 +272,6 @@ Innovation opportunities should be flagged but NOT added to scope. They go into 
 - Critical: [N] (blocks implementation)
 - Major: [N] (impacts quality)
 - Minor: [N] (cosmetic or edge case)
-- Innovation opportunities: [N]
 
 ### Critical Gaps
 1. [Gap description]
@@ -309,11 +295,6 @@ Innovation opportunities should be flagged but NOT added to scope. They go into 
    - **Analysis:** [why they conflict]
    - **Recommended resolution:** [which takes priority and why]
 
-### Innovation Opportunities
-1. [Opportunity description]
-   - **Effort:** [Low/Medium/High]
-   - **Impact:** [Low/Medium/High]
-   - **Recommendation:** [Defer/Consider for v1]
 ```
 
 ## When to Use Gap Analysis
