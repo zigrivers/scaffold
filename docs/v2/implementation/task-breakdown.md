@@ -406,8 +406,8 @@ Pure data modules with no CLI dependency. Each reads/writes one file format. Hea
 **Enables**: T-012, T-026, T-033, T-034, T-044
 
 **Files**:
-- Create: `src/core/methodology/preset-loader.ts`
-- Create: `src/core/methodology/preset-loader.test.ts`
+- Create: `src/core/assembly/preset-loader.ts`
+- Create: `src/core/assembly/preset-loader.test.ts`
 
 **Description**: Load methodology preset YAML files from `methodology/` directory (deep.yml, mvp.yml, custom-defaults.yml). Each preset defines: `name` (display name), `description`, `default_depth` (1-5), and `steps` map (step name → `{enabled: boolean, conditional?: 'if-needed'}`). Validate that all step names in the preset match known meta-prompt names. Validate preset structure. Report PRESET_MISSING, PRESET_PARSE_ERROR, PRESET_INVALID_STEP, PRESET_MISSING_STEP warnings. Return structured `MethodologyPreset` object with resolved step list and depth defaults.
 
@@ -531,10 +531,10 @@ The assembly engine and its dependencies. Tasks T-011 through T-016 can run in p
 **Enables**: T-023, T-024, T-029, T-034, T-036
 
 **Files**:
-- Create: `src/core/dependency/resolver.ts`
+- Create: `src/core/dependency/dependency.ts`
 - Create: `src/core/dependency/graph.ts`
 - Create: `src/core/dependency/eligibility.ts`
-- Create: `src/core/dependency/resolver.test.ts`
+- Create: `src/core/dependency/dependency.test.ts`
 - Create: `src/core/dependency/eligibility.test.ts`
 
 **Description**: Topological sort of pipeline steps using Kahn's algorithm. Build adjacency list from meta-prompt `dependencies` fields. Algorithm: (1) count in-degrees, (2) enqueue nodes with in-degree 0, (3) process queue — for each node, output it and decrement successors' in-degrees, enqueue when zero. Phase-based tiebreaker for deterministic ordering within same in-degree level. Cycle detection: if any node unvisited after algorithm completes, cycle exists (DEP_CYCLE_DETECTED, exit code 1). `computeEligible(state)` returns steps whose dependencies are all completed and that are not themselves completed/in_progress. `getParallelSets()` groups eligible steps by phase for parallel execution display. Validate: DEP_TARGET_MISSING (dependency references non-existent step), DEP_SELF_REFERENCE.
