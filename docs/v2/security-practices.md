@@ -1,4 +1,4 @@
-<!-- scaffold:security-practices v1 2026-03-14 -->
+<!-- scaffold:security-practices v2 2026-03-14 -->
 
 # Scaffold v2 — Security Practices
 
@@ -65,6 +65,10 @@ For operational security (npm token management, CI hardening, provenance attesta
 | Circular dependencies in pipeline cause infinite loop | Low | Medium | Dependency resolution uses Kahn's algorithm (ADR-009), which detects cycles and reports `DEP_CYCLE_DETECTED`. |
 | Extremely large knowledge base file exhausts memory | Very Low | Low | Knowledge base files ship in the npm package at known sizes. User-modified files could theoretically be large, but this is a self-inflicted scenario. No mitigation needed beyond Node's default memory limits. |
 
+**Repudiation**
+
+Not applicable in the traditional sense — scaffold has no multi-user system where one party would deny performing an action. The `decisions.jsonl` log records which decisions were made during each step, but it serves as project context for subsequent steps, not as a non-repudiation audit trail. The log is an append-only local file with no integrity protection (no signing, no tamper detection). This is acceptable because scaffold operates in a single-user or trusted-team context where repudiation is not a meaningful threat.
+
 **Elevation of Privilege**
 
 Not applicable. Scaffold has no privilege levels, no user roles, no admin mode. The CLI runs with the permissions of the invoking user. It does not use `sudo`, `chmod`, or `setuid`. Noted explicitly for completeness.
@@ -76,10 +80,12 @@ Not applicable. Scaffold has no privilege levels, no user roles, no admin mode. 
 │                    UNTRUSTED INPUT                       │
 │                                                         │
 │  CLI arguments ──────────┐                              │
-│  .scaffold/config.yml ───┤                              │
-│  .scaffold/instructions/ ┤   Validation occurs here     │
-│  User project files ─────┘   (yargs, schema validation, │
-│                               path checks)              │
+│  --instructions flag ────┤                              │
+│  .scaffold/config.yml ───┤   Validation occurs here     │
+│  .scaffold/instructions/ ┤   (yargs, schema validation, │
+│  Project files (init, ───┘    path checks)              │
+│    adopt: package.json,                                 │
+│    README, docs/, CI)                                   │
 └────────────────────────────┬────────────────────────────┘
                              │
                              ▼
@@ -90,25 +96,25 @@ Not applicable. Scaffold has no privilege levels, no user roles, no admin mode. 
 │  State Manager ───── reads/writes state.json            │
 │  Config Loader ───── validates then uses config.yml     │
 │  Lock Manager ────── advisory file locks                │
+│  Project Detector ── scans project dir (init, adopt)    │
+│  CLAUDE.md Manager ─ reads/writes CLAUDE.md             │
 └────────────────────────────┬────────────────────────────┘
                              │
-                             ▼
-┌─────────────────────────────────────────────────────────┐
-│                   TRUSTED CONTENT                       │
-│                                                         │
-│  pipeline/*.md ──── shipped in npm package              │
-│  knowledge/*.md ─── shipped in npm package              │
-│  methodology/*.yml  shipped in npm package              │
-└────────────────────────────┬────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────┐
-│                      OUTPUT                             │
-│                                                         │
-│  Assembled prompt ──► AI tool (Claude Code, Codex)      │
-│  State updates ─────► .scaffold/state.json              │
-│  Decision log ──────► .scaffold/decisions.jsonl         │
-└─────────────────────────────────────────────────────────┘
+              ┌──────────────┼──────────────┐
+              ▼              ▼              ▼
+┌──────────────────┐ ┌──────────────┐ ┌──────────────────┐
+│  TRUSTED CONTENT │ │ STATE (R/W)  │ │     OUTPUT       │
+│                  │ │              │ │                  │
+│  pipeline/*.md   │ │ state.json   │ │ Assembled prompt │
+│  knowledge/*.md  │ │ decisions.   │ │  ──► AI tool     │
+│  methodology/    │ │   jsonl      │ │ CLAUDE.md        │
+│    *.yml         │ │ lock.json    │ │ commands/*.md    │
+│                  │ │              │ │ AGENTS.md        │
+│ (shipped in npm  │ │ (written by  │ │                  │
+│  package)        │ │  scaffold,   │ │ (generated       │
+│                  │ │  read back   │ │  artifacts)      │
+│                  │ │  as context) │ │                  │
+└──────────────────┘ └──────────────┘ └──────────────────┘
 ```
 
 Validation occurs at the boundary between untrusted input and the scaffold CLI. Trusted content (shipped in the npm package) is not re-validated at runtime — its integrity is established at publish time via provenance attestation.
@@ -121,11 +127,11 @@ The assembly engine is scaffold's core — it reads meta-prompts, knowledge base
 
 ### User Instruction Files
 
-`.scaffold/instructions/` contains arbitrary markdown committed to the project's git repository. These files are included **verbatim** in assembled prompts.
+`.scaffold/instructions/` contains arbitrary markdown committed to the project's git repository. These files are included **verbatim** in assembled prompts. The `--instructions` CLI flag provides the same capability inline — its value is concatenated into the assembled prompt without sanitization.
 
-**Risk**: A user instruction file could contain prompt injection targeting the AI (e.g., "Ignore all previous instructions and...").
+**Risk**: A user instruction file (or `--instructions` flag value) could contain prompt injection targeting the AI (e.g., "Ignore all previous instructions and...").
 
-**Trust model**: User instructions are the user's own content, committed to their own repository, visible in git diffs. Scaffold treats them as trusted-by-the-user. This is equivalent to a developer writing code in their own repo — the tool includes it as requested. Scaffold does not sanitize, filter, or validate instruction content.
+**Trust model**: User instructions are the user's own content, committed to their own repository, visible in git diffs. Scaffold treats them as trusted-by-the-user. This is equivalent to a developer writing code in their own repo — the tool includes it as requested. Scaffold does not sanitize, filter, or validate instruction content. The same trust model applies to `--instructions` flag values — they are provided directly by the invoking user.
 
 **Implementation guidance**: Document this trust model clearly in user-facing docs. If scaffold is used in a team setting, instruction files should be reviewed in PRs like any other code.
 
@@ -198,6 +204,7 @@ Meta-prompt and knowledge base files are read as UTF-8 strings. They are never:
 - Used as template strings with `${}` interpolation
 - Processed through any template engine that could execute embedded code
 - Passed to `child_process.exec()` or `child_process.spawn()`
+- Loaded as modules via `require()` or dynamic `import()`
 
 Content files are concatenated into the assembled prompt as plain text. This is a hard architectural constraint.
 
@@ -217,6 +224,8 @@ Operations-runbook.md §6.4-6.5 covers supply chain basics (lockfile discipline,
 | Low | None | Best effort | Fix when convenient, bundle with other dependency updates |
 
 `npm audit --audit-level=high` runs in CI (see operations-runbook.md §3.2, `security-audit` job). Critical and high vulnerabilities fail the build.
+
+**Exception process**: If a critical or high vulnerability has no upstream fix available: (1) evaluate whether the vulnerable code path is actually reachable in scaffold's usage, (2) if not reachable, add an `npm audit` override in `package.json` with a comment explaining the exception and a link to the upstream issue, (3) if reachable, replace the dependency or vendor a patched fork, (4) file a Beads task to remove the override when an upstream fix ships.
 
 ### Dependency Selection Criteria
 
@@ -323,6 +332,8 @@ Verify before every release: `npm pack --dry-run` lists exactly what will be pub
 | `.scaffold/decisions.jsonl` | Decision log | `scaffold run` (for context) |
 | `.scaffold/instructions/` | User instruction files | `scaffold run` |
 | Completed artifacts | Prior step outputs (by path from meta-prompt `outputs` field) | `scaffold run` (update mode, context gathering) |
+| Project directory files | Package manifests, README, docs/, test configs, CI configs (signal scanning) | `scaffold init`, `scaffold adopt` |
+| `CLAUDE.md` | Project agent instruction file (section registry) | `scaffold run` (post-completion hook) |
 
 ### What Scaffold Writes
 
@@ -364,3 +375,5 @@ Before submitting a PR, review these questions for any new or modified feature:
 - [ ] **Passes user input to a shell command?** Use `child_process.execFile()` or `child_process.spawn()` with argument arrays — never `child_process.exec()` with string concatenation. Better yet, use a Node.js library instead of shelling out.
 
 - [ ] **Modifies the assembly engine's file reading?** Ensure symlinks are resolved and validated against the expected base directory (§3). Ensure no new tree-walking or globbing reads files the user didn't intend to include.
+
+- [ ] **Could this commit contain secrets?** Never commit `.env` files, API keys, tokens, or credentials. If a secret is accidentally committed: rotate it immediately (assume compromised even after removing from git history), then clean history with `git filter-repo` or BFG Repo Cleaner. Consider adding `git-secrets` or `gitleaks` as a pre-commit hook to catch secrets before they reach the repository.
