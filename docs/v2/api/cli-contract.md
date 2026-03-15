@@ -281,7 +281,7 @@ scaffold build --format json | jq '.data.prompts_resolved'
 **Purpose**: Scan an existing codebase, map discovered files to scaffold prompt `produces` fields, and generate `.scaffold/state.json` with pre-completed entries. Distinct from `scaffold init` — adopt is purely analytical and does not run the wizard.
 **Category**: init
 **Lock behavior**: Acquires lock (writes state.json)
-**Requires project**: No (creates `.scaffold/` directory)
+**Requires project**: Partial — requires `.scaffold/config.yml` to exist (for methodology and step resolution). Creates `.scaffold/state.json` and `.scaffold/decisions.jsonl`. If no config exists, use `scaffold init` instead, which includes brownfield detection.
 
 **Arguments:** None
 
@@ -333,7 +333,7 @@ In JSON mode, `data` contains `{ mode, artifacts_found, detected_artifacts, prom
 
 | Error Code | Exit Code | Trigger | Message |
 |------------|-----------|---------|---------|
-| `CONFIG_NOT_FOUND` | 1 | Config missing | "No config found. Run `scaffold init` first." |
+| `CONFIG_NOT_FOUND` | 1 | Config missing | "No config found. Run `scaffold init` first, then use `scaffold adopt` to scan existing artifacts." |
 | `STATE_PARSE_ERROR` | 3 | Existing state.json corrupt | "Existing state.json is corrupt. Use `--force` to overwrite." |
 | `LOCK_HELD` | 3 | Lock held (in `--auto`) | "Lock held by <holder>. Use `--force` to override." |
 | `USER_CANCELLED` | 4 | User cancels during partial match review | "Adopt cancelled." |
@@ -1193,6 +1193,33 @@ scaffold decisions --prompt tech-stack
 # Show last 5 decisions as JSON
 scaffold decisions --last 5 --format json
 ```
+
+---
+
+## Section 2b: Operational Patterns
+
+### Multi-Agent Execution
+
+Scaffold supports parallel execution via git worktrees ([system-architecture.md §6b](../architecture/system-architecture.md)). Each worktree has an independent `.scaffold/` directory. Setup is manual:
+
+```bash
+git worktree add ../project-agent-1 -b agent-1
+cd ../project-agent-1 && scaffold status
+```
+
+There is no `scaffold worktree` command — standard git worktree tooling is sufficient. Step coordination (preventing two agents from working on the same step) is the user's responsibility; `scaffold next` shows eligible steps but does not claim them.
+
+### CI/CD Pipeline Execution
+
+For automated pipelines, loop `scaffold next` and `scaffold run` with `--auto --format json`:
+
+```bash
+while step=$(scaffold next --format json | jq -r '.data.eligible[0].name // empty'); do
+  scaffold run "$step" --auto --format json || exit $?
+done
+```
+
+In `--auto` mode, `scaffold run` exits immediately after outputting the assembled prompt (step remains `in_progress`). Completion is detected via crash recovery on the next invocation. See `scaffold run` [completion gate](#scaffold-run-step-flags) for details.
 
 ---
 

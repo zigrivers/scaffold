@@ -23,6 +23,8 @@ Assembly order: meta-prompt + KB + context + global instructions + per-step inst
 
 All layers are optional — missing files are silently skipped. The instructions directory (`.scaffold/instructions/`) is created by `scaffold init`.
 
+**Semantics note:** "Override" means semantic priority, not deletion. All three instruction layers are included in the assembled prompt's Instructions section with clear provenance labels (e.g., "Global instructions:", "Per-step instructions:", "Inline instructions:"). The AI interprets later layers as taking precedence when instructions conflict. When instructions are complementary (not conflicting), all layers apply.
+
 ## Rationale
 
 Three layers match three natural scopes (project, step, invocation). Later-overrides-earlier is the simplest mental model and matches CSS/config cascade conventions. Making all layers optional means users pay zero cost until they need customization. Git-committed instruction files enable team sharing.

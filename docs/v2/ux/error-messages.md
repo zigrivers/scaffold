@@ -625,6 +625,8 @@ The architecture error registry (system-architecture.md Section 7c) uses compone
 
 ### 3.5 Prompt Resolver
 
+> **Note:** Domain 01 (prompt resolution) was superseded by ADR-041 (meta-prompt architecture). The resolution codes below apply to the meta-prompt loader (domain 15) which replaces the original prompt resolver. Component references to "Prompt Resolver (Domain 01)" should be read as "Meta-Prompt Loader (Domain 15)."
+
 #### RESOLUTION_FILE_MISSING
 
 **Severity**: Error

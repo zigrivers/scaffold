@@ -1786,16 +1786,16 @@ This section maps every major architectural element to its governing ADR(s) and 
 | ~~Phrase-level tool-name mapping~~ | ~~05~~ | ~~ADR-023~~ | — | **superseded** (ADR-041) |
 | ~~Prompt frontmatter section targeting~~ | ~~08~~ | ~~ADR-015~~ | — | **superseded** (ADR-045) |
 | ~~Methodology manifest YAML format~~ | ~~01, 02~~ | ~~ADR-016~~ | — | **superseded** (ADR-043) |
-| Proposed: context window management | [15](../domain-models/15-assembly-engine.md) | [ADR-050](../adrs/ADR-050-context-window-management.md) | — | **proposed** |
-| Proposed: depth downgrade policy | [09](../domain-models/09-cli-architecture.md), [16](../domain-models/16-methodology-depth-resolution.md) | [ADR-051](../adrs/ADR-051-depth-downgrade-policy.md) | — | **proposed** |
-| Proposed: decision recording interface | [11](../domain-models/11-decision-log.md), [15](../domain-models/15-assembly-engine.md) | [ADR-052](../adrs/ADR-052-decision-recording-interface.md) | — | **proposed** |
-| Proposed: artifact context scope | [15](../domain-models/15-assembly-engine.md) | [ADR-053](../adrs/ADR-053-artifact-context-scope.md) | — | **proposed** |
-| Proposed: state methodology tracking | [03](../domain-models/03-pipeline-state-machine.md), [16](../domain-models/16-methodology-depth-resolution.md) | [ADR-054](../adrs/ADR-054-state-methodology-tracking.md) | — | **proposed** |
+| Context window management (`reads` field) | [15](../domain-models/15-assembly-engine.md) | [ADR-050](../adrs/ADR-050-context-window-management.md) | — | **current** |
+| Depth downgrade policy | [09](../domain-models/09-cli-architecture.md), [16](../domain-models/16-methodology-depth-resolution.md) | [ADR-051](../adrs/ADR-051-depth-downgrade-policy.md) | — | **current** |
+| Decision recording interface | [11](../domain-models/11-decision-log.md), [15](../domain-models/15-assembly-engine.md) | [ADR-052](../adrs/ADR-052-decision-recording-interface.md) | — | **current** |
+| Artifact context scope | [15](../domain-models/15-assembly-engine.md) | [ADR-053](../adrs/ADR-053-artifact-context-scope.md) | — | **current** |
+| State methodology tracking (dual fields) | [03](../domain-models/03-pipeline-state-machine.md), [16](../domain-models/16-methodology-depth-resolution.md) | [ADR-054](../adrs/ADR-054-state-methodology-tracking.md) | — | **current** |
 
 **Coverage verification:**
 
 - All 16 domain models (01-16) appear at least once — domains 01, 04, 12 in superseded rows; domains 15, 16 in current meta-prompt architecture rows
-- All 54 ADRs (001-054) are referenced — 39 accepted ADRs in current rows, 10 superseded ADRs in superseded rows, 5 proposed ADRs in proposed rows
+- All 54 ADRs (001-054) are referenced — 44 accepted ADRs in current rows, 10 superseded ADRs in superseded rows
 - Every architecture section (1-11) is referenced at least once in the Architecture Section(s) column
 
 ---
@@ -1807,7 +1807,7 @@ The following diagram shows how design decisions flow from domain analysis throu
 ```mermaid
 graph TD
     DM["Domain Models (16)<br/>─────────<br/>Define entities, algorithms,<br/>edge cases, and error taxonomies<br/>(3 superseded: 01, 04, 12)"]
-    ADR["Architecture Decision Records (54)<br/>─────────<br/>Record decisions about<br/>those entities with rationale<br/>(10 superseded, 5 proposed)"]
+    ADR["Architecture Decision Records (54)<br/>─────────<br/>Record decisions about<br/>those entities with rationale<br/>(10 superseded)"]
     ARCH["System Architecture (this document)<br/>─────────<br/>Maps decisions to components,<br/>modules, and data flows"]
     IMPL["Implementation Artifacts<br/>─────────<br/>Data schemas, API contracts,<br/>source code, tests"]
 
