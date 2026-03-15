@@ -9,9 +9,11 @@ knowledge-base: [scope-management]
 ---
 
 ## Purpose
-Verify specs stay aligned to PRD boundaries. Check that architecture,
-implementation tasks, and other artifacts have not introduced features,
-components, or complexity beyond what the PRD requires, and flag any
+Verify specs stay aligned to PRD boundaries. Check that user stories,
+architecture, implementation tasks, and other artifacts have not introduced
+features, components, or complexity beyond what the PRD requires. User stories
+should not introduce features not in the PRD — UX-level enhancements are
+allowed only via the innovation step with explicit user approval. Flag any
 scope expansion for explicit approval.
 
 ## Inputs
