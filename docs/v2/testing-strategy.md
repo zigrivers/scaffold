@@ -1,4 +1,4 @@
-<!-- scaffold:testing-strategy v2 2026-03-14 -->
+<!-- scaffold:testing-strategy v3 2026-03-14 -->
 
 # Scaffold v2 — Testing & Quality Strategy
 
@@ -198,6 +198,11 @@ Pattern: `describe('<ModuleName>')` → `describe('<methodName>()')` → `it('<v
 - Verify schema validation: reject state with unknown status values, missing `schema_version`
 - Test `in_progress` lifecycle: set before execution, clear after completion
 - Verify completion detection: artifacts on disk override state.json (ADR-018)
+- **Dual completion detection 4-cell matrix** (ADR-018, `src/state/completion.ts`): each scenario sets `in_progress` to a non-null `InProgressRecord`, configures the artifact condition, calls `checkCompletion()`, and asserts the result:
+  - All artifacts exist → `confirmed_complete` (auto-mark completed, clear `in_progress`)
+  - No artifacts exist → `incomplete` (recommend re-run)
+  - Partial artifacts (some present, some missing) → `partial` (offer user choice; `--auto` mode: re-run)
+  - Zero-byte artifact present → `confirmed_complete` with `PSM_ZERO_BYTE_ARTIFACT` warning (file existence is the check, not file size)
 - **Mock boundary**: Use real filesystem via temp directories; mock nothing
 
 **Decision Logger** (`src/core/decisions/logger.ts`):
@@ -214,7 +219,8 @@ Pattern: `describe('<ModuleName>')` → `describe('<methodName>()')` → `it('<v
 - Test stale detection: `process.kill(pid, 0)` throws `ESRCH` → auto-clear
 - Test PID recycling: `processStartedAt` mismatch > 2 seconds → stale
 - Test `EPERM`: different user → treat as stale
-- **Mock boundary**: Mock `process.kill()` for PID checks; mock `os.hostname()` for holder field; use real filesystem via temp directories
+- **Platform-specific PID timestamp retrieval**: `processStartedAt` is obtained via platform-specific methods (macOS: `ps -o lstart=`, Linux: `/proc/PID/stat` field 22, fallback: `new Date().toISOString()`). Mock the platform detection layer (e.g., `getPlatform()` or `os.platform()`) — not `child_process.exec` directly — so unit tests exercise each platform branch independently. Provide fixtures for each platform's raw output format: a `ps -o lstart=` sample string, a `/proc/PID/stat` content string with field 22 populated, and a fallback path that returns an ISO timestamp.
+- **Mock boundary**: Mock `process.kill()` for PID checks; mock `os.hostname()` for holder field; mock platform detection for `processStartedAt` branches; use real filesystem via temp directories
 
 **Methodology Preset Loader** (`src/core/methodology/preset-loader.ts`):
 - Test against fixture preset YAML files in `tests/fixtures/presets/`
@@ -792,7 +798,7 @@ Three sub-scenarios:
 - Each test creates an isolated temp directory — no shared state between tests
 - Tests clean up temp directories in `afterEach`
 - E2E suite must complete within **30 seconds** total
-- **No network access** in any test
+- **No network access** in any test — enforced via a vitest `setupFiles` script (`tests/helpers/no-network.ts`) that installs a global `beforeAll` hook stubbing `net.connect`, `http.request`, `https.request`, and `globalThis.fetch` to throw `Error('Network access is not allowed in tests')`. This catches accidental network calls at runtime rather than relying on developer discipline.
 - Meta-prompt and knowledge base fixtures are minimal (10-20 lines each)
 - AI execution is mocked — the assembly engine produces output, but no AI model is called
 
@@ -807,6 +813,7 @@ Vitest benchmark mode with realistic fixture data. Performance tests live in `te
 | Assembly (9-step sequence) | < 500ms | `assembly-benchmark.test.ts` | 32 meta-prompts, 32 KB entries, populated state |
 | Step listing (status/list/next) | < 200ms | `state-io-benchmark.test.ts` | 32-step state with mixed statuses |
 | State I/O (read + write) | < 100ms | `state-io-benchmark.test.ts` | Realistic state.json (~100KB) |
+| Dependency resolution (Kahn's) | < 10ms | `state-io-benchmark.test.ts` | 32-node graph with 31 edges (realistic pipeline topology) |
 | Build (all platforms) | < 2s | `build-benchmark.test.ts` | 32 meta-prompts, 3 platforms |
 
 ### Benchmark Pattern
@@ -888,7 +895,7 @@ Coverage decrease detection: CI compares coverage percentages against the base b
 - E2E test suite
 - Coverage threshold enforcement (fail if below targets in Section 9, via vitest `coverage.thresholds`)
 - `npm audit --audit-level=high` — dependency vulnerability scanning (fail on high/critical)
-- No performance benchmarks in CI (environment-dependent timing)
+- No performance benchmarks in CI (environment-dependent timing). **Phase 7+ addition**: after the test suite stabilizes, add a CI step that runs `npm run test:bench` and parses vitest benchmark JSON output against hardcoded p95 thresholds. Vitest benchmark mode does not support threshold assertions natively — the CI script reads the JSON output and fails if any p95 exceeds its budget from Section 8.
 
 If the CI pipeline exceeds the 3-minute budget, investigate before adding parallelization — the budget is a gate, not an aspiration.
 
@@ -901,7 +908,7 @@ If the CI pipeline exceeds the 3-minute budget, investigate before adding parall
 ### Periodic (Manual/Scheduled)
 
 - Performance benchmarks (Section 8) against realistic data
-- Mutation testing to assess test suite quality (Stryker) — aspirational for v2.1; adopt when test suite stabilizes after initial implementation
+- Mutation testing to assess test suite quality (Stryker with `@stryker-mutator/core` and vitest runner plugin) — adopt after Phase 7 integration tasks complete and test suite achieves >80% branch coverage project-wide. Initial target: >60% mutation score on `src/core/` and `src/state/` (the modules where correctness matters most). Mutation testing stays periodic/manual — do not add to CI gates.
 - Visual dashboard verification via Playwright MCP (if dashboard changes)
 
 ---
