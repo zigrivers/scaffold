@@ -149,3 +149,19 @@ Fix upstream documents first so downstream documents can reference corrected ver
 12. Add a terminology glossary note mapping "step" (user-facing) ↔ "prompt" (data model)
 13. Operations-runbook.md §7.3: Resolve Node 18 EOL status vs CI matrix
 14. Fix remaining minor naming drift items
+
+---
+
+## Fix Status
+
+**All 25 findings addressed.** Date: 2026-03-14.
+
+Documents modified:
+- `system-architecture.md` — P0-2 (content directory rewrite), P2-14 (duplicate info.ts), P1-7 (barrel file exception), P1-3 (4-level depth), P1-10/P1-11 (`produces` → `outputs`, removed `reads` frontmatter), Constraint-1/2/9/11 (methodology/mixin/adapter cleanup), `Resume` → `Run` in §5a
+- `testing-strategy.md` — P0-1 (7 file paths), P0-3 (factory fields), P0-4 (schema_version), P0-5 co-fix (preset loader path), P1-4 (config_methodology), remaining §4 paths, §9 coverage table paths
+- `task-breakdown.md` — P0-5 (T-006 path), P1-12 (T-011 filename)
+- `operations-runbook.md` — P1-8 (§8.2 barrel file), P1-9 (§2.4/§8.2 assembly path), P3 (§7.3 Node 18 clarification)
+- `security-practices.md` — P1 Flow Walking #3 (added `codex-prompts/*.md`, `prompts/*.md`, `scaffold-pipeline.md`, `CLAUDE.md` to writes table)
+- `ADR-012-state-file-design.md` — `scaffold resume` → `scaffold run`
+- `ADR-019-advisory-locking.md` — `scaffold resume` → `scaffold run`
+- `ADR-040-error-handling-philosophy.md` — `scaffold resume` → `scaffold run`
