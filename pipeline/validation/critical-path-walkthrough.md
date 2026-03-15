@@ -10,9 +10,10 @@ knowledge-base: [critical-path-analysis]
 
 ## Purpose
 Walk critical user journeys end-to-end across all specs. Trace the most
-important user flows from PRD through UX, API contracts, architecture
-components, database operations, and implementation tasks to verify
-completeness and consistency at every layer.
+important user flows from PRD through user stories, UX spec, API contracts,
+architecture components, database operations, and implementation tasks.
+Use story acceptance criteria as the definition of "correct behavior" when
+verifying completeness and consistency at every layer.
 
 ## Inputs
 - All phase output artifacts (docs/prd.md, docs/domain-models/, docs/adrs/,
