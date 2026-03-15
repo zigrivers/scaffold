@@ -1,4 +1,4 @@
-<!-- scaffold:operations-runbook v2 2026-03-14 -->
+<!-- scaffold:operations-runbook v3 2026-03-14 -->
 
 # Scaffold v2 — Operations & Deployment Runbook
 
@@ -137,7 +137,7 @@ node --version   # Should print 18.x or 22.x
 If you don't have `nvm`, install it or use `fnm`. The minimum version is enforced by `package.json` `engines.node`.
 
 **Tests pass locally but fail in CI:**
-Check the Node version matrix — CI runs Node 18 and 22. A test using a Node 22 API will fail on 18. Use feature detection or polyfills for cross-version compatibility. To test both versions locally: `nvm install 18 && nvm use 18 && npm test`, then repeat for 22.
+Check the Node version matrix — CI runs Node 18 and 22. A test using a Node 22 API will fail on 18. Use feature detection or polyfills for cross-version compatibility. To test both versions locally: `nvm install 18 && nvm use 18 && npm test`, then repeat for 22. For full CI parity, run `npm run check` (not just `npm test`) under each Node version. To fully reproduce CI conditions: use `npm ci` (not `npm install`), delete `dist/` before building, and run with `--no-cache` if vitest caching is suspected. For filesystem case-sensitivity issues on macOS, create a case-sensitive disk image: `hdiutil create -size 2g -fs 'Case-sensitive APFS' -volname CaseSensitive cs.dmg && open cs.dmg`.
 
 **Platform differences (macOS local vs Ubuntu CI):**
 CI runs on `ubuntu-latest`. Known divergences:
@@ -270,6 +270,10 @@ on:
   push:
     tags: ['v*']
 
+concurrency:
+  group: release
+  cancel-in-progress: false   # Never cancel an in-progress publish
+
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
@@ -315,6 +319,8 @@ Configure on the `main` branch:
 - Require branches to be up to date before merging
 - No direct pushes to main (except tags)
 
+GitHub sends email notifications to the commit author on workflow failure by default. For team-wide visibility, configure a repository webhook or GitHub Actions notification to a shared channel.
+
 ---
 
 ## 4. Release Process
@@ -345,7 +351,7 @@ Scaffold follows [semver](https://semver.org):
 5. **Push tag**: `git push origin main --tags` — triggers the release workflow
 6. **Verify release**:
    - Release workflow succeeds in GitHub Actions
-   - `npm info @scaffold-cli/scaffold version` returns the new version
+   - `npm info @scaffold-cli/scaffold version` returns the new version (npm registry propagation can take 1-5 minutes — retry after a short delay if the version doesn't appear immediately)
    - `npx @scaffold-cli/scaffold --version` returns the new version (from a clean directory)
 7. **Update Homebrew formula** (see §4.7)
 
@@ -446,19 +452,21 @@ Verify: `brew update && brew upgrade scaffold && scaffold --version` matches the
 ```bash
 npm unpublish @scaffold-cli/scaffold@<bad-version>
 ```
-If the package exceeds 300 weekly downloads or has dependents, npm blocks unpublish even within 72 hours. In that case, use deprecation (below).
+If the package exceeds 300 weekly downloads or has dependents, npm blocks unpublish even within 72 hours. In that case, use deprecation (below). Unpublish takes effect within minutes of running the command.
 
 **After 72 hours or when unpublish is blocked**:
 ```bash
 npm deprecate @scaffold-cli/scaffold@<bad-version> "Known issue: <description>. Use <good-version> instead."
 ```
-Deprecated versions show a warning on install but remain available.
+Deprecated versions show a warning on install but remain available. Deprecation propagates within minutes.
+
+**Git tags for bad releases**: Do NOT delete the git tag — it documents release history and the GitHub Release (even if edited with a warning) provides context. Only delete tags for releases that were never actually published to npm.
 
 ### 5.2 Dual-Channel Rollback Sequencing
 
 **Order**: Roll back Homebrew **first**, then npm. Rationale: if the Homebrew formula sources from the npm registry, rolling back npm first could leave Homebrew pointing to a missing version.
 
-1. Revert the Homebrew formula PR in the tap repository — users receive the previous version on `brew update && brew upgrade`
+1. Revert the Homebrew formula PR in the tap repository — users receive the previous version on their next `brew update && brew upgrade` (not instant; depends on when users update)
 2. Unpublish or deprecate the npm version (see §5.1)
 3. Verify both channels serve the correct version
 
@@ -520,6 +528,12 @@ Each scenario follows: **Symptoms** → **Diagnosis** → **Resolution** → **V
 - *Resolution*: Write a test that catches the platform-specific failure, fix the code, publish a patch.
 - *Verification*: Test passes on both platforms/versions. Ask the reporting user to verify with the patched version.
 
+**Scenario D: Homebrew tap CI rejects the formula update PR**
+- *Symptoms*: PR to `zigrivers/homebrew-scaffold` fails CI (audit failure, test failure, or style violation).
+- *Diagnosis*: Check the tap CI logs. Common causes: SHA mismatch (npm tarball changed after initial publish), missing dependency declaration, or `brew audit` style violations.
+- *Resolution*: Fix the formula locally, run `brew audit --strict Formula/scaffold.rb` and `brew test scaffold`, push the fix.
+- *Verification*: Tap CI passes. `brew install scaffold` from the updated tap works and `scaffold --version` matches the npm version.
+
 ---
 
 ## 6. Security Practices
@@ -574,6 +588,7 @@ Scaffold is a CLI tool — there is no runtime to monitor. Release health is tra
 | Bug reports | GitHub Issues | Daily triage |
 | Feature requests | GitHub Discussions or Beads | Weekly review |
 | npm audit advisories | `npm audit` locally or Dependabot alerts | Continuous (CI) |
+| CI workflow health | GitHub Actions tab — check for failures on `main` | After each push to main |
 
 **Post-release verification** (within 48 hours of a release):
 1. Verify `npx @scaffold-cli/scaffold --version` from a clean temp directory returns the new version
@@ -582,11 +597,31 @@ Scaffold is a CLI tool — there is no runtime to monitor. Release health is tra
 4. Monitor npm download stats — a sudden drop may indicate a broken release
 5. If a platform-specific issue is suspected, test on macOS and Linux (or ask a contributor to verify)
 
+For major releases, repeat verification at 1 week to catch issues that only appear with broader adoption.
+
 ### 7.2 Dependency Updates
 
 - Run `npm outdated` monthly to identify available updates
-- Configure **Dependabot** or **Renovate** for automated dependency update PRs
-- Group minor/patch updates into single PRs to reduce noise
+- Configure **Dependabot** for automated dependency update PRs:
+
+```yaml
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+```
+
+- Group minor/patch updates into single PRs to reduce noise (configured via `groups` above)
 - Test thoroughly before merging major dependency updates (especially yargs, vitest, TypeScript)
 
 ### 7.3 Node.js Version Lifecycle
