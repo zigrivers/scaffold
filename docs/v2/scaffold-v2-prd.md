@@ -145,7 +145,7 @@ User invokes: scaffold run <step> [--instructions "..."]
 
 Get the user from idea to the point where AI agents can begin implementation with comprehensive context.
 
-### Complete Pipeline (32 steps)
+### Complete Pipeline (35 steps)
 
 #### Pre-Pipeline: Project Definition
 
@@ -153,6 +153,9 @@ Get the user from idea to the point where AI agents can begin implementation wit
 |------|-------------|-------------|
 | `create-prd` | Product requirements document | No |
 | `prd-gap-analysis` | Find gaps in requirements | No |
+| `user-stories` | Translate PRD features into user stories with acceptance criteria | No |
+| `review-user-stories` | Multi-pass review of user stories for PRD coverage, quality, downstream readiness | No |
+| `innovate-user-stories` | Discover UX-level enhancements and innovation opportunities | if-needed |
 
 #### Phase 1: Domain Modeling
 
@@ -233,7 +236,7 @@ The v1 pipeline includes project-setup steps that are not separate phases in the
 | Dev Environment Setup | Phase 9: Operations & Deployment | Dev env is an operational concern |
 | Git Workflow | Finalization: Implementation Playbook | Agents need branching/PR strategy when they start work |
 | Design System | Phase 6: UI/UX Specification | Design system is part of UX spec (conditional, if-needed) |
-| User Stories | Phase 7: Implementation Task Breakdown | Stories inform and become tasks |
+| User Stories | Pre-Pipeline: Project Definition | Now a first-class phase with creation, review, and innovation steps |
 
 ---
 
@@ -244,7 +247,7 @@ The v1 pipeline includes project-setup steps that are not separate phases in the
 | | Deep Domain Modeling | MVP | Custom |
 |---|---|---|---|
 | **Who it's for** | Teams building complex/long-lived systems | Solo devs, hackathons, proofs of concept | Everyone else |
-| **Steps** | All 32 steps active | 4 steps only | User chooses |
+| **Steps** | All 35 steps active | 6 steps only | User chooses |
 | **Depth** | 5 (maximum) at every step | 1 (minimum) at every step | User sets per step (1-5) |
 | **Output volume** | Comprehensive docs, full analysis | Lean docs, just enough to start | Varies |
 
@@ -262,11 +265,13 @@ The v1 pipeline includes project-setup steps that are not separate phases in the
 
 **Enabled** (depth 1):
 - `create-prd`
+- `user-stories`
+- `review-user-stories`
 - `phase-07-implementation-tasks`
 - `phase-08-testing-strategy`
 - `implementation-playbook`
 
-**Skipped**: All other steps (gap analysis, phases 1-6, all reviews, all validation, operations, security, developer onboarding, apply-fixes).
+**Skipped**: All other steps (gap analysis, innovation, phases 1-6, all phase reviews, all validation, operations, security, developer onboarding, apply-fixes).
 
 ### Methodology is Changeable
 
