@@ -193,7 +193,7 @@ Scaffold does not accept arbitrary paths for reading — only paths within the p
 
 ### YAML/JSON Parsing Safety
 
-- **`js-yaml`** (v4+): Uses `yaml.load()` which is safe by default — it does not support custom YAML tags that could trigger code execution (the dangerous `yaml.load()` with custom schemas is opt-in). Scaffold does not use custom schemas.
+- **`js-yaml`** (v4+): Used for `config.yml` and `methodology/*.yml` preset files. Uses `yaml.load()` which is safe by default — it does not support custom YAML tags that could trigger code execution (the dangerous `yaml.load()` with custom schemas is opt-in). Scaffold does not use custom schemas.
 - **`JSON.parse()`**: Native Node.js JSON parsing. Cannot execute code. Throws `SyntaxError` on malformed input, caught and reported as `CONFIG_PARSE_ERROR` or `STATE_PARSE_ERROR`.
 - **JSONL parsing** (`decisions.jsonl`): Each line is parsed independently with `JSON.parse()`. A malformed line is skipped with a warning, not a crash.
 
