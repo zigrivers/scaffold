@@ -28,7 +28,7 @@ trade-offs.
 - Every finding categorized by severity
 - Missing decisions identified and documented
 - Contradictions resolved
-- Downstream readiness confirmed (Phase 3 can proceed)
+- Downstream readiness confirmed (architecture phase can proceed)
 
 ## Methodology Scaling
 - **deep**: All review passes. Full findings report. Fixes applied and re-validated.

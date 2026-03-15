@@ -35,7 +35,7 @@ task decomposition downstream.
 ## Methodology Scaling
 - **deep**: Full story template with IDs, persona journey maps, cross-story
   dependency graphs, Given/When/Then acceptance criteria with parameterized
-  examples, story-to-domain-event mapping for Phase 1 consumption.
+  examples, story-to-domain-event mapping for domain modeling consumption.
 - **mvp**: Flat list of one-liner stories grouped by PRD section. One bullet
   per story for the primary success condition. No epics, no scope boundaries.
 - **custom:depth(1-5)**: Depth 1-2: flat list with brief acceptance criteria.

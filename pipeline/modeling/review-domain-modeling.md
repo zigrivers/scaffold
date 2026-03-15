@@ -27,7 +27,7 @@ and re-validate.
 - Every finding categorized by severity (P0-P3)
 - Fix plan created for P0 and P1 findings
 - Fixes applied and re-validated
-- Downstream readiness confirmed (Phase 2 can proceed)
+- Downstream readiness confirmed (decisions phase can proceed)
 
 ## Methodology Scaling
 - **deep**: All review passes from the knowledge base. Full findings report

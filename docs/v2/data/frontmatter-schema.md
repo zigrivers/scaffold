@@ -49,7 +49,7 @@ The following JSON Schema defines the structure that parsed YAML frontmatter mus
   "title": "MetaPromptFrontmatter",
   "description": "YAML frontmatter schema for scaffold meta-prompt files. Validated at runtime by the Assembly Engine.",
   "type": "object",
-  "required": ["name", "description", "phase", "outputs"],
+  "required": ["name", "description", "phase", "order", "outputs"],
   "additionalProperties": true,
   "properties": {
     "name": {
@@ -65,6 +65,12 @@ The following JSON Schema defines the structure that parsed YAML frontmatter mus
     "phase": {
       "type": "string",
       "description": "Pipeline phase identifier. Values: 'pre', 'modeling', 'decisions', 'architecture', 'specification', 'planning', 'quality', 'validation', 'finalization'. Used for display grouping and ordering."
+    },
+    "order": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 36,
+      "description": "Unique step position used as the primary tiebreaker in Kahn's algorithm topological sort. Lower values are dequeued first when multiple steps have zero in-degree. Each step has a unique order value."
     },
     "dependencies": {
       "type": "array",
@@ -126,7 +132,7 @@ The following JSON Schema defines the structure that parsed YAML frontmatter mus
 }
 ```
 
-**Note on `required` fields**: Unlike the original frontmatter schema which had no required fields, meta-prompt frontmatter requires `name`, `description`, `phase`, and `outputs`. Every meta-prompt must declare its identity, purpose, phase, and what it produces.
+**Note on `required` fields**: Unlike the original frontmatter schema which had no required fields, meta-prompt frontmatter requires `name`, `description`, `phase`, `order`, and `outputs`. Every meta-prompt must declare its identity, purpose, phase, execution order, and what it produces.
 
 **Note on `additionalProperties: true`**: Per [ADR-033](../adrs/ADR-033-forward-compatibility-unknown-fields.md), unknown fields produce warnings but do not cause validation failure. This supports forward compatibility.
 
@@ -176,10 +182,10 @@ Pipeline phase for display grouping and ordering.
 | Type | `string` |
 | Required | Yes |
 | Valid values | `"pre"`, `"modeling"`, `"decisions"`, `"architecture"`, `"specification"`, `"planning"`, `"quality"`, `"validation"`, `"finalization"` |
-| Used by | `scaffold status` phase grouping, `scaffold list` display, Kahn's algorithm phase tiebreaker |
+| Used by | `scaffold status` phase grouping, `scaffold list` display |
 | Error code | `FRONTMATTER_PHASE_INVALID` (exit 1) when not a recognized phase identifier |
 
-**Note**: The phase is a display and ordering hint. It does not enforce execution constraints — the dependency graph is the authoritative execution ordering. Phase is a secondary tiebreaker within the topological sort.
+**Note**: The phase is a display and grouping hint. It does not enforce execution constraints — the dependency graph is the authoritative execution ordering. The `order` field (not phase) is the primary tiebreaker within the topological sort.
 
 **Example values**:
 - `"pre"` (project definition steps)
@@ -187,6 +193,26 @@ Pipeline phase for display grouping and ordering.
 - `"architecture"` (system architecture review)
 - `"validation"` (validation phase steps)
 - `"finalization"` (finalization phase steps)
+
+### `order` (integer)
+
+Unique step position used as the primary tiebreaker in Kahn's algorithm.
+
+| Property | Value |
+|----------|-------|
+| Type | `integer` |
+| Required | Yes |
+| Range | 1–36 |
+| Uniqueness | Each step must have a unique `order` value across all meta-prompts |
+| Used by | Kahn's algorithm tiebreaker (`order ASC, slug ASC`), `scaffold list` display ordering |
+| Error code | `FRONTMATTER_ORDER_MISSING` (exit 1) when absent; `FRONTMATTER_ORDER_INVALID` (exit 1) when not an integer in 1–36; `FRONTMATTER_ORDER_DUPLICATE` (exit 1) when two meta-prompts share the same order value |
+
+**Note**: The `order` field is more granular than `phase` — it provides a unique position for every step, ensuring fully deterministic ordering when multiple steps have zero in-degree during topological sort. Steps with lower `order` values are dequeued first, with alphabetical slug as the secondary tiebreaker.
+
+**Example values**:
+- `1` (create-prd — first step in the pipeline)
+- `7` (domain-modeling)
+- `30` (scope-creep-check — late validation step)
 
 ### `dependencies` (string[])
 
@@ -408,6 +434,7 @@ All frontmatter keys use **kebab-case**: lowercase letters, digits, and hyphens.
 | `name` | `name` |
 | `description` | `description` |
 | `phase` | `phase` |
+| `order` | `order` |
 | `dependencies` | `dependencies` |
 | `outputs` | `outputs` |
 | `conditional` | `conditional` |
@@ -436,6 +463,8 @@ These checks run on each meta-prompt file independently.
 | Description present | `description` field exists and is a non-empty string | `FRONTMATTER_DESCRIPTION_MISSING` | Error | 1 | `Meta-prompt {file} is missing required 'description' field.` |
 | Phase present | `phase` field exists | `FRONTMATTER_PHASE_INVALID` | Error | 1 | `Meta-prompt {file} is missing required 'phase' field.` |
 | Phase valid | `phase` is a recognized phase identifier | `FRONTMATTER_PHASE_INVALID` | Error | 1 | `Meta-prompt {file} phase '{value}' is not a valid phase identifier.` |
+| Order present | `order` field exists and is an integer | `FRONTMATTER_ORDER_MISSING` | Error | 1 | `Meta-prompt {file} is missing required 'order' field.` |
+| Order valid | `order` is an integer in range 1–36 | `FRONTMATTER_ORDER_INVALID` | Error | 1 | `Meta-prompt {file} order '{value}' is not a valid integer in range 1–36.` |
 | Outputs present | `outputs` field exists and is a non-empty array | `FRONTMATTER_OUTPUTS_MISSING` | Error | 1 | `Meta-prompt {file} is missing required 'outputs' field.` |
 | `dependencies` type | If present, must be an array of kebab-case strings | `FRONTMATTER_DEPENDS_INVALID_SLUG` | Error | 1 | `{file} dependencies entry '{value}' is not valid kebab-case.` |
 | `outputs` type | If present, must be an array of non-empty strings | `FRONTMATTER_YAML_ERROR` | Error | 1 | `{file} outputs must be an array of non-empty strings.` |
@@ -456,6 +485,7 @@ These checks run after all meta-prompts are parsed and require knowledge of the 
 | `knowledge-base` entries exist | Each entry resolves to a file in `knowledge/` | `FRONTMATTER_KB_ENTRY_MISSING` | Error | 1 | `{file} references knowledge base entry '{entry}' which does not exist.` |
 | `reads` targets exist | Each name matches another meta-prompt's `name` field | `FRONTMATTER_READS_INVALID_STEP` | Error | 1 | `{file} reads entry '{name}' does not exist in the pipeline.` |
 | Name matches filename | `name` field matches the filename stem | `FRONTMATTER_NAME_MISMATCH` | Warning | 0 | `{file} name '{name}' does not match filename stem '{stem}'.` |
+| `order` unique | No two meta-prompts share the same `order` value | `FRONTMATTER_ORDER_DUPLICATE` | Error | 1 | `Meta-prompts {file1} and {file2} both have order {value}. Each step must have a unique order.` |
 | `outputs` path format | Paths must be relative, no `..` traversal, forward slashes only | `FRONTMATTER_PATH_FORMAT_INVALID` | Error | 1 | `Path '{path}' in outputs for {file} is invalid.` |
 
 ### Error Accumulation
@@ -475,6 +505,7 @@ A meta-prompt with only required fields:
 name: create-prd
 description: Create a product requirements document
 phase: "pre"
+order: 1
 outputs:
   - docs/prd.md
 ---
@@ -489,6 +520,7 @@ A typical meta-prompt with dependencies and knowledge base references:
 name: system-architecture
 description: Design and document system architecture
 phase: "architecture"
+order: 11
 dependencies:
   - adrs
 outputs:
@@ -507,6 +539,7 @@ A meta-prompt for a step that may not apply to all projects:
 name: database-schema
 description: Design database schema from domain models
 phase: "specification"
+order: 13
 dependencies:
   - system-architecture
 outputs:
@@ -526,6 +559,7 @@ A review step with multiple knowledge base entries:
 name: review-domain-modeling
 description: Review domain models for completeness, consistency, and downstream readiness
 phase: "modeling"
+order: 8
 dependencies:
   - domain-modeling
 outputs:
@@ -545,6 +579,7 @@ A validation step that depends on all core phases completing:
 name: cross-phase-consistency
 description: Audit consistency across all phases — naming, assumptions, data flows, interface contracts
 phase: "validation"
+order: 27
 dependencies:
   - review-security
 outputs:
@@ -564,7 +599,7 @@ outputs:
   - docs/architecture.md
 ---
 ```
-Errors: `FRONTMATTER_NAME_MISSING`, `FRONTMATTER_DESCRIPTION_MISSING` — meta-prompts must declare `name` and `description`.
+Errors: `FRONTMATTER_NAME_MISSING`, `FRONTMATTER_DESCRIPTION_MISSING`, `FRONTMATTER_ORDER_MISSING` — meta-prompts must declare `name`, `description`, and `order`.
 
 **Invalid dependency name**:
 ```yaml
