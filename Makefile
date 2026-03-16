@@ -18,7 +18,6 @@ setup: ## Install dev dependencies via Homebrew
 	@command -v shellcheck >/dev/null 2>&1 || { echo "Installing shellcheck..."; brew install shellcheck; }
 	@command -v bats >/dev/null 2>&1 || { echo "Installing bats-core..."; brew install bats-core; }
 	@command -v jq >/dev/null 2>&1 || { echo "Installing jq..."; brew install jq; }
-	@command -v bd >/dev/null 2>&1 || { echo "Installing beads..."; brew install beads; }
 	@echo "All dev dependencies installed."
 
 hooks: ## Install pre-commit and pre-push hooks

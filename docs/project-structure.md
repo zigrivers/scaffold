@@ -70,14 +70,6 @@ scaffold/
 ├── .claude/                   # Claude Code configuration
 │   ├── settings.json          # Project-level permissions
 │   └── settings.local.json    # Local machine overrides
-├── .beads/                    # Beads task database (managed by bd CLI)
-│   ├── config.yaml            # Beads project configuration
-│   ├── beads.db               # SQLite database
-│   ├── issues.jsonl           # Issue log
-│   ├── interactions.jsonl     # Interaction history
-│   ├── metadata.json          # Database metadata
-│   ├── sync-state.json        # Git sync state
-│   └── dolt/                  # Distributed database storage
 ├── tasks/                     # Session-specific task notes
 │   └── lessons.md
 ├── prompts.md                 # Source of truth for all prompts
@@ -122,7 +114,6 @@ Scaffold uses a **role-based** organization. Each directory has a single clear p
 | Plugin manifest | `.claude-plugin/` | `plugin.json`, `marketplace.json` |
 | CI/CD & templates | `.github/` | GitHub Actions workflows, PR template |
 | Claude Code config | `.claude/` | Project and local permissions (`settings.json`) |
-| Task tracking | `.beads/` | Beads SQLite database (managed by `bd` CLI) |
 | Session notes | `tasks/` | Learning log (`lessons.md`) |
 
 **Why role-based**: Scaffold isn't a feature-driven app — it's a tool pipeline. Each directory has a single clear purpose. There's no "auth module" or "sessions feature." Merge conflicts are minimized because prompt work, script work, and doc work happen in separate directories.
@@ -158,7 +149,6 @@ Scaffold uses a **role-based** organization. Each directory has a single clear p
 |------|------|------------|
 | `prompts.md` | Single source of truth, ~8500 lines | Only one agent edits at a time. Extract to `commands/` after editing. |
 | `CLAUDE.md` | Project guidance | Sections are independent — agents edit specific sections only. |
-| `.beads/beads.db` | Task tracking database | Managed by `bd` CLI — never edit directly. |
 
 ### Shared Utility Rule (future)
 
@@ -225,10 +215,8 @@ Additional `.bats` files should be added as scripts are created or modified, fol
 | Committed | Not Committed (in .gitignore) |
 |-----------|-------------------------------|
 | All source files (scripts, commands, docs, lib) | `coverage/` (kcov output) |
-| `.beads/config.yaml`, `issues.jsonl`, `metadata.json` | `.beads/beads.db-wal`, `.beads/beads.db-shm` (WAL files) |
-| `.beads/beads.db` (task database) | `.beads/daemon.*` (daemon lock/pid/log) |
-| Config files (`.editorconfig`, `.shellcheckrc`) | `.beads/ephemeral.sqlite3` |
-| `plugin.json`, `marketplace.json` | `*.tmp` (atomic write temp files) |
+| Config files (`.editorconfig`, `.shellcheckrc`) | `*.tmp` (atomic write temp files) |
+| `plugin.json`, `marketplace.json` | `.DS_Store` (already ignored) |
 | `tests/fixtures/` (test data) | `.DS_Store` (already ignored) |
 | `tests/screenshots/baseline/` (reference screenshots) | `.history/` (already ignored) |
 | `.github/` (CI workflows, PR template) | `*~`, `*.bak` (editor backup files) |
