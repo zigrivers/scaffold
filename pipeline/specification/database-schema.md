@@ -3,7 +3,7 @@ name: database-schema
 description: Design database schema from domain models
 phase: "specification"
 order: 13
-dependencies: [system-architecture]
+dependencies: [review-architecture]
 outputs: [docs/database-schema.md]
 conditional: "if-needed"
 knowledge-base: [database-design]

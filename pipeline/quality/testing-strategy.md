@@ -3,7 +3,7 @@ name: testing-strategy
 description: Define testing and quality strategy across all layers
 phase: "quality"
 order: 19
-dependencies: [system-architecture]
+dependencies: [review-architecture]
 outputs: [docs/testing-strategy.md]
 conditional: null
 knowledge-base: [testing-strategy]
