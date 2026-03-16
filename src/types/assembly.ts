@@ -79,6 +79,10 @@ export interface AssemblyOptions {
   state: PipelineState
   metaPrompt: MetaPromptFile
   knowledgeEntries: KnowledgeEntry[]
+  /** Pre-loaded artifacts from the dependency chain (caller is responsible for loading). */
+  artifacts?: ArtifactEntry[]
+  /** Pre-formatted decisions string (caller is responsible for loading). */
+  decisions?: string
   instructions: UserInstructions
   depth: DepthLevel
   depthProvenance: DepthProvenance
