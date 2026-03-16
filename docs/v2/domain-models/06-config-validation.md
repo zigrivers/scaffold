@@ -1678,14 +1678,18 @@ Fully defined in Algorithm 4 (Section 5). The validation chain is:
 
 ### Open Questions
 
-1. **Should `project.mode` (brownfield/greenfield) be an explicit config field?**
+1. **Should `project.mode` (brownfield/greenfield) be an explicit config field?** *(Resolved)*
    The spec mentions `mode: brownfield` in config but the brownfield detection section describes it as being set during `scaffold init`. The current model doesn't include `mode` as a config field — brownfield behavior is determined by the init wizard and recorded in `state.json` as `init-mode`. Should it also appear in config.yml for hand-editing scenarios?
+
+   > **Resolution**: Resolved: `mode` is stored in `state.json` only (set during init/adopt detection). Config.yml does not include a `mode` field — mode is a runtime detection result, not a user configuration choice.
 
 2. **How strict should extra-prompt frontmatter validation be?**
    Currently, only `description` is required for extra-prompts. Should `produces` also be required? Without `produces`, the pipeline can't do artifact-based completion detection for custom prompts. The tradeoff is ease of authoring vs. pipeline reliability.
 
-3. **Should config support future mixin axes without a CLI update?**
+3. **Should config support future mixin axes without a CLI update?** *(Obsolete)*
    If a methodology manifest references a mixin axis not in the hardcoded list (e.g., `documentation-style`), should the config validator accept it? This would enable methodology authors to define custom axes, but it weakens validation. Current model treats unknown axes as errors.
+
+   > **Resolution**: Obsolete: mixin axes eliminated by ADR-041 (meta-prompt architecture). Methodology presets use depth levels and per-step enable/disable instead.
 
 4. **What's the YAML library recommendation for comment preservation?**
    `scaffold add` needs to modify config without losing user comments. The `yaml` npm package supports this, but the specific API depends on implementation. This affects both config modification and migration write-back.

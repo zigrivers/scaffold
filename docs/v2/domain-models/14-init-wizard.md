@@ -1961,9 +1961,12 @@ function simulateWizardAnswers(answers: string[]): void;
 
    **Recommendation**: Yes, scan `~/.scaffold/methodologies/` in addition to the bundled ones. This enables the methodology extension story in Phase 3 without requiring CLI changes later.
 
-3. **How should `--auto` handle ambiguous codebase detection?** If both v1 artifacts AND brownfield signals are present, `--auto` uses v1-migration (higher priority). But what if v1 detection finds only weak signals (e.g., `.beads/` exists but no tracking comments)? Should auto mode still commit to v1 migration?
+3. **How should `--auto` handle ambiguous codebase detection?** *(Resolved)*
+   If both v1 artifacts AND brownfield signals are present, `--auto` uses v1-migration (higher priority). But what if v1 detection finds only weak signals (e.g., `.beads/` exists but no tracking comments)? Should auto mode still commit to v1 migration?
 
    **Recommendation**: In `--auto` mode, require at least one v1 tracking comment (not just `.beads/` or `tasks/lessons.md`) to trigger v1-migration. Weak v1 signals in auto mode should fall through to brownfield detection. Interactive mode can still offer the v1 migration prompt for any v1 signal.
+
+   > **Resolution**: Resolved: `--auto` mode requires at least one v1 tracking comment (`<!-- scaffold:...-->`) in project files to trigger v1-migration mode. `.beads/` directory presence alone is insufficient — it could be a non-scaffold Beads usage.
 
 4. **Should the wizard offer a "preview pipeline" step before confirmation?** The summary shows methodology, mixins, and prompt count, but not the full resolved pipeline. Should the wizard optionally expand to show all prompts grouped by phase (similar to `scaffold preview`)?
 

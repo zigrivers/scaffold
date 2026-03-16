@@ -1541,7 +1541,7 @@ Current design uses simple sequential `D-NNN` IDs. A compound format like `D-{ac
 
 **Recommendation**: Keep `D-NNN` for v2.0. The collision risk is low (requires concurrent appends from different machines) and the resolution is straightforward. If parallel execution adoption grows and collisions become frequent, migrate to compound IDs in a future version.
 
-**OQ3: Should there be a dedicated `scaffold decisions` command?**
+**OQ3: Should there be a dedicated `scaffold decisions` command?** *(Resolved)*
 
 Current design surfaces decisions through `scaffold run` (session bootstrap), `scaffold validate` (validation), and `scaffold status` (summary). A dedicated `scaffold decisions` command could offer:
 - `scaffold decisions list` — show all decisions
@@ -1550,6 +1550,8 @@ Current design surfaces decisions through `scaffold run` (session bootstrap), `s
 - `scaffold decisions export` — export as markdown table for documentation
 
 **Recommendation**: Implement `scaffold decisions` as a subcommand in Phase 2. For v2.0, decisions are accessible through existing commands. This is a candidate for an ADR once implementation begins.
+
+> **Resolution**: Resolved: `scaffold decisions` is included as a primary command per PRD Section 8 and CLI contract. Implemented in Phase 1.
 
 **OQ4: How should the 60-second batch window be configurable?**
 

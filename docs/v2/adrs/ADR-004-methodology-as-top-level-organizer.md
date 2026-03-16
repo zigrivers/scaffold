@@ -64,6 +64,8 @@ Concretely:
 
 ## Consequences
 
+**Note:** The mixin axis mechanism described in some constraints below was superseded by ADR-043 (depth scale). The core principle — methodology as the top-level organizer — remains in effect. Customization is now via depth levels (1-5) and per-step enable/disable, not mixin axes.
+
 ### Positive
 - Coherent workflows — methodology authors define and test the full pipeline experience end-to-end
 - Clear pipeline ordering — phases, prompt sequence, and dependencies are defined in the methodology manifest, not emergent from axis combinations
@@ -77,15 +79,15 @@ Concretely:
 - Users may feel constrained if no built-in methodology matches their workflow — the escape hatch is creating a custom methodology, which requires understanding the manifest format (see ADR-016)
 
 ### Neutral
-- Axes still provide meaningful customization within a methodology's constraints — the methodology defines WHICH axes exist and their valid options, but users still choose their preferred value for each axis
+- *(Post-ADR-043: depth levels and per-step enable/disable provide meaningful customization within a methodology's constraints, replacing the earlier mixin axis mechanism.)*
 - The number of built-in methodologies affects user experience — too few and users feel constrained, too many and selection is overwhelming. Initial v2 ships with 2-3 methodologies (deep, mvp, and potentially a rapid/minimal option)
 
 ## Constraints and Compliance
 
 - `.scaffold/config.yml` MUST specify exactly one methodology — multi-methodology configurations are not supported
-- Methodology manifests MUST define phases, prompt ordering, dependency overrides, and axis declarations (which axes exist, their defaults, valid values). See ADR-016 for the manifest schema
-- Mixin selections in config.yml MUST be validated against the chosen methodology's declared axes — selecting an axis or value not declared by the methodology is a validation error (domain 06)
-- The init wizard MUST suggest a methodology based on project analysis before asking axis-level questions (domain 14, Section 3, SmartSuggestion pipeline)
+- Methodology manifests MUST define phases, prompt ordering, dependency overrides, and customization options. *(Post-ADR-043: customization is via depth levels 1-5 and per-step enable/disable, replacing the earlier axis declarations.)* See ADR-016 for the manifest schema
+- ~~Mixin selections in config.yml MUST be validated against the chosen methodology's declared axes — selecting an axis or value not declared by the methodology is a validation error (domain 06)~~ *Superseded by ADR-043: customization is now depth level (1-5) and per-step enable/disable. Config validation (domain 06) validates depth and step overrides against the methodology manifest.*
+- The init wizard MUST suggest a methodology based on project analysis before asking customization questions (domain 14, Section 3, SmartSuggestion pipeline). *(Post-ADR-043: wizard asks about depth level and step overrides rather than axis selections.)*
 - Prompt resolution (domain 01) MUST use the methodology manifest as the authoritative source for pipeline shape — it MUST NOT derive pipeline structure from axis selections or other config fields
 - Adding a new methodology MUST NOT require changes to core CLI code — the CLI discovers methodologies by reading manifest files from the methodologies directory
 

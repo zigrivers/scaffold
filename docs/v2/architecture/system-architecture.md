@@ -5,7 +5,7 @@
 **Last updated**: 2026-03-14
 **Status**: Transformed
 
-> **Transformation notice:** Architecture updated per meta-prompt architecture (ADR-041). Build-time prompt resolution and mixin injection replaced by runtime assembly engine. See `docs/v2/scaffold-v2-prd.md` Sections 4 and 9 for the authoritative architecture description.
+> **Transformation notice:** Architecture updated per meta-prompt architecture (ADR-041). Build-time prompt resolution replaced by runtime assembly engine. See `docs/v2/scaffold-v2-prd.md` Sections 4 and 9 for the authoritative architecture description.
 
 ---
 
@@ -248,7 +248,7 @@ src/
 │   │   ├── reset.ts                  # scaffold reset — reset pipeline state
 │   │   ├── decisions.ts              # scaffold decisions — query decision log
 │   │   ├── dashboard.ts              # scaffold dashboard — generate HTML dashboard
-│   │   ├── list.ts                   # scaffold list — show methodologies and mixins
+│   │   ├── list.ts                   # scaffold list — show methodologies and presets
 │   │   ├── info.ts                   # scaffold info [<step>] — show project config or step details
 │   │   ├── version.ts               # scaffold version — show installed version
 │   │   └── update.ts                # scaffold update — update to latest version
@@ -368,7 +368,7 @@ src/
 
 ### Section 3c: Content Directory Structure
 
-The `content/` directory contains all shipped prompt, mixin, and methodology content. It is separate from the `src/` source code — `src/` contains the engine; `content/` contains the data the engine operates on.
+The `content/` directory contains all shipped meta-prompt, knowledge base, and methodology content. It is separate from the `src/` source code — `src/` contains the engine; `content/` contains the data the engine operates on.
 
 ```
 content/
@@ -435,7 +435,7 @@ content/
 
 **Content directory conventions:**
 
-> **Architecture note:** The meta-prompt architecture ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)) transformed the content structure. The `base/` directory contains **meta-prompts** (compact intent declarations with frontmatter) rather than fully-assembled prompts. The `methodology/` directory contains flat YAML preset files per [ADR-043](../adrs/ADR-043-depth-scale.md) — not manifest.yml with overrides/extensions subdirectories. The `knowledge/` directory (not shown above) contains domain expertise files loaded by the assembly engine at runtime. Methodology-specific content is expressed through depth scaling in meta-prompt frontmatter, not through mixin injection.
+> **Architecture note:** The meta-prompt architecture ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)) transformed the content structure. The `base/` directory contains **meta-prompts** (compact intent declarations with frontmatter) rather than fully-assembled prompts. The `methodology/` directory contains flat YAML preset files per [ADR-043](../adrs/ADR-043-depth-scale.md) — not manifest.yml with overrides/extensions subdirectories. The `knowledge/` directory (not shown above) contains domain expertise files loaded by the assembly engine at runtime. Methodology-specific content is expressed through depth scaling in meta-prompt frontmatter and methodology presets.
 
 - Every `.md` file in `base/` has YAML frontmatter conforming to the Meta-Prompt Frontmatter Schema ([domain 08](../domain-models/08-prompt-frontmatter.md), [ADR-045](../adrs/ADR-045-assembled-prompt-structure.md)).
 - Methodology presets (`methodology/*.yml`) define which steps are active and at what depth level ([ADR-043](../adrs/ADR-043-depth-scale.md)). Each preset is a flat YAML file with `name`, `description`, `default_depth` (1-5), and a `steps` map.
@@ -451,7 +451,7 @@ Three critical data paths collectively exercise every component in the system. T
 
 ### Section 4a: Build Pipeline (`scaffold build`)
 
-> **Architecture note:** The meta-prompt architecture ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)) replaced the original build-time resolution and mixin injection pipeline. `scaffold build` no longer resolves prompts, injects mixins, or produces fully-assembled prompt content. That work happens at runtime via the assembly engine (`scaffold run` — see Section 4b). `scaffold build` now generates thin platform command wrappers — files that invoke `scaffold run <step>` — from meta-prompt metadata (frontmatter fields like `description`, `phase`, `depends-on`, `outputs`).
+> **Architecture note:** The meta-prompt architecture ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)) replaced the original build-time resolution pipeline. `scaffold build` no longer resolves or assembles prompt content — that work happens at runtime via the assembly engine (`scaffold run` — see Section 4b). `scaffold build` now generates thin platform command wrappers — files that invoke `scaffold run <step>` — from meta-prompt metadata (frontmatter fields like `description`, `phase`, `depends-on`, `outputs`).
 
 The deterministic transformation from `config.yml` + meta-prompt metadata to platform-specific wrapper files. This is a lightweight text transformation exercising 6 components.
 
@@ -720,7 +720,7 @@ flowchart TD
     I --> J
 
     J --> K["Wizard: select methodology<br/>(recommendation highlighted)<br/>(Init Wizard)"]
-    K --> L["Wizard: mixin axes<br/>(task, tdd, git, agent)<br/>(Init Wizard)"]
+    K --> L["Wizard: project traits<br/>(task, tdd, git, agent)<br/>(Init Wizard)"]
     L --> M["Wizard: platform selection<br/>(Init Wizard)"]
     M --> N{"User<br/>confirms?"}
     N -->|"no"| ERR4["Exit 4:<br/>USER_CANCEL"]
@@ -821,7 +821,7 @@ Scaffold v2 manages all state through the file system — there are no databases
 
 | File | Created | Deleted | Max Expected Size |
 |------|---------|---------|-------------------|
-| `config.yml` | `scaffold init` (wizard writes it) | `scaffold reset` with `--confirm-reset` (but typically preserved — reset targets state, not config) | ~5 KB (50-100 lines for a 5-axis config) |
+| `config.yml` | `scaffold init` (wizard writes it) | `scaffold reset` with `--confirm-reset` (but typically preserved — reset targets state, not config) | ~5 KB (50-100 lines for a typical config) |
 | `state.json` | `scaffold init` (State Manager initializes from dependency order) | `scaffold reset` | ~20 KB (25-prompt pipeline with full metadata per entry) |
 | `decisions.jsonl` | `scaffold init` (created empty) or `scaffold adopt` (pre-populated from codebase scan) | `scaffold reset` | ~50 KB (30-90 entries at ~200 bytes each; grows monotonically due to append-only design) |
 | `lock.json` | `scaffold run` / `scaffold init` / `scaffold reset` (lock acquisition) | Normal: `releaseLock()` after completion. Crash: left on disk, cleaned up by stale detection on next invocation | < 1 KB (6 fields, ~200 bytes) |
@@ -871,7 +871,7 @@ Neither mechanism infers the other's state: lock acquisition does not check `in_
 
 | Disagreement | Cause | Resolution |
 |-------------|-------|------------|
-| State references prompts not in config's resolved set | Config changed (methodology switch, mixin change, `scaffold add`) after state was initialized | `scaffold run` warns about prompts in state that no longer appear in the resolved pipeline. The orphaned state entries are ignored but not deleted. |
+| State references prompts not in config's resolved set | Config changed (methodology switch, depth change, `scaffold add`) after state was initialized | `scaffold run` warns about prompts in state that no longer appear in the resolved pipeline. The orphaned state entries are ignored but not deleted. |
 
 **Methodology switch (prompt orphaning)**: When `scaffold build` runs after a methodology change, the resolved prompt set may differ from the prompts recorded in `state.json`. Prompts in `state.json` that are no longer in the resolved set become orphaned entries. Orphaned entries are **preserved, not deleted** — the user may switch back, and deleting completion records would force re-running prompts unnecessarily. `scaffold run` ignores orphaned entries (they don't appear as eligible prompts). `scaffold status` displays them in a separate "Orphaned (methodology changed)" section. `scaffold validate` warns about orphaned entries and suggests `scaffold reset` if the user wants a clean state.
 | Config resolves prompts not in state | New prompts added via methodology change or extra-prompt addition | `scaffold build` regenerates outputs from the new config; `scaffold run` adds new prompts to state as `pending`. |
@@ -924,7 +924,7 @@ sequenceDiagram
     end
 
     rect rgb(255, 248, 230)
-    Note over CF,CM: scaffold add (mixin change)
+    Note over CF,CM: scaffold add (config change)
     CF->>CF: → Modified
     Note right of CF: Requires scaffold build to take effect
     end
@@ -946,7 +946,7 @@ sequenceDiagram
 
 **Reset behavior notes:**
 
-- `scaffold reset` deletes `state.json` and `decisions.jsonl` but preserves `config.yml`, `CLAUDE.md`, and all build outputs. The rationale: config represents the user's project choices (methodology, mixins, platforms); resetting pipeline progress should not erase those choices.
+- `scaffold reset` deletes `state.json` and `decisions.jsonl` but preserves `config.yml`, `CLAUDE.md`, and all build outputs. The rationale: config represents the user's project choices (methodology, depth, platforms, traits); resetting pipeline progress should not erase those choices.
 - Produced artifacts (e.g., `docs/plan.md`) are NOT deleted by reset — they are the user's deliverables and may contain valuable work. After reset and re-initialization, prompts whose `outputs` artifacts already exist will be detected via dual completion detection and can be marked as completed.
 - `lock.json` is never explicitly deleted by reset — if a lock exists during reset, the reset command acquires the lock first (it's a lockable command) and releases it after.
 - Git history preserves all deleted files — `git show HEAD:.scaffold/state.json` recovers the last committed state.
@@ -959,9 +959,9 @@ sequenceDiagram
 
 - **Single process**: The scaffold CLI runs as a single Node.js process. There are no background daemons, worker threads, or child processes (except shell-outs to `git` and `ps` for PID checking).
 - **Synchronous I/O**: All file operations are synchronous. The v2 spec mandates "no background processes" — scaffold reads, transforms, and writes sequentially within each command invocation.
-- **No event loop for core operations**: The Node.js event loop is used only for `@inquirer/prompts` interactive input. Core pipeline operations (resolution, injection, dependency sorting, state mutation) are all synchronous.
+- **No event loop for core operations**: The Node.js event loop is used only for `@inquirer/prompts` interactive input. Core pipeline operations (resolution, assembly, dependency sorting, state mutation) are all synchronous.
 - **Agent execution is external**: The actual prompt execution by an AI agent (Claude Code, Codex, human copy-paste) happens **outside scaffold's process**. Scaffold's responsibility boundary: set `in_progress` before outputting prompt content → agent executes → scaffold records completion after agent finishes. Scaffold has no visibility into what happens during agent execution.
-- **Build is the longest synchronous operation**: For a 25-prompt pipeline with 5 mixin axes, `scaffold build` performs ~100 file reads (prompts + mixins + manifests + frontmatter) and ~75 file writes (3 platforms × 25 prompts). This is text transformation, not compilation — expected wall-clock time under 2 seconds on modern hardware.
+- **Build is the longest synchronous operation**: For a 25-step pipeline, `scaffold build` performs ~100 file reads (meta-prompts + methodology presets + frontmatter) and ~75 file writes (3 platforms × 25 steps). This is text transformation, not compilation — expected wall-clock time under 2 seconds on modern hardware.
 
 ### Section 6b: Multi-User Concurrency
 
@@ -1032,8 +1032,8 @@ Two operational modes, each with a distinct error handling strategy ([ADR-040](.
 
 | Classification | Criterion | Examples | Effect |
 |---------------|-----------|----------|--------|
-| **Error** | Structural integrity violation — the system cannot produce correct output | Missing required files, invalid schemas, circular dependencies, unresolved mixin markers, lock contention, corrupt state | Blocks operation; produces non-zero exit code |
-| **Warning** | Advisory issue — the system can produce output, but the user should be aware | Unknown fields ([ADR-033](../adrs/ADR-033-forward-compatibility-unknown-fields.md)), stale downstream artifacts ([ADR-034](../adrs/ADR-034-rerun-no-cascade.md)), incompatible mixin combinations, missing optional fields, skipped predecessor prompts, deprecated syntax | Reported but does not block; exit code remains 0 |
+| **Error** | Structural integrity violation — the system cannot produce correct output | Missing required files, invalid schemas, circular dependencies, unresolved knowledge base references, lock contention, corrupt state | Blocks operation; produces non-zero exit code |
+| **Warning** | Advisory issue — the system can produce output, but the user should be aware | Unknown fields ([ADR-033](../adrs/ADR-033-forward-compatibility-unknown-fields.md)), stale downstream artifacts ([ADR-034](../adrs/ADR-034-rerun-no-cascade.md)), incompatible trait combinations, missing optional fields, skipped predecessor prompts, deprecated syntax | Reported but does not block; exit code remains 0 |
 
 ---
 
@@ -1129,7 +1129,7 @@ Each error code appears in the JSON envelope's `errors` array (in `--format json
 | `CONFIG_NOT_OBJECT` | Parsed YAML is not a mapping (e.g., array at root) |
 | `CONFIG_INVALID_VERSION` | Config schema version higher than CLI supports |
 | `CONFIG_INVALID_METHODOLOGY` | Methodology value does not match any installed methodology |
-| `CONFIG_INVALID_MIXIN` | Mixin axis key not recognized or value not valid for axis |
+| ~~`CONFIG_INVALID_MIXIN`~~ | ~~Superseded — mixin axes removed by ADR-041. Project traits validated via `CONFIG_INVALID_TRAIT`~~ |
 | `CONFIG_INVALID_PLATFORM` | Platform entry does not match any installed adapter |
 | `CONFIG_INVALID_TRAIT` | Project trait name not recognized |
 | `CONFIG_MISSING_REQUIRED` | Required field (e.g., `methodology`) absent |
@@ -1236,7 +1236,7 @@ Each error code appears in the JSON envelope's `errors` array (in `--format json
 | `ADOPT_FUZZY_PATH_MATCH` | 0 | Warning — artifact path matched via fuzzy heuristic rather than exact location |
 | `ADOPT_V1_TRACKING_FORMAT` | 0 | Warning — detected v1-style tracking format; migration recommended |
 | `ADOPT_STALE_TRACKING` | 0 | Warning — tracking data references artifacts that have changed since last pipeline run |
-| `ADOPT_MIXIN_INFERENCE_WEAK` | 0 | Warning — mixin axis inferred with low confidence |
+| `ADOPT_TRAIT_INFERENCE_WEAK` | 0 | Warning — project trait inferred with low confidence |
 | `ADOPT_EXTRA_ARTIFACTS` | 0 | Warning — project contains artifacts not accounted for by any known prompt |
 
 **Warning codes** (exit 0 — reported but do not block):
@@ -1271,7 +1271,7 @@ Each error code appears in the JSON envelope's `errors` array (in `--format json
 | `ADOPT_FUZZY_PATH_MATCH` | Adopt Scanner | Artifact path matched via fuzzy heuristic rather than exact location |
 | `ADOPT_V1_TRACKING_FORMAT` | Adopt Scanner | Detected v1-style tracking format; migration recommended |
 | `ADOPT_STALE_TRACKING` | Adopt Scanner | Tracking data references artifacts that have changed since last pipeline run |
-| `ADOPT_MIXIN_INFERENCE_WEAK` | Adopt Scanner | Mixin axis inferred with low confidence |
+| `ADOPT_TRAIT_INFERENCE_WEAK` | Adopt Scanner | Project trait inferred with low confidence |
 | `ADOPT_EXTRA_ARTIFACTS` | Adopt Scanner | Project contains artifacts not accounted for by any known prompt |
 
 The complete domain-specific error taxonomies — including additional field-level validation codes, artifact schema codes, and assembly error codes — are documented in each domain model's Section 6 (domains 02, 03, 05, 06, 08, 09, 15, 16). Domains 01, 04, and 12 are superseded by ADR-041.
@@ -1490,7 +1490,7 @@ export const PACKAGE_ROOT = path.resolve(__dirname, '../..');
 export const CONTENT_DIR = path.join(PACKAGE_ROOT, 'content');
 export const BASE_PROMPTS_DIR = path.join(CONTENT_DIR, 'base');
 export const METHODOLOGIES_DIR = path.join(CONTENT_DIR, 'methodologies');
-export const MIXINS_DIR = path.join(CONTENT_DIR, 'mixins');
+export const KNOWLEDGE_DIR = path.join(CONTENT_DIR, 'knowledge');
 ```
 
 This works identically for npm-installed packages, Homebrew installations, and development mode (`ts-node` or `tsc --watch`) because the path relationship between `dist/` (or `src/`) and `content/` is fixed by the package structure. No environment variables or runtime configuration are needed.
@@ -1530,7 +1530,7 @@ The plugin manifest maps `/scaffold:*` slash commands to `scaffold` CLI invocati
     "skip":      { "description": "Skip a prompt",                     "run": "scaffold skip $ARGS" },
     "validate":  { "description": "Validate config and prompts",        "run": "scaffold validate" },
     "dashboard": { "description": "Open pipeline dashboard",            "run": "scaffold dashboard" },
-    "list":      { "description": "List methodologies and mixins",      "run": "scaffold list" },
+    "list":      { "description": "List methodologies and presets",      "run": "scaffold list" },
     "reset":     { "description": "Reset pipeline state",               "run": "scaffold reset" }
   }
 }
@@ -1538,7 +1538,7 @@ The plugin manifest maps `/scaffold:*` slash commands to `scaffold` CLI invocati
 
 **Architecture principles:**
 
-- **No plugin-specific logic**: Every `/scaffold:*` slash command maps directly to a `scaffold <command>` CLI invocation. The plugin translates the slash command to a shell command and returns the CLI's output. All behavior — validation, resolution, injection, state management — lives in the CLI ([ADR-003](../adrs/ADR-003-standalone-cli-source-of-truth.md)).
+- **No plugin-specific logic**: Every `/scaffold:*` slash command maps directly to a `scaffold <command>` CLI invocation. The plugin translates the slash command to a shell command and returns the CLI's output. All behavior — validation, resolution, assembly, state management — lives in the CLI ([ADR-003](../adrs/ADR-003-standalone-cli-source-of-truth.md)).
 - **Plugin version tracks CLI version**: The plugin is bundled with the CLI, not independently versioned. When a user installs `@scaffold-cli/scaffold` via npm, the plugin manifest is included in the package. Plugin updates happen via `scaffold update` ([ADR-032](../adrs/ADR-032-methodology-versioning-bundled.md)).
 - **Argument forwarding**: Plugin commands pass positional arguments and flags directly to the CLI. `/scaffold:skip tech-stack` becomes `scaffold skip tech-stack`. No argument transformation or validation occurs in the plugin layer.
 - **Output passthrough**: The CLI detects it is connected to a terminal (the default for Claude Code plugin invocations) and produces interactive-mode output. The plugin does not parse, transform, or filter CLI output.
@@ -1584,7 +1584,7 @@ Scaffold is a CLI tool, not a service. There are no log files, log levels, log r
 **No `--verbose` flag**: The v2 spec references `scaffold list --verbose` for expanded pipeline display, but does not define a general-purpose `--verbose` mode. Build-time and runtime output is fixed by the output mode (interactive, JSON, auto). If diagnostic output is needed during development:
 
 - **Resolution trace**: Which prompts were resolved from which source layer — visible in `scaffold validate` output (reports `RESOLUTION_CUSTOM_OVERRIDE_ACTIVE` for each active override)
-- **Injection trace**: Which markers were replaced and from which mixin files — visible in `scaffold build` error/warning output when issues occur
+- **Assembly trace**: Which knowledge base files and meta-prompt sections were composed — visible in `scaffold run` output when issues occur
 - **Dependency trace**: Topological sort order and parallel sets — visible in `scaffold build` summary and `scaffold status` pipeline display
 
 **Debugging**: For development of the scaffold CLI itself, standard Node.js debugging applies: `node --inspect`, VS Code debugger attachment, `console.log` to stderr. No scaffold-specific debug infrastructure exists or is planned.
@@ -1605,7 +1605,7 @@ Every configurable value in the system follows a four-layer precedence chain. Hi
 
 - Written by `scaffold init` or modified by `scaffold add`
 - Committed to git — shared across team members
-- Overrides methodology defaults for mixin axis values
+- Overrides methodology defaults for depth levels and project traits
 - Contains project traits that control optional prompt inclusion/exclusion
 
 **Layer 3: Methodology manifest defaults**
@@ -1796,7 +1796,7 @@ These are the rules that implementation agents must never violate. Violating an 
 - Excluded prompts do not appear in `state.json` or the runtime dependency graph; users cannot exclude at runtime ([ADR-020](../adrs/ADR-020-skip-vs-exclude-semantics.md))
 - Disabled steps (steps with `enabled: false` in the active methodology preset) are treated as satisfied for dependency resolution. The engine checks whether a predecessor is either completed or disabled — if either condition is true, the dependency is met. This allows methodology presets like MVP to enable steps that transitively depend on disabled steps (e.g., enabling `testing-strategy` even though its dependency `system-architecture` is disabled in that preset).
 
-**Assembly engine:** *(replaces the former "Injection" subsection — mixin injection was superseded by [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md))*
+**Assembly engine:** *(replaces the former build-time resolution subsection — superseded by [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md))*
 
 - The assembly engine must follow the 9-step sequence exactly: load meta-prompt → check prerequisites → load knowledge base → gather context → load instructions → determine depth → construct prompt → AI executes → update state ([ADR-044](../adrs/ADR-044-runtime-prompt-generation.md), [domain 15](../domain-models/15-assembly-engine.md))
 - The assembled prompt must contain exactly 7 sections in the defined order ([ADR-045](../adrs/ADR-045-assembled-prompt-structure.md))

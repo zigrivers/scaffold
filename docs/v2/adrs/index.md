@@ -2,7 +2,7 @@
 
 **Phase**: 2 — Architecture Decision Records
 **Last updated**: 2026-03-14
-**Status**: draft
+**Status**: current
 
 ---
 
@@ -63,11 +63,12 @@
 | [ADR-047](ADR-047-user-instruction-three-layer-precedence.md) | User Instruction Three-Layer Precedence | accepted | 09, 15 | Runtime Behavior |
 | [ADR-048](ADR-048-update-mode-diff-over-regeneration.md) | Update Mode — Diff Over Regeneration | accepted | 03, 15 | Runtime Behavior |
 | [ADR-049](ADR-049-methodology-changeable-mid-pipeline.md) | Methodology Changeable Mid-Pipeline | accepted | 03, 06, 16 | Runtime Behavior |
-| [ADR-050](ADR-050-context-window-management.md) | Context Window Management Strategy | proposed | 15 | Core Engine |
-| [ADR-051](ADR-051-depth-downgrade-policy.md) | Depth Downgrade Policy | proposed | 09, 16 | Runtime Behavior |
-| [ADR-052](ADR-052-decision-recording-interface.md) | Decision Recording Interface | proposed | 11, 15 | Data Formats |
-| [ADR-053](ADR-053-artifact-context-scope.md) | Artifact Context Scope | proposed | 15 | Core Engine |
-| [ADR-054](ADR-054-state-methodology-tracking.md) | State Methodology Tracking | proposed | 03, 16 | Data Formats |
+| [ADR-050](ADR-050-context-window-management.md) | Context Window Management Strategy | accepted | 15 | Core Engine |
+| [ADR-051](ADR-051-depth-downgrade-policy.md) | Depth Downgrade Policy | accepted | 09, 16 | Runtime Behavior |
+| [ADR-052](ADR-052-decision-recording-interface.md) | Decision Recording Interface | accepted | 11, 15 | Data Formats |
+| [ADR-053](ADR-053-artifact-context-scope.md) | Artifact Context Scope | accepted | 15 | Core Engine |
+| [ADR-054](ADR-054-state-methodology-tracking.md) | State Methodology Tracking | accepted | 03, 16 | Data Formats |
+| [ADR-055](ADR-055-backward-compatibility-contract.md) | Backward Compatibility Contract | accepted | 09 | Foundation |
 
 ## By Category
 
@@ -75,6 +76,7 @@
 - [ADR-001](ADR-001-cli-implementation-language.md) — CLI Implementation Language — Node.js
 - [ADR-002](ADR-002-distribution-strategy.md) — Distribution Strategy — npm Primary, Homebrew Secondary
 - [ADR-003](ADR-003-standalone-cli-source-of-truth.md) — Standalone CLI as Source of Truth
+- [ADR-055](ADR-055-backward-compatibility-contract.md) — Backward Compatibility Contract
 - [ADR-004](ADR-004-methodology-as-top-level-organizer.md) — Methodology as Top-Level Organizer
 
 ### Core Engine
@@ -87,8 +89,8 @@
 - [ADR-011](ADR-011-depends-on-union-semantics.md) — Frontmatter Depends-On Union Semantics
 - [ADR-035](ADR-035-non-recursive-injection.md) — Mixin Injection Is Non-Recursive (Two-Pass Bounded) *(superseded by ADR-041)*
 - [ADR-037](ADR-037-task-verb-global-scope.md) — Abstract Task Verb Replacement Scope Is Global *(superseded by ADR-041)*
-- [ADR-050](ADR-050-context-window-management.md) — Context Window Management Strategy *(proposed)*
-- [ADR-053](ADR-053-artifact-context-scope.md) — Artifact Context Scope *(proposed)*
+- [ADR-050](ADR-050-context-window-management.md) — Context Window Management Strategy
+- [ADR-053](ADR-053-artifact-context-scope.md) — Artifact Context Scope
 
 ### Data Formats
 - [ADR-012](ADR-012-state-file-design.md) — State File Design — Map-Keyed, Committed, Atomic
@@ -98,8 +100,8 @@
 - [ADR-016](ADR-016-methodology-manifest-format.md) — Methodology Manifest YAML Format *(superseded by ADR-043)*
 - [ADR-017](ADR-017-tracking-comments-artifact-provenance.md) — Tracking Comments for Artifact Provenance
 - [ADR-033](ADR-033-forward-compatibility-unknown-fields.md) — Forward Compatibility — Unknown Fields as Warnings
-- [ADR-052](ADR-052-decision-recording-interface.md) — Decision Recording Interface *(proposed)*
-- [ADR-054](ADR-054-state-methodology-tracking.md) — State Methodology Tracking *(proposed)*
+- [ADR-052](ADR-052-decision-recording-interface.md) — Decision Recording Interface
+- [ADR-054](ADR-054-state-methodology-tracking.md) — State Methodology Tracking
 
 ### Runtime Behavior
 - [ADR-018](ADR-018-completion-detection-crash-recovery.md) — Completion Detection and Crash Recovery
@@ -111,7 +113,7 @@
 - [ADR-047](ADR-047-user-instruction-three-layer-precedence.md) — User Instruction Three-Layer Precedence
 - [ADR-048](ADR-048-update-mode-diff-over-regeneration.md) — Update Mode — Diff Over Regeneration
 - [ADR-049](ADR-049-methodology-changeable-mid-pipeline.md) — Methodology Changeable Mid-Pipeline
-- [ADR-051](ADR-051-depth-downgrade-policy.md) — Depth Downgrade Policy *(proposed)*
+- [ADR-051](ADR-051-depth-downgrade-policy.md) — Depth Downgrade Policy
 
 ### Platform & Adapters
 - [ADR-022](ADR-022-three-platform-adapters.md) — Three Platform Adapters with Universal Always Generated
@@ -142,16 +144,6 @@
 - [ADR-044](ADR-044-runtime-prompt-generation.md) — Runtime Prompt Generation Over Build-Time Resolution
 - [ADR-045](ADR-045-assembled-prompt-structure.md) — Assembled Prompt Structure
 - [ADR-046](ADR-046-phase-specific-review-criteria.md) — Phase-Specific Review Criteria Over Generic Review Template
-
-## Proposed (Pending Review)
-
-5 ADRs are in `proposed` status, awaiting resolution of open questions from domain models 15 and 16:
-
-- [ADR-050](ADR-050-context-window-management.md) — Context Window Management Strategy
-- [ADR-051](ADR-051-depth-downgrade-policy.md) — Depth Downgrade Policy
-- [ADR-052](ADR-052-decision-recording-interface.md) — Decision Recording Interface
-- [ADR-053](ADR-053-artifact-context-scope.md) — Artifact Context Scope
-- [ADR-054](ADR-054-state-methodology-tracking.md) — State Methodology Tracking
 
 Note: ADR-008 includes a sub-decision about the `create-and-claim` compound verb that remains under consideration (documented within the ADR as a proposed element).
 
@@ -250,9 +242,9 @@ All explicit ADR candidates from the 16 domain models are covered:
 | Domain 09, Section 10 | yargs as CLI framework | ADR-001 |
 | Domain 09, Section 10 | OutputContext strategy pattern | ADR-025 |
 | Domain 12, Section 10 | Verb registry in YAML vs. embedded in markdown | ADR-008 |
-| Domain 15, Section 10 | Context window management strategy | ADR-050 (proposed) |
-| Domain 15, Section 10 | Decision recording interface | ADR-052 (proposed) |
+| Domain 15, Section 10 | Context window management strategy | ADR-050 (accepted) |
+| Domain 15, Section 10 | Decision recording interface | ADR-052 (accepted) |
 | Domain 15, Section 10 | Artifact verification timing | Deferred — low risk, can be decided during implementation |
-| Domain 16, Section 10 | Depth downgrade policy | ADR-051 (proposed) |
-| Domain 16, Section 10 | Methodology field in state.json | ADR-054 (proposed) |
+| Domain 16, Section 10 | Depth downgrade policy | ADR-051 (accepted) |
+| Domain 16, Section 10 | Methodology field in state.json | ADR-054 (accepted) |
 | Domain 16, Section 10 | Conditional step re-evaluation | Deferred — additive feature, can be added post-v2 |

@@ -1730,7 +1730,7 @@ It's a derived field that must be recomputed on every mutation and is the most l
 
 **Recommendation**: Keep it for agent ergonomics but document that it's a cached convenience field. The CLI should always recompute it before using it, and `scaffold validate` should verify it matches the recomputed value.
 
-**OQ2: How should prompts with shared `produces` be handled?**
+**OQ2: How should prompts with shared `produces` be handled?** *(Deferred)*
 
 Multiple prompts can list the same file in `produces` (e.g., `create-prd` produces `docs/plan.md` and `review-prd` also references it; `beads-setup` and `claude-md-optimization` both list `CLAUDE.md`). This makes artifact-based detection unreliable for the later prompt — the file exists because the earlier prompt created it.
 
@@ -1741,7 +1741,9 @@ Options:
 
 **Recommendation**: Introduce a `creates` vs `modifies` distinction in frontmatter. `produces` becomes the union of both for display, but only `creates` entries trigger artifact-based detection. `modifies` entries are verified by tracking comment presence (domain 10).
 
-**OQ3: What is the data model for `extra-prompts` at runtime?**
+> **Resolution**: Deferred to post-Phase 1. Current mitigation: completion detection uses both artifact existence AND state.json record. Review steps always update state.json on completion, so the dual-detection system handles this correctly. If false positives are observed during testing, revisit with a `creates`/`modifies` split in frontmatter.
+
+**OQ3: What is the data model for `extra-prompts` at runtime?** *(Deferred)*
 
 The spec mentions `extra-prompts` as an array but doesn't define how they integrate with the state machine. Questions:
 - Do extra prompts get entries in the `prompts` map?
@@ -1750,6 +1752,8 @@ The spec mentions `extra-prompts` as an array but doesn't define how they integr
 - How are they ordered relative to manifest prompts?
 
 **Recommendation**: Extra prompts should get entries in the `prompts` map (keyed by slug, same as manifest prompts). They can depend on manifest prompts. Manifest prompts cannot depend on extra prompts (one-way dependency). They are ordered after all manifest prompts that they don't depend on.
+
+> **Resolution**: Deferred to Phase 2. Extra-prompts (`scaffold add`) is not in MVP or Phase 1 scope. When implemented, extra-prompts will get entries in the `steps` map with `source: 'extra'` and can declare one-way dependencies on manifest steps.
 
 **OQ4: Should state.json support multiple `in_progress` prompts?**
 

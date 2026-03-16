@@ -22,11 +22,7 @@ Scaffold v2 follows an **accumulate and report** error handling philosophy at bu
 
 ### Build Time (`scaffold build`, `scaffold validate`)
 
-All errors and warnings are accumulated during processing. After processing completes (or as much processing as possible is completed), errors and warnings are reported grouped by source file, with errors listed before warnings. The command then exits with the appropriate code:
-
-- Exit code 0: No errors (warnings may be present)
-- Exit code 1: One or more errors found
-- Exit code 2: Usage error (invalid arguments, missing required flags)
+All errors and warnings are accumulated during processing. After processing completes (or as much processing as possible is completed), errors and warnings are reported grouped by source file, with errors listed before warnings. Exit codes follow the contract defined in ADR-025 (six distinct codes: 0 success, 1 validation error, 2 missing dependency, 3 state corruption, 4 user cancellation, 5 build error).
 
 Accumulation continues even after encountering an error — the goal is to report as many issues as possible in a single run so the user can fix multiple problems before re-running the command.
 
@@ -118,7 +114,7 @@ Escape hatches always downgrade an error to a warning — they never silence the
 - The error/warning classification must be maintained as new features are added — each new issue type must be explicitly classified as error or warning
 
 ### Neutral
-- Exit codes follow the standard convention (0 = success, 1 = error, 2 = usage error, 3 = lock contention) — this is consistent with ADR-025 but does not introduce new exit codes for warnings
+- Exit codes follow the contract defined in ADR-025 (six distinct codes: 0 success, 1 validation error, 2 missing dependency, 3 state corruption, 4 user cancellation, 5 build error) — this ADR does not introduce new exit codes for warnings
 - The `--allow-unresolved-markers` and `--force` escape hatches are defined in their respective ADRs — this ADR documents the pattern but does not modify the individual escape hatch behavior
 - `scaffold validate` and `scaffold build` use the same accumulation logic — `validate` reports issues without producing output files, `build` reports issues AND produces output files (unless errors prevent it)
 
