@@ -70,7 +70,6 @@ import { resolveOutputMode } from '../middleware/output-mode.js'
 import { StateManager } from '../../state/state-manager.js'
 import { acquireLock, releaseLock } from '../../state/lock-manager.js'
 import { runAdoption } from '../../project/adopt.js'
-import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import adoptCommand from './adopt.js'
 
 // ---------------------------------------------------------------------------
@@ -91,13 +90,13 @@ function defaultArgv(overrides: Partial<AdoptArgv> = {}): AdoptArgv {
   } as AdoptArgv
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'scaffold-adopt-cmd-test-'))
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 describe('adopt command', () => {
   let exitSpy: MockInstance
@@ -109,7 +108,6 @@ describe('adopt command', () => {
   const MockStateManager = vi.mocked(StateManager)
   const mockAcquireLock = vi.mocked(acquireLock)
   const mockRunAdoption = vi.mocked(runAdoption)
-  const mockDiscoverMetaPrompts = vi.mocked(discoverMetaPrompts)
 
   beforeEach(() => {
     tmpDir = makeTempDir()
@@ -125,7 +123,6 @@ describe('adopt command', () => {
     mockFindProjectRoot.mockReturnValue('/fake/project')
     mockResolveOutputMode.mockReturnValue('interactive')
     mockAcquireLock.mockReturnValue({ acquired: true })
-    mockDiscoverMetaPrompts.mockReturnValue(new Map())
     mockRunAdoption.mockReturnValue({
       mode: 'greenfield',
       artifactsFound: 0,
@@ -247,7 +244,7 @@ describe('adopt command', () => {
     expect(exitSpy).toHaveBeenCalledWith(0)
   })
 
-  // Test 5: Writes state.json when not dry-run (initializeState called)
+  // Test 5: Writes state.json when not dry-run — state gets initialized when state.json doesn't exist
   it('calls initializeState when state does not exist and not dry-run', async () => {
     // Use real tmpDir with no .scaffold/state.json — existsSync will return false naturally
     mockFindProjectRoot.mockReturnValue(tmpDir)
