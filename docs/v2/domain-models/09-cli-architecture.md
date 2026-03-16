@@ -10,6 +10,13 @@
 
 ---
 
+> **Implementation Note:** This domain model contains data envelopes for removed commands and mixin fields from the pre-meta-prompt architecture:
+> - `AddData` — `scaffold add` was removed (PRD Section 8)
+> - `PreviewData` — `scaffold preview` was removed (PRD Section 8)
+> - `InitData.mixins`, `InfoData.mixins`, `ListData.mixins` — mixin axes eliminated by ADR-041
+>
+> Use `docs/v2/api/cli-contract.md` and `docs/v2/api/json-output-schemas.md` as the authoritative CLI interface specifications.
+
 ## Section 1: Domain Overview
 
 The CLI Command Architecture & Output Modes domain defines the Node.js application shell that all Scaffold v2 functionality is delivered through. This domain covers the command dispatch system, argument parsing, the three interaction modes (interactive, `--format json`, `--auto`), exit code contract, project root detection, the assembly engine orchestration, error propagation framework, and the orchestration layer that composes business logic from other domains into user-facing commands.

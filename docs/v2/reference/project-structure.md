@@ -96,14 +96,14 @@ scaffold/
 **Runtime directory (target projects only — not in this repo):**
 
 ```
-.scaffold/                     # Created by /scaffold:init in target projects
-├── config.json                # Pipeline state (profile, completed, skipped)
-├── context.json               # Shared key-value context
-├── decisions.json             # Append-only decision log
-├── prompts/                   # Project-level prompt overrides
-│   └── *.md
-└── profiles/                  # Project-level custom profiles
-    └── *.json
+.scaffold/
+  config.yml                    # Methodology + project config
+  state.json                    # Pipeline state (committed)
+  decisions.jsonl               # Decision log (committed)
+  lock.json                     # Advisory lock (gitignored)
+  instructions/                 # User instructions
+    global.md                   # Applied to all steps
+    <step-name>.md              # Applied to specific step
 ```
 
 ## 2. Module Organization Strategy

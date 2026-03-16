@@ -10,6 +10,16 @@
 
 ---
 
+> **Implementation Note:** This domain model predates the meta-prompt architecture (ADR-041). Under the current architecture, platform adapters are **thin wrappers** that invoke `scaffold run <step>` — they do NOT transform prompt content. The following sections are superseded and should NOT be implemented:
+> - Tool-name mapping engine (Algorithms 1, 4, 5) — prompts are platform-neutral
+> - MCP handling system (Algorithm 2) — no content transformation needed
+> - Capability checking matrix — not in PRD scope
+> - `AdapterContext.mixins` field — mixin axes eliminated
+> - Condensed summary generation — AGENTS.md entries invoke `scaffold run`
+> - `codex-prompts/` directory — not needed with thin wrappers
+>
+> See `docs/v2/api/adapter-interface.md` for the current adapter interface specification.
+
 ## Section 1: Domain Overview
 
 The Platform Adapter System provides thin delivery wrappers that expose the meta-prompt assembly pipeline to different AI platforms. Adapters no longer transform prompt content — the assembly engine (which loads meta-prompts, knowledge base entries, and project context at runtime) produces platform-neutral assembled prompts. Each adapter simply wraps the assembly trigger in the platform's native format: **Claude Code** (generates `commands/*.md` that invoke `scaffold run <step>`), **Codex** (generates `AGENTS.md` entries pointing to the assembly pipeline), and **Universal** (outputs assembled prompts to stdout or file via `scaffold run <step>`).

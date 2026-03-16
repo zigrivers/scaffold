@@ -294,6 +294,8 @@ When scaffold reads `config.yml`, modifies a field, and writes it back, **commen
 
 In practice, comments on their own lines are reliably preserved. Inline comments (after a value on the same line) may be lost during write-back.
 
+**Phase 2.** Phase 1 uses simple serialize-and-write (`js-yaml.dump()`). Comment preservation via AST-preserving write is deferred to Phase 2.
+
 ### Indentation
 
 Scaffold writes YAML with 2-space indentation and no trailing spaces. User-edited files with different indentation are accepted (YAML is indentation-sensitive but the indent width is flexible).

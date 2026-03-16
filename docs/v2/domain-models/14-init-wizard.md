@@ -10,6 +10,14 @@
 
 ---
 
+> **Implementation Note:** This domain model's `WizardAnswers` interface includes 5 mixin axis questions (`taskTracking`, `tdd`, `gitWorkflow`, `agentMode`, `interactionStyle`) from the pre-meta-prompt architecture. These were eliminated by ADR-041. The init wizard asks only:
+> 1. Methodology selection (Deep/MVP/Custom)
+> 2. Platform selection (Claude Code, Codex, or both)
+> 3. Conditional step detection (database, API, UX — based on project signals)
+> 4. Confirmation
+>
+> See PRD Section 13 and `docs/v2/ux/init-wizard-flow.md` for the current wizard specification.
+
 ## 1. Domain Overview
 
 The init wizard is the entry point for every new scaffold project. It runs as `scaffold init` (optionally with idea text: `scaffold init "I want to build a CLI tool..."`) and produces `.scaffold/config.yml` — the configuration file that drives all subsequent scaffold operations.

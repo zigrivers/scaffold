@@ -131,7 +131,7 @@ JSON Schema draft 2020-12 for `.scaffold/state.json`.
       "items": {
         "$ref": "#/$defs/ExtraStepEntry"
       },
-      "description": "User-added custom steps not part of the resolved methodology manifest. Appended after manifest steps; may have dependencies on manifest steps."
+      "description": "User-added custom steps not part of the resolved methodology manifest. Appended after manifest steps; may have dependencies on manifest steps. **Deferred to Phase 2.** The `extra-steps` array is reserved for future use. Implementations MUST accept this field but SHOULD treat it as always empty for Phase 1. Do not implement ExtraStepEntry validation, dependency resolution for extra steps, or `source: 'extra'` display logic in Phase 1."
     }
   },
   "$defs": {
@@ -295,8 +295,8 @@ JSON Schema draft 2020-12 for `.scaffold/state.json`.
 | `created` | `string` | Yes | — | ISO 8601 date-time | When state.json was first created. | `scaffold status` display |
 | `in_progress` | `InProgressRecord \| null` | Yes | `null` | At most one; see InProgressRecord | Currently executing step or `null`. Non-null triggers crash recovery on resume. | State Manager (crash detection), `scaffold status` |
 | `steps` | `Record<string, StepStateEntry>` | Yes | — | At least 1 entry; keys are kebab-case step slugs | Map of every step in the resolved pipeline to its state entry. | State Manager (all operations), Dashboard Generator, `scaffold status`, `scaffold validate` |
-| `next_eligible` | `string[]` | Yes | `[]` | Unique items; each must be a key in `steps` | Cached eligible step list. Derived field — recomputed on every mutation. | `scaffold next`, `scaffold run`, Dashboard Generator |
-| `extra-steps` | `ExtraStepEntry[]` | Yes | `[]` | — | User-added custom steps not in the methodology manifest. | State Manager (initialization), Dependency Resolver |
+| `next_eligible` | `string[]` | Yes | `[]` | Unique items; each must be a key in `steps` | Cached eligible step list. Derived field — recomputed on every mutation. **Phase 2 optimization.** Phase 1 computes next-eligible on every read from the dependency graph and state. The cache field is reserved but SHOULD be set to `[]` in Phase 1. Computing eligibility for a 36-step graph is < 1ms. | `scaffold next`, `scaffold run`, Dashboard Generator |
+| `extra-steps` | `ExtraStepEntry[]` | Yes | `[]` | — | User-added custom steps not in the methodology manifest. **Deferred to Phase 2.** The `extra-steps` array is reserved for future use. Implementations MUST accept this field but SHOULD treat it as always empty for Phase 1. Do not implement ExtraStepEntry validation, dependency resolution for extra steps, or `source: 'extra'` display logic in Phase 1. | State Manager (initialization), Dependency Resolver |
 
 ### StepStateEntry fields
 
