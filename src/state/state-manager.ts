@@ -1,0 +1,149 @@
+import type { PipelineState, StepStateEntry, InProgressRecord, DepthLevel, StepStatus } from '../types/index.js'
+import type { ScaffoldError } from '../types/index.js'
+import { atomicWriteFile, fileExists, ensureDir } from '../utils/fs.js'
+import { stateMissing, stateParseError, stateSchemaVersion, psmAlreadyInProgress } from '../utils/errors.js'
+import fs from 'node:fs'
+import path from 'node:path'
+import type { MethodologyName } from '../types/index.js'
+
+export class StateManager {
+  private statePath: string
+
+  constructor(
+    private projectRoot: string,
+    private computeEligible: (steps: Record<string, StepStateEntry>) => string[],
+  ) {
+    this.statePath = path.join(projectRoot, '.scaffold', 'state.json')
+  }
+
+  /** Load and validate state.json from disk. Throws ScaffoldError on schema mismatch. */
+  loadState(): PipelineState {
+    if (!fileExists(this.statePath)) {
+      throw stateMissing(this.statePath)
+    }
+
+    let raw: string
+    try {
+      raw = fs.readFileSync(this.statePath, 'utf8')
+    } catch (err) {
+      throw stateParseError(this.statePath, (err as Error).message)
+    }
+
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(raw) as Record<string, unknown>
+    } catch (err) {
+      throw stateParseError(this.statePath, (err as Error).message)
+    }
+
+    const schemaVersion = parsed['schema-version']
+    if (schemaVersion !== 1) {
+      throw stateSchemaVersion(1, schemaVersion as number, this.statePath)
+    }
+
+    // ADR-033: forward compatibility — unknown fields produce warnings (not errors) and are preserved
+    // Simply return the full parsed object without stripping extra fields
+    return parsed as unknown as PipelineState
+  }
+
+  /** Atomically persist state to disk (write tmp + rename). */
+  saveState(state: PipelineState): void {
+    state.next_eligible = this.computeEligible(state.steps)
+    atomicWriteFile(this.statePath, JSON.stringify(state, null, 2))
+  }
+
+  /** Transition step to in_progress; sets in_progress record with actor. */
+  setInProgress(step: string, actor: string): void {
+    const state = this.loadState()
+    if (state.in_progress !== null) {
+      throw psmAlreadyInProgress(step, state.in_progress.step)
+    }
+    state.steps[step].status = 'in_progress'
+    state.steps[step].at = new Date().toISOString()
+    state.in_progress = {
+      step,
+      started: new Date().toISOString(),
+      partial_artifacts: [],
+      actor,
+    }
+    this.saveState(state)
+  }
+
+  /** Transition step to completed; records outputs, actor, and depth. */
+  markCompleted(step: string, outputs: string[], completedBy: string, depth: DepthLevel): void {
+    const state = this.loadState()
+    state.steps[step].status = 'completed'
+    state.steps[step].at = new Date().toISOString()
+    state.steps[step].completed_by = completedBy
+    state.steps[step].depth = depth
+    if (outputs.length > 0) {
+      state.steps[step].artifacts_verified = true
+    }
+    state.steps[step].produces = outputs
+    state.in_progress = null
+    this.saveState(state)
+  }
+
+  /** Transition step to skipped; records reason and actor. */
+  markSkipped(step: string, reason: string, skippedBy: string): void {
+    const state = this.loadState()
+    state.steps[step].status = 'skipped'
+    state.steps[step].at = new Date().toISOString()
+    state.steps[step].reason = reason
+    state.steps[step].completed_by = skippedBy
+    state.in_progress = null
+    this.saveState(state)
+  }
+
+  /** Clear the in_progress record (null out). Used by crash recovery. */
+  clearInProgress(): void {
+    const state = this.loadState()
+    state.in_progress = null
+    this.saveState(state)
+  }
+
+  /** Return the status of a single step, or undefined if step not in state. */
+  getStepStatus(step: string): StepStatus | undefined {
+    const state = this.loadState()
+    return state.steps[step]?.status
+  }
+
+  /**
+   * Initialize a new state.json with all steps in pending status.
+   * Not in the formal interface but needed by T-033 init wizard.
+   */
+  initializeState(options: {
+    enabledSteps: Array<{ slug: string; produces: string[] }>
+    scaffoldVersion: string
+    methodology: string
+    initMode: 'greenfield' | 'brownfield' | 'v1-migration'
+  }): void {
+    ensureDir(path.join(this.projectRoot, '.scaffold'))
+
+    const state: PipelineState = {
+      'schema-version': 1,
+      'scaffold-version': options.scaffoldVersion,
+      init_methodology: options.methodology as MethodologyName,
+      config_methodology: options.methodology as MethodologyName,
+      'init-mode': options.initMode,
+      created: new Date().toISOString(),
+      in_progress: null,
+      steps: {},
+      next_eligible: [],
+      'extra-steps': [],
+    }
+
+    for (const step of options.enabledSteps) {
+      state.steps[step.slug] = {
+        status: 'pending',
+        source: 'pipeline',
+        produces: step.produces,
+      }
+    }
+
+    this.saveState(state)
+  }
+}
+
+// Re-export ScaffoldError type for consumers
+export type { ScaffoldError, InProgressRecord }
