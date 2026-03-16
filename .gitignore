@@ -7,6 +7,10 @@
 # Coverage output (kcov)
 coverage/
 
+# Node.js / TypeScript v2
+node_modules/
+dist/
+
 # Temp files (atomic writes)
 *.tmp
 
