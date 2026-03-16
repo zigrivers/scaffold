@@ -203,15 +203,10 @@ describe('isStale', () => {
       holder: os.hostname(),
       pid: process.pid,
       started: new Date().toISOString(),
-      // Use a very old time so the recycling check won't false-positive on
-      // ps-timing granularity — but since it IS current process, kill(0) succeeds
-      // and processStartedAt will match within 2s
       processStartedAt: new Date().toISOString(),
       command: 'run',
     }
     // Current process is alive — isStale should return false
-    // (processStartedAt may differ slightly from ps, but we set it to now
-    // and ps resolution is seconds; the lock was just created so within 2s)
     const result = isStale(lock)
     expect(result).toBe(false)
   })
