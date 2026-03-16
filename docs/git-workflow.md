@@ -1,39 +1,42 @@
-<!-- scaffold:git-workflow v1 2026-02-16 -->
+<!-- scaffold:git-workflow v2 2026-03-16 -->
 # Git Workflow
 
-Conventions for branching, committing, PRs, and parallel agent execution in the scaffold project.
+Standard GitHub flow: branch, commit, push, PR, squash-merge.
 
-## 1. Branching Strategy
+## 1. Branching
 
-All work happens on feature branches created from `origin/main`.
+All work happens on feature branches from `origin/main`.
 
 ### Branch Naming
 
 ```
-bd-<task-id>/<short-description>
+type/short-description
 ```
+
+Types match conventional commits: `feat`, `fix`, `test`, `refactor`, `docs`, `chore`.
 
 Examples:
 ```
-bd-scaffold-abc/add-worktree-script
-bd-scaffold-xyz/fix-frontmatter-validation
+feat/assembly-engine
+fix/state-write-race
+docs/onboarding-guide
 ```
 
 ### Creating a Branch
 
 ```bash
 git fetch origin
-git checkout -b bd-<task-id>/<desc> origin/main
+git checkout -b type/short-description origin/main
 ```
 
 Always branch from `origin/main`, not local `main`, to avoid stale base commits.
 
-## 2. Commit Standards
+## 2. Commits
 
 ### Format
 
 ```
-[BD-<id>] type(scope): description
+type(scope): description
 ```
 
 ### Types
@@ -51,161 +54,44 @@ Always branch from `origin/main`, not local `main`, to avoid stale base commits.
 
 - Imperative mood: "add feature" not "added feature"
 - Lowercase after the type prefix
-- Every commit needs a Beads task ID
-- `[BD-0]` for bootstrapping tasks only
 
 ### Examples
 
 ```
-[BD-scaffold-abc] feat(scripts): add setup-agent-worktree script
-[BD-scaffold-xyz] fix(install): handle spaces in TARGET_DIR path
-[BD-0] chore: initialize project structure
+feat(scripts): add resolve-deps topological sort
+fix(install): handle spaces in TARGET_DIR path
+chore: initialize project structure
 ```
 
-## 3. Rebase Strategy
+## 3. PR Workflow
 
-Rebase before creating a PR to keep history linear.
-
-```bash
-git fetch origin
-git rebase origin/main
-```
-
-### Force Push Rules
-
-- **Feature branches**: `git push --force-with-lease` is safe and expected after rebasing
-- **main**: Never force push to main
-- `--force-with-lease` protects against overwriting someone else's push to the same branch
-
-### Conflict Resolution
-
-If rebase produces conflicts:
-1. Resolve each conflict
-2. `git add <resolved-files>`
-3. `git rebase --continue`
-4. If hopelessly stuck: `git rebase --abort` and rethink the approach
-
-## 4. PR Workflow
-
-### Creating a PR
-
-1. Ensure all quality gates pass:
+1. Run quality gates:
    ```bash
    make check
    ```
-2. AI review — spawn a review subagent to check `git diff origin/main...HEAD`:
-   - Check against CLAUDE.md and docs/coding-standards.md
-   - Fix P0/P1 findings, re-run `make check`
-   - Log recurring patterns to tasks/lessons.md
-3. Rebase on latest main:
-   ```bash
-   git fetch origin && git rebase origin/main
-   ```
-4. Push branch:
+2. Push branch:
    ```bash
    git push -u origin HEAD
    ```
-5. Create PR:
+3. Create PR:
    ```bash
-   gh pr create --title "[BD-<id>] type(scope): description" --body "$(cat <<'EOF'
-   ## Summary
-   - <what changed and why>
-
-   ## Test plan
-   - [ ] `make check` passes
-   EOF
-   )"
+   gh pr create
    ```
-6. Wait for CI (`check` job) to pass
-7. Self-review the diff:
-   ```bash
-   gh pr diff
-   ```
-8. Merge when CI is green:
+4. Wait for CI (`check` job) to pass
+5. Squash-merge:
    ```bash
    gh pr merge --squash --delete-branch
    ```
-9. Pull updated main:
+6. Pull updated main:
    ```bash
    git checkout main && git pull origin main
    ```
 
-### PR Title Convention
-
-Same as commit format: `[BD-<id>] type(scope): description`
-
-## 5. Task Closure
-
-### Single-Agent Flow
-
-```bash
-# After PR is merged
-bd close <id>
-bd sync
-bd ready                # Pick next task
-```
-
-### Worktree-Agent Flow
-
-```bash
-# In the worktree
-bd close <id>
-bd sync
-git checkout main && git pull origin main
-bd ready                # Pick next task
-```
-
-### Rules
-
-- Only close a task after the PR is merged (not just created)
-- `bd close` is the only way to close — never use `bd update --status completed`
-- Always `bd sync` after closing to persist state
-
-## 6. Crash Recovery
-
-### Worktree State Inspection
-
-If a worktree agent crashes or is interrupted:
-
-```bash
-# From the main repo, list all worktrees
-git worktree list
-
-# Check status of a specific worktree
-git -C ../scaffold-<agent> status
-
-# Check for in-progress rebases
-ls ../scaffold-<agent>/.git/rebase-merge 2>/dev/null && echo "rebase in progress"
-```
-
-### Recovering a Stuck Worktree
-
-```bash
-# Abort any in-progress rebase
-git -C ../scaffold-<agent> rebase --abort
-
-# Reset to clean state
-git -C ../scaffold-<agent> checkout main
-git -C ../scaffold-<agent> pull origin main
-```
-
-### Branch Cleanup
-
-```bash
-# Remove merged branches
-git branch --merged main | grep -v main | xargs git branch -d
-
-# Prune remote tracking branches
-git fetch --prune
-```
-
-## 7. Branch Protection
+## 4. Branch Protection
 
 CI is required on PRs to main. The `check` job in `.github/workflows/ci.yml` runs `make check` (lint + validate + test).
 
 ### Setup (After First CI Run)
-
-Branch protection can only reference status checks that have run at least once. After the first PR triggers CI:
 
 ```bash
 gh api repos/{owner}/{repo}/branches/main/protection -X PUT \
@@ -230,36 +116,24 @@ Fallback: GitHub web UI (Settings > Branches > Add rule).
 - **Review required**: No (single-developer project with AI agents)
 - **Admin enforcement**: No (allows emergency merges)
 
-## 8. Conflict Prevention
+## 5. Conflict Prevention
 
 ### High-Contention Files
 
-These files are edited by multiple prompts and agents. Coordinate carefully:
-
 | File | Risk | Mitigation |
 |------|------|------------|
-| `prompts.md` | Highest — source of truth for all prompts | Never edit in parallel; rebase immediately before touching |
+| `prompts.md` | Highest — source of truth for all prompts | Never edit in parallel; rebase before touching |
 | `CLAUDE.md` | High — all agents read this | Append-only edits preferred; rebase before merging |
 | `lib/common.sh` | Medium — shared library | Keep changes minimal; test thoroughly |
 
 ### Best Practices
 
 - Keep feature branches short-lived (merge within hours, not days)
-- Rebase frequently during long-running work
+- Rebase if needed to resolve conflicts before merging
 - Avoid reformatting files you're not otherwise changing
-- If two agents need the same file, serialize their tasks via Beads dependencies
+- If two agents need the same file, serialize their work
 
-## 9. Repository Hygiene
-
-### .gitignore
-
-The current `.gitignore` covers:
-- OS files (`.DS_Store`, `Thumbs.db`)
-- Editor files (`.vscode/`, `.idea/`)
-- Node artifacts (`node_modules/`)
-- Temporary files
-
-No additions needed for the current stack.
+## 6. Repository Hygiene
 
 ### Local Hooks
 
@@ -267,24 +141,21 @@ No additions needed for the current stack.
 - **Pre-commit**: ShellCheck + frontmatter validation
 - **Pre-push**: Full test suite
 
-These are local-only (not committed to `.git/hooks/`). Each developer/agent runs `make hooks` after cloning.
+These are local-only. Each developer/agent runs `make hooks` after cloning.
 
 ### CI by Design
 
-Quality gates run both locally (`make check`) and in CI (`.github/workflows/ci.yml`). The CI workflow is the authoritative gate — local hooks are a convenience.
+Quality gates run both locally (`make check`) and in CI. The CI workflow is the authoritative gate — local hooks are a convenience.
 
-## 10. Parallel Agent Setup
+## 7. Advanced: Parallel Agents (Worktrees)
 
-### Worktree Model
-
-Each parallel agent gets a permanent git worktree — an independent working directory sharing the same `.git` repository.
+For parallel development, each agent gets a git worktree — an independent working directory sharing the same `.git` repository.
 
 ```
 ~/projects/
-├── scaffold/                  # Main repo (orchestrator)
+├── scaffold/                  # Main repo
 ├── scaffold-agent-1/          # Worktree for agent 1
-├── scaffold-agent-2/          # Worktree for agent 2
-└── scaffold-agent-3/          # Worktree for agent 3
+└── scaffold-agent-2/          # Worktree for agent 2
 ```
 
 ### Creating Worktrees
@@ -293,40 +164,20 @@ Each parallel agent gets a permanent git worktree — an independent working dir
 scripts/setup-agent-worktree.sh <agent-name>
 ```
 
-This creates `../<repo-name>-<agent-suffix>` with a `<agent-suffix>-workspace` branch.
+This creates `../<repo-name>-<agent-suffix>` with a workspace branch.
 
-### Agent Identity
+### Worktree Workflow
 
-Set `BD_ACTOR` so Beads tracks who did what:
+Each agent follows the same PR workflow (section 3) from its worktree. Additional guidelines:
 
-```bash
-export BD_ACTOR="agent-1"
-```
-
-### Launch Workflow
-
-1. Create worktrees for each agent:
-   ```bash
-   scripts/setup-agent-worktree.sh agent-1
-   scripts/setup-agent-worktree.sh agent-2
-   ```
-2. In each worktree, set actor and start working:
-   ```bash
-   cd ../scaffold-agent-1
-   export BD_ACTOR="agent-1"
-   bd ready                    # Pick a task
-   ```
-3. Each agent creates feature branches from its worktree, makes PRs, and picks new tasks after merge.
+- Rebase frequently — other agents are merging to main
+- Never edit high-contention files without rebasing first
+- Keep branches short-lived to minimize conflicts
 
 ### Worktree Maintenance
 
 ```bash
-# List all worktrees
-git worktree list
-
-# Remove a worktree (from main repo)
-git worktree remove ../scaffold-<agent>
-
-# Prune stale worktree references
-git worktree prune
+git worktree list                          # List all worktrees
+git worktree remove ../scaffold-<agent>    # Remove a worktree
+git worktree prune                         # Prune stale references
 ```

@@ -32,10 +32,8 @@ This repo is a **Claude Code plugin** (installable via `/plugin marketplace add`
 ## Key Concepts
 
 - **Phases are sequential**: Phase 0 (prerequisites) through Phase 7 (implementation), with dependency constraints documented in the "Key Dependencies Between Prompts" section
-- **Beads** (`@beads/bd`) is the task tracking tool used throughout the pipeline
-- **Worktrees** are used for parallel agent execution — the Git Workflow prompt sets up permanent worktrees for multiple Claude Code sessions
+- **Worktrees** are used for parallel agent execution — see `docs/git-workflow.md` section 7 for setup
 - **Optional prompts** are marked and only apply to specific project types (web apps, mobile/Expo, multi-platform)
-- **Parallel agents** pull tasks from Beads and work in separate git worktrees — see `docs/git-workflow.md` section 10 for setup
 
 ## Editing Guidelines
 
@@ -47,32 +45,6 @@ When modifying prompts:
 - After editing `prompts.md`, update the corresponding file in `commands/` to stay in sync (frontmatter + "After This Step" sections are maintained in `commands/` only, not in `prompts.md`)
 - Every document-creating prompt has a **Mode Detection** block and **Update Mode Specifics** block — when modifying prompts, preserve these blocks and keep them positioned after the opening paragraph and before the first content section
 - When adding a new document-creating prompt, include Mode Detection + Update Mode Specifics following the same pattern as existing prompts (check any existing prompt for the template)
-
-## Task Management (Beads)
-
-All task tracking lives in Beads — no separate todo files.
-
-### Creating Tasks
-```bash
-bd create "Imperative, specific title" -p <0-3>
-bd update <id> --claim                   # Always claim after creating
-bd dep add <child> <parent>              # Child blocked by parent
-```
-
-Priority levels:
-- 0 = blocking release
-- 1 = must-have v1
-- 2 = should-have
-- 3 = nice-to-have
-
-Good titles: `"Fix streak calculation for timezone edge case"`
-Bad titles: `"Backend stuff"`
-
-### Closing Tasks
-```bash
-bd close <id>                            # Marks complete — use this, not bd update --status completed
-bd sync                                  # Force sync to git
-```
 
 ### Key Commands
 
@@ -86,93 +58,23 @@ bd sync                                  # Force sync to git
 | `make hooks` | Install pre-commit and pre-push hooks |
 | `make install` | Install scaffold commands to ~/.claude/commands/ |
 | `make extract` | Extract commands from prompts.md |
-| `bd ready` | Show unblocked tasks ready for work |
-| `bd create "Title" -p N` | Create task with priority |
-| `bd update <id> --status S` | Update status (in_progress, blocked, etc.) |
-| `bd update <id> --claim` | Claim task (uses BD_ACTOR for attribution) |
-| `bd close <id>` | Close completed task |
-| `bd dep add <child> <parent>` | Add dependency |
-| `bd dep tree <id>` | View dependency graph |
-| `bd show <id>` | Full task details |
-| `bd sync` | Force sync to git |
-| `bd list` | List all tasks |
-| `bd dep cycles` | Debug stuck/circular dependencies |
-| `scripts/setup-agent-worktree.sh <name>` | Create permanent worktree for parallel agent |
+| `scripts/setup-agent-worktree.sh <name>` | Create worktree for parallel agent |
 | `git worktree list` | List all active worktrees |
 | `gh pr create` | Create pull request from current branch |
 | `gh pr merge --squash --delete-branch` | Squash-merge PR and clean up branch |
 | `gh pr diff` | Review PR diff before merging |
 | `gh pr checks` | Check CI status on current PR |
-| `git push --force-with-lease` | Safe force push after rebase (feature branches only) |
 | `make dashboard-test` | Generate test-ready dashboard HTML for visual verification |
-
-**NEVER** use `bd edit` — it opens an interactive editor and breaks AI agents.
-
-### Every Commit Needs a Task
-
-All commits require a Beads task ID in the message: `[BD-<id>] type(scope): description`
-
-If you encounter a bug or need to make an ad-hoc fix:
-```bash
-bd create "fix: <description>" -p 1
-bd update <id> --claim
-# implement fix, then close when done
-bd close <id>
-```
-This keeps Beads as the single source of truth for all changes.
 
 ### Committing and Creating PRs
 
 1. Run `make check` to verify all quality gates pass
-2. AI review: spawn a review subagent to check `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md — fix P0/P1 findings, re-run `make check`, log recurring patterns to tasks/lessons.md
-3. Rebase on latest main: `git fetch origin && git rebase origin/main`
-4. Push branch: `git push -u origin HEAD`
-5. Create PR: `gh pr create --title "[BD-<id>] type(scope): description"`
-6. Wait for CI (`check` job) to pass
-7. Self-review: `gh pr diff`
-8. Merge: `gh pr merge --squash --delete-branch`
+2. Push branch: `git push -u origin HEAD`
+3. Create PR: `gh pr create`
+4. Wait for CI (`check` job) to pass
+5. Squash-merge: `gh pr merge --squash --delete-branch`
 
-See `docs/git-workflow.md` for the full PR workflow.
-
-### Task Closure and Next Task
-
-After a PR is merged:
-```bash
-bd close <id>
-bd sync
-bd ready                # Pick next task
-```
-
-In a worktree, also update main first:
-```bash
-bd close <id>
-bd sync
-git checkout main && git pull origin main
-bd ready
-```
-
-### Parallel Sessions (Worktrees)
-
-Each parallel agent runs in its own git worktree — an independent working directory sharing the same `.git` repository.
-
-```bash
-# Create a worktree for a new agent
-scripts/setup-agent-worktree.sh agent-1
-
-# Set agent identity for Beads attribution
-export BD_ACTOR="agent-1"
-
-# Install dev dependencies in the worktree
-make setup
-```
-
-### Worktree Awareness
-
-When running in a worktree:
-- **Always check `bd ready`** before starting work — another agent may have claimed your next task
-- **Rebase frequently** — other agents are merging to main
-- **Never edit high-contention files** (`prompts.md`, `CLAUDE.md`) without rebasing first
-- **Use `bd update <id> --claim`** immediately after picking a task to prevent conflicts
+See `docs/git-workflow.md` for the full workflow.
 
 ## Self-Improvement
 
@@ -182,14 +84,13 @@ When running in a worktree:
 
 ## Autonomous Behavior
 
-- **Fix bugs on sight**: When encountering bugs, errors, or failing tests — create a Beads task and fix them. Zero hand-holding required.
+- **Fix bugs on sight**: When encountering bugs, errors, or failing tests — fix them. Zero hand-holding required.
 - **Use subagents**: Offload research, exploration, and parallel analysis to subagents. Keeps main context clean.
-- **Keep working**: Continue until `bd ready` returns no available tasks.
 - **Re-plan when stuck**: If implementation goes sideways, stop and rethink your approach rather than pushing through. (Do NOT enter interactive `/plan` mode — just think through the problem and adjust.)
 
 ## Code Review
 
-Before pushing, spawn a review subagent to check `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md. Fix P0/P1 findings, re-run `make check`. Log recurring patterns to tasks/lessons.md.
+Before pushing, review `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md. Fix any issues and re-run `make check`. Log recurring patterns to tasks/lessons.md.
 
 ## Project Structure Quick Reference
 
@@ -206,7 +107,6 @@ See `docs/project-structure.md` for the full authoritative guide.
 | `tests/fixtures/` | Test data files |
 | `skills/` | Auto-activated skills |
 | `.claude-plugin/` | Plugin manifest (`plugin.json`) |
-| `.beads/` | Beads issue database (managed by `bd` CLI) |
 
 **File placement**: Scripts → `scripts/<name>.sh` | Tests → `tests/<name>.bats` | Docs → `docs/<topic>.md` | Shared functions → `lib/common.sh` (only when used by 2+ scripts)
 

@@ -445,7 +445,7 @@ Don't extract a helper until it's used in 2+ places. Three similar lines of code
 ### No Dead Code
 
 - No commented-out code blocks
-- No `TODO` comments without a Beads task ID: `# TODO [BD-xyz] description`
+- No `TODO` comments without context: `# TODO: description of why and when`
 - No unused variables or functions — delete them
 
 ### Follow Existing Patterns
@@ -470,7 +470,7 @@ Match the conventions in the file you're editing. Don't introduce new patterns f
 ### Format
 
 ```
-[BD-<id>] type(scope): description
+type(scope): description
 ```
 
 ### Commit Types
@@ -488,16 +488,14 @@ Match the conventions in the file you're editing. Don't introduce new patterns f
 
 - **Imperative mood**: "add feature" not "added feature"
 - **Lowercase** after the type prefix
-- **`[BD-0]`** for bootstrapping tasks (initial setup before Beads is configured)
-- Every commit needs a Beads task ID — if fixing a bug ad-hoc, create a task first
-- See `CLAUDE.md` for the authoritative reference
+- See `docs/git-workflow.md` for the full workflow
 
 ### Examples
 
 ```
-[BD-scaffold-abc] feat(scripts): add resolve-deps topological sort
-[BD-scaffold-xyz] fix(install): handle spaces in TARGET_DIR path
-[BD-0] chore: initialize project structure
+feat(scripts): add resolve-deps topological sort
+fix(install): handle spaces in TARGET_DIR path
+chore: initialize project structure
 ```
 
 ## 10. Styling / Dashboard Design System
@@ -535,8 +533,8 @@ Before merging any change, verify:
 - [ ] ATX headings only
 
 ### General
-- [ ] Commit message follows `[BD-<id>] type(scope): description` format
+- [ ] Commit message follows `type(scope): description` format
 - [ ] Tests cover success and failure paths
 - [ ] No secrets or credentials committed
-- [ ] No dead code or TODOs without Beads task IDs
+- [ ] No dead code or unexplained TODOs
 - [ ] File naming is kebab-case

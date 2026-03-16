@@ -14,7 +14,6 @@ How to set up and work with the scaffold development environment.
 | Git | Pre-installed on macOS | Version control |
 | jq | `brew install jq` | JSON processing |
 | Node.js 18+ | `brew install node` | Claude Code runtime |
-| Beads (`bd`) | `brew install beads` | Task tracking |
 
 ### Dev-Only
 
@@ -43,22 +42,21 @@ make check
 ## Daily Development
 
 ```bash
-# 1. See what's ready to work on
-bd ready
+# 1. Create a feature branch
+git fetch origin
+git checkout -b type/short-description origin/main
 
-# 2. Claim and start a task
-bd update <id> --claim
+# 2. Make your changes (TDD: write tests first)
 
-# 3. Make your changes (TDD: write tests first)
-
-# 4. Run quality gates
+# 3. Run quality gates
 make check
 
-# 5. Commit (requires Beads task ID)
-git commit -m "[BD-<id>] type(scope): description"
+# 4. Commit
+git commit -m "type(scope): description"
 
-# 6. Close the task
-bd close <id>
+# 5. Push and create PR
+git push -u origin HEAD
+gh pr create
 ```
 
 ## Common Tasks
@@ -89,19 +87,13 @@ brew install shellcheck
 brew install bats-core
 ```
 
-### `bd: command not found`
-
-```bash
-brew install beads
-```
-
 ### Pre-commit hook fails on ShellCheck
 
 ShellCheck warnings in existing scripts are expected tech debt. If blocked:
 
 ```bash
 # Commit without hooks (use sparingly)
-git commit --no-verify -m "[BD-<id>] message"
+git commit --no-verify -m "type(scope): message"
 ```
 
 ### `make lint` shows warnings on existing scripts
@@ -115,8 +107,4 @@ Quick-start for automated workflows:
 ```bash
 make setup          # Ensure all tools are installed
 make check          # Run all quality gates
-bd ready            # Find available work
-bd create "title" -p 1 && bd update <id> --claim  # Create + claim a task
-bd close <id>       # Mark task complete
-bd sync             # Sync state to git
 ```
