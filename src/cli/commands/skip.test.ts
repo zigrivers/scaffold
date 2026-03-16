@@ -99,7 +99,7 @@ describe('skip command', () => {
             'some-step': { status: 'pending', source: 'pipeline', produces: [] },
           },
           next_eligible: ['other-step'],
-        }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>
+        }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
       ),
       markSkipped: vi.fn(),
     }) as unknown as InstanceType<typeof StateManager>)
@@ -137,7 +137,7 @@ describe('skip command', () => {
             'some-step': { status: 'pending', source: 'pipeline', produces: [] },
           },
           next_eligible: ['other-step'],
-        }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>
+        }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
       ),
       markSkipped: mockMarkSkipped,
     }) as unknown as InstanceType<typeof StateManager>)
@@ -164,7 +164,7 @@ describe('skip command', () => {
         makeState({
           steps: { 'existing-step': { status: 'pending', source: 'pipeline', produces: [] } },
           next_eligible: [],
-        }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>
+        }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
       ),
       markSkipped: vi.fn(),
     }) as unknown as InstanceType<typeof StateManager>)
@@ -194,7 +194,7 @@ describe('skip command', () => {
         makeState({
           steps: { 'existing-step': { status: 'pending', source: 'pipeline', produces: [] } },
           next_eligible: [],
-        }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>
+        }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
       ),
       markSkipped: vi.fn(),
     }) as unknown as InstanceType<typeof StateManager>)
@@ -226,7 +226,7 @@ describe('skip command', () => {
             'completed-step': { status: 'completed', source: 'pipeline', produces: [] },
           },
           next_eligible: [],
-        }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>
+        }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
       ),
       markSkipped: vi.fn(),
     }) as unknown as InstanceType<typeof StateManager>)
@@ -259,7 +259,7 @@ describe('skip command', () => {
             'completed-step': { status: 'completed', source: 'pipeline', produces: [] },
           },
           next_eligible: [],
-        }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>
+        }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
       ),
       markSkipped: mockMarkSkipped,
     }) as unknown as InstanceType<typeof StateManager>)
@@ -309,7 +309,7 @@ describe('skip command', () => {
             'skipped-step': { status: 'skipped', source: 'pipeline', produces: [], reason: 'not needed' },
           },
           next_eligible: [],
-        }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>
+        }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
       ),
       markSkipped: vi.fn(),
     }) as unknown as InstanceType<typeof StateManager>)
@@ -340,7 +340,7 @@ describe('skip command', () => {
             'active-step': { status: 'in_progress', source: 'pipeline', produces: [] },
           },
           next_eligible: [],
-        }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>
+        }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
       ),
       markSkipped: mockMarkSkipped,
     }) as unknown as InstanceType<typeof StateManager>)
@@ -373,7 +373,7 @@ describe('skip command', () => {
             'my-step': { status: 'pending', source: 'pipeline', produces: [] },
           },
           next_eligible: ['next-step'],
-        }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>
+        }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
       ),
       markSkipped: vi.fn(),
     }) as unknown as InstanceType<typeof StateManager>)
