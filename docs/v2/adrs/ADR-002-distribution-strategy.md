@@ -80,7 +80,7 @@ Distribution channels:
 - npm namespace must be researched and secured before Phase 1 implementation can begin
 
 ### Neutral
-- Package name is TBD and requires npm namespace availability research. Candidates: `@scaffold-pipeline/cli`, `@zigrivers/scaffold`, `create-scaffold`. The chosen name affects both the npx command (`npx <name> init`) and global install command (`npm i -g <name>`)
+- Package name: `@scaffold-cli/scaffold`
 - Homebrew formula maintenance is an ongoing but low-effort task (update formula on each release)
 
 ## Constraints and Compliance

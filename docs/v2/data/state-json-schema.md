@@ -57,7 +57,6 @@ JSON Schema draft 2020-12 for `.scaffold/state.json`.
   "required": [
     "schema-version",
     "scaffold-version",
-    "methodology",
     "init_methodology",
     "config_methodology",
     "init-mode",
@@ -79,12 +78,6 @@ JSON Schema draft 2020-12 for `.scaffold/state.json`.
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
       "description": "Semver version of the scaffold CLI that created this state file. Informational — used for debugging, not for gating.",
       "examples": ["2.0.0", "2.1.3"]
-    },
-    "methodology": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9-]*$",
-      "description": "The methodology active when this state file was initialized. Copied from config.yml at init time. If config.yml methodology changes later, completed steps are preserved, orphaned entries are kept (not deleted), and pending steps are re-resolved against the new methodology (ADR-049). The methodology field in state.json records the original init-time value; config.yml is the source of truth for the current methodology.",
-      "examples": ["deep", "mvp", "custom"]
     },
     "init_methodology": {
       "type": "string",
@@ -296,7 +289,6 @@ JSON Schema draft 2020-12 for `.scaffold/state.json`.
 |-------|------|----------|---------|-------------|-------------|-----------|
 | `schema-version` | `integer` | Yes | — | Must equal `1` | Schema version for compatibility gating. CLI refuses to operate on mismatched versions. | State Manager (version check on load) |
 | `scaffold-version` | `string` | Yes | — | Semver format (`N.N.N`). Pattern permits leading zeros; scaffold versions never use them. | CLI version that created the file. Informational only. | Debugging, `scaffold status` display |
-| `methodology` | `string` | Yes | — | kebab-case (`[a-z][a-z0-9-]*`) | Methodology name at init time. Records the original choice; `config.yml` is the source of truth for the *current* methodology ([ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md)). | State Manager (methodology change detection), Dashboard Generator |
 | `init_methodology` | `string` | Yes | — | One of: `deep`, `mvp`, `custom` | Methodology selected at `scaffold init` time. Set once during initialization, never updated. Used with `config_methodology` to detect methodology changes ([ADR-054](../adrs/ADR-054-state-methodology-tracking.md)). | Methodology Resolver (change detection) |
 | `config_methodology` | `string` | Yes | — | One of: `deep`, `mvp`, `custom` | Current methodology from `config.yml`, copied into state on every `scaffold run` invocation. Compared against `init_methodology` to detect methodology changes ([ADR-054](../adrs/ADR-054-state-methodology-tracking.md)). | Methodology Resolver (change detection), `scaffold status` |
 | `init-mode` | `string` | Yes | — | One of: `greenfield`, `brownfield`, `v1-migration` | How state was initialized. Recorded for auditability. | `scaffold status` display, Dashboard Generator |
@@ -343,7 +335,6 @@ JSON Schema draft 2020-12 for `.scaffold/state.json`.
 
 | Field | References | Target Schema | Constraint | Validated By |
 |-------|-----------|---------------|------------|--------------|
-| `methodology` | `methodology` field in `.scaffold/config.yml` | [config-yml-schema.md](config-yml-schema.md) | Must match exactly. Mismatch produces `PSM_METHODOLOGY_MISMATCH` error. | State Manager on load |
 | `steps.{key}` | Resolved step set from `manifest.yml` + config `extra-steps` | [manifest-yml-schema.md](manifest-yml-schema.md) | Every key must exist in the resolved step set at time of state initialization. Orphaned keys (from methodology change) are preserved but ignored. | `scaffold validate` (warning: orphaned entries) |
 | `steps.{key}.produces[]` | `produces` field in step frontmatter YAML | [frontmatter-schema.md](frontmatter-schema.md) | Copied verbatim from frontmatter at init time. Paths are relative to project root. | State Manager (dual completion detection checks file existence at these paths) |
 | `steps.{key}.source` | Source of step: `pipeline` (meta-prompt from `pipeline/` directory) or `extra` (user-added custom step) | [frontmatter-schema.md](frontmatter-schema.md) | Must reflect actual source. | State Manager at initialization |
@@ -393,7 +384,7 @@ A schema change is **non-breaking** if:
 
 ### Migration note: `init_methodology` and `config_methodology`
 
-Existing state files created before the introduction of `init_methodology` and `config_methodology` ([ADR-054](../adrs/ADR-054-state-methodology-tracking.md)) will not contain these fields. During migration, both fields should default to the value of the existing `methodology` field. This preserves the assumption that no methodology change has occurred for pre-existing state files.
+Existing state files created before the introduction of `init_methodology` and `config_methodology` ([ADR-054](../adrs/ADR-054-state-methodology-tracking.md)) will not contain these fields. During migration, both fields should default to the methodology value from `config.yml` at migration time. This preserves the assumption that no methodology change has occurred for pre-existing state files.
 
 ### Forward compatibility (ADR-033)
 
@@ -412,7 +403,7 @@ Existing state files created before the introduction of `init_methodology` and `
 | **Line endings** | LF (`\n`). The file is JSON; line endings within string values are escaped as `\n`. |
 | **Trailing newline** | Yes — a single `\n` after the closing `}`. Prevents "no newline at end of file" git warnings. |
 | **Indentation** | 2 spaces. Produced by `JSON.stringify(state, null, 2)`. |
-| **Key ordering** | Top-level keys in declaration order (schema-version, scaffold-version, methodology, init-mode, created, in_progress, steps, next_eligible, extra-steps). Step keys within `steps` in manifest dependency order (the topological sort order from domain 02). No runtime sorting — order is preserved from initialization. |
+| **Key ordering** | Top-level keys in declaration order (schema-version, scaffold-version, init_methodology, config_methodology, init-mode, created, in_progress, steps, next_eligible, extra-steps). Step keys within `steps` in manifest dependency order (the topological sort order from domain 02). No runtime sorting — order is preserved from initialization. |
 | **Max file size** | ~20 KB for a 36-step pipeline with full metadata per entry. ~100 KB upper bound for pathological cases (many extra steps, long reason strings). |
 | **Atomicity** | All writes use the temp-file-then-rename pattern: (1) serialize to JSON string, (2) write to `.scaffold/state.json.tmp`, (3) `fs.rename('.scaffold/state.json.tmp', '.scaffold/state.json')`. `fs.rename()` is atomic on POSIX systems (single inode operation). The temp file and target file must be on the same filesystem — `.scaffold/` being a subdirectory of the project naturally satisfies this. |
 | **Concurrent writes** | Within a single worktree, the Lock Manager (domain 13) prevents concurrent state mutations. Across worktrees, each has its own `.scaffold/state.json`. Across machines (same branch), git merge handles reconciliation — the map-keyed structure ensures non-overlapping diff hunks for different steps. |
@@ -447,7 +438,7 @@ Checked during `scaffold validate` and opportunistically during `scaffold run`. 
 
 | ID | Rule | Error Code | Severity | Message Template | `scaffold validate` |
 |----|------|-----------|----------|-----------------|---------------------|
-| V1 | `methodology` in state.json differs from `config.yml` `methodology` (methodology changed mid-pipeline per [ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md)) | `PSM_METHODOLOGY_MISMATCH` | warning | `Methodology changed: state.json was initialized with '{state_method}', config.yml now says '{config_method}'. Completed steps preserved. Orphaned entries kept. Pending steps re-resolved against new methodology.` | Yes |
+| V1 | `init_methodology` differs from `config_methodology` (methodology changed mid-pipeline per [ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md), [ADR-054](../adrs/ADR-054-state-methodology-tracking.md)) | `PSM_METHODOLOGY_MISMATCH` | warning | `Methodology changed: state.json was initialized with '{init_methodology}', config.yml now says '{config_methodology}'. Completed steps preserved. Orphaned entries kept. Pending steps re-resolved against new methodology.` | Yes |
 | V2 | If `in_progress` is non-null, `in_progress.step` must be a key in `steps` | `STATE_CORRUPTED` | error | `in_progress references unknown step '{slug}'` | Yes |
 | V3 | If `in_progress` is non-null, exactly one step must have status `in_progress` | `STATE_CORRUPTED` | error | `in_progress is set but no step has status 'in_progress' (or multiple do)` | Yes |
 | V4 | If `in_progress` is non-null, the step it references must have status `in_progress` | `STATE_CORRUPTED` | error | `in_progress references step '{slug}' but its status is '{status}'` | Yes |
@@ -480,7 +471,8 @@ A freshly initialized greenfield pipeline with two steps. Represents the simples
 {
   "schema-version": 1,
   "scaffold-version": "2.0.0",
-  "methodology": "deep",
+  "init_methodology": "deep",
+  "config_methodology": "deep",
   "init-mode": "greenfield",
   "created": "2026-03-13T10:00:00Z",
   "in_progress": null,
@@ -509,7 +501,8 @@ A deep methodology pipeline partway through execution. Three steps completed, on
 {
   "schema-version": 1,
   "scaffold-version": "2.0.0",
-  "methodology": "deep",
+  "init_methodology": "deep",
+  "config_methodology": "deep",
   "init-mode": "greenfield",
   "created": "2026-03-12T09:00:00Z",
   "in_progress": {
@@ -608,7 +601,8 @@ Brownfield initialization with extra steps, a completed re-run, and every option
 {
   "schema-version": 1,
   "scaffold-version": "2.1.3",
-  "methodology": "deep",
+  "init_methodology": "deep",
+  "config_methodology": "deep",
   "init-mode": "brownfield",
   "created": "2026-03-10T08:00:00Z",
   "in_progress": {
@@ -731,7 +725,8 @@ The following instance contains five deliberate errors, annotated with their err
 {
   "schema-version": 2,
   "scaffold-version": "2.0.0",
-  "methodology": "deep",
+  "init_methodology": "deep",
+  "config_methodology": "deep",
   "init-mode": "greenfield",
   "created": "2026-03-13T10:00:00Z",
   "in_progress": {
@@ -811,7 +806,7 @@ lock.json              decisions.jsonl        produced artifacts
    - Run dual completion detection on the interrupted step (check `produces` artifacts on disk).
    - All artifacts present: auto-mark completed, clear `in_progress`, continue.
    - Partial/no artifacts: prompt user for recovery action (re-run, accept, or skip).
-4. **Methodology change check** ([ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md)): Compare `state.json` `methodology` against `config.yml` `methodology`. If they differ, emit `PSM_METHODOLOGY_MISMATCH` warning. Completed steps are preserved. Steps in state.json that no longer appear in the new methodology become orphaned entries (preserved, not deleted). New steps from the new methodology are added as `pending`. Pending steps are re-resolved against the new methodology's depth and enablement configuration.
+4. **Methodology change check** ([ADR-049](../adrs/ADR-049-methodology-changeable-mid-pipeline.md), [ADR-054](../adrs/ADR-054-state-methodology-tracking.md)): Copy current `config.yml` methodology into `config_methodology`. Compare `init_methodology` against `config_methodology`. If they differ, emit `PSM_METHODOLOGY_MISMATCH` warning. Completed steps are preserved. Steps in state.json that no longer appear in the new methodology become orphaned entries (preserved, not deleted). New steps from the new methodology are added as `pending`. Pending steps are re-resolved against the new methodology's depth and enablement configuration.
 5. **Artifact reconciliation**: For each step with status `pending`, check if all `produces` artifacts exist on disk. If so, auto-mark completed with `completed_by: "artifact"` and emit `PSM_ARTIFACTS_WITHOUT_STATE` warning.
 6. **Eligibility**: Read `next_eligible` (or recompute if stale). Select next step.
 6a. **Update mode detection** ([ADR-048](../adrs/ADR-048-update-mode-diff-over-regeneration.md)): If the selected step's status is `completed` and its `produces` artifacts exist on disk, the step enters update mode. The Assembly Engine includes the existing artifact content and previous `depth` in the assembled prompt for diff-based updates rather than full regeneration. If the current config depth differs from the recorded `depth`, a depth change context is provided.

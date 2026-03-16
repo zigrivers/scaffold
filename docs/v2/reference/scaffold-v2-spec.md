@@ -15,7 +15,7 @@
 | 2026-03-12 | Initial draft |
 | 2026-03-12 | Address spec review: decomposition strategy, optional prompts, reconfiguration, error handling, prompt classification, resolve open questions |
 | 2026-03-12 | Integrate features from plan.md: runtime orchestration, UX commands, prompt customization, brownfield mode, personas, NFRs, metrics, risks |
-| 2026-03-12 | Integrate agent ergonomics audit: structured CLI output, state.json redesign, prompt structure conventions, interaction-style mixin, artifact schemas, session continuity, merge-safe formats |
+| 2026-03-12 | Integrate agent ergonomics audit: structured CLI output, state.json redesign, prompt structure conventions, interaction-style adaptation, artifact schemas, session continuity, merge-safe formats |
 
 ## User Personas
 
@@ -23,7 +23,7 @@
 
 - **Goals**: Scaffold a new project quickly, get to implementation fast, use Claude Code or Codex agents for all coding work. Wants every document and configuration to be AI-optimized so agents can work autonomously.
 - **Pain points with v1**: Has to manually skip optional prompts by remembering which ones don't apply. Runs the full pipeline even for a CLI tool that doesn't need half the prompts. Locked into Claude Code — can't use Codex.
-- **Scaffold v2 value**: Pick a methodology + mixins, get exactly the prompts needed, run from either tool.
+- **Scaffold v2 value**: Pick a methodology preset, get exactly the prompts needed at the right depth, run from either tool.
 
 ### Team Lead Adopting AI Workflows ("Jordan")
 
@@ -51,7 +51,7 @@ Scaffold is currently a monolithic 29-prompt pipeline tightly coupled to Claude 
 ## Goals
 
 1. **Flavor system**: Different versions of Scaffold with different prompts, methodologies, and configurations
-2. **Composability**: Official curated presets built from composable modules; power users can compose their own
+2. **Composability**: Official curated methodology presets with configurable depth; power users can create custom presets
 3. **Cross-platform**: Run the scaffold pipeline from both Claude Code and Codex, and generate project artifacts that work with either tool
 4. **Backward compatibility**: Existing users who never opt in get current behavior unchanged
 
@@ -63,98 +63,106 @@ Scaffold is currently a monolithic 29-prompt pipeline tightly coupled to Claude 
 
 ## Architecture
 
+> **Note:** This section originally described a three-layer prompt resolution system (base prompts, methodology overrides/extensions, mixin injection). That architecture was superseded by the meta-prompt architecture defined in ADR-041, ADR-043, and ADR-044. The sections below have been updated to reflect the current design. See `docs/v2/scaffold-v2-prd.md` Section 4 for the authoritative architecture description.
+
 ### High-Level Flow
 
 ```
 User runs: scaffold init
          |
          v
-Interactive wizard (methodology -> axes -> platforms)
+Interactive wizard (methodology preset -> project traits -> platforms)
          |
          v
 Writes: .scaffold/config.yml
          |
          v
-User runs: scaffold build
+User runs: scaffold run <step>
          |
          v
-Resolves: base prompts + methodology overrides + mixin injections
+Runtime assembly: meta-prompt + knowledge base + project context + user instructions + depth
          |
          v
-Adapters generate:
-  +-- commands/*.md          (Claude Code slash commands)
+AI generates and executes a working prompt tailored to project + methodology
+         |
+         v
+Platform adapters deliver:
+  +-- Claude Code plugin commands (thin wrappers around `scaffold run`)
   +-- AGENTS.md sections     (Codex instructions)
   +-- prompts/*.md           (Plain markdown, universal)
 ```
 
-### Layered Prompt System
+### Meta-Prompt Architecture
 
-Three layers resolve into a final prompt set:
+The system uses three core components that are assembled at runtime into a tailored prompt:
 
-#### Layer 1: Base Prompts
+#### Meta-Prompts (pipeline/)
 
-Prompts that are shared across methodologies. Base prompts are written using **abstract task verbs** rather than tool-specific commands. Concrete tool commands are injected via mixins at build time.
+36 files in `pipeline/`, one per pipeline step. Each is a compact declaration (30-80 lines) of what the step should accomplish: purpose, inputs, outputs, quality criteria, and methodology-scaling rules. Meta-prompts do NOT contain the actual prompt text the AI executes — they declare intent and the assembly engine constructs the working prompt at runtime.
 
-**Abstract task verb convention:**
+#### Knowledge Base (knowledge/)
 
-Base prompts use generic verbs that mixins replace with concrete commands:
+37 files in `knowledge/`, organized by topic. Contains domain expertise: what makes a good PRD, how to review an architecture document, what failure modes to check in API contracts, etc. Reusable across steps — multiple meta-prompts can reference the same knowledge entry via their `knowledge-base` frontmatter field.
 
-| Abstract Verb | Beads Mixin | GitHub Issues Mixin | None Mixin |
-|---------------|-------------|---------------------|------------|
-| `<!-- scaffold:task-create "Title" priority=N -->` | `bd create "Title" -p N` | `gh issue create --title "Title" --label "priority:N"` | Add to TODO.md |
-| `<!-- scaffold:task-list -->` | `bd list` | `gh issue list` | Review TODO.md |
-| `<!-- scaffold:task-ready -->` | `bd ready` | `gh issue list --label "ready"` | Check TODO.md for unblocked items |
-| `<!-- scaffold:task-claim ID -->` | `bd update ID --claim` | `gh issue edit ID --add-assignee @me` | Mark as in-progress in TODO.md |
-| `<!-- scaffold:task-close ID -->` | `bd close ID` | `gh issue close ID` | Strike through in TODO.md |
-| `<!-- scaffold:task-dep-add CHILD PARENT -->` | `bd dep add CHILD PARENT` | Add "blocked by #PARENT" to CHILD | Note dependency in TODO.md |
-| `<!-- scaffold:task-show ID -->` | `bd show ID` | `gh issue view ID` | Read TODO.md entry |
-| `<!-- scaffold:task-sync -->` | `bd sync` | _(no-op, GitHub is remote)_ | `git add TODO.md && git commit` |
+#### Methodology Configuration (methodology/)
 
-HTML comments are universally ignored by execution engines, shells, and AI agent tool-use parsers. An agent encountering an unresolved marker will skip it rather than attempting to execute it. The `scaffold:` prefix makes it immediately identifiable as a scaffold system marker.
+3 YAML preset files controlling which pipeline steps are active and the depth level (1-5) for each step. Three presets:
+- **Deep Domain Modeling** — all steps active, depth 5
+- **MVP** — minimal steps, depth 1
+- **Custom** — user picks steps and depth per step
 
-During `scaffold build`, the mixin injection replaces these abstract verbs with concrete commands. This means:
-- Base prompts never reference `bd`, `gh issue`, or any specific tool directly
-- A single base prompt works with any task-tracking mixin
-- Prompts that are deeply methodology-specific (like execution loops) remain as methodology overrides/extensions, not base prompts
+**How they interact (runtime assembly):**
 
-**Prompt classification — which prompts are base vs. override vs. extension:**
+When `scaffold run <step>` is invoked:
+1. Load the meta-prompt for that step (`pipeline/<step>.md`)
+2. Check prerequisites (dependencies, completion, lock)
+3. Load relevant knowledge base entries (from meta-prompt frontmatter)
+4. Gather project context (prior artifacts, config, state, decisions)
+5. Load user instructions (global, per-step, and inline via `--instructions`)
+6. Determine depth from methodology config
+7. Assemble everything into a single 7-section prompt
+8. AI generates a working prompt tailored to project + methodology
+9. AI executes the working prompt, producing output artifacts
+10. CLI updates pipeline state
 
-Not all current prompts can be base prompts. Prompts that are deeply intertwined with a specific methodology's workflow (e.g., the current Implementation Plan with its 20+ `bd` references and Beads-specific dependency graph logic) must be methodology overrides or extensions. The classification:
+**Pipeline step classification:**
 
-| Current Prompt | v2 Classification | Rationale |
-|----------------|-------------------|-----------|
-| PRD Creation | base | Methodology-agnostic product definition |
-| PRD Gap Analysis | base | Methodology-agnostic analysis |
-| Tech Stack | base | Universal concern |
-| Coding Standards | base | Universal concern, mixin markers for TDD strictness |
-| TDD Standards | base | Universal concern, mixin markers for strictness level |
-| Project Structure | base | Universal concern |
-| Dev Environment Setup | base | Universal concern |
-| Design System | base (optional) | Universal for frontend projects |
-| Git Workflow | base | Universal concern, mixin markers for workflow style |
-| User Stories | base | Universal concern |
-| User Stories Gaps | base | Universal concern |
-| Add Playwright | base (optional) | Universal for web projects |
-| Add Maestro | base (optional) | Universal for mobile projects |
-| Beads Setup | deep extension | Beads-specific; other methodologies use different tracking setup |
-| Implementation Plan | deep override | Deeply Beads-integrated; each methodology needs its own version |
-| Implementation Plan Review | deep extension | Assumes Beads task graph structure |
-| Claude.md Optimization | deep extension | Assumes CLAUDE.md structure from deep pipeline |
-| Workflow Audit | deep extension | Verifies deep-specific doc set |
-| Single Agent Start | deep extension | Assumes Beads execution loop |
-| Multi Agent Start | deep extension | Assumes worktrees + Beads |
-| Single Agent Resume | deep extension | Assumes Beads state |
-| Multi Agent Resume | deep extension | Assumes worktrees + Beads |
-| Claude Code Permissions | base | Universal Claude Code configuration |
-| New Enhancement | deep extension | Assumes Beads for task creation |
-| Quick Task | deep extension | Assumes Beads for tracking |
-| Multi-Model Code Review | base (optional) | Universal, requires Codex/Gemini CLIs |
-| User Stories Multi-Model Review | base (optional) | Universal review process |
-| Implementation Plan Multi-Model Review | deep extension | Reviews Beads-specific task structure |
-| Platform Parity Review | base (optional) | Universal for multi-platform |
-| Session Analyzer | utility | Not part of pipeline; standalone analysis tool |
+Each pipeline step is defined as a meta-prompt in `pipeline/`. The methodology preset controls which steps are active and at what depth. Steps that were deeply methodology-specific in the original spec (e.g., Beads Setup, Implementation Plan) are now handled by meta-prompts whose knowledge base references and depth scaling adapt to the active methodology.
 
-**Utility commands** (always available, not part of the pipeline manifest):
+| Pipeline Step | Depth Scaling | Notes |
+|---------------|---------------|-------|
+| PRD Creation | Depth controls detail level | Methodology-agnostic |
+| PRD Gap Analysis | Depth controls rigor | Methodology-agnostic |
+| Tech Stack | Depth controls evaluation thoroughness | Universal concern |
+| Coding Standards | Depth controls strictness level | Universal concern |
+| TDD Standards | Depth controls strictness level | Universal concern |
+| Project Structure | Depth controls granularity | Universal concern |
+| Dev Environment Setup | Depth controls completeness | Universal concern |
+| Design System | Depth controls component coverage | Optional (frontend projects) |
+| Git Workflow | Depth controls workflow complexity | Universal concern |
+| User Stories | Depth controls story granularity | Universal concern |
+| User Stories Gaps | Depth controls analysis depth | Universal concern |
+| Add Playwright | Depth controls test coverage | Optional (web projects) |
+| Add Maestro | Depth controls test coverage | Optional (mobile projects) |
+| Tracking Setup | Depth scales tool integration level | Adapts to configured tracker |
+| Implementation Plan | Depth controls task granularity | Adapts to configured tracker |
+| Implementation Plan Review | Depth controls review thoroughness | Adapts to configured tracker |
+| Claude.md Optimization | Depth controls optimization scope | Universal concern |
+| Workflow Audit | Depth controls audit thoroughness | Universal concern |
+| Single Agent Start | Depth controls guidance level | Adapts to configured tracker |
+| Multi Agent Start | Depth controls coordination level | Adapts to configured tracker |
+| Single Agent Resume | Depth controls recovery guidance | Adapts to configured tracker |
+| Multi Agent Resume | Depth controls coordination level | Adapts to configured tracker |
+| Claude Code Permissions | Minimal depth variation | Universal Claude Code config |
+| New Enhancement | Depth controls process rigor | Universal concern |
+| Quick Task | Minimal depth variation | Universal concern |
+| Multi-Model Code Review | Depth controls review scope | Optional (multi-model CLI) |
+| User Stories Multi-Model Review | Depth controls review scope | Optional (multi-model CLI) |
+| Implementation Plan Multi-Model Review | Depth controls review scope | Optional (multi-model CLI) |
+| Platform Parity Review | Depth controls comparison depth | Optional (multi-platform) |
+| Session Analyzer | Utility (not in pipeline) | Standalone analysis tool |
+
+**Utility commands** (always available, not part of the pipeline):
 
 | Command | v2 Disposition |
 |---------|----------------|
@@ -166,8 +174,10 @@ Not all current prompts can be base prompts. Prompts that are deeply intertwined
 | dashboard | CLI built-in (`scaffold dashboard`) |
 | session-analyzer | CLI built-in (`scaffold analyze`) |
 
+**Meta-prompt file structure:**
+
 ```
-base/
+pipeline/
   create-prd.md
   review-prd.md
   innovate-prd.md
@@ -183,142 +193,79 @@ base/
   user-stories-gaps.md
   add-playwright.md
   add-maestro.md
+  tracking-setup.md
+  implementation-plan.md
+  implementation-plan-review.md
+  claude-md-optimization.md
+  workflow-audit.md
+  single-agent-start.md
+  multi-agent-start.md
+  single-agent-resume.md
+  multi-agent-resume.md
   multi-model-review.md
   user-stories-multi-model-review.md
   platform-parity-review.md
+  ...
 ```
 
-Each base prompt contains **mixin insertion points** where axis-specific content gets injected. A single prompt may have multiple insertion points for the same axis (e.g., task-tracking referenced in both a "Setup" section and a "Workflow" section):
-
-```markdown
-## Task Tracking
-
-<!-- mixin:task-tracking -->
-
-...later in the same prompt...
-
-## Closing a Task
-
-<!-- mixin:task-tracking:close-workflow -->
-```
-
-#### Layer 2: Methodologies
-
-Each methodology defines its own pipeline shape — which base prompts to include, which to override, and what new prompts to add.
-
-```
-methodologies/
-  deep/
-    manifest.yml
-    overrides/
-      implementation-plan.md
-    extensions/
-      beads-setup.md
-      multi-agent-start.md
-      single-agent-start.md
-      multi-agent-resume.md
-      single-agent-resume.md
-      claude-md-optimization.md
-      workflow-audit.md
-  mvp/
-    manifest.yml
-    overrides/
-      implementation-plan.md
-    extensions/
-      simple-tracking.md
-  ddd/                           # Future
-    manifest.yml
-    overrides/
-      create-prd.md
-    extensions/
-      domain-discovery.md
-      bounded-contexts.md
-      ubiquitous-language.md
-```
-
-**Manifest format** (`methodologies/deep/manifest.yml`):
+Each meta-prompt declares its knowledge base dependencies in YAML frontmatter. The assembly engine loads the referenced knowledge base files and includes their content in the assembled prompt:
 
 ```yaml
-name: Scaffold Deep
-description: Full pipeline with parallel agents, Beads tracking, and comprehensive standards
-phases:
-  - name: Product Definition
-    prompts:
-      - base:create-prd
-      - base:review-prd
-      - base:innovate-prd
-  - name: Project Foundation
-    prompts:
-      - ext:beads-setup
-      - base:tech-stack
-      - base:claude-code-permissions
-      - base:coding-standards
-      - base:tdd
-      - base:project-structure
-  - name: Development Environment
-    prompts:
-      - base:dev-env-setup
-      - base:design-system
-        optional: { requires: frontend }
-      - base:git-workflow
-  - name: Testing Integration
-    prompts:
-      - base:add-playwright
-        optional: { requires: web }
-      - base:add-maestro
-        optional: { requires: mobile }
-  - name: Stories and Planning
-    prompts:
-      - base:user-stories
-      - base:user-stories-gaps
-      - base:user-stories-multi-model-review
-        optional: { requires: multi-model-cli }
-      - base:platform-parity-review
-        optional: { requires: multi-platform }
-  - name: Consolidation
-    prompts:
-      - ext:claude-md-optimization
-      - ext:workflow-audit
-  - name: Implementation
-    prompts:
-      - override:implementation-plan
-      - ext:implementation-plan-review
-      - ext:single-agent-start
-      - ext:multi-agent-start
-defaults:
-  task-tracking: beads
-  tdd: strict
-  git-workflow: full-pr
-  agent-mode: multi
-dependencies:
-  create-prd: []
-  review-prd: [create-prd]
-  innovate-prd: [review-prd]
-  beads-setup: []
-  tech-stack: [beads-setup]
-  claude-code-permissions: [tech-stack]
-  coding-standards: [tech-stack]
-  tdd: [tech-stack]
-  project-structure: [coding-standards, tdd]
-  dev-env-setup: [project-structure]
-  design-system: [dev-env-setup]
-  git-workflow: [dev-env-setup]
-  user-stories: [review-prd]
-  user-stories-gaps: [user-stories]
-  claude-md-optimization: [git-workflow]
-  workflow-audit: [claude-md-optimization]
-  implementation-plan: [user-stories, project-structure]
-  implementation-plan-review: [implementation-plan]
+---
+knowledge-base:
+  - task-tracking
+  - tdd-practices
+depends-on: [tech-stack]
+produces: ["docs/coding-standards.md"]
+---
 ```
 
-**Resolution rules:**
-- `base:<name>` — use prompt from `base/` directory
-- `override:<name>` — use prompt from methodology's `overrides/` directory instead of base
-- `ext:<name>` — use prompt from methodology's `extensions/` directory (no base equivalent)
+#### Methodology Presets
 
-**Optional prompt handling:**
+Methodology presets are simplified YAML files that control step enablement and depth:
 
-Prompts can be marked `optional` with a `requires` condition. Valid conditions:
+```
+methodology/
+  deep.yml        # All steps, depth 5
+  mvp.yml         # Minimal steps, depth 1
+  custom.yml      # User-configured steps and depth
+```
+
+**Preset format** (`methodology/deep.yml`):
+
+```yaml
+name: Deep Domain Modeling
+description: Full pipeline with comprehensive standards and maximum depth
+steps:
+  create-prd: { enabled: true, depth: 5 }
+  review-prd: { enabled: true, depth: 5 }
+  innovate-prd: { enabled: true, depth: 5 }
+  tracking-setup: { enabled: true, depth: 5 }
+  tech-stack: { enabled: true, depth: 5 }
+  claude-code-permissions: { enabled: true, depth: 3 }
+  coding-standards: { enabled: true, depth: 5 }
+  tdd: { enabled: true, depth: 5 }
+  project-structure: { enabled: true, depth: 5 }
+  dev-env-setup: { enabled: true, depth: 5 }
+  design-system: { enabled: true, depth: 5, optional: { requires: frontend } }
+  git-workflow: { enabled: true, depth: 5 }
+  add-playwright: { enabled: true, depth: 5, optional: { requires: web } }
+  add-maestro: { enabled: true, depth: 5, optional: { requires: mobile } }
+  user-stories: { enabled: true, depth: 5 }
+  user-stories-gaps: { enabled: true, depth: 5 }
+  user-stories-multi-model-review: { enabled: true, depth: 5, optional: { requires: multi-model-cli } }
+  platform-parity-review: { enabled: true, depth: 5, optional: { requires: multi-platform } }
+  claude-md-optimization: { enabled: true, depth: 5 }
+  workflow-audit: { enabled: true, depth: 5 }
+  implementation-plan: { enabled: true, depth: 5 }
+  implementation-plan-review: { enabled: true, depth: 5 }
+  single-agent-start: { enabled: true, depth: 5 }
+  multi-agent-start: { enabled: true, depth: 5 }
+```
+
+**Optional step handling:**
+
+Steps can be marked `optional` with a `requires` condition. Valid conditions:
 
 | Condition | Meaning | Set during |
 |-----------|---------|------------|
@@ -336,56 +283,21 @@ project:
   multi-model-cli: true     # Auto-detected at init time
 ```
 
-During `scaffold build`, optional prompts whose conditions are not met are excluded from the resolved set. Users can override by adding/removing traits in `config.yml`.
+During `scaffold run`, optional steps whose conditions are not met are skipped. Users can override by adding/removing traits in `config.yml`.
 
 **Dependency graph is authoritative for ordering; phases are for grouping only.**
 
-The `phases` section groups prompts for display (dashboard, pipeline reference). The `dependencies` section is authoritative for execution order — a prompt cannot run until all its dependencies are complete. If phases and dependencies conflict, dependencies win. All dependency keys use short names (matching the filename without extension); the namespace prefix (`base:`, `override:`, `ext:`) is only used in the `phases.prompts` list to specify resolution source.
+Dependencies are declared in meta-prompt frontmatter (`depends-on` field) and resolved via Kahn's algorithm. Phase groupings in the methodology preset are for display purposes only (dashboard, pipeline reference). If phases and dependencies conflict, dependencies win.
 
-#### Layer 3: Mixins
+**Interaction-style adaptation** — The assembly engine adapts prompt behavior to the target platform automatically. Rather than injecting platform-specific content, the AI natively adapts its interaction style based on the platform configuration in `config.yml`:
 
-Small, focused content snippets injected at marked insertion points. Each axis has multiple options.
-
-```
-mixins/
-  task-tracking/
-    beads.md              # Beads CLI setup, bd commands, task lifecycle
-    github-issues.md      # GitHub Issues integration, gh commands
-    none.md               # Manual tracking guidance
-  tdd/
-    strict.md             # Test-first always, no exceptions
-    relaxed.md            # Tests encouraged for critical paths
-  git-workflow/
-    full-pr.md            # Branches, PR review, squash merge
-    simple.md             # Commit to main, lightweight
-  agent-mode/
-    multi.md              # Parallel worktrees, BD_ACTOR, task claiming
-    single.md             # Single agent loop
-    manual.md             # Human-driven, no agent loop
-  interaction-style/
-    claude-code.md        # AskUserQuestionTool, subagent delegation
-    codex.md              # Autonomous decisions with NEEDS_USER_REVIEW tagging
-    universal.md          # Present options as text, ask user to choose
-```
-
-**Injection mechanics:**
-
-During `scaffold build`, the build step:
-1. Reads the methodology manifest to determine which prompts to include
-2. For each prompt, reads the source file (base, override, or extension)
-3. Scans for `<!-- mixin:<axis-name> -->` markers
-4. Replaces each marker with the content of the selected mixin file
-5. Passes the resolved prompt to platform adapters
-
-**interaction-style** — Controls how prompts interact with the user during execution.
-
-| Option | Behavior |
-|--------|----------|
+| Platform | Behavior |
+|----------|----------|
 | `claude-code` | Uses `AskUserQuestionTool` for decisions. Delegates parallel research to subagents via the `Agent` tool. Conversational multi-phase workflows with context carryover between phases. |
 | `codex` | Makes autonomous best-judgment decisions based on project context and PRD. Tags high-stakes decisions (database choice, auth approach, infrastructure) with `NEEDS_USER_REVIEW` in `decisions.jsonl` for post-execution review. Performs research sequentially inline rather than via subagents. Includes explicit "carry forward" context summaries between prompt phases since Codex may not retain conversational memory. |
 | `universal` | Presents options as numbered text lists. Asks the user to choose before proceeding. If running in an automated context, chooses options marked `(recommended)` and documents the choice. No tool-specific references. |
 
-The interaction-style axis is distinct from tool-name mapping in the platform adapter. Tool mapping handles surface-level name translation (`Read tool` → `read the file`). The interaction-style mixin handles **behavioral differences**: how the agent makes decisions, whether it delegates to subagents, how it communicates with the user, and how it carries context across multi-phase workflows. Both mechanisms are needed — tool mapping catches incidental tool references in prose, while the interaction-style mixin shapes the instructional structure.
+Platform adaptation is handled at two levels: the assembly engine includes platform context in the assembled prompt (so the AI adapts its behavior natively), and platform adapters handle surface-level delivery format differences (Claude Code plugin commands vs. AGENTS.md sections vs. plain markdown).
 
 ### Configuration
 
@@ -394,89 +306,69 @@ The interaction-style axis is distinct from tool-name mapping in the platform ad
 ```yaml
 version: 1
 methodology: deep
-mixins:
-  task-tracking: beads
-  tdd: strict
-  git-workflow: full-pr
-  agent-mode: multi
-  interaction-style: claude-code
 platforms:
   - claude-code
   - codex
+project:
+  platforms: [web]
+  multi-model-cli: true
 ```
 
 This file is:
 - Written by `scaffold init` (interactive wizard)
 - Editable by hand
-- Read by `scaffold build` to resolve the prompt set
-- Committed to the project repo (so all contributors use the same flavor)
+- Read by `scaffold run` to configure runtime assembly
+- Committed to the project repo (so all contributors use the same methodology and depth)
 
-### Rebuild Behavior
+### Reconfiguration Behavior
 
-`scaffold build` is **idempotent** — it always regenerates platform outputs from scratch based on the current `config.yml`. It does not have its own "update mode."
+Users may change `config.yml` at any time. Because prompt assembly happens at runtime (not build time), the next `scaffold run` invocation picks up the new configuration automatically.
 
-**Mode Detection blocks in prompts pass through the build system unmodified.** Mode Detection operates at *runtime* (when the user executes a prompt and it checks whether `docs/plan.md` exists) — not at *build time*.
+**Mode Detection** operates at runtime — the assembly engine checks whether artifacts exist and communicates fresh vs. update mode to the AI in the assembled prompt.
 
-**Reconfiguration after initial build:**
-
-Users may change `config.yml` at any time and re-run `scaffold build`. The build system:
-1. Regenerates all platform outputs (commands, AGENTS.md, universal prompts)
-2. Prints a diff summary: "Added 3 prompts, removed 2, modified 5"
-3. **Does NOT modify project artifacts** that were created by running prompts (e.g., `docs/plan.md`, `docs/implementation-plan.md`, `CLAUDE.md`)
-
-If the user changes methodology or task-tracking mixin after already running prompts, their existing project artifacts may reference the old tooling. This is expected — the Mode Detection in prompts handles this: when the user re-runs a prompt (e.g., `/scaffold:implementation-plan`), it detects the existing artifact, shows what changed, and updates in place.
+If the user changes methodology after already running steps, their existing project artifacts may reference the old methodology's depth level. This is expected — when the user re-runs a step (e.g., `scaffold run implementation-plan`), the assembly engine detects the existing artifact, shows what changed, and updates in place.
 
 **Changing methodology is supported but advisory:**
 
 ```
-$ scaffold build
-Warning: Methodology changed from 'deep' to 'mvp'.
-Previously generated project artifacts may reference concepts from 'deep'.
-Re-run affected prompts to update artifacts. Changed prompts:
-  - implementation-plan (was: deep override, now: mvp override)
-  - beads-setup (removed — not in mvp)
-  + simple-tracking (added — new in mvp)
+$ scaffold run implementation-plan
+Warning: Methodology changed from 'deep' to 'mvp' since this step last ran.
+Previously generated artifacts may reflect depth 5; new methodology uses depth 1.
+Re-run affected steps to update artifacts.
 Proceed? [y/N]
 ```
 
 ### Error Handling
 
-`scaffold build` validates the configuration before generating outputs:
+`scaffold run` validates the configuration before assembling prompts:
 
 **Config validation:**
-- `methodology` must match an installed methodology directory
-- Each `mixins.<axis>` value must match an installed mixin file (`mixins/<axis>/<value>.md`)
+- `methodology` must match an installed methodology preset (`methodology/<name>.yml`)
 - Each `platforms` entry must match an installed adapter (`claude-code`, `codex`)
 - `project` traits must be known condition names
 - Each `extra-prompts` entry must resolve to an existing file (`.scaffold/prompts/<name>.md` or `~/.scaffold/prompts/<name>.md`) with valid YAML frontmatter. Missing files or invalid frontmatter are errors
 
-**Manifest validation:**
-- Every prompt reference (`base:X`, `override:X`, `ext:X`) must resolve to an existing file
-- Every dependency key must match a prompt in the `phases` list
+**Meta-prompt validation:**
+- Every step referenced in the methodology preset must have a corresponding meta-prompt file in `pipeline/`
+- Every `depends-on` key in meta-prompt frontmatter must reference an existing step
+- Every `knowledge-base` entry must reference an existing file in `knowledge/`
 - No circular dependencies
-- Optional prompt conditions must reference valid traits
-
-**Mixin validation:**
-- Every `<!-- mixin:<axis> -->` marker in a resolved prompt must have a corresponding axis in the config
-- **Unresolved mixin markers are errors by default.** If a resolved prompt contains a `<!-- mixin:<axis> -->` marker that was not replaced during injection (because the axis is not configured or the mixin file has no matching section), `scaffold build` reports an error. An unresolved marker in a prompt that an agent executes would be silently ignored or misinterpreted — this is worse than a build failure. Use `--allow-unresolved-markers` to downgrade to warnings during development.
-- Warn (not error) if a prompt has no markers for an axis that would logically apply — this is the inverse case (missing marker, not unresolved marker) and is less dangerous
+- Optional step conditions must reference valid traits
+- Depth values must be integers 1-5
 
 **Incompatible combination warnings:**
-- `agent-mode: manual` + `git-workflow: full-pr` — warn: full PR flow assumes automated agent execution
-- `task-tracking: none` + `agent-mode: multi` — warn: parallel agents need shared task tracking to avoid conflicts
-- These are warnings, not errors — users may have valid reasons to combine them
+- These are warnings, not errors — users may have valid reasons for unusual configurations
 
 Error messages include the config path, the specific invalid value, and the list of valid options.
 
 ### Platform Adapters
 
-Each adapter reads the resolved prompt set and packages it for a specific platform.
+Platform adapters are thin delivery wrappers around the CLI. The assembly engine (runtime) does the heavy lifting; adapters handle packaging and delivery format.
 
 #### Claude Code Adapter
 
-- Generates `commands/*.md` with YAML frontmatter (description, long-description, argument-hint)
+- Thin wrapper: plugin commands invoke `scaffold run <step>`
 - Generates/updates `CLAUDE.md` with methodology-appropriate agent guidance
-- Generates "After This Step" navigation sections based on manifest phase ordering
 - Registers as plugin or user commands (existing pattern preserved)
 
 #### Codex Adapter
@@ -515,9 +407,9 @@ patterns:
     replace: "Search for"
 ```
 
-Patterns are matched longest-first to avoid partial replacements. Each pattern is a complete phrase, not a single word — this prevents grammatically broken output. Base prompts and mixins should prefer abstract language where possible (e.g., "examine the file" rather than "use the Read tool"), reserving tool-specific references for cases where the exact tool matters. The mapping handles cases where tool-specific language slips through.
+Patterns are matched longest-first to avoid partial replacements. Each pattern is a complete phrase, not a single word — this prevents grammatically broken output. Meta-prompts and knowledge base entries should prefer abstract language where possible (e.g., "examine the file" rather than "use the Read tool"), reserving tool-specific references for cases where the exact tool matters. The mapping handles cases where tool-specific language slips through.
 
-**MCP tool handling:** Prompts that reference MCP tools (Playwright MCP, etc.) are handled via the interaction-style mixin and platform adapter together. The Claude Code adapter preserves MCP references. The Codex adapter replaces MCP tool instructions with equivalent direct-command alternatives (e.g., Playwright MCP screenshot instructions become `npx playwright screenshot` CLI commands). If no equivalent exists, the adapter wraps the section in a comment: `<!-- Platform note: this section requires MCP tools not available in Codex. Skip or adapt manually. -->`.
+**MCP tool handling:** Knowledge base entries that reference MCP tools (Playwright MCP, etc.) are handled via the assembly engine's platform context and the platform adapter together. The Claude Code adapter preserves MCP references. The Codex adapter replaces MCP tool instructions with equivalent direct-command alternatives (e.g., Playwright MCP screenshot instructions become `npx playwright screenshot` CLI commands). If no equivalent exists, the adapter wraps the section in a comment: `<!-- Platform note: this section requires MCP tools not available in Codex. Skip or adapt manually. -->`.
 
 **AGENTS.md section structure** (one section per pipeline phase):
 
@@ -545,17 +437,16 @@ Each section includes the run command, artifact references, and a condensed summ
 
 ```
 scaffold init              # Interactive wizard -> .scaffold/config.yml
-scaffold build             # Config -> platform-specific outputs
-scaffold list              # Show available methodologies and mixins
-scaffold info              # Show current project's config and resolved prompt count
-scaffold add <axis> <val>  # Add/change a mixin (e.g., scaffold add tdd relaxed)
-scaffold update            # Pull latest scaffold version and rebuild
+scaffold run <step>        # Assemble and execute a pipeline step
+scaffold list              # Show available methodology presets and steps
+scaffold info              # Show current project's config and pipeline progress
+scaffold update            # Pull latest scaffold version
 scaffold version           # Show installed version
 ```
 
-#### Runtime Orchestration Commands
+#### Pipeline Orchestration Commands
 
-In addition to the build-time commands above, the CLI provides runtime commands for managing pipeline execution:
+The CLI provides commands for managing pipeline execution:
 
 ```
 scaffold resume            # Resume pipeline from where it left off
@@ -604,9 +495,9 @@ When `--auto` is used without `--format json`, the CLI still prints human-readab
 | 2 | Missing dependency (predecessor artifact not found) |
 | 3 | State corruption (state.json unreadable, artifact/state mismatch) |
 | 4 | User cancellation (interactive prompt declined) |
-| 5 | Build error (mixin injection failed, adapter error) |
+| 5 | Assembly error (knowledge base load failed, adapter error) |
 
-**Fuzzy matching in error messages** — When a value doesn't match any valid option (methodology names, mixin values, prompt names), the CLI computes Levenshtein distance and suggests the closest match if the distance is ≤ 2. Example:
+**Fuzzy matching in error messages** — When a value doesn't match any valid option (methodology names, step names), the CLI computes Levenshtein distance and suggests the closest match if the distance is ≤ 2. Example:
 
 ```
 Error: methodology 'clasic' not found.
@@ -641,7 +532,7 @@ The CLI tracks pipeline execution state in `.scaffold/state.json` (separate from
   "prompts": {
     "create-prd": {
       "status": "completed",
-      "source": "base",
+      "depth": 5,
       "at": "2026-03-12T10:35:00Z",
       "produces": ["docs/plan.md"],
       "artifacts_verified": true,
@@ -649,7 +540,7 @@ The CLI tracks pipeline execution state in `.scaffold/state.json` (separate from
     },
     "review-prd": {
       "status": "completed",
-      "source": "base",
+      "depth": 5,
       "at": "2026-03-12T10:42:00Z",
       "produces": ["docs/reviews/pre-review-prd.md"],
       "artifacts_verified": true,
@@ -657,7 +548,7 @@ The CLI tracks pipeline execution state in `.scaffold/state.json` (separate from
     },
     "innovate-prd": {
       "status": "completed",
-      "source": "base",
+      "depth": 5,
       "at": "2026-03-12T10:45:00Z",
       "produces": ["docs/prd-innovation.md"],
       "artifacts_verified": true,
@@ -666,13 +557,12 @@ The CLI tracks pipeline execution state in `.scaffold/state.json` (separate from
     },
     "design-system": {
       "status": "skipped",
-      "source": "base",
       "at": "2026-03-12T11:00:00Z",
       "reason": "No frontend"
     },
     "dev-env-setup": {
       "status": "pending",
-      "source": "base",
+      "depth": 5,
       "produces": ["docs/dev-setup.md", "Makefile"]
     }
   },
@@ -681,14 +571,14 @@ The CLI tracks pipeline execution state in `.scaffold/state.json` (separate from
 }
 ```
 
-Each prompt entry includes:
+Each step entry includes:
 - `status`: One of `pending`, `in_progress`, `skipped`, `completed`
-- `source`: Resolution source — `base`, `override`, or `ext`
+- `depth`: Depth level (1-5) from the methodology preset at time of execution
 - `at`: ISO 8601 timestamp (set when completed or skipped)
-- `produces`: Copied from prompt frontmatter so agents don't need to load prompt files to verify artifacts
+- `produces`: Copied from meta-prompt frontmatter so agents don't need to load meta-prompt files to verify artifacts
 - `artifacts_verified`: Boolean, set after artifact existence check
 - `completed_by`: Actor identity for multi-agent attribution
-- `reason`: Explanation for skipped prompts
+- `reason`: Explanation for skipped steps
 
 The top-level `in_progress` field (nullable) tracks the currently executing prompt, its start time, and any partial artifacts written so far. This enables crash detection on resume.
 
@@ -750,15 +640,16 @@ Downstream prompts should treat `prompt_completed: false` decisions as provision
 - Deleted by `scaffold reset`. Decisions from re-run prompts (`scaffold resume --from X`) are not removed — new decisions are appended with the same prompt name, and consumers use the latest entry per prompt.
 - Committed to git
 
-### Prompt Frontmatter
+### Meta-Prompt Frontmatter
 
-All prompts (base, override, extension) use YAML frontmatter declaring metadata used by the CLI for orchestration:
+All meta-prompts use YAML frontmatter declaring metadata used by the CLI for orchestration:
 
 ```yaml
 ---
 description: "Research and document technology decisions"
-depends-on: [create-prd, beads-setup]
+depends-on: [create-prd, tracking-setup]
 phase: 2
+knowledge-base: [tech-evaluation, decision-making]
 argument-hint: "<tech constraints or preferences>"
 produces: ["docs/tech-stack.md"]
 reads: ["docs/plan.md"]
@@ -767,13 +658,14 @@ reads: ["docs/plan.md"]
 
 Fields:
 - `description` (required): Short description for pipeline display and help
-- `depends-on` (optional): Prompt names this prompt depends on. Defaults to empty. **Note**: These supplement the manifest's `dependencies` section — if both declare dependencies for the same prompt, they are merged (union)
+- `depends-on` (optional): Step names this step depends on. Defaults to empty
 - `phase` (optional): Phase number for display grouping. Defaults to phase of last dependency, or 1
+- `knowledge-base` (optional): List of knowledge base file names (without extension) to include in the assembled prompt
 - `argument-hint` (optional): Hint for argument substitution, shown in help
 - `produces` (required for built-in, optional for custom): Expected output file paths. Used by completion detection, v1 detection, and step gating
-- `reads` (optional): Input file paths this prompt needs. Supports both full-file and section-level references. Used to pre-load predecessor documents into context before execution
+- `reads` (optional): Input file paths this step needs. Supports both full-file and section-level references. Used to pre-load predecessor documents into context before execution
 - `artifact-schema` (optional): Defines the expected structure of produced artifacts for downstream validation
-- `requires-capabilities` (optional): Declares platform capabilities the prompt needs
+- `requires-capabilities` (optional): Declares platform capabilities the step needs
 
 **`reads` with section targeting** — The `reads` field supports both full-file and section-level references:
 
@@ -821,7 +713,7 @@ Fields within each artifact entry:
 - `id-format`: Regex pattern for entity IDs within the artifact (e.g., `FR-\\d{3}` for PRD features, `US-\\d{3}` for user stories). Null if no IDs are expected.
 - `index-table`: Boolean — if true, the artifact must contain a summary table within the first 50 lines listing all entities by ID.
 
-Mixins may inject content within existing sections but must not add new heading-level sections (`##` or above) to artifacts. This ensures that artifact schemas remain stable regardless of which mixins are active.
+Knowledge base entries contribute content within existing artifact sections but must not add new heading-level sections (`##` or above) to artifacts. This ensures that artifact schemas remain stable regardless of which knowledge base entries are included.
 
 **`requires-capabilities`** — Declares platform capabilities the prompt needs:
 
@@ -836,7 +728,7 @@ Valid capabilities: `user-interaction` (prompt asks the user questions), `filesy
 
 ### Prompt Structure Convention
 
-All prompts (base, override, extension) follow a standard section ordering convention that front-loads the most critical information for agent consumption:
+All meta-prompts follow a standard section ordering convention that front-loads the most critical information for agent consumption:
 
 ```markdown
 ---
@@ -901,13 +793,13 @@ Prompt `coding-standards` expects `docs/tech-stack.md` (from `tech-stack`), but 
 ### Dependency Resolution Algorithm
 
 The CLI uses Kahn's algorithm for topological sort:
-1. Build adjacency list and in-degree count from all `depends-on` declarations (manifest + frontmatter, merged)
-2. Initialize queue with all prompts that have in-degree 0 (no dependencies)
-3. While queue is non-empty: dequeue, add to sorted list, decrement in-degree for dependents. If any reach 0, enqueue (using manifest phase order as tiebreaker)
-4. If sorted list length != total prompt count, a cycle exists — report it
-5. Verification step: confirm every prompt appears after all its dependencies in the final list
+1. Build adjacency list and in-degree count from all `depends-on` declarations in meta-prompt frontmatter
+2. Initialize queue with all steps that have in-degree 0 (no dependencies)
+3. While queue is non-empty: dequeue, add to sorted list, decrement in-degree for dependents. If any reach 0, enqueue (using phase order as tiebreaker)
+4. If sorted list length != total step count, a cycle exists — report it
+5. Verification step: confirm every step appears after all its dependencies in the final list
 
-Resolution happens once at `scaffold build` time and is cached. Re-resolved when config or manifest changes.
+Resolution happens at startup and is cached. Re-resolved when config or meta-prompt frontmatter changes.
 
 ### UX Command Details
 
@@ -1001,11 +893,10 @@ When `in_progress` is non-null in state.json (previous session crashed), the cra
 - Prompts for optional reason text
 
 **`scaffold validate`:**
-- Validates config, manifests, and prompt files for errors without modifying anything
-- Checks: valid methodology, mixin values, prompt references resolve, no circular deps, valid frontmatter, prompt-override paths exist
+- Validates config, meta-prompts, and knowledge base files for errors without modifying anything
+- Checks: valid methodology preset, step references resolve, no circular deps, valid frontmatter, knowledge base paths exist, depth values are 1-5
 - Produced artifacts match their `artifact-schema` (required sections present with exact heading text, ID format matches regex, index table present if required)
 - Tracking comments on line 1 of produced artifacts are well-formed
-- No unresolved `<!-- scaffold:task-*` or `<!-- mixin:* -->` markers in produced artifacts
 - `state.json` schema version matches CLI expectation
 - All `decisions.jsonl` entries are valid JSON with required fields
 - Output: list of errors grouped by source file, or "All valid"
@@ -1018,7 +909,7 @@ When `in_progress` is non-null in state.json (previous session crashed), the cra
 
 **`scaffold preview`:**
 - Resolves and displays the full pipeline without executing or creating files
-- Shows: prompt names, phases, dependencies, source (base/override/ext), expected output artifacts
+- Shows: step names, phases, dependencies, depth levels, expected output artifacts
 - Shows resolution errors inline
 - Equivalent to `scaffold init --dry-run`
 
@@ -1036,7 +927,7 @@ Users can override built-in prompts or add custom prompts without forking scaffo
 **Prompt resolution precedence** (first match wins):
 1. `.scaffold/prompts/<name>.md` — project-level override
 2. `~/.scaffold/prompts/<name>.md` — user-level override
-3. Built-in prompt (resolved via methodology: base/override/ext)
+3. Built-in meta-prompt (from `pipeline/`)
 
 **To override a built-in prompt:** Create `.scaffold/prompts/<name>.md` with the same name. It replaces the built-in entirely. If frontmatter includes `depends-on`, those are used; if omitted, inherits from the built-in.
 
@@ -1056,7 +947,7 @@ The CLAUDE.md file in the target project is the primary agent instruction file f
 
 **Size budget:** CLAUDE.md should not exceed ~2,000 tokens (~1,500 words). The file is a quick-reference pointer, not comprehensive documentation. Detailed standards live in their dedicated docs files.
 
-**Reserved structure:** The Beads/tracking setup prompt (or equivalent methodology extension) creates CLAUDE.md with all section headings pre-defined. Later prompts fill their reserved sections rather than appending new ones:
+**Reserved structure:** The tracking-setup step creates CLAUDE.md with all section headings pre-defined. Later steps fill their reserved sections rather than appending new ones:
 
 ```markdown
 # CLAUDE.md
@@ -1106,15 +997,15 @@ Artifacts produced by scaffold prompts include tracking comments on line 1 and m
 **Tracking comment format** (line 1 of every scaffold artifact):
 
 ```
-<!-- scaffold:<prompt-name> v<version> <date> <methodology>/<mixin-summary> -->
+<!-- scaffold:<step-name> v<version> <date> <methodology>/depth-<N> -->
 ```
 
 Example:
 ```
-<!-- scaffold:tech-stack v1 2026-03-12 deep/strict-tdd/beads -->
+<!-- scaffold:tech-stack v1 2026-03-12 deep/depth-5 -->
 ```
 
-The methodology and mixin context enable Mode Detection to handle artifacts created under a different configuration — if the user switched from `deep` to `mvp`, the update mode knows which sections may no longer apply.
+The methodology and depth context enable Mode Detection to handle artifacts created under a different configuration — if the user switched from `deep` to `mvp`, or changed depth levels, the update mode knows which sections may no longer apply.
 
 Validation rule: tracking comments must match the regex `<!-- scaffold:[a-z-]+ v\d+ \d{4}-\d{2}-\d{2}( [a-z0-9/-]+)? -->`. Malformed tracking comments cause Mode Detection to warn rather than silently falling into legacy mode.
 
@@ -1137,7 +1028,7 @@ For adding scaffold to an existing codebase that already has code, dependencies,
 
 **Config:** `.scaffold/config.yml` includes `mode: brownfield` when activated.
 
-**Adapted prompts:** Four base prompts have brownfield-aware behavior (triggered by reading `mode` from config):
+**Adapted steps:** Four pipeline steps have brownfield-aware behavior (triggered by reading `mode` from config):
 - `create-prd`: Reads existing code/README to draft PRD, asks user to fill gaps
 - `tech-stack`: Reads package manifests to pre-populate decisions, presents for confirmation
 - `project-structure`: Documents existing structure rather than scaffolding new
@@ -1188,40 +1079,24 @@ The recommended methodology appears first in the selection with "(Recommended)".
 ```
 Welcome to Scaffold!
 
-? Choose a methodology:
-  > Scaffold Deep -- Full pipeline, parallel agents, comprehensive standards
-    Scaffold Lite -- Streamlined pipeline for solo developers
+? Choose a methodology preset:
+  > Deep Domain Modeling -- Full pipeline, all steps, depth 5
+    MVP -- Minimal steps, depth 1
+    Custom -- Pick steps and depth per step
     (more added over time)
-
-? Task tracking:
-  > Beads (AI-native, git-backed)
-    GitHub Issues
-    None
-
-? TDD approach:
-  > Strict (test-first always)
-    Relaxed (tests encouraged)
-
-? Git workflow:
-  > Full PR flow (branches, review, squash merge)
-    Simple (commit to main)
-
-? Agent mode:
-  > Multi-agent (parallel worktrees)
-    Single agent
-    Manual (human-driven)
 
 ? Target platforms:
   [x] Claude Code
   [x] Codex
 
-Config written to .scaffold/config.yml
-Running scaffold build...
-Generated 24 Claude Code commands
-Generated AGENTS.md sections
-Generated universal prompts
+? Project type (affects which optional steps are included):
+  [x] Web
+  [ ] Mobile
+  [ ] Multi-platform
 
-Run /scaffold:prompt-pipeline to see your pipeline.
+Config written to .scaffold/config.yml
+
+Ready! Run `scaffold run create-prd` to start, or `scaffold next` to see what's next.
 ```
 
 ### Distribution
@@ -1238,11 +1113,11 @@ Package structure:
 ```
 @scaffold-cli/scaffold/
   bin/scaffold             # CLI entry point
-  base/                    # Base prompts
-  methodologies/           # Methodology definitions
-  mixins/                  # Axis mixin content
+  pipeline/                # Meta-prompt files (one per step)
+  knowledge/               # Knowledge base files (domain expertise)
+  methodology/             # Methodology preset YAML files
   adapters/                # Platform adapter logic
-  lib/                     # Shared utilities
+  lib/                     # Shared utilities (assembly engine, etc.)
   package.json
 ```
 
@@ -1260,22 +1135,21 @@ Formula pulls from npm or GitHub releases.
 The existing Claude Code plugin continues to work as-is:
 - Plugin commands become thin wrappers: `/scaffold:init` calls `scaffold init`
 - Users who never run `scaffold init` get current behavior unchanged (deep methodology, all defaults)
-- The existing `commands/` directory in the scaffold repo serves as the "deep + all defaults" pre-built output
+- The existing `commands/` directory in the scaffold repo serves as the "deep preset, depth 5" default output
 
 ### Migration Path
 
 #### Phase 1: Foundation
 
-**Build system:**
+**Core engine:**
 - Build the CLI shell (Node.js, `@inquirer/prompts`)
-- Implement: `scaffold init`, `scaffold build`, `scaffold list`, `scaffold info`, `scaffold version`
-- Decompose current `prompts.md` into `base/` + `methodologies/deep/`
-- Add frontmatter (`produces`, `reads`, `depends-on`, `phase`) to all prompts
-- Identify and extract mixin insertion points from existing prompts
-- Create mixin content files for each axis
-- Build the mixin injection system (marker replacement)
+- Implement: `scaffold init`, `scaffold run`, `scaffold list`, `scaffold info`, `scaffold version`
+- Decompose current `prompts.md` into meta-prompts (`pipeline/`) + knowledge base (`knowledge/`)
+- Add frontmatter (`produces`, `reads`, `depends-on`, `phase`, `knowledge-base`) to all meta-prompts
+- Create methodology preset YAML files (`methodology/`)
+- Build the runtime assembly engine (7-section prompt construction)
 - Build dependency resolution (Kahn's algorithm)
-- Build the Claude Code adapter (replacing `scripts/extract-commands.sh`)
+- Build the Claude Code adapter (thin wrapper around `scaffold run`)
 
 **Runtime orchestration:**
 - Implement pipeline state tracking (`state.json`)
@@ -1305,18 +1179,19 @@ The existing Claude Code plugin continues to work as-is:
 
 #### Phase 3: New Content
 
-- Add `mvp` methodology (streamlined pipeline for solo devs)
-- Add additional mixin options as needed
-- Write methodology authoring guide for future methodologies (DDD, Lean MVP, etc.)
-- Add new methodologies
+- Add `mvp` methodology preset (streamlined pipeline for solo devs)
+- Add additional knowledge base entries as needed
+- Write methodology preset authoring guide for future presets (DDD, Lean MVP, etc.)
+- Add new methodology presets
 
 ### Key Design Decisions
 
 | Decision | Rationale |
 |----------|-----------|
-| Methodology as top-level organizer | Methodologies are coherent philosophies; mixing phases across them produces incoherent results |
-| Manifest-driven phase ordering | Each methodology defines its own pipeline shape, not just content |
-| Mixin injection over templating | Keeps prompt files clean; avoids conditional spaghetti in prompts |
+| Methodology preset as top-level organizer | Presets are coherent philosophies; mixing depth levels across them produces incoherent results |
+| Meta-prompt + knowledge base separation | Intent declarations (meta-prompts) stay compact; domain expertise (knowledge base) is reusable across steps |
+| Runtime assembly over build-time resolution | No build step needed; config changes take effect on next `scaffold run`; simpler mental model |
+| Depth scale (1-5) over discrete configuration axes | Single dimension replaces multiple independent toggles; AI adapts natively from depth + knowledge base |
 | Config file over runtime flags | Stable per-project; both AI tools read the same config; committed to repo |
 | Universal adapter always generated | Escape hatch for any AI tool, including future ones |
 | Standalone CLI as source of truth | Platform integrations are thin wrappers, not primary interfaces |
@@ -1327,15 +1202,15 @@ The existing Claude Code plugin continues to work as-is:
 
 These were open questions during brainstorming, now resolved:
 
-1. **CLI implementation language: Node.js** — Node.js for the CLI shell, wizard (using `@inquirer/prompts`), build system, and adapters. Rationale: natural for npm distribution, required for Codex users anyway, better interactive prompt libraries than bash. This is a shift from the current all-bash convention and will require updating CLAUDE.md, coding-standards, and test infrastructure for the v2 codebase. Bash scripts may still be used for git/shell-heavy utilities where appropriate.
+1. **CLI implementation language: Node.js** — Node.js for the CLI shell, wizard (using `@inquirer/prompts`), assembly engine, and adapters. Rationale: natural for npm distribution, required for Codex users anyway, better interactive prompt libraries than bash. This is a shift from the current all-bash convention and will require updating CLAUDE.md, coding-standards, and test infrastructure for the v2 codebase. Bash scripts may still be used for git/shell-heavy utilities where appropriate.
 
-2. **Mixin granularity: Multiple markers per prompt allowed** — A single prompt may have multiple `<!-- mixin:<axis> -->` markers, and may also use `<!-- mixin:<axis>:<sub-section> -->` for targeted injection of subsections within a mixin. Each mixin file can contain named subsections delimited by `<!-- section:<name> -->` markers. If a prompt requests `<!-- mixin:task-tracking:close-workflow -->`, only the matching subsection is injected.
+2. **Knowledge base granularity: Multiple entries per meta-prompt** — A single meta-prompt can reference multiple knowledge base files via its `knowledge-base` frontmatter field. The assembly engine loads all referenced entries and includes them in the assembled prompt's Knowledge Base section.
 
-3. **Methodology versioning: Bundled with CLI** — Methodologies ship as part of the npm/Homebrew package. No independent versioning initially. Revisit when community contributions begin.
+3. **Methodology versioning: Bundled with CLI** — Methodology presets ship as part of the npm/Homebrew package. No independent versioning initially. Revisit when community contributions begin.
 
 4. **Config inheritance: Deferred** — Global `~/.scaffold/defaults.yml` is a nice-to-have for a future release, not Phase 1-3 scope.
 
-5. **npm package name: TBD, requires research** — Must be resolved before Phase 1 implementation begins. Candidates: `@scaffold-pipeline/cli`, `@zigrivers/scaffold`, `create-scaffold`. Research npm namespace availability as a Phase 1 prerequisite task.
+5. **npm package name: `@scaffold-cli/scaffold`** — Resolved.
 
 ### Config Versioning
 
@@ -1343,7 +1218,7 @@ The config file includes a `version` field (starting at `1`) that tracks the con
 
 - **Minor CLI updates** do not change the config version — new optional fields may be added with defaults
 - **Breaking config changes** increment the version number
-- `scaffold build` checks the config version:
+- `scaffold run` checks the config version on each invocation:
   - If current: proceeds normally
   - If old: runs `scaffold config migrate` automatically to upgrade the config format, shows diff, asks for confirmation
   - If newer than CLI supports: errors with "please update scaffold"
@@ -1351,15 +1226,14 @@ The config file includes a `version` field (starting at `1`) that tracks the con
 
 ### Remaining Open Questions
 
-1. **Exact npm package name** — requires namespace availability research (see Resolved #5)
-2. **Codex command invocation pattern** — How does a Codex user "run" a scaffold prompt? Best current option: `codex "Follow the instructions in codex-prompts/create-prd.md to create a PRD for <idea>"`. Needs validation with real Codex usage patterns as they evolve.
+1. **Codex command invocation pattern** — How does a Codex user "run" a scaffold step? Best current option: `codex "Follow the instructions in codex-prompts/create-prd.md to create a PRD for <idea>"`. Needs validation with real Codex usage patterns as they evolve.
 
 ## Non-Functional Requirements
 
 ### Performance
 
-- **Build resolution**: `scaffold build` completes in under 2 seconds for up to 50 prompts (topological sort + mixin injection + adapter generation)
-- **Prompt loading**: Loading any prompt from any tier completes in under 100ms
+- **Runtime assembly**: `scaffold run` assembles a prompt in under 2 seconds (meta-prompt load + knowledge base load + context gathering + depth resolution)
+- **Meta-prompt loading**: Loading any meta-prompt and its knowledge base entries completes in under 100ms
 - **State reads/writes**: Reading/writing `state.json` completes in under 100ms (file is under 10KB)
 - **No background processes**: All operations are synchronous. No daemons, watchers, or background services
 
@@ -1367,15 +1241,15 @@ The config file includes a `version` field (starting at `1`) that tracks the con
 
 - **Crash recovery**: If a session crashes mid-prompt, no data is lost. The prompt is not marked complete. `scaffold resume` picks up where it left off
 - **State integrity**: `state.json` is written atomically (write to temp file, rename). If corrupted, `scaffold resume` falls back to artifact-based completion detection and regenerates state
-- **Idempotent builds**: `scaffold build` produces identical output given identical inputs. Running it twice is safe
-- **Idempotent prompts**: Running a prompt twice overwrites outputs cleanly (Mode Detection handles fresh vs. update)
+- **Idempotent assembly**: `scaffold run` with the same inputs produces identical assembled prompts
+- **Idempotent steps**: Running a step twice overwrites outputs cleanly (Mode Detection handles fresh vs. update)
 - **Merge-safe file formats**: All scaffold state files (`state.json`, `decisions.jsonl`, `config.yml`) are designed for conflict-free git merges when multiple team members work concurrently. `state.json` uses a map-keyed-by-prompt-name structure. `decisions.jsonl` uses JSONL (one object per line, append-only). `config.yml` is a flat structure with no arrays that grow over time.
 
 ### Compatibility
 
 - **Operating systems**: macOS and Linux. Windows via WSL expected to work but not tested
 - **Node.js**: Requires Node.js 18+ (for CLI). Codex already requires Node.js 22+
-- **Claude Code**: Requires plugin support. Specific minimum version TBD
+- **Claude Code**: Requires plugin support. Specific minimum version to be determined closer to release (Claude Code plugin API is evolving)
 - **Codex**: Compatible with current Codex CLI. Adapter will be updated as Codex evolves
 
 ### Security
@@ -1386,23 +1260,23 @@ The config file includes a `version` field (starting at `1`) that tracks the con
 
 ## Risks
 
-1. **Prompt content drift during v2 engine work.** Building the CLI, decomposing prompts, and writing adapters is substantial. If prompt content is also being improved in parallel, merge conflicts and content drift occur.
-   - **Mitigation**: Freeze prompt content changes during v2 engine development. Port existing prompts as-is with only frontmatter additions and mixin marker insertion.
+1. **Content drift during v2 engine work.** Building the CLI, decomposing prompts into meta-prompts + knowledge base, and writing adapters is substantial. If prompt content is also being improved in parallel, merge conflicts and content drift occur.
+   - **Mitigation**: Freeze prompt content changes during v2 engine development. Port existing prompts as-is into meta-prompt + knowledge base format.
 
-2. **Abstract task verb decomposition is harder than expected.** The 192 Beads-specific references may resist clean abstraction — some are deeply embedded in instructional flow, not just command invocations.
-   - **Mitigation**: Accept that some prompts cannot be base prompts (the classification table already accounts for this). Start with the prompts classified as "base" and validate the abstraction works before attempting more.
+2. **Knowledge base granularity tuning.** Determining the right boundaries for knowledge base files — too coarse wastes context tokens, too fine creates maintenance burden.
+   - **Mitigation**: Start with topic-level granularity (one file per domain topic) and split only when assembly produces prompts that exceed context budgets.
 
-3. **Cross-platform prompt quality divergence.** Prompts optimized for Claude Code's tool-use capabilities may work poorly when adapted for Codex, which has different strengths and constraints.
-   - **Mitigation**: Test every prompt on both platforms during Phase 2. Maintain platform-specific testing in CI. Accept that some prompts may need platform-specific variants (handled via adapters).
+3. **Cross-platform prompt quality divergence.** Meta-prompts assembled for Claude Code's tool-use capabilities may produce different quality when the same assembly runs on Codex, which has different strengths and constraints.
+   - **Mitigation**: Test every step on both platforms during Phase 2. Maintain platform-specific testing in CI. Accept that some steps may need platform-specific knowledge base entries (handled via assembly engine platform context).
 
-4. **Complexity for first-time users.** v2 adds concepts (methodologies, mixins, platforms, state tracking) that didn't exist in v1.
-   - **Mitigation**: The default experience (`scaffold init`) is simpler than v1 — answer a few questions and go. Advanced features (custom prompts, brownfield, manual mixin composition) are opt-in.
+4. **Complexity for first-time users.** v2 adds concepts (methodology presets, depth scale, knowledge base, state tracking) that didn't exist in v1.
+   - **Mitigation**: The default experience (`scaffold init`) is simpler than v1 — pick a preset and go. Advanced features (custom presets, brownfield, per-step depth overrides) are opt-in.
 
 5. **npm package name conflict.** The "scaffold" name is generic and may conflict with existing packages.
-   - **Mitigation**: Research npm namespace availability as a Phase 1 prerequisite. Have backup candidates ready.
+   - **Mitigation**: Using scoped package `@scaffold-cli/scaffold` to avoid conflicts.
 
-6. **Agent ergonomics gaps in prompt design.** Prompts designed for human reading may not be optimally structured for AI agent execution — agents need front-loaded instructions, machine-checkable completion criteria, and minimal boilerplate.
-   - **Mitigation**: Enforce the Prompt Structure Convention (What to Produce → Completion Criteria → Process → Specs → Update Mode) for all prompts during the v1-to-v2 prompt decomposition. Extract shared boilerplate (Mode Detection, After This Step navigation) into CLI behavior rather than prompt content. Validate prompt structure as part of `scaffold validate`.
+6. **Agent ergonomics gaps in meta-prompt design.** Meta-prompts designed for human reading may not be optimally structured for AI agent execution — agents need front-loaded instructions, machine-checkable completion criteria, and minimal boilerplate.
+   - **Mitigation**: Enforce the Prompt Structure Convention (What to Produce -> Completion Criteria -> Process -> Specs -> Update Mode) for all meta-prompts during the v1-to-v2 decomposition. Extract shared boilerplate (Mode Detection, After This Step navigation) into CLI behavior rather than meta-prompt content. Validate meta-prompt structure as part of `scaffold validate`.
 
 ## Success Metrics
 
@@ -1425,9 +1299,8 @@ The config file includes a `version` field (starting at `1`) that tracks the con
 
 ## Out of Scope
 
-- **Automatic prompt execution without confirmation**: Every prompt requires user confirmation. No unattended mode
-- **Prompt versioning or rollback**: Users delete override files to revert. No version history within scaffold
-- **Remote methodology registry**: Methodologies are shared via git or npm. No central marketplace
-- **Parallel prompt execution**: Prompts run sequentially. Parallel agents are for implementation, not pipeline setup
-- **Runtime prompt generation**: Prompts are static markdown with mixin injection at build time. No dynamic generation
-- **Pipeline Context (context.json)**: Deferred from plan.md. Cross-prompt data sharing adds complexity; prompts read predecessor output files directly. May revisit in a future version
+- **Automatic step execution without confirmation**: Every step requires user confirmation. No unattended mode
+- **Meta-prompt versioning or rollback**: Users delete override files to revert. No version history within scaffold
+- **Remote methodology registry**: Methodology presets are shared via git or npm. No central marketplace
+- **Parallel step execution**: Steps run sequentially. Parallel agents are for implementation, not pipeline setup
+- **Pipeline Context (context.json)**: Deferred from plan.md. Cross-step data sharing adds complexity; steps read predecessor output files directly. May revisit in a future version

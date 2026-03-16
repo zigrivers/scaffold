@@ -14,11 +14,11 @@ Scaffold v2 targets multiple AI development platforms. The v1 pipeline is tightl
 
 The design must address: which platforms to support at launch, how adapters interact with the core build pipeline, whether platform-specific outputs are isolated or interdependent, and whether there should always be a platform-agnostic fallback.
 
-Domain 05 (Platform Adapter System) defines the adapter architecture as the final stage of the build pipeline: `config.yml -> Config Validation -> Prompt Resolution -> Mixin Injection -> Platform Adapters`. Each adapter receives the same fully-injected prompt content and produces independent output.
+Domain 05 (Platform Adapter System) defines the adapter architecture as the final stage of the build pipeline: `config.yml -> Config Validation -> Prompt Resolution -> Assembly Engine -> Platform Adapters`. Each adapter receives the same assembled prompt content and produces independent output.
 
 ## Decision
 
-Three platform adapters at launch: **Claude Code**, **Codex**, and **Universal** (plain markdown). The Universal adapter is ALWAYS generated regardless of which platforms the user selects in `config.yml`. Adapters receive the fully-injected prompt content (`InjectionPipelineResult` from domain 12) and produce platform-specific output files. Adapters run independently — no inter-adapter communication or shared state.
+Three platform adapters at launch: **Claude Code**, **Codex**, and **Universal** (plain markdown). The Universal adapter is ALWAYS generated regardless of which platforms the user selects in `config.yml`. Adapters receive assembled prompts from the assembly engine (domain 15) and produce platform-specific output files. Adapters run independently — no inter-adapter communication or shared state.
 
 Each adapter produces distinct output:
 - **Claude Code**: `commands/*.md` with YAML frontmatter (compatible with Claude Code's slash command system)
@@ -82,7 +82,7 @@ Each adapter produces distinct output:
 
 - The Universal adapter MUST always generate output, regardless of platform selection in config.yml
 - Adapters MUST NOT communicate with each other or share intermediate state
-- All adapters MUST receive the same `InjectionPipelineResult` input from the mixin injection stage (domain 12)
+- All adapters MUST receive the same assembled prompt input from the assembly engine (domain 15). *Updated post-ADR-041: adapters receive assembled prompts from the assembly engine, not injection pipeline results.*
 - The Claude Code adapter MUST produce `commands/*.md` files with valid YAML frontmatter
 - The Codex adapter MUST produce `AGENTS.md` sections and `codex-prompts/*.md` files with tool-name mapping applied (ADR-023)
 - The Universal adapter MUST produce `prompts/*.md` as plain markdown plus a `scaffold-pipeline.md` reference
@@ -93,7 +93,7 @@ Each adapter produces distinct output:
 ## Related Decisions
 
 - [ADR-003](ADR-003-standalone-cli-source-of-truth.md) — Standalone CLI serves as the source of truth; adapters produce platform-specific projections
-- [ADR-010](ADR-010-build-time-resolution.md) — Build-time resolution pipeline that feeds fully-injected content to adapters
+- [ADR-010](ADR-010-build-time-resolution.md) — Build-time resolution pipeline that feeds assembled content to adapters *(superseded by [ADR-044](ADR-044-runtime-prompt-generation.md); retained for historical context)*
 - [ADR-023](ADR-023-phrase-level-tool-mapping.md) — Phrase-level tool-name mapping used by the Codex adapter
 - [ADR-024](ADR-024-capabilities-as-warnings.md) — Capabilities system determines which prompt features are available on each platform
 - Domain 05 ([05-platform-adapters.md](../domain-models/05-platform-adapters.md)) — Full adapter specification including input/output schemas, adapter interface, and per-platform output details

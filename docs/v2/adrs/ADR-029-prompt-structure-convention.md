@@ -29,7 +29,7 @@ Section ordering:
 5. **Update Mode Specifics** — per-prompt rules for update mode, relevant only when updating an existing artifact. The agent already knows from CLI output whether it is in update mode.
 
 Boilerplate removed from prompts:
-- **Mode Detection block**: the CLI determines fresh vs. update mode by checking artifact existence and communicates this in `scaffold resume` output
+- **Mode Detection block**: the CLI determines fresh vs. update mode by checking artifact existence and communicates this in `scaffold run` output
 - **"After This Step" navigation**: the CLI computes next steps dynamically from state via `scaffold next` and dependency resolution
 
 ## Rationale
@@ -42,7 +42,7 @@ Boilerplate removed from prompts:
 
 **Boilerplate extraction saves ~4,800 tokens**: Mode Detection blocks are ~300-400 tokens of identical logic across all prompts (check if artifact exists, branch on fresh vs. update). Moving this to the CLI saves ~4,000 tokens across a 20-prompt pipeline. "After This Step" sections are ~50 tokens each, saving ~800 more. These tokens are freed for prompt-specific content that actually helps the agent produce better output.
 
-**CLI-handled mode detection over embedded detection**: The CLI has access to state.json and the filesystem — it can check artifact existence faster and more reliably than an agent parsing its own prompt text. The CLI tells the agent "this is a fresh run" or "this is an update, here is the existing artifact" in `scaffold resume` output, which is cleaner than the agent running a Mode Detection heuristic embedded in the prompt.
+**CLI-handled mode detection over embedded detection**: The CLI has access to state.json and the filesystem — it can check artifact existence faster and more reliably than an agent parsing its own prompt text. The CLI tells the agent "this is a fresh run" or "this is an update, here is the existing artifact" in `scaffold run` output, which is cleaner than the agent running a Mode Detection heuristic embedded in the prompt.
 
 ## Alternatives Considered
 
@@ -92,7 +92,7 @@ Boilerplate removed from prompts:
 
 - All prompts MUST follow the defined section ordering when sections are present: What to Produce, Completion Criteria, Process, Detailed Specifications, Update Mode Specifics
 - Completion Criteria MUST include machine-checkable assertions using checkbox syntax (`- [ ] <assertion>`)
-- Mode Detection blocks MUST NOT appear in prompts — mode detection is handled by the CLI via `scaffold resume`
+- Mode Detection blocks MUST NOT appear in prompts — mode detection is handled by the CLI via `scaffold run`
 - "After This Step" navigation MUST NOT appear in prompts — navigation is handled by the CLI via `scaffold next` and dependency resolution
 - Prompt authors MUST put the most critical information (goal, key constraints) in the first 200 tokens of the prompt body
 - `scaffold validate` MUST parse Completion Criteria sections and check assertions programmatically
@@ -103,7 +103,7 @@ Boilerplate removed from prompts:
 - [ADR-015](ADR-015-prompt-frontmatter-schema.md) — Frontmatter schema that accompanies the structured prompt body
 - [ADR-017](ADR-017-tracking-comments-artifact-provenance.md) — Tracking comments enable CLI-handled mode detection, replacing embedded Mode Detection blocks
 - [ADR-018](ADR-018-completion-detection-crash-recovery.md) — Dual completion detection (artifact existence + state records) gates pipeline progression; Completion Criteria from this ADR provide complementary structural validation via `scaffold validate`
-- [ADR-010](ADR-010-build-time-resolution.md) — Build-time resolution that produces the final prompt content with this structure
+- [ADR-044](ADR-044-runtime-prompt-generation.md) — Runtime prompt generation that produces the final prompt content with this structure *(supersedes ADR-010)*
 - [ADR-026](ADR-026-claude-md-section-registry.md) — Both address agent context and token optimization; prompt structure reduces per-prompt overhead while section registry manages CLAUDE.md budget
 - Domain 08 ([08-prompt-frontmatter.md](../domain-models/08-prompt-frontmatter.md)) — Frontmatter metadata that precedes the structured sections
 - Domain 09 ([09-cli-architecture.md](../domain-models/09-cli-architecture.md)) — CLI architecture that handles mode detection and navigation
