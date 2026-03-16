@@ -705,12 +705,12 @@ The `InjectionResult.replacedMarkers` list is available for adapter diagnostic o
 
 ### Adapter Input Shape
 
-Platform adapters receive fully-injected content through the `AdapterPromptInput` type (defined in [adapter-interface.md](adapter-interface.md) Section 3). The injection pipeline contributes two key fields to that type:
+Platform adapters receive fully-injected content through the `AdapterStepInput` type (defined in [adapter-interface.md](adapter-interface.md) Section 3). The injection pipeline contributes two key fields to that type:
 
 - `injectionResult.injectedContent` — the fully-injected prompt markdown string with all markers replaced
 - `injectionResult.replacedMarkers` — metadata about which markers were replaced (advisory)
 
-See [adapter-interface.md](adapter-interface.md) for the complete `AdapterPromptInput` definition. The injection pipeline's `InjectionResult` is passed directly as the `injectionResult` field on `AdapterPromptInput`.
+See [adapter-interface.md](adapter-interface.md) for the complete `AdapterStepInput` definition. The injection pipeline's `InjectionResult` is passed directly as the `injectionResult` field on `AdapterStepInput`.
 
 ### Tool-Name Mapping Runs After Injection
 

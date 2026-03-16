@@ -6,7 +6,9 @@
 
 **Architecture:** 9-step runtime assembly engine constructs 7-section prompts from meta-prompts + knowledge base + project context + user instructions. Three methodology presets (deep/mvp/custom) with integer depth scale 1-5. 15 CLI commands via yargs. State managed through atomic JSON writes with advisory file locking.
 
-**Tech Stack:** TypeScript, Node.js 18+, yargs (CLI), @inquirer/prompts (wizard), js-yaml (YAML), vitest (tests), eslint (lint)
+**Tech Stack:** TypeScript, Node.js 18+, yargs (CLI), @inquirer/prompts (wizard), js-yaml (YAML), zod (schema validation), vitest (tests), eslint (lint)
+
+**Module Convention:** Core modules (StateManager, LockManager, AssemblyEngine, ConfigLoader) are classes instantiated with dependencies via constructor injection. Utility modules (`src/utils/`) export plain functions. Type-only modules (`src/types/`) export interfaces and type aliases. All file I/O uses synchronous fs APIs per the single-process model. All public APIs match the interfaces in `docs/v2/api/internal-interfaces.md`.
 
 ---
 
@@ -264,14 +266,14 @@ Phase 0 establishes the TypeScript project infrastructure. Zero spec-specific lo
 - Create: `tests/helpers/test-utils.ts` (shared test utilities)
 - Create: `.gitignore` (update for dist/, node_modules/)
 
-**Description**: Set up the TypeScript project with strict compiler settings, ES2022 target, vitest for testing, and eslint for linting. Configure `package.json` with `bin.scaffold` pointing to the compiled entry point, `engines.node >= 18`, and scripts for build/test/lint. This task produces zero business logic — just the build toolchain. Use @typescript-eslint/parser and @typescript-eslint/eslint-plugin with flat config. Enable recommended type-checked rules. Runtime dependencies (js-yaml, yargs, @inquirer/prompts) are added by their respective tasks.
+**Description**: Set up the TypeScript project with strict compiler settings, ES2022 target, vitest for testing, and eslint for linting. Configure `package.json` with `bin.scaffold` pointing to the compiled entry point, `"type": "module"` for ESM, `engines.node >= 18`, and scripts for build/test/lint. This task produces zero business logic — just the build toolchain. Use @typescript-eslint/parser and @typescript-eslint/eslint-plugin with flat config. ESLint flat config extends @typescript-eslint/recommended. Project rules: no semicolons, single quotes, trailing commas (es5), 2-space indent, max line length 120, import ordering enforced. Enable recommended type-checked rules. Runtime dependencies (js-yaml, yargs, @inquirer/prompts) are added by their respective tasks.
 
 **Acceptance Criteria**:
 - [ ] `npm run build` compiles TypeScript without errors
 - [ ] `npm test` runs vitest and reports 0 tests (no tests yet)
 - [ ] `npm run lint` runs eslint and reports 0 errors
 - [ ] `tsconfig.json` has `strict: true`, `target: "ES2022"`, `module: "Node16"`
-- [ ] `package.json` has `engines.node: ">=18"` and `bin.scaffold` field
+- [ ] `package.json` has `engines.node: ">=18"`, `"type": "module"`, and `bin.scaffold` field
 - [ ] `tests/helpers/test-utils.ts` exports shared utilities (temp directory creation, fixture loading)
 - [ ] tests/helpers/test-utils.ts exports `createTempDir(): Promise<string>` and `loadFixture(name: string): string`
 - [ ] `node dist/index.js` prints a placeholder message without errors
@@ -280,7 +282,7 @@ Phase 0 establishes the TypeScript project infrastructure. Zero spec-specific lo
 
 ### T-002: Define core shared type definitions
 
-**Implements**: All domain models (types extracted from domains 02, 03, 05, 06, 08, 09, 10, 11, 13, 14, 15, 16), state-json-schema, config-yml-schema, decisions-jsonl-schema, lock-json-schema, frontmatter-schema, manifest-yml-schema, cli-contract
+**Implements**: All domain models (types extracted from domains 02, 03, 05, 06, 08, 09, 10, 11, 13, 14, 15, 16), state-json-schema, config-yml-schema, decisions-jsonl-schema, lock-json-schema, frontmatter-schema, manifest-yml-schema, cli-contract, internal-interfaces.md
 **Depends on**: T-001
 **Enables**: T-004, T-005, T-007, T-009, T-010, T-019
 
@@ -301,14 +303,14 @@ Phase 0 establishes the TypeScript project infrastructure. Zero spec-specific lo
 - Create: `src/types/index.ts`
 - Create: `src/types/enums.test.ts`
 
-**Description**: Define all shared TypeScript types, interfaces, and enums extracted from the v2 specification documents. This is the type foundation that every module imports. Key enums: `MethodologyName` (deep/mvp/custom), `DepthLevel` (1-5 branded integer), `PromptSource` (pipeline/extra), `StepStatus` (pending/in_progress/completed/skipped), `ExitCode` (0-5), `OutputMode` (interactive/json/auto). Key interfaces: `ScaffoldConfig`, `PipelineState`, `PromptStateEntry`, `AssembledPrompt`, `DependencyGraph`, `MetaPromptFrontmatter`, `DecisionEntry`, `LockFile`, `PlatformAdapter`. No business logic — pure type definitions with JSDoc comments referencing source specs. **Context management note**: This task creates 15 files but all are pure type definitions (no business logic). Agent should work through reference documents in groups: (1) data schemas for config/state/decisions/lock types, (2) domain models 08+15 for assembly/frontmatter types, (3) domain models 02+03+09 for dependency/state/CLI types. Each type file is 30-80 lines.
+**Description**: Define all shared TypeScript types, interfaces, and enums extracted from the v2 specification documents. Note: Use `docs/v2/data/frontmatter-schema.md` as the authoritative source for `MetaPromptFrontmatter` (not domain model 08, which describes the pre-meta-prompt frontmatter system). This is the type foundation that every module imports. Key enums: `MethodologyName` (deep/mvp/custom), `DepthLevel` (1-5 branded integer), `StepSource` (pipeline/extra), `StepStatus` (pending/in_progress/completed/skipped), `ExitCode` (0-5), `OutputMode` (interactive/json/auto). Key interfaces: `ScaffoldConfig`, `PipelineState`, `StepStateEntry`, `AssembledPrompt`, `DependencyGraph`, `MetaPromptFrontmatter`, `DecisionEntry`, `LockFile`, `PlatformAdapter`. No business logic — pure type definitions with JSDoc comments referencing source specs. **Context management note**: This task creates 15 files but all are pure type definitions (no business logic). Agent should work through reference documents in groups: (1) data schemas for config/state/decisions/lock types, (2) domain models 08+15 for assembly/frontmatter types, (3) domain models 02+03+09 for dependency/state/CLI types. Each type file is 30-80 lines.
 
-Per-file type mapping: `enums.ts` — MethodologyName, DepthLevel, PromptSource, StepStatus, ExitCode (Success=0, ValidationError=1, MissingDependency=2, StateCorruption=3, UserCancellation=4, BuildError=5), OutputMode. `config.ts` — ScaffoldConfig, CustomConfig, MethodologyPreset. `state.ts` — PipelineState, PromptStateEntry, ExtraPromptEntry, InProgressRecord. `assembly.ts` — AssembledPrompt, PromptSection, AssemblyResult, AssemblyMetadata, ProjectContext, ArtifactEntry, ExistingArtifact. `frontmatter.ts` — MetaPromptFrontmatter, MetaPromptFile. `dependency.ts` — DependencyGraph, DependencyNode. `decision.ts` — DecisionEntry. `lock.ts` — LockFile, LockableCommand. `cli.ts` — GlobalFlags, CommandResult. `adapter.ts` — PlatformAdapter, AdapterContext, AdapterStepInput, AdapterStepOutput (per adapter-interface.md). `wizard.ts` — WizardAnswers, DetectionResult. `errors.ts` — ScaffoldError, ScaffoldWarning. `claude-md.ts` — ReservedSection, SectionRegistry. OutputMode is a three-value enum (interactive/json/auto). Combined auto+json mode is derived from flags at runtime, not a separate enum value.
+Per-file type mapping: `enums.ts` — MethodologyName, DepthLevel, StepSource, StepStatus, ExitCode (Success=0, ValidationError=1, MissingDependency=2, StateCorruption=3, UserCancellation=4, BuildError=5), OutputMode. `config.ts` — ScaffoldConfig, CustomConfig, MethodologyPreset. `state.ts` — PipelineState, StepStateEntry, ExtraStepEntry, InProgressRecord. `assembly.ts` — AssembledPrompt, PromptSection, AssemblyResult, AssemblyMetadata, ProjectContext, ArtifactEntry, ExistingArtifact. `frontmatter.ts` — MetaPromptFrontmatter, MetaPromptFile. `dependency.ts` — DependencyGraph, DependencyNode. `decision.ts` — DecisionEntry. `lock.ts` — LockFile, LockableCommand. `cli.ts` — GlobalFlags, CommandResult. `adapter.ts` — PlatformAdapter, AdapterContext, AdapterStepInput, AdapterStepOutput (per adapter-interface.md). `wizard.ts` — WizardAnswers, DetectionResult. `errors.ts` — ScaffoldError, ScaffoldWarning. `claude-md.ts` — ReservedSection, SectionRegistry. OutputMode is a three-value enum (interactive/json/auto). Combined auto+json mode is derived from flags at runtime, not a separate enum value.
 
 **Acceptance Criteria**:
-- [ ] All enums match exact values from specs: MethodologyName = 'deep' | 'mvp' | 'custom'; DepthLevel = 1-5; PromptSource = 'pipeline' | 'extra'; StepStatus = 'pending' | 'in_progress' | 'completed' | 'skipped'; ExitCode = 0-5
+- [ ] All enums match exact values from specs: MethodologyName = 'deep' | 'mvp' | 'custom'; DepthLevel = 1-5; StepSource = 'pipeline' | 'extra'; StepStatus = 'pending' | 'in_progress' | 'completed' | 'skipped'; ExitCode = 0-5
 - [ ] ScaffoldConfig interface matches config-yml-schema exactly (version, methodology, custom?, platforms, project?)
-- [ ] PipelineState interface matches state-json-schema exactly (schema-version matching state-json-schema.md — currently 1, config_methodology, prompts, in_progress)
+- [ ] PipelineState interface matches state-json-schema exactly (schema-version matching state-json-schema.md — currently 1, init_methodology, config_methodology, steps, in_progress)
 - [ ] All interfaces have JSDoc comments citing their source spec document
 - [ ] `src/types/index.ts` re-exports all types
 - [ ] TypeScript compiles without errors
@@ -318,7 +320,7 @@ Per-file type mapping: `enums.ts` — MethodologyName, DepthLevel, PromptSource,
 
 ### T-003: Implement utility modules and error system
 
-**Implements**: ADR-040 (error handling philosophy), ADR-025 (exit codes), cli-contract (exit codes 0-5), error-messages.md (error code registry)
+**Implements**: ADR-040 (error handling philosophy), ADR-025 (exit codes), cli-contract.md (error codes and messages)
 **Depends on**: T-001
 **Enables**: T-004, T-005, T-007, T-009, T-010, T-016, T-019
 
@@ -331,7 +333,7 @@ Per-file type mapping: `enums.ts` — MethodologyName, DepthLevel, PromptSource,
 - Create: `src/utils/errors.test.ts`
 - Create: `src/utils/index.ts`
 
-**Description**: Implement three foundational utility modules. (1) `fs.ts`: atomic file write via temp-file-then-rename pattern (write to `<path>.tmp`, then `fs.renameSync()`), file existence check, directory creation. (2) `levenshtein.ts`: Levenshtein distance calculation for fuzzy matching (used in error messages to suggest corrections when users mistype methodology names, step slugs, etc. — threshold of distance <= 2). (3) `errors.ts`: `ScaffoldError` base class with `code` (error code string like 'CONFIG_MISSING'), `exitCode` (0-5), `recovery` (suggested fix string), `context` (affected file/line). Error factory functions for each error code prefix (CONFIG_, FIELD_, STATE_, LOCK_, etc.). Exit code mapping per ADR-025. Create factories for Phase 0-1 error codes: CONFIG_MISSING, CONFIG_EMPTY, CONFIG_PARSE_ERROR, CONFIG_NOT_OBJECT, CONFIG_UNKNOWN_FIELD, FIELD_MISSING, FIELD_WRONG_TYPE, FIELD_EMPTY_VALUE, FIELD_INVALID_*, FRONTMATTER_*, STATE_*, LOCK_*, DECISION_*. Later tasks add factories for their own error codes. `ScaffoldError.context` type is `Record<string, string | number | undefined>` — a bag of template variables matching error-messages.md `{variable}` placeholders.
+**Description**: Implement three foundational utility modules. Use synchronous fs APIs (fs.writeFileSync, fs.renameSync, fs.existsSync) per the single-process synchronous I/O model (system-architecture.md Section 6a). (1) `fs.ts`: atomic file write via temp-file-then-rename pattern (write to `<path>.tmp`, then `fs.renameSync()`), file existence check, directory creation. (2) `levenshtein.ts`: Levenshtein distance calculation for fuzzy matching (used in error messages to suggest corrections when users mistype methodology names, step slugs, etc. — threshold of distance <= 2). (3) `errors.ts`: `ScaffoldError` base class with `code` (error code string like 'CONFIG_MISSING'), `exitCode` (0-5), `recovery` (suggested fix string), `context` (affected file/line). Error factory functions for each error code prefix (CONFIG_, FIELD_, STATE_, LOCK_, etc.). Exit code mapping per ADR-025. Create factories for Phase 0-1 error codes: CONFIG_MISSING, CONFIG_EMPTY, CONFIG_PARSE_ERROR, CONFIG_NOT_OBJECT, CONFIG_UNKNOWN_FIELD, FIELD_MISSING, FIELD_WRONG_TYPE, FIELD_EMPTY_VALUE, FIELD_INVALID_*, FRONTMATTER_*, STATE_*, LOCK_*, DECISION_*. Later tasks add factories for their own error codes. `ScaffoldError.context` type is `Record<string, string | number | undefined>` — a bag of template variables matching cli-contract.md (error codes and messages) `{variable}` placeholders.
 
 **Acceptance Criteria**:
 - [ ] `atomicWriteFile(path, content)` writes to temp file then renames; survives simulated crash (file either has old or new content, never partial)
@@ -339,7 +341,7 @@ Per-file type mapping: `enums.ts` — MethodologyName, DepthLevel, PromptSource,
 - [ ] `findClosestMatch('deap', ['deep', 'mvp', 'custom'], 2)` returns 'deep'
 - [ ] `ScaffoldError` has code, message, exitCode, recovery, context properties
 - [ ] Error factory `configMissing(path)` returns error with code 'CONFIG_MISSING', exitCode 1
-- [ ] `atomicWriteFile(path: string, content: string): Promise<void>`, `fileExists(path: string): Promise<boolean>`, `ensureDir(path: string): Promise<void>` (recursive mkdir) exported from fs.ts
+- [ ] `atomicWriteFile(path: string, content: string): void`, `fileExists(path: string): boolean`, `ensureDir(path: string): void` (recursive mkdir) exported from fs.ts
 - [ ] All tests pass
 - [ ] No lint errors
 
@@ -351,7 +353,7 @@ Pure data modules with no CLI dependency. Each reads/writes one file format. Hea
 
 ### T-004: Implement frontmatter parser
 
-**Implements**: Domain 08 (meta-prompt frontmatter schema), frontmatter-schema, ADR-041
+**Implements**: Domain 08 (meta-prompt frontmatter schema), frontmatter-schema, ADR-041, frontmatter-schema.md (authoritative, replaces domain model 08 for frontmatter types)
 **Depends on**: T-002, T-003
 **Enables**: T-006, T-008, T-011, T-013, T-014, T-025, T-032, T-036, T-043, T-048-T-051
 
@@ -359,7 +361,7 @@ Pure data modules with no CLI dependency. Each reads/writes one file format. Hea
 - Create: `src/project/frontmatter.ts`
 - Create: `src/project/frontmatter.test.ts`
 
-**Description**: Parse YAML frontmatter from markdown files (delimited by `---` on lines 1 and closing). Extract and validate fields per frontmatter-schema: `name` (required, kebab-case), `description` (required, max 200 chars), `phase` (required, valid phase ID), `dependencies` (optional, array of kebab-case slugs), `outputs` (required, array of relative paths), `conditional` (optional, 'if-needed' or null), `knowledge-base` (optional, array of entry names). Validate all constraints: name matches `^[a-z][a-z0-9-]*$`, dependencies are unique, outputs use forward slashes. Return structured `MetaPromptFrontmatter` object. Emit typed errors (FRONTMATTER_MISSING, FRONTMATTER_UNCLOSED, FRONTMATTER_YAML_ERROR, FRONTMATTER_NAME_INVALID, etc.). Parse and return the `reads` field (optional array of kebab-case step names). Structural validation: entries must be valid kebab-case. Semantic validation (step existence) deferred to the cross-file validator. Convert kebab-case YAML keys to camelCase TypeScript properties during parsing (e.g., `knowledge-base` → `knowledgeBase`) per frontmatter-schema.md §6. Use `js-yaml` for YAML parsing. Configure to reject anchors, aliases, and custom tags. Note: File path is `src/project/frontmatter.ts` per system-architecture.md §3a.
+**Description**: Parse YAML frontmatter from markdown files (delimited by `---` on lines 1 and closing). Extract and validate fields per frontmatter-schema: `name` (required, kebab-case), `description` (required, max 200 chars), `phase` (required, valid phase ID), `order` (required, integer 1-36), `dependencies` (optional, array of kebab-case slugs), `outputs` (required, array of relative paths), `conditional` (optional, 'if-needed' or null), `knowledge-base` (optional, array of entry names). Validate all constraints: name matches `^[a-z][a-z0-9-]*$`, dependencies are unique, outputs use forward slashes. Return structured `MetaPromptFrontmatter` object. Emit typed errors (FRONTMATTER_MISSING, FRONTMATTER_UNCLOSED, FRONTMATTER_YAML_ERROR, FRONTMATTER_NAME_INVALID, etc.). Parse and return the `reads` field (optional array of kebab-case step names). Structural validation: entries must be valid kebab-case. Semantic validation (step existence) deferred to the cross-file validator. Convert kebab-case YAML keys to camelCase TypeScript properties during parsing (e.g., `knowledge-base` → `knowledgeBase`) per frontmatter-schema.md §6. Use `js-yaml` for YAML parsing. Configure to reject anchors, aliases, and custom tags. Use Zod for frontmatter schema validation. Define a FrontmatterSchema Zod object in the parser that mirrors frontmatter-schema.md. Note: File path is `src/project/frontmatter.ts` per system-architecture.md §3a.
 
 **Acceptance Criteria**:
 - [ ] Parses valid frontmatter from markdown file and returns typed object
@@ -372,6 +374,7 @@ Pure data modules with no CLI dependency. Each reads/writes one file format. Hea
 - [ ] Warns on unknown fields (FRONTMATTER_UNKNOWN_FIELD)
 - [ ] Converts kebab-case YAML keys to camelCase TypeScript properties
 - [ ] Parses and returns `reads` field when present
+- [ ] Validates `order` field is present, is an integer, and is in range 1-36
 - [ ] All tests pass with >=90% branch coverage
 
 ---
@@ -390,7 +393,7 @@ Pure data modules with no CLI dependency. Each reads/writes one file format. Hea
 - Create: `src/config/schema.test.ts`
 - Create: `src/config/migration.test.ts`
 
-**Description**: Load and validate `.scaffold/config.yml`. Schema validation for all fields: `version` (must be 2), `methodology` (deep/mvp/custom enum), `custom` (optional object with `default_depth` 1-5 and `steps` map), `platforms` (array, at least one of claude-code/codex), `project` (optional name + platforms). Fuzzy matching with Levenshtein distance for mistyped methodology names and platform names. Config migration from v1 to v2 (removes `mixins`, maps methodology names, sets version to 2). Forward compatibility: warn on unknown fields (ADR-033). Uses `js-yaml` for YAML parsing. Returns validated `ScaffoldConfig` object or accumulated errors. Implement validation in the 6-phase pipeline per config-yml-schema.md §7. Phases 1-3 short-circuit on failure. Phases 4-6 accumulate and report all findings. Known step names are provided as a parameter to the validation function (injected by the caller, not discovered by the loader). V1 config format: has `version: 1` (or no version field), a `mixins` object (removed during migration), and a methodology string. Mapping: `classic` → `deep`, `classic-lite` → `mvp`, anything else → `custom`. Return type: `{ config: ScaffoldConfig | null; errors: ScaffoldError[]; warnings: ScaffoldWarning[] }`. When errors is non-empty, config is null.
+**Description**: Load and validate `.scaffold/config.yml`. Schema validation for all fields: `version` (must be 2), `methodology` (deep/mvp/custom enum), `custom` (optional object with `default_depth` 1-5 and `steps` map), `platforms` (array, at least one of claude-code/codex), `project` (optional name + platforms). Fuzzy matching with Levenshtein distance for mistyped methodology names and platform names. Config migration from v1 to v2 (removes `mixins`, maps methodology names, sets version to 2). Forward compatibility: warn on unknown fields (ADR-033). Uses `js-yaml` for YAML parsing. Returns validated `ScaffoldConfig` object or accumulated errors. Implement validation in the 6-phase pipeline per config-yml-schema.md §7. Phases 1-3 short-circuit on failure. Phases 4-6 accumulate and report all findings. Known step names are provided as a parameter to the validation function (injected by the caller, not discovered by the loader). V1 config format: has `version: 1` (or no version field), a `mixins` object (removed during migration), and a methodology string. Mapping: `classic` → `deep`, `classic-lite` → `mvp`, anything else → `custom`. Return type: `{ config: ScaffoldConfig | null; errors: ScaffoldError[]; warnings: ScaffoldWarning[] }`. When errors is non-empty, config is null. Use Zod for config schema validation. Define a ConfigSchema Zod object in `src/config/schema.ts` that mirrors config-yml-schema.md.
 
 **Acceptance Criteria**:
 - [ ] Loads valid config.yml and returns typed ScaffoldConfig
@@ -425,14 +428,14 @@ Note: "T-006 tests require fixture preset YAML files. The production preset file
 - [ ] Rejects preset with invalid step name (PRESET_INVALID_STEP)
 - [ ] Warns when meta-prompt exists but is not listed in preset (PRESET_MISSING_STEP)
 - [ ] Returns structured MethodologyPreset with step enablement map
-- [ ] Error codes PRESET_MISSING, PRESET_PARSE_ERROR, PRESET_INVALID_STEP (error, exit 1), PRESET_MISSING_STEP (warning, exit 0) — see error-messages.md
+- [ ] Error codes PRESET_MISSING, PRESET_PARSE_ERROR, PRESET_INVALID_STEP (error, exit 1), PRESET_MISSING_STEP (warning, exit 0) — see cli-contract.md (error codes and messages)
 - [ ] All tests pass
 
 ---
 
 ### T-007: Implement state manager with atomic writes
 
-**Implements**: Domain 03 (pipeline state machine), state-json-schema, ADR-012 (state file design), ADR-018 (completion detection)
+**Implements**: Domain 03 (pipeline state machine), state-json-schema, ADR-012 (state file design), ADR-018 (completion detection), internal-interfaces.md (StateManager interface)
 **Depends on**: T-002, T-003
 **Enables**: T-008, T-015, T-018, T-023, T-024, T-025, T-026, T-029, T-030, T-031, T-033, T-035, T-036, T-037, T-043
 
@@ -440,7 +443,7 @@ Note: "T-006 tests require fixture preset YAML files. The production preset file
 - Create: `src/state/state-manager.ts`
 - Create: `src/state/state-manager.test.ts`
 
-**Description**: CRUD operations on `.scaffold/state.json` with atomic writes. Core operations: `loadState()` reads and validates state file; `initializeState(enabledSteps)` creates initial state with all steps pending; `setInProgress(step)` marks step as in_progress and sets `in_progress` record; `markCompleted(step, outputs)` marks step completed with timestamp and outputs, clears `in_progress`; `markSkipped(step, reason)` marks step skipped with timestamp and reason; `getStepStatus(step)` returns current status. Support `extra_prompts` array for ExtraPromptEntry objects (steps not in active pipeline but tracked for methodology change recovery). All write operations use atomic temp-file-then-rename pattern. State validation: schema_version must be 2, all required fields present, status values valid, timestamps valid ISO 8601. Map-keyed structure for merge-safe git operations. All required top-level state.json fields must be populated: `schema-version` (1), `scaffold-version` (CLI semver from package.json), `methodology` (current methodology name), `init_methodology` (methodology at init time), `config_methodology` (methodology from config.yml), `init-mode` (greenfield/brownfield/v1-migration), `created` (ISO 8601 timestamp), `in_progress` (null or InProgressRecord), `prompts` (step map), `next_eligible` (array of step slugs — recomputed on every mutation), `extra-prompts` (array for methodology change recovery). `markCompleted(step: string, outputs: string[], completedBy: string, depth: DepthLevel)` — sets status to completed, records timestamp, outputs, completedBy, and depth. Clears `in_progress`. `setInProgress` throws PSM_ALREADY_IN_PROGRESS (exit code 3) if `in_progress` is already non-null. Crash recovery must clear `in_progress` before calling `setInProgress`. The `next_eligible` array requires dependency graph knowledge. Accept a `computeEligible` callback or dependency graph parameter in the state manager constructor. Recompute and write `next_eligible` on every state mutation.
+**Description**: CRUD operations on `.scaffold/state.json` with atomic writes. Core operations: `loadState()` reads and validates state file; `initializeState(enabledSteps)` creates initial state with all steps pending; `setInProgress(step)` marks step as in_progress and sets `in_progress` record; `markCompleted(step, outputs)` marks step completed with timestamp and outputs, clears `in_progress`; `markSkipped(step, reason)` marks step skipped with timestamp and reason; `getStepStatus(step)` returns current status. Support `extra-steps` array for ExtraStepEntry objects (steps not in active pipeline but tracked for methodology change recovery). All write operations use atomic temp-file-then-rename pattern. State validation: schema-version must be 1, all required fields present, status values valid, timestamps valid ISO 8601. Map-keyed structure for merge-safe git operations. All required top-level state.json fields must be populated: `schema-version` (1), `scaffold-version` (CLI semver from package.json), `init_methodology` (methodology at init time), `config_methodology` (methodology from config.yml), `init-mode` (greenfield/brownfield/v1-migration), `created` (ISO 8601 timestamp), `in_progress` (null or InProgressRecord), `steps` (step map), `next_eligible` (array of step slugs — recomputed on every mutation), `extra-steps` (array for methodology change recovery). `markCompleted(step: string, outputs: string[], completedBy: string, depth: DepthLevel)` — sets status to completed, records timestamp, outputs, completedBy, and depth. Clears `in_progress`. `setInProgress` throws PSM_ALREADY_IN_PROGRESS (exit code 3) if `in_progress` is already non-null. Crash recovery must clear `in_progress` before calling `setInProgress`. The `next_eligible` array requires dependency graph knowledge. Accept a `computeEligible` callback or dependency graph parameter in the state manager constructor. Recompute and write `next_eligible` on every state mutation.
 
 **Acceptance Criteria**:
 - [ ] `initializeState()` creates valid state.json with all steps pending, schema-version 1 (per state-json-schema.md)
@@ -450,7 +453,7 @@ Note: "T-006 tests require fixture preset YAML files. The production preset file
 - [ ] Writes are atomic: state.json.tmp → rename to state.json
 - [ ] Rejects state with invalid schema_version
 - [ ] Only one step can be in_progress at a time
-- [ ] Populates all 11 required top-level fields per state-json-schema.md
+- [ ] Populates all 10 required top-level fields per state-json-schema.md
 - [ ] `markCompleted` records `completed_by` and `depth` fields
 - [ ] All tests pass
 
@@ -466,7 +469,7 @@ Note: "T-006 tests require fixture preset YAML files. The production preset file
 - Create: `src/state/completion.ts`
 - Create: `src/state/completion.test.ts`
 
-**Description**: Dual completion detection: check both state.json status AND artifact existence on disk. When `in_progress` is non-null (indicating a crash), apply the recovery decision matrix: (1) all artifacts present → auto-mark completed, (2) no artifacts present → recommend re-run, (3) partial artifacts → ask user. Uses `outputs` from meta-prompt frontmatter to know which files to check. Zero-byte files count as "present" (existence check, not size). Artifacts are the source of truth — when artifacts exist but state says pending, update state to match reality. Provides `detectCrash()` and `checkCompletion(step)` functions. For partial artifacts, return a `CrashRecoveryAction` of type `'ask_user'` with lists of `presentArtifacts` and `missingArtifacts`. The CLI command layer handles the actual user prompt. In `--auto` mode, the default action is to recommend re-run. Return type for `checkCompletion`: `{ status: 'confirmed_complete' | 'likely_complete' | 'conflict' | 'incomplete'; presentArtifacts: string[]; missingArtifacts: string[] }`. Read `produces` from the step's `PromptStateEntry` in state.json (do not re-parse frontmatter — the state manager copies outputs into state at initialization).
+**Description**: Dual completion detection: check both state.json status AND artifact existence on disk. When `in_progress` is non-null (indicating a crash), apply the recovery decision matrix: (1) all artifacts present → auto-mark completed, (2) no artifacts present → recommend re-run, (3) partial artifacts → ask user. Uses `outputs` from meta-prompt frontmatter to know which files to check. Zero-byte files count as "present" (existence check, not size). Artifacts are the source of truth — when artifacts exist but state says pending, update state to match reality. Provides `detectCrash()` and `checkCompletion(step)` functions. For partial artifacts, return a `CrashRecoveryAction` of type `'ask_user'` with lists of `presentArtifacts` and `missingArtifacts`. The CLI command layer handles the actual user prompt. In `--auto` mode, the default action is to recommend re-run. Return type for `checkCompletion`: `{ status: 'confirmed_complete' | 'likely_complete' | 'conflict' | 'incomplete'; presentArtifacts: string[]; missingArtifacts: string[] }`. Read `produces` from the step's `StepStateEntry` in state.json (do not re-parse frontmatter — the state manager copies outputs into state at initialization).
 
 **Acceptance Criteria**:
 - [ ] `checkCompletion('create-prd')` returns 'confirmed_complete' when state=completed AND docs/prd.md exists
@@ -491,16 +494,16 @@ Note: "T-006 tests require fixture preset YAML files. The production preset file
 - Create: `src/state/decision-logger.ts`
 - Create: `src/state/decision-logger.test.ts`
 
-**Description**: Append-only JSONL logger for `.scaffold/decisions.jsonl`. Operations: `appendDecision(entry)` writes one line with all required fields (id, prompt, decision, at, completed_by, prompt_completed) plus optional fields (category, tags, review_status, depth). `readDecisions(filter?)` reads all entries with optional filter by prompt slug or last N. `getNextId()` returns next sequential D-NNN ID. `validateEntry(entry)` checks all field constraints. JSONL format rules: one compact JSON object per line, newline-terminated, no wrapping array, UTF-8, entries <= 4KB for POSIX atomic write. Validation errors: DECISION_PARSE_ERROR, DECISION_SCHEMA_ERROR, DECISION_ID_COLLISION, DECISION_TRUNCATED_LINE. Use `fs.appendFileSync()` for atomic line-level writes per decisions-jsonl-schema.md §6. Read the file, find the highest existing D-NNN ID, and return `D-(max+1)`. Concurrent writers may produce duplicate IDs; this is by design and resolved by `scaffold validate --fix`. `appendDecision` accepts and serializes optional fields (category, tags, review_status, depth) when provided.
+**Description**: Append-only JSONL logger for `.scaffold/decisions.jsonl`. Operations: `appendDecision(entry)` writes one line with all required fields (id, prompt, decision, at, completed_by, step_completed) plus optional fields (category, tags, review_status, depth). `readDecisions(filter?)` reads all entries with optional filter by step slug or last N. `getNextId()` returns next sequential D-NNN ID. `validateEntry(entry)` checks all field constraints. JSONL format rules: one compact JSON object per line, newline-terminated, no wrapping array, UTF-8, entries <= 4KB for POSIX atomic write. Validation errors: DECISION_PARSE_ERROR, DECISION_SCHEMA_ERROR, DECISION_ID_COLLISION, DECISION_TRUNCATED_LINE. Use `fs.appendFileSync()` for atomic line-level writes per decisions-jsonl-schema.md §6. Read the file, find the highest existing D-NNN ID, and return `D-(max+1)`. Concurrent writers may produce duplicate IDs; this is by design and resolved by `scaffold validate --fix`. `appendDecision` accepts and serializes optional fields (category, tags, review_status, depth) when provided.
 
 **Acceptance Criteria**:
 - [ ] `appendDecision()` appends one JSONL line to decisions.jsonl
 - [ ] Each line is valid JSON parseable independently
 - [ ] ID format is D-NNN (zero-padded 3+ digits, monotonically increasing)
 - [ ] `readDecisions()` returns all entries parsed from JSONL
-- [ ] `readDecisions({prompt: 'tech-stack'})` filters by prompt slug
+- [ ] `readDecisions({prompt: 'tech-stack'})` filters by step slug
 - [ ] `readDecisions({last: 5})` returns last 5 entries
-- [ ] Validates required fields (id, prompt, decision, at, completed_by, prompt_completed)
+- [ ] Validates required fields (id, prompt, decision, at, completed_by, step_completed)
 - [ ] Tolerates blank lines in JSONL file
 - [ ] All tests pass
 
@@ -549,7 +552,7 @@ The assembly engine and its dependencies. Tasks T-011 through T-016 can run in p
 - Create: `src/core/dependency/dependency.test.ts`
 - Create: `src/core/dependency/eligibility.test.ts`
 
-**Description**: Topological sort of pipeline steps using Kahn's algorithm. Build adjacency list from meta-prompt `dependencies` fields. Algorithm: (1) count in-degrees, (2) enqueue nodes with in-degree 0, (3) process queue — for each node, output it and decrement successors' in-degrees, enqueue when zero. Phase-based tiebreaker for deterministic ordering within same in-degree level. Cycle detection: if any node unvisited after algorithm completes, cycle exists (DEP_CYCLE_DETECTED, exit code 1). `computeEligible(state)` returns steps whose dependencies are all completed and that are not themselves completed/in_progress. `getParallelSets()` groups eligible steps by phase for parallel execution display. Validate: DEP_TARGET_MISSING (dependency references non-existent step), DEP_SELF_REFERENCE. Phase sort order (ascending): pre < 1 < 1a < 2 < 2a < ... < 10 < 10a < validation < finalization. Define a `PHASE_SORT_ORDER: Record<string, number>` constant mapping each valid phase string to a numeric sort key.
+**Description**: Topological sort of pipeline steps using Kahn's algorithm. Build adjacency list from meta-prompt `dependencies` fields. Algorithm: (1) count in-degrees, (2) enqueue nodes with in-degree 0, (3) process queue — for each node, output it and decrement successors' in-degrees, enqueue when zero. Phase-based tiebreaker for deterministic ordering within same in-degree level. Cycle detection: if any node unvisited after algorithm completes, cycle exists (DEP_CYCLE_DETECTED, exit code 1). `computeEligible(state)` returns steps whose dependencies are all completed and that are not themselves completed/in_progress. `getParallelSets()` groups eligible steps by phase for parallel execution display. Validate: DEP_TARGET_MISSING (dependency references non-existent step), DEP_SELF_REFERENCE. Phase sort order (ascending): pre < modeling < decisions < architecture < specification < planning < quality < validation < finalization. Define a `PHASE_SORT_ORDER: Record<string, number>` constant mapping each valid phase string to a numeric sort key: `{ pre: 0, modeling: 1, decisions: 2, architecture: 3, specification: 4, planning: 5, quality: 6, validation: 7, finalization: 8 }`. The primary tiebreaker is the frontmatter `order` field (integer 1-36). Phase-based sort is a secondary grouping mechanism. Reference `docs/v2/data/frontmatter-schema.md`. Implements DependencyResolver interface from docs/v2/api/internal-interfaces.md.
 
 **Acceptance Criteria**:
 - [ ] Topological sort of 36 steps produces valid ordering (no step before its dependencies)
@@ -577,7 +580,7 @@ The assembly engine and its dependencies. Tasks T-011 through T-016 can run in p
 - Create: `src/core/assembly/depth-resolver.test.ts`
 - Create: `src/core/assembly/methodology-resolver.test.ts`
 
-**Description**: Two resolvers. (1) Depth resolver: four-level precedence chain — CLI `--depth` flag (highest) > custom per-step override in config.yml > methodology preset default_depth > built-in default (3). Returns integer 1-5. (2) Methodology resolver: determines which steps are enabled and their effective depth. Loads preset, applies custom overrides, evaluates conditional steps against project traits. Handles methodology change detection: compares `state.json.config_methodology` with `config.yml.methodology`; emits ASM_METHODOLOGY_CHANGED warning on mismatch. Emits ASM_COMPLETED_AT_LOWER_DEPTH warning when completed step's depth < current config depth. Config is source of truth for current methodology; state is historical record. The `resolveDepth` function accepts an optional `cliDepthOverride?: DepthLevel` parameter for the CLI `--depth` flag. Four-level precedence chain handled within this function: CLI flag (highest) > custom per-step override > methodology preset `default_depth` > built-in fallback (3). The built-in fallback of 3 applies only when no preset is loaded. Methodology change detection is delegated to T-018's methodology-change.ts. Tests use fixture preset data. MVP step names: create-prd, testing-strategy, implementation-tasks, implementation-playbook.
+**Description**: Two resolvers. (1) Depth resolver: four-level precedence chain — CLI `--depth` flag (highest) > custom per-step override in config.yml > methodology preset default_depth > built-in default (3). Returns integer 1-5. (2) Methodology resolver: determines which steps are enabled and their effective depth. Loads preset, applies custom overrides, evaluates conditional steps against project traits. Handles methodology change detection: compares `state.json.config_methodology` with `config.yml.methodology`; emits ASM_METHODOLOGY_CHANGED warning on mismatch. Emits ASM_COMPLETED_AT_LOWER_DEPTH warning when completed step's depth < current config depth. Config is source of truth for current methodology; state is historical record. The `resolveDepth` function accepts an optional `cliDepthOverride?: DepthLevel` parameter for the CLI `--depth` flag. Four-level precedence chain handled within this function: CLI flag (highest) > custom per-step override > methodology preset `default_depth` > built-in fallback (3). The built-in fallback of 3 applies only when no preset is loaded. Methodology change detection is delegated to T-018's methodology-change.ts. Tests use fixture preset data. MVP step names: create-prd, review-prd, user-stories, review-user-stories, testing-strategy, implementation-tasks, implementation-playbook. Implements MethodologyResolver interface from docs/v2/api/internal-interfaces.md.
 
 **Acceptance Criteria**:
 - [ ] Depth resolution follows precedence: CLI flag > custom override > preset default > built-in
@@ -650,7 +653,7 @@ The assembly engine and its dependencies. Tasks T-011 through T-016 can run in p
 - Create: `src/core/assembly/context-gatherer.ts`
 - Create: `src/core/assembly/context-gatherer.test.ts`
 
-**Description**: Assemble project context from four sources for the assembled prompt's context section. (1) Completed artifacts: read file contents for all artifacts produced by completed steps (from `outputs` fields in state.json). (2) Config: load config.yml (methodology, depth, platforms, project metadata). (3) Pipeline state: snapshot of state.json (completed steps, next eligible, in-progress). (4) Decisions: read decisions.jsonl and format as readable summary. For update mode: also load existing output artifact content with previous depth and completion timestamp as `ExistingArtifact` object. Returns structured `ProjectContext` object containing all four sources. Gather artifacts from the current step's dependency chain plus any steps listed in the `reads` frontmatter field — not all completed steps. This scoping prevents context window bloat for late pipeline steps. See ADR-050 and ADR-053. Decisions: include confirmed decisions (`promptCompleted: true`) from dependency-chain steps, formatted as `D-NNN: <text> (<step>)`.
+**Description**: Assemble project context from four sources for the assembled prompt's context section. (1) Completed artifacts: read file contents for all artifacts produced by completed steps (from `outputs` fields in state.json). (2) Config: load config.yml (methodology, depth, platforms, project metadata). (3) Pipeline state: snapshot of state.json (completed steps, next eligible, in-progress). (4) Decisions: read decisions.jsonl and format as readable summary. For update mode: also load existing output artifact content with previous depth and completion timestamp as `ExistingArtifact` object. Returns structured `ProjectContext` object containing all four sources. Gather artifacts from the current step's dependency chain plus any steps listed in the `reads` frontmatter field — not all completed steps. This scoping prevents context window bloat for late pipeline steps. See ADR-050 and ADR-053. Decisions: include confirmed decisions (`stepCompleted: true`) from dependency-chain steps, formatted as `D-NNN: <text> (<step>)`. **Boundary with T-018**: T-018 detects update mode and determines if an existing artifact exists. T-015 loads the artifact content into `ProjectContext.existingOutput`. T-018 provides the detection result; T-015 performs the I/O.
 
 **Acceptance Criteria**:
 - [ ] Gathers artifacts from all completed steps' output paths
@@ -697,7 +700,7 @@ The assembly engine and its dependencies. Tasks T-011 through T-016 can run in p
 - Create: `src/core/assembly/engine.ts`
 - Create: `src/core/assembly/engine.test.ts`
 
-**Description**: Orchestrate the 9-step assembly sequence and construct the 7-section assembled prompt. Steps: (1) load meta-prompt via T-013, (2) check prerequisites (deps completed, step status, lock — delegated to callers), (3) load knowledge base via T-014, (4) gather context via T-015, (5) load instructions via T-016, (6) determine depth via T-012, (7) construct 7-section prompt in fixed order: System framing → Meta-prompt → Knowledge base entries → Project context → Methodology (depth + scaling guidance) → User instructions (all three layers, clearly separated) → Execution instruction. Assembly must be deterministic: same inputs → identical output. Returns `AssemblyResult` containing the assembled prompt text and metadata (step, depth, sections included, assembly duration). Support `--dry-run` by returning assembled prompt without execution. Section 1 (System framing) and Section 7 (Execution instruction) use scaffold-generated boilerplate templates defined in system-architecture.md §4b-1 'Assembled Prompt Boilerplate'. The assembly engine fills `{variable}` placeholders at runtime (project name, methodology, depth, progress). Section headers use markdown level-1 headings: `# System`, `# Meta-Prompt`, `# Knowledge Base`, `# Project Context`, `# Methodology`, `# Instructions`, `# Execution`. Knowledge base entries within the KB section are delimited by level-2 headings: `## <entry-name>: <description>`. Artifacts within the context section are delimited by: `## Artifact: <file-path>`. Step 2 (check prerequisites) is delegated to callers. The assembly engine trusts that prerequisites have been validated. If the engine detects an invalid state (e.g., step not found), it returns `AssemblyResult` with `success: false` and appropriate errors. Reference Domain 15 §3 for `AssemblyMetadata` interface: `stepName`, `depth`, `depthProvenance`, `updateMode`, `assemblyDuration`, `sectionsIncluded`.
+**Description**: Orchestrate the 9-step assembly sequence and construct the 7-section assembled prompt. Steps: (1) load meta-prompt via T-013, (2) check prerequisites (deps completed, step status, lock — delegated to callers), (3) load knowledge base via T-014, (4) gather context via T-015, (5) load instructions via T-016, (6) determine depth via T-012, (7) construct 7-section prompt in fixed order: System framing → Meta-prompt → Knowledge base entries → Project context → Methodology (depth + scaling guidance) → User instructions (all three layers, clearly separated) → Execution instruction. Assembly must be deterministic: same inputs → identical output. Returns `AssemblyResult` containing the assembled prompt text and metadata (step, depth, sections included, assembly duration). Support `--dry-run` by returning assembled prompt without execution. Section 1 (System framing) and Section 7 (Execution instruction) use scaffold-generated boilerplate templates defined in system-architecture.md §4b-1 'Assembled Prompt Boilerplate'. The assembly engine fills `{variable}` placeholders at runtime (project name, methodology, depth, progress). Section headers use markdown level-1 headings: `# System`, `# Meta-Prompt`, `# Knowledge Base`, `# Project Context`, `# Methodology`, `# Instructions`, `# Execution`. Knowledge base entries within the KB section are delimited by level-2 headings: `## <entry-name>: <description>`. Artifacts within the context section are delimited by: `## Artifact: <file-path>`. Step 2 (check prerequisites) is delegated to callers. The assembly engine trusts that prerequisites have been validated. If the engine detects an invalid state (e.g., step not found), it returns `AssemblyResult` with `success: false` and appropriate errors. Reference Domain 15 §3 for `AssemblyMetadata` interface: `stepName`, `depth`, `knowledgeBaseEntries`, `instructionLayers`, `artifactCount`, `decisionCount`, `assemblyDurationMs`, `assembledAt`, `depthProvenance`, `updateMode`, `sectionsIncluded`. Implements AssemblyEngine interface from docs/v2/api/internal-interfaces.md.
 
 **Acceptance Criteria**:
 - [ ] Assembles 7-section prompt in correct fixed order
@@ -800,7 +803,7 @@ The command-line interface framework. T-019 can start as soon as T-002 and T-003
 
 ### T-021: Implement error display and formatting
 
-**Implements**: error-messages.md, ADR-040 (error handling philosophy)
+**Implements**: cli-contract.md (error codes and messages), ADR-040 (error handling philosophy)
 **Depends on**: T-020
 **Enables**: T-023-T-038
 
@@ -808,7 +811,7 @@ The command-line interface framework. T-019 can start as soon as T-002 and T-003
 - Create: `src/cli/output/error-display.ts`
 - Create: `src/cli/output/error-display.test.ts`
 
-**Description**: Format error messages for display according to error-messages.md patterns. Single error: `✗ error [CODE]: message` + context line (file, line) + fix suggestion. Multiple errors grouped by source file: file header, then errors before warnings per file. Warning format: `⚠ warning [CODE]: message`. Fuzzy match suggestions in error context (e.g., "Did you mean 'deep'?"). Build-time error display: accumulate all errors and warnings, report after processing (ADR-040). Runtime error display: fail-fast on first structural error, but report warnings without blocking. Interactive mode: colored, indented, with icons. JSON mode: errors/warnings arrays in envelope. Auto mode: same as interactive but no prompts. Consumes `findClosestMatch()` from `src/utils/levenshtein.ts` (created by T-003). Threshold: Levenshtein distance ≤ 2. Error-display is responsible for formatting only. Error accumulation is owned by calling code (e.g., the validate command accumulates errors across all files before passing the batch to error-display for formatting).
+**Description**: Format error messages for display according to cli-contract.md (error codes and messages) patterns. Single error: `✗ error [CODE]: message` + context line (file, line) + fix suggestion. Multiple errors grouped by source file: file header, then errors before warnings per file. Warning format: `⚠ warning [CODE]: message`. Fuzzy match suggestions in error context (e.g., "Did you mean 'deep'?"). Build-time error display: accumulate all errors and warnings, report after processing (ADR-040). Runtime error display: fail-fast on first structural error, but report warnings without blocking. Interactive mode: colored, indented, with icons. JSON mode: errors/warnings arrays in envelope. Auto mode: same as interactive but no prompts. Consumes `findClosestMatch()` from `src/utils/levenshtein.ts` (created by T-003). Threshold: Levenshtein distance ≤ 2. Error-display is responsible for formatting only. Error accumulation is owned by calling code (e.g., the validate command accumulates errors across all files before passing the batch to error-display for formatting).
 
 **Acceptance Criteria**:
 - [ ] Single error displays as: icon + error code + message + context + fix
@@ -834,7 +837,7 @@ The command-line interface framework. T-019 can start as soon as T-002 and T-003
 - Create: `src/cli/middleware/project-root.test.ts`
 - Create: `src/cli/middleware/output-mode.test.ts`
 
-**Description**: Two yargs middleware functions. (1) Project root detection: walk up directory tree looking for `.scaffold/` directory. If found, set `projectRoot` in context. If `--root` flag provided, use that instead. Error if not found and command requires it (all commands except init, version, update). (2) Output mode resolution: parse `--format` and `--auto` flags, detect TTY, check NO_COLOR env var. Set `outputMode` in context (interactive/json/auto). Verbose flag requires interactive mode.
+**Description**: Two yargs middleware functions. (1) Project root detection: walk up directory tree looking for `.scaffold/` directory. If found, set `projectRoot` in context. If `--root` flag provided, use that instead. Error if not found and command requires it (all commands except init, version, update). (2) Output mode resolution: parse `--format` and `--auto` flags, detect TTY, check NO_COLOR env var. Set `outputMode` in context (interactive/json/auto). In `--format json` mode, verbose output is included in the `verbose` field of the JSON envelope per ADR-025.
 
 **Acceptance Criteria**:
 - [ ] Finds `.scaffold/` by walking up from cwd
@@ -842,7 +845,7 @@ The command-line interface framework. T-019 can start as soon as T-002 and T-003
 - [ ] Errors when no .scaffold/ found and command requires it
 - [ ] Does not error for init/version/update when .scaffold/ missing
 - [ ] Output mode correctly resolves from --format and --auto flags
-- [ ] Verbose requires interactive mode (error if combined with --format json)
+- [ ] In `--format json` mode, verbose output is included in the `verbose` field of the JSON envelope per ADR-025
 - [ ] All tests pass
 
 ---
@@ -853,7 +856,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 ### T-023: Implement scaffold status command
 
-**Implements**: Domain 09 (status command), cli-contract (status), cli-output-formats.md (status output), error-messages.md
+**Implements**: Domain 09 (status command), cli-contract (status), cli-output-formats.md (status output), cli-contract.md (error codes and messages)
 **Depends on**: T-021, T-022, T-007, T-011
 **Enables**: T-052
 
@@ -877,7 +880,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 ### T-024: Implement scaffold next command
 
-**Implements**: Domain 09 (next command), cli-contract (next), cli-output-formats.md (next output), error-messages.md
+**Implements**: Domain 09 (next command), cli-contract (next), cli-output-formats.md (next output), cli-contract.md (error codes and messages)
 **Depends on**: T-021, T-011, T-007
 **Enables**: T-052
 
@@ -894,14 +897,14 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - [ ] Each eligible step shows depth level and `scaffold run <step>` command
 - [ ] JSON mode returns NextResult with eligible array
 - [ ] Exit code 0 on success, exit code 1 if state or config invalid
-- [ ] JSON output includes structured `blocked_prompts` array with `slug` and `blocked_by` fields per json-output-schemas.md
+- [ ] JSON output includes structured `blocked_steps` array with `slug` and `blocked_by` fields per json-output-schemas.md
 - [ ] All tests pass
 
 ---
 
 ### T-025: Implement scaffold info command
 
-**Implements**: Domain 09 (info command), cli-contract (info), cli-output-formats.md (info output), error-messages.md
+**Implements**: Domain 09 (info command), cli-contract (info), cli-output-formats.md (info output), cli-contract.md (error codes and messages)
 **Depends on**: T-021, T-013, T-007
 **Enables**: T-052
 
@@ -927,7 +930,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 ### T-026: Implement scaffold list command
 
-**Implements**: Domain 09 (list command), cli-contract (list), cli-output-formats.md (list output), error-messages.md
+**Implements**: Domain 09 (list command), cli-contract (list), cli-output-formats.md (list output), cli-contract.md (error codes and messages)
 **Depends on**: T-021, T-006, T-007
 **Enables**: T-052
 
@@ -950,7 +953,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 ### T-027: Implement scaffold decisions command
 
-**Implements**: Domain 09 (decisions command), cli-contract (decisions), error-messages.md, cli-output-formats.md
+**Implements**: Domain 09 (decisions command), cli-contract (decisions), cli-contract.md (error codes and messages), cli-output-formats.md
 **Depends on**: T-021, T-009
 **Enables**: T-052
 
@@ -958,11 +961,11 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - Create: `src/cli/commands/decisions.ts`
 - Create: `src/cli/commands/decisions.test.ts`
 
-**Description**: Display decision log. Default: show all decisions chronologically. `--prompt <slug>` flag: filter by step. `--last N` flag: show last N decisions. Interactive output: formatted table with ID (D-NNN badge), step, decision text, timestamp, actor, category. Highlight provisional decisions (prompt_completed=false) with amber indicator. JSON output: DecisionsResult with decisions array.
+**Description**: Display decision log. Default: show all decisions chronologically. `--step <slug>` flag: filter by step. `--last N` flag: show last N decisions. Interactive output: formatted table with ID (D-NNN badge), step, decision text, timestamp, actor, category. Highlight provisional decisions (step_completed=false) with amber indicator. JSON output: DecisionsResult with decisions array.
 
 **Acceptance Criteria**:
 - [ ] Shows all decisions chronologically by default
-- [ ] `--prompt tech-stack` filters to tech-stack decisions only
+- [ ] `--step tech-stack` filters to tech-stack decisions only
 - [ ] `--last 5` shows last 5 decisions
 - [ ] Provisional decisions highlighted differently
 - [ ] Shows category badge when present
@@ -974,7 +977,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 ### T-028: Implement scaffold version command
 
-**Implements**: Domain 09 (version command), cli-contract (version), cli-output-formats.md, error-messages.md
+**Implements**: Domain 09 (version command), cli-contract (version), cli-output-formats.md, cli-contract.md (error codes and messages)
 **Depends on**: T-021
 **Enables**: T-052
 
@@ -996,7 +999,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 ### T-029: Implement scaffold run command
 
-**Implements**: Domain 09 (run command), Domain 15 (assembly engine), cli-contract (run), cli-output-formats.md (run output), error-messages.md, ADR-048 (update mode), ADR-049 (methodology changeable)
+**Implements**: Domain 09 (run command), Domain 15 (assembly engine), cli-contract (run), cli-output-formats.md (run output), cli-contract.md (error codes and messages), ADR-048 (update mode), ADR-049 (methodology changeable)
 **Depends on**: T-017, T-018, T-010, T-008, T-011, T-021, T-022
 **Enables**: T-052, T-054
 
@@ -1004,7 +1007,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - Create: `src/cli/commands/run.ts`
 - Create: `src/cli/commands/run.test.ts`
 
-**Description**: The core command — assemble and execute a pipeline step. Orchestration flow: (1) parse flags (--depth, --instructions, --auto, --force), (2) acquire lock via lock manager, (3) check state — if in_progress non-null, run crash recovery, (4) check dependencies via dependency resolver — error if unmet (exit code 2), (5) if step already completed and not --force, prompt for update mode confirmation, (6) set step to in_progress in state, (7) call assembly engine to construct 7-section prompt, (8) output assembled prompt (to stdout for AI agent consumption), (9) after AI execution: mark step completed in state, (10) log decisions to decisions.jsonl, (11) release lock, (12) show next eligible steps. Handle update mode (ADR-048): when re-running completed step, include existing artifact in context. Handle methodology change warnings (ADR-049). Exit codes: 0 success, 1 validation, 2 dependency, 3 lock, 4 cancel, 5 assembly error. Completion gate: In interactive mode, after outputting the assembled prompt, block with an @inquirer/prompts confirmation: `Step '<step>' complete? [Y/n/skip]`. In auto mode, exit immediately after prompt output — step remains `in_progress`; crash recovery (ADR-018) handles completion on next invocation. Depth downgrade check (step 6 per cli-contract.md): If the step was previously completed at a higher depth, the CLI prompts (interactive), warns and continues (auto), or skips the check (`--force`). See cli-contract.md `scaffold run` interactive behavior step 6. Post-completion: (a) fill CLAUDE.md managed section via T-043's CLAUDE.md manager, (b) emit downstream stale warning if dependent steps were completed at a lower depth.
+**Description**: The core command — assemble and execute a pipeline step. Orchestration flow: (1) parse flags (--depth, --instructions, --auto, --force), (2) acquire lock via lock manager, (3) check state — if in_progress non-null, run crash recovery, (4) check dependencies via dependency resolver — error if unmet (exit code 2), (5) if step already completed and not --force, prompt for update mode confirmation, (6) set step to in_progress in state, (7) call assembly engine to construct 7-section prompt, (8) output assembled prompt (to stdout for AI agent consumption), (9) after AI execution: mark step completed in state, (10) log decisions to decisions.jsonl, (11) release lock, (12) show next eligible steps. Handle update mode (ADR-048): when re-running completed step, include existing artifact in context. Handle methodology change warnings (ADR-049). Exit codes: 0 success, 1 validation, 2 dependency, 3 lock, 4 cancel, 5 assembly error. Completion gate: In interactive mode, after outputting the assembled prompt, block with an @inquirer/prompts confirmation: `Step '<step>' complete? [Y/n/skip]`. In auto mode, exit immediately after prompt output — step remains `in_progress`; crash recovery (ADR-018) handles completion on next invocation. Depth downgrade check (step 6 per cli-contract.md): If the step was previously completed at a higher depth, the CLI prompts (interactive), warns and continues (auto), or skips the check (`--force`). See cli-contract.md `scaffold run` interactive behavior step 6. Post-completion: (a) fill CLAUDE.md managed section via T-043's CLAUDE.md manager, (b) emit downstream stale warning if dependent steps were completed at a lower depth. Note: CLAUDE.md section fill (step 10) is deferred until T-043 is implemented. T-029 skips this step if the CLAUDE.md manager is not available.
 
 **Acceptance Criteria**:
 - [ ] Acquires lock before execution, releases on completion
@@ -1027,7 +1030,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 ### T-030: Implement scaffold skip command
 
-**Implements**: Domain 09 (skip command), cli-contract (skip), error-messages.md, cli-output-formats.md
+**Implements**: Domain 09 (skip command), cli-contract (skip), cli-contract.md (error codes and messages), cli-output-formats.md
 **Depends on**: T-010, T-007, T-021
 **Enables**: T-052
 
@@ -1035,7 +1038,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - Create: `src/cli/commands/skip.ts`
 - Create: `src/cli/commands/skip.test.ts`
 
-**Description**: Mark a step as explicitly skipped. Acquires lock, marks step as skipped in state with timestamp and optional reason (`--reason` flag), releases lock. Error if step already completed (can't skip a completed step). JSON output: SkipResult with step, reason, skippedAt. If step is already completed, present interactive confirmation: 'Prompt is already completed. Re-mark as skipped?' (matching cli-contract.md). In auto mode without `--force`, error with PSM_INVALID_TRANSITION (exit 3). Compute and return `newly_eligible` steps after skipping (required field in json-output-schemas.md `SkipData`). If step is `in_progress`, warn that a session may be actively executing it.
+**Description**: Mark a step as explicitly skipped. Acquires lock, marks step as skipped in state with timestamp and optional reason (`--reason` flag), releases lock. Error if step already completed (can't skip a completed step). JSON output: SkipResult with step, reason, skippedAt. If step is already completed, present interactive confirmation: 'Step is already completed. Re-mark as skipped?' (matching cli-contract.md). In auto mode without `--force`, error with PSM_INVALID_TRANSITION (exit 3). Compute and return `newly_eligible` steps after skipping (required field in json-output-schemas.md `SkipData`). If step is `in_progress`, warn that a session may be actively executing it.
 
 **Acceptance Criteria**:
 - [ ] Marks step as skipped in state.json
@@ -1044,7 +1047,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - [ ] If step already completed, prompts for confirmation (interactive) or errors with PSM_INVALID_TRANSITION (auto without --force)
 - [ ] Errors if step slug not found (with fuzzy match suggestion)
 - [ ] JSON output returns SkipResult
-- [ ] Exit code 0 on success, exit code 1 if step not found or already completed, exit code 3 if lock held
+- [ ] Exit code 0 on success, exit code 2 (DEP_TARGET_MISSING) if step not found, exit code 3 (PSM_INVALID_TRANSITION) if already completed (per cli-contract.md), exit code 3 if lock held
 - [ ] JSON output includes `newly_eligible` array
 - [ ] Warns when skipping an `in_progress` step
 - [ ] All tests pass
@@ -1053,7 +1056,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 ### T-031: Implement scaffold reset command
 
-**Implements**: Domain 09 (reset command), cli-contract (reset), error-messages.md, cli-output-formats.md
+**Implements**: Domain 09 (reset command), cli-contract (reset), cli-contract.md (error codes and messages), cli-output-formats.md
 **Depends on**: T-007, T-010, T-021
 **Enables**: T-052
 
@@ -1101,7 +1104,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 ### T-033: Implement init wizard and scaffold init command
 
-**Implements**: Domain 14 (init wizard), cli-contract (init), init-wizard-flow.md, ADR-027, error-messages.md, cli-output-formats.md
+**Implements**: Domain 14 (init wizard), cli-contract (init), init-wizard-flow.md, ADR-027, cli-contract.md (error codes and messages), cli-output-formats.md
 **Depends on**: T-032, T-006, T-007, T-021, T-034
 **Enables**: T-052
 
@@ -1134,7 +1137,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 ### T-034: Implement scaffold build command
 
-**Implements**: Domain 09 (build command), Domain 05 (platform adapters), cli-contract (build), error-messages.md, cli-output-formats.md
+**Implements**: Domain 09 (build command), Domain 05 (platform adapters), cli-contract (build), cli-contract.md (error codes and messages), cli-output-formats.md
 **Depends on**: T-011, T-006, T-021
 **Enables**: T-039, T-052
 
@@ -1142,7 +1145,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - Create: `src/cli/commands/build.ts`
 - Create: `src/cli/commands/build.test.ts`
 
-**Description**: Generate thin platform wrappers for all enabled steps. Flow: (1) load and validate config, (2) load methodology preset, (3) scan pipeline/ for meta-prompts, (4) resolve step enablement, (5) compute dependency graph (validate no cycles), (6) for each platform adapter: generate wrapper files. Build is metadata-only transformation — no prompt assembly. Deterministic and idempotent. `--validate-only`: check config and manifest without generating files. `--force`: regenerate even if outputs exist. Output: step count, platforms, generated files, build time. Performance budget: < 2s.
+**Description**: Generate thin platform wrappers for all enabled steps. Flow: (1) load and validate config, (2) load methodology preset, (3) scan pipeline/ for meta-prompts, (4) resolve step enablement, (5) compute dependency graph (validate no cycles), (6) for each platform adapter: generate wrapper files. Build is metadata-only transformation — no prompt assembly. Deterministic and idempotent. `--validate-only`: check config and manifest without generating files (Note: `--validate-only` is a convenience alias for `scaffold validate --scope manifests`; not in cli-contract.md). `--force`: regenerate even if outputs exist. Output: step count, platforms, generated files, build time. Performance budget: < 2s.
 
 **Acceptance Criteria**:
 - [ ] Generates wrapper files for all enabled platforms
@@ -1159,7 +1162,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 ### T-035: Implement scaffold adopt command
 
-**Implements**: Domain 07 (brownfield adopt), cli-contract (adopt), error-messages.md, cli-output-formats.md
+**Implements**: Domain 07 (brownfield adopt), cli-contract (adopt), cli-contract.md (error codes and messages), cli-output-formats.md
 **Depends on**: T-032, T-007, T-009, T-010, T-021
 **Enables**: T-052
 
@@ -1169,7 +1172,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - Create: `src/project/adopt.test.ts`
 - Create: `src/cli/commands/adopt.test.ts`
 
-**Description**: Brownfield adoption — scan existing codebase artifacts, map to pipeline steps, pre-populate state. Uses project detector signals + meta-prompt `outputs` fields to match existing files to steps. For each matched step, determine AdaptationStrategy: 'update-mode' (artifacts detected, step should re-run with existing context), 'skip-recommended' (artifacts fully satisfy requirements), 'context-only' (use artifacts as context but still run), 'full-run' (no artifacts detected). For v1 migration: detect tracking comments, map v1 artifacts to v2 step slugs. `--dry-run`: show matches without writing state. Writes state.json with matched steps pre-completed. Acquires lock. JSON output: AdoptResult with found matches, adaptation strategies, skipped, stateWritten. `AdaptationStrategy` enum values: `update-mode`, `skip-recommended`, `context-only`, `full-run`. These strategy names are the canonical v2 values. JSON output includes `strategy` field per artifact. V1 migration flow: For v1 migration, the user runs `scaffold init` first (which detects v1 via project detector and creates config.yml), then `scaffold adopt` maps existing artifacts to v2 steps. Artifact matching: Exact path match against meta-prompt `outputs` arrays. For fuzzy matching (e.g., `docs/architecture.md` matching `docs/system-architecture.md`), use filename-stem Levenshtein distance ≤ 2.
+**Description**: Brownfield adoption — scan existing codebase artifacts, map to pipeline steps, pre-populate state. Uses project detector signals + meta-prompt `outputs` fields to match existing files to steps. For each matched step, determine AdaptationStrategy: 'update-mode' (artifacts detected, step should re-run with existing context), 'skip-recommended' (artifacts fully satisfy requirements), 'context-only' (use artifacts as context but still run), 'full-run' (no artifacts detected). For v1 migration: detect tracking comments, map v1 artifacts to v2 step slugs. `--dry-run`: show matches without writing state. Writes state.json with matched steps pre-completed. Acquires lock. JSON output: AdoptResult with fields per json-output-schemas.md: `mode` (greenfield/brownfield/v1-migration), `artifacts_found` (count), `detected_artifacts` (array of matched artifacts with paths and matched steps), `steps_completed` (array of pre-completed step slugs), `steps_remaining` (array of steps still to run), `methodology` (selected methodology name). Per-artifact adaptation strategy values: `update-mode`, `skip-recommended`, `context-only`, `full-run`. These strategy names are the canonical v2 values. JSON output includes `strategy` field per artifact. V1 migration flow: For v1 migration, the user runs `scaffold init` first (which detects v1 via project detector and creates config.yml), then `scaffold adopt` maps existing artifacts to v2 steps. Artifact matching: Exact path match against meta-prompt `outputs` arrays. For fuzzy matching (e.g., `docs/architecture.md` matching `docs/system-architecture.md`), use filename-stem Levenshtein distance ≤ 2.
 
 **Acceptance Criteria**:
 - [ ] Scans for existing artifacts matching meta-prompt outputs
@@ -1185,7 +1188,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 ### T-036: Implement scaffold validate command
 
-**Implements**: Domain 09 (validate command), cli-contract (validate), ADR-040 (accumulate and report), error-messages.md, cli-output-formats.md
+**Implements**: Domain 09 (validate command), cli-contract (validate), ADR-040 (accumulate and report), cli-contract.md (error codes and messages), cli-output-formats.md
 **Depends on**: T-005, T-007, T-011, T-004, T-021
 **Enables**: T-052
 
@@ -1199,7 +1202,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 - Create: `src/validation/index.test.ts`
 - Create: `src/cli/commands/validate.test.ts`
 
-**Description**: Comprehensive validation of all scaffold configuration and state files. Validates: (1) config.yml schema and field values, (2) state.json structure and status values, (3) meta-prompt frontmatter in all pipeline/*.md files, (4) dependency graph (no cycles, no missing targets), (5) methodology preset consistency, (6) cross-file consistency (state references valid steps, decision references valid prompts). Accumulate-and-report pattern (ADR-040): process all files before reporting. Group errors by source file, errors before warnings. `--verbose`: show file-by-file detail with component tags. Exit 0 if valid (warnings OK), exit 1 if errors found. Note: validators are internal modules testable independently; the command handler orchestrates them. Agent should implement validators first, then wire into command handler. `--fix` flag: Apply safe auto-fixes where available (e.g., reassign duplicate decision IDs, fix missing schema-version). Only non-destructive fixes. `--scope <list>` flag: Comma-separated list of validation scopes. Valid values: `config`, `manifests`, `frontmatter`, `artifacts`, `state`, `decisions`. Default: all scopes.
+**Description**: Comprehensive validation of all scaffold configuration and state files. Validates: (1) config.yml schema and field values, (2) state.json structure and status values, (3) meta-prompt frontmatter in all pipeline/*.md files, (4) dependency graph (no cycles, no missing targets), (5) methodology preset consistency, (6) cross-file consistency (state references valid steps, decision references valid steps). Accumulate-and-report pattern (ADR-040): process all files before reporting. Group errors by source file, errors before warnings. `--verbose`: show file-by-file detail with component tags. Exit 0 if valid (warnings OK), exit 1 if errors found. Note: validators are internal modules testable independently; the command handler orchestrates them. Agent should implement validators first, then wire into command handler. `--fix` flag: Apply safe auto-fixes where available (e.g., reassign duplicate decision IDs, fix missing schema-version). Only non-destructive fixes. `--scope <list>` flag: Comma-separated list of validation scopes. Valid values: `config`, `manifests`, `frontmatter`, `artifacts`, `state`, `decisions`. Default: all scopes.
 
 **Acceptance Criteria**:
 - [ ] Validates config.yml schema and methodology
@@ -1219,7 +1222,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 ### T-037: Implement scaffold dashboard command
 
-**Implements**: dashboard-spec.md, Domain 09 (dashboard command), cli-output-formats.md, error-messages.md
+**Implements**: dashboard-spec.md, Domain 09 (dashboard command), cli-output-formats.md, cli-contract.md (error codes and messages)
 **Depends on**: T-007, T-005, T-009, T-021
 **Enables**: T-052
 
@@ -1252,7 +1255,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 ### T-038: Implement scaffold update command
 
-**Implements**: Domain 09 (update command), ADR-002 (distribution), cli-contract (update), error-messages.md, cli-output-formats.md
+**Implements**: Domain 09 (update command), ADR-002 (distribution), cli-contract (update), cli-contract.md (error codes and messages), cli-output-formats.md
 **Depends on**: T-021
 **Enables**: T-052
 
@@ -1374,7 +1377,7 @@ Thin wrappers that generate platform-specific command files at build time. T-039
 - Create: `src/project/claude-md.ts`
 - Create: `src/project/claude-md.test.ts`
 
-**Description**: Manage reserved sections in CLAUDE.md with ownership markers. Section registry maps step slugs to section names with per-section token budgets (200-300 tokens each, 2000 tokens total across all scaffold-managed sections). Ownership markers: `<!-- scaffold:managed by <slug> -->` / `<!-- /scaffold:managed -->` delimit managed sections. Operations: `fillSection(slug, content)` inserts content between ownership markers (replaces existing content), `readSection(slug)` extracts content, `listSections()` returns all managed sections with budget utilization, `getBudgetStatus()` returns per-section and total token usage. Token budget enforcement: warn CMD_SECTION_OVER_BUDGET when per-section or total budget exceeded. Preserve unmanaged content outside markers. Handle CLAUDE.md not existing (create with managed sections). Reservation placeholders for sections not yet filled. Token counting approximation: `Math.ceil(content.split(/\\s+/).length * 1.3)` (word count with 30% overhead for tokenization). This is a rough estimate — exact token counting is not required. Section registry is loaded from the methodology preset's `claude_md_sections` field (if present) or falls back to a hardcoded default registry mapping common step slugs to section headings.
+**Description**: Manage reserved sections in CLAUDE.md with ownership markers. Section registry maps step slugs to section names with per-section token budgets (200-300 tokens each, 2000 tokens total across all scaffold-managed sections). Ownership markers: `<!-- scaffold:managed by <slug> -->` / `<!-- /scaffold:managed -->` delimit managed sections. Operations: `fillSection(slug, content)` inserts content between ownership markers (replaces existing content), `readSection(slug)` extracts content, `listSections()` returns all managed sections with budget utilization, `getBudgetStatus()` returns per-section and total token usage. Token budget enforcement: warn CMD_SECTION_OVER_BUDGET when per-section or total budget exceeded. Preserve unmanaged content outside markers. Handle CLAUDE.md not existing (create with managed sections). Reservation placeholders for sections not yet filled. Token counting approximation: `Math.ceil(content.split(/\\s+/).length * 1.3)` (word count with 30% overhead for tokenization). This is a rough estimate — exact token counting is not required. Use a hardcoded default section registry. The default registry defines section headings, their owning step slugs, and per-section token budgets (typically 200-300 tokens each, 2000 total budget).
 
 **Acceptance Criteria**:
 - [ ] Fills managed section between ownership markers
@@ -1385,7 +1388,7 @@ Thin wrappers that generate platform-specific command files at build time. T-039
 - [ ] Lists all managed sections with their owners
 - [ ] Reads content of specific managed section
 - [ ] Uses CMD_SECTION_OVER_BUDGET warning code
-- [ ] CMD_SECTION_OVER_BUDGET template defined in error-messages.md
+- [ ] CMD_SECTION_OVER_BUDGET template defined in cli-contract.md (error codes and messages)
 - [ ] All tests pass
 
 ---
@@ -1405,7 +1408,7 @@ Content tasks — meta-prompts, knowledge base files, and methodology presets. T
 - Create: `methodology/mvp.yml`
 - Create: `methodology/custom-defaults.yml`
 
-**Description**: Author three methodology preset YAML files. (1) `deep.yml`: name "Deep Domain Modeling", description for complex systems, default_depth 5, all 36 steps enabled. (2) `mvp.yml`: name "MVP", description for fast start, default_depth 1, only 7 steps enabled (create-prd, testing-strategy, implementation-tasks, implementation-playbook). (3) `custom-defaults.yml`: name "Custom", description for user configuration, default_depth 3, all 36 steps enabled with conditional steps marked. Each preset must list every known step with enabled/disabled status. Use manifest-yml-schema.md §8.1 (`deep.yml` example) as the canonical list of all 36 step names. `custom-defaults.yml` uses the same conditional markers as `deep.yml` (database-schema, review-database, api-contracts, review-api, ux-spec, review-ux marked `conditional: 'if-needed'`).
+**Description**: Author three methodology preset YAML files. (1) `deep.yml`: name "Deep Domain Modeling", description for complex systems, default_depth 5, all 36 steps enabled. (2) `mvp.yml`: name "MVP", description for fast start, default_depth 1, only 7 steps enabled (create-prd, review-prd, user-stories, review-user-stories, testing-strategy, implementation-tasks, implementation-playbook). (3) `custom-defaults.yml`: name "Custom", description for user configuration, default_depth 3, all 36 steps enabled with conditional steps marked. Each preset must list every known step with enabled/disabled status. Use manifest-yml-schema.md §8.1 (`deep.yml` example) as the canonical list of all 36 step names. `custom-defaults.yml` uses the same conditional markers as `deep.yml` (database-schema, review-database, api-contracts, review-api, ux-spec, review-ux marked `conditional: 'if-needed'`).
 
 **Acceptance Criteria**:
 - [ ] deep.yml has all 36 steps enabled, default_depth 5
@@ -1446,6 +1449,8 @@ Content tasks — meta-prompts, knowledge base files, and methodology presets. T
 - [ ] Each entry covers expertise, patterns, pitfalls, evaluation criteria
 - [ ] Frontmatter validates against knowledge base schema
 
+Note: Source material: Existing knowledge base files in `knowledge/core/` already contain authored content. This task validates, refines, and ensures completeness of existing content against the 5-heading structure, rather than extracting from scratch.
+
 ---
 
 ### T-046: Author phase-specific review knowledge base files
@@ -1478,6 +1483,8 @@ Content tasks — meta-prompts, knowledge base files, and methodology presets. T
 - [ ] No tool-specific commands
 - [ ] Each review entry defines at least 3 failure modes with concrete detection heuristics
 
+Note: Source material: Existing knowledge base files in `knowledge/review/` already contain authored content. This task validates and refines existing content.
+
 ---
 
 ### T-047: Author validation and product knowledge base files
@@ -1508,6 +1515,8 @@ Content tasks — meta-prompts, knowledge base files, and methodology presets. T
 - [ ] Product entries cover artifact creation expertise
 - [ ] No tool-specific commands
 
+Note: Source material: Existing knowledge base files in `knowledge/validation/` and `knowledge/product/` already contain authored content. This task validates and refines existing content.
+
 ---
 
 ### T-048: Author pipeline meta-prompts — product and domain phases
@@ -1520,13 +1529,16 @@ Content tasks — meta-prompts, knowledge base files, and methodology presets. T
 - Create: `pipeline/pre/create-prd.md`
 - Create: `pipeline/pre/review-prd.md`
 - Create: `pipeline/pre/innovate-prd.md`
+- Create: `pipeline/pre/user-stories.md`
+- Create: `pipeline/pre/review-user-stories.md`
+- Create: `pipeline/pre/innovate-user-stories.md`
 - Create: `pipeline/modeling/domain-modeling.md`
 - Create: `pipeline/decisions/adrs.md`
 
-**Description**: Author 5 meta-prompts for product definition and early domain phases. Each meta-prompt has YAML frontmatter (name, description, phase, dependencies, outputs, knowledge-base) and body sections: Purpose, Inputs, Expected Outputs, Quality Criteria, Methodology Scaling (with specific guidance for depth 1 and depth 5), Mode Detection (create vs update behavior per ADR-048). Meta-prompts declare intent — they do NOT contain actual prompt text. 30-80 lines each. Reference appropriate knowledge base entries. See system-architecture.md §4a-1 for the meta-prompt body section convention and a complete example. Each meta-prompt body uses `## Purpose`, `## Inputs`, `## Expected Outputs`, `## Quality Criteria`, `## Methodology Scaling`, `## Mode Detection` headings. Intent vs prompt text: 'Analyze domain boundaries and identify bounded contexts' (intent — good). 'You are a domain modeling expert. Read the PRD and produce a domain model following DDD principles. Start by identifying...' (prompt text — bad).
+**Description**: Author 8 meta-prompts for product definition and early domain phases. Each meta-prompt has YAML frontmatter (name, description, phase, dependencies, outputs, knowledge-base) and body sections: Purpose, Inputs, Expected Outputs, Quality Criteria, Methodology Scaling (with specific guidance for depth 1 and depth 5), Mode Detection (create vs update behavior per ADR-048). Meta-prompts declare intent — they do NOT contain actual prompt text. 30-80 lines each. Reference appropriate knowledge base entries. See system-architecture.md §4a-1 for the meta-prompt body section convention and a complete example. Each meta-prompt body uses `## Purpose`, `## Inputs`, `## Expected Outputs`, `## Quality Criteria`, `## Methodology Scaling`, `## Mode Detection` headings. Intent vs prompt text: 'Analyze domain boundaries and identify bounded contexts' (intent — good). 'You are a domain modeling expert. Read the PRD and produce a domain model following DDD principles. Start by identifying...' (prompt text — bad).
 
 **Acceptance Criteria**:
-- [ ] All 5 files have valid frontmatter per frontmatter-schema
+- [ ] All 8 files have valid frontmatter per frontmatter-schema
 - [ ] Each includes Purpose, Inputs, Expected Outputs, Quality Criteria sections
 - [ ] Each includes Methodology Scaling with depth 1 and depth 5 specifics
 - [ ] Each includes Mode Detection block (create vs update)
@@ -1575,16 +1587,25 @@ Content tasks — meta-prompts, knowledge base files, and methodology presets. T
 - Create: `pipeline/finalization/developer-onboarding-guide.md`
 - Create: `pipeline/finalization/implementation-playbook.md`
 - Create: `pipeline/finalization/apply-fixes-and-freeze.md`
+- Create: `pipeline/validation/cross-phase-consistency.md`
+- Create: `pipeline/validation/traceability-matrix.md`
+- Create: `pipeline/validation/decision-completeness.md`
+- Create: `pipeline/validation/critical-path-walkthrough.md`
+- Create: `pipeline/validation/implementability-dry-run.md`
+- Create: `pipeline/validation/dependency-graph-validation.md`
+- Create: `pipeline/validation/scope-creep-check.md`
 
-**Description**: Author 7 meta-prompts for implementation planning, testing, operations, security, onboarding, and finalization phases. operations and security may be conditional. Implementation-playbook is one of the 4 MVP-enabled steps. Apply-fixes-and-freeze is the final validation/finalization step. Each references appropriate KB entries. Filenames and corresponding frontmatter `name` fields must match manifest-yml-schema.md §8.1 step names.
+**Description**: Author 14 meta-prompts for implementation planning, testing, operations, security, onboarding, finalization, and validation phases. operations and security may be conditional. Implementation-playbook is one of the 4 MVP-enabled steps. Apply-fixes-and-freeze is the final validation/finalization step. Each references appropriate KB entries. Filenames and corresponding frontmatter `name` fields must match manifest-yml-schema.md §8.1 step names.
 
 **Acceptance Criteria**:
-- [ ] All 7 files have valid frontmatter
+- [ ] All 14 files have valid frontmatter
 - [ ] Correct dependencies (later phases depend on earlier)
 - [ ] implementation-playbook is MVP-compatible (enabled in mvp.yml)
 - [ ] Methodology scaling guidance in each
 - [ ] Mode Detection blocks in each
 - [ ] 30-80 lines each
+
+Note: These validation meta-prompt files already exist in `pipeline/validation/`. This task verifies they conform to the frontmatter schema and content structure.
 
 ---
 
