@@ -82,6 +82,7 @@ graph TD
     T007 --> T015
     T005 --> T015
     T009 --> T015
+    T002 --> T016
     T003 --> T016
     T013 --> T017
     T014 --> T017
@@ -167,6 +168,7 @@ graph TD
     T011 --> T034
     T006 --> T034
     T021 --> T034
+    T034 --> T033
     T032 --> T035
     T007 --> T035
     T009 --> T035
@@ -240,6 +242,8 @@ graph TD
     T044 --> T052
     T048 --> T052
     T040 --> T053
+    T041 --> T053
+    T042 --> T053
     T052 --> T053
     T029 --> T054
     T052 --> T055
@@ -284,7 +288,7 @@ Phase 0 establishes the TypeScript project infrastructure. Zero spec-specific lo
 
 **Implements**: All domain models (types extracted from domains 02, 03, 05, 06, 08, 09, 10, 11, 13, 14, 15, 16), state-json-schema, config-yml-schema, decisions-jsonl-schema, lock-json-schema, frontmatter-schema, manifest-yml-schema, cli-contract, internal-interfaces.md
 **Depends on**: T-001
-**Enables**: T-004, T-005, T-007, T-009, T-010, T-019
+**Enables**: T-004, T-005, T-007, T-009, T-010, T-016, T-019
 
 **Files**:
 - Create: `src/types/enums.ts`
@@ -355,7 +359,7 @@ Pure data modules with no CLI dependency. Each reads/writes one file format. Hea
 
 **Implements**: Domain 08 (meta-prompt frontmatter schema), frontmatter-schema, ADR-041, frontmatter-schema.md (authoritative, replaces domain model 08 for frontmatter types)
 **Depends on**: T-002, T-003
-**Enables**: T-006, T-008, T-011, T-013, T-014, T-025, T-032, T-036, T-043, T-048-T-051
+**Enables**: T-006, T-008, T-011, T-013, T-014, T-032, T-036, T-043, T-048-T-051
 
 **Files**:
 - Create: `src/project/frontmatter.ts`
@@ -437,7 +441,7 @@ Note: "T-006 tests require fixture preset YAML files. The production preset file
 
 **Implements**: Domain 03 (pipeline state machine), state-json-schema, ADR-012 (state file design), ADR-018 (completion detection), internal-interfaces.md (StateManager interface)
 **Depends on**: T-002, T-003
-**Enables**: T-008, T-015, T-018, T-023, T-024, T-025, T-026, T-029, T-030, T-031, T-033, T-035, T-036, T-037, T-043
+**Enables**: T-008, T-015, T-018, T-023, T-024, T-025, T-026, T-030, T-031, T-033, T-035, T-036, T-037, T-043
 
 **Files**:
 - Create: `src/state/state-manager.ts`
@@ -488,7 +492,7 @@ Note: "T-006 tests require fixture preset YAML files. The production preset file
 
 **Implements**: Domain 11 (decision log lifecycle), decisions-jsonl-schema, ADR-013
 **Depends on**: T-002, T-003
-**Enables**: T-015, T-027, T-035
+**Enables**: T-015, T-027, T-035, T-037
 
 **Files**:
 - Create: `src/state/decision-logger.ts`
@@ -552,7 +556,7 @@ The assembly engine and its dependencies. Tasks T-011 through T-016 can run in p
 - Create: `src/core/dependency/dependency.test.ts`
 - Create: `src/core/dependency/eligibility.test.ts`
 
-**Description**: Topological sort of pipeline steps using Kahn's algorithm. Build adjacency list from meta-prompt `dependencies` fields. Algorithm: (1) count in-degrees, (2) enqueue nodes with in-degree 0, (3) process queue — for each node, output it and decrement successors' in-degrees, enqueue when zero. Phase-based tiebreaker for deterministic ordering within same in-degree level. Cycle detection: if any node unvisited after algorithm completes, cycle exists (DEP_CYCLE_DETECTED, exit code 1). `computeEligible(state)` returns steps whose dependencies are all completed and that are not themselves completed/in_progress. `getParallelSets()` groups eligible steps by phase for parallel execution display. Validate: DEP_TARGET_MISSING (dependency references non-existent step), DEP_SELF_REFERENCE. Phase sort order (ascending): pre < modeling < decisions < architecture < specification < planning < quality < validation < finalization. Define a `PHASE_SORT_ORDER: Record<string, number>` constant mapping each valid phase string to a numeric sort key: `{ pre: 0, modeling: 1, decisions: 2, architecture: 3, specification: 4, planning: 5, quality: 6, validation: 7, finalization: 8 }`. The primary tiebreaker is the frontmatter `order` field (integer 1-36). Phase-based sort is a secondary grouping mechanism. Reference `docs/v2/data/frontmatter-schema.md`. Implements DependencyResolver interface from docs/v2/api/internal-interfaces.md.
+**Description**: Topological sort of pipeline steps using Kahn's algorithm. Build adjacency list from meta-prompt `dependencies` fields. Algorithm: (1) count in-degrees, (2) enqueue nodes with in-degree 0, (3) process queue — for each node, output it and decrement successors' in-degrees, enqueue when zero. Phase-based tiebreaker for deterministic ordering within same in-degree level. Cycle detection: if any node unvisited after algorithm completes, cycle exists (DEP_CYCLE_DETECTED, exit code 1). `computeEligible(state)` returns steps whose dependencies are all completed and that are not themselves completed/in_progress. `getParallelSets()` groups eligible steps by phase for parallel execution display. Validate: DEP_TARGET_MISSING (dependency references non-existent step), DEP_SELF_REFERENCE. Phase sort order (ascending): pre < modeling < decisions < architecture < specification < quality < planning < validation < finalization. Define a `PHASE_SORT_ORDER: Record<string, number>` constant mapping each valid phase string to a numeric sort key: `{ pre: 0, modeling: 1, decisions: 2, architecture: 3, specification: 4, quality: 5, planning: 6, validation: 7, finalization: 8 }`. The primary tiebreaker is the frontmatter `order` field (integer 1-36). Phase-based sort is a secondary grouping mechanism. Reference `docs/v2/data/frontmatter-schema.md`. Implements DependencyResolver interface from docs/v2/api/internal-interfaces.md. When a step is disabled in the active methodology preset, it is treated as satisfied for dependency resolution purposes (per ADR-009). The resolver checks `step.enabled === false` when computing eligibility, treating disabled steps as equivalent to completed. This allows MVP mode to work correctly despite disabling 29 of 36 steps.
 
 **Acceptance Criteria**:
 - [ ] Topological sort of 36 steps produces valid ordering (no step before its dependencies)
@@ -670,7 +674,7 @@ The assembly engine and its dependencies. Tasks T-011 through T-016 can run in p
 ### T-016: Implement user instruction loader (three-layer precedence)
 
 **Implements**: ADR-047 (user instruction three-layer precedence), Domain 15 (assembly engine step 5)
-**Depends on**: T-003
+**Depends on**: T-002, T-003
 **Enables**: T-017
 
 **Files**:
@@ -1139,7 +1143,7 @@ Each command handler is independent after the CLI shell is set up. Groups A-D ca
 
 **Implements**: Domain 09 (build command), Domain 05 (platform adapters), cli-contract (build), cli-contract.md (error codes and messages), cli-output-formats.md
 **Depends on**: T-011, T-006, T-021
-**Enables**: T-039, T-052
+**Enables**: T-033, T-039, T-052
 
 **Files**:
 - Create: `src/cli/commands/build.ts`
@@ -1675,7 +1679,7 @@ Final integration testing, packaging, and validation against performance budgets
 ### T-053: Configure npm packaging and distribution
 
 **Implements**: ADR-002 (distribution strategy)
-**Depends on**: T-040, T-052
+**Depends on**: T-040, T-041, T-042, T-052
 **Enables**: none (terminal task)
 
 **Files**:
@@ -1772,11 +1776,11 @@ T-045 → T-048 → T-052 (3 tasks — content chain)
 
 | Task | Blocks | Why critical |
 |------|--------|-------------|
-| T-002 (types) | 8 tasks | Every data module needs shared types |
-| T-004 (frontmatter) | 9 tasks | Meta-prompts, KB, presets, detector all parse frontmatter |
+| T-002 (types) | 6 tasks | Every data module needs shared types |
+| T-004 (frontmatter) | 12 tasks | Meta-prompts, KB, presets, detector all parse frontmatter |
 | T-017 (assembly engine) | 2 tasks | The run command and update mode depend on assembly |
-| T-021 (error display) | 16 tasks | Every command needs error formatting |
-| T-029 (run command) | 3 tasks | E2E tests and migration guide need the core command |
+| T-021 (error display) | 15 tasks | Every command needs error formatting |
+| T-029 (run command) | 2 tasks | E2E tests and migration guide need the core command |
 
 ---
 

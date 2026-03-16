@@ -3,7 +3,7 @@ name: adrs
 description: Document architecture decisions as ADRs
 phase: "decisions"
 order: 9
-dependencies: [domain-modeling]
+dependencies: [review-domain-modeling]
 outputs: [docs/adrs/]
 conditional: null
 knowledge-base: [adr-craft]

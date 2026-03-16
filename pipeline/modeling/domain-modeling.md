@@ -3,7 +3,7 @@ name: domain-modeling
 description: Deep domain modeling across all identified project domains
 phase: "modeling"
 order: 7
-dependencies: [innovate-user-stories]
+dependencies: [review-user-stories]
 outputs: [docs/domain-models/]
 conditional: null
 knowledge-base: [domain-modeling]

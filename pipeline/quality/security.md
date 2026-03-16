@@ -3,7 +3,7 @@ name: security
 description: Security review and documentation
 phase: "quality"
 order: 23
-dependencies: [operations]
+dependencies: [review-operations]
 outputs: [docs/security-review.md]
 conditional: null
 knowledge-base: [security-review]

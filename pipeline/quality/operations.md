@@ -3,7 +3,7 @@ name: operations
 description: Define operations, deployment, and dev environment strategy
 phase: "quality"
 order: 21
-dependencies: [testing-strategy]
+dependencies: [review-testing]
 outputs: [docs/operations-runbook.md]
 conditional: null
 knowledge-base: [operations-runbook]

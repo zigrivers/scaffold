@@ -3,7 +3,7 @@ name: ux-spec
 description: Specify UI/UX design including design system
 phase: "specification"
 order: 17
-dependencies: [system-architecture]
+dependencies: [review-architecture]
 outputs: [docs/ux-spec.md]
 conditional: "if-needed"
 knowledge-base: [ux-specification]
