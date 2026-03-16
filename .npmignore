@@ -1,0 +1,31 @@
+# Source TypeScript files
+src/
+tests/
+*.test.ts
+*.test.js
+
+# Documentation
+docs/
+
+# Development config
+.eslintrc*
+eslint.config.*
+tsconfig.json
+vitest.config.ts
+
+# Scripts (dev only)
+scripts/setup-agent-worktree.sh
+scripts/install-hooks.sh
+
+# Git
+.git/
+.gitignore
+.worktrees/
+
+# Beads / local dev
+.scaffold/
+lib/
+commands/
+skills/
+.claude-plugin/
+Makefile
