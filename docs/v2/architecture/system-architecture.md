@@ -467,7 +467,7 @@ flowchart TD
     F -->|"sorted"| G["Sorted step list<br/>+ parallel sets"]
     G --> H["Generate commands/*.md<br/>wrappers + CLAUDE.md sections<br/>(Claude Code Adapter)"]
     G --> I["Generate AGENTS.md +<br/>codex-prompts/*.md wrappers<br/>(Codex Adapter)"]
-    G --> J["Generate prompts/*.md +<br/>scaffold-pipeline.md<br/>(Universal Adapter)"]
+    G --> J["Generate prompts/*.md +<br/>prompts/README.md<br/>(Universal Adapter)"]
     H & I & J --> K["Print build summary<br/>(CLI Shell)"]
 ```
 
@@ -482,7 +482,7 @@ flowchart TD
 | Kahn's sort | Dependency Resolver | — (in-memory frontmatter dependencies) | — | [ADR-009](../adrs/ADR-009-kahns-algorithm-dependency-resolution.md), [ADR-011](../adrs/ADR-011-depends-on-union-semantics.md) | `DEP_CYCLE_DETECTED` → exit 1 |
 | Claude Code output | Claude Code Adapter | — | `commands/*.md` (wrappers), CLAUDE.md sections (via CLAUDE.md Manager) | [ADR-022](../adrs/ADR-022-three-platform-adapters.md), [ADR-026](../adrs/ADR-026-claude-md-section-registry.md) | Write failure → exit 5 |
 | Codex output | Codex Adapter | — | `AGENTS.md`, `codex-prompts/*.md` (wrappers) | [ADR-022](../adrs/ADR-022-three-platform-adapters.md) | Write failure → exit 5 |
-| Universal output | Universal Adapter | `content/adapters/universal/pipeline-template.md` | `prompts/*.md`, `scaffold-pipeline.md` | [ADR-022](../adrs/ADR-022-three-platform-adapters.md) | Write failure → exit 5 |
+| Universal output | Universal Adapter | `content/adapters/universal/pipeline-template.md` | `prompts/*.md`, `prompts/README.md` | [ADR-022](../adrs/ADR-022-three-platform-adapters.md) | Write failure → exit 5 | **Phase 2.** Phase 1 Universal adapter generates `prompts/README.md` only. The `scaffold-pipeline.md` reference document is deferred. |
 
 **Walkthrough — non-obvious behaviors:**
 
@@ -566,7 +566,7 @@ The runtime path from "user runs `scaffold run <step>`" to "step executes and st
 
 ```mermaid
 flowchart TD
-    A["scaffold run [--from X]<br/>(CLI Shell)"] --> B["Parse args, determine<br/>output mode<br/>(CLI Shell)"]
+    A["scaffold run &lt;step&gt;<br/>(CLI Shell)"] --> B["Parse args, determine<br/>output mode<br/>(CLI Shell)"]
 
     B --> C["Check lock.json<br/>(Lock Manager)"]
     C --> D{"Lock<br/>exists?"}
@@ -595,8 +595,8 @@ flowchart TD
     O -->|"mark complete"| N
 
     P["Compute eligible prompts<br/>from dependency graph + state<br/>(Dependency Resolver)"]
-    P --> Q{"--from X<br/>specified?"}
-    Q -->|"yes"| R["Validate X exists,<br/>set as target"]
+    P --> Q{"Positional &lt;step&gt;<br/>specified?"}
+    Q -->|"yes"| R["Validate step exists,<br/>set as target"]
     Q -->|"no"| S["Pick first eligible<br/>(phase tiebreaker)"]
     S --> T{"Any<br/>eligible?"}
     T -->|"no"| U["Pipeline complete"]
@@ -635,7 +635,7 @@ flowchart TD
 | Read state | State Manager | `.scaffold/state.json` | — | [ADR-012](../adrs/ADR-012-state-file-design.md) | `STATE_CORRUPT` → exit 3 |
 | Crash check | State Manager | Artifact files on disk | `.scaffold/state.json` (if auto-marking) | [ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md) | — |
 | Compute eligible | Dependency Resolver | Methodology preset config, prompt frontmatter | — | [ADR-009](../adrs/ADR-009-kahns-algorithm-dependency-resolution.md), [ADR-021](../adrs/ADR-021-sequential-prompt-execution.md) | — |
-| `--from` validation | CLI Shell | — | — | [ADR-034](../adrs/ADR-034-rerun-no-cascade.md) | Prompt slug not found → exit 1 |
+| Positional `<step>` validation | CLI Shell | — | — | [ADR-034](../adrs/ADR-034-rerun-no-cascade.md) | Prompt slug not found → exit 1 |
 | Prerequisite check | State Manager | Predecessor `outputs` artifacts | — | [ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md) | Missing artifacts → exit 2 in `--auto` |
 | Set in_progress | State Manager | — | `.scaffold/state.json` (atomic) | [ADR-012](../adrs/ADR-012-state-file-design.md), [ADR-021](../adrs/ADR-021-sequential-prompt-execution.md) | — |
 | Session context | State Manager | `.scaffold/decisions.jsonl`, predecessor `outputs` artifacts | — | — | Missing predecessor outputs → warning |
@@ -657,7 +657,7 @@ flowchart TD
 
 In `--auto` mode, "all present" is auto-completed, "none present" triggers a re-run, and "partial" produces a warning and re-runs (safer to redo than trust partial output). Zero-byte files count as "present" — the artifact exists even if empty.
 
-**`--from` and re-run semantics.** When `scaffold run --from X` targets a previously completed prompt, only X is re-executed. Downstream prompts that depend on X are **not** automatically re-run ([ADR-034](../adrs/ADR-034-rerun-no-cascade.md)). Instead, a warning lists all prompts that transitively depend on X with suggested `scaffold run --from <downstream>` commands. X's old completion data (timestamp, actor, `artifacts_verified`) is overwritten by the new execution. This non-cascade design prevents a single re-run from triggering a full pipeline rebuild — the user explicitly controls which downstream prompts to refresh.
+**Re-run semantics.** When `scaffold run <step>` targets a previously completed prompt, only that step is re-executed. Downstream prompts that depend on it are **not** automatically re-run ([ADR-034](../adrs/ADR-034-rerun-no-cascade.md)). Instead, a warning lists all prompts that transitively depend on the step with suggested `scaffold run <downstream>` commands. The step's old completion data (timestamp, actor, `artifacts_verified`) is overwritten by the new execution. This non-cascade design prevents a single re-run from triggering a full pipeline rebuild — the user explicitly controls which downstream prompts to refresh.
 
 **Completion gate and auto-mode divergence.** In interactive mode, scaffold blocks after outputting the assembled prompt, presenting a completion confirmation prompt: `"Step '<step>' complete? [Y/n/skip]"`. The user (or AI agent in a terminal session) confirms completion, triggering post-completion state updates within the same process. In `--auto` mode, scaffold exits immediately after prompt output — it cannot block an unattended pipeline. The step remains `in_progress`, and completion is detected via crash recovery ([ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md)) on the next `scaffold run` invocation. This means auto-mode completion is always deferred to the next invocation, making crash recovery the primary (not backup) completion path for automated pipelines.
 
@@ -814,7 +814,7 @@ Scaffold v2 manages all state through the file system — there are no databases
 | `.scaffold/lock.json` | Execution lock — prevents concurrent write operations on same machine | Lock Manager | Run, skip, init, reset (before acquiring) | Gitignored | Full rewrite (`wx` flag), delete on release | [ADR-019](../adrs/ADR-019-advisory-locking.md) |
 | `CLAUDE.md` | Agent instructions — reserved sections with scaffold-managed content | CLAUDE.md Manager (run: section fill) | Claude Code agents | Committed | Section replace (find heading → replace managed block) | [ADR-026](../adrs/ADR-026-claude-md-section-registry.md) |
 | `AGENTS.md` | Codex agent instructions | Codex Adapter | Codex agents | Committed | Full rewrite on build | [ADR-022](../adrs/ADR-022-three-platform-adapters.md) |
-| Build outputs (`commands/*.md`, `codex-prompts/*.md`, `prompts/*.md`, `scaffold-pipeline.md`) | Platform-specific wrapper files — deterministic from config + meta-prompt metadata | Platform Adapters (build) | AI agents (invoke `scaffold run`) | Committed | Full rewrite on build | [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md), [ADR-022](../adrs/ADR-022-three-platform-adapters.md) |
+| Build outputs (`commands/*.md`, `codex-prompts/*.md`, `prompts/*.md`, `prompts/README.md`) | Platform-specific wrapper files — deterministic from config + meta-prompt metadata | Platform Adapters (build) | AI agents (invoke `scaffold run`) | Committed | Full rewrite on build | [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md), [ADR-022](../adrs/ADR-022-three-platform-adapters.md) |
 | Produced artifacts (e.g., `docs/plan.md`, `docs/tech-stack.md`) | Documents created by prompt execution — tracked via `outputs` in frontmatter | AI agents (outside scaffold) | State Manager (dual completion detection — see Section 4b for the detection algorithm), downstream prompts (via dependency ordering) | Committed | Agent-controlled (scaffold has no visibility into agent writes) | [ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md) |
 
 **Per-file lifecycle details:**
@@ -871,7 +871,7 @@ Neither mechanism infers the other's state: lock acquisition does not check `in_
 
 | Disagreement | Cause | Resolution |
 |-------------|-------|------------|
-| State references prompts not in config's resolved set | Config changed (methodology switch, depth change, `scaffold add`) after state was initialized | `scaffold run` warns about prompts in state that no longer appear in the resolved pipeline. The orphaned state entries are ignored but not deleted. |
+| State references prompts not in config's resolved set | Config changed (methodology switch, depth change, editing `config.yml` directly) after state was initialized | `scaffold run` warns about prompts in state that no longer appear in the resolved pipeline. The orphaned state entries are ignored but not deleted. |
 
 **Methodology switch (prompt orphaning)**: When `scaffold build` runs after a methodology change, the resolved prompt set may differ from the prompts recorded in `state.json`. Prompts in `state.json` that are no longer in the resolved set become orphaned entries. Orphaned entries are **preserved, not deleted** — the user may switch back, and deleting completion records would force re-running prompts unnecessarily. `scaffold run` ignores orphaned entries (they don't appear as eligible prompts). `scaffold status` displays them in a separate "Orphaned (methodology changed)" section. `scaffold validate` warns about orphaned entries and suggests `scaffold reset` if the user wants a clean state.
 | Config resolves prompts not in state | New prompts added via methodology change or extra-prompt addition | `scaffold build` regenerates outputs from the new config; `scaffold run` adds new prompts to state as `pending`. |
@@ -888,7 +888,7 @@ Neither mechanism infers the other's state: lock acquisition does not check `in_
 
 | Disagreement | Cause | Resolution |
 |-------------|-------|------------|
-| State says completed, CLAUDE.md section is placeholder | Session crashed after state update but before CLAUDE.md fill | `scaffold validate` checks section fill status against state; warns: `CMD_SECTION_NOT_FILLED`. Recovery: `scaffold run --from <prompt>` re-runs the prompt, which re-triggers section fill as part of its normal execution. The `--from` flag sets the prompt's status back to `in_progress`, and on completion the section fill executes. No separate repair mechanism is needed — re-running the prompt is the repair. |
+| State says completed, CLAUDE.md section is placeholder | Session crashed after state update but before CLAUDE.md fill | `scaffold validate` checks section fill status against state; warns: `CMD_SECTION_NOT_FILLED`. Recovery: `scaffold run <prompt>` re-runs the prompt, which re-triggers section fill as part of its normal execution. The positional step argument sets the prompt's status back to `in_progress`, and on completion the section fill executes. No separate repair mechanism is needed — re-running the prompt is the repair. |
 | CLAUDE.md section is filled, state says pending | User manually edited CLAUDE.md, or a different tool filled the section | Scaffold does not overwrite filled sections without ownership verification. Fill algorithm checks ownership markers before writing. |
 | CLAUDE.md over token budget | Prompt filled a section with more content than the budget allows | CLAUDE.md Manager emits `CMD_SECTION_OVER_BUDGET` warning. Optimization prompt (if enabled) trims content later in the pipeline. |
 
@@ -924,7 +924,7 @@ sequenceDiagram
     end
 
     rect rgb(255, 248, 230)
-    Note over CF,CM: scaffold add (config change)
+    Note over CF,CM: config.yml edited (re-run scaffold init or edit directly)
     CF->>CF: → Modified
     Note right of CF: Requires scaffold build to take effect
     end
@@ -1593,13 +1593,13 @@ Every configurable value in the system follows a four-layer precedence chain. Hi
 
 **Layer 1 (highest priority): CLI flags**
 
-- Example: `scaffold run --from create-prd` overrides automatic "next eligible" selection
+- Example: `scaffold run create-prd` overrides automatic "next eligible" selection
 - Example: `--format json` overrides the default interactive output mode
 - Flags never persist — they affect the current invocation only
 
 **Layer 2: `.scaffold/config.yml` (project-level)**
 
-- Written by `scaffold init` or modified by `scaffold add`
+- Written by `scaffold init` or edited directly
 - Committed to git — shared across team members
 - Overrides methodology defaults for depth levels and project traits
 - Contains project traits that control optional prompt inclusion/exclusion
@@ -1655,7 +1655,7 @@ Naming rules that apply across the system:
 
 | Entity | Format | Used As | Example |
 |--------|--------|---------|---------|
-| **Prompt names** | kebab-case (`[a-z][a-z0-9-]*`) | `state.json` keys, frontmatter `depends-on` values, manifest dependency keys, CLI `--from` argument | `create-prd`, `tech-stack`, `user-stories-gaps` |
+| **Prompt names** | kebab-case (`[a-z][a-z0-9-]*`) | `state.json` keys, frontmatter `depends-on` values, manifest dependency keys, CLI positional `<step>` argument | `create-prd`, `tech-stack`, `user-stories-gaps` |
 | **Methodology names** | kebab-case preset file basenames | `config.yml` `methodology` value, `state.json` `config_methodology` field | `deep`, `mvp`, `custom` |
 | **File extensions** | Standard | File type identification | `.md` for prompts, `.yml` for manifests and config, `.json` for state and lock, `.jsonl` for decision log |
 | **Decision IDs** | `D-NNN` (zero-padded three-digit) | `decisions.jsonl` `id` field, human reference in pipeline reviews | `D-001`, `D-042` |

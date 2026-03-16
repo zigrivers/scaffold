@@ -10,6 +10,15 @@
 
 ---
 
+> **Implementation Note:** This domain model contains mixin axis validation (5 axes: task-tracking, tdd, git-workflow, agent-mode, interaction-style) from the pre-meta-prompt architecture. Mixin axes were eliminated by ADR-041 and the PRD (Section 7). The following are superseded and should NOT be implemented:
+> - `FIELD_INVALID_MIXIN_AXIS`, `FIELD_INVALID_MIXIN_VALUE` error codes
+> - `COMBO_*` incompatible combination rules (Algorithm 3: `checkIncompatibleCombinations`)
+> - `InstalledResources.mixins` field
+> - Extra-prompts validation chain (Algorithm 4) — deferred to Phase 2
+> - `ConfigModification` interface — `scaffold add` was removed
+>
+> Config validation covers: version, methodology (deep/mvp/custom), platforms, custom depth/enable overrides, project metadata. See `docs/v2/data/config-yml-schema.md` for the current schema.
+
 ## Section 1: Domain Overview
 
 The Config Schema & Validation System defines the structure, constraints, and validation logic for `.scaffold/config.yml` — the per-project configuration file that drives every other Scaffold v2 subsystem. This domain covers the complete config schema, all validation rules (type checks, value validation, cross-field constraints), the version migration system for schema evolution, fuzzy matching for typo correction, and error surfacing in both interactive and JSON output modes.

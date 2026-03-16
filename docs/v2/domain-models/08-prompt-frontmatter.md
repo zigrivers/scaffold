@@ -10,6 +10,13 @@
 
 ---
 
+> **Implementation Note:** This domain model describes the pre-meta-prompt frontmatter schema. The current meta-prompt frontmatter schema is defined in `docs/v2/data/frontmatter-schema.md` (authoritative). The following fields/features from this domain model are NOT in the current schema and should NOT be implemented:
+> - `reads` with section-targeted syntax (`SectionTargetedRead`) — current `reads` field uses step names only (per ADR-050/053)
+> - `artifact-schema` field with `required-sections`, `id-format`, `index-table`, `min-count`
+> - `requires-capabilities` field with platform capability matrix
+>
+> Current meta-prompt frontmatter fields: `name`, `description`, `phase`, `order`, `dependencies`, `outputs`, `conditional`, `knowledge-base`, `reads` (optional, step names only).
+
 ## Section 1: Domain Overview
 
 The Meta-Prompt Frontmatter Schema domain defines the YAML metadata contract that every meta-prompt file in the `pipeline/` directory must satisfy. Frontmatter is the declarative interface between meta-prompt authors and the scaffold CLI — it tells the assembly engine what a step depends on, what it produces, what knowledge base entries to load, and whether the step is conditional.

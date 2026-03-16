@@ -785,7 +785,7 @@ scaffold next --format json
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--scope <list>` | string | `config,manifests,frontmatter,artifacts,state` | Comma-separated list of validation scopes to run. Valid values: `config`, `manifests`, `frontmatter`, `artifacts`, `state`, `decisions`. |
-| `--fix` | boolean | false | Apply safe auto-fixes where available (e.g., reassign duplicate decision IDs). Does not modify step files or config. |
+| `--fix` | boolean | false | Apply safe auto-fixes where available (e.g., reassign duplicate decision IDs). Does not modify step files or config. **Phase 2.** Implement `scaffold validate` as read-only in Phase 1. The `--fix` flag and auto-fix logic are deferred to Phase 2. |
 
 **Interactive behavior**:
 
