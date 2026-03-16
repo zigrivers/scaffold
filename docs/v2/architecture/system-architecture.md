@@ -1310,7 +1310,7 @@ Users extend Scaffold at three distinct points, spanning three architectural zon
 |----------------|----------------|-----------|-----------|-------------|-----|
 | **User instructions** | Customize prompt behavior per-project or per-step | `.scaffold/instructions/global.md` (all steps), `.scaffold/instructions/<step>.md` (per-step), `--instructions` flag (inline) | Assembly engine loads during step 5 of 9-step sequence | Later layers override earlier: inline > per-step > global. All layers are optional. Included in Instructions section of assembled prompt | [ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md) |
 | **Custom methodology presets** | New pipeline shapes and depth configurations | YAML preset files in `methodology/` controlling which steps are active and at what depth | Listed by `scaffold list`; selectable via `methodology: <name>` in config | Must define step enablement and depth defaults; acyclic step dependencies | [ADR-004](../adrs/ADR-004-methodology-as-top-level-organizer.md), [ADR-043](../adrs/ADR-043-depth-scale.md) |
-| **New platform adapters** | Support new AI tools | `src/core/adapters/<name>.ts` implementing the `PlatformAdapter` interface | Registered in adapter factory; activated by `platforms` config entry | Must implement `initialize()`, `transformPrompt()`, and `finalize()`; must not modify prompt content semantics (wrapper generation only) | [ADR-022](../adrs/ADR-022-three-platform-adapters.md) |
+| **New platform adapters** | Support new AI tools | `src/core/adapters/<name>.ts` implementing the `PlatformAdapter` interface | Registered in adapter factory; activated by `platforms` config entry | Must implement `initialize()`, `generateStepWrapper()`, and `finalize()`; must not modify prompt content semantics (wrapper generation only) | [ADR-022](../adrs/ADR-022-three-platform-adapters.md) |
 
 **User workflow for each extension:**
 
@@ -1581,11 +1581,7 @@ Scaffold is a CLI tool, not a service. There are no log files, log levels, log r
 - Human-readable output directed to stderr so stdout contains only the JSON envelope
 - Consumable by CI scripts, AI agents, and automation tooling
 
-**No `--verbose` flag**: The v2 spec references `scaffold list --verbose` for expanded pipeline display, but does not define a general-purpose `--verbose` mode. Build-time and runtime output is fixed by the output mode (interactive, JSON, auto). If diagnostic output is needed during development:
-
-- **Resolution trace**: Which prompts were resolved from which source layer — visible in `scaffold validate` output (reports `RESOLUTION_CUSTOM_OVERRIDE_ACTIVE` for each active override)
-- **Assembly trace**: Which knowledge base files and meta-prompt sections were composed — visible in `scaffold run` output when issues occur
-- **Dependency trace**: Topological sort order and parallel sets — visible in `scaffold build` summary and `scaffold status` pipeline display
+`--verbose` enables component-tagged diagnostic output. In interactive mode, extra detail is shown inline. In JSON mode, diagnostics appear in the `verbose` field of the JSON envelope (per ADR-025).
 
 **Debugging**: For development of the scaffold CLI itself, standard Node.js debugging applies: `node --inspect`, VS Code debugger attachment, `console.log` to stderr. No scaffold-specific debug infrastructure exists or is planned.
 

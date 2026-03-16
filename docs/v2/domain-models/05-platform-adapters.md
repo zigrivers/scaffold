@@ -108,10 +108,10 @@ interface PlatformAdapter {
   initialize(context: AdapterContext): Promise<AdapterInitResult>;
 
   /**
-   * Transform a single injected prompt into platform-specific output.
-   * Called once per prompt in pipeline order.
+   * Wrap a single assembled step into platform-specific output.
+   * Called once per step in pipeline order.
    */
-  transformPrompt(input: AdapterPromptInput): AdapterPromptOutput;
+  generateStepWrapper(input: AdapterStepInput): AdapterStepOutput;
 
   /**
    * Generate any aggregate output files after all prompts are processed.
@@ -119,7 +119,7 @@ interface PlatformAdapter {
    * For Codex: writes AGENTS.md (composed from all prompt summaries).
    * For Universal: writes scaffold-pipeline.md (pipeline reference).
    */
-  finalize(results: AdapterPromptOutput[]): AdapterFinalizeResult;
+  finalize(results: AdapterStepOutput[]): AdapterFinalizeResult;
 }
 
 
@@ -152,10 +152,10 @@ interface AdapterContext {
 }
 
 /**
- * Input for transforming a single prompt.
+ * Input for wrapping a single assembled step.
  * Combines the injection result with ordering context.
  */
-interface AdapterPromptInput {
+interface AdapterStepInput {
   /** The injection result containing fully-injected content */
   injectionResult: InjectionResult;
 
@@ -199,9 +199,9 @@ interface AdapterInitResult {
 }
 
 /**
- * Result of transforming a single prompt.
+ * Result of wrapping a single assembled step.
  */
-interface AdapterPromptOutput {
+interface AdapterStepOutput {
   /** The prompt slug (passed through from input) */
   slug: string;
 
@@ -744,7 +744,7 @@ stateDiagram-v2
 **Adapter processing order per `scaffold build`**:
 
 1. **Initialization**: Each configured adapter's `initialize()` is called. Codex adapter loads `tool-map.yml`. All adapters validate output directories.
-2. **Per-prompt transformation**: For each prompt in pipeline order, each adapter's `transformPrompt()` is called.
+2. **Per-step wrapping**: For each step in pipeline order, each adapter's `generateStepWrapper()` is called.
 3. **Finalization**: Each adapter's `finalize()` is called with all prompt outputs. Codex writes `AGENTS.md`. Universal writes `scaffold-pipeline.md`. Claude Code has nothing to finalize.
 4. **File writing**: The CLI writes all `OutputFile` records to disk.
 
@@ -925,7 +925,7 @@ FUNCTION checkCapabilities(
 ### Algorithm 4: Claude Code Command File Generation
 
 ```
-FUNCTION generateClaudeCodeCommand(input: AdapterPromptInput, context: AdapterContext): OutputFile
+FUNCTION generateClaudeCodeCommand(input: AdapterStepInput, context: AdapterContext): OutputFile
   prompt ← input.prompt
   content ← input.injectionResult.injectedContent
 
@@ -970,7 +970,7 @@ FUNCTION generateClaudeCodeCommand(input: AdapterPromptInput, context: AdapterCo
 ### Algorithm 5: Codex Prompt File Generation
 
 ```
-FUNCTION generateCodexPrompt(input: AdapterPromptInput, mapping: ToolNameMapping): OutputFile
+FUNCTION generateCodexPrompt(input: AdapterStepInput, mapping: ToolNameMapping): OutputFile
   content ← input.injectionResult.injectedContent
 
   // Step 1: Apply tool-name mapping
@@ -997,7 +997,7 @@ FUNCTION generateCodexPrompt(input: AdapterPromptInput, mapping: ToolNameMapping
 
 ```
 FUNCTION assembleAgentsMd(
-  results: AdapterPromptOutput[],
+  results: AdapterStepOutput[],
   context: AdapterContext
 ): OutputFile
 
@@ -1149,9 +1149,9 @@ FUNCTION truncateToTokens(content: string, maxTokens: number): string
 
 The `PlatformAdapter` interface (Section 3) defines the complete adapter contract:
 
-- **Inputs**: `AdapterContext` during initialization (project root, manifest, all prompts, dependency graph, mixins, platforms); `AdapterPromptInput` per prompt (injection result, resolved prompt, pipeline index, dependents, dependencies).
-- **Outputs**: `AdapterPromptOutput` per prompt (files to write, capability warnings, errors); `AdapterFinalizeResult` for aggregate outputs (AGENTS.md, scaffold-pipeline.md).
-- **Lifecycle hooks**: `initialize()` → `transformPrompt()` (per prompt) → `finalize()` (once).
+- **Inputs**: `AdapterContext` during initialization (project root, manifest, all prompts, dependency graph, mixins, platforms); `AdapterStepInput` per step (injection result, resolved prompt, pipeline index, dependents, dependencies).
+- **Outputs**: `AdapterStepOutput` per step (files to write, capability warnings, errors); `AdapterFinalizeResult` for aggregate outputs (AGENTS.md, scaffold-pipeline.md).
+- **Lifecycle hooks**: `initialize()` → `generateStepWrapper()` (per step) → `finalize()` (once).
 
 ### MQ2: Claude Code Adapter Transformation Pipeline
 
@@ -1306,7 +1306,7 @@ When `platforms: [claude-code, codex]`, both adapters run with **complete indepe
 
 Extension prompts (`ext:` prefix in manifest) are prompts with no base equivalent — they exist only within a specific methodology. At the adapter stage, extensions are treated **identically** to base and override prompts:
 
-- The adapter receives an `AdapterPromptInput` regardless of source layer. The `sourceLayer` field on `ResolvedPrompt` may be `ext`, but the adapter does not branch on this.
+- The adapter receives an `AdapterStepInput` regardless of source layer. The `sourceLayer` field on `ResolvedPrompt` may be `ext`, but the adapter does not branch on this.
 - Frontmatter generation uses the same fields (`description`, `argument-hint`, etc.).
 - Tool-name mapping applies to extensions just as it does to base prompts.
 - Capability checking applies to extensions.
@@ -1415,7 +1415,7 @@ Extension prompts (`ext:` prefix in manifest) are prompts with no base equivalen
 
 **Injected content** (truncated): `"## What to Produce\n\nCreate docs/tech-stack.md...\n\n## Process\n\n1. Ask the user about preferences..."`
 
-**AdapterPromptInput.dependents**: `["claude-code-permissions", "coding-standards"]`
+**AdapterStepInput.dependents**: `["claude-code-permissions", "coding-standards"]`
 
 **Output file** (`commands/tech-stack.md`):
 ```markdown

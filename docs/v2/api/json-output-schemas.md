@@ -1028,50 +1028,38 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
 
 ```json
 {
-  "valid": false,
-  "checks": [
+  "scopes_checked": ["config", "state", "manifests", "frontmatter", "decisions", "artifacts"],
+  "total_findings": 3,
+  "findings_by_severity": { "error": 1, "warning": 2 },
+  "findings": [
     {
-      "category": "config",
-      "name": "Config schema validation",
-      "status": "pass",
-      "message": null,
-      "details": {}
-    },
-    {
-      "category": "manifest",
-      "name": "Methodology manifest — dependency cycle check",
-      "status": "pass",
-      "message": null,
-      "details": {}
-    },
-    {
-      "category": "artifacts",
-      "name": "Artifact schema — docs/plan.md",
-      "status": "fail",
-      "message": "Artifact 'docs/plan.md' is missing required section 'Acceptance Criteria'.",
-      "details": {
-        "file": "docs/plan.md",
-        "missing_sections": ["Acceptance Criteria"],
-        "error_code": "VALIDATE_ARTIFACT_MISSING_SECTION"
-      }
-    },
-    {
-      "category": "state",
-      "name": "Orphaned state entries",
-      "status": "warn",
-      "message": "2 state entries reference steps not in the current resolved pipeline.",
-      "details": {
-        "orphaned_slugs": ["old-setup", "deprecated-review"]
-      }
+      "scope": "config",
+      "code": "CONFIG_UNKNOWN_FIELD",
+      "severity": "warning",
+      "message": "Unknown field 'foo' in config.yml.",
+      "file": ".scaffold/config.yml",
+      "line": 5
     }
   ],
-  "summary": {
-    "passed": 18,
-    "failed": 1,
-    "warnings": 1
-  }
+  "fixes_applied": 0
 }
 ```
+
+**Field descriptions**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `scopes_checked` | `string[]` | Validation scopes that were evaluated (e.g., `"config"`, `"state"`, `"manifests"`, `"frontmatter"`, `"decisions"`, `"artifacts"`). |
+| `total_findings` | `integer` | Total number of findings across all scopes. |
+| `findings_by_severity` | `object` | Breakdown of findings by severity level. Keys are severity strings (`"error"`, `"warning"`), values are counts. |
+| `findings` | `Finding[]` | Array of individual finding objects. |
+| `findings[].scope` | `string` | Which validation scope produced this finding. |
+| `findings[].code` | `string` | Machine-readable error code (e.g., `CONFIG_UNKNOWN_FIELD`, `VALIDATE_ARTIFACT_MISSING_SECTION`). |
+| `findings[].severity` | `string` | `"error"` or `"warning"`. Errors cause non-zero exit; warnings do not. |
+| `findings[].message` | `string` | Human-readable description of the issue. |
+| `findings[].file` | `string` | Relative path to the file where the issue was found. |
+| `findings[].line` | `integer` | Line number within the file, if applicable. |
+| `fixes_applied` | `integer` | Number of auto-fixes applied when `--fix` was passed. `0` when `--fix` was not used or no fixes were needed. |
 
 **JSON Schema**:
 
@@ -1080,74 +1068,45 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
   "$id": "https://scaffold-cli.dev/schemas/data/validate.json",
   "title": "ValidateData",
   "type": "object",
-  "required": ["valid", "checks", "summary"],
+  "required": ["scopes_checked", "total_findings", "findings_by_severity", "findings", "fixes_applied"],
   "additionalProperties": true,
   "properties": {
-    "valid": {
-      "type": "boolean",
-      "description": "True if no checks have status 'fail'. Warnings do not affect validity."
-    },
-    "checks": {
-      "type": "array",
-      "description": "All validation checks run, in execution order.",
-      "items": {
-        "type": "object",
-        "required": ["category", "name", "status"],
-        "additionalProperties": true,
-        "properties": {
-          "category": {
-            "type": "string",
-            "enum": ["config", "manifest", "steps", "artifacts", "state", "decisions"],
-            "description": "Which validation phase produced this check."
-          },
-          "name": {
-            "type": "string",
-            "description": "Human-readable name of the check."
-          },
-          "status": {
-            "type": "string",
-            "enum": ["pass", "fail", "warn"],
-            "description": "'pass' = no issue. 'fail' = error that makes the project invalid. 'warn' = advisory issue."
-          },
-          "message": {
-            "oneOf": [{ "type": "string" }, { "type": "null" }],
-            "description": "Human-readable description of the issue. Null on pass."
-          },
-          "details": {
-            "type": "object",
-            "additionalProperties": true,
-            "description": "Structured details about the check (file path, error code, missing fields, etc.)."
-          }
-        }
-      }
-    },
-    "summary": {
-      "type": "object",
-      "required": ["passed", "failed", "warnings"],
-      "additionalProperties": true,
-      "properties": {
-        "passed": { "type": "integer", "minimum": 0 },
-        "failed": { "type": "integer", "minimum": 0 },
-        "warnings": { "type": "integer", "minimum": 0 }
-      }
-    },
-    "scopes_active": {
+    "scopes_checked": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Validation scopes that were active for this run (e.g., 'config', 'manifest', 'steps', 'artifacts', 'state', 'decisions')."
+      "description": "Validation scopes that were evaluated."
     },
-    "fixes_applied": {
+    "total_findings": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of findings across all scopes."
+    },
+    "findings_by_severity": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 },
+      "description": "Breakdown of findings by severity level. Keys are severity strings, values are counts."
+    },
+    "findings": {
       "type": "array",
-      "description": "Auto-fixes applied when --fix was passed. Empty when --fix was not used or no fixes were needed.",
+      "description": "Individual finding objects.",
       "items": {
         "type": "object",
-        "required": ["description", "detail"],
+        "required": ["scope", "code", "severity", "message", "file"],
         "additionalProperties": true,
         "properties": {
-          "description": { "type": "string", "description": "Short summary of the fix applied." },
-          "detail": { "type": "string", "description": "Detailed explanation of what was changed." }
+          "scope": { "type": "string", "description": "Which validation scope produced this finding." },
+          "code": { "type": "string", "description": "Machine-readable error code." },
+          "severity": { "type": "string", "enum": ["error", "warning"], "description": "Error or warning." },
+          "message": { "type": "string", "description": "Human-readable description of the issue." },
+          "file": { "type": "string", "description": "Relative path to the file where the issue was found." },
+          "line": { "type": "integer", "minimum": 1, "description": "Line number within the file, if applicable." }
         }
       }
+    },
+    "fixes_applied": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of auto-fixes applied when --fix was passed."
     }
   }
 }
@@ -1411,15 +1370,15 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
 **Requires project**: No
 **Requires state**: No
 
-**Example `data`** — update applied:
+**Example `data`** — update available:
 
 ```json
 {
-  "current_version": "2.1.0",
-  "latest_version": "2.2.0",
-  "updated": true,
-  "changelog": "## v2.2.0\n- Add scaffold preview command\n- Fix crash recovery in --auto mode",
-  "rebuild_result": null
+  "current_version": "2.0.0",
+  "latest_version": "2.1.0",
+  "update_available": true,
+  "channel": "npm",
+  "updated": false
 }
 ```
 
@@ -1427,13 +1386,23 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
 
 ```json
 {
-  "current_version": "2.2.0",
-  "latest_version": "2.2.0",
-  "updated": false,
-  "changelog": null,
-  "rebuild_result": null
+  "current_version": "2.1.0",
+  "latest_version": "2.1.0",
+  "update_available": false,
+  "channel": "npm",
+  "updated": false
 }
 ```
+
+**Field descriptions**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `current_version` | `string` | Currently installed version. |
+| `latest_version` | `string` | Latest published version available in the channel. |
+| `update_available` | `boolean` | `true` if `latest_version` is newer than `current_version`. |
+| `channel` | `string` | Installation channel detected: `"npm"`, `"homebrew"`, or `"source"`. |
+| `updated` | `boolean` | Whether the CLI was actually updated to the new version during this invocation. `false` when `--check-only` is used. |
 
 **JSON Schema**:
 
@@ -1442,23 +1411,14 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
   "$id": "https://scaffold-cli.dev/schemas/data/update.json",
   "title": "UpdateData",
   "type": "object",
-  "required": ["current_version", "latest_version", "updated"],
+  "required": ["current_version", "latest_version", "update_available", "channel", "updated"],
   "additionalProperties": true,
   "properties": {
-    "current_version": { "type": "string", "description": "Version before the update." },
-    "latest_version": { "type": "string", "description": "Latest published version." },
-    "updated": { "type": "boolean", "description": "Whether the CLI was updated to a new version." },
-    "changelog": {
-      "oneOf": [{ "type": "string" }, { "type": "null" }],
-      "description": "Release notes for the installed version. Null if not updated or unavailable."
-    },
-    "rebuild_result": {
-      "oneOf": [
-        { "$ref": "build.json" },
-        { "type": "null" }
-      ],
-      "description": "If a project root was detected after update and a rebuild was triggered, the build result. Null if no rebuild was performed."
-    }
+    "current_version": { "type": "string", "description": "Currently installed version." },
+    "latest_version": { "type": "string", "description": "Latest published version available in the channel." },
+    "update_available": { "type": "boolean", "description": "True if latest_version is newer than current_version." },
+    "channel": { "type": "string", "enum": ["npm", "homebrew", "source"], "description": "Installation channel detected." },
+    "updated": { "type": "boolean", "description": "Whether the CLI was actually updated during this invocation." }
   }
 }
 ```
