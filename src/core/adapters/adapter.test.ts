@@ -193,10 +193,14 @@ describe('createAdapter', () => {
     }
   })
 
-  it('also throws for known platform IDs since adapters are not yet implemented', () => {
-    // T-040/T-041/T-042 will register real adapters; for now all throw
+  it('returns a PlatformAdapter for each known platform ID', () => {
+    // T-040/T-041/T-042 implemented — known platforms now return real adapters
     for (const pid of KNOWN_PLATFORMS) {
-      expect(() => createAdapter(pid)).toThrow('Unknown platform')
+      const adapter = createAdapter(pid)
+      expect(adapter.platformId).toBe(pid)
+      expect(typeof adapter.initialize).toBe('function')
+      expect(typeof adapter.generateStepWrapper).toBe('function')
+      expect(typeof adapter.finalize).toBe('function')
     }
   })
 })

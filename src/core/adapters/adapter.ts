@@ -1,4 +1,7 @@
 import type { ScaffoldError } from '../../types/index.js'
+import { ClaudeCodeAdapter } from './claude-code.js'
+import { CodexAdapter } from './codex.js'
+import { UniversalAdapter } from './universal.js'
 
 /** An output file to write during the build phase. */
 export interface OutputFile {
@@ -67,13 +70,19 @@ export interface PlatformAdapter {
  * Throws UNKNOWN_PLATFORM error if platformId is not registered.
  */
 export function createAdapter(platformId: string): PlatformAdapter {
-  // Dynamic imports are NOT used — adapters are registered at build time.
-  // This will be fully implemented once T-040, T-041, T-042 are done.
-  // For now: throw for all platforms (none registered yet).
-  throw Object.assign(new Error(`Unknown platform: ${platformId}`), {
-    code: 'UNKNOWN_PLATFORM',
-    exitCode: 1,
-  })
+  switch (platformId) {
+  case 'claude-code':
+    return new ClaudeCodeAdapter()
+  case 'codex':
+    return new CodexAdapter()
+  case 'universal':
+    return new UniversalAdapter()
+  default:
+    throw Object.assign(new Error(`Unknown platform: ${platformId}`), {
+      code: 'UNKNOWN_PLATFORM',
+      exitCode: 1,
+    })
+  }
 }
 
 /** Register of known platform IDs */
