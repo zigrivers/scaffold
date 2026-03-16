@@ -1,0 +1,10 @@
+name: Deep
+description: Comprehensive enterprise-grade scaffolding with all steps enabled
+default_depth: 5
+steps:
+  create-prd:
+    enabled: true
+  review-prd:
+    enabled: true
+  user-stories:
+    enabled: true

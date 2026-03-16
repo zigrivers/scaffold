@@ -1,0 +1,11 @@
+name: Custom
+description: Configurable scaffolding with all steps enabled at medium depth
+default_depth: 3
+steps:
+  create-prd:
+    enabled: true
+  review-prd:
+    enabled: true
+    conditional: if-needed
+  user-stories:
+    enabled: true

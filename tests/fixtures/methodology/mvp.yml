@@ -1,0 +1,8 @@
+name: MVP
+description: Fast prototype scaffolding with minimal steps
+default_depth: 1
+steps:
+  create-prd:
+    enabled: true
+  user-stories:
+    enabled: true
