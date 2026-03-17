@@ -33,6 +33,7 @@ import { createOutputContext } from '../../cli/output/context.js'
 import { resolveOutputMode } from '../../cli/middleware/output-mode.js'
 import { loadConfig } from '../../config/loader.js'
 import { runCli } from '../../cli/index.js'
+import { execSync } from 'node:child_process'
 
 const PROJECT_ROOT = '/fake/project'
 
@@ -161,5 +162,73 @@ describe('scaffold knowledge list', () => {
         expect.objectContaining({ name: 'api-design', source: 'global' }),
       ])
     )
+  })
+})
+
+describe('scaffold knowledge reset', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    vi.spyOn(process, 'exit').mockImplementation((() => {}) as any)
+    vi.spyOn(fs, 'unlinkSync').mockImplementation(() => undefined)
+  })
+
+  it('prints "nothing to reset" and exits 0 when no local override exists', async () => {
+    const output = setupDefaults()
+    vi.mocked(buildIndex).mockReturnValueOnce(new Map())  // no local override
+
+    await runCli(['knowledge', 'reset', 'api-design'])
+    expect(vi.mocked(output.info)).toHaveBeenCalledWith(expect.stringContaining('Nothing to reset'))
+  })
+
+  it('deletes the local override file when no uncommitted changes', async () => {
+    const output = setupDefaults()
+    const localPath = '/fake/project/.scaffold/knowledge/api-design.md'
+    vi.mocked(buildIndex).mockReturnValueOnce(new Map([['api-design', localPath]]))
+    vi.mocked(execSync).mockReturnValue(Buffer.from(''))  // empty = no changes
+
+    await runCli(['knowledge', 'reset', 'api-design'])
+    expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(localPath)
+    expect(vi.mocked(output.success)).toHaveBeenCalled()
+  })
+
+  it('exits 1 with warning when uncommitted changes and --auto not set', async () => {
+    setupDefaults()
+    const localPath = '/fake/project/.scaffold/knowledge/api-design.md'
+    vi.mocked(buildIndex).mockReturnValueOnce(new Map([['api-design', localPath]]))
+    vi.mocked(execSync).mockImplementation((cmd: string) => {
+      if (String(cmd).includes('status')) return Buffer.from(' M .scaffold/knowledge/api-design.md')
+      return Buffer.from('')
+    })
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any)
+
+    await runCli(['knowledge', 'reset', 'api-design'])
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(vi.mocked(fs.unlinkSync)).not.toHaveBeenCalled()
+  })
+
+  it('deletes with uncommitted changes when --auto is set', async () => {
+    setupDefaults()
+    const localPath = '/fake/project/.scaffold/knowledge/api-design.md'
+    vi.mocked(buildIndex).mockReturnValueOnce(new Map([['api-design', localPath]]))
+    vi.mocked(execSync).mockImplementation((cmd: string) => {
+      if (String(cmd).includes('status')) return Buffer.from(' M .scaffold/knowledge/api-design.md')
+      return Buffer.from('')
+    })
+
+    await runCli(['knowledge', 'reset', 'api-design', '--auto'])
+    expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(localPath)
+  })
+
+  it('skips git check and deletes when not a git repo', async () => {
+    setupDefaults()
+    const localPath = '/fake/project/.scaffold/knowledge/api-design.md'
+    vi.mocked(buildIndex).mockReturnValueOnce(new Map([['api-design', localPath]]))
+    vi.mocked(execSync).mockImplementation((cmd: string) => {
+      if (String(cmd).includes('rev-parse')) throw new Error('not a git repo')
+      return Buffer.from('')
+    })
+
+    await runCli(['knowledge', 'reset', 'api-design'])
+    expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(localPath)
   })
 })
