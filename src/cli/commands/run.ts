@@ -6,7 +6,7 @@ import { acquireLock, releaseLock } from '../../state/lock-manager.js'
 import { analyzeCrash } from '../../state/completion.js'
 import { AssemblyEngine } from '../../core/assembly/engine.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
-import { buildIndex, loadEntries } from '../../core/assembly/knowledge-loader.js'
+import { buildIndexWithOverrides, loadEntries } from '../../core/assembly/knowledge-loader.js'
 import { loadInstructions } from '../../core/assembly/instruction-loader.js'
 import { resolveDepth } from '../../core/assembly/depth-resolver.js'
 import { detectUpdateMode } from '../../core/assembly/update-mode.js'
@@ -307,8 +307,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       // -----------------------------------------------------------------------
       const { instructions } = loadInstructions(projectRoot, step, argv.instructions)
 
-      const knowledgeDir = path.join(projectRoot, 'knowledge')
-      const kbIndex = buildIndex(knowledgeDir)
+      const kbIndex = buildIndexWithOverrides(projectRoot, path.join(projectRoot, 'knowledge'))
       const { entries: knowledgeEntries, warnings: kbWarnings } = loadEntries(
         kbIndex,
         metaPrompt.frontmatter.knowledgeBase ?? [],
