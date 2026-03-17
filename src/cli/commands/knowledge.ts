@@ -102,8 +102,7 @@ const knowledgeCommand: CommandModule<Record<string, unknown>, Record<string, un
   builder: (yargs) => {
     return yargs
       .command(listSubcommand)
-      .demandCommand(1, 'Specify a subcommand: update, list, show, reset')
-      .strict() as Argv<Record<string, unknown>>
+      .demandCommand(1, 'Specify a subcommand: update, list, show, reset') as Argv<Record<string, unknown>>
   },
   handler: () => {
     // Handled by subcommands
