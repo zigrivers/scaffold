@@ -143,36 +143,37 @@ export function buildIndexWithOverrides(
   const localDir = path.join(projectRoot, '.scaffold', 'knowledge')
   const localIndex = new Map<string, string>()
 
-  if (fileExists(localDir)) {
-    function walkLocal(dir: string): void {
-      let entries: fs.Dirent[]
-      try {
-        entries = fs.readdirSync(dir, { withFileTypes: true })
-      } catch {
-        return
-      }
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name)
-        if (entry.isDirectory()) {
-          walkLocal(fullPath)
-        } else if (entry.isFile() && entry.name.endsWith('.md')) {
-          try {
-            const content = fs.readFileSync(fullPath, 'utf8')
-            const fm = extractKBFrontmatter(content)
-            if (fm?.name) {
-              if (localIndex.has(fm.name)) {
-                process.stderr.write(
-                  `warn: duplicate knowledge override name "${fm.name}" in ${localDir} — using last found\n`,
-                )
-              }
-              localIndex.set(fm.name, fullPath)
+  function walkLocal(dir: string): void {
+    let entries: fs.Dirent[]
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        walkLocal(fullPath)
+      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        try {
+          const content = fs.readFileSync(fullPath, 'utf8')
+          const fm = extractKBFrontmatter(content)
+          if (fm?.name) {
+            if (localIndex.has(fm.name)) {
+              process.stderr.write(
+                `warn: duplicate knowledge override name "${fm.name}" in ${localDir} — using last found\n`,
+              )
             }
-          } catch {
-            // skip invalid files
+            localIndex.set(fm.name, fullPath)
           }
+        } catch {
+          // skip invalid files
         }
       }
     }
+  }
+
+  if (fileExists(localDir)) {
     walkLocal(localDir)
   }
 
