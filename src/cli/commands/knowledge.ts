@@ -333,6 +333,7 @@ const updateSubcommand: CommandModule<Record<string, unknown>, UpdateArgs> = {
     // Assemble prompts for each entry
     const template = loadTemplate()
     const assembler = new KnowledgeUpdateAssembler(template)
+    const localIndex = buildIndex(localDir)
 
     for (const entryName of entryNames) {
       const globalFilePath = globalIndex.get(entryName)
@@ -358,7 +359,7 @@ const updateSubcommand: CommandModule<Record<string, unknown>, UpdateArgs> = {
 
       // Check for local override
       let localOverrideContent: string | null = null
-      const localEntryPath = buildIndex(localDir).get(entryName)
+      const localEntryPath = localIndex.get(entryName)
       if (localEntryPath && fs.existsSync(localEntryPath)) {
         try {
           localOverrideContent = fs.readFileSync(localEntryPath, 'utf8')
@@ -405,7 +406,7 @@ const updateSubcommand: CommandModule<Record<string, unknown>, UpdateArgs> = {
 }
 
 // -----------------------------------------------------------------------
-// Top-level knowledge command (other subcommands added in Tasks 4-6)
+// Top-level knowledge command
 // -----------------------------------------------------------------------
 
 const knowledgeCommand: CommandModule<Record<string, unknown>, Record<string, unknown>> = {
