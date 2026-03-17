@@ -87,6 +87,64 @@ const listSubcommand: CommandModule<Record<string, unknown>, ListArgs> = {
 }
 
 // -----------------------------------------------------------------------
+// show subcommand
+// -----------------------------------------------------------------------
+
+interface ShowArgs {
+  name: string
+  root?: string
+  format?: string
+  auto?: boolean
+  verbose?: boolean
+}
+
+const showSubcommand: CommandModule<Record<string, unknown>, ShowArgs> = {
+  command: 'show <name>',
+  describe: 'Print the effective content of a knowledge entry',
+  builder: (yargs) =>
+    yargs.positional('name', { type: 'string', demandOption: true }) as Argv<ShowArgs>,
+  handler: async (argv) => {
+    const projectRoot = getProjectRoot(argv)
+    if (!projectRoot) {
+      process.stderr.write('✗ error [PROJECT_NOT_INITIALIZED]: No .scaffold/ directory found\n')
+      process.exit(1)
+      return
+    }
+
+    const outputMode = resolveOutputMode(argv)
+    const output = createOutputContext(outputMode)
+
+    const globalDir = path.join(projectRoot, 'knowledge')
+    const localDir = path.join(projectRoot, '.scaffold', 'knowledge')
+    const globalIndex = buildIndex(globalDir)
+    const localIndex = buildIndex(localDir)
+
+    const name = argv.name
+    const isLocal = localIndex.has(name)
+    const filePath = isLocal ? localIndex.get(name) : globalIndex.get(name)
+
+    if (!filePath) {
+      output.error({ code: 'ENTRY_NOT_FOUND', message: `Knowledge entry '${name}' not found.`, exitCode: 1 })
+      process.exit(1)
+      return
+    }
+
+    try {
+      const content = fs.readFileSync(filePath, 'utf8')
+      const sourceLabel = isLocal ? 'local override' : 'global'
+      output.info(`# Source: ${sourceLabel} (${filePath})\n`)
+      output.info(content)
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
+      output.error({ code: 'READ_ERROR', message: `Failed to read entry: ${detail}`, exitCode: 1 })
+      process.exit(1)
+      return
+    }
+    process.exit(0)
+  },
+}
+
+// -----------------------------------------------------------------------
 // Top-level knowledge command (other subcommands added in Tasks 4-6)
 // -----------------------------------------------------------------------
 
@@ -96,6 +154,7 @@ const knowledgeCommand: CommandModule<Record<string, unknown>, Record<string, un
   builder: (yargs) => {
     return yargs
       .command(listSubcommand)
+      .command(showSubcommand)
       .demandCommand(1, 'Specify a subcommand: update, list, show, reset') as Argv<Record<string, unknown>>
   },
   handler: () => {

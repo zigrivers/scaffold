@@ -59,6 +59,59 @@ function setupDefaults(output = makeOutputMock()) {
   return output
 }
 
+describe('scaffold knowledge show', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    vi.spyOn(process, 'exit').mockImplementation((() => {}) as any)
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+  })
+
+  it('prints local override content with source header when override exists', async () => {
+    const output = setupDefaults()
+    vi.mocked(buildIndex)
+      .mockReturnValueOnce(new Map([['api-design', '/global/api-design.md']]))
+      .mockReturnValueOnce(new Map([['api-design', '/local/api-design.md']]))
+    vi.spyOn(fs, 'readFileSync').mockReturnValue('---\nname: api-design\ndescription: Local\ntopics: []\n---\n# Local Body' as any)
+
+    await runCli(['knowledge', 'show', 'api-design'])
+
+    const allOutput = [
+      ...vi.mocked(output.info).mock.calls.flat(),
+      ...vi.mocked(process.stdout.write).mock.calls.flat(),
+    ].join('\n')
+    expect(allOutput).toContain('local override')
+    expect(allOutput).toContain('# Local Body')
+  })
+
+  it('prints global content with source header when no override', async () => {
+    const output = setupDefaults()
+    vi.mocked(buildIndex)
+      .mockReturnValueOnce(new Map([['api-design', '/global/api-design.md']]))
+      .mockReturnValueOnce(new Map())  // no local
+    vi.spyOn(fs, 'readFileSync').mockReturnValue('---\nname: api-design\ndescription: Global\ntopics: []\n---\n# Global Body' as any)
+
+    await runCli(['knowledge', 'show', 'api-design'])
+
+    const allOutput = [
+      ...vi.mocked(output.info).mock.calls.flat(),
+      ...vi.mocked(process.stdout.write).mock.calls.flat(),
+    ].join('\n')
+    expect(allOutput).toContain('global')
+    expect(allOutput).toContain('# Global Body')
+  })
+
+  it('exits 1 when entry not found in either location', async () => {
+    setupDefaults()
+    vi.mocked(buildIndex)
+      .mockReturnValueOnce(new Map())
+      .mockReturnValueOnce(new Map())
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any)
+
+    await runCli(['knowledge', 'show', 'nonexistent'])
+    expect(exitSpy).toHaveBeenCalledWith(1)
+  })
+})
+
 describe('scaffold knowledge list', () => {
   beforeEach(() => {
     vi.resetAllMocks()
