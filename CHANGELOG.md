@@ -2,6 +2,56 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.0.0] — 2026-03-16
+
+### Breaking Changes
+
+This is a complete rewrite of Scaffold. The v1 hard-coded Bash prompt pipeline has been replaced with a composable TypeScript CLI and meta-prompt architecture.
+
+**Migration:** See `docs/v2/migration-guide.md` for step-by-step upgrade instructions.
+
+### Added
+
+- **TypeScript CLI** (`dist/index.js`) — fully typed, ESM, Node 18+ with 15 commands
+- **Meta-prompt architecture** — 30-80 line intent declaration `.md` files in `pipeline/` assembled at runtime into structured 7-section prompts
+- **Assembly engine** (`scaffold run <step>`) — loads meta-prompt, knowledge base, context, instructions, depth; constructs and outputs the full prompt for AI execution
+- **Dependency graph** — DAG with topological sort (Kahn's algorithm), cycle detection, and eligibility computation
+- **State manager** — atomic writes via `<file>.tmp` → `fs.renameSync()`, crash recovery, `in_progress` tracking
+- **Advisory lock manager** — `lock.json` with `wx` flag and PID liveness detection
+- **Decision logger** — append-only `decisions.jsonl` with `D-NNN` sequential IDs
+- **Three methodology presets** — `deep` (depth 5, 36 steps), `mvp` (depth 1, 7 steps), `custom` (depth 3, configurable)
+- **Depth scale 1-5** — 4-level precedence: CLI flag > step-override > custom-default > preset-default
+- **Platform adapters** — Claude Code (`commands/*.md`), Codex (`AGENTS.md`), Universal (`prompts/README.md`)
+- **Project detector** — greenfield / brownfield / v1-migration detection via file system signals
+- **CLAUDE.md manager** — ownership markers, 2000-token budget, section management
+- **Init wizard** (`scaffold init`) — interactive or `--auto` mode; writes config, state, decisions log
+- **Adopt command** (`scaffold adopt`) — scans existing artifacts to bootstrap state for brownfield projects
+- **Dashboard** (`scaffold dashboard`) — self-contained HTML with progress bars, status badges, light/dark theme
+- **Validate command** (`scaffold validate`) — checks meta-prompts, config, state, and dependency graph
+- **15 CLI commands total**: `init`, `run`, `build`, `adopt`, `skip`, `reset`, `status`, `next`, `validate`, `list`, `info`, `version`, `update`, `dashboard`, `decisions`
+- **OutputContext strategy pattern** — `interactive` (ANSI, spinner), `json` (envelope), `auto` (silent defaults)
+- **E2E test suite** — 39 tests covering real temp-directory workflows
+- **Performance benchmarks** — assembly p95 < 500ms, state I/O p95 < 100ms, graph build p95 < 2s
+- **npm packaging** — `@scaffold-cli/scaffold`, `files` array, `publishConfig`
+- **Migration guide** — `docs/v2/migration-guide.md` with v1→v2 concept mapping and step-by-step instructions
+
+### Changed
+
+- Plugin description updated to reflect meta-prompt architecture
+- `pipeline/` now contains composable `.md` meta-prompts instead of hard-coded Bash prompt text
+- `methodology/` contains YAML preset files consumed at runtime
+
+### Completed Tasks
+
+- [BD-scaffold-v2] Complete v2 spec suite — domains, ADRs, schemas, API, UX, and implementation tasks
+- [BD-3hj] fix(v2): resolve scope creep check findings
+- [BD-11m] fix(v2): resolve dependency graph validation findings
+- [BD-0nx] fix(v2): resolve implementability dry-run audit findings
+- [BD-zcp] fix(v2): resolve decision completeness audit findings
+- [BD-eg0] fix(v2): resolve traceability matrix audit findings
+- [BD-p2m] fix(v2): resolve cross-phase consistency audit findings
+- [BD-045] fix(v2): post-rename documentation review fixes
+
 ## [1.18.0] — 2026-03-08
 
 ### Added
