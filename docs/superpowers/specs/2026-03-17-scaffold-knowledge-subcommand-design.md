@@ -22,7 +22,7 @@ Project-local overrides give teams a way to enrich knowledge entries for their s
 
 ## Command Surface
 
-Four subcommands under `scaffold knowledge`:
+Four subcommands registered under the `scaffold knowledge` namespace via a single yargs CommandModule (`src/cli/commands/knowledge.ts`) with nested subcommands. This is a new namespace — it does not conflict with the existing top-level `scaffold reset` command.
 
 | Subcommand | Description |
 |---|---|
@@ -33,7 +33,7 @@ Four subcommands under `scaffold knowledge`:
 
 ### Claude Code slash command
 
-`commands/knowledge.md` registers `/scaffold:knowledge` as a slash command with full argument passthrough:
+`commands/knowledge.md` registers `/scaffold:knowledge` as a slash command with full argument passthrough, following the same frontmatter schema and "After This Step" structure as other `commands/*.md` files:
 
 ```
 /scaffold:knowledge update api-design research GraphQL federation patterns
@@ -49,33 +49,41 @@ Four subcommands under `scaffold knowledge`:
 
 ## Target Resolution
 
+Target resolution logic lives in the `knowledge update` subcommand handler in `knowledge.ts`. It calls `discoverMetaPrompts(path.join(projectRoot, 'pipeline'))` (consistent with `run.ts`) to build the step name index.
+
 When the user provides `<target>`, the command auto-detects the type:
 
 1. **Entry name** (e.g. `api-design`) — targets that entry directly. Takes precedence when ambiguous.
 2. **Step name** (e.g. `create-prd`) — looks up the meta-prompt's `knowledge-base` frontmatter field and resolves to all referenced entry names. Generates one prompt per entry.
 3. **Ambiguous** — matches both a step name and an entry name: prefers entry name, prints a note. Pass `--step` to force step resolution.
-4. **Not found** — lists close matches (fuzzy against both entry names and step names) and exits with a clear error.
+4. **Not found** — lists close matches (fuzzy against both entry names and step names) and exits with code 1.
 
 When a step resolves to multiple entries, the command generates one prompt per entry sequentially. Pass `--entry <name>` to target a single entry from a step's set.
 
 **Step resolution edge cases:**
-- Step has no `knowledge-base` entries in frontmatter → exits with: `"Step '<name>' has no knowledge-base entries. Nothing to update."`
-- `--entry <name>` passed but `<name>` is not in the step's resolved entries → exits with error listing the step's actual entries
-- Meta-prompts are discovered from `path.join(projectRoot, 'pipeline')`, consistent with `run.ts`
+
+| Condition | Behavior | Exit code |
+|---|---|---|
+| Step has no `knowledge-base` entries | Error: `"Step '<name>' has no knowledge-base entries. Nothing to update."` | 1 |
+| `--entry` not in step's entry set | Error listing the step's actual entries | 1 |
+| Target matches nothing | Error with fuzzy suggestions | 1 |
+| Entry not found in global knowledge dir | Error listing valid entry names | 1 |
 
 ---
 
 ## Prompt Assembly (`update` subcommand)
 
-The `update` subcommand uses a dedicated `KnowledgeUpdateAssembler` — a new lightweight assembler separate from `AssemblyEngine`. `AssemblyEngine` is designed for pipeline steps and requires `state`, `config`, `depth`, `depthProvenance`, and a `MetaPromptFile`, none of which apply to knowledge generation. `KnowledgeUpdateAssembler` is a simple template interpolator with no dependency on pipeline concepts.
+The `update` subcommand uses a dedicated `KnowledgeUpdateAssembler` (`src/core/knowledge/knowledge-update-assembler.ts`) — a lightweight template interpolator separate from `AssemblyEngine`. `AssemblyEngine` requires `state`, `config`, `depth`, `depthProvenance`, and a `MetaPromptFile` — none of which apply to knowledge generation. `KnowledgeUpdateAssembler` has no dependency on pipeline concepts.
+
+**Global knowledge dir resolution:** The global knowledge dir is `path.join(projectRoot, 'knowledge')` — the same resolution used by `run.ts` today. This is consistent with the existing codebase. Package-root resolution for the bundled `knowledge/` dir in installed deployments is a pre-existing open issue shared by `run`, `build`, `status`, and other commands; it is out of scope for this feature.
 
 **Assembly steps:**
 
-1. **Load global entry** — reads from `path.join(projectRoot, 'knowledge')` (same resolution as `run.ts`); strips frontmatter; uses body as seed context. If the entry name doesn't exist in the global dir, exits with a clear error listing valid entry names.
-2. **Detect mode** — if `.scaffold/knowledge/**/<name>.md` exists: **update mode** (refine in-place, existing content loaded). Otherwise: **create mode** (generate fresh from global seed).
-3. **Load project context** — reads `.scaffold/config.yml` (methodology setting); scans for any artifact whose path contains the entry name (e.g. `docs/api-spec.md` when updating `api-design`) using a simple filename-match heuristic. Context inclusion is best-effort — missing files are silently skipped.
-4. **Apply user instructions** — appended as a "Focus" section at the end of the assembled prompt if provided.
-5. **Deliver** — writes the assembled prompt to stdout (same as `scaffold run`). The user pastes it into a Claude Code session; Claude writes `.scaffold/knowledge/<name>.md` directly.
+1. **Load global entry** — reads from `path.join(projectRoot, 'knowledge')` via `buildIndex()`; strips frontmatter; uses body as seed context. Exits with code 1 and lists valid entry names if the entry is not found.
+2. **Detect mode** — if `.scaffold/knowledge/**/<name>.md` exists: **update mode** (load existing content). Otherwise: **create mode**.
+3. **Load project context** — reads `.scaffold/config.yml` (methodology setting); scans `docs/` in the project root for files whose filename contains the entry name as a substring (e.g. `docs/api-spec.md` when updating `api-design`). Only `.md` files in `docs/` are scanned. Context inclusion is best-effort — missing files and missing `docs/` dir are silently skipped.
+4. **Apply user instructions** — appended as a "Focus" section if provided; omitted if none.
+5. **Deliver** — writes assembled prompt to stdout. The user pastes it into a Claude Code session; Claude writes `.scaffold/knowledge/<name>.md` directly.
 
 **Prompt template structure** (`src/core/knowledge/knowledge-update-template.md`):
 
@@ -88,15 +96,15 @@ and a markdown body tailored to this project's context.
 ## Global Knowledge Entry (seed)
 <global entry body>
 
-## Existing Local Override (update mode only)
-<existing .scaffold/knowledge/<name>.md content, or "(none — create mode)">
+## Existing Local Override (update mode only — omitted in create mode)
+<existing .scaffold/knowledge/<name>.md content>
 
 ## Project Context
 Methodology: <methodology from config>
-<relevant artifact content if found>
+<relevant docs/ artifact content, if found>
 
 ## Focus
-<user instructions, or "(none provided)">
+<user instructions — omitted if none provided>
 
 ## Output Instructions
 - In create mode: seed structure from the global entry, tailor to project context and Focus
@@ -109,7 +117,7 @@ Methodology: <methodology from config>
 
 ## File Layout and Storage
 
-Local overrides live in `.scaffold/knowledge/`, mirroring the global structure:
+Local overrides live in `.scaffold/knowledge/`:
 
 ```
 .scaffold/
@@ -123,12 +131,14 @@ Local overrides live in `.scaffold/knowledge/`, mirroring the global structure:
   instructions/
 ```
 
-**Lookup precedence** in `knowledge-loader.ts`:
+**Lookup precedence** in `buildIndexWithOverrides()`:
 
-1. `.scaffold/knowledge/**/<name>.md` — project-local override (wins if present)
-2. `knowledge/**/<name>.md` — global entry (fallback)
+1. `<projectRoot>/.scaffold/knowledge/**/<name>.md` — project-local override (wins if present)
+2. `<globalKnowledgeDir>/**/<name>.md` — global entry (fallback)
 
-The knowledge loader resolves by entry name (not full path), so category subdirectory doesn't need to match between global and local. Local overrides use the same frontmatter schema as global entries.
+Resolution is by the `name` frontmatter field, not the filename or subdirectory. Local overrides do not need to mirror the global category structure. Local overrides use the same frontmatter schema (`name`, `description`, `topics`) as global entries.
+
+If two local override files declare the same `name`, `buildIndexWithOverrides()` emits a warning to stderr and uses last-write-wins (file system walk order). This is a new behavior — the current `buildIndex()` silently uses last-write-wins without warning.
 
 `.scaffold/knowledge/` is committed to git (like `state.json` and `instructions/`) so the whole team shares enriched knowledge.
 
@@ -138,10 +148,11 @@ The knowledge loader resolves by entry name (not full path), so category subdire
 
 ### `scaffold knowledge list`
 
-Prints all entries with source indicator. Respects `--format json`.
+Prints all entries with source indicator. `--format json` is supported; other subcommands do not support `--format json`.
 
-Global entries are scanned from `path.join(projectRoot, 'knowledge')`. Local overrides are scanned from `<projectRoot>/.scaffold/knowledge/`. Both use `buildIndex()`.
+Global entries scanned from `path.join(projectRoot, 'knowledge')`. Local overrides scanned from `<projectRoot>/.scaffold/knowledge/`. Both use `buildIndex()`.
 
+Text output:
 ```
 NAME                 SOURCE          DESCRIPTION
 api-design           local override  API design principles (project-customized)
@@ -149,7 +160,7 @@ prd-craft            global          How to write a great PRD
 testing-strategy     local override  Testing strategy (tailored for Jest + Postgres)
 ```
 
-JSON shape for `--format json`:
+JSON output shape:
 ```json
 [
   { "name": "api-design", "source": "local", "description": "..." },
@@ -157,34 +168,51 @@ JSON shape for `--format json`:
 ]
 ```
 
+Exit code: 0 (even if no entries found — prints empty table or `[]`).
+
 ### `scaffold knowledge show <name>`
 
-Prints the effective content — local override if present, otherwise global. Includes a header line indicating the active source. Useful for reviewing what Claude will see before running a step.
+Prints the effective content — local override if present, otherwise global. Includes a header comment indicating source. Exit code 1 if entry not found in either location.
 
 ### `scaffold knowledge reset <name>`
 
-Deletes `.scaffold/knowledge/**/<name>.md` if it exists. Prints confirmation on success, "nothing to reset" if no local override exists.
+Deletes `.scaffold/knowledge/**/<name>.md` if it exists. Uses `--yes` flag (not `--force`, which is a global flag with a different meaning) to bypass the uncommitted-changes confirmation.
 
-Requires `--force` when the local override has uncommitted git changes. Git change detection uses `child_process.execSync('git status --porcelain <file>')`. If the project is not a git repo (non-zero exit from `git rev-parse --git-dir`), the check is skipped and deletion proceeds without requiring `--force`.
+Behavior:
+- No local override found → prints "Nothing to reset for '<name>'" and exits 0
+- Local override found, no uncommitted changes → deletes and prints confirmation, exits 0
+- Local override found, uncommitted changes detected → prints warning and prompts for `--yes` to proceed; exits 1 without `--yes`
+- Project is not a git repo → skips git check, deletes without `--yes`, exits 0
+
+Git change detection: `child_process.execSync('git status --porcelain <filepath>', { stdio: 'pipe' })`. Non-zero exit from `git rev-parse --git-dir` indicates not a git repo — treat as no git check needed.
 
 ---
 
-## Assembly Engine Changes
+## Knowledge Loader Changes
 
-One change to `knowledge-loader.ts`: before falling back to the global `knowledge/` dir, check the project root's `.scaffold/knowledge/` directory for an override. If found, use it instead. No schema changes, no new file formats.
-
-The global knowledge dir is `path.join(projectRoot, 'knowledge')` — consistent with how `run.ts` resolves it today (`projectRoot` is the user's project root, detected via `findProjectRoot(process.cwd())`). No `packageRoot` concept is introduced.
+New exported function `buildIndexWithOverrides(projectRoot: string, globalKnowledgeDir: string): Map<string, string>` added to `knowledge-loader.ts`:
 
 ```typescript
-// New exported function: buildIndexWithOverrides(projectRoot, globalKnowledgeDir)
 // Lookup order:
 // 1. <projectRoot>/.scaffold/knowledge/**/<name>.md  (local override — wins if present)
-// 2. <globalKnowledgeDir>/**/<name>.md              (global fallback, same as today)
-// Duplicate names within the local override dir: emit a warning and use last-write-wins
-// (consistent with current buildIndex behavior for the global dir)
+// 2. <globalKnowledgeDir>/**/<name>.md              (global fallback)
+// Duplicate names in local override dir: emit warning to stderr, use last-write-wins
 ```
 
-Callers of `buildIndex()` in `run.ts` and `build.ts` are updated to call `buildIndexWithOverrides()` instead, passing both `projectRoot` and `knowledgeDir`. Existing behavior is preserved when no `.scaffold/knowledge/` dir exists.
+Callers of `buildIndex()` in `run.ts` are updated to call `buildIndexWithOverrides()`. `build.ts` does not call `buildIndex()` and requires no changes.
+
+Existing behavior is preserved when `.scaffold/knowledge/` does not exist.
+
+---
+
+## Exit Codes
+
+All `scaffold knowledge` subcommands use the existing codebase exit code conventions:
+
+| Code | Meaning |
+|---|---|
+| 0 | Success |
+| 1 | User error (target not found, no entries, etc.) |
 
 ---
 
@@ -197,16 +225,15 @@ Callers of `buildIndex()` in `run.ts` and `build.ts` are updated to call `buildI
 ## Implementation Scope
 
 ### New files
-- `src/cli/commands/knowledge.ts` — yargs CommandModule with four subcommands (`update`, `list`, `show`, `reset`)
+- `src/cli/commands/knowledge.ts` — yargs CommandModule with nested subcommands (`update`, `list`, `show`, `reset`)
 - `src/cli/commands/knowledge.test.ts` — unit tests for all four subcommands
 - `src/core/knowledge/knowledge-update-assembler.ts` — `KnowledgeUpdateAssembler` class
 - `src/core/knowledge/knowledge-update-template.md` — prompt template for knowledge generation
-- `commands/knowledge.md` — Claude Code slash command
+- `commands/knowledge.md` — Claude Code slash command (frontmatter + "After This Step" per CLAUDE.md conventions)
 
 ### Modified files
-- `src/core/assembly/knowledge-loader.ts` — add `buildIndexWithOverrides(projectRoot, globalKnowledgeDir)` export
+- `src/core/assembly/knowledge-loader.ts` — add `buildIndexWithOverrides()` export
 - `src/cli/commands/run.ts` — call `buildIndexWithOverrides()` instead of `buildIndex()`
-- `src/cli/commands/build.ts` — call `buildIndexWithOverrides()` instead of `buildIndex()` (if applicable)
 - `src/cli/index.ts` — register `knowledge` command
 
 ### Tests
