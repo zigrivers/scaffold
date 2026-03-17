@@ -28,7 +28,7 @@
     "scaffold": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp src/core/knowledge/knowledge-update-template.md dist/core/knowledge/knowledge-update-template.md",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",

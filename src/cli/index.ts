@@ -16,6 +16,7 @@ import versionCommand from './commands/version.js'
 import updateCommand from './commands/update.js'
 import dashboardCommand from './commands/dashboard.js'
 import decisionsCommand from './commands/decisions.js'
+import knowledgeCommand from './commands/knowledge.js'
 
 export async function runCli(argv: string[]): Promise<void> {
   await yargs(argv)
@@ -36,6 +37,7 @@ export async function runCli(argv: string[]): Promise<void> {
     .command(updateCommand)
     .command(dashboardCommand)
     .command(decisionsCommand)
+    .command(knowledgeCommand)
     .options({
       format: {
         type: 'string',

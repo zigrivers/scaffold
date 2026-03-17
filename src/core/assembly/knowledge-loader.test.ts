@@ -2,8 +2,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import { describe, it, expect, afterEach } from 'vitest'
-import { buildIndex, loadEntries } from './knowledge-loader.js'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
+import { buildIndex, buildIndexWithOverrides, loadEntries } from './knowledge-loader.js'
 
 const tmpDirs: string[] = []
 
@@ -107,6 +107,69 @@ describe('buildIndex', () => {
 
     expect(index.size).toBe(1)
     expect(index.has('prd-craft')).toBe(true)
+  })
+})
+
+describe('buildIndexWithOverrides', () => {
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffold-kb-test-'))
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true })
+  })
+
+  function writeEntry(dir: string, subPath: string, name: string, description = 'desc') {
+    const fullDir = path.join(dir, path.dirname(subPath))
+    fs.mkdirSync(fullDir, { recursive: true })
+    fs.writeFileSync(path.join(dir, subPath), `---\nname: ${name}\ndescription: ${description}\ntopics: []\n---\n# Body`)
+  }
+
+  it('returns global entry when no local override exists', () => {
+    const globalDir = path.join(tmpDir, 'knowledge')
+    writeEntry(globalDir, 'core/api-design.md', 'api-design', 'Global API design')
+    const index = buildIndexWithOverrides(tmpDir, globalDir)
+    expect(index.has('api-design')).toBe(true)
+    expect(index.get('api-design')).toContain('knowledge')
+    expect(index.get('api-design')).toContain('api-design.md')
+  })
+
+  it('local override wins over global entry', () => {
+    const globalDir = path.join(tmpDir, 'knowledge')
+    writeEntry(globalDir, 'core/api-design.md', 'api-design', 'Global')
+    const localDir = path.join(tmpDir, '.scaffold', 'knowledge')
+    writeEntry(localDir, 'api-design.md', 'api-design', 'Local override')
+    const index = buildIndexWithOverrides(tmpDir, globalDir)
+    expect(index.get('api-design')).toContain('.scaffold')
+  })
+
+  it('returns empty map when both dirs do not exist', () => {
+    const index = buildIndexWithOverrides(tmpDir, path.join(tmpDir, 'missing'))
+    expect(index.size).toBe(0)
+  })
+
+  it('includes global entries not overridden locally', () => {
+    const globalDir = path.join(tmpDir, 'knowledge')
+    writeEntry(globalDir, 'core/api-design.md', 'api-design')
+    writeEntry(globalDir, 'core/testing.md', 'testing-strategy')
+    const localDir = path.join(tmpDir, '.scaffold', 'knowledge')
+    writeEntry(localDir, 'api-design.md', 'api-design')
+    const index = buildIndexWithOverrides(tmpDir, globalDir)
+    expect(index.has('testing-strategy')).toBe(true)
+    expect(index.get('testing-strategy')).toContain('knowledge')
+  })
+
+  it('emits warning to stderr for duplicate names in local override dir', () => {
+    const globalDir = path.join(tmpDir, 'knowledge')
+    const localDir = path.join(tmpDir, '.scaffold', 'knowledge')
+    writeEntry(localDir, 'a/api-design.md', 'api-design', 'First')
+    writeEntry(localDir, 'b/api-design.md', 'api-design', 'Second')
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    buildIndexWithOverrides(tmpDir, globalDir)
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining('api-design'))
+    stderrSpy.mockRestore()
   })
 })
 
