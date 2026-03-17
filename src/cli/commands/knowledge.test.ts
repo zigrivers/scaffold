@@ -26,6 +26,12 @@ vi.mock('node:child_process', () => ({
 vi.mock('../../core/assembly/meta-prompt-loader.js', () => ({
   discoverMetaPrompts: vi.fn(),
 }))
+vi.mock('../../core/knowledge/knowledge-update-assembler.js', () => ({
+  KnowledgeUpdateAssembler: vi.fn().mockImplementation(() => ({
+    assemble: vi.fn().mockReturnValue('## Task\nUpdate knowledge for {{name}}'),
+  })),
+  loadTemplate: vi.fn().mockReturnValue('template'),
+}))
 
 import { findProjectRoot } from '../../cli/middleware/project-root.js'
 import { buildIndex } from '../../core/assembly/knowledge-loader.js'
@@ -34,6 +40,8 @@ import { resolveOutputMode } from '../../cli/middleware/output-mode.js'
 import { loadConfig } from '../../config/loader.js'
 import { runCli } from '../../cli/index.js'
 import { execSync } from 'node:child_process'
+import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
+import { KnowledgeUpdateAssembler } from '../../core/knowledge/knowledge-update-assembler.js'
 
 const PROJECT_ROOT = '/fake/project'
 
@@ -230,5 +238,93 @@ describe('scaffold knowledge reset', () => {
 
     await runCli(['knowledge', 'reset', 'api-design'])
     expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(localPath)
+  })
+})
+
+describe('scaffold knowledge update — target resolution', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    vi.spyOn(process, 'exit').mockImplementation((() => {}) as any)
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    // Re-setup assembler mock after resetAllMocks clears mockImplementation
+    vi.mocked(KnowledgeUpdateAssembler).mockImplementation(() => ({
+      assemble: vi.fn().mockReturnValue('## Task\nUpdate knowledge for {{name}}'),
+    }) as any)
+    // Set up default mocks that tests can override
+    vi.mocked(discoverMetaPrompts).mockReturnValue(new Map() as any)
+  })
+
+  it('resolves entry name directly and writes prompt to stdout', async () => {
+    setupDefaults()
+    vi.mocked(buildIndex)
+      .mockReturnValue(new Map([['api-design', '/fake/project/knowledge/api-design.md']]))
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      '---\nname: api-design\ndescription: desc\ntopics: []\n---\n# Body' as any
+    )
+    vi.spyOn(fs, 'existsSync').mockReturnValue(false)
+
+    await runCli(['knowledge', 'update', 'api-design'])
+
+    const stdoutCalls = vi.mocked(process.stdout.write).mock.calls.flat().join('')
+    expect(stdoutCalls.length).toBeGreaterThan(0)
+  })
+
+  it('resolves step name to its knowledge-base entries with --step flag', async () => {
+    setupDefaults()
+    const metaPromptMap = new Map([
+      ['create-prd', {
+        stepName: 'create-prd',
+        filePath: '/fake/pipeline/create-prd.md',
+        frontmatter: { knowledgeBase: ['prd-craft'] },
+        body: '',
+        sections: {},
+      }],
+    ])
+    vi.mocked(discoverMetaPrompts).mockReturnValue(metaPromptMap as any)
+    vi.mocked(buildIndex)
+      .mockReturnValue(new Map([['prd-craft', '/fake/project/knowledge/prd-craft.md']]))
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      '---\nname: prd-craft\ndescription: desc\ntopics: []\n---\n# PRD Body' as any
+    )
+    vi.spyOn(fs, 'existsSync').mockReturnValue(false)
+
+    await runCli(['knowledge', 'update', 'create-prd', '--step'])
+
+    const stdoutCalls = vi.mocked(process.stdout.write).mock.calls.flat().join('')
+    expect(stdoutCalls.length).toBeGreaterThan(0)
+  })
+
+  it('exits 1 with error when target not found', async () => {
+    setupDefaults()
+    vi.mocked(buildIndex).mockReturnValue(new Map())
+    vi.mocked(discoverMetaPrompts).mockReturnValue(new Map() as any)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any)
+
+    await runCli(['knowledge', 'update', 'nonexistent'])
+    expect(exitSpy).toHaveBeenCalledWith(1)
+  })
+
+  it('prefers entry name over step name when both match (without --step)', async () => {
+    setupDefaults()
+    const metaPromptMap = new Map([
+      ['testing-strategy', {
+        stepName: 'testing-strategy',
+        frontmatter: { knowledgeBase: ['testing-strategy'] },
+        body: '', sections: {}, filePath: '',
+      }],
+    ])
+    vi.mocked(discoverMetaPrompts).mockReturnValue(metaPromptMap as any)
+    vi.mocked(buildIndex)
+      .mockReturnValue(new Map([['testing-strategy', '/fake/project/knowledge/testing-strategy.md']]))
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      '---\nname: testing-strategy\ndescription: desc\ntopics: []\n---\n# Body' as any
+    )
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    vi.spyOn(fs, 'existsSync').mockReturnValue(false)
+
+    await runCli(['knowledge', 'update', 'testing-strategy'])
+
+    const stderrOutput = vi.mocked(process.stderr.write).mock.calls.flat().join('')
+    expect(stderrOutput).toContain('also a step')
   })
 })

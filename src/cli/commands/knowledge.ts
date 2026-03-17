@@ -6,6 +6,10 @@ import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { buildIndex, extractKBFrontmatter } from '../../core/assembly/knowledge-loader.js'
+import { KnowledgeUpdateAssembler, loadTemplate } from '../../core/knowledge/knowledge-update-assembler.js'
+import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
+import { loadConfig } from '../../config/loader.js'
+import { findClosestMatch } from '../../utils/levenshtein.js'
 
 // -----------------------------------------------------------------------
 // Shared helpers
@@ -227,6 +231,173 @@ const resetSubcommand: CommandModule<Record<string, unknown>, ResetArgs> = {
 }
 
 // -----------------------------------------------------------------------
+// update subcommand
+// -----------------------------------------------------------------------
+
+interface UpdateArgs {
+  target: string
+  step?: boolean
+  entry?: string
+  focus?: string
+  root?: string
+  format?: string
+  auto?: boolean
+  verbose?: boolean
+}
+
+const updateSubcommand: CommandModule<Record<string, unknown>, UpdateArgs> = {
+  command: 'update <target>',
+  describe: 'Assemble a knowledge update prompt for an entry or all entries in a pipeline step',
+  builder: (yargs) =>
+    yargs
+      .positional('target', { type: 'string', demandOption: true })
+      .option('step', { type: 'boolean', default: false, describe: 'Treat target as a pipeline step name' })
+      .option('entry', { type: 'string', describe: 'When using --step, update only this entry' })
+      .option('focus', { type: 'string', describe: 'Optional focus area for the update prompt' }) as Argv<UpdateArgs>,
+  handler: async (argv) => {
+    const projectRoot = getProjectRoot(argv)
+    if (!projectRoot) {
+      process.stderr.write('✗ error [PROJECT_NOT_INITIALIZED]: No .scaffold/ directory found\n')
+      process.exit(1)
+      return
+    }
+
+    const outputMode = resolveOutputMode(argv)
+    const output = createOutputContext(outputMode)
+
+    const globalDir = path.join(projectRoot, 'knowledge')
+    const localDir = path.join(projectRoot, '.scaffold', 'knowledge')
+    const globalIndex = buildIndex(globalDir)
+
+    const pipelineDir = path.join(projectRoot, '.scaffold', 'pipeline')
+    const metaPrompts = discoverMetaPrompts(pipelineDir)
+
+    const target = argv.target
+    const isEntryName = globalIndex.has(target)
+    const isStepName = metaPrompts.has(target)
+    const forceStep = argv.step === true
+
+    let entryNames: string[]
+
+    if (forceStep || (!isEntryName && isStepName)) {
+      // Step resolution path
+      const step = metaPrompts.get(target)!
+      const stepEntries: string[] = step.frontmatter.knowledgeBase ?? []
+
+      if (stepEntries.length === 0) {
+        output.error({ code: 'STEP_NO_ENTRIES', message: `Step '${target}' has no knowledge-base entries`, exitCode: 1 })
+        process.exit(1)
+        return
+      }
+
+      if (argv.entry !== undefined) {
+        if (!stepEntries.includes(argv.entry)) {
+          output.error({
+            code: 'ENTRY_NOT_IN_STEP',
+            message: `Entry '${argv.entry}' is not in step '${target}'. Available: ${stepEntries.join(', ')}`,
+            exitCode: 1,
+          })
+          process.exit(1)
+          return
+        }
+        entryNames = [argv.entry]
+      } else {
+        entryNames = stepEntries
+      }
+    } else if (isEntryName) {
+      entryNames = [target]
+      if (isStepName) {
+        process.stderr.write(
+          `note: '${target}' is also a step name — use --step to update all entries for that step\n`,
+        )
+      }
+    } else {
+      // Not found — provide fuzzy suggestion
+      const allCandidates = [...globalIndex.keys(), ...metaPrompts.keys()]
+      const suggestion = findClosestMatch(target, allCandidates, 3)
+      const hint = suggestion ? ` Did you mean '${suggestion}'?` : ''
+      output.error({ code: 'TARGET_NOT_FOUND', message: `Target '${target}' not found.${hint}`, exitCode: 1 })
+      process.exit(1)
+      return
+    }
+
+    // Config
+    const { config } = loadConfig(projectRoot, [])
+    const methodology = config?.methodology ?? 'deep'
+
+    // Assemble prompts for each entry
+    const template = loadTemplate()
+    const assembler = new KnowledgeUpdateAssembler(template)
+
+    for (const entryName of entryNames) {
+      const globalFilePath = globalIndex.get(entryName)
+      let globalBody = ''
+      if (globalFilePath) {
+        try {
+          const content = fs.readFileSync(globalFilePath, 'utf8')
+          // Strip frontmatter
+          const lines = content.split('\n')
+          if (lines[0]?.trim() === '---') {
+            let closeIdx = -1
+            for (let i = 1; i < lines.length; i++) {
+              if (lines[i].trim() === '---') { closeIdx = i; break }
+            }
+            globalBody = closeIdx !== -1 ? lines.slice(closeIdx + 1).join('\n').trim() : content
+          } else {
+            globalBody = content
+          }
+        } catch {
+          globalBody = ''
+        }
+      }
+
+      // Check for local override
+      let localOverrideContent: string | null = null
+      const localEntryPath = buildIndex(localDir).get(entryName)
+      if (localEntryPath && fs.existsSync(localEntryPath)) {
+        try {
+          localOverrideContent = fs.readFileSync(localEntryPath, 'utf8')
+        } catch {
+          localOverrideContent = null
+        }
+      }
+
+      // Scan docs/ for artifact files matching this entry name
+      const docArtifacts: string[] = []
+      const docsDir = path.join(projectRoot, 'docs')
+      try {
+        const docFiles = fs.readdirSync(docsDir)
+        for (const docFile of docFiles) {
+          if (docFile.endsWith('.md') && docFile.toLowerCase().includes(entryName.toLowerCase())) {
+            try {
+              const docContent = fs.readFileSync(path.join(docsDir, docFile), 'utf8')
+              docArtifacts.push(docContent)
+            } catch {
+              // skip
+            }
+          }
+        }
+      } catch {
+        // docs dir may not exist
+      }
+
+      const prompt = assembler.assemble({
+        name: entryName,
+        globalBody,
+        localOverrideContent,
+        methodology,
+        artifacts: docArtifacts,
+        focus: argv.focus ?? null,
+      })
+
+      process.stdout.write(prompt + '\n')
+    }
+
+    process.exit(0)
+  },
+}
+
+// -----------------------------------------------------------------------
 // Top-level knowledge command (other subcommands added in Tasks 4-6)
 // -----------------------------------------------------------------------
 
@@ -238,6 +409,7 @@ const knowledgeCommand: CommandModule<Record<string, unknown>, Record<string, un
       .command(listSubcommand)
       .command(showSubcommand)
       .command(resetSubcommand)
+      .command(updateSubcommand)
       .demandCommand(1, 'Specify a subcommand: update, list, show, reset') as Argv<Record<string, unknown>>
   },
   handler: () => {
