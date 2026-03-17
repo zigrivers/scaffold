@@ -44,7 +44,7 @@ vi.mock('../../core/assembly/meta-prompt-loader.js', () => ({
 }))
 
 vi.mock('../../core/assembly/knowledge-loader.js', () => ({
-  buildIndex: vi.fn(),
+  buildIndexWithOverrides: vi.fn(),
   loadEntries: vi.fn(),
 }))
 
@@ -111,7 +111,7 @@ import { acquireLock, releaseLock } from '../../state/lock-manager.js'
 import { analyzeCrash } from '../../state/completion.js'
 import { AssemblyEngine } from '../../core/assembly/engine.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
-import { buildIndex, loadEntries } from '../../core/assembly/knowledge-loader.js'
+import { buildIndexWithOverrides, loadEntries } from '../../core/assembly/knowledge-loader.js'
 import { loadInstructions } from '../../core/assembly/instruction-loader.js'
 import { resolveDepth } from '../../core/assembly/depth-resolver.js'
 import { detectUpdateMode } from '../../core/assembly/update-mode.js'
@@ -327,7 +327,7 @@ beforeEach(() => {
     instructions: { global: null, perStep: null, inline: null },
     warnings: [],
   })
-  vi.mocked(buildIndex).mockReturnValue(new Map())
+  vi.mocked(buildIndexWithOverrides).mockReturnValue(new Map())
   vi.mocked(loadEntries).mockReturnValue({ entries: [], warnings: [] })
 
   const assemblyResult = makeSuccessAssemblyResult()

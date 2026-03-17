@@ -15,7 +15,7 @@ interface KBFrontmatter {
  * Extract and parse YAML frontmatter from knowledge base file content.
  * Returns null if frontmatter is missing or has no name field.
  */
-function extractKBFrontmatter(content: string): KBFrontmatter | null {
+export function extractKBFrontmatter(content: string): KBFrontmatter | null {
   const lines = content.split('\n')
 
   if (lines[0]?.trim() !== '---') {
@@ -125,6 +125,64 @@ export function buildIndex(knowledgeDir: string): Map<string, string> {
 
   walkDir(knowledgeDir)
   return index
+}
+
+/**
+ * Like buildIndex(), but checks <projectRoot>/.scaffold/knowledge/ first.
+ * Local overrides take precedence over global entries by the same name.
+ * Emits a stderr warning for duplicate names within the local override dir.
+ */
+export function buildIndexWithOverrides(
+  projectRoot: string,
+  globalKnowledgeDir: string,
+): Map<string, string> {
+  // Build global index first (lower precedence)
+  const globalIndex = buildIndex(globalKnowledgeDir)
+
+  // Build local override index
+  const localDir = path.join(projectRoot, '.scaffold', 'knowledge')
+  const localIndex = new Map<string, string>()
+
+  function walkLocal(dir: string): void {
+    let entries: fs.Dirent[]
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        walkLocal(fullPath)
+      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        try {
+          const content = fs.readFileSync(fullPath, 'utf8')
+          const fm = extractKBFrontmatter(content)
+          if (fm?.name) {
+            if (localIndex.has(fm.name)) {
+              process.stderr.write(
+                `warn: duplicate knowledge override name "${fm.name}" in ${localDir} — using last found\n`,
+              )
+            }
+            localIndex.set(fm.name, fullPath)
+          }
+        } catch {
+          // skip invalid files
+        }
+      }
+    }
+  }
+
+  if (fileExists(localDir)) {
+    walkLocal(localDir)
+  }
+
+  // Merge: local overrides win
+  const merged = new Map(globalIndex)
+  for (const [name, filePath] of localIndex) {
+    merged.set(name, filePath)
+  }
+  return merged
 }
 
 /**
