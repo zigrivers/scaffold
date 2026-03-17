@@ -41,7 +41,7 @@ function makeOutputMock() {
     success: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
-    log: vi.fn(),
+    info: vi.fn(),
     result: vi.fn(),
     startSpinner: vi.fn(),
     stopSpinner: vi.fn(),
@@ -87,7 +87,7 @@ describe('scaffold knowledge list', () => {
     await runCli(['knowledge', 'list'])
 
     const allCalls = [
-      ...vi.mocked(output.log).mock.calls.flat(),
+      ...vi.mocked(output.info).mock.calls.flat(),
       ...vi.mocked(process.stdout.write).mock.calls.flat(),
     ].join(' ')
     expect(allCalls).toContain('api-design')

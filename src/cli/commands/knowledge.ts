@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
-import { buildIndex } from '../../core/assembly/knowledge-loader.js'
+import { buildIndex, extractKBFrontmatter } from '../../core/assembly/knowledge-loader.js'
 
 // -----------------------------------------------------------------------
 // Shared helpers
@@ -17,8 +17,7 @@ function getProjectRoot(argv: { root?: string }): string | null {
 function readFrontmatterDescription(filePath: string): string {
   try {
     const content = fs.readFileSync(filePath, 'utf8')
-    const match = content.match(/^---\n[\s\S]*?description:\s*(.+?)\n[\s\S]*?---/)
-    return match?.[1]?.trim() ?? ''
+    return extractKBFrontmatter(content)?.description ?? ''
   } catch {
     return ''
   }
@@ -70,23 +69,18 @@ const listSubcommand: CommandModule<Record<string, unknown>, ListArgs> = {
 
     if (outputMode === 'json') {
       output.result(entries)
-      return
-    }
-
-    if (entries.length === 0) {
-      output.log('No knowledge entries found.')
-      process.exit(0)
-      return
-    }
-
-    const nameWidth = Math.max(4, ...entries.map((e) => e.name.length)) + 2
-    const sourceWidth = 16
-    const header = 'NAME'.padEnd(nameWidth) + 'SOURCE'.padEnd(sourceWidth) + 'DESCRIPTION'
-    output.log(header)
-    output.log('-'.repeat(header.length))
-    for (const e of entries) {
-      const sourceLabel = e.source === 'local' ? 'local override' : 'global'
-      output.log(e.name.padEnd(nameWidth) + sourceLabel.padEnd(sourceWidth) + e.description)
+    } else if (entries.length === 0) {
+      output.info('No knowledge entries found.')
+    } else {
+      const nameWidth = Math.max(4, ...entries.map((e) => e.name.length)) + 2
+      const sourceWidth = 16
+      const header = 'NAME'.padEnd(nameWidth) + 'SOURCE'.padEnd(sourceWidth) + 'DESCRIPTION'
+      output.info(header)
+      output.info('-'.repeat(header.length))
+      for (const e of entries) {
+        const sourceLabel = e.source === 'local' ? 'local override' : 'global'
+        output.info(e.name.padEnd(nameWidth) + sourceLabel.padEnd(sourceWidth) + e.description)
+      }
     }
     process.exit(0)
   },

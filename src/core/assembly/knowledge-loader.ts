@@ -15,7 +15,7 @@ interface KBFrontmatter {
  * Extract and parse YAML frontmatter from knowledge base file content.
  * Returns null if frontmatter is missing or has no name field.
  */
-function extractKBFrontmatter(content: string): KBFrontmatter | null {
+export function extractKBFrontmatter(content: string): KBFrontmatter | null {
   const lines = content.split('\n')
 
   if (lines[0]?.trim() !== '---') {
