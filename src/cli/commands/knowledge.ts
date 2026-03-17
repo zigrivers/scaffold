@@ -238,7 +238,7 @@ interface UpdateArgs {
   target: string
   step?: boolean
   entry?: string
-  focus?: string
+  instructions?: string[]
   root?: string
   format?: string
   auto?: boolean
@@ -246,14 +246,14 @@ interface UpdateArgs {
 }
 
 const updateSubcommand: CommandModule<Record<string, unknown>, UpdateArgs> = {
-  command: 'update <target>',
+  command: 'update <target> [instructions..]',
   describe: 'Assemble a knowledge update prompt for an entry or all entries in a pipeline step',
   builder: (yargs) =>
     yargs
       .positional('target', { type: 'string', demandOption: true })
+      .positional('instructions', { type: 'string', array: true, default: [] })
       .option('step', { type: 'boolean', default: false, describe: 'Treat target as a pipeline step name' })
-      .option('entry', { type: 'string', describe: 'When using --step, update only this entry' })
-      .option('focus', { type: 'string', describe: 'Optional focus area for the update prompt' }) as Argv<UpdateArgs>,
+      .option('entry', { type: 'string', describe: 'When using --step, update only this entry' }) as Argv<UpdateArgs>,
   handler: async (argv) => {
     const projectRoot = getProjectRoot(argv)
     if (!projectRoot) {
@@ -281,7 +281,12 @@ const updateSubcommand: CommandModule<Record<string, unknown>, UpdateArgs> = {
 
     if (forceStep || (!isEntryName && isStepName)) {
       // Step resolution path
-      const step = metaPrompts.get(target)!
+      const step = metaPrompts.get(target)
+      if (!step) {
+        output.error({ code: 'TARGET_NOT_FOUND', message: `No step named '${target}' found.`, exitCode: 1 })
+        process.exit(1)
+        return
+      }
       const stepEntries: string[] = step.frontmatter.knowledgeBase ?? []
 
       if (stepEntries.length === 0) {
@@ -387,7 +392,9 @@ const updateSubcommand: CommandModule<Record<string, unknown>, UpdateArgs> = {
         localOverrideContent,
         methodology,
         artifacts: docArtifacts,
-        focus: argv.focus ?? null,
+        focus: argv.instructions && argv.instructions.length > 0
+        ? argv.instructions.join(' ')
+        : null,
       })
 
       process.stdout.write(prompt + '\n')

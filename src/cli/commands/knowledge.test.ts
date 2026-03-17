@@ -304,6 +304,16 @@ describe('scaffold knowledge update — target resolution', () => {
     expect(exitSpy).toHaveBeenCalledWith(1)
   })
 
+  it('exits 1 when --step target is not a valid step name', async () => {
+    setupDefaults()
+    vi.mocked(buildIndex).mockReturnValue(new Map())
+    vi.mocked(discoverMetaPrompts).mockReturnValue(new Map() as any)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any)
+
+    await runCli(['knowledge', 'update', 'not-a-step', '--step'])
+    expect(exitSpy).toHaveBeenCalledWith(1)
+  })
+
   it('prefers entry name over step name when both match (without --step)', async () => {
     setupDefaults()
     const metaPromptMap = new Map([
