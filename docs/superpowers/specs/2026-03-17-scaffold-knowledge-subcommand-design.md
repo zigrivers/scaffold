@@ -22,7 +22,7 @@ Project-local overrides give teams a way to enrich knowledge entries for their s
 
 ## Command Surface
 
-Four subcommands registered under the `scaffold knowledge` namespace via a single yargs CommandModule (`src/cli/commands/knowledge.ts`) with nested subcommands. This is a new namespace — it does not conflict with the existing top-level `scaffold reset` command.
+Four subcommands registered under the `scaffold knowledge` namespace via a single yargs CommandModule (`src/cli/commands/knowledge.ts`). Subcommands are declared via `yargs.command(...)` inside the `builder` function — the standard yargs nested pattern compatible with `.strict()` on the top-level yargs instance. This is a new namespace — it does not conflict with the existing top-level `scaffold reset` command.
 
 | Subcommand | Description |
 |---|---|
@@ -68,6 +68,7 @@ When a step resolves to multiple entries, the command generates one prompt per e
 | `--entry` not in step's entry set | Error listing the step's actual entries | 1 |
 | Target matches nothing | Error with fuzzy suggestions | 1 |
 | Entry not found in global knowledge dir | Error listing valid entry names | 1 |
+| Entry exists locally but not in global knowledge dir | Use existing local content as seed instead of global entry; note in prompt that no global seed exists | 0 |
 
 ---
 
@@ -81,7 +82,7 @@ The `update` subcommand uses a dedicated `KnowledgeUpdateAssembler` (`src/core/k
 
 1. **Load global entry** — reads from `path.join(projectRoot, 'knowledge')` via `buildIndex()`; strips frontmatter; uses body as seed context. Exits with code 1 and lists valid entry names if the entry is not found.
 2. **Detect mode** — if `.scaffold/knowledge/**/<name>.md` exists: **update mode** (load existing content). Otherwise: **create mode**.
-3. **Load project context** — reads `.scaffold/config.yml` (methodology setting); scans `docs/` in the project root for files whose filename contains the entry name as a substring (e.g. `docs/api-spec.md` when updating `api-design`). Only `.md` files in `docs/` are scanned. Context inclusion is best-effort — missing files and missing `docs/` dir are silently skipped.
+3. **Load project context** — reads `.scaffold/config.yml` (methodology setting); recursively scans `docs/**/*.md` in the project root for files whose filename (not full path) contains the entry name as a substring (e.g. `docs/api/api-spec.md` when updating `api-design`). Context inclusion is best-effort — missing files and missing `docs/` dir are silently skipped.
 4. **Apply user instructions** — appended as a "Focus" section if provided; omitted if none.
 5. **Deliver** — writes assembled prompt to stdout. The user pastes it into a Claude Code session; Claude writes `.scaffold/knowledge/<name>.md` directly.
 
@@ -176,15 +177,16 @@ Prints the effective content — local override if present, otherwise global. In
 
 ### `scaffold knowledge reset <name>`
 
-Deletes `.scaffold/knowledge/**/<name>.md` if it exists. Uses `--yes` flag (not `--force`, which is a global flag with a different meaning) to bypass the uncommitted-changes confirmation.
+Deletes `.scaffold/knowledge/**/<name>.md` if it exists. Respects the global `--auto` flag (already used codebase-wide to suppress prompts and use safe defaults) to bypass the uncommitted-changes confirmation.
 
 Behavior:
 - No local override found → prints "Nothing to reset for '<name>'" and exits 0
 - Local override found, no uncommitted changes → deletes and prints confirmation, exits 0
-- Local override found, uncommitted changes detected → prints warning and prompts for `--yes` to proceed; exits 1 without `--yes`
-- Project is not a git repo → skips git check, deletes without `--yes`, exits 0
+- Local override found, uncommitted changes detected, `--auto` not set → prints warning and exits 1 with message to re-run with `--auto` to confirm
+- Local override found, uncommitted changes detected, `--auto` set → deletes and prints confirmation, exits 0
+- Project is not a git repo → skips git check, deletes, exits 0
 
-Git change detection: `child_process.execSync('git status --porcelain <filepath>', { stdio: 'pipe' })`. Non-zero exit from `git rev-parse --git-dir` indicates not a git repo — treat as no git check needed.
+Git change detection: `child_process.execSync('git status --porcelain <filepath>', { stdio: 'pipe' })`. Non-zero exit from `git rev-parse --git-dir` indicates not a git repo — skip git check entirely.
 
 ---
 
@@ -199,7 +201,7 @@ New exported function `buildIndexWithOverrides(projectRoot: string, globalKnowle
 // Duplicate names in local override dir: emit warning to stderr, use last-write-wins
 ```
 
-Callers of `buildIndex()` in `run.ts` are updated to call `buildIndexWithOverrides()`. `build.ts` does not call `buildIndex()` and requires no changes.
+Callers of `buildIndex()` in `run.ts` are updated to call `buildIndexWithOverrides(projectRoot, path.join(projectRoot, 'knowledge'))` — `projectRoot` stays the project root (from `findProjectRoot`) and `globalKnowledgeDir` stays `path.join(projectRoot, 'knowledge')`, consistent with today. The return type remains `Map<string, string>` (name → filepath), so `loadEntries()` requires no changes. `build.ts` does not call `buildIndex()` and requires no changes.
 
 Existing behavior is preserved when `.scaffold/knowledge/` does not exist.
 
@@ -226,18 +228,19 @@ All `scaffold knowledge` subcommands use the existing codebase exit code convent
 
 ### New files
 - `src/cli/commands/knowledge.ts` — yargs CommandModule with nested subcommands (`update`, `list`, `show`, `reset`)
-- `src/cli/commands/knowledge.test.ts` — unit tests for all four subcommands
+- `src/cli/commands/knowledge.test.ts` — unit tests for CLI handler logic (target resolution, argument parsing)
 - `src/core/knowledge/knowledge-update-assembler.ts` — `KnowledgeUpdateAssembler` class
+- `src/core/knowledge/knowledge-update-assembler.test.ts` — unit tests for `KnowledgeUpdateAssembler` (per `src/core/assembly/*.test.ts` convention)
 - `src/core/knowledge/knowledge-update-template.md` — prompt template for knowledge generation
-- `commands/knowledge.md` — Claude Code slash command (frontmatter + "After This Step" per CLAUDE.md conventions)
+- `commands/knowledge.md` — Claude Code slash command; invokes `scaffold knowledge <subcommand>` via the CLI and delivers the stdout output (same pattern as other `commands/*.md` files); includes frontmatter and "After This Step" section per CLAUDE.md conventions
 
 ### Modified files
 - `src/core/assembly/knowledge-loader.ts` — add `buildIndexWithOverrides()` export
-- `src/cli/commands/run.ts` — call `buildIndexWithOverrides()` instead of `buildIndex()`
+- `src/cli/commands/run.ts` — call `buildIndexWithOverrides(projectRoot, path.join(projectRoot, 'knowledge'))` instead of `buildIndex(knowledgeDir)`
 - `src/cli/index.ts` — register `knowledge` command
 
 ### Tests
 - Unit (`knowledge.test.ts`): target resolution (step → entries, entry direct, ambiguous, not found, step with no entries, `--entry` mismatch)
-- Unit (`knowledge.test.ts`): `KnowledgeUpdateAssembler` in create mode and update mode
+- Unit (`knowledge-update-assembler.test.ts`): `KnowledgeUpdateAssembler` in create mode, update mode, local-only entry mode
 - Unit (`knowledge-loader.test.ts`): `buildIndexWithOverrides` override precedence, duplicate name warning
-- E2E (`tests/e2e/knowledge.test.ts`): `scaffold knowledge update`, `list`, `show`, `reset` in a temp project directory with real file system
+- E2E (`src/e2e/knowledge.test.ts`): `scaffold knowledge update`, `list`, `show`, `reset` in a temp project directory with real file system
