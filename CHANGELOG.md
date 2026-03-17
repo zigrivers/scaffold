@@ -2,6 +2,19 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.1.0] — 2026-03-17
+
+### Added
+
+- **`scaffold knowledge` subcommand namespace** — four subcommands for managing project-local knowledge base overrides:
+  - `scaffold knowledge update <target> [instructions...]` — generates a Claude prompt to create or refresh `.scaffold/knowledge/<name>.md`; `<target>` resolves as an entry name or step name (auto-detected), with `--step` flag to force step resolution and `--entry` to target a single entry from a step's set
+  - `scaffold knowledge list` — shows all entries (global and local overrides) with NAME/SOURCE/DESCRIPTION columns; `--format json` supported
+  - `scaffold knowledge show <name>` — prints the effective content for an entry (local override wins if present)
+  - `scaffold knowledge reset <name>` — removes a local override, reverting to global; respects `--auto` flag to bypass uncommitted-changes confirmation
+- **`buildIndexWithOverrides()`** — `scaffold run` now automatically loads project-local knowledge overrides from `.scaffold/knowledge/` during prompt assembly, layering them over global entries without any extra configuration
+- **`/scaffold:knowledge` slash command** — Claude Code integration for the full knowledge namespace
+- **Project-local knowledge overrides** — committable `.scaffold/knowledge/` files let teams share enriched, project-specific knowledge entries across the whole team
+
 ## [2.0.0] — 2026-03-16
 
 ### Breaking Changes
