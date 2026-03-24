@@ -1,440 +1,476 @@
 # Scaffold
 
-A guided AI pipeline that takes you from "I have an idea" to working software. Scaffold walks you through 29 structured prompts — run them in order, and Claude Code handles the research, planning, and implementation for you.
+A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 36 structured pipeline steps — organized into 9 phases — and Claude Code handles the research, planning, and implementation for you.
 
 By the end, you'll have a fully planned, standards-documented, implementation-ready project with working code.
 
 ## What is Scaffold?
 
-Scaffold is a pipeline of AI-powered prompts designed for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Anthropic's command-line coding tool. If you have an idea for a software project but don't know where to start — or you want to make sure your project is set up with solid architecture, standards, and tests from day one — Scaffold guides you through every step.
+Scaffold is a composable meta-prompt pipeline built for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Anthropic's command-line coding tool. If you have an idea for a software project but don't know where to start — or you want to make sure your project is set up with solid architecture, standards, and tests from day one — Scaffold guides you through every step.
 
-Here's how it works: you install Scaffold, then run slash commands like `/scaffold:create-prd` in Claude Code. Each command is a carefully structured prompt that tells Claude exactly what to research, what decisions to make, and what files to create. You don't need to write the prompts yourself — just run the commands and answer Claude's questions along the way.
+Here's how it works:
 
-Each step in the pipeline produces a specific artifact — a planning document, a configuration file, a standards guide, or actual code — and then tells you exactly which command to run next. You follow the chain from defining your product all the way through to a working implementation.
+1. **Initialize** — run `scaffold init` in your project directory. The init wizard detects whether you're starting fresh (greenfield) or working with an existing codebase (brownfield), and lets you pick a methodology preset (deep, mvp, or custom).
+
+2. **Run steps** — each step is a composable meta-prompt (a short intent declaration in `pipeline/`) that gets assembled at runtime into a full 7-section prompt. The assembly engine injects relevant knowledge base entries, project context from prior steps, methodology settings, and depth-appropriate instructions.
+
+3. **Follow the dependency graph** — Scaffold tracks which steps are complete, which are eligible, and which are blocked. Run `scaffold next` to see what's unblocked, or `scaffold status` for the full picture. Each step produces a specific artifact — a planning document, architecture decision, specification, or actual code.
+
+You can run steps via the CLI (`scaffold run create-prd`) or via slash commands in Claude Code (`/scaffold:create-prd`). Either way, Scaffold constructs the prompt and Claude does the work.
+
+## Key Concepts
+
+**Meta-prompts** — Each pipeline step is defined as a short `.md` file in `pipeline/` with YAML frontmatter (dependencies, outputs, knowledge entries) and a markdown body describing the step's intent. These are *not* the prompts Claude sees — they're assembled into full prompts at runtime.
+
+**Assembly engine** — At execution time, Scaffold builds a 7-section prompt from: system metadata, the meta-prompt, knowledge base entries, project context (artifacts from prior steps), methodology settings, layered instructions, and depth-specific execution guidance.
+
+**Knowledge base** — 38 domain expertise entries in `knowledge/` covering testing strategy, domain modeling, API design, security review, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
+
+**Methodology presets** — Three built-in presets control which steps run and how deep the analysis goes:
+- **deep** (depth 5) — all 36 steps, exhaustive analysis
+- **mvp** (depth 1) — 7 critical steps, get to code fast
+- **custom** (depth 1-5) — you choose which steps to enable and how deep each one goes
+
+**Depth scale** (1-5) — Controls how thorough each step's output is, from "focus on the core deliverable" (1) to "explore all angles, tradeoffs, and edge cases" (5). Depth resolves with 4-level precedence: CLI flag > step override > custom default > preset default.
+
+**State management** — Pipeline progress is tracked in `.scaffold/state.json` with atomic file writes and crash recovery. An advisory lock prevents concurrent runs. Decisions are logged to an append-only `decisions.jsonl`.
+
+**Dependency graph** — Steps declare their prerequisites in frontmatter. Scaffold builds a DAG, runs topological sort (Kahn's algorithm), detects cycles, and computes which steps are eligible at any point.
 
 ## Prerequisites
-
-Before using Scaffold, you'll need the following tools installed:
 
 ### Required
 
 **Node.js** (v18 or later)
-Needed for Beads and most modern JavaScript/TypeScript projects.
 - Install: https://nodejs.org or `brew install node`
 - Verify: `node --version`
 
 **Git**
-Needed for version control and Beads task tracking.
 - Install: https://git-scm.com or `brew install git`
 - Verify: `git --version`
 
 **Claude Code**
-The AI coding assistant that runs the Scaffold prompts. Claude Code is a command-line tool from Anthropic — it's not the same as the Claude web chat.
+The AI coding assistant that runs the assembled prompts. Claude Code is a command-line tool from Anthropic.
 - Install: `npm install -g @anthropic-ai/claude-code`
 - Verify: `claude --version`
 - Docs: https://docs.anthropic.com/en/docs/claude-code
 
-**Beads**
-A git-backed task tracker designed for AI agents. Scaffold uses Beads (`bd`) to create and manage the task graph that drives implementation. Think of it as a to-do list that both you and Claude can read and update.
-- Install: `npm install -g @beads/bd`
-- Verify: `bd --version`
-- Repo: https://github.com/steveyegge/beads
-
 ### Optional
 
 **Playwright MCP** (web apps only)
-Lets Claude control a real browser for visual testing and screenshots. MCP (Model Context Protocol) is a way for Claude to use external tools — in this case, a headless browser.
+Lets Claude control a real browser for visual testing and screenshots.
 - Install: `claude mcp add playwright npx @playwright/mcp@latest`
-- Only needed if your project has a web frontend
 
 **ChatGPT subscription** (for multi-model review)
-One optional step (`multi-model-review`) sets up automated code review using both Claude and OpenAI's Codex. This requires a ChatGPT subscription (Plus, Pro, or Team) — reviews use credits (~25 per review) with weekly limits that vary by plan. You can skip this step entirely if you don't have one.
+One optional step (`multi-model-review`) sets up automated code review using both Claude and OpenAI's Codex. Requires a ChatGPT subscription (Plus, Pro, or Team). Skip this step if you don't have one.
 
-**Codex CLI and/or Gemini CLI** (for user stories multi-model review)
-One optional step (`user-stories-multi-model-review`) runs independent AI reviewers against your user stories to catch gaps a single model might miss. You need at least one of: Codex CLI (requires ChatGPT subscription) or Gemini CLI (free tier available). See [Multi-Model Stories Review Setup](docs/multi-model-stories-review-setup.md) for detailed instructions.
+**Codex CLI and/or Gemini CLI** (for multi-model stories review)
+One optional step (`user-stories-multi-model-review`) runs independent AI reviewers against your user stories. You need at least one of: Codex CLI (requires ChatGPT subscription) or Gemini CLI (free tier available). See [Multi-Model Stories Review Setup](docs/multi-model-stories-review-setup.md).
 
 ## Installation
 
-There are two ways to install Scaffold. Both give you the same commands — the only difference is the prefix you type.
+### Option 1: npm (recommended)
 
-### Option 1: Claude Code Plugin (recommended)
+```bash
+npm install -g @zigrivers/scaffold
+```
 
-Open Claude Code and run:
+After installing, the `scaffold` CLI is available globally. Slash commands (`/scaffold:create-prd`, etc.) are also available in Claude Code via the plugin.
+
+### Option 2: Homebrew
+
+```bash
+brew tap zigrivers/scaffold
+brew install scaffold
+```
+
+### Option 3: Claude Code Plugin
+
+If you only need slash commands inside Claude Code (no CLI):
 
 ```
 /plugin marketplace add zigrivers/scaffold
-```
-
-Then install the plugin:
-
-```
 /plugin install scaffold@zigrivers-scaffold
 ```
 
-After installing, commands are available as `/scaffold:command-name` (for example, `/scaffold:create-prd`).
-
-**What's a plugin?** Claude Code plugins are add-on command packages. When you install one, its commands become available as slash commands you can run in any Claude Code session. The plugin prefix (`/scaffold:`) keeps them organized and separate from other commands.
-
-### Option 2: User Commands (shorter prefix)
-
-If you prefer a shorter prefix, clone the repo and run the install script:
-
-```bash
-git clone https://github.com/zigrivers/scaffold
-cd scaffold && ./scripts/install.sh
-```
-
-Commands are available as `/user:command-name` (for example, `/user:create-prd`).
-
-To uninstall later: `./scripts/uninstall.sh`
+Commands are available as `/scaffold:command-name` (for example, `/scaffold:create-prd`).
 
 ### Verify Installation
 
-After installing, open Claude Code and run:
+```bash
+scaffold version
+```
+
+Or in Claude Code:
 
 ```
 /scaffold:prompt-pipeline
 ```
 
-(or `/user:prompt-pipeline` if you used Option 2)
-
-This prints the full pipeline reference. If you see a table of phases and commands, you're all set.
-
 ## Updating
 
-When new prompts or fixes are released, update to get the latest versions.
+### npm
 
-### Plugin installs
+```bash
+npm update -g @zigrivers/scaffold
+```
 
-From a Claude Code session:
+### Homebrew
+
+```bash
+brew upgrade scaffold
+```
+
+### Plugin
 
 ```
 /scaffold:update
 ```
 
-Or update the plugin directly:
-
-```
-/plugin marketplace update zigrivers-scaffold
-```
-
-### User command installs
-
-From a Claude Code session:
-
-```
-/user:update
-```
-
-Or from the terminal:
-
-```bash
-./scripts/update.sh
-```
-
-If you no longer have the repo cloned locally, the update command will fetch it automatically.
+Or: `/plugin marketplace update zigrivers-scaffold`
 
 ## Quick Start
 
-Here's what the first few steps look like in practice:
-
-**1. Create a new directory and open Claude Code**
+**1. Create a new project and initialize Scaffold**
 
 ```bash
 mkdir my-project && cd my-project
 git init
-claude
+scaffold init
 ```
 
+The init wizard detects your project type and walks you through choosing a methodology preset. It creates `.scaffold/` with your config, state, and decisions log.
+
 **2. Define your product**
+
+```bash
+scaffold run create-prd
+```
+
+Or in Claude Code:
 
 ```
 /scaffold:create-prd I want to build a recipe sharing app where users can save, organize, and share recipes with friends
 ```
 
-Claude will ask you clarifying questions about your idea, research best practices, and produce `docs/plan.md` — a detailed product requirements document (PRD). This becomes the foundation that all later steps build on.
+Claude asks clarifying questions about your idea, researches best practices, and produces a detailed product requirements document. This becomes the foundation that all later steps build on.
 
-**3. Analyze the PRD for gaps**
+**3. See what's next**
 
-```
-/scaffold:prd-gap-analysis
-```
-
-Claude reviews the PRD it just created, identifies missing pieces, suggests innovations, and updates the plan with your approval.
-
-**4. Set up task tracking**
-
-```
-/scaffold:beads
+```bash
+scaffold next
 ```
 
-This initializes Beads in your project and creates the `CLAUDE.md` file — a configuration file that tells Claude how to work in your project.
+Scaffold shows you which steps are now unblocked based on the dependency graph.
 
-**5. Keep following the chain**
+**4. Keep following the pipeline**
 
-Each command tells you what to run next when it finishes. Just follow the prompts through Phase 2 (project foundation), Phase 3 (dev environment), and beyond. The pipeline is designed so you never have to wonder "what's next?"
+```bash
+scaffold run review-prd
+scaffold run user-stories
+# ... and so on
+```
 
-## The Full Pipeline
+Each step tells you what to run next. Use `scaffold status` at any time to see the full pipeline state, or `scaffold dashboard` to open a visual progress dashboard in your browser.
 
-### Phase 0 — Prerequisites (one-time setup)
+## The Pipeline
 
-| Action | Command |
-|--------|---------|
-| Install Beads | `npm install -g @beads/bd` |
-| Install Playwright MCP | `claude mcp add playwright npx @playwright/mcp@latest` **(optional — web apps only)** |
-
-### Phase 1 — Product Definition
+### Phase 1 — Product Definition (pre)
 
 Define what you're building.
 
-| # | Command | What It Does |
-|---|---------|-------------|
-| 1 | `/scaffold:create-prd` | Creates `docs/plan.md` — a detailed product requirements document from your idea |
-| 2 | `/scaffold:prd-gap-analysis` | Reviews the PRD for missing pieces and suggests innovations |
+| Step | What It Does |
+|------|-------------|
+| `create-prd` | Creates a detailed product requirements document from your idea |
+| `innovate-prd` | Reviews the PRD for missing pieces and suggests innovations |
+| `review-prd` | Structured review of the PRD for completeness and quality |
+| `user-stories` | Creates detailed user stories for every PRD feature |
+| `innovate-user-stories` | Gap analysis and UX innovation pass on user stories |
+| `review-user-stories` | Structured review of user stories for coverage and clarity |
 
-### Phase 2 — Project Foundation
+### Phase 2 — Domain Modeling (modeling)
 
-Establish the technical decisions and standards for your project.
+Understand the problem domain.
 
-| # | Command | What It Does |
-|---|---------|-------------|
-| 3 | `/scaffold:beads` | Initializes Beads task tracking and creates `CLAUDE.md` |
-| 4 | `/scaffold:tech-stack` | Researches and documents technology choices in `docs/tech-stack.md` |
-| 5 | `/scaffold:claude-code-permissions` | Configures permissions so Claude can work without asking for approval on every action |
-| 6 | `/scaffold:coding-standards` | Creates `docs/coding-standards.md` with conventions, patterns, and linting rules |
-| 7 | `/scaffold:tdd` | Creates `docs/tdd-standards.md` with test-driven development practices |
-| 8 | `/scaffold:project-structure` | Defines and scaffolds the directory structure with `docs/project-structure.md` |
+| Step | What It Does |
+|------|-------------|
+| `domain-modeling` | DDD analysis — bounded contexts, aggregates, value objects |
+| `review-domain-modeling` | Review of domain model for correctness and completeness |
 
-### Phase 3 — Development Environment
+### Phase 3 — Architecture Decisions (decisions)
 
-Get the dev server running and set up collaboration infrastructure.
+Record key technical decisions.
 
-| # | Command | What It Does | Notes |
-|---|---------|-------------|-------|
-| 9 | `/scaffold:dev-env-setup` | Sets up dev server, database, environment variables, and `docs/dev-setup.md` | |
-| 10 | `/scaffold:design-system` | Creates a design system with components, colors, and typography | **Optional** — frontend projects only |
-| 11 | `/scaffold:git-workflow` | Configures branching strategy, CI pipeline, and parallel agent worktrees in `docs/git-workflow.md` | |
-| 11.5 | `/scaffold:multi-model-review` | Sets up automated code review using Claude and OpenAI Codex on PRs | **Optional** — requires ChatGPT subscription (credits) |
+| Step | What It Does |
+|------|-------------|
+| `adrs` | Creates Architecture Decision Records for major choices |
+| `review-adrs` | Review of ADRs for completeness and rationale |
 
-### Phase 4 — Testing Integration
+### Phase 4 — System Architecture (architecture)
 
-Add end-to-end testing for your platform.
+Design the system.
 
-| # | Command | What It Does | Notes |
-|---|---------|-------------|-------|
-| 12 | `/scaffold:add-playwright` | Configures Playwright for browser-based visual testing | **Optional** — web apps only |
-| 13 | `/scaffold:add-maestro` | Configures Maestro for mobile UI testing | **Optional** — Expo/mobile apps only |
+| Step | What It Does |
+|------|-------------|
+| `system-architecture` | Component design, layering, patterns, scalability |
+| `review-architecture` | Structured architecture review |
 
-### Phase 5 — Stories & Planning
+### Phase 5 — Specifications (specification)
 
-Break the PRD down into implementable user stories.
+Detail the interfaces.
 
-| # | Command | What It Does | Notes |
-|---|---------|-------------|-------|
-| 14 | `/scaffold:user-stories` | Creates `docs/user-stories.md` with detailed stories for every PRD feature | |
-| 15 | `/scaffold:user-stories-gaps` | Gap analysis and UX innovation pass on user stories | |
-| 15.5 | `/scaffold:user-stories-multi-model-review` | Multi-model coverage audit with Codex/Gemini reviewers | **Optional** — requires Codex/Gemini CLI |
-| 16 | `/scaffold:platform-parity-review` | Audits docs for platform coverage gaps | **Optional** — multi-platform projects only |
+| Step | What It Does |
+|------|-------------|
+| `database-schema` | Database design — normalization, indexing, migrations |
+| `review-database` | Review of database schema |
+| `api-contracts` | REST/GraphQL contracts, versioning, error handling |
+| `review-api` | Review of API contracts |
+| `ux-spec` | Interaction design, usability, user flows |
+| `review-ux` | Review of UX specification |
 
-### Phase 6 — Consolidation & Verification
+### Phase 6 — Quality (quality)
 
-Make sure everything is consistent before implementation begins.
+Plan for quality, security, and operations.
 
-| # | Command | What It Does |
-|---|---------|-------------|
-| 17 | `/scaffold:claude-md-optimization` | Restructures and optimizes `CLAUDE.md` as the single source of truth |
-| 18 | `/scaffold:workflow-audit` | Verifies all docs are consistent on workflow, naming, and processes |
+| Step | What It Does |
+|------|-------------|
+| `testing-strategy` | Test pyramid, patterns, coverage strategy |
+| `review-testing` | Review of testing strategy |
+| `security` | OWASP, threat modeling, security controls |
+| `review-security` | Review of security practices |
+| `operations` | CI/CD, deployment, monitoring, runbooks |
+| `review-operations` | Review of operations plan |
 
-### Phase 7 — Implementation
+### Phase 7 — Planning (planning)
 
-Build the actual software.
+Break work into implementable tasks.
 
-| # | Command | What It Does |
-|---|---------|-------------|
-| 19 | `/scaffold:implementation-plan` | Creates a full task graph in Beads from user stories and standards |
-| 20 | `/scaffold:implementation-plan-review` | Reviews task quality, coverage, dependencies, and sizing |
-| 21 | `/scaffold:single-agent-start` | Starts the autonomous implementation loop — Claude picks up tasks and builds |
+| Step | What It Does |
+|------|-------------|
+| `implementation-tasks` | Decompose stories into a task graph with dependencies |
+| `review-tasks` | Review task quality, coverage, and sizing |
 
-## Understanding the Pipeline Flow
+### Phase 8 — Validation (validation)
 
-Not every step applies to every project. Here's how to navigate the optional steps:
+Cross-phase audits before implementation.
 
-### Web App (React, Next.js, etc.)
+| Step | What It Does |
+|------|-------------|
+| `scope-creep-check` | Detect scope drift from original PRD |
+| `dependency-graph-validation` | Verify task graph integrity |
+| `implementability-dry-run` | Can this actually be built as specified? |
+| `decision-completeness` | Audit ADRs for missing decisions |
+| `traceability-matrix` | Requirements → design → tasks mapping |
+| `cross-phase-consistency` | Alignment check across all phases |
+| `critical-path-walkthrough` | Identify the critical implementation path |
 
-Run the full pipeline including:
-- `/scaffold:design-system` (Phase 3) — for your UI components
-- `/scaffold:add-playwright` (Phase 4) — for browser testing
+### Phase 9 — Finalization (finalization)
 
-### Mobile App (Expo / React Native)
+Lock it down and start building.
 
-Run the full pipeline including:
-- `/scaffold:design-system` (Phase 3) — for your UI components
-- `/scaffold:add-maestro` (Phase 4) — for mobile UI testing
+| Step | What It Does |
+|------|-------------|
+| `implementation-playbook` | Step-by-step guide for the implementation phase |
+| `developer-onboarding-guide` | Onboarding guide for new contributors |
+| `apply-fixes-and-freeze` | Apply any remaining fixes and freeze the specification |
 
-### Backend / CLI / API-only
+## Methodology Presets
 
-Skip these optional steps:
-- Skip `/scaffold:design-system` — no frontend to design
-- Skip `/scaffold:add-playwright` — no browser to test
-- Skip `/scaffold:add-maestro` — no mobile app to test
+Not every project needs all 36 steps. Choose a methodology when you run `scaffold init`:
 
-### Multi-platform (web + mobile)
+### deep (depth 5)
+All 36 steps enabled. Comprehensive analysis of every angle — domain modeling, ADRs, security review, traceability matrix, the works. Best for complex systems, team projects, or when you want thorough documentation.
 
-Run everything above, including both Playwright and Maestro, plus:
-- `/scaffold:platform-parity-review` (Phase 5) — ensures all platforms have equal feature coverage
+### mvp (depth 1)
+Only 7 critical steps: create-prd, review-prd, user-stories, review-user-stories, testing-strategy, implementation-tasks, and implementation-playbook. Minimal ceremony — get to code fast. Best for prototypes, hackathons, or solo projects.
 
-### Other optional steps
+### custom (configurable)
+You choose which steps to enable and set a default depth (1-5). You can also override depth per step. Best when you know which parts of the pipeline matter for your project.
 
-- `/scaffold:multi-model-review` — requires a ChatGPT subscription (Plus/Pro/Team). Sets up a two-tier automated code review (Claude + OpenAI Codex) on every PR. Reviews use credits (~25 per review, weekly limits). Skip it if you don't have a ChatGPT subscription.
-- `/scaffold:user-stories-multi-model-review` — runs independent Codex and/or Gemini reviews of your user stories against the PRD. Requires at least one of: Codex CLI (ChatGPT subscription) or Gemini CLI (free tier available). See [setup guide](docs/multi-model-stories-review-setup.md).
-- `/scaffold:platform-parity-review` — only needed if your project targets multiple platforms (e.g., web + iOS + Android). Skip it for single-platform projects.
+You can change methodology mid-pipeline with `scaffold init --methodology <preset>`. Scaffold preserves your completed work and adjusts what's remaining.
+
+## CLI Commands
+
+| Command | What It Does |
+|---------|-------------|
+| `scaffold init` | Initialize `.scaffold/` with config, state, and decisions log |
+| `scaffold run <step>` | Execute a pipeline step (assembles and outputs the full prompt) |
+| `scaffold build` | Generate platform adapter output (commands/, AGENTS.md, etc.) |
+| `scaffold adopt` | Bootstrap state from existing artifacts (brownfield projects) |
+| `scaffold skip <step>` | Mark a step as skipped with a reason |
+| `scaffold reset <step>` | Reset a step back to pending |
+| `scaffold status` | Show pipeline progress and eligibility |
+| `scaffold next` | List next unblocked step(s) |
+| `scaffold validate` | Validate meta-prompts, config, state, and dependency graph |
+| `scaffold list` | List all steps with status |
+| `scaffold info <step>` | Show full metadata for a step |
+| `scaffold version` | Show Scaffold version |
+| `scaffold update` | Update to the latest version |
+| `scaffold dashboard` | Open a visual progress dashboard in your browser |
+| `scaffold decisions` | Show all logged decisions |
+| `scaffold knowledge` | Manage project-local knowledge base overrides |
+
+## Knowledge System
+
+Scaffold ships with 38 domain expertise entries organized in four categories:
+
+- **core/** (12 entries) — testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security review, operations, task decomposition, user stories, UX specification
+- **product/** (3 entries) — PRD craft, PRD innovation, gap analysis
+- **review/** (12 entries) — review methodologies for each domain area
+- **validation/** (7 entries) — critical path analysis, cross-phase consistency, scope management, traceability, implementability
+- **finalization/** (3 entries) — implementation playbook, developer onboarding, apply-fixes-and-freeze
+
+Each pipeline step declares which knowledge entries it needs in its frontmatter. The assembly engine injects them automatically.
+
+### Project-local overrides (v2.1)
+
+Teams can create project-specific knowledge entries in `.scaffold/knowledge/` that layer over the global entries:
+
+```bash
+scaffold knowledge update testing-strategy "We use Playwright for all E2E tests, Jest for unit tests"
+scaffold knowledge list                    # See all entries (global + local)
+scaffold knowledge show testing-strategy   # View effective content
+scaffold knowledge reset testing-strategy  # Remove override, revert to global
+```
+
+Local overrides are committable — the whole team shares enriched, project-specific guidance.
 
 ## After the Pipeline: Ongoing Commands
 
-Once your project is scaffolded and you're building features, these commands are available anytime:
+Once your project is scaffolded and you're building features, these slash commands are available in Claude Code:
 
 | Command | When to Use |
 |---------|-------------|
-| `/scaffold:new-enhancement` | You want to add a new feature to an already-scaffolded project. It updates the PRD, creates new user stories, and sets up Beads tasks with proper dependencies. |
-| `/scaffold:quick-task` | You need a focused Beads task for a bug fix, refactor, performance improvement, or small refinement — work that needs clear acceptance criteria and a test plan but not full enhancement discovery. |
-| `/scaffold:version-bump` | You've completed a set of user stories or reached a milestone and want to mark it with a version number — but you're not ready to create a tag or GitHub release yet. It bumps the version, updates the changelog, and commits. No tags, no push, no release ceremony. |
-| `/scaffold:release` | You're ready to ship a new version. It analyzes your commits, suggests a version bump (major/minor/patch), updates the changelog, bumps the version number in your project files, and creates a Git tag and GitHub release. Supports `--dry-run` to preview changes, `current` to release an already-bumped version, and `rollback` to undo a bad release. |
-| `/scaffold:single-agent-resume` | You closed Claude Code and want to pick up where you left off. It checks your current git state, finds in-progress tasks, and resumes the workflow. |
-| `/scaffold:prompt-pipeline` | Quick reference — prints the full pipeline table so you can see where you are and what's next. |
-| `/scaffold:implementation-plan-review` | Re-run after creating 5+ new tasks to audit quality and dependencies. |
-| `/scaffold:platform-parity-review` | Re-run after adding platform-specific features to check for coverage gaps. |
-| `/scaffold:multi-model-review` | Runs automatically on every PR once configured. |
+| `/scaffold:new-enhancement` | Add a new feature to an already-scaffolded project. Updates the PRD, creates new user stories, and sets up tasks with dependencies. |
+| `/scaffold:quick-task` | Create a focused task for a bug fix, refactor, or small improvement. |
+| `/scaffold:version-bump` | Mark a milestone with a version number without the full release ceremony. |
+| `/scaffold:release` | Ship a new version — changelog, Git tag, and GitHub release. Supports `--dry-run`, `current`, and `rollback`. |
+| `/scaffold:single-agent-start` | Start the autonomous implementation loop — Claude picks up tasks and builds. |
+| `/scaffold:single-agent-resume` | Resume where you left off after closing Claude Code. |
+| `/scaffold:multi-agent-start` | Start parallel implementation with multiple agents in worktrees. |
+| `/scaffold:multi-agent-resume` | Resume parallel agent work after a break. |
+| `/scaffold:prompt-pipeline` | Print the full pipeline reference table. |
 
 ## Releasing Your Project
 
 ### Version bumps (development milestones)
 
-During development, you may want to mark milestones — like completing a set of user stories — without the full release ceremony:
-
 ```
 /scaffold:version-bump
 ```
 
-This bumps the version number and updates the changelog, but doesn't create tags, push, or publish a GitHub release. Think of it as a checkpoint. You can specify the bump type explicitly (`/scaffold:version-bump minor`) or let Claude analyze your commits to suggest one.
+Bumps the version number and updates the changelog, but doesn't create tags, push, or publish a GitHub release. Think of it as a checkpoint.
 
 ### Creating a release
-
-Once you've built features and are ready to ship a version, use the release command:
-
-### Create a release
 
 ```
 /scaffold:release
 ```
 
-Claude analyzes your commits since the last release, suggests whether this is a major, minor, or patch version bump (based on your commit messages), and walks you through:
-1. Running your project's tests to make sure everything passes
-2. Updating the version number in your project files (`package.json`, `pyproject.toml`, etc.)
-3. Generating a changelog entry from your commit history
+Claude analyzes your commits since the last release, suggests whether this is a major, minor, or patch version bump, and walks you through:
+1. Running your project's tests
+2. Updating the version number in your project files
+3. Generating a changelog entry
 4. Creating a Git tag and GitHub release
 
-You confirm each step before it happens.
-
-### Preview without executing
-
-```
-/scaffold:release --dry-run
-```
-
-Shows you exactly what would happen — version bump, changelog preview, files that would change — without actually modifying anything. Use this when you want to check before committing.
-
-### Specify the version bump
-
-```
-/scaffold:release minor
-```
-
-Skip the auto-suggestion and tell Claude exactly what type of bump you want: `major`, `minor`, or `patch`.
-
-### Undo a release
-
-```
-/scaffold:release rollback
-```
-
-Made a mistake? This deletes the GitHub release, removes the Git tag, and reverts the version bump commit. You'll need to confirm by typing the exact tag name as a safety measure.
-
-### Release an already-bumped version
-
-If you already bumped the version with `/scaffold:version-bump`, the release command detects this and offers to release that version as-is — no double-bumping. You can also be explicit:
-
-```
-/scaffold:release current
-```
-
-This tags and publishes the version already in your files without bumping further.
-
-### First release
-
-If your project has never been released (no Git tags), the command detects this automatically and guides you through choosing an initial version number and setting up your changelog.
+Options: `--dry-run` to preview, `minor`/`major`/`patch` to specify the bump, `current` to release an already-bumped version, `rollback` to undo.
 
 ## Glossary
 
-Terms you'll encounter throughout the pipeline:
-
 | Term | What It Means |
 |------|---------------|
-| **Beads / `bd`** | A task tracker built for AI agents. Like a to-do list that Claude can read, create tasks in, and mark complete. Tasks are stored in git so they're versioned with your code. |
-| **CLAUDE.md** | A configuration file in your project root that tells Claude Code how to work in your project — what commands to run, what conventions to follow, and how to handle git workflow. |
-| **MCP** | Model Context Protocol. A way for Claude to use external tools. For example, the Playwright MCP lets Claude control a web browser for testing. |
-| **PRD** | Product Requirements Document. The detailed plan for what you're building — features, user flows, data models, and success metrics. Created in Phase 1. |
-| **Slash commands** | Commands you type in Claude Code that start with `/`. For example, `/scaffold:create-prd` runs the PRD creation prompt. |
-| **TDD** | Test-Driven Development. A practice where you write a failing test first, then write code to make it pass. Scaffold sets up TDD standards in Phase 2. |
-| **Worktrees** | A git feature that lets you have multiple working copies of your repo at the same time. Scaffold uses these to run multiple Claude Code agents in parallel without conflicts. |
-| **Frontmatter** | The YAML metadata block at the top of command files, between `---` markers. Contains the command description and configuration. |
+| **Assembly engine** | The runtime system that constructs full 7-section prompts from meta-prompts, knowledge entries, project context, and methodology settings. |
+| **CLAUDE.md** | A configuration file in your project root that tells Claude Code how to work in your project. |
+| **Depth** | A 1-5 scale controlling how thorough each step's analysis is, from MVP-focused (1) to exhaustive (5). |
+| **Frontmatter** | The YAML metadata block at the top of meta-prompt files, declaring dependencies, outputs, knowledge entries, and other configuration. |
+| **Knowledge base** | 38 domain expertise entries that get injected into prompts. Can be extended with project-local overrides. |
+| **MCP** | Model Context Protocol. A way for Claude to use external tools like a headless browser. |
+| **Meta-prompt** | A short intent declaration in `pipeline/` that gets assembled into a full prompt at runtime. |
+| **Methodology** | A preset (deep, mvp, custom) controlling which steps run and at what depth. |
+| **PRD** | Product Requirements Document. The foundation for everything Scaffold builds. |
+| **Slash commands** | Commands in Claude Code starting with `/`. For example, `/scaffold:create-prd`. |
+| **Worktrees** | A git feature for multiple working copies. Scaffold uses these for parallel agent execution. |
 
 ## Troubleshooting / FAQ
 
 **I ran a command and nothing happened.**
-Make sure the plugin is installed — run `/scaffold:prompt-pipeline` and check that it prints a table. If it says "unknown command," re-run the installation step.
+Make sure Scaffold is installed — run `scaffold version` or `/scaffold:prompt-pipeline` in Claude Code.
 
 **Which steps can I skip?**
-Only the ones marked **optional** in the pipeline tables above. See [Understanding the Pipeline Flow](#understanding-the-pipeline-flow) for guidance on which optional steps apply to your project type.
+Use `scaffold skip <step> --reason "..."` to skip any step. The mvp preset only enables 7 critical steps by default. With the custom preset, you choose exactly which steps to run.
 
 **Can I go back and re-run a step?**
-Yes. Most steps are idempotent — they'll update existing files rather than creating duplicates. This is especially useful for the gap analysis and review steps.
+Yes. Use `scaffold reset <step>` to reset it to pending, then `scaffold run <step>`. When re-running a completed step, Scaffold uses update mode — it loads the existing artifact and generates improvements rather than starting from scratch.
 
 **Do I need to run every step in one sitting?**
-No. You can stop after any step and come back later. When you return, use `/scaffold:single-agent-resume` if you're in the implementation phase, or just run the next command in the pipeline.
+No. Pipeline state is persisted in `.scaffold/state.json`. Run `scaffold status` when you come back to see where you left off, or `scaffold next` for what's unblocked.
 
 **What if Claude asks me a question I don't know the answer to?**
-It's fine to say you're not sure. Claude will suggest reasonable defaults and explain the trade-offs. You can always revisit decisions later.
-
-**How do I know which command to run next?**
-Every command prints "After This Step" guidance when it finishes, telling you exactly what to run next (including which optional steps to skip based on your project type).
-
-**How do I get the latest prompts?**
-Run `/scaffold:update` (or `/user:update`) from a Claude Code session. This fetches the latest version and updates your command files. You can also run `./scripts/update.sh` from the terminal. See [Updating](#updating) for details.
-
-**How do I create a release?**
-Run `/scaffold:release`. It analyzes your commits, suggests a version number, and handles the changelog, Git tag, and GitHub release for you. Use `--dry-run` first if you want to preview what will happen. For lighter-weight milestone markers (no tags or GitHub release), use `/scaffold:version-bump` instead.
+Say you're not sure. Claude suggests reasonable defaults and explains the trade-offs. You can revisit decisions later.
 
 **Can I use this for an existing project?**
-Scaffold is designed for new projects. For existing projects, you can use `/scaffold:new-enhancement` to add features or `/scaffold:quick-task` for bug fixes and small improvements, both using the same structured approach. The full pipeline assumes a fresh start.
+Yes. Run `scaffold init` — the project detector will identify it as brownfield and suggest the `deep` methodology. Use `scaffold adopt` to bootstrap state from existing artifacts.
 
-## How It Works (for contributors)
+**How do I customize the knowledge base for my project?**
+Use `scaffold knowledge update <name>` to create a project-local override in `.scaffold/knowledge/`. It layers over the global entry and is committable for team sharing.
 
-The pipeline lives in a few key places:
+## Architecture (for contributors)
 
-- **`prompts.md`** — The source of truth. Contains all 29 prompts in a single file with a setup order table at the top and individual prompt sections below.
-- **`commands/`** — Individual `.md` files (one per command) with YAML frontmatter and "After This Step" guidance. These are what Claude Code actually executes when you run a slash command.
-- **`.claude-plugin/plugin.json`** — Plugin manifest that tells Claude Code the plugin's name and metadata.
-- **`skills/scaffold-pipeline/SKILL.md`** — Auto-activated skill that provides pipeline context.
-- **`scripts/`** — Install, uninstall, and command extraction scripts.
+The project is a TypeScript CLI (`@zigrivers/scaffold`) built with yargs, targeting ES2022/Node16 ESM.
 
-The relationship between `prompts.md` and `commands/`: the prompt content comes from `prompts.md`, while frontmatter and "After This Step" sections are maintained only in the `commands/` files. If you edit a prompt, update both places.
+### Source layout
 
-## Contributing
+```
+src/
+├── cli/commands/     # 16 CLI command implementations
+├── cli/middleware/    # Project root detection, output mode resolution
+├── cli/output/       # Output strategies (interactive, json, auto)
+├── core/assembly/    # Assembly engine — meta-prompt → full prompt
+├── core/adapters/    # Platform adapters (Claude Code, Codex, Universal)
+├── core/dependency/  # DAG builder, topological sort, eligibility
+├── core/knowledge/   # Knowledge update assembler
+├── state/            # State manager, lock manager, decision logger
+├── config/           # Config loading, migration, schema validation
+├── project/          # Project detector, CLAUDE.md manager, adoption
+├── wizard/           # Init wizard (interactive + --auto)
+├── validation/       # Config, state, frontmatter validators
+├── types/            # TypeScript types and enums
+├── utils/            # FS helpers, errors, levenshtein
+└── dashboard/        # HTML dashboard generator
+```
 
-1. Edit `prompts.md` (the source of truth for prompt content)
-2. Update the corresponding file in `commands/` with any content changes
-3. If adding a new command, update the frontmatter mapping in `scripts/extract-commands.sh`
-4. Keep the setup order table at the top of `prompts.md` in sync with actual prompt sections
+### Key modules
+
+- **Assembly engine** (`src/core/assembly/engine.ts`) — Pure orchestrator with no I/O. Constructs 7-section prompts from meta-prompt + knowledge + context + methodology + instructions + depth guidance.
+- **State manager** (`src/state/state-manager.ts`) — Atomic writes via tmp + `fs.renameSync()`. Tracks step status, in-progress records, and next-eligible cache.
+- **Dependency graph** (`src/core/dependency/`) — Kahn's algorithm topological sort with phase-aware ordering and cycle detection.
+- **Platform adapters** (`src/core/adapters/`) — 3-step lifecycle (initialize → generateStepWrapper → finalize) producing Claude Code commands, Codex AGENTS.md, or universal markdown.
+- **Project detector** (`src/project/detector.ts`) — Scans for file system signals to classify projects as greenfield, brownfield, or v1-migration.
+
+### Content layout
+
+```
+pipeline/             # 36 meta-prompts organized by phase
+knowledge/            # 38 domain expertise entries (core, product, review, validation, finalization)
+methodology/          # 3 YAML presets (deep, mvp, custom)
+commands/             # Generated Claude Code slash commands (from scaffold build)
+skills/               # Claude Code plugin skill definition
+```
+
+### Testing
+
+- **Vitest** for unit and E2E tests (60 test files)
+- **Performance benchmarks** — assembly p95 < 500ms, state I/O p95 < 100ms, graph build p95 < 2s
+- **Shell script tests** via bats
+- Run: `npm test` (unit + E2E), `npm run test:bench` (benchmarks), `make check` (full CI gate)
+
+### Contributing
+
+1. Meta-prompt content lives in `pipeline/` — edit the relevant `.md` file
+2. Run `scaffold build` to regenerate `commands/` from pipeline meta-prompts
+3. Run `npm run check` (lint + type-check + test) before submitting
+4. Knowledge entries live in `knowledge/` — follow the existing frontmatter schema
+5. ADRs documenting architectural decisions are in `docs/v2/adrs/` (55 total)
 
 ## License
 

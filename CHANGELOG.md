@@ -45,7 +45,7 @@ This is a complete rewrite of Scaffold. The v1 hard-coded Bash prompt pipeline h
 - **OutputContext strategy pattern** — `interactive` (ANSI, spinner), `json` (envelope), `auto` (silent defaults)
 - **E2E test suite** — 39 tests covering real temp-directory workflows
 - **Performance benchmarks** — assembly p95 < 500ms, state I/O p95 < 100ms, graph build p95 < 2s
-- **npm packaging** — `@scaffold-cli/scaffold`, `files` array, `publishConfig`
+- **npm packaging** — `@zigrivers/scaffold`, `files` array, `publishConfig`
 - **Migration guide** — `docs/v2/migration-guide.md` with v1→v2 concept mapping and step-by-step instructions
 
 ### Changed

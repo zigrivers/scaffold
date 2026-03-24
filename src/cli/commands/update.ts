@@ -46,12 +46,12 @@ function detectInstallChannel(): { channel: string; upgradeCommand: string } {
     return { channel: 'homebrew', upgradeCommand: 'brew upgrade scaffold' }
   }
   try {
-    execSync('npm list -g scaffold 2>/dev/null', { stdio: 'pipe' })
-    return { channel: 'npm-global', upgradeCommand: 'npm update -g scaffold' }
+    execSync('npm list -g @zigrivers/scaffold 2>/dev/null', { stdio: 'pipe' })
+    return { channel: 'npm-global', upgradeCommand: 'npm update -g @zigrivers/scaffold' }
   } catch {
     // not npm global
   }
-  return { channel: 'npx', upgradeCommand: 'npx scaffold@latest' }
+  return { channel: 'npx', upgradeCommand: 'npx @zigrivers/scaffold@latest' }
 }
 
 /**
@@ -116,7 +116,7 @@ const updateCommand: CommandModule<Record<string, unknown>, UpdateArgs> = {
 
     let latestVersion: string | null = null
     try {
-      latestVersion = await _fetchLatestVersion('scaffold')
+      latestVersion = await _fetchLatestVersion('@zigrivers/scaffold')
     } catch {
       // network error — latestVersion stays null
     }

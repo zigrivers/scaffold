@@ -1,5 +1,5 @@
 {
-  "name": "@scaffold-cli/scaffold",
+  "name": "@zigrivers/scaffold",
   "version": "2.1.0",
   "description": "AI-powered software project scaffolding pipeline",
   "type": "module",
