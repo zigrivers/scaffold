@@ -2,6 +2,13 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.2.2] — 2026-03-26
+
+### Added
+
+- **Automatic state migration** — upgrading from v2.1 to v2.2 is now frictionless. On first `scaffold status` or `scaffold run`, the state manager automatically renames `testing-strategy` → `tdd`, `implementation-tasks` → `implementation-plan`, `review-tasks` → `implementation-plan-review` in `.scaffold/state.json`
+- **PRD path flexibility** — projects using `docs/prd.md` (v1 convention) or `docs/plan.md` (v2 convention) now work interchangeably. The context gatherer resolves aliased artifact paths, and the project detector recognizes both filenames
+
 ## [2.2.1] — 2026-03-26
 
 ### Added
