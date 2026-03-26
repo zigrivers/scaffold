@@ -69,43 +69,40 @@ One optional step (`user-stories-multi-model-review`) runs independent AI review
 
 ## Installation
 
-### Option 1: npm (recommended)
+Scaffold has two parts that install separately:
+
+- **CLI** (`scaffold`) — the core tool. Install via npm or Homebrew. Use it from your terminal or from Claude Code with `! scaffold run <step>`.
+- **Plugin** (`/scaffold:`) — optional slash commands for Claude Code. Lets you type `/scaffold:create-prd` instead of `! scaffold run create-prd`.
+
+### Step 1: Install the CLI
+
+Pick one:
+
+**npm (recommended)**
 
 ```bash
 npm install -g @zigrivers/scaffold
 ```
 
-After installing, the `scaffold` CLI is available globally. Slash commands (`/scaffold:create-prd`, etc.) are also available in Claude Code via the plugin.
-
-### Option 2: Homebrew
+**Homebrew**
 
 ```bash
 brew tap zigrivers/scaffold
 brew install scaffold
 ```
 
-### Option 3: Claude Code Plugin
+Verify: `scaffold version`
 
-If you only need slash commands inside Claude Code (no CLI):
+### Step 2: Add slash commands (optional)
+
+If you want `/scaffold:` commands inside Claude Code, also install the plugin:
 
 ```
 /plugin marketplace add zigrivers/scaffold
 /plugin install scaffold@zigrivers-scaffold
 ```
 
-Commands are available as `/scaffold:command-name` (for example, `/scaffold:create-prd`).
-
-### Verify Installation
-
-```bash
-scaffold version
-```
-
-Or in Claude Code:
-
-```
-/scaffold:prompt-pipeline
-```
+This is optional — everything the plugin does can also be done with `scaffold run <step>` from the CLI.
 
 ## Updating
 
