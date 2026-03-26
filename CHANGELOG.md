@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.3.3] — 2026-03-26
+
+### Fixed
+
+- **`scaffold skill install` path resolution** — skills directory was incorrectly resolved relative to `dist/` instead of the package root. Now uses `getPackageRoot()` consistent with pipeline/knowledge/methodology resolution.
+
 ## [2.3.2] — 2026-03-26
 
 ### Added
