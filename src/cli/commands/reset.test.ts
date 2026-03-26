@@ -245,4 +245,95 @@ describe('reset command', () => {
     void stdoutSpy
     void mockAcquireLock
   })
+
+  // --- Step-level reset tests ---
+
+  function writeState(steps: Record<string, { status: string; produces?: string[] }>) {
+    const state = {
+      'schema-version': 1,
+      'scaffold-version': '2.4.0',
+      init_methodology: 'deep',
+      config_methodology: 'deep',
+      'init-mode': 'greenfield',
+      created: '2026-01-01T00:00:00.000Z',
+      in_progress: null,
+      steps: Object.fromEntries(
+        Object.entries(steps).map(([name, entry]) => [
+          name,
+          { status: entry.status, source: 'pipeline', produces: entry.produces ?? [] },
+        ]),
+      ),
+      next_eligible: [],
+      'extra-steps': [],
+    }
+    fs.writeFileSync(
+      path.join(tempDir, '.scaffold', 'state.json'),
+      JSON.stringify(state, null, 2),
+    )
+  }
+
+  it('resets a completed step to pending', async () => {
+    writeState({ 'create-prd': { status: 'completed', produces: ['docs/plan.md'] } })
+
+    await resetCommand.handler({
+      step: 'create-prd',
+      force: true,
+      root: tempDir,
+      $0: 'scaffold',
+      _: ['reset', 'create-prd'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    const state = JSON.parse(
+      fs.readFileSync(path.join(tempDir, '.scaffold', 'state.json'), 'utf8'),
+    )
+    expect(state.steps['create-prd'].status).toBe('pending')
+    expect(exitSpy).toHaveBeenCalledWith(0)
+  })
+
+  it('resets a skipped step to pending', async () => {
+    writeState({ 'design-system': { status: 'skipped' } })
+
+    await resetCommand.handler({
+      step: 'design-system',
+      force: true,
+      root: tempDir,
+      $0: 'scaffold',
+      _: ['reset', 'design-system'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    const state = JSON.parse(
+      fs.readFileSync(path.join(tempDir, '.scaffold', 'state.json'), 'utf8'),
+    )
+    expect(state.steps['design-system'].status).toBe('pending')
+    expect(exitSpy).toHaveBeenCalledWith(0)
+  })
+
+  it('reports already pending step without error', async () => {
+    writeState({ 'tdd': { status: 'pending' } })
+
+    await resetCommand.handler({
+      step: 'tdd',
+      root: tempDir,
+      $0: 'scaffold',
+      _: ['reset', 'tdd'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(writtenLines.join('')).toContain('already pending')
+  })
+
+  it('exits 2 for nonexistent step with suggestion', async () => {
+    writeState({ 'create-prd': { status: 'completed' } })
+
+    await resetCommand.handler({
+      step: 'creat-prd',
+      force: true,
+      root: tempDir,
+      $0: 'scaffold',
+      _: ['reset', 'creat-prd'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    expect(exitSpy).toHaveBeenCalledWith(2)
+    expect(writtenLines.join('')).toContain('Did you mean')
+  })
 })
