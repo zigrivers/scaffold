@@ -1,4 +1,4 @@
-.PHONY: help test lint validate check setup hooks install uninstall extract dashboard-test
+.PHONY: help test lint validate check eval setup hooks install uninstall extract dashboard-test
 
 help: ## Show available targets
 	@grep -E '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -13,6 +13,9 @@ validate: ## Validate frontmatter in command files
 	./scripts/validate-frontmatter.sh commands/*.md
 
 check: lint validate test ## Run all quality gates (lint + validate + test)
+
+eval: ## Run scaffold meta-evals (cross-system consistency checks)
+	npx bats tests/evals/
 
 setup: ## Install dev dependencies via Homebrew
 	@command -v shellcheck >/dev/null 2>&1 || { echo "Installing shellcheck..."; brew install shellcheck; }

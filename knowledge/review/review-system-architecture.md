@@ -294,3 +294,31 @@ Architecture documents are long. Inconsistencies between early and late sections
 - P1: "Section 3 describes the system as having five microservices, but the component diagram shows six. The 'Scheduler' component appears in the diagram but not in the prose."
 - P1: "The architecture uses 'API Gateway' in sections 2-4 and 'Reverse Proxy' in section 6 for what appears to be the same component."
 - P2: "Node.js version is stated as 18 in section 1 and 20 in the deployment section."
+
+### Example Review Finding
+
+```markdown
+### Finding: Orphaned component with no data flow connections
+
+**Pass:** 3 — Data Flow Completeness
+**Priority:** P0
+**Location:** Component diagram (architecture.md, Section 2.1)
+
+**Issue:** Component 'AnalyticsEngine' appears in the component diagram as a
+standalone service but is not referenced in any of the 12 documented data flows.
+It has no documented inputs (what data does it consume?), no documented outputs
+(where do analytics results go?), and no documented trigger (what initiates
+analytics processing?).
+
+**Impact:** The database schema step cannot design analytics storage without
+knowing what data the AnalyticsEngine processes. The implementation tasks step
+cannot scope analytics work without knowing the component's interfaces. The UX
+spec step cannot design analytics dashboards without knowing what data is available.
+
+**Recommendation:** Either (a) add data flows showing how AnalyticsEngine receives
+events from other components, what processing it performs, and where results are
+stored/served, or (b) remove AnalyticsEngine from the diagram if analytics is
+out of scope for v1.
+
+**Trace:** Component diagram → missing data flow coverage
+```

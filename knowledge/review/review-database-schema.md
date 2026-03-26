@@ -227,3 +227,29 @@ The API contracts step specifically needs:
 - P0: "API will need 'get all orders for a customer with their line items and product details.' This requires joining orders -> line_items -> products, but line_items has no index on order_id, and the relationship from line_items to products is missing."
 - P1: "The schema supports 'get user by email' but the API will also need 'search users by name.' No index exists on user name columns."
 - P2: "Some tables use soft delete (deleted_at column) and some use hard delete. The API contract needs to know which approach applies to determine whether 'delete' operations return 204 or 200."
+
+### Example Review Finding
+
+```markdown
+### Finding: Missing composite index for primary order query pattern
+
+**Pass:** 4 — Index Coverage
+**Priority:** P0
+**Location:** orders table, schema.sql lines 45-72
+
+**Issue:** Architecture data flow DF-003 ("Customer views order history") describes
+the primary query as "find all orders by customer, sorted by most recent first." This
+query filters on customer_id and sorts on created_at DESC. The orders table has a
+single-column index on customer_id but no composite index on (customer_id, created_at).
+
+**Impact:** Without a composite index, PostgreSQL will use the customer_id index to
+filter, then perform a filesort on the matching rows. At projected volume (50K orders
+per customer for enterprise accounts), this filesort will cause multi-second response
+times on the most frequently executed query.
+
+**Recommendation:** Add composite index: CREATE INDEX idx_orders_customer_date
+ON orders (customer_id, created_at DESC). The DESC matches the sort direction,
+enabling an index-only scan for this query pattern.
+
+**Trace:** Architecture data flow DF-003 → PRD Feature 2.1 "Order History"
+```

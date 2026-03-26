@@ -233,3 +233,36 @@ The PRD's primary consumer is the user stories phase. If features are too vague 
 
 - P0: "Feature 'user management' cannot be decomposed into stories — what operations? What user types? What permissions model?"
 - P1: "Business rules for discount application are implied but not stated — story acceptance criteria will have to guess at validation logic."
+
+### Example Review Finding
+
+```markdown
+### Finding: NFRs use qualitative adjectives instead of quantified targets
+
+**Pass:** 5 — NFR Quantification
+**Priority:** P1
+**Location:** PRD Section 6 "Non-Functional Requirements"
+
+**Issue:** Performance requirements state "the system should be fast and responsive."
+No response time targets, percentile thresholds, or load conditions are specified.
+"Fast" is subjective — it means <100ms to a backend engineer and <3s to a product
+manager evaluating full page loads.
+
+Similarly, availability requirement states "high availability" without specifying
+a target uptime percentage, maximum acceptable downtime window, or recovery time
+objective (RTO).
+
+**Impact:** The architecture step cannot make infrastructure decisions (single
+instance vs. load-balanced, database read replicas, CDN) without quantified
+performance targets. The testing step cannot write performance tests without
+thresholds to assert against. Implementing agents will make arbitrary performance
+trade-offs with no shared baseline.
+
+**Recommendation:** Replace with quantified targets:
+- "API response time: p95 < 200ms, p99 < 500ms under 1000 concurrent users"
+- "Page load time: Largest Contentful Paint < 2.5s on 4G connection"
+- "Availability: 99.9% uptime (8.7 hours maximum downtime per year)"
+- "Recovery: RTO < 15 minutes, RPO < 1 hour"
+
+**Trace:** PRD Section 6 → blocks Architecture Phase → blocks Implementation
+```

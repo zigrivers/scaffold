@@ -169,3 +169,60 @@ Group related suggestions for efficient decision-making. For each group:
 2. State the cost (trivial/moderate/significant)
 3. State your recommendation (must-have/backlog/reject)
 4. Wait for approval before integrating into stories
+
+### Example Innovation Finding
+
+When documenting an innovation suggestion, use a structured format that makes the enhancement, its cost, and its impact immediately clear:
+
+```markdown
+## Innovation Finding: Smart Defaults for Checkout Address
+
+**Category:** High-Value Low-Effort Enhancement — Smart Defaults
+**Applies to:** Story 4.2 "As a returning customer, I want to enter my shipping address"
+
+**Current behavior:** User must re-enter full shipping address on every order, even
+if it has not changed since their last purchase.
+
+**Proposed enhancement:** Pre-fill shipping address from the user's most recent order.
+Show a "Same as last order" toggle that auto-populates all address fields. User can
+still edit any field after pre-fill.
+
+**User benefit:** Reduces a 6-field manual entry to a single click for repeat customers,
+which account for 65% of orders per the PRD's user research.
+
+**Cost:** Trivial — requires reading the most recent order's address (data already exists)
+and pre-populating form fields. No new API endpoints, no new database tables.
+
+**Impact:** Noticeable improvement — reduces checkout friction for the majority of users.
+Directly supports the PRD success metric "reduce checkout abandonment from 72% to 45%."
+
+**Recommendation:** Must-have for v1. High impact, trivial cost, directly tied to a
+success metric.
+
+**Acceptance criteria addition:**
+- Given a returning customer with a previous order,
+  when they reach the shipping address step,
+  then all address fields are pre-filled with their most recent shipping address
+- Given a new customer with no previous orders,
+  when they reach the shipping address step,
+  then all address fields are empty (current behavior)
+```
+
+---
+
+## Integration With User Stories
+
+When approved innovations are integrated into the story set, they modify stories in one of three ways:
+
+**Adding acceptance criteria** — The most common integration for trivial-cost enhancements. The innovation becomes additional acceptance criteria on an existing story.
+
+**Adding a new story** — For moderate-cost enhancements that warrant their own story. The new story should reference the innovation finding and include a clear "why" tying it back to the PRD.
+
+**Modifying an existing story's scope** — For enhancements that change how a feature works rather than adding to it. The original story's description and acceptance criteria are updated to reflect the enhanced behavior.
+
+### Traceability
+
+Every innovation that gets integrated must be traceable:
+- The innovation finding should reference the PRD requirement it enhances
+- The modified or new story should reference the innovation finding
+- The innovation decision (must-have/backlog/reject) should be recorded for audit

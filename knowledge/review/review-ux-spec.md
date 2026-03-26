@@ -206,3 +206,39 @@ When the UX spec designs components that do not match the architecture's compone
 - P1: "The UX spec designs an 'OrderSummaryWidget' that combines order details, customer info, and payment status. The architecture separates these into three independent components (OrderComponent, CustomerComponent, PaymentComponent) with separate data sources."
 - P1: "The UX spec assumes global state for user preferences (accessible from any component), but the architecture specifies component-local state with prop drilling."
 - P2: "The UX spec's 'ProductCard' component bundles product image, price, and add-to-cart button. The architecture models 'ProductDisplay' and 'CartAction' as separate concerns."
+
+### Example Review Finding
+
+```markdown
+### Finding: Dashboard has no empty state or loading state design
+
+**Pass:** 3 — Interaction State Completeness
+**Priority:** P0
+**Location:** UX Spec Section 4.1 "User Dashboard"
+
+**Issue:** The dashboard screen shows charts (order volume, revenue trend) and
+summary metrics (total orders, account balance, recent activity). The spec provides
+only the populated state — what the screen looks like with data.
+
+Missing states:
+- **Empty state:** A new user with zero orders sees empty chart containers with
+  no axes, no labels, and no guidance. The metrics show "$0" and "0 orders" with
+  no context.
+- **Loading state:** When dashboard data is being fetched (3 separate API calls
+  per the API contract), what does the user see? No skeleton, spinner, or
+  progressive loading is specified.
+- **Partial error state:** If the revenue chart API fails but the orders API
+  succeeds, does the entire dashboard show an error, or just the revenue widget?
+
+**Impact:** Implementing agents will either show blank containers (confusing for
+new users), a full-page spinner (poor perceived performance), or nothing at all
+while loading. The first-time user experience — which is critical for activation
+metrics in the PRD — is completely undesigned.
+
+**Recommendation:** Design three additional states:
+1. Empty state with onboarding CTA ("Create your first order to see analytics here")
+2. Skeleton loading state with placeholder shapes matching the populated layout
+3. Per-widget error state with retry button, so partial failures are isolated
+
+**Trace:** UX Spec 4.1 → PRD Success Metric "70% user activation within 7 days"
+```

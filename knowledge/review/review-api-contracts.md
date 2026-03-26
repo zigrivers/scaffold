@@ -231,3 +231,36 @@ The implementation tasks step needs:
 - P0: "The UX wireframe shows a 'user dashboard' with order count, recent orders, and account balance, but the API has no endpoint that provides this aggregated data. The frontend would need to make 3+ separate calls."
 - P1: "Several endpoints are marked as 'async' (returns 202) but there is no documented polling or webhook mechanism for the frontend to get the result."
 - P2: "API response examples do not include null/empty cases. The UX spec needs to know what an empty order list or a user with no profile photo looks like in API terms."
+
+### Example Review Finding
+
+```markdown
+### Finding: Payment endpoint missing idempotency specification
+
+**Pass:** 6 — Idempotency
+**Priority:** P0
+**Location:** API Contract Section 5.3 "POST /payments/charge"
+
+**Issue:** The POST /payments/charge endpoint accepts a payment method and amount,
+charges the customer, and returns a payment confirmation. The endpoint documents
+only the 201 (success) and 400 (bad request) responses.
+
+No idempotency mechanism is specified. If a client sends a charge request and
+receives a network timeout (no response), it cannot safely retry — the retry
+may charge the customer a second time. This is a financial data integrity issue.
+
+**Impact:** Frontend developers will either (a) not retry on timeout, leaving
+the user unsure if payment succeeded, or (b) retry unconditionally, risking
+double charges. Both outcomes damage user trust and create support burden.
+
+**Recommendation:** Add an Idempotency-Key header requirement:
+- Client must include `Idempotency-Key: <uuid>` on every POST /payments/charge
+- Server stores the key with the payment result for 24 hours
+- Repeated requests with the same key return the original result without
+  re-processing
+- Document the key format (UUIDv4), retention window (24h), and behavior on
+  key reuse (return cached result with 200, not 201)
+
+**Trace:** API Contract 5.3 → PRD Section 3.2 "Payment Processing" →
+ADR-009 "Financial data integrity requirements"
+```

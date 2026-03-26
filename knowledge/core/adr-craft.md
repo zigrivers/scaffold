@@ -251,6 +251,55 @@ Technology decisions often cluster. Rather than 20 individual ADRs for each pack
 
 Each group ADR can cover multiple decisions if they are tightly coupled and were evaluated together.
 
+## Example ADR
+
+The following shows a complete ADR following the structure and quality guidelines above:
+
+```markdown
+# ADR-003: Use PostgreSQL for Persistent Storage
+
+## Status
+Accepted
+
+## Context
+The application (per PRD Section 2) manages financial transaction data with strict
+consistency requirements, flexible metadata per transaction type, and projected volume
+of 500K transactions/month within the first year. The team has strong SQL experience
+and the project is AI-built, favoring well-documented technologies.
+
+## Decision
+We will use PostgreSQL 16 for all persistent storage in this application.
+
+## Alternatives Considered
+
+### SQLite
+- **Why considered:** Zero operational overhead, embedded, excellent for small-to-medium
+  read-heavy workloads.
+- **Why rejected:** Single-writer limitation is incompatible with concurrent transaction
+  processing. No built-in network access for multi-instance deployment.
+
+### MongoDB
+- **Why considered:** Flexible schema matches variable transaction metadata. Strong
+  horizontal scaling story.
+- **Why rejected:** Weaker ACID guarantees for multi-document transactions. Team has
+  limited MongoDB experience. Less well-represented in AI training data than PostgreSQL,
+  increasing hallucination risk for query patterns.
+
+## Consequences
+
+### Benefits
+- JSONB columns provide flexible metadata storage without sacrificing relational integrity
+- Strong ACID compliance for financial transaction consistency
+- Most widely adopted open-source RDBMS — extensive AI training data coverage
+- Rich ecosystem: pg_stat_statements for monitoring, pg_dump for backups, mature ORMs
+
+### Costs and Risks
+- Operational overhead: requires backup configuration, connection pooling, and monitoring
+- JSONB queries are less performant than MongoDB's native document queries for deeply
+  nested structures
+- Schema migrations require planning for zero-downtime deployments
+```
+
 ## Common Pitfalls
 
 **Recording decisions without alternatives.** An ADR that says "We'll use React" without mentioning Vue or Svelte provides no insight into the decision process. When a new team member asks "why not Vue?", there's no answer. Fix: always document at least one alternative and why it was rejected.
