@@ -6,7 +6,8 @@ import { createOutputContext } from '../output/context.js'
 import { loadConfig } from '../../config/loader.js'
 import { StateManager } from '../../state/state-manager.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
-import { getPackagePipelineDir } from '../../utils/fs.js'
+import { getPackagePipelineDir, getPackageMethodologyDir } from '../../utils/fs.js'
+import { loadAllPresets } from '../../core/assembly/preset-loader.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { computeEligible } from '../../core/dependency/eligibility.js'
 
@@ -45,16 +46,36 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
-    // 2. Load state and config
-    const stateManager = new StateManager(projectRoot, () => [])
-    const state = stateManager.loadState()
-    loadConfig(projectRoot, [])
-
-    // 3. Discover meta-prompts and compute eligible
+    // 2. Load config and discover meta-prompts
+    const { config } = loadConfig(projectRoot, [])
     const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))
+
+    // 3. Load methodology preset (same as run.ts) for correct eligibility
+    const methodologyDir = getPackageMethodologyDir(projectRoot)
+    const presets = loadAllPresets(methodologyDir, [...metaPrompts.keys()])
+    const methodology = (config as Record<string, unknown>)?.methodology as string ?? 'deep'
+    const preset = methodology === 'mvp'
+      ? presets.mvp
+      : methodology === 'custom'
+        ? presets.custom ?? presets.deep
+        : presets.deep
+    const presetSteps = new Map(Object.entries(preset?.steps ?? {}))
+
+    // 4. Build graph with preset and compute eligible
+    const computeEligibleFn = (steps: Parameters<typeof computeEligible>[1]) => {
+      const graph = buildGraph(
+        [...metaPrompts.values()].map(m => m.frontmatter),
+        presetSteps,
+      )
+      return computeEligible(graph, steps)
+    }
+
+    const stateManager = new StateManager(projectRoot, computeEligibleFn)
+    const state = stateManager.loadState()
+
     const graph = buildGraph(
       [...metaPrompts.values()].map(m => m.frontmatter),
-      new Map(),
+      presetSteps,
     )
     const eligible = computeEligible(graph, state.steps)
 
