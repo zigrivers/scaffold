@@ -2,6 +2,13 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.3.1] — 2026-03-26
+
+### Added
+
+- **Scaffold Runner skill** (`skills/scaffold-runner/SKILL.md`) — Claude Code skill that wraps the scaffold CLI with intelligent decision point surfacing. Previews assembled prompts, extracts AskUserQuestion patterns (depth, strictness, optional sections), presents them as interactive questions, and executes with answers baked in.
+- **README installation instructions** for the skill, with usage examples
+
 ## [2.3.0] — 2026-03-26
 
 ### Added
