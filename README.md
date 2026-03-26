@@ -109,6 +109,36 @@ If you want `/scaffold:` commands inside Claude Code, also install the plugin:
 
 This is optional — everything the plugin does can also be done with `scaffold run <step>` from the CLI.
 
+### Step 3: Enable the Scaffold Runner skill (recommended)
+
+The Scaffold Runner skill gives Claude Code an intelligent interactive wrapper around the scaffold CLI. Without it, when Claude runs `scaffold run <step>`, decision points in the assembled prompt (depth level, strictness, optional sections) get buried and Claude picks defaults silently. With the skill, those questions are surfaced to you before execution.
+
+**If you installed the plugin** (Step 2), the skill is included automatically.
+
+**If you're using the CLI only**, add the skill to your project:
+
+```bash
+# In your project directory
+mkdir -p .claude/skills
+cp "$(npm root -g)/@zigrivers/scaffold/skills/scaffold-runner/SKILL.md" .claude/skills/scaffold-runner.md
+```
+
+**What the skill does:**
+1. Previews the assembled prompt before executing it
+2. Extracts decision points (depth, strictness, optional sections, architecture choices)
+3. Presents them to you as interactive questions
+4. Executes the full prompt with your answers baked in
+5. Shows pipeline progress and suggests the next step
+
+**Usage** — just tell Claude Code what you want in natural language:
+```
+"Run the next scaffold step"
+"Run scaffold create-prd"
+"Where am I in the pipeline?"
+"Skip the design system step"
+"Use depth 3 for everything"
+```
+
 ## Updating
 
 ### npm
@@ -514,7 +544,7 @@ pipeline/             # 53 meta-prompts organized by 14 phases
 knowledge/            # 43 domain expertise entries (core, product, review, validation, finalization)
 methodology/          # 3 YAML presets (deep, mvp, custom)
 commands/             # 69 Claude Code slash commands (53 pipeline + 16 utility)
-skills/               # Claude Code plugin skill definition
+skills/               # Claude Code skills (scaffold-pipeline reference, scaffold-runner interactive wrapper)
 ```
 
 ### Testing
