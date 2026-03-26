@@ -2,6 +2,18 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.2.1] — 2026-03-26
+
+### Added
+
+- **Meta-evals** — 6 bats-based eval files in `tests/evals/` (20 tests) that verify cross-system consistency: channel parity, knowledge quality gates, pipeline step completeness, command structure, cross-channel consistency, redundancy detection
+- **`make eval` target** — runs meta-evals separately from `make test` and `make check` (opt-in for CI)
+
+### Fixed
+
+- **10 knowledge quality gaps** caught by the new evals: `user-story-innovation.md` expanded to 228 lines, code blocks added to 9 files (adr-craft + 8 review files)
+- **`create-prd` pipeline output path** — corrected from `docs/prd.md` to `docs/plan.md` to match the actual command behavior
+
 ## [2.2.0] — 2026-03-26
 
 ### Added
