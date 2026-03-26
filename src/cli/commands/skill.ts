@@ -67,7 +67,8 @@ const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
       let installed = 0
       for (const skill of INSTALLABLE_SKILLS) {
         const sourcePath = path.join(packageSkillsDir, skill.source)
-        const destPath = path.join(skillsDir, `${skill.name}.md`)
+        const destDir = path.join(skillsDir, skill.name)
+        const destPath = path.join(destDir, 'SKILL.md')
 
         if (fs.existsSync(destPath) && !argv.force) {
           output.info(`${skill.name}: already installed (use --force to overwrite)`)
@@ -79,9 +80,16 @@ const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
           continue
         }
 
+        // Clean up old flat-file format (.claude/skills/<name>.md) from v2.3.2
+        const oldFlatPath = path.join(skillsDir, `${skill.name}.md`)
+        if (fs.existsSync(oldFlatPath)) {
+          fs.unlinkSync(oldFlatPath)
+        }
+
+        fs.mkdirSync(destDir, { recursive: true })
         fs.copyFileSync(sourcePath, destPath)
         installed++
-        output.success(`${skill.name}: installed to .claude/skills/${skill.name}.md`)
+        output.success(`${skill.name}: installed to .claude/skills/${skill.name}/SKILL.md`)
       }
 
       if (installed > 0) {
@@ -97,13 +105,13 @@ const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
         const skills = INSTALLABLE_SKILLS.map(skill => ({
           name: skill.name,
           description: skill.description,
-          installed: fs.existsSync(path.join(skillsDir, `${skill.name}.md`)),
+          installed: fs.existsSync(path.join(skillsDir, skill.name, 'SKILL.md')),
         }))
         output.result(skills)
       } else {
         output.info('Available scaffold skills:\n')
         for (const skill of INSTALLABLE_SKILLS) {
-          const installed = fs.existsSync(path.join(skillsDir, `${skill.name}.md`))
+          const installed = fs.existsSync(path.join(skillsDir, skill.name, 'SKILL.md'))
           const status = installed ? '\u2713 installed' : '  not installed'
           output.info(`  ${status}  ${skill.name} — ${skill.description}`)
         }
@@ -115,9 +123,9 @@ const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
     case 'remove': {
       let removed = 0
       for (const skill of INSTALLABLE_SKILLS) {
-        const destPath = path.join(skillsDir, `${skill.name}.md`)
-        if (fs.existsSync(destPath)) {
-          fs.unlinkSync(destPath)
+        const destDir = path.join(skillsDir, skill.name)
+        if (fs.existsSync(destDir)) {
+          fs.rmSync(destDir, { recursive: true })
           removed++
           output.success(`${skill.name}: removed`)
         }

@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.3.5] — 2026-03-26
+
+### Fixed
+
+- **Skills installed to wrong directory structure** — `scaffold skill install` was creating `.claude/skills/<name>.md` (flat files) but Claude Code expects `.claude/skills/<name>/SKILL.md` (subdirectories). Now creates the correct structure. Also cleans up old flat files from v2.3.2-2.3.4 on re-install.
+
 ## [2.3.4] — 2026-03-26
 
 ### Fixed
