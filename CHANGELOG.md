@@ -2,6 +2,16 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.3.2] — 2026-03-26
+
+### Added
+
+- **`scaffold skill` CLI command** — one-command skill installation for CLI-only users. `scaffold skill install` copies skills to `.claude/skills/`, `scaffold skill list` shows status, `scaffold skill remove` cleans up.
+
+### Changed
+
+- **README simplified** — plugin install (Step 2) is now the recommended path and includes both skills automatically. CLI-only users get `scaffold skill install` as a one-liner alternative.
+
 ## [2.3.1] — 2026-03-26
 
 ### Added
