@@ -1,9 +1,9 @@
 import type { CommandModule, Argv } from 'yargs'
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
+import { getPackageRoot } from '../../utils/fs.js'
 
 interface SkillArgs {
   action: string
@@ -14,19 +14,9 @@ interface SkillArgs {
   force?: boolean
 }
 
-/** Resolve the package's skills directory (works in both dev and dist). */
+/** Resolve the package's skills directory using the same root as pipeline/knowledge. */
 function getPackageSkillsDir(): string {
-  const __dirname = path.dirname(fileURLToPath(import.meta.url))
-  // dist/cli/commands/ → ../../skills/
-  // src/cli/commands/ → ../../../skills/
-  const candidates = [
-    path.resolve(__dirname, '../../skills'),
-    path.resolve(__dirname, '../../../skills'),
-  ]
-  for (const dir of candidates) {
-    if (fs.existsSync(dir)) return dir
-  }
-  return candidates[0]
+  return path.join(getPackageRoot(), 'skills')
 }
 
 /** Available skills to install. */
