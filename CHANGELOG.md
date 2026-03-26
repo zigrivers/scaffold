@@ -2,6 +2,18 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.3.0] — 2026-03-26
+
+### Added
+
+- **`scaffold build` command generation** (T-039-T-042) — generates rich command files from pipeline steps + knowledge base entries. Plugin users (`/scaffold:`) now get domain expertise in every command, closing the quality gap between the CLI and Plugin channels.
+- **`loadFullEntries()`** in knowledge loader — returns complete knowledge content (Summary + Deep Guidance) for build-time use, while `loadEntries()` continues returning Deep Guidance only for CLI assembly
+
+### Changed
+
+- **`AdapterStepInput` extended** with `body`, `sections`, `knowledgeEntries`, `conditional`, `longDescription` — adapters now receive full step content for richer output generation
+- **`ClaudeCodeAdapter` rewritten** — generates self-contained command files with meta-prompt body, domain knowledge content, and dependency-derived navigation instead of simple wrappers
+
 ## [2.2.2] — 2026-03-26
 
 ### Added
