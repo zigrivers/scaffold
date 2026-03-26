@@ -1,6 +1,6 @@
 {
   "name": "scaffold",
-  "version": "2.3.6",
+  "version": "2.4.0",
   "description": "Composable meta-prompt pipeline for scaffolding new software projects with Claude Code",
   "author": {
     "name": "zigrivers"

@@ -2,6 +2,14 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.4.0] — 2026-03-26
+
+### Fixed
+
+- **"Next eligible: none" bug** — `scaffold next` and `scaffold status` now correctly compute eligible steps by loading the methodology preset. Previously they built the dependency graph with an empty preset map, breaking eligibility computation for all projects.
+- **`scaffold init --force` preserves completed steps** — re-initialization now reads old state before backup, applies step name migrations, and merges completed/skipped steps into the new state. Previously all progress was lost on re-init.
+- **`scaffold status` shows live eligibility** — computes eligible steps fresh instead of displaying stale cache from state.json
+
 ## [2.3.6] — 2026-03-26
 
 ### Fixed
