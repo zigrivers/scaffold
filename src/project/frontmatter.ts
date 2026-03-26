@@ -145,6 +145,11 @@ function normalizeRawObject(raw: Record<string, unknown>): Record<string, unknow
     normalized['order'] = isNaN(n) ? normalized['order'] : n
   }
 
+  // FAILSAFE_SCHEMA returns null as the string "null" — coerce to actual null
+  if (normalized['conditional'] === 'null') {
+    normalized['conditional'] = null
+  }
+
   // Coerce arrays parsed via FAILSAFE_SCHEMA (values remain strings, which is correct)
   // Arrays returned by FAILSAFE_SCHEMA are already arrays of strings — no coercion needed
 

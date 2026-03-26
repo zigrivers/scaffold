@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.1.2] — 2026-03-25
+
+### Fixed
+
+- **Meta-prompt loading with FAILSAFE_SCHEMA** — `conditional: null` in pipeline frontmatter was parsed as the string `"null"` instead of actual `null`, causing all 36 meta-prompts to be skipped with "Required field conditional is missing"
+
 ## [2.1.1] — 2026-03-25
 
 ### Fixed
