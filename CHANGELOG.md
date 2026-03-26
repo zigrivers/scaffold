@@ -2,6 +2,13 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.3.6] — 2026-03-26
+
+### Fixed
+
+- **New pipeline phases not recognized** — frontmatter validator only allowed the original 9 phases. Added `foundation`, `environment`, `integration`, `stories`, `consolidation` to the schema.
+- **Order range too restrictive** — `order` was limited to integers 1-36. Now allows numbers 1-100 (including decimals like 20.5) to accommodate the expanded pipeline.
+
 ## [2.3.5] — 2026-03-26
 
 ### Fixed
