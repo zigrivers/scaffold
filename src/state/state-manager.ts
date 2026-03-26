@@ -2,6 +2,7 @@ import type { PipelineState, StepStateEntry, InProgressRecord, DepthLevel, StepS
 import type { ScaffoldError } from '../types/index.js'
 import { atomicWriteFile, fileExists, ensureDir } from '../utils/fs.js'
 import { stateMissing, stateParseError, stateSchemaVersion, psmAlreadyInProgress } from '../utils/errors.js'
+import { migrateState } from './state-migration.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { MethodologyName } from '../types/index.js'
@@ -42,8 +43,15 @@ export class StateManager {
     }
 
     // ADR-033: forward compatibility — unknown fields produce warnings (not errors) and are preserved
-    // Simply return the full parsed object without stripping extra fields
-    return parsed as unknown as PipelineState
+    const state = parsed as unknown as PipelineState
+
+    // Apply state migrations (step renames, artifact path normalization).
+    // Migrations are idempotent — safe to run on already-migrated state.
+    if (migrateState(state)) {
+      this.saveState(state)
+    }
+
+    return state
   }
 
   /** Atomically persist state to disk (write tmp + rename). */

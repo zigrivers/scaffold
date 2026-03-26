@@ -196,7 +196,8 @@ describe('StateManager', () => {
 
       const state = manager.loadState()
       expect(state.steps['create-prd'].status).toBe('completed')
-      expect(state.steps['create-prd'].produces).toEqual(['docs/prd.md'])
+      // State migration normalizes docs/prd.md → docs/plan.md on load
+      expect(state.steps['create-prd'].produces).toEqual(['docs/plan.md'])
       expect(state.steps['create-prd'].artifacts_verified).toBe(true)
       expect(typeof state.steps['create-prd'].at).toBe('string')
       expect(state.in_progress).toBeNull()

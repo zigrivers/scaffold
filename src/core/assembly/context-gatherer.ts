@@ -2,6 +2,7 @@ import type { ProjectContext, ArtifactEntry, ExistingArtifact } from '../../type
 import type { PipelineState, ScaffoldConfig, DecisionEntry } from '../../types/index.js'
 import { fileExists } from '../../utils/fs.js'
 import { readDecisions } from '../../state/decision-logger.js'
+import { resolveArtifactPath } from '../../state/state-migration.js'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -28,11 +29,13 @@ export function gatherContext(options: {
     if (!stepEntry || stepEntry.status !== 'completed') continue
     const produces = stepEntry.produces ?? []
     for (const outputPath of produces) {
-      const fullPath = path.resolve(projectRoot, outputPath)
+      // Resolve aliased paths (e.g., docs/prd.md ↔ docs/plan.md)
+      const resolvedPath = resolveArtifactPath(projectRoot, outputPath)
+      const fullPath = path.resolve(projectRoot, resolvedPath)
       if (fileExists(fullPath)) {
         try {
           const content = fs.readFileSync(fullPath, 'utf8')
-          artifacts.push({ stepName: depStep, filePath: outputPath, content })
+          artifacts.push({ stepName: depStep, filePath: resolvedPath, content })
         } catch {
           // warn but continue — missing artifact gracefully handled
         }
