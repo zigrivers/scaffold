@@ -23,7 +23,7 @@ afterEach(() => {
 const testRegistry: SectionRegistry = {
   'create-prd': { heading: '## Project Overview', tokenBudget: 50 },
   'system-architecture': { heading: '## Architecture Summary', tokenBudget: 100 },
-  'testing-strategy': { heading: '## Testing Strategy', tokenBudget: 30 },
+  'tdd': { heading: '## Testing Strategy', tokenBudget: 30 },
 }
 
 describe('ClaudeMdManager', () => {
@@ -92,15 +92,15 @@ describe('ClaudeMdManager', () => {
     const slugs = sections.map(s => s.slug)
     expect(slugs).toContain('create-prd')
     expect(slugs).toContain('system-architecture')
-    expect(slugs).toContain('testing-strategy')
+    expect(slugs).toContain('tdd')
   })
 
   it('fillSection returns CMD_SECTION_OVER_BUDGET warning when content exceeds token budget', () => {
     const root = makeTmpDir()
-    // tokenBudget for testing-strategy is 30 — use lots of words to exceed it
+    // tokenBudget for tdd is 30 — use lots of words to exceed it
     const manager = new ClaudeMdManager(root, testRegistry)
     const longContent = Array(50).fill('word').join(' ')
-    const warnings = manager.fillSection('testing-strategy', longContent)
+    const warnings = manager.fillSection('tdd', longContent)
     expect(warnings.length).toBeGreaterThan(0)
     expect(warnings.some(w => w.code === 'CMD_SECTION_OVER_BUDGET')).toBe(true)
   })

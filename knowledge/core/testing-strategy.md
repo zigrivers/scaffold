@@ -4,9 +4,13 @@ description: Test pyramid, testing patterns, coverage strategy, and quality gate
 topics: [testing, tdd, test-pyramid, quality-gates, coverage, test-data, mocking]
 ---
 
-## Test Pyramid
+# Testing Strategy
 
-The test pyramid organizes tests by scope, speed, and confidence:
+Expert knowledge for test pyramid design, testing patterns, coverage strategy, and quality gates across all test levels.
+
+## Summary
+
+### Test Pyramid
 
 ```
         /  E2E Tests  \         Few, slow, high confidence
@@ -15,7 +19,28 @@ The test pyramid organizes tests by scope, speed, and confidence:
      ________________________
 ```
 
-### Unit Tests
+### Test Level Definitions
+
+- **Unit Tests** — Single function/method/class in isolation. No I/O, deterministic, millisecond execution. Test pure business logic, state machines, edge cases, error handling.
+- **Integration Tests** — Interaction between 2+ components with real infrastructure. Seconds to execute. Test API handlers, DB queries, auth middleware, external service integrations.
+- **E2E Tests** — Complete user flows with real browser/device. Seconds to minutes. Test critical user journeys only (5-15 tests for most apps).
+
+### Basic Patterns
+
+- **Arrange/Act/Assert (AAA)** — Set up conditions, perform action, verify result.
+- **Given/When/Then (BDD)** — Behavior-oriented variant for integration and E2E tests.
+- **Test Doubles** — Stubs (return predetermined data), Mocks (verify interactions), Spies (wrap real implementations), Fakes (simplified working implementations).
+
+### What NOT to Mock
+
+- The thing you're testing
+- Value objects and simple data transformations
+- The database in integration tests
+- Too many things (if 10 mocks needed, refactor the code)
+
+## Deep Guidance
+
+### Unit Tests — Extended
 
 **What they test:** A single function, method, or class in isolation from all external dependencies (database, network, file system, other modules).
 
@@ -62,7 +87,7 @@ describe('calculateOrderTotal', () => {
 });
 ```
 
-### Integration Tests
+### Integration Tests — Extended
 
 **What they test:** The interaction between two or more components, including real infrastructure (database, API calls between layers, message queues).
 
@@ -113,7 +138,7 @@ describe('POST /api/v1/users', () => {
 });
 ```
 
-### End-to-End (E2E) Tests
+### End-to-End (E2E) Tests — Extended
 
 **What they test:** Complete user flows from the user's perspective, using a real browser (for web apps) or real device/emulator (for mobile apps).
 
@@ -139,60 +164,19 @@ describe('POST /api/v1/users', () => {
 - Each tests a complete user journey, not a single interaction
 - If an E2E test breaks, it reveals a real user-facing problem
 
-## Testing Patterns
+### Test Doubles — Detailed Patterns
 
-### Arrange / Act / Assert (AAA)
+#### Stubs
 
-Every test follows three phases:
-
-```typescript
-it('calculates discount for premium members', () => {
-  // Arrange: set up the test conditions
-  const member = createMember({ tier: 'premium' });
-  const order = createOrder({ items: [{ price: 10000 }] });
-
-  // Act: perform the action being tested
-  const discount = calculateDiscount(member, order);
-
-  // Assert: verify the result
-  expect(discount).toBe(1000);  // 10% discount
-});
-```
-
-### Given / When / Then (BDD)
-
-Behavior-oriented variant, often used for integration and E2E tests:
-
-```typescript
-describe('Order submission', () => {
-  it('sends confirmation email when order is submitted', async () => {
-    // Given: a draft order with valid items
-    const order = await createDraftOrder({ customerId, items: validItems });
-
-    // When: the order is submitted
-    await orderService.submit(order.id);
-
-    // Then: a confirmation email is queued
-    expect(emailQueue.messages).toContainEqual(
-      expect.objectContaining({
-        to: customer.email,
-        template: 'order-confirmation',
-        data: { orderId: order.id }
-      })
-    );
-  });
-});
-```
-
-### Test Doubles
-
-**Stubs:** Return predetermined responses. Use when you need to control what a dependency returns.
+Return predetermined responses. Use when you need to control what a dependency returns.
 
 ```typescript
 const userRepo = { findById: jest.fn().mockResolvedValue({ id: '1', name: 'Alice' }) };
 ```
 
-**Mocks:** Record calls and verify interactions. Use when you need to verify that a dependency was called correctly.
+#### Mocks
+
+Record calls and verify interactions. Use when you need to verify that a dependency was called correctly.
 
 ```typescript
 const emailService = { send: jest.fn() };
@@ -203,17 +187,22 @@ expect(emailService.send).toHaveBeenCalledWith({
 });
 ```
 
-**Spies:** Wrap real implementations and record calls. Use when you want real behavior but also want to verify calls.
+#### Spies
 
-**Fakes:** Working implementations with simplified behavior. Use for expensive dependencies in tests (in-memory database instead of real database).
+Wrap real implementations and record calls. Use when you want real behavior but also want to verify calls.
 
-**When to use which:**
+#### Fakes
+
+Working implementations with simplified behavior. Use for expensive dependencies in tests (in-memory database instead of real database).
+
+#### When to Use Which
+
 - Stub external services (HTTP APIs, email, payment)
 - Mock side-effect-producing dependencies (to verify they're called)
 - Spy on internal functions (to verify call patterns without changing behavior)
 - Fake databases in unit tests (in-memory implementations of repository interfaces)
 
-### What NOT to Mock
+### What NOT to Mock — Extended
 
 - **The thing you're testing.** If you mock the function under test, you're testing the mock, not the code.
 - **Value objects and simple data transformations.** Use real instances; they're fast and deterministic.
@@ -243,9 +232,9 @@ Verify that a service provider and its consumers agree on the API contract:
 
 Best for: microservices, separate frontend/backend teams, or any system where the API producer and consumer are developed independently.
 
-## Coverage Strategy
+### Coverage Strategy — In Depth
 
-### Coverage Targets by Layer
+#### Coverage Targets by Layer
 
 Coverage targets should vary by the criticality and testability of each layer:
 
@@ -257,7 +246,7 @@ Coverage targets should vary by the criticality and testability of each layer:
 | Infrastructure (adapters, config) | 50-70% line | Low logic density; over-testing adds maintenance burden |
 | Generated code | 0% | Don't test generated code; test the generator |
 
-### Meaningful vs. Vanity Coverage
+#### Meaningful vs. Vanity Coverage
 
 **Meaningful coverage** tests behavior that could break:
 - Branch coverage (both sides of every `if` statement)
@@ -283,9 +272,9 @@ Tools: Stryker (JavaScript/TypeScript), mutmut (Python), PITest (Java).
 
 Use mutation testing periodically (not on every CI run — it's slow) to assess test suite quality.
 
-## Quality Gates
+### Quality Gates — Detailed
 
-### Pre-Commit Checks
+#### Pre-Commit Checks
 
 Run on every commit (should complete in <10 seconds):
 
@@ -295,7 +284,7 @@ Run on every commit (should complete in <10 seconds):
 
 These are fast, catch obvious mistakes, and prevent noisy diffs in PRs.
 
-### CI Pipeline Checks
+#### CI Pipeline Checks
 
 Run on every push and PR (should complete in <5 minutes):
 
@@ -305,7 +294,7 @@ Run on every push and PR (should complete in <5 minutes):
 - **Build verification** (the application compiles and builds successfully)
 - **Security audit** (dependency vulnerability scan)
 
-### Pre-Merge Requirements
+#### Pre-Merge Requirements
 
 Before a PR can be merged:
 
@@ -314,7 +303,7 @@ Before a PR can be merged:
 - No merge conflicts
 - Branch is up-to-date with main (or rebased)
 
-### Performance Benchmarks (Optional)
+#### Performance Benchmarks (Optional)
 
 For performance-critical applications:
 
@@ -323,9 +312,9 @@ For performance-critical applications:
 - Significant regressions (>10% degradation) block merge
 - Baselines updated when intentional changes affect performance
 
-## Test Data
+### Test Data Management
 
-### Fixtures
+#### Fixtures
 
 Static test data stored in files or constants. Best for:
 - Reference data (country lists, category hierarchies, status enums)
@@ -347,7 +336,7 @@ export const adminUser = {
 };
 ```
 
-### Factories
+#### Factories
 
 Functions that generate test data with sensible defaults and selective overrides. Best for:
 - Creating many variations of the same entity
@@ -370,7 +359,7 @@ function createUser(overrides: Partial<User> = {}): User {
 const suspendedUser = createUser({ status: 'suspended' });
 ```
 
-### Seeds
+#### Seeds
 
 Initial data loaded into the test database for integration tests. Rules:
 - Seed data represents realistic scenarios (not just one record per table)
@@ -378,7 +367,7 @@ Initial data loaded into the test database for integration tests. Rules:
 - Seed data is minimal (only what tests need; don't replicate production)
 - Seed data includes edge cases (user with no orders, order with many items)
 
-### Test Database Management
+#### Test Database Management
 
 **Transaction rollback pattern:** Each test runs inside a database transaction that is rolled back after the test. Fast, clean, but doesn't test commit behavior.
 
@@ -388,7 +377,7 @@ Initial data loaded into the test database for integration tests. Rules:
 
 **Recommendation:** Use transaction rollback for unit-level database tests. Use truncate-and-seed for integration test suites. Use dedicated databases for CI.
 
-## Common Pitfalls
+### Common Pitfalls
 
 **Testing implementation details.** "Verify that `_processPayment` was called with exactly these parameters." This test breaks whenever the internal implementation changes, even if the observable behavior is unchanged. Fix: test the observable outcome, not the internal mechanism.
 

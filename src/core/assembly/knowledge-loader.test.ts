@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
-import { buildIndex, buildIndexWithOverrides, loadEntries } from './knowledge-loader.js'
+import { buildIndex, buildIndexWithOverrides, loadEntries, extractDeepGuidance } from './knowledge-loader.js'
 
 const tmpDirs: string[] = []
 
@@ -242,5 +242,104 @@ describe('loadEntries', () => {
     expect(entries).toHaveLength(0)
     expect(warnings).toHaveLength(2)
     expect(warnings.every(w => w.code === 'FRONTMATTER_KB_ENTRY_MISSING')).toBe(true)
+  })
+
+  it('loads only Deep Guidance section when present', () => {
+    const dir = makeTmpDir()
+    const deepContent = `---
+name: test-deep
+description: Test deep guidance extraction
+topics:
+  - testing
+---
+
+# Test Deep
+
+## Summary
+
+This content overlaps with the command prompt and should be skipped.
+
+## Deep Guidance
+
+This is the deep guidance that should be loaded.
+
+### Subsection
+
+More deep content here.
+`
+    writeTmpFile(dir, 'test-deep.md', deepContent)
+
+    const index = buildIndex(dir)
+    const { entries } = loadEntries(index, ['test-deep'])
+
+    expect(entries).toHaveLength(1)
+    expect(entries[0].content).toContain('This is the deep guidance that should be loaded')
+    expect(entries[0].content).toContain('More deep content here')
+    expect(entries[0].content).not.toContain('overlaps with the command prompt')
+    expect(entries[0].content).not.toContain('## Summary')
+  })
+
+  it('loads full body when no Deep Guidance section exists', () => {
+    const dir = makeTmpDir()
+    writeTmpFile(dir, 'prd-craft.md', prdCraftContent)
+
+    const index = buildIndex(dir)
+    const { entries } = loadEntries(index, ['prd-craft'])
+
+    expect(entries).toHaveLength(1)
+    expect(entries[0].content).toContain('This is the knowledge base content for PRD crafting')
+    expect(entries[0].content).toContain('Section One')
+  })
+})
+
+describe('extractDeepGuidance', () => {
+  it('returns content after Deep Guidance heading', () => {
+    const body = `# Title
+
+## Summary
+
+Summary content.
+
+## Deep Guidance
+
+Deep content here.
+
+### More
+
+Even more.`
+
+    const result = extractDeepGuidance(body)
+    expect(result).not.toBeNull()
+    expect(result).toContain('Deep content here')
+    expect(result).toContain('Even more')
+    expect(result).not.toContain('Summary content')
+  })
+
+  it('returns null when no Deep Guidance heading exists', () => {
+    const body = `# Title
+
+## Section One
+
+Content.
+
+## Section Two
+
+More content.`
+
+    expect(extractDeepGuidance(body)).toBeNull()
+  })
+
+  it('handles case-insensitive heading match', () => {
+    const body = `## Summary
+
+Stuff.
+
+## deep guidance
+
+Deep stuff here.`
+
+    const result = extractDeepGuidance(body)
+    expect(result).not.toBeNull()
+    expect(result).toContain('Deep stuff here')
   })
 })

@@ -1,6 +1,6 @@
 # Scaffold
 
-A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 36 structured pipeline steps — organized into 9 phases — and Claude Code handles the research, planning, and implementation for you.
+A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 53 structured pipeline steps — organized into 14 phases — and Claude Code handles the research, planning, and implementation for you.
 
 By the end, you'll have a fully planned, standards-documented, implementation-ready project with working code.
 
@@ -16,7 +16,12 @@ Here's how it works:
 
 3. **Follow the dependency graph** — Scaffold tracks which steps are complete, which are eligible, and which are blocked. Run `scaffold next` to see what's unblocked, or `scaffold status` for the full picture. Each step produces a specific artifact — a planning document, architecture decision, specification, or actual code.
 
-You can run steps via the CLI (`scaffold run create-prd`) or via slash commands in Claude Code (`/scaffold:create-prd`). Either way, Scaffold constructs the prompt and Claude does the work.
+You can run steps two ways:
+
+- **CLI**: `scaffold run create-prd` — the assembly engine builds a full prompt from the meta-prompt, knowledge base entries, and project context. Best for the structured pipeline with dependency tracking.
+- **Slash commands**: `/scaffold:create-prd` in Claude Code — uses pre-rendered, self-contained prompts. Best for quick access to individual commands without the full pipeline ceremony.
+
+Either way, Scaffold constructs the prompt and Claude does the work. The CLI tracks pipeline state and dependencies; slash commands are fire-and-forget.
 
 ## Key Concepts
 
@@ -24,10 +29,10 @@ You can run steps via the CLI (`scaffold run create-prd`) or via slash commands 
 
 **Assembly engine** — At execution time, Scaffold builds a 7-section prompt from: system metadata, the meta-prompt, knowledge base entries, project context (artifacts from prior steps), methodology settings, layered instructions, and depth-specific execution guidance.
 
-**Knowledge base** — 38 domain expertise entries in `knowledge/` covering testing strategy, domain modeling, API design, security review, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
+**Knowledge base** — 39 domain expertise entries in `knowledge/` covering testing strategy, domain modeling, API design, security best practices, eval craft, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
 
 **Methodology presets** — Three built-in presets control which steps run and how deep the analysis goes:
-- **deep** (depth 5) — all 36 steps, exhaustive analysis
+- **deep** (depth 5) — all steps enabled, exhaustive analysis
 - **mvp** (depth 1) — 7 critical steps, get to code fast
 - **custom** (depth 1-5) — you choose which steps to enable and how deep each one goes
 
@@ -185,7 +190,39 @@ Define what you're building.
 | `innovate-user-stories` | Gap analysis and UX innovation pass on user stories |
 | `review-user-stories` | Structured review of user stories for coverage and clarity |
 
-### Phase 2 — Domain Modeling (modeling)
+### Phase 2 — Project Foundation (foundation)
+
+Set up tooling, standards, and project structure.
+
+| Step | What It Does |
+|------|-------------|
+| `beads` | Initialize Beads task tracking and create CLAUDE.md |
+| `tech-stack` | Research and document technology choices |
+| `claude-code-permissions` | Configure agent permissions for autonomous work |
+| `coding-standards` | Create coding standards with linter/formatter configs |
+| `project-structure` | Design and scaffold the directory layout |
+
+### Phase 3 — Development Environment (environment)
+
+Configure the working environment.
+
+| Step | What It Does |
+|------|-------------|
+| `dev-env-setup` | Set up local dev environment with live reload |
+| `design-system` | Create design tokens and component patterns *(web apps only)* |
+| `git-workflow` | Configure branching, CI, and worktree scripts |
+| `multi-model-review` | Set up multi-model code review on PRs *(optional)* |
+
+### Phase 4 — Testing Integration (integration)
+
+Add E2E testing frameworks.
+
+| Step | What It Does |
+|------|-------------|
+| `add-playwright` | Configure Playwright for web app testing *(web apps only)* |
+| `add-maestro` | Configure Maestro for mobile app testing *(mobile apps only)* |
+
+### Phase 5 — Domain Modeling (modeling)
 
 Understand the problem domain.
 
@@ -194,7 +231,7 @@ Understand the problem domain.
 | `domain-modeling` | DDD analysis — bounded contexts, aggregates, value objects |
 | `review-domain-modeling` | Review of domain model for correctness and completeness |
 
-### Phase 3 — Architecture Decisions (decisions)
+### Phase 6 — Architecture Decisions (decisions)
 
 Record key technical decisions.
 
@@ -203,7 +240,7 @@ Record key technical decisions.
 | `adrs` | Creates Architecture Decision Records for major choices |
 | `review-adrs` | Review of ADRs for completeness and rationale |
 
-### Phase 4 — System Architecture (architecture)
+### Phase 7 — System Architecture (architecture)
 
 Design the system.
 
@@ -212,7 +249,7 @@ Design the system.
 | `system-architecture` | Component design, layering, patterns, scalability |
 | `review-architecture` | Structured architecture review |
 
-### Phase 5 — Specifications (specification)
+### Phase 8 — Specifications (specification)
 
 Detail the interfaces.
 
@@ -225,29 +262,49 @@ Detail the interfaces.
 | `ux-spec` | Interaction design, usability, user flows |
 | `review-ux` | Review of UX specification |
 
-### Phase 6 — Quality (quality)
+### Phase 9 — Quality (quality)
 
 Plan for quality, security, and operations.
 
 | Step | What It Does |
 |------|-------------|
-| `testing-strategy` | Test pyramid, patterns, coverage strategy |
+| `tdd` | Test pyramid, patterns, coverage strategy |
 | `review-testing` | Review of testing strategy |
+| `create-evals` | Generate project-specific eval checks from standards docs |
 | `security` | OWASP, threat modeling, security controls |
 | `review-security` | Review of security practices |
 | `operations` | CI/CD, deployment, monitoring, runbooks |
 | `review-operations` | Review of operations plan |
 
-### Phase 7 — Planning (planning)
+### Phase 10 — Stories & Reviews (stories)
+
+Multi-model reviews and cross-platform checks.
+
+| Step | What It Does |
+|------|-------------|
+| `user-stories-multi-model-review` | Multi-model coverage audit of user stories *(optional)* |
+| `platform-parity-review` | Audit platform coverage across docs *(multi-platform only)* |
+
+### Phase 11 — Consolidation (consolidation)
+
+Clean up and verify before planning implementation.
+
+| Step | What It Does |
+|------|-------------|
+| `claude-md-optimization` | Consolidate and optimize CLAUDE.md |
+| `workflow-audit` | Verify workflow consistency across all docs |
+
+### Phase 12 — Planning (planning)
 
 Break work into implementable tasks.
 
 | Step | What It Does |
 |------|-------------|
-| `implementation-tasks` | Decompose stories into a task graph with dependencies |
-| `review-tasks` | Review task quality, coverage, and sizing |
+| `implementation-plan` | Decompose stories into a task graph with dependencies |
+| `implementation-plan-review` | Review task quality, coverage, and sizing |
+| `multi-model-review-tasks` | Multi-model review of implementation tasks *(optional)* |
 
-### Phase 8 — Validation (validation)
+### Phase 13 — Validation (validation)
 
 Cross-phase audits before implementation.
 
@@ -261,7 +318,7 @@ Cross-phase audits before implementation.
 | `cross-phase-consistency` | Alignment check across all phases |
 | `critical-path-walkthrough` | Identify the critical implementation path |
 
-### Phase 9 — Finalization (finalization)
+### Phase 14 — Finalization (finalization)
 
 Lock it down and start building.
 
@@ -273,13 +330,13 @@ Lock it down and start building.
 
 ## Methodology Presets
 
-Not every project needs all 36 steps. Choose a methodology when you run `scaffold init`:
+Not every project needs all 53 steps. Choose a methodology when you run `scaffold init`:
 
 ### deep (depth 5)
-All 36 steps enabled. Comprehensive analysis of every angle — domain modeling, ADRs, security review, traceability matrix, the works. Best for complex systems, team projects, or when you want thorough documentation.
+All steps enabled. Comprehensive analysis of every angle — domain modeling, ADRs, security review, traceability matrix, the works. Best for complex systems, team projects, or when you want thorough documentation.
 
 ### mvp (depth 1)
-Only 7 critical steps: create-prd, review-prd, user-stories, review-user-stories, testing-strategy, implementation-tasks, and implementation-playbook. Minimal ceremony — get to code fast. Best for prototypes, hackathons, or solo projects.
+Only 7 critical steps: create-prd, review-prd, user-stories, review-user-stories, tdd, implementation-plan, and implementation-playbook. Minimal ceremony — get to code fast. Best for prototypes, hackathons, or solo projects.
 
 ### custom (configurable)
 You choose which steps to enable and set a default depth (1-5). You can also override depth per step. Best when you know which parts of the pipeline matter for your project.
@@ -309,15 +366,15 @@ You can change methodology mid-pipeline with `scaffold init --methodology <prese
 
 ## Knowledge System
 
-Scaffold ships with 38 domain expertise entries organized in four categories:
+Scaffold ships with 39 domain expertise entries organized in five categories:
 
-- **core/** (12 entries) — testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security review, operations, task decomposition, user stories, UX specification
+- **core/** (13 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, user story innovation
 - **product/** (3 entries) — PRD craft, PRD innovation, gap analysis
-- **review/** (12 entries) — review methodologies for each domain area
-- **validation/** (7 entries) — critical path analysis, cross-phase consistency, scope management, traceability, implementability
+- **review/** (13 entries) — review methodology (shared), plus domain-specific review passes for PRD, user stories, domain modeling, ADRs, architecture, API contracts, database schema, UX spec, testing, security, operations, implementation tasks
+- **validation/** (7 entries) — critical path analysis, cross-phase consistency, scope management, traceability, implementability, decision completeness, dependency validation
 - **finalization/** (3 entries) — implementation playbook, developer onboarding, apply-fixes-and-freeze
 
-Each pipeline step declares which knowledge entries it needs in its frontmatter. The assembly engine injects them automatically.
+Each pipeline step declares which knowledge entries it needs in its frontmatter. The assembly engine injects them automatically. Knowledge files with a `## Deep Guidance` section are optimized for the CLI — only the deep guidance content is loaded into the assembled prompt, skipping the summary to avoid redundancy with the prompt text.
 
 ### Project-local overrides (v2.1)
 
@@ -447,10 +504,10 @@ src/
 ### Content layout
 
 ```
-pipeline/             # 36 meta-prompts organized by phase
-knowledge/            # 38 domain expertise entries (core, product, review, validation, finalization)
+pipeline/             # 53 meta-prompts organized by 14 phases
+knowledge/            # 39 domain expertise entries (core, product, review, validation, finalization)
 methodology/          # 3 YAML presets (deep, mvp, custom)
-commands/             # Generated Claude Code slash commands (from scaffold build)
+commands/             # 38 Claude Code slash commands (generated from prompts.md)
 skills/               # Claude Code plugin skill definition
 ```
 

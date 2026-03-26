@@ -16,7 +16,7 @@ This is both the production operations guide and the local development workflow.
 
 ## Inputs
 - docs/system-architecture.md (required) — what to deploy
-- docs/testing-strategy.md (required) — CI pipeline test stages
+- docs/tdd-standards.md (required) — CI pipeline test stages
 - docs/adrs/ (required) — infrastructure decisions
 
 ## Expected Outputs

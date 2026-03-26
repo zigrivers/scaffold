@@ -200,3 +200,53 @@ AI agents have limited context windows. If a task does not specify what to read,
 - P0: "Task 'Implement order creation endpoint' lists no context documents. The agent needs the API contract (endpoint spec), database schema (orders table), domain model (Order aggregate invariants), and architecture section (Order Service design)."
 - P1: "Task 'Build user dashboard' references the architecture document but not the UX spec. The agent will build the component structure correctly but not the visual design."
 - P2: "Task context references 'docs/system-architecture.md' without specifying which section. The agent will load the entire 2000-line document instead of the relevant 100-line section."
+
+---
+
+## Common Review Anti-Patterns
+
+### 1. Reviewing Tasks in Isolation
+
+The reviewer checks each task individually (sizing, acceptance criteria, context) but never builds the full dependency graph or traces the critical path. Individual tasks may look fine, but the overall task structure has cycles, missing coverage, or an incorrect critical path. Passes 2, 5, and 6 require looking at the task set as a whole, not one task at a time.
+
+**How to spot it:** The review report has findings only from Passes 3, 4, and 7 (task-level checks) and none from Passes 1, 2, 5, or 6 (structural checks). The reviewer never drew the dependency graph.
+
+### 2. Trusting Dependency Declarations Without Verification
+
+The reviewer reads the declared dependencies for each task and checks for cycles, but never verifies that the declared dependencies are complete. A task that says "depends on: database schema" may also implicitly depend on "auth middleware" (because the endpoint requires authentication), but this dependency is not declared. The reviewer must read the task description and infer actual prerequisites, not just validate declared ones.
+
+**Example finding:**
+
+```markdown
+## Finding: ITR-022
+
+**Priority:** P0
+**Pass:** Missing Dependencies (Pass 2)
+**Document:** docs/implementation-tasks.md, Task 14
+
+**Issue:** Task 14 ("Implement order creation endpoint") declares dependency on Task 3
+("Create database schema") but does not declare dependency on Task 7 ("Implement auth
+middleware"). The task's acceptance criteria include "returns 401 for unauthenticated
+requests," which requires auth middleware to exist. If an agent starts Task 14 before
+Task 7 is complete, they cannot implement or test the auth requirement.
+
+**Recommendation:** Add Task 7 as an explicit dependency for Task 14.
+```
+
+### 3. Accepting "Implement Feature X" as a Valid Task
+
+The reviewer sees a task titled "Implement user management" with acceptance criteria listing 8 endpoints, 3 database tables, 2 background jobs, and role-based access control — and does not flag it as too large. A single task should be completable in one agent session (30-60 minutes). "Implement user management" is a project phase, not a task.
+
+**How to spot it:** Count the acceptance criteria and the distinct concerns. More than 5-7 acceptance criteria or more than 2 distinct concerns (e.g., API + database + auth) means the task needs splitting.
+
+### 4. Ignoring Test Tasks
+
+The reviewer verifies implementation tasks but does not check whether corresponding test tasks exist. The testing strategy says "integration tests for all API endpoints," but there is no task for writing those tests. Tests are not free — they require their own implementation time, and if no task exists for them, they will not be written.
+
+**How to spot it:** For each implementation task, search for a corresponding test task. If implementation tasks outnumber test tasks by more than 3:1, testing is systematically under-tasked.
+
+### 5. No Verification of Parallelization Claims
+
+Tasks are marked as parallelizable, and the reviewer accepts this at face value. But two tasks marked as parallel both modify `src/config/database.ts` or both add routes to the same router file. The reviewer must check for shared file modifications, not just logical independence.
+
+**How to spot it:** The review has no findings from Pass 6 (Parallelization Validity). The reviewer checked for logical dependencies but not for file-level conflicts.

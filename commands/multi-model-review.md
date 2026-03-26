@@ -72,7 +72,7 @@ TIER 3: POST-MERGE FOLLOW-UP (after merge — catches escaped findings)
   • Follow-up PR created targeting main
 ```
 
-**Tier 1 (review subagent)** is built into the Git Workflow prompt (Section 4: PR Workflow) and applies to ALL projects. The agent spawns a review subagent that checks `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md. P0/P1 findings block push.
+**Tier 1 (review subagent)** is built into the Git Workflow prompt (Section 4: PR Workflow) and applies to ALL projects. The agent spawns a review subagent that checks `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md. Optionally, if the task references a user story and `docs/user-stories.md` exists, it also verifies the PR's tests address each acceptance criterion. P0/P1 findings block push.
 
 **Tier 2 (Codex Cloud + CI fix loop)** is optional and per-project. The rest of this prompt sets up Tier 2.
 

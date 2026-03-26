@@ -51,6 +51,7 @@ Continue until all acceptance criteria for the task are met. Multiple commits pe
 **4.5. AI review (before push)**
 Spawn a review subagent with fresh context to check `git diff origin/main...HEAD`:
 - Check against CLAUDE.md and docs/coding-standards.md
+- If the task references a user story (e.g., BD description contains "US-XXX") and `docs/user-stories.md` exists: read that story's acceptance criteria and verify the PR's tests address each AC. Flag untested ACs as P1.
 - Report P0 (blocking), P1 (must fix), P2 (should fix), P3 (optional)
 - Fix P0/P1 findings, re-run lint+test, commit fixes with `[BD-<id>] fix: address review findings`
 - Log recurring patterns to tasks/lessons.md
@@ -185,6 +186,7 @@ CLAUDE.md must contain the complete workflow. Check for:
 **Step 4.5: AI Review**:
 - [ ] Review subagent step documented (spawns fresh-context subagent before push)
 - [ ] Reviews `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md
+- [ ] Optional requirements check: if task references a user story (BD description contains "US-XXX") and `docs/user-stories.md` exists, verifies PR tests address each AC (untested ACs are P1)
 - [ ] P0/P1 findings block push; P2/P3 optional
 - [ ] Runs lint and test after fixes
 - [ ] Recurring patterns logged to tasks/lessons.md
@@ -657,7 +659,7 @@ After updates, verify:
 | 2 | `git fetch`, branch format, `origin/main`, lessons.md reference |
 | 3 | Think through approach (3+ steps), write specs, do NOT use `/plan`, re-plan if stuck |
 | 4 | Red/Green/Refactor, verify command (project's lint+test from Key Commands), commit format `[BD-<id>]` |
-| 4.5 | AI review: spawn review subagent, checks `git diff origin/main...HEAD` against CLAUDE.md + docs/coding-standards.md, P0/P1 block push, recurring patterns → tasks/lessons.md |
+| 4.5 | AI review: spawn review subagent, checks `git diff origin/main...HEAD` against CLAUDE.md + docs/coding-standards.md. Optional: if task references US-XXX and docs/user-stories.md exists, verify PR tests address each AC (untested ACs = P1). P0/P1 block push, recurring patterns → tasks/lessons.md |
 | 5 | Rebase onto origin/main, push, PR create with title, auto-merge with `--delete-branch` |
 | 6 | `gh pr checks --watch`, failure handling |
 | 7 | Merge confirmation command, "never close until MERGED" |
@@ -670,9 +672,11 @@ After updates, verify:
 When this step is complete, tell the user:
 
 ---
-**Phase 6 complete** — Workflow verified and aligned across all documents.
+**Phase 6 in progress** — Workflow verified and aligned across all documents.
 
-**Next:** Run `/scaffold:implementation-plan` — Create task graph from stories and standards (starts Phase 7).
+**Next:** Run `/scaffold:create-evals` — Generate project-specific eval checks from standards docs.
+
+**Or skip to:** `/scaffold:implementation-plan` — Create task graph from stories and standards (starts Phase 7).
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

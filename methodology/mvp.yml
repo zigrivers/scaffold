@@ -4,6 +4,21 @@ description: Get to code fast with minimal ceremony
 default_depth: 1
 
 steps:
+  # Phase 2 — Foundation (minimal setup for MVP)
+  beads: { enabled: false }
+  tech-stack: { enabled: true }
+  claude-code-permissions: { enabled: false }
+  coding-standards: { enabled: true }
+  project-structure: { enabled: true }
+  # Phase 3 — Environment
+  dev-env-setup: { enabled: true }
+  design-system: { enabled: false }
+  git-workflow: { enabled: false }
+  multi-model-review: { enabled: false }
+  # Phase 4 — Integration
+  add-playwright: { enabled: false }
+  add-maestro: { enabled: false }
+  # Phase 1 — Product Definition
   create-prd: { enabled: true }
   review-prd: { enabled: true }
   innovate-prd: { enabled: false }
@@ -22,14 +37,23 @@ steps:
   review-api: { enabled: false }
   ux-spec: { enabled: false }
   review-ux: { enabled: false }
-  testing-strategy: { enabled: true }
+  tdd: { enabled: true }
   review-testing: { enabled: false }
   operations: { enabled: false }
   review-operations: { enabled: false }
   security: { enabled: false }
   review-security: { enabled: false }
-  implementation-tasks: { enabled: true }
-  review-tasks: { enabled: false }
+  create-evals: { enabled: false }
+  # Phase 10 — Stories & Reviews
+  user-stories-multi-model-review: { enabled: false }
+  platform-parity-review: { enabled: false }
+  # Phase 11 — Consolidation
+  claude-md-optimization: { enabled: false }
+  workflow-audit: { enabled: false }
+  # Phase 12 — Planning
+  implementation-plan: { enabled: true }
+  implementation-plan-review: { enabled: false }
+  multi-model-review-tasks: { enabled: false }
   cross-phase-consistency: { enabled: false }
   traceability-matrix: { enabled: false }
   decision-completeness: { enabled: false }

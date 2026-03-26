@@ -38,8 +38,8 @@ const DEFAULT_REGISTRY: SectionRegistry = {
   'create-prd': { heading: '## Project Overview', tokenBudget: 300 },
   'system-architecture': { heading: '## Architecture Summary', tokenBudget: 300 },
   'domain-modeling': { heading: '## Domain Model', tokenBudget: 300 },
-  'implementation-tasks': { heading: '## Implementation Tasks', tokenBudget: 300 },
-  'testing-strategy': { heading: '## Testing Strategy', tokenBudget: 200 },
+  'implementation-plan': { heading: '## Implementation Tasks', tokenBudget: 300 },
+  'tdd': { heading: '## Testing Strategy', tokenBudget: 200 },
   'developer-onboarding-guide': { heading: '## Developer Onboarding', tokenBudget: 300 },
 }
 

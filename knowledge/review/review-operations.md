@@ -210,3 +210,58 @@ Without a backup strategy, data loss is permanent. Without a disaster recovery p
 - P0: "Backups run daily but the RPO is 15 minutes. Up to 24 hours of data could be lost, far exceeding the business tolerance."
 - P1: "Backup restoration procedure says 'restore from backup' with no specifics. What tool? What command? How long does it take? What is the verification step?"
 - P2: "DR strategy exists but has never been tested. The team does not know if recovery actually works within the stated RTO."
+
+---
+
+## Common Review Anti-Patterns
+
+### 1. Reviewing the Runbook as a Standalone Document
+
+The reviewer checks the operations runbook for completeness (are all sections present? are rollback procedures documented?) but never cross-references with the architecture or deployment infrastructure. The runbook may describe a deployment pipeline that does not match the actual CI/CD configuration, or monitoring that covers components that no longer exist. Operations documentation must be validated against the architecture it describes.
+
+**How to spot it:** The review has no findings that reference the architecture document or infrastructure configuration. All findings are about what the runbook says, not whether what it says matches reality.
+
+### 2. "We Use Kubernetes" as a Complete Deployment Strategy
+
+The deployment section names the orchestration platform (Kubernetes, ECS, Heroku) but does not describe the actual deployment process. How are images built? How are they tagged? What triggers a deployment? What is the rollout strategy (rolling update, blue-green, canary)? What happens when a pod fails health checks during rollout? Naming the platform is not a strategy.
+
+**Example finding:**
+
+```markdown
+## Finding: OPS-011
+
+**Priority:** P1
+**Pass:** Deployment Strategy Completeness (Pass 1)
+**Document:** docs/operations-runbook.md, Section 2
+
+**Issue:** Deployment section states: "The application is deployed to Kubernetes using
+Helm charts." No further detail is provided. The following questions are unanswered:
+  - What triggers a deployment? (manual, on PR merge, on tag?)
+  - What is the rollout strategy? (rolling update, blue-green, canary?)
+  - What are the health check endpoints and thresholds?
+  - When do database migrations run relative to the code deployment?
+  - What is the rollback procedure? (Helm rollback? Redeploy previous image?)
+  - How long does a typical deployment take?
+
+**Recommendation:** Expand the deployment section to cover each stage of the pipeline
+from merged PR to verified production deployment, with specific commands, tools,
+and decision points.
+```
+
+### 3. Monitoring Section Lists Tools but Not Metrics
+
+The monitoring section says "we use Datadog for monitoring and PagerDuty for alerting" but does not specify what metrics are collected, what dashboards exist, or what alert thresholds are configured. Tools are not a monitoring strategy. The question is not "do we have Datadog?" but "what does Datadog measure, and when does it wake someone up?"
+
+**How to spot it:** The monitoring section mentions tool names but contains no metric names (error rate, p95 latency, request throughput), no threshold values, and no alert severity definitions.
+
+### 4. Rollback Procedure That Ignores Data
+
+The rollback section describes how to revert code (redeploy previous version, Helm rollback) but does not address database schema changes or data migrations. If the deployment included a migration that added a column and backfilled data, "rollback" is not just reverting the code — it requires a reverse migration, and the reverse migration may be destructive (dropping the new column loses the backfilled data).
+
+**How to spot it:** The rollback section mentions code rollback but not database rollback. Search for "migration," "schema," or "database" in the rollback procedure — if absent, data rollback is unaddressed.
+
+### 5. No Runbook Entries for the Most Likely Failures
+
+The runbook has procedures for exotic failure scenarios (complete region outage, database corruption) but not for the failures that actually happen weekly: a single pod crashing, a dependency timing out, disk filling up from log accumulation, a certificate expiring. The most useful runbook entries cover common, mundane failures — not catastrophic ones.
+
+**How to spot it:** Count runbook entries. If there are fewer than 5, the most likely failure scenarios are probably missing. Check specifically for: service restart, dependency timeout, disk full, certificate expiration, and failed deployment rollback.

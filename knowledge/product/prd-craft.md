@@ -8,13 +8,36 @@ topics: [prd, requirements, product, scoping]
 
 A Product Requirements Document is the single source of truth for what is being built and why. It defines the problem, the users, the scope, and the success criteria. Everything in the pipeline flows from the PRD — domain models, architecture, implementation tasks. A weak PRD propagates weakness through every downstream artifact.
 
-This document covers what makes a good PRD, what makes a bad one, and how to tell the difference.
+## Summary
 
-## Problem Statement
+### PRD Structure
+
+A complete PRD includes these sections:
+1. **Problem Statement** — Specific, testable, grounded in observable reality. Names a user group, describes a pain point, includes quantitative evidence.
+2. **Target Users** — Personas with roles, needs, current behavior, constraints, and success criteria. Typically 2-4 meaningful personas.
+3. **Feature Scoping** — Three explicit lists: In Scope (v1), Out of Scope, and Deferred (future). Each in-scope feature detailed enough to estimate.
+4. **Success Criteria** — Measurable outcomes tied to the problem statement with target values and measurement methods.
+5. **Constraints** — Technical, timeline, budget, team, and regulatory constraints traceable to architectural decisions.
+6. **Non-Functional Requirements** — Quantified performance, scalability, availability, security, accessibility, data, i18n, browser/device support, and monitoring requirements.
+7. **Competitive Context** — What exists, how this differs, why users would switch.
+
+### Quality Criteria
+
+- Problem statement is specific and testable
+- Features are prioritized with MoSCoW (Must/Should/Could/Won't)
+- Success criteria have target values and measurement methods
+- NFRs are quantified (not "fast" but "p95 under 200ms")
+- Error scenarios and edge cases are addressed
+- The PRD says WHAT, not HOW
+- Every feature is detailed enough for estimation without prescribing implementation
+
+## Deep Guidance
+
+### Problem Statement
 
 The problem statement is the foundation. If it is wrong, everything built on top of it is wrong.
 
-### What Makes a Good Problem Statement
+#### What Makes a Good Problem Statement
 
 A good problem statement is **specific**, **testable**, and **grounded in observable reality**.
 
@@ -29,7 +52,7 @@ A good problem statement is **specific**, **testable**, and **grounded in observ
 - "Users want a better dashboard." (Aspirational, not grounded. What is wrong with the current one? What does "better" mean?)
 - "We need to modernize our technology stack." (Technology is not a problem — what user-facing or business issue does the old stack cause?)
 
-### Problem Statement Checklist
+#### Problem Statement Checklist
 
 - [ ] Names a specific user group (not "users" or "everyone")
 - [ ] Describes an observable behavior or pain point (not a desired state)
@@ -37,9 +60,9 @@ A good problem statement is **specific**, **testable**, and **grounded in observ
 - [ ] Does not prescribe a solution (the problem is not "we need feature X")
 - [ ] Can be validated — you can measure whether the problem is solved
 
-## Target Users
+### Target Users — Detailed Persona Methodology
 
-### Personas with Needs
+#### Personas with Needs
 
 Each persona should have:
 - **Role or description** — Who they are in relation to the product.
@@ -69,17 +92,17 @@ Each persona should have:
 
 The bad persona tells the implementation team nothing actionable. It does not constrain design decisions.
 
-### How Many Personas
+#### How Many Personas
 
 Most products have 2-4 meaningful personas. If a PRD lists more than 6, the product scope is likely too broad. If it lists only 1, secondary users (admins, support staff, integration partners) may be missing.
 
-### Anti-pattern: The Everything User
+#### Anti-pattern: The Everything User
 
 A persona that represents all users is no persona at all. "Power users who want advanced features AND casual users who want simplicity" describes a contradiction, not a persona. Different personas may have conflicting needs — that is fine, but the PRD must state which takes priority.
 
-## Feature Scoping
+### Feature Scoping — Depth
 
-### What Is In, What Is Out, What Is Deferred
+#### What Is In, What Is Out, What Is Deferred
 
 Every PRD should have three explicit lists:
 
@@ -126,7 +149,7 @@ Every PRD should have three explicit lists:
 
 This tells you nothing about boundaries. Is "user management" basic registration or full RBAC with teams and permissions? Is "analytics" a page view counter or a business intelligence suite?
 
-### MoSCoW Prioritization
+#### MoSCoW Prioritization — In Depth
 
 When the in-scope list is large, use MoSCoW to further prioritize:
 
@@ -160,7 +183,7 @@ Won't Have:
 - Social login
 ```
 
-### Feature Detail Level
+#### Feature Detail Level
 
 Each in-scope feature needs enough detail to be estimable:
 
@@ -175,9 +198,9 @@ Each in-scope feature needs enough detail to be estimable:
 
 The PRD says WHAT, not HOW.
 
-## Success Criteria
+### Success Criteria — Depth
 
-### Measurable Outcomes
+#### Measurable Outcomes
 
 Success criteria define how you will know the product works. They must be measurable, specific, and tied to the problem statement.
 
@@ -193,7 +216,7 @@ Success criteria define how you will know the product works. They must be measur
 - "Revenue increases." (Not tied to the problem. Revenue can increase for many reasons.)
 - "We ship on time." (Success criteria for the project, not the product)
 
-### Types of Success Criteria
+#### Types of Success Criteria
 
 1. **User behavior metrics** — Conversion rates, completion rates, time-on-task, error rates.
 2. **Business metrics** — Revenue impact, cost reduction, customer acquisition.
@@ -202,9 +225,9 @@ Success criteria define how you will know the product works. They must be measur
 
 Every success criterion should have a **target value** and a **measurement method**. "Checkout abandonment under 40% as measured by analytics funnel tracking" is complete. "Checkout abandonment decreases" is not.
 
-## Constraints
+### Constraints — Detailed Categories
 
-### Categories of Constraints
+#### Categories of Constraints
 
 **Technical constraints:**
 - Existing systems that must be integrated with.
@@ -233,7 +256,7 @@ Every success criterion should have a **target value** and a **measurement metho
 - Accessibility mandates (ADA, WCAG requirements).
 - Industry-specific regulations.
 
-### How Constraints Affect Downstream Artifacts
+#### How Constraints Affect Downstream Artifacts
 
 Each constraint should be traceable to architectural decisions:
 - "Must use PostgreSQL" → ADR for database choice.
@@ -241,11 +264,9 @@ Each constraint should be traceable to architectural decisions:
 - "Team of 3 developers" → Implementation tasks sized for 3 parallel workers.
 - "Launch by March 1" → Feature scope fits within timeline.
 
-## Non-Functional Requirements
+### NFR Quantification Patterns
 
-NFRs define HOW the system should behave, not WHAT it should do. They are frequently under-specified in PRDs, which leads to expensive rework.
-
-### Quantified NFRs
+#### Quantified NFRs
 
 **Good:**
 - "Page load time: p95 under 2 seconds on 4G mobile connection."
@@ -260,7 +281,7 @@ NFRs define HOW the system should behave, not WHAT it should do. They are freque
 - "Scalable." (To what? 100 users? 1 million users? What is the growth curve?)
 - "Secure." (Against what threats? To what standard?)
 
-### NFR Categories Checklist
+#### NFR Categories Checklist
 
 - [ ] **Performance** — Response times (p50, p95, p99), throughput, page load times
 - [ ] **Scalability** — Concurrent users, data volume, growth rate
@@ -272,42 +293,42 @@ NFRs define HOW the system should behave, not WHAT it should do. They are freque
 - [ ] **Browser/device support** — Minimum browser versions, mobile support, responsive breakpoints
 - [ ] **Monitoring** — What needs to be observable? Alerting thresholds?
 
-## Competitive Context
+### Competitive Context Analysis
 
-### What to Include
+#### What to Include
 
 - **What exists** — Name competing products and what they do well.
 - **How this is different** — Specific differentiators, not "we're better."
 - **Why users would switch** — What pain does this product solve that competitors do not?
 - **What to learn from** — Features or patterns from competitors worth adopting.
 
-### What NOT to Include
+#### What NOT to Include
 
 - Exhaustive competitor feature matrices (belongs in market research, not PRD).
 - Competitive strategy or positioning (belongs in business plan, not PRD).
 - Pricing comparisons (unless pricing is a product feature).
 
-## Common PRD Failures
+### Common PRD Failures
 
-### The "Requirements as Solutions" Failure
+#### The "Requirements as Solutions" Failure
 PRD prescribes technical solutions instead of stating requirements. "Use Redis for caching" belongs in architecture, not the PRD. The PRD should say "response time under 200ms" — how to achieve that is an architectural decision.
 
-### The "Missing Sad Path" Failure
+#### The "Missing Sad Path" Failure
 PRD describes only happy paths. What happens when payment fails? When the user's session expires during checkout? When the network drops? When the form has invalid data? Every user action that can fail should have at least a sentence about what happens.
 
-### The "Everyone Is a User" Failure
+#### The "Everyone Is a User" Failure
 PRD addresses "users" as a monolith instead of identifying distinct personas with distinct needs. Admins, end users, API consumers, and support staff have different requirements.
 
-### The "Implied API" Failure
+#### The "Implied API" Failure
 PRD describes a UI but implies an API without stating it. "Users can view their order history" implies GET /orders, data model for orders, pagination, filtering, sorting. These implications should be explicit in the PRD.
 
-### The "No Boundaries" Failure
+#### The "No Boundaries" Failure
 PRD states what is in scope but never states what is out. Every documentation phase becomes a scope negotiation.
 
-### The "Success Is Shipping" Failure
+#### The "Success Is Shipping" Failure
 PRD has no success criteria beyond "launch the product." Without measurable outcomes, there is no way to know if the product solved the problem.
 
-## PRD Quality Checklist
+### PRD Quality Checklist
 
 Before considering a PRD complete:
 

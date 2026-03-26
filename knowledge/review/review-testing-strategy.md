@@ -174,3 +174,54 @@ A quality gate that exists in documentation but not in CI is not a gate. If the 
 - P0: "Testing strategy requires 80% code coverage but the CI pipeline has no coverage reporting or enforcement. The requirement is unverifiable."
 - P1: "Security scanning is listed as a quality requirement but no specific tool or CI pipeline step implements it."
 - P2: "Quality gates run linting, unit tests, and integration tests, but do not validate database migrations. A broken migration would pass all gates and fail in production."
+
+---
+
+## Common Review Anti-Patterns
+
+### 1. Copy-Pasted Generic Strategy
+
+The testing strategy is a boilerplate document that says "we will have unit tests, integration tests, and E2E tests" without connecting to the actual architecture. No mention of specific components, no mapping of test types to architectural layers, no project-specific invariants.
+
+**How to spot it:** The strategy could be copy-pasted into any other project and still read correctly. No component names, no domain terms, no architecture-specific decisions.
+
+### 2. Testing Strategy Disconnected from Architecture
+
+The strategy defines test types and coverage goals but does not reference the system architecture. Tests are organized by test framework (Jest unit tests, Playwright E2E tests) rather than by architectural component. This makes it impossible to verify coverage — you cannot tell which components are tested and which are not.
+
+**How to spot it:** Search for component names from the architecture document. If none appear in the testing strategy, the two documents are disconnected.
+
+### 3. Mock-Everything Mentality
+
+Every external dependency is mocked, including the database. Unit test coverage is high, but no test ever executes a real query, a real HTTP call, or a real message queue interaction. The test suite provides confidence that the mocking layer works, not that the system works.
+
+**Example finding:**
+
+```markdown
+## Finding: TSR-009
+
+**Priority:** P1
+**Pass:** Integration Boundary Coverage (Pass 5)
+**Document:** docs/testing-strategy.md, Section 4.2
+
+**Issue:** All database tests use an in-memory mock repository. The repository interface
+is tested, but no test ever executes SQL against a real PostgreSQL instance. The following
+risks are untested: query syntax errors, constraint violations, transaction isolation
+behavior, migration correctness.
+
+**Recommendation:** Add integration tests using testcontainers or a CI-managed PostgreSQL
+instance for at least the OrderRepository and UserRepository (the two repositories with
+complex queries).
+```
+
+### 4. No Negative Test Scenarios
+
+The strategy defines tests for the happy path but never specifies what happens when things fail. No test scenarios for invalid input, network timeouts, concurrent modification, or resource exhaustion. The system is verified to work when everything goes right — the most uninteresting case.
+
+**How to spot it:** Scan test scenario descriptions for words like "invalid," "timeout," "failure," "error," "reject," "concurrent," "duplicate." If these are absent, negative scenarios are missing.
+
+### 5. Coverage Percentage as the Only Quality Metric
+
+The strategy defines 80% code coverage as the quality gate but specifies no other quality criteria. High coverage with no assertion quality means tests that execute code paths without verifying behavior — "tests" that call functions and ignore the return value. Coverage measures how much code was run, not whether it was tested correctly.
+
+**How to spot it:** The quality gates section mentions only code coverage. No mention of mutation testing, assertion density, test execution time budgets, or flakiness tracking.

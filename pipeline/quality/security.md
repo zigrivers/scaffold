@@ -6,7 +6,7 @@ order: 23
 dependencies: [review-operations]
 outputs: [docs/security-review.md]
 conditional: null
-knowledge-base: [security-review]
+knowledge-base: [security-best-practices]
 ---
 
 ## Purpose

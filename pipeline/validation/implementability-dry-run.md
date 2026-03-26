@@ -3,7 +3,7 @@ name: implementability-dry-run
 description: Dry-run specs as implementing agent, catching ambiguity
 phase: "validation"
 order: 31
-dependencies: [review-tasks, review-security]
+dependencies: [implementation-plan-review, review-security]
 outputs: [docs/validation/implementability-dry-run.md]
 conditional: null
 knowledge-base: [implementability-review]

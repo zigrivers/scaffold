@@ -1,9 +1,9 @@
 ---
-name: review-tasks
+name: implementation-plan-review
 description: Review implementation tasks for coverage and feasibility
 phase: "planning"
 order: 26
-dependencies: [implementation-tasks]
+dependencies: [implementation-plan]
 outputs: [docs/reviews/review-tasks.md]
 conditional: null
 knowledge-base: [review-methodology, review-implementation-tasks]
@@ -15,13 +15,13 @@ coverage gaps, missing dependencies, tasks too large or too vague for agents,
 critical path inaccuracy, and invalid parallelization assumptions.
 
 ## Inputs
-- docs/implementation-tasks.md (required) — tasks to review
+- docs/implementation-plan.md (required) — tasks to review
 - docs/system-architecture.md (required) — for coverage checking
 - docs/domain-models/ (required) — for completeness
 
 ## Expected Outputs
 - docs/reviews/review-tasks.md — findings and resolution log
-- docs/implementation-tasks.md — updated with fixes
+- docs/implementation-plan.md — updated with fixes
 
 ## Quality Criteria
 - Architecture coverage verified (every component has tasks)

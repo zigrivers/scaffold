@@ -170,3 +170,57 @@ Stories are the primary input to domain discovery in the domain modeling step. I
 - P1: "US-007 ('As a teacher, I want to manage my classes') — acceptance criteria say 'classes are managed correctly.' No mention of what entities are involved (Class, Enrollment, Student?), what state transitions occur, or what business rules apply. Domain modeling will have to guess."
 - P2: "Cross-story entity naming is inconsistent: US-003 uses 'User,' US-008 uses 'Account,' US-015 uses 'Member.' These may be different bounded context terms or may be accidental inconsistency — clarify before domain modeling."
 - P2: "Stories in the 'Payments' epic mention 'processing a payment' but no acceptance criteria describe the payment lifecycle states (pending → processing → completed/failed). Domain events cannot be discovered from these stories."
+
+---
+
+## Common Review Anti-Patterns
+
+### 1. Reviewing Against a Generic Checklist Instead of the PRD
+
+The reviewer checks whether stories have acceptance criteria and follow INVEST principles, but never opens the PRD to verify coverage. The stories could be missing entire PRD features and this review would not catch it. Reviews must cross-reference the PRD — checking story quality without checking story completeness misses the highest-severity failure mode.
+
+**How to spot it:** The review report contains no references to specific PRD sections. Findings are all about story quality (vague criteria, poor sizing) and none about story coverage (missing features, missing flows).
+
+### 2. Accepting Vague Acceptance Criteria as "Good Enough"
+
+The reviewer sees acceptance criteria like "user can manage their profile" and does not flag it because the intent is clear. But intent is not implementation guidance. Two agents reading "manage their profile" will implement different field sets, different validation rules, and different UX flows. Acceptance criteria must be testable — if you cannot write an automated test directly from the criterion, it is too vague.
+
+**Example finding:**
+
+```markdown
+## Finding: USR-014
+
+**Priority:** P1
+**Pass:** Acceptance Criteria Quality (Pass 2)
+**Document:** docs/user-stories.md, US-008
+
+**Issue:** Acceptance criteria for US-008 ("As a user, I want to manage my profile"):
+  - "Given I am logged in, when I update my profile, then my changes are saved"
+
+This criterion does not specify: which fields are editable, what validation rules apply,
+whether partial updates are supported, what happens on validation failure, or whether
+changes require re-authentication (e.g., email change).
+
+**Recommendation:** Replace with specific Given/When/Then scenarios:
+  - Given I am logged in, when I change my display name to a valid name (1-100 chars), then my display name is updated
+  - Given I am logged in, when I change my email, then a verification email is sent to the new address and the email is not changed until verified
+  - Given I am logged in, when I submit a display name longer than 100 characters, then I see a validation error
+```
+
+### 3. Ignoring Story Dependencies
+
+The reviewer checks each story in isolation but never maps dependencies between stories. Stories that secretly depend on each other are not flagged. This creates false parallelization opportunities downstream — the implementation tasks phase will mark these as parallel, and agents will produce conflicting work.
+
+**How to spot it:** The review report has no findings from Pass 3 (Story Independence). Dependencies are only discovered later during implementation tasks or during actual implementation.
+
+### 4. Persona Name Drift Without Flagging
+
+The PRD defines personas as "Teacher," "Student," and "Admin." Stories reference "Instructor," "Learner," and "Administrator." The reviewer does not flag the terminology mismatch because the mapping is obvious to a human. But downstream, the domain model and implementation tasks may use either set of terms inconsistently, creating confusion.
+
+**How to spot it:** Compare persona names in the PRD with persona names in story "As a..." statements. Any mismatch is a finding, even if the intent is obvious.
+
+### 5. Reviewing Only Happy-Path Stories
+
+The reviewer verifies that the main user flows have stories but does not check for error handling, edge cases, or administrative workflows. Stories exist for "user creates an account" and "user places an order" but not for "user enters invalid payment info," "user tries to order an out-of-stock item," or "admin resolves a disputed transaction." These missing stories become missing tasks and missing implementations.
+
+**How to spot it:** Count the ratio of happy-path stories to error/edge-case stories. If the ratio is heavily skewed (e.g., 20 happy-path stories and 2 error stories), error handling is systematically under-specified.

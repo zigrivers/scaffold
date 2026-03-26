@@ -211,3 +211,56 @@ Frontend-only validation is a UX convenience, not a security control. Attackers 
 - P1: "File upload endpoint validates file extension (.jpg, .png) but does not validate file content. An attacker could upload a malicious script with a .jpg extension."
 - P1: "Webhook receiver accepts payloads from external services with no signature validation. An attacker could forge webhook calls."
 - P2: "Input validation is specified for API endpoints but not for message queue consumers. A malformed message could cause the consumer to crash."
+
+---
+
+## Common Review Anti-Patterns
+
+### 1. Generic OWASP Checklist Without Project Mapping
+
+The security document lists all 10 OWASP categories with textbook mitigations ("use parameterized queries," "encrypt data at rest") but never connects them to the actual project. No component names, no endpoint references, no architecture-specific analysis. The same document could describe any web application.
+
+**How to spot it:** The OWASP section contains zero references to the project's architecture document, API contracts, or database schema. Mitigations are general advice rather than specific implementation plans tied to named components.
+
+### 2. Auth Designed in Isolation from API Contracts
+
+The security document defines roles, permissions, and access control policies, but the reviewer does not cross-reference these with the API contract's endpoint-level auth requirements. The security document says "admin-only" for user management, but the API contract has no auth annotation on DELETE /users/{id}. This gap means the security design exists on paper but may not be enforced.
+
+**Example finding:**
+
+```markdown
+## Finding: SEC-018
+
+**Priority:** P0
+**Pass:** Auth/AuthZ Boundary Alignment (Pass 2)
+**Document:** docs/security-review.md, Section 3 / docs/api-contracts.md, Section 5.2
+
+**Issue:** Security document defines three roles (admin, editor, viewer) with a permission
+matrix. API contract defines 24 endpoints. Cross-referencing reveals:
+  - 6 endpoints have no auth requirement specified in the API contract
+  - 3 endpoints specify "authenticated" but the security document requires "admin" role
+  - Endpoint PATCH /users/{id}/role has no authorization check — any authenticated user
+    could escalate privileges
+
+**Recommendation:** Add auth/authz annotations to all 24 endpoints in the API contract.
+Reconcile the 3 mismatched endpoints with the security document's permission matrix.
+Add explicit admin-only restriction to the role-change endpoint.
+```
+
+### 3. Secrets Strategy Says "Environment Variables" and Stops
+
+The security document addresses secrets management by stating "secrets are stored in environment variables" with no further detail. This leaves critical questions unanswered: how are environment variables populated in production (plain text config file on the server? Kubernetes secrets? A vault?)? How are secrets rotated? What happens when a secret is compromised? "Environment variables" is a mechanism, not a strategy.
+
+**How to spot it:** The secrets management section is shorter than half a page. It mentions environment variables but not rotation, not emergency response, not CI/CD secret injection, and not local development secrets handling.
+
+### 4. Threat Model Without Trust Boundaries
+
+The security document includes a threat model section that lists generic threats (SQL injection, XSS, CSRF) without mapping them to the system's trust boundaries. No data flow analysis, no identification of where untrusted input enters the system, no assessment of service-to-service trust. The threats listed are a vocabulary exercise, not a risk analysis.
+
+**How to spot it:** The threat model section does not reference the architecture diagram. No trust boundaries are drawn. Threats are listed as a flat list rather than organized by boundary (client-to-API, service-to-service, service-to-database).
+
+### 5. Reviewing Security Document Without Cross-Referencing Other Artifacts
+
+The reviewer checks the security document internally (are all sections present? is the OWASP analysis complete?) but never opens the API contracts, architecture document, or operations runbook. Security findings that span multiple documents — auth gaps between the security doc and API contract, secrets handling gaps between the security doc and operations runbook — are invisible to a single-document review.
+
+**How to spot it:** The review report cites only the security document. No findings reference the API contracts (Pass 2), the architecture (Pass 5 trust boundaries), or the operations runbook (Pass 3 secrets in deployment).

@@ -1,5 +1,5 @@
 ---
-name: security-review
+name: security-best-practices
 description: OWASP Top 10, authentication, authorization, data protection, and threat modeling
 topics: [security, owasp, authentication, authorization, threat-modeling, secrets-management, dependency-auditing]
 ---

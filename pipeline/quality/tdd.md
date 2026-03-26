@@ -1,10 +1,10 @@
 ---
-name: testing-strategy
+name: tdd
 description: Define testing and quality strategy across all layers
 phase: "quality"
 order: 19
 dependencies: [review-architecture]
-outputs: [docs/testing-strategy.md]
+outputs: [docs/tdd-standards.md]
 conditional: null
 knowledge-base: [testing-strategy]
 ---
@@ -22,7 +22,7 @@ how to test the code they write.
 - docs/database-schema.md (optional) — data layer test scenarios
 
 ## Expected Outputs
-- docs/testing-strategy.md — testing approach with coverage goals and patterns
+- docs/tdd-standards.md — testing approach with coverage goals and patterns
 
 ## Quality Criteria
 - Test pyramid defined with coverage targets per layer

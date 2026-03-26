@@ -88,6 +88,31 @@ function extractBody(content: string): string {
 }
 
 /**
+ * Extract only the "Deep Guidance" section from a knowledge file body.
+ *
+ * Knowledge files with dual-channel distribution contain a "## Summary"
+ * section (content that overlaps with the command prompt) and a
+ * "## Deep Guidance" section (supplementary expertise). When assembling
+ * CLI prompts, we load only the Deep Guidance to avoid redundancy with
+ * the prompt text the user already sees.
+ *
+ * Returns null if no "## Deep Guidance" heading is found — callers
+ * should fall back to the full body for backward compatibility.
+ */
+export function extractDeepGuidance(body: string): string | null {
+  const lines = body.split('\n')
+  const heading = /^## Deep Guidance\s*$/i
+
+  for (let i = 0; i < lines.length; i++) {
+    if (heading.test(lines[i])) {
+      return lines.slice(i + 1).join('\n').trim()
+    }
+  }
+
+  return null
+}
+
+/**
  * Scan knowledgeDir recursively for .md files.
  * Returns a map of entry name → absolute file path.
  * Gracefully returns an empty map if the directory does not exist.
@@ -220,13 +245,14 @@ export function loadEntries(
         continue
       }
 
-      const body = extractBody(content)
+      const fullBody = extractBody(content)
+      const deepOnly = extractDeepGuidance(fullBody)
 
       entries.push({
         name: fm.name,
         description: fm.description,
         topics: fm.topics,
-        content: body,
+        content: deepOnly ?? fullBody,
       })
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err)

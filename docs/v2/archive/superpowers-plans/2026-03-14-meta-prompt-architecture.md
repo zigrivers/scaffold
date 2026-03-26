@@ -1345,7 +1345,7 @@ phase: "10"
 dependencies: [phase-09-operations]
 outputs: [docs/security-review.md]
 conditional: null
-knowledge-base: [security-review]
+knowledge-base: [security-best-practices]
 ---
 
 ## Purpose

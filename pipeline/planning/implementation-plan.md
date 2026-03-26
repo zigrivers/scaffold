@@ -1,10 +1,10 @@
 ---
-name: implementation-tasks
+name: implementation-plan
 description: Break architecture into implementable tasks with dependencies
 phase: "planning"
 order: 25
-dependencies: [testing-strategy, operations, security]
-outputs: [docs/implementation-tasks.md]
+dependencies: [tdd, operations, security]
+outputs: [docs/implementation-plan.md]
 conditional: null
 knowledge-base: [task-decomposition]
 ---
@@ -21,7 +21,7 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 - docs/adrs/ (required) — technology constraints
 - docs/prd.md (required) — features to trace tasks back to
 - docs/user-stories.md (required) — stories to derive tasks from
-- docs/testing-strategy.md (required) — testing requirements to incorporate into tasks
+- docs/tdd-standards.md (required) — testing requirements to incorporate into tasks
 - docs/operations-runbook.md (optional) — ops requirements to incorporate into tasks
 - docs/security-review.md (optional) — security requirements to incorporate into tasks
 - docs/database-schema.md (optional) — data layer tasks
@@ -29,7 +29,7 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 - docs/ux-spec.md (optional) — frontend tasks
 
 ## Expected Outputs
-- docs/implementation-tasks.md — task list with dependencies, sizing, and
+- docs/implementation-plan.md — task list with dependencies, sizing, and
   assignment recommendations
 
 ## Quality Criteria

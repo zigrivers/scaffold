@@ -3,7 +3,7 @@ name: traceability-matrix
 description: Build traceability from PRD requirements through architecture to implementation tasks
 phase: "validation"
 order: 28
-dependencies: [review-tasks, review-security]
+dependencies: [implementation-plan-review, review-security]
 outputs: [docs/validation/traceability-matrix.md]
 conditional: null
 knowledge-base: [traceability]

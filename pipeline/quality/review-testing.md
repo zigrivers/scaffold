@@ -3,7 +3,7 @@ name: review-testing
 description: Review testing strategy for coverage gaps and feasibility
 phase: "quality"
 order: 20
-dependencies: [testing-strategy]
+dependencies: [tdd]
 outputs: [docs/reviews/review-testing.md]
 conditional: null
 knowledge-base: [review-methodology, review-testing-strategy]
@@ -15,13 +15,13 @@ by layer, missing edge cases from domain invariants, unrealistic test environmen
 assumptions, inadequate performance test coverage, and missing integration boundaries.
 
 ## Inputs
-- docs/testing-strategy.md (required) — strategy to review
+- docs/tdd-standards.md (required) — strategy to review
 - docs/domain-models/ (required) — for invariant test case coverage
 - docs/system-architecture.md (required) — for layer coverage
 
 ## Expected Outputs
 - docs/reviews/review-testing.md — findings and resolution log
-- docs/testing-strategy.md — updated with fixes
+- docs/tdd-standards.md — updated with fixes
 
 ## Quality Criteria
 - Coverage gaps by layer identified

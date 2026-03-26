@@ -45,6 +45,7 @@ declare -a FRONTMATTER=(
     'platform-parity-review|Audit platform coverage across all docs|'
     'claude-md-optimization|Consolidate and optimize CLAUDE.md|'
     'workflow-audit|Verify workflow consistency across all docs|'
+    'create-evals|Generate project-specific eval checks|'
     'implementation-plan|Create task graph from stories and standards|'
     'implementation-plan-review|Review task quality, coverage, and dependencies|'
     'multi-model-review-tasks|Multi-model review of implementation plan tasks for coverage and quality|'
@@ -85,6 +86,7 @@ HEADING_TO_SLUG["User Stories Multi-Model Review"]="user-stories-multi-model-rev
 HEADING_TO_SLUG["Platform Parity Review"]="platform-parity-review"
 HEADING_TO_SLUG["Claude.md Optimization"]="claude-md-optimization"
 HEADING_TO_SLUG["Workflow Audit"]="workflow-audit"
+HEADING_TO_SLUG["Create Evals"]="create-evals"
 HEADING_TO_SLUG["Implementation Plan"]="implementation-plan"
 HEADING_TO_SLUG["Implementation Plan Review"]="implementation-plan-review"
 HEADING_TO_SLUG["Implementation Plan Multi-Model Review"]="multi-model-review-tasks"
@@ -447,7 +449,26 @@ NEXTSTEP
 When this step is complete, tell the user:
 
 ---
-**Phase 6 complete** — Workflow verified and aligned across all documents.
+**Phase 6 in progress** — Workflow verified and aligned across all documents.
+
+**Next:** Run `/scaffold:create-evals` — Generate project-specific eval checks from standards docs.
+
+**Or skip to:** `/scaffold:implementation-plan` — Create task graph from stories and standards (starts Phase 7).
+
+**Pipeline reference:** `/scaffold:prompt-pipeline`
+
+---
+NEXTSTEP
+            ;;
+        create-evals)
+            cat <<'NEXTSTEP'
+
+## After This Step
+
+When this step is complete, tell the user:
+
+---
+**Phase 6 complete** — Eval infrastructure created in `tests/evals/`, `docs/eval-standards.md` documents what is and isn't checked.
 
 **Next:** Run `/scaffold:implementation-plan` — Create task graph from stories and standards (starts Phase 7).
 

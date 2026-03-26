@@ -16,9 +16,9 @@ per task, coding standards, git workflow (branching/PR strategy), handoff
 format between agents, and success criteria.
 
 ## Inputs
-- docs/implementation-tasks.md (required) — tasks to sequence
+- docs/implementation-plan.md (required) — tasks to sequence
 - docs/system-architecture.md (required) — architecture context
-- docs/testing-strategy.md (required) — testing requirements
+- docs/tdd-standards.md (required) — testing requirements
 - All other frozen artifacts
 
 ## Expected Outputs

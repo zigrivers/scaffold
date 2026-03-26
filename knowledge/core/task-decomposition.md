@@ -4,11 +4,45 @@ description: Breaking architecture into implementable tasks with dependency anal
 topics: [tasks, decomposition, dependencies, user-stories, parallelization, sizing, critical-path]
 ---
 
-## User Stories to Tasks
+# Task Decomposition
+
+Expert knowledge for breaking user stories into implementable tasks with dependency analysis, sizing, parallelization, and agent context requirements.
+
+## Summary
+
+### Story-to-Task Mapping
+
+User stories bridge PRD features and implementation tasks. Each story decomposes into tasks following the technical layers needed. Every task must trace back to a user story, and every story to a PRD feature (PRD Feature → US-xxx → Task BD-xxx).
+
+### Task Sizing
+
+Each task should be completable in a single AI agent session (30-90 minutes of agent time). A well-sized task has a clear title (usable as commit message), touches 1-5 files, produces a testable result, and has no ambiguity about "done."
+
+Split large tasks by layer (API, UI, DB, tests), by feature slice (happy path, validation, edge cases), or by entity. Combine tiny tasks that touch the same file and have no independent value.
+
+### Dependency Types
+
+- **Logical** — Task B requires Task A's output (endpoint needs DB schema)
+- **File contention** — Two tasks modify the same file (merge conflict risk)
+- **Infrastructure** — Task requires setup that must exist first (DB, auth, CI)
+- **Knowledge** — Task benefits from understanding gained in another task
+
+Only logical, file contention, and infrastructure dependencies should be formal constraints.
+
+### Definition of Done
+
+1. Acceptance criteria from the user story are met
+2. Unit tests pass (for new logic)
+3. Integration tests pass (for API endpoints or component interactions)
+4. No linting or type errors
+5. Code follows project coding standards
+6. Changes committed with proper message format
+
+## Deep Guidance
+
+### From Stories to Tasks — Extended
 
 > **Note:** User stories are created as an upstream artifact in the pre-pipeline phase and available at `docs/user-stories.md`. This section covers how to consume stories and derive implementation tasks from them.
-
-### From Stories to Tasks
 
 User stories bridge the gap between what the business wants (PRD features) and what developers build (implementation tasks). Every PRD feature maps to one or more user stories (created in the pre-pipeline), and every user story should map to one or more implementation tasks.
 
@@ -115,9 +149,9 @@ This traceability ensures:
 - No orphan tasks exist (every task serves a purpose)
 - Impact analysis is possible (changing a PRD feature reveals which tasks are affected)
 
-## Task Sizing
+### Task Sizing — Extended
 
-### Right-Sizing for Agent Sessions
+#### Right-Sizing for Agent Sessions
 
 Each task should be completable in a single AI agent session (typically 30-90 minutes of agent time). Tasks that are too large overflow the context window; tasks that are too small create unnecessary coordination overhead.
 
@@ -136,7 +170,7 @@ Each task should be completable in a single AI agent session (typically 30-90 mi
 | "Create Button component" | "Build form components (Input, Select, Textarea) with validation states" | "Create the full design system" |
 | "Add index to users table" | "Create database schema for user management with migration" | "Set up the entire database" |
 
-### Splitting Large Tasks
+#### Splitting Large Tasks
 
 When a task is too large, split along these axes:
 
@@ -163,7 +197,7 @@ When a task is too large, split along these axes:
 - The task involves more than 2 architectural boundaries (e.g., database + API + frontend + auth)
 - You can't describe what "done" looks like in 2-3 sentences
 
-### Combining Small Tasks
+#### Combining Small Tasks
 
 If multiple tiny tasks touch the same file and have no independent value, combine them:
 
@@ -172,20 +206,9 @@ If multiple tiny tasks touch the same file and have no independent value, combin
 
 The test: would the small task result in a useful commit on its own? If not, combine.
 
-### Definition of Done
+### Dependency Analysis — Extended
 
-Every task needs a clear definition of done. Standard criteria:
-
-1. All acceptance criteria from the user story are met
-2. Unit tests pass (for new logic)
-3. Integration tests pass (for API endpoints or component interactions)
-4. No linting or type errors
-5. Code follows project coding standards
-6. Changes are committed with proper message format
-
-## Dependency Analysis
-
-### Types of Dependencies
+#### Types of Dependencies
 
 **Logical dependencies:** Task B requires Task A's output. The API endpoint task depends on the database schema task because the endpoint queries tables that must exist first.
 
@@ -195,7 +218,7 @@ Every task needs a clear definition of done. Standard criteria:
 
 **Knowledge dependencies:** A task requires understanding gained from completing another task. The developer who builds the auth system understands the auth patterns needed by other features.
 
-### Building Dependency Graphs (DAGs)
+#### Building Dependency Graphs (DAGs)
 
 A dependency graph is a directed acyclic graph (DAG) where:
 - Nodes are tasks
@@ -210,7 +233,7 @@ A dependency graph is a directed acyclic graph (DAG) where:
 4. Draw an edge from producer to consumer
 5. Check for cycles (if A depends on B and B depends on A, something is wrong — split or reorganize)
 
-### Detecting Cycles
+#### Detecting Cycles
 
 Cycles indicate a modeling problem. Common causes and fixes:
 
@@ -218,7 +241,7 @@ Cycles indicate a modeling problem. Common causes and fixes:
 - **Feature interaction:** Feature X needs Feature Y's component, and Feature Y needs Feature X's component. Fix: extract the shared component into its own task.
 - **Testing dependency:** "Can't test A without B, can't test B without A." Fix: use mocks/stubs to break the cycle during testing. The integration test that tests both together becomes a separate task.
 
-### Finding Critical Path
+#### Finding Critical Path
 
 The critical path is the longest chain of dependent tasks from start to finish. It determines the minimum project duration.
 
@@ -235,7 +258,7 @@ The critical path is the longest chain of dependent tasks from start to finish. 
 - To shorten the project, focus on splitting or accelerating critical-path tasks
 - Non-critical-path tasks have "float" — they can be delayed without affecting the project end date
 
-### Dependency Documentation
+#### Dependency Documentation
 
 For each dependency, document:
 
@@ -245,9 +268,9 @@ For each dependency, document:
 | BD-12 -> BD-13 | File contention | Both modify src/routes/index.ts | Medium — merge conflict risk |
 | BD-01 -> BD-* | Infrastructure | BD-01 sets up the database; everything needs it | High — blocks all work |
 
-## Parallelization
+### Parallelization and Wave Planning
 
-### Identifying Independent Tasks
+#### Identifying Independent Tasks
 
 Tasks are safe to run in parallel when:
 - They have no shared dependencies (no common prerequisite still in progress)
@@ -267,7 +290,7 @@ Tasks are safe to run in parallel when:
 - Tasks that modify the same shared utility file
 - Tasks where one produces test fixtures the other consumes
 
-### Managing Shared-State Tasks
+#### Managing Shared-State Tasks
 
 When tasks must share state (database, shared configuration, route registry):
 
@@ -277,7 +300,7 @@ When tasks must share state (database, shared configuration, route registry):
 
 **Feature flags:** Both tasks can merge independently. A feature flag controls which one is active. Integrate them in a separate task after both complete.
 
-### Merge Strategies for Parallel Work
+#### Merge Strategies for Parallel Work
 
 When parallel tasks produce branches that must be merged to main:
 
@@ -285,7 +308,7 @@ When parallel tasks produce branches that must be merged to main:
 - **First-in wins:** The first task to merge gets a clean merge. Subsequent tasks must rebase and resolve conflicts.
 - **Minimize shared files:** Design the task decomposition to minimize file overlap. Feature-based directory structure helps enormously.
 
-### Wave Planning
+#### Wave Planning
 
 Organize tasks into waves based on the dependency graph:
 
@@ -298,9 +321,9 @@ Wave 4 (depends on Wave 3): End-to-end tests, performance optimization, polish
 
 Each wave's tasks can run in parallel. Wave N+1 starts only when all its dependencies in Wave N are complete. The number of parallel agents should match the number of independent tasks in the current wave.
 
-## Agent Context
+### Agent Context Requirements
 
-### What Context Each Task Needs
+#### What Context Each Task Needs
 
 Every task description should specify what documents and code the implementing agent needs to read:
 
@@ -321,7 +344,7 @@ Produces:
 - tests/features/auth/register.integration.test.ts
 ```
 
-### Handoff Information
+#### Handoff Information
 
 When a task produces output that another task consumes, specify the handoff:
 
@@ -338,7 +361,7 @@ Consuming tasks:
   BD-30 (onboarding flow) expects the response shape above
 ```
 
-### Assumed Prior Work
+#### Assumed Prior Work
 
 Explicitly state what the agent can assume exists:
 
@@ -353,7 +376,7 @@ Does NOT assume:
 - Any auth endpoints exist (this is the first)
 ```
 
-## Common Pitfalls
+### Common Pitfalls
 
 **Tasks too vague.** "Implement backend" or "Set up auth" with no acceptance criteria, no file paths, and no test requirements. An agent receiving this task will guess wrong about scope, structure, and conventions. Fix: every task must specify exact files to create/modify, acceptance criteria, and test requirements.
 
