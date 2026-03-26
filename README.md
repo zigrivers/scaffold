@@ -29,7 +29,7 @@ Either way, Scaffold constructs the prompt and Claude does the work. The CLI tra
 
 **Assembly engine** — At execution time, Scaffold builds a 7-section prompt from: system metadata, the meta-prompt, knowledge base entries, project context (artifacts from prior steps), methodology settings, layered instructions, and depth-specific execution guidance.
 
-**Knowledge base** — 39 domain expertise entries in `knowledge/` covering testing strategy, domain modeling, API design, security best practices, eval craft, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
+**Knowledge base** — 43 domain expertise entries in `knowledge/` covering testing strategy, domain modeling, API design, security best practices, eval craft, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
 
 **Methodology presets** — Three built-in presets control which steps run and how deep the analysis goes:
 - **deep** (depth 5) — all steps enabled, exhaustive analysis
@@ -130,6 +130,12 @@ brew upgrade scaffold
 ```
 
 Or: `/plugin marketplace update zigrivers-scaffold`
+
+### Existing projects
+
+After upgrading the CLI, existing projects migrate automatically. Run `scaffold status` in your project directory — the state manager detects and renames old step keys, normalizes artifact paths, and persists the changes atomically. No manual editing of `.scaffold/state.json` is needed.
+
+Projects using either `docs/prd.md` (v1 convention) or `docs/plan.md` (v2 convention) work interchangeably — the context gatherer resolves aliased paths so downstream steps find your PRD regardless of which filename you used.
 
 ## Quick Start
 
@@ -366,9 +372,9 @@ You can change methodology mid-pipeline with `scaffold init --methodology <prese
 
 ## Knowledge System
 
-Scaffold ships with 39 domain expertise entries organized in five categories:
+Scaffold ships with 43 domain expertise entries organized in five categories:
 
-- **core/** (13 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, user story innovation
+- **core/** (17 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, user story innovation
 - **product/** (3 entries) — PRD craft, PRD innovation, gap analysis
 - **review/** (13 entries) — review methodology (shared), plus domain-specific review passes for PRD, user stories, domain modeling, ADRs, architecture, API contracts, database schema, UX spec, testing, security, operations, implementation tasks
 - **validation/** (7 entries) — critical path analysis, cross-phase consistency, scope management, traceability, implementability, decision completeness, dependency validation
@@ -505,7 +511,7 @@ src/
 
 ```
 pipeline/             # 53 meta-prompts organized by 14 phases
-knowledge/            # 39 domain expertise entries (core, product, review, validation, finalization)
+knowledge/            # 43 domain expertise entries (core, product, review, validation, finalization)
 methodology/          # 3 YAML presets (deep, mvp, custom)
 commands/             # 38 Claude Code slash commands (generated from prompts.md)
 skills/               # Claude Code plugin skill definition
