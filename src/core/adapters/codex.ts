@@ -10,10 +10,15 @@ import type {
 
 const PHASE_ORDER = [
   'pre',
+  'foundation',
+  'environment',
+  'integration',
+  'stories',
   'modeling',
   'decisions',
   'architecture',
   'specification',
+  'consolidation',
   'quality',
   'planning',
   'validation',
