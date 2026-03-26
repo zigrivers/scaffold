@@ -98,46 +98,36 @@ brew install scaffold
 
 Verify: `scaffold version`
 
-### Step 2: Add slash commands (optional)
+### Step 2: Add the plugin (recommended)
 
-If you want `/scaffold:` commands inside Claude Code, also install the plugin:
+Install the Scaffold plugin inside Claude Code for slash commands AND the interactive runner skill:
 
 ```
 /plugin marketplace add zigrivers/scaffold
 /plugin install scaffold@zigrivers-scaffold
 ```
 
-This is optional — everything the plugin does can also be done with `scaffold run <step>` from the CLI.
-
-### Step 3: Enable the Scaffold Runner skill (recommended)
-
-The Scaffold Runner skill gives Claude Code an intelligent interactive wrapper around the scaffold CLI. Without it, when Claude runs `scaffold run <step>`, decision points in the assembled prompt (depth level, strictness, optional sections) get buried and Claude picks defaults silently. With the skill, those questions are surfaced to you before execution.
-
-**If you installed the plugin** (Step 2), the skill is included automatically.
-
-**If you're using the CLI only**, add the skill to your project:
-
-```bash
-# In your project directory
-mkdir -p .claude/skills
-cp "$(npm root -g)/@zigrivers/scaffold/skills/scaffold-runner/SKILL.md" .claude/skills/scaffold-runner.md
-```
-
-**What the skill does:**
-1. Previews the assembled prompt before executing it
-2. Extracts decision points (depth, strictness, optional sections, architecture choices)
-3. Presents them to you as interactive questions
-4. Executes the full prompt with your answers baked in
-5. Shows pipeline progress and suggests the next step
+This gives you:
+- **Slash commands** (`/scaffold:create-prd`, `/scaffold:tdd`, etc.) — quick access to any pipeline step
+- **Scaffold Runner skill** — intelligent interactive wrapper that surfaces decision points (depth level, strictness, optional sections) before execution instead of letting Claude pick defaults silently
+- **Pipeline reference skill** — shows pipeline ordering, dependencies, and completion status
 
 **Usage** — just tell Claude Code what you want in natural language:
 ```
-"Run the next scaffold step"
-"Run scaffold create-prd"
-"Where am I in the pipeline?"
-"Skip the design system step"
-"Use depth 3 for everything"
+"Run the next scaffold step"          → previews prompt, asks decisions, executes
+"Run scaffold create-prd"             → same for a specific step
+"Where am I in the pipeline?"         → shows progress and next eligible steps
+"Skip the design system step"         → marks step as skipped
+"Use depth 3 for everything"          → remembers preference for the session
 ```
+
+The plugin is optional — everything it does can also be done with `scaffold run <step>` from the CLI. But you lose the interactive decision surfacing without the Scaffold Runner skill.
+
+> **CLI-only users**: If you prefer not to install the plugin, add skills with one command:
+> ```bash
+> scaffold skill install
+> ```
+> This copies the Scaffold Runner and Pipeline Reference skills to `.claude/skills/` in your project.
 
 ## Updating
 
@@ -399,6 +389,9 @@ You can change methodology mid-pipeline with `scaffold init --methodology <prese
 | `scaffold dashboard` | Open a visual progress dashboard in your browser |
 | `scaffold decisions` | Show all logged decisions |
 | `scaffold knowledge` | Manage project-local knowledge base overrides |
+| `scaffold skill install` | Install scaffold skills into the current project |
+| `scaffold skill list` | Show available skills and installation status |
+| `scaffold skill remove` | Remove scaffold skills from the current project |
 
 ## Knowledge System
 
