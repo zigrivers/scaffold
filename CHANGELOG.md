@@ -2,6 +2,20 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.1.1] — 2026-03-25
+
+### Fixed
+
+- **Global install path resolution** — `scaffold next`, `scaffold run`, and other commands now correctly find the bundled `pipeline/`, `knowledge/`, and `methodology/` directories when installed via npm or Homebrew, instead of looking in the user's project directory
+- **Package renamed** — npm package is now `@zigrivers/scaffold` (was `@scaffold-cli/scaffold`)
+- **Update command** — `scaffold update` now checks the correct package name on the npm registry
+- **Homebrew formula** — added missing `require "language/node"` for compatibility with current Homebrew
+
+### Changed
+
+- **README rewritten** — reflects v2 architecture (assembly engine, meta-prompts, 9 phases, 36 steps, methodology presets, knowledge system, CLI commands)
+- **Installation docs** — clarified that CLI (npm/brew) and plugin (`/scaffold:` slash commands) are separate installs
+
 ## [2.1.0] — 2026-03-17
 
 ### Added

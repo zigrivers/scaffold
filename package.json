@@ -1,9 +1,17 @@
 {
   "name": "@zigrivers/scaffold",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "AI-powered software project scaffolding pipeline",
   "type": "module",
-  "keywords": ["scaffold", "ai", "claude", "codex", "pipeline", "prompts", "meta-prompts"],
+  "keywords": [
+    "scaffold",
+    "ai",
+    "claude",
+    "codex",
+    "pipeline",
+    "prompts",
+    "meta-prompts"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
