@@ -201,3 +201,35 @@ For each category, verify at least one accepted ADR covers it. If a category is 
 - P0: "The monolith-vs-services question has two proposed ADRs (ADR-003, ADR-004) but neither is accepted. The system architecture step cannot define component boundaries."
 - P1: "Authentication approach is not covered by any ADR. The system architecture step needs to know the auth pattern to design the auth component."
 - P2: "Monitoring strategy has no ADR. This could be deferred to the operations step but should be noted."
+
+### Example Review Finding
+
+```markdown
+### Finding: Straw-man alternatives mask the real decision rationale
+
+**Pass:** 2 — Rationale Quality
+**Priority:** P0
+**Location:** ADR-003 "Use React for Frontend Framework"
+
+**Issue:** ADR-003 lists two alternatives: "Use jQuery" and "Build from scratch
+with vanilla JS." Neither is a genuinely viable alternative for a 2024 SPA with
+the complexity described in the PRD. The real alternatives — Vue, Svelte, Angular
+— are not mentioned.
+
+The consequences section lists four benefits and zero costs. React has well-known
+trade-offs (large bundle size, JSX learning curve, frequent ecosystem churn) that
+are absent.
+
+**Impact:** When conditions change (e.g., bundle size becomes a priority, or the
+team grows to include Vue-experienced developers), there is no documented rationale
+for why React was chosen over comparable frameworks. The ADR cannot be meaningfully
+re-evaluated because the real decision criteria were never recorded.
+
+**Recommendation:** Replace alternatives with genuinely considered options (Vue 3,
+Svelte/SvelteKit, Angular). For each, document honest pros and cons. Add negative
+consequences to the React decision: bundle size overhead, ecosystem churn rate,
+and dependency on the React team's architectural direction (Server Components,
+compiler changes).
+
+**Trace:** ADR-003 → blocks Architecture Phase component structure decisions
+```

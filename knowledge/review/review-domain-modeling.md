@@ -286,3 +286,36 @@ Internal inconsistencies within a single domain model erode trust in the artifac
 - P0: "Invariant 'PaymentAmount must not exceed OrderTotal' references PaymentAmount, but the Payment entity has an attribute called 'amount', not 'paymentAmount'."
 - P1: "Relationship diagram shows Order -> Customer as one-to-many, but the Order entity definition says 'each order belongs to one customer' (many-to-one). Direction is inverted."
 - P2: "The Inventory domain model calls the same concept 'stock level' in the overview and 'quantity on hand' in the entity definition."
+
+### Example Review Finding
+
+```markdown
+### Finding: Aggregate boundary cannot enforce cross-aggregate invariant
+
+**Pass:** 4 — Aggregate Boundary Validation
+**Priority:** P0
+**Location:** Order aggregate and Discount aggregate (domain-models.md, Section 3.2)
+
+**Issue:** Domain invariant INV-007 states "discount amount must not exceed order
+subtotal." Enforcing this requires access to both the Order aggregate (to read the
+subtotal, which is the sum of line items) and the Discount aggregate (to read the
+discount amount). These are modeled as separate aggregates with independent
+lifecycles.
+
+Because aggregates are consistency boundaries, there is no transactional guarantee
+that the discount and order subtotal are evaluated atomically. A line item could be
+removed from the Order (reducing subtotal) after a discount was validated against
+the previous subtotal, violating the invariant.
+
+**Impact:** Without resolution, implementing agents will either (a) ignore the
+invariant, allowing invalid discount states, or (b) create tight coupling between
+Order and Discount aggregates, defeating the purpose of the boundary.
+
+**Recommendation:** Move Discount inside the Order aggregate as a value object.
+The discount lifecycle is tied to the order — discounts do not exist independently.
+This allows the Order aggregate root to enforce INV-007 within a single
+consistency boundary.
+
+**Trace:** Invariant INV-007 → Order aggregate + Discount aggregate → PRD
+Feature 3.4 "Apply discount codes at checkout"
+```
