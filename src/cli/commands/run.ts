@@ -6,6 +6,7 @@ import { acquireLock, releaseLock } from '../../state/lock-manager.js'
 import { analyzeCrash } from '../../state/completion.js'
 import { AssemblyEngine } from '../../core/assembly/engine.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
+import { getPackagePipelineDir, getPackageMethodologyDir, getPackageKnowledgeDir } from '../../utils/fs.js'
 import { buildIndexWithOverrides, loadEntries } from '../../core/assembly/knowledge-loader.js'
 import { loadInstructions } from '../../core/assembly/instruction-loader.js'
 import { resolveDepth } from '../../core/assembly/depth-resolver.js'
@@ -86,7 +87,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     // -----------------------------------------------------------------------
     // Step 2: Discover meta-prompts and pipeline
     // -----------------------------------------------------------------------
-    const pipelineDir = path.join(projectRoot, 'pipeline')
+    const pipelineDir = getPackagePipelineDir(projectRoot)
     const metaPrompts = discoverMetaPrompts(pipelineDir)
 
     const metaPrompt = metaPrompts.get(step)
@@ -103,7 +104,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       process.exit(1)
     }
 
-    const methodologyDir = path.join(projectRoot, 'methodology')
+    const methodologyDir = getPackageMethodologyDir(projectRoot)
     const presets = loadAllPresets(methodologyDir, [...metaPrompts.keys()])
 
     const preset = config.methodology === 'mvp'
@@ -307,7 +308,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       // -----------------------------------------------------------------------
       const { instructions } = loadInstructions(projectRoot, step, argv.instructions)
 
-      const kbIndex = buildIndexWithOverrides(projectRoot, path.join(projectRoot, 'knowledge'))
+      const kbIndex = buildIndexWithOverrides(projectRoot, getPackageKnowledgeDir(projectRoot))
       const { entries: knowledgeEntries, warnings: kbWarnings } = loadEntries(
         kbIndex,
         metaPrompt.frontmatter.knowledgeBase ?? [],

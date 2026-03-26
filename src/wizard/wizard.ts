@@ -6,7 +6,7 @@ import { suggestMethodology } from './suggestion.js'
 import { askWizardQuestions } from './questions.js'
 import { StateManager } from '../state/state-manager.js'
 import { discoverMetaPrompts } from '../core/assembly/meta-prompt-loader.js'
-import { atomicWriteFile, ensureDir } from '../utils/fs.js'
+import { atomicWriteFile, ensureDir, getPackagePipelineDir } from '../utils/fs.js'
 import yaml from 'js-yaml'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -101,7 +101,7 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
   atomicWriteFile(configPath, yaml.dump(config))
 
   // Initialize state.json via StateManager
-  const pipelineDir = path.join(projectRoot, 'pipeline')
+  const pipelineDir = getPackagePipelineDir(projectRoot)
   const metaPrompts = discoverMetaPrompts(pipelineDir)
   const allSteps = [...metaPrompts.entries()].map(([slug, mp]) => ({
     slug,

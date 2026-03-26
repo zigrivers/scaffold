@@ -5,6 +5,7 @@ import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { loadConfig } from '../../config/loader.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
+import { getPackagePipelineDir, getPackageMethodologyDir } from '../../utils/fs.js'
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { detectCycles, topologicalSort } from '../../core/dependency/dependency.js'
@@ -66,12 +67,12 @@ const buildCommand: CommandModule<Record<string, unknown>, BuildArgs> = {
     }
 
     // Step 3: Discover meta-prompts
-    const metaPrompts = discoverMetaPrompts(path.join(projectRoot, 'pipeline'))
+    const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))
     const stepNames = [...metaPrompts.keys()]
 
     // Step 4: Load presets (optional — failures are non-fatal)
     try {
-      const methodologyDir = path.join(projectRoot, 'methodology')
+      const methodologyDir = getPackageMethodologyDir(projectRoot)
       loadAllPresets(methodologyDir, stepNames)
     } catch {
       // No presets available — continue without them

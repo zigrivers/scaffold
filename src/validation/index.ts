@@ -3,6 +3,7 @@
 import path from 'node:path'
 import type { ScaffoldError, ScaffoldWarning } from '../types/index.js'
 import { discoverMetaPrompts } from '../core/assembly/meta-prompt-loader.js'
+import { getPackagePipelineDir } from '../utils/fs.js'
 import { validateConfig } from './config-validator.js'
 import { validateFrontmatter } from './frontmatter-validator.js'
 import { validateState } from './state-validator.js'
@@ -36,7 +37,7 @@ export function runValidation(
   let validFiles = 0
   let totalFiles = 0
 
-  const pipelineDir = path.join(projectRoot, 'pipeline')
+  const pipelineDir = getPackagePipelineDir(projectRoot)
 
   // Discover known steps for config cross-field validation
   const knownSteps: string[] = []

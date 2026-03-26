@@ -6,6 +6,7 @@ import { createOutputContext } from '../output/context.js'
 import { loadConfig } from '../../config/loader.js'
 import { StateManager } from '../../state/state-manager.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
+import { getPackagePipelineDir, getPackageMethodologyDir } from '../../utils/fs.js'
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
 
 interface StatusArgs {
@@ -52,9 +53,9 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     const state = stateManager.loadState()
 
     // 4. Discover meta-prompts
-    const metaPrompts = discoverMetaPrompts(path.join(projectRoot, 'pipeline'))
+    const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))
     loadAllPresets(
-      path.join(projectRoot, 'methodology'),
+      getPackageMethodologyDir(projectRoot),
       [...metaPrompts.keys()],
     )
 

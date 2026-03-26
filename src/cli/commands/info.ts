@@ -1,6 +1,7 @@
 import type { CommandModule } from 'yargs'
 import path from 'node:path'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
+import { getPackagePipelineDir } from '../../utils/fs.js'
 import { StateManager } from '../../state/state-manager.js'
 import { loadConfig } from '../../config/loader.js'
 import { createOutputContext } from '../output/context.js'
@@ -67,7 +68,7 @@ const infoCommand: CommandModule<Record<string, unknown>, InfoArgs> = {
     }
 
     // Step info mode
-    const metaPrompts = discoverMetaPrompts(path.join(projectRoot, 'pipeline'))
+    const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))
     const mp = metaPrompts.get(argv.step)
     if (!mp) {
       const suggestion = findClosestMatch(argv.step, [...metaPrompts.keys()])

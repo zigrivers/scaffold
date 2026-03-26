@@ -7,6 +7,7 @@ import { createOutputContext } from '../output/context.js'
 import { StateManager } from '../../state/state-manager.js'
 import { acquireLock, releaseLock } from '../../state/lock-manager.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
+import { getPackagePipelineDir } from '../../utils/fs.js'
 import { runAdoption } from '../../project/adopt.js'
 
 interface AdoptArgs {
@@ -53,7 +54,7 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
 
     try {
       const dryRun = argv['dry-run'] ?? false
-      const metaPromptDir = path.join(projectRoot, 'pipeline')
+      const metaPromptDir = getPackagePipelineDir(projectRoot)
       const methodology = 'deep'
 
       const adoptResult = runAdoption({ projectRoot, metaPromptDir, methodology, dryRun })

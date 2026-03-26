@@ -127,7 +127,7 @@ describe('list command — interactive mode', () => {
     expect(written).not.toContain('Methodology Presets')
   })
 
-  it('shows message when no presets are found', async () => {
+  it('falls back to package presets when project has no methodology dir', async () => {
     const root = makeProjectRoot({ hasMethodology: false })
 
     await runListHandler({
@@ -142,7 +142,8 @@ describe('list command — interactive mode', () => {
       ...stderrWrite.mock.calls.map(c => String(c[0])),
     ].join('')
 
-    expect(written).toContain('none found')
+    // Should find bundled package presets even without local methodology dir
+    expect(written).toContain('Methodology Presets')
   })
 
   it('works without a project root (no .scaffold/ dir)', async () => {

@@ -6,6 +6,7 @@ import { createOutputContext } from '../output/context.js'
 import { loadConfig } from '../../config/loader.js'
 import { StateManager } from '../../state/state-manager.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
+import { getPackagePipelineDir } from '../../utils/fs.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { computeEligible } from '../../core/dependency/eligibility.js'
 
@@ -50,7 +51,7 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     loadConfig(projectRoot, [])
 
     // 3. Discover meta-prompts and compute eligible
-    const metaPrompts = discoverMetaPrompts(path.join(projectRoot, 'pipeline'))
+    const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))
     const graph = buildGraph(
       [...metaPrompts.values()].map(m => m.frontmatter),
       new Map(),

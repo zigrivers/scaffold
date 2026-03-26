@@ -10,6 +10,7 @@ import { KnowledgeUpdateAssembler, loadTemplate } from '../../core/knowledge/kno
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { loadConfig } from '../../config/loader.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
+import { getPackageKnowledgeDir, getPackagePipelineDir } from '../../utils/fs.js'
 
 // -----------------------------------------------------------------------
 // Shared helpers
@@ -54,7 +55,7 @@ const listSubcommand: CommandModule<Record<string, unknown>, ListArgs> = {
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
-    const globalDir = path.join(projectRoot, 'knowledge')
+    const globalDir = getPackageKnowledgeDir(projectRoot)
     const localDir = path.join(projectRoot, '.scaffold', 'knowledge')
 
     const globalIndex = buildIndex(globalDir)
@@ -119,7 +120,7 @@ const showSubcommand: CommandModule<Record<string, unknown>, ShowArgs> = {
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
-    const globalDir = path.join(projectRoot, 'knowledge')
+    const globalDir = getPackageKnowledgeDir(projectRoot)
     const localDir = path.join(projectRoot, '.scaffold', 'knowledge')
     const globalIndex = buildIndex(globalDir)
     const localIndex = buildIndex(localDir)
@@ -265,12 +266,11 @@ const updateSubcommand: CommandModule<Record<string, unknown>, UpdateArgs> = {
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
-    const globalDir = path.join(projectRoot, 'knowledge')
+    const globalDir = getPackageKnowledgeDir(projectRoot)
     const localDir = path.join(projectRoot, '.scaffold', 'knowledge')
     const globalIndex = buildIndex(globalDir)
 
-    const pipelineDir = path.join(projectRoot, '.scaffold', 'pipeline')
-    const metaPrompts = discoverMetaPrompts(pipelineDir)
+    const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))
 
     const target = argv.target
     const isEntryName = globalIndex.has(target)

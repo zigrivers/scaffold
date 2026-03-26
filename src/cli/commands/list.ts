@@ -2,6 +2,7 @@ import type { CommandModule } from 'yargs'
 import path from 'node:path'
 import type { MethodologyPreset } from '../../types/index.js'
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
+import { getPackageMethodologyDir } from '../../utils/fs.js'
 import { createOutputContext } from '../output/context.js'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
@@ -32,7 +33,7 @@ const listCommand: CommandModule<Record<string, unknown>, ListArgs> = {
 
     // Try to find project root for methodology dir
     const projectRoot = argv.root ?? findProjectRoot(process.cwd())
-    const methodologyDir = projectRoot ? path.join(projectRoot, 'methodology') : null
+    const methodologyDir = getPackageMethodologyDir(projectRoot ?? undefined)
 
     // Load presets if methodology dir is available
     const presets: Map<string, MethodologyPreset> = new Map()
