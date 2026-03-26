@@ -513,7 +513,7 @@ src/
 pipeline/             # 53 meta-prompts organized by 14 phases
 knowledge/            # 43 domain expertise entries (core, product, review, validation, finalization)
 methodology/          # 3 YAML presets (deep, mvp, custom)
-commands/             # 38 Claude Code slash commands (generated from prompts.md)
+commands/             # 69 Claude Code slash commands (53 pipeline + 16 utility)
 skills/               # Claude Code plugin skill definition
 ```
 
