@@ -8,6 +8,8 @@ import { StateManager } from '../../state/state-manager.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { getPackagePipelineDir, getPackageMethodologyDir } from '../../utils/fs.js'
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
+import { buildGraph } from '../../core/dependency/graph.js'
+import { computeEligible } from '../../core/dependency/eligibility.js'
 
 interface StatusArgs {
   phase?: number
@@ -47,17 +49,32 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
-    // 3. Load config and state
+    // 3. Load config and discover meta-prompts
     const { config } = loadConfig(projectRoot, [])
-    const stateManager = new StateManager(projectRoot, () => [])
-    const state = stateManager.loadState()
-
-    // 4. Discover meta-prompts
     const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))
-    loadAllPresets(
-      getPackageMethodologyDir(projectRoot),
-      [...metaPrompts.keys()],
-    )
+
+    // 4. Load methodology preset for correct eligibility computation
+    const methodologyDir = getPackageMethodologyDir(projectRoot)
+    const presets = loadAllPresets(methodologyDir, [...metaPrompts.keys()])
+    const configMethodology =
+      (config as Record<string, unknown>)?.methodology as string ?? 'deep'
+    const preset = configMethodology === 'mvp'
+      ? presets.mvp
+      : configMethodology === 'custom'
+        ? presets.custom ?? presets.deep
+        : presets.deep
+    const presetSteps = new Map(Object.entries(preset?.steps ?? {}))
+
+    const computeEligibleFn = (steps: Parameters<typeof computeEligible>[1]) => {
+      const graph = buildGraph(
+        [...metaPrompts.values()].map(m => m.frontmatter),
+        presetSteps,
+      )
+      return computeEligible(graph, steps)
+    }
+
+    const stateManager = new StateManager(projectRoot, computeEligibleFn)
+    const state = stateManager.loadState()
 
     // 5. Build progress stats
     const { steps } = state
@@ -98,7 +115,13 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
         output.info(`  ${icon} [${entry.status}] ${slug}`)
       }
 
-      const nextEligibleList = state.next_eligible.join(', ') || 'none'
+      // Compute eligible live (don't rely on stale cache in state.json)
+      const graph = buildGraph(
+        [...metaPrompts.values()].map(m => m.frontmatter),
+        presetSteps,
+      )
+      const liveEligible = computeEligible(graph, state.steps)
+      const nextEligibleList = liveEligible.join(', ') || 'none'
       output.info(`\nNext eligible: ${nextEligibleList}`)
     }
 

@@ -1,10 +1,12 @@
 import type { ScaffoldConfig } from '../types/index.js'
 import type { ScaffoldError } from '../types/index.js'
+import type { PipelineState } from '../types/index.js'
 import type { OutputContext } from '../cli/output/context.js'
 import { detectProjectMode } from '../project/detector.js'
 import { suggestMethodology } from './suggestion.js'
 import { askWizardQuestions } from './questions.js'
 import { StateManager } from '../state/state-manager.js'
+import { migrateState } from '../state/state-migration.js'
 import { discoverMetaPrompts } from '../core/assembly/meta-prompt-loader.js'
 import { atomicWriteFile, ensureDir, getPackagePipelineDir } from '../utils/fs.js'
 import yaml from 'js-yaml'
@@ -50,8 +52,21 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
     }
   }
 
-  // Backup existing .scaffold/ if --force
+  // Read old state before backup (to preserve completed steps)
+  let oldState: PipelineState | null = null
   if (fs.existsSync(scaffoldDir) && force) {
+    const oldStatePath = path.join(scaffoldDir, 'state.json')
+    if (fs.existsSync(oldStatePath)) {
+      try {
+        const raw = JSON.parse(fs.readFileSync(oldStatePath, 'utf8')) as PipelineState
+        // Apply step name migrations before merging
+        migrateState(raw)
+        oldState = raw
+      } catch {
+        // Couldn't read old state — proceed without preserving
+      }
+    }
+
     const backupPath = path.join(projectRoot, '.scaffold.backup')
     const finalBackup = fs.existsSync(backupPath)
       ? `${backupPath}.${Date.now()}`
@@ -119,6 +134,26 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
         ? 'brownfield'
         : 'greenfield',
   })
+
+  // Merge completed/skipped steps from old state (--force re-init)
+  if (oldState) {
+    const newState = stateManager.loadState()
+    let preserved = 0
+    for (const [slug, entry] of Object.entries(oldState.steps)) {
+      if (entry.status === 'completed' || entry.status === 'skipped') {
+        if (newState.steps[slug]) {
+          // Step exists in new pipeline — preserve its completion status
+          newState.steps[slug] = entry
+          preserved++
+        }
+        // Step doesn't exist in new pipeline — skip (it was removed or renamed)
+      }
+    }
+    if (preserved > 0) {
+      stateManager.saveState(newState)
+      output.info(`Preserved ${preserved} completed/skipped step(s) from previous state`)
+    }
+  }
 
   // Write empty decisions.jsonl
   const decisionsPath = path.join(scaffoldDir, 'decisions.jsonl')
