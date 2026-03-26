@@ -38,6 +38,25 @@ vi.mock('../../cli/output/error-display.js', () => ({
   displayErrors: vi.fn(),
 }))
 
+vi.mock('../../core/assembly/knowledge-loader.js', () => ({
+  buildIndexWithOverrides: vi.fn(() => new Map()),
+  loadFullEntries: vi.fn(() => ({ entries: [], warnings: [] })),
+}))
+
+vi.mock('../../core/adapters/adapter.js', () => ({
+  createAdapter: vi.fn(() => ({
+    platformId: 'claude-code',
+    initialize: vi.fn(() => ({ success: true, errors: [] })),
+    generateStepWrapper: vi.fn((input: { slug: string }) => ({
+      slug: input.slug,
+      platformId: 'claude-code',
+      files: [],
+      success: true,
+    })),
+    finalize: vi.fn(() => ({ files: [], errors: [] })),
+  })),
+}))
+
 // ---------------------------------------------------------------------------
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
@@ -77,9 +96,11 @@ function makeMetaPromptMap(names: string[]): Map<string, unknown> {
           order: 1,
           dependencies: [],
           outputs: [],
+          knowledgeBase: [],
+          conditional: null,
         },
-        body: '',
-        sections: {},
+        body: '## Purpose\nTest step.',
+        sections: { Purpose: 'Test step.' },
       },
     ]),
   )

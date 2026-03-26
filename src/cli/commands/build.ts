@@ -5,11 +5,15 @@ import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { loadConfig } from '../../config/loader.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
-import { getPackagePipelineDir, getPackageMethodologyDir } from '../../utils/fs.js'
+import { getPackagePipelineDir, getPackageMethodologyDir, getPackageKnowledgeDir } from '../../utils/fs.js'
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { detectCycles, topologicalSort } from '../../core/dependency/dependency.js'
 import { displayErrors } from '../../cli/output/error-display.js'
+import { buildIndexWithOverrides, loadFullEntries } from '../../core/assembly/knowledge-loader.js'
+import { createAdapter } from '../../core/adapters/adapter.js'
+import type { AdapterStepInput, AdapterStepOutput, OutputFile } from '../../core/adapters/adapter.js'
+import fs from 'node:fs'
 
 interface BuildArgs {
   'validate-only': boolean
@@ -94,10 +98,7 @@ const buildCommand: CommandModule<Record<string, unknown>, BuildArgs> = {
 
     // Step 7: Topological sort
     const sorted = topologicalSort(graph)
-    const enabledSteps = sorted.filter(() => {
-      // For now: all steps enabled (adapter logic comes in T-039-T-042)
-      return true
-    })
+    const enabledSteps = sorted
 
     // Step 8: Handle --validate-only
     if (argv['validate-only']) {
@@ -109,20 +110,105 @@ const buildCommand: CommandModule<Record<string, unknown>, BuildArgs> = {
       return
     }
 
-    // Step 9: Report build stats (adapter file generation is T-039-T-042)
+    // Step 9: Load knowledge index
+    const kbIndex = buildIndexWithOverrides(
+      projectRoot,
+      getPackageKnowledgeDir(projectRoot),
+    )
+
+    // Step 10: Build reverse dependency map (step → steps that come after it)
+    const forwardDeps = new Map<string, string[]>()
+    for (const [stepName, node] of graph.nodes) {
+      // Find steps that list this step as a dependency
+      const dependents: string[] = []
+      for (const [otherName, otherNode] of graph.nodes) {
+        if (otherName === stepName) continue
+        const otherMeta = metaPrompts.get(otherName)
+        if (otherMeta?.frontmatter.dependencies.includes(stepName)) {
+          dependents.push(otherName)
+        }
+      }
+      forwardDeps.set(stepName, dependents)
+    }
+
+    // Step 11: Create adapters and generate
+    const platforms = (config.platforms as string[]) ?? ['claude-code']
+    const allOutputFiles: OutputFile[] = []
+
+    for (const platformId of platforms) {
+      const adapter = createAdapter(platformId)
+      adapter.initialize({
+        projectRoot,
+        methodology: config.methodology ?? 'deep',
+        allSteps: stepNames,
+      })
+
+      const results: AdapterStepOutput[] = []
+
+      for (const stepSlug of enabledSteps) {
+        const meta = metaPrompts.get(stepSlug)
+        if (!meta) continue
+
+        // Load full knowledge entries (Summary + Deep Guidance) for self-contained commands
+        const kbNames = meta.frontmatter.knowledgeBase ?? []
+        const { entries: kbEntries } = loadFullEntries(kbIndex, kbNames)
+
+        // Build Purpose-derived long description
+        const purposeSection = meta.sections['Purpose'] ?? ''
+        const longDescription = purposeSection.split('\n')[0]?.trim() ?? meta.frontmatter.description
+
+        const input: AdapterStepInput = {
+          slug: stepSlug,
+          description: meta.frontmatter.description,
+          phase: meta.frontmatter.phase,
+          dependsOn: forwardDeps.get(stepSlug) ?? [],
+          produces: meta.frontmatter.outputs,
+          pipelineIndex: enabledSteps.indexOf(stepSlug),
+          body: meta.body,
+          sections: meta.sections,
+          knowledgeEntries: kbEntries.map(e => ({
+            name: e.name,
+            description: e.description,
+            content: e.content,
+          })),
+          conditional: meta.frontmatter.conditional,
+          longDescription,
+        }
+
+        const stepResult = adapter.generateStepWrapper(input)
+        results.push(stepResult)
+        allOutputFiles.push(...stepResult.files)
+      }
+
+      adapter.finalize({ results })
+    }
+
+    // Step 12: Write output files
+    let generatedCount = 0
+    for (const file of allOutputFiles) {
+      const fullPath = path.join(projectRoot, file.relativePath)
+      const dir = path.dirname(fullPath)
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true })
+      }
+      fs.writeFileSync(fullPath, file.content, 'utf8')
+      generatedCount++
+    }
+
+    // Step 13: Report build stats
     const buildResult = {
       stepsTotal: stepNames.length,
       stepsEnabled: enabledSteps.length,
-      platforms: (config.platforms as string[]) ?? [],
-      generatedFiles: 0,
+      platforms,
+      generatedFiles: generatedCount,
       buildTimeMs: Date.now() - startTime,
     }
 
     if (outputMode === 'json') {
       output.result(buildResult)
     } else {
-      output.success(`Build complete: ${enabledSteps.length}/${stepNames.length} steps enabled`)
-      output.info(`Platforms: ${buildResult.platforms.join(', ') || 'none'}`)
+      output.success(`Build complete: ${generatedCount} files generated for ${enabledSteps.length} steps`)
+      output.info(`Platforms: ${platforms.join(', ')}`)
     }
 
     process.exit(0)

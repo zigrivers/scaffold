@@ -16,6 +16,11 @@ const makeStepInput = (overrides?: Partial<AdapterStepInput>): AdapterStepInput 
   dependsOn: [],
   produces: ['docs/goals.md'],
   pipelineIndex: 0,
+  body: '## Purpose\nDefine the project goals.',
+  sections: { Purpose: 'Define the project goals.' },
+  knowledgeEntries: [],
+  conditional: null,
+  longDescription: 'Define the project goals.',
   ...overrides,
 })
 

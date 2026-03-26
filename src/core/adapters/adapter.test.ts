@@ -83,6 +83,11 @@ describe('AdapterStepInput shape', () => {
       dependsOn: [],
       produces: ['docs/goals.md'],
       pipelineIndex: 0,
+      body: '## Purpose\nDefine the project goals.',
+      sections: { Purpose: 'Define the project goals.' },
+      knowledgeEntries: [],
+      conditional: null,
+      longDescription: 'Define the project goals.',
     }
     expect(input.slug).toBe('define-goals')
     expect(input.phase).toBe('pre')
@@ -97,6 +102,11 @@ describe('AdapterStepInput shape', () => {
       dependsOn: [],
       produces: [],
       pipelineIndex: 5,
+      body: '',
+      sections: {},
+      knowledgeEntries: [],
+      conditional: null,
+      longDescription: '',
     }
     expect(input.phase).toBeNull()
   })

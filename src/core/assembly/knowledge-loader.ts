@@ -266,3 +266,61 @@ export function loadEntries(
 
   return { entries, warnings }
 }
+
+/**
+ * Load knowledge entries with FULL content (Summary + Deep Guidance).
+ * Used by scaffold build to generate self-contained command files
+ * where no runtime assembly is available to inject knowledge.
+ *
+ * Unlike loadEntries() which prefers Deep Guidance only (for CLI assembly),
+ * this always returns the complete body after frontmatter.
+ */
+export function loadFullEntries(
+  index: Map<string, string>,
+  names: string[],
+): { entries: KnowledgeEntry[]; warnings: ScaffoldWarning[] } {
+  const entries: KnowledgeEntry[] = []
+  const warnings: ScaffoldWarning[] = []
+
+  for (const name of names) {
+    const filePath = index.get(name)
+    if (!filePath) {
+      warnings.push({
+        code: 'FRONTMATTER_KB_ENTRY_MISSING',
+        message: `Knowledge base entry "${name}" not found in index`,
+        context: { name },
+      })
+      continue
+    }
+
+    try {
+      const content = fs.readFileSync(filePath, 'utf8')
+      const fm = extractKBFrontmatter(content)
+
+      if (!fm) {
+        warnings.push({
+          code: 'FRONTMATTER_KB_ENTRY_MISSING',
+          message: `Knowledge base entry "${name}" has invalid frontmatter`,
+          context: { name, file: filePath },
+        })
+        continue
+      }
+
+      entries.push({
+        name: fm.name,
+        description: fm.description,
+        topics: fm.topics,
+        content: extractBody(content),
+      })
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
+      warnings.push({
+        code: 'FRONTMATTER_KB_ENTRY_MISSING',
+        message: `Failed to load knowledge base entry "${name}": ${detail}`,
+        context: { name, file: filePath },
+      })
+    }
+  }
+
+  return { entries, warnings }
+}

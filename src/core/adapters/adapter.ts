@@ -31,6 +31,16 @@ export interface AdapterStepInput {
   dependsOn: string[]
   produces: string[]
   pipelineIndex: number  // position in sorted order
+  /** Raw meta-prompt markdown body (everything after frontmatter) */
+  body: string
+  /** Parsed H2 sections from the meta-prompt body */
+  sections: Record<string, string>
+  /** Loaded knowledge base entries for this step */
+  knowledgeEntries: Array<{ name: string; description: string; content: string }>
+  /** Conditional execution flag */
+  conditional: 'if-needed' | null
+  /** Expanded description derived from Purpose section */
+  longDescription: string
 }
 
 /** Output from generateStepWrapper() */
