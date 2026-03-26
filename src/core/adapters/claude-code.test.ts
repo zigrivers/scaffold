@@ -16,6 +16,11 @@ const makeStepInput = (overrides?: Partial<AdapterStepInput>): AdapterStepInput 
   dependsOn: [],
   produces: ['docs/goals.md'],
   pipelineIndex: 0,
+  body: '## Purpose\nDefine the project goals.\n\n## Inputs\n- docs/prd.md\n\n## Expected Outputs\n- docs/goals.md',
+  sections: { Purpose: 'Define the project goals.', Inputs: '- docs/prd.md', 'Expected Outputs': '- docs/goals.md' },
+  knowledgeEntries: [],
+  conditional: null,
+  longDescription: 'Define the project goals and success criteria based on PRD requirements.',
   ...overrides,
 })
 
@@ -26,14 +31,12 @@ describe('ClaudeCodeAdapter', () => {
     adapter = new ClaudeCodeAdapter()
   })
 
-  // T-040 test 1: initialize() returns success
   it('initialize() returns success', () => {
     const result = adapter.initialize(makeContext())
     expect(result.success).toBe(true)
     expect(result.errors).toEqual([])
   })
 
-  // T-040 test 2: generateStepWrapper creates file at commands/<slug>.md
   it('generateStepWrapper creates file at commands/<slug>.md', () => {
     adapter.initialize(makeContext())
     const output = adapter.generateStepWrapper(makeStepInput({ slug: 'define-goals' }))
@@ -41,29 +44,54 @@ describe('ClaudeCodeAdapter', () => {
     expect(output.files[0].relativePath).toBe('commands/define-goals.md')
   })
 
-  // T-040 test 3: File has YAML frontmatter with description
   it('generated file has YAML frontmatter with description', () => {
     adapter.initialize(makeContext())
     const output = adapter.generateStepWrapper(makeStepInput({ description: 'Define project goals' }))
     expect(output.files[0].content).toContain('---')
-    expect(output.files[0].content).toContain('description: Define project goals')
+    expect(output.files[0].content).toContain('description:')
+    expect(output.files[0].content).toContain('Define project goals')
   })
 
-  // T-040 test 4: File body contains scaffold run <slug>
-  it('generated file body contains scaffold run <slug>', () => {
+  it('generated file includes meta-prompt body content', () => {
     adapter.initialize(makeContext())
-    const output = adapter.generateStepWrapper(makeStepInput({ slug: 'define-goals' }))
-    expect(output.files[0].content).toContain('scaffold run define-goals')
+    const output = adapter.generateStepWrapper(makeStepInput({
+      body: '## Purpose\nBuild the thing.\n\n## Inputs\n- docs/prd.md',
+    }))
+    expect(output.files[0].content).toContain('Build the thing')
+    expect(output.files[0].content).toContain('## Inputs')
   })
 
-  // T-040 test 5: File body contains step index
-  it('generated file body contains step index (1-based)', () => {
+  it('generated file includes long-description in frontmatter', () => {
     adapter.initialize(makeContext())
-    const output = adapter.generateStepWrapper(makeStepInput({ pipelineIndex: 2 }))
-    expect(output.files[0].content).toContain('step 3')
+    const output = adapter.generateStepWrapper(makeStepInput({
+      longDescription: 'A detailed description of the step.',
+    }))
+    expect(output.files[0].content).toContain('long-description:')
+    expect(output.files[0].content).toContain('A detailed description of the step')
   })
 
-  // T-040 test 6: finalize() returns empty files
+  it('generated file includes knowledge entries under Domain Knowledge heading', () => {
+    adapter.initialize(makeContext())
+    const output = adapter.generateStepWrapper(makeStepInput({
+      knowledgeEntries: [
+        { name: 'testing-strategy', description: 'Test patterns', content: 'Use the test pyramid.' },
+        { name: 'api-design', description: 'API patterns', content: 'REST best practices.' },
+      ],
+    }))
+    const content = output.files[0].content
+    expect(content).toContain('## Domain Knowledge')
+    expect(content).toContain('### testing-strategy')
+    expect(content).toContain('Use the test pyramid.')
+    expect(content).toContain('### api-design')
+    expect(content).toContain('REST best practices.')
+  })
+
+  it('generated file has no Domain Knowledge section when no entries', () => {
+    adapter.initialize(makeContext())
+    const output = adapter.generateStepWrapper(makeStepInput({ knowledgeEntries: [] }))
+    expect(output.files[0].content).not.toContain('Domain Knowledge')
+  })
+
   it('finalize() returns empty files array', () => {
     adapter.initialize(makeContext())
     const finalizeInput: AdapterFinalizeInput = { results: [] }
@@ -72,7 +100,6 @@ describe('ClaudeCodeAdapter', () => {
     expect(result.errors).toEqual([])
   })
 
-  // T-040 test 7: Output is deterministic (same input → same output)
   it('output is deterministic — same input produces same output', () => {
     adapter.initialize(makeContext())
     const input = makeStepInput()
@@ -81,7 +108,6 @@ describe('ClaudeCodeAdapter', () => {
     expect(out1.files[0].content).toBe(out2.files[0].content)
   })
 
-  // Additional: generateStepWrapper returns correct platformId and slug
   it('generateStepWrapper returns platformId "claude-code" and correct slug', () => {
     adapter.initialize(makeContext())
     const output = adapter.generateStepWrapper(makeStepInput({ slug: 'design-arch' }))
@@ -90,23 +116,20 @@ describe('ClaudeCodeAdapter', () => {
     expect(output.success).toBe(true)
   })
 
-  // Additional: dependsOn produces "After This Step" section
   it('generates "After This Step" section when dependsOn is non-empty', () => {
     adapter.initialize(makeContext())
     const output = adapter.generateStepWrapper(makeStepInput({ dependsOn: ['step-a', 'step-b'] }))
     expect(output.files[0].content).toContain('After This Step')
-    expect(output.files[0].content).toContain('scaffold run step-a')
-    expect(output.files[0].content).toContain('scaffold run step-b')
+    expect(output.files[0].content).toContain('/scaffold:step-a')
+    expect(output.files[0].content).toContain('/scaffold:step-b')
   })
 
-  // Additional: no "After This Step" when dependsOn is empty
   it('omits "After This Step" section when dependsOn is empty', () => {
     adapter.initialize(makeContext())
     const output = adapter.generateStepWrapper(makeStepInput({ dependsOn: [] }))
     expect(output.files[0].content).not.toContain('After This Step')
   })
 
-  // Additional: file writeMode is 'create'
   it('file writeMode is "create"', () => {
     adapter.initialize(makeContext())
     const output = adapter.generateStepWrapper(makeStepInput())

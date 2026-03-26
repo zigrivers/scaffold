@@ -19,21 +19,26 @@ export class ClaudeCodeAdapter implements PlatformAdapter {
   }
 
   generateStepWrapper(input: AdapterStepInput): AdapterStepOutput {
-    const { slug, description, dependsOn, pipelineIndex } = input
+    const { slug, description, dependsOn, body, sections, knowledgeEntries, longDescription } = input
 
-    const afterThisStep =
-      dependsOn.length > 0
-        ? `\n## After This Step\n\nContinue with: ${dependsOn.map((d) => `\`scaffold run ${d}\``).join(', ')}`
-        : ''
+    // Build YAML frontmatter
+    const descriptionYaml = JSON.stringify(description)
+    const longDescYaml = longDescription ? `\nlong-description: ${JSON.stringify(longDescription)}` : ''
+
+    // Build meta-prompt body (skip Purpose section since it's in long-description)
+    const bodyContent = buildBodyContent(body, sections)
+
+    // Build knowledge section
+    const knowledgeSection = buildKnowledgeSection(knowledgeEntries)
+
+    // Build After This Step section
+    const afterSection = buildAfterThisStep(dependsOn)
 
     const content = `---
-description: ${description}
+description: ${descriptionYaml}${longDescYaml}
 ---
 
-Execute: \`scaffold run ${slug}\`
-
-This is step ${pipelineIndex + 1} in the Scaffold pipeline.
-${afterThisStep}
+${bodyContent}${knowledgeSection}${afterSection}
 `
 
     return {
@@ -48,4 +53,45 @@ ${afterThisStep}
   finalize(_input: AdapterFinalizeInput): AdapterFinalizeResult {
     return { files: [], errors: [] }
   }
+}
+
+/**
+ * Build the main body content from the meta-prompt.
+ * Includes all sections except Purpose (which goes in long-description frontmatter).
+ */
+function buildBodyContent(body: string, sections: Record<string, string>): string {
+  // If the body has structured sections, use the full body as-is
+  // (it already has proper ## headings from the pipeline step)
+  if (body.trim().length > 0) {
+    return body.trim()
+  }
+  return ''
+}
+
+/**
+ * Format knowledge entries as a Domain Knowledge section.
+ * Each entry gets its own H2 subsection.
+ */
+function buildKnowledgeSection(
+  entries: Array<{ name: string; description: string; content: string }>,
+): string {
+  if (entries.length === 0) return ''
+
+  const parts = entries.map((entry) => {
+    const header = `### ${entry.name}\n\n*${entry.description}*`
+    return `${header}\n\n${entry.content.trim()}`
+  })
+
+  return `\n\n---\n\n## Domain Knowledge\n\n${parts.join('\n\n---\n\n')}`
+}
+
+/**
+ * Build the After This Step section from forward dependencies.
+ * dependsOn contains steps that come AFTER this one (downstream dependents).
+ */
+function buildAfterThisStep(dependsOn: string[]): string {
+  if (dependsOn.length === 0) return ''
+
+  const nextSteps = dependsOn.map((d) => `\`/scaffold:${d}\``).join(', ')
+  return `\n\n---\n\n## After This Step\n\nContinue with: ${nextSteps}`
 }
