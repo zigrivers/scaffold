@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.3.4] — 2026-03-26
+
+### Fixed
+
+- **Skills not shipped in npm package** — `skills/` directory was missing from `package.json` `files` array, so `scaffold skill install` couldn't find source files after Homebrew/npm install
+
 ## [2.3.3] — 2026-03-26
 
 ### Fixed
