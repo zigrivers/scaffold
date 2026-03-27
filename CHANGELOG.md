@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.16.2] — 2026-03-27
+
+### Fixed
+
+- **Gemini CLI hang in non-TTY shells** — Added `NO_BROWSER=true` to all Gemini invocations across 20 files. Root cause: Gemini relaunches as a child process and shows a consent prompt ("Do you want to continue? [Y/n]") that hangs when stdin is not a TTY. `NO_BROWSER=true` suppresses this prompt and uses cached credentials directly. OAuth tokens were always persisted — the issue was purely the consent prompt blocking, not missing auth.
+
 ## [2.16.1] — 2026-03-27
 
 ### Added
