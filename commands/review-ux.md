@@ -100,8 +100,9 @@ At depth 4+, dispatch the reviewed artifact to independent AI models for additio
 - `docs/ux-spec.md` (the reviewed artifact)
 - `docs/plan.md` (PRD)
 - `docs/user-stories.md`
-- `docs/design-system.md`
-- Focus areas: missing error states, accessibility gaps, design system violations, incomplete user journeys
+- `docs/design-system.md` (if it exists)
+- `docs/api-contracts.md` (if it exists — for response shape and error contract alignment)
+- Focus areas: missing error states, accessibility gaps, design system violations, incomplete user journeys, API response shape mismatches
 
 If neither CLI is available, perform a structured adversarial self-review instead: re-read the artifact specifically looking for issues the initial review passes might have missed.
 
@@ -124,7 +125,9 @@ When this step is complete, tell the user:
 ---
 **Review complete** — UX specification review findings documented in `docs/reviews/review-ux.md`.
 
-**Next:** Run `/scaffold:claude-md-optimization` — Consolidate CLAUDE.md, or proceed to remaining specification steps if database or API specs are still needed.
+**Next:**
+- Proceed to remaining spec steps (`/scaffold:database-schema`, `/scaffold:api-contracts`) if not yet done.
+- Or proceed to quality gates (`/scaffold:review-testing`) if all applicable spec steps are complete.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 
