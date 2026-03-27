@@ -20,6 +20,7 @@ by the entire workflow.
 - docs/tech-stack.md (required) — determines dev server, database, and tooling
 - docs/project-structure.md (required) — where config files live
 - docs/coding-standards.md (optional) — linter/formatter already configured
+- docs/tdd-standards.md (optional) — test runner, flags, coverage thresholds, quality gates
 
 ## Expected Outputs
 - docs/dev-setup.md — getting started guide, daily development, common tasks,
