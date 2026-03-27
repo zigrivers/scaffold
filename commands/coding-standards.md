@@ -106,7 +106,9 @@ These prevent the most common AI coding mistakes:
 
 ### 9. Commit Messages
 
-Define the project's commit message format:
+Check if `.beads/` directory exists to determine which commit format to use.
+
+**If Beads is configured** (`.beads/` exists):
 
 Format: `[BD-<id>] type(scope): description`
 
@@ -119,9 +121,23 @@ Examples:
 - `[BD-42] chore(deps): update dependencies`
 
 Rules:
-- Types: feat, fix, test, refactor, docs, chore
 - The `[BD-<id>]` prefix is required — every commit must trace to a Beads task
 - Special case: `[BD-0]` is used for project setup commits before real tasks exist (bootstrapping)
+
+**Without Beads** (conventional commits):
+
+Format: `type(scope): description`
+
+Examples:
+- `feat(auth): add login endpoint`
+- `fix(auth): handle expired tokens`
+- `test(auth): add login validation tests`
+- `refactor(auth): extract token validation`
+- `docs(api): add endpoint documentation`
+- `chore(deps): update dependencies`
+
+**Common rules (both formats):**
+- Types: feat, fix, test, refactor, docs, chore
 - Scope should be the feature or module being changed
 - Description should be imperative ("add", "fix", "update" — not "added", "fixed", "updated")
 

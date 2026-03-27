@@ -81,7 +81,11 @@ describe('Consistency: CLAUDE.md Key Commands', () => {
   it('recent commits follow documented format', () => {
     const log = execSync('git log --oneline -20').toString();
     const lines = log.trim().split('\n');
-    const formatRegex = /^\w+ \[BD-\w+\] \w+(\(\w+\))?:/;
+    // Beads format: [BD-<id>] type(scope): description
+    // Conventional format: type(scope): description
+    const beadsRegex = /^\w+ \[BD-\w+\] \w+(\(\w+\))?:/;
+    const conventionalRegex = /^\w+ \w+(\(\w+\))?:/;
+    const formatRegex = fs.existsSync('.beads') ? beadsRegex : conventionalRegex;
     const violations = lines.filter(l => !formatRegex.test(l) && !l.includes('Merge'));
     expect(violations).toEqual([]);
   });
@@ -126,7 +130,7 @@ describe('Structure: shared code has multiple consumers', () => {
 
 Verify code follows patterns from `docs/coding-standards.md` and `docs/tdd-standards.md`:
 
-- **TODO format**: No TODO/FIXME/HACK comments without a `[BD-` task ID
+- **TODO format**: If Beads: no TODO/FIXME/HACK comments without a `[BD-` task ID. Without Beads: no TODO/FIXME/HACK comments without a linked issue or explanation
 - **Mock patterns**: Test files follow the mocking strategy from `docs/tdd-standards.md` (e.g., no mocking what shouldn't be mocked)
 - **Error handling**: Code follows the error handling patterns from `docs/coding-standards.md`
 - **Stack-specific patterns**: Generated from `docs/tech-stack.md` (e.g., no `any` type in TypeScript projects, no raw SQL without parameterized queries)

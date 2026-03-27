@@ -166,9 +166,11 @@ bd sync                                  # Force sync to git
 
 **NEVER** use `bd edit` — it opens an interactive editor and breaks AI agents.
 
-### Every Commit Needs a Task
+### Every Commit Needs a Task (Beads Projects)
 
-All commits require a Beads task ID in the message: `[BD-<id>] type(scope): description`
+When Beads is configured, all commits require a Beads task ID in the message: `[BD-<id>] type(scope): description`
+
+Note: Projects that skip the Beads step use conventional commits instead (`type(scope): description` without a task ID prefix). See `docs/coding-standards.md` for the project's commit format.
 
 If you encounter a bug or need to make an ad-hoc fix:
 ```bash

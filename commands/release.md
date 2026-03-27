@@ -246,7 +246,7 @@ git add <changed-files>
 git commit -m "chore(release): vX.Y.Z"
 ```
 
-If a Beads task is active (e.g., the user created one for the release), include the task ID: `[BD-xxx] chore(release): vX.Y.Z`.
+If Beads is configured (`.beads/` exists) and a task is active, include the task ID: `[BD-xxx] chore(release): vX.Y.Z`.
 
 ---
 
