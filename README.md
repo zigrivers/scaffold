@@ -1,6 +1,6 @@
 # Scaffold
 
-A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 53 structured pipeline steps — organized into 14 phases — and Claude Code handles the research, planning, and implementation for you.
+A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 50 structured pipeline steps — organized into 14 phases — and Claude Code handles the research, planning, and implementation for you.
 
 By the end, you'll have a fully planned, standards-documented, implementation-ready project with working code.
 
@@ -29,7 +29,7 @@ Either way, Scaffold constructs the prompt and Claude does the work. The CLI tra
 
 **Assembly engine** — At execution time, Scaffold builds a 7-section prompt from: system metadata, the meta-prompt, knowledge base entries, project context (artifacts from prior steps), methodology settings, layered instructions, and depth-specific execution guidance.
 
-**Knowledge base** — 43 domain expertise entries in `knowledge/` covering testing strategy, domain modeling, API design, security best practices, eval craft, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
+**Knowledge base** — 44 domain expertise entries in `knowledge/` covering testing strategy, domain modeling, API design, security best practices, eval craft, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
 
 **Methodology presets** — Three built-in presets control which steps run and how deep the analysis goes:
 - **deep** (depth 5) — all steps enabled, exhaustive analysis
@@ -37,6 +37,8 @@ Either way, Scaffold constructs the prompt and Claude does the work. The CLI tra
 - **custom** (depth 1-5) — you choose which steps to enable and how deep each one goes
 
 **Depth scale** (1-5) — Controls how thorough each step's output is, from "focus on the core deliverable" (1) to "explore all angles, tradeoffs, and edge cases" (5). Depth resolves with 4-level precedence: CLI flag > step override > custom default > preset default.
+
+**Multi-model validation** — At depth 4-5, all 15 review and validation steps can dispatch independent reviews to Codex and/or Gemini CLIs. Two independent models catch more blind spots than one. When both CLIs are available, findings are reconciled by confidence level (both agree = high confidence, single model P0 = still actionable). See the [Multi-Model Review](#multi-model-review) section.
 
 **State management** — Pipeline progress is tracked in `.scaffold/state.json` with atomic file writes and crash recovery. An advisory lock prevents concurrent runs. Decisions are logged to an append-only `decisions.jsonl`.
 
@@ -62,12 +64,21 @@ The AI coding assistant that runs the assembled prompts. Claude Code is a comman
 
 ### Optional
 
+**Codex CLI** (for multi-model review)
+Independent code review from a different AI model. Used at depth 4-5 by all review steps.
+- Install: `npm install -g @openai/codex`
+- Requires: ChatGPT subscription (Plus/Pro/Team)
+- Verify: `codex --version`
+
+**Gemini CLI** (for multi-model review)
+Independent review from Google's model. Can run alongside or instead of Codex.
+- Install: `npm install -g @google/gemini-cli`
+- Requires: Google account (free tier available)
+- Verify: `gemini --version`
+
 **Playwright MCP** (web apps only)
 Lets Claude control a real browser for visual testing and screenshots.
 - Install: `claude mcp add playwright npx @playwright/mcp@latest`
-
-**External reviewer** (for automated PR review)
-One optional step (`automated-pr-review`) sets up automated code review using an external reviewer (Codex Cloud, Gemini, etc.). Requires access to at least one external reviewer service. Skip this step if you don't have one.
 
 ## Installation
 
@@ -108,13 +119,16 @@ This gives you:
 - **Slash commands** (`/scaffold:create-prd`, `/scaffold:tdd`, etc.) — quick access to any pipeline step
 - **Scaffold Runner skill** — intelligent interactive wrapper that surfaces decision points (depth level, strictness, optional sections) before execution instead of letting Claude pick defaults silently
 - **Pipeline reference skill** — shows pipeline ordering, dependencies, and completion status
+- **Multi-model dispatch skill** — correct invocation patterns for Codex and Gemini CLIs
 
 **Usage** — just tell Claude Code what you want in natural language:
 ```
 "Run the next scaffold step"          → previews prompt, asks decisions, executes
 "Run scaffold create-prd"             → same for a specific step
 "Where am I in the pipeline?"         → shows progress and next eligible steps
-"Skip the design system step"         → marks step as skipped
+"What's left?"                        → compact view of remaining steps only
+"Skip design-system and add-e2e-testing"  → batch skip with reason
+"Is add-e2e-testing applicable?"      → checks platform detection without running
 "Use depth 3 for everything"          → remembers preference for the session
 ```
 
@@ -124,7 +138,7 @@ The plugin is optional — everything it does can also be done with `scaffold ru
 > ```bash
 > scaffold skill install
 > ```
-> This copies the Scaffold Runner and Pipeline Reference skills to `.claude/skills/` in your project.
+> This copies the Scaffold Runner, Pipeline Reference, and Multi-Model Dispatch skills to `.claude/skills/` in your project.
 
 ## Updating
 
@@ -150,7 +164,14 @@ Or: `/plugin marketplace update zigrivers-scaffold`
 
 ### Existing projects
 
-After upgrading the CLI, existing projects migrate automatically. Run `scaffold status` in your project directory — the state manager detects and renames old step keys, normalizes artifact paths, and persists the changes atomically. No manual editing of `.scaffold/state.json` is needed.
+After upgrading the CLI, existing projects migrate automatically. Run `scaffold status` in your project directory — the state manager detects and renames old step keys, removes retired steps, normalizes artifact paths, and persists the changes atomically. No manual editing of `.scaffold/state.json` is needed.
+
+**Step migrations handled automatically:**
+- `add-playwright` / `add-maestro` → `add-e2e-testing`
+- `multi-model-review` → `automated-pr-review`
+- `user-stories-multi-model-review` → removed (folded into `review-user-stories`)
+- `claude-code-permissions` → removed (folded into `git-workflow` + `tech-stack`)
+- `testing-strategy` → `tdd`, `implementation-tasks` → `implementation-plan`, `review-tasks` → `implementation-plan-review`
 
 Projects using either `docs/prd.md` (v1 convention) or `docs/plan.md` (v2 convention) work interchangeably — the context gatherer resolves aliased paths so downstream steps find your PRD regardless of which filename you used.
 
@@ -196,7 +217,7 @@ scaffold run user-stories
 # ... and so on
 ```
 
-Each step tells you what to run next. Use `scaffold status` at any time to see the full pipeline state, or `scaffold dashboard` to open a visual progress dashboard in your browser.
+Each step tells you what to run next. Use `scaffold status` at any time to see the full pipeline state, `scaffold status --compact` for just the remaining work, or `scaffold dashboard` to open a visual progress dashboard in your browser.
 
 ## The Pipeline
 
@@ -211,7 +232,7 @@ Define what you're building.
 | `review-prd` | Structured review of the PRD for completeness and quality |
 | `user-stories` | Creates detailed user stories for every PRD feature |
 | `innovate-user-stories` | Gap analysis and UX innovation pass on user stories |
-| `review-user-stories` | Structured review of user stories for coverage and clarity |
+| `review-user-stories` | Structured review with optional multi-model validation and requirements traceability at depth 4-5 |
 
 ### Phase 2 — Project Foundation (foundation)
 
@@ -219,8 +240,8 @@ Set up tooling, standards, and project structure.
 
 | Step | What It Does |
 |------|-------------|
-| `beads` | Initialize Beads task tracking and create CLAUDE.md |
-| `tech-stack` | Research and document technology choices |
+| `beads` | Initialize Beads task tracking and create CLAUDE.md *(optional)* |
+| `tech-stack` | Research and document technology choices; adds stack-specific safety rules |
 | `coding-standards` | Create coding standards with linter/formatter configs |
 | `project-structure` | Design and scaffold the directory layout |
 
@@ -232,8 +253,8 @@ Configure the working environment.
 |------|-------------|
 | `dev-env-setup` | Set up local dev environment with live reload |
 | `design-system` | Create design tokens and component patterns *(web apps only)* |
-| `git-workflow` | Configure branching, CI, and worktree scripts |
-| `automated-pr-review` | Set up automated PR review with external reviewers *(optional)* |
+| `git-workflow` | Configure branching, CI, worktree scripts, and project safety permissions |
+| `automated-pr-review` | Agent-driven PR review with local CLI or external reviewers *(optional)* |
 
 ### Phase 4 — Testing Integration (integration)
 
@@ -241,7 +262,7 @@ Add E2E testing frameworks.
 
 | Step | What It Does |
 |------|-------------|
-| `add-e2e-testing` | Configure E2E testing — Playwright (web) and/or Maestro (mobile) *(web/mobile apps only)* |
+| `add-e2e-testing` | Auto-detects platform, configures Playwright (web) and/or Maestro (mobile) *(optional)* |
 
 ### Phase 5 — Domain Modeling (modeling)
 
@@ -276,12 +297,12 @@ Detail the interfaces.
 
 | Step | What It Does |
 |------|-------------|
-| `database-schema` | Database design — normalization, indexing, migrations |
-| `review-database` | Review of database schema |
-| `api-contracts` | REST/GraphQL contracts, versioning, error handling |
-| `review-api` | Review of API contracts |
-| `ux-spec` | Interaction design, usability, user flows |
-| `review-ux` | Review of UX specification |
+| `database-schema` | Database design — normalization, indexing, migrations *(if applicable)* |
+| `review-database` | Review of database schema *(if applicable)* |
+| `api-contracts` | REST/GraphQL contracts, versioning, error handling *(if applicable)* |
+| `review-api` | Review of API contracts *(if applicable)* |
+| `ux-spec` | Interaction design, usability, user flows *(if applicable)* |
+| `review-ux` | Review of UX specification *(if applicable)* |
 
 ### Phase 9 — Quality (quality)
 
@@ -293,13 +314,13 @@ Plan for quality, security, and operations.
 | `review-testing` | Review of testing strategy |
 | `create-evals` | Generate project-specific eval checks from standards docs |
 | `security` | OWASP, threat modeling, security controls |
-| `review-security` | Review of security practices |
+| `review-security` | Security review — **highest priority for multi-model validation** |
 | `operations` | CI/CD, deployment, monitoring, runbooks |
 | `review-operations` | Review of operations plan |
 
 ### Phase 10 — Stories & Reviews (stories)
 
-Multi-model reviews and cross-platform checks.
+Cross-platform checks.
 
 | Step | What It Does |
 |------|-------------|
@@ -348,12 +369,60 @@ Lock it down and start building.
 | `developer-onboarding-guide` | Onboarding guide for new contributors |
 | `apply-fixes-and-freeze` | Apply any remaining fixes and freeze the specification |
 
+## Multi-Model Review
+
+At depth 4-5, all 18 review and validation steps can dispatch independent reviews to Codex and/or Gemini CLIs. This catches blind spots that a single model misses — what Claude considers correct, Codex or Gemini may flag as problematic.
+
+### How It Works
+
+1. Claude completes its own structured multi-pass review first
+2. The artifact is bundled with upstream references into a review prompt
+3. Each available CLI reviews the artifact independently (they don't see each other's output)
+4. Findings are reconciled by confidence level:
+
+| Scenario | Confidence | Action |
+|----------|-----------|--------|
+| Both models flag the same issue | **High** | Fix immediately |
+| Both models approve | **High** | Proceed confidently |
+| One flags P0, other approves | **High** | Fix it (P0 is critical) |
+| One flags P1, other approves | **Medium** | Review before fixing |
+| Models contradict each other | **Low** | Present both to user |
+
+### Which Steps Support It
+
+**All 11 domain review steps**: review-prd, review-domain-modeling, review-adrs, review-architecture, review-database, review-api, review-ux, review-testing, review-operations, review-security, implementation-plan-review
+
+**All 4 validation steps**: cross-phase-consistency, traceability-matrix, critical-path-walkthrough, implementability-dry-run
+
+**Plus 3 steps with built-in multi-model**: review-user-stories (depth 5), automated-pr-review (local CLI mode), multi-model-review-tasks
+
+### CLI Invocation
+
+The `multi-model-dispatch` skill documents the correct patterns:
+
+```bash
+# Codex (headless mode — use "exec", NOT bare "codex")
+codex exec -s read-only --ephemeral "Review this artifact..." 2>/dev/null
+
+# Gemini (headless mode — use "-p" flag)
+gemini -p "Review this artifact..." --output-format json --approval-mode yolo 2>/dev/null
+```
+
+### Checking CLI Availability
+
+```bash
+scaffold check add-e2e-testing        # platform detection + brownfield
+scaffold check automated-pr-review    # GitHub remote + CLI detection
+```
+
+The `scaffold check` command reports which CLIs are available and recommends the appropriate review mode.
+
 ## Methodology Presets
 
-Not every project needs all 53 steps. Choose a methodology when you run `scaffold init`:
+Not every project needs all 50 steps. Choose a methodology when you run `scaffold init`:
 
 ### deep (depth 5)
-All steps enabled. Comprehensive analysis of every angle — domain modeling, ADRs, security review, traceability matrix, the works. Best for complex systems, team projects, or when you want thorough documentation.
+All steps enabled. Comprehensive analysis of every angle — domain modeling, ADRs, security review, traceability matrix, the works. At depth 4-5, review steps dispatch to Codex/Gemini CLIs for multi-model validation. Best for complex systems, team projects, or when you want thorough documentation.
 
 ### mvp (depth 1)
 Only 7 critical steps: create-prd, review-prd, user-stories, review-user-stories, tdd, implementation-plan, and implementation-playbook. Minimal ceremony — get to code fast. Best for prototypes, hackathons, or solo projects.
@@ -371,10 +440,11 @@ You can change methodology mid-pipeline with `scaffold init --methodology <prese
 | `scaffold run <step>` | Execute a pipeline step (assembles and outputs the full prompt) |
 | `scaffold build` | Generate platform adapter output (commands/, AGENTS.md, etc.) |
 | `scaffold adopt` | Bootstrap state from existing artifacts (brownfield projects) |
-| `scaffold skip <step>` | Mark a step as skipped with a reason |
+| `scaffold skip <step> [<step2>...]` | Skip one or more steps with a reason |
 | `scaffold reset <step>` | Reset a step back to pending |
-| `scaffold status` | Show pipeline progress and eligibility |
+| `scaffold status [--compact]` | Show pipeline progress (`--compact` shows only remaining work) |
 | `scaffold next` | List next unblocked step(s) |
+| `scaffold check <step>` | Check if a conditional step applies to this project |
 | `scaffold validate` | Validate meta-prompts, config, state, and dependency graph |
 | `scaffold list` | List all steps with status |
 | `scaffold info <step>` | Show full metadata for a step |
@@ -387,19 +457,55 @@ You can change methodology mid-pipeline with `scaffold init --methodology <prese
 | `scaffold skill list` | Show available skills and installation status |
 | `scaffold skill remove` | Remove scaffold skills from the current project |
 
+### Examples
+
+```bash
+# Initialize a new project with deep methodology
+scaffold init
+
+# Run a specific step
+scaffold run create-prd
+
+# See what's next
+scaffold next
+
+# Check full pipeline status
+scaffold status
+
+# See only remaining work
+scaffold status --compact
+
+# Skip multiple steps at once
+scaffold skip design-system add-e2e-testing --reason "backend-only project"
+
+# Check if a step applies before running it
+scaffold check add-e2e-testing
+# → Applicable: yes | Platform: web | Brownfield: no | Mode: fresh
+
+scaffold check automated-pr-review
+# → Applicable: yes | GitHub remote: yes | Available CLIs: codex, gemini | Recommended: local-cli (dual-model)
+
+# Re-run a completed step in update mode
+scaffold reset review-prd --force
+scaffold run review-prd
+
+# Open the visual dashboard
+scaffold dashboard
+```
+
 ## Knowledge System
 
-Scaffold ships with 43 domain expertise entries organized in five categories:
+Scaffold ships with 44 domain expertise entries organized in five categories:
 
-- **core/** (17 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, user story innovation
+- **core/** (17 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, design system tokens, user story innovation
 - **product/** (3 entries) — PRD craft, PRD innovation, gap analysis
 - **review/** (13 entries) — review methodology (shared), plus domain-specific review passes for PRD, user stories, domain modeling, ADRs, architecture, API contracts, database schema, UX spec, testing, security, operations, implementation tasks
 - **validation/** (7 entries) — critical path analysis, cross-phase consistency, scope management, traceability, implementability, decision completeness, dependency validation
-- **finalization/** (3 entries) — implementation playbook, developer onboarding, apply-fixes-and-freeze
+- **finalization/** (4 entries) — implementation playbook, developer onboarding, apply-fixes-and-freeze
 
 Each pipeline step declares which knowledge entries it needs in its frontmatter. The assembly engine injects them automatically. Knowledge files with a `## Deep Guidance` section are optimized for the CLI — only the deep guidance content is loaded into the assembled prompt, skipping the summary to avoid redundancy with the prompt text.
 
-### Project-local overrides (v2.1)
+### Project-local overrides
 
 Teams can create project-specific knowledge entries in `.scaffold/knowledge/` that layer over the global entries:
 
@@ -460,10 +566,11 @@ Options: `--dry-run` to preview, `minor`/`major`/`patch` to specify the bump, `c
 | **CLAUDE.md** | A configuration file in your project root that tells Claude Code how to work in your project. |
 | **Depth** | A 1-5 scale controlling how thorough each step's analysis is, from MVP-focused (1) to exhaustive (5). |
 | **Frontmatter** | The YAML metadata block at the top of meta-prompt files, declaring dependencies, outputs, knowledge entries, and other configuration. |
-| **Knowledge base** | 38 domain expertise entries that get injected into prompts. Can be extended with project-local overrides. |
+| **Knowledge base** | 44 domain expertise entries that get injected into prompts. Can be extended with project-local overrides. |
 | **MCP** | Model Context Protocol. A way for Claude to use external tools like a headless browser. |
 | **Meta-prompt** | A short intent declaration in `pipeline/` that gets assembled into a full prompt at runtime. |
 | **Methodology** | A preset (deep, mvp, custom) controlling which steps run and at what depth. |
+| **Multi-model review** | Independent validation from Codex/Gemini CLIs at depth 4-5, catching blind spots a single model misses. |
 | **PRD** | Product Requirements Document. The foundation for everything Scaffold builds. |
 | **Slash commands** | Commands in Claude Code starting with `/`. For example, `/scaffold:create-prd`. |
 | **Worktrees** | A git feature for multiple working copies. Scaffold uses these for parallel agent execution. |
@@ -474,10 +581,10 @@ Options: `--dry-run` to preview, `minor`/`major`/`patch` to specify the bump, `c
 Make sure Scaffold is installed — run `scaffold version` or `/scaffold:prompt-pipeline` in Claude Code.
 
 **Which steps can I skip?**
-Use `scaffold skip <step> --reason "..."` to skip any step. The mvp preset only enables 7 critical steps by default. With the custom preset, you choose exactly which steps to run.
+Use `scaffold skip <step> --reason "..."` to skip any step. You can skip multiple steps at once: `scaffold skip design-system add-e2e-testing --reason "backend-only"`. The mvp preset only enables 7 critical steps by default. With the custom preset, you choose exactly which steps to run.
 
 **Can I go back and re-run a step?**
-Yes. Use `scaffold reset <step>` to reset it to pending, then `scaffold run <step>`. When re-running a completed step, Scaffold uses update mode — it loads the existing artifact and generates improvements rather than starting from scratch.
+Yes. Use `scaffold reset <step> --force` to reset it to pending, then `scaffold run <step>`. When re-running a completed step, Scaffold uses update mode — it loads the existing artifact and generates improvements rather than starting from scratch.
 
 **Do I need to run every step in one sitting?**
 No. Pipeline state is persisted in `.scaffold/state.json`. Run `scaffold status` when you come back to see where you left off, or `scaffold next` for what's unblocked.
@@ -491,6 +598,15 @@ Yes. Run `scaffold init` — the project detector will identify it as brownfield
 **How do I customize the knowledge base for my project?**
 Use `scaffold knowledge update <name>` to create a project-local override in `.scaffold/knowledge/`. It layers over the global entry and is committable for team sharing.
 
+**How do I check if an optional step applies to my project?**
+Run `scaffold check <step>`. For example, `scaffold check add-e2e-testing` detects whether your project has a web or mobile frontend. `scaffold check automated-pr-review` checks for a GitHub remote and available review CLIs.
+
+**Codex CLI fails with "stdin is not a terminal"**
+Use `codex exec "prompt"` (headless mode), not bare `codex "prompt"` (interactive TUI). The `multi-model-dispatch` skill documents the correct invocation patterns.
+
+**I upgraded and my pipeline shows old step names**
+Run `scaffold status` — the state manager automatically migrates old step names (e.g., `add-playwright` → `add-e2e-testing`, `multi-model-review` → `automated-pr-review`) and removes retired steps.
+
 ## Architecture (for contributors)
 
 The project is a TypeScript CLI (`@zigrivers/scaffold`) built with yargs, targeting ES2022/Node16 ESM.
@@ -499,7 +615,7 @@ The project is a TypeScript CLI (`@zigrivers/scaffold`) built with yargs, target
 
 ```
 src/
-├── cli/commands/     # 16 CLI command implementations
+├── cli/commands/     # 17 CLI command implementations
 ├── cli/middleware/    # Project root detection, output mode resolution
 ├── cli/output/       # Output strategies (interactive, json, auto)
 ├── core/assembly/    # Assembly engine — meta-prompt → full prompt
@@ -519,24 +635,25 @@ src/
 ### Key modules
 
 - **Assembly engine** (`src/core/assembly/engine.ts`) — Pure orchestrator with no I/O. Constructs 7-section prompts from meta-prompt + knowledge + context + methodology + instructions + depth guidance.
-- **State manager** (`src/state/state-manager.ts`) — Atomic writes via tmp + `fs.renameSync()`. Tracks step status, in-progress records, and next-eligible cache.
+- **State manager** (`src/state/state-manager.ts`) — Atomic writes via tmp + `fs.renameSync()`. Tracks step status, in-progress records, and next-eligible cache. Includes migration system for step renames and retired steps.
 - **Dependency graph** (`src/core/dependency/`) — Kahn's algorithm topological sort with phase-aware ordering and cycle detection.
 - **Platform adapters** (`src/core/adapters/`) — 3-step lifecycle (initialize → generateStepWrapper → finalize) producing Claude Code commands, Codex AGENTS.md, or universal markdown.
 - **Project detector** (`src/project/detector.ts`) — Scans for file system signals to classify projects as greenfield, brownfield, or v1-migration.
+- **Check command** (`src/cli/commands/check.ts`) — Applicability detection for conditional steps (platform detection, GitHub remote detection, CLI availability).
 
 ### Content layout
 
 ```
-pipeline/             # 53 meta-prompts organized by 14 phases
-knowledge/            # 43 domain expertise entries (core, product, review, validation, finalization)
+pipeline/             # 50 meta-prompts organized by 14 phases
+knowledge/            # 44 domain expertise entries (core, product, review, validation, finalization)
 methodology/          # 3 YAML presets (deep, mvp, custom)
-commands/             # 69 Claude Code slash commands (53 pipeline + 16 utility)
-skills/               # Claude Code skills (scaffold-pipeline reference, scaffold-runner interactive wrapper)
+commands/             # 66 Claude Code slash commands (50 pipeline + 16 utility)
+skills/               # 3 Claude Code skills (pipeline reference, runner, multi-model dispatch)
 ```
 
 ### Testing
 
-- **Vitest** for unit and E2E tests (60 test files)
+- **Vitest** for unit and E2E tests (66 test files, 753 tests)
 - **Performance benchmarks** — assembly p95 < 500ms, state I/O p95 < 100ms, graph build p95 < 2s
 - **Shell script tests** via bats
 - Run: `npm test` (unit + E2E), `npm run test:bench` (benchmarks), `make check` (full CI gate)
@@ -547,7 +664,7 @@ skills/               # Claude Code skills (scaffold-pipeline reference, scaffol
 2. Run `scaffold build` to regenerate `commands/` from pipeline meta-prompts
 3. Run `npm run check` (lint + type-check + test) before submitting
 4. Knowledge entries live in `knowledge/` — follow the existing frontmatter schema
-5. ADRs documenting architectural decisions are in `docs/v2/adrs/` (55 total)
+5. ADRs documenting architectural decisions are in `docs/v2/adrs/`
 
 ## License
 
