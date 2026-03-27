@@ -32,7 +32,7 @@ These configure tooling and create standards documents. Run in this order becaus
 
 | # | Prompt | Produces | Notes |
 |---|--------|----------|-------|
-| 3 | **Beads Setup** | `.beads/`, `tasks/lessons.md`, initial `CLAUDE.md` | Creates CLAUDE.md — must run before other setup prompts |
+| 3 | **Beads Setup** *(optional)* | `.beads/`, `tasks/lessons.md`, initial `CLAUDE.md` | Optional — only if project uses Beads for task tracking |
 | 4 | **Tech Stack** | `docs/tech-stack.md` | Drives all subsequent technical decisions |
 | 5 | **Claude Code Permissions** | `.claude/settings.json`, `~/.claude/settings.json` | Enables agents to work without permission prompts. References tech-stack.md for stack-specific rules |
 | 6 | **Coding Standards** | `docs/coding-standards.md`, linter/formatter configs | References tech-stack.md |

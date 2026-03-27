@@ -3,7 +3,7 @@ name: tech-stack
 description: Research and document tech stack decisions with rationale for each choice
 phase: "foundation"
 order: 41
-dependencies: [beads]
+dependencies: []
 outputs: [docs/tech-stack.md]
 conditional: null
 knowledge-base: [tech-stack-selection]
