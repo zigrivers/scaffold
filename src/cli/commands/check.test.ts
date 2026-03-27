@@ -327,6 +327,81 @@ describe('check command', () => {
     expect(data.mode).toBe('skip')
   })
 
+  it('detects automated-pr-review as applicable when GitHub remote exists', async () => {
+    const dir = makeTmpProject()
+    tmpDirs.push(dir)
+    // Init a git repo with a GitHub remote
+    const { execSync } = await import('node:child_process')
+    execSync('git init', { cwd: dir })
+    execSync('git remote add origin https://github.com/test/repo.git', { cwd: dir })
+    fs.mkdirSync(path.join(dir, '.github', 'workflows'), { recursive: true })
+
+    mockFindProjectRoot.mockReturnValue(dir)
+    type MP = ReturnType<typeof discoverMetaPrompts> extends Map<string, infer V> ? V : never
+    mockDiscoverMetaPrompts.mockReturnValue(new Map([
+      ['automated-pr-review', makeMetaPrompt('automated-pr-review', 'if-needed') as MP],
+    ]))
+
+    mockResolveOutputMode.mockReturnValue('json')
+    await checkCommand.handler(defaultArgv({ step: 'automated-pr-review', root: dir, format: 'json' }))
+
+    const allOutput = writtenLines.join('')
+    const parsed = JSON.parse(allOutput)
+    const data = parsed.data ?? parsed
+    expect(data.applicable).toBe(true)
+    expect(data.hasGithubRemote).toBe(true)
+    expect(data.hasCi).toBe(true)
+    expect(data.mode).toBe('fresh')
+  })
+
+  it('detects automated-pr-review as not applicable without GitHub remote', async () => {
+    const dir = makeTmpProject()
+    tmpDirs.push(dir)
+    // Init a git repo with NO GitHub remote
+    const { execSync } = await import('node:child_process')
+    execSync('git init', { cwd: dir })
+
+    mockFindProjectRoot.mockReturnValue(dir)
+    type MP = ReturnType<typeof discoverMetaPrompts> extends Map<string, infer V> ? V : never
+    mockDiscoverMetaPrompts.mockReturnValue(new Map([
+      ['automated-pr-review', makeMetaPrompt('automated-pr-review', 'if-needed') as MP],
+    ]))
+
+    mockResolveOutputMode.mockReturnValue('json')
+    await checkCommand.handler(defaultArgv({ step: 'automated-pr-review', root: dir, format: 'json' }))
+
+    const allOutput = writtenLines.join('')
+    const parsed = JSON.parse(allOutput)
+    const data = parsed.data ?? parsed
+    expect(data.applicable).toBe(false)
+    expect(data.hasGithubRemote).toBe(false)
+    expect(data.mode).toBe('skip')
+  })
+
+  it('detects automated-pr-review update mode when AGENTS.md exists', async () => {
+    const dir = makeTmpProject()
+    tmpDirs.push(dir)
+    const { execSync } = await import('node:child_process')
+    execSync('git init', { cwd: dir })
+    execSync('git remote add origin https://github.com/test/repo.git', { cwd: dir })
+    fs.writeFileSync(path.join(dir, 'AGENTS.md'), '# Code Review Instructions')
+
+    mockFindProjectRoot.mockReturnValue(dir)
+    type MP = ReturnType<typeof discoverMetaPrompts> extends Map<string, infer V> ? V : never
+    mockDiscoverMetaPrompts.mockReturnValue(new Map([
+      ['automated-pr-review', makeMetaPrompt('automated-pr-review', 'if-needed') as MP],
+    ]))
+
+    mockResolveOutputMode.mockReturnValue('json')
+    await checkCommand.handler(defaultArgv({ step: 'automated-pr-review', root: dir, format: 'json' }))
+
+    const allOutput = writtenLines.join('')
+    const parsed = JSON.parse(allOutput)
+    const data = parsed.data ?? parsed
+    expect(data.brownfield).toBe(true)
+    expect(data.mode).toBe('update')
+  })
+
   it('handles non-e2e conditional step with generic response', async () => {
     type MP = ReturnType<typeof discoverMetaPrompts> extends Map<string, infer V> ? V : never
     mockDiscoverMetaPrompts.mockReturnValue(new Map([

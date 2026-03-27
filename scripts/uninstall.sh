@@ -19,7 +19,7 @@ FILES=(
     "dev-env-setup.md"
     "design-system.md"
     "git-workflow.md"
-    "multi-model-review.md"
+    "automated-pr-review.md"
     "add-e2e-testing.md"
     "user-stories.md"
     "user-stories-gaps.md"

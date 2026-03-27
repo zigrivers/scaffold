@@ -38,7 +38,7 @@ scaffold/
 │   ├── tdd-standards.md
 │   ├── tech-stack.md
 │   ├── user-stories.md
-│   ├── add-multi-model-review.md
+│   ├── add-automated-pr-review.md
 │   ├── multi-model-stories-review-setup.md
 │   ├── reviews/               # Multi-model review artifacts
 │   │   └── user-stories/      # Codex/Gemini review data, coverage analysis

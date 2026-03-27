@@ -345,10 +345,10 @@ This is the primary entry point for all new projects.
 - **Priority**: Must-have (v2.0)
 - **Business rules**:
   - **web-app**: All prompts from v1 pipeline except Platform Parity Review. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, design-system, git-workflow, add-e2e-testing, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. (18 prompts)
-  - **cli-tool**: Focused set for CLI tools / libraries. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. Excludes: design-system, add-e2e-testing, multi-model-review, platform-parity-review. (16 prompts)
+  - **cli-tool**: Focused set for CLI tools / libraries. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. Excludes: design-system, add-e2e-testing, automated-pr-review, platform-parity-review. (16 prompts)
   - **mobile**: For React Native / Expo apps. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, design-system, git-workflow, add-e2e-testing, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. (18 prompts)
-  - **api-service**: Backend API / microservice. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. Excludes: design-system, add-e2e-testing, multi-model-review, platform-parity-review. (16 prompts — same prompt list as `cli-tool`. Differentiation comes from PRD content and profile name, which aids UX clarity, smart profile suggestion, and future profile-specific behavior.)
-  - **minimal**: Fastest path to implementation. Includes: create-prd, beads, tech-stack, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, user-stories, implementation-plan. Excludes: prd-gap-analysis, claude-code-permissions, design-system, add-e2e-testing, multi-model-review, user-stories-gaps, platform-parity-review, claude-md-optimization, workflow-audit, implementation-plan-review. (10 prompts)
+  - **api-service**: Backend API / microservice. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. Excludes: design-system, add-e2e-testing, automated-pr-review, platform-parity-review. (16 prompts — same prompt list as `cli-tool`. Differentiation comes from PRD content and profile name, which aids UX clarity, smart profile suggestion, and future profile-specific behavior.)
+  - **minimal**: Fastest path to implementation. Includes: create-prd, beads, tech-stack, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, user-stories, implementation-plan. Excludes: prd-gap-analysis, claude-code-permissions, design-system, add-e2e-testing, automated-pr-review, user-stories-gaps, platform-parity-review, claude-md-optimization, workflow-audit, implementation-plan-review. (10 prompts)
   - Built-in profiles are read-only. Users cannot modify them directly but can extend them via custom profiles.
 
 #### F-PR-2: Custom Profiles
@@ -364,7 +364,7 @@ This is the primary entry point for all new projects.
       "extends": "web-app",
       "description": "Web app with security audit and compliance",
       "add-prompts": ["security-audit"],
-      "remove-prompts": ["multi-model-review"],
+      "remove-prompts": ["automated-pr-review"],
       "prompt-overrides": {
         "create-prd": ".scaffold/prompts/create-prd-custom.md"
       }
@@ -413,7 +413,7 @@ This is the primary entry point for all new projects.
     - `dev-env-setup` depends on `project-structure`
     - `design-system` depends on `dev-env-setup`
     - `git-workflow` depends on `dev-env-setup`
-    - `multi-model-review` depends on `git-workflow`
+    - `automated-pr-review` depends on `git-workflow`
     - `add-e2e-testing` depends on `tdd`
     - `user-stories` depends on `create-prd`
     - `user-stories-gaps` depends on `user-stories`
@@ -900,7 +900,7 @@ This architecture has key implications:
 
 2. **Pipeline context timing** → Resolved: F-PE-3 (Pipeline Context) ships as should-have. If deferred, all references to `context.json` are removed: `init` does not create it, `reset` does not reference it, and brownfield detection uses `config.json` `mode` field. Prompts read predecessor output files directly (same as v1 behavior). See F-PE-3 "If deferred" note.
 
-3. **Multi-model review handling** → Resolved: `multi-model-review` and `platform-parity-review` are opt-in pipeline prompts available via `add-prompts` in a profile or `extra-prompts` in config.json. Not included in any built-in profile. See F-SC-1.
+3. **Multi-model review handling** → Resolved: `automated-pr-review` and `platform-parity-review` are opt-in pipeline prompts available via `add-prompts` in a profile or `extra-prompts` in config.json. Not included in any built-in profile. See F-SC-1.
 
 4. **Config committed to git** → Resolved: Yes. `.scaffold/config.json`, `.scaffold/context.json`, `.scaffold/decisions.json`, `.scaffold/profiles/`, and `.scaffold/prompts/` are all committed to git. The `.scaffold/` directory is project configuration, like `.github/` or `.vscode/`. Rationale: enables team sharing, pipeline resumption across machines, and version history of pipeline state.
 

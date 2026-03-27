@@ -201,7 +201,7 @@ pipeline/
   multi-agent-start.md
   single-agent-resume.md
   multi-agent-resume.md
-  multi-model-review.md
+  automated-pr-review.md
   platform-parity-review.md
   ...
 ```

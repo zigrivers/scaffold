@@ -17,6 +17,7 @@ const STEP_RENAMES: Record<string, string> = {
   'review-tasks': 'implementation-plan-review',
   'add-playwright': 'add-e2e-testing',
   'add-maestro': 'add-e2e-testing',
+  'multi-model-review': 'automated-pr-review',
 }
 
 /**

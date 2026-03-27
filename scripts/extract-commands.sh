@@ -36,7 +36,7 @@ declare -a FRONTMATTER=(
     'dev-env-setup|Set up local dev environment with live reload|'
     'design-system|Create a cohesive design system for frontend|'
     'git-workflow|Configure git workflow for parallel agents|'
-    'multi-model-review|Set up multi-model code review on PRs|'
+    'automated-pr-review|Set up automated PR review with external reviewers|'
     'add-e2e-testing|Configure E2E testing (Playwright/Maestro)|'
     'user-stories|Create user stories covering every PRD feature|'
     'user-stories-gaps|Gap analysis and UX innovation for user stories|'
@@ -75,7 +75,7 @@ HEADING_TO_SLUG["Project Structure"]="project-structure"
 HEADING_TO_SLUG["Dev Environment Setup"]="dev-env-setup"
 HEADING_TO_SLUG["Design System"]="design-system"
 HEADING_TO_SLUG["Git Workflow"]="git-workflow"
-HEADING_TO_SLUG["Multi-Model Code Review Loop"]="multi-model-review"
+HEADING_TO_SLUG["Automated PR Review"]="automated-pr-review"
 HEADING_TO_SLUG["E2E Testing"]="add-e2e-testing"
 HEADING_TO_SLUG["User Stories"]="user-stories"
 HEADING_TO_SLUG["User Stories Gap Analysis & Innovation"]="user-stories-gaps"
@@ -281,7 +281,7 @@ When this step is complete, tell the user:
 **Phase 3 in progress** — `docs/git-workflow.md` created, CI configured, worktree script ready.
 
 **Next (choose one):**
-- **(Optional)** Run `/scaffold:multi-model-review` — Set up multi-model code review on PRs (requires ChatGPT Pro subscription).
+- **(Optional)** Run `/scaffold:automated-pr-review` — Set up automated PR review with external reviewers.
 - If your project has a **web frontend and/or mobile app**: Skip to `/scaffold:add-e2e-testing` — Configure E2E testing (starts Phase 4).
 - If **neither**: Skip to `/scaffold:user-stories` — Create user stories (starts Phase 5).
 
@@ -290,7 +290,7 @@ When this step is complete, tell the user:
 ---
 NEXTSTEP
             ;;
-        multi-model-review)
+        automated-pr-review)
             cat <<'NEXTSTEP'
 
 ## After This Step
@@ -298,7 +298,7 @@ NEXTSTEP
 When this step is complete, tell the user:
 
 ---
-**Phase 3 complete** — Multi-model code review configured with Codex Cloud + Claude Code Action fix loop.
+**Phase 3 complete** — Automated PR review configured with external reviewer integration.
 
 **Next (choose based on your project):**
 - If your project has a **web frontend and/or mobile app**: Run `/scaffold:add-e2e-testing` — Configure E2E testing (starts Phase 4).

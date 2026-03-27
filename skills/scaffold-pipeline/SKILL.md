@@ -29,7 +29,7 @@ Use this skill ONLY when the user asks about:
 | 9 | Dev Environment | `/scaffold:dev-env-setup` | Creates lint/test/install commands |
 | 10 | Dev Environment | `/scaffold:design-system` | **(optional)** Frontend projects only |
 | 11 | Dev Environment | `/scaffold:git-workflow` | References dev-setup.md |
-| 11.5 | Dev Environment | `/scaffold:multi-model-review` | **(optional)** Requires ChatGPT Pro |
+| 11.5 | Dev Environment | `/scaffold:automated-pr-review` | **(optional)** Requires external reviewer |
 | 12 | Testing | `/scaffold:add-e2e-testing` | **(optional)** Web and/or mobile apps |
 | 14 | Stories & Planning | `/scaffold:user-stories` | Covers every PRD feature |
 | 15 | Stories & Planning | `/scaffold:user-stories-gaps` | UX improvements |

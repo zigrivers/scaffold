@@ -1077,7 +1077,7 @@ Covers: F-PR-1, F-PR-2, F-PR-3, Flow 4
 
 2. **Given** the profile name `cli-tool`,
    **When** resolution runs,
-   **Then** it outputs 16 prompts (excludes: design-system, add-e2e-testing, multi-model-review, platform-parity-review).
+   **Then** it outputs 16 prompts (excludes: design-system, add-e2e-testing, automated-pr-review, platform-parity-review).
 
 3. **Given** the profile name `mobile`,
    **When** resolution runs,
@@ -1861,15 +1861,15 @@ Covers: F-SC-1
 
 ### US-9.2: Opt-in Pipeline Prompts via add-prompts/extra-prompts
 
-**As** Jordan, **I want to** include `multi-model-review` or `platform-parity-review` in my pipeline, **so that** my team gets these extra quality gates.
+**As** Jordan, **I want to** include `automated-pr-review` or `platform-parity-review` in my pipeline, **so that** my team gets these extra quality gates.
 
 **Priority**: Must-have
 
 **Acceptance Criteria**:
 
-1. **Given** a custom profile with `add-prompts: ["multi-model-review"]`,
+1. **Given** a custom profile with `add-prompts: ["automated-pr-review"]`,
    **When** the pipeline resolves,
-   **Then** `multi-model-review` appears in the pipeline at the position determined by its `depends-on` and `phase`.
+   **Then** `automated-pr-review` appears in the pipeline at the position determined by its `depends-on` and `phase`.
 
 2. **Given** `extra-prompts: ["platform-parity-review"]` in `.scaffold/config.json`,
    **When** the pipeline resolves,
@@ -1877,7 +1877,7 @@ Covers: F-SC-1
 
 3. **Given** neither `add-prompts` nor `extra-prompts` references these prompts,
    **When** any built-in profile resolves,
-   **Then** `multi-model-review` and `platform-parity-review` are NOT included — they're opt-in only.
+   **Then** `automated-pr-review` and `platform-parity-review` are NOT included — they're opt-in only.
 
 **Scope Boundary**: Does NOT cover: the execution behavior of these opt-in prompts — only their inclusion mechanism.
 

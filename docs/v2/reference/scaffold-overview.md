@@ -60,7 +60,7 @@ Phases are run in order, with explicit dependency constraints between prompts. S
 | 9 | `dev-env-setup` | Set up local dev environment with live reload | |
 | 10 | `design-system` | Create a cohesive design system for frontend | **(optional)** Frontend projects only |
 | 11 | `git-workflow` | Configure git workflow for parallel agents | |
-| 11.5 | `multi-model-review` | Set up multi-model code review on PRs | **(optional)** Requires ChatGPT Pro |
+| 11.5 | `automated-pr-review` | Set up automated PR review with external reviewers | **(optional)** Requires external reviewer |
 
 ### Phase 4 — Testing Integration
 

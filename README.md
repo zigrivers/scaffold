@@ -66,8 +66,8 @@ The AI coding assistant that runs the assembled prompts. Claude Code is a comman
 Lets Claude control a real browser for visual testing and screenshots.
 - Install: `claude mcp add playwright npx @playwright/mcp@latest`
 
-**ChatGPT subscription** (for multi-model review)
-One optional step (`multi-model-review`) sets up automated code review using both Claude and OpenAI's Codex. Requires a ChatGPT subscription (Plus, Pro, or Team). Skip this step if you don't have one.
+**External reviewer** (for automated PR review)
+One optional step (`automated-pr-review`) sets up automated code review using an external reviewer (Codex Cloud, Gemini, etc.). Requires access to at least one external reviewer service. Skip this step if you don't have one.
 
 ## Installation
 
@@ -234,7 +234,7 @@ Configure the working environment.
 | `dev-env-setup` | Set up local dev environment with live reload |
 | `design-system` | Create design tokens and component patterns *(web apps only)* |
 | `git-workflow` | Configure branching, CI, and worktree scripts |
-| `multi-model-review` | Set up multi-model code review on PRs *(optional)* |
+| `automated-pr-review` | Set up automated PR review with external reviewers *(optional)* |
 
 ### Phase 4 — Testing Integration (integration)
 

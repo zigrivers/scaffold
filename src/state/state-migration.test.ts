@@ -204,6 +204,19 @@ describe('migrateState', () => {
       expect(changed).toBe(true)
       expect(state.in_progress?.step).toBe('add-e2e-testing')
     })
+
+    it('renames multi-model-review to automated-pr-review', () => {
+      const state = makeState({
+        'multi-model-review': { status: 'skipped' },
+      })
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(true)
+      expect(state.steps['automated-pr-review']).toBeDefined()
+      expect(state.steps['automated-pr-review'].status).toBe('skipped')
+      expect(state.steps['multi-model-review']).toBeUndefined()
+    })
   })
 
   describe('artifact path normalization', () => {

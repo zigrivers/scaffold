@@ -1,4 +1,5 @@
 import type { CommandModule } from 'yargs'
+import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
@@ -27,6 +28,21 @@ const WEB_SIGNALS = new Set([
 const MOBILE_SIGNALS = new Set([
   'expo', 'react-native',
 ])
+
+function detectGithubRemote(projectRoot: string): { hasGithub: boolean; reason: string } {
+  try {
+    const output = execSync('git remote -v', { cwd: projectRoot, encoding: 'utf8', timeout: 5000 })
+    const hasGithub = output.includes('github.com')
+    return {
+      hasGithub,
+      reason: hasGithub
+        ? 'GitHub remote detected'
+        : 'No GitHub remote found (git remote -v has no github.com entry)',
+    }
+  } catch {
+    return { hasGithub: false, reason: 'Not a git repository or git not available' }
+  }
+}
 
 function detectPlatform(projectRoot: string): { platform: 'web' | 'mobile' | 'both' | 'none'; reason: string } {
   const pkgPath = path.join(projectRoot, 'package.json')
@@ -150,6 +166,36 @@ const checkCommand: CommandModule<Record<string, unknown>, CheckArgs> = {
         output.info(`Brownfield: ${brownfield ? `yes (${signals.join(', ')})` : 'no'}`)
         output.info(`Mode: ${mode}`)
         output.info(`Reason: ${reason}`)
+      }
+      process.exit(0)
+      return
+    }
+
+    // For automated-pr-review: GitHub remote + CI detection
+    if (argv.step === 'automated-pr-review') {
+      const { hasGithub, reason: githubReason } = detectGithubRemote(projectRoot)
+      const hasCi = fs.existsSync(path.join(projectRoot, '.github', 'workflows'))
+      const applicable = hasGithub
+      const hasAgentsMd = fs.existsSync(path.join(projectRoot, 'AGENTS.md'))
+      const mode = !applicable ? 'skip' : hasAgentsMd ? 'update' : 'fresh'
+
+      if (outputMode === 'json') {
+        output.result({
+          step: argv.step,
+          applicable,
+          reason: githubReason,
+          hasGithubRemote: hasGithub,
+          hasCi,
+          brownfield: hasAgentsMd,
+          mode,
+        })
+      } else {
+        output.info(`Step: ${argv.step}`)
+        output.info(`Applicable: ${applicable ? 'yes' : 'no'}`)
+        output.info(`GitHub remote: ${hasGithub ? 'yes' : 'no'}`)
+        output.info(`CI configured: ${hasCi ? 'yes' : 'no'}`)
+        output.info(`Mode: ${mode}`)
+        output.info(`Reason: ${githubReason}`)
       }
       process.exit(0)
       return

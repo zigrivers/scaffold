@@ -39,7 +39,7 @@ Display the prompt pipeline order below. Do not read any files or run any comman
 | 9 | **Dev Environment Setup** | `/scaffold:dev-env-setup` | Creates lint/test/install commands |
 | 10 | **Design System** | `/scaffold:design-system` | **(optional)** Frontend projects only |
 | 11 | **Git Workflow** | `/scaffold:git-workflow` | References dev-setup.md |
-| 11.5 | **Multi-Model Code Review** | `/scaffold:multi-model-review` | **(optional)** Requires ChatGPT Pro |
+| 11.5 | **Automated PR Review** | `/scaffold:automated-pr-review` | **(optional)** Requires external reviewer |
 
 ### Phase 4 — Testing Integration
 | # | Prompt | Command | Notes |
@@ -77,5 +77,5 @@ Display the prompt pipeline order below. Do not read any files or run any comman
 | **Resume (multi)** | `/scaffold:multi-agent-resume <agent-name>` | Resuming a worktree agent after a break |
 | **Implementation Plan Review** | `/scaffold:implementation-plan-review` | After creating 5+ new tasks |
 | **Platform Parity Review** | `/scaffold:platform-parity-review` | After adding platform-specific features |
-| **Multi-Model Code Review** | `/scaffold:multi-model-review` | Runs automatically on every PR |
+| **Automated PR Review** | `/scaffold:automated-pr-review` | Runs automatically on every PR |
 | **Visual Dashboard** | `/scaffold:dashboard` | Visual HTML pipeline overview in browser |
