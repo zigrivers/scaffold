@@ -138,6 +138,7 @@ Respond to these natural language requests:
 | "What's next?" / "Next step" | Run `scaffold next`, present eligible steps |
 | "Where am I?" / "Pipeline status" | Run `scaffold status`, present progress summary |
 | "What does X do?" | Run `scaffold info <step>`, present purpose and dependencies |
+| "Run multi-model review" / "Review stories with other models" | Run `scaffold run review-user-stories` at depth 5 (multi-model capabilities are now built into review-user-stories) |
 | "Skip X" | Run `scaffold skip <step> --reason "<user's reason>"` |
 | "Skip X, Y, and Z" | Run `scaffold skip <step1> <step2> <step3> --reason "<reason>"` |
 | "What's left?" / "Show remaining" | Run `scaffold status --compact`, show only pending/in-progress steps |
@@ -181,6 +182,17 @@ When the user asks "what's left?", "show remaining steps", or is deep into the p
 - Keeps the output focused on what's actionable
 
 Use the full `scaffold status` (without `--compact`) when the user asks for a complete overview or wants to see what was skipped.
+
+### Depth-Aware Steps
+
+Some steps behave significantly differently at higher depths. When running these steps, surface the depth choice as a decision point:
+
+**`review-user-stories`** — The review step scales with depth:
+- Depth 1-3: Claude-only multi-pass review (6 review passes)
+- Depth 4: Adds requirements index (REQ-xxx IDs) and coverage matrix (coverage.json) for formal PRD traceability
+- Depth 5: Adds multi-model dispatch to Codex/Gemini CLI for independent validation, with graceful fallback to Claude-only enhanced review if CLIs aren't available
+
+When running `review-user-stories` at depth 5, check if `codex` or `gemini` CLI is available (`command -v codex`, `command -v gemini`). If neither is available, inform the user that the step will fall back to a Claude-only adversarial self-review — still valuable but less thorough than multi-model review.
 
 ## Error Handling
 
