@@ -2,6 +2,17 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.4.2] — 2026-03-26
+
+### Added
+
+- **`scaffold reset <step>`** — reset a single step back to pending so you can re-run it. Validates step exists (with typo suggestions), confirms before resetting completed steps, warns on in_progress steps.
+
+### Changed
+
+- **Scaffold Runner skill** — now handles "re-run X", "redo X", "reset X" by running `scaffold reset <step> --force` then the full execution workflow
+- **Scaffold Pipeline skill** — added "Re-running Steps" section explaining reset + update mode
+
 ## [2.4.0] — 2026-03-26
 
 ### Fixed
