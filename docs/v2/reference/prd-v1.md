@@ -235,20 +235,6 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Presents innovation ideas for approval via `AskUserQuestionTool`
 - **Dependencies**: FR-15 (requires user stories)
 
-### FR-17: User Stories Multi-Model Review (Optional)
-- **Description**: 100% PRD coverage verification via independent Codex + Gemini reviews
-- **User-facing commands**: `/scaffold:user-stories-multi-model-review` (`commands/user-stories-multi-model-review.md`)
-- **Behavior**:
-  - Creates atomic PRD requirements index (REQ-001, REQ-002, etc.)
-  - Builds coverage map (requirement → stories)
-  - Runs external reviews via `scripts/user-stories-mmr.sh` (Codex and Gemini in parallel)
-  - Validates output JSON against `scripts/user-stories-mmr.schema.json`
-  - Reconciles findings, applies fixes to stories
-  - Quality gate: verifies zero uncovered requirements
-  - Outputs to `docs/reviews/user-stories/` (requirements-index.md, coverage.json, review-summary.md)
-  - Single-writer rule: only Claude edits user-stories.md
-- **Dependencies**: FR-15, FR-16 (requires completed user stories)
-
 ### FR-18: Platform Parity Review (Optional — Multi-Platform)
 - **Description**: Ensures every target platform (iOS, Android, web) is thoroughly addressed across all documentation
 - **User-facing commands**: `/scaffold:platform-parity-review` (`commands/platform-parity-review.md`)
@@ -480,7 +466,6 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
 |------|---------|--------|
 | 14 | `/scaffold:user-stories` | `docs/user-stories.md` |
 | 15 | `/scaffold:user-stories-gaps` | Updated `docs/user-stories.md` |
-| 15.5 | `/scaffold:user-stories-multi-model-review` (optional) | `docs/reviews/user-stories/` |
 | 16 | `/scaffold:platform-parity-review` (optional) | Updated docs, new stories/tasks |
 
 ### Phase 6 — Consolidation & Verification

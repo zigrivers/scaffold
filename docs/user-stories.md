@@ -1877,7 +1877,7 @@ Covers: F-SC-1
 
 3. **Given** neither `add-prompts` nor `extra-prompts` references these prompts,
    **When** any built-in profile resolves,
-   **Then** `multi-model-review`, `user-stories-multi-model-review`, and `platform-parity-review` are NOT included — they're opt-in only.
+   **Then** `multi-model-review` and `platform-parity-review` are NOT included — they're opt-in only.
 
 **Scope Boundary**: Does NOT cover: the execution behavior of these opt-in prompts — only their inclusion mechanism.
 

@@ -37,7 +37,7 @@ A Node.js/Python engine was considered and rejected:
 
 ### Conventions
 
-All scripts follow patterns established by the existing v1 scripts (`scripts/extract-commands.sh`, `scripts/user-stories-mmr.sh`):
+All scripts follow patterns established by the existing v1 scripts (`scripts/extract-commands.sh`):
 
 ```bash
 #!/usr/bin/env bash
@@ -116,7 +116,7 @@ All files in `.scaffold/` are committed to git. User-level equivalents live at `
 
 ### Schema Definitions
 
-Config and profile JSON files follow implicit schemas documented in the PRD (Section 5, Data Model). Formal JSON Schema files (like the existing `scripts/user-stories-mmr.schema.json`) will be created for:
+Config and profile JSON files follow implicit schemas documented in the PRD (Section 5, Data Model). Formal JSON Schema files will be created for:
 
 - `.scaffold/config.json` — Pipeline configuration schema
 - `.scaffold/profiles/*.json` — Profile definition schema
@@ -144,7 +144,6 @@ tests/
 ├── uninstall.bats               # Tests for scripts/uninstall.sh
 ├── update.bats                  # Tests for scripts/update.sh
 ├── extract-commands.bats        # Tests for scripts/extract-commands.sh
-├── user-stories-mmr.bats        # Tests for scripts/user-stories-mmr.sh
 ├── resolve-deps.bats            # Tests for topological sort
 ├── resolve-profile.bats         # Tests for profile inheritance
 ├── resolve-prompt.bats          # Tests for 4-tier prompt lookup
@@ -284,9 +283,7 @@ Beads and Node.js are required by the pipeline prompts (specifically the `beads`
 
 | Tool | Version | Purpose | When Needed |
 |------|---------|---------|-------------|
-| Python 3 | 3.8+ | YAML frontmatter parsing fallback, JSON schema validation in `user-stories-mmr.sh` | Only if `validate-frontmatter.sh` needs complex YAML parsing |
-| Codex CLI | Latest | Multi-model review of user stories | Only for `/scaffold:user-stories-multi-model-review` |
-| Gemini CLI | Latest | Multi-model review of user stories | Only for `/scaffold:user-stories-multi-model-review` |
+| Python 3 | 3.8+ | YAML frontmatter parsing fallback | Only if `validate-frontmatter.sh` needs complex YAML parsing |
 | Playwright MCP | Latest | E2E testing for web apps | Only for `/scaffold:add-playwright` |
 | `gh` CLI | 2.0+ | GitHub PR/issue operations, CI setup | Only for `/scaffold:git-workflow` and `/scaffold:multi-model-review` |
 

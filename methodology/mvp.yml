@@ -45,7 +45,6 @@ steps:
   review-security: { enabled: false }
   create-evals: { enabled: false }
   # Phase 10 — Stories & Reviews
-  user-stories-multi-model-review: { enabled: false }
   platform-parity-review: { enabled: false }
   # Phase 11 — Consolidation
   claude-md-optimization: { enabled: false }

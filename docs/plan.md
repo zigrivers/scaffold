@@ -697,7 +697,7 @@ v1 deprecated migration prompts in favor of universal update mode (all document-
 
 #### F-SC-1: Commands Outside the Pipeline
 
-- **What**: Certain commands remain standalone and are not part of any profile's pipeline: `quick-task`, `new-enhancement`, `release`, `version-bump`, `single-agent-start`, `single-agent-resume`, `multi-agent-start`, `multi-agent-resume`, `prompt-pipeline`, `update`, `version`, `status`, `next`, `skip`, `validate`, `reset`, `adopt`, and all migration commands. Additionally, `user-stories-multi-model-review` and `platform-parity-review` are available as opt-in pipeline prompts (addable via `add-prompts` in a profile or `extra-prompts` in config.json) but are not included in any built-in profile.
+- **What**: Certain commands remain standalone and are not part of any profile's pipeline: `quick-task`, `new-enhancement`, `release`, `version-bump`, `single-agent-start`, `single-agent-resume`, `multi-agent-start`, `multi-agent-resume`, `prompt-pipeline`, `update`, `version`, `status`, `next`, `skip`, `validate`, `reset`, `adopt`, and all migration commands. Additionally, `platform-parity-review` is available as an opt-in pipeline prompt (addable via `add-prompts` in a profile or `extra-prompts` in config.json) but is not included in any built-in profile.
 - **Why**: These are used after the pipeline completes or for ongoing project work. They don't belong in the scaffolding sequence.
 - **Priority**: Must-have (v2.0)
 - **Business rules**:
@@ -901,7 +901,7 @@ This architecture has key implications:
 
 2. **Pipeline context timing** → Resolved: F-PE-3 (Pipeline Context) ships as should-have. If deferred, all references to `context.json` are removed: `init` does not create it, `reset` does not reference it, and brownfield detection uses `config.json` `mode` field. Prompts read predecessor output files directly (same as v1 behavior). See F-PE-3 "If deferred" note.
 
-3. **Multi-model review handling** → Resolved: `multi-model-review`, `user-stories-multi-model-review`, and `platform-parity-review` are opt-in pipeline prompts available via `add-prompts` in a profile or `extra-prompts` in config.json. Not included in any built-in profile. See F-SC-1.
+3. **Multi-model review handling** → Resolved: `multi-model-review` and `platform-parity-review` are opt-in pipeline prompts available via `add-prompts` in a profile or `extra-prompts` in config.json. Not included in any built-in profile. See F-SC-1.
 
 4. **Config committed to git** → Resolved: Yes. `.scaffold/config.json`, `.scaffold/context.json`, `.scaffold/decisions.json`, `.scaffold/profiles/`, and `.scaffold/prompts/` are all committed to git. The `.scaffold/` directory is project configuration, like `.github/` or `.vscode/`. Rationale: enables team sharing, pipeline resumption across machines, and version history of pipeline state.
 
