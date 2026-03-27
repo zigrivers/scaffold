@@ -240,4 +240,83 @@ describe('migrateState', () => {
       expect(state.steps['tdd'].produces).toEqual(['docs/plan.md', 'docs/tdd-standards.md'])
     })
   })
+
+  describe('retired step deletion', () => {
+    it('removes user-stories-multi-model-review when pending', () => {
+      const state = makeState({
+        'user-stories-multi-model-review': { status: 'pending' },
+        'create-prd': { status: 'completed' },
+      })
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(true)
+      expect(state.steps['user-stories-multi-model-review']).toBeUndefined()
+      expect(state.steps['create-prd'].status).toBe('completed')
+    })
+
+    it('removes user-stories-multi-model-review when completed', () => {
+      const state = makeState({
+        'user-stories-multi-model-review': { status: 'completed' },
+      })
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(true)
+      expect(state.steps['user-stories-multi-model-review']).toBeUndefined()
+    })
+
+    it('removes user-stories-multi-model-review when skipped', () => {
+      const state = makeState({
+        'user-stories-multi-model-review': { status: 'skipped' },
+      })
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(true)
+      expect(state.steps['user-stories-multi-model-review']).toBeUndefined()
+    })
+
+    it('clears in_progress if it references a retired step', () => {
+      const state = makeState({
+        'user-stories-multi-model-review': { status: 'in_progress' },
+      })
+      state.in_progress = {
+        step: 'user-stories-multi-model-review',
+        started: '2026-01-01T00:00:00.000Z',
+        partial_artifacts: [],
+        actor: 'scaffold-run',
+      }
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(true)
+      expect(state.steps['user-stories-multi-model-review']).toBeUndefined()
+      expect(state.in_progress).toBeNull()
+    })
+
+    it('does not affect other steps when removing retired step', () => {
+      const state = makeState({
+        'user-stories-multi-model-review': { status: 'pending' },
+        'review-user-stories': { status: 'completed' },
+        'user-stories': { status: 'completed' },
+      })
+
+      migrateState(state)
+
+      expect(state.steps['review-user-stories'].status).toBe('completed')
+      expect(state.steps['user-stories'].status).toBe('completed')
+    })
+
+    it('returns false when retired step is not present', () => {
+      const state = makeState({
+        'create-prd': { status: 'completed' },
+        'tdd': { status: 'completed' },
+      })
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(false)
+    })
+  })
 })

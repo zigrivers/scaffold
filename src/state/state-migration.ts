@@ -31,6 +31,15 @@ const STATUS_PRIORITY: Record<string, number> = {
 }
 
 /**
+ * Steps that were retired and should be removed from state entirely.
+ * These steps were folded into existing steps and no longer exist in
+ * the pipeline. Removing them prevents orphaned entries in status output.
+ */
+const RETIRED_STEPS: string[] = [
+  'user-stories-multi-model-review', // folded into review-user-stories (v2.8.0)
+]
+
+/**
  * Artifact path aliases for backward compatibility.
  * Keys are old paths, values are canonical paths.
  * Applied to the `produces` array of each step.
@@ -78,7 +87,19 @@ export function migrateState(state: PipelineState): boolean {
     }
   }
 
-  // Phase 2: Normalize artifact paths in produces arrays
+  // Phase 2: Remove retired steps
+  for (const stepName of RETIRED_STEPS) {
+    if (state.steps[stepName]) {
+      delete state.steps[stepName]
+      changed = true
+    }
+    if (state.in_progress?.step === stepName) {
+      state.in_progress = null
+      changed = true
+    }
+  }
+
+  // Phase 3: Normalize artifact paths in produces arrays
   for (const step of Object.values(state.steps)) {
     if (step.produces) {
       for (let i = 0; i < step.produces.length; i++) {
