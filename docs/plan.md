@@ -60,30 +60,29 @@ This is the primary entry point for all new projects.
    Phase 2 — Project Foundation
      3. beads
      4. tech-stack
-     5. claude-code-permissions
-     6. coding-standards
-     7. tdd
-     8. project-structure
+     5. coding-standards
+     6. tdd
+     7. project-structure
 
    Phase 3 — Development Environment
-     9.  dev-env-setup
-     10. design-system
-     11. git-workflow
+     8.  dev-env-setup
+     9.  design-system
+     10. git-workflow
 
    Phase 4 — Testing Integration
-     12. add-e2e-testing
+     11. add-e2e-testing
 
    Phase 5 — Stories & Planning
-     13. user-stories
-     14. user-stories-gaps
+     12. user-stories
+     13. user-stories-gaps
 
    Phase 6 — Consolidation
-     15. claude-md-optimization
-     16. workflow-audit
+     14. claude-md-optimization
+     15. workflow-audit
 
    Phase 7 — Implementation
-     17. implementation-plan
-     18. implementation-plan-review
+     16. implementation-plan
+     17. implementation-plan-review
    ```
 8. Scaffold asks: "Ready to start? The first prompt is `create-prd`." User confirms.
 9. Scaffold begins executing the first prompt (`create-prd`). If the user provided `<idea>` in step 1, it's passed as the argument.
@@ -344,11 +343,11 @@ This is the primary entry point for all new projects.
 - **Why**: Most projects fit one of a few categories. Profiles eliminate the need to manually select prompts for common cases.
 - **Priority**: Must-have (v2.0)
 - **Business rules**:
-  - **web-app**: All prompts from v1 pipeline except Platform Parity Review. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, design-system, git-workflow, add-e2e-testing, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. (18 prompts)
-  - **cli-tool**: Focused set for CLI tools / libraries. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. Excludes: design-system, add-e2e-testing, automated-pr-review, platform-parity-review. (16 prompts)
-  - **mobile**: For React Native / Expo apps. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, design-system, git-workflow, add-e2e-testing, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. (18 prompts)
-  - **api-service**: Backend API / microservice. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. Excludes: design-system, add-e2e-testing, automated-pr-review, platform-parity-review. (16 prompts — same prompt list as `cli-tool`. Differentiation comes from PRD content and profile name, which aids UX clarity, smart profile suggestion, and future profile-specific behavior.)
-  - **minimal**: Fastest path to implementation. Includes: create-prd, beads, tech-stack, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, user-stories, implementation-plan. Excludes: prd-gap-analysis, claude-code-permissions, design-system, add-e2e-testing, automated-pr-review, user-stories-gaps, platform-parity-review, claude-md-optimization, workflow-audit, implementation-plan-review. (10 prompts)
+  - **web-app**: All prompts from v1 pipeline except Platform Parity Review. Includes: create-prd, prd-gap-analysis, beads, tech-stack, coding-standards, tdd, project-structure, dev-env-setup, design-system, git-workflow, add-e2e-testing, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. (17 prompts)
+  - **cli-tool**: Focused set for CLI tools / libraries. Includes: create-prd, prd-gap-analysis, beads, tech-stack, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. Excludes: design-system, add-e2e-testing, automated-pr-review, platform-parity-review. (15 prompts)
+  - **mobile**: For React Native / Expo apps. Includes: create-prd, prd-gap-analysis, beads, tech-stack, coding-standards, tdd, project-structure, dev-env-setup, design-system, git-workflow, add-e2e-testing, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. (17 prompts)
+  - **api-service**: Backend API / microservice. Includes: create-prd, prd-gap-analysis, beads, tech-stack, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. Excludes: design-system, add-e2e-testing, automated-pr-review, platform-parity-review. (15 prompts — same prompt list as `cli-tool`. Differentiation comes from PRD content and profile name, which aids UX clarity, smart profile suggestion, and future profile-specific behavior.)
+  - **minimal**: Fastest path to implementation. Includes: create-prd, beads, tech-stack, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, user-stories, implementation-plan. Excludes: prd-gap-analysis, design-system, add-e2e-testing, automated-pr-review, user-stories-gaps, platform-parity-review, claude-md-optimization, workflow-audit, implementation-plan-review. (10 prompts)
   - Built-in profiles are read-only. Users cannot modify them directly but can extend them via custom profiles.
 
 #### F-PR-2: Custom Profiles
@@ -406,7 +405,6 @@ This is the primary entry point for all new projects.
   - All existing v1 prompts will have frontmatter added/updated to declare `depends-on` and `produces`. The dependency graph is derived from the existing "Key Dependencies Between Prompts" section in prompts.md:
     - `prd-gap-analysis` depends on `create-prd`
     - `tech-stack` depends on `create-prd`, `beads`
-    - `claude-code-permissions` depends on `tech-stack`
     - `coding-standards` depends on `tech-stack`
     - `tdd` depends on `coding-standards`
     - `project-structure` depends on `tdd`
@@ -507,13 +505,12 @@ These constraints are reflected throughout the init flow, profile selection, cus
 - **Business rules**:
   - Format:
     ```
-    Pipeline: web-app (8/18 complete)
+    Pipeline: web-app (7/17 complete)
     Phase 3 — Development Environment
     ✓ create-prd
     ✓ prd-gap-analysis
     ✓ beads
     ✓ tech-stack
-    ✓ claude-code-permissions
     ✓ coding-standards
     ✓ tdd
     ✓ project-structure

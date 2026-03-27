@@ -34,10 +34,9 @@ These configure tooling and create standards documents. Run in this order becaus
 |---|--------|----------|-------|
 | 3 | **Beads Setup** *(optional)* | `.beads/`, `tasks/lessons.md`, initial `CLAUDE.md` | Optional — only if project uses Beads for task tracking |
 | 4 | **Tech Stack** | `docs/tech-stack.md` | Drives all subsequent technical decisions |
-| 5 | **Claude Code Permissions** | `.claude/settings.json`, `~/.claude/settings.json` | Enables agents to work without permission prompts. References tech-stack.md for stack-specific rules |
-| 6 | **Coding Standards** | `docs/coding-standards.md`, linter/formatter configs | References tech-stack.md |
-| 7 | **TDD Standards** | `docs/tdd-standards.md` | References tech-stack.md and coding-standards.md |
-| 8 | **Project Structure** | `docs/project-structure.md`, scaffolded directories | References all Phase 2 docs above |
+| 5 | **Coding Standards** | `docs/coding-standards.md`, linter/formatter configs | References tech-stack.md |
+| 6 | **TDD Standards** | `docs/tdd-standards.md` | References tech-stack.md and coding-standards.md |
+| 7 | **Project Structure** | `docs/project-structure.md`, scaffolded directories | References all Phase 2 docs above |
 
 ---
 
@@ -47,10 +46,10 @@ These set up the working environment. Dev Setup creates the commands that everyt
 
 | # | Prompt | Produces | Notes |
 |---|--------|----------|-------|
-| 9 | **Dev Environment Setup** | `docs/dev-setup.md`, Makefile/scripts, `.env.example` | Creates lint/test/install commands used by workflow |
-| 10 | **Design System** | `docs/design-system.md`, theme config | **(optional)** Only for projects with a frontend |
-| 11 | **Git Workflow** | `docs/git-workflow.md`, `scripts/setup-agent-worktree.sh`, CI config | References dev-setup.md for lint/test commands |
-| 11.5 | **Automated PR Review** | `AGENTS.md`, `docs/review-standards.md` | **(optional)** Requires external reviewer (Codex Cloud, Gemini, etc.) |
+| 8 | **Dev Environment Setup** | `docs/dev-setup.md`, Makefile/scripts, `.env.example` | Creates lint/test/install commands used by workflow |
+| 9 | **Design System** | `docs/design-system.md`, theme config | **(optional)** Only for projects with a frontend |
+| 10 | **Git Workflow** | `docs/git-workflow.md`, `scripts/setup-agent-worktree.sh`, CI config | References dev-setup.md for lint/test commands |
+| 10.5 | **Automated PR Review** | `AGENTS.md`, `docs/review-standards.md` | **(optional)** Requires external reviewer (Codex Cloud, Gemini, etc.) |
 
 ---
 
@@ -60,7 +59,7 @@ These add E2E testing on top of the TDD standards already configured.
 
 | # | Prompt | Produces | Notes |
 |---|--------|----------|-------|
-| 12 | **E2E Testing** | Playwright config, Maestro config, test patterns | **(optional)** Web and/or mobile apps |
+| 11 | **E2E Testing** | Playwright config, Maestro config, test patterns | **(optional)** Web and/or mobile apps |
 
 ---
 
@@ -70,9 +69,9 @@ These translate the PRD into implementable work.
 
 | # | Prompt | Produces | Notes |
 |---|--------|----------|-------|
-| 14 | **User Stories** | `docs/user-stories.md` | Covers every PRD feature |
-| 15 | **User Stories Gap Analysis & Innovation** | Updates `docs/user-stories.md` | UX-level improvements, not new features |
-| 16 | **Platform Parity Review** | Updates multiple docs, creates tasks | **(optional)** For projects targeting both mobile and web |
+| 13 | **User Stories** | `docs/user-stories.md` | Covers every PRD feature |
+| 14 | **User Stories Gap Analysis & Innovation** | Updates `docs/user-stories.md` | UX-level improvements, not new features |
+| 15 | **Platform Parity Review** | Updates multiple docs, creates tasks | **(optional)** For projects targeting both mobile and web |
 
 ---
 
@@ -82,9 +81,9 @@ These clean up the accumulated CLAUDE.md additions and verify consistency.
 
 | # | Prompt | Produces | Notes |
 |---|--------|----------|-------|
-| 17 | **Claude.md Optimization** | Restructured `CLAUDE.md` | Must run BEFORE Workflow Audit |
-| 18 | **Workflow Audit** | Fixes across all docs | Must run AFTER Claude.md Optimization |
-| 18.5 | **Create Evals** | `tests/evals/`, `docs/eval-standards.md`, `make eval` target | Generates project-specific eval checks from standards docs |
+| 16 | **Claude.md Optimization** | Restructured `CLAUDE.md` | Must run BEFORE Workflow Audit |
+| 17 | **Workflow Audit** | Fixes across all docs | Must run AFTER Claude.md Optimization |
+| 17.5 | **Create Evals** | `tests/evals/`, `docs/eval-standards.md`, `make eval` target | Generates project-specific eval checks from standards docs |
 
 ---
 
@@ -94,10 +93,10 @@ These create tasks and start building.
 
 | # | Prompt | Produces | Notes |
 |---|--------|----------|-------|
-| 19 | **Implementation Plan** | `docs/implementation-plan.md`, Beads tasks | Creates the full task graph |
-| 20 | **Implementation Plan Review** | Updated tasks, dependencies | Second pass for quality |
-| 20.5 | **Implementation Plan Multi-Model Review** | `docs/reviews/implementation-plan/`, updated tasks | **(optional)** Requires Codex/Gemini CLI |
-| 21 | **Execution** | Working software | Agent prompts — paste into Claude Code sessions |
+| 18 | **Implementation Plan** | `docs/implementation-plan.md`, Beads tasks | Creates the full task graph |
+| 19 | **Implementation Plan Review** | Updated tasks, dependencies | Second pass for quality |
+| 19.5 | **Implementation Plan Multi-Model Review** | `docs/reviews/implementation-plan/`, updated tasks | **(optional)** Requires Codex/Gemini CLI |
+| 20 | **Execution** | Working software | Agent prompts — paste into Claude Code sessions |
 
 ---
 
@@ -143,7 +142,7 @@ Dev Setup → Git Workflow → Claude.md Optimization → Workflow Audit → Cre
 
 The most critical ordering constraints:
 1. **Beads Setup before everything else in Phase 2** — creates CLAUDE.md
-2. **Tech Stack before Permissions, Coding Standards, and TDD** — they reference it
+2. **Tech Stack before Coding Standards and TDD** — they reference it
 3. **Dev Setup before Git Workflow** — Git Workflow references lint/test commands
 4. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
 5. **Workflow Audit before Create Evals** — evals reference the verified workflow and standards
@@ -705,374 +704,6 @@ This project will be built and maintained entirely by AI agents. Every technolog
 - Use AskUserQuestion to present key decisions (especially framework choices and hosting) with your recommendation and rationale before finalizing
 - After creating tech-stack.md, review plan.md and update it with any technical clarifications or additions that emerged from the analysis
 - At the end of the document, include a **Quick Reference** section listing every dependency with its version — this becomes the source of truth for package.json / requirements.txt / pyproject.toml
-
-
-_________________________________________
-# Claude Code Permissions Setup (Prompt)
-
-Set up Claude Code permissions for this project so agents can work without "Do you want to proceed?" prompts. The permissions use two layers that merge at runtime.
-
-Review `docs/tech-stack.md` for stack-specific tools that need permissions, and `CLAUDE.md` for the current project configuration.
-
-## Architecture
-
-| Layer | File | Checked into git? | Purpose |
-|-------|------|-------------------|---------|
-| Project | `.claude/settings.json` | Yes | Project-specific deny rules (destructive operations) |
-| User | `~/.claude/settings.json` | No | Standard tool permissions for your dev environment |
-
-Both layers merge at runtime:
-- Allow lists combine (union)
-- Deny lists combine (union) — **deny always wins over allow**
-- Commands matching an allow pattern (and no deny pattern) run without prompting
-
-### How Permission Matching Works
-
-Claude Code's permission matcher is **shell-operator-aware**. A specific pattern like `Bash(git *)` matches `git status` but does NOT match commands containing shell operators:
-
-| Operator | Example | Why `Bash(git *)` fails |
-|----------|---------|------------------------|
-| `&&` | `git fetch && git rebase` | Two commands chained |
-| `\|\|` | `git checkout main \|\| true` | Fallback operator |
-| `\|` | `git log \| head -5` | Pipe |
-| `2>/dev/null` | `git status 2>/dev/null` | Redirect |
-| `$(...)` | `echo $(git rev-parse HEAD)` | Command substitution |
-| `&` | `npx next dev &` | Background execution |
-| `;` | `cd dir; make test` | Sequential execution |
-
-**Specific patterns alone cannot cover compound commands. The bare `Bash` entry is the only way to auto-approve them. Safety comes from deny rules, not from enumerating allowed commands.**
-
-### 1. Project-level settings (`.claude/settings.json`)
-
-This gets checked into git. It defines **deny rules only** — the things agents must never do in this project. Allow rules live at the user level (your standard tools, shared across all projects).
-
-```json
-{
-  "permissions": {
-    "allow": [],
-    "deny": [
-      "Bash(rm -rf *)",
-      "Bash(rm -rf /)",
-      "Bash(rm -r *)",
-      "Bash(sudo *)",
-      "Bash(git push --force *)",
-      "Bash(git push origin main)",
-      "Bash(git push -f origin main)",
-      "Bash(git push --force origin main)",
-      "Bash(git reset --hard *)",
-      "Bash(git worktree remove *)",
-      "Bash(bd edit *)"
-    ]
-  }
-}
-```
-
-Create the directory if needed: `mkdir -p .claude`
-
-**Why deny-only at project level:**
-- `git push origin main` — agents must never push directly to main (all changes via PR)
-- `git push --force` — only `--force-with-lease` is allowed, only on feature branches
-- `git reset --hard` — too destructive, agents should use `git checkout` or `git clean`
-- `git worktree remove` — worktree lifecycle is a human decision, not an agent decision
-- `rm -rf` / `rm -r` — recursive deletion should be explicit and human-approved
-- `bd edit` — opens interactive editor, breaks AI agents
-- `sudo` — agents should never need elevated privileges
-
-**Project-specific deny rules:** Review `docs/tech-stack.md` and add deny rules for destructive operations in your stack. Examples:
-
-```json
-"Bash(npx prisma migrate reset *)",
-"Bash(DROP TABLE *)",
-"Bash(kubectl delete *)",
-"Bash(docker rm -f *)",
-"Bash(docker system prune *)"
-```
-
-### 2. User-level settings (`~/.claude/settings.json`)
-
-This is personal to your machine and shared across all projects. It defines what tools agents are allowed to use without prompting.
-
-If the file already exists, **MERGE** these entries into the existing allow/deny arrays without duplicating or removing existing entries. If it doesn't exist, create it.
-
-```json
-{
-  "permissions": {
-    "allow": [
-      "Bash",
-      "Read",
-      "Write",
-      "Edit",
-      "Read(~/**)",
-      "Edit(~/**)",
-      "Write(~/**)",
-      "Glob(~/**)",
-      "Grep(~/**)",
-      "WebFetch(*)",
-      "WebSearch",
-      "mcp__*",
-      "mcp__plugin_playwright_playwright",
-      "mcp__plugin_context7_context7"
-    ],
-    "deny": [
-      "Bash(rm -rf *)",
-      "Bash(rm -rf /)",
-      "Bash(rm -r *)",
-      "Bash(sudo *)",
-      "Bash(git push --force *)",
-      "Bash(git reset --hard *)"
-    ]
-  }
-}
-```
-
-**The bare `Bash` entry is the most important line.** It auto-approves all bash commands including compound commands with shell operators (`&&`, `||`, pipes, redirects, `$(...)`, backgrounding). Deny rules still block destructive operations — deny always wins over allow. Without the bare `Bash` entry, agents will be prompted for every compound command and autonomous workflows become impractical.
-
-**The `mcp__*` entry is a broad MCP wildcard.** Due to known matching issues, also add bare server-name entries for each installed MCP plugin. Check `~/.claude/settings.json` for `enabledPlugins` — each plugin that provides MCP tools needs a bare server-name entry. The format is `mcp__plugin_<slug>_<server>` where `<slug>` is the plugin identifier and `<server>` is the MCP server name from the plugin's `.mcp.json`.
-
-Common entries:
-- `mcp__plugin_playwright_playwright` — all Playwright browser tools
-- `mcp__plugin_context7_context7` — all Context7 documentation tools
-
-The bare server-name format (without `__*` suffix) matches ALL tools from that server. This is more reliable than the `mcp__*` wildcard.
-
-**Important**: Expand `~/**` to your actual home directory path (e.g., `/Users/username/**`).
-
-**Why broad `Bash` lives at user level:** Your standard dev tools are the same across all projects. Putting them in user-level means you don't copy the same allow list into every project. Project-level only needs deny rules for project-specific destructive operations. The deny rules at both levels combine — deny always wins.
-
-### Reference: What These Entries Cover
-
-The bare `Bash` entry covers all of the following (and their compound combinations). This is provided for documentation — you do NOT need to add these as individual patterns:
-
-- **Git**: status, diff, log, branch, show, add, commit, push, checkout, pull, stash, fetch, rebase, merge, worktree, rev-parse, clean
-- **GitHub CLI**: gh pr, gh issue, gh auth, gh api
-- **Task tracking**: bd, bd *
-- **Build tools**: make, npm, npx, node, python, pytest, uv, pip
-- **Containers**: docker compose, docker ps, docker logs
-- **Shell utilities**: curl, ls, cat, find, grep, head, tail, sort, wc, pwd, echo, which, tree, mkdir, cp, mv, rm, touch, chmod, diff, sed, awk, tee, xargs
-
-**MCP (`mcp__*` + bare server names)**: All tools from all installed MCP servers (plugins). The `mcp__*` wildcard is kept as a fallback, but bare server-name entries (e.g., `mcp__plugin_playwright_playwright`) are more reliable due to known wildcard matching issues. Common servers include Context7 (documentation lookup), Playwright (browser automation), and any custom MCP servers configured in your environment.
-
-### Cautious Mode (alternative)
-
-If you cannot use the bare `Bash` entry (org policy, shared machines, etc.), you can instead enumerate specific patterns. Create your user-level settings with individual `Bash(command *)` entries for each tool category listed in the reference above.
-
-> **Trade-off:** With specific patterns only, you WILL still be prompted for compound commands (anything with `&&`, `||`, pipes, redirects, `$(...)`, backgrounding, `;`). There is no workaround — this is how Claude Code's permission matcher works. Autonomous agent workflows will be impractical in cautious mode.
-
-<details>
-<summary>Full cautious-mode allow list (click to expand)</summary>
-
-```json
-"Bash(git status)",
-"Bash(git diff *)",
-"Bash(git log *)",
-"Bash(git branch *)",
-"Bash(git show *)",
-"Bash(git add *)",
-"Bash(git commit *)",
-"Bash(git push *)",
-"Bash(git checkout *)",
-"Bash(git pull *)",
-"Bash(git stash *)",
-"Bash(git fetch *)",
-"Bash(git rebase *)",
-"Bash(git merge *)",
-"Bash(git worktree *)",
-"Bash(git rev-parse *)",
-"Bash(git clean *)",
-"Bash(git -C *)",
-"Bash(gh pr *)",
-"Bash(gh issue *)",
-"Bash(gh auth *)",
-"Bash(gh api *)",
-"Bash(bd)",
-"Bash(bd *)",
-"Bash(make)",
-"Bash(make *)",
-"Bash(npm run *)",
-"Bash(npm test *)",
-"Bash(npm install *)",
-"Bash(npx *)",
-"Bash(node *)",
-"Bash(python *)",
-"Bash(pytest *)",
-"Bash(uv *)",
-"Bash(pip *)",
-"Bash(docker compose *)",
-"Bash(docker ps *)",
-"Bash(docker logs *)",
-"Bash(curl *)",
-"Bash(ls)",
-"Bash(ls *)",
-"Bash(cat *)",
-"Bash(find *)",
-"Bash(grep *)",
-"Bash(head *)",
-"Bash(tail *)",
-"Bash(sort *)",
-"Bash(wc *)",
-"Bash(pwd)",
-"Bash(echo *)",
-"Bash(which *)",
-"Bash(tree *)",
-"Bash(mkdir *)",
-"Bash(cp *)",
-"Bash(mv *)",
-"Bash(rm *)",
-"Bash(touch *)",
-"Bash(chmod *)",
-"Bash(diff *)",
-"Bash(sed *)",
-"Bash(awk *)",
-"Bash(tee *)",
-"Bash(xargs *)",
-"Bash(export *)",
-"Bash(env *)",
-"Bash(printenv *)",
-"Bash(cd *)",
-"Bash(./scripts/*)",
-"mcp__plugin_context7_context7",
-"mcp__plugin_playwright_playwright"
-```
-
-</details>
-
-### 3. Stack-Specific Additions
-
-> **Note:** If you're using bare `Bash` (recommended), stack-specific additions are unnecessary — all commands are already covered. This section only applies if you chose cautious mode.
-
-Review `docs/tech-stack.md` for this project's tools. Add any additional tool permissions to your **user-level** settings (since you'll use the same tools across projects).
-
-Common additions by stack:
-
-**Mobile (Expo / React Native):**
-```
-"Bash(npx expo *)",
-"Bash(maestro *)",
-"Bash(xcodebuild *)",
-"Bash(pod *)",
-"Bash(eas *)"
-```
-
-**Ruby / Rails:**
-```
-"Bash(bundle *)",
-"Bash(rails *)",
-"Bash(rake *)",
-"Bash(rspec *)"
-```
-
-**Go:**
-```
-"Bash(go *)",
-"Bash(golangci-lint *)"
-```
-
-**Rust:**
-```
-"Bash(cargo *)",
-"Bash(rustc *)"
-```
-
-**Java / Kotlin:**
-```
-"Bash(./gradlew *)",
-"Bash(mvn *)"
-```
-
-### 4. Verify the Setup
-
-After creating both files:
-
-```bash
-# Show project settings
-cat .claude/settings.json
-
-# Confirm user settings
-cat ~/.claude/settings.json
-```
-
-#### Tier 1 — Compound Command Tests
-
-These are the litmus test for bare `Bash`. **If any Tier 1 command prompts, the bare `Bash` entry is missing — fix it before continuing.**
-
-| Test Command | Validates |
-|--------------|-----------|
-| `git fetch origin && echo "done"` | `&&` passes |
-| `git rev-parse --show-toplevel \|\| echo "not a repo"` | `\|\|` passes |
-| `ls -la 2>/dev/null` | Redirect passes |
-| `echo $(pwd)` | Command substitution passes |
-
-#### Tier 2 — Standard Workflow Commands
-
-Test that these commands (used in the canonical workflow) don't prompt:
-
-| Command | Used In |
-|---------|---------|
-| `git status` | General |
-| `git fetch origin` | Branch creation, between tasks |
-| `git checkout -b test-branch origin/main` | Branch creation |
-| `git clean -fd` | Worktree cleanup between tasks |
-| `git push -u origin HEAD` | PR workflow |
-| `git branch -d test-branch` | Task closure cleanup |
-| `git fetch origin --prune` | Task closure cleanup |
-| `gh pr create --title "test" --body "test"` | PR workflow |
-| `gh pr merge --squash --auto --delete-branch` | PR workflow |
-| `gh pr checks --watch --fail-fast` | CI watch (long-running) |
-| `gh pr view --json state -q .state` | Merge confirmation |
-| `bd ready` | Task selection |
-| `bd create "test" -p 3` | Task creation |
-| `bd close <id>` | Task closure |
-| `bd sync` | Task sync |
-| `make lint` | Verification |
-| `make test` | Verification |
-
-If MCP plugins are installed, run a quick smoke test for each:
-- Playwright: Use `browser_navigate` to open a `file:///tmp/test.html` page, then `browser_close`
-- Context7: Use `resolve-library-id` for any library
-
-If these prompt for approval, the MCP entries are missing or incorrect.
-
-Clean up after testing:
-```bash
-git checkout main
-git branch -D test-branch
-```
-
-### 5. Still Getting Prompted?
-
-Six common causes:
-
-1. **Missing bare `Bash`** — open `~/.claude/settings.json` and check for a standalone `"Bash"` entry (not `"Bash(something)"`). It must be present in the allow array.
-2. **Conflicting deny rule** — deny always wins over allow. Check both user-level and project-level deny arrays for rules that match the command being prompted.
-3. **Unexpanded `~/**` paths** — Claude Code may not expand `~`. Replace `~` with your actual home directory path (e.g., `/Users/username/**`).
-4. **Session not restarted** — permission changes require restarting Claude Code (`/exit` and relaunch, or start a new session).
-5. **Missing `mcp__*`** — the bare `Bash` entry does NOT cover MCP tools. MCP tools need their own allow entry. Check for `"mcp__*"` in the user-level allow array.
-6. **`mcp__*` wildcard bug** — `mcp__*` doesn't reliably match all MCP tools. Add explicit bare server-name entries alongside it: `mcp__plugin_playwright_playwright`, `mcp__plugin_context7_context7`, etc. The bare server-name format (no `__*` suffix) matches all tools from that server.
-
-### 6. Commit Project Settings
-
-```bash
-git add .claude/settings.json
-git commit -m "[BD-0] chore: configure Claude Code permissions"
-```
-
-## Process
-- Create a Beads task: `bd create "chore: configure Claude Code permissions" -p 0`
-  and `bd update <id> --claim`
-- Read the user's existing `~/.claude/settings.json` before making changes — if it
-  exists, MERGE entries; do not replace the file
-- The bare `"Bash"` entry in the user-level allow array is CRITICAL — verify it is
-  present after writing the file
-- Do NOT include specific `Bash(...)` patterns alongside the bare `"Bash"` — they
-  are redundant and create confusion about what's actually needed
-- **MCP detection**: Read `~/.claude/settings.json` `enabledPlugins` to discover
-  installed MCP-providing plugins. For each plugin, check
-  `~/.claude/plugins/cache/<org>/<name>/<version>/.mcp.json` for server names.
-  Add `mcp__plugin_<slug>_<server>` entries for each discovered server. Keep
-  `mcp__*` as a fallback (in case the bug is fixed).
-- Run the verification checklist (Tier 1 first). If any compound command prompts,
-  the bare `"Bash"` entry is missing — fix before continuing
-- When both files are created, verified, and committed: `bd close <id>`
 
 
 _____________________________________

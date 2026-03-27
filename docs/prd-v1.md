@@ -34,7 +34,7 @@ The central organizing principle. 21 sequential prompts across 7 phases, plus 8+
 Prompts are grouped into 7 phases with strict ordering:
 - **Phase 0**: Prerequisites (install tools)
 - **Phase 1**: Product Definition (PRD)
-- **Phase 2**: Project Foundation (Beads, tech stack, permissions, standards, structure)
+- **Phase 2**: Project Foundation (Beads, tech stack, standards, structure)
 - **Phase 3**: Development Environment (dev setup, design system, git workflow)
 - **Phase 4**: Testing Integration (Playwright, Maestro — optional)
 - **Phase 5**: Stories & Planning (user stories, gap analysis, reviews)
@@ -101,19 +101,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Quick Reference section becomes source of truth for dependency versions
 - **Dependencies**: FR-1 (references PRD)
 
-### FR-5: Claude Code Permissions Configuration
-- **Description**: Configures Claude Code's permission system so agents can work without interactive approval prompts
-- **User-facing commands**: `/scaffold:claude-code-permissions` (`commands/claude-code-permissions.md`)
-- **Behavior**:
-  - Two-layer system: project-level deny rules (`.claude/settings.json`) + user-level allow rules (`~/.claude/settings.json`)
-  - Project layer: deny destructive operations (git push --force, rm -rf, bd edit, sudo)
-  - User layer: allow Bash (bare entry required), tool-specific allows, MCP server entries
-  - Stack-specific additions (mobile, Ruby, Go, Rust, Java)
-  - Verification: Tier 1 tests (compound commands), Tier 2 tests (standard workflow), MCP smoke tests
-  - Troubleshooting guide for 6 common causes of continued prompting
-- **Dependencies**: FR-4 (references tech stack)
-
-### FR-6: Coding Standards
+### FR-5: Coding Standards
 - **Description**: Defines code quality rules referenced by all agents during implementation
 - **User-facing commands**: `/scaffold:coding-standards` (`commands/coding-standards.md`)
 - **Behavior**:
@@ -123,7 +111,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Enforces commit format: `[BD-<id>] type(scope): description`
 - **Dependencies**: FR-4 (references tech stack)
 
-### FR-7: TDD Standards
+### FR-6: TDD Standards
 - **Description**: Defines test-driven development workflow specific to the project's tech stack
 - **User-facing commands**: `/scaffold:tdd` (`commands/tdd.md`)
 - **Behavior**:
@@ -133,7 +121,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - AI-specific rules: never test the framework, no trivial tests, assert behavior not implementation
 - **Dependencies**: FR-4 (references tech stack)
 
-### FR-8: Project Structure
+### FR-7: Project Structure
 - **Description**: Designs directory layout, documents file placement rules, and scaffolds actual folders
 - **User-facing commands**: `/scaffold:project-structure` (`commands/project-structure.md`)
 - **Behavior**:
@@ -143,9 +131,9 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Updates `.gitignore`
   - Adds Quick Reference table to CLAUDE.md
   - Addresses AI-specific concern: merge conflict frequency for parallel agents
-- **Dependencies**: FR-6, FR-7 (references coding and TDD standards)
+- **Dependencies**: FR-5, FR-6 (references coding and TDD standards)
 
-### FR-9: Dev Environment Setup
+### FR-8: Dev Environment Setup
 - **Description**: Creates one-command development experience with live reloading
 - **User-facing commands**: `/scaffold:dev-env-setup` (`commands/dev-env-setup.md`)
 - **Behavior**:
@@ -153,9 +141,9 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Configures: dev server with live reload, local database (if applicable), environment variables, simple commands (Makefile or scripts), dependency installation
   - 6-step verification checklist (install, dev start, browser load, code change→reload, test run, db commands)
   - Adds "Key Commands" table to CLAUDE.md (single source of truth for all commands)
-- **Dependencies**: FR-8 (references project structure)
+- **Dependencies**: FR-7 (references project structure)
 
-### FR-10: Design System (Optional — Frontend Only)
+### FR-9: Design System (Optional — Frontend Only)
 - **Description**: Creates a cohesive, professional UI design system without requiring design expertise
 - **User-facing commands**: `/scaffold:design-system` (`commands/design-system.md`)
 - **Behavior**:
@@ -166,7 +154,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Updates Coding Standards and CLAUDE.md with design system sections
 - **Dependencies**: FR-9 (references dev setup)
 
-### FR-11: Git Workflow for Parallel Agents
+### FR-10: Git Workflow for Parallel Agents
 - **Description**: Enables multiple AI agents to work simultaneously without conflicts or broken main
 - **User-facing commands**: `/scaffold:git-workflow` (`commands/git-workflow.md`)
 - **Behavior**:
@@ -179,7 +167,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Updates CLAUDE.md with full workflow sections
 - **Dependencies**: FR-9 (references lint/test commands)
 
-### FR-12: Multi-Model Code Review (Optional)
+### FR-11: Multi-Model Code Review (Optional)
 - **Description**: Two-tier code review system — local AI self-review plus optional external Codex Cloud review with auto-fix loop
 - **User-facing commands**: `/scaffold:automated-pr-review` (`commands/automated-pr-review.md`)
 - **Behavior**:
@@ -190,7 +178,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Safety rails: round cap (max 3), bot-loop prevention, cost cap, fork protection, human override, usage-limit detection, follow-up dedup
 - **Dependencies**: FR-11 (references git workflow), FR-6 (references coding standards)
 
-### FR-13: E2E Testing Setup (Optional — Web and/or Mobile)
+### FR-12: E2E Testing Setup (Optional — Web and/or Mobile)
 - **Description**: Configures end-to-end testing for web apps (Playwright) and/or mobile apps (Maestro)
 - **User-facing commands**: `/scaffold:add-e2e-testing` (`commands/add-e2e-testing.md`)
 - **Behavior**:
@@ -201,7 +189,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Adds Playwright MCP permissions to `.claude/settings.json` (if web)
 - **Dependencies**: FR-7 (updates TDD standards)
 
-### FR-15: User Stories
+### FR-13: User Stories
 - **Description**: Translates PRD features into structured, implementable user stories for AI agents
 - **User-facing commands**: `/scaffold:user-stories` (`commands/user-stories.md`)
 - **Behavior**:
@@ -212,7 +200,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Creates Beads task for the work
 - **Dependencies**: FR-1 (references PRD), FR-6 (references coding standards)
 
-### FR-16: User Stories Gap Analysis & Innovation
+### FR-14: User Stories Gap Analysis & Innovation
 - **Description**: Strengthens user stories before implementation planning
 - **User-facing commands**: `/scaffold:user-stories-gaps` (`commands/user-stories-gaps.md`)
 - **Behavior**:
@@ -221,7 +209,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Presents innovation ideas for approval via `AskUserQuestionTool`
 - **Dependencies**: FR-15 (requires user stories)
 
-### FR-18: Platform Parity Review (Optional — Multi-Platform)
+### FR-15: Platform Parity Review (Optional — Multi-Platform)
 - **Description**: Ensures every target platform (iOS, Android, web) is thoroughly addressed across all documentation
 - **User-facing commands**: `/scaffold:platform-parity-review` (`commands/platform-parity-review.md`)
 - **Behavior**:
@@ -232,7 +220,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Produces recommendations and executes approved updates
 - **Dependencies**: FR-15 (requires user stories for coverage check)
 
-### FR-19: CLAUDE.md Optimization
+### FR-16: CLAUDE.md Optimization
 - **Description**: Consolidates accumulated CLAUDE.md sections for maximum signal density
 - **User-facing commands**: `/scaffold:claude-md-optimization` (`commands/claude-md-optimization.md`)
 - **Behavior**:
@@ -243,7 +231,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Must run BEFORE Workflow Audit
 - **Dependencies**: All Phase 2–4 prompts (they all add to CLAUDE.md)
 
-### FR-20: Workflow Audit
+### FR-17: Workflow Audit
 - **Description**: Cross-references all documentation to detect contradictions, stale references, and inconsistencies
 - **User-facing commands**: `/scaffold:workflow-audit` (`commands/workflow-audit.md`)
 - **Behavior**:
@@ -257,7 +245,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - 28-item verification checklist
 - **Dependencies**: FR-19 (runs after CLAUDE.md optimization)
 
-### FR-21: Implementation Plan
+### FR-18: Implementation Plan
 - **Description**: Creates a full task graph from user stories for parallel agent execution
 - **User-facing commands**: `/scaffold:implementation-plan` (`commands/implementation-plan.md`)
 - **Behavior**:
@@ -268,7 +256,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Every user story maps to one or more tasks
 - **Dependencies**: FR-15 (requires user stories), FR-6–FR-9 (references all standards)
 
-### FR-22: Implementation Plan Review
+### FR-19: Implementation Plan Review
 - **Description**: Quality gate on task sizing, dependencies, and coverage
 - **User-facing commands**: `/scaffold:implementation-plan-review` (`commands/implementation-plan-review.md`)
 - **Behavior**:
@@ -278,7 +266,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Updates tasks, clarifies dependencies
 - **Dependencies**: FR-21 (requires implementation plan)
 
-### FR-23: Implementation Plan Multi-Model Review (Optional)
+### FR-20: Implementation Plan Multi-Model Review (Optional)
 - **Description**: Independent Codex + Gemini review of task definitions
 - **User-facing commands**: `/scaffold:multi-model-review-tasks` (`commands/multi-model-review-tasks.md`)
 - **Behavior**:
@@ -289,7 +277,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Outputs to `docs/reviews/implementation-plan/`
 - **Dependencies**: FR-21 (requires implementation plan)
 
-### FR-24: Single-Agent Execution
+### FR-21: Single-Agent Execution
 - **Description**: TDD execution loop for a single Claude Code session
 - **User-facing commands**: `/scaffold:single-agent-start` (`commands/single-agent-start.md`), `/scaffold:single-agent-resume` (`commands/single-agent-resume.md`)
 - **Behavior**:
@@ -299,7 +287,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Follows workflow defined in CLAUDE.md (commit format, PR process, task closure)
 - **Dependencies**: FR-21 (requires task graph)
 
-### FR-25: Multi-Agent Execution
+### FR-22: Multi-Agent Execution
 - **Description**: Parallel agent execution in separate git worktrees
 - **User-facing commands**: `/scaffold:multi-agent-start` (`commands/multi-agent-start.md`), `/scaffold:multi-agent-resume` (`commands/multi-agent-resume.md`)
 - **Behavior**:
@@ -309,7 +297,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Agent identity via `BD_ACTOR` for task attribution
 - **Dependencies**: FR-11 (requires worktree setup), FR-21 (requires task graph)
 
-### FR-26: Visual Pipeline Dashboard
+### FR-23: Visual Pipeline Dashboard
 - **Description**: Self-contained HTML dashboard showing pipeline progress, task status, and next steps
 - **User-facing commands**: `/scaffold:dashboard` (`commands/dashboard.md`)
 - **Behavior**:
@@ -324,7 +312,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Generates `make dashboard-test` target for visual verification
 - **Dependencies**: None (standalone, usable at any point)
 
-### FR-27: New Enhancement Workflow
+### FR-24: New Enhancement Workflow
 - **Description**: Guides adding a feature to an existing project — updates PRD, creates stories, builds tasks
 - **User-facing commands**: `/scaffold:new-enhancement` (`commands/new-enhancement.md`)
 - **Behavior**:
@@ -336,7 +324,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Redirects to full PRD workflow for major pivots
 - **Dependencies**: Existing pipeline artifacts (PRD, stories, standards)
 
-### FR-28: Quick Task
+### FR-25: Quick Task
 - **Description**: Creates a focused Beads task for bug fixes, refactors, or small improvements
 - **User-facing commands**: `/scaffold:quick-task` (`commands/quick-task.md`)
 - **Behavior**:
@@ -348,7 +336,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - When to use: bug fixes, refactoring, perf, a11y, test gaps, chores
 - **Dependencies**: FR-3 (requires Beads)
 
-### FR-29: Version Management
+### FR-26: Version Management
 - **Description**: Version bumping and release creation for scaffolded projects
 - **User-facing commands**: `/scaffold:version-bump` (`commands/version-bump.md`), `/scaffold:release` (`commands/release.md`)
 - **Behavior**:
@@ -360,7 +348,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Beads task integration in release notes
 - **Dependencies**: None (standalone utility)
 
-### FR-30: Version & Update Management
+### FR-27: Version & Update Management
 - **Description**: Check installed version and apply updates from within Claude Code
 - **User-facing commands**: `/scaffold:version` (`commands/version.md`), `/scaffold:update` (`commands/update.md`)
 - **Behavior**:
@@ -370,13 +358,13 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - `.scaffold-version` marker file tracks installed version and git SHA
 - **Dependencies**: None (standalone utility)
 
-### FR-31: Pipeline Reference
+### FR-28: Pipeline Reference
 - **Description**: Quick-reference display of the full pipeline order
 - **User-facing commands**: `/scaffold:prompt-pipeline` (`commands/prompt-pipeline.md`)
 - **Behavior**: Prints the complete Phase 0–7 pipeline table with all commands and notes. Does not read files or run commands — static reference display.
 - **Dependencies**: None
 
-### FR-32: Session Analyzer
+### FR-29: Session Analyzer
 - **Description**: Analyzes Claude Code session history to find patterns worth automating
 - **User-facing commands**: `/scaffold:session-analyzer` (`commands/session-analyzer.md`)
 - **Behavior**:
@@ -388,7 +376,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Read-only, privacy-respecting, supports `--project`, `--depth`, `--output` flags
 - **Dependencies**: None (standalone utility)
 
-### FR-33: Worktree Setup Script
+### FR-30: Worktree Setup Script
 - **Description**: Creates permanent git worktrees for parallel agent sessions
 - **User-facing commands**: `scripts/setup-agent-worktree.sh <agent-name>` (CLI script, referenced by FR-11)
 - **Behavior**:
@@ -398,7 +386,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Idempotent (succeeds if worktree already exists)
 - **Dependencies**: git
 
-### FR-34: Auto-Activated Pipeline Skill
+### FR-31: Auto-Activated Pipeline Skill
 - **Description**: Provides pipeline ordering context without user action
 - **Implementation**: `skills/scaffold-pipeline/SKILL.md`
 - **Behavior**:
@@ -428,53 +416,52 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
 |------|---------|--------|
 | 3 | `/scaffold:beads` | `.beads/`, `tasks/lessons.md`, CLAUDE.md |
 | 4 | `/scaffold:tech-stack` | `docs/tech-stack.md` |
-| 5 | `/scaffold:claude-code-permissions` | `.claude/settings.json`, `~/.claude/settings.json` |
-| 6 | `/scaffold:coding-standards` | `docs/coding-standards.md`, linter configs |
-| 7 | `/scaffold:tdd` | `docs/tdd-standards.md` |
-| 8 | `/scaffold:project-structure` | `docs/project-structure.md`, scaffolded dirs |
+| 5 | `/scaffold:coding-standards` | `docs/coding-standards.md`, linter configs |
+| 6 | `/scaffold:tdd` | `docs/tdd-standards.md` |
+| 7 | `/scaffold:project-structure` | `docs/project-structure.md`, scaffolded dirs |
 
 ### Phase 3 — Development Environment
 | Step | Command | Output |
 |------|---------|--------|
-| 9 | `/scaffold:dev-env-setup` | `docs/dev-setup.md`, Makefile, `.env.example` |
-| 10 | `/scaffold:design-system` (optional) | `docs/design-system.md`, theme configs |
-| 11 | `/scaffold:git-workflow` | `docs/git-workflow.md`, worktree script, CI |
-| 11.5 | `/scaffold:automated-pr-review` (optional) | `AGENTS.md`, `docs/review-standards.md` |
+| 8 | `/scaffold:dev-env-setup` | `docs/dev-setup.md`, Makefile, `.env.example` |
+| 9 | `/scaffold:design-system` (optional) | `docs/design-system.md`, theme configs |
+| 10 | `/scaffold:git-workflow` | `docs/git-workflow.md`, worktree script, CI |
+| 10.5 | `/scaffold:automated-pr-review` (optional) | `AGENTS.md`, `docs/review-standards.md` |
 
 ### Phase 4 — Testing Integration
 | Step | Command | Output |
 |------|---------|--------|
-| 12 | `/scaffold:add-e2e-testing` (optional, web/mobile) | Playwright config, Maestro config, test patterns |
+| 11 | `/scaffold:add-e2e-testing` (optional, web/mobile) | Playwright config, Maestro config, test patterns |
 
 ### Phase 5 — Stories & Planning
 | Step | Command | Output |
 |------|---------|--------|
-| 14 | `/scaffold:user-stories` | `docs/user-stories.md` |
-| 15 | `/scaffold:user-stories-gaps` | Updated `docs/user-stories.md` |
-| 16 | `/scaffold:platform-parity-review` (optional) | Updated docs, new stories/tasks |
+| 13 | `/scaffold:user-stories` | `docs/user-stories.md` |
+| 14 | `/scaffold:user-stories-gaps` | Updated `docs/user-stories.md` |
+| 15 | `/scaffold:platform-parity-review` (optional) | Updated docs, new stories/tasks |
 
 ### Phase 6 — Consolidation & Verification
 | Step | Command | Output |
 |------|---------|--------|
-| 17 | `/scaffold:claude-md-optimization` | Restructured CLAUDE.md |
-| 18 | `/scaffold:workflow-audit` | Fixes across all docs |
+| 16 | `/scaffold:claude-md-optimization` | Restructured CLAUDE.md |
+| 17 | `/scaffold:workflow-audit` | Fixes across all docs |
 
 ### Phase 7 — Implementation
 | Step | Command | Output |
 |------|---------|--------|
-| 19 | `/scaffold:implementation-plan` | `docs/implementation-plan.md`, Beads tasks |
-| 20 | `/scaffold:implementation-plan-review` | Updated tasks/dependencies |
-| 20.5 | `/scaffold:multi-model-review-tasks` (optional) | `docs/reviews/implementation-plan/` |
-| 21 | `/scaffold:single-agent-start` or `/scaffold:multi-agent-start` | Working software |
+| 18 | `/scaffold:implementation-plan` | `docs/implementation-plan.md`, Beads tasks |
+| 19 | `/scaffold:implementation-plan-review` | Updated tasks/dependencies |
+| 19.5 | `/scaffold:multi-model-review-tasks` (optional) | `docs/reviews/implementation-plan/` |
+| 20 | `/scaffold:single-agent-start` or `/scaffold:multi-agent-start` | Working software |
 
 ### Key Dependency Constraints
 ```
-PRD (1) → Tech Stack (4) → Coding Standards (6) → TDD (7) → Project Structure (8)
-PRD (1) → User Stories (14) → Implementation Plan (19) → Execution (21)
+PRD (1) → Tech Stack (4) → Coding Standards (5) → TDD (6) → Project Structure (7)
+PRD (1) → User Stories (13) → Implementation Plan (18) → Execution (20)
 Beads (3) → all Phase 2+ prompts
-Dev Setup (9) → Git Workflow (11)
-Claude.md Optimization (17) → Workflow Audit (18)
-Implementation Plan (19) → Implementation Plan Review (20)
+Dev Setup (8) → Git Workflow (10)
+Claude.md Optimization (16) → Workflow Audit (17)
+Implementation Plan (18) → Implementation Plan Review (19)
 ```
 
 ---

@@ -28,45 +28,44 @@ Display the prompt pipeline order below. Do not read any files or run any comman
 |---|--------|---------|-------|
 | 3 | **Beads Setup** | `/scaffold:beads` | Creates CLAUDE.md — run first |
 | 4 | **Tech Stack** | `/scaffold:tech-stack` | Drives all technical decisions |
-| 5 | **Claude Code Permissions** | `/scaffold:claude-code-permissions` | Enables autonomous agents |
-| 6 | **Coding Standards** | `/scaffold:coding-standards` | References tech-stack.md |
-| 7 | **TDD Standards** | `/scaffold:tdd` | References tech-stack.md + coding-standards.md |
-| 8 | **Project Structure** | `/scaffold:project-structure` | References all Phase 2 docs |
+| 5 | **Coding Standards** | `/scaffold:coding-standards` | References tech-stack.md |
+| 6 | **TDD Standards** | `/scaffold:tdd` | References tech-stack.md + coding-standards.md |
+| 7 | **Project Structure** | `/scaffold:project-structure` | References all Phase 2 docs |
 
 ### Phase 3 — Development Environment
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
-| 9 | **Dev Environment Setup** | `/scaffold:dev-env-setup` | Creates lint/test/install commands |
-| 10 | **Design System** | `/scaffold:design-system` | **(optional)** Frontend projects only |
-| 11 | **Git Workflow** | `/scaffold:git-workflow` | References dev-setup.md |
-| 11.5 | **Automated PR Review** | `/scaffold:automated-pr-review` | **(optional)** Requires external reviewer |
+| 8 | **Dev Environment Setup** | `/scaffold:dev-env-setup` | Creates lint/test/install commands |
+| 9 | **Design System** | `/scaffold:design-system` | **(optional)** Frontend projects only |
+| 10 | **Git Workflow** | `/scaffold:git-workflow` | References dev-setup.md |
+| 10.5 | **Automated PR Review** | `/scaffold:automated-pr-review` | **(optional)** Requires external reviewer |
 
 ### Phase 4 — Testing Integration
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
-| 12 | **E2E Testing** | `/scaffold:add-e2e-testing` | **(optional)** Web and/or mobile apps |
+| 11 | **E2E Testing** | `/scaffold:add-e2e-testing` | **(optional)** Web and/or mobile apps |
 
 ### Phase 5 — Stories & Planning
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
-| 14 | **User Stories** | `/scaffold:user-stories` | Covers every PRD feature |
-| 15 | **User Stories Gap Analysis** | `/scaffold:user-stories-gaps` | UX improvements |
-| 16 | **Platform Parity Review** | `/scaffold:platform-parity-review` | **(optional)** Multi-platform projects |
+| 13 | **User Stories** | `/scaffold:user-stories` | Covers every PRD feature |
+| 14 | **User Stories Gap Analysis** | `/scaffold:user-stories-gaps` | UX improvements |
+| 15 | **Platform Parity Review** | `/scaffold:platform-parity-review` | **(optional)** Multi-platform projects |
 
 ### Phase 6 — Consolidation & Verification
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
-| 17 | **Claude.md Optimization** | `/scaffold:claude-md-optimization` | Run BEFORE Workflow Audit |
-| 18 | **Workflow Audit** | `/scaffold:workflow-audit` | Run AFTER Claude.md Optimization |
+| 16 | **Claude.md Optimization** | `/scaffold:claude-md-optimization` | Run BEFORE Workflow Audit |
+| 17 | **Workflow Audit** | `/scaffold:workflow-audit` | Run AFTER Claude.md Optimization |
 
 ### Phase 7 — Implementation
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
-| 19 | **Implementation Plan** | `/scaffold:implementation-plan` | Creates full task graph |
-| 20 | **Implementation Plan Review** | `/scaffold:implementation-plan-review` | Second pass for quality |
-| 20.5 | **Implementation Plan Multi-Model Review** | `/scaffold:multi-model-review-tasks` | **(optional)** Requires Codex/Gemini CLI |
-| 21 | **Execution (single)** | `/scaffold:single-agent-start` | Single-agent execution loop |
-| 21 | **Execution (multi)** | `/scaffold:multi-agent-start <agent-name>` | One per worktree |
+| 18 | **Implementation Plan** | `/scaffold:implementation-plan` | Creates full task graph |
+| 19 | **Implementation Plan Review** | `/scaffold:implementation-plan-review` | Second pass for quality |
+| 19.5 | **Implementation Plan Multi-Model Review** | `/scaffold:multi-model-review-tasks` | **(optional)** Requires Codex/Gemini CLI |
+| 20 | **Execution (single)** | `/scaffold:single-agent-start` | Single-agent execution loop |
+| 20 | **Execution (multi)** | `/scaffold:multi-agent-start <agent-name>` | One per worktree |
 
 ### Ongoing
 | Prompt | Command | When |
