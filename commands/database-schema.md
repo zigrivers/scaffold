@@ -3,7 +3,7 @@ description: "Design database schema from domain models with indexes, constraint
 long-description: "Reads domain models and architecture, then creates docs/database-schema.md defining tables, relationships, indexes, constraints, normalization decisions, and migration strategy."
 ---
 
-Read `docs/domain-models/`, `docs/system-architecture.md`, `docs/adrs/`, and `docs/plan.md`, then design the database schema. Create `docs/database-schema.md` translating domain entities into concrete tables/collections with relationships, indexes, constraints, and a migration strategy.
+Read `docs/domain-models/`, `docs/system-architecture.md`, `docs/adrs/`, `docs/plan.md`, `docs/tech-stack.md` (for database engine and ORM choice), and `docs/user-stories.md` (for query patterns and data requirements). Also read `docs/api-contracts.md` if it exists (for payload-to-schema alignment). Create `docs/database-schema.md` translating domain entities into concrete tables/collections with relationships, indexes, constraints, and a migration strategy.
 
 ## Mode Detection
 
@@ -138,7 +138,7 @@ If the project uses a document database:
 
 ## Process
 
-1. **Read all inputs** — Read `docs/domain-models/`, `docs/system-architecture.md`, and `docs/adrs/` completely.
+1. **Read all inputs** — Read `docs/domain-models/`, `docs/system-architecture.md`, `docs/adrs/`, `docs/tech-stack.md`, and `docs/user-stories.md` completely. Read `docs/api-contracts.md` if it exists.
 2. **Use AskUserQuestionTool** for these decisions:
    - **Database engine**: Confirm the database choice from ADRs (PostgreSQL, SQLite, MongoDB, etc.)
    - **Schema depth**: Full CREATE TABLE statements with index justification, or entity-to-table mapping with key relationships?
@@ -158,7 +158,9 @@ When this step is complete, tell the user:
 ---
 **Specification phase in progress** — `docs/database-schema.md` created with tables, indexes, constraints, and migration strategy.
 
-**Next:** Run `/scaffold:api-contracts` — Define API contracts for all system interfaces, or `/scaffold:ux-spec` — Specify the user experience.
+**Next:**
+- Run `/scaffold:review-database` — Review the schema for coverage, normalization, and migration safety.
+- Or skip review and proceed to `/scaffold:api-contracts` (if project exposes APIs) or `/scaffold:ux-spec` (if project has a frontend).
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

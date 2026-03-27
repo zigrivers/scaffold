@@ -103,7 +103,9 @@ At depth 4+, dispatch the reviewed artifact to independent AI models for additio
 - `docs/database-schema.md` (the reviewed artifact)
 - `docs/domain-models/` directory
 - `docs/system-architecture.md`
-- Focus areas: missing indexes, inadequate constraints, normalization issues, unsafe migrations
+- `docs/adrs/` (for storage engine and denormalization decisions)
+- `docs/api-contracts.md` (if it exists — for payload-to-schema alignment)
+- Focus areas: missing indexes, inadequate constraints, normalization issues, unsafe migrations, ADR constraint violations
 
 If neither CLI is available, perform a structured adversarial self-review instead: re-read the artifact specifically looking for issues the initial review passes might have missed.
 
@@ -126,7 +128,10 @@ When this step is complete, tell the user:
 ---
 **Review complete** — Database schema review findings documented in `docs/reviews/review-database.md`.
 
-**Next:** Run `/scaffold:api-contracts` to define API contracts informed by the reviewed schema.
+**Next:**
+- Run `/scaffold:api-contracts` — Define API contracts (if project exposes APIs).
+- Or `/scaffold:ux-spec` — Specify the user experience (if project has a frontend).
+- Or proceed to quality gates if all applicable spec steps are complete.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

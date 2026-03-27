@@ -3,7 +3,7 @@ description: "Define API contracts with endpoints, schemas, error handling, and 
 long-description: "Reads system architecture and domain models, then creates docs/api-contracts.md specifying REST/GraphQL endpoints, request/response schemas, error contracts, authentication, pagination, and versioning."
 ---
 
-Read `docs/system-architecture.md`, `docs/domain-models/`, `docs/adrs/`, and `docs/user-stories.md`, then define API contracts for all system interfaces. Create `docs/api-contracts.md` specifying every endpoint with request/response shapes, error codes, authentication requirements, and pagination.
+Read `docs/system-architecture.md`, `docs/domain-models/`, `docs/adrs/`, `docs/user-stories.md`, and `docs/tech-stack.md` (for API framework and conventions). Also read `docs/database-schema.md` if it exists (for payload-to-schema alignment). Create `docs/api-contracts.md` specifying every endpoint with request/response shapes, error codes, authentication requirements, and pagination.
 
 ## Mode Detection
 
@@ -187,7 +187,7 @@ Choose and document:
 
 ## Process
 
-1. **Read all inputs** — Read `docs/system-architecture.md`, `docs/domain-models/`, and `docs/adrs/` completely. Read `docs/user-stories.md` to understand user-facing operations.
+1. **Read all inputs** — Read `docs/system-architecture.md`, `docs/domain-models/`, `docs/adrs/`, `docs/tech-stack.md`, and `docs/user-stories.md` completely. Read `docs/database-schema.md` if it exists (for payload-to-schema alignment).
 2. **Use AskUserQuestionTool** for these decisions:
    - **API style**: REST, GraphQL, or hybrid? (Confirm from ADRs)
    - **Specification depth**: Full OpenAPI-style with examples, or endpoint list with key schemas?
@@ -208,7 +208,9 @@ When this step is complete, tell the user:
 ---
 **Specification phase in progress** — `docs/api-contracts.md` created with endpoint definitions, error contracts, auth requirements, and pagination.
 
-**Next:** Run `/scaffold:ux-spec` — Specify the user experience design, or `/scaffold:database-schema` if not yet done.
+**Next:**
+- Run `/scaffold:review-api` — Review API contracts for coverage, error handling, and auth gaps.
+- Or skip review and proceed to `/scaffold:ux-spec` (if project has a frontend) or `/scaffold:database-schema` (if not yet done).
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

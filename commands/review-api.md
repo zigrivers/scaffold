@@ -103,8 +103,10 @@ At depth 4+, dispatch the reviewed artifact to independent AI models for additio
 - `docs/api-contracts.md` (the reviewed artifact)
 - `docs/domain-models/` directory
 - `docs/system-architecture.md`
+- `docs/adrs/` (for API style, versioning, and auth decisions)
 - `docs/user-stories.md`
-- Focus areas: missing error cases, auth gaps, payload mismatches, idempotency oversights
+- `docs/database-schema.md` (if it exists — for payload-to-schema alignment)
+- Focus areas: missing error cases, auth gaps, payload mismatches, idempotency oversights, ADR constraint violations
 
 If neither CLI is available, perform a structured adversarial self-review instead: re-read the artifact specifically looking for issues the initial review passes might have missed.
 
@@ -127,7 +129,10 @@ When this step is complete, tell the user:
 ---
 **Review complete** — API contracts review findings documented in `docs/reviews/review-api.md`.
 
-**Next:** Run `/scaffold:ux-spec` to create the UX specification informed by the reviewed API contracts.
+**Next:**
+- Run `/scaffold:ux-spec` — Specify the user experience (if project has a frontend).
+- Or `/scaffold:database-schema` (if not yet done).
+- Or proceed to quality gates if all applicable spec steps are complete.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 
