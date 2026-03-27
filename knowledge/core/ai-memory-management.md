@@ -131,12 +131,28 @@ Hooks automate memory capture at key session events:
 
 **PreCompact** (highest value) — Triggers before context compression. Captures patterns, decisions, and corrections that would otherwise be lost when the context window compacts.
 
+Hook commands should integrate with the configured MCP memory server so entries are queryable in future sessions:
+
 ```json
 {
   "hooks": {
     "PreCompact": [{
       "type": "command",
-      "command": "echo 'Summarize key decisions and patterns from this session' | engram save --category decision"
+      "command": "engram save --category session 'Context compacting — key decisions and patterns should be preserved'",
+      "timeout": 10000
+    }]
+  }
+}
+```
+
+Without an MCP server, use file-logging as a fallback:
+```json
+{
+  "hooks": {
+    "PreCompact": [{
+      "type": "command",
+      "command": "date '+%Y-%m-%d %H:%M' >> .claude/compaction-log.txt && echo 'Context compacted' >> .claude/compaction-log.txt",
+      "timeout": 5000
     }]
   }
 }
@@ -148,6 +164,7 @@ Hooks automate memory capture at key session events:
 
 **Hook selection guidance:**
 - Start with PreCompact only — it captures the most value with least noise
+- Hook commands must produce a side effect (write to MCP server, append to file) — echoing to `/dev/null` provides zero value
 - Add Stop if sessions frequently end with unrecorded decisions
 - Avoid PreToolUse unless you have a specific logging need — it fires constantly
 
