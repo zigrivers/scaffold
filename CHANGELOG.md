@@ -2,6 +2,13 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.10.1] — 2026-03-28
+
+### Added
+
+- **Local CLI review mode** — `automated-pr-review` now supports running Codex and/or Gemini CLI locally against the PR diff for immediate results. No external bot, no polling. When both CLIs are available, runs both independently and reconciles findings by confidence level (dual-model review).
+- **CLI detection in `scaffold check`** — `scaffold check automated-pr-review` now reports available CLIs and recommends local-cli vs external-bot mode.
+
 ## [2.10.0] — 2026-03-28
 
 ### Added
