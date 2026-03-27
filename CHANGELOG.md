@@ -2,6 +2,13 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.15.1] — 2026-03-27
+
+### Fixed
+
+- **Multi-model dispatch now in Process section** — All 15 review/validation commands had multi-model validation as a disconnected section above the Process checklist. Agents followed the Process steps and skipped CLI dispatch. Now an explicit numbered step: "(Depth 4+) Dispatch multi-model validation — verify CLI auth, bundle context, dispatch, reconcile findings, apply high-confidence fixes".
+- **Previous auth failures no longer exempt subsequent dispatches** — Added "MANDATORY at depth 4+" label, inline auth pre-flight checks, and explicit "Previous auth failures do NOT exempt this dispatch — re-check before each review step" rule to all 15 commands and the multi-model-dispatch skill.
+
 ## [2.15.0] — 2026-03-27
 
 ### Fixed
