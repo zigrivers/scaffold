@@ -360,6 +360,7 @@ $REVIEW_PROMPT"
     echo "$codex_prompt" > "$prompt_file"
 
     if codex exec \
+        --skip-git-repo-check \
         --sandbox read-only \
         --ask-for-approval never \
         --ephemeral \

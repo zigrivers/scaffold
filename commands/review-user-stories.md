@@ -165,7 +165,7 @@ Check if at least one external review CLI is available (check with `command -v`)
 
 Bundle the PRD, requirements index, coverage map, and user stories into a review package. Follow the invocation patterns from the `multi-model-dispatch` skill:
 
-- **Codex**: `codex exec -s read-only --ephemeral "REVIEW_PROMPT" 2>/dev/null` — independently review coverage, identify missing requirements, flag vague acceptance criteria, find contradictions, and report overlaps. Request structured JSON output.
+- **Codex**: `codex exec --skip-git-repo-check -s read-only --ephemeral "REVIEW_PROMPT" 2>/dev/null` — independently review coverage, identify missing requirements, flag vague acceptance criteria, find contradictions, and report overlaps. Request structured JSON output.
 - **Gemini**: `gemini -p "REVIEW_PROMPT" --output-format json --approval-mode yolo 2>/dev/null` — same prompt and output structure as Codex. Run independently — do not share one model's findings with the other.
 
 Do NOT edit the review JSON files — they are raw evidence from independent reviewers.

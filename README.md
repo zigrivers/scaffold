@@ -403,7 +403,7 @@ The `multi-model-dispatch` skill documents the correct patterns:
 
 ```bash
 # Codex (headless mode — use "exec", NOT bare "codex")
-codex exec -s read-only --ephemeral "Review this artifact..." 2>/dev/null
+codex exec --skip-git-repo-check -s read-only --ephemeral "Review this artifact..." 2>/dev/null
 
 # Gemini (headless mode — use "-p" flag)
 gemini -p "Review this artifact..." --output-format json --approval-mode yolo 2>/dev/null
@@ -608,6 +608,9 @@ Run `scaffold check <step>`. For example, `scaffold check add-e2e-testing` detec
 
 **Codex CLI fails with "stdin is not a terminal"**
 Use `codex exec "prompt"` (headless mode), not bare `codex "prompt"` (interactive TUI). The `multi-model-dispatch` skill documents the correct invocation patterns.
+
+**Codex CLI fails with "Not inside a trusted directory"**
+Add `--skip-git-repo-check` flag: `codex exec --skip-git-repo-check -s read-only --ephemeral "prompt"`. This is required when the project hasn't initialized git yet.
 
 **I upgraded and my pipeline shows old step names**
 Run `scaffold status` — the state manager automatically migrates old step names (e.g., `add-playwright` → `add-e2e-testing`, `multi-model-review` → `automated-pr-review`) and removes retired steps.
