@@ -2,6 +2,17 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.12.0] — 2026-03-28
+
+### Added
+
+- **`multi-model-dispatch` skill** — New auto-activated skill documenting correct Codex CLI (`codex exec`) and Gemini CLI (`gemini -p`) invocation patterns for headless operation from Claude Code. Covers context bundling templates, dual-model reconciliation rules, output parsing, and fallback handling.
+- **Multi-model validation on all review/validation steps** — All 11 domain review commands and 4 validation commands now include a "Multi-Model Validation (Depth 4-5)" section that dispatches to available Codex/Gemini CLIs for independent validation.
+
+### Fixed
+
+- **Codex CLI invocation** — Fixed `automated-pr-review` to use `codex exec` (headless mode) instead of bare `codex` (interactive TUI that fails with "stdin is not a terminal"). Added explicit invocation commands to `review-user-stories` depth 5 section.
+
 ## [2.11.0] — 2026-03-28
 
 ### Removed
