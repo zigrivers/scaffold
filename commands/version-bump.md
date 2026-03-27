@@ -203,7 +203,7 @@ git add <changed-files>
 git commit -m "chore(version): vX.Y.Z"
 ```
 
-If a Beads task is active, include the task ID: `[BD-xxx] chore(version): vX.Y.Z`.
+If Beads is configured (`.beads/` exists) and a task is active, include the task ID: `[BD-xxx] chore(version): vX.Y.Z`.
 
 ---
 

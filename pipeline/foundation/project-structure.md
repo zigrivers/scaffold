@@ -2,7 +2,7 @@
 name: project-structure
 description: Design directory layout and scaffold the actual project structure
 phase: "foundation"
-order: 44
+order: 45
 dependencies: [tech-stack, coding-standards]
 outputs: [docs/project-structure.md]
 conditional: null

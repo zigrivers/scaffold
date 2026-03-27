@@ -1,25 +1,26 @@
 ---
 name: tdd
-description: Define testing and quality strategy across all layers
-phase: "quality"
-order: 19
-dependencies: [review-architecture]
+description: Define testing conventions and TDD standards for the tech stack
+phase: "foundation"
+order: 44
+dependencies: [coding-standards]
 outputs: [docs/tdd-standards.md]
 conditional: null
 knowledge-base: [testing-strategy]
 ---
 
 ## Purpose
-Define the testing strategy: test pyramid, coverage goals per layer, testing
-patterns, quality gates, and performance testing approach. This tells agents
-how to test the code they write.
+Define the project's testing conventions, TDD workflow, test pyramid, coverage
+goals, quality gates, and testing patterns. This tells agents how to test the
+code they write and establishes testing standards before implementation begins.
 
 ## Inputs
-- docs/system-architecture.md (required) — layers to test
-- docs/domain-models/ (required) — business rules to verify
-- docs/adrs/ (required) — testing technology choices
-- docs/api-contracts.md (optional) — API test scenarios
-- docs/database-schema.md (optional) — data layer test scenarios
+- docs/tech-stack.md (required) — determines test runner, assertion library, and framework-specific testing patterns
+- docs/coding-standards.md (required) — naming conventions and code patterns that apply to test files
+- docs/plan.md (required) — features inform which testing scenarios matter most
+- docs/system-architecture.md (optional) — if available, layers to test
+- docs/domain-models/ (optional) — if available, business rules to verify
+- docs/adrs/ (optional) — if available, testing technology choices
 
 ## Expected Outputs
 - docs/tdd-standards.md — testing approach with coverage goals and patterns
