@@ -214,6 +214,21 @@ scaffold check add-e2e-testing
 
 This is useful when the user asks "Do I need this step?" or when previewing which optional steps apply before running them.
 
+### Multi-Model Review at Depth 4-5
+
+All review and validation steps now support independent multi-model validation at depth 4-5 using Codex and/or Gemini CLIs. The `multi-model-dispatch` skill documents the correct invocation patterns:
+
+- **Codex**: `codex exec -s read-only --ephemeral "prompt" 2>/dev/null` (NOT bare `codex`)
+- **Gemini**: `gemini -p "prompt" --output-format json --approval-mode yolo 2>/dev/null`
+
+When running a review step at depth 4-5:
+1. Check CLI availability before dispatching
+2. If both available, run dual-model review for highest quality
+3. If one available, run single-model external review
+4. If neither available, fall back to Claude-only adversarial self-review
+
+The runner should surface the depth choice as a decision point for review steps, noting that depth 4-5 enables multi-model validation if CLIs are available.
+
 ## Error Handling
 
 | Situation | Response |

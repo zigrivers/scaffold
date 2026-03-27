@@ -291,6 +291,29 @@ bd ready           # Show the updated first wave of parallel work
 
 ---
 
+## Multi-Model Validation (Depth 4-5)
+
+**Skip this section at depth 1-3.**
+
+At depth 4+, dispatch the reviewed artifact to independent AI models for additional validation. This catches blind spots that a single model misses. Follow the invocation patterns in the `multi-model-dispatch` skill.
+
+**Note:** This runs BEFORE `multi-model-review-tasks`; the multi-model section here is complementary.
+
+1. **Detect CLIs**: Check for `codex` and `gemini` CLI availability
+2. **Bundle context**: Include the reviewed artifact + upstream references (listed below)
+3. **Dispatch**: Run each available CLI independently with the review prompt
+4. **Reconcile**: Apply dual-model reconciliation rules from the skill
+5. **Apply fixes**: Fix high-confidence findings; present medium/low-confidence findings to the user
+
+**Upstream references to include in the review bundle:**
+- Implementation plan/tasks (the reviewed artifact)
+- `docs/user-stories.md`
+- `docs/system-architecture.md`
+- `docs/tdd-standards.md`
+- Focus areas: coverage gaps, sizing issues, dependency problems, ambiguous descriptions
+
+If neither CLI is available, perform a structured adversarial self-review instead: re-read the artifact specifically looking for issues the initial review passes might have missed.
+
 ## Process Rules
 
 1. **Be exhaustive in Phase 1** — every acceptance criterion must be checked, not just the obvious ones
