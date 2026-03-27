@@ -3,7 +3,7 @@ description: "Design database schema from domain models with indexes, constraint
 long-description: "Reads domain models and architecture, then creates docs/database-schema.md defining tables, relationships, indexes, constraints, normalization decisions, and migration strategy."
 ---
 
-Read `docs/domain-models/`, `docs/system-architecture.md`, and `docs/adrs/`, then design the database schema. Create `docs/database-schema.md` translating domain entities into concrete tables/collections with relationships, indexes, constraints, and a migration strategy.
+Read `docs/domain-models/`, `docs/system-architecture.md`, `docs/adrs/`, and `docs/plan.md`, then design the database schema. Create `docs/database-schema.md` translating domain entities into concrete tables/collections with relationships, indexes, constraints, and a migration strategy.
 
 ## Mode Detection
 

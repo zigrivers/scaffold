@@ -124,7 +124,7 @@ When this step is complete, tell the user:
 ---
 **Review complete** — UX specification review findings documented in `docs/reviews/review-ux.md`.
 
-**Next:** Run `/scaffold:tdd` to create the testing strategy informed by the reviewed UX spec.
+**Next:** Run `/scaffold:claude-md-optimization` — Consolidate CLAUDE.md, or proceed to remaining specification steps if database or API specs are still needed.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

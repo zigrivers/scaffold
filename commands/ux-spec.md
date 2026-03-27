@@ -168,7 +168,7 @@ When this step is complete, tell the user:
 ---
 **Specification phase complete** — `docs/ux-spec.md` created with user flows, component architecture, accessibility, and responsive behavior.
 
-**Next:** Run `/scaffold:tdd` — Create TDD standards, or `/scaffold:coding-standards` if not yet done.
+**Next:** Run `/scaffold:claude-md-optimization` — Consolidate CLAUDE.md before implementation planning. Or proceed to remaining specification steps if database or API specs are still needed.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

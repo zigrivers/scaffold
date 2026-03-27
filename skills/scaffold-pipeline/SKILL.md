@@ -34,6 +34,18 @@ Use this skill ONLY when the user asks about:
 | 13 | Stories & Planning | `/scaffold:user-stories` | Covers every PRD feature |
 | 14 | Stories & Planning | `/scaffold:user-stories-gaps` | UX improvements |
 | 15 | Stories & Planning | `/scaffold:platform-parity-review` | **(optional)** Multi-platform projects |
+| 15.1 | Domain Modeling | `/scaffold:domain-modeling` | Entities, aggregates, events, bounded contexts |
+| 15.2 | Domain Modeling | `/scaffold:review-domain-modeling` | 10-pass domain model review |
+| 15.3 | Architecture | `/scaffold:adrs` | Architecture Decision Records |
+| 15.4 | Architecture | `/scaffold:review-adrs` | Review for contradictions, missing decisions |
+| 15.5 | Architecture | `/scaffold:system-architecture` | Components, data flows, module structure |
+| 15.6 | Architecture | `/scaffold:review-architecture` | Coverage gaps, constraint violations |
+| 15.7 | Specification | `/scaffold:database-schema` | **(optional)** Tables, indexes, constraints |
+| 15.8 | Specification | `/scaffold:review-database` | **(optional)** Schema review |
+| 15.9 | Specification | `/scaffold:api-contracts` | **(optional)** Endpoints, error codes, auth |
+| 15.10 | Specification | `/scaffold:review-api` | **(optional)** API contracts review |
+| 15.11 | Specification | `/scaffold:ux-spec` | **(optional)** Flows, states, accessibility |
+| 15.12 | Specification | `/scaffold:review-ux` | **(optional)** UX spec review |
 | 16 | Consolidation | `/scaffold:claude-md-optimization` | Run BEFORE workflow-audit |
 | 17 | Consolidation | `/scaffold:workflow-audit` | Run AFTER claude-md-optimization |
 | 18 | Implementation | `/scaffold:implementation-plan` | Creates full task graph |
@@ -60,11 +72,14 @@ Use this skill ONLY when the user asks about:
 ```
 PRD → Tech Stack → Coding Standards → TDD Standards → Project Structure
                                                             ↓
-PRD → User Stories → Implementation Plan → Execution
-                                    ↓
+PRD → User Stories → Domain Modeling → ADRs → System Architecture
+                                                      ↓
+                                               ┌──────┼──────┐
+                                            DB Schema  API   UX Spec
+                                                      ↓
 Dev Setup → Git Workflow → AI Memory Setup → Claude.md Optimization → Workflow Audit
                                                             ↓
-                                              Implementation Plan Review
+                                              Implementation Plan → Review → Execution
 ```
 
 ## Critical Ordering Constraints
@@ -73,8 +88,11 @@ Dev Setup → Git Workflow → AI Memory Setup → Claude.md Optimization → Wo
 2. **Tech Stack before Coding Standards and TDD** — they reference it
 3. **Dev Setup before Git Workflow** — Git Workflow references lint/test commands
 4. **Git Workflow before AI Memory Setup** — memory rules are extracted from project docs created by earlier steps
-5. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
-6. **Implementation Plan before Implementation Plan Review** — can't review what doesn't exist
+5. **User Stories before Domain Modeling** — domain models derive from stories
+6. **Domain Modeling → ADRs → Architecture** — linear chain through modeling phases
+7. **Architecture before Specification** — DB, API, UX specs derive from architecture (can parallelize)
+8. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
+9. **Implementation Plan before Implementation Plan Review** — can't review what doesn't exist
 
 ## Status & Navigation
 

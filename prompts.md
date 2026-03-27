@@ -76,6 +76,45 @@ These translate the PRD into implementable work.
 
 ---
 
+## Phase 5b — Domain Modeling
+
+Discover and model the problem domain from user stories.
+
+| # | Prompt | Produces | Notes |
+|---|--------|----------|-------|
+| 15.1 | **Domain Modeling** | `docs/domain-models/` | Entities, aggregates, events, invariants per bounded context |
+| 15.2 | **Review Domain Modeling** | `docs/reviews/review-domain-modeling.md` | 10-pass review of domain model quality |
+
+---
+
+## Phase 5c — Architecture Decisions
+
+Document architectural choices informed by domain models.
+
+| # | Prompt | Produces | Notes |
+|---|--------|----------|-------|
+| 15.3 | **ADRs** | `docs/adrs/` | Architecture Decision Records with rationale |
+| 15.4 | **Review ADRs** | `docs/reviews/review-adrs.md` | Review for contradictions, missing decisions |
+| 15.5 | **System Architecture** | `docs/system-architecture.md` | Components, data flows, module structure |
+| 15.6 | **Review Architecture** | `docs/reviews/review-architecture.md` | Review for coverage gaps, constraint violations |
+
+---
+
+## Phase 5d — Specification
+
+Translate architecture into concrete specifications. All steps are optional — skip what doesn't apply.
+
+| # | Prompt | Produces | Notes |
+|---|--------|----------|-------|
+| 15.7 | **Database Schema** | `docs/database-schema.md` | **(optional)** Tables, indexes, constraints, migrations |
+| 15.8 | **Review Database** | `docs/reviews/review-database.md` | **(optional)** Review schema for entity coverage, normalization |
+| 15.9 | **API Contracts** | `docs/api-contracts.md` | **(optional)** Endpoints, error codes, auth, rate limits |
+| 15.10 | **Review API** | `docs/reviews/review-api.md` | **(optional)** Review for operation coverage, payload consistency |
+| 15.11 | **UX Spec** | `docs/ux-spec.md` | **(optional)** User flows, interaction states, accessibility |
+| 15.12 | **Review UX** | `docs/reviews/review-ux.md` | **(optional)** Review for journey coverage, design system consistency |
+
+---
+
 ## Phase 6 — Consolidation & Verification
 
 These clean up the accumulated CLAUDE.md additions and verify consistency.
@@ -134,11 +173,17 @@ This replaces the previous Beads Migration, Workflow Migration, and Permissions 
 ```
 PRD → Tech Stack → Coding Standards → TDD Standards → Project Structure
                                                             ↓
-PRD → User Stories → Implementation Plan → Execution
-                                    ↓
+PRD → User Stories → Domain Modeling → ADRs → System Architecture
+                          ↓                         ↓
+                   Review Steps              ┌──────┼──────┐
+                                             ↓      ↓      ↓
+                                          DB Schema  API   UX Spec
+                                             ↓      ↓      ↓
+                                          Reviews  Reviews  Reviews
+                                                    ↓
 Dev Setup → Git Workflow → AI Memory Setup → Claude.md Optimization → Workflow Audit → Create Evals
                                                                           ↓
-                                                          Implementation Plan Review
+                                                          Implementation Plan → Review → Execution
 ```
 
 The most critical ordering constraints:
@@ -146,9 +191,12 @@ The most critical ordering constraints:
 2. **Tech Stack before Coding Standards and TDD** — they reference it
 3. **Dev Setup before Git Workflow** — Git Workflow references lint/test commands
 4. **Git Workflow before AI Memory Setup** — memory rules are extracted from docs created by earlier steps
-5. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
-6. **Workflow Audit before Create Evals** — evals reference the verified workflow and standards
-7. **Implementation Plan before Implementation Plan Review** — can't review what doesn't exist
+5. **User Stories before Domain Modeling** — domain models are derived from stories
+6. **Domain Modeling → ADRs → Architecture** — linear dependency chain through modeling phases
+7. **Architecture before Specification** — database, API, and UX specs derive from architecture (can run in parallel)
+8. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
+9. **Workflow Audit before Create Evals** — evals reference the verified workflow and standards
+10. **Implementation Plan before Implementation Plan Review** — can't review what doesn't exist
 
 
 __________________________________
