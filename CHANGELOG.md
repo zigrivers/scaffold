@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.13.1] — 2026-03-27
+
+### Fixed
+
+- **Codex CLI "Not inside a trusted directory"** — Added `--skip-git-repo-check` flag to all `codex exec` invocations across multi-model-dispatch skill, command files, scripts, runner skill, and README. Required when running reviews before git is initialized.
+
 ## [2.13.0] — 2026-03-27
 
 ### Added
