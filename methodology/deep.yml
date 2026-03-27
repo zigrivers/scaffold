@@ -14,7 +14,7 @@ steps:
   dev-env-setup: { enabled: true }
   design-system: { enabled: true, conditional: "if-needed" }
   git-workflow: { enabled: true }
-  multi-model-review: { enabled: true, conditional: "if-needed" }
+  automated-pr-review: { enabled: true, conditional: "if-needed" }
   # Phase 4 — Integration
   add-e2e-testing: { enabled: true, conditional: "if-needed" }
   # Phase 1 — Product Definition

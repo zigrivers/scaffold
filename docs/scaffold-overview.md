@@ -17,7 +17,7 @@ Phases are run in order, with explicit dependency constraints between prompts. S
 - **Structured 7-phase pipeline** (Phase 0-7) — from product definition through implementation
 - **Beads task tracking** — integrated task management with `@beads/bd` throughout the pipeline
 - **Parallel agent execution** — git worktrees enable multiple Claude Code sessions working simultaneously
-- **Multi-model code review** (optional) — automated PR review using Codex Cloud with Claude-powered fixes
+- **Automated PR review** (optional) — automated PR review using external reviewers (Codex Cloud, Gemini, etc.)
 - **Project type awareness** — optional prompts for web apps (Playwright), mobile/Expo (Maestro), and multi-platform projects
 - **Update mode** — all document-creating prompts auto-detect fresh vs. update mode, replacing dedicated migration prompts
 - **Auto-activated pipeline skill** — provides ordering context so Claude Code knows which command to suggest next
@@ -59,7 +59,7 @@ Phases are run in order, with explicit dependency constraints between prompts. S
 | 9 | `dev-env-setup` | Set up local dev environment with live reload | |
 | 10 | `design-system` | Create a cohesive design system for frontend | **(optional)** Frontend projects only |
 | 11 | `git-workflow` | Configure git workflow for parallel agents | |
-| 11.5 | `multi-model-review` | Set up multi-model code review on PRs | **(optional)** Requires ChatGPT Pro |
+| 11.5 | `automated-pr-review` | Set up automated PR review with external reviewers | **(optional)** Requires external reviewer |
 
 ### Phase 4 — Testing Integration
 
@@ -153,8 +153,8 @@ The pipeline generates the following project documents:
 | `docs/dev-setup.md` | Dev Environment Setup (#9) | Local development instructions |
 | `docs/design-system.md` | Design System (#10) | Theme, tokens, component patterns |
 | `docs/git-workflow.md` | Git Workflow (#11) | Branching, PR, and agent workflow |
-| `AGENTS.md` | Multi-Model Review (#11.5) | Codex Cloud review configuration |
-| `docs/review-standards.md` | Multi-Model Review (#11.5) | Code review criteria |
+| `AGENTS.md` | Automated PR Review (#11.5) | External reviewer configuration |
+| `docs/review-standards.md` | Automated PR Review (#11.5) | Code review criteria |
 | `docs/user-stories.md` | User Stories (#14) | Implementable user stories |
 | `docs/reviews/user-stories/` | User Stories Multi-Model Review (#15.5) | Codex/Gemini review data, coverage analysis |
 | `docs/implementation-plan.md` | Implementation Plan (#19) | Full task graph with dependencies |

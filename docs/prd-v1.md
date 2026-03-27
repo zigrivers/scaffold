@@ -181,7 +181,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
 
 ### FR-12: Multi-Model Code Review (Optional)
 - **Description**: Two-tier code review system — local AI self-review plus optional external Codex Cloud review with auto-fix loop
-- **User-facing commands**: `/scaffold:multi-model-review` (`commands/multi-model-review.md`)
+- **User-facing commands**: `/scaffold:automated-pr-review` (`commands/automated-pr-review.md`)
 - **Behavior**:
   - Tier 1 (Local, required): AI review subagent checks `git diff origin/main...HEAD` against standards before push
   - Tier 2 (Codex Cloud, optional): Auto-review on PR via GitHub Actions, convergence loop (fix/review until approval or round cap)
@@ -439,7 +439,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
 | 9 | `/scaffold:dev-env-setup` | `docs/dev-setup.md`, Makefile, `.env.example` |
 | 10 | `/scaffold:design-system` (optional) | `docs/design-system.md`, theme configs |
 | 11 | `/scaffold:git-workflow` | `docs/git-workflow.md`, worktree script, CI |
-| 11.5 | `/scaffold:multi-model-review` (optional) | `AGENTS.md`, GitHub Actions, review prompts |
+| 11.5 | `/scaffold:automated-pr-review` (optional) | `AGENTS.md`, `docs/review-standards.md` |
 
 ### Phase 4 — Testing Integration
 | Step | Command | Output |

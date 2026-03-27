@@ -619,7 +619,7 @@ When this step is complete, tell the user:
 **Phase 3 in progress** — `docs/git-workflow.md` created, CI configured, worktree script ready.
 
 **Next (choose one):**
-- **(Optional)** Run `/scaffold:multi-model-review` — Set up multi-model code review on PRs (requires ChatGPT Pro subscription).
+- **(Optional)** Run `/scaffold:automated-pr-review` — Set up automated PR review with external reviewers.
 - If your project has a **web frontend and/or mobile app**: Skip to `/scaffold:add-e2e-testing` — Configure E2E testing (starts Phase 4).
 - If **neither**: Skip to `/scaffold:user-stories` — Create user stories (starts Phase 5).
 
