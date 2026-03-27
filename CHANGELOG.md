@@ -2,6 +2,15 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.17.2] — 2026-03-27
+
+### Enhanced
+
+- **Specification phase upstream reads** — database-schema now reads `docs/tech-stack.md` (database engine) and `docs/user-stories.md` (query patterns). api-contracts now reads `docs/tech-stack.md` (API framework). ux-spec now reads `docs/coding-standards.md` (component naming).
+- **Cross-references between spec commands** — database-schema and api-contracts now conditionally read each other's output for payload-to-schema alignment validation.
+- **After This Step chains clarified** — Each spec command now guides: create → review → next applicable spec → quality gates. Removed ambiguous branching.
+- **Multi-model validation bundles completed** — review-database added `docs/adrs/` and `docs/api-contracts.md`. review-api added `docs/adrs/` and `docs/database-schema.md`. review-ux added `docs/api-contracts.md`.
+
 ## [2.17.1] — 2026-03-27
 
 ### Fixed
