@@ -2,6 +2,22 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.13.0] — 2026-03-27
+
+### Added
+
+- **`ai-memory-setup` pipeline step** — New Phase 3 environment step (order 58, after git-workflow) that configures a tiered AI memory stack:
+  - **Tier 1 — Modular Rules**: Extracts conventions from coding-standards.md, tech-stack.md, and git-workflow.md into path-scoped `.claude/rules/` files. Keeps CLAUDE.md lean under 200 lines.
+  - **Tier 2 — Persistent Memory**: Configures MCP memory server (Engram/hmem/Claude-Mem), lifecycle hooks (PreCompact, Stop, PreToolUse), and structured decision logging in `docs/decisions/`.
+  - **Tier 3 — External Context**: Adds library documentation server (Context7/Nia/Docfork) to prevent API hallucination.
+- **`ai-memory-management` knowledge base** — New domain expertise file with research-backed memory best practices including the ETH Zurich findings on context file effectiveness.
+- **`scaffold check ai-memory-setup`** — Detects existing `.claude/rules/`, MCP memory server configuration, lifecycle hooks, and decision logging structure.
+
+### Enhanced
+
+- **README.md** — Comprehensive rewrite reflecting all v2.7–v2.12 changes (batch skip, compact status, unified E2E testing, automated PR review, multi-model dispatch, retired steps).
+- **Pipeline cross-references** — git-workflow and automated-pr-review "After This Step" sections now reference ai-memory-setup.
+
 ## [2.12.0] — 2026-03-28
 
 ### Added
