@@ -2,6 +2,39 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.6.0] — 2026-03-27
+
+### Refactored
+
+- **Deduplicate design-system and ux-spec prompts** — Extracted design token content (colors, typography, spacing, shadows, dark mode, base components, pattern library) from `knowledge/core/ux-specification.md` into a new `knowledge/core/design-system-tokens.md`. ux-spec now references `docs/design-system.md` for visual tokens instead of redefining them. Clear boundary: design-system owns appearance, ux-spec owns behavior.
+- **Deduplicate operations runbook** — Operations CI/CD section now references existing CI from git-workflow instead of redefining stages 1-2. Dev environment section replaced with reference to `docs/dev-setup.md`. Knowledge file trimmed by ~200 lines.
+
+### Fixed
+
+- **Make Beads truly optional across entire pipeline** — Beads was declared `conditional: "if-needed"` but ~30 commands hardcoded it as mandatory. Added `.beads/` directory detection throughout. Non-Beads projects get conventional commits (`type(scope): description`), standard branch naming (`<type>/<desc>`), and skip all `bd` CLI references. Affected 31 files across commands/ and pipeline/.
+
+### Enhanced
+
+- **Workflow audit cross-validates operations runbook** — workflow-audit now includes `docs/operations-runbook.md` in its document inventory and consistency checks. Verifies the runbook references (not redefines) base CI and dev-setup, and doesn't hardcode commands that differ from the Key Commands table.
+
+## [2.5.2] — 2026-03-27
+
+### Fixed
+
+- **Directory artifact crash** — Fix `EISDIR: illegal operation on a directory, read` crash when re-running pipeline steps whose outputs include directory paths (e.g., `docs/domain-models/`). `detectUpdateMode` now skips directory entries.
+
+## [2.5.1] — 2026-03-27
+
+### Fixed
+
+- **Beads no longer a tech-stack dependency** — Removed Beads from tech-stack prompt's dependency list since it's an optional tool, not a tech stack choice.
+
+## [2.5.0] — 2026-03-27
+
+### Enhanced
+
+- **CLAUDE.md optimization prompt** — Added best practices for anti-sycophancy guidance, scope discipline, structured formats for critical rules, and Key Commands as single source of truth.
+
 ## [2.4.3] — 2026-03-26
 
 ### Fixed

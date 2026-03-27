@@ -1,6 +1,6 @@
 {
   "name": "@zigrivers/scaffold",
-  "version": "2.5.2",
+  "version": "2.6.0",
   "description": "AI-powered software project scaffolding pipeline",
   "type": "module",
   "keywords": [
