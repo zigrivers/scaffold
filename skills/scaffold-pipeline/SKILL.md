@@ -1,11 +1,18 @@
 ---
 name: scaffold-pipeline
-description: Provides pipeline ordering context for the scaffold prompt pipeline. Auto-activates when users ask about scaffolding sequence, which command to run next, or pipeline ordering.
+description: Static reference for scaffold pipeline ordering, dependencies, and phase structure. Use ONLY for questions about pipeline design, step ordering, or dependency constraints — NOT for status, progress, or "what's next" queries (those go through scaffold-runner).
 ---
 
 # Scaffold Pipeline Reference
 
-This skill provides context about the scaffold prompt pipeline ordering. When the user asks about which command to run next, what order to follow, or how the pipeline works, use this reference.
+This skill is a **static reference** for pipeline ordering and dependency constraints. It does NOT handle status checks, progress queries, or navigation.
+
+**Activation boundary:** If the user asks "where am I?", "what's next?", "pipeline status", or anything about their current progress → **do not use this skill**. The `scaffold-runner` skill handles all status/navigation via the `scaffold` CLI.
+
+Use this skill ONLY when the user asks about:
+- Pipeline design: "what phases are there?", "what's the ordering?"
+- Dependency rules: "what depends on what?", "can I run X before Y?"
+- Step reference: "what commands are in phase 3?", "is design-system optional?"
 
 ## Pipeline Order
 
@@ -70,48 +77,11 @@ Dev Setup → Git Workflow → Claude.md Optimization → Workflow Audit
 4. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
 5. **Implementation Plan before Implementation Plan Review** — can't review what doesn't exist
 
-## Completion Detection
+## Status & Navigation
 
-When checking pipeline status, use these detection criteria:
+For all status, progress, and navigation queries, use the `scaffold-runner` skill, which delegates to the `scaffold` CLI:
 
-| # | Step | Check file exists | Tracking comment to search for |
-|---|------|-------------------|-------------------------------|
-| 1 | PRD Creation | `docs/plan.md` | `<!-- scaffold:prd ` |
-| 2 | PRD Gap Analysis | `docs/plan.md` | `<!-- scaffold:prd-gap-analysis ` |
-| 3 | Beads Setup | `.beads/config.yaml` | N/A |
-| 4 | Tech Stack | `docs/tech-stack.md` | `<!-- scaffold:tech-stack ` |
-| 5 | Claude Code Permissions | `.claude/settings.json` | N/A |
-| 6 | Coding Standards | `docs/coding-standards.md` | `<!-- scaffold:coding-standards ` |
-| 7 | TDD Standards | `docs/tdd-standards.md` | `<!-- scaffold:tdd-standards ` |
-| 8 | Project Structure | `docs/project-structure.md` | `<!-- scaffold:project-structure ` |
-| 9 | Dev Env Setup | `docs/dev-setup.md` | `<!-- scaffold:dev-setup ` |
-| 10 | Design System | `docs/design-system.md` | `<!-- scaffold:design-system ` |
-| 11 | Git Workflow | `docs/git-workflow.md` | `<!-- scaffold:git-workflow ` |
-| 11.5 | Multi-Model Review | `AGENTS.md` | `<!-- scaffold:multi-model-review ` |
-| 12 | Playwright | `playwright.config.ts` | `// scaffold:playwright ` |
-| 13 | Maestro | `maestro/config.yaml` | `# scaffold:maestro ` |
-| 14 | User Stories | `docs/user-stories.md` | `<!-- scaffold:user-stories ` |
-| 15 | User Stories Gaps | `docs/user-stories.md` | `<!-- scaffold:user-stories-gaps ` |
-| 15.5 | User Stories MMR | `docs/reviews/user-stories/review-summary.md` | `<!-- scaffold:user-stories-mmr ` |
-| 16 | Platform Parity | `docs/user-stories.md` | `<!-- scaffold:platform-parity ` |
-| 17 | Claude.md Optimization | `CLAUDE.md` | `<!-- scaffold:claude-md-optimization ` |
-| 18 | Workflow Audit | `CLAUDE.md` | `<!-- scaffold:workflow-audit ` |
-| 19 | Implementation Plan | `docs/implementation-plan.md` | `<!-- scaffold:implementation-plan ` |
-| 20 | Impl Plan Review | `docs/implementation-plan.md` | `<!-- scaffold:implementation-plan-review ` |
-| 20.5 | Impl Plan MMR | `docs/reviews/implementation-plan/review-summary.md` | `<!-- scaffold:implementation-plan-mmr ` |
-
-**Detection rules:**
-- If the file exists → step was likely run (even without tracking comment — older projects lack them)
-- If the tracking comment exists in the file → step was definitively run
-- For update-only steps (2, 15, 16, 17, 18, 20): file existence alone only confirms the prerequisite ran; check for the specific tracking comment to confirm the update step itself
-
-## Re-running Steps
-
-To re-run a completed step:
-
-```bash
-scaffold reset <step> --force   # reset to pending
-scaffold run <step>             # re-run (detects existing artifact → update mode)
-```
-
-The step runs in **update mode** — it reads the existing artifact, shows what it would add/change/preserve, and updates in-place. This is useful for incorporating new requirements or re-running at deeper depth.
+- `scaffold status` — current pipeline progress
+- `scaffold next` — next eligible steps
+- `scaffold list` — full pipeline with status indicators
+- `scaffold reset <step> --force` — reset a step to re-run it

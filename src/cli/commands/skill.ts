@@ -29,7 +29,7 @@ const INSTALLABLE_SKILLS = [
   {
     name: 'scaffold-pipeline',
     source: 'scaffold-pipeline/SKILL.md',
-    description: 'Pipeline ordering reference and completion detection',
+    description: 'Static reference for pipeline ordering, dependencies, and phase structure',
   },
 ]
 

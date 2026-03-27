@@ -227,9 +227,9 @@ teardown() {
 
 # ─── Bug fix verification ───────────────────────────────────────
 
-@test "beads detection uses config.yaml not directory" {
-    # Verify the SKILL.md fix: .beads/config.yaml instead of .beads/ directory
-    run grep 'config.yaml' "$BATS_TEST_DIRNAME/../skills/scaffold-pipeline/SKILL.md"
+@test "pipeline skill defers status to scaffold-runner" {
+    # Verify the skill activation fix: pipeline skill points to runner for status
+    run grep 'scaffold-runner' "$BATS_TEST_DIRNAME/../skills/scaffold-pipeline/SKILL.md"
     [ "$status" -eq 0 ]
 }
 
