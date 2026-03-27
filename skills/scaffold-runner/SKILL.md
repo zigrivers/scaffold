@@ -122,9 +122,10 @@ Track these preferences within the current session to avoid re-asking:
 | Preference | Example | How to Track |
 |---|---|---|
 | Default depth | "Use depth 3 for everything" | Remember and apply to all steps |
-| Skip optional steps | "Skip design system, I don't have a frontend" | Remember and auto-skip |
+| Skip optional steps | "Skip design system, I don't have a frontend" | Batch skip with `scaffold skip <step1> <step2> --reason "..."` |
 | Methodology | "I'm using MVP" | Informs default recommendations |
 | Batch mode | "Run the next 3 steps" | Execute sequentially, surface decisions for each |
+| Compact status | User is mid-pipeline, only cares about remaining work | Default to `scaffold status --compact` |
 
 When the user sets a preference, acknowledge it and apply it to subsequent steps. Don't ask about it again unless the context changes.
 
@@ -138,6 +139,8 @@ Respond to these natural language requests:
 | "Where am I?" / "Pipeline status" | Run `scaffold status`, present progress summary |
 | "What does X do?" | Run `scaffold info <step>`, present purpose and dependencies |
 | "Skip X" | Run `scaffold skip <step> --reason "<user's reason>"` |
+| "Skip X, Y, and Z" | Run `scaffold skip <step1> <step2> <step3> --reason "<reason>"` |
+| "What's left?" / "Show remaining" | Run `scaffold status --compact`, show only pending/in-progress steps |
 | "Re-run X" / "Redo X" / "Go back to X" | Reset then re-run: `scaffold reset <step> --force && scaffold run <step>` |
 | "Reset X" / "Reset X to pending" | Run `scaffold reset <step>`, confirm if completed |
 | "Show the full pipeline" | Run `scaffold list`, present with status indicators |
@@ -156,6 +159,28 @@ This is useful when:
 - The user wants to incorporate new requirements into an existing artifact
 - A prior step was run at a shallow depth and the user wants to re-run at deeper depth
 - The user modified upstream documents and wants downstream steps to reflect changes
+
+### Skipping Steps
+
+**Single skip:** `scaffold skip <step> --reason "reason"`
+
+**Batch skip:** `scaffold skip <step1> <step2> <step3> --reason "reason"`
+
+Use batch skip when the user wants to skip multiple related steps at once (e.g., "skip all the optional testing steps", "I don't have a frontend — skip design-system and add-playwright"). This avoids running the command multiple times and gives a single summary of newly eligible steps.
+
+When the user says "skip" without a reason, still pass `--reason` with a brief reason inferred from context (e.g., `--reason "no frontend"`, `--reason "using external CI"`). This aids team visibility in state.json.
+
+If a batch skip partially fails (e.g., one step not found), the CLI skips the valid steps and reports errors for the rest. Exit code 2 indicates partial failure.
+
+### Compact Status
+
+When the user asks "what's left?", "show remaining steps", or is deep into the pipeline, use `scaffold status --compact` instead of the full status view. This:
+
+- Shows a summary line with counts (completed, skipped, pending, in progress)
+- Lists only pending and in-progress steps (hides completed/skipped)
+- Keeps the output focused on what's actionable
+
+Use the full `scaffold status` (without `--compact`) when the user asks for a complete overview or wants to see what was skipped.
 
 ## Error Handling
 

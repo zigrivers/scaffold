@@ -405,4 +405,112 @@ describe('skip command', () => {
     void mockAcquireLock
     void releaseLock
   })
+
+  // -------------------------------------------------------------------------
+  // Batch skip tests
+  // -------------------------------------------------------------------------
+
+  describe('batch skip (multiple steps)', () => {
+    it('skips multiple steps in one invocation', async () => {
+      const mockMarkSkipped = vi.fn()
+      MockStateManager.mockImplementation(() => ({
+        loadState: vi.fn(() =>
+          makeState({
+            steps: {
+              'step-a': { status: 'pending', source: 'pipeline', produces: [] },
+              'step-b': { status: 'pending', source: 'pipeline', produces: [] },
+            },
+            next_eligible: [],
+          }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
+        ),
+        markSkipped: mockMarkSkipped,
+      }) as unknown as InstanceType<typeof StateManager>)
+
+      const argv = {
+        step: ['step-a', 'step-b'],
+        reason: 'no frontend',
+        format: undefined,
+        auto: undefined,
+        verbose: undefined,
+        root: undefined,
+        force: undefined,
+      }
+      await skipCommand.handler(argv as Parameters<typeof skipCommand.handler>[0])
+
+      expect(mockMarkSkipped).toHaveBeenCalledTimes(2)
+      expect(mockMarkSkipped).toHaveBeenCalledWith('step-a', 'no frontend', 'scaffold-skip')
+      expect(mockMarkSkipped).toHaveBeenCalledWith('step-b', 'no frontend', 'scaffold-skip')
+      expect(exitSpy).toHaveBeenCalledWith(0)
+    })
+
+    it('continues skipping remaining steps when one is not found', async () => {
+      const mockMarkSkipped = vi.fn()
+      MockStateManager.mockImplementation(() => ({
+        loadState: vi.fn(() =>
+          makeState({
+            steps: {
+              'good-step': { status: 'pending', source: 'pipeline', produces: [] },
+            },
+            next_eligible: [],
+          }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
+        ),
+        markSkipped: mockMarkSkipped,
+      }) as unknown as InstanceType<typeof StateManager>)
+
+      const argv = {
+        step: ['bad-step', 'good-step'],
+        reason: undefined,
+        format: undefined,
+        auto: undefined,
+        verbose: undefined,
+        root: undefined,
+        force: undefined,
+      }
+      await skipCommand.handler(argv as Parameters<typeof skipCommand.handler>[0])
+
+      // Should still skip the valid step
+      expect(mockMarkSkipped).toHaveBeenCalledWith('good-step', 'user-requested', 'scaffold-skip')
+      // Should exit with partial failure code
+      expect(exitSpy).toHaveBeenCalledWith(2)
+    })
+
+    it('batch skip JSON output includes results array', async () => {
+      mockResolveOutputMode.mockReturnValue('json')
+
+      const mockMarkSkipped = vi.fn()
+      MockStateManager.mockImplementation(() => ({
+        loadState: vi.fn(() =>
+          makeState({
+            steps: {
+              'step-a': { status: 'pending', source: 'pipeline', produces: [] },
+              'step-b': { status: 'pending', source: 'pipeline', produces: [] },
+            },
+            next_eligible: ['next-step'],
+          }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
+        ),
+        markSkipped: mockMarkSkipped,
+      }) as unknown as InstanceType<typeof StateManager>)
+
+      const argv = {
+        step: ['step-a', 'step-b'],
+        reason: 'not needed',
+        format: 'json',
+        auto: undefined,
+        verbose: undefined,
+        root: undefined,
+        force: undefined,
+      }
+      await skipCommand.handler(argv as Parameters<typeof skipCommand.handler>[0])
+
+      const allOutput = writtenLines.join('')
+      const parsed = JSON.parse(allOutput)
+      const data = parsed.data ?? parsed
+      expect(data).toHaveProperty('results')
+      expect(Array.isArray(data.results)).toBe(true)
+      expect(data.results).toHaveLength(2)
+      expect(data.results[0]).toHaveProperty('step', 'step-a')
+      expect(data.results[1]).toHaveProperty('step', 'step-b')
+      expect(data).toHaveProperty('newly_eligible')
+    })
+  })
 })

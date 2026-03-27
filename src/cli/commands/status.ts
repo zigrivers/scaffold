@@ -13,6 +13,7 @@ import { computeEligible } from '../../core/dependency/eligibility.js'
 
 interface StatusArgs {
   phase?: number
+  compact?: boolean
   format?: string
   auto?: boolean
   verbose?: boolean
@@ -26,10 +27,15 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
   command: 'status',
   describe: 'Show pipeline progress and step statuses',
   builder: (yargs) => {
-    return yargs.option('phase', {
-      type: 'number',
-      description: 'Filter output to a specific phase number',
-    })
+    return yargs
+      .option('phase', {
+        type: 'number',
+        description: 'Filter output to a specific phase number',
+      })
+      .option('compact', {
+        type: 'boolean',
+        description: 'Show only actionable steps (pending and in-progress)',
+      })
   },
   handler: async (argv) => {
     // 1. Resolve project root
@@ -88,17 +94,32 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     const methodology =
       (config as ConfigWithMethodology)?.methodology?.preset ?? state.config_methodology
 
+    const isCompact = argv.compact === true
+    const actionableStatuses = new Set(['pending', 'in_progress'])
+
     // 6. Display or return JSON
     if (outputMode === 'json') {
-      output.result({
+      const result: Record<string, unknown> = {
         pipeline: { methodology, total, completed, skipped, pending, inProgress },
         progress: { completed, skipped, pending, inProgress, total, percentage: pct },
         phases: [],
         nextEligible: state.next_eligible,
         orphaned_entries: [],
-      })
+      }
+      if (isCompact) {
+        result.compact = true
+        result.steps = Object.entries(steps)
+          .filter(([, entry]) => actionableStatuses.has(entry.status))
+          .map(([slug, entry]) => ({ slug, status: entry.status }))
+      }
+      output.result(result)
     } else {
-      output.info(`Pipeline: ${methodology} | Progress: ${pct}% (${completed}/${total})`)
+      if (isCompact) {
+        output.info(`Pipeline: ${methodology} | Progress: ${pct}% (${completed}/${total})`)
+        output.info(`  ${completed} completed, ${skipped} skipped, ${pending} pending, ${inProgress} in progress`)
+      } else {
+        output.info(`Pipeline: ${methodology} | Progress: ${pct}% (${completed}/${total})`)
+      }
 
       const statusIcons: Record<string, string> = {
         completed: '✓',
@@ -108,6 +129,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       }
 
       for (const [slug, entry] of Object.entries(steps)) {
+        if (isCompact && !actionableStatuses.has(entry.status)) continue
         const mp = metaPrompts.get(slug)
         const phase = mp?.frontmatter?.phase ?? '?'
         const icon = statusIcons[entry.status] ?? '?'
