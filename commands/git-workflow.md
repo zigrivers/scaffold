@@ -9,6 +9,14 @@ Review CLAUDE.md, docs/tech-stack.md, and docs/coding-standards.md to understand
 
 **Command placeholders:** This prompt uses `<install-deps>`, `<lint>`, and `<test>` as placeholders. When creating `docs/git-workflow.md`, replace these with the actual commands from the project's CLAUDE.md Key Commands table (e.g., `npm install`, `make lint`, `make test`). These are configured by the Dev Setup prompt.
 
+## Beads Detection
+
+Check if `.beads/` directory exists. This determines task management conventions throughout:
+- **Beads project**: `.beads/` exists → use `bd` CLI for task tracking, `[BD-<id>]` commit prefixes, `bd-<id>/<desc>` branch naming, `BD_ACTOR` for parallel agents
+- **Non-Beads project**: `.beads/` does not exist → use conventional commits (`type(scope): description`), standard branch naming (`<type>/<desc>`, e.g. `feat/add-auth`, `fix/login-bug`), skip all `bd` command references
+
+Apply this detection throughout. Sections below use **"If Beads:"** / **"Without Beads:"** where conventions differ.
+
 ## Mode Detection
 
 Before starting, check if `docs/git-workflow.md` already exists:
@@ -45,7 +53,7 @@ Before starting, check if `docs/git-workflow.md` already exists:
 
 ## The Core Problem
 
-Multiple Claude Code agents will work in parallel, each pulling tasks from Beads (`bd ready`). They'll be working on separate feature branches, pushing, creating PRs, and merging into main concurrently. The workflow must prevent merge conflicts, a broken main branch, and agents stepping on each other's work.
+Multiple Claude Code agents will work in parallel, each picking up tasks and working on separate feature branches, pushing, creating PRs, and merging into main concurrently. The workflow must prevent merge conflicts, a broken main branch, and agents stepping on each other's work.
 
 ## CRITICAL: Permanent Worktrees for Parallel Agents
 
@@ -88,7 +96,7 @@ WORKTREE_DIR="../${REPO_NAME}-${DIR_SUFFIX}"
 
 if [ -d "$WORKTREE_DIR" ]; then
     echo "⚠️  Worktree already exists: $WORKTREE_DIR"
-    echo "   To launch: cd $WORKTREE_DIR && BD_ACTOR=\"$AGENT_NAME\" claude"
+    echo "   To launch: cd $WORKTREE_DIR && claude"
     exit 0
 fi
 
@@ -102,25 +110,27 @@ echo ""
 echo "✅ Permanent worktree created: $WORKTREE_DIR"
 echo ""
 echo "To launch Claude Code in this worktree:"
-echo "  cd $WORKTREE_DIR && BD_ACTOR=\"$AGENT_NAME\" claude"
+echo "  cd $WORKTREE_DIR && claude"
 echo ""
 echo "This worktree is reusable across tasks. Do NOT remove it between tasks."
 echo ""
 echo "Agents create feature branches from origin/main:"
 echo "  git fetch origin"
-echo "  git checkout -b bd-<task-id>/<desc> origin/main"
+echo "  git checkout -b <type>/<desc> origin/main"
 ```
 
 Make executable: `chmod +x scripts/setup-agent-worktree.sh`
 
-### Agent Identity with BD_ACTOR
+### Agent Identity with BD_ACTOR (Beads only)
+
+> **Skip this section if the project does not use Beads.**
 
 Beads resolves task assignee from: `--actor flag` > `$BD_ACTOR env var` > `git config user.name` > `$USER`
 
 Without BD_ACTOR, all agents show as your git username, making it impossible to tell which agent owns which task.
 
 ```bash
-# Launch agents with distinct identities
+# Launch agents with distinct identities (Beads projects)
 cd ../project-agent-1 && BD_ACTOR="Agent-1" claude
 cd ../project-agent-2 && BD_ACTOR="Agent-2" claude
 ```
@@ -136,35 +146,38 @@ cd ../project-agent-2 && BD_ACTOR="Agent-2" claude
 
 **Launch agents (each in its own terminal):**
 ```bash
+# Without Beads:
+cd ../project-agent-1 && claude
+cd ../project-agent-2 && claude
+
+# With Beads (adds BD_ACTOR for task attribution):
 cd ../project-agent-1 && BD_ACTOR="Agent-1" claude
 cd ../project-agent-2 && BD_ACTOR="Agent-2" claude
-cd ../project-agent-3 && BD_ACTOR="Agent-3" claude
 ```
 
 **Inside their worktree, agents branch directly from origin/main:**
 ```bash
 git fetch origin
-git checkout -b bd-<task-id>/<description> origin/main
+git checkout -b <type>/<description> origin/main   # e.g., feat/add-auth
 # work, commit, push, PR, watch CI, confirm merge...
-bd close <task-id>
-bd sync
 git fetch origin --prune
 git clean -fd
 <install-deps>
-bd ready  # continue to next task
-# Create next feature branch directly from origin/main
-git checkout -b bd-<next-task>/<description> origin/main
+# Continue to next task — create next feature branch from origin/main
+git checkout -b <type>/<next-description> origin/main
 ```
+
+**If Beads:** Use `bd-<task-id>/<desc>` branch naming, run `bd close <id> && bd sync` after merge, and `bd ready` to find next task.
 
 **Note:** Worktree agents cannot `git checkout main` (main is checked out in the main repo). They always branch from `origin/main` and never return to main between tasks. Merged feature branches accumulate locally and are batch-cleaned periodically (see Cleanup section).
 
 ### How Many Agents to Run
 
 Match agent count to available parallel work, not some arbitrary max:
-- Run `bd ready` to see how many unblocked tasks exist
 - Only spin up as many agents as there are independent, non-overlapping tasks
-- If two tasks touch the same files, don't run them in parallel — sequence them via Beads dependencies instead
+- If two tasks touch the same files, don't run them in parallel — sequence them instead
 - Running more agents than available parallel tasks wastes resources and invites conflicts
+- **If Beads:** Run `bd ready` to see how many unblocked tasks exist. Use Beads dependencies to enforce sequencing.
 
 ### Worktree Maintenance
 
@@ -179,7 +192,7 @@ git clean -fd
 To batch-clean merged feature branches (run periodically):
 ```bash
 git fetch origin --prune
-git branch --merged origin/main | grep "bd-" | xargs -r git branch -d
+git branch --merged origin/main | grep -v "^\*\|workspace" | xargs -r git branch -d
 ```
 
 ### Worktree Management Commands
@@ -198,14 +211,26 @@ If running only ONE Claude Code session at a time, worktrees are not needed. Sta
 ## What the Document Must Cover
 
 ### 1. Branching Strategy
+
+**If Beads:**
 - Branch naming: `bd-<task-id>/<short-description>` (tied to Beads task IDs)
 - Rule: one Beads task = one branch = one PR (no multi-task branches)
 - Always branch from `origin/main`: `git checkout -b bd-<task-id>/<desc> origin/main`
+
+**Without Beads:**
+- Branch naming: `<type>/<short-description>` (e.g., `feat/add-auth`, `fix/login-bug`, `docs/update-readme`)
+- Rule: one logical change = one branch = one PR
+- Always branch from `origin/main`: `git checkout -b <type>/<desc> origin/main`
+
+**Both:**
 - Branch lifecycle: create from origin/main → work → PR → squash merge → delete branch
 - Stale branch policy: branches open longer than 2 days should be rebased or split into smaller tasks
 
 ### 2. Commit Standards
-- Commit message format: `[BD-<id>] type(scope): description`
+
+**If Beads:** Commit message format: `[BD-<id>] type(scope): description`
+**Without Beads:** Commit message format: `type(scope): description` (conventional commits)
+
 - Types: feat, fix, test, refactor, docs, chore
 - Commit on each meaningful change — passing tests, completed function, etc.
 - Never commit: secrets, .env files, large binaries, build artifacts
@@ -226,7 +251,8 @@ If running only ONE Claude Code session at a time, worktrees are not needed. Sta
 ```bash
 # 1. Commit changes
 git add .
-git commit -m "[BD-<id>] type(scope): description"
+git commit -m "type(scope): description"       # Without Beads
+git commit -m "[BD-<id>] type(scope): description"  # With Beads
 
 # 2. AI review (catch issues before external review)
 # Spawn a review subagent with fresh context:
@@ -234,8 +260,8 @@ git commit -m "[BD-<id>] type(scope): description"
 # - Check against CLAUDE.md and docs/coding-standards.md
 # - Report P0 (blocking), P1 (must fix), P2 (should fix), P3 (optional)
 # Fix all P0/P1 findings, then re-run make check (or project lint+test)
-# If a finding matches a recurring pattern, log it to tasks/lessons.md
-# Commit fixes: git commit -m "[BD-<id>] fix: address review findings"
+# If a finding matches a recurring pattern, log it to tasks/lessons.md (if it exists)
+# Commit fixes: git commit -m "fix: address review findings"
 
 # 3. Rebase onto latest main
 git fetch origin && git rebase origin/main
@@ -244,7 +270,8 @@ git fetch origin && git rebase origin/main
 git push -u origin HEAD
 
 # 5. Create PR
-gh pr create --title "[BD-<id>] type(scope): description" --body "Closes BD-<id>"
+gh pr create --title "type(scope): description" --body "Summary of changes"
+# With Beads: --title "[BD-<id>] type(scope): description" --body "Closes BD-<id>"
 
 # 6. Enable auto-merge (merges after CI passes, deletes remote branch)
 gh pr merge --squash --auto --delete-branch
@@ -277,29 +304,27 @@ gh pr view --json state -q .state   # Must show "MERGED"
 - Don't use `--admin` to bypass CI
 - Watch with `gh pr checks --watch --fail-fast`, fix failures, push, re-watch
 
-### 5. Task Closure and Cleanup
+### 5. Branch Cleanup and Next Task
 
 After merge is confirmed:
 
 **Single agent (main repo):**
 ```bash
-bd close <id>
-bd sync
 git checkout main && git pull --rebase origin main
-git branch -d bd-<task-id>/<short-desc>    # Local only; remote deleted by --delete-branch
+git branch -d <branch-name>                # Local only; remote deleted by --delete-branch
 git fetch origin --prune                    # Clean up stale remote refs
 ```
 
 **Worktree agent:**
 ```bash
-bd close <id>
-bd sync
 git fetch origin --prune                    # Clean up stale remote refs
 git clean -fd
 <install-deps>
 # Next task branches directly from origin/main:
-git checkout -b bd-<next-task>/<desc> origin/main
+git checkout -b <type>/<desc> origin/main
 ```
+
+**If Beads**, also run after merge: `bd close <id> && bd sync`. Then `bd ready` to find the next task.
 
 Worktree agents cannot checkout main (it's checked out in the main repo). They always branch from `origin/main`. Merged local branches accumulate and are batch-cleaned periodically (see Worktree Maintenance).
 
@@ -312,8 +337,8 @@ When an agent session dies mid-task:
    cd ../project-agent-N
    git status                    # See uncommitted work
    git log --oneline -5          # See what was committed
-   bd list --actor Agent-N       # See what task was claimed
    ```
+   **If Beads:** `bd list --actor Agent-N` to see what task was claimed.
 
 2. **If work is salvageable:** Commit it, push the branch, create the PR (or resume work in a new session)
 
@@ -327,8 +352,8 @@ When an agent session dies mid-task:
    git checkout <agent-name>-workspace
    git branch -D <stale-branch>
 
-   # Either way, unclaim the task:
-   bd update <task-id> --status ready
+   # If Beads, unclaim the task:
+   # bd update <task-id> --status ready
    ```
 
 4. **Reset the worktree to clean state:**
@@ -374,18 +399,19 @@ If main breaks: you fix it directly with a hotfix PR, or push directly if `enfor
 
 Keep it simple with one core rule:
 
-> **If two tasks touch the same files, don't run them in parallel.** Use Beads dependencies to sequence them.
+> **If two tasks touch the same files, don't run them in parallel.** Sequence them instead.
 
 Additional guardrails:
-- Keep PRs small and focused (one task = one PR). Smaller changes merge faster and conflict less.
+- Keep PRs small and focused (one logical change = one PR). Smaller changes merge faster and conflict less.
 - Rebase before creating PRs to catch conflicts early
-- High-conflict files (route indexes, DB schemas, shared types) should be modified by one agent at a time — enforce via Beads task dependencies, not tooling
+- High-conflict files (route indexes, DB schemas, shared types) should be modified by one agent at a time
+- **If Beads:** enforce sequencing via `bd dep add <child> <parent>` dependencies
 
 ### 9. .gitignore and Repository Hygiene
 - Ensure .gitignore is comprehensive for the project's tech stack
 - Files that must be tracked vs. generated
 - No code quality git hooks (linting, type checking, test runs) — let CI be the gatekeeper
-- **Exception:** Beads data-sync hooks (`bd hooks install`) are allowed — these sync task tracking data, not code quality checks
+- **If Beads:** Beads data-sync hooks (`bd hooks install`) are the one exception — these sync task tracking data, not code quality checks
 
 ### 10. Update CLAUDE.md
 
@@ -393,7 +419,7 @@ Add the following sections to CLAUDE.md:
 
 **In Session Start section, add parallel agent note:**
 ```markdown
-**If running multiple agents in parallel**: Each agent MUST be in its own permanent worktree with BD_ACTOR set. See docs/git-workflow.md for setup.
+**If running multiple agents in parallel**: Each agent MUST be in its own permanent worktree. See docs/git-workflow.md for setup.
 ```
 
 **Add Committing and PR Workflow section:**
@@ -402,47 +428,43 @@ Add the following sections to CLAUDE.md:
 
 **NEVER push directly to main** — it's protected. Always use feature branches and PRs:
 
-1. Commit: `git add . && git commit -m "[BD-<id>] type(scope): description"`
-2. AI review: spawn a review subagent to check `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md — fix P0/P1 findings, re-run lint+test, log recurring patterns to tasks/lessons.md
+1. Commit: `git add . && git commit -m "type(scope): description"` (If Beads: prefix with `[BD-<id>]`)
+2. AI review: spawn a review subagent to check `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md — fix P0/P1 findings, re-run lint+test
 3. Rebase: `git fetch origin && git rebase origin/main`
 4. Push: `git push -u origin HEAD`
-5. Create PR: `gh pr create --title "[BD-<id>] type(scope): description" --body "Closes BD-<id>"`
+5. Create PR: `gh pr create --title "type(scope): description" --body "Summary"` (If Beads: include `[BD-<id>]` in title, `Closes BD-<id>` in body)
 6. Auto-merge: `gh pr merge --squash --auto --delete-branch`
 7. Watch CI: `gh pr checks --watch --fail-fast` (fix failures, push, re-watch)
 8. Confirm: `gh pr view --json state -q .state` — must show "MERGED"
 ```
 
-**Add Task Closure and Next Task section:**
+**Add Branch Cleanup and Next Task section:**
 ```markdown
-### Task Closure and Next Task
+### Branch Cleanup and Next Task
 
-After merge is confirmed (step 7 above):
+After merge is confirmed (step 8 above):
 
 **Single agent (main repo):**
 ```bash
-bd close <id>
-bd sync
 git checkout main && git pull --rebase origin main
-git branch -d bd-<task-id>/<short-desc>
+git branch -d <branch-name>
 git fetch origin --prune
-bd ready
 ```
 
 **Worktree agent:**
 ```bash
-bd close <id>
-bd sync
 git fetch origin --prune
 git clean -fd
 <install-deps>
-bd ready
 # Next task branches directly from origin/main:
-git checkout -b bd-<next-task>/<desc> origin/main
+git checkout -b <type>/<desc> origin/main
 ```
 
-- If tasks remain: pick the lowest-ID, create a feature branch, and implement it
+If Beads: also run `bd close <id> && bd sync` after merge, and `bd ready` to find next task.
+
+- If tasks remain: create a feature branch and implement the next one
 - If none remain: session is complete
-- **Keep working until `bd ready` returns no available tasks**
+- **Keep working until no tasks remain**
 
 **Note:** Worktree agents cannot checkout main (it's checked out in the main repo). They always branch from `origin/main`. Merged branches are batch-cleaned periodically.
 ```
@@ -451,9 +473,9 @@ git checkout -b bd-<next-task>/<desc> origin/main
 ```markdown
 ### Parallel Sessions (Worktrees)
 
-When running **multiple Claude Code agents simultaneously**, each MUST have:
-1. Its own permanent git worktree (agents sharing a directory will corrupt each other's work)
-2. BD_ACTOR environment variable set (for Beads task attribution)
+When running **multiple Claude Code agents simultaneously**, each MUST have its own permanent git worktree (agents sharing a directory will corrupt each other's work).
+
+If Beads: also set BD_ACTOR environment variable for task attribution.
 
 **One-Time Setup (run from main repo):**
 ```bash
@@ -464,8 +486,9 @@ When running **multiple Claude Code agents simultaneously**, each MUST have:
 
 **Launching Agents:**
 ```bash
-cd ../project-agent-1 && BD_ACTOR="Agent-1" claude
-cd ../project-agent-2 && BD_ACTOR="Agent-2" claude
+cd ../project-agent-1 && claude
+cd ../project-agent-2 && claude
+# If Beads: BD_ACTOR="Agent-1" claude (for task attribution)
 ```
 
 Inside their worktree, agents branch directly from `origin/main` (they cannot checkout main). Between tasks:
@@ -481,9 +504,9 @@ git clean -fd && <install-deps>
 
 If you are in a permanent worktree:
 - **Never run `git checkout main`** — main is checked out in the main repo; this will fail
-- Always branch from remote: `git checkout -b bd-<id>/<desc> origin/main`
-- Verify your identity: `echo $BD_ACTOR` should show your agent name
+- Always branch from remote: `git checkout -b <type>/<desc> origin/main` (If Beads: `bd-<id>/<desc>`)
 - Clean workspace between tasks: `git fetch origin --prune && git clean -fd && <install-deps>`
+- **If Beads:** Verify your identity: `echo $BD_ACTOR` should show your agent name
 - To detect if in a worktree: `git rev-parse --git-dir` contains `/worktrees/`
 - Merged branches accumulate — they're batch-cleaned periodically, not per-task
 ```
@@ -503,11 +526,13 @@ Before pushing, spawn a review subagent to check `git diff origin/main...HEAD` a
 |---------|---------|
 | `./scripts/setup-agent-worktree.sh <n>` | Create permanent worktree for agent |
 | `git worktree list` | List all active worktrees |
-| `BD_ACTOR="Agent-1" claude` | Launch agent with Beads identity |
 | `gh pr create --title "..." --body "..."` | Create PR from current branch |
 | `gh pr merge --squash --auto --delete-branch` | Queue auto-merge after CI passes |
 | `gh pr checks --watch --fail-fast` | Watch CI until pass or fail |
 | `gh pr view --json state -q .state` | Confirm merge completed |
+
+If Beads, also include:
+| `BD_ACTOR="Agent-1" claude` | Launch agent with Beads identity |
 | `bd close <id>` | Close completed task |
 
 **Add row to "When to Consult Other Docs" table:**
@@ -523,7 +548,7 @@ After creating the documentation, actually set up:
 - [ ] PR template (`.github/pull_request_template.md`)
 - [ ] .gitignore appropriate for the project's tech stack
 - [ ] CI workflow file for automated checks on PRs (see below)
-- [ ] `tasks/lessons.md` — if it doesn't already exist, create it (Beads Setup should have created this, but verify)
+- [ ] `tasks/lessons.md` — if it doesn't already exist, create it for cross-session learning
 
 ### CI Workflow File
 
@@ -562,13 +587,10 @@ The `check` job name must match what's referenced in branch protection rules (Se
 Create `.github/pull_request_template.md`:
 
 ```markdown
-## [BD-<id>] type(scope): description
+## type(scope): description
 
 ### What
 <!-- Brief description of changes -->
-
-### User Story
-<!-- Reference: US-XXX -->
 
 ### Testing
 - [ ] All tests pass

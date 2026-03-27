@@ -139,8 +139,7 @@ The index must contain:
 5. **Create domain model files** — one per bounded context with all required sections
 6. **Create index.md** with context map, relationships, and ubiquitous language glossary
 7. **Cross-validate** — verify every PRD feature and every user story maps to at least one domain entity
-8. Create a Beads task for this work before starting: `bd create "docs: domain modeling" -p 0` and `bd update <id> --claim`
-9. When the models are complete and committed, close it: `bd close <id>`
+8. If using Beads: create a task (`bd create "docs: domain modeling" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 10. If this work surfaces implementation tasks (missing requirements, ambiguous stories), create separate Beads tasks — don't try to resolve them now
 
 ## After This Step

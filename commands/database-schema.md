@@ -149,8 +149,7 @@ If the project uses a document database:
 6. **Define constraints** — translate every domain invariant to a database constraint
 7. **Document migration strategy** — including rollback and zero-downtime patterns
 8. **Cross-validate** — verify every domain entity is represented, every relationship has a FK, every invariant has a constraint
-9. Create a Beads task: `bd create "docs: database schema" -p 0` and `bd update <id> --claim`
-10. When complete and committed: `bd close <id>`
+9. If using Beads: create a task (`bd create "docs: database schema" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 
 ## After This Step
 

@@ -9,6 +9,14 @@ The workflow below is the canonical source of truth. Your job is to ensure every
 
 **Ordering note:** This prompt should run AFTER the Claude.md Optimization prompt. That prompt consolidates; this one verifies alignment with the canonical workflow and fixes any remaining gaps.
 
+## Beads Detection
+
+Check if `.beads/` directory exists:
+- **Beads project**: Validate all workflow steps including Beads task management (`bd` commands, `[BD-<id>]` commit format, `BD_ACTOR`, task closure)
+- **Non-Beads project**: **Skip all Beads-specific checklist items** throughout this audit. Workflow steps referencing `bd`, `[BD-<id>]`, `BD_ACTOR`, or Beads task closure do not apply. Validate only: git workflow, PR process, TDD, CI, branch conventions using conventional commits (`type(scope): description`) and standard branch naming (`<type>/<desc>`).
+
+Items marked with **(Beads)** below should be skipped for non-Beads projects.
+
 ---
 
 ## Canonical Workflow
@@ -157,7 +165,7 @@ CLAUDE.md must contain the complete workflow. Check for:
 - [ ] All 9 steps are present (pick task → next task), plus step 4.5 (AI review)
 - [ ] Commands are copy-pasteable (not pseudo-code)
 
-**Step 1: Task Selection**:
+**Step 1: Task Selection** **(Beads)**:
 - [ ] `bd ready` documented
 - [ ] `bd update <id> --status in_progress --claim` documented
 - [ ] "Pick lowest-ID unblocked task" rule stated
@@ -165,7 +173,7 @@ CLAUDE.md must contain the complete workflow. Check for:
 
 **Step 2: Branch Creation**:
 - [ ] `git fetch origin` before branching
-- [ ] Branch naming format: `bd-<task-id>/<short-desc>`
+- [ ] Branch naming format: `bd-<task-id>/<short-desc>` **(Beads)** or `<type>/<short-desc>` (non-Beads)
 - [ ] Branch from `origin/main` (not checkout main, pull, then branch)
 - [ ] Reference to `tasks/lessons.md` review
 
@@ -181,7 +189,7 @@ CLAUDE.md must contain the complete workflow. Check for:
 - [ ] Clear that loop repeats per piece of functionality until all acceptance criteria are met
 - [ ] Multiple commits per task acknowledged (squash-merged later)
 - [ ] Lint and test verification step (using project's commands from CLAUDE.md Key Commands table)
-- [ ] Commit message format: `[BD-<id>] type(scope): description`
+- [ ] Commit message format: `[BD-<id>] type(scope): description` **(Beads)** or `type(scope): description` (non-Beads)
 
 **Step 4.5: AI Review**:
 - [ ] Review subagent step documented (spawns fresh-context subagent before push)
@@ -195,7 +203,7 @@ CLAUDE.md must contain the complete workflow. Check for:
 **Step 5: Rebase, Push, PR Creation**:
 - [ ] `git fetch origin && git rebase origin/main` before push
 - [ ] `git push -u origin HEAD`
-- [ ] `gh pr create` with title format matching `[BD-<id>] type(scope): description`
+- [ ] `gh pr create` with title format matching `[BD-<id>] type(scope): description` **(Beads)** or `type(scope): description` (non-Beads)
 - [ ] `gh pr merge --squash --auto --delete-branch` immediately after create
 - [ ] `--delete-branch` explained (removes remote branch after merge)
 - [ ] Explanation that auto-merge triggers after CI passes
@@ -210,22 +218,22 @@ CLAUDE.md must contain the complete workflow. Check for:
 - [ ] "Never close task until MERGED" rule
 
 **Step 8: Cleanup**:
-- [ ] `bd close <id>` (not `bd update --status completed`)
-- [ ] `bd sync`
+- [ ] **(Beads)** `bd close <id>` (not `bd update --status completed`)
+- [ ] **(Beads)** `bd sync`
 - [ ] Single agent: return to main and pull with rebase, delete local feature branch
 - [ ] Worktree agent: `git fetch origin --prune`, `git clean -fd`, reinstall deps using project's install command (no checkout main — it's checked out in main repo)
 - [ ] `git fetch origin --prune` to clean up stale remote refs
 - [ ] Worktree variant explicitly documented (agents cannot checkout main)
 
 **Step 9: Continue or Stop**:
-- [ ] `bd ready` to check for more work
+- [ ] **(Beads)** `bd ready` to check for more work
 - [ ] "Keep working until no tasks remain" stated
 - [ ] Worktree agents: branch directly from `origin/main` for next task
 - [ ] Batch branch cleanup documented for worktree agents
 
 **Key Constraints Section**:
 - [ ] Never push directly to main
-- [ ] Every commit has Beads task ID in `[BD-<id>]` format
+- [ ] **(Beads)** Every commit has Beads task ID in `[BD-<id>]` format
 - [ ] Lint and test before commit (references Key Commands table, not hardcoded commands)
 - [ ] Only `--force-with-lease` on feature branches
 - [ ] Subagents for research

@@ -105,8 +105,7 @@ Until those prompts run, E2E testing patterns are not yet defined. Focus TDD eff
 - Review docs/user-stories.md to understand the types of features being built — this informs which testing patterns will be most relevant
 - Use AskUserQuestionTool for decisions like coverage thresholds, test runner preferences, or e2e scope
 - Include runnable example commands for running tests, checking coverage, and running specific test categories
-- Create a Beads task for this work before starting: `bd create "docs: <document being created>" -p 0` and `bd update <id> --claim`
-- When the document is complete and committed, close it: `bd close <id>`
+- If using Beads: create a task before starting (`bd create "docs: <document being created>" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 - If this work surfaces implementation tasks (bugs, missing infrastructure), create separate Beads tasks for those — don't try to do them now
 
 ## After This Step

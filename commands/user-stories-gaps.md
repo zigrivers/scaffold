@@ -57,8 +57,7 @@ For each innovation idea, present it with:
 Use AskUserQuestionTool to present innovation ideas for my approval BEFORE adding them to user-stories.md. Group related ideas together so we can make decisions efficiently rather than one at a time.
 
 ## Process
-- Create a Beads task for this work before starting: `bd create "docs: <document being created>" -p 0` and `bd update <id> --claim`
-- When the document is complete and committed, close it: `bd close <id>`
+- If using Beads: create a task before starting (`bd create "docs: <document being created>" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 - If this work surfaces implementation tasks (bugs, missing infrastructure), create separate Beads tasks for those — don't try to do them now
 - Use subagents to research the competitive landscape and best practices in parallel with the gap analysis
 - After all approved changes, do a final INVEST criteria pass on any new or modified stories

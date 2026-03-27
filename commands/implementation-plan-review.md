@@ -218,14 +218,14 @@ Organize changes by category. For each change, specify the exact action:
 
 **Tasks to Add (coverage gaps):**
 ```
-bd create "feat(auth): show validation error for invalid email format" -p 1
+Create "feat(auth): show validation error for invalid email format" -p 1
   → Covers: US-1 acceptance criterion "Show error for invalid credentials"
-  → Depends on: BD-12 (login endpoint)
+  → Depends on: login endpoint task
 ```
 
 **Tasks to Split (oversized):**
 ```
-BD-15 "feat(dashboard): build complete dashboard page"
+"feat(dashboard): build complete dashboard page"
   → Split into:
     1. "feat(dashboard): add session list component with pagination"
     2. "feat(dashboard): add session detail panel"
@@ -234,26 +234,29 @@ BD-15 "feat(dashboard): build complete dashboard page"
 
 **Dependencies to Add (contention/logic):**
 ```
-bd dep add BD-18 BD-14
+Task 18 depends on Task 14
   → Reason: Both modify src/features/shared/types.ts
 ```
 
 **Dependencies to Remove (over-constrained):**
 ```
-bd dep remove BD-22 BD-19
+Remove dependency: Task 22 on Task 19
   → Reason: No shared files or logical dependency; can run in parallel
 ```
 
 **Descriptions to Update (incomplete/incorrect):**
 ```
-BD-14: Add test requirements — integration test for API endpoint per tdd-standards.md
-BD-17: Fix file path — should be src/features/auth/services/login.ts not src/auth/login.ts
+Task 14: Add test requirements — integration test for API endpoint per tdd-standards.md
+Task 17: Fix file path — should be src/features/auth/services/login.ts not src/auth/login.ts
 ```
 
 **Tasks to Remove (orphans/scope creep):**
 ```
-BD-25: "Add dark mode support" — not in any user story or plan.md requirement
+"Add dark mode support" — not in any user story or plan.md requirement
 ```
+
+**If Beads:** Use `bd create`, `bd dep add`/`bd dep remove`, `bd update` for these changes.
+**Without Beads:** Update the task list in `docs/implementation-plan.md` directly.
 
 ### 5.3 Get Approval
 
@@ -271,7 +274,7 @@ After approval:
 4. Update task descriptions
 5. Remove orphan tasks
 
-After all changes:
+**If Beads**, after all changes:
 ```bash
 bd dep tree        # Verify dependency graph looks correct
 bd ready           # Show the updated first wave of parallel work
@@ -280,7 +283,7 @@ bd ready           # Show the updated first wave of parallel work
 ### Final Verification
 
 - [ ] Every user story acceptance criterion maps to at least one task
-- [ ] No two tasks in `bd ready` output modify the same high-contention file
+- [ ] No two tasks in the first parallel wave modify the same high-contention file
 - [ ] All task descriptions include file paths, test requirements, and acceptance criteria
 - [ ] No oversized tasks remain (each completable in one session)
 - [ ] No orphan tasks without traceability to plan.md or user-stories.md
@@ -294,7 +297,7 @@ bd ready           # Show the updated first wave of parallel work
 2. **Propose, don't execute** — present findings and get approval before making changes
 3. **Err toward splitting** — if you're unsure whether a task is too large, it probably is
 4. **Don't add scope** — if something isn't in plan.md or user-stories.md, don't create a task for it
-5. **Fix descriptions in place** — use `bd update` to fix task descriptions rather than recreating tasks (preserves IDs and existing dependencies)
+5. **Fix descriptions in place** — if using Beads, use `bd update` to fix task descriptions rather than recreating tasks (preserves IDs and existing dependencies)
 6. After all changes are applied, add a tracking comment to `docs/implementation-plan.md` after any existing scaffold tracking comment: `<!-- scaffold:implementation-plan-review v1 YYYY-MM-DD -->` (use actual date)
 
 ## After This Step

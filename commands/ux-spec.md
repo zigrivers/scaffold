@@ -159,8 +159,7 @@ Document recurring UI patterns:
 6. **Document accessibility requirements** — keyboard, screen reader, contrast, focus management
 7. **Define responsive behavior** — layout changes per breakpoint, touch targets
 8. **Cross-validate** — verify every user story has a flow, every flow has error states, every component has all states
-9. Create a Beads task: `bd create "docs: UX specification" -p 0` and `bd update <id> --claim`
-10. When complete and committed: `bd close <id>`
+9. If using Beads: create a task (`bd create "docs: UX specification" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 
 ## After This Step
 

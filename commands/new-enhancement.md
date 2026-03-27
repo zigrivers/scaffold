@@ -172,16 +172,19 @@ After updating both documents:
 
 ## Phase 3: Task Creation
 
-Create Beads tasks for implementation.
+Create tasks for implementation.
 
 ### Task Creation Guidelines
 
 For each user story (or logical grouping of small stories):
 
+**If Beads:**
 ```bash
 bd create "US-XXX: <imperative title>" -p <priority>
 # Priority: 0=blocking release, 1=must-have, 2=should-have, 3=nice-to-have
 ```
+
+**Without Beads:** Document tasks as a structured list in `docs/implementation-plan.md` with title, priority, dependencies, and description.
 
 ### Task Titles and Descriptions
 
@@ -203,19 +206,22 @@ bd create "US-XXX: <imperative title>" -p <priority>
 
 ### Dependency Management
 
+**If Beads:**
 ```bash
 # Set up dependencies (child is blocked by parent)
 bd dep add <child-task-id> <parent-task-id>
 
-# Common dependency patterns:
-# - Migrations before features that use new models
-# - Backend before frontend
-# - Core functionality before edge cases
-# - Shared components before features that use them
-
 # Verify the dependency graph
 bd dep tree <task-id>
 ```
+
+**Without Beads:** Note dependencies inline (e.g., "depends on: US-045 migration task").
+
+Common dependency patterns:
+- Migrations before features that use new models
+- Backend before frontend
+- Core functionality before edge cases
+- Shared components before features that use them
 
 ### Migration Considerations
 
@@ -281,7 +287,7 @@ Depending on the enhancement scope, you may want to re-run these prompts:
 - **Maintain consistency**: Match terminology, format, and style of existing docs exactly
 - **Add traceability**: Mark enhancements with dates so we know when features were added
 - **Right-size the scope**: Push back if the enhancement is too large — suggest phasing
-- **Check for conflicts**: Review `bd list` for in-progress work that might be affected
+- **Check for conflicts**: If Beads, review `bd list` for in-progress work that might be affected
 
 ---
 
@@ -294,7 +300,7 @@ Depending on the enhancement scope, you may want to re-run these prompts:
 
 ## When NOT to Use This Prompt
 
-- **Bug fixes**: Use `/scaffold:quick-task` instead — it creates focused, well-defined Beads tasks
+- **Bug fixes**: Use `/scaffold:quick-task` instead — it creates focused, well-defined tasks
 - **Refactoring**: Use `/scaffold:quick-task` instead — no doc updates needed, just a task with clear acceptance criteria
 - **Performance improvements**: Use `/scaffold:quick-task` instead — targeted fixes don't need full discovery
 - **Initial product creation**: Use the PRD prompt instead

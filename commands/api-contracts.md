@@ -199,8 +199,7 @@ Choose and document:
 6. **Define error contracts** — single error structure, full error code taxonomy
 7. **Specify auth, pagination, and rate limiting** per endpoint
 8. **Cross-validate** — verify every user story's operations are covered, every domain operation has an endpoint
-9. Create a Beads task: `bd create "docs: API contracts" -p 0` and `bd update <id> --claim`
-10. When complete and committed: `bd close <id>`
+9. If using Beads: create a task (`bd create "docs: API contracts" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 
 ## After This Step
 

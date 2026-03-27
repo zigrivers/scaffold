@@ -161,8 +161,7 @@ Related technology decisions can share a single ADR:
 5. **Create ADR files** with the required structure, one per decision or decision group
 6. **Create index.md** with a decision log table (number, title, status, date)
 7. **Cross-validate** — verify no ADR contradicts another, all cross-references are complete
-8. Create a Beads task for this work before starting: `bd create "docs: architecture decision records" -p 0` and `bd update <id> --claim`
-9. When complete and committed, close it: `bd close <id>`
+8. If using Beads: create a task (`bd create "docs: architecture decision records" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 10. If this work surfaces implementation tasks or unresolved questions, create separate Beads tasks
 
 ## After This Step

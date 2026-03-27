@@ -72,8 +72,7 @@ Before starting, check if `docs/user-stories.md` already exists:
 - Use subagents to research best practices while analyzing the PRD in parallel
 - Use AskUserQuestionTool for any questions, ambiguities in the PRD, or priority decisions
 - After drafting, do a final pass to verify full PRD coverage and story quality against INVEST
-- Create a Beads task for this work before starting: `bd create "docs: <document being created>" -p 0` and `bd update <id> --claim`
-- When the document is complete and committed, close it: `bd close <id>`
+- If using Beads: create a task before starting (`bd create "docs: <document being created>" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 - If this work surfaces implementation tasks (bugs, missing infrastructure), create separate Beads tasks for those — don't try to do them now
 
 ## After This Step

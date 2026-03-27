@@ -184,8 +184,7 @@ Choose and document one:
 7. **Set up monitoring** — four golden signals, dashboards, alert thresholds
 8. **Document incident response** — runbooks, escalation, post-mortems, SLAs
 9. **Cross-validate** — verify pipeline stages match test categories from TDD standards, deployment matches architecture
-10. Create a Beads task: `bd create "docs: operations runbook" -p 0` and `bd update <id> --claim`
-11. When complete and committed: `bd close <id>`
+10. If using Beads: create a task (`bd create "docs: operations runbook" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 
 ## After This Step
 

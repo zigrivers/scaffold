@@ -202,8 +202,7 @@ These remain the domain of Step 4.5 AI Review, functional tests, and human revie
 5. **Run `make eval`** (or equivalent) to verify all generated evals pass on the current codebase. Fix any false positives before finishing.
 6. **Create `docs/eval-standards.md`** documenting what each eval checks, how to add exclusions, and what is explicitly not checked
 7. **Add `make eval` target** (or equivalent) to Makefile/package.json that runs only `tests/evals/`
-8. Create a Beads task for this work before starting: `bd create "docs: create eval infrastructure" -p 0` and `bd update <id> --claim`
-9. When the eval infrastructure is complete and committed, close it: `bd close <id>`
+8. If using Beads: create a task (`bd create "docs: create eval infrastructure" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 10. If this work surfaces implementation tasks (bugs, missing infrastructure), create separate Beads tasks for those — don't try to do them now
 
 ## What This Prompt Should NOT Do

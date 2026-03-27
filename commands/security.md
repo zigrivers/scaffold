@@ -203,8 +203,7 @@ For each OWASP category, assess the specific risk to THIS project and define mit
 7. **Build threat model** — STRIDE analysis, attack surface, trust boundaries
 8. **Define secrets management** — environment variables, vault, rotation, pre-commit scanning
 9. **Cross-validate** — verify auth requirements match API contracts, data classification matches schema
-10. Create a Beads task: `bd create "docs: security review" -p 0` and `bd update <id> --claim`
-11. When complete and committed: `bd close <id>`
+10. If using Beads: create a task (`bd create "docs: security review" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 
 ## After This Step
 

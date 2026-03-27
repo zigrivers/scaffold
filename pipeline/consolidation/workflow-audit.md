@@ -34,10 +34,10 @@ Fix all issues found.
 
 ## Quality Criteria
 - CLAUDE.md contains complete workflow (9 steps + AI review step 4.5)
-- Commit format [BD-<id>] type(scope): description is consistent everywhere
-- Branch naming bd-<task-id>/<short-desc> from origin/main is consistent everywhere
+- Commit format is consistent everywhere (If Beads: [BD-<id>] type(scope): description. Without Beads: type(scope): description)
+- Branch naming is consistent everywhere (If Beads: bd-<task-id>/<short-desc>. Without Beads: <type>/<short-desc>)
 - PR workflow includes all 8 sub-steps with --delete-branch flag
-- Task closure uses bd close (not bd update --status completed)
+- If Beads: task closure uses bd close (not bd update --status completed)
 - Key Commands table matches actual Makefile/package.json commands
 - Worktree cleanup between tasks documented (cannot checkout main)
 - Agent crash recovery documented
