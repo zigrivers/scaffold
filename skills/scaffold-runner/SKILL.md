@@ -227,12 +227,14 @@ This is useful when the user asks "Do I need this step?" or when previewing whic
 All review and validation steps now support independent multi-model validation at depth 4-5 using Codex and/or Gemini CLIs. The `multi-model-dispatch` skill documents the correct invocation patterns:
 
 - **Codex**: `codex exec --skip-git-repo-check -s read-only --ephemeral "prompt" 2>/dev/null` (NOT bare `codex`)
-- **Gemini**: `gemini -p "prompt" --output-format json --approval-mode yolo 2>/dev/null`
+- **Gemini**: `NO_BROWSER=true gemini -p "prompt" --output-format json --approval-mode yolo 2>/dev/null`
+
+**`NO_BROWSER=true` is required for all Gemini invocations** from Claude Code's Bash tool. Without it, Gemini's child process relaunch shows a consent prompt that hangs in non-TTY shells.
 
 **Auth verification is mandatory before dispatch.** CLI tokens expire mid-session. Before running any review at depth 4-5:
 1. Check Codex auth: `codex login status`
-2. Check Gemini auth: `gemini -p "respond with ok" -o json` (exit 41 = auth failure)
-3. If auth fails, tell the user to re-authenticate: `! codex login` or `! gemini -p "hello"` (the `!` prefix runs it interactively in the user's session)
+2. Check Gemini auth: `NO_BROWSER=true gemini -p "respond with ok" -o json` (exit 41 = auth failure)
+3. If auth fails, tell the user to re-authenticate: `! gemini -p "hello"` or `! codex login` (the `!` prefix runs it interactively with TTY access)
 4. **Never silently skip a CLI due to auth failure** — surface it to the user
 
 When running a review step at depth 4-5:

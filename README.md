@@ -613,7 +613,7 @@ Use `codex exec "prompt"` (headless mode), not bare `codex "prompt"` (interactiv
 Add `--skip-git-repo-check` flag: `codex exec --skip-git-repo-check -s read-only --ephemeral "prompt"`. This is required when the project hasn't initialized git yet.
 
 **Gemini CLI hangs on "Opening authentication page" or returns empty output**
-Auth token expired mid-session. Run `! gemini -p "hello"` to re-authenticate interactively (the `!` prefix runs it in your terminal). For CI/headless: set `GEMINI_API_KEY` env var instead of OAuth.
+Gemini's child process relaunch shows a consent prompt that hangs in non-TTY shells. All scaffold Gemini invocations now include `NO_BROWSER=true` to suppress this. If you're invoking Gemini manually, prepend `NO_BROWSER=true gemini -p "..."`. If auth tokens have actually expired, run `! gemini -p "hello"` to re-authenticate interactively. For CI/headless: set `GEMINI_API_KEY` env var instead of OAuth.
 
 **Codex CLI auth expired ("refresh token", "sign in again")**
 Run `! codex login` to re-authenticate interactively. For CI/headless: set `CODEX_API_KEY` env var. Check auth status with `codex login status`.

@@ -246,7 +246,7 @@ The script should:
 1. Detect available CLIs (`command -v codex`, `command -v gemini`)
 2. **Verify auth before dispatch** (follows multi-model-dispatch skill patterns):
    - Codex: `codex login status 2>/dev/null` (exit 0 = authenticated)
-   - Gemini: `gemini -p "respond with ok" -o json 2>/dev/null` (exit 41 = auth failure)
+   - Gemini: `NO_BROWSER=true gemini -p "respond with ok" -o json 2>/dev/null` (exit 41 = auth failure)
    - If a CLI fails auth: print warning with recovery command (`codex login` or `gemini -p "hello"`), skip that CLI but continue with the other
    - If both fail auth → exit 5 with message "Both CLIs need re-authentication"
 3. If neither available or authenticated → exit 5 with error message

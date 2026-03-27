@@ -38,7 +38,7 @@ codex login status 2>/dev/null && echo "codex authenticated" || echo "codex NOT 
 
 **Gemini auth check** (no built-in status command — use a minimal prompt):
 ```bash
-GEMINI_AUTH_CHECK=$(gemini -p "respond with ok" -o json 2>&1)
+GEMINI_AUTH_CHECK=$(NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1)
 GEMINI_EXIT=$?
 if [ "$GEMINI_EXIT" -eq 0 ]; then
   echo "gemini authenticated"
@@ -48,6 +48,8 @@ else
   echo "gemini auth unknown (exit $GEMINI_EXIT)"
 fi
 ```
+
+**Why `NO_BROWSER=true`?** Gemini CLI relaunches itself as a child process for memory management. During the relaunch, it shows a "Do you want to continue? [Y/n]" consent prompt that hangs when stdin is not a TTY (as in Claude Code's Bash tool). `NO_BROWSER=true` suppresses this prompt and uses cached credentials directly.
 
 ### Step 3: Handle Auth Failures
 
@@ -103,23 +105,26 @@ codex exec --skip-git-repo-check -s read-only --ephemeral --output-schema schema
 
 **Use `-p` / `--prompt` for headless mode.** Without this flag, Gemini launches interactive mode.
 
+**CRITICAL: Always prepend `NO_BROWSER=true`.** Without this, Gemini's child process relaunch shows a consent prompt ("Do you want to continue? [Y/n]") that hangs when stdin is not a TTY. This affects ALL non-interactive contexts including Claude Code's Bash tool.
+
 ```bash
 # Basic review dispatch
-gemini -p "REVIEW_PROMPT_HERE" --output-format json --approval-mode yolo 2>/dev/null
+NO_BROWSER=true gemini -p "REVIEW_PROMPT_HERE" --output-format json --approval-mode yolo 2>/dev/null
 
 # With specific model
-gemini -p "REVIEW_PROMPT_HERE" -m pro --output-format json --approval-mode yolo 2>/dev/null
+NO_BROWSER=true gemini -p "REVIEW_PROMPT_HERE" -m pro --output-format json --approval-mode yolo 2>/dev/null
 
 # Reading context from stdin
-cat artifact.md | gemini -p "Review this artifact for issues" --output-format json --approval-mode yolo 2>/dev/null
+cat artifact.md | NO_BROWSER=true gemini -p "Review this artifact for issues" --output-format json --approval-mode yolo 2>/dev/null
 
 # With sandbox (no file writes)
-gemini -p "REVIEW_PROMPT_HERE" --output-format json -s --approval-mode yolo 2>/dev/null
+NO_BROWSER=true gemini -p "REVIEW_PROMPT_HERE" --output-format json -s --approval-mode yolo 2>/dev/null
 ```
 
 **Key flags:**
 | Flag | Purpose |
 |------|---------|
+| `NO_BROWSER=true` | **Required** — suppresses consent prompt that hangs in non-TTY shells |
 | `-p "prompt"` | **Required** — headless mode, no interactive UI |
 | `--output-format json` | Structured JSON output for parsing |
 | `--approval-mode yolo` | Auto-approve all tool calls (reviewer doesn't need to write) |
@@ -267,7 +272,7 @@ OUTPUT=$(codex exec --skip-git-repo-check -s read-only --ephemeral "prompt" 2>"$
 }
 
 GEMINI_STDERR=$(mktemp)
-OUTPUT=$(gemini -p "prompt" --output-format json --approval-mode yolo 2>"$GEMINI_STDERR") || {
+OUTPUT=$(NO_BROWSER=true gemini -p "prompt" --output-format json --approval-mode yolo 2>"$GEMINI_STDERR") || {
   EXIT_CODE=$?
   if [ "$EXIT_CODE" -eq 41 ]; then
     echo "Gemini auth failed (exit 41). Ask user to run: ! gemini -p \"hello\""
