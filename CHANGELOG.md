@@ -2,6 +2,18 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.7.0] — 2026-03-27
+
+### Added
+
+- **Batch skip** — `scaffold skip step1 step2 --reason "..."` skips multiple pipeline steps in one command. Each step is validated independently; partial failures don't block valid skips. Exit code 2 for partial failure, JSON output includes a `results` array.
+- **Compact status** — `scaffold status --compact` hides completed and skipped steps, showing only a summary count line plus pending/in-progress steps. Both interactive and JSON modes supported.
+
+### Updated
+
+- **scaffold-runner skill** — Documents batch skip usage, compact status, new navigation mappings ("Skip X, Y, Z", "What's left?"), and updated session preferences table.
+- **scaffold-pipeline skill** — Added `--compact` and batch skip to the Status & Navigation reference.
+
 ## [2.6.0] — 2026-03-27
 
 ### Refactored
