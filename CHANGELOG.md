@@ -2,6 +2,17 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.11.0] — 2026-03-28
+
+### Removed
+
+- **Retired `claude-code-permissions`** as a standalone pipeline step — most users run with `--dangerously-skip-permissions`, making the step inert. Deny rules folded into `git-workflow` (project-level) and `tech-stack` (stack-specific). State migration removes the step from existing projects.
+
+### Enhanced
+
+- **`git-workflow`** now creates `.claude/settings.json` with project-level deny rules (no force push to main, no rm -rf, no git reset --hard, etc.)
+- **`tech-stack`** now adds stack-specific deny rules to `.claude/settings.json` (Prisma reset, DROP TABLE, kubectl delete, etc.)
+
 ## [2.10.1] — 2026-03-28
 
 ### Added
