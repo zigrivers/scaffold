@@ -145,6 +145,8 @@ Read these documents and note any workflow-related content:
 | `Makefile` or `package.json` or `pyproject.toml` | Available commands (lint, test, install, dev) |
 | `.github/` | PR templates, CI workflows |
 | `tasks/lessons.md` | Referenced in workflow? Contains useful patterns? |
+| `.claude/rules/*.md` (if dir exists) | Rule files consistent with source docs? Globs match real files? |
+| `docs/ai-memory-setup.md` (if exists) | Memory stack documented? Rules inventory matches actual files? |
 
 For each document, extract:
 - Current workflow instructions (verbatim quotes)
@@ -352,6 +354,23 @@ Create a table of findings:
 - Formatting inconsistencies
 - Redundant documentation
 - Could be clearer
+
+### 3.3 Memory & Rules Consistency Check
+
+**Skip this section if `.claude/rules/` does not exist.**
+
+If `.claude/rules/` exists, verify consistency between rule files and their source documents:
+
+| Check | How to Verify | Severity if Broken |
+|-------|--------------|-------------------|
+| Rules match source docs | Compare `.claude/rules/code-style.md` against `docs/coding-standards.md` — are conventions in sync? | High |
+| Globs match real files | For each rule file's `globs` pattern, verify matching files exist in the project | Medium |
+| No duplicate rules | Check that no two rule files have overlapping globs that would double-load rules | Medium |
+| CLAUDE.md uses pointer pattern | CLAUDE.md should reference `.claude/rules/` instead of inlining conventions (if ai-memory-setup has run) | Medium |
+| Total rules under 500 lines | Run `wc -l .claude/rules/*.md` — exceeding 500 lines reduces effectiveness | Low |
+| memory-hygiene.md exists | Verify the memory hygiene rule file is present | Low |
+
+For each drift found between a rule file and its source doc, note which is authoritative (the source doc is always authoritative) and update the rule file.
 
 ---
 

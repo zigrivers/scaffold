@@ -219,34 +219,111 @@ Add `.hmem/` to `.gitignore`.
 Based on the user's hook choices, add hook configuration to `.claude/settings.json`:
 
 **PreCompact hook** (always recommended):
+
+The hook command depends on which MCP memory server is configured:
+
+**With Engram:**
 ```json
 {
   "hooks": {
     "PreCompact": [{
       "type": "command",
-      "command": "echo 'Session context compacting. Key decisions and patterns from this session should be saved to memory before compaction.' >> /dev/null",
+      "command": "engram save --category session 'Context compacting — key decisions and patterns should be preserved'",
+      "timeout": 10000
+    }]
+  }
+}
+```
+
+**With hmem:**
+```json
+{
+  "hooks": {
+    "PreCompact": [{
+      "type": "command",
+      "command": "hmem add --type decision 'Context compacting — key decisions and patterns should be preserved'",
+      "timeout": 10000
+    }]
+  }
+}
+```
+
+**Without MCP server (Tier 1 only):**
+```json
+{
+  "hooks": {
+    "PreCompact": [{
+      "type": "command",
+      "command": "date '+%Y-%m-%d %H:%M' >> .claude/compaction-log.txt && echo 'Context compacted' >> .claude/compaction-log.txt",
       "timeout": 5000
     }]
   }
 }
 ```
 
-Note: The PreCompact hook's primary value is as a signal to Claude Code's auto-memory system. The command itself is minimal — the act of the hook firing triggers Claude to evaluate what should be preserved.
+Note: When an MCP memory server is configured, the PreCompact hook writes a marker to the memory store, making it queryable in future sessions. Without a memory server, the hook logs compaction timestamps for debugging context loss.
 
 **Stop hook** (optional):
+
+**With Engram:**
 ```json
 {
   "hooks": {
     "Stop": [{
       "type": "command",
-      "command": "echo 'Session ending. Save any unsaved decisions or lessons.' >> /dev/null",
+      "command": "engram save --category session 'Session ended'",
+      "timeout": 10000
+    }]
+  }
+}
+```
+
+**With hmem:**
+```json
+{
+  "hooks": {
+    "Stop": [{
+      "type": "command",
+      "command": "hmem add --type task 'Session ended'",
+      "timeout": 10000
+    }]
+  }
+}
+```
+
+**Without MCP server:**
+```json
+{
+  "hooks": {
+    "Stop": [{
+      "type": "command",
+      "command": "date '+%Y-%m-%d %H:%M session ended' >> .claude/compaction-log.txt",
       "timeout": 5000
     }]
   }
 }
 ```
 
-**Merge hooks into existing configuration** — do not overwrite existing hooks.
+**Merge hooks into existing configuration** — do not overwrite existing hooks. Match the hook command to whichever MCP server was configured in Step 2.2. If no MCP server, use the file-logging fallback.
+
+### Step 2.3b: Update .gitignore
+
+After configuring the MCP memory server and hooks, update `.gitignore` to exclude local memory databases and logs:
+
+```bash
+# Add to .gitignore if not already present
+```
+
+Entries to add (only for the configured server):
+
+| MCP Server | .gitignore Entry |
+|-----------|-----------------|
+| Engram | `.engram/` |
+| hmem | `.hmem/` |
+| Claude-Mem | `.claude-mem/` |
+| (file-logging fallback) | `.claude/compaction-log.txt` |
+
+Read `.gitignore` first, check if entries already exist, and only append missing ones. Memory databases are local — they should never be committed to git.
 
 ### Step 2.4: Decision Logging Structure
 
@@ -258,11 +335,23 @@ mkdir -p docs/decisions
 
 Create `docs/decisions/README.md`:
 
+Check if `.beads/` exists to determine whether to include Beads task ID in the decision format.
+
 ```markdown
 # Decision Log
 
-This directory captures implementation decisions made during development.
+This directory captures **implementation decisions** made during development.
 Decisions are the highest-value memory type — they cannot be derived from code.
+
+## Decision Log vs ADRs vs Lessons
+
+| Type | Location | Scope | Example |
+|------|----------|-------|---------|
+| **Decision Log** | `docs/decisions/` | Day-to-day implementation choices | "Use JWT over session cookies for auth" |
+| **ADRs** | `docs/adrs/` | Architecture-level decisions | "Adopt event-driven architecture for notifications" |
+| **Lessons** | `tasks/lessons.md` | Recurring patterns and anti-patterns | "Always run migrations before seeding" |
+
+**Rule of thumb**: If the decision shapes the system's structure → ADR. If it's an implementation choice within an established structure → Decision Log. If it's a pattern you want to remember → Lessons.
 
 ## Format
 
@@ -272,11 +361,14 @@ Each decision file follows this structure:
 ## DEC-NNN: [Short title]
 
 **Date:** YYYY-MM-DD
+**Task:** [BD-xxx or N/A if no Beads]
 **Context:** [What situation prompted this decision]
 **Decision:** [What was chosen]
 **Rejected:** [What alternatives were considered and why they were rejected]
 **Consequences:** [What this decision means for future work]
 ```
+
+If Beads is not configured, omit the **Task:** line.
 
 ## When to Log a Decision
 

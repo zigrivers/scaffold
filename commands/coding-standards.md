@@ -162,6 +162,8 @@ When this step is complete, tell the user:
 
 **Next:** Run `/scaffold:tdd` — Create TDD standards for the tech stack.
 
+**Note:** If you later run `/scaffold:ai-memory-setup`, it will extract conventions from this document into path-scoped `.claude/rules/` files. If you update coding standards after that, re-run ai-memory-setup to keep rules in sync.
+
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 
 ---

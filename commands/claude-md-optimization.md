@@ -27,10 +27,23 @@ These incremental additions may have created redundancy, inconsistency, or gaps.
 
 **Ordering note:** This prompt should run BEFORE the Workflow Audit prompt. This prompt consolidates; the Workflow Audit verifies alignment with the canonical workflow.
 
+## Rules Detection
+
+Check if `.claude/rules/` directory exists. If it does:
+- **Rules exist**: Read all `.md` files in `.claude/rules/`. These contain path-scoped conventions extracted from project docs. CLAUDE.md should use the **pointer pattern** — reference rules and docs instead of inlining their content.
+- **No rules**: Proceed normally. Recommend running `/scaffold:ai-memory-setup` in the After This Step guidance if CLAUDE.md exceeds 200 lines.
+
+When rules exist, actively move inline convention blocks from CLAUDE.md into rule files or replace them with pointers:
+```markdown
+## Coding Conventions
+See `docs/coding-standards.md` for full reference. Path-scoped rules in `.claude/rules/`.
+```
+
 ## Documents to Review
 
 Read and cross-reference ALL of these:
 - `CLAUDE.md` (current state)
+- `.claude/rules/*.md` (if directory exists — modular rules for AI agents)
 - `docs/plan.md` (PRD)
 - `docs/tech-stack.md`
 - `docs/coding-standards.md`
@@ -134,8 +147,11 @@ After analysis, restructure CLAUDE.md to follow this format:
 | Running multiple agents in parallel | docs/git-workflow.md |
 | Review criteria / severity definitions | docs/review-standards.md |
 | Codex Cloud review instructions | AGENTS.md |
+| AI memory stack documentation | docs/ai-memory-setup.md |
 
 ## Rules
+
+[**If `.claude/rules/` exists**: Reference the rules directory here — "Path-scoped rules in `.claude/rules/` activate automatically per file type. See `docs/ai-memory-setup.md` for details." Do NOT inline rule content.]
 
 ### Git Rules
 [Branch format, commit format, forbidden actions like push to main, --force-with-lease only. **If Beads:** commit format uses `[BD-<id>]` prefix and branch format uses `bd-<id>/`. **Without Beads:** conventional commits and `<type>/` branch prefixes.]
@@ -164,6 +180,8 @@ After analysis, restructure CLAUDE.md to follow this format:
 
 ### Every Instruction Must Earn Its Place
 CLAUDE.md is loaded into context on every interaction — every line costs tokens and attention. Apply the "earn its place" test: if an instruction doesn't directly change agent behavior on most tasks, move it to a situational doc and reference it instead. If something is in another doc, reference it — don't repeat it.
+
+**If `.claude/rules/` exists**: Convention-specific rules (naming, formatting, imports, test patterns) belong in path-scoped rule files, NOT in CLAUDE.md. Rule files activate automatically when the agent works on matching files. Move any inline convention blocks to the appropriate rule file and replace with a pointer. Target: CLAUDE.md under 200 lines total.
 
 ### Scannability
 - Use tables for lookups
