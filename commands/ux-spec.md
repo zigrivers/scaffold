@@ -1,9 +1,9 @@
 ---
-description: "Specify UX design with flows, components, design system, and accessibility"
-long-description: "Reads PRD and user stories, then creates docs/ux-spec.md defining user flows, component hierarchy, design tokens, interaction patterns, accessibility requirements, and responsive behavior."
+description: "Specify user flows, interaction states, component architecture, accessibility, and responsive behavior"
+long-description: "Reads PRD, user stories, and system architecture, then creates docs/ux-spec.md defining user flows, interaction state machines, component architecture, accessibility requirements, and responsive behavior. References docs/design-system.md for visual tokens rather than redefining them."
 ---
 
-Read `docs/prd.md`, `docs/user-stories.md`, `docs/system-architecture.md`, and `docs/api-contracts.md` (if it exists), then create the UX specification. Produce `docs/ux-spec.md` as the visual and interaction blueprint for the frontend — user flows, component hierarchy, design system, accessibility, and responsive design.
+Read `docs/prd.md`, `docs/user-stories.md`, `docs/system-architecture.md`, `docs/design-system.md` (if it exists), and `docs/api-contracts.md` (if it exists), then create the UX specification. Produce `docs/ux-spec.md` as the interaction and behavior blueprint for the frontend — user flows, component architecture, accessibility, and responsive behavior. Visual tokens and component appearance come from `docs/design-system.md` — this step consumes those tokens, it does not redefine them.
 
 ## Mode Detection
 
@@ -27,9 +27,9 @@ Before starting, check if `docs/ux-spec.md` already exists:
 
 ### Update Mode Specifics
 - **Primary output**: `docs/ux-spec.md`
-- **Preserve**: Design token values, custom component specifications, accessibility level decisions, responsive breakpoint choices, brand-specific design decisions
-- **Related docs**: `docs/prd.md`, `docs/user-stories.md`, `docs/system-architecture.md`, `docs/api-contracts.md`
-- **Special rules**: Never change design token values without user approval. Preserve component specifications that are already implemented.
+- **Preserve**: Custom component architecture decisions, accessibility level decisions, responsive breakpoint choices, user flow mappings
+- **Related docs**: `docs/prd.md`, `docs/user-stories.md`, `docs/system-architecture.md`, `docs/api-contracts.md`, `docs/design-system.md`
+- **Special rules**: Preserve component specifications that are already implemented. Reference design tokens from `docs/design-system.md` — do not redefine token values here.
 
 ---
 
@@ -68,43 +68,13 @@ Organize components in a hierarchy:
 
 **Shared vs. page-specific**: Components start page-specific. Promote to shared when a second feature needs the same component.
 
-### 3. Design System
+### 3. Design System Reference
 
-**Color tokens:**
-- Primary, secondary, neutral scale (50-900), semantic colors (success, warning, error, info)
-- Dark mode: parallel set of semantic tokens switching via `prefers-color-scheme`
-- Use semantic tokens (`--bg-primary`, `--text-primary`) in components, not raw colors
+If `docs/design-system.md` exists, reference its tokens (colors, typography, spacing, borders, shadows) and component visual specs (buttons, forms, cards, feedback). Do NOT redefine token values — just reference them by name.
 
-**Typography tokens:**
-- Font family, size scale (xs through 3xl), weights, line heights
-- Consistent scale — no ad-hoc font sizes
+If `docs/design-system.md` does not exist, note which design tokens and component patterns the UX flows require, so the design-system step can address them later. Use placeholder references like `--color-primary`, `--space-4` rather than inventing concrete values.
 
-**Spacing tokens:**
-- 4px base scale: 4, 8, 12, 16, 24, 32, 48, 64
-- Use only values from the scale — no arbitrary spacing
-
-**Border and shadow tokens:**
-- Border radius scale (sm, md, lg, full)
-- Shadow scale (sm, md, lg, xl)
-
-### 4. Base Component Specifications
-
-**Buttons:**
-- Variants: Primary, Secondary, Outline, Ghost, Destructive
-- Sizes: sm (28px), md (36px), lg (44px)
-- States: default, hover, active, focused, disabled, loading (spinner replaces label)
-
-**Form elements:**
-- All inputs: border, focus ring, error state (red border + message), disabled state
-- Labels: always visible (never placeholder-only), required indicator
-- Help text: below input, muted color
-- Error messages: below input, error color, describes what went wrong AND how to fix
-
-**Cards**: Default (subtle shadow/border), interactive (hover state, cursor pointer), structured sections
-
-**Feedback**: Toast notifications (auto-dismiss), alert banners (persistent), empty states (illustration + text + CTA), loading (skeleton loaders for content, spinners for actions)
-
-### 5. Accessibility (WCAG AA Baseline)
+### 4. Accessibility (WCAG AA Baseline)
 
 **Keyboard navigation:**
 - Tab order follows visual reading order
@@ -130,7 +100,7 @@ Organize components in a hierarchy:
 - Modal close: return focus to trigger element
 - Item deleted: focus next item (or previous if last)
 
-### 6. Responsive Design
+### 5. Responsive Design
 
 **Breakpoints:**
 ```
@@ -154,7 +124,7 @@ Large Desktop: > 1280px
 
 **Mobile-first recommended**: Base styles for mobile, add complexity with `min-width` media queries.
 
-### 7. Pattern Library
+### 6. Pattern Library
 
 Document recurring UI patterns:
 - Search with autocomplete (debounced, keyboard nav, "no results" state)
@@ -169,9 +139,9 @@ Document recurring UI patterns:
 
 - Every PRD user journey has a corresponding flow with all states documented
 - Component hierarchy covers all UI states (loading, error, empty, populated)
-- Design system defines tokens and base components with concrete values
+- Design tokens referenced from `docs/design-system.md` — not redefined in this document
 - Accessibility requirements meet WCAG AA (keyboard nav, screen readers, contrast)
-- Responsive breakpoints defined with behavior specified per breakpoint
+- Responsive breakpoints defined with layout behavior specified per breakpoint
 - Error states documented for every user action that can fail
 - No missed states: loading, submitting, partial data, stale data, offline
 
@@ -179,28 +149,25 @@ Document recurring UI patterns:
 
 ## Process
 
-1. **Read all inputs** — Read `docs/prd.md`, `docs/user-stories.md`, and `docs/system-architecture.md`. Read `docs/api-contracts.md` for data shapes if it exists.
+1. **Read all inputs** — Read `docs/prd.md`, `docs/user-stories.md`, and `docs/system-architecture.md`. Read `docs/api-contracts.md` for data shapes if it exists. Read `docs/design-system.md` if it exists — reference its tokens throughout.
 2. **Use AskUserQuestionTool** for these decisions:
    - **UX depth**: Full specification with detailed wireframe descriptions, or key flows with core component list?
-   - **Design system**: Custom tokens or use an existing system (Tailwind defaults, Material Design, etc.)?
    - **Accessibility level**: WCAG AA (standard) or AAA (enhanced) for critical flows?
-   - **Dark mode**: Required for v1?
 3. **Use subagents** to research UX patterns for the project's specific frontend framework
 4. **Map stories to flows** — create user flow documentation for every core journey
-5. **Define component hierarchy** — atoms through pages, with state specifications
-6. **Create design system** — tokens, base components, pattern library
-7. **Document accessibility requirements** — keyboard, screen reader, contrast, focus management
-8. **Define responsive behavior** — breakpoints, layout changes, touch targets
-9. **Cross-validate** — verify every user story has a flow, every flow has error states, every component has all states
-10. Create a Beads task: `bd create "docs: UX specification" -p 0` and `bd update <id> --claim`
-11. When complete and committed: `bd close <id>`
+5. **Define component hierarchy** — atoms through pages, with state specifications for every component
+6. **Document accessibility requirements** — keyboard, screen reader, contrast, focus management
+7. **Define responsive behavior** — layout changes per breakpoint, touch targets
+8. **Cross-validate** — verify every user story has a flow, every flow has error states, every component has all states
+9. Create a Beads task: `bd create "docs: UX specification" -p 0` and `bd update <id> --claim`
+10. When complete and committed: `bd close <id>`
 
 ## After This Step
 
 When this step is complete, tell the user:
 
 ---
-**Specification phase complete** — `docs/ux-spec.md` created with user flows, component hierarchy, design system, accessibility, and responsive design.
+**Specification phase complete** — `docs/ux-spec.md` created with user flows, component architecture, accessibility, and responsive behavior.
 
 **Next:** Run `/scaffold:tdd` — Create TDD standards, or `/scaffold:coding-standards` if not yet done.
 
