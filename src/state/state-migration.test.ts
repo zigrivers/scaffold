@@ -321,6 +321,30 @@ describe('migrateState', () => {
       expect(state.steps['user-stories'].status).toBe('completed')
     })
 
+    it('removes claude-code-permissions when pending', () => {
+      const state = makeState({
+        'claude-code-permissions': { status: 'pending' },
+        'tech-stack': { status: 'completed' },
+      })
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(true)
+      expect(state.steps['claude-code-permissions']).toBeUndefined()
+      expect(state.steps['tech-stack'].status).toBe('completed')
+    })
+
+    it('removes claude-code-permissions when completed', () => {
+      const state = makeState({
+        'claude-code-permissions': { status: 'completed' },
+      })
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(true)
+      expect(state.steps['claude-code-permissions']).toBeUndefined()
+    })
+
     it('returns false when retired step is not present', () => {
       const state = makeState({
         'create-prd': { status: 'completed' },

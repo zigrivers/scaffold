@@ -22,25 +22,24 @@ Use this skill ONLY when the user asks about:
 | 2 | Product Definition | `/scaffold:prd-gap-analysis` | Last chance to strengthen PRD |
 | 3 | Project Foundation | `/scaffold:beads` | Creates CLAUDE.md — run first in Phase 2 |
 | 4 | Project Foundation | `/scaffold:tech-stack` | Drives all technical decisions |
-| 5 | Project Foundation | `/scaffold:claude-code-permissions` | Enables autonomous agents |
-| 6 | Project Foundation | `/scaffold:coding-standards` | References tech-stack.md |
-| 7 | Project Foundation | `/scaffold:tdd` | References tech-stack.md + coding-standards.md |
-| 8 | Project Foundation | `/scaffold:project-structure` | References all Phase 2 docs |
-| 9 | Dev Environment | `/scaffold:dev-env-setup` | Creates lint/test/install commands |
-| 10 | Dev Environment | `/scaffold:design-system` | **(optional)** Frontend projects only |
-| 11 | Dev Environment | `/scaffold:git-workflow` | References dev-setup.md |
-| 11.5 | Dev Environment | `/scaffold:automated-pr-review` | **(optional)** Requires external reviewer |
-| 12 | Testing | `/scaffold:add-e2e-testing` | **(optional)** Web and/or mobile apps |
-| 14 | Stories & Planning | `/scaffold:user-stories` | Covers every PRD feature |
-| 15 | Stories & Planning | `/scaffold:user-stories-gaps` | UX improvements |
-| 16 | Stories & Planning | `/scaffold:platform-parity-review` | **(optional)** Multi-platform projects |
-| 17 | Consolidation | `/scaffold:claude-md-optimization` | Run BEFORE workflow-audit |
-| 18 | Consolidation | `/scaffold:workflow-audit` | Run AFTER claude-md-optimization |
-| 19 | Implementation | `/scaffold:implementation-plan` | Creates full task graph |
-| 20 | Implementation | `/scaffold:implementation-plan-review` | Second pass for quality |
-| 20.5 | Implementation | `/scaffold:multi-model-review-tasks` | **(optional)** Requires Codex/Gemini CLI |
-| 21 | Implementation | `/scaffold:single-agent-start` | Single-agent execution loop |
-| 21 | Implementation | `/scaffold:multi-agent-start` | Multi-agent — one per worktree |
+| 5 | Project Foundation | `/scaffold:coding-standards` | References tech-stack.md |
+| 6 | Project Foundation | `/scaffold:tdd` | References tech-stack.md + coding-standards.md |
+| 7 | Project Foundation | `/scaffold:project-structure` | References all Phase 2 docs |
+| 8 | Dev Environment | `/scaffold:dev-env-setup` | Creates lint/test/install commands |
+| 9 | Dev Environment | `/scaffold:design-system` | **(optional)** Frontend projects only |
+| 10 | Dev Environment | `/scaffold:git-workflow` | References dev-setup.md |
+| 10.5 | Dev Environment | `/scaffold:automated-pr-review` | **(optional)** Requires external reviewer |
+| 11 | Testing | `/scaffold:add-e2e-testing` | **(optional)** Web and/or mobile apps |
+| 13 | Stories & Planning | `/scaffold:user-stories` | Covers every PRD feature |
+| 14 | Stories & Planning | `/scaffold:user-stories-gaps` | UX improvements |
+| 15 | Stories & Planning | `/scaffold:platform-parity-review` | **(optional)** Multi-platform projects |
+| 16 | Consolidation | `/scaffold:claude-md-optimization` | Run BEFORE workflow-audit |
+| 17 | Consolidation | `/scaffold:workflow-audit` | Run AFTER claude-md-optimization |
+| 18 | Implementation | `/scaffold:implementation-plan` | Creates full task graph |
+| 19 | Implementation | `/scaffold:implementation-plan-review` | Second pass for quality |
+| 19.5 | Implementation | `/scaffold:multi-model-review-tasks` | **(optional)** Requires Codex/Gemini CLI |
+| 20 | Implementation | `/scaffold:single-agent-start` | Single-agent execution loop |
+| 20 | Implementation | `/scaffold:multi-agent-start` | Multi-agent — one per worktree |
 
 ## Standalone Commands
 
@@ -70,7 +69,7 @@ Dev Setup → Git Workflow → Claude.md Optimization → Workflow Audit
 ## Critical Ordering Constraints
 
 1. **Beads Setup before everything else in Phase 2** — creates CLAUDE.md
-2. **Tech Stack before Permissions, Coding Standards, and TDD** — they reference it
+2. **Tech Stack before Coding Standards and TDD** — they reference it
 3. **Dev Setup before Git Workflow** — Git Workflow references lint/test commands
 4. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
 5. **Implementation Plan before Implementation Plan Review** — can't review what doesn't exist

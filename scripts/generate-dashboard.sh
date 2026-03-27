@@ -149,7 +149,6 @@ DEPS_JSON=$(cat <<'DEPSJSON'
     "prd-gap-analysis": ["create-prd"],
     "beads": ["prd-gap-analysis"],
     "tech-stack": ["beads"],
-    "claude-code-permissions": ["tech-stack"],
     "coding-standards": ["tech-stack"],
     "tdd": ["tech-stack", "coding-standards"],
     "project-structure": ["coding-standards", "tdd"],

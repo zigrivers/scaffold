@@ -34,7 +34,7 @@ The central organizing principle. 21 sequential prompts across 7 phases, plus 8+
 Prompts are grouped into 7 phases with strict ordering:
 - **Phase 0**: Prerequisites (install tools)
 - **Phase 1**: Product Definition (PRD)
-- **Phase 2**: Project Foundation (Beads, tech stack, permissions, standards, structure)
+- **Phase 2**: Project Foundation (Beads, tech stack, standards, structure)
 - **Phase 3**: Development Environment (dev setup, design system, git workflow)
 - **Phase 4**: Testing Integration (Playwright, Maestro — optional)
 - **Phase 5**: Stories & Planning (user stories, gap analysis, reviews)
@@ -101,19 +101,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Quick Reference section becomes source of truth for dependency versions
 - **Dependencies**: FR-1 (references PRD)
 
-### FR-5: Claude Code Permissions Configuration
-- **Description**: Configures Claude Code's permission system so agents can work without interactive approval prompts
-- **User-facing commands**: `/scaffold:claude-code-permissions` (`commands/claude-code-permissions.md`)
-- **Behavior**:
-  - Two-layer system: project-level deny rules (`.claude/settings.json`) + user-level allow rules (`~/.claude/settings.json`)
-  - Project layer: deny destructive operations (git push --force, rm -rf, bd edit, sudo)
-  - User layer: allow Bash (bare entry required), tool-specific allows, MCP server entries
-  - Stack-specific additions (mobile, Ruby, Go, Rust, Java)
-  - Verification: Tier 1 tests (compound commands), Tier 2 tests (standard workflow), MCP smoke tests
-  - Troubleshooting guide for 6 common causes of continued prompting
-- **Dependencies**: FR-4 (references tech stack)
-
-### FR-6: Coding Standards
+### FR-5: Coding Standards
 - **Description**: Defines code quality rules referenced by all agents during implementation
 - **User-facing commands**: `/scaffold:coding-standards` (`commands/coding-standards.md`)
 - **Behavior**:
@@ -428,53 +416,52 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
 |------|---------|--------|
 | 3 | `/scaffold:beads` | `.beads/`, `tasks/lessons.md`, CLAUDE.md |
 | 4 | `/scaffold:tech-stack` | `docs/tech-stack.md` |
-| 5 | `/scaffold:claude-code-permissions` | `.claude/settings.json`, `~/.claude/settings.json` |
-| 6 | `/scaffold:coding-standards` | `docs/coding-standards.md`, linter configs |
-| 7 | `/scaffold:tdd` | `docs/tdd-standards.md` |
-| 8 | `/scaffold:project-structure` | `docs/project-structure.md`, scaffolded dirs |
+| 5 | `/scaffold:coding-standards` | `docs/coding-standards.md`, linter configs |
+| 6 | `/scaffold:tdd` | `docs/tdd-standards.md` |
+| 7 | `/scaffold:project-structure` | `docs/project-structure.md`, scaffolded dirs |
 
 ### Phase 3 — Development Environment
 | Step | Command | Output |
 |------|---------|--------|
-| 9 | `/scaffold:dev-env-setup` | `docs/dev-setup.md`, Makefile, `.env.example` |
-| 10 | `/scaffold:design-system` (optional) | `docs/design-system.md`, theme configs |
-| 11 | `/scaffold:git-workflow` | `docs/git-workflow.md`, worktree script, CI |
-| 11.5 | `/scaffold:automated-pr-review` (optional) | `AGENTS.md`, `docs/review-standards.md` |
+| 8 | `/scaffold:dev-env-setup` | `docs/dev-setup.md`, Makefile, `.env.example` |
+| 9 | `/scaffold:design-system` (optional) | `docs/design-system.md`, theme configs |
+| 10 | `/scaffold:git-workflow` | `docs/git-workflow.md`, worktree script, CI |
+| 10.5 | `/scaffold:automated-pr-review` (optional) | `AGENTS.md`, `docs/review-standards.md` |
 
 ### Phase 4 — Testing Integration
 | Step | Command | Output |
 |------|---------|--------|
-| 12 | `/scaffold:add-e2e-testing` (optional, web/mobile) | Playwright config, Maestro config, test patterns |
+| 11 | `/scaffold:add-e2e-testing` (optional, web/mobile) | Playwright config, Maestro config, test patterns |
 
 ### Phase 5 — Stories & Planning
 | Step | Command | Output |
 |------|---------|--------|
-| 14 | `/scaffold:user-stories` | `docs/user-stories.md` |
-| 15 | `/scaffold:user-stories-gaps` | Updated `docs/user-stories.md` |
-| 16 | `/scaffold:platform-parity-review` (optional) | Updated docs, new stories/tasks |
+| 13 | `/scaffold:user-stories` | `docs/user-stories.md` |
+| 14 | `/scaffold:user-stories-gaps` | Updated `docs/user-stories.md` |
+| 15 | `/scaffold:platform-parity-review` (optional) | Updated docs, new stories/tasks |
 
 ### Phase 6 — Consolidation & Verification
 | Step | Command | Output |
 |------|---------|--------|
-| 17 | `/scaffold:claude-md-optimization` | Restructured CLAUDE.md |
-| 18 | `/scaffold:workflow-audit` | Fixes across all docs |
+| 16 | `/scaffold:claude-md-optimization` | Restructured CLAUDE.md |
+| 17 | `/scaffold:workflow-audit` | Fixes across all docs |
 
 ### Phase 7 — Implementation
 | Step | Command | Output |
 |------|---------|--------|
-| 19 | `/scaffold:implementation-plan` | `docs/implementation-plan.md`, Beads tasks |
-| 20 | `/scaffold:implementation-plan-review` | Updated tasks/dependencies |
-| 20.5 | `/scaffold:multi-model-review-tasks` (optional) | `docs/reviews/implementation-plan/` |
-| 21 | `/scaffold:single-agent-start` or `/scaffold:multi-agent-start` | Working software |
+| 18 | `/scaffold:implementation-plan` | `docs/implementation-plan.md`, Beads tasks |
+| 19 | `/scaffold:implementation-plan-review` | Updated tasks/dependencies |
+| 19.5 | `/scaffold:multi-model-review-tasks` (optional) | `docs/reviews/implementation-plan/` |
+| 20 | `/scaffold:single-agent-start` or `/scaffold:multi-agent-start` | Working software |
 
 ### Key Dependency Constraints
 ```
-PRD (1) → Tech Stack (4) → Coding Standards (6) → TDD (7) → Project Structure (8)
-PRD (1) → User Stories (14) → Implementation Plan (19) → Execution (21)
+PRD (1) → Tech Stack (4) → Coding Standards (5) → TDD (6) → Project Structure (7)
+PRD (1) → User Stories (13) → Implementation Plan (18) → Execution (20)
 Beads (3) → all Phase 2+ prompts
-Dev Setup (9) → Git Workflow (11)
-Claude.md Optimization (17) → Workflow Audit (18)
-Implementation Plan (19) → Implementation Plan Review (20)
+Dev Setup (8) → Git Workflow (10)
+Claude.md Optimization (16) → Workflow Audit (17)
+Implementation Plan (18) → Implementation Plan Review (19)
 ```
 
 ---

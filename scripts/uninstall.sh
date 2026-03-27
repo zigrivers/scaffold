@@ -12,7 +12,6 @@ FILES=(
     "prd-gap-analysis.md"
     "beads.md"
     "tech-stack.md"
-    "claude-code-permissions.md"
     "coding-standards.md"
     "tdd.md"
     "project-structure.md"

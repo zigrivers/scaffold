@@ -845,8 +845,8 @@ Covers: F-UX-2, F-UX-4, F-UX-5, F-UX-6, F-UX-9, F-UX-11, Flow 2
    ✓ prd-gap-analysis
    ✓ beads
    ✓ tech-stack
-   → claude-code-permissions (next)
-     coding-standards
+   → coding-standards (next)
+     tdd
      tdd
      project-structure
      ...
@@ -859,7 +859,7 @@ Covers: F-UX-2, F-UX-4, F-UX-5, F-UX-6, F-UX-9, F-UX-11, Flow 2
 
 3. **Given** the progress is displayed after a prompt completes,
    **When** Scaffold identifies the next prompt,
-   **Then** it shows elapsed time and asks: "Prompt `tech-stack` complete (3m 42s). Next: `claude-code-permissions`. Run it now?" Elapsed time is calculated from the prompt's start to its completion timestamp.
+   **Then** it shows elapsed time and asks: "Prompt `tech-stack` complete (3m 42s). Next: `coding-standards`. Run it now?" Elapsed time is calculated from the prompt's start to its completion timestamp.
 
 4. **Given** the initial pipeline display during `init` (before any prompts are run),
    **When** Scaffold shows the resolved pipeline,
@@ -1072,7 +1072,7 @@ Covers: F-PR-1, F-PR-2, F-PR-3, Flow 4
    **When** `scripts/resolve-profile.sh web-app` runs,
    **Then** it outputs the prompt list:
    ```json
-   ["create-prd", "prd-gap-analysis", "beads", "tech-stack", "claude-code-permissions", "coding-standards", "tdd", "project-structure", "dev-env-setup", "design-system", "git-workflow", "add-e2e-testing", "user-stories", "user-stories-gaps", "claude-md-optimization", "workflow-audit", "implementation-plan", "implementation-plan-review"]
+   ["create-prd", "prd-gap-analysis", "beads", "tech-stack", "coding-standards", "tdd", "project-structure", "dev-env-setup", "design-system", "git-workflow", "add-e2e-testing", "user-stories", "user-stories-gaps", "claude-md-optimization", "workflow-audit", "implementation-plan", "implementation-plan-review"]
    ```
 
 2. **Given** the profile name `cli-tool`,

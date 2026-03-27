@@ -29,7 +29,6 @@ declare -a FRONTMATTER=(
     'prd-gap-analysis|Analyze PRD for gaps, then innovate|'
     'beads|Initialize Beads task tracking in this project|'
     'tech-stack|Research and document tech stack decisions|'
-    'claude-code-permissions|Configure Claude Code permissions for agents|'
     'coding-standards|Create coding standards for the tech stack|'
     'tdd|Create TDD standards for the tech stack|'
     'project-structure|Define and scaffold project directory structure|'
@@ -68,7 +67,6 @@ HEADING_TO_SLUG["PRD Creation"]="create-prd"
 HEADING_TO_SLUG["PRD Gap Analysis & Innovation"]="prd-gap-analysis"
 HEADING_TO_SLUG["Beads Setup"]="beads"
 HEADING_TO_SLUG["Tech Stack"]="tech-stack"
-HEADING_TO_SLUG["Claude Code Permissions Setup"]="claude-code-permissions"
 HEADING_TO_SLUG["Coding Standards"]="coding-standards"
 HEADING_TO_SLUG["TDD"]="tdd"
 HEADING_TO_SLUG["Project Structure"]="project-structure"
@@ -158,23 +156,6 @@ When this step is complete, tell the user:
 
 ---
 **Phase 2 in progress** — `docs/tech-stack.md` created.
-
-**Next:** Run `/scaffold:claude-code-permissions` — Configure Claude Code permissions for agents.
-
-**Pipeline reference:** `/scaffold:prompt-pipeline`
-
----
-NEXTSTEP
-            ;;
-        claude-code-permissions)
-            cat <<'NEXTSTEP'
-
-## After This Step
-
-When this step is complete, tell the user:
-
----
-**Phase 2 in progress** — Permissions configured in `.claude/settings.json` and `~/.claude/settings.json`.
 
 **Next:** Run `/scaffold:coding-standards` — Create coding standards for the tech stack.
 

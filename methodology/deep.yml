@@ -7,7 +7,6 @@ steps:
   # Phase 2 — Foundation
   beads: { enabled: true, conditional: "if-needed" }
   tech-stack: { enabled: true }
-  claude-code-permissions: { enabled: true }
   coding-standards: { enabled: true }
   project-structure: { enabled: true }
   # Phase 3 — Environment

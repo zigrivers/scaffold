@@ -114,6 +114,22 @@ This project will be built and maintained entirely by AI agents. Every technolog
 - Multiple options without a decision — make a recommendation, don't present a menu
 - Boilerplate descriptions of what a framework is — assume the reader knows, just explain why we chose it
 
+## Stack-Specific Safety Rules
+
+After documenting the tech stack, check if `.claude/settings.json` exists (created by git-workflow). If it does, add deny rules for destructive operations specific to this stack. Append to the existing `deny` array — do not replace existing rules.
+
+Common additions by stack:
+
+| Stack | Deny Rule | Why |
+|-------|-----------|-----|
+| Prisma | `Bash(npx prisma migrate reset *)` | Drops and recreates database |
+| SQL | `Bash(DROP TABLE *)`, `Bash(DROP DATABASE *)` | Irreversible data loss |
+| Kubernetes | `Bash(kubectl delete *)` | Removes running resources |
+| Docker | `Bash(docker rm -f *)`, `Bash(docker system prune *)` | Destroys containers/images |
+| Terraform | `Bash(terraform destroy *)` | Destroys infrastructure |
+
+Only add rules relevant to the project's actual tech stack. If `.claude/settings.json` doesn't exist yet, skip this section — git-workflow will create it.
+
 ## Process
 - **First**, gather user preferences using AskUserQuestion as described in Step 1 above — do this before creating the Beads task or starting any research
 - If using Beads: create a task before starting (`bd create "docs: <document being created>" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
@@ -131,7 +147,7 @@ When this step is complete, tell the user:
 ---
 **Phase 2 in progress** — `docs/tech-stack.md` created.
 
-**Next:** Run `/scaffold:claude-code-permissions` — Configure Claude Code permissions for agents.
+**Next:** Run `/scaffold:coding-standards` — Create coding standards for the tech stack.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

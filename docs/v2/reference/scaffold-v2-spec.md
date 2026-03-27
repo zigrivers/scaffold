@@ -153,7 +153,6 @@ Each pipeline step is defined as a meta-prompt in `pipeline/`. The methodology p
 | Multi Agent Start | Depth controls coordination level | Adapts to configured tracker |
 | Single Agent Resume | Depth controls recovery guidance | Adapts to configured tracker |
 | Multi Agent Resume | Depth controls coordination level | Adapts to configured tracker |
-| Claude Code Permissions | Minimal depth variation | Universal Claude Code config |
 | New Enhancement | Depth controls process rigor | Universal concern |
 | Quick Task | Minimal depth variation | Universal concern |
 | Multi-Model Code Review | Depth controls review scope | Optional (multi-model CLI) |
@@ -182,7 +181,6 @@ pipeline/
   review-prd.md
   innovate-prd.md
   tech-stack.md
-  claude-code-permissions.md
   coding-standards.md
   tdd.md
   project-structure.md
@@ -240,7 +238,6 @@ steps:
   innovate-prd: { enabled: true, depth: 5 }
   tracking-setup: { enabled: true, depth: 5 }
   tech-stack: { enabled: true, depth: 5 }
-  claude-code-permissions: { enabled: true, depth: 3 }
   coding-standards: { enabled: true, depth: 5 }
   tdd: { enabled: true, depth: 5 }
   project-structure: { enabled: true, depth: 5 }

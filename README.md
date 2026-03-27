@@ -221,7 +221,6 @@ Set up tooling, standards, and project structure.
 |------|-------------|
 | `beads` | Initialize Beads task tracking and create CLAUDE.md |
 | `tech-stack` | Research and document technology choices |
-| `claude-code-permissions` | Configure agent permissions for autonomous work |
 | `coding-standards` | Create coding standards with linter/formatter configs |
 | `project-structure` | Design and scaffold the directory layout |
 

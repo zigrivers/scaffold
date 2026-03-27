@@ -48,50 +48,49 @@ Phases are run in order, with explicit dependency constraints between prompts. S
 |---|---------|-------------|----------|
 | 3 | `beads` | Initialize Beads task tracking in this project | |
 | 4 | `tech-stack` | Research and document tech stack decisions | |
-| 5 | `claude-code-permissions` | Configure Claude Code permissions for agents | |
-| 6 | `coding-standards` | Create coding standards for the tech stack | |
-| 7 | `tdd` | Create TDD standards for the tech stack | |
-| 8 | `project-structure` | Define and scaffold project directory structure | |
+| 5 | `coding-standards` | Create coding standards for the tech stack | |
+| 6 | `tdd` | Create TDD standards for the tech stack | |
+| 7 | `project-structure` | Define and scaffold project directory structure | |
 
 ### Phase 3 — Development Environment
 
 | # | Command | Description | Optional |
 |---|---------|-------------|----------|
-| 9 | `dev-env-setup` | Set up local dev environment with live reload | |
-| 10 | `design-system` | Create a cohesive design system for frontend | **(optional)** Frontend projects only |
-| 11 | `git-workflow` | Configure git workflow for parallel agents | |
-| 11.5 | `automated-pr-review` | Set up automated PR review with external reviewers | **(optional)** Requires external reviewer |
+| 8 | `dev-env-setup` | Set up local dev environment with live reload | |
+| 9 | `design-system` | Create a cohesive design system for frontend | **(optional)** Frontend projects only |
+| 10 | `git-workflow` | Configure git workflow for parallel agents | |
+| 10.5 | `automated-pr-review` | Set up automated PR review with external reviewers | **(optional)** Requires external reviewer |
 
 ### Phase 4 — Testing Integration
 
 | # | Command | Description | Optional |
 |---|---------|-------------|----------|
-| 12 | `add-e2e-testing` | Configure E2E testing (Playwright/Maestro) | **(optional)** Web and/or mobile apps |
+| 11 | `add-e2e-testing` | Configure E2E testing (Playwright/Maestro) | **(optional)** Web and/or mobile apps |
 
 ### Phase 5 — Stories & Planning
 
 | # | Command | Description | Optional |
 |---|---------|-------------|----------|
-| 14 | `user-stories` | Create user stories covering every PRD feature | |
-| 15 | `user-stories-gaps` | Gap analysis and UX innovation for user stories | |
-| 16 | `platform-parity-review` | Audit platform coverage across all docs | **(optional)** Multi-platform projects only |
+| 13 | `user-stories` | Create user stories covering every PRD feature | |
+| 14 | `user-stories-gaps` | Gap analysis and UX innovation for user stories | |
+| 15 | `platform-parity-review` | Audit platform coverage across all docs | **(optional)** Multi-platform projects only |
 
 ### Phase 6 — Consolidation & Verification
 
 | # | Command | Description | Optional |
 |---|---------|-------------|----------|
-| 17 | `claude-md-optimization` | Consolidate and optimize CLAUDE.md | |
-| 18 | `workflow-audit` | Verify workflow consistency across all docs | |
+| 16 | `claude-md-optimization` | Consolidate and optimize CLAUDE.md | |
+| 17 | `workflow-audit` | Verify workflow consistency across all docs | |
 
 ### Phase 7 — Implementation
 
 | # | Command | Description | Optional |
 |---|---------|-------------|----------|
-| 19 | `implementation-plan` | Create task graph from stories and standards | |
-| 20 | `implementation-plan-review` | Review task quality, coverage, and dependencies | |
-| 20.5 | `multi-model-review-tasks` | Multi-model review of implementation plan tasks | **(optional)** Requires Codex/Gemini CLI |
-| 21 | `single-agent-start` | Start single-agent execution loop | |
-| 21 | `multi-agent-start` | Start multi-agent execution loop in a worktree | |
+| 18 | `implementation-plan` | Create task graph from stories and standards | |
+| 19 | `implementation-plan-review` | Review task quality, coverage, and dependencies | |
+| 19.5 | `multi-model-review-tasks` | Multi-model review of implementation plan tasks | **(optional)** Requires Codex/Gemini CLI |
+| 20 | `single-agent-start` | Start single-agent execution loop | |
+| 20 | `multi-agent-start` | Start multi-agent execution loop in a worktree | |
 
 ### Ongoing — After Initial Setup
 
@@ -133,7 +132,7 @@ Dev Setup → Git Workflow → Claude.md Optimization → Workflow Audit
 **Critical ordering constraints:**
 
 1. **Beads Setup before everything else in Phase 2** — creates CLAUDE.md
-2. **Tech Stack before Permissions, Coding Standards, and TDD** — they reference it
+2. **Tech Stack before Coding Standards and TDD** — they reference it
 3. **Dev Setup before Git Workflow** — Git Workflow references lint/test commands
 4. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
 5. **Implementation Plan before Implementation Plan Review** — can't review what doesn't exist
@@ -147,19 +146,18 @@ The pipeline generates the following project documents:
 | `docs/plan.md` | PRD Creation (#1) | Product requirements document |
 | `CLAUDE.md` | Beads Setup (#3) | Claude Code project instructions |
 | `docs/tech-stack.md` | Tech Stack (#4) | Technology choices and rationale |
-| `.claude/settings.json` | Claude Code Permissions (#5) | Project-level permissions |
-| `docs/coding-standards.md` | Coding Standards (#6) | Code style and conventions |
-| `docs/tdd-standards.md` | TDD Standards (#7) | Testing approach and patterns |
-| `docs/project-structure.md` | Project Structure (#8) | Directory layout and conventions |
-| `docs/dev-setup.md` | Dev Environment Setup (#9) | Local development instructions |
-| `docs/design-system.md` | Design System (#10) | Theme, tokens, component patterns |
-| `docs/git-workflow.md` | Git Workflow (#11) | Branching, PR, and agent workflow |
-| `AGENTS.md` | Multi-Model Review (#11.5) | Codex Cloud review configuration |
-| `docs/review-standards.md` | Multi-Model Review (#11.5) | Code review criteria |
-| `docs/user-stories.md` | User Stories (#14) | Implementable user stories |
-| `docs/reviews/user-stories/` | User Stories Multi-Model Review (#15.5) | Codex/Gemini review data, coverage analysis |
-| `docs/implementation-plan.md` | Implementation Plan (#19) | Full task graph with dependencies |
-| `docs/reviews/implementation-plan/` | Implementation Plan Multi-Model Review (#20.5) | Codex/Gemini review of task quality |
+| `docs/coding-standards.md` | Coding Standards (#5) | Code style and conventions |
+| `docs/tdd-standards.md` | TDD Standards (#6) | Testing approach and patterns |
+| `docs/project-structure.md` | Project Structure (#7) | Directory layout and conventions |
+| `docs/dev-setup.md` | Dev Environment Setup (#8) | Local development instructions |
+| `docs/design-system.md` | Design System (#9) | Theme, tokens, component patterns |
+| `docs/git-workflow.md` | Git Workflow (#10) | Branching, PR, and agent workflow |
+| `AGENTS.md` | Multi-Model Review (#10.5) | Codex Cloud review configuration |
+| `docs/review-standards.md` | Multi-Model Review (#10.5) | Code review criteria |
+| `docs/user-stories.md` | User Stories (#13) | Implementable user stories |
+| `docs/reviews/user-stories/` | User Stories Multi-Model Review (#14.5) | Codex/Gemini review data, coverage analysis |
+| `docs/implementation-plan.md` | Implementation Plan (#18) | Full task graph with dependencies |
+| `docs/reviews/implementation-plan/` | Implementation Plan Multi-Model Review (#19.5) | Codex/Gemini review of task quality |
 
 ## Installation
 

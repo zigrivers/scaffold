@@ -602,6 +602,40 @@ Create `.github/pull_request_template.md`:
 <!-- If UI change, include before/after or key states -->
 ```
 
+## Project Safety Permissions
+
+Create `.claude/settings.json` (checked into git) with **deny-only rules** to prevent destructive operations by AI agents. These protect the git workflow regardless of whether the user runs with `--dangerously-skip-permissions`:
+
+```json
+{
+  "permissions": {
+    "allow": [],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(rm -rf /)",
+      "Bash(rm -r *)",
+      "Bash(sudo *)",
+      "Bash(git push --force *)",
+      "Bash(git push origin main)",
+      "Bash(git push -f origin main)",
+      "Bash(git push --force origin main)",
+      "Bash(git reset --hard *)",
+      "Bash(git worktree remove *)",
+      "Bash(bd edit *)"
+    ]
+  }
+}
+```
+
+Create the directory if needed (`mkdir -p .claude`) and commit: `git add .claude/settings.json`.
+
+**Why these deny rules:**
+- `git push origin main` — agents use PRs, never push directly to main
+- `git push --force` — only `--force-with-lease` on feature branches is acceptable
+- `git reset --hard` — too destructive; use `git checkout` or `git stash` instead
+- `rm -rf` — recursive deletion requires human approval
+- `bd edit` — opens interactive editor, breaks AI agents
+
 ## What This Document Should NOT Be
 - A git tutorial — assume agents know git commands
 - Theoretical — every rule should be actionable
@@ -609,6 +643,7 @@ Create `.github/pull_request_template.md`:
 
 ## Process
 - After creating docs and configuration, commit everything to the repo
+- Create `.claude/settings.json` with deny rules and commit it
 - Test the workflow by verifying branch protection and CI checks are active
 
 ## After This Step
