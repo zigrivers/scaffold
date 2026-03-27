@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.14.1] — 2026-03-27
+
+### Fixed
+
+- **CLI auth pre-flight checks** — Multi-model dispatch now verifies authentication before dispatching reviews, not just CLI installation. Gemini exit code 41 (auth failure) and Codex stderr auth messages are detected specifically. Auth failures surface to the user with interactive recovery commands (`! codex login` / `! gemini -p "hello"`) instead of silently falling back to Claude-only review.
+
 ## [2.14.0] — 2026-03-27
 
 ### Changed
