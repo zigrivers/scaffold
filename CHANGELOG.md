@@ -2,6 +2,20 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.14.0] — 2026-03-27
+
+### Changed
+
+- **TDD moved to foundation phase** — Pipeline step relocated from `pipeline/quality/` (order 19, after review-architecture) to `pipeline/foundation/` (order 44, after coding-standards). Now runs as Phase 2 item #6, matching `prompts.md` intent. Dependencies changed from `[review-architecture]` to `[coding-standards]`. Architecture docs are optional inputs (available when re-running later). Project-structure order bumped to 45.
+
+### Fixed
+
+- **Beads/non-Beads commit format consistency** — Six commands had Beads-only commit format documentation. Non-Beads projects (the majority) now have documented conventional commit format:
+  - `coding-standards.md` — Added Beads detection, documents both `[BD-<id>] type(scope): desc` and conventional `type(scope): desc` with examples
+  - `create-evals.md` — Fixed hard-coded `[BD-\w+]` regex to detect `.beads/` and use appropriate format check
+  - `beads.md` — Added note that non-Beads projects use conventional commits
+  - `release.md` / `version-bump.md` — Clarified task ID is conditional on `.beads/` existing
+
 ## [2.13.2] — 2026-03-27
 
 ### Fixed
