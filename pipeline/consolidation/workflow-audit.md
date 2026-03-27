@@ -12,9 +12,9 @@ knowledge-base: [cross-phase-consistency]
 ## Purpose
 Cross-reference all documentation to ensure the canonical feature workflow is
 consistently documented. Check every document that touches workflow (CLAUDE.md,
-git-workflow.md, coding-standards.md, dev-setup.md, Makefile/package.json) for
-contradictions, stale references, missing steps, and inconsistent command formats.
-Fix all issues found.
+git-workflow.md, coding-standards.md, dev-setup.md, operations-runbook.md,
+Makefile/package.json) for contradictions, stale references, missing steps, and
+inconsistent command formats. Fix all issues found.
 
 ## Inputs
 - CLAUDE.md (required) — primary workflow document to audit
@@ -23,6 +23,7 @@ Fix all issues found.
 - docs/dev-setup.md (required) — commands to verify match Key Commands
 - Makefile or package.json (required) — actual commands to match against
 - .github/ (optional) — PR templates and CI workflows to verify
+- docs/operations-runbook.md (optional) — deployment pipeline to verify doesn't contradict CI or dev-setup
 - tasks/lessons.md (optional) — verify it exists and is referenced
 
 ## Expected Outputs
