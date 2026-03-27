@@ -10,10 +10,10 @@ knowledge-base: [review-methodology]
 ---
 
 ## Purpose
-Configure an agent-driven automated PR review system that integrates external
-AI reviewers (Codex Cloud, Gemini Code Assist, or custom) without requiring
-GitHub Actions workflows. The agent manages the entire review-fix-push loop
-locally, using `gh api` calls to poll for reviews (zero Actions minutes).
+Configure an agent-driven automated PR review system using local CLI reviewers
+(Codex, Gemini — runs both when available for dual-model quality) or external
+GitHub App reviewers. Zero GitHub Actions workflows. The agent manages the
+entire review-fix loop locally.
 
 ## Inputs
 - docs/coding-standards.md (required) — review criteria reference
@@ -22,10 +22,10 @@ locally, using `gh api` calls to poll for reviews (zero Actions minutes).
 - CLAUDE.md (required) — workflow sections to update
 
 ## Expected Outputs
-- AGENTS.md — External reviewer instructions with project-specific rules
+- AGENTS.md — Reviewer instructions with project-specific rules
 - docs/review-standards.md — severity definitions (P0-P3) and review criteria
-- scripts/await-pr-review.sh — enhanced polling script with JSON output,
-  round tracking, and configurable reviewer
+- scripts/cli-pr-review.sh (local CLI mode) — dual-model review with reconciliation
+- scripts/await-pr-review.sh (external bot mode) — polling script with JSON output
 - docs/git-workflow.md updated with review loop integration
 - CLAUDE.md updated with agent-driven review workflow
 
@@ -39,13 +39,13 @@ locally, using `gh api` calls to poll for reviews (zero Actions minutes).
 - Legacy GitHub Actions workflows detected and cleanup offered
 
 ## Methodology Scaling
-- **deep**: Full external review setup with configurable reviewer choice,
-  enhanced await script with JSON output, comprehensive review-standards.md,
-  and agent-driven loop documented in CLAUDE.md.
+- **deep**: Full setup with local CLI review (dual-model when both available),
+  review-standards.md, AGENTS.md, and comprehensive CLAUDE.md workflow.
+  Falls back to external bot review if no CLIs available.
 - **mvp**: Step is disabled. Local self-review from git-workflow suffices.
-- **custom:depth(1-5)**: Depth 1-2: disabled. Depth 3: basic AGENTS.md +
-  review-standards.md. Depth 4: add enhanced await script. Depth 5: full
-  suite with reviewer choice and legacy cleanup.
+- **custom:depth(1-5)**: Depth 1-2: disabled. Depth 3: basic review-standards.md
+  + single-CLI review. Depth 4: add dual-model review. Depth 5: full suite
+  with all options and legacy cleanup.
 
 ## Mode Detection
 Update mode if AGENTS.md exists. In update mode: preserve custom review rules,

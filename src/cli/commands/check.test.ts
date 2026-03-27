@@ -352,6 +352,8 @@ describe('check command', () => {
     expect(data.hasGithubRemote).toBe(true)
     expect(data.hasCi).toBe(true)
     expect(data.mode).toBe('fresh')
+    expect(data).toHaveProperty('availableClis')
+    expect(data).toHaveProperty('recommendedReviewMode')
   })
 
   it('detects automated-pr-review as not applicable without GitHub remote', async () => {
