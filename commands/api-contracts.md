@@ -3,7 +3,7 @@ description: "Define API contracts with endpoints, schemas, error handling, and 
 long-description: "Reads system architecture and domain models, then creates docs/api-contracts.md specifying REST/GraphQL endpoints, request/response schemas, error contracts, authentication, pagination, and versioning."
 ---
 
-Read `docs/system-architecture.md`, `docs/domain-models/`, and `docs/adrs/`, then define API contracts for all system interfaces. Create `docs/api-contracts.md` specifying every endpoint with request/response shapes, error codes, authentication requirements, and pagination.
+Read `docs/system-architecture.md`, `docs/domain-models/`, `docs/adrs/`, and `docs/user-stories.md`, then define API contracts for all system interfaces. Create `docs/api-contracts.md` specifying every endpoint with request/response shapes, error codes, authentication requirements, and pagination.
 
 ## Mode Detection
 
