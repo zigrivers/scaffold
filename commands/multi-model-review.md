@@ -855,10 +855,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Install Beads
+      - name: Install Beads (if used)
+        id: beads-check
         run: |
-          npm install -g @beads/bd
-          bd --version
+          if [ -d ".beads" ]; then
+            npm install -g @beads/bd
+            bd --version
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Beads not configured — skipping"
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Collect findings
         env:
@@ -882,8 +889,9 @@ jobs:
             exit 1
           fi
 
-      - name: Create Beads task
+      - name: Create Beads task (if available)
         id: beads
+        if: steps.beads-check.outputs.available == 'true'
         run: |
           PR=${{ needs.check-followup-needed.outputs.original_pr }}
           TASK_OUTPUT=$(bd --no-db --no-daemon create "fix: unresolved P0/P1 from #$PR" -p 1 2>&1)
@@ -891,17 +899,27 @@ jobs:
           echo "task_id=$TASK_ID" >> $GITHUB_OUTPUT
           echo "Created Beads task: $TASK_ID"
 
-      - name: Create branch and commit Beads state
+      - name: Create branch
         id: branch
         run: |
           PR=${{ needs.check-followup-needed.outputs.original_pr }}
           TASK_ID=${{ steps.beads.outputs.task_id }}
-          BRANCH="bd-${TASK_ID}/followup-pr-${PR}"
+          if [ -n "$TASK_ID" ]; then
+            BRANCH="bd-${TASK_ID}/followup-pr-${PR}"
+          else
+            BRANCH="fix/followup-pr-${PR}"
+          fi
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
           git checkout -b "$BRANCH"
-          git add .beads/ || true
-          git commit -m "[BD-${TASK_ID}] chore: create follow-up task for #${PR}" --allow-empty || true
+          if [ -d ".beads" ]; then
+            git add .beads/ || true
+          fi
+          COMMIT_PREFIX=""
+          if [ -n "$TASK_ID" ]; then
+            COMMIT_PREFIX="[BD-${TASK_ID}] "
+          fi
+          git commit -m "${COMMIT_PREFIX}chore: create follow-up task for #${PR}" --allow-empty || true
           git push -u origin "$BRANCH"
 
       - name: Create GitHub Issue
@@ -921,8 +939,6 @@ jobs:
           **Original PR**: #PRNUM
           **Trigger**: TRIGGER_REASON
           **Findings**: FCOUNT unresolved P0/P1 finding(s)
-          **Beads task**: TASK
-
           ### Findings
 
           ISSUE_EOF
@@ -931,9 +947,13 @@ jobs:
 
           jq -r '.[] | "- **\(.path)** (line \(.line // "N/A")): \(.body | split("\n")[0])"' /tmp/followup-findings.json >> /tmp/issue-body.md
 
+          TITLE_PREFIX=""
+          if [ -n "$TASK_ID" ]; then
+            TITLE_PREFIX="[BD-${TASK_ID}] "
+          fi
           ISSUE_URL=$(gh issue create \
             --repo "$REPO" \
-            --title "[BD-${TASK_ID}] fix: unresolved P0/P1 from #${PR}" \
+            --title "${TITLE_PREFIX}fix: unresolved P0/P1 from #${PR}" \
             --body-file /tmp/issue-body.md \
             --label "followup-fix" 2>&1 | tail -1)
 
@@ -963,9 +983,9 @@ jobs:
           gh pr comment "$PR" --repo "$REPO" --body "## Post-Merge Follow-Up
 
           This PR merged with unresolved P0/P1 findings. A follow-up has been created:
-          - **Beads task**: $TASK_ID
           - **Issue**: $ISSUE_URL
           - **Branch**: \`$BRANCH\`
+          $([ -n \"$TASK_ID\" ] && echo \"- **Beads task**: $TASK_ID\")
 
           Claude Code will attempt to fix the findings automatically."
 

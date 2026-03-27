@@ -1,9 +1,11 @@
 ---
 description: "Create task graph from stories and standards"
-long-description: "Converts user stories into a dependency-ordered task graph in docs/implementation-plan.md and creates corresponding Beads tasks with priorities."
+long-description: "Converts user stories into a dependency-ordered implementation plan in docs/implementation-plan.md with prioritized tasks. If Beads is configured, also creates corresponding Beads tasks."
 ---
 
-Review the PRD (`docs/plan.md`), user stories (`docs/user-stories.md`), and all project standards, then create an implementation plan and Beads task graph for this project.
+Review the PRD (`docs/plan.md`), user stories (`docs/user-stories.md`), and all project standards, then create an implementation plan and task graph for this project.
+
+**Beads Detection:** Check if `.beads/` directory exists. If yes, create tasks via `bd create` and manage dependencies via `bd dep add`. If no, document the task graph in `docs/implementation-plan.md` as a structured markdown task list with dependencies noted inline.
 
 ## Mode Detection
 
@@ -12,7 +14,7 @@ Before starting, check if `docs/implementation-plan.md` already exists:
 **If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
 
 **If the file exists → UPDATE MODE**:
-1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:implementation-plan v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative. Also run `bd list` to see all existing Beads tasks.
+1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:implementation-plan v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative. If Beads: also run `bd list` to see existing tasks.
 2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
    - **ADD** — Required by current prompt but missing from existing doc
    - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
@@ -34,10 +36,10 @@ Before starting, check if `docs/implementation-plan.md` already exists:
 
 ### Update Mode Specifics
 - **Primary output**: `docs/implementation-plan.md`
-- **Secondary output**: Beads tasks (via `bd create`)
+- **Secondary output**: Tasks (via `bd create` if Beads, or markdown task list if not)
 - **Preserve**: Architecture decisions, component boundaries, existing task descriptions
 - **Related docs**: `docs/plan.md`, `docs/user-stories.md`, `docs/project-structure.md`, `docs/tdd-standards.md`, `docs/coding-standards.md`
-- **Special rules**: **Never duplicate Beads tasks** — run `bd list` first and cross-reference before creating any tasks. **Never re-create tasks that already exist** (even if their description differs from what this prompt would produce). Only create tasks for genuinely new work not covered by existing tasks.
+- **Special rules**: **Never duplicate tasks.** If Beads: run `bd list` first and cross-reference before creating any tasks. **Never re-create tasks that already exist** (even if their description differs from what this prompt would produce). Only create tasks for genuinely new work not covered by existing tasks.
 
 ## Required Reading Before Creating Tasks
 
@@ -75,9 +77,10 @@ Create a concise document covering ONLY decisions specific to this implementatio
 - File locations: docs/project-structure.md
 ```
 
-### 2. Beads Task Graph (the actual plan)
+### 2. Task Graph (the actual plan)
 
-Create every implementation task as a Beads task using `bd create "Title" -p <priority>`.
+**If Beads:** Create every implementation task using `bd create "Title" -p <priority>`.
+**Without Beads:** Document each task as a structured list item in `docs/implementation-plan.md` with title, priority (P0-P3), dependencies, and description.
 
 #### Task Descriptions Must Include:
 
@@ -101,7 +104,7 @@ Titles should be imperative, specific, and map cleanly to commit messages:
 - Bad: `Set up auth` (too vague)
 - Bad: `Models and routes for sessions` (horizontal, not vertical)
 
-These become the basis for commit messages in format `[BD-<id>] title`.
+**If Beads:** These become the basis for commit messages in format `[BD-<id>] title`.
 
 #### Task Sizing
 
@@ -112,13 +115,13 @@ These become the basis for commit messages in format `[BD-<id>] title`.
 
 #### Dependency Graph — File Contention Awareness
 
-When setting dependencies with `bd dep add <child> <parent>`, consider TWO types of dependencies:
+When setting dependencies (**If Beads:** `bd dep add <child> <parent>`. **Without Beads:** note `depends on: <task>` in the task description), consider TWO types of dependencies:
 
 1. **Logical dependencies** — Task B needs Task A's output (e.g., API endpoint needs DB schema)
 2. **File contention dependencies** — Tasks that modify the same high-contention files must be sequenced
 
 Review the high-contention files identified in `docs/project-structure.md` (route indexes, DB schemas, shared type definitions, app entry points, etc.). If two tasks both modify a high-contention file:
-- Add a Beads dependency between them so they don't run in parallel
+- Add a dependency between them so they don't run in parallel
 - Note in the task description which shared file is being modified and why
 
 Tasks that only touch files within their own feature directory can safely run in parallel with no dependency.
@@ -134,8 +137,8 @@ Follow the shared code strategy from `docs/project-structure.md`:
 ## What NOT to Do
 
 - Do NOT start implementing anything
-- Do NOT create a flat ordered list in markdown — that's what `bd ready` is for
-- Do NOT manually tag tasks as "parallel" or "sequential" — the Beads dependency graph handles this
+- **If Beads:** Do NOT create a flat ordered list in markdown — that's what `bd ready` is for. The dependency graph handles sequencing.
+- **Without Beads:** Document tasks with explicit dependency annotations so the execution order is clear.
 - Do NOT restate testing strategy or coding conventions in implementation-plan.md — reference the existing docs
 - Do NOT create tasks with vague file locations like "create the auth service" — use exact paths
 
@@ -143,16 +146,15 @@ Follow the shared code strategy from `docs/project-structure.md`:
 
 - Use subagents to research implementation best practices for the project's specific tech stack in parallel
 - Use AskUserQuestionTool for any questions or important decisions
-- After creating all tasks, run `bd dep tree` on root tasks so I can review the dependency graph
-- Run `bd ready` at the end to show me what the first wave of parallelizable work looks like
-- Verify: no two tasks in the first `bd ready` wave modify the same high-contention file
+- **If Beads:** After creating all tasks, run `bd dep tree` on root tasks so I can review the dependency graph. Run `bd ready` at the end to show the first wave of parallelizable work. Verify no two tasks in the first wave modify the same high-contention file.
+- **Without Beads:** Present the task list grouped by wave (tasks with no unmet dependencies form wave 1, etc.). Verify no two tasks in wave 1 modify the same high-contention file.
 
 ## After This Step
 
 When this step is complete, tell the user:
 
 ---
-**Phase 7 in progress** — `docs/implementation-plan.md` created, Beads task graph built.
+**Phase 7 in progress** — `docs/implementation-plan.md` created, task graph built.
 
 **Next:** Run `/scaffold:implementation-plan-review` — Review task quality, coverage, and dependencies.
 

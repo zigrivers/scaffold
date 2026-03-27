@@ -154,8 +154,7 @@ Document designed extension points (not speculative):
 6. **Define directory structure** — specify file naming, module boundaries, and import rules
 7. **Document cross-cutting concerns** — logging, error handling, configuration, feature flags
 8. **Cross-validate** — verify every domain model has a home, every ADR is respected, no orphaned components
-9. Create a Beads task for this work before starting: `bd create "docs: system architecture" -p 0` and `bd update <id> --claim`
-10. When complete and committed, close it: `bd close <id>`
+9. If using Beads: create a task (`bd create "docs: system architecture" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 
 ## After This Step
 

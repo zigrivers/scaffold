@@ -150,8 +150,7 @@ A quick-reference checklist AI agents should self-apply before marking a task co
 - Review docs/plan.md to understand the application domain — this informs which patterns matter most (e.g., a real-time app needs different standards than a CRUD app)
 - Use AskUserQuestionTool for architectural decisions like error handling strategy, validation approach, and strictness levels
 - Include runnable example snippets showing the RIGHT way to do things in our stack — AI follows patterns better than prose
-- Create a Beads task for this work before starting: `bd create "docs: <document being created>" -p 0` and `bd update <id> --claim`
-- When the document is complete and committed, close it: `bd close <id>`
+- If using Beads: create a task before starting (`bd create "docs: <document being created>" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 - If this work surfaces implementation tasks (bugs, missing infrastructure), create separate Beads tasks for those — don't try to do them now
 
 ## After This Step

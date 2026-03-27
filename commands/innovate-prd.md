@@ -142,8 +142,7 @@ Group related suggestions for efficient decision-making. For each group:
 5. **Present grouped suggestions** to the user using AskUserQuestionTool. Wait for approval.
 6. **Integrate approved innovations** into `docs/prd.md` at the same quality standard as existing features
 7. **Create `docs/prd-innovation.md`** documenting all findings with their disposition (accepted/rejected/deferred)
-8. Create a Beads task: `bd create "docs: PRD innovation pass" -p 0` and `bd update <id> --claim`
-9. When complete and committed: `bd close <id>`
+8. If using Beads: create a task (`bd create "docs: PRD innovation pass" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 10. If this surfaces implementation concerns, create separate Beads tasks
 
 ## After This Step

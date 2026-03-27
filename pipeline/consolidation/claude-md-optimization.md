@@ -38,7 +38,7 @@ scannability.
 - Consistent terminology throughout (task vs. ticket, etc.)
 - Key Commands table matches actual Makefile/package.json commands
 - Critical patterns are prominent (TDD, never push to main, keep working,
-  verify before commit, worktrees for parallel, every commit needs task ID)
+  verify before commit, worktrees for parallel). If Beads: every commit needs task ID.
 - An agent can skim CLAUDE.md in 30 seconds and get the critical points
 - Workflow scenarios cover error cases (test failures, merge conflicts, CI failures,
   crashed sessions, blocked tasks)

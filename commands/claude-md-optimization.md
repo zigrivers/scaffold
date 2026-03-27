@@ -5,13 +5,21 @@ long-description: "Reorganizes and deduplicates CLAUDE.md to maximize signal den
 
 Review all project documentation and consolidate CLAUDE.md into the definitive, optimized reference for AI agents working on this project.
 
+## Beads Detection
+
+Check if `.beads/` directory exists. This determines whether task management sections use Beads commands or conventional alternatives:
+- **Beads project**: `.beads/` exists → include Beads command references, `bd` CLI workflows, `[BD-<id>]` commit prefixes, `BD_ACTOR` for parallel agents
+- **Non-Beads project**: `.beads/` does not exist → use conventional commits (`type(scope): description`), standard branch naming (`feat/`, `fix/`), skip all `bd` command references
+
+Apply this detection throughout all sections below. When this prompt says "If Beads:" or "Without Beads:", use the detected mode.
+
 ## Context
 
 Throughout project setup, multiple prompts have added sections to CLAUDE.md:
 - Core workflow and TDD process
-- Beads task management
+- Task management (Beads, if configured)
 - Git workflow procedures (branching, PRs, protected main)
-- Parallel agent coordination (worktrees, BD_ACTOR)
+- Parallel agent coordination (worktrees)
 - Browser testing with Playwright or Maestro
 - Project structure quick reference
 
@@ -40,20 +48,20 @@ Read and cross-reference ALL of these:
 
 ### 2. Consistency Audit
 - Terminology: Are we consistent? (task vs. ticket, feature vs. story, etc.)
-- Commands: Are Beads commands, git commands, and test commands shown consistently?
+- Commands: Are task management commands (if any), git commands, and test commands shown consistently?
 - Workflow steps: Does the session-start and session-end sequence appear once, clearly?
-- Branching pattern: Use `git checkout -b bd-<id>/<desc> origin/main` consistently (branch from origin/main, not checkout-pull-branch)
-- Commit format: Use `[BD-<id>] type(scope): description` consistently (task ID prefix in brackets)
+- **If Beads:** Branching pattern uses `git checkout -b bd-<id>/<desc> origin/main` consistently. Commit format uses `[BD-<id>] type(scope): description` consistently.
+- **Without Beads:** Branching pattern uses `git checkout -b <type>/<desc> origin/main` (e.g., `feat/add-auth`, `fix/login-bug`). Commit format uses conventional commits: `type(scope): description`.
 
 ### 3. Gap Audit
 - Is every doc referenced appropriately? (Agent should know when to consult each)
-- Are there workflow scenarios not covered? (What if tests fail? What if there's a merge conflict? What if `bd ready` returns nothing? What if push to main is rejected? What if an agent session crashes mid-task?)
+- Are there workflow scenarios not covered? (What if tests fail? What if there's a merge conflict? What if push to main is rejected? What if an agent session crashes mid-task?)
 - Are the most common agent mistakes addressed with explicit rules?
-- Is the parallel agent workflow clear? (Permanent worktrees with workspace branches, BD_ACTOR, agents cannot checkout main, always branch from origin/main)
+- Is the parallel agent workflow clear? (Permanent worktrees with workspace branches, agents cannot checkout main, always branch from origin/main)
 - Is the PR workflow explicit and complete? (Rebase, push, create PR, auto-merge with --delete-branch, watch CI, confirm merge)
-- Is task closure documented with both variants? (Single agent: checkout main, delete branch, prune. Worktree: fetch, prune, clean. Both: `bd close`, `bd sync`)
-- Is the continuous work loop clear? (Keep working until `bd ready` returns nothing)
-- Is it clear that every commit requires a Beads task? (All fixes and enhancements need a task for the commit message)
+- Is branch cleanup documented with both variants? (Single agent: checkout main, delete branch, prune. Worktree: fetch, prune, clean.)
+- **If Beads:** Is task closure clear? (`bd close`, `bd sync` after merge.) Is the continuous work loop clear? (Keep working until `bd ready` returns nothing.) Is it clear every commit requires a task ID? (`[BD-<id>]` prefix.)
+- **Without Beads:** Is the continuous work loop clear? (Keep working on assigned tasks until done.)
 - Does the Key Commands table include all project-specific commands? (lint, test, install, dev server — these must match what's in Makefile/package.json/pyproject.toml, and the workflow references this table instead of hardcoding commands)
 - Does the planning guidance explicitly warn against Claude Code's interactive `/plan` mode? (Agents should think through their approach, NOT enter `/plan` which blocks autonomous execution)
 - Does CLAUDE.md include anti-sycophancy guidance? (Agent should push back on approaches with clear problems rather than agreeing — state the downside, propose alternatives, accept override)
@@ -61,13 +69,13 @@ Read and cross-reference ALL of these:
 - Are critical rules written in structured formats (numbered steps, tables, bold imperatives) rather than buried in prose paragraphs?
 
 ### 4. Priority Audit
-- What are the 6 most important things an agent must do correctly?
+- What are the most important things an agent must do correctly?
   - TDD (failing test first)
   - Never push to main (always PR with squash)
   - Keep working until no tasks remain
   - Verify before committing (tests pass, lint clean)
   - Use worktrees for parallel agents
-  - Every commit needs a Beads task (for commit message ID)
+  - **If Beads:** Every commit needs a Beads task ID (`[BD-<id>]` prefix)
 - Are these prominent and unambiguous, or buried in prose?
 - Could an agent skim CLAUDE.md in 30 seconds and get the critical points?
 
@@ -87,22 +95,22 @@ After analysis, restructure CLAUDE.md to follow this format:
 ## Workflow
 
 ### Session Start
-[Exact steps - Beads, lessons review, etc.]
+[Exact steps - review lessons file (if exists), check for available tasks, etc. **If Beads:** `bd ready` to find next task.]
 
 ### Plan Before Building
 [Think through approach for non-trivial work. Write specs upfront. CRITICAL: Do NOT enter Claude Code's interactive `/plan` mode — it blocks autonomous execution. Just think through the problem internally.]
 
 ### Implementation Loop
-[TDD cycle repeating per piece of functionality, verification using Key Commands lint+test, AI review subagent before push (checks diff against CLAUDE.md + coding-standards.md, fix P0/P1), commits with [BD-<id>] format. Multiple commits per task are normal — they squash-merge. Rebase onto origin/main before push. One clear flow.]
+[TDD cycle repeating per piece of functionality, verification using Key Commands lint+test, AI review subagent before push (checks diff against CLAUDE.md + coding-standards.md, fix P0/P1). Multiple commits per task are normal — they squash-merge. Rebase onto origin/main before push. One clear flow. **If Beads:** commits use `[BD-<id>] type(scope): description` format. **Without Beads:** commits use `type(scope): description` (conventional commits).]
 
 ### Task Closure and Next Task
-[Confirm merge, bd close, bd sync. Single agent: checkout main, delete branch, prune. Worktree agent: fetch, prune, clean, branch from origin/main (cannot checkout main). Keep working until no tasks remain]
+[Confirm merge. Single agent: checkout main, delete branch, prune. Worktree agent: fetch, prune, clean, branch from origin/main (cannot checkout main). Keep working until no tasks remain. **If Beads:** `bd close <id>`, `bd sync` after merge.]
 
 ### Session End
 [Exact steps - mandatory, in order]
 
 ## Parallel Sessions (Worktrees)
-[For multiple simultaneous agents - permanent worktrees with workspace branches, BD_ACTOR, agents cannot checkout main (it's checked out in main repo), always branch from origin/main, workspace cleanup between tasks, batch branch cleanup]
+[For multiple simultaneous agents - permanent worktrees with workspace branches, agents cannot checkout main (it's checked out in main repo), always branch from origin/main, workspace cleanup between tasks, batch branch cleanup. **If Beads:** BD_ACTOR for agent attribution.]
 
 ## Quick Reference
 
@@ -110,7 +118,7 @@ After analysis, restructure CLAUDE.md to follow this format:
 [Where things go - table or brief list, link to full doc]
 
 ### Key Commands
-[Beads, git, PR commands — these are universal]
+[Git, PR commands — these are universal. **If Beads:** include Beads commands (`bd ready`, `bd create`, `bd close`, etc.).]
 [Lint, test, install, dev server commands — these are project-specific, populated by the Dev Setup prompt. The workflow references this table instead of hardcoding commands.]
 
 ### When to Consult Other Docs
@@ -130,7 +138,7 @@ After analysis, restructure CLAUDE.md to follow this format:
 ## Rules
 
 ### Git Rules
-[Branch format, commit format with [BD-<id>] prefix, forbidden actions like push to main, --force-with-lease only]
+[Branch format, commit format, forbidden actions like push to main, --force-with-lease only. **If Beads:** commit format uses `[BD-<id>]` prefix and branch format uses `bd-<id>/`. **Without Beads:** conventional commits and `<type>/` branch prefixes.]
 
 ### Code Rules
 [AI-Specific pitfalls to avoid - consolidated from all docs]
@@ -149,7 +157,7 @@ After analysis, restructure CLAUDE.md to follow this format:
 
 ## Autonomous Behavior
 [Fix bugs on sight, keep working until no tasks, use subagents]
-[Every fix/enhancement needs a Beads task — commit messages require task ID]
+[**If Beads:** Every fix/enhancement needs a Beads task — commit messages require task ID]
 ```
 
 ## Optimization Principles
@@ -201,15 +209,19 @@ Before finalizing, verify CLAUDE.md explicitly covers:
 
 1. **Never push to main** — main is protected, all changes via PR
 2. **PR workflow** — rebase onto origin/main, then `gh pr create`, then `gh pr merge --squash --auto --delete-branch`, then `gh pr checks --watch --fail-fast`, then `gh pr view --json state -q .state` must show "MERGED"
-3. **AI review before push** — spawn review subagent to check diff against CLAUDE.md + docs/coding-standards.md, fix P0/P1 findings, re-run lint+test, log recurring patterns to tasks/lessons.md
-4. **Task closure** — two variants: single agent (checkout main, delete branch, prune) and worktree agent (fetch, prune, clean — cannot checkout main). Both use `bd close`, `bd sync`
-5. **Continuous work loop** — clean workspace between tasks, keep working until `bd ready` returns nothing
-6. **Parallel agent setup** — permanent worktrees with workspace branches, BD_ACTOR, agents always branch from `origin/main`, never `git checkout main`
+3. **AI review before push** — spawn review subagent to check diff against CLAUDE.md + docs/coding-standards.md, fix P0/P1 findings, re-run lint+test, log recurring patterns to tasks/lessons.md (if it exists)
+4. **Branch cleanup** — two variants: single agent (checkout main, delete branch, prune) and worktree agent (fetch, prune, clean — cannot checkout main)
+5. **Continuous work loop** — clean workspace between tasks, keep working until no tasks remain
+6. **Parallel agent setup** — permanent worktrees with workspace branches, agents always branch from `origin/main`, never `git checkout main`
 7. **TDD always** — failing test before implementation, loop repeats per piece of functionality, multiple commits per task squash-merge
-8. **Every commit needs a Beads task** — commit messages require `[BD-<id>]` format
-9. **Error recovery** — test failures, merge conflicts, CI failures, crashed sessions, orphaned worktree work
-10. **Honesty over agreement** — if an approach has clear problems, say so directly, explain the downside, propose an alternative, and accept override. Never comply with a flawed approach just to avoid friction
-11. **Scope discipline** — flag when a task is growing beyond its original scope, suggest breaking it into phases, and get explicit confirmation before expanding
+8. **Error recovery** — test failures, merge conflicts, CI failures, crashed sessions, orphaned worktree work
+9. **Honesty over agreement** — if an approach has clear problems, say so directly, explain the downside, propose an alternative, and accept override. Never comply with a flawed approach just to avoid friction
+10. **Scope discipline** — flag when a task is growing beyond its original scope, suggest breaking it into phases, and get explicit confirmation before expanding
+
+**If Beads, also verify:**
+11. **Task closure** — `bd close <id>` and `bd sync` after merge (both single-agent and worktree variants)
+12. **Every commit needs a Beads task** — commit messages require `[BD-<id>]` format
+13. **BD_ACTOR** — set in parallel agent worktrees for attribution
 
 ## After This Step
 

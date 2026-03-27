@@ -311,10 +311,11 @@ Test that these commands (used in the canonical workflow) don't prompt:
 | `gh pr merge --squash --auto --delete-branch` | PR workflow |
 | `gh pr checks --watch --fail-fast` | CI watch (long-running) |
 | `gh pr view --json state -q .state` | Merge confirmation |
-| `bd ready` | Task selection |
-| `bd create "test" -p 3` | Task creation |
-| `bd close <id>` | Task closure |
-| `bd sync` | Task sync |
+<!-- If using Beads, also test: -->
+<!-- | `bd ready` | Task selection | -->
+<!-- | `bd create "test" -p 3` | Task creation | -->
+<!-- | `bd close <id>` | Task closure | -->
+<!-- | `bd sync` | Task sync | -->
 | `make lint` | Verification |
 | `make test` | Verification |
 
@@ -345,12 +346,11 @@ Six common causes:
 
 ```bash
 git add .claude/settings.json
-git commit -m "[BD-0] chore: configure Claude Code permissions"
+git commit -m "chore: configure Claude Code permissions"
 ```
 
 ## Process
-- Create a Beads task: `bd create "chore: configure Claude Code permissions" -p 0`
-  and `bd update <id> --claim`
+- If using Beads: create a task (`bd create "chore: configure Claude Code permissions" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 - Read the user's existing `~/.claude/settings.json` before making changes — if it
   exists, MERGE entries; do not replace the file
 - The bare `"Bash"` entry in the user-level allow array is CRITICAL — verify it is
@@ -364,7 +364,7 @@ git commit -m "[BD-0] chore: configure Claude Code permissions"
   `mcp__*` as a fallback (in case the bug is fixed).
 - Run the verification checklist (Tier 1 first). If any compound command prompts,
   the bare `"Bash"` entry is missing — fix before continuing
-- When both files are created, verified, and committed: `bd close <id>`
+- When both files are created, verified, and committed, the step is done
 
 ## After This Step
 

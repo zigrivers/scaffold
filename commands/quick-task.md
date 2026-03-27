@@ -1,10 +1,12 @@
 ---
-description: "Create a focused Beads task for a bug fix, refactor, or small improvement"
-long-description: "Creates a single well-defined Beads task with acceptance criteria, test plan, and implementation notes for a focused code change."
+description: "Create a focused task for a bug fix, refactor, or small improvement"
+long-description: "Creates a single well-defined task with acceptance criteria, test plan, and implementation notes for a focused code change. Uses Beads if configured, otherwise documents the task in markdown."
 argument-hint: "<task description>"
 ---
 
-Create a focused Beads task for a small, well-defined piece of work — a bug fix, refactor, performance improvement, or minor refinement. This prompt produces a single, implementation-ready task with clear acceptance criteria and a TDD test plan, without the full discovery process of the Enhancement prompt.
+Create a focused task for a small, well-defined piece of work — a bug fix, refactor, performance improvement, or minor refinement. This prompt produces a single, implementation-ready task with clear acceptance criteria and a TDD test plan, without the full discovery process of the Enhancement prompt.
+
+**Beads Detection:** Check if `.beads/` directory exists. If yes, create the task via `bd create` and manage it with Beads commands. If no, document the task directly and proceed to implementation.
 
 ## The Request
 
@@ -45,7 +47,7 @@ Before asking questions, review:
 - Relevant source code — Read the files that will be modified
 
 ### Check for Duplicates
-Run `bd list` and check for existing tasks that overlap with this request. If a matching or overlapping task exists:
+**If Beads:** Run `bd list` and check for existing tasks that overlap with this request. If a matching or overlapping task exists:
 - Tell the user which task(s) already cover this work
 - Ask whether to proceed (create a new task) or use the existing one
 - If proceeding, note the relationship in the new task's description
@@ -120,14 +122,15 @@ Reference `docs/tdd-standards.md` for the project's test conventions:
 
 ---
 
-## Phase 3: Create the Beads Task
+## Phase 3: Create the Task
 
-Create the task:
-
+**If Beads:**
 ```bash
 bd create "type(scope): description" -p <priority>
 # Example: bd create "fix(auth): prevent duplicate session creation on rapid re-login" -p 2
 ```
+
+**Without Beads:** Document the task inline and proceed directly to implementation.
 
 Then set the task description with the full context from Phase 2. Include all of:
 
@@ -291,7 +294,7 @@ Here's what the output looks like for a typical quick task:
 When this step is complete, tell the user:
 
 ---
-**Quick task created** — Beads task ready with acceptance criteria, test plan, and implementation notes.
+**Quick task created** — Task ready with acceptance criteria, test plan, and implementation notes.
 
 **Next:** Run `/scaffold:single-agent-start` or `/scaffold:single-agent-resume` to begin implementation (or `/scaffold:multi-agent-start <agent-name>` / `/scaffold:multi-agent-resume <agent-name>` for worktree agents).
 

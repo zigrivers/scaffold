@@ -269,8 +269,7 @@ Use AskUserQuestionTool to ask me:
 - Don't configure dark mode unless I explicitly want it
 
 ## Process
-- Create a Beads task for this work before starting: `bd create "docs: <document being created>" -p 0` and `bd update <id> --claim`
-- When the document is complete and committed, close it: `bd close <id>`
+- If using Beads: create a task before starting (`bd create "docs: <document being created>" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 - If this work surfaces implementation tasks (bugs, missing infrastructure), create separate Beads tasks for those — don't try to do them now
 - Research modern design systems (Tailwind defaults, shadcn/ui, Radix, Linear, Vercel) for inspiration
 - Ask me design direction questions early, before making choices

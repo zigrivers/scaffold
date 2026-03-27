@@ -116,8 +116,7 @@ This project will be built and maintained entirely by AI agents. Every technolog
 
 ## Process
 - **First**, gather user preferences using AskUserQuestion as described in Step 1 above — do this before creating the Beads task or starting any research
-- Create a Beads task for this work: `bd create "docs: <document being created>" -p 0` and `bd update <id> --claim`
-- When the document is complete and committed, close it: `bd close <id>`
+- If using Beads: create a task before starting (`bd create "docs: <document being created>" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 - If this work surfaces implementation tasks (bugs, missing infrastructure), create separate Beads tasks for those — don't try to do them now
 - Use subagents to research and compare tech stack options in parallel
 - Cross-reference every PRD feature against the proposed stack — verify nothing requires a capability the stack doesn't support

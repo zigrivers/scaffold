@@ -11,10 +11,10 @@ knowledge-base: [dev-environment]
 
 ## Purpose
 Configure the repository for parallel Claude Code sessions working simultaneously.
-Define branching strategy (one task = one branch = one PR), commit standards with
-Beads task IDs, rebase strategy, PR workflow with squash-merge and auto-merge,
-worktree setup for parallel agents, CI pipeline, branch protection, and conflict
-prevention rules.
+Define branching strategy (one task = one branch = one PR), commit standards
+(with Beads task IDs if configured, conventional commits otherwise), rebase
+strategy, PR workflow with squash-merge and auto-merge, worktree setup for
+parallel agents, CI pipeline, branch protection, and conflict prevention rules.
 
 ## Inputs
 - CLAUDE.md (required) — Key Commands table for lint/test/install commands
@@ -32,14 +32,14 @@ prevention rules.
   Worktree Awareness, and Code Review sections
 
 ## Quality Criteria
-- Branch naming format is bd-<task-id>/<short-desc> from origin/main
-- Commit format is [BD-<id>] type(scope): description consistently
+- Branch naming format is consistent (Beads: bd-<task-id>/<desc>. Non-Beads: <type>/<desc>)
+- Commit format is consistent (Beads: [BD-<id>] type(scope): desc. Non-Beads: type(scope): desc)
 - PR workflow includes all 8 sub-steps (commit, AI review, rebase, push, create,
   auto-merge with --delete-branch, watch CI, confirm merge)
 - Worktree script creates permanent worktrees with workspace branches
-- BD_ACTOR environment variable documented for agent identity
+- If Beads: BD_ACTOR environment variable documented for agent identity
 - CI workflow job name matches branch protection context
-- Task closure documented for both single-agent and worktree-agent variants
+- Branch cleanup documented for both single-agent and worktree-agent variants
 - Agent crash recovery procedure documented
 - Conflict prevention rule: don't parallelize tasks touching same files
 

@@ -221,8 +221,7 @@ Before creating a new file, check project-structure.md for the correct location.
 - Use AskUserQuestionTool for key decisions: organization strategy, test location, barrel file policy
 - After documenting, actually create the directory structure and commit it
 - Verify the structure works by checking that imports resolve correctly (if tooling is set up)
-- Create a Beads task for this work before starting: `bd create "docs: <document being created>" -p 0` and `bd update <id> --claim`
-- When the document is complete and committed, close it: `bd close <id>`
+- If using Beads: create a task before starting (`bd create "docs: <document being created>" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 - If this work surfaces implementation tasks (bugs, missing infrastructure), create separate Beads tasks for those — don't try to do them now
 
 ## After This Step
