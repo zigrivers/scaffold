@@ -17,7 +17,7 @@ Use user stories and their acceptance criteria to discover entities, events,
 and aggregate boundaries. User actions reveal the domain model.
 
 ## Inputs
-- docs/prd.md (required) — requirements defining the problem space
+- docs/plan.md (required) — requirements defining the problem space
 - docs/reviews/pre-review-prd.md (optional) — review findings for context
 - docs/prd-innovation.md (optional) — innovation findings and approved enhancements
 - docs/user-stories.md (required) — user stories with acceptance criteria for domain discovery

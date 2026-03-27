@@ -18,7 +18,7 @@ allowed only via the innovation step with explicit user approval. Flag any
 scope expansion for explicit approval.
 
 ## Inputs
-- All phase output artifacts (docs/prd.md, docs/domain-models/, docs/adrs/,
+- All phase output artifacts (docs/plan.md, docs/domain-models/, docs/adrs/,
   docs/system-architecture.md, etc.)
 
 ## Expected Outputs

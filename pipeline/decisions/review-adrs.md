@@ -17,7 +17,7 @@ trade-offs.
 ## Inputs
 - docs/adrs/ (required) — ADRs to review
 - docs/domain-models/ (required) — for coverage checking
-- docs/prd.md (required) — for requirement tracing
+- docs/plan.md (required) — for requirement tracing
 
 ## Expected Outputs
 - docs/reviews/review-adrs.md — findings and resolution log

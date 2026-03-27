@@ -9,7 +9,7 @@ Compare every specification artifact against the PRD to ensure the documented sy
 
 Read all of these artifacts (skip any that do not exist):
 
-- `docs/prd.md` — Source of truth for scope (primary input)
+- `docs/plan.md` — Source of truth for scope (primary input)
 - `docs/user-stories.md` — Stories and acceptance criteria
 - `docs/domain-models/` — Entities and aggregates
 - `docs/system-architecture.md` — Components, services, infrastructure

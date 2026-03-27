@@ -9,7 +9,7 @@ Audit all pipeline artifacts for cross-phase consistency. When different phases 
 
 Read all of these artifacts (skip any that do not exist):
 
-- `docs/prd.md` — Requirements and scope
+- `docs/plan.md` — Requirements and scope
 - `docs/domain-models/` — Entities, aggregates, value objects, events, invariants
 - `docs/adrs/` — Architectural decision records
 - `docs/system-architecture.md` — Components, data flows, interfaces

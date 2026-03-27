@@ -16,7 +16,7 @@ and missing error states.
 
 ## Inputs
 - docs/ux-spec.md (required) — spec to review
-- docs/prd.md (required) — for journey coverage
+- docs/plan.md (required) — for journey coverage
 - docs/api-contracts.md (optional) — for data shape alignment
 
 ## Expected Outputs

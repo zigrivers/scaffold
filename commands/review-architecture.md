@@ -22,7 +22,7 @@ Check if `docs/reviews/review-architecture.md` already exists:
 
 ### Step 1: Read the Artifact
 
-Read `docs/system-architecture.md` completely. Also read `docs/domain-models/`, `docs/adrs/`, and `docs/prd.md` as upstream artifacts for cross-reference and compliance checking.
+Read `docs/system-architecture.md` completely. Also read `docs/domain-models/`, `docs/adrs/`, and `docs/plan.md` as upstream artifacts for cross-reference and compliance checking.
 
 ### Step 2: Multi-Pass Review
 
@@ -114,7 +114,7 @@ If neither CLI is available, perform a structured adversarial self-review instea
 
 ## Process
 
-1. Read `docs/system-architecture.md`, `docs/domain-models/`, `docs/adrs/`, and `docs/prd.md`
+1. Read `docs/system-architecture.md`, `docs/domain-models/`, `docs/adrs/`, and `docs/plan.md`
 2. Execute all 10 review passes sequentially — do not combine passes
 3. Categorize every finding by severity (P0-P3) using the review methodology
 4. Create fix plan grouped by root cause and severity

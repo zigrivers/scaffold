@@ -19,7 +19,7 @@ This is the foundation document that all subsequent phases reference.
 - Existing project files (if brownfield — any README, docs, or code)
 
 ## Expected Outputs
-- docs/prd.md — Product requirements document
+- docs/plan.md — Product requirements document
 
 ## Quality Criteria
 - Problem statement is specific and testable (not vague aspirations)
@@ -40,6 +40,6 @@ This is the foundation document that all subsequent phases reference.
   phased delivery.
 
 ## Mode Detection
-If docs/prd.md exists, operate in update mode: read existing content, identify
+If docs/plan.md exists, operate in update mode: read existing content, identify
 what has changed or been learned since it was written, propose targeted updates.
 Preserve existing decisions unless explicitly revisiting them.

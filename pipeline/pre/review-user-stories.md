@@ -20,7 +20,7 @@ independent coverage validation.
 
 ## Inputs
 - docs/user-stories.md (required) — stories to review
-- docs/prd.md (required) — source requirements for coverage checking
+- docs/plan.md (required) — source requirements for coverage checking
 - docs/reviews/user-stories/ artifacts (optional) — prior review findings in update mode
 
 ## Expected Outputs

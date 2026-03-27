@@ -16,7 +16,7 @@ that all dependencies are satisfied before dependent tasks, and that no
 critical tasks are missing from the graph.
 
 ## Inputs
-- All phase output artifacts (docs/prd.md, docs/domain-models/, docs/adrs/,
+- All phase output artifacts (docs/plan.md, docs/domain-models/, docs/adrs/,
   docs/system-architecture.md, etc.)
 
 ## Expected Outputs

@@ -3,7 +3,7 @@ description: "Model project domains using DDD tactical and strategic patterns"
 long-description: "Reads the PRD and user stories, then creates docs/domain-models/ with bounded contexts, entities, value objects, aggregates, domain events, and invariants using Domain-Driven Design."
 ---
 
-Read `docs/prd.md` and `docs/user-stories.md`, then create a complete domain model for the project using Domain-Driven Design. Produce one file per bounded context in `docs/domain-models/` plus an `index.md` overview of all domains and their relationships.
+Read `docs/plan.md` and `docs/user-stories.md`, then create a complete domain model for the project using Domain-Driven Design. Produce one file per bounded context in `docs/domain-models/` plus an `index.md` overview of all domains and their relationships.
 
 ## Mode Detection
 
@@ -17,7 +17,7 @@ Before starting, check if the `docs/domain-models/` directory already exists:
    - **ADD** — Required by current prompt but missing from existing models
    - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
    - **PRESERVE** — Project-specific entity decisions, relationship choices, invariant customizations
-3. **Cross-doc consistency**: Read related docs (`docs/prd.md`, `docs/user-stories.md`) and verify models align with current requirements. Skip any that don't exist yet.
+3. **Cross-doc consistency**: Read related docs (`docs/plan.md`, `docs/user-stories.md`) and verify models align with current requirements. Skip any that don't exist yet.
 4. **Preview changes**: Present the user a summary:
    | Action | Domain/Section | Detail |
    |--------|----------------|--------|
@@ -36,7 +36,7 @@ Before starting, check if the `docs/domain-models/` directory already exists:
 - **Primary output**: `docs/domain-models/` directory
 - **Secondary output**: `docs/domain-models/index.md`
 - **Preserve**: Entity relationship decisions, aggregate boundary justifications, domain-specific invariants, ubiquitous language glossary entries
-- **Related docs**: `docs/prd.md`, `docs/user-stories.md`, `docs/prd-innovation.md`
+- **Related docs**: `docs/plan.md`, `docs/user-stories.md`, `docs/prd-innovation.md`
 - **Special rules**: Never delete user-customized invariants or relationship decisions without explicit approval. Preserve ubiquitous language terms that have been refined.
 
 ---
@@ -130,7 +130,7 @@ The index must contain:
 
 ## Process
 
-1. **Read all inputs** — Read `docs/prd.md` and `docs/user-stories.md` completely. Read `docs/prd-innovation.md` if it exists.
+1. **Read all inputs** — Read `docs/plan.md` and `docs/user-stories.md` completely. Read `docs/prd-innovation.md` if it exists.
 2. **Use AskUserQuestionTool** for these decisions:
    - **Modeling depth**: Full DDD (separate files per domain, detailed tactical patterns) or lightweight (single-file entity overview with key relationships)?
    - **Any known domain boundaries**: Does the user already have opinions about how domains should be organized?

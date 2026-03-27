@@ -22,7 +22,7 @@ Check if `docs/reviews/review-ux.md` already exists:
 
 ### Step 1: Read the Artifact
 
-Read `docs/ux-spec.md` completely. Also read `docs/prd.md` for journey coverage cross-reference and `docs/api-contracts.md` (if available) for data shape alignment.
+Read `docs/ux-spec.md` completely. Also read `docs/plan.md` for journey coverage cross-reference and `docs/api-contracts.md` (if available) for data shape alignment.
 
 ### Step 2: Multi-Pass Review
 
@@ -105,7 +105,7 @@ If neither CLI is available, perform a structured adversarial self-review instea
 
 ## Process
 
-1. Read `docs/ux-spec.md`, `docs/prd.md`, and `docs/api-contracts.md` (if it exists)
+1. Read `docs/ux-spec.md`, `docs/plan.md`, and `docs/api-contracts.md` (if it exists)
 2. Execute all 7 review passes sequentially — do not combine passes
 3. Categorize every finding by severity (P0-P3) using the review methodology
 4. Create fix plan grouped by root cause and severity

@@ -9,7 +9,7 @@ Build a traceability matrix that maps every PRD requirement through the full pip
 
 Read all of these artifacts (skip any that do not exist):
 
-- `docs/prd.md` — Source of all requirements
+- `docs/plan.md` — Source of all requirements
 - `docs/user-stories.md` — Stories and acceptance criteria
 - `docs/domain-models/` — Entities, aggregates, events, invariants
 - `docs/adrs/` — Architectural decision records

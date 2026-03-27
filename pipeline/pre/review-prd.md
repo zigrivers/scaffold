@@ -16,12 +16,12 @@ fixes, and re-validate. Ensures the PRD is complete, clear, consistent, and
 ready for User Stories to consume.
 
 ## Inputs
-- docs/prd.md (required) — PRD to review
+- docs/plan.md (required) — PRD to review
 - Project idea or brief (context from user, if available)
 
 ## Expected Outputs
 - docs/reviews/pre-review-prd.md — review findings, fix plan, and resolution log
-- docs/prd.md — updated with fixes
+- docs/plan.md — updated with fixes
 
 ## Quality Criteria
 - All review passes executed with findings documented

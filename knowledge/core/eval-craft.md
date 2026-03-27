@@ -284,7 +284,7 @@ Rule of thumb: if grep can find it, use grep. If grep finds too many false posit
 
 #### What to Check
 
-- **Feature coverage**: Every Must-have feature in `docs/plan.md` or `docs/prd.md` maps to at least one implementation file. Match by keywords from the feature description against file names and file content.
+- **Feature coverage**: Every Must-have feature in `docs/plan.md` or `docs/plan.md` maps to at least one implementation file. Match by keywords from the feature description against file names and file content.
 - **AC coverage**: Every acceptance criterion in `docs/user-stories.md` is referenced by at least one test file. Match by domain keywords extracted from the AC text.
 - **API coverage**: Every API endpoint described in docs has a route definition and at least one test.
 

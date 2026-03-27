@@ -16,13 +16,13 @@ NOT UX-level enhancement (that belongs in user story innovation) — it focuses
 on whether the right features are in the PRD at all.
 
 ## Inputs
-- docs/prd.md (required) — PRD to analyze for innovation opportunities
+- docs/plan.md (required) — PRD to analyze for innovation opportunities
 - docs/reviews/pre-review-prd.md (optional) — review findings for context
 
 ## Expected Outputs
 - docs/prd-innovation.md — innovation findings, suggestions with cost/impact
   assessment, and disposition (accepted/rejected/deferred)
-- docs/prd.md — updated with approved innovations
+- docs/plan.md — updated with approved innovations
 
 ## Quality Criteria
 - Enhancements are feature-level, not UX-level polish

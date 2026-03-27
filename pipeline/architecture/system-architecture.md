@@ -17,7 +17,7 @@ organization. Project directory structure and module organization are defined he
 ## Inputs
 - docs/domain-models/ (required) — domain models from modeling phase
 - docs/adrs/ (required) — architecture decisions from decisions phase
-- docs/prd.md (required) — requirements driving architecture
+- docs/plan.md (required) — requirements driving architecture
 
 ## Expected Outputs
 - docs/system-architecture.md — architecture document with component design,

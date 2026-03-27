@@ -3,7 +3,7 @@ description: "Design system architecture with components, data flows, and module
 long-description: "Reads domain models and ADRs, then creates docs/system-architecture.md defining component design, data flows, module organization, state management, and extension points."
 ---
 
-Read `docs/domain-models/`, `docs/adrs/`, and `docs/prd.md`, then design and document the system architecture. Create `docs/system-architecture.md` translating domain models and ADR decisions into a concrete component structure, data flows, and module organization.
+Read `docs/domain-models/`, `docs/adrs/`, and `docs/plan.md`, then design and document the system architecture. Create `docs/system-architecture.md` translating domain models and ADR decisions into a concrete component structure, data flows, and module organization.
 
 ## Mode Detection
 
@@ -17,7 +17,7 @@ Before starting, check if `docs/system-architecture.md` already exists:
    - **ADD** — Required sections missing from the existing document
    - **RESTRUCTURE** — Exists but doesn't match current prompt's structure
    - **PRESERVE** — Project-specific component decisions, custom data flows, directory structure choices
-3. **Cross-doc consistency**: Read related docs (`docs/domain-models/`, `docs/adrs/`, `docs/prd.md`) and verify architecture aligns with current domain models and decisions. Skip any that don't exist.
+3. **Cross-doc consistency**: Read related docs (`docs/domain-models/`, `docs/adrs/`, `docs/plan.md`) and verify architecture aligns with current domain models and decisions. Skip any that don't exist.
 4. **Preview changes**: Present the user a summary table. Wait for approval before proceeding.
 5. **Execute update**: Restructure to match current prompt's layout. Preserve project-specific content.
 6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:system-architecture v<ver> <date> -->`
@@ -28,7 +28,7 @@ Before starting, check if `docs/system-architecture.md` already exists:
 ### Update Mode Specifics
 - **Primary output**: `docs/system-architecture.md`
 - **Preserve**: Component decisions, custom data flow diagrams, module organization choices, directory structure, extension point designs
-- **Related docs**: `docs/domain-models/`, `docs/adrs/`, `docs/prd.md`
+- **Related docs**: `docs/domain-models/`, `docs/adrs/`, `docs/plan.md`
 - **Special rules**: Never remove extension points that are already implemented. Preserve directory structure decisions that are reflected in the codebase.
 
 ---
@@ -143,7 +143,7 @@ Document designed extension points (not speculative):
 
 ## Process
 
-1. **Read all inputs** — Read `docs/domain-models/`, `docs/adrs/`, and `docs/prd.md` completely.
+1. **Read all inputs** — Read `docs/domain-models/`, `docs/adrs/`, and `docs/plan.md` completely.
 2. **Use AskUserQuestionTool** for these decisions:
    - **Architecture depth**: Full specification with detailed data flows, or high-level component overview sufficient for agents to build without ambiguity?
    - **Directory structure preference**: Feature-based, layer-based, or hybrid? Any existing conventions to follow?

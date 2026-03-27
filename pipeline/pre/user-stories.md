@@ -16,7 +16,7 @@ that are testable and specific enough to drive domain modeling, UX design, and
 task decomposition downstream.
 
 ## Inputs
-- docs/prd.md (required) — features, personas, and requirements to translate
+- docs/plan.md (required) — features, personas, and requirements to translate
 - docs/reviews/pre-review-prd.md (optional) — review findings for context
 - docs/prd-innovation.md (optional) — innovation findings and approved enhancements
 

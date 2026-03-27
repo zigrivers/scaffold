@@ -166,7 +166,7 @@ The complete set of frozen artifacts should be documented in the fix log as a ma
 
 | Document | Freeze Date | P0 Fixes | P1 Fixes | P2 Deferred |
 |----------|------------|----------|----------|-------------|
-| docs/prd.md | 2025-01-15 | 0 | 2 | 1 |
+| docs/plan.md | 2025-01-15 | 0 | 2 | 1 |
 | docs/system-architecture.md | 2025-01-15 | 3 | 4 | 2 |
 | docs/api-contracts.md | 2025-01-15 | 1 | 1 | 0 |
 | docs/database-schema.md | 2025-01-15 | 2 | 3 | 1 |
