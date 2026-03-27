@@ -141,6 +141,7 @@ Read these documents and note any workflow-related content:
 | `docs/coding-standards.md` | Commit message format, TDD requirements, linting |
 | `docs/git-workflow.md` | Branch naming, PR process, merge strategy, worktree workflow |
 | `docs/implementation-plan.md` (if exists) | Task workflow references |
+| `docs/operations-runbook.md` (if exists) | CI/CD pipeline stages, deployment commands, rollback procedures |
 | `Makefile` or `package.json` or `pyproject.toml` | Available commands (lint, test, install, dev) |
 | `.github/` | PR templates, CI workflows |
 | `tasks/lessons.md` | Referenced in workflow? Contains useful patterns? |
@@ -272,6 +273,12 @@ CLAUDE.md must contain the complete workflow. Check for:
 - [ ] Agent crash recovery documented
 - [ ] No contradictory merge strategy or commit format
 
+**docs/operations-runbook.md** (if exists):
+- [ ] Deployment pipeline stages reference (not redefine) the base CI from `.github/workflows/ci.yml`
+- [ ] Dev environment section references `docs/dev-setup.md` (not redefined inline)
+- [ ] Deployment commands don't contradict git-workflow.md (e.g., merge strategy, branch protection)
+- [ ] No hardcoded lint/test commands that differ from CLAUDE.md Key Commands table
+
 **.github/PULL_REQUEST_TEMPLATE.md** (if exists):
 - [ ] References task ID format
 - [ ] Matches documented PR title format
@@ -290,7 +297,8 @@ Cross-reference all documents for contradictions:
 | Commit format | `[BD-<id>] type(scope): description` everywhere |
 | Branch naming | `bd-<task-id>/<short-desc>` from `origin/main` everywhere |
 | Merge strategy | `--squash --auto --delete-branch` stated consistently |
-| Required checks | Lint and test commands consistent across CLAUDE.md Key Commands, dev-setup.md, and Makefile/package.json |
+| Required checks | Lint and test commands consistent across CLAUDE.md Key Commands, dev-setup.md, Makefile/package.json, and operations-runbook.md (if exists) |
+| CI pipeline | Operations runbook deployment stages extend (not contradict) `.github/workflows/ci.yml` |
 | Task ID format | `[BD-<id>]` consistent (not `BD-<id>` without brackets, not `(bd-<id>)` suffix) |
 | Close command | `bd close` consistently (not `bd update --status completed`) |
 | Pull strategy | `git pull --rebase origin main` consistently |
