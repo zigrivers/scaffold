@@ -244,6 +244,61 @@ describe('detectUpdateMode', () => {
     expect(result.warnings).toHaveLength(0)
   })
 
+  it('skips directory artifacts and uses next file artifact for update mode', () => {
+    // Create a directory artifact and a file artifact
+    const dirPath = 'docs/domain-models/'
+    const filePath = 'docs/domain-models/index.md'
+    const fullDirPath = path.join(tmpDir, dirPath)
+    const fullFilePath = path.join(tmpDir, filePath)
+    fs.mkdirSync(fullDirPath, { recursive: true })
+    fs.writeFileSync(fullFilePath, '# Domain Models', 'utf8')
+
+    const state = makeState({
+      'domain-modeling': {
+        status: 'completed',
+        source: 'pipeline',
+        at: '2024-01-01T00:00:00.000Z',
+        depth: 3,
+        produces: [dirPath, filePath],
+      },
+    })
+
+    const result = detectUpdateMode({
+      step: 'domain-modeling',
+      state,
+      currentDepth: 3,
+      projectRoot: tmpDir,
+    })
+
+    expect(result.isUpdateMode).toBe(true)
+    expect(result.existingArtifact!.filePath).toBe(filePath)
+    expect(result.existingArtifact!.content).toBe('# Domain Models')
+  })
+
+  it('returns isUpdateMode: false when only directory artifacts exist', () => {
+    const dirPath = 'docs/domain-models/'
+    fs.mkdirSync(path.join(tmpDir, dirPath), { recursive: true })
+
+    const state = makeState({
+      'domain-modeling': {
+        status: 'completed',
+        source: 'pipeline',
+        at: '2024-01-01T00:00:00.000Z',
+        depth: 3,
+        produces: [dirPath],
+      },
+    })
+
+    const result = detectUpdateMode({
+      step: 'domain-modeling',
+      state,
+      currentDepth: 3,
+      projectRoot: tmpDir,
+    })
+
+    expect(result.isUpdateMode).toBe(false)
+  })
+
   it('depthIncreased is true when currentDepth > previousDepth', () => {
     const outputPath = 'docs/prd.md'
     const fullPath = path.join(tmpDir, outputPath)

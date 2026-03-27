@@ -41,13 +41,18 @@ export function detectUpdateMode(options: {
     return { isUpdateMode: false, currentDepth, warnings: [] }
   }
 
-  // Find the first artifact that exists on disk
+  // Find the first file artifact that exists on disk (skip directories)
   let firstExistingRelPath: string | undefined
   for (const relativePath of produces) {
     const fullPath = path.resolve(projectRoot, relativePath)
-    if (fs.existsSync(fullPath)) {
-      firstExistingRelPath = relativePath
-      break
+    try {
+      const stat = fs.statSync(fullPath)
+      if (stat.isFile()) {
+        firstExistingRelPath = relativePath
+        break
+      }
+    } catch {
+      // Path does not exist — skip
     }
   }
 
