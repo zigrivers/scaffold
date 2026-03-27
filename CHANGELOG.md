@@ -2,6 +2,13 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.17.1] — 2026-03-27
+
+### Fixed
+
+- **prompt-pipeline.md rewritten** — The `/scaffold:prompt-pipeline` command was severely outdated (showed 20 steps in 7 phases). Rewritten to show the complete 48-step pipeline across all phases including modeling, architecture, specification, quality gates, validation, finalization, and ai-memory-setup.
+- **Resume commands non-Beads fallback** — `single-agent-resume` and `multi-agent-resume` assumed Beads with no fallback. Now handle non-Beads projects (read `docs/implementation-plan.md` for task tracking).
+
 ## [2.17.0] — 2026-03-27
 
 ### Added
