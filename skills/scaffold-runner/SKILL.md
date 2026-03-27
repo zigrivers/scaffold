@@ -138,10 +138,24 @@ Respond to these natural language requests:
 | "Where am I?" / "Pipeline status" | Run `scaffold status`, present progress summary |
 | "What does X do?" | Run `scaffold info <step>`, present purpose and dependencies |
 | "Skip X" | Run `scaffold skip <step> --reason "<user's reason>"` |
-| "Go back to X" | Run `scaffold reset <step>`, explain implications |
+| "Re-run X" / "Redo X" / "Go back to X" | Reset then re-run: `scaffold reset <step> --force && scaffold run <step>` |
+| "Reset X" / "Reset X to pending" | Run `scaffold reset <step>`, confirm if completed |
 | "Show the full pipeline" | Run `scaffold list`, present with status indicators |
 | "Open the dashboard" | Run `scaffold dashboard` |
 | "Switch to MVP" / "Change depth" | Run `scaffold init --methodology <preset>` |
+
+### Re-running Steps
+
+When the user wants to re-run a completed step (e.g., "re-run the PRD", "redo create-prd", "I want to update my user stories"):
+
+1. **Reset the step to pending**: Run `scaffold reset <step> --force`
+2. **Then run it**: Follow the normal Smart Scaffold Execution workflow (preview → extract decisions → ask user → execute)
+3. The step will run in **update mode** — it detects the existing artifact and updates it rather than starting from scratch
+
+This is useful when:
+- The user wants to incorporate new requirements into an existing artifact
+- A prior step was run at a shallow depth and the user wants to re-run at deeper depth
+- The user modified upstream documents and wants downstream steps to reflect changes
 
 ## Error Handling
 
