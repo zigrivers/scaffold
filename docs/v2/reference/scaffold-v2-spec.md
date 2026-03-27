@@ -203,7 +203,6 @@ pipeline/
   single-agent-resume.md
   multi-agent-resume.md
   multi-model-review.md
-  user-stories-multi-model-review.md
   platform-parity-review.md
   ...
 ```
@@ -253,7 +252,6 @@ steps:
   add-maestro: { enabled: true, depth: 5, optional: { requires: mobile } }
   user-stories: { enabled: true, depth: 5 }
   user-stories-gaps: { enabled: true, depth: 5 }
-  user-stories-multi-model-review: { enabled: true, depth: 5, optional: { requires: multi-model-cli } }
   platform-parity-review: { enabled: true, depth: 5, optional: { requires: multi-platform } }
   claude-md-optimization: { enabled: true, depth: 5 }
   workflow-audit: { enabled: true, depth: 5 }

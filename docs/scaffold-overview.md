@@ -74,7 +74,6 @@ Phases are run in order, with explicit dependency constraints between prompts. S
 |---|---------|-------------|----------|
 | 14 | `user-stories` | Create user stories covering every PRD feature | |
 | 15 | `user-stories-gaps` | Gap analysis and UX innovation for user stories | |
-| 15.5 | `user-stories-multi-model-review` | Multi-model review of user stories for PRD coverage | **(optional)** Requires Codex/Gemini CLI |
 | 16 | `platform-parity-review` | Audit platform coverage across all docs | **(optional)** Multi-platform projects only |
 
 ### Phase 6 — Consolidation & Verification

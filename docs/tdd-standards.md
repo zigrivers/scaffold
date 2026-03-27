@@ -91,7 +91,6 @@ tests/
 ├── uninstall.bats               # Tests for scripts/uninstall.sh
 ├── update.bats                  # Tests for scripts/update.sh
 ├── extract-commands.bats        # Tests for scripts/extract-commands.sh
-├── user-stories-mmr.bats        # Tests for scripts/user-stories-mmr.sh
 ├── resolve-deps.bats            # Tests for scripts/resolve-deps.sh
 ├── resolve-profile.bats         # Tests for scripts/resolve-profile.sh
 ├── resolve-prompt.bats          # Tests for scripts/resolve-prompt.sh
@@ -293,14 +292,6 @@ MOCK
     assert_success
 }
 
-@test "user-stories-mmr exits 1 when neither codex nor gemini available" {
-    # No mocks on PATH — commands don't exist
-    # Override HAS_CODEX/HAS_GEMINI check by ensuring command -v fails
-    run bash "$PROJECT_ROOT/scripts/user-stories-mmr.sh" \
-        --skip-codex --skip-gemini
-    assert_failure 1
-    assert_output --partial "Neither Codex nor Gemini"
-}
 ```
 
 ### Pattern D: Testing Exit Codes and Stderr
@@ -591,7 +582,6 @@ open coverage/index.html
 | Validation scripts (`validate-config.sh`, `validate-frontmatter.sh`) | 90%+ branch | Correctness is their entire purpose |
 | Core scripts (`resolve-deps.sh`, `resolve-profile.sh`, `resolve-prompt.sh`) | 80%+ branch | Algorithmic — most branches are reachable |
 | File operation scripts (`install.sh`, `uninstall.sh`, `update.sh`) | 80%+ branch | File system edge cases matter |
-| Network-dependent scripts (`user-stories-mmr.sh`) | 70%+ branch | Heavily mocked — real coverage is lower |
 | `extract-commands.sh` | 70%+ branch | Text parsing with many edge cases — focus on common paths |
 
 ### What to Measure

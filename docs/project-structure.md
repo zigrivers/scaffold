@@ -25,8 +25,6 @@ scaffold/
 │   ├── setup-agent-worktree.sh
 │   ├── uninstall.sh
 │   ├── update.sh
-│   ├── user-stories-mmr.schema.json
-│   ├── user-stories-mmr.sh
 │   └── validate-frontmatter.sh
 ├── lib/                       # Shared assets
 │   └── dashboard-theme.css    # Dashboard CSS (embedded into generated HTML)
@@ -123,7 +121,7 @@ Scaffold uses a **role-based** organization. Each directory has a single clear p
 | File Type | Location | Naming Convention | Example |
 |-----------|----------|-------------------|---------|
 | Bash scripts | `scripts/` | `<name>.sh` (kebab-case) | `scripts/generate-dashboard.sh` |
-| JSON schemas | `scripts/` | `<name>.schema.json` | `scripts/user-stories-mmr.schema.json` |
+| JSON schemas | `scripts/` | `<name>.schema.json` | `scripts/implementation-plan-mmr.schema.json` |
 | Command prompts | `commands/` | `<slug>.md` (generated from `prompts.md`) | `commands/tech-stack.md` |
 | Documentation | `docs/` | `<topic>.md` (kebab-case) | `docs/coding-standards.md` |
 | Test files | `tests/` | `<script-name>.bats` | `tests/generate-dashboard.bats` |

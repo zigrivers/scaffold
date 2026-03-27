@@ -69,9 +69,6 @@ Lets Claude control a real browser for visual testing and screenshots.
 **ChatGPT subscription** (for multi-model review)
 One optional step (`multi-model-review`) sets up automated code review using both Claude and OpenAI's Codex. Requires a ChatGPT subscription (Plus, Pro, or Team). Skip this step if you don't have one.
 
-**Codex CLI and/or Gemini CLI** (for multi-model stories review)
-One optional step (`user-stories-multi-model-review`) runs independent AI reviewers against your user stories. You need at least one of: Codex CLI (requires ChatGPT subscription) or Gemini CLI (free tier available). See [Multi-Model Stories Review Setup](docs/multi-model-stories-review-setup.md).
-
 ## Installation
 
 Scaffold has two parts that install separately:
@@ -308,7 +305,6 @@ Multi-model reviews and cross-platform checks.
 
 | Step | What It Does |
 |------|-------------|
-| `user-stories-multi-model-review` | Multi-model coverage audit of user stories *(optional)* |
 | `platform-parity-review` | Audit platform coverage across docs *(multi-platform only)* |
 
 ### Phase 11 — Consolidation (consolidation)

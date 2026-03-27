@@ -1,6 +1,6 @@
 ---
 description: "User stories review for completeness and quality"
-long-description: "Performs a structured multi-pass review of user stories, targeting failure modes specific to story artifacts. Covers PRD coverage, acceptance criteria quality, story independence, persona coverage, sizing, and downstream readiness for domain modeling."
+long-description: "Performs a structured multi-pass review of user stories, targeting failure modes specific to story artifacts. Covers PRD coverage, acceptance criteria quality, story independence, persona coverage, sizing, and downstream readiness for domain modeling. At depth 4+, builds a formal requirements index and coverage matrix. At depth 5, dispatches to external AI models for independent validation."
 ---
 
 Perform a structured multi-pass review of user stories, targeting failure modes specific to story artifacts. Follow the review methodology from review-methodology knowledge base.
@@ -17,6 +17,7 @@ Check if `docs/reviews/pre-review-user-stories.md` already exists:
 3. Run all review passes again on the current user stories
 4. Focus on: remaining unresolved findings, regressions from fixes, and any new stories added since the last review
 5. Update the review report rather than replacing it — preserve the fix history
+6. If `docs/reviews/user-stories/requirements-index.md` exists (from a prior depth 4+ run), preserve all REQ-xxx IDs — never renumber. New requirements get the next available ID in sequence.
 
 ## Review Process
 
@@ -79,6 +80,162 @@ Re-validation is complete when all P0 and P1 findings are resolved and no new P0
 
 Write the full review report to `docs/reviews/pre-review-user-stories.md` including: executive summary, findings by pass, fix plan, fix log, re-validation results, and downstream readiness assessment.
 
+### Step 6: Requirements Index & Coverage Matrix (Depth 4+)
+
+**Skip this step if running at depth 1-3.**
+
+Build a formal requirements traceability system to enforce 100% PRD coverage.
+
+#### 6a: Build Atomic PRD Requirements Index
+
+Read `docs/plan.md` thoroughly. Extract every distinct, testable requirement into an atomic list.
+
+Create `docs/reviews/user-stories/requirements-index.md`:
+
+```markdown
+# PRD Requirements Index
+
+Atomic requirements extracted from docs/plan.md for traceability.
+
+| ID | Requirement | PRD Section | Priority |
+|----|-------------|-------------|----------|
+| REQ-001 | Users can create an account with email and password | User Authentication | Must |
+| REQ-002 | Users can reset their password via email link | User Authentication | Must |
+| ... | ... | ... | ... |
+```
+
+Rules:
+- One requirement per row — split compound requirements ("X and Y") into separate rows
+- Each requirement must be testable (a developer could write a pass/fail test for it)
+- Include implicit requirements (error handling, validation, accessibility) if the PRD implies them
+- Priority comes from PRD emphasis (Must/Should/Could/Won't)
+
+#### 6b: Create Coverage Map
+
+Map each requirement to the user story (or stories) that cover it.
+
+Create `docs/reviews/user-stories/coverage.json`:
+
+```json
+{
+  "generated": "YYYY-MM-DD",
+  "total_requirements": 47,
+  "covered": 45,
+  "uncovered": 2,
+  "requirements": {
+    "REQ-001": {
+      "text": "Users can create an account with email and password",
+      "stories": ["US-001", "US-002"],
+      "status": "covered"
+    },
+    "REQ-042": {
+      "text": "App sends push notification on task reminder",
+      "stories": [],
+      "status": "uncovered"
+    }
+  }
+}
+```
+
+#### 6c: Coverage Quality Gate
+
+The coverage map must show zero uncovered requirements.
+
+If any requirements are uncovered:
+1. List the uncovered requirements
+2. Ask the user whether to add stories for them or mark them as intentionally deferred
+3. If adding stories: create new stories with the next available US-xxx ID, update `docs/user-stories.md`
+4. If deferred: add `"status": "deferred"` with a `"reason"` field in coverage.json
+
+### Step 7: Multi-Model Review (Depth 5)
+
+**Skip this step if running at depth 1-4.**
+
+Dispatch user stories to independent AI models for parallel coverage validation. This catches blind spots that a single model misses.
+
+#### Prerequisites
+
+Check if at least one external review CLI is available (check with `command -v`):
+- `codex` — Codex CLI (install: `npm install -g @openai/codex`)
+- `gemini` — Gemini CLI (install: `npm install -g @google/gemini-cli`)
+
+**If neither CLI is available**: Skip the multi-model dispatch and instead perform a structured self-review. Re-read the requirements index and coverage matrix with an adversarial lens — actively try to find requirements that are technically "covered" but where the story doesn't actually address the requirement's intent. Document findings in the review summary. This is less thorough than multi-model review but still adds value.
+
+#### 7a: Dispatch External Reviews
+
+Bundle the PRD, requirements index, coverage map, and user stories into a review package. For each available CLI:
+
+- **Codex**: Prompt it to independently review coverage, identify missing requirements, flag vague acceptance criteria, find contradictions, and report overlaps. Request structured JSON output with findings categorized by: missing_requirements, story_issues, contradictions, duplication_or_overlap, coverage_assertion.
+- **Gemini**: Same prompt and output structure as Codex. Run independently — do not share one model's findings with the other.
+
+Do NOT edit the review JSON files — they are raw evidence from independent reviewers.
+
+#### 7b: Reconcile Findings
+
+Read both review outputs (whichever are available). For each finding, apply these rules:
+
+| Scenario | Action |
+|----------|--------|
+| Both models agree | High confidence — apply fix |
+| One model only, severity critical/high | Apply fix |
+| One model only, severity medium/low | Use judgment; present to user if uncertain |
+| Contradictory findings | Present both to user, let them decide |
+
+**Hard scope boundary**: No new features — reviewers critique existing stories, they don't invent new product capabilities.
+
+**Single-writer rule**: Only Claude edits `docs/user-stories.md`. External models only critique.
+
+Apply fixes:
+- **Missing requirements**: Add new user stories with the next available US-xxx ID
+- **Story issues**: Fix acceptance criteria, scope boundaries, data requirements in-place
+- **Contradictions**: Resolve by aligning story with PRD (PRD is source of truth)
+- **Overlaps**: Clarify boundaries or consolidate (preserve IDs)
+
+Use AskUserQuestionTool for any findings where the right action isn't clear.
+
+#### 7c: Write Review Summary
+
+Create `docs/reviews/user-stories/review-summary.md`:
+
+```markdown
+# User Stories Coverage Review Summary
+
+## Review Metadata
+- **Date**: YYYY-MM-DD
+- **Reviewers**: [Claude / Codex CLI / Gemini CLI — list whichever participated]
+- **Stories reviewed**: N
+- **PRD requirements**: N
+- **Pre-review coverage**: X/Y (Z%)
+- **Post-review coverage**: Y/Y (100%)
+
+## Findings Summary
+
+| Category | Count | Applied |
+|----------|-------|---------|
+| Missing requirements | N | N |
+| Story issues | N | N |
+| Contradictions | N | N |
+| Overlaps | N | N |
+
+## Actions Taken
+
+### Stories Added
+- US-xxx: [title] — covers REQ-xxx
+
+### Stories Modified
+- US-xxx: [what changed and why]
+
+### Findings Deferred
+- [any findings not actioned, with rationale]
+
+## Coverage Verification
+- Total PRD requirements: N
+- Covered by user stories: N
+- Uncovered: 0 (or list deferred items)
+```
+
+Update `docs/reviews/user-stories/coverage.json` with the post-fix state.
+
 ## Process
 
 1. Read `docs/user-stories.md` and `docs/prd.md`
@@ -89,6 +246,8 @@ Write the full review report to `docs/reviews/pre-review-user-stories.md` includ
 6. Apply approved fixes
 7. Re-validate by re-running affected passes
 8. Write review report to `docs/reviews/pre-review-user-stories.md`
+9. (Depth 4+) Build requirements index and coverage matrix
+10. (Depth 5) Dispatch multi-model review and reconcile findings
 
 ## After This Step
 

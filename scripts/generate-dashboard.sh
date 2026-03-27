@@ -161,7 +161,6 @@ DEPS_JSON=$(cat <<'DEPSJSON'
     "add-maestro": ["dev-env-setup"],
     "user-stories": ["prd-gap-analysis"],
     "user-stories-gaps": ["user-stories"],
-    "user-stories-multi-model-review": ["user-stories-gaps"],
     "platform-parity-review": ["user-stories-gaps"],
     "claude-md-optimization": ["git-workflow", "user-stories-gaps"],
     "workflow-audit": ["claude-md-optimization"],
