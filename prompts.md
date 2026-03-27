@@ -115,15 +115,29 @@ Translate architecture into concrete specifications. All steps are optional — 
 
 ---
 
+## Phase 5e — Quality Gates
+
+Review testing strategy, create eval infrastructure, define operations and security posture.
+
+| # | Prompt | Produces | Notes |
+|---|--------|----------|-------|
+| 15.13 | **Review Testing** | `docs/reviews/review-testing.md` | Reviews TDD strategy for coverage gaps and edge cases |
+| 15.14 | **Create Evals** | `tests/evals/`, `docs/eval-standards.md`, `make eval` target | Generates eval checks from standards docs |
+| 15.15 | **Operations** | `docs/operations-runbook.md` | Deployment, monitoring, alerting, incident response |
+| 15.16 | **Review Operations** | `docs/reviews/review-operations.md` | Reviews operations runbook |
+| 15.17 | **Security** | `docs/security-review.md` | Threat model, auth/authz, data protection, secrets management |
+| 15.18 | **Review Security** | `docs/reviews/review-security.md` | Reviews security posture |
+
+---
+
 ## Phase 6 — Consolidation & Verification
 
-These clean up the accumulated CLAUDE.md additions and verify consistency.
+These clean up the accumulated CLAUDE.md additions and verify consistency across all docs.
 
 | # | Prompt | Produces | Notes |
 |---|--------|----------|-------|
 | 16 | **Claude.md Optimization** | Restructured `CLAUDE.md` | Must run BEFORE Workflow Audit |
 | 17 | **Workflow Audit** | Fixes across all docs | Must run AFTER Claude.md Optimization |
-| 17.5 | **Create Evals** | `tests/evals/`, `docs/eval-standards.md`, `make eval` target | Generates project-specific eval checks from standards docs |
 
 ---
 
@@ -181,7 +195,11 @@ PRD → User Stories → Domain Modeling → ADRs → System Architecture
                                              ↓      ↓      ↓
                                           Reviews  Reviews  Reviews
                                                     ↓
-Dev Setup → Git Workflow → AI Memory Setup → Claude.md Optimization → Workflow Audit → Create Evals
+                        TDD → Review Testing → Create Evals
+                                    ↓
+                              Operations → Security (+ reviews)
+                                                    ↓
+Dev Setup → Git Workflow → AI Memory Setup → Claude.md Optimization → Workflow Audit
                                                                           ↓
                                                           Implementation Plan → Review → Execution
 ```
@@ -194,9 +212,12 @@ The most critical ordering constraints:
 5. **User Stories before Domain Modeling** — domain models are derived from stories
 6. **Domain Modeling → ADRs → Architecture** — linear dependency chain through modeling phases
 7. **Architecture before Specification** — database, API, and UX specs derive from architecture (can run in parallel)
-8. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
-9. **Workflow Audit before Create Evals** — evals reference the verified workflow and standards
-10. **Implementation Plan before Implementation Plan Review** — can't review what doesn't exist
+8. **TDD before Review Testing** — review-testing reviews the TDD strategy
+9. **Review Testing before Operations** — operations extends the CI pipeline defined in TDD/git-workflow
+10. **Operations before Security** — security review covers operational posture
+11. **Quality Gates before Consolidation** — consolidation verifies all docs including operations/security
+12. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
+13. **Implementation Plan before Implementation Plan Review** — can't review what doesn't exist
 
 
 __________________________________
