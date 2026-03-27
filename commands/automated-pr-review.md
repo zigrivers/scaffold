@@ -286,7 +286,7 @@ The script should:
 
 Include the full script implementation. For Codex CLI invocation, use:
 ```bash
-echo "$REVIEW_PROMPT" | codex exec -s read-only --ephemeral - 2>/dev/null
+echo "$REVIEW_PROMPT" | codex exec --skip-git-repo-check -s read-only --ephemeral - 2>/dev/null
 ```
 
 For Gemini CLI invocation, use the appropriate command format for the installed version.

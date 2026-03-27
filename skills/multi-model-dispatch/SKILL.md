@@ -31,24 +31,27 @@ command -v gemini && echo "gemini available" || echo "gemini not found"
 
 **CRITICAL: Use `codex exec`, NOT `codex` directly.** The bare `codex` command launches an interactive TUI that requires a TTY and will fail with "stdin is not a terminal" when run from Claude Code.
 
+**CRITICAL: Always include `--skip-git-repo-check`.** Without this flag, Codex fails with "Not inside a trusted directory" when the project hasn't initialized git yet (common early in the pipeline).
+
 ```bash
 # Basic review dispatch
-codex exec -s read-only --ephemeral "REVIEW_PROMPT_HERE" 2>/dev/null
+codex exec --skip-git-repo-check -s read-only --ephemeral "REVIEW_PROMPT_HERE" 2>/dev/null
 
 # With specific model and reasoning effort
-codex exec -m o4-mini -s read-only -c model_reasoning_effort=high --ephemeral "REVIEW_PROMPT_HERE" 2>/dev/null
+codex exec --skip-git-repo-check -m o4-mini -s read-only -c model_reasoning_effort=high --ephemeral "REVIEW_PROMPT_HERE" 2>/dev/null
 
 # Reading prompt from stdin (use - flag)
-echo "$REVIEW_PROMPT" | codex exec -s read-only --ephemeral - 2>/dev/null
+echo "$REVIEW_PROMPT" | codex exec --skip-git-repo-check -s read-only --ephemeral - 2>/dev/null
 
 # With JSON schema enforcement
-codex exec -s read-only --ephemeral --output-schema schema.json "REVIEW_PROMPT_HERE" 2>/dev/null
+codex exec --skip-git-repo-check -s read-only --ephemeral --output-schema schema.json "REVIEW_PROMPT_HERE" 2>/dev/null
 ```
 
 **Key flags:**
 | Flag | Purpose |
 |------|---------|
 | `exec` | **Required** — headless mode, no TUI, no TTY needed |
+| `--skip-git-repo-check` | **Required** — allows running outside a git repo or untrusted directory |
 | `-s read-only` | Sandbox: reviewer cannot write files (read-only analysis) |
 | `--ephemeral` | Don't persist session (one-shot review) |
 | `2>/dev/null` | Suppress thinking tokens on stderr (keeps Claude Code context clean) |
@@ -207,7 +210,7 @@ Each review step adds a "Multi-Model Validation" section at the end that:
 
 ```bash
 # Capture exit code and output separately
-OUTPUT=$(codex exec -s read-only --ephemeral "prompt" 2>/dev/null) || {
+OUTPUT=$(codex exec --skip-git-repo-check -s read-only --ephemeral "prompt" 2>/dev/null) || {
   echo "Codex CLI failed with exit code $?"
   # Fall back to Gemini or Claude-only
 }
