@@ -2,6 +2,14 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.15.2] — 2026-03-27
+
+### Enhanced
+
+- **dev-env-setup now reads docs/tdd-standards.md** — Since TDD moved to foundation phase (v2.14.0), tdd-standards.md exists before dev-env-setup runs. Test commands now match what TDD standards specify (test runner, flags, coverage thresholds, quality gates).
+- **cli-pr-review.sh template includes auth pre-flight** — The generated PR review script now verifies CLI authentication before dispatching (codex login status, gemini minimal prompt). Skips unauthenticated CLIs with warning instead of hanging.
+- **automated-pr-review Process step 4** — Now specifies exact auth verification commands instead of vague "verify prerequisites".
+
 ## [2.15.1] — 2026-03-27
 
 ### Fixed
