@@ -89,6 +89,25 @@ For each issue found:
 | Journey | Steps | Gaps Found | Critical Gaps | Assessment |
 |---------|-------|-----------|---------------|------------|
 
+## Multi-Model Validation (Depth 4-5)
+
+**Skip this section at depth 1-3.**
+
+At depth 4+, dispatch the reviewed artifact to independent AI models for additional validation. This catches blind spots that a single model misses. Follow the invocation patterns in the `multi-model-dispatch` skill.
+
+1. **Detect CLIs**: Check for `codex` and `gemini` CLI availability
+2. **Bundle context**: Include the reviewed artifacts + upstream references (listed below)
+3. **Dispatch**: Run each available CLI independently with the review prompt
+4. **Reconcile**: Apply dual-model reconciliation rules from the skill
+5. **Apply fixes**: Fix high-confidence findings; present medium/low-confidence findings to the user
+
+**Upstream references to include in the review bundle:**
+- 5-10 critical user journeys traced across UX, API, architecture, schema, and tasks
+- All relevant docs for the traced journeys
+- Focus areas: handoff gaps, missing error paths, state transition gaps
+
+If neither CLI is available, perform a structured adversarial self-review instead: re-read the artifact specifically looking for issues the initial review passes might have missed.
+
 ## Process
 
 1. Read all input artifacts listed above
