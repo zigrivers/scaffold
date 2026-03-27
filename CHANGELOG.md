@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.9.1] — 2026-03-28
+
+### Fixed
+
+- **Remove retired `user-stories-multi-model-review` from project state** — Projects initialized before v2.8.0 still had this step as pending in `state.json`, causing it to appear in `scaffold status`. New `RETIRED_STEPS` migration phase removes orphaned entries on next state load.
+
 ## [2.9.0] — 2026-03-27
 
 ### Added
