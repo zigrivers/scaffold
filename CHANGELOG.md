@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.4.3] — 2026-03-26
+
+### Fixed
+
+- **Skill activation conflict** — scaffold-pipeline skill no longer activates for status/progress queries ("where am I?", "what's next?"). Removed v1 Completion Detection section (file-existence checks) and narrowed activation to static reference only. Status and navigation now correctly route to scaffold-runner, which uses the `scaffold` CLI.
+
 ## [2.4.2] — 2026-03-26
 
 ### Added
