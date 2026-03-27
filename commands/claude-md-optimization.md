@@ -56,6 +56,9 @@ Read and cross-reference ALL of these:
 - Is it clear that every commit requires a Beads task? (All fixes and enhancements need a task for the commit message)
 - Does the Key Commands table include all project-specific commands? (lint, test, install, dev server — these must match what's in Makefile/package.json/pyproject.toml, and the workflow references this table instead of hardcoding commands)
 - Does the planning guidance explicitly warn against Claude Code's interactive `/plan` mode? (Agents should think through their approach, NOT enter `/plan` which blocks autonomous execution)
+- Does CLAUDE.md include anti-sycophancy guidance? (Agent should push back on approaches with clear problems rather than agreeing — state the downside, propose alternatives, accept override)
+- Does CLAUDE.md include scope discipline? (Agent should flag when a task is growing beyond its original scope and suggest breaking it into phases)
+- Are critical rules written in structured formats (numbered steps, tables, bold imperatives) rather than buried in prose paragraphs?
 
 ### 4. Priority Audit
 - What are the 6 most important things an agent must do correctly?
@@ -76,7 +79,7 @@ After analysis, restructure CLAUDE.md to follow this format:
 # CLAUDE.md
 
 ## Core Principles
-[3-5 non-negotiable rules - the things that matter most]
+[3-5 non-negotiable rules - the things that matter most. Candidates: TDD always, never push to main, honesty over agreement (push back on flawed approaches rather than complying), scope discipline (flag scope creep, suggest phased approach)]
 
 ## Git Workflow (CRITICAL)
 [Never commit to main, full PR workflow: rebase → push → create PR → auto-merge with --delete-branch → watch CI → confirm merge, key commands]
@@ -111,6 +114,7 @@ After analysis, restructure CLAUDE.md to follow this format:
 [Lint, test, install, dev server commands — these are project-specific, populated by the Dev Setup prompt. The workflow references this table instead of hardcoding commands.]
 
 ### When to Consult Other Docs
+[Progressive disclosure: this table is the primary mechanism for keeping CLAUDE.md lean. Instead of duplicating guide content, agents load situational context on-demand when they hit a matching scenario.]
 | Situation | Document |
 |-----------|----------|
 | Need to understand a feature | docs/user-stories.md |
@@ -141,7 +145,7 @@ After analysis, restructure CLAUDE.md to follow this format:
 [Playwright MCP or Maestro usage - keep brief, patterns only]
 
 ## Self-Improvement
-[Lessons file location, when to update it]
+[Lessons file location, when to update it, periodic CLAUDE.md health check: regularly ask "Is every instruction still earning its place in always-loaded context?" and move stale or situational rules to docs/]
 
 ## Autonomous Behavior
 [Fix bugs on sight, keep working until no tasks, use subagents]
@@ -150,14 +154,17 @@ After analysis, restructure CLAUDE.md to follow this format:
 
 ## Optimization Principles
 
-### Brevity Over Completeness
-CLAUDE.md is read at the start of every task. Every unnecessary sentence costs attention. If something is in another doc and can be referenced, reference it — don't repeat it.
+### Every Instruction Must Earn Its Place
+CLAUDE.md is loaded into context on every interaction — every line costs tokens and attention. Apply the "earn its place" test: if an instruction doesn't directly change agent behavior on most tasks, move it to a situational doc and reference it instead. If something is in another doc, reference it — don't repeat it.
 
 ### Scannability
 - Use tables for lookups
 - Use numbered steps for sequences
 - Use bullet points sparingly and only for truly parallel items
 - Bold the most critical words in any rule
+
+### Structured Formats for Critical Rules
+For rules agents MUST follow without exception, use structured formats — numbered steps, tables, or bold imperatives — over plain prose paragraphs. Agents process structured content more reliably than narrative text. Reserve prose for context and rationale.
 
 ### Front-Load the Important Stuff
 The first thing an agent reads should be the most important. Core principles and session-start workflow should be at the top, not buried after background context.
@@ -201,6 +208,8 @@ Before finalizing, verify CLAUDE.md explicitly covers:
 7. **TDD always** — failing test before implementation, loop repeats per piece of functionality, multiple commits per task squash-merge
 8. **Every commit needs a Beads task** — commit messages require `[BD-<id>]` format
 9. **Error recovery** — test failures, merge conflicts, CI failures, crashed sessions, orphaned worktree work
+10. **Honesty over agreement** — if an approach has clear problems, say so directly, explain the downside, propose an alternative, and accept override. Never comply with a flawed approach just to avoid friction
+11. **Scope discipline** — flag when a task is growing beyond its original scope, suggest breaking it into phases, and get explicit confirmation before expanding
 
 ## After This Step
 
