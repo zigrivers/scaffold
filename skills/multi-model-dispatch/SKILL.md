@@ -29,6 +29,8 @@ command -v gemini && echo "gemini installed" || echo "gemini not found"
 
 **CRITICAL: Do not skip this step.** Auth tokens expire mid-session. A CLI that worked 30 minutes ago may fail now.
 
+**CRITICAL: Previous auth failures do NOT exempt subsequent dispatches.** Auth tokens refresh — a CLI that failed auth during user story review may work fine for domain modeling review. Always re-check auth before EACH review step, not once per session.
+
 **Codex auth check** (has a built-in status command):
 ```bash
 codex login status 2>/dev/null && echo "codex authenticated" || echo "codex NOT authenticated"
