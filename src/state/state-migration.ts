@@ -7,11 +7,27 @@ import path from 'node:path'
 /**
  * Step name renames introduced in v2.2.0.
  * Keys are old names, values are new names.
+ *
+ * Note: add-playwright and add-maestro both map to add-e2e-testing.
+ * When both exist, mergeConflictingRenames() picks the best status.
  */
 const STEP_RENAMES: Record<string, string> = {
   'testing-strategy': 'tdd',
   'implementation-tasks': 'implementation-plan',
   'review-tasks': 'implementation-plan-review',
+  'add-playwright': 'add-e2e-testing',
+  'add-maestro': 'add-e2e-testing',
+}
+
+/**
+ * Status priority for resolving conflicts when multiple old names map
+ * to the same new name. Higher value = preferred.
+ */
+const STATUS_PRIORITY: Record<string, number> = {
+  'completed': 3,
+  'in_progress': 2,
+  'skipped': 1,
+  'pending': 0,
 }
 
 /**
@@ -36,8 +52,21 @@ export function migrateState(state: PipelineState): boolean {
 
   // Phase 1: Rename step keys
   for (const [oldName, newName] of Object.entries(STEP_RENAMES)) {
-    if (state.steps[oldName] && !state.steps[newName]) {
+    if (!state.steps[oldName]) continue
+
+    if (!state.steps[newName]) {
+      // Simple rename: new name doesn't exist yet
       state.steps[newName] = state.steps[oldName]
+      delete state.steps[oldName]
+      changed = true
+    } else {
+      // Many-to-one conflict: new name already exists (from a prior rename
+      // in this loop). Keep the entry with the highest-priority status.
+      const existingPriority = STATUS_PRIORITY[state.steps[newName].status] ?? 0
+      const incomingPriority = STATUS_PRIORITY[state.steps[oldName].status] ?? 0
+      if (incomingPriority > existingPriority) {
+        state.steps[newName] = state.steps[oldName]
+      }
       delete state.steps[oldName]
       changed = true
     }

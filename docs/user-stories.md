@@ -940,7 +940,7 @@ Covers: F-UX-2, F-UX-4, F-UX-5, F-UX-6, F-UX-9, F-UX-11, Flow 2
    ```
 
 3. **Given** `design-system` is skipped,
-   **When** a downstream prompt (`add-playwright`) depends on it,
+   **When** a downstream prompt (`add-e2e-testing`) depends on it,
    **Then** the downstream prompt can still run — skipped prompts are treated as "done" for dependency resolution.
 
 4. **Given** `create-prd` is already in the `completed` array,
@@ -1072,16 +1072,16 @@ Covers: F-PR-1, F-PR-2, F-PR-3, Flow 4
    **When** `scripts/resolve-profile.sh web-app` runs,
    **Then** it outputs the prompt list:
    ```json
-   ["create-prd", "prd-gap-analysis", "beads", "tech-stack", "claude-code-permissions", "coding-standards", "tdd", "project-structure", "dev-env-setup", "design-system", "git-workflow", "add-playwright", "user-stories", "user-stories-gaps", "claude-md-optimization", "workflow-audit", "implementation-plan", "implementation-plan-review"]
+   ["create-prd", "prd-gap-analysis", "beads", "tech-stack", "claude-code-permissions", "coding-standards", "tdd", "project-structure", "dev-env-setup", "design-system", "git-workflow", "add-e2e-testing", "user-stories", "user-stories-gaps", "claude-md-optimization", "workflow-audit", "implementation-plan", "implementation-plan-review"]
    ```
 
 2. **Given** the profile name `cli-tool`,
    **When** resolution runs,
-   **Then** it outputs 16 prompts (excludes: design-system, add-playwright, add-maestro, multi-model-review, platform-parity-review).
+   **Then** it outputs 16 prompts (excludes: design-system, add-e2e-testing, multi-model-review, platform-parity-review).
 
 3. **Given** the profile name `mobile`,
    **When** resolution runs,
-   **Then** it outputs 18 prompts including `add-maestro` (not `add-playwright`).
+   **Then** it outputs 18 prompts including `add-e2e-testing`.
 
 4. **Given** the profile name `api-service`,
    **When** resolution runs,

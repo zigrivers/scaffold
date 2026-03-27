@@ -71,7 +71,7 @@ This is the primary entry point for all new projects.
      11. git-workflow
 
    Phase 4 — Testing Integration
-     12. add-playwright
+     12. add-e2e-testing
 
    Phase 5 — Stories & Planning
      13. user-stories
@@ -344,11 +344,11 @@ This is the primary entry point for all new projects.
 - **Why**: Most projects fit one of a few categories. Profiles eliminate the need to manually select prompts for common cases.
 - **Priority**: Must-have (v2.0)
 - **Business rules**:
-  - **web-app**: All prompts from v1 pipeline except Maestro and Platform Parity Review. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, design-system, git-workflow, add-playwright, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. (18 prompts)
-  - **cli-tool**: Focused set for CLI tools / libraries. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. Excludes: design-system, add-playwright, add-maestro, multi-model-review, platform-parity-review. (16 prompts)
-  - **mobile**: For React Native / Expo apps. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, design-system, git-workflow, add-maestro, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. (18 prompts)
-  - **api-service**: Backend API / microservice. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. Excludes: design-system, add-playwright, add-maestro, multi-model-review, platform-parity-review. (16 prompts — same prompt list as `cli-tool`. Differentiation comes from PRD content and profile name, which aids UX clarity, smart profile suggestion, and future profile-specific behavior.)
-  - **minimal**: Fastest path to implementation. Includes: create-prd, beads, tech-stack, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, user-stories, implementation-plan. Excludes: prd-gap-analysis, claude-code-permissions, design-system, add-playwright, add-maestro, multi-model-review, user-stories-gaps, platform-parity-review, claude-md-optimization, workflow-audit, implementation-plan-review. (10 prompts)
+  - **web-app**: All prompts from v1 pipeline except Platform Parity Review. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, design-system, git-workflow, add-e2e-testing, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. (18 prompts)
+  - **cli-tool**: Focused set for CLI tools / libraries. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. Excludes: design-system, add-e2e-testing, multi-model-review, platform-parity-review. (16 prompts)
+  - **mobile**: For React Native / Expo apps. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, design-system, git-workflow, add-e2e-testing, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. (18 prompts)
+  - **api-service**: Backend API / microservice. Includes: create-prd, prd-gap-analysis, beads, tech-stack, claude-code-permissions, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, user-stories, user-stories-gaps, claude-md-optimization, workflow-audit, implementation-plan, implementation-plan-review. Excludes: design-system, add-e2e-testing, multi-model-review, platform-parity-review. (16 prompts — same prompt list as `cli-tool`. Differentiation comes from PRD content and profile name, which aids UX clarity, smart profile suggestion, and future profile-specific behavior.)
+  - **minimal**: Fastest path to implementation. Includes: create-prd, beads, tech-stack, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, user-stories, implementation-plan. Excludes: prd-gap-analysis, claude-code-permissions, design-system, add-e2e-testing, multi-model-review, user-stories-gaps, platform-parity-review, claude-md-optimization, workflow-audit, implementation-plan-review. (10 prompts)
   - Built-in profiles are read-only. Users cannot modify them directly but can extend them via custom profiles.
 
 #### F-PR-2: Custom Profiles
@@ -414,8 +414,7 @@ This is the primary entry point for all new projects.
     - `design-system` depends on `dev-env-setup`
     - `git-workflow` depends on `dev-env-setup`
     - `multi-model-review` depends on `git-workflow`
-    - `add-playwright` depends on `tdd`
-    - `add-maestro` depends on `tdd`
+    - `add-e2e-testing` depends on `tdd`
     - `user-stories` depends on `create-prd`
     - `user-stories-gaps` depends on `user-stories`
     - `platform-parity-review` depends on `user-stories-gaps`

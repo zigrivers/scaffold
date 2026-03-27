@@ -242,8 +242,7 @@ Add E2E testing frameworks.
 
 | Step | What It Does |
 |------|-------------|
-| `add-playwright` | Configure Playwright for web app testing *(web apps only)* |
-| `add-maestro` | Configure Maestro for mobile app testing *(mobile apps only)* |
+| `add-e2e-testing` | Configure E2E testing — Playwright (web) and/or Maestro (mobile) *(web/mobile apps only)* |
 
 ### Phase 5 — Domain Modeling (modeling)
 

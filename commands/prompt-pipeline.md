@@ -44,8 +44,7 @@ Display the prompt pipeline order below. Do not read any files or run any comman
 ### Phase 4 — Testing Integration
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
-| 12 | **Playwright Integration** | `/scaffold:add-playwright` | **(optional)** Web apps |
-| 13 | **Maestro Setup** | `/scaffold:add-maestro` | **(optional)** Expo/mobile apps |
+| 12 | **E2E Testing** | `/scaffold:add-e2e-testing` | **(optional)** Web and/or mobile apps |
 
 ### Phase 5 — Stories & Planning
 | # | Prompt | Command | Notes |

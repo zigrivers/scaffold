@@ -191,8 +191,7 @@ pipeline/
   git-workflow.md
   user-stories.md
   user-stories-gaps.md
-  add-playwright.md
-  add-maestro.md
+  add-e2e-testing.md
   tracking-setup.md
   implementation-plan.md
   implementation-plan-review.md
@@ -248,8 +247,7 @@ steps:
   dev-env-setup: { enabled: true, depth: 5 }
   design-system: { enabled: true, depth: 5, optional: { requires: frontend } }
   git-workflow: { enabled: true, depth: 5 }
-  add-playwright: { enabled: true, depth: 5, optional: { requires: web } }
-  add-maestro: { enabled: true, depth: 5, optional: { requires: mobile } }
+  add-e2e-testing: { enabled: true, depth: 5, optional: { requires: [web, mobile] } }
   user-stories: { enabled: true, depth: 5 }
   user-stories-gaps: { enabled: true, depth: 5 }
   platform-parity-review: { enabled: true, depth: 5, optional: { requires: multi-platform } }

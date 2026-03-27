@@ -620,8 +620,7 @@ When this step is complete, tell the user:
 
 **Next (choose one):**
 - **(Optional)** Run `/scaffold:multi-model-review` — Set up multi-model code review on PRs (requires ChatGPT Pro subscription).
-- If your project has a **web frontend**: Skip to `/scaffold:add-playwright` — Configure Playwright for web app testing (starts Phase 4).
-- If your project has a **mobile app**: Skip to `/scaffold:add-maestro` — Configure Maestro for mobile app testing.
+- If your project has a **web frontend and/or mobile app**: Skip to `/scaffold:add-e2e-testing` — Configure E2E testing (starts Phase 4).
 - If **neither**: Skip to `/scaffold:user-stories` — Create user stories (starts Phase 5).
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`

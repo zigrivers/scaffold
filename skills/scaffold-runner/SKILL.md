@@ -138,6 +138,8 @@ Respond to these natural language requests:
 | "What's next?" / "Next step" | Run `scaffold next`, present eligible steps |
 | "Where am I?" / "Pipeline status" | Run `scaffold status`, present progress summary |
 | "What does X do?" | Run `scaffold info <step>`, present purpose and dependencies |
+| "Is X applicable?" / "Do I need X?" | Run `scaffold check <step>` to detect platform and brownfield status |
+| "Set up testing" / "Add Playwright" / "Add Maestro" | Run `scaffold run add-e2e-testing` — auto-detects web/mobile and configures the right framework(s) |
 | "Run multi-model review" / "Review stories with other models" | Run `scaffold run review-user-stories` at depth 5 (multi-model capabilities are now built into review-user-stories) |
 | "Skip X" | Run `scaffold skip <step> --reason "<user's reason>"` |
 | "Skip X, Y, and Z" | Run `scaffold skip <step1> <step2> <step3> --reason "<reason>"` |
@@ -167,7 +169,7 @@ This is useful when:
 
 **Batch skip:** `scaffold skip <step1> <step2> <step3> --reason "reason"`
 
-Use batch skip when the user wants to skip multiple related steps at once (e.g., "skip all the optional testing steps", "I don't have a frontend — skip design-system and add-playwright"). This avoids running the command multiple times and gives a single summary of newly eligible steps.
+Use batch skip when the user wants to skip multiple related steps at once (e.g., "skip all the optional testing steps", "I don't have a frontend — skip design-system and add-e2e-testing"). This avoids running the command multiple times and gives a single summary of newly eligible steps.
 
 When the user says "skip" without a reason, still pass `--reason` with a brief reason inferred from context (e.g., `--reason "no frontend"`, `--reason "using external CI"`). This aids team visibility in state.json.
 
@@ -193,6 +195,24 @@ Some steps behave significantly differently at higher depths. When running these
 - Depth 5: Adds multi-model dispatch to Codex/Gemini CLI for independent validation, with graceful fallback to Claude-only enhanced review if CLIs aren't available
 
 When running `review-user-stories` at depth 5, check if `codex` or `gemini` CLI is available (`command -v codex`, `command -v gemini`). If neither is available, inform the user that the step will fall back to a Claude-only adversarial self-review — still valuable but less thorough than multi-model review.
+
+**`add-e2e-testing`** — Unified E2E testing step that auto-detects the platform:
+- Reads `docs/tech-stack.md` and `package.json` to determine web (Playwright), mobile (Maestro), or both
+- Self-skips for backend-only projects with no frontend
+- Detects brownfield (existing Playwright config or Maestro flows) and auto-enters update mode
+
+Before running this step, you can use `scaffold check add-e2e-testing` to preview what it will detect without executing.
+
+### Applicability Checking
+
+Use `scaffold check <step>` to check if a conditional step applies to the current project:
+
+```bash
+scaffold check add-e2e-testing
+# → Applicable: yes | Platform: web | Brownfield: no | Mode: fresh
+```
+
+This is useful when the user asks "Do I need this step?" or when previewing which optional steps apply before running them.
 
 ## Error Handling
 

@@ -8,8 +8,7 @@ Authoritative map of the Scaffold repository — where every file goes, why, and
 ```
 scaffold/
 ├── commands/                  # Individual command .md files (36, generated from prompts.md)
-│   ├── add-maestro.md
-│   ├── add-playwright.md
+│   ├── add-e2e-testing.md
 │   ├── beads.md
 │   ├── ...                    # 30 more command files
 │   ├── version-bump.md
