@@ -229,6 +229,12 @@ All review and validation steps now support independent multi-model validation a
 - **Codex**: `codex exec --skip-git-repo-check -s read-only --ephemeral "prompt" 2>/dev/null` (NOT bare `codex`)
 - **Gemini**: `gemini -p "prompt" --output-format json --approval-mode yolo 2>/dev/null`
 
+**Auth verification is mandatory before dispatch.** CLI tokens expire mid-session. Before running any review at depth 4-5:
+1. Check Codex auth: `codex login status`
+2. Check Gemini auth: `gemini -p "respond with ok" -o json` (exit 41 = auth failure)
+3. If auth fails, tell the user to re-authenticate: `! codex login` or `! gemini -p "hello"` (the `!` prefix runs it interactively in the user's session)
+4. **Never silently skip a CLI due to auth failure** — surface it to the user
+
 When running a review step at depth 4-5:
 1. Check CLI availability before dispatching
 2. If both available, run dual-model review for highest quality

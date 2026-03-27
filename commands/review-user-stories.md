@@ -155,11 +155,18 @@ Dispatch user stories to independent AI models for parallel coverage validation.
 
 #### Prerequisites
 
-Check if at least one external review CLI is available (check with `command -v`):
+Check if at least one external review CLI is available AND authenticated. Follow the `multi-model-dispatch` skill's CLI Detection & Auth Verification steps:
+
+1. **Check installation**: `command -v codex`, `command -v gemini`
+2. **Verify auth** (tokens expire mid-session):
+   - Codex: `codex login status` (exit 0 = authenticated)
+   - Gemini: `gemini -p "respond with ok" -o json` (exit 41 = auth failure)
+3. **If auth fails**: Tell the user and offer interactive recovery — `! codex login` or `! gemini -p "hello"` (the `!` prefix runs it in the user's terminal). **Do not silently skip.**
+
 - `codex` — Codex CLI (install: `npm install -g @openai/codex`)
 - `gemini` — Gemini CLI (install: `npm install -g @google/gemini-cli`)
 
-**If neither CLI is available**: Skip the multi-model dispatch and instead perform a structured self-review. Re-read the requirements index and coverage matrix with an adversarial lens — actively try to find requirements that are technically "covered" but where the story doesn't actually address the requirement's intent. Document findings in the review summary. This is less thorough than multi-model review but still adds value.
+**If neither CLI is available or the user declines to re-authenticate**: Fall back to structured self-review. Re-read the requirements index and coverage matrix with an adversarial lens — actively try to find requirements that are technically "covered" but where the story doesn't actually address the requirement's intent. Document findings in the review summary. This is less thorough than multi-model review but still adds value.
 
 #### 7a: Dispatch External Reviews
 
