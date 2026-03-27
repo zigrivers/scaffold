@@ -1,9 +1,13 @@
 ---
-description: "Define CI/CD, deployment, monitoring, and incident response operations"
-long-description: "Reads system architecture and TDD standards, then creates docs/operations-runbook.md defining dev environment setup, CI/CD pipeline, deployment strategy, monitoring, alerting, and incident response."
+description: "Define deployment, monitoring, and incident response operations"
+long-description: "Reads system architecture, TDD standards, and existing CI/dev-setup docs, then creates docs/operations-runbook.md defining deployment pipeline, deployment strategy, monitoring, alerting, and incident response. References docs/dev-setup.md for local dev and docs/git-workflow.md for base CI."
 ---
 
-Read `docs/system-architecture.md`, `docs/tdd-standards.md`, and `docs/adrs/`, then define the complete operational strategy. Create `docs/operations-runbook.md` covering local development setup, CI/CD pipeline, deployment approach, monitoring, alerting, incident response, and rollback procedures.
+Read `docs/system-architecture.md`, `docs/tdd-standards.md`, `docs/adrs/`, `docs/dev-setup.md` (if it exists), and `docs/git-workflow.md` (if it exists), then define the production operational strategy. Create `docs/operations-runbook.md` covering deployment pipeline (extending the base CI from git-workflow), deployment strategy, monitoring, alerting, incident response, and rollback procedures.
+
+**Important — avoid duplication:**
+- **Dev environment setup** is already covered in `docs/dev-setup.md` (created by the Dev Setup prompt). Do NOT redefine prerequisites, env vars, one-command setup, common commands, or troubleshooting here — reference `docs/dev-setup.md` instead.
+- **Base CI pipeline** (lint + test on PRs) is already configured in `.github/workflows/ci.yml` (created by the Git Workflow prompt). Do NOT redefine Stages 1-2 (fast checks, tests) — reference the existing CI and focus on extending it with build, deploy, and post-deploy stages.
 
 ## Mode Detection
 
@@ -35,62 +39,44 @@ Before starting, check if `docs/operations-runbook.md` already exists:
 
 ## What the Document Must Cover
 
-### 1. Dev Environment Setup
+### 1. Dev Environment Reference
 
-**Prerequisites table** — every system dependency with exact version and reason:
+**Do not redefine local development setup here.** Reference `docs/dev-setup.md` for:
+- Prerequisites, version managers, and version pinning
+- Environment variables (`.env.example` template)
+- One-command setup (`make setup` or equivalent)
+- Database setup (local, Docker, SQLite)
+- Hot reloading configuration
+- Common dev commands table
+- Troubleshooting guide
 
-| Dependency | Version | Why |
-|------------|---------|-----|
-| (runtime) | (version) | (purpose) |
+If `docs/dev-setup.md` does not exist yet, note that the Dev Setup prompt should be run first and add a brief placeholder section.
 
-Include version manager recommendations (nvm, pyenv) and version pinning files (.nvmrc, .python-version).
+**What to add here (operations-specific only):**
+- Environment-specific configurations for staging and production (env var differences, secrets management)
+- Production database connection and migration procedures (distinct from local dev)
+- Secrets management approach (how production secrets are stored and rotated — environment variables, secrets manager, etc.)
 
-**Environment variables:**
-- `.env.example` template committed to git with all required variables, defaults, and comments
-- `.env` gitignored, created by copying `.env.example`
-- Mark required vs. optional (features degrade gracefully without optional vars)
+### 2. Deployment Pipeline (Extending Base CI)
 
-**One-command setup** — `make setup` or equivalent that installs deps, creates database, runs migrations, seeds data. Must be idempotent.
+The base CI pipeline (lint + test on PRs) is already configured in `.github/workflows/ci.yml` by the Git Workflow prompt. **Do not redefine Stages 1-2.** Instead, reference the existing CI and extend it with production deployment stages:
 
-**Database setup** — local installation, Docker Compose, or SQLite for dev. Include connection strings, migration commands, seed commands.
-
-**Hot reloading** — configure for the project's stack. Frontend and backend must reload automatically on code changes.
-
-**Common dev commands table:**
-
-| Command | Purpose |
-|---------|---------|
-| `make dev` | Start dev server with hot reload |
-| `make test` | Run all tests |
-| `make lint` | Check code style |
-| `make format` | Auto-fix formatting |
-| `make db-migrate` | Run pending migrations |
-| `make db-seed` | Seed database |
-| `make db-reset` | Drop, recreate, migrate, seed |
-| `make check` | Run all quality gates |
-
-**Troubleshooting guide** — solutions for common issues: port in use, database connection refused, dependencies out of sync, migrations out of date.
-
-### 2. CI/CD Pipeline
-
-**Pipeline stages:**
 ```
-Push -> Stage 1: Fast checks (30s) — lint, format, type check
-     -> Stage 2: Tests (2-5 min) — unit + integration in parallel
-     -> Stage 3: Build (1-2 min) — compile, bundle, artifacts
-     -> Stage 4: Deploy (2-5 min, main only) — deploy + health check
-     -> Stage 5: Post-deploy verification — smoke tests
+Existing CI (from git-workflow):
+  -> Stage 1: Fast checks (30s) — lint, format, type check
+  -> Stage 2: Tests (2-5 min) — unit + integration in parallel
+
+Operations adds (main branch only):
+  -> Stage 3: Build (1-2 min) — compile, bundle, generate artifacts
+  -> Stage 4: Deploy (2-5 min) — deploy to staging/production + health check
+  -> Stage 5: Post-deploy verification — smoke tests against deployed environment
 ```
 
-For each stage: what runs, what blocks, caching strategy, target duration.
-
-**GitHub Actions** (or project's CI platform) configuration with specific YAML examples for the project's stack.
-
-**Parallelization**: Lint, unit tests, integration tests as separate parallel jobs.
-
-**Dependency caching**: Cache `node_modules/` (or equivalent) keyed by lockfile hash.
+For each new stage: what runs, what blocks, target duration.
 
 **Artifact management**: Build once, deploy to all environments. Tag with git SHA. Set retention policies.
+
+**Dependency caching**: If the existing CI doesn't already cache dependencies, add caching (keyed by lockfile hash) to the deployment pipeline.
 
 ### 3. Deployment Strategy
 
@@ -157,11 +143,12 @@ Choose and document one:
 
 ## Quality Criteria
 
-- CI/CD pipeline defined with all stages and target durations
+- Deployment pipeline stages (build, deploy, post-deploy) defined with target durations
+- Extends existing CI from git-workflow — does not redefine lint/test stages
 - Deployment strategy chosen with tested rollback procedure
 - Monitoring covers all four golden signals
 - Alerting thresholds justified by user impact, not arbitrary
-- Dev environment reproducible in under 5 minutes
+- References `docs/dev-setup.md` for local dev — does not redefine it
 - Incident response process defined with escalation paths
 - Every alert has a documented response action
 - Secrets management: no secrets in code
@@ -170,20 +157,19 @@ Choose and document one:
 
 ## Process
 
-1. **Read all inputs** — Read `docs/system-architecture.md`, `docs/tdd-standards.md`, and `docs/adrs/` completely.
+1. **Read all inputs** — Read `docs/system-architecture.md`, `docs/tdd-standards.md`, `docs/adrs/`, `docs/dev-setup.md` (if exists), and `docs/git-workflow.md` (if exists).
 2. **Use AskUserQuestionTool** for these decisions:
    - **Hosting platform**: Where will the app be deployed (Vercel, AWS, GCP, self-hosted)?
-   - **CI platform**: GitHub Actions, CircleCI, or other?
    - **Deployment strategy**: Blue-green, canary, rolling, or feature flags?
    - **Monitoring tooling**: Datadog, Grafana, CloudWatch, or built-in platform monitoring?
    - **Team size**: Solo developer, small team, or larger team (affects on-call and escalation)?
-3. **Use subagents** to research CI/CD and deployment patterns for the project's hosting platform
-4. **Document dev setup** — prerequisites, env vars, one-command setup, common commands, troubleshooting
-5. **Design CI/CD pipeline** — stages, parallelization, caching, artifact management
+3. **Use subagents** to research deployment patterns for the project's hosting platform
+4. **Reference dev setup** — link to `docs/dev-setup.md`, add only operations-specific content (staging/prod env vars, secrets management)
+5. **Extend CI with deployment pipeline** — reference existing CI stages from `.github/workflows/ci.yml`, add build/deploy/post-deploy stages
 6. **Define deployment strategy** — including rollback and database migration handling
 7. **Set up monitoring** — four golden signals, dashboards, alert thresholds
 8. **Document incident response** — runbooks, escalation, post-mortems, SLAs
-9. **Cross-validate** — verify pipeline stages match test categories from TDD standards, deployment matches architecture
+9. **Cross-validate** — verify deployment pipeline matches architecture, alert thresholds cover all critical paths
 10. If using Beads: create a task (`bd create "docs: operations runbook" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 
 ## After This Step
@@ -191,7 +177,7 @@ Choose and document one:
 When this step is complete, tell the user:
 
 ---
-**Quality phase in progress** — `docs/operations-runbook.md` created with dev setup, CI/CD, deployment, monitoring, and incident response.
+**Quality phase in progress** — `docs/operations-runbook.md` created with deployment pipeline, deployment strategy, monitoring, and incident response.
 
 **Next:** Run `/scaffold:security` — Conduct security review of the system design.
 

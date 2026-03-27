@@ -1,257 +1,70 @@
 ---
 name: operations-runbook
-description: Dev environment setup, CI/CD pipeline design, deployment, monitoring, and incident response
-topics: [operations, cicd, deployment, monitoring, dev-environment, incident-response, local-dev]
+description: Deployment pipeline, deployment strategies, monitoring, alerting, and incident response
+topics: [operations, cicd, deployment, monitoring, incident-response, alerting, rollback]
 ---
 
-## Dev Environment Setup
+## Dev Environment Reference
 
-A productive development environment lets a developer (or AI agent) go from cloning the repo to running the application in under 5 minutes. The fewer manual steps, the fewer things that can go wrong.
+Local development setup (prerequisites, env vars, one-command setup, database, hot reload, common commands, troubleshooting) is defined in `docs/dev-setup.md`, created by the Dev Setup prompt. The operations runbook should reference it rather than redefine it.
 
-### Local Development Prerequisites
+**Operations-specific additions** (not covered by dev-setup):
 
-Document every system-level dependency with exact versions:
+### Environment-Specific Configuration
 
-| Dependency | Version | Why |
-|------------|---------|-----|
-| Node.js | 20.x LTS | Runtime |
-| Python | 3.12+ | Backend scripts |
-| PostgreSQL | 16+ | Primary database |
-| Redis | 7+ | Caching and sessions |
-| Docker | 24+ | Database containers (optional) |
+Document how environment variables differ across environments:
 
-**Version management:** Recommend a version manager for each language runtime:
-- Node.js: `nvm`, `fnm`, or `.nvmrc` for automatic version switching
-- Python: `pyenv` with `.python-version`
-- Ruby: `rbenv` with `.ruby-version`
+| Variable | Local | Staging | Production |
+|----------|-------|---------|------------|
+| `APP_ENV` | development | staging | production |
+| `DATABASE_URL` | localhost | staging-db-host | prod-db-host |
+| `LOG_LEVEL` | debug | info | warn |
 
-Check in a `.node-version` or `.nvmrc` file so tools auto-select the correct version.
+### Secrets Management
 
-### Environment Variables
+Production secrets should never be in code or `.env` files:
+- Use a secrets manager (AWS Secrets Manager, GCP Secret Manager, Vault, Doppler)
+- Rotate secrets on a schedule (90 days for API keys, 365 days for service accounts)
+- Audit access to secrets
+- Document which secrets exist, where they're stored, and who can access them
 
-Every project needs a clear environment variable strategy:
+## Deployment Pipeline
 
-**`.env.example`** — Template committed to git with all required variables, default values for local development, and comments explaining each variable:
-
-```bash
-# Application
-APP_PORT=3000                    # Port for the dev server
-APP_ENV=development              # development | staging | production
-APP_URL=http://localhost:3000    # Base URL for the app
-
-# Database
-DATABASE_URL=postgresql://localhost:5432/myapp_dev  # Local PostgreSQL
-DATABASE_POOL_SIZE=5             # Connection pool size
-
-# Authentication
-JWT_SECRET=local-dev-secret-change-in-production  # JWT signing key
-SESSION_SECRET=local-session-secret               # Session cookie secret
-
-# External Services (optional for local dev)
-# STRIPE_SECRET_KEY=sk_test_...  # Uncomment when testing payments
-# SENDGRID_API_KEY=SG....       # Uncomment when testing emails
-```
-
-**`.env`** — Actual local configuration, gitignored. Created by copying `.env.example`.
-
-**Required vs. optional:** Clearly mark which variables are required for the app to start and which are optional (features degrade gracefully without them).
-
-### One-Command Setup
-
-Provide a single command that installs all dependencies, creates the database, runs migrations, seeds data, and starts the dev server:
-
-```bash
-# First time setup
-make setup    # or: npm run setup
-
-# Daily development
-make dev      # or: npm run dev
-```
-
-The setup command should be idempotent — safe to run twice without breaking anything.
-
-### Database Setup for Local Development
-
-**Option A: Local installation**
-- Install database server natively
-- Create dev database: `createdb myapp_dev` (PostgreSQL)
-- Run migrations: `make db-migrate`
-- Seed data: `make db-seed`
-
-**Option B: Docker Compose**
-```yaml
-services:
-  db:
-    image: postgres:16
-    ports: ["5432:5432"]
-    environment:
-      POSTGRES_DB: myapp_dev
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-
-  redis:
-    image: redis:7
-    ports: ["6379:6379"]
-
-volumes:
-  pgdata:
-```
-
-Docker Compose is convenient for managing service dependencies but adds startup time and complexity. For simple stacks (SQLite, single service), skip Docker entirely.
-
-**Option C: SQLite for development**
-- No setup required
-- Create database file on first run
-- Fast, zero-configuration
-- Trade-off: behavior differences from production PostgreSQL (no JSONB, different SQL dialect)
-
-### Hot Reloading Configuration
-
-The dev server must reload automatically when code changes:
-
-- **Frontend:** Vite HMR (React, Vue, Svelte), Next.js Fast Refresh, or webpack HMR
-- **Backend (Node.js):** `tsx watch`, `nodemon`, or `ts-node-dev` for TypeScript; `node --watch` for plain Node
-- **Backend (Python):** `uvicorn --reload` (FastAPI), `flask run --debug` (Flask), `manage.py runserver` (Django)
-- **Full-stack:** Run frontend and backend concurrently with a process manager (`concurrently`, `honcho`, or Makefile with `&`)
-
-### Common Dev Commands
-
-Every project should have a consistent set of commands. Use whatever mechanism fits the stack:
-
-| Command | Purpose | Implementation |
-|---------|---------|---------------|
-| `make dev` | Start dev server with hot reload | Frontend + backend concurrently |
-| `make test` | Run all tests | Test runner with coverage |
-| `make test-watch` | Run tests in watch mode | Test runner in watch mode |
-| `make lint` | Check code style | Linter for each language |
-| `make format` | Auto-fix formatting | Formatter for each language |
-| `make db-migrate` | Run pending migrations | Migration tool |
-| `make db-seed` | Seed database with sample data | Seed script |
-| `make db-reset` | Drop, recreate, migrate, seed | Compose the above |
-| `make check` | Run all quality gates | lint + type-check + test |
-
-Commands should be:
-- Short and memorable (not `npx jest --runInBand --coverage --passWithNoTests`)
-- Documented with help text
-- Idempotent where possible
-- Fast enough to run frequently
-
-### Troubleshooting Guide
-
-Document solutions for common development issues:
-
-**Port already in use:**
-```bash
-lsof -i :3000  # Find the process
-kill -9 <PID>  # Kill it
-```
-
-**Database connection refused:**
-- Is the database running? `pg_isready` or `docker ps`
-- Is the connection string correct? Check `.env`
-- Is the port correct? Check for port conflicts
-
-**Dependencies out of sync:**
-```bash
-rm -rf node_modules && npm install  # Node.js
-rm -rf .venv && python -m venv .venv && pip install -r requirements.txt  # Python
-```
-
-**Migrations out of date:**
-```bash
-make db-migrate  # Run pending migrations
-make db-reset    # Nuclear option: start fresh
-```
-
-## CI/CD Pipeline
+The base CI pipeline (lint + test on PRs) is configured by the Git Workflow prompt in `.github/workflows/ci.yml`. The operations runbook extends this with production deployment stages — it does not redefine the base CI.
 
 ### Pipeline Architecture
 
-A CI/CD pipeline automates the path from code commit to production deployment. Design it in stages:
-
 ```
-Push to branch
-  -> Stage 1: Fast checks (30s)
-       Lint, format check, type check
-  -> Stage 2: Tests (2-5 min)
-       Unit tests, integration tests (parallel)
-  -> Stage 3: Build (1-2 min)
-       Compile, bundle, generate artifacts
-  -> Stage 4: Deploy (2-5 min, only on main)
-       Deploy to staging/production
+Existing CI (from git-workflow — already configured):
+  -> Stage 1: Fast checks (30s) — lint, format, type check
+  -> Stage 2: Tests (2-5 min) — unit + integration in parallel
 
-PR merge to main
-  -> All stages above
-  -> Stage 5: Post-deploy verification
-       Smoke tests against deployed environment
+Operations adds (main branch only):
+  -> Stage 3: Build (1-2 min) — compile, bundle, generate artifacts
+  -> Stage 4: Deploy (2-5 min) — deploy to staging/production
+  -> Stage 5: Post-deploy verification — smoke tests
 ```
 
-### Stage Design
+### Stage 3: Build
 
-**Stage 1: Fast Checks**
-- Run on every push and PR
-- Fail fast: if linting fails, don't bother running tests
-- Cache dependencies between runs
-- Target: <30 seconds
-
-```yaml
-# GitHub Actions example
-lint:
-  runs-on: ubuntu-latest
-  steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
-      with: { node-version-file: '.nvmrc' }
-    - run: npm ci --ignore-scripts
-    - run: npm run lint
-    - run: npm run type-check
-```
-
-**Stage 2: Tests**
-- Run unit and integration tests in parallel
-- Use a service container for the test database
-- Upload coverage reports as artifacts
-- Target: <5 minutes
-
-```yaml
-test:
-  runs-on: ubuntu-latest
-  services:
-    postgres:
-      image: postgres:16
-      env:
-        POSTGRES_DB: test
-        POSTGRES_PASSWORD: test
-      ports: ['5432:5432']
-  steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
-    - run: npm ci
-    - run: npm run test:ci
-      env:
-        DATABASE_URL: postgresql://postgres:test@localhost:5432/test
-```
-
-**Stage 3: Build**
 - Compile TypeScript, bundle frontend assets, generate Docker image
 - Verify the build artifact is valid (start the server and check health endpoint)
 - Store the build artifact for deployment
+- Only runs after Stages 1-2 pass
 
-**Stage 4: Deploy**
+### Stage 4: Deploy
+
 - Only runs on main branch (after PR merge)
 - Deploy the build artifact from Stage 3
 - Run database migrations before starting new version
 - Verify health check after deployment
 
-### Parallelization and Caching
+### Stage 5: Post-Deploy Verification
 
-**Parallel jobs:** Run lint, unit tests, and integration tests as separate parallel jobs. The total pipeline time equals the longest individual job, not the sum.
-
-**Dependency caching:** Cache `node_modules/` (keyed by `package-lock.json` hash), Python virtual environments, Docker layer cache. This turns a 60-second install into a 5-second cache restore.
-
-**Test parallelization:** Split test files across multiple runners. Most test frameworks support `--shard` or `--split` modes.
+- Run smoke tests against the deployed environment
+- Verify critical user flows work end-to-end
+- Check external dependency connectivity
+- If smoke tests fail: trigger automatic rollback
 
 ### Artifact Management
 
@@ -501,8 +314,6 @@ Define service level targets for the application:
 **Missing rollback procedures.** Deploying without a tested rollback plan. When the deployment breaks production, the team scrambles to figure out how to revert. Fix: every deployment strategy includes a documented, tested rollback procedure.
 
 **Alert fatigue.** Too many alerts firing for non-critical issues. The on-call person starts ignoring alerts because most are noise. A real incident gets missed. Fix: every alert must have a clear response action. Remove alerts that routinely fire without requiring action.
-
-**No local dev story.** "It works on the CI server" but developers can't run the application locally. Fix: document the local setup, make it one command, test it regularly by having new team members follow the instructions.
 
 **Manual deployment steps.** Deployment requires an engineer to SSH into a server and run commands. This is error-prone, unreproducible, and blocks deployment on individual availability. Fix: fully automate deployment. A merge to main should trigger deployment automatically.
 
