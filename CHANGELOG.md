@@ -2,6 +2,18 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.16.0] — 2026-03-27
+
+### Added
+
+- **12 v2 steps added to prompts.md and pipeline skill** — Domain modeling, ADRs, system architecture, and specification phases (12 steps + reviews) were in pipeline files and methodology presets but missing from prompts.md Setup Order table and scaffold-pipeline SKILL.md. Added as Phase 5b (Domain Modeling), Phase 5c (Architecture Decisions), and Phase 5d (Specification). Updated dependency graphs in both files.
+
+### Fixed
+
+- **ux-spec / review-ux After This Step** — Pointed to `/scaffold:tdd` (foundation phase, already complete). Now correctly points to `/scaffold:claude-md-optimization`.
+- **database-schema.md** — Added `docs/plan.md` to initial read instruction for PRD context.
+- **api-contracts.md** — Added `docs/user-stories.md` to initial read instruction (was in Process section but missing from intro).
+
 ## [2.15.2] — 2026-03-27
 
 ### Enhanced
