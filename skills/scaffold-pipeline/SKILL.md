@@ -82,6 +82,8 @@ Dev Setup → Git Workflow → Claude.md Optimization → Workflow Audit
 For all status, progress, and navigation queries, use the `scaffold-runner` skill, which delegates to the `scaffold` CLI:
 
 - `scaffold status` — current pipeline progress
+- `scaffold status --compact` — show only actionable steps (pending/in-progress)
 - `scaffold next` — next eligible steps
 - `scaffold list` — full pipeline with status indicators
+- `scaffold skip <step> [<step2>...] --reason "..."` — skip one or more steps
 - `scaffold reset <step> --force` — reset a step to re-run it

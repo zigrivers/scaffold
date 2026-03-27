@@ -83,6 +83,7 @@ function makeState(overrides: Record<string, unknown> = {}): Record<string, unkn
 function defaultArgv(overrides: Partial<StatusArgv> = {}): StatusArgv {
   return {
     phase: undefined,
+    compact: undefined,
     format: undefined,
     auto: undefined,
     root: undefined,
@@ -286,5 +287,58 @@ describe('status command', () => {
     expect(parsed.progress.pending).toBe(1)
     expect(parsed.progress.inProgress).toBe(1)
     expect(parsed.progress.total).toBe(6)
+  })
+
+  describe('--compact flag', () => {
+    it('hides completed and skipped steps from detail list', async () => {
+      const steps = {
+        'done-step': { status: 'completed', source: 'pipeline', produces: [] },
+        'skipped-step': { status: 'skipped', source: 'pipeline', produces: [] },
+        'todo-step': { status: 'pending', source: 'pipeline', produces: [] },
+        'active-step': { status: 'in_progress', source: 'pipeline', produces: [] },
+      }
+      mockStateWith(MockStateManager, steps, { next_eligible: ['todo-step'] })
+      await statusCommand.handler(defaultArgv({ compact: true }))
+      const allOutput = writtenLines.join('')
+      expect(allOutput).not.toContain('done-step')
+      expect(allOutput).not.toContain('skipped-step')
+      expect(allOutput).toContain('todo-step')
+      expect(allOutput).toContain('active-step')
+    })
+
+    it('shows summary counts in compact mode', async () => {
+      const steps = {
+        's1': { status: 'completed', source: 'pipeline', produces: [] },
+        's2': { status: 'completed', source: 'pipeline', produces: [] },
+        's3': { status: 'skipped', source: 'pipeline', produces: [] },
+        's4': { status: 'pending', source: 'pipeline', produces: [] },
+        's5': { status: 'in_progress', source: 'pipeline', produces: [] },
+      }
+      mockStateWith(MockStateManager, steps, { next_eligible: ['s4'] })
+      await statusCommand.handler(defaultArgv({ compact: true }))
+      const allOutput = writtenLines.join('')
+      // Summary line should show counts
+      expect(allOutput).toContain('2 completed')
+      expect(allOutput).toContain('1 skipped')
+      expect(allOutput).toContain('1 pending')
+      expect(allOutput).toContain('1 in progress')
+    })
+
+    it('compact JSON mode includes compact flag in output', async () => {
+      mockResolveOutputMode.mockReturnValue('json')
+      const steps = {
+        'done': { status: 'completed', source: 'pipeline', produces: [] },
+        'todo': { status: 'pending', source: 'pipeline', produces: [] },
+      }
+      mockStateWith(MockStateManager, steps, { next_eligible: ['todo'] })
+      await statusCommand.handler(defaultArgv({ compact: true, format: 'json' }))
+      const envelope = JSON.parse(writtenLines.join(''))
+      const parsed = envelope.data ?? envelope
+      expect(parsed.compact).toBe(true)
+      // Compact JSON should only include actionable steps
+      const stepSlugs = parsed.steps.map((s: { slug: string }) => s.slug)
+      expect(stepSlugs).toContain('todo')
+      expect(stepSlugs).not.toContain('done')
+    })
   })
 })
