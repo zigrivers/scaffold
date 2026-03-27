@@ -213,6 +213,77 @@ const checkCommand: CommandModule<Record<string, unknown>, CheckArgs> = {
       return
     }
 
+    // For ai-memory-setup: detect rules, MCP servers, hooks
+    if (argv.step === 'ai-memory-setup') {
+      const hasRules = fs.existsSync(path.join(projectRoot, '.claude', 'rules'))
+      const hasDecisions = fs.existsSync(path.join(projectRoot, 'docs', 'decisions'))
+      let hasMcpServer = false
+      let mcpServerName = 'none'
+      let hasHooks = false
+      const hookNames: string[] = []
+
+      // Check .claude/settings.json for MCP servers and hooks
+      const settingsPath = path.join(projectRoot, '.claude', 'settings.json')
+      if (fs.existsSync(settingsPath)) {
+        try {
+          const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'))
+          const servers = settings.mcpServers ?? {}
+          for (const [name, _config] of Object.entries(servers)) {
+            if (['memory', 'engram', 'hmem', 'claude-mem', 'context7', 'nia', 'docfork'].includes(name)) {
+              hasMcpServer = true
+              mcpServerName = name
+              break
+            }
+          }
+          const hooks = settings.hooks ?? {}
+          for (const hookType of ['PreCompact', 'Stop', 'PreToolUse']) {
+            if (hooks[hookType] && Array.isArray(hooks[hookType]) && hooks[hookType].length > 0) {
+              hasHooks = true
+              hookNames.push(hookType)
+            }
+          }
+        } catch { /* invalid JSON */ }
+      }
+
+      const brownfield = hasRules || hasMcpServer || hasHooks
+      const mode = brownfield ? 'update' : 'fresh'
+
+      // Count rule files
+      let ruleCount = 0
+      const rulesDir = path.join(projectRoot, '.claude', 'rules')
+      if (hasRules) {
+        try {
+          ruleCount = fs.readdirSync(rulesDir).filter(f => f.endsWith('.md')).length
+        } catch { /* ignore */ }
+      }
+
+      if (outputMode === 'json') {
+        output.result({
+          step: argv.step,
+          applicable: true,
+          reason: 'AI memory setup is always applicable',
+          hasRules,
+          ruleCount,
+          hasMcpServer,
+          mcpServerName,
+          hasHooks,
+          hookNames,
+          hasDecisions,
+          mode,
+        })
+      } else {
+        output.info(`Step: ${argv.step}`)
+        output.info(`Applicable: yes (always applicable)`)
+        output.info(`Rules: ${hasRules ? `yes (${ruleCount} files)` : 'no'}`)
+        output.info(`MCP server: ${hasMcpServer ? mcpServerName : 'none'}`)
+        output.info(`Hooks: ${hasHooks ? hookNames.join(', ') : 'none'}`)
+        output.info(`Decision log: ${hasDecisions ? 'yes' : 'no'}`)
+        output.info(`Mode: ${mode}`)
+      }
+      process.exit(0)
+      return
+    }
+
     // Generic handling for other conditional steps
     const conditional = mp.frontmatter.conditional
     if (conditional) {

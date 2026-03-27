@@ -139,6 +139,7 @@ Respond to these natural language requests:
 | "Where am I?" / "Pipeline status" | Run `scaffold status`, present progress summary |
 | "What does X do?" | Run `scaffold info <step>`, present purpose and dependencies |
 | "Is X applicable?" / "Do I need X?" | Run `scaffold check <step>` to detect platform and brownfield status |
+| "Set up memory" / "Configure AI memory" / "Add memory" | Run `scaffold run ai-memory-setup` — sets up modular rules, optional MCP memory server, and external context |
 | "Set up testing" / "Add Playwright" / "Add Maestro" | Run `scaffold run add-e2e-testing` — auto-detects web/mobile and configures the right framework(s) |
 | "Run multi-model review" / "Review stories with other models" | Run `scaffold run review-user-stories` at depth 5 (multi-model capabilities are now built into review-user-stories) |
 | "Skip X" | Run `scaffold skip <step> --reason "<user's reason>"` |
@@ -195,6 +196,13 @@ Some steps behave significantly differently at higher depths. When running these
 - Depth 5: Adds multi-model dispatch to Codex/Gemini CLI for independent validation, with graceful fallback to Claude-only enhanced review if CLIs aren't available
 
 When running `review-user-stories` at depth 5, check if `codex` or `gemini` CLI is available (`command -v codex`, `command -v gemini`). If neither is available, inform the user that the step will fall back to a Claude-only adversarial self-review — still valuable but less thorough than multi-model review.
+
+**`ai-memory-setup`** — Three-tier AI memory configuration:
+- Tier 1 (Modular Rules): Extracts conventions from coding-standards.md, tech-stack.md, git-workflow.md into path-scoped `.claude/rules/` files. Always recommended.
+- Tier 2 (Persistent Memory): Configures MCP memory server (Engram/hmem/Claude-Mem), lifecycle hooks (PreCompact, Stop), and decision logging in `docs/decisions/`.
+- Tier 3 (External Context): Adds library documentation server (Context7/Nia/Docfork) to prevent API hallucination. Only relevant for projects with external dependencies.
+
+The step auto-detects installed MCP servers and presents tier choices as decision points. Brownfield detection: if `.claude/rules/` exists, enters update mode preserving user customizations.
 
 **`add-e2e-testing`** — Unified E2E testing step that auto-detects the platform:
 - Reads `docs/tech-stack.md` and `package.json` to determine web (Playwright), mobile (Maestro), or both

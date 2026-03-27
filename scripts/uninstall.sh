@@ -19,6 +19,7 @@ FILES=(
     "design-system.md"
     "git-workflow.md"
     "automated-pr-review.md"
+    "ai-memory-setup.md"
     "add-e2e-testing.md"
     "user-stories.md"
     "user-stories-gaps.md"

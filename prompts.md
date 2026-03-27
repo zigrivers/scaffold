@@ -50,6 +50,7 @@ These set up the working environment. Dev Setup creates the commands that everyt
 | 9 | **Design System** | `docs/design-system.md`, theme config | **(optional)** Only for projects with a frontend |
 | 10 | **Git Workflow** | `docs/git-workflow.md`, `scripts/setup-agent-worktree.sh`, CI config | References dev-setup.md for lint/test commands |
 | 10.5 | **Automated PR Review** | `AGENTS.md`, `docs/review-standards.md` | **(optional)** Requires external reviewer (Codex Cloud, Gemini, etc.) |
+| 10.8 | **AI Memory Setup** | `.claude/rules/`, `docs/ai-memory-setup.md` | Modular rules + optional MCP memory server + external docs |
 
 ---
 
@@ -135,7 +136,7 @@ PRD → Tech Stack → Coding Standards → TDD Standards → Project Structure
                                                             ↓
 PRD → User Stories → Implementation Plan → Execution
                                     ↓
-Dev Setup → Git Workflow → Claude.md Optimization → Workflow Audit → Create Evals
+Dev Setup → Git Workflow → AI Memory Setup → Claude.md Optimization → Workflow Audit → Create Evals
                                                                           ↓
                                                           Implementation Plan Review
 ```
@@ -144,9 +145,10 @@ The most critical ordering constraints:
 1. **Beads Setup before everything else in Phase 2** — creates CLAUDE.md
 2. **Tech Stack before Coding Standards and TDD** — they reference it
 3. **Dev Setup before Git Workflow** — Git Workflow references lint/test commands
-4. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
-5. **Workflow Audit before Create Evals** — evals reference the verified workflow and standards
-6. **Implementation Plan before Implementation Plan Review** — can't review what doesn't exist
+4. **Git Workflow before AI Memory Setup** — memory rules are extracted from docs created by earlier steps
+5. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
+6. **Workflow Audit before Create Evals** — evals reference the verified workflow and standards
+7. **Implementation Plan before Implementation Plan Review** — can't review what doesn't exist
 
 
 __________________________________

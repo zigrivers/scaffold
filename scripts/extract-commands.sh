@@ -36,6 +36,7 @@ declare -a FRONTMATTER=(
     'design-system|Create a cohesive design system for frontend|'
     'git-workflow|Configure git workflow for parallel agents|'
     'automated-pr-review|Set up automated PR review with external reviewers|'
+    'ai-memory-setup|Configure AI memory and context management|'
     'add-e2e-testing|Configure E2E testing (Playwright/Maestro)|'
     'user-stories|Create user stories covering every PRD feature|'
     'user-stories-gaps|Gap analysis and UX innovation for user stories|'
@@ -74,6 +75,7 @@ HEADING_TO_SLUG["Dev Environment Setup"]="dev-env-setup"
 HEADING_TO_SLUG["Design System"]="design-system"
 HEADING_TO_SLUG["Git Workflow"]="git-workflow"
 HEADING_TO_SLUG["Automated PR Review"]="automated-pr-review"
+HEADING_TO_SLUG["AI Memory Setup"]="ai-memory-setup"
 HEADING_TO_SLUG["E2E Testing"]="add-e2e-testing"
 HEADING_TO_SLUG["User Stories"]="user-stories"
 HEADING_TO_SLUG["User Stories Gap Analysis & Innovation"]="user-stories-gaps"
@@ -263,6 +265,7 @@ When this step is complete, tell the user:
 
 **Next (choose one):**
 - **(Optional)** Run `/scaffold:automated-pr-review` — Set up automated PR review with external reviewers.
+- Run `/scaffold:ai-memory-setup` — Configure AI memory with modular rules, optional MCP memory server, and external context.
 - If your project has a **web frontend and/or mobile app**: Skip to `/scaffold:add-e2e-testing` — Configure E2E testing (starts Phase 4).
 - If **neither**: Skip to `/scaffold:user-stories` — Create user stories (starts Phase 5).
 
@@ -279,11 +282,29 @@ NEXTSTEP
 When this step is complete, tell the user:
 
 ---
-**Phase 3 complete** — Automated PR review configured with external reviewer integration.
+**Phase 3 in progress** — Automated PR review configured with external reviewer integration.
 
 **Next (choose based on your project):**
+- Run `/scaffold:ai-memory-setup` — Configure AI memory with modular rules, optional MCP memory server, and external context.
 - If your project has a **web frontend and/or mobile app**: Run `/scaffold:add-e2e-testing` — Configure E2E testing (starts Phase 4).
 - If **neither**: Skip to `/scaffold:user-stories` — Create user stories (starts Phase 5).
+
+**Pipeline reference:** `/scaffold:prompt-pipeline`
+
+---
+NEXTSTEP
+            ;;
+        ai-memory-setup)
+            cat <<'NEXTSTEP'
+
+## After This Step
+
+When this step is complete, tell the user:
+
+---
+**Memory setup complete** — AI memory stack configured and documented in `docs/ai-memory-setup.md`.
+
+**Next:** Run `/scaffold:add-e2e-testing` to configure end-to-end testing, or `/scaffold:create-prd` to begin product definition.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

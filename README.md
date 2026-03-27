@@ -255,6 +255,7 @@ Configure the working environment.
 | `design-system` | Create design tokens and component patterns *(web apps only)* |
 | `git-workflow` | Configure branching, CI, worktree scripts, and project safety permissions |
 | `automated-pr-review` | Agent-driven PR review with local CLI or external reviewers *(optional)* |
+| `ai-memory-setup` | Configure AI memory: modular `.claude/rules/`, optional MCP memory server, external docs |
 
 ### Phase 4 — Testing Integration (integration)
 
@@ -413,6 +414,7 @@ gemini -p "Review this artifact..." --output-format json --approval-mode yolo 2>
 ```bash
 scaffold check add-e2e-testing        # platform detection + brownfield
 scaffold check automated-pr-review    # GitHub remote + CLI detection
+scaffold check ai-memory-setup        # .claude/rules/, MCP servers, hooks
 ```
 
 The `scaffold check` command reports which CLIs are available and recommends the appropriate review mode.
@@ -484,6 +486,9 @@ scaffold check add-e2e-testing
 
 scaffold check automated-pr-review
 # → Applicable: yes | GitHub remote: yes | Available CLIs: codex, gemini | Recommended: local-cli (dual-model)
+
+scaffold check ai-memory-setup
+# → Rules: no | MCP server: none | Hooks: none | Mode: fresh
 
 # Re-run a completed step in update mode
 scaffold reset review-prd --force
