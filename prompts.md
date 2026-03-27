@@ -141,16 +141,54 @@ These clean up the accumulated CLAUDE.md additions and verify consistency across
 
 ---
 
-## Phase 7 — Implementation
+## Phase 7 — Planning
 
-These create tasks and start building.
+Create the implementation task graph and review it.
 
 | # | Prompt | Produces | Notes |
 |---|--------|----------|-------|
 | 18 | **Implementation Plan** | `docs/implementation-plan.md`, Beads tasks | Creates the full task graph |
 | 19 | **Implementation Plan Review** | Updated tasks, dependencies | Second pass for quality |
 | 19.5 | **Implementation Plan Multi-Model Review** | `docs/reviews/implementation-plan/`, updated tasks | **(optional)** Requires Codex/Gemini CLI |
-| 20 | **Execution** | Working software | Agent prompts — paste into Claude Code sessions |
+
+---
+
+## Phase 7b — Validation
+
+Seven parallel checks that verify the complete documentation set is internally consistent and implementation-ready.
+
+| # | Prompt | Produces | Notes |
+|---|--------|----------|-------|
+| 19.6 | **Cross-Phase Consistency** | `docs/validation/cross-phase-consistency.md` | Naming, assumptions, interfaces across all phases |
+| 19.7 | **Traceability Matrix** | `docs/validation/traceability-matrix.md` | PRD → Stories → Architecture → Tasks mapping |
+| 19.8 | **Decision Completeness** | `docs/validation/decision-completeness.md` | All decisions recorded, justified, non-contradictory |
+| 19.9 | **Critical Path Walkthrough** | `docs/validation/critical-path-walkthrough.md` | End-to-end trace of critical user journeys |
+| 19.10 | **Implementability Dry Run** | `docs/validation/implementability-dry-run.md` | Simulate agent picking up each task |
+| 19.11 | **Dependency Graph Validation** | `docs/validation/dependency-graph-validation.md` | Verify task DAG is acyclic and complete |
+| 19.12 | **Scope Creep Check** | `docs/validation/scope-creep-check.md` | Verify specs stay within PRD boundaries |
+
+---
+
+## Phase 7c — Finalization
+
+Apply validation fixes, freeze documentation, create implementation guides.
+
+| # | Prompt | Produces | Notes |
+|---|--------|----------|-------|
+| 19.13 | **Apply Fixes & Freeze** | `docs/validation/fix-log.md` | Apply all validation findings, freeze docs |
+| 19.14 | **Developer Onboarding Guide** | `docs/onboarding-guide.md` | "Start here" guide for new developers/agents |
+| 19.15 | **Implementation Playbook** | `docs/implementation-playbook.md` | Operational guide for agent execution |
+
+---
+
+## Phase 8 — Execution
+
+Start building.
+
+| # | Prompt | Produces | Notes |
+|---|--------|----------|-------|
+| 20 | **Single Agent Start** | Working software | Single-agent TDD execution loop |
+| 20 | **Multi Agent Start** | Working software | Multi-agent — one per worktree |
 
 ---
 
@@ -201,7 +239,11 @@ PRD → User Stories → Domain Modeling → ADRs → System Architecture
                                                     ↓
 Dev Setup → Git Workflow → AI Memory Setup → Claude.md Optimization → Workflow Audit
                                                                           ↓
-                                                          Implementation Plan → Review → Execution
+                                              Implementation Plan → Review → Validation (7 parallel checks)
+                                                                                    ↓
+                                                                    Apply Fixes & Freeze → Onboarding → Playbook
+                                                                                                          ↓
+                                                                                                      Execution
 ```
 
 The most critical ordering constraints:
@@ -212,12 +254,13 @@ The most critical ordering constraints:
 5. **User Stories before Domain Modeling** — domain models are derived from stories
 6. **Domain Modeling → ADRs → Architecture** — linear dependency chain through modeling phases
 7. **Architecture before Specification** — database, API, and UX specs derive from architecture (can run in parallel)
-8. **TDD before Review Testing** — review-testing reviews the TDD strategy
-9. **Review Testing before Operations** — operations extends the CI pipeline defined in TDD/git-workflow
-10. **Operations before Security** — security review covers operational posture
-11. **Quality Gates before Consolidation** — consolidation verifies all docs including operations/security
-12. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
-13. **Implementation Plan before Implementation Plan Review** — can't review what doesn't exist
+8. **TDD → Review Testing → Operations → Security** — quality gate chain
+9. **Quality Gates before Consolidation** — consolidation verifies all docs including operations/security
+10. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
+11. **Implementation Plan Review before Validation** — 7 validation checks run after plan review
+12. **All 7 Validation checks before Apply Fixes & Freeze** — freeze requires all findings
+13. **Apply Fixes & Freeze → Onboarding Guide → Implementation Playbook** — sequential finalization
+14. **Finalization before Execution** — agents need frozen docs and playbook
 
 
 __________________________________
