@@ -2,6 +2,16 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.8.0] — 2026-03-27
+
+### Removed
+
+- **Retired `user-stories-multi-model-review`** — Standalone pipeline step (order 62) removed along with its command file, shell script (`scripts/user-stories-mmr.sh`), JSON schema, and setup guide. The step was positioned too late in the pipeline (after downstream steps had already consumed the stories) and duplicated much of `review-user-stories`.
+
+### Enhanced
+
+- **`review-user-stories` now includes requirements traceability and multi-model review** — Depth 4 adds a formal requirements index (REQ-xxx IDs) and coverage matrix (coverage.json) for 100% PRD traceability. Depth 5 adds multi-model dispatch to Codex/Gemini with graceful fallback to Claude-only enhanced review when external CLIs aren't available. This puts the quality gate at order 5 (before downstream steps) instead of order 62.
+
 ## [2.7.0] — 2026-03-27
 
 ### Added
