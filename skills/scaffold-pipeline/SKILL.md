@@ -46,6 +46,12 @@ Use this skill ONLY when the user asks about:
 | 15.10 | Specification | `/scaffold:review-api` | **(optional)** API contracts review |
 | 15.11 | Specification | `/scaffold:ux-spec` | **(optional)** Flows, states, accessibility |
 | 15.12 | Specification | `/scaffold:review-ux` | **(optional)** UX spec review |
+| 15.13 | Quality Gates | `/scaffold:review-testing` | Reviews TDD strategy for coverage gaps |
+| 15.14 | Quality Gates | `/scaffold:create-evals` | Generates eval checks from standards docs |
+| 15.15 | Quality Gates | `/scaffold:operations` | Deployment, monitoring, incident response |
+| 15.16 | Quality Gates | `/scaffold:review-operations` | Reviews operations runbook |
+| 15.17 | Quality Gates | `/scaffold:security` | Threat model, auth, data protection |
+| 15.18 | Quality Gates | `/scaffold:review-security` | Reviews security posture |
 | 16 | Consolidation | `/scaffold:claude-md-optimization` | Run BEFORE workflow-audit |
 | 17 | Consolidation | `/scaffold:workflow-audit` | Run AFTER claude-md-optimization |
 | 18 | Implementation | `/scaffold:implementation-plan` | Creates full task graph |
@@ -77,6 +83,10 @@ PRD → User Stories → Domain Modeling → ADRs → System Architecture
                                                ┌──────┼──────┐
                                             DB Schema  API   UX Spec
                                                       ↓
+                        TDD → Review Testing → Create Evals
+                                    ↓
+                              Operations → Security (+ reviews)
+                                                      ↓
 Dev Setup → Git Workflow → AI Memory Setup → Claude.md Optimization → Workflow Audit
                                                             ↓
                                               Implementation Plan → Review → Execution
@@ -91,8 +101,10 @@ Dev Setup → Git Workflow → AI Memory Setup → Claude.md Optimization → Wo
 5. **User Stories before Domain Modeling** — domain models derive from stories
 6. **Domain Modeling → ADRs → Architecture** — linear chain through modeling phases
 7. **Architecture before Specification** — DB, API, UX specs derive from architecture (can parallelize)
-8. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
-9. **Implementation Plan before Implementation Plan Review** — can't review what doesn't exist
+8. **TDD → Review Testing → Operations → Security** — quality gate chain
+9. **Quality Gates before Consolidation** — consolidation verifies all docs including operations/security
+10. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
+11. **Implementation Plan before Implementation Plan Review** — can't review what doesn't exist
 
 ## Status & Navigation
 
