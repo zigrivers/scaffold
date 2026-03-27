@@ -93,7 +93,7 @@ At depth 4+, dispatch the reviewed artifact to independent AI models for additio
 
 **Previous auth failures do NOT exempt this dispatch.** Auth tokens refresh — always re-check before each review step.
 
-1. **Verify auth**: Run `codex login status` and `gemini -p "respond with ok" -o json 2>/dev/null` (exit 41 = auth failure). If auth fails, tell the user to run `! codex login` or `! gemini -p "hello"` for interactive recovery. Do not silently skip.
+1. **Verify auth**: Run `codex login status` and `NO_BROWSER=true gemini -p "respond with ok" -o json 2>/dev/null` (exit 41 = auth failure). If auth fails, tell the user to run `! codex login` or `! gemini -p "hello"` for interactive recovery. Do not silently skip.
 2. **Bundle context**: Include the reviewed artifact + upstream references (listed below)
 3. **Dispatch**: Run each available CLI independently with the review prompt
 4. **Reconcile**: Apply dual-model reconciliation rules from the skill

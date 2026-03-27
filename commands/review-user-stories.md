@@ -160,7 +160,7 @@ Check if at least one external review CLI is available AND authenticated. Follow
 1. **Check installation**: `command -v codex`, `command -v gemini`
 2. **Verify auth** (tokens expire mid-session):
    - Codex: `codex login status` (exit 0 = authenticated)
-   - Gemini: `gemini -p "respond with ok" -o json` (exit 41 = auth failure)
+   - Gemini: `NO_BROWSER=true gemini -p "respond with ok" -o json` (exit 41 = auth failure)
 3. **If auth fails**: Tell the user and offer interactive recovery — `! codex login` or `! gemini -p "hello"` (the `!` prefix runs it in the user's terminal). **Do not silently skip.**
 
 - `codex` — Codex CLI (install: `npm install -g @openai/codex`)
@@ -173,7 +173,7 @@ Check if at least one external review CLI is available AND authenticated. Follow
 Bundle the PRD, requirements index, coverage map, and user stories into a review package. Follow the invocation patterns from the `multi-model-dispatch` skill:
 
 - **Codex**: `codex exec --skip-git-repo-check -s read-only --ephemeral "REVIEW_PROMPT" 2>/dev/null` — independently review coverage, identify missing requirements, flag vague acceptance criteria, find contradictions, and report overlaps. Request structured JSON output.
-- **Gemini**: `gemini -p "REVIEW_PROMPT" --output-format json --approval-mode yolo 2>/dev/null` — same prompt and output structure as Codex. Run independently — do not share one model's findings with the other.
+- **Gemini**: `NO_BROWSER=true gemini -p "REVIEW_PROMPT" --output-format json --approval-mode yolo 2>/dev/null` — same prompt and output structure as Codex. Run independently — do not share one model's findings with the other.
 
 Do NOT edit the review JSON files — they are raw evidence from independent reviewers.
 
