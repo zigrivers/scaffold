@@ -1340,8 +1340,7 @@ When this step is complete, tell the user:
 **Phase 3 complete** — Multi-model code review configured with Codex Cloud + Claude Code Action fix loop.
 
 **Next (choose based on your project):**
-- If your project has a **web frontend**: Run `/scaffold:add-playwright` — Configure Playwright for web app testing (starts Phase 4).
-- If your project has a **mobile app**: Run `/scaffold:add-maestro` — Configure Maestro for mobile app testing.
+- If your project has a **web frontend and/or mobile app**: Run `/scaffold:add-e2e-testing` — Configure E2E testing (starts Phase 4).
 - If **neither**: Skip to `/scaffold:user-stories` — Create user stories (starts Phase 5).
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`

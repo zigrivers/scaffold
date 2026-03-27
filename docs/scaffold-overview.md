@@ -65,8 +65,7 @@ Phases are run in order, with explicit dependency constraints between prompts. S
 
 | # | Command | Description | Optional |
 |---|---------|-------------|----------|
-| 12 | `add-playwright` | Configure Playwright for web app testing | **(optional)** Web apps only |
-| 13 | `add-maestro` | Configure Maestro for mobile app testing | **(optional)** Mobile/Expo apps only |
+| 12 | `add-e2e-testing` | Configure E2E testing (Playwright/Maestro) | **(optional)** Web and/or mobile apps |
 
 ### Phase 5 — Stories & Planning
 

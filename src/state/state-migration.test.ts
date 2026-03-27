@@ -89,7 +89,7 @@ describe('migrateState', () => {
       expect(state.steps['review-tasks']).toBeUndefined()
     })
 
-    it('does not rename if new name already exists (idempotent)', () => {
+    it('keeps higher-priority status when new name already exists', () => {
       const state = makeState({
         'tdd': { status: 'completed' },
         'testing-strategy': { status: 'pending' }, // stale entry alongside new
@@ -97,10 +97,11 @@ describe('migrateState', () => {
 
       const changed = migrateState(state)
 
-      // Should NOT overwrite existing tdd entry
+      expect(changed).toBe(true)
+      // Should keep completed (higher priority) over pending
       expect(state.steps['tdd'].status).toBe('completed')
-      // Old entry stays since new name exists — avoids data loss
-      expect(state.steps['testing-strategy']).toBeDefined()
+      // Old entry cleaned up
+      expect(state.steps['testing-strategy']).toBeUndefined()
     })
 
     it('returns false when no migration needed', () => {
@@ -130,6 +131,78 @@ describe('migrateState', () => {
 
       expect(changed).toBe(true)
       expect(state.in_progress?.step).toBe('tdd')
+    })
+
+    it('renames add-playwright to add-e2e-testing', () => {
+      const state = makeState({
+        'add-playwright': { status: 'completed' },
+      })
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(true)
+      expect(state.steps['add-e2e-testing']).toBeDefined()
+      expect(state.steps['add-e2e-testing'].status).toBe('completed')
+      expect(state.steps['add-playwright']).toBeUndefined()
+    })
+
+    it('renames add-maestro to add-e2e-testing', () => {
+      const state = makeState({
+        'add-maestro': { status: 'completed' },
+      })
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(true)
+      expect(state.steps['add-e2e-testing']).toBeDefined()
+      expect(state.steps['add-e2e-testing'].status).toBe('completed')
+      expect(state.steps['add-maestro']).toBeUndefined()
+    })
+
+    it('when both add-playwright and add-maestro exist, prefers completed status', () => {
+      const state = makeState({
+        'add-playwright': { status: 'completed' },
+        'add-maestro': { status: 'pending' },
+      })
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(true)
+      expect(state.steps['add-e2e-testing']).toBeDefined()
+      expect(state.steps['add-e2e-testing'].status).toBe('completed')
+      expect(state.steps['add-playwright']).toBeUndefined()
+      expect(state.steps['add-maestro']).toBeUndefined()
+    })
+
+    it('when both exist with in_progress and pending, prefers in_progress', () => {
+      const state = makeState({
+        'add-playwright': { status: 'pending' },
+        'add-maestro': { status: 'in_progress' },
+      })
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(true)
+      expect(state.steps['add-e2e-testing'].status).toBe('in_progress')
+      expect(state.steps['add-playwright']).toBeUndefined()
+      expect(state.steps['add-maestro']).toBeUndefined()
+    })
+
+    it('fixes in_progress referencing add-playwright to add-e2e-testing', () => {
+      const state = makeState({
+        'add-playwright': { status: 'in_progress' },
+      })
+      state.in_progress = {
+        step: 'add-playwright',
+        started: '2026-01-01T00:00:00.000Z',
+        partial_artifacts: [],
+        actor: 'scaffold-run',
+      }
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(true)
+      expect(state.in_progress?.step).toBe('add-e2e-testing')
     })
   })
 

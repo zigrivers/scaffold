@@ -94,7 +94,7 @@ For each file in `commands/`, classify as:
 |------|-------------|---------|
 | **Pipeline (core)** | In Setup Order table, creates project artifacts | `create-prd`, `tech-stack`, `coding-standards` |
 | **Pipeline (review)** | In Setup Order table, reviews/innovates existing artifacts | `prd-gap-analysis`, `workflow-audit` |
-| **Pipeline (optional)** | In Setup Order table, conditional on project type | `add-playwright`, `design-system` |
+| **Pipeline (optional)** | In Setup Order table, conditional on project type | `add-e2e-testing`, `design-system` |
 | **Ongoing** | In Ongoing table, re-runnable for maintenance | `new-enhancement`, `create-evals` (re-run) |
 | **Execution** | Agent start/resume commands | `single-agent-start`, `multi-agent-resume` |
 | **Utility** | Operational tools, not part of pipeline | `release`, `version-bump`, `dashboard` |

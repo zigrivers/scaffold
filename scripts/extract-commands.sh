@@ -37,8 +37,7 @@ declare -a FRONTMATTER=(
     'design-system|Create a cohesive design system for frontend|'
     'git-workflow|Configure git workflow for parallel agents|'
     'multi-model-review|Set up multi-model code review on PRs|'
-    'add-playwright|Configure Playwright for web app testing|'
-    'add-maestro|Configure Maestro for mobile app testing|'
+    'add-e2e-testing|Configure E2E testing (Playwright/Maestro)|'
     'user-stories|Create user stories covering every PRD feature|'
     'user-stories-gaps|Gap analysis and UX innovation for user stories|'
     'platform-parity-review|Audit platform coverage across all docs|'
@@ -77,8 +76,7 @@ HEADING_TO_SLUG["Dev Environment Setup"]="dev-env-setup"
 HEADING_TO_SLUG["Design System"]="design-system"
 HEADING_TO_SLUG["Git Workflow"]="git-workflow"
 HEADING_TO_SLUG["Multi-Model Code Review Loop"]="multi-model-review"
-HEADING_TO_SLUG["Integrate Playwright (if building a web app)"]="add-playwright"
-HEADING_TO_SLUG["Maestro Setup"]="add-maestro"
+HEADING_TO_SLUG["E2E Testing"]="add-e2e-testing"
 HEADING_TO_SLUG["User Stories"]="user-stories"
 HEADING_TO_SLUG["User Stories Gap Analysis & Innovation"]="user-stories-gaps"
 HEADING_TO_SLUG["Platform Parity Review"]="platform-parity-review"
@@ -284,8 +282,7 @@ When this step is complete, tell the user:
 
 **Next (choose one):**
 - **(Optional)** Run `/scaffold:multi-model-review` — Set up multi-model code review on PRs (requires ChatGPT Pro subscription).
-- If your project has a **web frontend**: Skip to `/scaffold:add-playwright` — Configure Playwright for web app testing (starts Phase 4).
-- If your project has a **mobile app**: Skip to `/scaffold:add-maestro` — Configure Maestro for mobile app testing.
+- If your project has a **web frontend and/or mobile app**: Skip to `/scaffold:add-e2e-testing` — Configure E2E testing (starts Phase 4).
 - If **neither**: Skip to `/scaffold:user-stories` — Create user stories (starts Phase 5).
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
@@ -304,8 +301,7 @@ When this step is complete, tell the user:
 **Phase 3 complete** — Multi-model code review configured with Codex Cloud + Claude Code Action fix loop.
 
 **Next (choose based on your project):**
-- If your project has a **web frontend**: Run `/scaffold:add-playwright` — Configure Playwright for web app testing (starts Phase 4).
-- If your project has a **mobile app**: Run `/scaffold:add-maestro` — Configure Maestro for mobile app testing.
+- If your project has a **web frontend and/or mobile app**: Run `/scaffold:add-e2e-testing` — Configure E2E testing (starts Phase 4).
 - If **neither**: Skip to `/scaffold:user-stories` — Create user stories (starts Phase 5).
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
@@ -313,7 +309,7 @@ When this step is complete, tell the user:
 ---
 NEXTSTEP
             ;;
-        add-playwright)
+        add-e2e-testing)
             cat <<'NEXTSTEP'
 
 ## After This Step
@@ -321,26 +317,7 @@ NEXTSTEP
 When this step is complete, tell the user:
 
 ---
-**Phase 4 in progress** — Playwright configured for web app testing.
-
-**Next:**
-- If your project **also** has a mobile app: Run `/scaffold:add-maestro` — Configure Maestro for mobile app testing.
-- Otherwise: Skip to `/scaffold:user-stories` — Create user stories (starts Phase 5).
-
-**Pipeline reference:** `/scaffold:prompt-pipeline`
-
----
-NEXTSTEP
-            ;;
-        add-maestro)
-            cat <<'NEXTSTEP'
-
-## After This Step
-
-When this step is complete, tell the user:
-
----
-**Phase 4 complete** — Maestro configured for mobile app testing.
+**Phase 4 complete** — E2E testing configured (Playwright and/or Maestro as applicable).
 
 **Next:** Run `/scaffold:user-stories` — Create user stories covering every PRD feature (starts Phase 5).
 

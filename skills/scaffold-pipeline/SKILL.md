@@ -30,8 +30,7 @@ Use this skill ONLY when the user asks about:
 | 10 | Dev Environment | `/scaffold:design-system` | **(optional)** Frontend projects only |
 | 11 | Dev Environment | `/scaffold:git-workflow` | References dev-setup.md |
 | 11.5 | Dev Environment | `/scaffold:multi-model-review` | **(optional)** Requires ChatGPT Pro |
-| 12 | Testing | `/scaffold:add-playwright` | **(optional)** Web apps only |
-| 13 | Testing | `/scaffold:add-maestro` | **(optional)** Mobile/Expo apps only |
+| 12 | Testing | `/scaffold:add-e2e-testing` | **(optional)** Web and/or mobile apps |
 | 14 | Stories & Planning | `/scaffold:user-stories` | Covers every PRD feature |
 | 15 | Stories & Planning | `/scaffold:user-stories-gaps` | UX improvements |
 | 16 | Stories & Planning | `/scaffold:platform-parity-review` | **(optional)** Multi-platform projects |

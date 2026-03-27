@@ -284,7 +284,7 @@ Beads and Node.js are required by the pipeline prompts (specifically the `beads`
 | Tool | Version | Purpose | When Needed |
 |------|---------|---------|-------------|
 | Python 3 | 3.8+ | YAML frontmatter parsing fallback | Only if `validate-frontmatter.sh` needs complex YAML parsing |
-| Playwright MCP | Latest | E2E testing for web apps | Only for `/scaffold:add-playwright` |
+| Playwright MCP | Latest | E2E testing for web apps | Only for `/scaffold:add-e2e-testing` |
 | `gh` CLI | 2.0+ | GitHub PR/issue operations, CI setup | Only for `/scaffold:git-workflow` and `/scaffold:multi-model-review` |
 
 ## 8. Quick Reference

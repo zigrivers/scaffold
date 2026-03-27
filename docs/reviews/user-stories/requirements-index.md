@@ -90,8 +90,8 @@ Atomic requirements extracted from `docs/plan.md` for traceability. Each require
 | ID | Requirement | PRD Section | Priority |
 |----|-------------|-------------|----------|
 | REQ-047 | `web-app` profile includes 18 specific prompts as listed in PRD | F-PR-1 | Must |
-| REQ-048 | `cli-tool` profile includes 16 prompts (excludes design-system, add-playwright, add-maestro, multi-model-review, platform-parity-review) | F-PR-1 | Must |
-| REQ-049 | `mobile` profile includes 18 prompts including `add-maestro` (not `add-playwright`) | F-PR-1 | Must |
+| REQ-048 | `cli-tool` profile includes 16 prompts (excludes design-system, add-e2e-testing, multi-model-review, platform-parity-review) | F-PR-1 | Must |
+| REQ-049 | `mobile` profile includes 18 prompts including `add-e2e-testing` | F-PR-1 | Must |
 | REQ-050 | `api-service` profile includes same 16 prompts as `cli-tool` | F-PR-1 | Must |
 | REQ-051 | `minimal` profile includes 10 prompts (fastest path to implementation) | F-PR-1 | Must |
 | REQ-052 | Built-in profiles are read-only (users cannot modify them directly) | F-PR-1 | Must |

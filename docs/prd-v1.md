@@ -190,29 +190,15 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
   - Safety rails: round cap (max 3), bot-loop prevention, cost cap, fork protection, human override, usage-limit detection, follow-up dedup
 - **Dependencies**: FR-11 (references git workflow), FR-6 (references coding standards)
 
-### FR-13: Playwright Integration (Optional — Web Apps)
-- **Description**: Browser automation and visual testing for web applications
-- **User-facing commands**: `/scaffold:add-playwright` (`commands/add-playwright.md`)
+### FR-13: E2E Testing Setup (Optional — Web and/or Mobile)
+- **Description**: Configures end-to-end testing for web apps (Playwright) and/or mobile apps (Maestro)
+- **User-facing commands**: `/scaffold:add-e2e-testing` (`commands/add-e2e-testing.md`)
 - **Behavior**:
-  - Configures Playwright with base URL, viewports, screenshot directories, timeouts
-  - Sets up screenshot directory structure (`baseline/`, `current/`, `diff/`)
-  - Defines naming convention: `{story-id}_{feature}_{viewport}_{state}.png`
-  - Visual testing patterns: page load, user flow, responsive, error states
-  - Baseline management: baselines committed, current gitignored
-  - Updates CLAUDE.md with MCP tool patterns and TDD Standards with E2E section
-  - Adds Playwright MCP permissions to `.claude/settings.json`
-- **Dependencies**: FR-7 (updates TDD standards)
-
-### FR-14: Maestro Setup (Optional — Mobile/Expo)
-- **Description**: Mobile UI testing for Expo/React Native applications
-- **User-facing commands**: `/scaffold:add-maestro` (`commands/add-maestro.md`)
-- **Behavior**:
-  - Creates `maestro/` directory with `flows/`, `shared/`, `screenshots/`, `config.yaml`
-  - YAML-based flow definitions for user interactions
-  - TestID requirements for all interactive elements
-  - Expo-specific setup (development builds, not Expo Go)
-  - Package.json scripts: `test:e2e`, `test:e2e:ios`, `test:e2e:android`, `maestro:studio`
-  - Updates CLAUDE.md and TDD Standards with mobile testing sections
+  - Detects project type (web, mobile, or both) and configures applicable frameworks
+  - Playwright: configures base URL, viewports, screenshot directories, timeouts, visual testing patterns
+  - Maestro: creates `maestro/` directory with flows, config, TestID requirements, package.json scripts
+  - Updates CLAUDE.md and TDD Standards with E2E testing sections
+  - Adds Playwright MCP permissions to `.claude/settings.json` (if web)
 - **Dependencies**: FR-7 (updates TDD standards)
 
 ### FR-15: User Stories
@@ -458,8 +444,7 @@ Independent code/story review by external AI models (OpenAI Codex CLI, Google Ge
 ### Phase 4 — Testing Integration
 | Step | Command | Output |
 |------|---------|--------|
-| 12 | `/scaffold:add-playwright` (optional, web) | Playwright config, screenshot dirs |
-| 13 | `/scaffold:add-maestro` (optional, mobile) | `maestro/` directory, flows, config |
+| 12 | `/scaffold:add-e2e-testing` (optional, web/mobile) | Playwright config, Maestro config, test patterns |
 
 ### Phase 5 — Stories & Planning
 | Step | Command | Output |

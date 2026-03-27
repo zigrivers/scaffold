@@ -16,8 +16,7 @@ steps:
   git-workflow: { enabled: true }
   multi-model-review: { enabled: true, conditional: "if-needed" }
   # Phase 4 — Integration
-  add-playwright: { enabled: true, conditional: "if-needed" }
-  add-maestro: { enabled: true, conditional: "if-needed" }
+  add-e2e-testing: { enabled: true, conditional: "if-needed" }
   # Phase 1 — Product Definition
   create-prd: { enabled: true }
   review-prd: { enabled: true }
