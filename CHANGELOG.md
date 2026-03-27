@@ -2,6 +2,20 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.9.0] — 2026-03-27
+
+### Added
+
+- **Unified `add-e2e-testing` step** — Replaces separate `add-playwright` and `add-maestro` steps with a single step that auto-detects project platform from `tech-stack.md` and `package.json`. Configures Playwright for web, Maestro for mobile, or both. Self-skips for backend-only projects.
+- **`scaffold check` command** — New CLI command to preview step applicability without executing: `scaffold check add-e2e-testing` shows platform detection, brownfield status, and recommended mode.
+- **Brownfield detection** — Detects existing Playwright config or Maestro flows and auto-enters update mode.
+- **Framework-specific Playwright config** — Generates correct `webServer` configuration for Next.js, Vite, Remix, Gatsby, SvelteKit, and Angular.
+- **Expo-specific Maestro detection** — Detects SDK version, EAS Build, and managed vs bare workflow.
+
+### Removed
+
+- **`add-playwright`** and **`add-maestro`** as separate pipeline steps (replaced by `add-e2e-testing`). State migration handles projects with either or both old step names.
+
 ## [2.8.1] — 2026-03-27
 
 ### Fixed
