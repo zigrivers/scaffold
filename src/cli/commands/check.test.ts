@@ -404,6 +404,87 @@ describe('check command', () => {
     expect(data.mode).toBe('update')
   })
 
+  it('detects ai-memory-setup as fresh when nothing configured', async () => {
+    const dir = makeTmpProject()
+    tmpDirs.push(dir)
+
+    mockFindProjectRoot.mockReturnValue(dir)
+    type MP = ReturnType<typeof discoverMetaPrompts> extends Map<string, infer V> ? V : never
+    mockDiscoverMetaPrompts.mockReturnValue(new Map([
+      ['ai-memory-setup', makeMetaPrompt('ai-memory-setup') as MP],
+    ]))
+
+    mockResolveOutputMode.mockReturnValue('json')
+    await checkCommand.handler(defaultArgv({ step: 'ai-memory-setup', root: dir, format: 'json' }))
+
+    const allOutput = writtenLines.join('')
+    const parsed = JSON.parse(allOutput)
+    const data = parsed.data ?? parsed
+    expect(data.applicable).toBe(true)
+    expect(data.hasRules).toBe(false)
+    expect(data.hasMcpServer).toBe(false)
+    expect(data.hasHooks).toBe(false)
+    expect(data.mode).toBe('fresh')
+  })
+
+  it('detects ai-memory-setup as update when rules exist', async () => {
+    const dir = makeTmpProject()
+    tmpDirs.push(dir)
+    fs.mkdirSync(path.join(dir, '.claude', 'rules'), { recursive: true })
+    fs.writeFileSync(path.join(dir, '.claude', 'rules', 'code-style.md'), '---\ndescription: test\n---\n- rule')
+    fs.writeFileSync(path.join(dir, '.claude', 'rules', 'testing.md'), '---\ndescription: test\n---\n- rule')
+
+    mockFindProjectRoot.mockReturnValue(dir)
+    type MP = ReturnType<typeof discoverMetaPrompts> extends Map<string, infer V> ? V : never
+    mockDiscoverMetaPrompts.mockReturnValue(new Map([
+      ['ai-memory-setup', makeMetaPrompt('ai-memory-setup') as MP],
+    ]))
+
+    mockResolveOutputMode.mockReturnValue('json')
+    await checkCommand.handler(defaultArgv({ step: 'ai-memory-setup', root: dir, format: 'json' }))
+
+    const allOutput = writtenLines.join('')
+    const parsed = JSON.parse(allOutput)
+    const data = parsed.data ?? parsed
+    expect(data.hasRules).toBe(true)
+    expect(data.ruleCount).toBe(2)
+    expect(data.mode).toBe('update')
+  })
+
+  it('detects ai-memory-setup MCP server and hooks', async () => {
+    const dir = makeTmpProject()
+    tmpDirs.push(dir)
+    fs.mkdirSync(path.join(dir, '.claude'), { recursive: true })
+    fs.writeFileSync(path.join(dir, '.claude', 'settings.json'), JSON.stringify({
+      mcpServers: {
+        memory: { command: 'engram', args: ['mcp'] },
+      },
+      hooks: {
+        PreCompact: [{ type: 'command', command: 'echo test' }],
+        Stop: [{ type: 'command', command: 'echo stop' }],
+      },
+    }))
+
+    mockFindProjectRoot.mockReturnValue(dir)
+    type MP = ReturnType<typeof discoverMetaPrompts> extends Map<string, infer V> ? V : never
+    mockDiscoverMetaPrompts.mockReturnValue(new Map([
+      ['ai-memory-setup', makeMetaPrompt('ai-memory-setup') as MP],
+    ]))
+
+    mockResolveOutputMode.mockReturnValue('json')
+    await checkCommand.handler(defaultArgv({ step: 'ai-memory-setup', root: dir, format: 'json' }))
+
+    const allOutput = writtenLines.join('')
+    const parsed = JSON.parse(allOutput)
+    const data = parsed.data ?? parsed
+    expect(data.hasMcpServer).toBe(true)
+    expect(data.mcpServerName).toBe('memory')
+    expect(data.hasHooks).toBe(true)
+    expect(data.hookNames).toContain('PreCompact')
+    expect(data.hookNames).toContain('Stop')
+    expect(data.mode).toBe('update')
+  })
+
   it('handles non-e2e conditional step with generic response', async () => {
     type MP = ReturnType<typeof discoverMetaPrompts> extends Map<string, infer V> ? V : never
     mockDiscoverMetaPrompts.mockReturnValue(new Map([

@@ -156,6 +156,7 @@ DEPS_JSON=$(cat <<'DEPSJSON'
     "design-system": ["dev-env-setup"],
     "git-workflow": ["dev-env-setup"],
     "automated-pr-review": ["git-workflow"],
+    "ai-memory-setup": ["git-workflow"],
     "add-e2e-testing": ["dev-env-setup"],
     "user-stories": ["prd-gap-analysis"],
     "user-stories-gaps": ["user-stories"],

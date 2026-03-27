@@ -438,6 +438,7 @@ When this step is complete, tell the user:
 **Phase 3 in progress** — Automated PR review configured with agent-driven loop.
 
 **Next:**
+- Run `/scaffold:ai-memory-setup` — Configure AI memory with modular rules, optional MCP memory server, and external context.
 - Run `/scaffold:add-e2e-testing` — Configure E2E testing (if project has web or mobile frontend).
 - Or skip to `/scaffold:user-stories` — Create user stories (starts Phase 5).
 

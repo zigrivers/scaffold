@@ -29,6 +29,7 @@ Use this skill ONLY when the user asks about:
 | 9 | Dev Environment | `/scaffold:design-system` | **(optional)** Frontend projects only |
 | 10 | Dev Environment | `/scaffold:git-workflow` | References dev-setup.md |
 | 10.5 | Dev Environment | `/scaffold:automated-pr-review` | **(optional)** Requires external reviewer |
+| 10.8 | Dev Environment | `/scaffold:ai-memory-setup` | Modular rules, optional MCP memory + external docs |
 | 11 | Testing | `/scaffold:add-e2e-testing` | **(optional)** Web and/or mobile apps |
 | 13 | Stories & Planning | `/scaffold:user-stories` | Covers every PRD feature |
 | 14 | Stories & Planning | `/scaffold:user-stories-gaps` | UX improvements |
@@ -61,7 +62,7 @@ PRD → Tech Stack → Coding Standards → TDD Standards → Project Structure
                                                             ↓
 PRD → User Stories → Implementation Plan → Execution
                                     ↓
-Dev Setup → Git Workflow → Claude.md Optimization → Workflow Audit
+Dev Setup → Git Workflow → AI Memory Setup → Claude.md Optimization → Workflow Audit
                                                             ↓
                                               Implementation Plan Review
 ```
@@ -71,8 +72,9 @@ Dev Setup → Git Workflow → Claude.md Optimization → Workflow Audit
 1. **Beads Setup before everything else in Phase 2** — creates CLAUDE.md
 2. **Tech Stack before Coding Standards and TDD** — they reference it
 3. **Dev Setup before Git Workflow** — Git Workflow references lint/test commands
-4. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
-5. **Implementation Plan before Implementation Plan Review** — can't review what doesn't exist
+4. **Git Workflow before AI Memory Setup** — memory rules are extracted from project docs created by earlier steps
+5. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
+6. **Implementation Plan before Implementation Plan Review** — can't review what doesn't exist
 
 ## Status & Navigation
 

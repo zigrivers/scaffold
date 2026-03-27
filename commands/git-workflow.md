@@ -655,6 +655,7 @@ When this step is complete, tell the user:
 
 **Next (choose one):**
 - **(Optional)** Run `/scaffold:automated-pr-review` — Set up automated PR review with external reviewers.
+- Run `/scaffold:ai-memory-setup` — Configure AI memory with modular rules, optional MCP memory server, and external context.
 - If your project has a **web frontend and/or mobile app**: Skip to `/scaffold:add-e2e-testing` — Configure E2E testing (starts Phase 4).
 - If **neither**: Skip to `/scaffold:user-stories` — Create user stories (starts Phase 5).
 

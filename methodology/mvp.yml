@@ -14,6 +14,7 @@ steps:
   design-system: { enabled: false }
   git-workflow: { enabled: false }
   automated-pr-review: { enabled: false }
+  ai-memory-setup: { enabled: false }
   # Phase 4 — Integration
   add-e2e-testing: { enabled: false }
   # Phase 1 — Product Definition
