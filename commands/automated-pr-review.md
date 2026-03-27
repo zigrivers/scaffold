@@ -39,41 +39,47 @@ Check if `AGENTS.md` already exists at the repo root:
 
 ## Step 1: Detect Available Reviewers & Choose Mode
 
-First, detect what's available locally:
+Detect what's available locally:
 
 ```bash
 command -v codex && echo "Codex CLI available" || echo "Codex CLI not found"
 command -v gemini && echo "Gemini CLI available" || echo "Gemini CLI not found"
 ```
 
-Then present the user with reviewer options using AskUserQuestionTool:
+### Auto-Select Logic
 
-### Local CLI Review (Recommended)
+**If at least one CLI is available → default to local CLI review (Option A).** Inform the user:
+- "Detected [codex/gemini/both]. Using local CLI review (fastest, no external services needed)."
+- If both available: "Both Codex and Gemini CLIs detected — will run dual-model review for highest quality."
+- Do NOT ask the user to choose — just proceed with local CLI mode. Only ask if the user wants to override to an external bot mode.
 
-**Option A — Local CLI review (recommended if CLIs available)**
+**If no CLI is available → ask the user** which external bot to configure using AskUserQuestionTool.
+
+### Option A — Local CLI Review (default when CLIs available)
+
 - The agent captures the PR diff and runs it through Codex and/or Gemini CLI locally
 - Results are immediate — no polling, no waiting for external bots
 - If **both CLIs available**: Run both independently, reconcile findings (highest quality)
 - If **one CLI available**: Run that one (still catches different-model blind spots)
-- Requires: `codex` CLI (ChatGPT subscription) and/or `gemini` CLI (free tier available)
 - Cost: included in existing subscriptions, no additional credits per review
 
-### External Bot Review (Alternative)
+### Option B — Codex Cloud (fallback when no local CLI)
 
-**Option B — Codex Cloud (GitHub App)**
 - Requires: ChatGPT subscription + Codex Cloud GitHub App installed on repo
 - Bot posts PR review comments; agent polls for results via `gh api`
 - Slower than local CLI (must wait for external service)
 
-**Option C — Gemini Code Assist (GitHub App)**
+### Option C — Gemini Code Assist (fallback when no local CLI)
+
 - Requires: Google Cloud project + Gemini Code Assist enabled on repo
 - Same polling pattern as Option B
 
-**Option D — Custom reviewer bot**
+### Option D — Custom reviewer bot
+
 - User provides: bot username, approval signal text
 - Works with any bot that posts GitHub PR reviews
 
-Store the choice. Options B-D use the external bot flow (AGENTS.md + await script). Option A uses the local CLI flow (no AGENTS.md needed for local mode, but created anyway for documentation).
+Options B-D use the external bot flow (AGENTS.md + await script). Option A uses the local CLI flow.
 
 ## Prerequisites
 
