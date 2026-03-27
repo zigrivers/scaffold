@@ -2,6 +2,17 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.13.2] — 2026-03-27
+
+### Fixed
+
+- **claude-md-optimization** now detects `.claude/rules/` and reinforces the pointer pattern instead of re-inlining conventions. Targets CLAUDE.md under 200 lines when rules exist.
+- **workflow-audit** now includes a "Memory & Rules Consistency Check" section — verifies rule files match source docs, globs match real files, and CLAUDE.md uses pointer pattern.
+- **Lifecycle hooks** in ai-memory-setup now integrate with the configured MCP memory server (Engram/hmem) instead of echoing to `/dev/null`. File-logging fallback for Tier 1-only setups.
+- **Missing .gitignore update** — added consolidated Step 2.3b to add MCP database directories to .gitignore.
+- **Decision log vs ADRs** — added comparison table and Beads task ID field to decision entry format.
+- **coding-standards** After This Step now notes that ai-memory-setup rules may need re-syncing after updates.
+
 ## [2.13.1] — 2026-03-27
 
 ### Fixed
