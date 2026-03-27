@@ -2,6 +2,16 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.16.1] — 2026-03-27
+
+### Added
+
+- **6 quality gate steps added to prompts.md and pipeline skill** — review-testing, create-evals, operations, review-operations, security, review-security were in pipeline files but missing from documentation. Added as Phase 5e (Quality Gates). Updated dependency graphs with quality gate chain.
+
+### Changed
+
+- **create-evals moved from Phase 6 to Phase 5e** — Was listed after workflow-audit in prompts.md, but the v2 pipeline places it in the quality phase (after tdd). Now correctly positioned before consolidation.
+
 ## [2.16.0] — 2026-03-27
 
 ### Added
