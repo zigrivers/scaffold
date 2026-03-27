@@ -54,11 +54,21 @@ Use this skill ONLY when the user asks about:
 | 15.18 | Quality Gates | `/scaffold:review-security` | Reviews security posture |
 | 16 | Consolidation | `/scaffold:claude-md-optimization` | Run BEFORE workflow-audit |
 | 17 | Consolidation | `/scaffold:workflow-audit` | Run AFTER claude-md-optimization |
-| 18 | Implementation | `/scaffold:implementation-plan` | Creates full task graph |
-| 19 | Implementation | `/scaffold:implementation-plan-review` | Second pass for quality |
-| 19.5 | Implementation | `/scaffold:multi-model-review-tasks` | **(optional)** Requires Codex/Gemini CLI |
-| 20 | Implementation | `/scaffold:single-agent-start` | Single-agent execution loop |
-| 20 | Implementation | `/scaffold:multi-agent-start` | Multi-agent — one per worktree |
+| 18 | Planning | `/scaffold:implementation-plan` | Creates full task graph |
+| 19 | Planning | `/scaffold:implementation-plan-review` | Second pass for quality |
+| 19.5 | Planning | `/scaffold:multi-model-review-tasks` | **(optional)** Requires Codex/Gemini CLI |
+| 19.6 | Validation | `/scaffold:cross-phase-consistency` | Naming, assumptions, interfaces |
+| 19.7 | Validation | `/scaffold:traceability-matrix` | PRD → Stories → Architecture → Tasks |
+| 19.8 | Validation | `/scaffold:decision-completeness` | All decisions recorded and justified |
+| 19.9 | Validation | `/scaffold:critical-path-walkthrough` | End-to-end critical journey trace |
+| 19.10 | Validation | `/scaffold:implementability-dry-run` | Simulate agent picking up tasks |
+| 19.11 | Validation | `/scaffold:dependency-graph-validation` | Verify task DAG is acyclic |
+| 19.12 | Validation | `/scaffold:scope-creep-check` | Specs stay within PRD boundaries |
+| 19.13 | Finalization | `/scaffold:apply-fixes-and-freeze` | Apply findings, freeze docs |
+| 19.14 | Finalization | `/scaffold:developer-onboarding-guide` | "Start here" for new devs/agents |
+| 19.15 | Finalization | `/scaffold:implementation-playbook` | Operational guide for agent execution |
+| 20 | Execution | `/scaffold:single-agent-start` | Single-agent TDD execution loop |
+| 20 | Execution | `/scaffold:multi-agent-start` | Multi-agent — one per worktree |
 
 ## Standalone Commands
 
@@ -89,7 +99,11 @@ PRD → User Stories → Domain Modeling → ADRs → System Architecture
                                                       ↓
 Dev Setup → Git Workflow → AI Memory Setup → Claude.md Optimization → Workflow Audit
                                                             ↓
-                                              Implementation Plan → Review → Execution
+                              Implementation Plan → Review → Validation (7 parallel checks)
+                                                                    ↓
+                                                    Apply Fixes & Freeze → Onboarding → Playbook
+                                                                                          ↓
+                                                                                      Execution
 ```
 
 ## Critical Ordering Constraints
@@ -104,7 +118,9 @@ Dev Setup → Git Workflow → AI Memory Setup → Claude.md Optimization → Wo
 8. **TDD → Review Testing → Operations → Security** — quality gate chain
 9. **Quality Gates before Consolidation** — consolidation verifies all docs including operations/security
 10. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
-11. **Implementation Plan before Implementation Plan Review** — can't review what doesn't exist
+11. **Implementation Plan Review before Validation** — 7 checks run after plan review
+12. **All 7 Validation checks before Apply Fixes & Freeze** — freeze requires all findings
+13. **Finalization before Execution** — agents need frozen docs and playbook
 
 ## Status & Navigation
 

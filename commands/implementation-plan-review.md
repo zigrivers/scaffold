@@ -333,11 +333,12 @@ When this step is complete, tell the user:
 ---
 **Phase 7 in progress** — Tasks reviewed, gaps filled, dependencies verified.
 
-**Next:**
-- If you have **Codex CLI and/or Gemini CLI**: Run `/scaffold:multi-model-review-tasks` — Independent multi-model review of implementation tasks for coverage and quality.
-- Otherwise: Choose an execution mode:
-  - **Single agent:** Run `/scaffold:single-agent-start` — Start execution from the main repo.
-  - **Multiple agents:** Set up worktrees per `docs/git-workflow.md`, then run `/scaffold:multi-agent-start <agent-name>` in each worktree.
+**Next (choose based on methodology):**
+- **(Optional)** Run `/scaffold:multi-model-review-tasks` — Independent multi-model review of tasks (requires Codex/Gemini CLI).
+- **(Recommended)** Run `/scaffold:cross-phase-consistency` — Start the 7-check validation phase to verify documentation is internally consistent and implementation-ready.
+- **(Skip validation)** For MVP or when ready to build now: Run `/scaffold:single-agent-start` or `/scaffold:multi-agent-start <agent-name>`.
+
+**Full pipeline path:** Plan Review → Validation (7 checks) → Apply Fixes & Freeze → Onboarding Guide → Implementation Playbook → Execution
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 
