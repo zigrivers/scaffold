@@ -104,3 +104,14 @@ When checking pipeline status, use these detection criteria:
 - If the file exists → step was likely run (even without tracking comment — older projects lack them)
 - If the tracking comment exists in the file → step was definitively run
 - For update-only steps (2, 15, 16, 17, 18, 20): file existence alone only confirms the prerequisite ran; check for the specific tracking comment to confirm the update step itself
+
+## Re-running Steps
+
+To re-run a completed step:
+
+```bash
+scaffold reset <step> --force   # reset to pending
+scaffold run <step>             # re-run (detects existing artifact → update mode)
+```
+
+The step runs in **update mode** — it reads the existing artifact, shows what it would add/change/preserve, and updates in-place. This is useful for incorporating new requirements or re-running at deeper depth.
