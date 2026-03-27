@@ -293,13 +293,15 @@ bd ready           # Show the updated first wave of parallel work
 
 ## Multi-Model Validation (Depth 4-5)
 
-**Skip this section at depth 1-3.**
+**Skip this section at depth 1-3. MANDATORY at depth 4+.**
 
-At depth 4+, dispatch the reviewed artifact to independent AI models for additional validation. This catches blind spots that a single model misses. Follow the invocation patterns in the `multi-model-dispatch` skill.
+At depth 4+, dispatch the reviewed artifact to independent AI models for additional validation. This catches blind spots that a single model misses. Follow the invocation patterns and auth verification in the `multi-model-dispatch` skill.
 
 **Note:** This runs BEFORE `multi-model-review-tasks`; the multi-model section here is complementary.
 
-1. **Detect CLIs**: Check for `codex` and `gemini` CLI availability
+**Previous auth failures do NOT exempt this dispatch.** Auth tokens refresh — always re-check before each review step.
+
+1. **Verify auth**: Run `codex login status` and `gemini -p "respond with ok" -o json 2>/dev/null` (exit 41 = auth failure). If auth fails, tell the user to run `! codex login` or `! gemini -p "hello"` for interactive recovery. Do not silently skip.
 2. **Bundle context**: Include the reviewed artifact + upstream references (listed below)
 3. **Dispatch**: Run each available CLI independently with the review prompt
 4. **Reconcile**: Apply dual-model reconciliation rules from the skill
@@ -321,7 +323,8 @@ If neither CLI is available, perform a structured adversarial self-review instea
 3. **Err toward splitting** — if you're unsure whether a task is too large, it probably is
 4. **Don't add scope** — if something isn't in plan.md or user-stories.md, don't create a task for it
 5. **Fix descriptions in place** — if using Beads, use `bd update` to fix task descriptions rather than recreating tasks (preserves IDs and existing dependencies)
-6. After all changes are applied, add a tracking comment to `docs/implementation-plan.md` after any existing scaffold tracking comment: `<!-- scaffold:implementation-plan-review v1 YYYY-MM-DD -->` (use actual date)
+6. (Depth 4+) Dispatch multi-model validation — verify CLI auth, bundle context, dispatch, reconcile findings, apply high-confidence fixes
+7. After all changes are applied, add a tracking comment to `docs/implementation-plan.md` after any existing scaffold tracking comment: `<!-- scaffold:implementation-plan-review v1 YYYY-MM-DD -->` (use actual date)
 
 ## After This Step
 
