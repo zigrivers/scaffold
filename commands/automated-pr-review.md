@@ -244,21 +244,26 @@ Create `scripts/cli-pr-review.sh` — the agent runs this to get immediate local
 
 The script should:
 1. Detect available CLIs (`command -v codex`, `command -v gemini`)
-2. If neither available → exit 5 with error message
-3. Capture the diff: `gh pr diff <pr>` (if PR number given) or `git diff origin/main...HEAD`
-4. Read `docs/review-standards.md` for severity definitions and focus areas
-5. Read `docs/coding-standards.md` and `docs/tdd-standards.md` for project-specific rules
-6. Bundle diff + review context into a review prompt:
+2. **Verify auth before dispatch** (follows multi-model-dispatch skill patterns):
+   - Codex: `codex login status 2>/dev/null` (exit 0 = authenticated)
+   - Gemini: `gemini -p "respond with ok" -o json 2>/dev/null` (exit 41 = auth failure)
+   - If a CLI fails auth: print warning with recovery command (`codex login` or `gemini -p "hello"`), skip that CLI but continue with the other
+   - If both fail auth → exit 5 with message "Both CLIs need re-authentication"
+3. If neither available or authenticated → exit 5 with error message
+4. Capture the diff: `gh pr diff <pr>` (if PR number given) or `git diff origin/main...HEAD`
+5. Read `docs/review-standards.md` for severity definitions and focus areas
+6. Read `docs/coding-standards.md` and `docs/tdd-standards.md` for project-specific rules
+7. Bundle diff + review context into a review prompt:
    - "Review this code diff. For each issue found, report: file, line, severity (P0/P1 only), description, and suggested fix. If no P0/P1 issues, respond with: APPROVED: No P0/P1 issues found."
-7. For each available CLI, run the review independently:
+8. For each authenticated CLI, run the review independently:
    - `codex` — Run with the review prompt, capture structured output
    - `gemini` — Run with the same prompt independently (do not share one model's output with the other)
-8. Parse outputs and reconcile findings:
+9. Parse outputs and reconcile findings:
    - **Both models agree on a finding** → High confidence, include in results
    - **One model only, P0** → Include (P0 is critical enough to act on from a single model)
    - **One model only, P1** → Include with note "single-model finding"
    - **Contradictions** → Include both with note for agent to adjudicate
-9. Output JSON to stdout:
+10. Output JSON to stdout:
    ```json
    {
      "reviewers": ["codex", "gemini"],
@@ -282,7 +287,7 @@ The script should:
      }
    }
    ```
-10. Exit 0 if no P0/P1 findings, exit 1 if findings present
+11. Exit 0 if no P0/P1 findings, exit 1 if findings present
 
 Include the full script implementation. For Codex CLI invocation, use:
 ```bash
@@ -421,7 +426,7 @@ If legacy GitHub Actions review workflows were detected in Mode Detection:
 1. Check applicability (GitHub remote, CI setup)
 2. Detect available CLIs (`codex`, `gemini`)
 3. Ask user to choose reviewer mode (local CLI / external bot)
-4. Verify prerequisites (CLIs authenticated or bot app installed)
+4. Verify prerequisites: For local CLI mode, run `codex login status` and `gemini -p "respond with ok" -o json` to verify auth. If auth fails, tell the user to run `! codex login` or `! gemini -p "hello"` for interactive recovery. For external bot mode, verify the GitHub App is installed on the repo.
 5. Create docs/review-standards.md
 6. Create AGENTS.md with review instructions
 7. Create review script: `scripts/cli-pr-review.sh` (local) or `scripts/await-pr-review.sh` (external)

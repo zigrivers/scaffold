@@ -3,7 +3,7 @@ description: "Set up local dev environment with live reload"
 long-description: "Creates docs/dev-setup.md and configures Makefile commands for linting, testing, building, and running the project with hot-reload support."
 ---
 
-Set up a complete local development environment for this project based on docs/tech-stack.md and docs/project-structure.md. The goal is a one-command dev experience with live reloading so I can see changes in real-time as work progresses.
+Set up a complete local development environment for this project based on docs/tech-stack.md, docs/project-structure.md, and docs/tdd-standards.md (if it exists). The goal is a one-command dev experience with live reloading so I can see changes in real-time as work progresses.
 
 I'm not a professional developer, so the setup should be beginner-friendly with clear instructions for common tasks.
 
@@ -91,7 +91,9 @@ Document which variables are required vs. optional for local dev.
 
 ### 4. Simple Commands (scripts or Makefile)
 
-Create easy-to-remember commands for common tasks. Use whatever fits our stack:
+Create easy-to-remember commands for common tasks. Use whatever fits our stack.
+
+**If `docs/tdd-standards.md` exists**: Read it to determine the test runner, test command flags (watch mode, coverage thresholds), and quality gate definitions. The test commands below should match what tdd-standards specifies.
 
 **Option A: package.json scripts (Node projects)**
 ```json
