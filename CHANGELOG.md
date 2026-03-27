@@ -2,6 +2,24 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.10.0] — 2026-03-28
+
+### Added
+
+- **`automated-pr-review` step** — Replaces `multi-model-review` with an agent-driven architecture that uses zero GitHub Actions minutes. The agent polls for external reviews via `gh api` and handles fixes locally.
+- **Configurable reviewer** — Choose between Codex Cloud (default), Gemini Code Assist, or a custom reviewer bot.
+- **Applicability check** — `scaffold check automated-pr-review` detects GitHub remote and CI configuration.
+
+### Removed
+
+- **`multi-model-review`** as a pipeline step (replaced by `automated-pr-review`). State migration handles the rename.
+- **GitHub Actions review workflows** — No more `code-review-trigger.yml`, `code-review-handler.yml`, `codex-timeout.yml`, or `post-merge-followup.yml`.
+- **ANTHROPIC_API_KEY requirement** — Fixes run locally, not via Claude Code Action in CI.
+
+### Changed
+
+- **Prompt reduced by ~2,900 lines** — Focused on configuration decisions rather than YAML workflow generation.
+
 ## [2.9.1] — 2026-03-28
 
 ### Fixed
