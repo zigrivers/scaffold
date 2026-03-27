@@ -1,6 +1,6 @@
 ---
 name: ux-spec
-description: Specify UI/UX design including design system
+description: Specify user flows, interaction states, component architecture, accessibility, and responsive behavior
 phase: "specification"
 order: 17
 dependencies: [review-architecture]
@@ -10,25 +10,28 @@ knowledge-base: [ux-specification]
 ---
 
 ## Purpose
-Define the user experience specification: user flows, wireframes, component
-hierarchy, interaction patterns, and design system (tokens, components, patterns).
-This is the visual and interaction blueprint for the frontend.
+Define the user experience specification: user flows, interaction state machines,
+component architecture (hierarchy and data flow), accessibility requirements, and
+responsive behavior. This is the interaction and behavior blueprint for the frontend.
+Visual tokens and component appearance are defined in `docs/design-system.md` — this
+step consumes those tokens, it does not redefine them.
 
 ## Inputs
 - docs/prd.md (required) — user requirements and personas
 - docs/system-architecture.md (required) — frontend architecture
 - docs/api-contracts.md (optional) — data shapes for UI components
 - docs/user-stories.md (required) — user journeys driving flow design
+- docs/design-system.md (optional) — design tokens and component visual specs to reference
 
 ## Expected Outputs
 - docs/ux-spec.md — UX specification with flows, components, design system
 
 ## Quality Criteria
-- Every PRD user journey has a corresponding flow
+- Every PRD user journey has a corresponding flow with all states documented
 - Component hierarchy covers all UI states (loading, error, empty, populated)
-- Design system defines tokens (colors, spacing, typography) and base components
+- References design tokens from docs/design-system.md (does not redefine them)
 - Accessibility requirements documented (WCAG level, keyboard nav, screen readers)
-- Responsive breakpoints defined with behavior per breakpoint
+- Responsive breakpoints defined with layout behavior per breakpoint
 - Error states documented for every user action that can fail
 
 ## Methodology Scaling

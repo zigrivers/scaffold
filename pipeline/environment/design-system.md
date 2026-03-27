@@ -6,7 +6,7 @@ order: 51
 dependencies: [dev-env-setup]
 outputs: [docs/design-system.md]
 conditional: "if-needed"
-knowledge-base: [ux-specification]
+knowledge-base: [design-system-tokens]
 ---
 
 ## Purpose
