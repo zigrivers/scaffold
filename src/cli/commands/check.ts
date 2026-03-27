@@ -171,13 +171,21 @@ const checkCommand: CommandModule<Record<string, unknown>, CheckArgs> = {
       return
     }
 
-    // For automated-pr-review: GitHub remote + CI detection
+    // For automated-pr-review: GitHub remote + CI + CLI detection
     if (argv.step === 'automated-pr-review') {
       const { hasGithub, reason: githubReason } = detectGithubRemote(projectRoot)
       const hasCi = fs.existsSync(path.join(projectRoot, '.github', 'workflows'))
       const applicable = hasGithub
       const hasAgentsMd = fs.existsSync(path.join(projectRoot, 'AGENTS.md'))
       const mode = !applicable ? 'skip' : hasAgentsMd ? 'update' : 'fresh'
+
+      // Detect available CLIs for local review
+      let hasCodexCli = false
+      let hasGeminiCli = false
+      try { execSync('command -v codex', { encoding: 'utf8', timeout: 3000 }); hasCodexCli = true } catch { /* not available */ }
+      try { execSync('command -v gemini', { encoding: 'utf8', timeout: 3000 }); hasGeminiCli = true } catch { /* not available */ }
+      const availableClis = [hasCodexCli && 'codex', hasGeminiCli && 'gemini'].filter(Boolean) as string[]
+      const recommendedMode = availableClis.length > 0 ? 'local-cli' : 'external-bot'
 
       if (outputMode === 'json') {
         output.result({
@@ -188,12 +196,16 @@ const checkCommand: CommandModule<Record<string, unknown>, CheckArgs> = {
           hasCi,
           brownfield: hasAgentsMd,
           mode,
+          availableClis,
+          recommendedReviewMode: recommendedMode,
         })
       } else {
         output.info(`Step: ${argv.step}`)
         output.info(`Applicable: ${applicable ? 'yes' : 'no'}`)
         output.info(`GitHub remote: ${hasGithub ? 'yes' : 'no'}`)
         output.info(`CI configured: ${hasCi ? 'yes' : 'no'}`)
+        output.info(`Available CLIs: ${availableClis.length > 0 ? availableClis.join(', ') : 'none'}`)
+        output.info(`Recommended: ${recommendedMode}${availableClis.length === 2 ? ' (dual-model)' : ''}`)
         output.info(`Mode: ${mode}`)
         output.info(`Reason: ${githubReason}`)
       }
