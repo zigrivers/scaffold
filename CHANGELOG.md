@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.8.1] — 2026-03-27
+
+### Fixed
+
+- **scaffold-runner skill compatibility** — Updated scaffold-runner skill for v2.8.0 changes: added depth-aware guidance for `review-user-stories` (depth 4 adds requirements index, depth 5 adds multi-model dispatch), mapped "run multi-model review" requests to `review-user-stories` at depth 5, and added CLI availability check guidance for Codex/Gemini fallback.
+
 ## [2.8.0] — 2026-03-27
 
 ### Removed
