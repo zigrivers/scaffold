@@ -16,7 +16,7 @@ and re-validate.
 
 ## Inputs
 - docs/domain-models/ (required) — domain models to review
-- docs/prd.md (required) — source requirements for coverage checking
+- docs/plan.md (required) — source requirements for coverage checking
 
 ## Expected Outputs
 - docs/reviews/review-domain-modeling.md — review findings, fix plan, and resolution log

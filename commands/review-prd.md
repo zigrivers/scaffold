@@ -22,7 +22,7 @@ Check if `docs/reviews/pre-review-prd.md` already exists:
 
 ### Step 1: Read the Artifact
 
-Read `docs/prd.md` (or `docs/plan.md`) completely. Also read any upstream context (project brief, user-provided problem statement) for cross-reference.
+Read `docs/plan.md` (or `docs/plan.md`) completely. Also read any upstream context (project brief, user-provided problem statement) for cross-reference.
 
 ### Step 2: Multi-Pass Review
 
@@ -72,7 +72,7 @@ Wait for user approval before executing fixes.
 
 ### Step 4: Execute Fixes
 
-Apply approved fixes to `docs/prd.md` (or `docs/plan.md`). For each fix, verify it does not break other artifacts or introduce new inconsistencies.
+Apply approved fixes to `docs/plan.md` (or `docs/plan.md`). For each fix, verify it does not break other artifacts or introduce new inconsistencies.
 
 ### Step 5: Re-Validate
 
@@ -98,14 +98,14 @@ At depth 4+, dispatch the reviewed artifact to independent AI models for additio
 5. **Apply fixes**: Fix high-confidence findings; present medium/low-confidence findings to the user
 
 **Upstream references to include in the review bundle:**
-- `docs/prd.md` (or `docs/plan.md`) — this is the top-level artifact; no upstream dependencies
+- `docs/plan.md` (or `docs/plan.md`) — this is the top-level artifact; no upstream dependencies
 - Focus areas: vague requirements, missing personas, unquantified NFRs, undocumented constraints
 
 If neither CLI is available, perform a structured adversarial self-review instead: re-read the artifact specifically looking for issues the initial review passes might have missed.
 
 ## Process
 
-1. Read `docs/prd.md` (or `docs/plan.md`) and any upstream context
+1. Read `docs/plan.md` (or `docs/plan.md`) and any upstream context
 2. Execute all 8 review passes sequentially — do not combine passes
 3. Categorize every finding by severity (P0-P3) using the review methodology
 4. Create fix plan grouped by root cause and severity

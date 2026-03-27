@@ -18,7 +18,7 @@ progressive disclosure, accessibility improvements, and AI-native capabilities.
 
 ## Inputs
 - docs/user-stories.md (required) — stories to enhance
-- docs/prd.md (required) — PRD boundaries (innovation must not exceed scope)
+- docs/plan.md (required) — PRD boundaries (innovation must not exceed scope)
 
 ## Expected Outputs
 - docs/user-stories-innovation.md — innovation findings, suggestions with

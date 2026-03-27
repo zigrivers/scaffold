@@ -9,7 +9,7 @@ Walk the most critical user journeys end-to-end across every specification artif
 
 Read all of these artifacts (skip any that do not exist):
 
-- `docs/prd.md` — Success criteria, personas, feature descriptions
+- `docs/plan.md` — Success criteria, personas, feature descriptions
 - `docs/user-stories.md` — Stories and acceptance criteria (defines "correct behavior")
 - `docs/domain-models/` — Entities, state machines, events
 - `docs/system-architecture.md` — Components, data flows

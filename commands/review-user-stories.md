@@ -23,7 +23,7 @@ Check if `docs/reviews/pre-review-user-stories.md` already exists:
 
 ### Step 1: Read the Artifact
 
-Read `docs/user-stories.md` completely. Also read `docs/prd.md` (or `docs/plan.md`) as the upstream artifact for cross-reference and coverage checking.
+Read `docs/user-stories.md` completely. Also read `docs/plan.md` (or `docs/plan.md`) as the upstream artifact for cross-reference and coverage checking.
 
 ### Step 2: Multi-Pass Review
 
@@ -245,7 +245,7 @@ Update `docs/reviews/user-stories/coverage.json` with the post-fix state.
 
 ## Process
 
-1. Read `docs/user-stories.md` and `docs/prd.md`
+1. Read `docs/user-stories.md` and `docs/plan.md`
 2. Execute all 6 review passes sequentially — do not combine passes
 3. Categorize every finding by severity (P0-P3) using the review methodology
 4. Create fix plan grouped by root cause and severity

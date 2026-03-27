@@ -17,7 +17,7 @@ Visual tokens and component appearance are defined in `docs/design-system.md` �
 step consumes those tokens, it does not redefine them.
 
 ## Inputs
-- docs/prd.md (required) — user requirements and personas
+- docs/plan.md (required) — user requirements and personas
 - docs/system-architecture.md (required) — frontend architecture
 - docs/api-contracts.md (optional) — data shapes for UI components
 - docs/user-stories.md (required) — user journeys driving flow design

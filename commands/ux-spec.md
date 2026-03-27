@@ -3,7 +3,7 @@ description: "Specify user flows, interaction states, component architecture, ac
 long-description: "Reads PRD, user stories, and system architecture, then creates docs/ux-spec.md defining user flows, interaction state machines, component architecture, accessibility requirements, and responsive behavior. References docs/design-system.md for visual tokens rather than redefining them."
 ---
 
-Read `docs/prd.md`, `docs/user-stories.md`, `docs/system-architecture.md`, `docs/design-system.md` (if it exists), and `docs/api-contracts.md` (if it exists), then create the UX specification. Produce `docs/ux-spec.md` as the interaction and behavior blueprint for the frontend — user flows, component architecture, accessibility, and responsive behavior. Visual tokens and component appearance come from `docs/design-system.md` — this step consumes those tokens, it does not redefine them.
+Read `docs/plan.md`, `docs/user-stories.md`, `docs/system-architecture.md`, `docs/design-system.md` (if it exists), and `docs/api-contracts.md` (if it exists), then create the UX specification. Produce `docs/ux-spec.md` as the interaction and behavior blueprint for the frontend — user flows, component architecture, accessibility, and responsive behavior. Visual tokens and component appearance come from `docs/design-system.md` — this step consumes those tokens, it does not redefine them.
 
 ## Mode Detection
 
@@ -28,7 +28,7 @@ Before starting, check if `docs/ux-spec.md` already exists:
 ### Update Mode Specifics
 - **Primary output**: `docs/ux-spec.md`
 - **Preserve**: Custom component architecture decisions, accessibility level decisions, responsive breakpoint choices, user flow mappings
-- **Related docs**: `docs/prd.md`, `docs/user-stories.md`, `docs/system-architecture.md`, `docs/api-contracts.md`, `docs/design-system.md`
+- **Related docs**: `docs/plan.md`, `docs/user-stories.md`, `docs/system-architecture.md`, `docs/api-contracts.md`, `docs/design-system.md`
 - **Special rules**: Preserve component specifications that are already implemented. Reference design tokens from `docs/design-system.md` — do not redefine token values here.
 
 ---
@@ -149,7 +149,7 @@ Document recurring UI patterns:
 
 ## Process
 
-1. **Read all inputs** — Read `docs/prd.md`, `docs/user-stories.md`, and `docs/system-architecture.md`. Read `docs/api-contracts.md` for data shapes if it exists. Read `docs/design-system.md` if it exists — reference its tokens throughout.
+1. **Read all inputs** — Read `docs/plan.md`, `docs/user-stories.md`, and `docs/system-architecture.md`. Read `docs/api-contracts.md` for data shapes if it exists. Read `docs/design-system.md` if it exists — reference its tokens throughout.
 2. **Use AskUserQuestionTool** for these decisions:
    - **UX depth**: Full specification with detailed wireframe descriptions, or key flows with core component list?
    - **Accessibility level**: WCAG AA (standard) or AAA (enhanced) for critical flows?

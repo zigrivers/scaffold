@@ -17,7 +17,7 @@ ADR category — tech stack decisions are documented here.
 
 ## Inputs
 - docs/domain-models/ (required) — domain structure driving architecture choices
-- docs/prd.md (required) — requirements and constraints
+- docs/plan.md (required) — requirements and constraints
 
 ## Expected Outputs
 - docs/adrs/ — one ADR file per decision (ADR-NNN-title.md format)

@@ -19,7 +19,7 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 - docs/system-architecture.md (required) — components to implement
 - docs/domain-models/ (required) — domain logic to implement
 - docs/adrs/ (required) — technology constraints
-- docs/prd.md (required) — features to trace tasks back to
+- docs/plan.md (required) — features to trace tasks back to
 - docs/user-stories.md (required) — stories to derive tasks from
 - docs/tdd-standards.md (required) — testing requirements to incorporate into tasks
 - docs/operations-runbook.md (optional) — ops requirements to incorporate into tasks

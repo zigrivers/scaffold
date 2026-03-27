@@ -17,7 +17,7 @@ Use story acceptance criteria as the definition of "correct behavior" when
 verifying completeness and consistency at every layer.
 
 ## Inputs
-- All phase output artifacts (docs/prd.md, docs/domain-models/, docs/adrs/,
+- All phase output artifacts (docs/plan.md, docs/domain-models/, docs/adrs/,
   docs/system-architecture.md, etc.)
 
 ## Expected Outputs

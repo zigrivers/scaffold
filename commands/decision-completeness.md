@@ -17,7 +17,7 @@ Read all of these artifacts (skip any that do not exist):
 - `docs/tech-stack.md` — Technology selections
 - `docs/implementation-plan.md` or `docs/plan.md` — Sequencing decisions
 - `docs/testing-strategy.md` or `docs/tdd-standards.md` — Test framework, coverage targets
-- `docs/prd.md` — Constraints and technology mandates
+- `docs/plan.md` — Constraints and technology mandates
 
 ## What to Check
 

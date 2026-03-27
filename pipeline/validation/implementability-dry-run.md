@@ -16,7 +16,7 @@ inputs clear, are the acceptance criteria testable, are there ambiguities
 that would force the agent to guess?
 
 ## Inputs
-- All phase output artifacts (docs/prd.md, docs/domain-models/, docs/adrs/,
+- All phase output artifacts (docs/plan.md, docs/domain-models/, docs/adrs/,
   docs/system-architecture.md, etc.)
 
 ## Expected Outputs

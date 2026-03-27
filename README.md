@@ -173,7 +173,7 @@ After upgrading the CLI, existing projects migrate automatically. Run `scaffold 
 - `claude-code-permissions` → removed (folded into `git-workflow` + `tech-stack`)
 - `testing-strategy` → `tdd`, `implementation-tasks` → `implementation-plan`, `review-tasks` → `implementation-plan-review`
 
-Projects using either `docs/prd.md` (v1 convention) or `docs/plan.md` (v2 convention) work interchangeably — the context gatherer resolves aliased paths so downstream steps find your PRD regardless of which filename you used.
+The PRD is always created as `docs/plan.md`. If you have a legacy `docs/prd.md` from an older version, the context gatherer resolves aliased paths so downstream steps find your PRD regardless.
 
 ## Quick Start
 

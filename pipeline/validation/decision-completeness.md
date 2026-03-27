@@ -16,7 +16,7 @@ that no two ADRs contradict each other, and that all decisions have clear
 rationale.
 
 ## Inputs
-- All phase output artifacts (docs/prd.md, docs/domain-models/, docs/adrs/,
+- All phase output artifacts (docs/plan.md, docs/domain-models/, docs/adrs/,
   docs/system-architecture.md, etc.)
 
 ## Expected Outputs

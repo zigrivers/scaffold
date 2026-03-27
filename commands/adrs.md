@@ -3,7 +3,7 @@ description: "Document architecture decisions as ADRs with alternatives and trad
 long-description: "Reads domain models and PRD, then creates docs/adrs/ with Architecture Decision Records covering technology selection, architectural patterns, data architecture, and integration decisions."
 ---
 
-Read `docs/domain-models/`, `docs/prd.md`, and existing project context, then identify and document all significant architecture decisions. Create one ADR file per decision (or decision group) in `docs/adrs/` plus an `index.md` decision log overview.
+Read `docs/domain-models/`, `docs/plan.md`, and existing project context, then identify and document all significant architecture decisions. Create one ADR file per decision (or decision group) in `docs/adrs/` plus an `index.md` decision log overview.
 
 ## Mode Detection
 
@@ -17,7 +17,7 @@ Before starting, check if the `docs/adrs/` directory already exists:
    - **ADD** — Decisions that should exist but don't have an ADR
    - **SUPERSEDE** — Existing ADRs whose context has changed, needing new ADRs
    - **PRESERVE** — Existing ADRs that are still current and accurate
-3. **Cross-doc consistency**: Read related docs (`docs/domain-models/`, `docs/prd.md`) and verify ADRs align with current domain models and requirements.
+3. **Cross-doc consistency**: Read related docs (`docs/domain-models/`, `docs/plan.md`) and verify ADRs align with current domain models and requirements.
 4. **Preview changes**: Present the user a summary:
    | Action | ADR | Detail |
    |--------|-----|--------|
@@ -35,7 +35,7 @@ Before starting, check if the `docs/adrs/` directory already exists:
 - **Primary output**: `docs/adrs/` directory
 - **Secondary output**: `docs/adrs/index.md`
 - **Preserve**: All existing ADRs (never delete — mark as superseded or deprecated). User-added rationale and custom evaluation criteria.
-- **Related docs**: `docs/domain-models/`, `docs/prd.md`
+- **Related docs**: `docs/domain-models/`, `docs/plan.md`
 - **Special rules**: Never delete an ADR. Superseded or deprecated ADRs are marked, not removed. The history of decisions is valuable context.
 
 ---
@@ -151,7 +151,7 @@ Related technology decisions can share a single ADR:
 
 ## Process
 
-1. **Read all inputs** — Read `docs/domain-models/` to understand what the architecture must support. Read `docs/prd.md` for requirements and constraints.
+1. **Read all inputs** — Read `docs/domain-models/` to understand what the architecture must support. Read `docs/plan.md` for requirements and constraints.
 2. **Use AskUserQuestionTool** for these decisions:
    - **Known technology preferences**: Any pre-decided technology choices (language, framework, hosting)?
    - **Decision depth**: Full evaluation matrices for each decision, or brief rationale for obvious choices?

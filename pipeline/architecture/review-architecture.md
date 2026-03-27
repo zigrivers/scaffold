@@ -19,7 +19,7 @@ and downstream readiness.
 - docs/system-architecture.md (required) — architecture to review
 - docs/domain-models/ (required) — for coverage checking
 - docs/adrs/ (required) — for constraint compliance
-- docs/prd.md (required) — for requirement tracing
+- docs/plan.md (required) — for requirement tracing
 
 ## Expected Outputs
 - docs/reviews/review-architecture.md — findings and resolution log
