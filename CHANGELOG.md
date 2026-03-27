@@ -2,6 +2,16 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.15.0] — 2026-03-27
+
+### Fixed
+
+- **PRD filename standardized to `docs/plan.md`** — Replaced `docs/prd.md` references across 42 files (22 pipeline, 17 commands, 2 knowledge, 1 README). The create-prd command always produced `docs/plan.md` but pipeline files incorrectly referenced `docs/prd.md`. The create-prd pipeline meta-prompt was self-contradictory (outputs said `plan.md`, Expected Outputs said `prd.md`).
+
+### Improved
+
+- **Innovation commands now reference knowledge base instead of duplicating content** — Removed 171 lines of verbatim-duplicated content from `innovate-prd.md` (decision matrix, 5 innovation categories) and `innovate-user-stories.md` (enhancement categories, evaluation framework). Commands now reference their knowledge base entries (`prd-innovation`, `user-story-innovation`) which the v2 engine assembles automatically.
+
 ## [2.14.1] — 2026-03-27
 
 ### Fixed
