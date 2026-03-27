@@ -2,6 +2,18 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.17.0] — 2026-03-27
+
+### Added
+
+- **10 validation/finalization steps added to prompts.md and pipeline skill** — 7 validation checks (cross-phase-consistency through scope-creep-check) and 3 finalization steps (apply-fixes-and-freeze, developer-onboarding-guide, implementation-playbook) added as Phase 7b and 7c. Execution split to Phase 8.
+- **Full pipeline path now documented**: Plan Review → Validation (7 parallel checks) → Apply Fixes & Freeze → Onboarding Guide → Implementation Playbook → Execution
+
+### Fixed
+
+- **implementation-plan-review After This Step** — Previously jumped directly to execution, bypassing 10 steps. Now references validation phase with MVP skip option.
+- **single-agent-start / multi-agent-start** — No longer assume Beads is configured. Non-Beads projects read `docs/implementation-plan.md` for task list.
+
 ## [2.16.2] — 2026-03-27
 
 ### Fixed
