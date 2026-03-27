@@ -14,16 +14,53 @@ This skill teaches Claude Code how to correctly invoke Codex and Gemini CLIs for
 - The `automated-pr-review` step is using local CLI review mode
 - The `multi-model-review-tasks` step dispatches to external CLIs
 
-## CLI Detection
+## CLI Detection & Auth Verification
 
-Before attempting any dispatch, detect what's available:
+Before attempting any dispatch, detect what's available AND verify authentication. A CLI that's installed but not authenticated is useless in headless mode — it will hang on an interactive auth prompt or fail silently.
+
+### Step 1: Check CLI Installation
 
 ```bash
-command -v codex && echo "codex available" || echo "codex not found"
-command -v gemini && echo "gemini available" || echo "gemini not found"
+command -v codex && echo "codex installed" || echo "codex not found"
+command -v gemini && echo "gemini installed" || echo "gemini not found"
 ```
 
-**If neither is available**: Fall back to structured Claude-only self-review. Re-read the artifact with an adversarial lens — actively try to find issues the initial review missed. Document this as "single-model review (no external CLIs available)."
+### Step 2: Verify Authentication
+
+**CRITICAL: Do not skip this step.** Auth tokens expire mid-session. A CLI that worked 30 minutes ago may fail now.
+
+**Codex auth check** (has a built-in status command):
+```bash
+codex login status 2>/dev/null && echo "codex authenticated" || echo "codex NOT authenticated"
+```
+
+**Gemini auth check** (no built-in status command — use a minimal prompt):
+```bash
+GEMINI_AUTH_CHECK=$(gemini -p "respond with ok" -o json 2>&1)
+GEMINI_EXIT=$?
+if [ "$GEMINI_EXIT" -eq 0 ]; then
+  echo "gemini authenticated"
+elif [ "$GEMINI_EXIT" -eq 41 ]; then
+  echo "gemini NOT authenticated (exit 41: auth error)"
+else
+  echo "gemini auth unknown (exit $GEMINI_EXIT)"
+fi
+```
+
+### Step 3: Handle Auth Failures
+
+**If a CLI fails auth, do NOT silently fall back.** Instead:
+
+1. **Tell the user** which CLI failed auth and why
+2. **Offer interactive recovery**: Ask the user to run the auth command in their terminal:
+   - **Codex**: `! codex login` (opens browser for OAuth) or set `CODEX_API_KEY` env var
+   - **Gemini**: `! gemini -p "hello"` (triggers OAuth flow) or set `GEMINI_API_KEY` env var
+3. **After recovery**: Re-run the auth check. If it passes, proceed with dispatch.
+4. **If user declines**: Fall back to the other CLI or Claude-only review, but **document the auth failure** in the review summary.
+
+The `!` prefix runs the command in the user's terminal session, allowing interactive auth flows (browser OAuth, Y/n prompts) that can't work in headless mode.
+
+**If neither CLI is available or authenticated**: Fall back to structured Claude-only self-review. Re-read the artifact with an adversarial lens — actively try to find issues the initial review missed. Document this as "single-model review (no external CLIs available)."
 
 ## Correct Invocation Patterns
 
@@ -186,9 +223,12 @@ When both CLIs produce results, reconcile findings using these rules:
 | Neither CLI available | Structured Claude-only adversarial self-review |
 | Codex only | Single-model review with Codex |
 | Gemini only | Single-model review with Gemini |
-| One CLI fails mid-review | Continue with the other; note the failure in summary |
-| Both CLIs fail | Fall back to Claude-only self-review; warn user |
+| **CLI auth expired** | **Surface to user with recovery command — do NOT silently fall back** |
+| One CLI fails mid-review (non-auth) | Continue with the other; note the failure in summary |
+| Both CLIs fail (non-auth) | Fall back to Claude-only self-review; warn user |
 | CLI output not parseable as JSON | Treat as text, extract findings manually |
+
+**Auth failures are NOT silent fallbacks.** The difference between "CLI not installed" (fall back quietly) and "CLI auth expired" (user action required) is critical. Auth can be fixed in 30 seconds with an interactive command — silently skipping wastes the user's review infrastructure.
 
 ## Integration with Review Steps
 
@@ -209,23 +249,71 @@ Each review step adds a "Multi-Model Validation" section at the end that:
 ## Error Handling
 
 ```bash
-# Capture exit code and output separately
-OUTPUT=$(codex exec --skip-git-repo-check -s read-only --ephemeral "prompt" 2>/dev/null) || {
-  echo "Codex CLI failed with exit code $?"
-  # Fall back to Gemini or Claude-only
+# Capture exit code AND stderr separately (don't suppress stderr for error detection)
+CODEX_STDERR=$(mktemp)
+OUTPUT=$(codex exec --skip-git-repo-check -s read-only --ephemeral "prompt" 2>"$CODEX_STDERR") || {
+  EXIT_CODE=$?
+  STDERR_CONTENT=$(cat "$CODEX_STDERR")
+  if echo "$STDERR_CONTENT" | grep -qi "refresh token\|please re-run.*login\|sign in again\|auth"; then
+    echo "Codex auth expired. Ask user to run: ! codex login"
+    # DO NOT silently fall back — surface to user
+  else
+    echo "Codex CLI failed with exit code $EXIT_CODE"
+    # Fall back to Gemini or Claude-only
+  fi
+  rm -f "$CODEX_STDERR"
 }
 
-OUTPUT=$(gemini -p "prompt" --output-format json --approval-mode yolo 2>/dev/null) || {
-  echo "Gemini CLI failed with exit code $?"
-  # Fall back to Codex or Claude-only
+GEMINI_STDERR=$(mktemp)
+OUTPUT=$(gemini -p "prompt" --output-format json --approval-mode yolo 2>"$GEMINI_STDERR") || {
+  EXIT_CODE=$?
+  if [ "$EXIT_CODE" -eq 41 ]; then
+    echo "Gemini auth failed (exit 41). Ask user to run: ! gemini -p \"hello\""
+    # DO NOT silently fall back — surface to user
+  else
+    echo "Gemini CLI failed with exit code $EXIT_CODE"
+    # Fall back to Codex or Claude-only
+  fi
+  rm -f "$GEMINI_STDERR"
 }
 ```
 
-**Gemini exit codes**: 0 = success, 1 = general error, 42 = input error, 53 = turn limit exceeded.
+### Exit Codes
+
+**Gemini exit codes:**
+
+| Code | Meaning | Action |
+|------|---------|--------|
+| 0 | Success | Parse output |
+| 1 | General error | Fall back to other CLI |
+| **41** | **Auth failure** | **Surface to user — offer `! gemini -p "hello"` recovery** |
+| 42 | Input error | Check prompt format |
+| 52 | Config error | Check `~/.gemini/settings.json` |
+| 53 | Turn limit exceeded | Retry with shorter prompt |
+
+**Codex exit codes:**
+
+| Code | Meaning | Action |
+|------|---------|--------|
+| 0 | Success | Parse output |
+| 1 | General failure | Check stderr for auth messages |
+
+Codex uses exit code 1 for all failures. **Check stderr** for auth-specific messages: "refresh token", "please re-run", "sign in again", "ChatGPT account ID not available".
+
+### Auth Recovery Flow
+
+When an auth failure is detected during dispatch (not during pre-flight):
+
+1. Stop the review dispatch immediately
+2. Tell the user: "Gemini/Codex auth has expired. To re-authenticate, run:"
+3. Suggest: `! codex login` or `! gemini -p "hello"` (the `!` prefix runs it interactively)
+4. After the user re-authenticates, re-run the auth check
+5. If auth succeeds, resume the review dispatch from where it stopped
+6. If the user declines, fall back to the other CLI or Claude-only review
 
 ## What This Skill Does NOT Do
 
 - Does not install CLIs (user must install `codex` and `gemini` separately)
-- Does not handle authentication (user must authenticate each CLI independently)
+- Does not authenticate CLIs — but it **detects auth failures** and guides the user through interactive recovery via `!` prefix commands
 - Does not replace Claude's own review passes — it adds independent validation on top
 - Does not work as an MCP server — it uses Bash tool invocations directly

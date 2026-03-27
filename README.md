@@ -612,6 +612,12 @@ Use `codex exec "prompt"` (headless mode), not bare `codex "prompt"` (interactiv
 **Codex CLI fails with "Not inside a trusted directory"**
 Add `--skip-git-repo-check` flag: `codex exec --skip-git-repo-check -s read-only --ephemeral "prompt"`. This is required when the project hasn't initialized git yet.
 
+**Gemini CLI hangs on "Opening authentication page" or returns empty output**
+Auth token expired mid-session. Run `! gemini -p "hello"` to re-authenticate interactively (the `!` prefix runs it in your terminal). For CI/headless: set `GEMINI_API_KEY` env var instead of OAuth.
+
+**Codex CLI auth expired ("refresh token", "sign in again")**
+Run `! codex login` to re-authenticate interactively. For CI/headless: set `CODEX_API_KEY` env var. Check auth status with `codex login status`.
+
 **I upgraded and my pipeline shows old step names**
 Run `scaffold status` — the state manager automatically migrates old step names (e.g., `add-playwright` → `add-e2e-testing`, `multi-model-review` → `automated-pr-review`) and removes retired steps.
 
