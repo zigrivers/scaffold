@@ -12,7 +12,7 @@ lint: ## Run ShellCheck on all shell scripts
 validate: ## Validate frontmatter in command files
 	./scripts/validate-frontmatter.sh commands/*.md
 
-check: lint validate test ## Run all quality gates (lint + validate + test)
+check: lint validate test eval ## Run all quality gates (lint + validate + test + eval)
 
 eval: ## Run scaffold meta-evals (cross-system consistency checks)
 	npx bats tests/evals/

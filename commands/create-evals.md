@@ -44,7 +44,7 @@ Before starting, check if `tests/evals/` directory already exists:
 
 ## What Evals Check
 
-Evals verify that AI-generated code adheres to the project's documented standards. They check four categories:
+Evals verify that AI-generated code adheres to the project's documented standards. They check five categories:
 
 ### 1. Consistency Checks
 
@@ -145,6 +145,54 @@ Verify documented requirements have corresponding implementation and tests:
 
 **Important**: Coverage checks use approximate keyword/regex matching. They catch the most common gap — entirely missing test coverage for a documented requirement. They do NOT verify correctness or completeness of tests.
 
+### 5. Cross-Document Consistency Checks
+
+Verify that scaffold-produced documentation is internally consistent across documents:
+
+- **Technology consistency**: Stack choices declared in `docs/tech-stack.md` match technology references in `docs/coding-standards.md`, `docs/tdd-standards.md`, `docs/system-architecture.md`, and `CLAUDE.md`
+- **Path consistency**: File paths declared in `docs/project-structure.md` match paths referenced in `docs/implementation-plan.md` task descriptions (if both exist)
+- **Terminology consistency**: Entity names used in `docs/plan.md` appear consistently in `docs/user-stories.md` and `docs/domain-models/` (if all exist)
+- **Cross-reference integrity**: Internal doc references (`docs/X.md` mentioned in another doc) resolve to existing files
+
+**Example** (vitest):
+```typescript
+import { readFileSync, existsSync } from 'fs';
+import { globSync } from 'glob';
+
+describe('Cross-Document Consistency: tech stack references', () => {
+  const techStack = existsSync('docs/tech-stack.md')
+    ? readFileSync('docs/tech-stack.md', 'utf-8') : '';
+
+  it('coding-standards references match tech-stack choices', () => {
+    if (!techStack || !existsSync('docs/coding-standards.md')) return;
+    const standards = readFileSync('docs/coding-standards.md', 'utf-8');
+    // Extract framework names from tech-stack
+    const frameworks = techStack.match(/(?:React|Vue|Angular|Next|Express|FastAPI|Django|Flask)/gi) || [];
+    for (const fw of frameworks) {
+      expect(standards.toLowerCase()).toContain(fw.toLowerCase());
+    }
+  });
+
+  it('internal doc references resolve to existing files', () => {
+    const docs = globSync('docs/**/*.md');
+    const failures: string[] = [];
+    for (const doc of docs) {
+      const content = readFileSync(doc, 'utf-8');
+      const refs = content.match(/`docs\/[^`]+\.md`/g) || [];
+      for (const ref of refs) {
+        const path = ref.replace(/`/g, '');
+        if (!existsSync(path)) {
+          failures.push(`${doc}: references ${path} but it doesn't exist`);
+        }
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+});
+```
+
+**Note**: Cross-document consistency evals are only generated when the project has scaffold-produced docs. If `docs/tech-stack.md` doesn't exist, this category is skipped entirely.
+
 ---
 
 ## What Evals Produce
@@ -155,6 +203,7 @@ Verify documented requirements have corresponding implementation and tests:
 | `tests/evals/structure.test.*` | File placement, shared code, test location | Fully regenerated on re-run |
 | `tests/evals/adherence.test.*` | Coding convention patterns, mock rules, TODO format | Generated once, then PRESERVED on re-run (users customize exclusions) |
 | `tests/evals/coverage.test.*` | Feature→code mapping, AC→test mapping | Regenerated when plan.md or user-stories.md change |
+| `tests/evals/cross-doc.test.*` | Tech stack refs, path consistency, terminology, internal links | Fully regenerated on re-run |
 | `tests/evals/helpers.*` | Shared utilities for reading files, globbing, parsing docs | Regenerated |
 | `docs/eval-standards.md` | Documents what each eval checks, how to add exclusions, what is NOT checked and why | Generated once, updated in update mode |
 | Makefile/package.json addition | `make eval` or `npm run eval` target that runs only `tests/evals/` | Added once |
