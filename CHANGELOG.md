@@ -2,6 +2,22 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.24.0] — 2026-03-28
+
+### Added
+
+- **Phase-alignment meta-eval** — Verifies every pipeline step's order number falls within its phase's expected range (Phase N → N00-N99). Catches ordering drift automatically.
+- **Dependency-direction meta-eval** — Verifies all dependencies point to same or earlier phase (no forward dependencies).
+- **Skill trigger evals** (`tests/evals/skill-triggers.bats`) — 7 tests verifying skill activation patterns: runner triggers for run/batch/status, pipeline has activation boundary, dispatch activates for review context, no skill overlap.
+- **Cross-document consistency eval category** in `create-evals` — 5th category checking technology, path, terminology, and cross-reference consistency across scaffold-produced docs. Generated in user projects alongside existing 4 categories.
+- **Meta-evals in CI** — `make check` now includes `make eval`, so all 29 meta-evals run on every PR automatically.
+- **`implementation-plan` depends on `create-evals`** — Quality gate: evals must pass before task decomposition begins.
+
+### Fixed
+
+- **Pre-existing cross-channel.bats failures** — `((checked++))` fails under bash `set -e` when `checked=0` (bash treats `((0))` as false). Replaced with `checked=$((checked + 1))`.
+- **design-system-tokens.md** marked as eval-wip (166 lines, below 200-line core minimum).
+
 ## [2.23.0] — 2026-03-28
 
 ### Changed
