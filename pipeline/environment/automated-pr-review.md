@@ -5,6 +5,7 @@ phase: "environment"
 order: 340
 dependencies: [git-workflow]
 outputs: [AGENTS.md, docs/review-standards.md]
+reads: [tdd]
 conditional: "if-needed"
 knowledge-base: [review-methodology]
 ---

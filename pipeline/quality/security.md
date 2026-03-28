@@ -5,6 +5,7 @@ phase: "quality"
 order: 950
 dependencies: [review-operations]
 outputs: [docs/security-review.md]
+reads: [system-architecture]
 conditional: null
 knowledge-base: [security-best-practices]
 ---

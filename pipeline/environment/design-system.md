@@ -5,6 +5,7 @@ phase: "environment"
 order: 320
 dependencies: [dev-env-setup]
 outputs: [docs/design-system.md]
+reads: [create-prd]
 conditional: "if-needed"
 knowledge-base: [design-system-tokens]
 ---

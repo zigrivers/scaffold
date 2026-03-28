@@ -5,6 +5,7 @@ phase: "quality"
 order: 930
 dependencies: [review-testing]
 outputs: [docs/operations-runbook.md]
+reads: [system-architecture, adrs]
 conditional: null
 knowledge-base: [operations-runbook]
 ---

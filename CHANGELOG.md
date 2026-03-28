@@ -2,6 +2,17 @@
 
 All notable changes to Scaffold are documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- **Broken dependency chains in quality phase** — `review-testing` now declares `reads: [domain-modeling, system-architecture]`, `operations` declares `reads: [system-architecture, adrs]`, and `security` declares `reads: [system-architecture]`. Previously these steps required artifacts with no formal path to their producers.
+- **Missing reads in consolidation/environment phase** — `claude-md-optimization` now declares `reads: [create-prd, tdd]`, `automated-pr-review` declares `reads: [tdd]`, and `design-system` declares `reads: [create-prd]`. Ensures formal data flow for all required inputs.
+
+### Added
+
+- **`docs/comprehensive-alignment-audit.md`** — 8-module alignment audit covering dependency flow, methodology scaling, mode detection, quality criteria, knowledge system, command parity, implementation handoff, and meta-eval coverage.
+
 ## [2.31.0] — 2026-03-29
 
 ### Added

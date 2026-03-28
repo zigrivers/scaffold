@@ -5,6 +5,7 @@ phase: "consolidation"
 order: 1110
 dependencies: [git-workflow]
 outputs: [CLAUDE.md]
+reads: [create-prd, tdd]
 conditional: null
 knowledge-base: [claude-md-patterns]
 ---
