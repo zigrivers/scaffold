@@ -2,6 +2,13 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.17.5] — 2026-03-27
+
+### Fixed
+
+- **implementation-plan-mmr.sh Gemini hang** — Added `NO_BROWSER=true` to both Gemini invocations (initial + retry) in the multi-model review script. Without this, Gemini hangs on consent prompt in non-TTY shells.
+- **implementation-plan.md missing upstream docs** — Required Reading table was missing 8 docs: system-architecture, domain-models/, adrs/, operations-runbook, security-review, database-schema, api-contracts, ux-spec. These are needed to create comprehensive implementation tasks.
+
 ## [2.17.4] — 2026-03-27
 
 ### Fixed
