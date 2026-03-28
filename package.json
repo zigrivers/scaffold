@@ -1,6 +1,6 @@
 {
   "name": "@zigrivers/scaffold",
-  "version": "2.29.0",
+  "version": "2.30.0",
   "description": "AI-powered software project scaffolding pipeline",
   "type": "module",
   "keywords": [
@@ -45,7 +45,7 @@
     "lint": "eslint src/ tests/",
     "type-check": "tsc --noEmit",
     "check": "npm run lint && npm run type-check && npm test",
-    "prepublish": "bash scripts/prepublish.sh"
+    "prepublishOnly": "bash scripts/prepublish.sh"
   },
   "dependencies": {
     "@inquirer/prompts": "^7.4.0",

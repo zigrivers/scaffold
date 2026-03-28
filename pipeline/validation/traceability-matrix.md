@@ -5,6 +5,7 @@ phase: "validation"
 order: 1320
 dependencies: [implementation-plan-review, review-security]
 outputs: [docs/validation/traceability-matrix.md, docs/validation/traceability-matrix/review-summary.md, docs/validation/traceability-matrix/codex-review.json, docs/validation/traceability-matrix/gemini-review.json]
+reads: [story-tests, create-evals]
 conditional: null
 knowledge-base: [traceability]
 ---
@@ -22,6 +23,9 @@ coverage gaps.
 ## Inputs
 - All phase output artifacts (docs/plan.md, docs/domain-models/, docs/adrs/,
   docs/system-architecture.md, etc.)
+- docs/story-tests-map.md (required if exists) — AC-to-test-case traceability
+- tests/acceptance/ (required if exists) — test skeleton files for verification
+- docs/eval-standards.md (required if exists) — eval coverage documentation
 
 ## Expected Outputs
 - docs/validation/traceability-matrix.md — findings report
@@ -33,6 +37,8 @@ coverage gaps.
 - Analysis is comprehensive (not superficial)
 - Findings are actionable (specific file, section, and issue)
 - Severity categorization (P0-P3)
+- Every AC maps to at least one test case (verified against docs/story-tests-map.md if it exists)
+- Every test case maps to at least one implementation task
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Finding Disposition

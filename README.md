@@ -314,8 +314,8 @@ Plan for quality, security, and operations.
 | Step | What It Does |
 |------|-------------|
 | `review-testing` | Review of testing strategy |
-| `story-tests` | Generate tagged test skeletons from user story acceptance criteria |
-| `create-evals` | Generate project-specific eval checks from standards docs |
+| `story-tests` | Generate tagged test skeletons from user story acceptance criteria — feeds into `create-evals` and `implementation-plan` |
+| `create-evals` | Generate project-specific eval checks from standards docs — used as quality gates during implementation |
 | `operations` | CI/CD, deployment, monitoring, runbooks |
 | `review-operations` | Review of operations plan |
 | `security` | OWASP, threat modeling, security controls |
@@ -357,7 +357,7 @@ Cross-phase audits before implementation.
 | `dependency-graph-validation` | Verify task graph integrity |
 | `implementability-dry-run` | Can this actually be built as specified? |
 | `decision-completeness` | Audit ADRs for missing decisions |
-| `traceability-matrix` | Requirements → design → tasks mapping |
+| `traceability-matrix` | Requirements → stories → test cases → tasks mapping |
 | `cross-phase-consistency` | Alignment check across all phases |
 | `critical-path-walkthrough` | Identify the critical implementation path |
 
@@ -369,7 +369,7 @@ Lock it down and start building.
 |------|-------------|
 | `apply-fixes-and-freeze` | Apply all validation findings and freeze documentation |
 | `developer-onboarding-guide` | "Start here" guide for new contributors and AI agents |
-| `implementation-playbook` | Operational guide agents follow during implementation |
+| `implementation-playbook` | Operational guide agents follow during implementation, with test skeleton and eval gate references |
 
 ## Multi-Model Review
 

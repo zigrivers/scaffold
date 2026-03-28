@@ -63,6 +63,8 @@ Read ALL of these before creating any tasks or documentation:
 | `docs/database-schema.md` | *(if exists)* Schema, migrations, indexes to implement |
 | `docs/api-contracts.md` | *(if exists)* Endpoints, error contracts, auth per endpoint |
 | `docs/ux-spec.md` | *(if exists)* User flows, component hierarchy, accessibility requirements |
+| `tests/acceptance/` | *(if exists)* Test skeleton files — reference in task descriptions so agents know which tests to implement |
+| `docs/story-tests-map.md` | *(if exists)* AC-to-test mapping — verify task coverage against test coverage |
 | `CLAUDE.md` | Workflow, priority definitions, commit format |
 
 ## What to Produce

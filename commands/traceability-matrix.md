@@ -19,6 +19,9 @@ Read all of these artifacts (skip any that do not exist):
 - `docs/ux-specification.md` or `docs/ux/` — Screens, flows, components
 - `docs/implementation-plan.md` or `docs/plan.md` — Task breakdown
 - `docs/testing-strategy.md` or `docs/tdd-standards.md` — Test coverage plan
+- `docs/story-tests-map.md` — *(if exists)* AC-to-test-case traceability mapping
+- `tests/acceptance/` — *(if exists)* Test skeleton files for verification
+- `docs/eval-standards.md` — *(if exists)* Eval coverage documentation
 
 ## What to Check
 
@@ -46,7 +49,8 @@ For each requirement, search downstream artifacts for coverage:
 | API | API contracts | Endpoints that expose it |
 | UX | UX specification | Screens that deliver it to users |
 | Task | Implementation plan | Tasks that build it |
-| Test | Testing strategy | Test cases that verify it |
+| Test Case | `docs/story-tests-map.md` or testing strategy | Tagged test cases that verify it |
+| Test | Testing strategy | Test coverage plan that verifies it |
 
 Mark cells as: **Covered**, **N/A** (legitimately not applicable), or **GAP** (missing and should exist).
 
