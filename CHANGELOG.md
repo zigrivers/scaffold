@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.20.1] — 2026-03-27
+
+### Fixed
+
+- **README step counts** — Updated all pipeline step count references from 51 to 50 after merging `multi-model-review-tasks` into `implementation-plan-review`.
+
 ## [2.20.0] — 2026-03-27
 
 ### Changed
