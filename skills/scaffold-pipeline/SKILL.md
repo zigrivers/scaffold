@@ -37,60 +37,60 @@ Use this skill ONLY when the user asks about:
 
 ## Pipeline Order
 
-| Phase | Command | Notes |
-|-------|---------|-------|
-| 1. Product Definition | `/scaffold:create-prd` | Interactive — requires user input |
-| | `/scaffold:review-prd` | Multi-pass PRD review |
-| | `/scaffold:innovate-prd` | **(optional)** Feature-level innovation |
-| | `/scaffold:user-stories` | Covers every PRD feature |
-| | `/scaffold:review-user-stories` | Multi-pass story review; depth 4+ adds requirements index |
-| | `/scaffold:innovate-user-stories` | **(optional)** UX-level enhancements |
-| 2. Project Foundation | `/scaffold:beads` | **(optional)** Creates CLAUDE.md + task tracking |
-| | `/scaffold:tech-stack` | Drives all technical decisions |
-| | `/scaffold:coding-standards` | References tech-stack.md |
-| | `/scaffold:tdd` | References tech-stack.md + coding-standards.md |
-| | `/scaffold:project-structure` | References all Phase 2 docs |
-| 3. Dev Environment | `/scaffold:dev-env-setup` | Creates lint/test/install commands |
-| | `/scaffold:design-system` | **(optional)** Frontend projects only |
-| | `/scaffold:git-workflow` | Branching, CI, worktrees, permissions |
-| | `/scaffold:automated-pr-review` | **(optional)** Local CLI or external reviewer |
-| | `/scaffold:ai-memory-setup` | Modular rules, optional MCP memory + external docs |
-| 4. Testing Integration | `/scaffold:add-e2e-testing` | **(optional)** Playwright (web) and/or Maestro (mobile) |
-| 5. Domain Modeling | `/scaffold:domain-modeling` | Entities, aggregates, events, bounded contexts |
-| | `/scaffold:review-domain-modeling` | 10-pass domain model review |
-| 6. Architecture Decisions | `/scaffold:adrs` | Architecture Decision Records |
-| | `/scaffold:review-adrs` | Review for contradictions, missing decisions |
-| 7. System Architecture | `/scaffold:system-architecture` | Components, data flows, module structure |
-| | `/scaffold:review-architecture` | Coverage gaps, constraint violations |
-| 8. Specifications | `/scaffold:database-schema` | **(optional)** Tables, indexes, constraints |
-| | `/scaffold:review-database` | **(optional)** Schema review |
-| | `/scaffold:api-contracts` | **(optional)** Endpoints, error codes, auth |
-| | `/scaffold:review-api` | **(optional)** API contracts review |
-| | `/scaffold:ux-spec` | **(optional)** Flows, states, accessibility |
-| | `/scaffold:review-ux` | **(optional)** UX spec review |
-| 9. Quality Gates | `/scaffold:review-testing` | Reviews TDD strategy for coverage gaps |
-| | `/scaffold:create-evals` | Generates eval checks from standards docs |
-| | `/scaffold:operations` | Deployment, monitoring, incident response |
-| | `/scaffold:review-operations` | Reviews operations runbook |
-| | `/scaffold:security` | Threat model, auth, data protection |
-| | `/scaffold:review-security` | Reviews security posture |
-| 10. Stories & Reviews | `/scaffold:platform-parity-review` | **(optional)** Multi-platform projects |
-| 11. Consolidation | `/scaffold:claude-md-optimization` | Run BEFORE workflow-audit |
-| | `/scaffold:workflow-audit` | Run AFTER claude-md-optimization |
-| 12. Planning | `/scaffold:implementation-plan` | Creates full task graph |
-| | `/scaffold:implementation-plan-review` | Second pass for quality + multi-model validation (depth 4+) |
-| 13. Validation | `/scaffold:cross-phase-consistency` | Naming, assumptions, interfaces |
-| | `/scaffold:traceability-matrix` | PRD → Stories → Architecture → Tasks |
-| | `/scaffold:decision-completeness` | All decisions recorded and justified |
-| | `/scaffold:critical-path-walkthrough` | End-to-end critical journey trace |
-| | `/scaffold:implementability-dry-run` | Simulate agent picking up tasks |
-| | `/scaffold:dependency-graph-validation` | Verify task DAG is acyclic |
-| | `/scaffold:scope-creep-check` | Specs stay within PRD boundaries |
-| 14. Finalization | `/scaffold:apply-fixes-and-freeze` | Apply findings, freeze docs |
-| | `/scaffold:developer-onboarding-guide` | "Start here" for new devs/agents |
-| | `/scaffold:implementation-playbook` | Operational guide for agent execution |
-| Execution (post-pipeline) | `/scaffold:single-agent-start` | Single-agent TDD execution loop |
-| | `/scaffold:multi-agent-start` | Multi-agent — one per worktree |
+| # | Phase | Command | Notes |
+|---|-------|---------|-------|
+| 1 | Product Definition | `/scaffold:create-prd` | Interactive — requires user input |
+| 2 | Product Definition | `/scaffold:review-prd` | Multi-pass PRD review |
+| 2.5 | Product Definition | `/scaffold:innovate-prd` | **(optional)** Feature-level innovation |
+| 3 | Product Definition | `/scaffold:user-stories` | Covers every PRD feature |
+| 4 | Product Definition | `/scaffold:review-user-stories` | Multi-pass story review; depth 4+ adds requirements index |
+| 4.5 | Product Definition | `/scaffold:innovate-user-stories` | **(optional)** UX-level enhancements |
+| 5 | Project Foundation | `/scaffold:beads` | **(optional)** Creates CLAUDE.md + task tracking |
+| 6 | Project Foundation | `/scaffold:tech-stack` | Drives all technical decisions |
+| 7 | Project Foundation | `/scaffold:coding-standards` | References tech-stack.md |
+| 8 | Project Foundation | `/scaffold:tdd` | References tech-stack.md + coding-standards.md |
+| 9 | Project Foundation | `/scaffold:project-structure` | References all Phase 2 docs |
+| 10 | Dev Environment | `/scaffold:dev-env-setup` | Creates lint/test/install commands |
+| 11 | Dev Environment | `/scaffold:design-system` | **(optional)** Frontend projects only |
+| 12 | Dev Environment | `/scaffold:git-workflow` | Branching, CI, worktrees, permissions |
+| 12.5 | Dev Environment | `/scaffold:automated-pr-review` | **(optional)** Local CLI or external reviewer |
+| 13 | Dev Environment | `/scaffold:ai-memory-setup` | Modular rules, optional MCP memory + external docs |
+| 14 | Testing Integration | `/scaffold:add-e2e-testing` | **(optional)** Playwright (web) and/or Maestro (mobile) |
+| 15 | Domain Modeling | `/scaffold:domain-modeling` | Entities, aggregates, events, bounded contexts |
+| 16 | Domain Modeling | `/scaffold:review-domain-modeling` | 10-pass domain model review |
+| 17 | Architecture Decisions | `/scaffold:adrs` | Architecture Decision Records |
+| 18 | Architecture Decisions | `/scaffold:review-adrs` | Review for contradictions, missing decisions |
+| 19 | System Architecture | `/scaffold:system-architecture` | Components, data flows, module structure |
+| 20 | System Architecture | `/scaffold:review-architecture` | Coverage gaps, constraint violations |
+| 21 | Specifications | `/scaffold:database-schema` | **(optional)** Tables, indexes, constraints |
+| 22 | Specifications | `/scaffold:review-database` | **(optional)** Schema review |
+| 23 | Specifications | `/scaffold:api-contracts` | **(optional)** Endpoints, error codes, auth |
+| 24 | Specifications | `/scaffold:review-api` | **(optional)** API contracts review |
+| 25 | Specifications | `/scaffold:ux-spec` | **(optional)** Flows, states, accessibility |
+| 26 | Specifications | `/scaffold:review-ux` | **(optional)** UX spec review |
+| 27 | Quality Gates | `/scaffold:review-testing` | Reviews TDD strategy for coverage gaps |
+| 28 | Quality Gates | `/scaffold:create-evals` | Generates eval checks from standards docs |
+| 29 | Quality Gates | `/scaffold:operations` | Deployment, monitoring, incident response |
+| 30 | Quality Gates | `/scaffold:review-operations` | Reviews operations runbook |
+| 31 | Quality Gates | `/scaffold:security` | Threat model, auth, data protection |
+| 32 | Quality Gates | `/scaffold:review-security` | Reviews security posture |
+| 33 | Stories & Reviews | `/scaffold:platform-parity-review` | **(optional)** Multi-platform projects |
+| 34 | Consolidation | `/scaffold:claude-md-optimization` | Run BEFORE workflow-audit |
+| 35 | Consolidation | `/scaffold:workflow-audit` | Run AFTER claude-md-optimization |
+| 36 | Planning | `/scaffold:implementation-plan` | Creates full task graph |
+| 37 | Planning | `/scaffold:implementation-plan-review` | Second pass for quality + multi-model validation (depth 4+) |
+| 38 | Validation | `/scaffold:cross-phase-consistency` | Naming, assumptions, interfaces |
+| 39 | Validation | `/scaffold:traceability-matrix` | PRD → Stories → Architecture → Tasks |
+| 40 | Validation | `/scaffold:decision-completeness` | All decisions recorded and justified |
+| 41 | Validation | `/scaffold:critical-path-walkthrough` | End-to-end critical journey trace |
+| 42 | Validation | `/scaffold:implementability-dry-run` | Simulate agent picking up tasks |
+| 43 | Validation | `/scaffold:dependency-graph-validation` | Verify task DAG is acyclic |
+| 44 | Validation | `/scaffold:scope-creep-check` | Specs stay within PRD boundaries |
+| 45 | Finalization | `/scaffold:apply-fixes-and-freeze` | Apply findings, freeze docs |
+| 46 | Finalization | `/scaffold:developer-onboarding-guide` | "Start here" for new devs/agents |
+| 47 | Finalization | `/scaffold:implementation-playbook` | Operational guide for agent execution |
+| 48 | Execution | `/scaffold:single-agent-start` | Single-agent TDD execution loop |
+| 48 | Execution | `/scaffold:multi-agent-start` | Multi-agent — one per worktree |
 
 ## Standalone Commands
 
