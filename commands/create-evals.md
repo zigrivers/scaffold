@@ -37,14 +37,14 @@ Before starting, check if `tests/evals/` directory already exists:
 - **Primary output**: `tests/evals/` directory
 - **Secondary output**: `docs/eval-standards.md`, `make eval` target
 - **Preserve**: Custom exclusion patterns in adherence evals, user-added eval files, `docs/eval-standards.md` customizations (exclusion lists, "What Evals Don't Check" additions)
-- **Related docs**: `docs/tech-stack.md`, `docs/coding-standards.md`, `docs/tdd-standards.md`, `docs/project-structure.md`, `docs/user-stories.md`, `docs/plan.md`
-- **Special rules**: Never delete user-added eval files. Adherence evals (`adherence.test.*`) are generated once then preserved on re-run — users customize exclusion patterns. Consistency and structure evals are fully regenerated. Coverage evals are regenerated when `docs/plan.md` or `docs/user-stories.md` change.
+- **Related docs**: `docs/tech-stack.md`, `docs/coding-standards.md`, `docs/tdd-standards.md`, `docs/project-structure.md`, `docs/user-stories.md`, `docs/plan.md`, `docs/system-architecture.md`, `docs/api-contracts.md`, `docs/security-review.md`, `docs/database-schema.md`, `docs/ux-spec.md`, `docs/dev-setup.md`
+- **Special rules**: Never delete user-added eval files. Adherence, security, and error-handling evals are generated once then preserved on re-run — users customize exclusion patterns. Consistency, structure, cross-doc, and all other conditional categories are fully regenerated. Coverage evals are regenerated when `docs/plan.md` or `docs/user-stories.md` change. Conditional categories are added/removed based on whether their source doc exists.
 
 ---
 
 ## What Evals Check
 
-Evals verify that AI-generated code adheres to the project's documented standards. They check five categories:
+Evals verify that AI-generated code adheres to the project's documented standards. They check up to 13 categories — 5 core (always generated) and 8 conditional (generated when their source document exists):
 
 ### 1. Consistency Checks
 
@@ -195,7 +195,90 @@ describe('Cross-Document Consistency: tech stack references', () => {
 
 ---
 
+## Conditional Eval Categories (Document-Driven)
+
+The following categories are **only generated when their source document exists**. Each closes a specific gap between "document says X" and "code actually does X."
+
+### 6. Architecture Conformance *(requires `docs/system-architecture.md` + `docs/project-structure.md`)*
+
+Verify code follows documented architecture:
+
+- **Layer/dependency direction**: Imports only flow in documented directions (e.g., controllers → services → repositories, never reverse). Checks import/require statements with grep/regex.
+- **Module boundary enforcement**: Feature directories don't import directly from another feature's internal modules. Cross-feature dependencies must go through shared/public interfaces.
+- **No circular dependencies**: Import chains between documented modules don't form cycles.
+
+For complex projects, recommend installing `dependency-cruiser` (JS/TS) or equivalent. For simpler projects, grep-based import direction checks are sufficient.
+
+### 7. API Contract Validation *(requires `docs/api-contracts.md`)*
+
+Verify API implementations match documented contracts:
+
+- **Endpoint existence**: Every documented endpoint has a corresponding route definition in code.
+- **HTTP method match**: Documented GET/POST/PUT/DELETE matches the route's method.
+- **Response shape coverage**: For each documented endpoint, a test file validates the response structure.
+- **Error response coverage**: Documented error codes (400, 401, 403, 404, 422) have corresponding test cases.
+
+### 8. Security Pattern Verification *(requires `docs/security-review.md`)*
+
+Verify documented security controls are implemented:
+
+- **Auth middleware presence**: Protected routes (documented in security review or API contracts) have authentication middleware applied.
+- **No hardcoded secrets**: No API keys, passwords, or tokens in source code (regex for common secret formats: `(?:api[_-]?key|secret|password|token)\s*[:=]\s*['"][^'"]+['"]`).
+- **Input validation**: User-facing endpoints have validation (check for validation library imports or manual validation).
+- **SQL injection prevention**: Database queries use parameterized statements (no string concatenation in query construction).
+- **CORS configuration**: If documented, verify CORS settings match the security review's allowed origins.
+
+### 9. Database Schema Conformance *(requires `docs/database-schema.md`)*
+
+Verify database implementation matches documented schema:
+
+- **Migration existence**: Every documented table has a corresponding migration file.
+- **Column coverage**: Documented columns appear in the migration or model definition.
+- **Index presence**: Documented indexes are defined in migrations.
+- **Relationship integrity**: Documented foreign keys exist in migration files.
+
+### 10. Accessibility Compliance *(requires `docs/ux-spec.md` with accessibility section)*
+
+Verify documented accessibility requirements are met:
+
+- **ARIA attributes**: Interactive components have required ARIA attributes.
+- **Alt text coverage**: Image elements have alt text (grep for `<img` without `alt=`).
+- **Keyboard navigation**: Focusable elements have visible focus styles (check CSS for `:focus` or `:focus-visible`).
+- **Color contrast**: If design tokens are documented, verify contrast ratios meet WCAG AA (4.5:1 for normal text).
+
+For frontend projects, recommend installing `axe-core` for runtime accessibility checking.
+
+### 11. Performance Budget *(requires performance requirements in `docs/plan.md`)*
+
+Verify documented performance targets are tracked:
+
+- **Budget file exists**: A `budget.json`, `size-limit` config, or equivalent performance budget definition exists.
+- **Bundle size tracking**: If documented, verify JS/CSS bundle sizes are tracked in CI config.
+- **Performance test existence**: Critical user flows have corresponding performance tests or Lighthouse CI config.
+
+Only generated when `docs/plan.md` contains non-functional requirements mentioning performance, load time, or response time.
+
+### 12. Configuration Validation *(requires `docs/dev-setup.md`)*
+
+Verify documented environment configuration is correct:
+
+- **Env var documentation**: Every env var referenced in code (`process.env.X`, `os.environ["X"]`, `os.Getenv("X")`) exists in `.env.example` or dev setup docs.
+- **No undocumented env vars**: Env vars in `.env.example` are actually used in code (detect dead config).
+- **Startup validation**: The app validates required config at startup (check for config schema validation with Zod, Pydantic, envconfig, etc.).
+
+### 13. Error Handling Completeness *(requires error patterns in `docs/coding-standards.md`)*
+
+Verify documented error handling patterns are followed:
+
+- **No bare catch blocks**: Catch blocks don't swallow errors (no empty catch, no catch without logging/rethrowing).
+- **Documented error responses tested**: For each error response in API contracts, a test triggers that error path.
+- **Custom error classes used**: If coding standards define custom error classes, verify they're used instead of generic `Error`/`Exception`.
+
+---
+
 ## What Evals Produce
+
+### Core categories (always generated)
 
 | File | Contents | Regeneration behavior |
 |------|----------|-----------------------|
@@ -204,8 +287,26 @@ describe('Cross-Document Consistency: tech stack references', () => {
 | `tests/evals/adherence.test.*` | Coding convention patterns, mock rules, TODO format | Generated once, then PRESERVED on re-run (users customize exclusions) |
 | `tests/evals/coverage.test.*` | Feature→code mapping, AC→test mapping | Regenerated when plan.md or user-stories.md change |
 | `tests/evals/cross-doc.test.*` | Tech stack refs, path consistency, terminology, internal links | Fully regenerated on re-run |
+
+### Conditional categories (generated when source doc exists)
+
+| File | Source Doc | Contents | Regeneration behavior |
+|------|-----------|----------|-----------------------|
+| `tests/evals/architecture.test.*` | system-architecture.md | Layer direction, module boundaries, circular deps | Fully regenerated |
+| `tests/evals/api-contract.test.*` | api-contracts.md | Endpoint existence, methods, error codes | Fully regenerated |
+| `tests/evals/security.test.*` | security-review.md | Auth middleware, secrets, input validation, SQL injection | Generated once, then PRESERVED |
+| `tests/evals/database.test.*` | database-schema.md | Migration coverage, columns, indexes, relationships | Fully regenerated |
+| `tests/evals/accessibility.test.*` | ux-spec.md | ARIA, alt text, focus styles, contrast | Fully regenerated |
+| `tests/evals/performance.test.*` | plan.md (NFRs) | Budget files, bundle tracking, perf test existence | Fully regenerated |
+| `tests/evals/config.test.*` | dev-setup.md | Env var docs, dead config, startup validation | Fully regenerated |
+| `tests/evals/error-handling.test.*` | coding-standards.md | Bare catches, error responses tested, custom error classes | Generated once, then PRESERVED |
+
+### Supporting files (always generated)
+
+| File | Contents | Regeneration behavior |
+|------|----------|-----------------------|
 | `tests/evals/helpers.*` | Shared utilities for reading files, globbing, parsing docs | Regenerated |
-| `docs/eval-standards.md` | Documents what each eval checks, how to add exclusions, what is NOT checked and why | Generated once, updated in update mode |
+| `docs/eval-standards.md` | Documents what each eval checks, how to add exclusions, what is NOT checked | Generated once, updated in update mode |
 | Makefile/package.json addition | `make eval` or `npm run eval` target that runs only `tests/evals/` | Added once |
 
 The test file extension and framework match the project's stack from `docs/tech-stack.md` (vitest for TS/JS, pytest for Python, bats for shell, go test for Go).
@@ -218,12 +319,12 @@ These must be documented in `docs/eval-standards.md`:
 
 - **Code quality or elegance** — evals check patterns, not taste
 - **Algorithmic correctness** — that's what unit/integration tests are for
-- **UX quality** — visual and interaction quality requires human judgment
-- **Performance** — unless performance tests already exist in the project
-- **Security vulnerabilities** — beyond documented patterns in coding-standards.md (use dedicated security tools)
+- **UX quality** — visual and interaction quality requires human judgment (beyond automated a11y checks)
+- **Deep security vulnerabilities** — evals check documented patterns; use dedicated SAST/DAST tools (Semgrep, OWASP ZAP) for deep scanning
 - **Test quality** — evals verify tests exist for requirements, not that the tests are good
+- **Runtime performance** — evals verify budgets and tracking config exist, not actual measured performance
 
-These remain the domain of Step 4.5 AI Review, functional tests, and human review.
+These remain the domain of functional tests, security scanning tools, and human review.
 
 ---
 
@@ -237,7 +338,7 @@ These remain the domain of Step 4.5 AI Review, functional tests, and human revie
 
 4. **Update mode with existing code = review mode.** When re-run on a project with code, it: (a) regenerates evals from current docs, (b) runs `make eval`, (c) produces a coverage/adherence summary report, (d) creates Beads tasks for P0 findings, (e) logs recurring adherence patterns to `tasks/lessons.md`.
 
-5. **Adapts to what docs exist.** No `docs/design-system.md`? Skip design token checks. No `docs/user-stories.md`? Skip AC-level coverage (only feature-level). No Playwright? Skip visual test checks. The prompt reads `docs/tech-stack.md` to determine stack-specific patterns.
+5. **Adapts to what docs exist.** The 8 conditional categories (architecture, API contract, security, database, accessibility, performance, config, error handling) are only generated when their source document exists. No `docs/api-contracts.md`? No API contract evals. No `docs/security-review.md`? No security evals. This keeps the eval suite lean and relevant.
 
 6. **Goodhart's Law mitigation.** Evals check existence and pattern adherence, not quality. Binary PASS/FAIL, not scores. The "What Evals Don't Check" section is explicit about boundaries.
 
