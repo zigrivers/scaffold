@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.19.1] — 2026-03-27
+
+### Fixed
+
+- **State manager crash on new pipeline steps** — `scaffold run ai-memory-setup` (or any step added after project initialization) crashed with "Cannot set properties of undefined (setting 'status')". The `setInProgress()` method now auto-creates a pending step entry before transitioning to in_progress, handling the case where the pipeline has new steps not in the original `state.json`.
+
 ## [2.19.0] — 2026-03-27
 
 ### Added
