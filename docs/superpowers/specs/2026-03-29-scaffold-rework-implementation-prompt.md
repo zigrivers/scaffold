@@ -280,3 +280,111 @@ Then manually verify:
 2. `scaffold rework --resume --format json` — should load and display the session
 3. `scaffold rework --advance create-prd --format json` — should advance the step
 4. `scaffold rework --clear` — should delete rework.json
+
+## Step 8: Git Workflow, PR, and Release
+
+After all tests pass and verification is complete, follow the project's git workflow to ship this feature.
+
+### 8a. Create Feature Branch and PR
+
+```bash
+# Create branch (should already be on one — if not:)
+git checkout -b feat/rework-command origin/main
+
+# Stage and commit all changes (use conventional commit format)
+git add src/types/rework.ts src/state/rework-manager.ts src/core/rework/phase-selector.ts \
+        src/cli/commands/rework.ts src/cli/index.ts src/types/index.ts src/types/assembly.ts \
+        src/core/assembly/engine.ts skills/scaffold-runner/SKILL.md tests/rework.bats
+git commit -m "feat: add scaffold rework command for phase-level re-execution"
+
+# Push and create PR
+git push -u origin HEAD
+gh pr create --title "feat: add scaffold rework command" --body "$(cat <<'EOF'
+## Summary
+- New `scaffold rework` CLI command for re-running all steps within selected phases
+- Persistent rework sessions (`.scaffold/rework.json`) survive context resets
+- Phase selection via `--phases`, `--through`, `--exclude` flags or interactive checklist
+- `--fix` flag for auto-fixing issues in review steps
+- Runner skill integration for step-by-step execution
+
+## Test plan
+- [ ] `make check` passes (lint + validate + test)
+- [ ] `scaffold rework --help` shows correct usage
+- [ ] `scaffold rework --through 3 --format json` creates rework.json
+- [ ] `scaffold rework --resume` loads existing session
+- [ ] `scaffold rework --advance <step>` advances correctly
+- [ ] `scaffold rework --clear` removes session
+EOF
+)"
+```
+
+### 8b. Wait for CI, then Merge
+
+```bash
+gh pr checks --watch        # Wait for CI to pass
+gh pr merge --squash --delete-branch
+git checkout main && git pull --rebase origin main
+```
+
+### 8c. Version Bump and Changelog
+
+Determine the new version — this is a new feature so bump the minor version. Check the current version first:
+
+```bash
+node -p "require('./package.json').version"
+```
+
+Then create a release branch:
+
+```bash
+git checkout -b chore/release-vX.Y.0 origin/main
+```
+
+1. **Bump version** in both `package.json` and `.claude-plugin/plugin.json`
+2. **Update `CHANGELOG.md`** — Add a new entry at the top following the existing format:
+
+```markdown
+## [X.Y.0] — YYYY-MM-DD
+
+### Added
+
+- **`scaffold rework` command** — Re-run all steps within selected phases at configurable depth. Supports `--phases`, `--through`, `--exclude` for phase selection, `--fix` for auto-fixing review step issues, `--fresh` for clean re-runs, and persistent sessions (`.scaffold/rework.json`) that survive context resets.
+- **Rework mode in scaffold-runner skill** — Runner skill auto-detects active rework sessions, executes steps sequentially, pauses at phase boundaries, and supports natural language triggers ("rework phases 1-5", "resume rework").
+- **`reworkFix` assembly option** — Assembly engine injects auto-fix instructions for review steps during rework mode.
+```
+
+3. **Update `README.md`** — If there's a command count or feature list, update it to include the new `rework` command.
+
+### 8d. Release PR and Tag
+
+```bash
+git add package.json .claude-plugin/plugin.json CHANGELOG.md README.md
+git commit -m "chore: bump version to X.Y.0"
+git push -u origin HEAD
+gh pr create --title "chore: bump version to X.Y.0" --body "Version release for scaffold rework command"
+gh pr checks --watch
+gh pr merge --squash --delete-branch
+git checkout main && git pull --rebase origin main
+```
+
+### 8e. Tag and GitHub Release
+
+```bash
+git tag vX.Y.0
+git push origin vX.Y.0
+gh release create vX.Y.0 --title "vX.Y.0 — scaffold rework command" --notes "$(cat <<'EOF'
+## What's New
+
+**`scaffold rework`** — Re-run entire phases of the pipeline at configurable depth.
+
+- Phase selection: `--phases 1-5`, `--through 5`, `--exclude 3`
+- Auto-fix review steps: `--fix` (default on)
+- Persistent sessions: survives context resets via `.scaffold/rework.json`
+- Runner skill integration: natural language triggers, phase boundary pauses
+
+See [CHANGELOG.md](CHANGELOG.md) for full details.
+EOF
+)"
+```
+
+The Homebrew formula auto-updates on tag push via the `update-homebrew.yml` workflow.
