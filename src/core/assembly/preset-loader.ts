@@ -1,7 +1,10 @@
 import type { MethodologyPreset } from '../../types/index.js'
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
 import { fileExists } from '../../utils/fs.js'
-import { presetMissing, presetParseError, presetInvalidStep, presetMissingStep } from '../../utils/errors.js'
+import {
+  presetMissing, presetParseError, presetInvalidStep,
+  presetMissingStep, presetUnmetDependency,
+} from '../../utils/errors.js'
 import yaml from 'js-yaml'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -194,4 +197,35 @@ export function loadAllPresets(
     errors: allErrors,
     warnings: allWarnings,
   }
+}
+
+/**
+ * Validate that enabled steps in a preset have their dependencies also enabled.
+ * The engine treats disabled dependencies as satisfied (soft-dependency behavior),
+ * but this validation warns users about potential quality gaps.
+ *
+ * @param preset - A loaded methodology preset
+ * @param stepDependencies - Map of step name to its dependency list (from pipeline frontmatter)
+ * @returns Array of warnings for enabled steps with disabled dependencies
+ */
+export function validateDependencyCoherence(
+  preset: MethodologyPreset,
+  stepDependencies: Map<string, string[]>,
+): ScaffoldWarning[] {
+  const warnings: ScaffoldWarning[] = []
+
+  for (const [stepName, stepConfig] of Object.entries(preset.steps)) {
+    if (!stepConfig.enabled) continue
+
+    const deps = stepDependencies.get(stepName) ?? []
+    for (const dep of deps) {
+      const depConfig = preset.steps[dep]
+      // Warn if dependency is explicitly disabled (or absent from preset)
+      if (depConfig && !depConfig.enabled) {
+        warnings.push(presetUnmetDependency(stepName, dep, preset.name))
+      }
+    }
+  }
+
+  return warnings
 }

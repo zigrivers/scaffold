@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { loadPreset, loadAllPresets } from './preset-loader.js'
+import { loadPreset, loadAllPresets, validateDependencyCoherence } from './preset-loader.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const fixtureDir = path.resolve(__dirname, '../../../tests/fixtures/methodology')
@@ -142,5 +142,73 @@ describe('loadAllPresets', () => {
     expect(result.custom).toBeNull()
     expect(result.errors.length).toBeGreaterThan(0)
     expect(result.errors.some(e => e.code === 'PRESET_MISSING')).toBe(true)
+  })
+})
+
+describe('validateDependencyCoherence', () => {
+  it('returns no warnings when all dependencies are enabled', () => {
+    const preset = {
+      name: 'Test',
+      description: 'Test preset',
+      default_depth: 3 as const,
+      steps: {
+        'step-a': { enabled: true },
+        'step-b': { enabled: true },
+      },
+    }
+    const deps = new Map([['step-b', ['step-a']]])
+    const warnings = validateDependencyCoherence(preset, deps)
+    expect(warnings).toHaveLength(0)
+  })
+
+  it('warns when an enabled step has a disabled dependency', () => {
+    const preset = {
+      name: 'MVP',
+      description: 'Test preset',
+      default_depth: 1 as const,
+      steps: {
+        'step-a': { enabled: false },
+        'step-b': { enabled: true },
+      },
+    }
+    const deps = new Map([['step-b', ['step-a']]])
+    const warnings = validateDependencyCoherence(preset, deps)
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0].code).toBe('PRESET_UNMET_DEPENDENCY')
+    expect(warnings[0].context?.step).toBe('step-b')
+    expect(warnings[0].context?.dependency).toBe('step-a')
+  })
+
+  it('does not warn for disabled steps with disabled dependencies', () => {
+    const preset = {
+      name: 'Test',
+      description: 'Test preset',
+      default_depth: 1 as const,
+      steps: {
+        'step-a': { enabled: false },
+        'step-b': { enabled: false },
+      },
+    }
+    const deps = new Map([['step-b', ['step-a']]])
+    const warnings = validateDependencyCoherence(preset, deps)
+    expect(warnings).toHaveLength(0)
+  })
+
+  it('warns for each disabled dependency of an enabled step', () => {
+    const preset = {
+      name: 'Test',
+      description: 'Test preset',
+      default_depth: 1 as const,
+      steps: {
+        'dep-1': { enabled: false },
+        'dep-2': { enabled: false },
+        'dep-3': { enabled: true },
+        'consumer': { enabled: true },
+      },
+    }
+    const deps = new Map([['consumer', ['dep-1', 'dep-2', 'dep-3']]])
+    const warnings = validateDependencyCoherence(preset, deps)
+    expect(warnings).toHaveLength(2) // dep-1 and dep-2 are disabled
+    expect(warnings.every(w => w.code === 'PRESET_UNMET_DEPENDENCY')).toBe(true)
   })
 })

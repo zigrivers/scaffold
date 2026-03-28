@@ -8,9 +8,11 @@ All notable changes to Scaffold are documented here.
 
 - **Broken dependency chains in quality phase** — `review-testing` now declares `reads: [domain-modeling, system-architecture]`, `operations` declares `reads: [system-architecture, adrs]`, and `security` declares `reads: [system-architecture]`. Previously these steps required artifacts with no formal path to their producers.
 - **Missing reads in consolidation/environment phase** — `claude-md-optimization` now declares `reads: [create-prd, tdd]`, `automated-pr-review` declares `reads: [tdd]`, and `design-system` declares `reads: [create-prd]`. Ensures formal data flow for all required inputs.
+- **Malformed mvp bullets in 3 review steps** — `review-ux`, `review-operations`, and `review-security` had their `**mvp**` bullet indented under `**deep**`, making it invisible to methodology parsers. Now properly formatted as separate bullets.
 
 ### Added
 
+- **Dependency coherence validation for presets** — New `validateDependencyCoherence()` function in preset-loader warns when enabled steps have disabled dependencies. The engine already treats disabled deps as satisfied (soft-dependency), but users now get explicit warnings about potential quality gaps.
 - **`docs/comprehensive-alignment-audit.md`** — 8-module alignment audit covering dependency flow, methodology scaling, mode detection, quality criteria, knowledge system, command parity, implementation handoff, and meta-eval coverage.
 
 ## [2.31.0] — 2026-03-29
