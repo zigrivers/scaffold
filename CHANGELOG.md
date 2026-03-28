@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.21.0] — 2026-03-27
+
+### Added
+
+- **Batch execution in scaffold runner skill** — The runner can now handle multi-step requests like "re-run all reviews", "run phases 5-8", "run the next 5 steps", or "finish the pipeline". Resolves natural language to ordered step lists, executes sequentially, carries forward session preferences (depth, decisions), and continues autonomously — stopping only on blockers requiring human intervention. Includes batch summary reporting and interrupted batch resumption.
+
 ## [2.20.1] — 2026-03-27
 
 ### Fixed
