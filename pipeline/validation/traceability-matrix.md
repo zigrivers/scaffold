@@ -34,11 +34,13 @@ coverage gaps.
 - docs/validation/traceability-matrix/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- Analysis is comprehensive (not superficial)
-- Findings are actionable (specific file, section, and issue)
-- Severity categorization (P0-P3)
-- Every AC maps to at least one test case (verified against docs/story-tests-map.md if it exists)
-- Every test case maps to at least one implementation task
+- Every PRD requirement maps to >= 1 user story
+- Every user story maps to >= 1 implementation task
+- Every acceptance criterion maps to >= 1 test case (verified against `docs/story-tests-map.md`)
+- Every test case maps to >= 1 implementation task
+- No orphan items in either direction at any layer
+- Bidirectional traceability verified: PRD → Stories → Domain → Architecture → Tasks
+- Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Finding Disposition

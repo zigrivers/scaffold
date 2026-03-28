@@ -29,9 +29,11 @@ drift patterns.
 - docs/validation/cross-phase-consistency/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- Analysis is comprehensive (not superficial)
-- Findings are actionable (specific file, section, and issue)
-- Severity categorization (P0-P3)
+- Entity names are consistent across domain models, database schema, and API contracts (zero mismatches)
+- Technology references match `docs/tech-stack.md` in all documents
+- Data flow descriptions in architecture match API endpoint definitions
+- Terminology is consistent (same concept never uses two different names)
+- Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Finding Disposition

@@ -31,9 +31,11 @@ spec gaps along the critical path.
 - docs/validation/critical-path-walkthrough/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- Analysis is comprehensive (not superficial)
-- Findings are actionable (specific file, section, and issue)
-- Severity categorization (P0-P3)
+- Top critical user journeys (all Must-have epics, minimum 3) traced end-to-end
+- Every journey verified at each layer: PRD → Story → UX → API → Architecture → DB → Task
+- Each critical path verified against story acceptance criteria for behavioral correctness
+- Missing layers or broken handoffs documented with specific gap description
+- Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Finding Disposition

@@ -9,6 +9,7 @@ All notable changes to Scaffold are documented here.
 - **Broken dependency chains in quality phase** — `review-testing` now declares `reads: [domain-modeling, system-architecture]`, `operations` declares `reads: [system-architecture, adrs]`, and `security` declares `reads: [system-architecture]`. Previously these steps required artifacts with no formal path to their producers.
 - **Missing reads in consolidation/environment phase** — `claude-md-optimization` now declares `reads: [create-prd, tdd]`, `automated-pr-review` declares `reads: [tdd]`, and `design-system` declares `reads: [create-prd]`. Ensures formal data flow for all required inputs.
 - **Malformed mvp bullets in 3 review steps** — `review-ux`, `review-operations`, and `review-security` had their `**mvp**` bullet indented under `**deep**`, making it invisible to methodology parsers. Now properly formatted as separate bullets.
+- **Generic validation step quality criteria** — All 7 validation steps (`cross-phase-consistency`, `traceability-matrix`, `decision-completeness`, `critical-path-walkthrough`, `implementability-dry-run`, `dependency-graph-validation`, `scope-creep-check`) had identical copy-paste criteria ("analysis is comprehensive"). Replaced with step-specific, measurable criteria derived from each step's Purpose section.
 
 ### Added
 
