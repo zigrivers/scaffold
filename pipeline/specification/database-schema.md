@@ -23,11 +23,11 @@ relationships, indexes, constraints, and migration strategy.
   constraints, and migration strategy
 
 ## Quality Criteria
-- Every domain entity maps to a table/collection (or justified denormalization)
-- Relationships match domain model relationships
-- Indexes cover known query patterns from architecture data flows
-- Constraints enforce domain invariants at the database level
-- Migration strategy handles schema evolution
+- (mvp) Every domain entity maps to a table/collection (or justified denormalization)
+- (mvp) Relationships match domain model relationships
+- (deep) Indexes cover known query patterns from architecture data flows
+- (deep) Constraints enforce domain invariants at the database level
+- (deep) Migration strategy handles schema evolution
 
 ## Methodology Scaling
 - **deep**: Full schema specification. CREATE TABLE statements or equivalent.

@@ -11,6 +11,8 @@ All notable changes to Scaffold are documented here.
 - **Malformed mvp bullets in 3 review steps** — `review-ux`, `review-operations`, and `review-security` had their `**mvp**` bullet indented under `**deep**`, making it invisible to methodology parsers. Now properly formatted as separate bullets.
 - **Generic validation step quality criteria** — All 7 validation steps (`cross-phase-consistency`, `traceability-matrix`, `decision-completeness`, `critical-path-walkthrough`, `implementability-dry-run`, `dependency-graph-validation`, `scope-creep-check`) had identical copy-paste criteria ("analysis is comprehensive"). Replaced with step-specific, measurable criteria derived from each step's Purpose section.
 - **Mode Detection mismatches** — Added Mode Detection sections to `commands/claude-md-optimization.md` and `commands/workflow-audit.md` (previously omitted entirely). Updated `apply-fixes-and-freeze` pipeline to acknowledge update mode (was "N/A"). Expanded stub Mode Detection in `developer-onboarding-guide` and `implementation-playbook` pipeline files.
+- **Quality criteria depth tags** — Added `(mvp)`/`(deep)` tags to 9 pipeline steps: `operations`, `security`, `api-contracts`, `database-schema`, `ux-spec`, `design-system`, `system-architecture`, `domain-modeling`, `implementation-plan`. Criteria now clearly indicate which apply at which methodology depth.
+- **Review step Pattern A normalization** — Added missing Pattern A criteria (P0-P3 categorization, fix plan, downstream readiness) to 6 Pattern C review steps: `review-api`, `review-database`, `review-ux`, `review-operations`, `review-security`, `review-testing`.
 
 ### Added
 

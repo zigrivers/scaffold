@@ -36,6 +36,9 @@ independent review validation.
 - Test environment assumptions validated
 - Performance test coverage assessed against NFRs
 - Integration boundaries have integration tests defined
+- Every finding categorized P0-P3 with specific test layer, gap, and issue
+- Fix plan documented for all P0/P1 findings; fixes applied to tdd-standards.md and re-validated
+- Downstream readiness confirmed — no unresolved P0 or P1 findings remain before operations step proceeds
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling

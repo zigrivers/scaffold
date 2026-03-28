@@ -34,6 +34,9 @@ independent review validation.
 - Alert thresholds have rationale
 - Common failure scenarios have runbook entries
 - Dev environment parity assessed
+- Every finding categorized P0-P3 with specific runbook section, metric, and issue
+- Fix plan documented for all P0/P1 findings; fixes applied to operations-runbook.md and re-validated
+- Downstream readiness confirmed — no unresolved P0 or P1 findings remain before security step proceeds
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling

@@ -24,12 +24,12 @@ response shapes, error codes, authentication requirements, and rate limits.
   shapes, error contracts, auth requirements
 
 ## Quality Criteria
-- Every domain operation that crosses a component boundary has an API endpoint
-- Error contracts are explicit (not just "500 Internal Server Error")
-- Authentication and authorization requirements per endpoint
-- Versioning strategy documented (if applicable)
-- Pagination, filtering, and sorting for list endpoints
-- Idempotency documented for mutating operations
+- (mvp) Every domain operation that crosses a component boundary has an API endpoint
+- (mvp) Error contracts are explicit (not just "500 Internal Server Error")
+- (mvp) Authentication and authorization requirements per endpoint
+- (deep) Versioning strategy documented (if applicable)
+- (deep) Pagination, filtering, and sorting for list endpoints
+- (deep) Idempotency documented for mutating operations
 
 ## Methodology Scaling
 - **deep**: OpenAPI-style specification. Full request/response schemas with

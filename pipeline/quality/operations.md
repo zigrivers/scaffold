@@ -27,19 +27,19 @@ development setup rather than redefining it.
 - docs/operations-runbook.md — production operations and deployment runbook
 
 ## Quality Criteria
-- Deployment pipeline extends existing CI (build, deploy, post-deploy stages)
-- Deployment pipeline has explicit stages (build → test → deploy → verify → rollback-ready)
-- Does not redefine base CI stages (lint, test) from git-workflow
-- Deployment strategy chosen with rollback procedure
-- Rollback procedure tested with specific trigger conditions (e.g., error rate > X%, health check failure)
-- Runbook structured by operational scenario (deployment, rollback, incident, scaling)
-- Monitoring covers key metrics (latency, error rate, saturation)
-- Each monitoring metric has an explicit threshold with rationale
-- Health check endpoints defined with expected response codes and latency bounds
-- Log aggregation strategy specifies retention period and searchable fields
-- Alerting thresholds are justified, not arbitrary
+- (mvp) Deployment pipeline extends existing CI (build, deploy, post-deploy stages)
+- (mvp) Deployment pipeline has explicit stages (build → test → deploy → verify → rollback-ready)
+- (mvp) Does not redefine base CI stages (lint, test) from git-workflow
+- (mvp) Deployment strategy chosen with rollback procedure
+- (deep) Rollback procedure tested with specific trigger conditions (e.g., error rate > X%, health check failure)
+- (deep) Runbook structured by operational scenario (deployment, rollback, incident, scaling)
+- (mvp) Monitoring covers key metrics (latency, error rate, saturation)
+- (deep) Each monitoring metric has an explicit threshold with rationale
+- (deep) Health check endpoints defined with expected response codes and latency bounds
+- (deep) Log aggregation strategy specifies retention period and searchable fields
+- (deep) Alerting thresholds are justified, not arbitrary
 - References docs/dev-setup.md for local dev — does not redefine it
-- Incident response process defined
+- (deep) Incident response process defined
 
 ## Methodology Scaling
 - **deep**: Full runbook. Deployment topology diagrams. Monitoring dashboard

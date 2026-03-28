@@ -37,6 +37,9 @@ independent review validation.
 - Dependency audit scope covers all dependencies
 - Threat model covers all trust boundaries
 - Data classification is complete
+- Every finding categorized P0-P3 with specific control, boundary, and issue
+- Fix plan documented for all P0/P1 findings; fixes applied to security-review.md and re-validated
+- Downstream readiness confirmed — no unresolved P0 or P1 findings remain before planning phase proceeds
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling

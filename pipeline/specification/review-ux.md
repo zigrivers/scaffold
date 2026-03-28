@@ -35,6 +35,9 @@ independent review validation.
 - All interaction states covered
 - Design system consistency verified
 - Error states present for all failure-capable actions
+- Every finding categorized P0-P3 with specific flow, screen, and issue
+- Fix plan documented for all P0/P1 findings; fixes applied to ux-spec.md and re-validated
+- Downstream readiness confirmed — no unresolved P0 or P1 findings remain before quality phase proceeds
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling

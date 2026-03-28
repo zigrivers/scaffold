@@ -25,18 +25,18 @@ management, and dependency audit strategy.
 - docs/security-review.md — security review and controls document
 
 ## Quality Criteria
-- OWASP top 10 addressed for this specific project
-- Every API endpoint has authentication and authorization requirements specified
-- Auth/authz boundaries defined and consistent with API contracts
-- Input validation rules defined for each user-facing field (type, length, pattern)
-- Data classified by sensitivity with handling requirements
-- Secrets management approach documented (no hardcoded credentials in code)
-- Secrets management strategy defined (no secrets in code)
-- CORS policy explicitly configured per origin (not wildcard in production)
-- Rate limiting defined for public-facing endpoints with specific thresholds
-- Threat model covers all trust boundaries
-- Dependency audit strategy documented (automated scanning, update cadence)
-- Dependency audit integrated into CI
+- (mvp) OWASP top 10 addressed for this specific project
+- (mvp) Every API endpoint has authentication and authorization requirements specified
+- (mvp) Auth/authz boundaries defined and consistent with API contracts
+- (mvp) Input validation rules defined for each user-facing field (type, length, pattern)
+- (deep) Data classified by sensitivity with handling requirements
+- (mvp) Secrets management approach documented (no hardcoded credentials in code)
+- (mvp) Secrets management strategy defined (no secrets in code)
+- (deep) CORS policy explicitly configured per origin (not wildcard in production)
+- (deep) Rate limiting defined for public-facing endpoints with specific thresholds
+- (deep) Threat model covers all trust boundaries
+- (deep) Dependency audit strategy documented (automated scanning, update cadence)
+- (deep) Dependency audit integrated into CI
 
 ## Methodology Scaling
 - **deep**: Full threat model (STRIDE). OWASP analysis per component.

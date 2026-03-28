@@ -32,13 +32,13 @@ professional UI without requiring design expertise from the user.
 - CLAUDE.md updated with Design System section and quick reference
 
 ## Quality Criteria
-- All colors meet WCAG AA contrast requirements
-- Typography scale is consistent and readable
-- Spacing uses a consistent base unit (e.g., 4px increments)
-- Component patterns cover buttons, forms, cards, feedback, navigation, data display
-- Theme configuration files actually work (verified by running dev server)
-- Both light and dark mode token values provided (if dark mode requested)
-- Responsive breakpoints defined (mobile, tablet, desktop)
+- (mvp) All colors meet WCAG AA contrast requirements
+- (mvp) Typography scale is consistent and readable
+- (mvp) Spacing uses a consistent base unit (e.g., 4px increments)
+- (deep) Component patterns cover buttons, forms, cards, feedback, navigation, data display
+- (mvp) Theme configuration files actually work (verified by running dev server)
+- (deep) Both light and dark mode token values provided (if dark mode requested)
+- (deep) Responsive breakpoints defined (mobile, tablet, desktop)
 - No arbitrary hex values or pixel values in component examples (all use tokens)
 
 ## Methodology Scaling
