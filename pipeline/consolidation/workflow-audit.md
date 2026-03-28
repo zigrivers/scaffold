@@ -43,6 +43,7 @@ inconsistent command formats. Fix all issues found.
 - Worktree cleanup between tasks documented (cannot checkout main)
 - Agent crash recovery documented
 - No document contradicts the canonical workflow
+- Tracking comment matches format: `<!-- scaffold:workflow-audit v1 YYYY-MM-DD -->`
 - Tracking comment added: <!-- scaffold:workflow-audit v1 YYYY-MM-DD -->
 
 ## Methodology Scaling
@@ -67,7 +68,8 @@ manually-added workflow steps or custom CI configurations.
   and date
 - **Preserve**: custom CI jobs, user-added workflow steps, project-specific
   branch protection rules, custom PR template fields
-- **Triggers for update**: new setup prompts modified workflow docs, Makefile
-  targets added or renamed, git-workflow.md updated with new steps
+- **Triggers for update**: CI configuration changed, git-workflow.md updated,
+  new scripts added to Makefile, Makefile targets added or renamed, new setup
+  prompts modified workflow docs
 - **Conflict resolution**: if two docs disagree on workflow, the canonical
   workflow in CLAUDE.md wins; update the conflicting doc to match

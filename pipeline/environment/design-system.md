@@ -33,7 +33,7 @@ professional UI without requiring design expertise from the user.
 
 ## Quality Criteria
 - (mvp) All colors meet WCAG AA contrast requirements
-- (mvp) Typography scale is consistent and readable
+- (mvp) Typography scale uses a consistent modular ratio; body text >= 16px; line height >= 1.5 for body text
 - (mvp) Spacing uses a consistent base unit (e.g., 4px increments)
 - (deep) Component patterns cover buttons, forms, cards, feedback, navigation, data display
 - (mvp) Theme configuration files actually work (verified by running dev server)

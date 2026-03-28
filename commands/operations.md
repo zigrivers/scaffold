@@ -5,6 +5,8 @@ long-description: "Reads system architecture, TDD standards, and existing CI/dev
 
 Read `docs/system-architecture.md`, `docs/tdd-standards.md`, `docs/adrs/`, `docs/dev-setup.md` (if it exists), and `docs/git-workflow.md` (if it exists), then define the production operational strategy. Create `docs/operations-runbook.md` covering deployment pipeline (extending the base CI from git-workflow), deployment strategy, monitoring, alerting, incident response, and rollback procedures.
 
+> **Prerequisites:** Run `review-testing` first.
+
 **Important — avoid duplication:**
 - **Dev environment setup** is already covered in `docs/dev-setup.md` (created by the Dev Setup prompt). Do NOT redefine prerequisites, env vars, one-command setup, common commands, or troubleshooting here — reference `docs/dev-setup.md` instead.
 - **Base CI pipeline** (lint + test on PRs) is already configured in `.github/workflows/ci.yml` (created by the Git Workflow prompt). Do NOT redefine Stages 1-2 (fast checks, tests) — reference the existing CI and focus on extending it with build, deploy, and post-deploy stages.

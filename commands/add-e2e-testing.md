@@ -5,6 +5,8 @@ long-description: "Detects project platform (web, mobile, or both) from tech-sta
 
 Configure end-to-end testing for this project. This step auto-detects which platform(s) the project targets and configures the appropriate E2E framework(s).
 
+> **When to use this step:** Only for projects with a web or mobile frontend. Skip if your project is a CLI tool, API-only backend, or library. The step will auto-skip if no frontend is detected, but you can skip it proactively.
+
 Review docs/tech-stack.md, docs/tdd-standards.md, and CLAUDE.md to understand the existing project conventions.
 
 ## Step 0: Platform Detection & Applicability

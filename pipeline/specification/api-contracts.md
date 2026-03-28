@@ -13,6 +13,8 @@ knowledge-base: [api-design]
 Define API contracts for all system interfaces — REST endpoints, GraphQL schema,
 WebSocket events, or inter-service communication. Each endpoint specifies request/
 response shapes, error codes, authentication requirements, and rate limits.
+Contracts serve as the definitive agreement between frontend and backend agents,
+enabling parallel development with confidence.
 
 ## Inputs
 - docs/system-architecture.md (required) — component interfaces to specify
@@ -25,7 +27,7 @@ response shapes, error codes, authentication requirements, and rate limits.
 
 ## Quality Criteria
 - (mvp) Every domain operation that crosses a component boundary has an API endpoint
-- (mvp) Error contracts are explicit (not just "500 Internal Server Error")
+- (mvp) Every endpoint documents: success response code, error response codes, error response body schema, and at least one domain-specific error beyond 500
 - (mvp) Authentication and authorization requirements per endpoint
 - (deep) Versioning strategy documented (if applicable)
 - (deep) Pagination, filtering, and sorting for list endpoints

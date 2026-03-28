@@ -12,7 +12,9 @@ knowledge-base: [developer-onboarding]
 ## Purpose
 Create a comprehensive onboarding guide that gives any developer (human or AI
 agent) everything they need to understand the project and start contributing.
-This is the "start here" document.
+This is the "start here" document. It synthesizes information from all frozen
+artifacts into a single coherent narrative that new contributors can read
+before their first task.
 
 ## Inputs
 - All frozen phase artifacts
@@ -22,7 +24,7 @@ This is the "start here" document.
 
 ## Quality Criteria
 - Covers: project purpose, architecture overview, key patterns, where to find what
-- A new developer can set up and run the project following this guide
+- Guide includes clone instructions, dependency install command, dev server start command, and test run command; every ADR referenced by number with one-sentence summary
 - Key architectural decisions are summarized (with pointers to ADRs)
 - Development workflow is clear (branch, code, test, PR)
 

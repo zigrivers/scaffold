@@ -39,8 +39,7 @@ about ecosystem maturity, alternatives, and gotchas.
 - No speculative technologies ("might need someday")
 - Every choice is a decision, not a menu of options
 - Quick Reference section lists every dependency with version
-- Stack optimizes for AI familiarity, convention over configuration, minimal dependencies,
-  strong typing, and mature ecosystem
+- Each technology choice documents AI compatibility assessment (training data availability, convention strength); total direct dependencies counted and justified
 - (depth 4+) Multi-model recommendations cross-referenced — agreements flagged as high-confidence, disagreements flagged for human decision
 
 ## Methodology Scaling

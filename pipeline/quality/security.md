@@ -13,7 +13,9 @@ knowledge-base: [security-best-practices]
 ## Purpose
 Conduct a security review of the entire system design. Document security
 controls, threat model, auth/authz approach, data protection, secrets
-management, and dependency audit strategy.
+management, and dependency audit strategy. The review covers OWASP Top 10
+analysis specific to this project's stack and architecture, plus STRIDE
+threat modeling across all trust boundaries.
 
 ## Inputs
 - docs/system-architecture.md (required) — attack surface
@@ -30,8 +32,7 @@ management, and dependency audit strategy.
 - (mvp) Auth/authz boundaries defined and consistent with API contracts
 - (mvp) Input validation rules defined for each user-facing field (type, length, pattern)
 - (deep) Data classified by sensitivity with handling requirements
-- (mvp) Secrets management approach documented (no hardcoded credentials in code)
-- (mvp) Secrets management strategy defined (no secrets in code)
+- (mvp) Secrets management strategy documented with rotation policy (no hardcoded secrets in code)
 - (deep) CORS policy explicitly configured per origin (not wildcard in production)
 - (deep) Rate limiting defined for public-facing endpoints with specific thresholds
 - (deep) Threat model covers all trust boundaries

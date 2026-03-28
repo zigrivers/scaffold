@@ -13,6 +13,8 @@ knowledge-base: [prd-craft]
 Transform a project idea into a structured product requirements document that
 defines the problem, target users, features, constraints, and success criteria.
 This is the foundation document that all subsequent phases reference.
+The PRD drives user stories, architecture decisions, and implementation planning
+throughout the entire pipeline.
 
 ## Inputs
 - Project idea (provided by user verbally or in a brief)
@@ -47,7 +49,8 @@ Preserve existing decisions unless explicitly revisiting them.
 ## Update Mode Specifics
 - **Detect prior artifact**: docs/plan.md exists
 - **Preserve**: problem statement, existing feature definitions, success criteria,
-  user personas, and scope boundaries unless user explicitly requests changes
+  user personas, scope boundaries, and enhancement markers (`<!-- enhancement: ... -->`)
+  unless user explicitly requests changes
 - **Triggers for update**: user provides new requirements, scope adjustment
   requested, constraints changed (timeline, budget, team), new user research
 - **Conflict resolution**: new features are appended to the feature list with

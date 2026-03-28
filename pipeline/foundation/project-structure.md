@@ -40,6 +40,7 @@ with a Quick Reference section for file placement.
 - Test file location aligns with tdd-standards.md (if it exists)
 - .gitignore covers all generated files for the tech stack
 - Structure follows the chosen framework's conventions
+- CLAUDE.md contains Project Structure Quick Reference section with file placement table
 
 ## Methodology Scaling
 - **deep**: Comprehensive structure with high-contention analysis, shared code

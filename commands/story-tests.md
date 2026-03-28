@@ -5,6 +5,8 @@ long-description: "Parses user stories and creates tagged, pending test cases fo
 
 Parse `docs/user-stories.md` and generate test skeleton files with tagged, pending test cases for every acceptance criterion. Each story gets its own test file. Each AC becomes a test case tagged with story and AC IDs. All tests are created as pending/skipped — developers implement them during TDD execution.
 
+> **Prerequisites:** Run `tdd`, `review-user-stories`, and `review-architecture` first.
+
 ## Mode Detection
 
 Before starting, check if `tests/acceptance/` directory already exists:

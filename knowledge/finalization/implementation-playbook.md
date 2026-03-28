@@ -305,8 +305,8 @@ Before a task is considered complete, all quality gates must pass.
 ### Gate 1: Tests Pass
 
 ```bash
-npm test                     # All tests pass
-npm run test:coverage        # Coverage meets threshold
+make test                    # All tests pass
+make test-coverage           # Coverage meets threshold
 ```
 
 Every task must include tests for the code it adds or modifies:
@@ -318,8 +318,8 @@ Every task must include tests for the code it adds or modifies:
 ### Gate 2: Lint and Type Check
 
 ```bash
-npm run lint                 # No lint errors (warnings are allowed but discouraged)
-npm run typecheck            # No type errors
+make lint                    # No lint errors (warnings are allowed but discouraged)
+make typecheck               # No type errors
 ```
 
 Do not disable lint rules with `eslint-disable` unless the rule is genuinely wrong for that specific case, and add a comment explaining why.
@@ -327,8 +327,10 @@ Do not disable lint rules with `eslint-disable` unless the rule is genuinely wro
 ### Gate 3: Build Succeeds
 
 ```bash
-npm run build                # Production build succeeds
+make build                   # Production build succeeds
 ```
+
+> Commands shown here are examples. Use the actual commands from your project's CLAUDE.md Key Commands table.
 
 If the build fails with warnings, investigate. Warnings often become errors in stricter environments.
 
@@ -345,6 +347,8 @@ Run the full test suite, not just the tests for the changed code. New code can b
 ### Gate 6: Evals
 
 **Gate: Evals** — Run `make eval` (or project-equivalent from CLAUDE.md Key Commands). All eval checks must pass. If a specific eval fails, consult `docs/eval-standards.md` for category descriptions and resolution guidance.
+
+Evals run collectively via `make eval`. If a specific eval category fails, consult `docs/eval-standards.md` for the category description and resolution approach.
 
 ## Inter-Agent Handoff
 
@@ -425,6 +429,8 @@ The playbook is a living document. Update it when:
 The playbook should be the first document agents read before their first task, and the document they reference throughout implementation. If an agent asks a question that the playbook should answer, the answer goes in the playbook.
 
 ### Error Recovery
+
+> The depth and specificity of error recovery guidance in CLAUDE.md depends on the `workflow-audit` step's methodology depth. At MVP depth, error recovery may be minimal.
 
 When quality gates fail during implementation:
 

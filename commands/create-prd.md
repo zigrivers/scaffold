@@ -5,6 +5,8 @@ argument-hint: "<idea or @files>"
 ---
 I have an idea for an application and I want you to help me create a thorough and detailed product requirements document that AI will use to build user stories, define the tech stack, and create an implementation plan.
 
+> **Note:** This command produces full-depth output. For lighter execution at a specific methodology depth, use the pipeline engine with presets: `scaffold run --preset mvp`
+
 ## Mode Detection
 
 Before starting, check if `docs/plan.md` already exists:

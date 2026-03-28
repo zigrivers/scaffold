@@ -74,3 +74,7 @@ is_exempt() {
     return 1
   fi
 }
+
+@test "COMMAND_EXEMPT entries reference existing command files" {
+  validate_exempt_commands
+}

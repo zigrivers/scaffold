@@ -25,7 +25,7 @@ ADR category — tech stack decisions are documented here.
 - docs/adrs/index.md — decision log overview
 
 ## Quality Criteria
-- Every significant decision has an ADR (technology, patterns, trade-offs)
+- ADRs exist for: language, framework, database, ORM, deployment target, API style, authentication, and any decision referenced in system-architecture.md
 - Each ADR documents alternatives considered with pros/cons
 - Decisions trace to PRD requirements or domain model constraints
 - No ADR contradicts another without explicit acknowledgment

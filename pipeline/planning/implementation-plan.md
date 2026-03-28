@@ -38,7 +38,7 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 ## Quality Criteria
 - (mvp) Every architecture component has implementation tasks
 - (mvp) Task dependencies form a valid DAG (no cycles)
-- (mvp) Each task is scoped for a single agent session (not too large, not too small)
+- (mvp) Each task estimated at 1-4 hours of agent work (produces <= 500 lines of net-new code)
 - (mvp) Tasks include acceptance criteria (how to know it's done)
 - (mvp) Tasks incorporate testing requirements from the testing strategy
 - (deep) Tasks reference corresponding test skeletons from tests/acceptance/ where applicable
@@ -71,7 +71,8 @@ that are in-progress or completed.
 - **Detect prior artifact**: docs/implementation-plan.md exists
 - **Preserve**: completed and in-progress task statuses, existing task IDs,
   dependency relationships for stable tasks, wave assignments for tasks
-  already started, agent allocation history
+  already started, agent allocation history, architecture decisions,
+  component boundaries
 - **Triggers for update**: architecture changed (new components need tasks),
   user stories added or changed, security review identified new requirements,
   operations runbook added deployment tasks, specification docs changed

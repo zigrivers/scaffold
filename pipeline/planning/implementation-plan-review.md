@@ -40,7 +40,7 @@ and produce a structured coverage matrix and review summary.
 - Critical path is accurate
 - Parallelization assumptions are valid
 - Every acceptance criterion maps to at least one task (100% AC coverage)
-- Task descriptions are unambiguous enough for AI agents (agent-implementable)
+- Every task has verb-first description, >= 1 input file reference, >= 1 acceptance criterion, and defined output artifact
 - At depth 4+: independent model reviews completed and reconciled
 
 ## Methodology Scaling

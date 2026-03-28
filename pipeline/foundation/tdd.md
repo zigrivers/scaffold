@@ -14,6 +14,8 @@ knowledge-base: [testing-strategy]
 Define the project's testing conventions, TDD workflow, test pyramid, coverage
 goals, quality gates, and testing patterns. This tells agents how to test the
 code they write and establishes testing standards before implementation begins.
+Includes concrete reference examples for each test category using the project's
+actual test framework and assertion library.
 
 ## Inputs
 - docs/tech-stack.md (required) — determines test runner, assertion library, and framework-specific testing patterns

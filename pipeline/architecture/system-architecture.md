@@ -5,15 +5,17 @@ phase: "architecture"
 order: 710
 dependencies: [review-adrs]
 outputs: [docs/system-architecture.md]
-reads: [create-prd]
+reads: []
 conditional: null
-knowledge-base: [system-architecture]
+knowledge-base: [system-architecture, domain-modeling]
 ---
 
 ## Purpose
 Design and document the system architecture, translating domain models and ADR
 decisions into a concrete component structure, data flows, and module
-organization. Project directory structure and module organization are defined here.
+organization. Project directory structure and module organization are defined
+here. This is the blueprint that agents reference when deciding where code
+lives and how components communicate.
 
 ## Inputs
 - docs/domain-models/ (required) — domain models from modeling phase
@@ -28,7 +30,7 @@ organization. Project directory structure and module organization are defined he
 - (mvp) Every domain model lands in a component or module
 - (mvp) Every ADR constraint is respected in the architecture
 - (mvp) All components appear in at least one data flow diagram
-- (deep) Extension points are both documented and designed (not just listed)
+- (deep) Each extension point has interface definition, example usage scenario, and constraints on what can/cannot be extended
 - (mvp) Project directory structure is defined with file-level granularity
 
 ## Methodology Scaling

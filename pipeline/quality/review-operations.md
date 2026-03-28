@@ -30,10 +30,10 @@ independent review validation.
 
 ## Quality Criteria
 - Deployment lifecycle fully documented (deploy, verify, rollback)
-- Monitoring covers all critical metrics
+- Monitoring verified against minimum set: latency, error rate, and saturation
 - Alert thresholds have rationale
 - Common failure scenarios have runbook entries
-- Dev environment parity assessed
+- Dev/staging/production environment differences documented in operations runbook
 - Every finding categorized P0-P3 with specific runbook section, metric, and issue
 - Fix plan documented for all P0/P1 findings; fixes applied to operations-runbook.md and re-validated
 - Downstream readiness confirmed — no unresolved P0 or P1 findings remain before security step proceeds

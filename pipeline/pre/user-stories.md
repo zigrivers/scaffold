@@ -5,6 +5,7 @@ phase: "pre"
 order: 140
 dependencies: [review-prd]
 outputs: [docs/user-stories.md]
+reads: [innovate-prd]
 conditional: null
 knowledge-base: [user-stories]
 ---
@@ -28,7 +29,7 @@ task decomposition downstream.
 - Every PRD feature maps to at least one user story
 - Stories follow INVEST criteria (Independent, Negotiable, Valuable, Estimable, Small, Testable)
 - Acceptance criteria are testable — unambiguous pass/fail
-- No story too large to implement in 1-3 focused agent sessions
+- No story has more than 7 acceptance criteria
 - Every PRD persona is represented in at least one story
 - Stories describe user behavior, not implementation details
 
@@ -50,7 +51,9 @@ PRESERVE, get approval before modifying. Preserve existing story IDs.
 ## Update Mode Specifics
 - **Detect prior artifact**: docs/user-stories.md exists
 - **Preserve**: existing story IDs, epic groupings, acceptance criteria that
-  haven't been invalidated, story-to-PRD-feature traceability
+  haven't been invalidated, story-to-PRD-feature traceability, enhancement
+  markers (`<!-- enhancement: ... -->`), priority decisions, story ID format
+  (US-xxx)
 - **Triggers for update**: PRD features added or changed, innovation suggestions
   accepted, user personas expanded, review findings require story adjustments
 - **Conflict resolution**: never reuse a retired story ID; if a story's scope

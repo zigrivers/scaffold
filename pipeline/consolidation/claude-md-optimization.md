@@ -40,7 +40,7 @@ scannability.
 - Key Commands table matches actual Makefile/package.json commands
 - Critical patterns are prominent (TDD, never push to main, keep working,
   verify before commit, worktrees for parallel). If Beads: every commit needs task ID.
-- An agent can skim CLAUDE.md in 30 seconds and get the critical points
+- CLAUDE.md is <= 200 lines or critical patterns appear in the first 50 lines
 - Workflow scenarios cover error cases (test failures, merge conflicts, CI failures,
   crashed sessions, blocked tasks)
 - Tracking comment added: <!-- scaffold:claude-md-optimization v1 YYYY-MM-DD -->
@@ -68,7 +68,8 @@ rules — only consolidate and clarify what already exists.
 - **Detect prior artifact**: tracking comment in CLAUDE.md with version and date
 - **Preserve**: manually-added sections, user-customized rules, project-specific
   command aliases, any content not traceable to a pipeline setup prompt
-- **Triggers for update**: new setup prompts have appended sections since last
-  optimization, terminology inconsistencies introduced by incremental additions
+- **Triggers for update**: new setup prompts completed, coding-standards updated,
+  tdd-standards updated, git-workflow updated, terminology inconsistencies
+  introduced by incremental additions
 - **Conflict resolution**: if a user-customized section conflicts with a setup
   prompt's output, keep the user version and flag the conflict in a comment
