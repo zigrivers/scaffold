@@ -2,6 +2,21 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.30.0] — 2026-03-28
+
+### Fixed
+
+- **`implementation-plan` disconnected from story-tests outputs** — Added `reads: [story-tests]` so implementation tasks reference test skeletons from `tests/acceptance/`. Tasks now include which pending tests to implement rather than generic "write tests" instructions.
+- **`implementation-playbook` missing quality artifact references** — Added `reads: [story-tests, create-evals, implementation-plan]` and input references to `tests/acceptance/`, `docs/story-tests-map.md`, `tests/evals/`, and `docs/eval-standards.md`. Agents following the playbook now know about test skeletons and eval quality gates.
+- **`traceability-matrix` didn't trace Stories → Test Cases** — Added `reads: [story-tests, create-evals]` and input references to `docs/story-tests-map.md`. Traceability now verifies the full chain: PRD → Stories → Test Cases → Tasks.
+- **`output-consumption.bats` incorrectly exempted `story-tests`** — Removed from `TERMINAL_OUTPUT_EXEMPT` since `create-evals` consumes its outputs.
+- **Generic quality criteria** in `traceability-matrix`, `implementation-plan`, and `implementation-playbook` strengthened with specific test/eval gate references.
+- **`implementation-plan` command Required Reading** — Added `tests/acceptance/` and `docs/story-tests-map.md` to the table.
+
+### Added
+
+- **`docs/alignment-audit.md`** — Full audit of the test/eval/implementation artifact chain with dependency map, findings, and proposed changes.
+
 ## [2.29.0] — 2026-03-28
 
 ### Added

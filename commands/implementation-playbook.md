@@ -43,6 +43,10 @@ Read ALL of these before writing any content:
 | `docs/project-structure.md` | Directory layout, module organization, high-contention files |
 | `docs/tech-stack.md` | Frameworks, libraries, tooling |
 | `docs/dev-setup.md` | Key commands, environment setup |
+| `tests/acceptance/` | *(if exists)* Test skeleton files agents implement during TDD |
+| `docs/story-tests-map.md` | *(if exists)* Story-to-test mapping for tracking implementation progress |
+| `tests/evals/` | *(if exists)* Project eval checks to run as quality gates |
+| `docs/eval-standards.md` | *(if exists)* What evals check and what they don't |
 | `CLAUDE.md` | Workflow conventions, key commands |
 
 Skip any document that does not exist — adapt the playbook to what is available.

@@ -5,7 +5,7 @@ phase: "planning"
 order: 1210
 dependencies: [tdd, operations, security, review-architecture, create-evals]
 outputs: [docs/implementation-plan.md]
-reads: [create-prd]
+reads: [create-prd, story-tests]
 conditional: null
 knowledge-base: [task-decomposition]
 ---
@@ -28,6 +28,8 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 - docs/database-schema.md (optional) — data layer tasks
 - docs/api-contracts.md (optional) — API implementation tasks
 - docs/ux-spec.md (optional) — frontend tasks
+- tests/acceptance/ (optional) — test skeletons to reference in task descriptions
+- docs/story-tests-map.md (optional) — AC-to-test mapping for task coverage verification
 
 ## Expected Outputs
 - docs/implementation-plan.md — task list with dependencies, sizing, and
@@ -39,6 +41,7 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 - Each task is scoped for a single agent session (not too large, not too small)
 - Tasks include acceptance criteria (how to know it's done)
 - Tasks incorporate testing requirements from the testing strategy
+- Tasks reference corresponding test skeletons from tests/acceptance/ where applicable
 - Tasks incorporate security controls from the security review where applicable
 - Tasks incorporate operational requirements (monitoring, deployment) where applicable
 - Critical path is identified

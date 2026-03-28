@@ -13,7 +13,6 @@ TERMINAL_OUTPUT_EXEMPT=(
   "implementation-plan"
   "developer-onboarding-guide"
   "session-handoff-brief"
-  "story-tests"
   "implementation-playbook"
   "apply-fixes-and-freeze"
   "ai-memory-setup"
