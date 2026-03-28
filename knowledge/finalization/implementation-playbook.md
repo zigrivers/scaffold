@@ -63,6 +63,19 @@ Read before starting:
 
 If a task does not have a context brief, the agent should create one from the specification artifacts before starting.
 
+### Minimum Context by Task Type
+
+When a per-task context block is incomplete, agents should consult this taxonomy to ensure they have sufficient context:
+
+| Task Type | Required Docs | Additional Context |
+|-----------|--------------|-------------------|
+| Backend API | `docs/api-contracts.md`, `docs/database-schema.md`, `docs/domain-models/`, `docs/coding-standards.md`, `docs/tdd-standards.md` | Relevant ADR for API style choices |
+| Frontend UI | `docs/ux-spec.md`, `docs/design-system.md`, `docs/api-contracts.md`, `docs/coding-standards.md`, `docs/tdd-standards.md` | Component patterns from design system |
+| Database migration | `docs/database-schema.md`, `docs/domain-models/`, `docs/operations-runbook.md` | Rollback strategy from ops runbook |
+| Infrastructure/CI | `docs/dev-setup.md`, `docs/git-workflow.md`, `docs/operations-runbook.md` | Deployment pipeline stages |
+| Bug fix | Relevant source code, `docs/tdd-standards.md`, `docs/coding-standards.md` | Related test files, reproduction steps |
+| Security hardening | `docs/security-review.md`, `docs/api-contracts.md`, `docs/coding-standards.md` | OWASP checklist items from security review |
+
 ## Coding Standards
 
 Coding standards ensure consistency across agents. Every agent must follow these conventions without exception. Inconsistency between agents produces a codebase that feels like it was written by different teams — because it was.
@@ -325,6 +338,10 @@ Automated tests are necessary but not sufficient. Always verify the feature work
 
 Run the full test suite, not just the tests for the changed code. New code can break existing features through unexpected interactions.
 
+### Gate 6: Evals
+
+**Gate: Evals** — Run `make eval` (or project-equivalent from CLAUDE.md Key Commands). All eval checks must pass. If a specific eval fails, consult `docs/eval-standards.md` for category descriptions and resolution guidance.
+
 ## Inter-Agent Handoff
 
 When one agent completes a task and another agent will build on it, the completing agent must communicate:
@@ -402,3 +419,32 @@ The playbook is a living document. Update it when:
 - Agent coordination issues arise (add to parallel work rules)
 
 The playbook should be the first document agents read before their first task, and the document they reference throughout implementation. If an agent asks a question that the playbook should answer, the answer goes in the playbook.
+
+### Error Recovery
+
+When quality gates fail during implementation:
+
+**Test failures:**
+1. Read the failing test to understand the expected behavior
+2. Check if the test is testing your change or pre-existing functionality
+3. If your change broke the test: fix the implementation, not the test
+4. If the test is wrong: document why and update the test with the fix
+5. Re-run the full test suite, not just the failing test
+
+**CI failures:**
+1. Pull latest main and rebase your branch
+2. Run `make check` locally to reproduce the failure
+3. If the failure is environment-specific: check dev-setup.md for requirements
+4. If the failure is a flaky test: document the flakiness and retry once
+
+**Spec gap discovered during implementation:**
+1. Document the gap with specific details (what's missing, what's needed)
+2. Check if an ADR or architecture decision covers the case
+3. If the gap is small: make a judgment call, document it in the commit message
+4. If the gap is significant: pause the task and flag it for upstream resolution
+
+**Agent produces incorrect output:**
+1. Review the task description and acceptance criteria
+2. Diff the output against the expected behavior
+3. If the task description was ambiguous: improve it for future agents
+4. Roll back the incorrect changes and retry with clearer context

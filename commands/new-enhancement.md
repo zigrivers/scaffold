@@ -353,6 +353,8 @@ When this step is complete, tell the user:
 **Next (if applicable):**
 - If you created **5+ tasks**: Run `/scaffold:implementation-plan-review` — Review task quality, coverage, and dependencies.
 - If the enhancement has **platform-specific behavior**: Run `/scaffold:platform-parity-review` — Check platform coverage.
+- If user stories were added or changed: Run `/scaffold:story-tests` — Regenerate test skeletons for new user stories.
+- If scope changed materially: Run `/scaffold:create-evals` — Update eval checks for new scope.
 - Otherwise: Run `/scaffold:single-agent-start` or `/scaffold:single-agent-resume` to begin implementation (or `/scaffold:multi-agent-start <agent-name>` / `/scaffold:multi-agent-resume <agent-name>` for worktree agents).
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`

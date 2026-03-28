@@ -24,6 +24,15 @@ format between agents, and success criteria.
 - docs/story-tests-map.md (required if exists) — story-to-test mapping for progress tracking
 - tests/evals/ (required if exists) — project eval checks to run as quality gates
 - docs/eval-standards.md (required if exists) — what evals check and what they don't
+- docs/plan.md (optional) — PRD for requirement traceability
+- docs/user-stories.md (optional) — acceptance criteria source
+- docs/database-schema.md (optional) — for data-layer task context
+- docs/api-contracts.md (optional) — for API endpoint task context
+- docs/ux-spec.md (optional) — for UI task context
+- docs/design-system.md (optional) — for styling task context
+- docs/security-review.md (optional) — for security control task context
+- docs/operations-runbook.md (optional) — for deployment task context
+- docs/onboarding-guide.md (required) — agents should read for project context before playbook
 - All other frozen artifacts
 
 ## Expected Outputs
