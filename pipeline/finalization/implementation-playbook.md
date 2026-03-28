@@ -49,4 +49,6 @@ format between agents, and success criteria.
 - **custom:depth(1-5)**: Scale detail with depth.
 
 ## Mode Detection
-Update mode if playbook exists.
+Check if `docs/implementation-playbook.md` already exists.
+- If exists: UPDATE MODE — read current playbook, identify changes in implementation plan or upstream docs, update per-task context blocks and wave assignments while preserving completed task status and agent allocation history.
+- If not: FRESH MODE — generate from scratch using implementation plan and all supporting docs.

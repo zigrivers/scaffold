@@ -5,6 +5,22 @@ long-description: "Reorganizes and deduplicates CLAUDE.md to maximize signal den
 
 Review all project documentation and consolidate CLAUDE.md into the definitive, optimized reference for AI agents working on this project.
 
+## Mode Detection
+
+Before starting, check if `CLAUDE.md` contains a tracking comment `<!-- scaffold:claude-md-optimization v1 YYYY-MM-DD -->`:
+
+**If the tracking comment is NOT found → FRESH MODE**: Skip to the next section and consolidate from scratch.
+
+**If the tracking comment IS found → UPDATE MODE**:
+1. **Read & analyze**: Read the existing CLAUDE.md completely. Note the version date from the tracking comment.
+2. **Identify changes since last optimization**: Check which setup prompts have appended new sections or modified existing content since the last optimization date.
+3. **Preserve user customizations**: Identify manually-added sections, user-customized rules, and project-specific command aliases — do not restructure these.
+4. **Propose targeted updates**: Present the user a summary of what will be consolidated, deduplicated, or restructured. Only consolidate sections that originated from setup prompts.
+5. **Execute update**: Apply consolidation while preserving all user-authored content. If a user-customized section conflicts with a setup prompt's output, keep the user version and flag the conflict in a comment.
+6. **Update tracking comment**: Update the date in `<!-- scaffold:claude-md-optimization v1 YYYY-MM-DD -->`.
+
+**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+
 ## Beads Detection
 
 Check if `.beads/` directory exists. This determines whether task management sections use Beads commands or conventional alternatives:

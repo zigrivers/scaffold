@@ -33,4 +33,6 @@ This is the "start here" document.
 - **custom:depth(1-5)**: Scale detail with depth.
 
 ## Mode Detection
-Update mode if guide exists.
+Check if `docs/onboarding-guide.md` already exists.
+- If exists: UPDATE MODE — read current guide, diff against upstream docs for changes, propose targeted updates while preserving project-specific customizations and environment-specific instructions.
+- If not: FRESH MODE — generate from scratch using all pipeline artifacts.
