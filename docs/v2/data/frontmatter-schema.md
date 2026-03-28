@@ -64,12 +64,13 @@ The following JSON Schema defines the structure that parsed YAML frontmatter mus
     },
     "phase": {
       "type": "string",
-      "description": "Pipeline phase identifier. Values: 'pre', 'modeling', 'decisions', 'architecture', 'specification', 'planning', 'quality', 'validation', 'finalization'. Used for display grouping and ordering."
+      "enum": ["pre", "foundation", "environment", "integration", "modeling", "decisions", "architecture", "specification", "quality", "stories", "consolidation", "planning", "validation", "finalization"],
+      "description": "Pipeline phase identifier. 14 phases ordered by number: (1) pre, (2) foundation, (3) environment, (4) integration, (5) modeling, (6) decisions, (7) architecture, (8) specification, (9) quality, (10) stories, (11) consolidation, (12) planning, (13) validation, (14) finalization. Canonical definitions in src/types/frontmatter.ts PHASES constant."
     },
     "order": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 36,
+      "maximum": 100,
       "description": "Unique step position used as the primary tiebreaker in Kahn's algorithm topological sort. Lower values are dequeued first when multiple steps have zero in-degree. Each step has a unique order value."
     },
     "dependencies": {
@@ -181,18 +182,31 @@ Pipeline phase for display grouping and ordering.
 |----------|-------|
 | Type | `string` |
 | Required | Yes |
-| Valid values | `"pre"`, `"modeling"`, `"decisions"`, `"architecture"`, `"specification"`, `"planning"`, `"quality"`, `"validation"`, `"finalization"` |
+| Valid values | `"pre"`, `"foundation"`, `"environment"`, `"integration"`, `"modeling"`, `"decisions"`, `"architecture"`, `"specification"`, `"quality"`, `"stories"`, `"consolidation"`, `"planning"`, `"validation"`, `"finalization"` |
 | Used by | `scaffold status` phase grouping, `scaffold list` display |
 | Error code | `FRONTMATTER_PHASE_INVALID` (exit 1) when not a recognized phase identifier |
+| Source of truth | `src/types/frontmatter.ts` `PHASES` constant |
 
 **Note**: The phase is a display and grouping hint. It does not enforce execution constraints — the dependency graph is the authoritative execution ordering. The `order` field (not phase) is the primary tiebreaker within the topological sort.
 
-**Example values**:
-- `"pre"` (project definition steps)
-- `"architecture"` (system architecture)
-- `"architecture"` (system architecture review)
-- `"validation"` (validation phase steps)
-- `"finalization"` (finalization phase steps)
+**14 phases** (number → slug → display name):
+
+| # | Slug | Display Name |
+|---|------|-------------|
+| 1 | `pre` | Product Definition |
+| 2 | `foundation` | Project Foundation |
+| 3 | `environment` | Development Environment |
+| 4 | `integration` | Testing Integration |
+| 5 | `modeling` | Domain Modeling |
+| 6 | `decisions` | Architecture Decisions |
+| 7 | `architecture` | System Architecture |
+| 8 | `specification` | Specifications |
+| 9 | `quality` | Quality Gates |
+| 10 | `stories` | Stories & Reviews |
+| 11 | `consolidation` | Consolidation |
+| 12 | `planning` | Planning |
+| 13 | `validation` | Validation |
+| 14 | `finalization` | Finalization |
 
 ### `order` (integer)
 

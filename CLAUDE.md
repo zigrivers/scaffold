@@ -17,11 +17,14 @@ This is a **prompt pipeline** — a curated sequence of structured prompts used 
 
 This repo is a **Claude Code plugin** (installable via `/plugin marketplace add`) and also distributable as user commands.
 
-### Source of Truth
-`prompts.md` contains:
-1. **Setup Order table** (top of file) — The execution sequence across 7 phases, from product definition through implementation
-2. **Individual prompt sections** — Each marked with `# Prompt Name (Prompt)`, containing the full prompt text to paste into Claude Code sessions
-3. **Update mode** — All document-creating prompts auto-detect fresh vs. update mode via Mode Detection blocks
+### Source of Truth (v2 Architecture)
+- `pipeline/` — 50 meta-prompt files organized into 14 phases (source of truth for pipeline steps)
+- `knowledge/` — 45 domain expertise entries (injected into prompts during assembly)
+- `src/types/frontmatter.ts` — Canonical `PHASES` constant defining all 14 phase slugs, numbers, and display names
+- `commands/` — Generated slash commands (built from pipeline + knowledge via `scaffold build`)
+
+### Legacy (v1)
+`prompts.md` contains the original v1 prompt content. It is **not** the source of truth for v2 — pipeline steps in `pipeline/` and commands in `commands/` are authoritative.
 
 ### Plugin Structure
 - `.claude-plugin/plugin.json` — Plugin manifest (name: `scaffold`)
