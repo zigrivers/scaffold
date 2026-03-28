@@ -38,6 +38,7 @@ enhancement opportunities.
 - Each suggestion has a clear user benefit
 - Approved enhancements are integrated into existing stories (not new stories)
 - PRD scope boundaries are respected — no scope creep
+- User approval for each accepted innovation documented with date/method
 - (depth 4+) Multi-model suggestions deduplicated and synthesized with unique ideas from each model highlighted
 
 ## Methodology Scaling
@@ -47,7 +48,8 @@ enhancement opportunities.
   innovation dispatched to Codex and Gemini if available, with graceful
   fallback to Claude-only enhanced brainstorming.
 - **mvp**: Not applicable — this step is conditional and skipped in MVP.
-- **custom:depth(1-5)**: Depth 1-2: not typically enabled. Depth 3: quick
+- **custom:depth(1-5)**: Depth 1-2: Quick scan only — identify 1-2 high-impact
+  innovations with brief cost/benefit. Skip multi-model analysis. Depth 3: quick
   scan for obvious improvements. Depth 4: full innovation pass + one external
   model (if CLI available). Depth 5: full innovation pass + multi-model with
   deduplication and synthesis.

@@ -5,7 +5,7 @@ phase: "modeling"
 order: 510
 dependencies: [review-user-stories]
 outputs: [docs/domain-models/]
-reads: [coding-standards]
+reads: [coding-standards, innovate-user-stories]
 conditional: null
 knowledge-base: [domain-modeling]
 ---
@@ -36,7 +36,7 @@ and aggregate boundaries. User actions reveal the domain model.
 ## Quality Criteria
 - (mvp) Every PRD feature maps to at least one domain
 - (mvp) Entity relationships are explicit (not implied)
-- (mvp) Aggregate boundaries are justified (why this grouping?)
+- (mvp) Each aggregate boundary documents: the invariant it protects, the consistency boundary it enforces, and why included entities must change together
 - (deep) Domain events cover all state transitions
 - (deep) Invariants are testable assertions, not vague rules
 - Ubiquitous language is consistent across all domain models

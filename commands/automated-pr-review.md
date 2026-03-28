@@ -5,6 +5,8 @@ long-description: "Configures agent-driven automated PR review using local CLI r
 
 Set up automated PR review for this project. The system uses independent AI reviewers to catch issues that local self-review misses, with the agent managing the entire fix loop locally.
 
+> **When to use this step:** Only for projects hosted on GitHub that use pull requests. Skip if your project is local-only, uses a different hosting platform, or does not use a PR-based workflow.
+
 **This step does NOT create any GitHub Actions workflows.** All review orchestration runs locally via the agent. Two review modes are available: local CLI review (fastest, recommended) and external bot review (GitHub App-based, with polling).
 
 Review docs/coding-standards.md, docs/tdd-standards.md, docs/git-workflow.md, and CLAUDE.md to understand the existing project conventions.

@@ -36,7 +36,7 @@ self-review checklist.
 - AI-specific coding rules section addresses common AI mistakes (dead code,
   duplication, magic numbers, premature abstraction, unnecessary features)
 - Linter/formatter configs created and referenced from the document
-- No aspirational standards — only rules enforced from day one
+- Every standard has a corresponding linter rule, code review checklist item, or test pattern that enforces it
 - Code review checklist is actionable (not vague)
 
 ## Methodology Scaling

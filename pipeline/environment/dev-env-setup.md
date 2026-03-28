@@ -37,6 +37,7 @@ by the entire workflow.
 - Lint and test commands exist and are runnable
 - Verification checklist passes (install, dev server, browser, live reload, tests, db)
 - Setup process works for first-time clone (max 5 steps)
+- Makefile/package.json includes at minimum: dev, test, lint targets
 
 ## Methodology Scaling
 - **deep**: Full environment with database setup, seed data, Docker Compose (if

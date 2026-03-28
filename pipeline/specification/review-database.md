@@ -30,7 +30,7 @@ independent review validation.
 - docs/reviews/database/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- Entity coverage verified
+- Every domain entity has a corresponding table/collection or documented denormalization rationale
 - Normalization decisions justified
 - Index coverage for known query patterns verified
 - Migration safety assessed

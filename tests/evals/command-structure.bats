@@ -81,6 +81,50 @@ is_after_exempt() {
   fi
 }
 
+# Finalization-phase command slugs (phase 14) — these are terminal by design
+FINALIZATION_COMMANDS=(
+  "apply-fixes-and-freeze"
+  "developer-onboarding-guide"
+  "implementation-playbook"
+)
+
+is_finalization() {
+  local name="$1"
+  for fin in "${FINALIZATION_COMMANDS[@]}"; do
+    [[ "$name" == "$fin" ]] && return 0
+  done
+  return 1
+}
+
+@test "non-finalization commands with >50 lines have scaffold references (dead-end warning)" {
+  local warnings=()
+  local checked=0
+
+  for cmd_file in "${PROJECT_ROOT}"/commands/*.md; do
+    local slug lines
+    slug="$(basename "$cmd_file" .md)"
+    lines="$(count_lines "$cmd_file")"
+    [[ "$lines" -le "$MIN_LINES_FOR_STRUCTURE" ]] && continue
+    is_after_exempt "$slug" && continue
+    is_finalization "$slug" && continue
+
+    checked=$((checked + 1))
+
+    if ! grep -q '/scaffold:' "$cmd_file"; then
+      warnings+=("${slug}.md (${lines} lines): no /scaffold: reference — potential dead-end command")
+    fi
+  done
+
+  if [[ ${#warnings[@]} -gt 0 ]]; then
+    printf "WARNING: potential dead-end commands (%d checked, %d without /scaffold: references):\n" "$checked" "${#warnings[@]}"
+    printf "  %s\n" "${warnings[@]}"
+  fi
+
+  # Soft check — warn but don't fail. Uncomment return 1 to enforce.
+  # [[ ${#warnings[@]} -eq 0 ]]
+  [[ "$checked" -gt 0 ]]
+}
+
 @test "After This Step references point to existing commands" {
   local failures=()
   local checked=0

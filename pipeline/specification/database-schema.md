@@ -11,7 +11,10 @@ knowledge-base: [database-design]
 
 ## Purpose
 Translate domain models into a concrete database schema. Define tables/collections,
-relationships, indexes, constraints, and migration strategy.
+relationships, indexes, constraints, and migration strategy. Every domain entity
+maps to a table with appropriate normalization, and every domain invariant is
+enforced at the database level through constraints. Indexing strategy is derived
+from the application's query patterns.
 
 ## Inputs
 - docs/domain-models/ (required) — entities and relationships to model
@@ -27,7 +30,7 @@ relationships, indexes, constraints, and migration strategy.
 - (mvp) Relationships match domain model relationships
 - (deep) Indexes cover known query patterns from architecture data flows
 - (deep) Constraints enforce domain invariants at the database level
-- (deep) Migration strategy handles schema evolution
+- (deep) Migration strategy specifies: migration tool, forward migration approach, rollback approach, and data preservation policy
 
 ## Methodology Scaling
 - **deep**: Full schema specification. CREATE TABLE statements or equivalent.

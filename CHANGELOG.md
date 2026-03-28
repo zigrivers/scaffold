@@ -16,6 +16,7 @@ All notable changes to Scaffold are documented here.
 - **Implementation handoff improvements** — Added task-type minimum-context taxonomy, `make eval` quality gate, specification artifact inputs, error recovery documentation to playbook knowledge. Added `story-tests` and `create-evals` follow-up to `new-enhancement` command. Added `docs/onboarding-guide.md` to playbook inputs.
 
 - **Deep Guidance optimization** — Added Summary/Deep Guidance structure to 10 large knowledge entries (527→321 lines each), improving assembly engine efficiency. Normalized topic names (`data-flows`→`data-flow`, `naming-conventions`→`naming`, `gaps`→`gap-analysis`).
+- **Remaining findings sweep (WP10)** — Removed redundant reads entries, added conditional dependency handling for innovate steps, tightened Mode Detection false-positive logic, harmonized preserve rules, replaced 23 vague quality criteria with measurable thresholds, added missing criteria to 8 steps, added conditionality guidance and prerequisite warnings to commands, documented depth-5 limitation, replaced hardcoded npm commands with stack-agnostic placeholders, raised eval minimum from 2 to 4 lines, added self-validating exempt lists and dead-end detection.
 
 ### Added
 

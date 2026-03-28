@@ -5,6 +5,8 @@ long-description: "Reads system architecture and API contracts, then creates doc
 
 Read `docs/system-architecture.md`, `docs/api-contracts.md`, `docs/database-schema.md`, and `docs/operations-runbook.md`, then conduct a security review of the entire system design. Create `docs/security-review.md` documenting security controls, threat model, auth/authz approach, data protection, and secrets management.
 
+> **Prerequisites:** Run `review-operations` first.
+
 ## Mode Detection
 
 Before starting, check if `docs/security-review.md` already exists:

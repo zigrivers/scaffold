@@ -5,7 +5,7 @@ phase: "integration"
 order: 410
 dependencies: [git-workflow, tdd]
 outputs: [tests/screenshots/, maestro/]
-reads: [tdd, coding-standards]
+reads: [coding-standards]
 conditional: "if-needed"
 knowledge-base: [testing-strategy]
 ---
@@ -41,6 +41,8 @@ Outputs vary by detected platform:
 - (mobile) testID naming convention defined and documented
 - E2E section in tdd-standards.md distinguishes when to use E2E vs unit tests
 - Baseline screenshots committed, current screenshots gitignored
+- CLAUDE.md contains browser/mobile testing section
+- tdd-standards.md E2E section updated with when-to-use guidance
 
 ## Methodology Scaling
 - **deep**: Full setup for all detected platforms. All visual testing patterns,
@@ -63,3 +65,13 @@ Check for existing E2E config: Playwright config file (playwright.config.ts or
 .js) and/or maestro/ directory. If either exists, run in update mode for that
 platform. Preserve baseline screenshots, custom viewports, existing flows,
 and environment variables.
+
+## Update Mode Specifics
+- **Detect prior artifact**: playwright.config.ts/.js exists and/or maestro/
+  directory exists with flow files
+- **Preserve**: baseline screenshots, custom viewports, existing test flows,
+  environment variables, testID naming conventions
+- **Triggers for update**: new user stories with UI interactions added,
+  platform targets changed in tech-stack.md, tdd-standards.md E2E section updated
+- **Conflict resolution**: preserve existing baselines, add new flows alongside
+  existing ones rather than replacing

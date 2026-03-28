@@ -51,7 +51,8 @@ setup), or user explicitly enables structured task management. Skip when: user p
 GitHub Issues, Linear, or another task tracker, or explicitly declines Beads setup.
 
 ## Mode Detection
-Update mode if .beads/ directory exists. In update mode: never re-initialize
+Update mode if .beads/ contains a config.json or tasks directory (not just an
+empty directory). In update mode: never re-initialize
 .beads/ (existing task data is irreplaceable), never overwrite tasks/lessons.md
 (only add missing sections), update CLAUDE.md Beads sections in-place preserving
 project-specific customizations.

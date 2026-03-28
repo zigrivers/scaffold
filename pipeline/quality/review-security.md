@@ -33,10 +33,10 @@ independent review validation.
 ## Quality Criteria
 - OWASP coverage verified for this project
 - Auth boundaries match API contract auth requirements
-- Secrets management is complete (no gaps)
+- Secrets management covers: all environment variables, API keys, database credentials, and third-party tokens
 - Dependency audit scope covers all dependencies
 - Threat model covers all trust boundaries
-- Data classification is complete
+- Data classification covers every entity in the domain model
 - Every finding categorized P0-P3 with specific control, boundary, and issue
 - Fix plan documented for all P0/P1 findings; fixes applied to security-review.md and re-validated
 - Downstream readiness confirmed — no unresolved P0 or P1 findings remain before planning phase proceeds

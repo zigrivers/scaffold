@@ -12,7 +12,7 @@ setup() {
 SUBSTANTIVE_SECTIONS=("## Purpose" "## Quality Criteria")
 
 # Minimum lines of content per required section (excluding blank lines)
-MIN_SECTION_LINES=2
+MIN_SECTION_LINES=4
 
 @test "required sections have substantive content (not empty stubs)" {
   local failures=()

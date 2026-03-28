@@ -38,7 +38,7 @@ pending/skipped — developers implement them during TDD execution.
 - Every user story in docs/user-stories.md has a corresponding test file
 - Every acceptance criterion has at least one tagged test case
 - Test cases are tagged with story ID and AC ID for traceability
-- Test layer (unit/integration/e2e) is assigned based on AC type and architecture
+- Test layer assignment: single-function ACs → unit; cross-component ACs → integration; full user journey ACs → e2e
 - Test files use the project's test framework from docs/tech-stack.md
 - All test cases are created as pending/skipped (not implemented)
 - docs/story-tests-map.md shows 100% AC-to-test-case coverage

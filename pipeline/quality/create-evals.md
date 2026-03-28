@@ -5,7 +5,7 @@ phase: "quality"
 order: 920
 dependencies: [tdd, story-tests]
 outputs: [tests/evals/, docs/eval-standards.md]
-reads: [story-tests]
+reads: []
 conditional: null
 knowledge-base: [eval-craft, testing-strategy]
 ---

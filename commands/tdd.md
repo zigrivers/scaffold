@@ -7,6 +7,8 @@ Deeply research test-driven development (TDD) best practices for our tech stack 
 
 This document will be referenced by AI agents during every implementation task. It needs to be prescriptive and concrete, not theoretical.
 
+> **Note:** This command produces full-depth output. For lighter execution at a specific methodology depth, use the pipeline engine with presets: `scaffold run --preset mvp`
+
 ## Mode Detection
 
 Before starting, check if `docs/tdd-standards.md` already exists:

@@ -5,6 +5,8 @@ long-description: "Generates docs/design-system.md with color palettes, typograp
 
 Create a cohesive design system for this project that AI agents will use for all frontend work. The goal is a professional, polished UI without requiring design expertise from me.
 
+> **When to use this step:** Only for projects with a frontend UI. Skip if your project is a CLI tool, API-only backend, library, or other non-visual project.
+
 Review docs/tech-stack.md to understand our frontend framework and any UI libraries already chosen. Review docs/plan.md to understand the application's purpose and target users.
 
 I have no design experience, so I'm relying on you to make good choices and explain them simply.

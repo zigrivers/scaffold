@@ -31,8 +31,8 @@ independent review validation.
 
 ## Quality Criteria
 - User journey coverage verified against PRD
-- Accessibility compliance checked
-- All interaction states covered
+- Accessibility verified against WCAG level specified in ux-spec
+- Every user action has at minimum: loading, success, and error states documented
 - Design system consistency verified
 - Error states present for all failure-capable actions
 - Every finding categorized P0-P3 with specific flow, screen, and issue

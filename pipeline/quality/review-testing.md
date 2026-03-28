@@ -31,9 +31,9 @@ independent review validation.
 - docs/reviews/testing/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- Coverage gaps by layer identified
+- Coverage gaps by layer documented with severity
 - Domain invariant test cases verified
-- Test environment assumptions validated
+- Each test environment assumption verified against actual environment config or flagged as unverifiable
 - Performance test coverage assessed against NFRs
 - Integration boundaries have integration tests defined
 - Every finding categorized P0-P3 with specific test layer, gap, and issue

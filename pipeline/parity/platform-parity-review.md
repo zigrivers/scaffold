@@ -68,3 +68,13 @@ re-run audit against current documents, preserve prior findings still valid,
 note which gaps have been addressed since last review. If multi-model review
 artifacts exist under docs/reviews/platform-parity/, preserve prior findings
 still valid.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/reviews/platform-parity-review.md exists
+- **Preserve**: existing parity findings still valid, platform-specific decisions,
+  feature parity matrix entries for unchanged features
+- **Triggers for update**: specification changes (tech-stack.md, user-stories.md,
+  system-architecture.md updated), new target platform added to PRD, platform-specific
+  coding standards changed
+- **Conflict resolution**: preserve platform-specific decisions already made,
+  merge new findings alongside existing ones rather than replacing

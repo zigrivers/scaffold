@@ -28,7 +28,7 @@ issue is discovered during implementation.
 - All P0 and P1 validation findings addressed
 - P2 findings addressed or explicitly deferred with rationale
 - Fix log documents what changed and why
-- All documents pass a final consistency check after fixes
+- Cross-phase-consistency validation re-run after fixes yields no new P0 or P1 findings
 
 ## Methodology Scaling
 - **deep**: All findings addressed. Full fix log. Final consistency check.
