@@ -17,7 +17,7 @@ Display the prompt pipeline order below. Do not read any files or run any comman
 | Install Beads | `npm install -g @beads/bd` or `brew install beads` **(optional)** |
 | Install Playwright MCP | `claude mcp add playwright npx @playwright/mcp@latest` **(optional — web apps only)** |
 
-### Phase 1 — Product Definition
+### Phase 1 — Product Definition (`pre`)
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
 | 1 | **PRD Creation** | `/scaffold:create-prd <idea or @files>` | Interactive — requires user input |
@@ -27,7 +27,7 @@ Display the prompt pipeline order below. Do not read any files or run any comman
 | 4 | **Review User Stories** | `/scaffold:review-user-stories` | Multi-pass story review; depth 4+ adds requirements index |
 | 4.5 | **Innovate User Stories** | `/scaffold:innovate-user-stories` | **(optional)** UX-level enhancements |
 
-### Phase 2 — Project Foundation
+### Phase 2 — Project Foundation (`foundation`)
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
 | 5 | **Beads Setup** | `/scaffold:beads` | **(optional)** Creates CLAUDE.md + task tracking |
@@ -36,7 +36,7 @@ Display the prompt pipeline order below. Do not read any files or run any comman
 | 8 | **TDD Standards** | `/scaffold:tdd` | References tech-stack.md + coding-standards.md |
 | 9 | **Project Structure** | `/scaffold:project-structure` | References all Phase 2 docs |
 
-### Phase 3 — Development Environment
+### Phase 3 — Development Environment (`environment`)
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
 | 10 | **Dev Environment Setup** | `/scaffold:dev-env-setup` | Creates lint/test/install commands |
@@ -45,63 +45,67 @@ Display the prompt pipeline order below. Do not read any files or run any comman
 | 12.5 | **Automated PR Review** | `/scaffold:automated-pr-review` | **(optional)** Local CLI or external reviewer |
 | 13 | **AI Memory Setup** | `/scaffold:ai-memory-setup` | Modular rules, optional MCP memory + external docs |
 
-### Phase 4 — Testing Integration
+### Phase 4 — Testing Integration (`integration`)
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
 | 14 | **E2E Testing** | `/scaffold:add-e2e-testing` | **(optional)** Playwright (web) and/or Maestro (mobile) |
 
-### Phase 5 — Stories & Reviews
+### Phase 5 — Domain Modeling (`modeling`)
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
-| 15 | **Platform Parity Review** | `/scaffold:platform-parity-review` | **(optional)** Multi-platform projects |
+| 15 | **Domain Modeling** | `/scaffold:domain-modeling` | Entities, aggregates, events, bounded contexts |
+| 16 | **Review Domain Modeling** | `/scaffold:review-domain-modeling` | 10-pass domain model review |
 
-### Phase 5b — Domain Modeling
+### Phase 6 — Architecture Decisions (`decisions`)
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
-| 16 | **Domain Modeling** | `/scaffold:domain-modeling` | Entities, aggregates, events, bounded contexts |
-| 17 | **Review Domain Modeling** | `/scaffold:review-domain-modeling` | 10-pass domain model review |
+| 17 | **ADRs** | `/scaffold:adrs` | Architecture Decision Records |
+| 18 | **Review ADRs** | `/scaffold:review-adrs` | Review for contradictions, missing decisions |
 
-### Phase 5c — Architecture Decisions
+### Phase 7 — System Architecture (`architecture`)
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
-| 18 | **ADRs** | `/scaffold:adrs` | Architecture Decision Records |
-| 19 | **Review ADRs** | `/scaffold:review-adrs` | Review for contradictions, missing decisions |
-| 20 | **System Architecture** | `/scaffold:system-architecture` | Components, data flows, module structure |
-| 21 | **Review Architecture** | `/scaffold:review-architecture` | Coverage gaps, constraint violations |
+| 19 | **System Architecture** | `/scaffold:system-architecture` | Components, data flows, module structure |
+| 20 | **Review Architecture** | `/scaffold:review-architecture` | Coverage gaps, constraint violations |
 
-### Phase 5d — Specification (all optional)
+### Phase 8 — Specifications (`specification`)
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
-| 22 | **Database Schema** | `/scaffold:database-schema` | **(optional)** Tables, indexes, constraints |
-| 23 | **Review Database** | `/scaffold:review-database` | **(optional)** Schema review |
-| 24 | **API Contracts** | `/scaffold:api-contracts` | **(optional)** Endpoints, error codes, auth |
-| 25 | **Review API** | `/scaffold:review-api` | **(optional)** API contracts review |
-| 26 | **UX Spec** | `/scaffold:ux-spec` | **(optional)** Flows, states, accessibility |
-| 27 | **Review UX** | `/scaffold:review-ux` | **(optional)** UX spec review |
+| 21 | **Database Schema** | `/scaffold:database-schema` | **(optional)** Tables, indexes, constraints |
+| 22 | **Review Database** | `/scaffold:review-database` | **(optional)** Schema review |
+| 23 | **API Contracts** | `/scaffold:api-contracts` | **(optional)** Endpoints, error codes, auth |
+| 24 | **Review API** | `/scaffold:review-api` | **(optional)** API contracts review |
+| 25 | **UX Spec** | `/scaffold:ux-spec` | **(optional)** Flows, states, accessibility |
+| 26 | **Review UX** | `/scaffold:review-ux` | **(optional)** UX spec review |
 
-### Phase 5e — Quality Gates
+### Phase 9 — Quality Gates (`quality`)
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
-| 28 | **Review Testing** | `/scaffold:review-testing` | Reviews TDD strategy |
-| 29 | **Create Evals** | `/scaffold:create-evals` | Generates eval checks from standards docs |
-| 30 | **Operations** | `/scaffold:operations` | Deployment, monitoring, incident response |
-| 31 | **Review Operations** | `/scaffold:review-operations` | Reviews operations runbook |
-| 32 | **Security** | `/scaffold:security` | Threat model, auth, data protection |
-| 33 | **Review Security** | `/scaffold:review-security` | Reviews security posture |
+| 27 | **Review Testing** | `/scaffold:review-testing` | Reviews TDD strategy |
+| 28 | **Create Evals** | `/scaffold:create-evals` | Generates eval checks from standards docs |
+| 29 | **Operations** | `/scaffold:operations` | Deployment, monitoring, incident response |
+| 30 | **Review Operations** | `/scaffold:review-operations` | Reviews operations runbook |
+| 31 | **Security** | `/scaffold:security` | Threat model, auth, data protection |
+| 32 | **Review Security** | `/scaffold:review-security` | Reviews security posture |
 
-### Phase 6 — Consolidation
+### Phase 10 — Stories & Reviews (`stories`)
+| # | Prompt | Command | Notes |
+|---|--------|---------|-------|
+| 33 | **Platform Parity Review** | `/scaffold:platform-parity-review` | **(optional)** Multi-platform projects |
+
+### Phase 11 — Consolidation (`consolidation`)
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
 | 34 | **Claude.md Optimization** | `/scaffold:claude-md-optimization` | Run BEFORE Workflow Audit |
 | 35 | **Workflow Audit** | `/scaffold:workflow-audit` | Run AFTER Claude.md Optimization |
 
-### Phase 7 — Planning
+### Phase 12 — Planning (`planning`)
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
 | 36 | **Implementation Plan** | `/scaffold:implementation-plan` | Creates full task graph |
 | 37 | **Implementation Plan Review** | `/scaffold:implementation-plan-review` | Second pass for quality + multi-model validation (depth 4+) |
 
-### Phase 7b — Validation (7 parallel checks)
+### Phase 13 — Validation (`validation`)
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
 | 38 | **Cross-Phase Consistency** | `/scaffold:cross-phase-consistency` | Naming, assumptions, interfaces |
@@ -112,18 +116,18 @@ Display the prompt pipeline order below. Do not read any files or run any comman
 | 43 | **Dependency Graph Validation** | `/scaffold:dependency-graph-validation` | Verify task DAG is acyclic |
 | 44 | **Scope Creep Check** | `/scaffold:scope-creep-check` | Specs stay within PRD boundaries |
 
-### Phase 7c — Finalization
+### Phase 14 — Finalization (`finalization`)
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
 | 45 | **Apply Fixes & Freeze** | `/scaffold:apply-fixes-and-freeze` | Apply findings, freeze docs |
 | 46 | **Developer Onboarding Guide** | `/scaffold:developer-onboarding-guide` | "Start here" for new devs/agents |
 | 47 | **Implementation Playbook** | `/scaffold:implementation-playbook` | Operational guide for agent execution |
 
-### Phase 8 — Execution
+### Execution (post-pipeline)
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
-| 48 | **Single Agent Start** | `/scaffold:single-agent-start` | TDD execution loop |
-| 48 | **Multi Agent Start** | `/scaffold:multi-agent-start <agent-name>` | One per worktree |
+| — | **Single Agent Start** | `/scaffold:single-agent-start` | TDD execution loop |
+| — | **Multi Agent Start** | `/scaffold:multi-agent-start <agent-name>` | One per worktree |
 
 ### Standalone / Ongoing
 | Prompt | Command | When |

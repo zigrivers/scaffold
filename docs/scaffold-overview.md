@@ -1,5 +1,7 @@
 # Scaffold Overview
 
+> **Note:** This document describes the v1 architecture (7 phases, 29 prompts). The current v2 architecture has **14 phases and 50 pipeline steps**. See `README.md` for the current pipeline structure or `src/types/frontmatter.ts` for the canonical phase definitions.
+
 ## What is Scaffold
 
 Scaffold is a prompt pipeline for scaffolding new software projects with Claude Code. It provides a curated sequence of 29 structured prompts that guide you from a raw product idea through to working software, producing documentation, standards, task graphs, and implementation along the way.
