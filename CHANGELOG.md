@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.17.7] — 2026-03-27
+
+### Enhanced
+
+- **developer-onboarding-guide** now references `.claude/rules/`, `docs/ai-memory-setup.md`, and `docs/decisions/` in its Inputs table and "Where to Find Things" section (conditional on existence).
+
 ## [2.17.6] — 2026-03-27
 
 ### Fixed
