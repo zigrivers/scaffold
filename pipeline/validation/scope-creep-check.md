@@ -32,9 +32,12 @@ differently, surfacing subtle creep.
 - docs/validation/scope-creep-check/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- Analysis is comprehensive (not superficial)
-- Findings are actionable (specific file, section, and issue)
-- Severity categorization (P0-P3)
+- Every user story traces back to a PRD feature or requirement
+- Every architecture component traces to a PRD requirement
+- Items beyond PRD scope are flagged with disposition (remove, defer, or justify)
+- No "gold-plating" — implementation tasks do not exceed story acceptance criteria
+- Feature count has not grown beyond PRD scope without documented justification
+- Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Finding Disposition

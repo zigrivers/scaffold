@@ -30,9 +30,11 @@ decisions.
 - docs/validation/decision-completeness/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- Analysis is comprehensive (not superficial)
-- Findings are actionable (specific file, section, and issue)
-- Severity categorization (P0-P3)
+- Every technology choice in `docs/tech-stack.md` has a corresponding ADR
+- No two ADRs contradict each other
+- Every ADR has alternatives-considered section with pros/cons
+- Every ADR referenced in `docs/system-architecture.md` exists in `docs/adrs/`
+- Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Finding Disposition

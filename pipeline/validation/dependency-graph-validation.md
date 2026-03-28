@@ -30,9 +30,12 @@ and completeness issues.
 - docs/validation/dependency-graph-validation/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- Analysis is comprehensive (not superficial)
-- Findings are actionable (specific file, section, and issue)
-- Severity categorization (P0-P3)
+- Task dependency graph verified as acyclic (no circular dependencies)
+- Every task with dependencies has all dependencies present in the graph
+- Critical path identified and total estimated duration documented
+- No task is blocked by more than 3 sequential dependencies (flag deep chains)
+- Wave assignments are consistent with dependency ordering
+- Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Finding Disposition
