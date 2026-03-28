@@ -2,6 +2,35 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.28.0] — 2026-03-28
+
+### Fixed
+
+- **`story-tests` missing from `scaffold status` in existing projects** — New `reconcileWithPipeline()` method in StateManager detects pipeline steps absent from the project's `state.json` and inserts them as pending. Called from both `status` and `next` commands.
+- **`add-e2e-testing` wrong dependencies and outputs** — Added missing `tdd` dependency. Removed `docs/tdd-standards.md` from outputs (the step modifies it, not creates it). Added `reads: [tdd, coding-standards]` for soft artifact references.
+- **`platform-parity-review` wrong directory and weak dependencies** — Moved from `pipeline/stories/` to `pipeline/parity/` to match the phase slug. Dependencies now include `review-architecture`, `review-database`, `review-api`, `review-ux` instead of just `user-stories`.
+
+### Added
+
+- **Depth 4+ outputs in review frontmatter** — 21 review step frontmatter files now declare multi-model outputs (`review-summary.md`, `codex-review.json`, `gemini-review.json`) for correct completion detection at higher depths.
+- **`reads` field across pipeline** — 13 pipeline files now declare soft artifact references via the `reads` frontmatter field, making implicit cross-phase dependencies explicit without creating hard blocks.
+- **Update Mode Specifics** — 27 creation steps now include `## Update Mode Specifics` sections explaining what to preserve, what triggers updates, and how to handle conflicts in brownfield/update mode.
+- **Expanded Mode Detection** — Terse 1-line Mode Detection blocks in `tdd`, `database-schema`, `api-contracts`, `ux-spec`, consolidation steps, and others expanded to 4-8 lines with concrete guidance.
+- **3 new knowledge entries** — `task-tracking` (Beads patterns), `claude-md-patterns` (CLAUDE.md structure and merge strategy across 7 steps), `multi-model-review-dispatch` (depth 4+ external model guidance).
+- **`review-step-template` knowledge entry** — Shared template documenting the common structure across 15+ review pipeline steps.
+- **Finding Disposition sections** — All 7 validation steps now include P0-P3 severity handling guidance (who decides, when to fix, how tasks reorder).
+- **Conditional Evaluation sections** — 6 conditional steps now document the project signals that trigger enable/disable decisions.
+- **Strengthened Quality Criteria** — `operations.md`, `security.md` now match the specificity of specification-phase criteria. `create-evals.md` criteria vary by depth (mvp vs deep).
+- **`docs/glossary.md`** — 11 pipeline term definitions (greenfield, brownfield, depth levels, wave plan, conditional step, etc.).
+- **`design-system-tokens.md` completed** — Expanded from 168 to 465 lines. WIP marker removed. Full coverage of color tokens, spacing, responsive breakpoints, accessibility, and all component patterns.
+- **Knowledge cross-references** — 8 knowledge entries now include "See Also" sections linking to related entries.
+
+### Changed
+
+- **Knowledge entry renames** — `review-api-contracts` → `review-api-design`, `review-database-schema` → `review-database-design`, `review-ux-spec` → `review-ux-specification` (aligned with creation-step knowledge names).
+- **CLAUDE.md cleanup** — Removed stale "Process" section reference (v1 artifact). Updated prompts.md sync guidance to v2-accurate `scaffold build` workflow.
+- **`beads` and `claude-md-optimization`** now reference their new knowledge entries (`task-tracking`, `claude-md-patterns`).
+
 ## [2.27.0] — 2026-03-28
 
 ### Added

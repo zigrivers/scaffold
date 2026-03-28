@@ -29,7 +29,7 @@ Either way, Scaffold constructs the prompt and Claude does the work. The CLI tra
 
 **Assembly engine** — At execution time, Scaffold builds a 7-section prompt from: system metadata, the meta-prompt, knowledge base entries, project context (artifacts from prior steps), methodology settings, layered instructions, and depth-specific execution guidance.
 
-**Knowledge base** — 45 domain expertise entries in `knowledge/` covering testing strategy, domain modeling, API design, security best practices, eval craft, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
+**Knowledge base** — 49 domain expertise entries in `knowledge/` covering testing strategy, domain modeling, API design, security best practices, eval craft, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
 
 **Methodology presets** — Three built-in presets control which steps run and how deep the analysis goes:
 - **deep** (depth 5) — all steps enabled, exhaustive analysis
@@ -502,13 +502,13 @@ scaffold dashboard
 
 ## Knowledge System
 
-Scaffold ships with 45 domain expertise entries organized in five categories:
+Scaffold ships with 49 domain expertise entries organized in five categories:
 
-- **core/** (18 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, design system tokens, user story innovation, AI memory management
+- **core/** (23 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, design system tokens, user story innovation, AI memory management, coding conventions, tech stack selection, project structure patterns, task tracking, CLAUDE.md patterns, multi-model review dispatch, review step template, dev environment
 - **product/** (3 entries) — PRD craft, PRD innovation, gap analysis
-- **review/** (13 entries) — review methodology (shared), plus domain-specific review passes for PRD, user stories, domain modeling, ADRs, architecture, API contracts, database schema, UX spec, testing, security, operations, implementation tasks
+- **review/** (13 entries) — review methodology (shared), plus domain-specific review passes for PRD, user stories, domain modeling, ADRs, architecture, API design, database design, UX specification, testing, security, operations, implementation tasks
 - **validation/** (7 entries) — critical path analysis, cross-phase consistency, scope management, traceability, implementability, decision completeness, dependency validation
-- **finalization/** (4 entries) — implementation playbook, developer onboarding, apply-fixes-and-freeze
+- **finalization/** (3 entries) — implementation playbook, developer onboarding, apply-fixes-and-freeze
 
 Each pipeline step declares which knowledge entries it needs in its frontmatter. The assembly engine injects them automatically. Knowledge files with a `## Deep Guidance` section are optimized for the CLI — only the deep guidance content is loaded into the assembled prompt, skipping the summary to avoid redundancy with the prompt text.
 
@@ -573,7 +573,7 @@ Options: `--dry-run` to preview, `minor`/`major`/`patch` to specify the bump, `c
 | **CLAUDE.md** | A configuration file in your project root that tells Claude Code how to work in your project. |
 | **Depth** | A 1-5 scale controlling how thorough each step's analysis is, from MVP-focused (1) to exhaustive (5). |
 | **Frontmatter** | The YAML metadata block at the top of meta-prompt files, declaring dependencies, outputs, knowledge entries, and other configuration. |
-| **Knowledge base** | 44 domain expertise entries that get injected into prompts. Can be extended with project-local overrides. |
+| **Knowledge base** | 49 domain expertise entries that get injected into prompts. Can be extended with project-local overrides. |
 | **MCP** | Model Context Protocol. A way for Claude to use external tools like a headless browser. |
 | **Meta-prompt** | A short intent declaration in `pipeline/` that gets assembled into a full prompt at runtime. |
 | **Methodology** | A preset (deep, mvp, custom) controlling which steps run and at what depth. |
@@ -661,7 +661,7 @@ src/
 
 ```
 pipeline/             # 51 meta-prompts organized by 14 phases
-knowledge/            # 45 domain expertise entries (core, product, review, validation, finalization)
+knowledge/            # 49 domain expertise entries (core, product, review, validation, finalization)
 methodology/          # 3 YAML presets (deep, mvp, custom)
 commands/             # 67 Claude Code slash commands (51 pipeline + 16 utility)
 skills/               # 3 Claude Code skills (pipeline reference, runner, multi-model dispatch)
@@ -669,7 +669,7 @@ skills/               # 3 Claude Code skills (pipeline reference, runner, multi-
 
 ### Testing
 
-- **Vitest** for unit and E2E tests (67 test files, 764 tests)
+- **Vitest** for unit and E2E tests (67 test files, 772 tests)
 - **Performance benchmarks** — assembly p95 < 500ms, state I/O p95 < 100ms, graph build p95 < 2s
 - **Shell script tests** via bats
 - Run: `npm test` (unit + E2E), `npm run test:bench` (benchmarks), `make check` (full CI gate)
