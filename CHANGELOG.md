@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.27.0] — 2026-03-28
+
+### Added
+
+- **Multi-LLM verification across all review, validation, innovation, and research steps** — 21 pipeline steps now support depth-gated Codex/Gemini CLI dispatch (depth 4: one external model, depth 5: full multi-model reconciliation) with graceful fallback to Claude-only when CLIs are unavailable. Follows the established pattern from `review-user-stories` and `implementation-plan-review`. Covers 11 review steps, 7 validation steps, 2 innovation steps, and tech-stack research.
+
 ## [2.26.0] — 2026-03-28
 
 ### Added
