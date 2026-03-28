@@ -171,6 +171,7 @@ After upgrading the CLI, existing projects migrate automatically. Run `scaffold 
 - `multi-model-review` → `automated-pr-review`
 - `user-stories-multi-model-review` → removed (folded into `review-user-stories`)
 - `claude-code-permissions` → removed (folded into `git-workflow` + `tech-stack`)
+- `multi-model-review-tasks` → removed (folded into `implementation-plan-review`)
 - `testing-strategy` → `tdd`, `implementation-tasks` → `implementation-plan`, `review-tasks` → `implementation-plan-review`
 
 The PRD is always created as `docs/plan.md`. If you have a legacy `docs/prd.md` from an older version, the context gatherer resolves aliased paths so downstream steps find your PRD regardless.

@@ -39,6 +39,7 @@ const STATUS_PRIORITY: Record<string, number> = {
 const RETIRED_STEPS: string[] = [
   'user-stories-multi-model-review', // folded into review-user-stories (v2.8.0)
   'claude-code-permissions',         // folded into git-workflow + tech-stack (v2.11.0)
+  'multi-model-review-tasks',        // folded into implementation-plan-review (v2.20.0)
 ]
 
 /**
