@@ -12,7 +12,7 @@ This skill teaches Claude Code how to correctly invoke Codex and Gemini CLIs for
 - A review or validation step is running at depth 4+ and wants independent model validation
 - User asks to "run multi-model review" or "get a second opinion from Codex/Gemini"
 - The `automated-pr-review` step is using local CLI review mode
-- The `multi-model-review-tasks` step dispatches to external CLIs
+- The `implementation-plan-review` step dispatches to external CLIs at depth 4+
 
 ## CLI Detection & Auth Verification
 

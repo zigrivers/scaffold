@@ -45,8 +45,7 @@ declare -a FRONTMATTER=(
     'workflow-audit|Verify workflow consistency across all docs|'
     'create-evals|Generate project-specific eval checks|'
     'implementation-plan|Create task graph from stories and standards|'
-    'implementation-plan-review|Review task quality, coverage, and dependencies|'
-    'multi-model-review-tasks|Multi-model review of implementation plan tasks for coverage and quality|'
+    'implementation-plan-review|Review task quality, coverage, dependencies, and multi-model validation|'
     'single-agent-start|Start single-agent execution loop|'
     'single-agent-resume|Resume work after a break|'
     'multi-agent-start|Start multi-agent execution loop in a worktree|<agent-name>'
@@ -85,7 +84,6 @@ HEADING_TO_SLUG["Workflow Audit"]="workflow-audit"
 HEADING_TO_SLUG["Create Evals"]="create-evals"
 HEADING_TO_SLUG["Implementation Plan"]="implementation-plan"
 HEADING_TO_SLUG["Implementation Plan Review"]="implementation-plan-review"
-HEADING_TO_SLUG["Implementation Plan Multi-Model Review"]="multi-model-review-tasks"
 HEADING_TO_SLUG["New Enhancement"]="new-enhancement"
 HEADING_TO_SLUG["Quick Task"]="quick-task"
 HEADING_TO_SLUG["Version Bump"]="version-bump"
@@ -463,30 +461,9 @@ When this step is complete, tell the user:
 ---
 **Phase 7 in progress** — Tasks reviewed, gaps filled, dependencies verified.
 
-**Next:**
-- If you have **Codex CLI and/or Gemini CLI**: Run `/scaffold:multi-model-review-tasks` — Independent multi-model review of implementation tasks for coverage and quality.
-- Otherwise: Choose an execution mode:
-  - **Single agent:** Run `/scaffold:single-agent-start` — Start execution from the main repo.
-  - **Multiple agents:** Set up worktrees per `docs/git-workflow.md`, then run `/scaffold:multi-agent-start <agent-name>` in each worktree.
-
-**Pipeline reference:** `/scaffold:prompt-pipeline`
-
----
-NEXTSTEP
-            ;;
-        multi-model-review-tasks)
-            cat <<'NEXTSTEP'
-
-## After This Step
-
-When this step is complete, tell the user:
-
----
-**Phase 7 in progress** — Implementation tasks reviewed by independent models, coverage verified, dependencies corrected.
-
-**Next:** Choose an execution mode:
-- **Single agent:** Run `/scaffold:single-agent-start` — Start execution from the main repo.
-- **Multiple agents:** Set up worktrees per `docs/git-workflow.md`, then run `/scaffold:multi-agent-start <agent-name>` in each worktree.
+**Next (choose based on methodology):**
+- **(Recommended)** Run `/scaffold:cross-phase-consistency` — Start the 7-check validation phase.
+- **(Skip validation)** For MVP or when ready to build now: Run `/scaffold:single-agent-start` or `/scaffold:multi-agent-start <agent-name>`.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

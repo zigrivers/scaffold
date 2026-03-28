@@ -99,8 +99,7 @@ Display the prompt pipeline order below. Do not read any files or run any comman
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
 | 36 | **Implementation Plan** | `/scaffold:implementation-plan` | Creates full task graph |
-| 37 | **Implementation Plan Review** | `/scaffold:implementation-plan-review` | Second pass for quality |
-| 37.5 | **Multi-Model Review Tasks** | `/scaffold:multi-model-review-tasks` | **(optional)** Requires Codex/Gemini CLI |
+| 37 | **Implementation Plan Review** | `/scaffold:implementation-plan-review` | Second pass for quality + multi-model validation (depth 4+) |
 
 ### Phase 7b — Validation (7 parallel checks)
 | # | Prompt | Command | Notes |
