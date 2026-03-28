@@ -18,19 +18,32 @@ Unit tests answer: "Does this function return the right result?"
 Integration tests answer: "Do these components work together?"
 Evals answer: "Does this project follow its own documented rules?"
 
-### The Four Categories
+### Eval Categories (up to 13)
 
-1. **Consistency Evals** — Verify documentation and tooling stay in sync. Command tables match build targets, commit messages follow documented format, cross-doc references resolve.
-2. **Structure Evals** — Verify files are in the right places per project-structure.md. File placement rules, shared code 2+ consumer requirement, test co-location conventions.
-3. **Adherence Evals** — Verify code follows patterns from coding-standards.md and tdd-standards.md. TODO format, mock patterns, error handling, stack-specific rules. Must support exclusion mechanisms.
-4. **Coverage Evals** — Verify documented requirements have corresponding implementation and tests. Feature-to-code keyword matching, AC-to-test mapping, API endpoint coverage.
+**5 Core categories** (always generated):
+1. **Consistency** — Doc-tooling sync: command tables ↔ build targets, commit format, cross-doc refs
+2. **Structure** — File placement per project-structure.md, shared code 2+ consumers, test co-location
+3. **Adherence** — Coding patterns from coding-standards.md: TODO format, mock rules, error handling, stack-specific
+4. **Coverage** — Requirement→code keyword matching, AC→test mapping, API endpoint coverage
+5. **Cross-doc** — Technology, path, terminology consistency across scaffold-produced docs
+
+**8 Conditional categories** (generated when source doc exists):
+6. **Architecture conformance** ← system-architecture.md — Layer direction, module boundaries, circular deps
+7. **API contract** ← api-contracts.md — Endpoint existence, HTTP methods, error response coverage
+8. **Security patterns** ← security-review.md — Auth middleware, no secrets, input validation, SQL injection
+9. **Database schema** ← database-schema.md — Migration coverage, columns, indexes, foreign keys
+10. **Accessibility** ← ux-spec.md — ARIA, alt text, focus styles, color contrast
+11. **Performance budget** ← plan.md NFRs — Budget files, bundle tracking, perf test existence
+12. **Configuration** ← dev-setup.md — Env var docs, dead config, startup validation
+13. **Error handling** ← coding-standards.md — No bare catches, error responses tested, custom error classes
 
 ### Design Principles
 
 - **Binary PASS/FAIL, not scores** — prevents Goodhart's Law gaming
 - **Every eval needs a false-positive mitigation strategy** — exclusion mechanism is mandatory
+- **Conditional on source doc** — never generate evals for docs that don't exist
 - **Prefer grep over AST** — faster to write, run, and maintain
-- **Evals must be fast** — full suite under 15 seconds, individual file under 2 seconds
+- **Evals must be fast** — full suite under 30 seconds, individual file under 2 seconds
 - **One category per eval file** — don't mix consistency and adherence in one file
 - **Document what evals don't check** — prevent false confidence
 
@@ -39,9 +52,9 @@ Evals answer: "Does this project follow its own documented rules?"
 - Whether code is correct (functional tests)
 - Whether code is elegant or well-designed (code review)
 - Whether tests are good quality (manual review)
-- Whether the UI looks right (visual testing)
-- Whether performance meets targets (benchmarks)
-- Whether security vulnerabilities exist (security scanning)
+- Whether the UI looks right (visual testing, beyond automated a11y)
+- Deep security vulnerabilities (use dedicated SAST/DAST tools)
+- Actual runtime performance (evals verify tracking config, not measurements)
 
 This boundary must be documented explicitly in `docs/eval-standards.md`.
 
@@ -409,6 +422,152 @@ function featureHasImplementation(
 }
 ```
 
+### Architecture Conformance Evals — Deep Dive
+
+**Source doc**: `docs/system-architecture.md` + `docs/project-structure.md`
+
+Architecture conformance evals prevent code from silently diverging from documented architecture. They check three things: import direction, module boundaries, and circular dependencies.
+
+**Import direction checking** (grep-based):
+1. Parse the architecture doc for layer definitions (e.g., "controllers depend on services, services depend on repositories")
+2. For each source file, determine its layer from its file path (e.g., `src/controllers/` → controller layer)
+3. Scan its import statements and verify they only reference allowed layers
+4. Report violations: "src/repositories/user.ts imports from src/controllers/auth.ts — repositories should not depend on controllers"
+
+**Module boundary checking**:
+1. Parse `docs/project-structure.md` for feature directories (e.g., `src/features/auth/`, `src/features/billing/`)
+2. For each feature directory, scan imports
+3. Flag imports that reach into another feature's internal modules (e.g., `src/features/auth/services/token.ts` importing `src/features/billing/internal/invoice-calc.ts`)
+4. Cross-feature imports should go through shared/public interfaces only
+
+**False positive mitigation**: Exclude shared/common directories, type-only imports, and test files. Allow an `// eval-exclude: cross-feature` inline comment to suppress.
+
+**Tool recommendations**: For JS/TS projects with complex architecture, recommend `dependency-cruiser` or `eslint-plugin-boundaries` in `docs/eval-standards.md`. The eval checks for their config existence as a positive signal.
+
+### API Contract Evals — Deep Dive
+
+**Source doc**: `docs/api-contracts.md`
+
+API contract evals verify that documented API specifications match actual code. They use grep/regex — not runtime testing (that's Dredd/Pact territory).
+
+**Endpoint existence checking**:
+1. Parse `docs/api-contracts.md` for endpoint definitions (look for patterns like `GET /api/v1/users`, `POST /api/auth/login`)
+2. For each endpoint, search route definition files for the path pattern
+3. Report missing routes: "POST /api/v1/orders documented but no route definition found"
+
+**Error response coverage**:
+1. For each endpoint, extract documented error codes (400, 401, 403, 404, 422)
+2. Search test files for tests that verify these status codes for that endpoint
+3. Report: "GET /api/v1/users/:id documents 404 response but no test triggers it"
+
+**False positive mitigation**: Route frameworks vary widely — check for common patterns (`app.get`, `router.post`, `@Get()`, `@app.route`). Allow pattern overrides via a config section in `docs/eval-standards.md`.
+
+### Security Pattern Evals — Deep Dive
+
+**Source doc**: `docs/security-review.md`
+
+Security evals verify documented security controls are implemented. They check patterns, not vulnerabilities — use SAST/DAST tools for deep scanning.
+
+**No hardcoded secrets** (regex patterns):
+```
+# Common secret patterns to flag
+(?:api[_-]?key|secret|password|token|credential)\s*[:=]\s*['"][^'"]{8,}['"]
+(?:sk|pk)[-_][a-zA-Z0-9]{20,}    # Stripe-style keys
+AKIA[0-9A-Z]{16}                  # AWS access key IDs
+ghp_[a-zA-Z0-9]{36}              # GitHub personal tokens
+```
+
+**Auth middleware presence**:
+1. Parse security review for protected routes/resources
+2. Check route definitions for auth middleware application (e.g., `requireAuth`, `@authenticated`, `authMiddleware`)
+3. Flag unprotected routes that should be protected
+
+**SQL injection prevention**:
+1. Search for database query patterns (e.g., string concatenation in SQL: `` `SELECT * FROM ${table}` ``)
+2. Flag string interpolation in query strings
+3. Allow parameterized queries and ORM usage
+
+**False positive mitigation**: Security evals are PRESERVED on re-run because teams customize exclusion patterns extensively. Inline `// eval-exclude: secret-pattern` for test fixtures and config examples.
+
+### Database Schema Evals — Deep Dive
+
+**Source doc**: `docs/database-schema.md`
+
+Database evals verify migration files produce the documented schema. Grep-based — no database connection needed.
+
+**Migration existence checking**:
+1. Parse `docs/database-schema.md` for table names
+2. Search migration files for `CREATE TABLE` or equivalent ORM statements
+3. Report: "Table 'order_items' documented but no migration creates it"
+
+**Column coverage**:
+1. For each documented table, extract column names
+2. Search the table's migration file for column definitions
+3. Report missing columns
+
+**False positive mitigation**: ORM-generated migrations use different syntax than raw SQL. Check for both patterns. Allow `docs/eval-standards.md` to specify the migration framework for accurate matching.
+
+### Accessibility Evals — Deep Dive
+
+**Source doc**: `docs/ux-spec.md` (accessibility section)
+
+Only generated when the UX spec documents accessibility requirements (search for "WCAG", "accessibility", "a11y", "screen reader").
+
+**Alt text checking**:
+```
+# Flag img elements without alt attribute
+<img[^>]*(?!alt=)[^>]*>
+# Also check framework-specific: Image, next/image without alt
+```
+
+**Focus style checking**: Search CSS/styled-components for `:focus` or `:focus-visible` rules. Flag interactive elements (button, a, input) without visible focus styles.
+
+**Tool recommendation**: If the project has a frontend, recommend `@axe-core/cli` or Playwright's built-in accessibility assertions in `docs/eval-standards.md`. The eval checks for axe-core in dependencies as a positive signal.
+
+### Performance Budget Evals — Deep Dive
+
+**Source doc**: `docs/plan.md` (non-functional requirements section)
+
+Only generated when the PRD contains performance targets. Search for patterns: "response time", "load time", "within X seconds", "under X ms", "bundle size".
+
+**What to check**:
+1. A performance budget file exists (`budget.json`, `.size-limit.json`, or equivalent)
+2. CI config references performance testing (Lighthouse CI, k6, Artillery)
+3. Critical user flows (from user stories) have corresponding performance test config
+
+**False positive mitigation**: Skip if no performance-related NFRs are found in plan.md. Don't enforce specific tools — just verify that *some* performance tracking exists.
+
+### Configuration Validation Evals — Deep Dive
+
+**Source doc**: `docs/dev-setup.md`
+
+Config evals prevent the "works on my machine" problem by verifying env vars are documented and validated.
+
+**Env var scanning** (per-stack patterns):
+- TypeScript/JS: `process.env.X` or `process.env['X']`
+- Python: `os.environ["X"]` or `os.getenv("X")`
+- Go: `os.Getenv("X")`
+- Shell: `$X` or `${X}`
+
+For each env var found in code, verify it appears in `.env.example` or `docs/dev-setup.md`. For each var in `.env.example`, verify it's actually referenced in code (detect dead config).
+
+**Startup validation check**: Search for config schema validation at app startup — Zod parse of process.env, Pydantic BaseSettings, Go envconfig struct tags. The existence of startup validation is a positive signal.
+
+### Error Handling Completeness Evals — Deep Dive
+
+**Source doc**: `docs/coding-standards.md` + `docs/api-contracts.md`
+
+Error handling evals verify that documented error patterns are followed and documented error responses are tested.
+
+**Bare catch detection** (per-stack):
+- TypeScript/JS: `catch\s*\(\s*\w*\s*\)\s*\{\s*\}` (empty catch block)
+- Python: `except:\s*$` or `except Exception:\s*pass`
+- Go: `if err != nil \{\s*\}` (swallowed errors)
+
+**Error response test coverage**: For each error code documented in API contracts, search test files for assertions on that status code + endpoint combination. Report: "PUT /api/users/:id documents 422 but no test verifies it."
+
+**False positive mitigation**: Error handling evals are PRESERVED on re-run. Intentionally empty catches (e.g., cleanup code) can use `// eval-exclude: bare-catch` inline comments.
+
 ### Eval Design Principles — Extended
 
 #### 1. Binary PASS/FAIL, Not Scores
@@ -441,7 +600,7 @@ The entire eval suite should run in seconds, not minutes. If evals are slow, dev
 
 **Performance targets:**
 - Individual eval file: < 2 seconds
-- Full eval suite (`make eval`): < 15 seconds
+- Full eval suite (`make eval`): < 30 seconds
 - File I/O: read files once, share across checks via helpers
 
 **What makes evals slow:**
