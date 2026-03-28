@@ -3,7 +3,7 @@ name: implementation-plan
 description: Break architecture into implementable tasks with dependencies
 phase: "planning"
 order: 1210
-dependencies: [tdd, operations, security, review-architecture]
+dependencies: [tdd, operations, security, review-architecture, create-evals]
 outputs: [docs/implementation-plan.md]
 conditional: null
 knowledge-base: [task-decomposition]

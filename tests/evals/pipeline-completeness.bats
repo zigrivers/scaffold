@@ -89,6 +89,61 @@ REQUIRED_SECTIONS=("## Purpose" "## Inputs" "## Expected Outputs" "## Quality Cr
   fi
 }
 
+@test "pipeline step order values fall within phase-aligned range" {
+  local failures=()
+  while IFS= read -r file; do
+    local phase order range min max
+    phase="$(extract_field "$file" "phase")"
+    order="$(extract_field "$file" "order")"
+    range="$(get_phase_order_range "$phase")"
+
+    [[ -z "$range" ]] && { failures+=("$(basename "$file"): unknown phase '$phase'"); continue; }
+
+    min="${range%% *}"
+    max="${range##* }"
+
+    if [[ "$order" -lt "$min" || "$order" -gt "$max" ]]; then
+      failures+=("$(basename "$file"): order $order outside phase '$phase' range ($min-$max)")
+    fi
+  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+
+  if [[ ${#failures[@]} -gt 0 ]]; then
+    printf "Order/phase alignment failures:\n"
+    printf "  %s\n" "${failures[@]}"
+    return 1
+  fi
+}
+
+@test "all pipeline dependencies point to same or earlier phase" {
+  local failures=()
+  while IFS= read -r file; do
+    local step_phase step_phase_num dep_phase dep_phase_num
+    step_phase="$(extract_field "$file" "phase")"
+    step_phase_num="$(get_phase_number "$step_phase")"
+
+    while IFS= read -r dep; do
+      [[ -z "$dep" ]] && continue
+      # Find the dependency's file
+      local dep_file
+      dep_file="$(find "${PROJECT_ROOT}/pipeline" -name "${dep}.md" -type f | head -1)"
+      [[ -z "$dep_file" ]] && continue  # dangling dep caught by other test
+
+      dep_phase="$(extract_field "$dep_file" "phase")"
+      dep_phase_num="$(get_phase_number "$dep_phase")"
+
+      if [[ "$dep_phase_num" -gt "$step_phase_num" ]]; then
+        failures+=("$(basename "$file") (phase $step_phase_num/$step_phase) depends on $(basename "$dep_file") (phase $dep_phase_num/$dep_phase) — forward dependency")
+      fi
+    done <<< "$(get_dep_refs "$file")"
+  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+
+  if [[ ${#failures[@]} -gt 0 ]]; then
+    printf "Forward dependency failures (deps should point to same or earlier phase):\n"
+    printf "  %s\n" "${failures[@]}"
+    return 1
+  fi
+}
+
 @test "all pipeline knowledge-base references resolve to existing entries" {
   local kb_names
   kb_names="$(get_knowledge_names)"

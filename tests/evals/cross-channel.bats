@@ -92,7 +92,7 @@ is_consolidation() {
 
       # Check if next step has current step in its dependencies
       local next_deps
-      next_deps="$(get_dep_refs "$next_pipeline")"
+      next_deps="$(get_dep_refs "$next_pipeline" 2>/dev/null || true)"
       # This is a soft check — dependency chains can be indirect
     done <<< "$next_commands"
   done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
