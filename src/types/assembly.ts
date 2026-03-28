@@ -88,6 +88,8 @@ export interface AssemblyOptions {
   depthProvenance: DepthProvenance
   updateMode: boolean
   existingArtifact?: ExistingArtifact
+  /** When true, inject auto-fix instructions for review steps in rework mode. */
+  reworkFix?: boolean
 }
 
 /** Result from AssemblyEngine.assemble(). */

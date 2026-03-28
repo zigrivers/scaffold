@@ -566,4 +566,28 @@ describe('AssemblyEngine', () => {
     const result = engine.assemble('create-prd', makeOptions({ decisions: '' }))
     expect(result.prompt!.metadata.decisionCount).toBe(0)
   })
+
+  // --- Rework Fix ---
+
+  it('injects auto-fix instructions when reworkFix is true', () => {
+    const result = engine.assemble('review-prd', makeOptions({ reworkFix: true }))
+
+    expect(result.success).toBe(true)
+    expect(result.prompt!.text).toContain('Rework Mode: Auto-Fix Enabled')
+    expect(result.prompt!.text).toContain('Apply fixes directly to the artifact')
+  })
+
+  it('does not inject auto-fix instructions when reworkFix is false', () => {
+    const result = engine.assemble('review-prd', makeOptions({ reworkFix: false }))
+
+    expect(result.success).toBe(true)
+    expect(result.prompt!.text).not.toContain('Rework Mode: Auto-Fix Enabled')
+  })
+
+  it('does not inject auto-fix instructions when reworkFix is undefined', () => {
+    const result = engine.assemble('review-prd', makeOptions())
+
+    expect(result.success).toBe(true)
+    expect(result.prompt!.text).not.toContain('Rework Mode: Auto-Fix Enabled')
+  })
 })
