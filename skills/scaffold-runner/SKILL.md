@@ -201,7 +201,7 @@ When running `review-user-stories` at depth 5, check if `codex` or `gemini` CLI 
 
 **`ai-memory-setup`** — Three-tier AI memory configuration:
 - Tier 1 (Modular Rules): Extracts conventions from coding-standards.md, tech-stack.md, git-workflow.md into path-scoped `.claude/rules/` files. Always recommended.
-- Tier 2 (Persistent Memory): Configures MCP memory server (Engram/hmem/Claude-Mem), lifecycle hooks (PreCompact, Stop), and decision logging in `docs/decisions/`.
+- Tier 2 (Persistent Memory): Configures MCP Knowledge Graph server (`@modelcontextprotocol/server-memory`), lifecycle hooks (PreCompact, Stop), and decision logging in `docs/decisions/`.
 - Tier 3 (External Context): Adds library documentation server (Context7/Nia/Docfork) to prevent API hallucination. Only relevant for projects with external dependencies.
 
 The step auto-detects installed MCP servers and presents tier choices as decision points. Brownfield detection: if `.claude/rules/` exists, enters update mode preserving user customizations.
