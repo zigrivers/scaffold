@@ -170,6 +170,20 @@ describe('StateManager', () => {
       }
     })
 
+    it('auto-creates step entry when step is not in state', () => {
+      const tempDir = makeTempDir()
+      const manager = new StateManager(tempDir, computeEligible)
+      manager.initializeState(INIT_OPTIONS)
+
+      // 'ai-memory-setup' is not in ENABLED_STEPS / state
+      manager.setInProgress('ai-memory-setup', 'agent-1')
+
+      const state = manager.loadState()
+      expect(state.steps['ai-memory-setup']).toBeDefined()
+      expect(state.steps['ai-memory-setup'].status).toBe('in_progress')
+      expect(state.in_progress?.step).toBe('ai-memory-setup')
+    })
+
     it('only one step can be in_progress at a time', () => {
       const tempDir = makeTempDir()
       const manager = new StateManager(tempDir, computeEligible)
