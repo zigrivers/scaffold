@@ -7,7 +7,7 @@ dependencies: [tdd]
 outputs: [docs/reviews/review-testing.md, docs/reviews/testing/review-summary.md, docs/reviews/testing/codex-review.json, docs/reviews/testing/gemini-review.json]
 reads: [domain-modeling, system-architecture]
 conditional: null
-knowledge-base: [review-methodology, review-testing-strategy]
+knowledge-base: [review-methodology, review-testing-strategy, multi-model-review-dispatch, review-step-template]
 ---
 
 ## Purpose

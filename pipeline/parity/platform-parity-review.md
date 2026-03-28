@@ -7,7 +7,7 @@ dependencies: [review-architecture, review-database, review-api, review-ux]
 outputs: [docs/reviews/platform-parity-review.md, docs/reviews/platform-parity/review-summary.md, docs/reviews/platform-parity/codex-review.json, docs/reviews/platform-parity/gemini-review.json]
 reads: [user-stories, coding-standards, tech-stack, project-structure, tdd]
 conditional: "if-needed"
-knowledge-base: [cross-phase-consistency]
+knowledge-base: [cross-phase-consistency, multi-model-review-dispatch, review-step-template]
 ---
 
 ## Purpose

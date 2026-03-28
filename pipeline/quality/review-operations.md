@@ -6,7 +6,7 @@ order: 940
 dependencies: [operations]
 outputs: [docs/reviews/review-operations.md, docs/reviews/operations/review-summary.md, docs/reviews/operations/codex-review.json, docs/reviews/operations/gemini-review.json]
 conditional: null
-knowledge-base: [review-methodology, review-operations]
+knowledge-base: [review-methodology, review-operations, multi-model-review-dispatch, review-step-template]
 ---
 
 ## Purpose

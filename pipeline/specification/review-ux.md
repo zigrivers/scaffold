@@ -6,7 +6,7 @@ order: 860
 dependencies: [ux-spec]
 outputs: [docs/reviews/review-ux.md, docs/reviews/ux/review-summary.md, docs/reviews/ux/codex-review.json, docs/reviews/ux/gemini-review.json]
 conditional: "if-needed"
-knowledge-base: [review-methodology, review-ux-specification]
+knowledge-base: [review-methodology, review-ux-specification, multi-model-review-dispatch, review-step-template]
 ---
 
 ## Purpose

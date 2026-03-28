@@ -6,7 +6,7 @@ order: 720
 dependencies: [system-architecture]
 outputs: [docs/reviews/review-architecture.md, docs/reviews/architecture/review-summary.md, docs/reviews/architecture/codex-review.json, docs/reviews/architecture/gemini-review.json]
 conditional: null
-knowledge-base: [review-methodology, review-system-architecture]
+knowledge-base: [review-methodology, review-system-architecture, multi-model-review-dispatch, review-step-template]
 ---
 
 ## Purpose

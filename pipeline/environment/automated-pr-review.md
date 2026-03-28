@@ -7,7 +7,7 @@ dependencies: [git-workflow]
 outputs: [AGENTS.md, docs/review-standards.md]
 reads: [tdd]
 conditional: "if-needed"
-knowledge-base: [review-methodology]
+knowledge-base: [review-methodology, automated-review-tooling]
 ---
 
 ## Purpose

@@ -6,7 +6,7 @@ order: 960
 dependencies: [security]
 outputs: [docs/reviews/review-security.md, docs/reviews/security/review-summary.md, docs/reviews/security/codex-review.json, docs/reviews/security/gemini-review.json]
 conditional: null
-knowledge-base: [review-methodology, review-security]
+knowledge-base: [review-methodology, review-security, multi-model-review-dispatch, review-step-template]
 ---
 
 ## Purpose
