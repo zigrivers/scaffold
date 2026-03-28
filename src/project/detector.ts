@@ -10,7 +10,10 @@ export function detectProjectMode(projectRoot: string): DetectionResult {
   const signals: ProjectSignal[] = []
 
   // Check for v1 tracking comments (highest priority)
-  const v1Files = ['docs/prd.md', 'docs/plan.md', 'docs/user-stories.md', 'docs/domain-model.md', 'docs/system-architecture.md']
+  const v1Files = [
+    'docs/prd.md', 'docs/plan.md', 'docs/user-stories.md',
+    'docs/domain-model.md', 'docs/system-architecture.md',
+  ]
   let hasV1Tracking = false
   for (const relPath of v1Files) {
     const fullPath = path.join(projectRoot, relPath)

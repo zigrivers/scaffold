@@ -2,6 +2,39 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.29.0] — 2026-03-28
+
+### Added
+
+- **TypeScript tests in CI** — CI workflow now installs Node.js, runs `npm run lint`, `npm run type-check`, `npm test`, and `npm run build` on every PR. Previously only bash tests ran.
+- **Coverage thresholds** — vitest enforces 84/80/88/84 (statements/branches/functions/lines) minimums. Any PR that drops coverage below these floors fails CI.
+- **`make check-all` target** — Unified quality gate that runs both bash gates (`make check`) and TypeScript gates (`ts-check`) in one command.
+- **4 new validation test files** — Dedicated tests for `config-validator.ts`, `dependency-validator.ts`, `frontmatter-validator.ts`, `state-validator.ts` (87 tests, 57% → 92% branch coverage).
+- **3 new meta-eval files** — `output-consumption.bats` (pipeline outputs consumed downstream), `dependency-ordering.bats` (transitive ordering + cycle detection), `prompt-quality.bats` (section content, placeholders, Mode Detection phrasing). 7 new eval tests.
+- **4 extended meta-evals** — `pipeline-completeness.bats` (conditional step validity), `command-structure.bats` (After This Step chain integrity), `cross-channel.bats` (knowledge-base reference quality).
+- **`vitest.e2e.config.ts`** — Dedicated E2E test config. The `test:e2e` npm script was previously broken (referenced a missing file).
+- **`tests/install-uninstall.bats`** — 15 tests for install.sh and uninstall.sh scripts using mocked HOME directory.
+- **`tests/helpers/fixtures.ts`** — Shared test fixture factory for MetaPrompt, Config, State, Preset, DependencyGraph, and AssemblyResult types.
+- **`src/core/dependency/graph.test.ts`** — 12 dedicated unit tests for DAG construction.
+- **`src/wizard/suggestion.test.ts`** — 29 tests for methodology suggestion engine.
+
+### Changed
+
+- **Overall test coverage: 84% → 90%** — 997 TypeScript tests (was 772), 70 bats tests (was 54), 39 meta-evals (was 28).
+- **`skill.ts` coverage: 47% → 96% branches** — 12 tests covering install/remove/list in all modes.
+- **`run.ts` coverage: 68% → 86% branches** — 33 tests covering crash recovery, update mode, depth downgrade, interactive flows.
+- **`reset.ts` coverage: 68% → 95% branches** — 29 tests covering interactive confirmation, lock failures, force overrides.
+- **`validation/` coverage: 57% → 92% branches** — 4 dedicated test files with 87 tests.
+- **`knowledge-loader.ts` coverage: 68% → 95% statements** — 47 tests covering Deep Guidance extraction, overrides, edge cases.
+- **`update.ts` coverage: 57% → 91% statements** — 19 tests covering version checks, network errors, CLI auth.
+- **`version.ts` coverage: 59% → 98% statements** — 16 tests covering JSON output, registry fetch, error handling.
+- **Renamed `test:bench` to `test:perf`** in package.json (performance tests use `.test.ts`, not `.bench.ts`).
+
+### Fixed
+
+- **64 ESLint errors** — All fixed (unused vars, line length, `any` types, quotes, trailing commas). Zero lint errors remaining.
+- **Broken `test:e2e` script** — Created missing `vitest.e2e.config.ts`.
+
 ## [2.28.1] — 2026-03-28
 
 ### Fixed

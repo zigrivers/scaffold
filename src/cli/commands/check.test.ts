@@ -120,8 +120,10 @@ describe('check command', () => {
   })
 
   it('exits 2 when step not found', async () => {
+    type MetaPromptValue =
+      ReturnType<typeof discoverMetaPrompts> extends Map<string, infer V> ? V : never
     mockDiscoverMetaPrompts.mockReturnValue(new Map([
-      ['some-step', makeMetaPrompt('some-step') as ReturnType<typeof discoverMetaPrompts> extends Map<string, infer V> ? V : never],
+      ['some-step', makeMetaPrompt('some-step') as MetaPromptValue],
     ]))
     await checkCommand.handler(defaultArgv({ step: 'nonexistent' }))
     expect(exitSpy).toHaveBeenCalledWith(2)
@@ -129,8 +131,10 @@ describe('check command', () => {
 
   it('shows fuzzy suggestion when step not found', async () => {
     mockFindClosestMatch.mockReturnValue('add-e2e-testing')
+    type MetaPromptVal =
+      ReturnType<typeof discoverMetaPrompts> extends Map<string, infer V> ? V : never
     mockDiscoverMetaPrompts.mockReturnValue(new Map([
-      ['add-e2e-testing', makeMetaPrompt('add-e2e-testing', 'if-needed') as ReturnType<typeof discoverMetaPrompts> extends Map<string, infer V> ? V : never],
+      ['add-e2e-testing', makeMetaPrompt('add-e2e-testing', 'if-needed') as MetaPromptVal],
     ]))
     await checkCommand.handler(defaultArgv({ step: 'add-e2e-testin' }))
     const allOutput = writtenLines.join('')

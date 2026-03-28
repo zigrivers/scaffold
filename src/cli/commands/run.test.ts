@@ -68,6 +68,18 @@ vi.mock('../../core/assembly/preset-loader.js', () => ({
   loadAllPresets: vi.fn(),
 }))
 
+vi.mock('node:fs', async () => {
+  const actual = await vi.importActual<typeof import('node:fs')>('node:fs')
+  return {
+    ...actual,
+    default: {
+      ...actual,
+      existsSync: vi.fn(actual.existsSync),
+      readFileSync: vi.fn(actual.readFileSync),
+    },
+  }
+})
+
 vi.mock('../../config/loader.js', () => ({
   loadConfig: vi.fn(),
 }))
@@ -124,6 +136,7 @@ import { computeEligible } from '../../core/dependency/eligibility.js'
 import { findProjectRoot } from '../../cli/middleware/project-root.js'
 import { createOutputContext } from '../../cli/output/context.js'
 import { resolveOutputMode } from '../../cli/middleware/output-mode.js'
+import fs from 'node:fs'
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -677,6 +690,338 @@ describe('run command handler', () => {
         .rejects.toThrow('process.exit called')
 
       expect(releaseLock).toHaveBeenCalledWith(PROJECT_ROOT)
+    })
+  })
+
+  describe('crash recovery: interactive mode ask_user', () => {
+    function setupCrashState() {
+      const stateWithInProgress = makeState(
+        { 'create-prd': { status: 'in_progress', source: 'pipeline', produces: ['docs/prd.md'] } },
+        { step: 'create-prd', started: '2024-01-01T00:00:00.000Z', partial_artifacts: [], actor: 'scaffold-run' },
+      )
+      vi.mocked(StateManager.prototype.loadState).mockReturnValue(stateWithInProgress)
+      vi.mocked(analyzeCrash).mockReturnValue({
+        action: 'ask_user',
+        presentArtifacts: ['docs/prd.md'],
+        missingArtifacts: ['docs/other.md'],
+      })
+      vi.mocked(resolveOutputMode).mockReturnValue('interactive')
+    }
+
+    it('marks completed when user confirms crash recovery', async () => {
+      setupCrashState()
+      // First confirm: crash recovery "mark as completed?" → yes
+      // Second confirm: step complete? → yes (after assembly output)
+      mockOutput.confirm = vi.fn()
+        .mockResolvedValueOnce(true)   // crash recovery: mark as completed
+        .mockResolvedValueOnce(true)   // step complete
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
+        .rejects.toThrow('process.exit called')
+
+      expect(StateManager.prototype.markCompleted).toHaveBeenCalledWith(
+        'create-prd',
+        [],
+        'scaffold-crash-recovery',
+        3,
+      )
+      expect(StateManager.prototype.clearInProgress).toHaveBeenCalled()
+    })
+
+    it('clears in_progress without completing when user declines crash recovery', async () => {
+      setupCrashState()
+      // First confirm: crash recovery "mark as completed?" → no
+      // Second confirm: step complete? → yes (after assembly output)
+      mockOutput.confirm = vi.fn()
+        .mockResolvedValueOnce(false)  // crash recovery: do not mark completed
+        .mockResolvedValueOnce(true)   // step complete
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
+        .rejects.toThrow('process.exit called')
+
+      // Should have called clearInProgress but NOT markCompleted with crash-recovery source
+      const markCompletedCalls = vi.mocked(StateManager.prototype.markCompleted).mock.calls
+      const crashRecoveryCalls = markCompletedCalls.filter(
+        call => call[2] === 'scaffold-crash-recovery',
+      )
+      expect(crashRecoveryCalls).toHaveLength(0)
+      expect(StateManager.prototype.clearInProgress).toHaveBeenCalled()
+    })
+  })
+
+  describe('update mode: interactive confirmation', () => {
+    function setupUpdateMode(warnings: Array<{ code: string; message: string }> = []) {
+      vi.mocked(detectUpdateMode).mockReturnValue({
+        isUpdateMode: true,
+        currentDepth: 3,
+        existingArtifact: {
+          filePath: 'docs/prd.md',
+          content: 'old content',
+          previousDepth: 3,
+          completionTimestamp: '2024-01-01T00:00:00.000Z',
+        },
+        warnings,
+      })
+      vi.mocked(resolveOutputMode).mockReturnValue('interactive')
+    }
+
+    it('exits 4 when user declines update mode confirmation', async () => {
+      setupUpdateMode()
+      // User declines re-run confirmation
+      mockOutput.confirm = vi.fn().mockResolvedValueOnce(false)
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
+        .rejects.toThrow('process.exit called')
+
+      expect(exitSpy).toHaveBeenCalledWith(4)
+      expect(releaseLock).toHaveBeenCalledWith(PROJECT_ROOT)
+    })
+
+    it('proceeds when user confirms depth downgrade', async () => {
+      setupUpdateMode([{ code: 'ASM_DEPTH_DOWNGRADE', message: 'Depth downgraded from 4 to 3' }])
+      // First confirm: re-run in update mode? → yes
+      // Second confirm: depth downgrade? → yes
+      // Third confirm: step complete? → yes
+      mockOutput.confirm = vi.fn()
+        .mockResolvedValueOnce(true)   // update mode confirmation
+        .mockResolvedValueOnce(true)   // depth downgrade confirmation
+        .mockResolvedValueOnce(true)   // step complete
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
+        .rejects.toThrow('process.exit called')
+
+      expect(exitSpy).toHaveBeenCalledWith(0)
+      expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('assembled prompt text'))
+    })
+
+    it('exits 4 when user declines depth downgrade', async () => {
+      setupUpdateMode([{ code: 'ASM_DEPTH_DOWNGRADE', message: 'Depth downgraded from 4 to 3' }])
+      // First confirm: re-run in update mode? → yes
+      // Second confirm: depth downgrade? → no
+      mockOutput.confirm = vi.fn()
+        .mockResolvedValueOnce(true)   // update mode confirmation
+        .mockResolvedValueOnce(false)  // depth downgrade → decline
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
+        .rejects.toThrow('process.exit called')
+
+      expect(exitSpy).toHaveBeenCalledWith(4)
+      expect(releaseLock).toHaveBeenCalledWith(PROJECT_ROOT)
+    })
+
+    it('outputs warnings and proceeds in auto mode with depth downgrade', async () => {
+      vi.mocked(detectUpdateMode).mockReturnValue({
+        isUpdateMode: true,
+        currentDepth: 3,
+        existingArtifact: {
+          filePath: 'docs/prd.md',
+          content: 'old content',
+          previousDepth: 4,
+          completionTimestamp: '2024-01-01T00:00:00.000Z',
+        },
+        warnings: [{ code: 'ASM_DEPTH_DOWNGRADE', message: 'Depth downgraded from 4 to 3' }],
+      })
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
+        .rejects.toThrow('process.exit called')
+
+      expect(mockOutput.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'ASM_DEPTH_DOWNGRADE' }),
+      )
+      expect(exitSpy).toHaveBeenCalledWith(0)
+    })
+  })
+
+  describe('lock warning display', () => {
+    it('displays warning when acquireLock returns a warning', async () => {
+      vi.mocked(acquireLock).mockReturnValue({
+        acquired: true,
+        warning: { code: 'LOCK_STALE_CLEARED', message: 'Stale lock cleared' },
+      })
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
+        .rejects.toThrow('process.exit called')
+
+      expect(mockOutput.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'LOCK_STALE_CLEARED', message: 'Stale lock cleared' }),
+      )
+    })
+  })
+
+  describe('interactive mode: skip marking', () => {
+    it('marks step as skipped when user declines completion but confirms skip', async () => {
+      vi.mocked(resolveOutputMode).mockReturnValue('interactive')
+      mockOutput.confirm = vi.fn()
+        .mockResolvedValueOnce(false)  // Step complete? → no
+        .mockResolvedValueOnce(true)   // Mark as skipped? → yes
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
+        .rejects.toThrow('process.exit called')
+
+      expect(StateManager.prototype.markSkipped).toHaveBeenCalledWith(
+        'create-prd',
+        'user-cancelled',
+        'scaffold-run',
+      )
+      expect(exitSpy).toHaveBeenCalledWith(4)
+    })
+  })
+
+  describe('interactive mode: next eligible steps display', () => {
+    it('displays next eligible steps after completion', async () => {
+      vi.mocked(resolveOutputMode).mockReturnValue('interactive')
+      vi.mocked(computeEligible).mockReturnValue(['create-arch', 'create-api'])
+      mockOutput.confirm = vi.fn().mockResolvedValue(true)
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
+        .rejects.toThrow('process.exit called')
+
+      expect(mockOutput.info).toHaveBeenCalledWith(
+        expect.stringContaining('Next eligible: create-arch, create-api'),
+      )
+    })
+
+    it('displays "No more eligible steps" when none available', async () => {
+      vi.mocked(resolveOutputMode).mockReturnValue('interactive')
+      vi.mocked(computeEligible).mockReturnValue([])
+      mockOutput.confirm = vi.fn().mockResolvedValue(true)
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
+        .rejects.toThrow('process.exit called')
+
+      expect(mockOutput.info).toHaveBeenCalledWith('No more eligible steps.')
+    })
+  })
+
+  describe('unexpected error handling', () => {
+    it('releases lock and exits 1 when assembly engine throws unexpected error', async () => {
+      vi.mocked(AssemblyEngine.prototype.assemble).mockImplementation(() => {
+        throw new Error('unexpected engine failure')
+      })
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
+        .rejects.toThrow('process.exit called')
+
+      expect(releaseLock).toHaveBeenCalledWith(PROJECT_ROOT)
+      expect(mockOutput.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: 'RUN_UNEXPECTED_ERROR',
+          message: 'unexpected engine failure',
+          exitCode: 1,
+        }),
+      )
+      expect(exitSpy).toHaveBeenCalledWith(1)
+    })
+  })
+
+  describe('methodology change warnings', () => {
+    it('outputs methodology change warnings', async () => {
+      vi.mocked(detectMethodologyChange).mockReturnValue({
+        changed: true,
+        stateMeta: 'deep',
+        configMeta: 'mvp',
+        warnings: [
+          { code: 'METHODOLOGY_CHANGED', message: 'Methodology changed from deep to mvp' },
+        ],
+      })
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
+        .rejects.toThrow('process.exit called')
+
+      expect(mockOutput.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'METHODOLOGY_CHANGED' }),
+      )
+    })
+  })
+
+  describe('artifact loading from completed dependencies', () => {
+    it('loads artifacts from completed dependency steps', async () => {
+      // Set up two-step pipeline: create-prd depends on setup-project
+      const setupMeta = makeMetaPrompt({
+        stepName: 'setup-project',
+        frontmatter: makeFrontmatter({
+          name: 'setup-project',
+          phase: 'prerequisites',
+          order: 0,
+          dependencies: [],
+          outputs: ['docs/setup.md'],
+        }),
+      })
+      const prdMeta = makeMetaPrompt({
+        stepName: 'create-prd',
+        frontmatter: makeFrontmatter({
+          name: 'create-prd',
+          dependencies: ['setup-project'],
+          outputs: ['docs/prd.md'],
+        }),
+      })
+      vi.mocked(discoverMetaPrompts).mockReturnValue(new Map([
+        ['setup-project', setupMeta],
+        ['create-prd', prdMeta],
+      ]))
+
+      // setup-project is completed with produces
+      const state = makeState({
+        'setup-project': {
+          status: 'completed',
+          source: 'pipeline',
+          produces: ['docs/setup.md'],
+          depth: 3,
+          completed_by: 'scaffold-run',
+        },
+        'create-prd': { status: 'pending', source: 'pipeline', produces: ['docs/prd.md'] },
+      })
+      vi.mocked(StateManager.prototype.loadState).mockReturnValue(state)
+
+      // Graph with dependency
+      const graph: DependencyGraph = {
+        nodes: new Map([
+          ['setup-project', {
+            slug: 'setup-project', phase: 'prerequisites',
+            order: 0, dependencies: [], enabled: true,
+          }],
+          ['create-prd', {
+            slug: 'create-prd', phase: 'modeling',
+            order: 1, dependencies: ['setup-project'], enabled: true,
+          }],
+        ]),
+        edges: new Map([
+          ['setup-project', ['create-prd']],
+          ['create-prd', []],
+        ]),
+      }
+      vi.mocked(buildGraph).mockReturnValue(graph)
+
+      // Mock fs to return artifact content
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        if (String(p).includes('docs/setup.md')) return true
+        return false
+      })
+      vi.mocked(fs.readFileSync).mockImplementation((p: fs.PathOrFileDescriptor, _opts?: unknown) => {
+        if (String(p).includes('docs/setup.md')) return '# Setup Document\nContent here.'
+        throw new Error(`ENOENT: no such file: ${String(p)}`)
+      })
+
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
+        .rejects.toThrow('process.exit called')
+
+      // Verify the assembly engine received artifacts
+      expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+        'create-prd',
+        expect.objectContaining({
+          artifacts: expect.arrayContaining([
+            expect.objectContaining({
+              stepName: 'setup-project',
+              filePath: 'docs/setup.md',
+              content: '# Setup Document\nContent here.',
+            }),
+          ]),
+        }),
+      )
+      expect(exitSpy).toHaveBeenCalledWith(0)
     })
   })
 })

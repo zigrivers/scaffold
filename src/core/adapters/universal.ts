@@ -30,7 +30,6 @@ export class UniversalAdapter implements PlatformAdapter {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   finalize(_input: AdapterFinalizeInput): AdapterFinalizeResult {
     const stepList = this.collectedSteps
       .map((s) => `- \`scaffold run ${s.slug}\` — ${s.description}`)

@@ -1,5 +1,5 @@
 import type { CommandModule } from 'yargs'
-import path from 'node:path'
+
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { getPackagePipelineDir } from '../../utils/fs.js'
 import { StateManager } from '../../state/state-manager.js'

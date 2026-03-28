@@ -1,6 +1,6 @@
 // src/validation/index.ts
 
-import path from 'node:path'
+
 import type { ScaffoldError, ScaffoldWarning } from '../types/index.js'
 import { discoverMetaPrompts } from '../core/assembly/meta-prompt-loader.js'
 import { getPackagePipelineDir } from '../utils/fs.js'

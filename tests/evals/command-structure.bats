@@ -88,3 +88,38 @@ is_after_exempt() {
     return 1
   fi
 }
+
+@test "After This Step references point to existing commands" {
+  local failures=()
+  local checked=0
+
+  for cmd_file in "${PROJECT_ROOT}"/commands/*.md; do
+    local slug
+    slug="$(basename "$cmd_file" .md)"
+
+    # Extract After This Step section
+    local after_section
+    after_section="$(awk '/^## After This Step/{found=1; next} /^## /{if(found) exit} found{print}' "$cmd_file")"
+    [[ -z "$after_section" ]] && continue
+
+    # Extract /scaffold: references
+    local next_commands
+    next_commands="$(echo "$after_section" | grep -o '/scaffold:[a-z0-9-]*' | sed 's|/scaffold:||' | sort -u || true)"
+    [[ -z "$next_commands" ]] && continue
+
+    while IFS= read -r next_cmd; do
+      [[ -z "$next_cmd" ]] && continue
+      checked=$((checked + 1))
+
+      if [[ ! -f "${PROJECT_ROOT}/commands/${next_cmd}.md" ]]; then
+        failures+=("${slug}: After This Step references '/scaffold:${next_cmd}' but commands/${next_cmd}.md does not exist")
+      fi
+    done <<< "$next_commands"
+  done
+
+  if [[ ${#failures[@]} -gt 0 ]]; then
+    printf "Dangling After This Step references (%d checked):\n" "$checked"
+    printf "  %s\n" "${failures[@]}"
+    return 1
+  fi
+}

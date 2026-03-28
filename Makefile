@@ -1,4 +1,4 @@
-.PHONY: help test lint validate check eval setup hooks install uninstall extract dashboard-test
+.PHONY: help test lint validate check check-all eval ts-check setup hooks install uninstall extract dashboard-test
 
 help: ## Show available targets
 	@grep -E '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -12,7 +12,15 @@ lint: ## Run ShellCheck on all shell scripts
 validate: ## Validate frontmatter in command files
 	./scripts/validate-frontmatter.sh commands/*.md
 
-check: lint validate test eval ## Run all quality gates (lint + validate + test + eval)
+check: lint validate test eval ## Run bash quality gates (lint + validate + test + eval)
+
+check-all: check ts-check ## Run all quality gates (bash + TypeScript)
+
+ts-check: ## Run TypeScript quality gates (lint + type-check + unit tests + build)
+	npm run lint
+	npm run type-check
+	npm test
+	npm run build
 
 eval: ## Run scaffold meta-evals (cross-system consistency checks)
 	npx bats tests/evals/

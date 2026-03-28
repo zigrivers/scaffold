@@ -164,3 +164,29 @@ REQUIRED_SECTIONS=("## Purpose" "## Inputs" "## Expected Outputs" "## Quality Cr
     return 1
   fi
 }
+
+@test "conditional steps document their conditions in the body" {
+  local failures=()
+  while IFS= read -r file; do
+    local conditional
+    conditional="$(extract_field "$file" "conditional")"
+    # Skip steps that are not conditional (null, false, or empty)
+    [[ -z "$conditional" || "$conditional" == "null" || "$conditional" == "false" ]] && continue
+
+    # Conditional steps should mention their condition in Mode Detection
+    # or have a section explaining when to run
+    local body
+    body="$(awk '/^---$/{ if(++c==2) start=1; next } start{print}' "$file")"
+
+    # Check for conditional language in Mode Detection or body
+    if ! echo "$body" | grep -qi "conditional\|only.*when\|skip.*if\|required.*when\|applicable.*to\|web.*app\|mobile\|expo\|multi.platform\|if.needed\|when.*present\|if.*exists\|optional\|may.*skip\|not.*all.*projects\|relevant.*project"; then
+      failures+=("$(basename "$file"): conditional='${conditional}' but body lacks conditional guidance")
+    fi
+  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+
+  if [[ ${#failures[@]} -gt 0 ]]; then
+    printf "Conditional steps missing condition documentation:\n"
+    printf "  %s\n" "${failures[@]}"
+    return 1
+  fi
+}

@@ -48,7 +48,6 @@ export class CodexAdapter implements PlatformAdapter {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   finalize(_input: AdapterFinalizeInput): AdapterFinalizeResult {
     const phases = new Map<string, AdapterStepInput[]>()
 
