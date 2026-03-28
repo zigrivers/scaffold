@@ -1,8 +1,10 @@
 ---
 name: system-architecture
 description: Architecture patterns, component design, and project structure
-topics: [architecture, components, modules, data-flows, project-structure, state-management]
+topics: [architecture, components, modules, data-flow, project-structure, state-management]
 ---
+
+## Summary
 
 ## Architecture Patterns
 
@@ -80,6 +82,8 @@ For most scaffold pipeline projects:
 3. Consider **event-driven** if the domain naturally involves reactive workflows, audit requirements, or multiple consumers of business events.
 4. Use **microservices** only if you have multiple teams that need independent deployment, or specific services with dramatically different scaling needs.
 5. Avoid **layered** unless the application is genuinely simple (CRUD with minimal business logic).
+
+## Deep Guidance
 
 ## Component Design
 

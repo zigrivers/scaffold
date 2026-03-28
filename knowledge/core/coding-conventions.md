@@ -1,7 +1,7 @@
 ---
 name: coding-conventions
 description: Universal coding standards patterns across languages and linter/formatter configuration
-topics: [coding-standards, linting, formatting, naming-conventions, error-handling, code-style]
+topics: [coding-standards, linting, formatting, naming, error-handling, code-style]
 ---
 
 # Coding Conventions

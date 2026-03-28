@@ -4,6 +4,8 @@ description: Domain-driven design patterns for identifying and modeling project 
 topics: [ddd, domain-modeling, entities, aggregates, bounded-contexts, domain-events, value-objects]
 ---
 
+## Summary
+
 ## Strategic DDD Patterns
 
 Strategic DDD operates at the system level, answering where domain boundaries fall and how domains communicate.
@@ -53,6 +55,8 @@ Not all parts of a system are equally important or complex. Classify domains by 
 **Generic Domain** — Solved problems that are the same across industries. Authentication, email delivery, payment processing, and logging. Use existing solutions (libraries, services, SaaS) rather than building custom implementations.
 
 **Classification decisions matter because they drive resource allocation.** Over-investing in a generic domain (building a custom auth system when Auth0 exists) wastes effort. Under-investing in a core domain (using a generic CRUD framework for your competitive advantage) produces mediocre software.
+
+## Deep Guidance
 
 ## Tactical DDD Patterns
 

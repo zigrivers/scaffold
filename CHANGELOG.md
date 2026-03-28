@@ -15,6 +15,8 @@ All notable changes to Scaffold are documented here.
 - **Review step Pattern A normalization** — Added missing Pattern A criteria (P0-P3 categorization, fix plan, downstream readiness) to 6 Pattern C review steps: `review-api`, `review-database`, `review-ux`, `review-operations`, `review-security`, `review-testing`.
 - **Implementation handoff improvements** — Added task-type minimum-context taxonomy, `make eval` quality gate, specification artifact inputs, error recovery documentation to playbook knowledge. Added `story-tests` and `create-evals` follow-up to `new-enhancement` command. Added `docs/onboarding-guide.md` to playbook inputs.
 
+- **Deep Guidance optimization** — Added Summary/Deep Guidance structure to 10 large knowledge entries (527→321 lines each), improving assembly engine efficiency. Normalized topic names (`data-flows`→`data-flow`, `naming-conventions`→`naming`, `gaps`→`gap-analysis`).
+
 ### Added
 
 - **Dependency coherence validation for presets** — New `validateDependencyCoherence()` function in preset-loader warns when enabled steps have disabled dependencies. The engine already treats disabled deps as satisfied (soft-dependency), but users now get explicit warnings about potential quality gaps.

@@ -1,7 +1,7 @@
 ---
 name: critical-path-analysis
 description: Tracing critical user journeys end-to-end across all specifications
-topics: [validation, critical-path, user-journeys, end-to-end, gaps]
+topics: [validation, critical-path, user-journeys, end-to-end, gap-analysis]
 ---
 
 # Critical Path Analysis

@@ -4,6 +4,8 @@ description: Database schema design, normalization, indexing, and migration patt
 topics: [database, schema, sql, nosql, migrations, indexing, data-modeling]
 ---
 
+## Summary
+
 ## From Domain Models to Schema
 
 The domain model defines what the business cares about. The database schema defines how that information is stored. The mapping between them is deliberate, not automatic.
@@ -76,6 +78,8 @@ metadata JSONB NOT NULL DEFAULT '{}'
 ```
 
 **Lookup table** — Store value objects with limited valid values in a reference table. Best for enums with associated data (status codes with descriptions, country codes with names).
+
+## Deep Guidance
 
 ### Modeling Relationships
 

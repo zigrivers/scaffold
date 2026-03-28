@@ -4,6 +4,8 @@ description: OWASP Top 10, authentication, authorization, data protection, and t
 topics: [security, owasp, authentication, authorization, threat-modeling, secrets-management, dependency-auditing]
 ---
 
+## Summary
+
 ## OWASP Top 10
 
 The OWASP Top 10 represents the most critical security risks to web applications. Every project should evaluate each risk and implement appropriate mitigations.
@@ -54,6 +56,8 @@ Sensitive data exposed due to weak or missing encryption.
 - Use TLS 1.2+ for all data in transit (HTTPS everywhere, no mixed content)
 - Hash passwords with bcrypt, scrypt, or Argon2 (NEVER MD5 or SHA-256 for passwords)
 - Don't store sensitive data you don't need — the safest data is data you don't have
+
+## Deep Guidance
 
 ### A03: Injection
 

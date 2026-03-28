@@ -4,6 +4,8 @@ description: API design principles for REST, GraphQL, and inter-service communic
 topics: [api, rest, graphql, endpoints, contracts, versioning, error-handling, authentication]
 ---
 
+## Summary
+
 ## API-First Development
 
 Design the API contract before writing implementation code. The contract defines what the API does; the implementation fulfills that contract. This order matters because:
@@ -80,6 +82,8 @@ Or use a command-style resource:
 POST /api/v1/order-submissions       # Create an "order submission" resource
 POST /api/v1/password-resets         # Create a "password reset" resource
 ```
+
+## Deep Guidance
 
 ### HTTP Methods
 

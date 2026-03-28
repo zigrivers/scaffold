@@ -10,6 +10,8 @@ The implementation playbook is the definitive reference for AI agents executing 
 
 This is the most critical finalization document. If the onboarding guide tells agents "what this project is," the playbook tells them "how to do the work."
 
+## Summary
+
 ## Task Execution Protocol
 
 ### How Agents Pick Work
@@ -75,6 +77,8 @@ When a per-task context block is incomplete, agents should consult this taxonomy
 | Infrastructure/CI | `docs/dev-setup.md`, `docs/git-workflow.md`, `docs/operations-runbook.md` | Deployment pipeline stages |
 | Bug fix | Relevant source code, `docs/tdd-standards.md`, `docs/coding-standards.md` | Related test files, reproduction steps |
 | Security hardening | `docs/security-review.md`, `docs/api-contracts.md`, `docs/coding-standards.md` | OWASP checklist items from security review |
+
+## Deep Guidance
 
 ## Coding Standards
 

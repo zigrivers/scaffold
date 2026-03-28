@@ -4,6 +4,8 @@ description: Writing effective architecture decision records including technolog
 topics: [adr, architecture-decisions, tech-stack, decision-documentation, technology-selection]
 ---
 
+## Summary
+
 ## What Warrants an ADR
 
 An Architecture Decision Record captures a decision that is architecturally significant — one that affects the system's structure, non-functional characteristics, dependencies, interfaces, or construction techniques. Not every decision needs an ADR. The litmus test: would a new team member need to know why this choice was made to work effectively?
@@ -60,6 +62,8 @@ Each technology choice should compare the top 2-3 realistic options, state the s
 - Implementation details within a bounded context (which sorting algorithm) — unless performance-critical
 - Temporary decisions (experiment with X for a spike) — not architectural
 - Decisions that have no realistic alternatives — if there's only one viable option, just use it
+
+## Deep Guidance
 
 ## ADR Structure
 
