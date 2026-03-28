@@ -390,7 +390,7 @@ run_gemini() {
     echo "  Running Gemini CLI review..."
     echo "═══════════════════════════════════════════════════"
 
-    if gemini -p "$REVIEW_PROMPT" \
+    if NO_BROWSER=true gemini -p "$REVIEW_PROMPT" \
         --output-format json \
         --yolo \
         -m gemini-2.5-pro \
@@ -412,7 +412,7 @@ run_gemini() {
 
 CRITICAL: Your previous response was not valid JSON. Return ONLY a raw JSON object. No markdown, no code fences, no commentary."
 
-        if gemini -p "$retry_prompt" \
+        if NO_BROWSER=true gemini -p "$retry_prompt" \
             --output-format json \
             --yolo \
             -m gemini-2.5-pro \

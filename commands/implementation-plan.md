@@ -49,12 +49,20 @@ Read ALL of these before creating any tasks or documentation:
 |----------|----------------|
 | `docs/plan.md` | Features to build, technical requirements, constraints |
 | `docs/user-stories.md` | Acceptance criteria, user flows, priority |
+| `docs/system-architecture.md` | Component structure, data flows, module boundaries |
+| `docs/domain-models/` | Entities, aggregates, domain events, bounded contexts |
+| `docs/adrs/` | Technology choices, architectural patterns, constraints |
 | `docs/project-structure.md` | File locations, module organization strategy, high-contention files, shared code rules |
 | `docs/tdd-standards.md` | Test categories (unit/integration/e2e), which code gets which test type, mocking strategy, test file locations, reference patterns |
 | `docs/coding-standards.md` | Naming conventions, code style, patterns to follow |
 | `docs/tech-stack.md` | Libraries, frameworks, tooling |
 | `docs/dev-setup.md` | Available dev commands, environment setup, Key Commands |
 | `docs/git-workflow.md` | CI configuration, branch protection, worktree setup |
+| `docs/operations-runbook.md` | *(if exists)* Deployment requirements, monitoring hooks, CI extensions |
+| `docs/security-review.md` | *(if exists)* Security controls, auth patterns, data protection requirements |
+| `docs/database-schema.md` | *(if exists)* Schema, migrations, indexes to implement |
+| `docs/api-contracts.md` | *(if exists)* Endpoints, error contracts, auth per endpoint |
+| `docs/ux-spec.md` | *(if exists)* User flows, component hierarchy, accessibility requirements |
 | `CLAUDE.md` | Workflow, priority definitions, commit format |
 
 ## What to Produce
