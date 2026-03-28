@@ -42,7 +42,7 @@ independent review validation.
 ## Methodology Scaling
 - **deep**: Full multi-pass review. Multi-model review dispatched to Codex and
   Gemini if available, with graceful fallback to Claude-only enhanced review.
-  **mvp**: OWASP coverage check only.
+- **mvp**: OWASP coverage check only.
 - **custom:depth(1-5)**: Depth 1-3: scale passes with depth. Depth 4: full
   review + one external model (if CLI available). Depth 5: full review +
   multi-model with reconciliation.
