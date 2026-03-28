@@ -57,3 +57,15 @@ parallel agents, CI pipeline, branch protection, and conflict prevention rules.
 Update mode if docs/git-workflow.md exists. In update mode: never rename CI jobs
 without checking branch protection rules, preserve worktree directory naming,
 keep setup-agent-worktree.sh customizations intact.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/git-workflow.md exists
+- **Preserve**: branch naming convention, commit message format, CI job names,
+  branch protection rules, worktree directory structure, PR template fields,
+  setup-agent-worktree.sh customizations
+- **Triggers for update**: coding-standards.md changed commit format, new CI
+  stages needed (e.g., evals added), Beads status changed (added or removed),
+  new worktree patterns needed for parallel execution
+- **Conflict resolution**: if CI job rename is required, update branch
+  protection rules in the same operation; verify CLAUDE.md workflow section
+  stays consistent after any changes

@@ -4,9 +4,9 @@ description: Review API contracts for completeness and consistency
 phase: "specification"
 order: 840
 dependencies: [api-contracts]
-outputs: [docs/reviews/review-api.md]
+outputs: [docs/reviews/review-api.md, docs/reviews/api/review-summary.md, docs/reviews/api/codex-review.json, docs/reviews/api/gemini-review.json]
 conditional: "if-needed"
-knowledge-base: [review-methodology, review-api-contracts]
+knowledge-base: [review-methodology, review-api-design]
 ---
 
 ## Purpose

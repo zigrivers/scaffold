@@ -41,4 +41,19 @@ response shapes, error codes, authentication requirements, and rate limits.
   error contracts. Depth 4-5: full OpenAPI-style spec.
 
 ## Mode Detection
-Update mode if contracts exist. Diff against architecture changes.
+Check for docs/api-contracts.md. If it exists, operate in update mode: read
+existing endpoint definitions and diff against current system architecture and
+domain models. Preserve existing endpoint paths, request/response schemas, and
+error contracts. Add new endpoints for new features or domain operations.
+Update error contracts if domain model changed validation rules. Never remove
+or rename existing endpoints without explicit user approval.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/api-contracts.md exists
+- **Preserve**: existing endpoint paths, HTTP methods, request/response schemas,
+  error codes, auth requirements, pagination patterns, versioning strategy
+- **Triggers for update**: architecture changed component boundaries, domain
+  models added new operations, ADRs changed API style or auth approach
+- **Conflict resolution**: if architecture moved an operation to a different
+  component, update the endpoint's component ownership but preserve its contract;
+  flag breaking schema changes for user review

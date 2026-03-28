@@ -3,8 +3,9 @@ name: platform-parity-review
 description: Audit all documentation for platform-specific gaps across target platforms
 phase: "parity"
 order: 1010
-dependencies: [user-stories]
-outputs: [docs/reviews/platform-parity-review.md]
+dependencies: [review-architecture, review-database, review-api, review-ux]
+outputs: [docs/reviews/platform-parity-review.md, docs/reviews/platform-parity/review-summary.md, docs/reviews/platform-parity/codex-review.json, docs/reviews/platform-parity/gemini-review.json]
+reads: [user-stories, coding-standards, tech-stack, project-structure, tdd]
 conditional: "if-needed"
 knowledge-base: [cross-phase-consistency]
 ---

@@ -121,6 +121,38 @@ export class StateManager {
   }
 
   /**
+   * Reconcile state with the current pipeline definition.
+   *
+   * Steps that exist in the pipeline but are missing from state.steps
+   * (e.g., a new step added after the project was initialized) are
+   * inserted as pending. Returns true if any steps were added (and
+   * the state was persisted).
+   */
+  reconcileWithPipeline(
+    pipelineSteps: Array<{ slug: string; produces: string[]; enabled: boolean }>,
+  ): boolean {
+    const state = this.loadState()
+    let changed = false
+
+    for (const step of pipelineSteps) {
+      // Only add enabled steps that aren't already tracked
+      if (step.enabled && !state.steps[step.slug]) {
+        state.steps[step.slug] = {
+          status: 'pending',
+          source: 'pipeline',
+          produces: step.produces,
+        }
+        changed = true
+      }
+    }
+
+    if (changed) {
+      this.saveState(state)
+    }
+    return changed
+  }
+
+  /**
    * Initialize a new state.json with all steps in pending status.
    * Not in the formal interface but needed by T-033 init wizard.
    */

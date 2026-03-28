@@ -4,7 +4,7 @@ description: Review testing strategy for coverage gaps and feasibility
 phase: "quality"
 order: 910
 dependencies: [tdd]
-outputs: [docs/reviews/review-testing.md]
+outputs: [docs/reviews/review-testing.md, docs/reviews/testing/review-summary.md, docs/reviews/testing/codex-review.json, docs/reviews/testing/gemini-review.json]
 conditional: null
 knowledge-base: [review-methodology, review-testing-strategy]
 ---

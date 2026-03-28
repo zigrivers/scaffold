@@ -225,3 +225,7 @@ Moving from layer-based to feature-based (the most common migration):
 6. Update `docs/project-structure.md`
 
 Move one feature per PR. Each PR leaves the project working with passing tests. Five small PRs over a week is safer than one massive PR touching every file.
+
+## See Also
+
+- [system-architecture](../core/system-architecture.md) — Architecture manifests in file structure

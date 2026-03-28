@@ -4,7 +4,7 @@ description: Discover UX-level enhancements and innovation opportunities in user
 phase: "pre"
 order: 160
 dependencies: [review-user-stories]
-outputs: [docs/user-stories-innovation.md]
+outputs: [docs/user-stories-innovation.md, docs/reviews/user-stories-innovation/review-summary.md, docs/reviews/user-stories-innovation/codex-review.json, docs/reviews/user-stories-innovation/gemini-review.json]
 conditional: "if-needed"
 knowledge-base: [user-stories, user-story-innovation]
 ---
@@ -52,9 +52,27 @@ enhancement opportunities.
   model (if CLI available). Depth 5: full innovation pass + multi-model with
   deduplication and synthesis.
 
+## Conditional Evaluation
+Enable when: user stories review identifies UX gaps, project targets a consumer-facing
+audience, or progressive disclosure patterns would benefit users. Skip when: stories
+are backend-only with no user-facing UI, depth < 3, or user explicitly declines
+innovation.
+
 ## Mode Detection
 If docs/user-stories-innovation.md exists, this is a re-innovation pass. Read
 previous suggestions and their disposition (accepted/rejected), focus on new
 opportunities from story changes since last run. If multi-model artifacts
 exist under docs/reviews/user-stories-innovation/, preserve prior suggestion
 dispositions.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/user-stories-innovation.md exists with
+  suggestion dispositions
+- **Preserve**: accepted/rejected dispositions from prior runs, cost/impact
+  assessments already reviewed, multi-model review artifacts
+- **Triggers for update**: user stories changed (new stories added, existing
+  stories rewritten), PRD innovation accepted new features that need UX
+  enhancement analysis
+- **Conflict resolution**: if a previously rejected UX enhancement is now
+  relevant due to story changes, re-propose with updated rationale; never
+  re-suggest rejected enhancements without a material change in context

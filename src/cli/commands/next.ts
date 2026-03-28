@@ -71,6 +71,16 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     }
 
     const stateManager = new StateManager(projectRoot, computeEligibleFn)
+
+    // Reconcile state with current pipeline — adds any new steps that were
+    // introduced after the project was initialized.
+    const pipelineSteps = [...metaPrompts.values()].map(m => ({
+      slug: m.frontmatter.name,
+      produces: m.frontmatter.outputs,
+      enabled: presetSteps.get(m.frontmatter.name)?.enabled ?? true,
+    }))
+    stateManager.reconcileWithPipeline(pipelineSteps)
+
     const state = stateManager.loadState()
 
     const graph = buildGraph(

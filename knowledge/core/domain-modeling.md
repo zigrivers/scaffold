@@ -315,3 +315,7 @@ A domain model is likely correct when:
 - **Cross-context communication is explicit.** No context reaches into another's internals. All integration goes through documented mechanisms (events, APIs, shared language).
 - **The model explains the business.** A new team member can read the domain model and understand what the business does, what its rules are, and how its parts interact.
 - **Value objects outnumber entities.** Most concepts in a well-modeled domain are values, not identities. If nearly everything is an entity, you may be confusing data containers with identity-bearing objects.
+
+## See Also
+
+- [task-decomposition](../core/task-decomposition.md) — DDD entities map to implementation tasks

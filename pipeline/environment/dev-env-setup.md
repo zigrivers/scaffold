@@ -52,3 +52,14 @@ by the entire workflow.
 Update mode if docs/dev-setup.md exists. In update mode: preserve port assignments,
 custom scripts, .env variable names, database configuration, and Makefile
 customizations. Update CLAUDE.md Key Commands section in-place.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/dev-setup.md exists
+- **Preserve**: port assignments, .env variable names and defaults, database
+  connection strings, custom Makefile targets, troubleshooting entries
+- **Triggers for update**: tech stack changed (new dev server or database),
+  project structure changed (new config file locations), new dependencies
+  require setup steps, tdd-standards.md changed test commands
+- **Conflict resolution**: if a new dependency conflicts with an existing port
+  or env var, propose a non-breaking alternative; always update CLAUDE.md Key
+  Commands table to match actual Makefile/package.json after changes

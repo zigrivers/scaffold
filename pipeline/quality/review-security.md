@@ -4,7 +4,7 @@ description: Review security review for coverage and correctness
 phase: "quality"
 order: 960
 dependencies: [security]
-outputs: [docs/reviews/review-security.md]
+outputs: [docs/reviews/review-security.md, docs/reviews/security/review-summary.md, docs/reviews/security/codex-review.json, docs/reviews/security/gemini-review.json]
 conditional: null
 knowledge-base: [review-methodology, review-security]
 ---

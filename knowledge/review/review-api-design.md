@@ -1,5 +1,5 @@
 ---
-name: review-api-contracts
+name: review-api-design
 description: Failure modes and review passes specific to API contract specifications
 topics: [review, api, contracts, rest, graphql]
 ---

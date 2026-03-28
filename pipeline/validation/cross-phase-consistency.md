@@ -4,7 +4,7 @@ description: Audit naming, assumptions, data flows, interface contracts across a
 phase: "validation"
 order: 1310
 dependencies: [implementation-plan-review, review-security]
-outputs: [docs/validation/cross-phase-consistency.md]
+outputs: [docs/validation/cross-phase-consistency.md, docs/validation/cross-phase-consistency/review-summary.md, docs/validation/cross-phase-consistency/codex-review.json, docs/validation/cross-phase-consistency/gemini-review.json]
 conditional: null
 knowledge-base: [cross-phase-consistency]
 ---
@@ -33,6 +33,19 @@ drift patterns.
 - Findings are actionable (specific file, section, and issue)
 - Severity categorization (P0-P3)
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+
+## Finding Disposition
+- **P0 (blocking)**: Must be resolved before proceeding to implementation. Create
+  fix tasks and re-run affected upstream steps.
+- **P1 (critical)**: Should be resolved; proceeding requires explicit risk acceptance
+  documented in an ADR. Flag to project lead.
+- **P2 (medium)**: Document in implementation plan as tech debt. May defer to
+  post-launch with tracking issue.
+- **P3 (minor)**: Log for future improvement. No action required before implementation.
+
+Findings are reported in the validation output file with severity, affected artifact,
+and recommended resolution. P0/P1 findings block the implementation-plan step from
+proceeding without acknowledgment.
 
 ## Methodology Scaling
 - **deep**: Exhaustive analysis with all sub-checks. Multi-model validation

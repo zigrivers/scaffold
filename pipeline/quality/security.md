@@ -25,10 +25,16 @@ management, and dependency audit strategy.
 
 ## Quality Criteria
 - OWASP top 10 addressed for this specific project
+- Every API endpoint has authentication and authorization requirements specified
 - Auth/authz boundaries defined and consistent with API contracts
+- Input validation rules defined for each user-facing field (type, length, pattern)
 - Data classified by sensitivity with handling requirements
+- Secrets management approach documented (no hardcoded credentials in code)
 - Secrets management strategy defined (no secrets in code)
+- CORS policy explicitly configured per origin (not wildcard in production)
+- Rate limiting defined for public-facing endpoints with specific thresholds
 - Threat model covers all trust boundaries
+- Dependency audit strategy documented (automated scanning, update cadence)
 - Dependency audit integrated into CI
 
 ## Methodology Scaling
@@ -41,4 +47,20 @@ management, and dependency audit strategy.
   Depth 4-5: full security review.
 
 ## Mode Detection
-Update mode if review exists.
+Check for docs/security-review.md. If it exists, operate in update mode: read
+existing security controls and threat model, diff against current system
+architecture and API contracts. Preserve existing threat model entries, auth
+decisions, and data classification. Add new threat boundaries for new
+components. Update auth requirements if API contracts changed.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/security-review.md exists
+- **Preserve**: threat model entries, data classification matrix, auth/authz
+  decisions, secrets management strategy, dependency audit configuration,
+  compliance checklist items
+- **Triggers for update**: architecture added new components (new attack surface),
+  API contracts changed auth requirements, database schema changed data
+  sensitivity, operations runbook changed deployment security
+- **Conflict resolution**: if a new component introduces a trust boundary
+  that conflicts with existing auth approach, document both and flag for
+  user decision; never weaken existing security controls without approval

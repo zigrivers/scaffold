@@ -5,6 +5,7 @@ phase: "foundation"
 order: 220
 dependencies: []
 outputs: [docs/tech-stack.md]
+reads: [create-prd]
 conditional: null
 knowledge-base: [tech-stack-selection]
 ---
@@ -60,3 +61,14 @@ Update mode if docs/tech-stack.md exists. In update mode: never change a
 technology choice without user approval, preserve version pins exactly, update
 Quick Reference to match any structural changes. If multi-model artifacts exist
 under docs/reviews/tech-stack/, preserve prior recommendation dispositions.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/tech-stack.md exists
+- **Preserve**: all technology choices and their rationale, version pins,
+  Quick Reference dependency list, multi-model review artifacts and dispositions
+- **Triggers for update**: PRD requirements changed (new integrations needed),
+  user requests technology swap, security vulnerability in a dependency,
+  new PRD features require capabilities not covered by current stack
+- **Conflict resolution**: if a new requirement conflicts with an existing
+  technology choice, document the conflict and propose alternatives with
+  migration cost — never silently swap a technology

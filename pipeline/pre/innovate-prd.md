@@ -4,7 +4,7 @@ description: Discover feature-level innovation opportunities in the PRD
 phase: "pre"
 order: 130
 dependencies: [review-prd]
-outputs: [docs/prd-innovation.md]
+outputs: [docs/prd-innovation.md, docs/reviews/prd-innovation/review-summary.md, docs/reviews/prd-innovation/codex-review.json, docs/reviews/prd-innovation/gemini-review.json]
 conditional: "if-needed"
 knowledge-base: [prd-innovation, prd-craft]
 ---
@@ -52,8 +52,25 @@ creative opportunities and competitive insights.
   pass + one external model (if CLI available). Depth 5: full innovation pass
   + multi-model with deduplication and synthesis.
 
+## Conditional Evaluation
+Enable when: project has a competitive landscape section in plan.md, user explicitly
+requests an innovation pass, or the PRD review (review-prd) identifies feature gaps
+or missing capabilities. Skip when: PRD is minimal/exploratory, depth < 3, or user
+explicitly declines innovation.
+
 ## Mode Detection
 If docs/prd-innovation.md exists, this is a re-innovation pass. Read previous
 suggestions and their disposition (accepted/rejected/deferred), focus on new
 opportunities from PRD changes since last run. If multi-model artifacts exist
 under docs/reviews/prd-innovation/, preserve prior suggestion dispositions.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/prd-innovation.md exists with suggestion
+  dispositions
+- **Preserve**: accepted/rejected/deferred dispositions from prior runs,
+  cost/impact assessments already reviewed by user, multi-model review artifacts
+- **Triggers for update**: PRD scope changed (new features added or removed),
+  user requests re-evaluation of deferred suggestions, new external model
+  available for additional perspectives
+- **Conflict resolution**: if a previously rejected suggestion is now relevant
+  due to PRD changes, re-propose with updated rationale referencing the change

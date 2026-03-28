@@ -55,5 +55,19 @@ inconsistent command formats. Fix all issues found.
   cross-doc consistency. Depth 4: add gap analysis. Depth 5: full six-phase audit.
 
 ## Mode Detection
-Always operates in update mode (all documents exist by this point). The canonical
-workflow is the source of truth — documents align to it, not vice versa.
+Always operates in update mode (all documents exist by this point). Check for
+tracking comment `<!-- scaffold:workflow-audit v1 YYYY-MM-DD -->` to detect
+prior audit. If present, focus on changes since that date — new docs added,
+existing docs modified, Makefile targets changed. The canonical workflow is
+the source of truth — documents align to it, not vice versa. Preserve any
+manually-added workflow steps or custom CI configurations.
+
+## Update Mode Specifics
+- **Detect prior artifact**: tracking comment in CLAUDE.md with audit version
+  and date
+- **Preserve**: custom CI jobs, user-added workflow steps, project-specific
+  branch protection rules, custom PR template fields
+- **Triggers for update**: new setup prompts modified workflow docs, Makefile
+  targets added or renamed, git-workflow.md updated with new steps
+- **Conflict resolution**: if two docs disagree on workflow, the canonical
+  workflow in CLAUDE.md wins; update the conflicting doc to match

@@ -21,7 +21,7 @@ Before starting, check if `docs/user-stories-innovation.md` already exists:
 5. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:innovate-user-stories v<ver> <date> -->`
 6. **Post-update summary**: Report new suggestions, disposition changes, and story updates.
 
-**In both modes**, follow all instructions below.
+**In both modes**, follow all instructions below. If multi-model artifacts exist under `docs/reviews/user-stories-innovation/` (e.g., `review-summary.md`, `codex-review.json`, `gemini-review.json`), preserve prior suggestion dispositions.
 
 ### Update Mode Specifics
 - **Primary output**: `docs/user-stories-innovation.md`

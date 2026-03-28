@@ -5,6 +5,7 @@ phase: "quality"
 order: 915
 dependencies: [tdd, review-user-stories, review-architecture]
 outputs: [tests/acceptance/, docs/story-tests-map.md]
+reads: [tech-stack, coding-standards, project-structure]
 conditional: null
 knowledge-base: [testing-strategy, user-stories]
 ---
@@ -58,3 +59,15 @@ Update mode if tests/acceptance/ directory exists. In update mode: add test
 files for new stories, add test cases for new ACs in existing stories, never
 delete user-implemented test logic (only add new pending cases). Update
 docs/story-tests-map.md with new mappings.
+
+## Update Mode Specifics
+- **Detect prior artifact**: tests/acceptance/ directory exists with test files
+- **Preserve**: all user-implemented test logic, existing test file names and
+  structure, story ID and AC ID tags, traceability mappings in
+  docs/story-tests-map.md
+- **Triggers for update**: user stories added or changed acceptance criteria,
+  architecture changed component structure (layer assignments may shift),
+  tdd-standards.md changed test patterns or framework
+- **Conflict resolution**: if a story's AC was reworded, update the test case
+  description but preserve any implemented test body; if layer assignment
+  changed, move the test case to the correct layer file

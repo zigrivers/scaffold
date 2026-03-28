@@ -5,6 +5,7 @@ phase: "quality"
 order: 920
 dependencies: [tdd, story-tests]
 outputs: [tests/evals/, docs/eval-standards.md]
+reads: [story-tests]
 conditional: null
 knowledge-base: [eval-craft, testing-strategy]
 ---
@@ -25,6 +26,7 @@ configuration validation, error handling completeness.
 - docs/project-structure.md (required) — file placement rules for structure evals
 - CLAUDE.md (required) — Key Commands table for consistency evals
 - Makefile or package.json (required) — build targets to match against
+- tests/acceptance/ (optional) — story test skeletons for coverage validation
 - docs/user-stories.md (optional) — acceptance criteria for coverage evals
 - docs/plan.md (optional) — feature list for coverage evals, performance NFRs
 - docs/system-architecture.md (optional) — architecture conformance evals
@@ -59,14 +61,15 @@ Supporting:
 - make eval target added to Makefile/package.json
 
 ## Quality Criteria
-- All applicable eval categories generated (conditional on source doc existence)
-- Evals use the project's own test framework from docs/tech-stack.md
-- All generated evals pass on the current codebase (no false positives)
-- Adherence, security, and error-handling evals include exclusion mechanisms
-- Eval results are binary PASS/FAIL, not scores
-- docs/eval-standards.md explicitly documents what evals do NOT check
-- make eval is separate from make test and make check (opt-in for CI)
-- Full eval suite runs in under 30 seconds
+- (mvp) Consistency + Structure evals generated
+- (mvp) Evals use the project's own test framework from docs/tech-stack.md
+- (mvp) All generated evals pass on the current codebase (no false positives)
+- (mvp) Eval results are binary PASS/FAIL, not scores
+- (mvp) make eval is separate from make test and make check (opt-in for CI)
+- (deep) All applicable eval categories generated including security, API, DB, accessibility (conditional on source doc existence)
+- (deep) Adherence, security, and error-handling evals include exclusion mechanisms
+- (deep) docs/eval-standards.md explicitly documents what evals do NOT check
+- (deep) Full eval suite runs in under 30 seconds
 
 ## Methodology Scaling
 - **deep**: All 13 eval categories (conditional on doc existence). Stack-specific
@@ -85,3 +88,15 @@ consistency, structure, cross-doc, and conditional category evals. Preserve
 adherence, security, and error-handling eval exclusions. Regenerate coverage
 evals only if plan.md or user-stories.md changed. Add/remove conditional
 categories based on whether their source doc exists.
+
+## Update Mode Specifics
+- **Detect prior artifact**: tests/evals/ directory exists with eval test files
+- **Preserve**: adherence eval exclusions, security eval exclusions,
+  error-handling eval exclusions, custom helper utilities in tests/evals/helpers,
+  make eval target configuration
+- **Triggers for update**: source docs changed (coding-standards, project-structure,
+  tech-stack), new conditional source docs appeared (e.g., security-review.md
+  now exists), Makefile targets changed, user-stories.md changed
+- **Conflict resolution**: if a source doc was removed, archive its conditional
+  eval category rather than deleting; if exclusion patterns conflict with new
+  standards, flag for user review

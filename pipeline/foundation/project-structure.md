@@ -5,6 +5,7 @@ phase: "foundation"
 order: 250
 dependencies: [tech-stack, coding-standards]
 outputs: [docs/project-structure.md]
+reads: [create-prd, user-stories]
 conditional: null
 knowledge-base: [project-structure-patterns]
 ---
@@ -54,3 +55,15 @@ with a Quick Reference section for file placement.
 Update mode if docs/project-structure.md exists. In update mode: never delete
 existing directories (only add new ones), preserve module organization strategy
 choice, update CLAUDE.md Quick Reference section in-place.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/project-structure.md exists
+- **Preserve**: module organization strategy (feature-based, layer-based, hybrid),
+  existing directory tree, file placement rules, import conventions, barrel file
+  policy, .gitignore entries
+- **Triggers for update**: new features require new directories, architecture
+  changed module boundaries, tech stack added new file types needing placement
+  rules, tdd-standards.md changed test co-location rules
+- **Conflict resolution**: if architecture restructured modules, add new
+  directories but do not remove existing ones until migration is complete;
+  update CLAUDE.md Quick Reference to reflect additions

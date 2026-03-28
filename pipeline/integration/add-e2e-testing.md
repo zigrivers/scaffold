@@ -3,8 +3,9 @@ name: add-e2e-testing
 description: Configure end-to-end testing (Playwright for web, Maestro for mobile) based on detected project platform
 phase: "integration"
 order: 410
-dependencies: [git-workflow]
-outputs: [docs/tdd-standards.md, tests/screenshots/, maestro/]
+dependencies: [git-workflow, tdd]
+outputs: [tests/screenshots/, maestro/]
+reads: [tdd, coding-standards]
 conditional: "if-needed"
 knowledge-base: [testing-strategy]
 ---
@@ -50,6 +51,12 @@ Outputs vary by detected platform:
 - **custom:depth(1-5)**: Depth 1-2: config + smoke test. Depth 3: add patterns,
   naming, testID rules. Depth 4: add CI integration, both mobile platforms.
   Depth 5: full suite with baseline management and sub-flows.
+
+## Conditional Evaluation
+Enable when: tech-stack.md indicates a web frontend (Playwright) or mobile app
+(Maestro). Detection signals: React/Vue/Angular/Svelte in tech-stack (web),
+Expo/React Native (mobile), or explicit UI layer in architecture. Self-skips for
+backend-only or library projects with no UI.
 
 ## Mode Detection
 Check for existing E2E config: Playwright config file (playwright.config.ts or

@@ -18,6 +18,7 @@ Check if `docs/reviews/pre-review-user-stories.md` already exists:
 4. Focus on: remaining unresolved findings, regressions from fixes, and any new stories added since the last review
 5. Update the review report rather than replacing it — preserve the fix history
 6. If `docs/reviews/user-stories/requirements-index.md` exists (from a prior depth 4+ run), preserve all REQ-xxx IDs — never renumber. New requirements get the next available ID in sequence.
+7. If multi-model review artifacts exist under `docs/reviews/user-stories/` (e.g., `review-summary.md`, `coverage.json`, `codex-review.json`, `gemini-review.json`), preserve prior findings still valid.
 
 ## Review Process
 

@@ -4,7 +4,7 @@ description: Multi-pass review of user stories for PRD coverage, quality, and do
 phase: "pre"
 order: 150
 dependencies: [user-stories]
-outputs: [docs/reviews/pre-review-user-stories.md]
+outputs: [docs/reviews/pre-review-user-stories.md, docs/reviews/user-stories/requirements-index.md, docs/reviews/user-stories/coverage.json, docs/reviews/user-stories/review-summary.md]
 conditional: null
 knowledge-base: [review-methodology, review-user-stories]
 ---

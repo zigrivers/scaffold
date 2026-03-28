@@ -5,6 +5,7 @@ phase: "environment"
 order: 350
 dependencies: [git-workflow]
 outputs: [.claude/rules/, docs/ai-memory-setup.md]
+reads: [coding-standards, tech-stack]
 conditional: null
 knowledge-base: [ai-memory-management]
 ---
@@ -56,3 +57,14 @@ Update mode if .claude/rules/ directory exists. In update mode: preserve existin
 rule files and their customizations, add missing rules for new conventions,
 update rules where source docs have changed. Never delete user-customized rules.
 If MCP server already configured, verify and update rather than replace.
+
+## Update Mode Specifics
+- **Detect prior artifact**: .claude/rules/ directory exists with rule files
+- **Preserve**: existing rule files and their YAML frontmatter, user-customized
+  rules, MCP server configurations, hook settings, CLAUDE.md pointer patterns
+- **Triggers for update**: source docs changed (coding-standards.md, tech-stack.md,
+  git-workflow.md), new conventions added that need rule extraction, new
+  dependencies added that need Tier 3 doc servers
+- **Conflict resolution**: if a source doc changed a convention, update the
+  corresponding rule file but preserve any user-added rules in that file;
+  never exceed 500-line total rule budget without consolidating

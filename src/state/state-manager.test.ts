@@ -281,6 +281,83 @@ describe('StateManager', () => {
     })
   })
 
+  describe('reconcileWithPipeline', () => {
+    it('adds new pipeline steps missing from state as pending', () => {
+      const tempDir = makeTempDir()
+      const manager = new StateManager(tempDir, computeEligible)
+      manager.initializeState(INIT_OPTIONS)
+
+      // Simulate a new step added to the pipeline after project init
+      const pipelineSteps = [
+        { slug: 'create-prd', produces: ['docs/prd.md'], enabled: true },
+        { slug: 'create-architecture', produces: ['docs/architecture.md'], enabled: true },
+        { slug: 'story-tests', produces: ['tests/acceptance/', 'docs/story-tests-map.md'], enabled: true },
+      ]
+
+      const changed = manager.reconcileWithPipeline(pipelineSteps)
+      expect(changed).toBe(true)
+
+      const state = manager.loadState()
+      expect(state.steps['story-tests']).toBeDefined()
+      expect(state.steps['story-tests'].status).toBe('pending')
+      expect(state.steps['story-tests'].source).toBe('pipeline')
+      expect(state.steps['story-tests'].produces).toEqual(['tests/acceptance/', 'docs/story-tests-map.md'])
+    })
+
+    it('does not overwrite existing steps', () => {
+      const tempDir = makeTempDir()
+      const manager = new StateManager(tempDir, computeEligible)
+      manager.initializeState(INIT_OPTIONS)
+
+      // Complete create-prd
+      manager.setInProgress('create-prd', 'agent-1')
+      manager.markCompleted('create-prd', ['docs/prd.md'], 'agent-1', 3)
+
+      const pipelineSteps = [
+        { slug: 'create-prd', produces: ['docs/prd.md'], enabled: true },
+        { slug: 'create-architecture', produces: ['docs/architecture.md'], enabled: true },
+      ]
+
+      const changed = manager.reconcileWithPipeline(pipelineSteps)
+      expect(changed).toBe(false)
+
+      const state = manager.loadState()
+      expect(state.steps['create-prd'].status).toBe('completed')
+    })
+
+    it('does not add disabled pipeline steps', () => {
+      const tempDir = makeTempDir()
+      const manager = new StateManager(tempDir, computeEligible)
+      manager.initializeState(INIT_OPTIONS)
+
+      const pipelineSteps = [
+        { slug: 'create-prd', produces: ['docs/prd.md'], enabled: true },
+        { slug: 'create-architecture', produces: ['docs/architecture.md'], enabled: true },
+        { slug: 'disabled-step', produces: [], enabled: false },
+      ]
+
+      const changed = manager.reconcileWithPipeline(pipelineSteps)
+      expect(changed).toBe(false)
+
+      const state = manager.loadState()
+      expect(state.steps['disabled-step']).toBeUndefined()
+    })
+
+    it('returns false when no steps are missing', () => {
+      const tempDir = makeTempDir()
+      const manager = new StateManager(tempDir, computeEligible)
+      manager.initializeState(INIT_OPTIONS)
+
+      const pipelineSteps = [
+        { slug: 'create-prd', produces: ['docs/prd.md'], enabled: true },
+        { slug: 'create-architecture', produces: ['docs/architecture.md'], enabled: true },
+      ]
+
+      const changed = manager.reconcileWithPipeline(pipelineSteps)
+      expect(changed).toBe(false)
+    })
+  })
+
   describe('atomic writes', () => {
     it('state.json.tmp does not persist after successful write', () => {
       const tempDir = makeTempDir()

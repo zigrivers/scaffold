@@ -378,3 +378,7 @@ For distributed databases (DynamoDB, Cassandra), the partition key determines da
 **Allowing unbounded growth in aggregate tables.** An events or logs table that grows without limit, eventually consuming all storage and degrading query performance. Fix: define a retention policy and implement it (archival, partitioning, or deletion).
 
 **Using the database as a message queue.** Polling a table for new rows to process. This creates lock contention, wastes resources, and scales poorly. Fix: use a proper message queue (Redis, RabbitMQ, SQS) for event-driven processing.
+
+## See Also
+
+- [domain-modeling](../core/domain-modeling.md) — Domain entities map to database schema

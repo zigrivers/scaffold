@@ -46,3 +46,13 @@ task decomposition downstream.
 If docs/user-stories.md exists, operate in update mode: read existing stories,
 identify changes needed based on updated PRD, categorize as ADD/RESTRUCTURE/
 PRESERVE, get approval before modifying. Preserve existing story IDs.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/user-stories.md exists
+- **Preserve**: existing story IDs, epic groupings, acceptance criteria that
+  haven't been invalidated, story-to-PRD-feature traceability
+- **Triggers for update**: PRD features added or changed, innovation suggestions
+  accepted, user personas expanded, review findings require story adjustments
+- **Conflict resolution**: never reuse a retired story ID; if a story's scope
+  changed, update its acceptance criteria in-place rather than creating a
+  duplicate story

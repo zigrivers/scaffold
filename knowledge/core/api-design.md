@@ -499,3 +499,7 @@ Design APIs so that transient failures can be safely retried:
 **Missing rate limiting.** No protection against abusive or buggy clients sending excessive requests. Fix: implement rate limiting on all public endpoints. Return 429 with `Retry-After` header.
 
 **Ignoring CORS.** Frontend can't call the API because CORS headers are missing. Fix: configure CORS at API design time. Be specific about allowed origins — don't use `*` in production.
+
+## See Also
+
+- [testing-strategy](../core/testing-strategy.md) — Contract testing and API test patterns
