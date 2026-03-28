@@ -69,6 +69,7 @@ Use this skill ONLY when the user asks about:
 | 25 | Specifications | `/scaffold:ux-spec` | **(optional)** Flows, states, accessibility |
 | 26 | Specifications | `/scaffold:review-ux` | **(optional)** UX spec review |
 | 27 | Quality Gates | `/scaffold:review-testing` | Reviews TDD strategy for coverage gaps |
+| 27.5 | Quality Gates | `/scaffold:story-tests` | Tagged test skeletons from user story ACs |
 | 28 | Quality Gates | `/scaffold:create-evals` | Generates eval checks from standards docs |
 | 29 | Quality Gates | `/scaffold:operations` | Deployment, monitoring, incident response |
 | 30 | Quality Gates | `/scaffold:review-operations` | Reviews operations runbook |

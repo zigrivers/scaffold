@@ -82,6 +82,7 @@ Display the prompt pipeline order below. Do not read any files or run any comman
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
 | 27 | **Review Testing** | `/scaffold:review-testing` | Reviews TDD strategy |
+| 27.5 | **Story Tests** | `/scaffold:story-tests` | Generates tagged test skeletons from user story ACs |
 | 28 | **Create Evals** | `/scaffold:create-evals` | Generates eval checks from standards docs |
 | 29 | **Operations** | `/scaffold:operations` | Deployment, monitoring, incident response |
 | 30 | **Review Operations** | `/scaffold:review-operations` | Reviews operations runbook |
