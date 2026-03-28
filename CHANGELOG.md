@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.19.2] — 2026-03-27
+
+### Fixed
+
+- **MCP memory server recommendations** — ai-memory-setup recommended Engram, hmem, and Claude-Mem, but none exist as installable npm/brew packages. Replaced with `@modelcontextprotocol/server-memory` (official MCP Knowledge Graph server, stable, zero-setup via `npx`). Updated command, knowledge base, runner skill, and check command detection. Net -90 lines of non-functional configurations removed.
+
 ## [2.19.1] — 2026-03-27
 
 ### Fixed
