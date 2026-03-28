@@ -2,6 +2,17 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.22.0] — 2026-03-28
+
+### Changed
+
+- **Standardized phase definitions across codebase** — Created a canonical `PHASES` constant in `src/types/frontmatter.ts` as the single source of truth for all 14 phase slugs, numbers, and display names. Fixed stale references that listed only 9 phases in the TypeScript type comment, frontmatter schema doc, and pipeline skill. Rewrote `prompt-pipeline` command from old sub-phase numbering (5b/5c/7b/7c) to canonical 14-phase structure. Updated CLAUDE.md to reference v2 architecture as source of truth. Added v1 deprecation notice to `docs/scaffold-overview.md`.
+
+### Added
+
+- `PHASES` constant, `PhaseSlug` type, and `PHASE_BY_SLUG` lookup map in `src/types/frontmatter.ts`
+- Phase reference table in `scaffold-pipeline` skill with all 14 phases (number, slug, display name)
+
 ## [2.21.0] — 2026-03-27
 
 ### Added
