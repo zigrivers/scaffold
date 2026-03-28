@@ -29,7 +29,7 @@ Either way, Scaffold constructs the prompt and Claude does the work. The CLI tra
 
 **Assembly engine** — At execution time, Scaffold builds a 7-section prompt from: system metadata, the meta-prompt, knowledge base entries, project context (artifacts from prior steps), methodology settings, layered instructions, and depth-specific execution guidance.
 
-**Knowledge base** — 49 domain expertise entries in `knowledge/` covering testing strategy, domain modeling, API design, security best practices, eval craft, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
+**Knowledge base** — 51 domain expertise entries in `knowledge/` covering testing strategy, domain modeling, API design, security best practices, eval craft, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
 
 **Methodology presets** — Three built-in presets control which steps run and how deep the analysis goes:
 - **deep** (depth 5) — all steps enabled, exhaustive analysis
@@ -502,9 +502,9 @@ scaffold dashboard
 
 ## Knowledge System
 
-Scaffold ships with 49 domain expertise entries organized in five categories:
+Scaffold ships with 51 domain expertise entries organized in five categories:
 
-- **core/** (23 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, design system tokens, user story innovation, AI memory management, coding conventions, tech stack selection, project structure patterns, task tracking, CLAUDE.md patterns, multi-model review dispatch, review step template, dev environment
+- **core/** (25 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, design system tokens, user story innovation, AI memory management, coding conventions, tech stack selection, project structure patterns, task tracking, CLAUDE.md patterns, multi-model review dispatch, review step template, dev environment, git workflow patterns, automated review tooling
 - **product/** (3 entries) — PRD craft, PRD innovation, gap analysis
 - **review/** (13 entries) — review methodology (shared), plus domain-specific review passes for PRD, user stories, domain modeling, ADRs, architecture, API design, database design, UX specification, testing, security, operations, implementation tasks
 - **validation/** (7 entries) — critical path analysis, cross-phase consistency, scope management, traceability, implementability, decision completeness, dependency validation
