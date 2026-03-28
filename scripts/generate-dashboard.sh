@@ -165,7 +165,6 @@ DEPS_JSON=$(cat <<'DEPSJSON'
     "workflow-audit": ["claude-md-optimization"],
     "implementation-plan": ["workflow-audit", "user-stories-gaps", "project-structure"],
     "implementation-plan-review": ["implementation-plan"],
-    "multi-model-review-tasks": ["implementation-plan-review"],
     "single-agent-start": ["implementation-plan-review"],
     "multi-agent-start": ["implementation-plan-review", "git-workflow"]
 }

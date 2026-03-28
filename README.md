@@ -343,8 +343,7 @@ Break work into implementable tasks.
 | Step | What It Does |
 |------|-------------|
 | `implementation-plan` | Decompose stories into a task graph with dependencies |
-| `implementation-plan-review` | Review task quality, coverage, and sizing |
-| `multi-model-review-tasks` | Multi-model review of implementation tasks *(optional)* |
+| `implementation-plan-review` | Review task quality, coverage, sizing, and multi-model validation (depth 4+) |
 
 ### Phase 13 — Validation (validation)
 
@@ -395,7 +394,7 @@ At depth 4-5, all 19 review and validation steps can dispatch independent review
 
 **All 7 validation steps**: cross-phase-consistency, traceability-matrix, critical-path-walkthrough, implementability-dry-run, decision-completeness, dependency-graph-validation, scope-creep-check
 
-**Plus 3 steps with built-in multi-model**: review-user-stories (depth 5), automated-pr-review (local CLI mode), multi-model-review-tasks
+**Plus 2 steps with built-in multi-model**: review-user-stories (depth 5), automated-pr-review (local CLI mode)
 
 ### CLI Invocation
 

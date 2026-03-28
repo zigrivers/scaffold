@@ -142,6 +142,31 @@ Follow the shared code strategy from `docs/project-structure.md`:
 - Feature-specific helpers stay in the feature folder until 2+ features need them
 - If a task creates shared code, its description must include tests for that shared code
 
+#### Risk Flags
+
+For each task, assess and document risk where non-trivial:
+- **Technology risk**: Uses a library/API the team hasn't used before — note in description
+- **Integration risk**: Touches 3+ external systems — note mitigation (mocks, stubs)
+- **Complexity risk**: Non-trivial algorithms, concurrency, or state management — consider splitting
+- **Critical path risk**: Bottleneck task blocking many downstream tasks — consider splitting
+
+Mark high-risk tasks with a `⚠️ HIGH RISK` annotation in the task description with the risk type and recommended mitigation.
+
+### 3. Wave Plan & Parallelism
+
+After the task graph is complete, produce a wave summary showing how tasks group for parallel execution:
+
+```
+Wave 1: N tasks (infrastructure) — N agents useful
+Wave 2: N tasks (core features) — N agents useful
+Wave 3: N tasks (dependent features) — N agents useful
+...
+Maximum useful agents: N (Wave X)
+Critical path: Task A → Task B → ... → Task Z (N tasks)
+```
+
+This helps the user plan how many agents/worktrees to set up before execution begins.
+
 ## What NOT to Do
 
 - Do NOT start implementing anything

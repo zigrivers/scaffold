@@ -57,8 +57,7 @@ Use this skill ONLY when the user asks about:
 | 16 | Consolidation | `/scaffold:claude-md-optimization` | Run BEFORE workflow-audit |
 | 17 | Consolidation | `/scaffold:workflow-audit` | Run AFTER claude-md-optimization |
 | 18 | Planning | `/scaffold:implementation-plan` | Creates full task graph |
-| 19 | Planning | `/scaffold:implementation-plan-review` | Second pass for quality |
-| 19.5 | Planning | `/scaffold:multi-model-review-tasks` | **(optional)** Requires Codex/Gemini CLI |
+| 19 | Planning | `/scaffold:implementation-plan-review` | Second pass for quality + multi-model validation (depth 4+) |
 | 19.6 | Validation | `/scaffold:cross-phase-consistency` | Naming, assumptions, interfaces |
 | 19.7 | Validation | `/scaffold:traceability-matrix` | PRD → Stories → Architecture → Tasks |
 | 19.8 | Validation | `/scaffold:decision-completeness` | All decisions recorded and justified |

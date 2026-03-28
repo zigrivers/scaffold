@@ -51,7 +51,6 @@ steps:
   # Phase 12 — Planning
   implementation-plan: { enabled: true }
   implementation-plan-review: { enabled: true }
-  multi-model-review-tasks: { enabled: true, conditional: "if-needed" }
   cross-phase-consistency: { enabled: true }
   traceability-matrix: { enabled: true }
   decision-completeness: { enabled: true }

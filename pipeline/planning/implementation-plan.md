@@ -41,8 +41,10 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 - Tasks incorporate security controls from the security review where applicable
 - Tasks incorporate operational requirements (monitoring, deployment) where applicable
 - Critical path is identified
-- Parallelization opportunities are marked
+- Parallelization opportunities are marked with wave plan
 - Every user story maps to at least one task
+- High-risk tasks are flagged with risk type and mitigation
+- Wave summary produced with agent allocation recommendation
 
 ## Methodology Scaling
 - **deep**: Detailed task breakdown with story-to-task tracing. Dependency graph.
