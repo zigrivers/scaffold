@@ -1,7 +1,7 @@
 ---
 name: ai-memory-management
 description: AI memory and context management patterns for Claude Code projects including modular rules, MCP memory servers, lifecycle hooks, decision logging, and external context integration
-topics: [ai-memory, claude-code, claude-rules, mcp-servers, lifecycle-hooks, context-management, session-handoff, decision-logging, engram, hmem, context7]
+topics: [ai-memory, claude-code, claude-rules, mcp-servers, lifecycle-hooks, context-management, session-handoff, decision-logging, mcp-knowledge-graph, context7]
 ---
 
 # AI Memory Management
@@ -88,37 +88,27 @@ This replaces inline convention blocks, keeping CLAUDE.md under 200 lines (the e
 
 #### MCP Memory Servers
 
-Three recommended servers, each with different trade-offs:
+**Recommended: MCP Knowledge Graph** (`@modelcontextprotocol/server-memory`)
+- Official MCP server from the Model Context Protocol project
+- Stores entities, relations, and observations in a local JSON file
+- Zero setup: `npx -y @modelcontextprotocol/server-memory`
+- Entities persist across sessions — decisions, patterns, project facts
+- Best for: All projects (stable, official, zero dependencies beyond Node)
 
-**Engram** — Lightweight, zero dependencies
-- Single Go binary + SQLite file. No Docker, no Node, no Python.
-- Structured entries: What/Why/Where/Learned per memory
-- CLI + HTTP API + MCP server + TUI
-- Export/import for cross-machine sharing
-- Best for: Solo developers, simple projects, minimal overhead
-
-**hmem** — Hierarchical, cross-tool
-- 5-level lazy loading: L1 summaries always loaded (~5k tokens for 300 entries), deeper levels on demand
-- Categories: Project, Lesson, Error, Decision, Human expertise, Rule, Infrastructure, Task
-- SQLite + FTS5, AES-256-GCM encryption, cross-device sync
-- Works across Claude Code, Cursor, Windsurf, Gemini CLI
-- Best for: Teams, complex projects, multi-tool workflows
-
-**Claude-Mem** — Comprehensive capture
-- Auto-captures everything via lifecycle hooks, compresses with AI, injects into future sessions
-- SQLite + Chroma vector search + web viewer UI
-- Progressive disclosure (3-layer search) for token efficiency
-- Best for: Users who want maximum capture with minimal manual effort
+**Alternative: Custom MCP server**
+- If the user has a preferred MCP memory server already installed, use it
+- The key requirement is that it exposes MCP tools for storing and retrieving structured memory
+- Examples from the ecosystem: Engram (if installed), hmem (if installed), ContextVault
 
 **Configuration pattern** (`.claude/settings.json`):
 ```json
 {
   "mcpServers": {
     "memory": {
-      "command": "engram",
-      "args": ["mcp"],
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
       "env": {
-        "ENGRAM_DB": ".engram/memory.db"
+        "MEMORY_FILE_PATH": ".claude/memory-graph.json"
       }
     }
   }
@@ -129,23 +119,21 @@ Three recommended servers, each with different trade-offs:
 
 Hooks automate memory capture at key session events:
 
-**PreCompact** (highest value) — Triggers before context compression. Captures patterns, decisions, and corrections that would otherwise be lost when the context window compacts.
-
-Hook commands should integrate with the configured MCP memory server so entries are queryable in future sessions:
+**PreCompact** (highest value) — Triggers before context compression. Logs when compaction occurs for debugging context loss.
 
 ```json
 {
   "hooks": {
     "PreCompact": [{
       "type": "command",
-      "command": "engram save --category session 'Context compacting — key decisions and patterns should be preserved'",
-      "timeout": 10000
+      "command": "echo \"$(date '+%Y-%m-%d %H:%M:%S') — Context compacting\" >> .claude/compaction-log.txt",
+      "timeout": 5000
     }]
   }
 }
 ```
 
-Without an MCP server, use file-logging as a fallback:
+File-logging for compaction events:
 ```json
 {
   "hooks": {

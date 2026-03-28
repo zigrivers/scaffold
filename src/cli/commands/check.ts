@@ -229,7 +229,7 @@ const checkCommand: CommandModule<Record<string, unknown>, CheckArgs> = {
           const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'))
           const servers = settings.mcpServers ?? {}
           for (const [name, _config] of Object.entries(servers)) {
-            if (['memory', 'engram', 'hmem', 'claude-mem', 'context7', 'nia', 'docfork'].includes(name)) {
+            if (['memory', 'knowledge-graph', 'context7', 'nia', 'docfork'].includes(name) || name.includes('memory')) {
               hasMcpServer = true
               mcpServerName = name
               break

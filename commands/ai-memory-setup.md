@@ -44,7 +44,7 @@ Before starting, check if `.claude/rules/` directory exists:
 Use AskUserQuestionTool for these decisions:
 
 1. **Which memory tiers to enable?** Present all three tiers with descriptions. Tier 1 (Modular Rules) is always recommended. Tier 2 (Persistent Memory) and Tier 3 (External Context) are optional.
-2. **(Tier 2) Which MCP memory server?** Options: Engram (lightweight, zero dependencies — recommended for most projects), hmem (hierarchical, cross-tool — recommended for teams and complex projects), Claude-Mem (comprehensive auto-capture — recommended for users who want maximum capture). Auto-detect: check if any of these are already installed (`command -v engram`, `command -v hmem`, check for Claude-Mem in existing MCP config).
+2. **(Tier 2) Which MCP memory server?** Options: MCP Knowledge Graph (`@modelcontextprotocol/server-memory` — official, stable, recommended), or a custom MCP server the user already has configured. Auto-detect: check if any MCP memory server is already in `.claude/settings.json`.
 3. **(Tier 2) Which lifecycle hooks?** Options: PreCompact only (recommended — highest value, lowest noise), PreCompact + Stop (captures session summaries too), All three (PreCompact + Stop + PreToolUse — verbose, for complex projects).
 4. **(Tier 3) Which library doc server?** Options: Context7 (most popular, 1K free requests/month), Nia (comprehensive, 3K+ indexed packages), Docfork (9K+ libraries, MIT, self-hostable). Only offer if the project has external dependencies.
 
@@ -153,64 +153,46 @@ Skip this tier if the user did not opt in.
 ### Step 2.1: Detect Existing Memory Tools
 
 ```bash
-# Check for installed MCP memory servers
-command -v engram && echo "engram available" || echo "engram not found"
-command -v hmem && echo "hmem available" || echo "hmem not found"
-# Check for Claude-Mem in existing MCP config
-cat .claude/settings.json 2>/dev/null | grep -q "claude-mem" && echo "claude-mem configured" || echo "claude-mem not configured"
+# Check if an MCP memory server is already configured
+cat .claude/settings.json 2>/dev/null | python3 -c "
+import json, sys
+try:
+  cfg = json.load(sys.stdin)
+  servers = cfg.get('mcpServers', {})
+  for name in servers:
+    if 'memory' in name.lower() or 'knowledge' in name.lower():
+      print(f'MCP memory server configured: {name}')
+      sys.exit(0)
+  print('No MCP memory server configured')
+except: print('No .claude/settings.json found')
+" 2>/dev/null
 ```
 
-If a memory server is already installed, recommend using it rather than installing a new one.
+If a memory server is already configured, verify it works rather than replacing it.
 
 ### Step 2.2: MCP Memory Server Setup
 
-Based on the user's choice (or auto-detected installation), configure the MCP memory server in `.claude/settings.json`.
+Configure the MCP Knowledge Graph server — the official `@modelcontextprotocol/server-memory` package. It stores entities, relations, and observations in a local JSON file.
 
-**Engram configuration:**
 ```json
 {
   "mcpServers": {
     "memory": {
-      "command": "engram",
-      "args": ["mcp"],
-      "env": {
-        "ENGRAM_DB": ".engram/memory.db"
-      }
-    }
-  }
-}
-```
-
-Add `.engram/` to `.gitignore` (memory is local, not shared via git).
-
-**hmem configuration:**
-```json
-{
-  "mcpServers": {
-    "memory": {
-      "command": "hmem",
-      "args": ["serve", "--mcp"],
-      "env": {
-        "HMEM_DB": ".hmem/memory.db"
-      }
-    }
-  }
-}
-```
-
-Add `.hmem/` to `.gitignore`.
-
-**Claude-Mem configuration:**
-```json
-{
-  "mcpServers": {
-    "claude-mem": {
       "command": "npx",
-      "args": ["-y", "claude-mem", "mcp"]
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "env": {
+        "MEMORY_FILE_PATH": ".claude/memory-graph.json"
+      }
     }
   }
 }
 ```
+
+The `MEMORY_FILE_PATH` should use an absolute path or a path relative to the project root. The server stores a knowledge graph of entities and their relationships — decisions, patterns, and project facts persist across sessions.
+
+Add `.claude/memory-graph.json` to `.gitignore` (memory is local to the developer, not shared via git).
+
+**If the user has a different MCP memory server** they prefer (e.g., one they've already installed), use their configuration instead. The key requirement is that it exposes MCP tools for storing and retrieving structured memory.
 
 **Important**: Merge into existing `.claude/settings.json` — do not overwrite. Read the file first, add the `mcpServers` entry, write back.
 
@@ -219,92 +201,34 @@ Add `.hmem/` to `.gitignore`.
 Based on the user's hook choices, add hook configuration to `.claude/settings.json`:
 
 **PreCompact hook** (always recommended):
-
-The hook command depends on which MCP memory server is configured:
-
-**With Engram:**
 ```json
 {
   "hooks": {
     "PreCompact": [{
       "type": "command",
-      "command": "engram save --category session 'Context compacting — key decisions and patterns should be preserved'",
-      "timeout": 10000
-    }]
-  }
-}
-```
-
-**With hmem:**
-```json
-{
-  "hooks": {
-    "PreCompact": [{
-      "type": "command",
-      "command": "hmem add --type decision 'Context compacting — key decisions and patterns should be preserved'",
-      "timeout": 10000
-    }]
-  }
-}
-```
-
-**Without MCP server (Tier 1 only):**
-```json
-{
-  "hooks": {
-    "PreCompact": [{
-      "type": "command",
-      "command": "date '+%Y-%m-%d %H:%M' >> .claude/compaction-log.txt && echo 'Context compacted' >> .claude/compaction-log.txt",
+      "command": "echo \"$(date '+%Y-%m-%d %H:%M:%S') — Context compacting\" >> .claude/compaction-log.txt",
       "timeout": 5000
     }]
   }
 }
 ```
-
-Note: When an MCP memory server is configured, the PreCompact hook writes a marker to the memory store, making it queryable in future sessions. Without a memory server, the hook logs compaction timestamps for debugging context loss.
 
 **Stop hook** (optional):
-
-**With Engram:**
 ```json
 {
   "hooks": {
     "Stop": [{
       "type": "command",
-      "command": "engram save --category session 'Session ended'",
-      "timeout": 10000
-    }]
-  }
-}
-```
-
-**With hmem:**
-```json
-{
-  "hooks": {
-    "Stop": [{
-      "type": "command",
-      "command": "hmem add --type task 'Session ended'",
-      "timeout": 10000
-    }]
-  }
-}
-```
-
-**Without MCP server:**
-```json
-{
-  "hooks": {
-    "Stop": [{
-      "type": "command",
-      "command": "date '+%Y-%m-%d %H:%M session ended' >> .claude/compaction-log.txt",
+      "command": "echo \"$(date '+%Y-%m-%d %H:%M:%S') — Session ended\" >> .claude/compaction-log.txt",
       "timeout": 5000
     }]
   }
 }
 ```
 
-**Merge hooks into existing configuration** — do not overwrite existing hooks. Match the hook command to whichever MCP server was configured in Step 2.2. If no MCP server, use the file-logging fallback.
+Note: These hooks log compaction and session events for debugging context loss. The MCP Knowledge Graph server configured in Step 2.2 handles persistent memory storage — Claude Code's built-in auto-memory and the MCP server work together to preserve important context across sessions. The hooks provide an audit trail of when compaction occurs.
+
+**Merge hooks into existing configuration** — do not overwrite existing hooks.
 
 ### Step 2.3b: Update .gitignore
 
@@ -316,12 +240,10 @@ After configuring the MCP memory server and hooks, update `.gitignore` to exclud
 
 Entries to add (only for the configured server):
 
-| MCP Server | .gitignore Entry |
+| Component | .gitignore Entry |
 |-----------|-----------------|
-| Engram | `.engram/` |
-| hmem | `.hmem/` |
-| Claude-Mem | `.claude-mem/` |
-| (file-logging fallback) | `.claude/compaction-log.txt` |
+| MCP Knowledge Graph | `.claude/memory-graph.json` |
+| Compaction log | `.claude/compaction-log.txt` |
 
 Read `.gitignore` first, check if entries already exist, and only append missing ones. Memory databases are local — they should never be committed to git.
 
