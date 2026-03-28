@@ -321,7 +321,7 @@ describe('status command', () => {
 
     // Verify reconcileWithPipeline was called with pipeline steps
     expect(reconcileFn).toHaveBeenCalledTimes(1)
-    const pipelineArg = reconcileFn.mock.calls[0][0] as Array<{ slug: string }>
+    const pipelineArg = (reconcileFn.mock.calls[0] as unknown as [Array<{ slug: string }>])[0]
     const slugs = pipelineArg.map((s: { slug: string }) => s.slug)
     expect(slugs).toContain('story-tests')
     expect(slugs).toContain('step-a')

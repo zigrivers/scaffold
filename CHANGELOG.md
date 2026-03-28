@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.28.1] — 2026-03-28
+
+### Fixed
+
+- **TypeScript build error in `status.test.ts`** — Fixed TS2352/TS2493 cast error on mock call args by routing through `unknown` first. Caused Homebrew install failure.
+
 ## [2.28.0] — 2026-03-28
 
 ### Fixed
