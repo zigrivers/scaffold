@@ -94,6 +94,26 @@ For each issue found:
 - **P2**: Minor implied decision without ADR (library choice, convention). ADR missing alternatives section.
 - **P3**: ADR could be clearer. Convention-level decision without formal record.
 
+## Multi-Model Validation (Depth 4-5)
+
+**Skip this section at depth 1-3. MANDATORY at depth 4+.**
+
+At depth 4+, dispatch the reviewed artifact to independent AI models for additional validation. This catches blind spots that a single model misses. Follow the invocation patterns and auth verification in the `multi-model-dispatch` skill.
+
+**Previous auth failures do NOT exempt this dispatch.** Auth tokens refresh — always re-check before each review step.
+
+1. **Verify auth**: Run `codex login status` and `NO_BROWSER=true gemini -p "respond with ok" -o json 2>/dev/null` (exit 41 = auth failure). If auth fails, tell the user to run `! codex login` or `! gemini -p "hello"` for interactive recovery. Do not silently skip.
+2. **Bundle context**: Include the reviewed artifacts + upstream references (listed below)
+3. **Dispatch**: Run each available CLI independently with the review prompt
+4. **Reconcile**: Apply dual-model reconciliation rules from the skill
+5. **Apply fixes**: Fix high-confidence findings; present medium/low-confidence findings to the user
+
+**Upstream references to include in the review bundle:**
+- `docs/adrs/` (primary artifact), `docs/domain-models/`, `docs/system-architecture.md`, `docs/plan.md`
+- Focus areas: implied-but-unrecorded decisions, contradictions between ADRs, stale "Proposed" status
+
+If neither CLI is available, perform a structured adversarial self-review instead: re-read the artifacts specifically looking for issues the initial passes might have missed.
+
 ## Process
 
 1. Read all input artifacts listed above
@@ -105,7 +125,8 @@ For each issue found:
 7. Run the category checklist for coverage gaps
 8. Compile findings report sorted by severity
 9. Present to user for review
-10. Execute approved fixes
+10. (Depth 4+) Dispatch multi-model validation — verify CLI auth, bundle context, dispatch, reconcile findings, apply high-confidence fixes
+11. Execute approved fixes
 
 ## After This Step
 
