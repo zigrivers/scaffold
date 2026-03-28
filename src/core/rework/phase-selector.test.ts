@@ -84,11 +84,16 @@ describe('resolveStepsForPhases', () => {
     'extra-steps': [],
   })
 
+  const BASE: MetaPromptFrontmatter = {
+    name: '', description: '', phase: 'pre', order: 0,
+    dependencies: [], outputs: [], conditional: null,
+    knowledgeBase: [], reads: [],
+  }
   const metaPrompts: MetaPromptFrontmatter[] = [
-    { name: 'create-prd', description: 'Create PRD', phase: 'pre', order: 110, dependencies: [], outputs: [], conditional: null, knowledgeBase: [], reads: [] },
-    { name: 'review-prd', description: 'Review PRD', phase: 'pre', order: 120, dependencies: ['create-prd'], outputs: [], conditional: null, knowledgeBase: [], reads: [] },
-    { name: 'tech-stack', description: 'Tech stack', phase: 'foundation', order: 210, dependencies: [], outputs: [], conditional: null, knowledgeBase: [], reads: [] },
-    { name: 'beads', description: 'Beads', phase: 'foundation', order: 200, dependencies: [], outputs: [], conditional: 'if-needed', knowledgeBase: [], reads: [] },
+    { ...BASE, name: 'create-prd', description: 'Create PRD', phase: 'pre', order: 110 },
+    { ...BASE, name: 'review-prd', description: 'Review PRD', phase: 'pre', order: 120, dependencies: ['create-prd'] },
+    { ...BASE, name: 'tech-stack', description: 'Tech stack', phase: 'foundation', order: 210 },
+    { ...BASE, name: 'beads', description: 'Beads', phase: 'foundation', order: 200, conditional: 'if-needed' },
   ]
 
   it('returns steps for selected phases in topological order', () => {

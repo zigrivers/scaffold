@@ -86,7 +86,6 @@ function makeReworkSession(overrides: Record<string, unknown> = {}): Record<stri
 
 describe('rework command', () => {
   let exitSpy: MockInstance
-  let stdoutSpy: MockInstance
   let writtenLines: string[]
   let tempDir: string
 
@@ -100,7 +99,7 @@ describe('rework command', () => {
 
     writtenLines = []
     exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
-    stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
       writtenLines.push(String(chunk))
       return true
     })

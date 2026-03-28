@@ -56,12 +56,27 @@ function makeState(steps: Record<string, { status: StepStatus; produces?: string
   }
 }
 
+const BASE: MetaPromptFrontmatter = {
+  name: '', description: '', phase: 'pre', order: 0,
+  dependencies: [], outputs: [], conditional: null,
+  knowledgeBase: [], reads: [],
+}
 const SAMPLE_PROMPTS: MetaPromptFrontmatter[] = [
-  { name: 'create-prd', description: 'Create PRD', phase: 'pre', order: 110, dependencies: [], outputs: ['docs/plan.md'], conditional: null, knowledgeBase: [], reads: [] },
-  { name: 'review-prd', description: 'Review PRD', phase: 'pre', order: 120, dependencies: ['create-prd'], outputs: [], conditional: null, knowledgeBase: [], reads: [] },
-  { name: 'tech-stack', description: 'Tech stack', phase: 'foundation', order: 210, dependencies: [], outputs: ['docs/tech-stack.md'], conditional: null, knowledgeBase: [], reads: [] },
-  { name: 'coding-standards', description: 'Coding standards', phase: 'foundation', order: 220, dependencies: ['tech-stack'], outputs: ['docs/coding-standards.md'], conditional: null, knowledgeBase: [], reads: [] },
-  { name: 'beads', description: 'Optional beads', phase: 'foundation', order: 200, dependencies: [], outputs: [], conditional: 'if-needed', knowledgeBase: [], reads: [] },
+  { ...BASE, name: 'create-prd', description: 'Create PRD', order: 110, outputs: ['docs/plan.md'] },
+  { ...BASE, name: 'review-prd', description: 'Review PRD', order: 120, dependencies: ['create-prd'] },
+  {
+    ...BASE, name: 'tech-stack', description: 'Tech stack',
+    phase: 'foundation', order: 210, outputs: ['docs/tech-stack.md'],
+  },
+  {
+    ...BASE, name: 'coding-standards', description: 'Coding standards',
+    phase: 'foundation', order: 220, dependencies: ['tech-stack'],
+    outputs: ['docs/coding-standards.md'],
+  },
+  {
+    ...BASE, name: 'beads', description: 'Optional beads',
+    phase: 'foundation', order: 200, conditional: 'if-needed',
+  },
 ]
 
 // ---------------------------------------------------------------------------

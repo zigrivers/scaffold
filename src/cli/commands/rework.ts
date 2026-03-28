@@ -138,8 +138,9 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
             all_done: true,
           })
         } else {
+          const { completed, failed, skipped } = session.stats
           output.success(
-            `Rework complete: ${session.stats.completed} completed, ${session.stats.failed} failed, ${session.stats.skipped} skipped`,
+            `Rework complete: ${completed} completed, ${failed} failed, ${skipped} skipped`,
           )
         }
         reworkManager.clearSession()
