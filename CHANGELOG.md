@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.22.1] — 2026-03-28
+
+### Fixed
+
+- **`multi-model-review-tasks` not removed from existing projects** — Added `multi-model-review-tasks` to `RETIRED_STEPS` in state migration so existing projects auto-remove the retired step from `state.json` on next `scaffold status` or `scaffold run`. Without this, upgraded projects showed the step as pending with a total of 51 instead of 50.
+
 ## [2.22.0] — 2026-03-28
 
 ### Changed
