@@ -19,7 +19,8 @@ Use this skill ONLY when the user asks about:
 | # | Phase | Command | Notes |
 |---|-------|---------|-------|
 | 1 | Product Definition | `/scaffold:create-prd` | Interactive — requires user input |
-| 2 | Product Definition | `/scaffold:prd-gap-analysis` | Last chance to strengthen PRD |
+| 2 | Product Definition | `/scaffold:review-prd` | Multi-pass PRD review |
+| 2.5 | Product Definition | `/scaffold:innovate-prd` | **(optional)** Feature-level innovation |
 | 3 | Project Foundation | `/scaffold:beads` | Creates CLAUDE.md — run first in Phase 2 |
 | 4 | Project Foundation | `/scaffold:tech-stack` | Drives all technical decisions |
 | 5 | Project Foundation | `/scaffold:coding-standards` | References tech-stack.md |
@@ -32,7 +33,8 @@ Use this skill ONLY when the user asks about:
 | 10.8 | Dev Environment | `/scaffold:ai-memory-setup` | Modular rules, optional MCP memory + external docs |
 | 11 | Testing | `/scaffold:add-e2e-testing` | **(optional)** Web and/or mobile apps |
 | 13 | Stories & Planning | `/scaffold:user-stories` | Covers every PRD feature |
-| 14 | Stories & Planning | `/scaffold:user-stories-gaps` | UX improvements |
+| 14 | Stories & Planning | `/scaffold:review-user-stories` | Multi-pass story review; depth 4+ adds requirements index |
+| 14.5 | Stories & Planning | `/scaffold:innovate-user-stories` | **(optional)** UX-level enhancements |
 | 15 | Stories & Planning | `/scaffold:platform-parity-review` | **(optional)** Multi-platform projects |
 | 15.1 | Domain Modeling | `/scaffold:domain-modeling` | Entities, aggregates, events, bounded contexts |
 | 15.2 | Domain Modeling | `/scaffold:review-domain-modeling` | 10-pass domain model review |
