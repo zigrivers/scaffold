@@ -2,6 +2,15 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.31.0] — 2026-03-29
+
+### Added
+
+- **`scaffold rework` command** — Re-run all steps within selected phases at configurable depth. Supports `--phases`, `--through`, `--exclude` for phase selection, `--fix` for auto-fixing review step issues (default on), `--fresh` for clean re-runs, and persistent sessions (`.scaffold/rework.json`) that survive context resets. Session management via `--resume`, `--clear`, and `--advance` flags.
+- **Rework mode in scaffold-runner skill** — Runner skill auto-detects active rework sessions, executes steps sequentially, pauses at phase boundaries, and supports natural language triggers ("rework phases 1-5", "resume rework", "rework status").
+- **`reworkFix` assembly option** — Assembly engine injects auto-fix instructions for review steps during rework mode, directing Claude to apply fixes directly to artifacts instead of just listing issues.
+- **41 new tests** — ReworkManager unit tests (17), phase-selector unit tests (18), E2E lifecycle tests (6), plus 11 CLI command tests and 3 assembly engine tests.
+
 ## [2.30.0] — 2026-03-28
 
 ### Fixed
