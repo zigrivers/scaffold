@@ -2,6 +2,13 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.26.0] — 2026-03-28
+
+### Added
+
+- **`story-tests` pipeline step** (Phase 9, order 915) — Generates tagged, pending test skeletons from user story acceptance criteria. Creates one test file per story in `tests/acceptance/`, one test case per AC tagged with `[US-xxx:AC-y]` for traceability. Assigns test layer (unit/integration/e2e) based on AC type. Produces `docs/story-tests-map.md` traceability matrix. Replaces approximate keyword matching with precise tag-based AC-to-test coverage.
+- **`create-evals` now depends on `story-tests`** — Coverage evals can verify AC tags instead of keyword co-occurrence, providing precise rather than approximate coverage checking.
+
 ## [2.25.0] — 2026-03-28
 
 ### Added
