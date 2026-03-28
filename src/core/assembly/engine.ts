@@ -96,7 +96,7 @@ export class AssemblyEngine {
         { heading: 'Knowledge Base', content: this.buildKnowledgeBaseSection(options.knowledgeEntries) },
         { heading: 'Project Context', content: this.buildProjectContextSection(artifacts, decisions, options) },
         { heading: 'Methodology', content: this.buildMethodologySection(depth, options.depthProvenance) },
-        { heading: 'Instructions', content: this.buildInstructionsSection(options.instructions) },
+        { heading: 'Instructions', content: this.buildInstructionsSection(options.instructions, options.reworkFix) },
         { heading: 'Execution', content: this.buildExecutionSection(depth) },
       ]
 
@@ -225,7 +225,7 @@ export class AssemblyEngine {
     ].join('\n')
   }
 
-  private buildInstructionsSection(instructions: UserInstructions): string {
+  private buildInstructionsSection(instructions: UserInstructions, reworkFix?: boolean): string {
     const parts: string[] = []
 
     if (instructions.global != null) {
@@ -238,6 +238,17 @@ export class AssemblyEngine {
 
     if (instructions.inline != null) {
       parts.push(`### Inline Instructions\n\n${instructions.inline}`)
+    }
+
+    if (reworkFix) {
+      parts.push(
+        '### Rework Mode: Auto-Fix Enabled\n\n' +
+        'You are re-running this review step in rework mode. Instead of just listing issues:\n' +
+        '1. Read the artifact being reviewed\n' +
+        '2. Identify all issues at the current depth level\n' +
+        '3. Apply fixes directly to the artifact\n' +
+        '4. Summarize what you changed and why',
+      )
     }
 
     if (parts.length === 0) {
