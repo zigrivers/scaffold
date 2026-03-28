@@ -709,9 +709,7 @@ When this step is complete, tell the user:
 ---
 **Phase 6 in progress** — Workflow verified and aligned across all documents.
 
-**Next:** Run `/scaffold:create-evals` — Generate project-specific eval checks from standards docs.
-
-**Or skip to:** `/scaffold:implementation-plan` — Create task graph from stories and standards (starts Phase 7).
+**Next:** Run `/scaffold:implementation-plan` — Create task graph from stories and standards (starts Phase 7).
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 
