@@ -9,6 +9,21 @@ The workflow below is the canonical source of truth. Your job is to ensure every
 
 **Ordering note:** This prompt should run AFTER the Claude.md Optimization prompt. That prompt consolidates; this one verifies alignment with the canonical workflow and fixes any remaining gaps.
 
+## Mode Detection
+
+Before starting, check if `CLAUDE.md` or `docs/git-workflow.md` contains a tracking comment `<!-- scaffold:workflow-audit v1 YYYY-MM-DD -->`:
+
+**If the tracking comment is NOT found → FRESH MODE**: Skip to the next section and run the full audit from scratch.
+
+**If the tracking comment IS found → UPDATE MODE**:
+1. **Read & analyze**: Read CLAUDE.md and docs/git-workflow.md. Note the version date from the tracking comment.
+2. **Focus on changes since last audit**: Identify new docs added, existing docs modified, Makefile targets changed, or git-workflow.md updated with new steps since the last audit date.
+3. **Preserve customizations**: Keep custom CI jobs, user-added workflow steps, project-specific branch protection rules, and custom PR template fields.
+4. **Propose targeted fixes**: Present a summary of new inconsistencies or gaps found since the last audit. The canonical workflow remains the source of truth — documents align to it, not vice versa.
+5. **Update tracking comment**: Update the date in `<!-- scaffold:workflow-audit v1 YYYY-MM-DD -->`.
+
+**In both modes**, follow all instructions below — update mode focuses on changes since the last audit rather than re-auditing everything.
+
 ## Beads Detection
 
 Check if `.beads/` directory exists:

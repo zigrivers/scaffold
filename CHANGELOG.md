@@ -10,6 +10,7 @@ All notable changes to Scaffold are documented here.
 - **Missing reads in consolidation/environment phase** — `claude-md-optimization` now declares `reads: [create-prd, tdd]`, `automated-pr-review` declares `reads: [tdd]`, and `design-system` declares `reads: [create-prd]`. Ensures formal data flow for all required inputs.
 - **Malformed mvp bullets in 3 review steps** — `review-ux`, `review-operations`, and `review-security` had their `**mvp**` bullet indented under `**deep**`, making it invisible to methodology parsers. Now properly formatted as separate bullets.
 - **Generic validation step quality criteria** — All 7 validation steps (`cross-phase-consistency`, `traceability-matrix`, `decision-completeness`, `critical-path-walkthrough`, `implementability-dry-run`, `dependency-graph-validation`, `scope-creep-check`) had identical copy-paste criteria ("analysis is comprehensive"). Replaced with step-specific, measurable criteria derived from each step's Purpose section.
+- **Mode Detection mismatches** — Added Mode Detection sections to `commands/claude-md-optimization.md` and `commands/workflow-audit.md` (previously omitted entirely). Updated `apply-fixes-and-freeze` pipeline to acknowledge update mode (was "N/A"). Expanded stub Mode Detection in `developer-onboarding-guide` and `implementation-playbook` pipeline files.
 
 ### Added
 

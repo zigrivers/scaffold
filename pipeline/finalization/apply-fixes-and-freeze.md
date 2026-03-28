@@ -36,4 +36,6 @@ issue is discovered during implementation.
 - **custom:depth(1-5)**: Scale with depth.
 
 ## Mode Detection
-Not applicable — this step runs once after validation.
+Check if `docs/validation/fix-log.md` already exists.
+- If exists: UPDATE MODE — read existing fix log, identify newly introduced validation findings, apply incremental fixes, preserve previously applied fixes and their verification status.
+- If not: FRESH MODE — apply all validation findings from scratch.
