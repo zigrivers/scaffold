@@ -25,11 +25,11 @@ organization. Project directory structure and module organization are defined he
   data flows, module structure, and extension points
 
 ## Quality Criteria
-- Every domain model lands in a component or module
-- Every ADR constraint is respected in the architecture
-- All components appear in at least one data flow diagram
-- Extension points are both documented and designed (not just listed)
-- Project directory structure is defined with file-level granularity
+- (mvp) Every domain model lands in a component or module
+- (mvp) Every ADR constraint is respected in the architecture
+- (mvp) All components appear in at least one data flow diagram
+- (deep) Extension points are both documented and designed (not just listed)
+- (mvp) Project directory structure is defined with file-level granularity
 
 ## Methodology Scaling
 - **deep**: Full architecture document. Component diagrams, data flow diagrams,

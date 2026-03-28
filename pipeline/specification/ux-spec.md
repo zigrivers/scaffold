@@ -27,12 +27,12 @@ step consumes those tokens, it does not redefine them.
 - docs/ux-spec.md — UX specification with flows, components, design system
 
 ## Quality Criteria
-- Every PRD user journey has a corresponding flow with all states documented
-- Component hierarchy covers all UI states (loading, error, empty, populated)
+- (mvp) Every PRD user journey has a corresponding flow with all states documented
+- (mvp) Component hierarchy covers all UI states (loading, error, empty, populated)
 - References design tokens from docs/design-system.md (does not redefine them)
-- Accessibility requirements documented (WCAG level, keyboard nav, screen readers)
-- Responsive breakpoints defined with layout behavior per breakpoint
-- Error states documented for every user action that can fail
+- (deep) Accessibility requirements documented (WCAG level, keyboard nav, screen readers)
+- (deep) Responsive breakpoints defined with layout behavior per breakpoint
+- (mvp) Error states documented for every user action that can fail
 
 ## Methodology Scaling
 - **deep**: Full UX specification. Detailed wireframes described in prose.

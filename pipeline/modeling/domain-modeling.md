@@ -34,13 +34,13 @@ and aggregate boundaries. User actions reveal the domain model.
 - docs/domain-models/index.md — overview of all domains and their relationships
 
 ## Quality Criteria
-- Every PRD feature maps to at least one domain
-- Entity relationships are explicit (not implied)
-- Aggregate boundaries are justified (why this grouping?)
-- Domain events cover all state transitions
-- Invariants are testable assertions, not vague rules
+- (mvp) Every PRD feature maps to at least one domain
+- (mvp) Entity relationships are explicit (not implied)
+- (mvp) Aggregate boundaries are justified (why this grouping?)
+- (deep) Domain events cover all state transitions
+- (deep) Invariants are testable assertions, not vague rules
 - Ubiquitous language is consistent across all domain models
-- Cross-domain relationships are documented at context boundaries
+- (deep) Cross-domain relationships are documented at context boundaries
 
 ## Methodology Scaling
 - **deep**: Full DDD tactical patterns. Detailed entity specs with TypeScript-style

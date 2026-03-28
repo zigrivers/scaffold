@@ -36,6 +36,9 @@ independent review validation.
 - Auth requirements specified for every endpoint
 - Versioning strategy consistent with ADRs
 - Idempotency documented for all mutating operations
+- Every finding categorized P0-P3 with specific endpoint, field, and issue
+- Fix plan documented for all P0/P1 findings; fixes applied to api-contracts.md and re-validated
+- Downstream readiness confirmed — no unresolved P0 or P1 findings remain before UX spec proceeds
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling

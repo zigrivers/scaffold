@@ -36,19 +36,19 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
   assignment recommendations
 
 ## Quality Criteria
-- Every architecture component has implementation tasks
-- Task dependencies form a valid DAG (no cycles)
-- Each task is scoped for a single agent session (not too large, not too small)
-- Tasks include acceptance criteria (how to know it's done)
-- Tasks incorporate testing requirements from the testing strategy
-- Tasks reference corresponding test skeletons from tests/acceptance/ where applicable
-- Tasks incorporate security controls from the security review where applicable
-- Tasks incorporate operational requirements (monitoring, deployment) where applicable
-- Critical path is identified
-- Parallelization opportunities are marked with wave plan
-- Every user story maps to at least one task
-- High-risk tasks are flagged with risk type and mitigation
-- Wave summary produced with agent allocation recommendation
+- (mvp) Every architecture component has implementation tasks
+- (mvp) Task dependencies form a valid DAG (no cycles)
+- (mvp) Each task is scoped for a single agent session (not too large, not too small)
+- (mvp) Tasks include acceptance criteria (how to know it's done)
+- (mvp) Tasks incorporate testing requirements from the testing strategy
+- (deep) Tasks reference corresponding test skeletons from tests/acceptance/ where applicable
+- (deep) Tasks incorporate security controls from the security review where applicable
+- (deep) Tasks incorporate operational requirements (monitoring, deployment) where applicable
+- (deep) Critical path is identified
+- (deep) Parallelization opportunities are marked with wave plan
+- (mvp) Every user story maps to at least one task
+- (deep) High-risk tasks are flagged with risk type and mitigation
+- (deep) Wave summary produced with agent allocation recommendation
 
 ## Methodology Scaling
 - **deep**: Detailed task breakdown with story-to-task tracing. Dependency graph.
