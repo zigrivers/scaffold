@@ -2,6 +2,21 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.20.0] — 2026-03-27
+
+### Changed
+
+- **Merged `multi-model-review-tasks` into `implementation-plan-review`** — The standalone multi-model review pipeline step was redundant with the review's own multi-model validation section. The review now handles everything in an 8-phase structure: coverage audit (produces `task-coverage.json`), task quality, dependencies, standards alignment, risk assessment, present/fix, execute changes, and multi-model validation (depth 4+). Planning phase reduced from 3 steps to 2.
+
+### Added
+
+- **Risk assessment in planning phase** — `implementation-plan` now flags high-risk tasks (technology, integration, complexity, critical path) with severity and mitigation. `implementation-plan-review` Phase 5 verifies risk flags.
+- **Wave plan & parallelism output** — `implementation-plan` now produces a wave summary showing tasks per wave and maximum useful agent count, helping users plan worktree/agent allocation before execution.
+
+### Removed
+
+- **`multi-model-review-tasks` pipeline step and command** — Absorbed into `implementation-plan-review`. The `scripts/implementation-plan-mmr.sh` script and schema are preserved (now invoked by the review's Phase 8).
+
 ## [2.19.3] — 2026-03-27
 
 ### Fixed
