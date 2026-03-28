@@ -77,6 +77,7 @@ get_dep_refs() {
 get_phase_order_range() {
   local phase="$1"
   case "$phase" in
+    vision)         echo "0 99" ;;
     pre)            echo "100 199" ;;
     foundation)     echo "200 299" ;;
     environment)    echo "300 399" ;;
@@ -99,11 +100,11 @@ get_phase_order_range() {
 get_phase_number() {
   local phase="$1"
   case "$phase" in
-    pre) echo 1 ;; foundation) echo 2 ;; environment) echo 3 ;;
+    vision) echo 0 ;; pre) echo 1 ;; foundation) echo 2 ;; environment) echo 3 ;;
     integration) echo 4 ;; modeling) echo 5 ;; decisions) echo 6 ;;
     architecture) echo 7 ;; specification) echo 8 ;; quality) echo 9 ;;
     parity) echo 10 ;; consolidation) echo 11 ;; planning) echo 12 ;;
-    validation) echo 13 ;; finalization) echo 14 ;; *) echo 0 ;;
+    validation) echo 13 ;; finalization) echo 14 ;; *) echo -1 ;;
   esac
 }
 

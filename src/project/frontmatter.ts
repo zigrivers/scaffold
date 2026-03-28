@@ -4,6 +4,7 @@ import yaml from 'js-yaml'
 import { z } from 'zod'
 import type { MetaPromptFrontmatter } from '../types/index.js'
 import type { ScaffoldError, ScaffoldWarning } from '../types/index.js'
+import { PHASES } from '../types/frontmatter.js'
 import {
   frontmatterMissing,
   frontmatterUnclosed,
@@ -31,23 +32,8 @@ const KNOWN_YAML_KEYS = new Set([
 const frontmatterSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9-]*$/, 'name must be kebab-case'),
   description: z.string().max(200),
-  phase: z.enum([
-    'pre',
-    'foundation',
-    'environment',
-    'integration',
-    'modeling',
-    'decisions',
-    'architecture',
-    'specification',
-    'quality',
-    'parity',
-    'consolidation',
-    'planning',
-    'validation',
-    'finalization',
-  ]),
-  order: z.number().min(1).max(1500),
+  phase: z.enum(PHASES.map(p => p.slug) as [string, ...string[]]),
+  order: z.number().min(0).max(1500),
   dependencies: z.array(z.string().regex(/^[a-z][a-z0-9-]*$/)).default([]),
   outputs: z.array(z.string()).nonempty(),
   conditional: z.enum(['if-needed']).nullable().default(null),

@@ -195,8 +195,8 @@ describe('Rework E2E: Phase Resolution with Real Graph', () => {
     expect(names).toContain('coding-standards')
   })
 
-  it('--through 2 --exclude 1 gives only phase 2 steps', () => {
-    const phases = applyExclusions(parseThrough(2), parsePhases('1'))
+  it('--through 2 --exclude 0,1 gives only phase 2 steps', () => {
+    const phases = applyExclusions(parseThrough(2), parsePhases('0,1'))
     expect(phases).toEqual([2])
 
     const state = makeState({

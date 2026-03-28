@@ -2,6 +2,23 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.33.0] — 2026-03-29
+
+### Added
+
+- **Phase 0: Product Vision** — New pipeline phase with three steps (`create-vision`, `review-vision`, `innovate-vision`) that produce a strategic product vision document (`docs/vision.md`) before the PRD. The vision document establishes the product's purpose, target audience, competitive positioning, guiding principles, and success criteria — serving as the North Star for all downstream pipeline steps.
+- **`create-vision` step** — Hybrid framework combining Geoffrey Moore's elevator pitch, Roman Pichler's Vision Board, Reforge's narrative approach, and Amazon's Working Backwards methodology. Supports fresh and update modes. Produces a 12-section comprehensive vision document.
+- **`review-vision` step** — 5-pass structured review targeting vision-specific failure modes: vision clarity, audience precision, competitive rigor, strategic coherence, and downstream readiness.
+- **`innovate-vision` step** (conditional) — Strategic innovation across 5 dimensions: market opportunity expansion, positioning alternatives, AI-native rethinking, ecosystem thinking, and contrarian bets. Updates `docs/vision.md` directly with approved innovations.
+- **`vision-craft` knowledge base entry** — Product vision best practices synthesized from Geoffrey Moore, Roman Pichler, Marty Cagan, Reforge, and Amazon Working Backwards. Referenced by all three vision steps.
+
+### Changed
+
+- **`create-prd` now reads `docs/vision.md`** — When a vision document exists, the PRD step uses it as strategic foundation and skips its own vision discovery questions. The PRD works unchanged when no vision document exists (soft read, not hard dependency).
+- **PHASES constant updated** — Added Phase 0 `vision` (display name: "Product Vision") to `src/types/frontmatter.ts`.
+- **Zod phase enum derived from PHASES** — The frontmatter validation schema now derives its phase enum from the canonical PHASES constant instead of maintaining a separate hardcoded list.
+- **Runner skill updated** — Phase name reference table includes the new vision phase for batch execution and navigation.
+
 ## [2.32.0] — 2026-03-28
 
 ### Fixed

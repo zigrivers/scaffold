@@ -279,6 +279,7 @@ Map natural language requests to concrete step lists using `scaffold status` out
 
 | Phase Name | Also Known As | Steps |
 |---|---|---|
+| vision | Product Vision | create-vision, review-vision, innovate-vision |
 | pre | Product Definition | create-prd, review-prd, innovate-prd, user-stories, review-user-stories, innovate-user-stories |
 | foundation | Project Foundation | beads, tech-stack, coding-standards, tdd, project-structure |
 | environment | Dev Environment | dev-env-setup, design-system, git-workflow, automated-pr-review, ai-memory-setup |

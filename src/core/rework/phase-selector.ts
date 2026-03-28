@@ -5,7 +5,8 @@ import type { ReworkStep } from '../../types/index.js'
 import { PHASES } from '../../types/frontmatter.js'
 import { topologicalSort } from '../dependency/dependency.js'
 
-const MAX_PHASE = PHASES.length
+const MIN_PHASE = Math.min(...PHASES.map(p => p.number))
+const MAX_PHASE = Math.max(...PHASES.map(p => p.number))
 
 /**
  * Parse --phases flag value into an array of phase numbers.
@@ -49,7 +50,7 @@ export function parsePhases(input: string): number[] {
  */
 export function parseThrough(n: number): number[] {
   validatePhaseNumber(n)
-  return Array.from({ length: n }, (_, i) => i + 1)
+  return Array.from({ length: n - MIN_PHASE + 1 }, (_, i) => i + MIN_PHASE)
 }
 
 /**
@@ -112,7 +113,7 @@ export function resolveStepsForPhases(
 }
 
 function validatePhaseNumber(n: number): void {
-  if (n < 1 || n > MAX_PHASE) {
-    throw new Error(`Phase number ${n} out of range (1-${MAX_PHASE})`)
+  if (n < MIN_PHASE || n > MAX_PHASE) {
+    throw new Error(`Phase number ${n} out of range (${MIN_PHASE}-${MAX_PHASE})`)
   }
 }

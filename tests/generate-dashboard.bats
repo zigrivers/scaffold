@@ -153,8 +153,9 @@ teardown() {
     run bash "$SCRIPT" --no-open --output "$TEST_OUT/dashboard.html"
     [ "$status" -eq 0 ]
     grep -q '\[data-theme="dark"\]' "$TEST_OUT/dashboard.html"
-    # Should NOT have @media prefers-color-scheme for dark mode tokens
-    count=$(grep -c '@media.*prefers-color-scheme.*dark' "$TEST_OUT/dashboard.html" || true)
+    # Should NOT have @media prefers-color-scheme for dark mode tokens in CSS/style blocks
+    # (promptContent JSON may legitimately contain CSS examples with prefers-color-scheme)
+    count=$(sed -n '/<style/,/<\/style>/p' "$TEST_OUT/dashboard.html" | grep -c '@media.*prefers-color-scheme.*dark' || true)
     [ "$count" -eq 0 ]
 }
 
