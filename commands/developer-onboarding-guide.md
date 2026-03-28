@@ -56,6 +56,9 @@ Read ALL of these before writing any content:
 | `docs/git-workflow.md` | Branching, commit format, PR process |
 | `docs/implementation-plan.md` | Architecture overview, component boundaries |
 | `CLAUDE.md` | Key commands, workflow, project conventions |
+| `.claude/rules/` *(if exists)* | Path-scoped convention rules for AI agents |
+| `docs/ai-memory-setup.md` *(if exists)* | Memory stack tiers, MCP server config, decision logging |
+| `docs/decisions/` *(if exists)* | Implementation decisions and their rationale |
 
 Skip any document that does not exist — adapt the guide to what is available.
 
@@ -81,7 +84,7 @@ Copy-paste executable setup instructions. Include: prerequisites (with specific 
 Step-by-step guides for frequent developer activities: adding a feature, fixing a bug, running tests, creating a PR, deploying. Use the project's actual commands and file paths — not generic examples.
 
 ### 6. Where to Find Things
-Directory map showing what lives where, annotated key files (entry points, configuration, error handlers, schemas), and a "Key Files" list with one-line descriptions.
+Directory map showing what lives where, annotated key files (entry points, configuration, error handlers, schemas), and a "Key Files" list with one-line descriptions. If `.claude/rules/` exists, document it: explain that path-scoped rules activate automatically per file type, and point to `docs/ai-memory-setup.md` for details. If `docs/decisions/` exists, explain the decision log format.
 
 ### 7. Troubleshooting
 Known issues, common mistakes, and their solutions. Start with 5-10 entries based on setup complexity and common pitfalls from the tech stack. Add entries as issues are reported.
