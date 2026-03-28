@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.17.3] — 2026-03-27
+
+### Fixed
+
+- **Quality phase After This Step chains** — 3 commands pointed to wrong next steps: `security.md` → create-evals (already done), `create-evals.md` → implementation-plan (skips operations/security), `review-security.md` → implementation-plan (skips consolidation). All now correctly point to the next step in the pipeline execution order.
+
 ## [2.17.2] — 2026-03-27
 
 ### Enhanced
