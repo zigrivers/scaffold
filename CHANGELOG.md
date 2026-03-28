@@ -2,6 +2,25 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.18.0] — 2026-03-27
+
+### Fixed
+
+- **SKILL.md v2 step names** — Pipeline Order table used v1 combined names (`prd-gap-analysis`, `user-stories-gaps`) instead of v2 individual steps (`review-prd` + `innovate-prd`, `review-user-stories` + `innovate-user-stories`). Now matches prompt-pipeline.md.
+
+### Verified (Final Cross-Phase Audit)
+
+Complete systematic verification of all 51 pipeline steps:
+- Zero remaining `docs/prd.md` references (commands, pipeline, knowledge, prompts.md)
+- All Gemini invocations have `NO_BROWSER=true` (commands, skills, scripts)
+- All 19 review/validation commands have Multi-Model Validation with auth pre-flight
+- All 19 have explicit dispatch step in Process section
+- All execution/task commands handle both Beads and non-Beads
+- All 51 steps present in all 3 methodology presets
+- After This Step chains complete from create-prd through execution
+- All document-creating commands have Mode Detection
+- prompts.md, SKILL.md, and prompt-pipeline.md all have complete step coverage
+
 ## [2.17.7] — 2026-03-27
 
 ### Enhanced
