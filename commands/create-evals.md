@@ -224,7 +224,9 @@ When this step is complete, tell the user:
 ---
 **Phase 6 complete** — Eval infrastructure created in `tests/evals/`, `docs/eval-standards.md` documents what is and isn't checked.
 
-**Next:** Run `/scaffold:implementation-plan` — Create task graph from stories and standards (starts Phase 7).
+**Next:**
+- Run `/scaffold:operations` — Create operations runbook with deployment, monitoring, and incident response.
+- Or if operations is already done: proceed to `/scaffold:security` or `/scaffold:claude-md-optimization`.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 
