@@ -2,6 +2,22 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.23.0] — 2026-03-28
+
+### Changed
+
+- **Phase-aligned order numbers** — All 50 pipeline steps renumbered so Phase N uses orders in the N00 range (Phase 1 = 110-160, Phase 2 = 210-250, ..., Phase 14 = 1410-1430). Steps spaced by 10 for future insertions. Previously Phase 5 had orders 7-8 and Phase 2 had orders 40-45 — now you can tell which phase a step belongs to from its order alone. Also eliminates the fractional order (create-evals was 20.5, now 920).
+- **Phase 10 renamed** — "Stories & Reviews" (`stories`) → "Platform Parity" (`parity`). The phase contains only `platform-parity-review`, which audits cross-platform coverage, not stories.
+- **Methodology YAML comments** — Reordered from scrambled (Phase 2, 3, 4, 1...) to sequential (Phase 1 through 14).
+
+### Fixed
+
+- **Missing dependency: `implementation-plan` → `review-architecture`** — The step's Required Reading lists `docs/system-architecture.md`, `docs/domain-models/`, and `docs/adrs/` as REQUIRED inputs, but the dependency graph didn't guarantee these were ready. `review-architecture` transitively covers all three through the modeling→decisions→architecture chain.
+
+### Added
+
+- **Execution model documentation** in scaffold-pipeline skill — explains the two parallel tracks (infrastructure vs domain/quality), convergence at planning, how order numbers work as tiebreakers, and which phases can run in parallel.
+
 ## [2.22.1] — 2026-03-28
 
 ### Fixed
