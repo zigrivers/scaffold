@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.17.6] — 2026-03-27
+
+### Fixed
+
+- **3 validation commands missing Multi-Model Validation** — `decision-completeness`, `dependency-graph-validation`, and `scope-creep-check` were missing the entire Multi-Model Validation (Depth 4-5) section that the other 4 validation commands had. Added full section with `NO_BROWSER=true`, auth pre-flight, command-specific review bundles, and explicit Process step. All 7 validation commands now have consistent multi-model support.
+
 ## [2.17.5] — 2026-03-27
 
 ### Fixed
