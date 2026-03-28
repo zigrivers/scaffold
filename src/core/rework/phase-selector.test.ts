@@ -30,8 +30,12 @@ describe('parsePhases', () => {
   })
 
   it('throws on out-of-range phase number', () => {
-    expect(() => parsePhases('0')).toThrow()
+    expect(() => parsePhases('99')).toThrow()
     expect(() => parsePhases('15')).toThrow()
+  })
+
+  it('accepts phase 0', () => {
+    expect(parsePhases('0')).toEqual([0])
   })
 
   it('throws on reversed range', () => {
@@ -40,17 +44,21 @@ describe('parsePhases', () => {
 })
 
 describe('parseThrough', () => {
-  it('returns 1 through N', () => {
-    expect(parseThrough(5)).toEqual([1, 2, 3, 4, 5])
+  it('returns 0 through N', () => {
+    expect(parseThrough(5)).toEqual([0, 1, 2, 3, 4, 5])
   })
 
-  it('returns [1] for through 1', () => {
-    expect(parseThrough(1)).toEqual([1])
+  it('returns [0, 1] for through 1', () => {
+    expect(parseThrough(1)).toEqual([0, 1])
   })
 
   it('throws for invalid N', () => {
-    expect(() => parseThrough(0)).toThrow()
+    expect(() => parseThrough(-1)).toThrow()
     expect(() => parseThrough(15)).toThrow()
+  })
+
+  it('accepts through 0', () => {
+    expect(parseThrough(0)).toEqual([0])
   })
 })
 

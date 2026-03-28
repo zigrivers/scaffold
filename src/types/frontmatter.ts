@@ -4,6 +4,7 @@
  * All other references (docs, skills, commands) must match these definitions.
  */
 export const PHASES = [
+  { number: 0, slug: 'vision', displayName: 'Product Vision' },
   { number: 1, slug: 'pre', displayName: 'Product Definition' },
   { number: 2, slug: 'foundation', displayName: 'Project Foundation' },
   { number: 3, slug: 'environment', displayName: 'Development Environment' },
