@@ -443,6 +443,7 @@ You can change methodology mid-pipeline with `scaffold init --methodology <prese
 | `scaffold build` | Generate platform adapter output (commands/, AGENTS.md, etc.) |
 | `scaffold adopt` | Bootstrap state from existing artifacts (brownfield projects) |
 | `scaffold skip <step> [<step2>...]` | Skip one or more steps with a reason |
+| `scaffold complete <step>` | Mark a step as completed (for steps executed outside `scaffold run`) |
 | `scaffold reset <step>` | Reset a step back to pending |
 | `scaffold status [--compact]` | Show pipeline progress (`--compact` shows only remaining work) |
 | `scaffold next` | List next unblocked step(s) |
@@ -629,7 +630,7 @@ The project is a TypeScript CLI (`@zigrivers/scaffold`) built with yargs, target
 
 ```
 src/
-├── cli/commands/     # 17 CLI command implementations
+├── cli/commands/     # 18 CLI command implementations
 ├── cli/middleware/    # Project root detection, output mode resolution
 ├── cli/output/       # Output strategies (interactive, json, auto)
 ├── core/assembly/    # Assembly engine — meta-prompt → full prompt
@@ -667,7 +668,7 @@ skills/               # 3 Claude Code skills (pipeline reference, runner, multi-
 
 ### Testing
 
-- **Vitest** for unit and E2E tests (66 test files, 756 tests)
+- **Vitest** for unit and E2E tests (67 test files, 764 tests)
 - **Performance benchmarks** — assembly p95 < 500ms, state I/O p95 < 100ms, graph build p95 < 2s
 - **Shell script tests** via bats
 - Run: `npm test` (unit + E2E), `npm run test:bench` (benchmarks), `make check` (full CI gate)

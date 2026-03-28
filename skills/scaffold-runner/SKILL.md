@@ -99,10 +99,11 @@ Now execute the assembled prompt as your working instructions. This means:
 
 After the step completes:
 
-1. **Mark completion** — The scaffold CLI tracks this. Run:
+1. **Mark completion** — If the step was run via `scaffold run`, it's auto-tracked. If the prompt was captured with `scaffold run --auto` and executed manually, mark it complete:
    ```bash
-   scaffold status
+   scaffold complete <step>
    ```
+   Then verify with `scaffold status`.
 
 2. **Show what's next** — Run:
    ```bash
@@ -146,6 +147,7 @@ Respond to these natural language requests:
 | "Skip X, Y, and Z" | Run `scaffold skip <step1> <step2> <step3> --reason "<reason>"` |
 | "What's left?" / "Show remaining" | Run `scaffold status --compact`, show only pending/in-progress steps |
 | "Re-run X" / "Redo X" / "Go back to X" | Reset then re-run: `scaffold reset <step> --force && scaffold run <step>` |
+| "Mark X as done" / "Complete X" | Run `scaffold complete <step>` — marks a step as completed when executed outside `scaffold run` |
 | "Reset X" / "Reset X to pending" | Run `scaffold reset <step>`, confirm if completed |
 | "Show the full pipeline" | Run `scaffold list`, present with status indicators |
 | "Open the dashboard" | Run `scaffold dashboard` |
