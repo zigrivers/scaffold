@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.17.4] — 2026-03-27
+
+### Fixed
+
+- **workflow-audit After This Step** — Pointed to create-evals (which now runs in Phase 5e before consolidation since v2.16.1). Now correctly points to implementation-plan (Phase 7).
+
 ## [2.17.3] — 2026-03-27
 
 ### Fixed
