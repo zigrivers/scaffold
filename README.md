@@ -1,6 +1,6 @@
 # Scaffold
 
-A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 50 structured pipeline steps — organized into 14 phases — and Claude Code handles the research, planning, and implementation for you.
+A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 51 structured pipeline steps — organized into 14 phases — and Claude Code handles the research, planning, and implementation for you.
 
 By the end, you'll have a fully planned, standards-documented, implementation-ready project with working code.
 
@@ -29,7 +29,7 @@ Either way, Scaffold constructs the prompt and Claude does the work. The CLI tra
 
 **Assembly engine** — At execution time, Scaffold builds a 7-section prompt from: system metadata, the meta-prompt, knowledge base entries, project context (artifacts from prior steps), methodology settings, layered instructions, and depth-specific execution guidance.
 
-**Knowledge base** — 44 domain expertise entries in `knowledge/` covering testing strategy, domain modeling, API design, security best practices, eval craft, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
+**Knowledge base** — 45 domain expertise entries in `knowledge/` covering testing strategy, domain modeling, API design, security best practices, eval craft, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
 
 **Methodology presets** — Three built-in presets control which steps run and how deep the analysis goes:
 - **deep** (depth 5) — all steps enabled, exhaustive analysis
@@ -38,7 +38,7 @@ Either way, Scaffold constructs the prompt and Claude does the work. The CLI tra
 
 **Depth scale** (1-5) — Controls how thorough each step's output is, from "focus on the core deliverable" (1) to "explore all angles, tradeoffs, and edge cases" (5). Depth resolves with 4-level precedence: CLI flag > step override > custom default > preset default.
 
-**Multi-model validation** — At depth 4-5, all 15 review and validation steps can dispatch independent reviews to Codex and/or Gemini CLIs. Two independent models catch more blind spots than one. When both CLIs are available, findings are reconciled by confidence level (both agree = high confidence, single model P0 = still actionable). See the [Multi-Model Review](#multi-model-review) section.
+**Multi-model validation** — At depth 4-5, all 19 review and validation steps can dispatch independent reviews to Codex and/or Gemini CLIs. Two independent models catch more blind spots than one. When both CLIs are available, findings are reconciled by confidence level (both agree = high confidence, single model P0 = still actionable). Auth is verified before every dispatch (`codex login status`, `NO_BROWSER=true gemini -p "respond with ok"`). See the [Multi-Model Review](#multi-model-review) section.
 
 **State management** — Pipeline progress is tracked in `.scaffold/state.json` with atomic file writes and crash recovery. An advisory lock prevents concurrent runs. Decisions are logged to an append-only `decisions.jsonl`.
 
@@ -243,6 +243,7 @@ Set up tooling, standards, and project structure.
 | `beads` | Initialize Beads task tracking and create CLAUDE.md *(optional)* |
 | `tech-stack` | Research and document technology choices; adds stack-specific safety rules |
 | `coding-standards` | Create coding standards with linter/formatter configs |
+| `tdd` | Define testing conventions, TDD workflow, test pyramid, coverage strategy |
 | `project-structure` | Design and scaffold the directory layout |
 
 ### Phase 3 — Development Environment (environment)
@@ -311,13 +312,12 @@ Plan for quality, security, and operations.
 
 | Step | What It Does |
 |------|-------------|
-| `tdd` | Test pyramid, patterns, coverage strategy |
 | `review-testing` | Review of testing strategy |
 | `create-evals` | Generate project-specific eval checks from standards docs |
-| `security` | OWASP, threat modeling, security controls |
-| `review-security` | Security review — **highest priority for multi-model validation** |
 | `operations` | CI/CD, deployment, monitoring, runbooks |
 | `review-operations` | Review of operations plan |
+| `security` | OWASP, threat modeling, security controls |
+| `review-security` | Security review — **highest priority for multi-model validation** |
 
 ### Phase 10 — Stories & Reviews (stories)
 
@@ -366,13 +366,13 @@ Lock it down and start building.
 
 | Step | What It Does |
 |------|-------------|
-| `implementation-playbook` | Step-by-step guide for the implementation phase |
-| `developer-onboarding-guide` | Onboarding guide for new contributors |
-| `apply-fixes-and-freeze` | Apply any remaining fixes and freeze the specification |
+| `apply-fixes-and-freeze` | Apply all validation findings and freeze documentation |
+| `developer-onboarding-guide` | "Start here" guide for new contributors and AI agents |
+| `implementation-playbook` | Operational guide agents follow during implementation |
 
 ## Multi-Model Review
 
-At depth 4-5, all 18 review and validation steps can dispatch independent reviews to Codex and/or Gemini CLIs. This catches blind spots that a single model misses — what Claude considers correct, Codex or Gemini may flag as problematic.
+At depth 4-5, all 19 review and validation steps can dispatch independent reviews to Codex and/or Gemini CLIs. This catches blind spots that a single model misses — what Claude considers correct, Codex or Gemini may flag as problematic. Auth is verified before every dispatch — previous auth failures do not exempt subsequent dispatches.
 
 ### How It Works
 
@@ -393,7 +393,7 @@ At depth 4-5, all 18 review and validation steps can dispatch independent review
 
 **All 11 domain review steps**: review-prd, review-domain-modeling, review-adrs, review-architecture, review-database, review-api, review-ux, review-testing, review-operations, review-security, implementation-plan-review
 
-**All 4 validation steps**: cross-phase-consistency, traceability-matrix, critical-path-walkthrough, implementability-dry-run
+**All 7 validation steps**: cross-phase-consistency, traceability-matrix, critical-path-walkthrough, implementability-dry-run, decision-completeness, dependency-graph-validation, scope-creep-check
 
 **Plus 3 steps with built-in multi-model**: review-user-stories (depth 5), automated-pr-review (local CLI mode), multi-model-review-tasks
 
@@ -405,8 +405,8 @@ The `multi-model-dispatch` skill documents the correct patterns:
 # Codex (headless mode — use "exec", NOT bare "codex")
 codex exec --skip-git-repo-check -s read-only --ephemeral "Review this artifact..." 2>/dev/null
 
-# Gemini (headless mode — use "-p" flag)
-gemini -p "Review this artifact..." --output-format json --approval-mode yolo 2>/dev/null
+# Gemini (headless mode — use "-p" flag, NO_BROWSER prevents consent prompt hang)
+NO_BROWSER=true gemini -p "Review this artifact..." --output-format json --approval-mode yolo 2>/dev/null
 ```
 
 ### Checking CLI Availability
@@ -421,7 +421,7 @@ The `scaffold check` command reports which CLIs are available and recommends the
 
 ## Methodology Presets
 
-Not every project needs all 50 steps. Choose a methodology when you run `scaffold init`:
+Not every project needs all 51 steps. Choose a methodology when you run `scaffold init`:
 
 ### deep (depth 5)
 All steps enabled. Comprehensive analysis of every angle — domain modeling, ADRs, security review, traceability matrix, the works. At depth 4-5, review steps dispatch to Codex/Gemini CLIs for multi-model validation. Best for complex systems, team projects, or when you want thorough documentation.
@@ -500,9 +500,9 @@ scaffold dashboard
 
 ## Knowledge System
 
-Scaffold ships with 44 domain expertise entries organized in five categories:
+Scaffold ships with 45 domain expertise entries organized in five categories:
 
-- **core/** (17 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, design system tokens, user story innovation
+- **core/** (18 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, design system tokens, user story innovation, AI memory management
 - **product/** (3 entries) — PRD craft, PRD innovation, gap analysis
 - **review/** (13 entries) — review methodology (shared), plus domain-specific review passes for PRD, user stories, domain modeling, ADRs, architecture, API contracts, database schema, UX spec, testing, security, operations, implementation tasks
 - **validation/** (7 entries) — critical path analysis, cross-phase consistency, scope management, traceability, implementability, decision completeness, dependency validation
@@ -658,16 +658,16 @@ src/
 ### Content layout
 
 ```
-pipeline/             # 50 meta-prompts organized by 14 phases
-knowledge/            # 44 domain expertise entries (core, product, review, validation, finalization)
+pipeline/             # 51 meta-prompts organized by 14 phases
+knowledge/            # 45 domain expertise entries (core, product, review, validation, finalization)
 methodology/          # 3 YAML presets (deep, mvp, custom)
-commands/             # 66 Claude Code slash commands (50 pipeline + 16 utility)
+commands/             # 67 Claude Code slash commands (51 pipeline + 16 utility)
 skills/               # 3 Claude Code skills (pipeline reference, runner, multi-model dispatch)
 ```
 
 ### Testing
 
-- **Vitest** for unit and E2E tests (66 test files, 753 tests)
+- **Vitest** for unit and E2E tests (66 test files, 756 tests)
 - **Performance benchmarks** — assembly p95 < 500ms, state I/O p95 < 100ms, graph build p95 < 2s
 - **Shell script tests** via bats
 - Run: `npm test` (unit + E2E), `npm run test:bench` (benchmarks), `make check` (full CI gate)
