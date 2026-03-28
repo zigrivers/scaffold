@@ -1,5 +1,5 @@
 import type { CommandModule } from 'yargs'
-import path from 'node:path'
+
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'

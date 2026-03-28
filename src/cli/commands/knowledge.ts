@@ -212,7 +212,7 @@ const resetSubcommand: CommandModule<Record<string, unknown>, ResetArgs> = {
     if (hasUncommittedChanges && !argv.auto) {
       process.stderr.write(
         `warn: '${name}' has uncommitted changes.\n` +
-        `  Re-run with --auto to delete anyway.\n`
+        '  Re-run with --auto to delete anyway.\n',
       )
       process.exit(1)
       return
@@ -290,7 +290,11 @@ const updateSubcommand: CommandModule<Record<string, unknown>, UpdateArgs> = {
       const stepEntries: string[] = step.frontmatter.knowledgeBase ?? []
 
       if (stepEntries.length === 0) {
-        output.error({ code: 'STEP_NO_ENTRIES', message: `Step '${target}' has no knowledge-base entries`, exitCode: 1 })
+        output.error({
+          code: 'STEP_NO_ENTRIES',
+          message: `Step '${target}' has no knowledge-base entries`,
+          exitCode: 1,
+        })
         process.exit(1)
         return
       }
@@ -394,8 +398,8 @@ const updateSubcommand: CommandModule<Record<string, unknown>, UpdateArgs> = {
         methodology,
         artifacts: docArtifacts,
         focus: argv.instructions && argv.instructions.length > 0
-        ? argv.instructions.join(' ')
-        : null,
+          ? argv.instructions.join(' ')
+          : null,
       })
 
       process.stdout.write(prompt + '\n')

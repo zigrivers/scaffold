@@ -25,7 +25,7 @@ export type PhaseSlug = typeof PHASES[number]['slug']
 
 /** Lookup map from phase slug to phase metadata. */
 export const PHASE_BY_SLUG = Object.fromEntries(
-  PHASES.map(p => [p.slug, p])
+  PHASES.map(p => [p.slug, p]),
 ) as Record<PhaseSlug, typeof PHASES[number]>
 
 /**

@@ -16,11 +16,12 @@ function scaffold(args: string, cwd: string): { stdout: string; stderr: string; 
       stdio: ['pipe', 'pipe', 'pipe'],
     })
     return { stdout: result, stderr: '', exitCode: 0 }
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const e = err as { stdout?: string; stderr?: string; status?: number }
     return {
-      stdout: err.stdout ?? '',
-      stderr: err.stderr ?? '',
-      exitCode: err.status ?? 1,
+      stdout: e.stdout ?? '',
+      stderr: e.stderr ?? '',
+      exitCode: e.status ?? 1,
     }
   }
 }
@@ -30,7 +31,7 @@ function setupProject(dir: string) {
   fs.mkdirSync(scaffoldDir, { recursive: true })
   fs.writeFileSync(
     path.join(scaffoldDir, 'config.yml'),
-    'version: 2\nmethodology: deep\nplatforms:\n  - claude-code\n'
+    'version: 2\nmethodology: deep\nplatforms:\n  - claude-code\n',
   )
   fs.writeFileSync(
     path.join(scaffoldDir, 'state.json'),
@@ -45,7 +46,7 @@ function setupProject(dir: string) {
       steps: {},
       next_eligible: [],
       'extra-steps': [],
-    })
+    }),
   )
   // Symlink knowledge and pipeline from source (read-only)
   fs.symlinkSync(KNOWLEDGE_SRC, path.join(dir, 'knowledge'))
@@ -75,7 +76,7 @@ describe('scaffold knowledge (E2E)', () => {
     fs.mkdirSync(localKbDir, { recursive: true })
     fs.writeFileSync(
       path.join(localKbDir, 'api-design.md'),
-      '---\nname: api-design\ndescription: Custom GraphQL API design\ntopics: [api, graphql]\n---\n# Custom'
+      '---\nname: api-design\ndescription: Custom GraphQL API design\ntopics: [api, graphql]\n---\n# Custom',
     )
     const { stdout, exitCode } = scaffold('knowledge list', tmpDir)
     expect(exitCode).toBe(0)
@@ -106,7 +107,7 @@ describe('scaffold knowledge (E2E)', () => {
     const overridePath = path.join(localKbDir, 'api-design.md')
     fs.writeFileSync(
       overridePath,
-      '---\nname: api-design\ndescription: Custom\ntopics: []\n---\n# Custom'
+      '---\nname: api-design\ndescription: Custom\ntopics: []\n---\n# Custom',
     )
     const { exitCode } = scaffold('knowledge reset api-design --auto', tmpDir)
     expect(exitCode).toBe(0)

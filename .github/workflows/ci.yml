@@ -10,11 +10,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y shellcheck jq
           sudo npm install -g bats
 
+      - name: Install npm dependencies
+        run: npm ci
+
       - name: Run all quality gates
-        run: make check
+        run: make check-all

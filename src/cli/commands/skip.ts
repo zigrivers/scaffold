@@ -103,9 +103,17 @@ const skipCommand: CommandModule<Record<string, unknown>, SkipArgs> = {
         }
 
         if (entry.status === 'completed' && !argv.force) {
-          results.push({ step: stepSlug, status: 'error', error: `Step '${stepSlug}' is already completed (use --force)` })
+          results.push({
+            step: stepSlug,
+            status: 'error',
+            error: `Step '${stepSlug}' is already completed (use --force)`,
+          })
           hasErrors = true
-          if (outputMode !== 'json') output.warn(`Step '${stepSlug}' is already completed — use --force to re-mark as skipped`)
+          if (outputMode !== 'json') {
+            output.warn(
+              `Step '${stepSlug}' is already completed — use --force to re-mark as skipped`,
+            )
+          }
           continue
         }
 

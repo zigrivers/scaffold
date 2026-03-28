@@ -67,7 +67,10 @@ function detectPlatform(projectRoot: string): { platform: 'web' | 'mobile' | 'bo
   const mobileFramework = Object.keys(allDeps).find(d => MOBILE_SIGNALS.has(d))
 
   if (hasWeb && hasMobile) {
-    return { platform: 'both', reason: `Web (${webFramework}) and mobile (${mobileFramework}) detected in package.json` }
+    return {
+      platform: 'both',
+      reason: `Web (${webFramework}) and mobile (${mobileFramework}) detected in package.json`,
+    }
   }
   if (hasWeb) {
     return { platform: 'web', reason: `Web frontend detected (${webFramework} in package.json)` }
@@ -182,8 +185,14 @@ const checkCommand: CommandModule<Record<string, unknown>, CheckArgs> = {
       // Detect available CLIs for local review
       let hasCodexCli = false
       let hasGeminiCli = false
-      try { execSync('command -v codex', { encoding: 'utf8', timeout: 3000 }); hasCodexCli = true } catch { /* not available */ }
-      try { execSync('command -v gemini', { encoding: 'utf8', timeout: 3000 }); hasGeminiCli = true } catch { /* not available */ }
+      try {
+        execSync('command -v codex', { encoding: 'utf8', timeout: 3000 })
+        hasCodexCli = true
+      } catch { /* not available */ }
+      try {
+        execSync('command -v gemini', { encoding: 'utf8', timeout: 3000 })
+        hasGeminiCli = true
+      } catch { /* not available */ }
       const availableClis = [hasCodexCli && 'codex', hasGeminiCli && 'gemini'].filter(Boolean) as string[]
       const recommendedMode = availableClis.length > 0 ? 'local-cli' : 'external-bot'
 
@@ -229,7 +238,8 @@ const checkCommand: CommandModule<Record<string, unknown>, CheckArgs> = {
           const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'))
           const servers = settings.mcpServers ?? {}
           for (const [name, _config] of Object.entries(servers)) {
-            if (['memory', 'knowledge-graph', 'context7', 'nia', 'docfork'].includes(name) || name.includes('memory')) {
+            const mcpNames = ['memory', 'knowledge-graph', 'context7', 'nia', 'docfork']
+            if (mcpNames.includes(name) || name.includes('memory')) {
               hasMcpServer = true
               mcpServerName = name
               break
@@ -273,7 +283,7 @@ const checkCommand: CommandModule<Record<string, unknown>, CheckArgs> = {
         })
       } else {
         output.info(`Step: ${argv.step}`)
-        output.info(`Applicable: yes (always applicable)`)
+        output.info('Applicable: yes (always applicable)')
         output.info(`Rules: ${hasRules ? `yes (${ruleCount} files)` : 'no'}`)
         output.info(`MCP server: ${hasMcpServer ? mcpServerName : 'none'}`)
         output.info(`Hooks: ${hasHooks ? hookNames.join(', ') : 'none'}`)
@@ -287,7 +297,10 @@ const checkCommand: CommandModule<Record<string, unknown>, CheckArgs> = {
     // Generic handling for other conditional steps
     const conditional = mp.frontmatter.conditional
     if (conditional) {
-      const reason = `Step '${argv.step}' is conditional (${conditional}). No automated applicability check available — run the step and it will self-determine.`
+      const reason =
+        `Step '${argv.step}' is conditional (${conditional}). ` +
+        'No automated applicability check available — ' +
+        'run the step and it will self-determine.'
       if (outputMode === 'json') {
         output.result({
           step: argv.step,
@@ -311,7 +324,7 @@ const checkCommand: CommandModule<Record<string, unknown>, CheckArgs> = {
         })
       } else {
         output.info(`Step: ${argv.step}`)
-        output.info(`Always applicable (not conditional)`)
+        output.info('Always applicable (not conditional)')
       }
     }
     process.exit(0)

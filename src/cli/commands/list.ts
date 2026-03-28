@@ -1,5 +1,5 @@
 import type { CommandModule } from 'yargs'
-import path from 'node:path'
+
 import type { MethodologyPreset } from '../../types/index.js'
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
 import { getPackageMethodologyDir } from '../../utils/fs.js'

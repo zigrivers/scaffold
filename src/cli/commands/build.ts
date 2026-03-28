@@ -118,10 +118,10 @@ const buildCommand: CommandModule<Record<string, unknown>, BuildArgs> = {
 
     // Step 10: Build reverse dependency map (step → steps that come after it)
     const forwardDeps = new Map<string, string[]>()
-    for (const [stepName, node] of graph.nodes) {
+    for (const [stepName, _node] of graph.nodes) {
       // Find steps that list this step as a dependency
       const dependents: string[] = []
-      for (const [otherName, otherNode] of graph.nodes) {
+      for (const [otherName, _otherNode] of graph.nodes) {
         if (otherName === stepName) continue
         const otherMeta = metaPrompts.get(otherName)
         if (otherMeta?.frontmatter.dependencies.includes(stepName)) {

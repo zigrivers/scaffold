@@ -21,6 +21,22 @@ vi.mock('../../state/lock-manager.js', () => ({
   releaseLock: vi.fn(),
 }))
 
+// createOutputContext is optionally mocked per-test for interactive confirm tests
+let mockConfirmResult: boolean | null = null
+vi.mock('../output/context.js', async (importOriginal) => {
+  const original = await importOriginal() as Record<string, unknown>
+  return {
+    ...original,
+    createOutputContext: (...args: unknown[]) => {
+      const ctx = (original['createOutputContext'] as (...a: unknown[]) => Record<string, unknown>)(...args)
+      if (mockConfirmResult !== null) {
+        ctx.confirm = vi.fn().mockResolvedValue(mockConfirmResult)
+      }
+      return ctx
+    },
+  }
+})
+
 // ---------------------------------------------------------------------------
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
@@ -63,6 +79,7 @@ describe('reset command', () => {
     mockFindProjectRoot.mockReturnValue(tempDir)
     mockResolveOutputMode.mockReturnValue('auto')
     mockAcquireLock.mockReturnValue({ acquired: true })
+    mockConfirmResult = null
   })
 
   afterEach(() => {
@@ -335,5 +352,351 @@ describe('reset command', () => {
 
     expect(exitSpy).toHaveBeenCalledWith(2)
     expect(writtenLines.join('')).toContain('Did you mean')
+  })
+
+  // --- Additional step-level reset tests ---
+
+  it('exits 2 for nonexistent step without suggestion when no close match', async () => {
+    writeState({ 'create-prd': { status: 'completed' } })
+
+    await resetCommand.handler({
+      step: 'zzzzzzzzzzzzz',
+      force: true,
+      root: tempDir,
+      $0: 'scaffold',
+      _: ['reset', 'zzzzzzzzzzzzz'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    expect(exitSpy).toHaveBeenCalledWith(2)
+    const allOutput = writtenLines.join('')
+    expect(allOutput).toContain('not found')
+    expect(allOutput).not.toContain('Did you mean')
+  })
+
+  it('step reset: lock failure with error exits 3', async () => {
+    writeState({ 'create-prd': { status: 'completed' } })
+    mockAcquireLock.mockReturnValue({
+      acquired: false,
+      error: { code: 'LOCK_HELD', message: 'Lock held by PID 12345', exitCode: 3 },
+    })
+
+    await resetCommand.handler({
+      step: 'create-prd',
+      root: tempDir,
+      $0: 'scaffold',
+      _: ['reset', 'create-prd'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    expect(exitSpy).toHaveBeenCalledWith(3)
+    const allOutput = writtenLines.join('')
+    expect(allOutput).toContain('LOCK_HELD')
+  })
+
+  it('step reset: lock failure without error object exits 3', async () => {
+    writeState({ 'create-prd': { status: 'completed' } })
+    mockAcquireLock.mockReturnValue({ acquired: false })
+
+    await resetCommand.handler({
+      step: 'create-prd',
+      root: tempDir,
+      $0: 'scaffold',
+      _: ['reset', 'create-prd'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    expect(exitSpy).toHaveBeenCalledWith(3)
+    const allOutput = writtenLines.join('')
+    expect(allOutput).toContain('Lock is held by another process')
+  })
+
+  it('warns when resetting in_progress step', async () => {
+    writeState({ 'create-prd': { status: 'in_progress' } })
+
+    await resetCommand.handler({
+      step: 'create-prd',
+      force: true,
+      root: tempDir,
+      $0: 'scaffold',
+      _: ['reset', 'create-prd'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    expect(exitSpy).toHaveBeenCalledWith(0)
+    const allOutput = writtenLines.join('')
+    expect(allOutput).toContain('appears to be in progress')
+
+    const state = JSON.parse(
+      fs.readFileSync(path.join(tempDir, '.scaffold', 'state.json'), 'utf8'),
+    )
+    expect(state.steps['create-prd'].status).toBe('pending')
+  })
+
+  it('completed step in non-interactive mode without --force exits 3', async () => {
+    mockResolveOutputMode.mockReturnValue('auto')
+    writeState({ 'create-prd': { status: 'completed' } })
+
+    await resetCommand.handler({
+      step: 'create-prd',
+      root: tempDir,
+      force: false,
+      $0: 'scaffold',
+      _: ['reset', 'create-prd'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    expect(exitSpy).toHaveBeenCalledWith(3)
+    const allOutput = writtenLines.join('')
+    expect(allOutput).toContain('PSM_INVALID_TRANSITION')
+    expect(allOutput).toContain('Use --force')
+  })
+
+  it('completed step in interactive mode: user confirms proceeds', async () => {
+    mockResolveOutputMode.mockReturnValue('interactive')
+    mockConfirmResult = true
+    writeState({ 'create-prd': { status: 'completed' } })
+
+    await resetCommand.handler({
+      step: 'create-prd',
+      root: tempDir,
+      $0: 'scaffold',
+      _: ['reset', 'create-prd'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    expect(exitSpy).toHaveBeenCalledWith(0)
+    const state = JSON.parse(
+      fs.readFileSync(path.join(tempDir, '.scaffold', 'state.json'), 'utf8'),
+    )
+    expect(state.steps['create-prd'].status).toBe('pending')
+  })
+
+  it('completed step in interactive mode: user declines exits 0', async () => {
+    mockResolveOutputMode.mockReturnValue('interactive')
+    mockConfirmResult = false
+    writeState({ 'create-prd': { status: 'completed' } })
+
+    await resetCommand.handler({
+      step: 'create-prd',
+      root: tempDir,
+      $0: 'scaffold',
+      _: ['reset', 'create-prd'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    expect(exitSpy).toHaveBeenCalledWith(0)
+    // State should NOT have changed
+    const state = JSON.parse(
+      fs.readFileSync(path.join(tempDir, '.scaffold', 'state.json'), 'utf8'),
+    )
+    expect(state.steps['create-prd'].status).toBe('completed')
+  })
+
+  it('clears in_progress when it references the reset step', async () => {
+    const state = {
+      'schema-version': 1,
+      'scaffold-version': '2.4.0',
+      init_methodology: 'deep',
+      config_methodology: 'deep',
+      'init-mode': 'greenfield',
+      created: '2026-01-01T00:00:00.000Z',
+      in_progress: { step: 'create-prd', started: '2026-01-01T00:00:00.000Z' },
+      steps: {
+        'create-prd': { status: 'in_progress', source: 'pipeline', produces: [] },
+      },
+      next_eligible: [],
+      'extra-steps': [],
+    }
+    fs.writeFileSync(
+      path.join(tempDir, '.scaffold', 'state.json'),
+      JSON.stringify(state, null, 2),
+    )
+
+    await resetCommand.handler({
+      step: 'create-prd',
+      force: true,
+      root: tempDir,
+      $0: 'scaffold',
+      _: ['reset', 'create-prd'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    expect(exitSpy).toHaveBeenCalledWith(0)
+    const savedState = JSON.parse(
+      fs.readFileSync(path.join(tempDir, '.scaffold', 'state.json'), 'utf8'),
+    )
+    expect(savedState.in_progress).toBeNull()
+    expect(savedState.steps['create-prd'].status).toBe('pending')
+  })
+
+  it('step reset: JSON output includes step, previousStatus, newStatus', async () => {
+    mockResolveOutputMode.mockReturnValue('json')
+    writeState({ 'create-prd': { status: 'completed', produces: ['docs/plan.md'] } })
+
+    await resetCommand.handler({
+      step: 'create-prd',
+      force: true,
+      root: tempDir,
+      format: 'json',
+      $0: 'scaffold',
+      _: ['reset', 'create-prd'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    expect(exitSpy).toHaveBeenCalledWith(0)
+    const allOutput = writtenLines.join('')
+    const parsed = JSON.parse(allOutput)
+    const data = parsed.data ?? parsed
+    expect(data.step).toBe('create-prd')
+    expect(data.previousStatus).toBe('completed')
+    expect(data.newStatus).toBe('pending')
+  })
+
+  // --- Additional pipeline reset tests ---
+
+  it('interactive pipeline reset: user confirms proceeds', async () => {
+    mockResolveOutputMode.mockReturnValue('interactive')
+    mockConfirmResult = true
+
+    const statePath = path.join(tempDir, '.scaffold', 'state.json')
+    fs.writeFileSync(statePath, '{"schema-version": 1}')
+
+    await resetCommand.handler({
+      root: tempDir,
+      $0: 'scaffold',
+      _: ['reset'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(fs.existsSync(statePath)).toBe(false)
+  })
+
+  it('interactive pipeline reset: user declines exits 0 without deleting', async () => {
+    mockResolveOutputMode.mockReturnValue('interactive')
+    mockConfirmResult = false
+
+    const statePath = path.join(tempDir, '.scaffold', 'state.json')
+    fs.writeFileSync(statePath, '{"schema-version": 1}')
+
+    await resetCommand.handler({
+      root: tempDir,
+      $0: 'scaffold',
+      _: ['reset'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(fs.existsSync(statePath)).toBe(true) // Should be preserved
+  })
+
+  it('pipeline reset: lock failure with error exits 3', async () => {
+    mockResolveOutputMode.mockReturnValue('auto')
+    mockAcquireLock.mockReturnValue({
+      acquired: false,
+      error: { code: 'LOCK_HELD', message: 'Lock held by PID 999', exitCode: 3 },
+    })
+
+    const statePath = path.join(tempDir, '.scaffold', 'state.json')
+    fs.writeFileSync(statePath, '{"schema-version": 1}')
+
+    await resetCommand.handler({
+      confirmReset: true,
+      'confirm-reset': true,
+      root: tempDir,
+      auto: true,
+      $0: 'scaffold',
+      _: ['reset'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    expect(exitSpy).toHaveBeenCalledWith(3)
+    const allOutput = writtenLines.join('')
+    expect(allOutput).toContain('LOCK_HELD')
+  })
+
+  it('pipeline reset: lock failure without error object exits 3', async () => {
+    mockResolveOutputMode.mockReturnValue('auto')
+    mockAcquireLock.mockReturnValue({ acquired: false })
+
+    const statePath = path.join(tempDir, '.scaffold', 'state.json')
+    fs.writeFileSync(statePath, '{"schema-version": 1}')
+
+    await resetCommand.handler({
+      confirmReset: true,
+      'confirm-reset': true,
+      root: tempDir,
+      auto: true,
+      $0: 'scaffold',
+      _: ['reset'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    expect(exitSpy).toHaveBeenCalledWith(3)
+    const allOutput = writtenLines.join('')
+    expect(allOutput).toContain('Lock is held by another process')
+  })
+
+  it('pipeline reset with --force skips lock acquisition', async () => {
+    mockResolveOutputMode.mockReturnValue('auto')
+
+    const statePath = path.join(tempDir, '.scaffold', 'state.json')
+    fs.writeFileSync(statePath, '{"schema-version": 1}')
+
+    await resetCommand.handler({
+      confirmReset: true,
+      'confirm-reset': true,
+      root: tempDir,
+      auto: true,
+      force: true,
+      $0: 'scaffold',
+      _: ['reset'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(fs.existsSync(statePath)).toBe(false)
+    // acquireLock should NOT have been called for pipeline reset path
+    // (it gets called with 'reset' as operation name, no step)
+    // With --force, the pipeline reset skips lock entirely
+  })
+
+  it('pipeline reset with --force does not call releaseLock', async () => {
+    mockResolveOutputMode.mockReturnValue('auto')
+    mockReleaseLock.mockClear()
+
+    await resetCommand.handler({
+      confirmReset: true,
+      'confirm-reset': true,
+      root: tempDir,
+      auto: true,
+      force: true,
+      $0: 'scaffold',
+      _: ['reset'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    // The finally block should skip releaseLock when force is true
+    expect(mockReleaseLock).not.toHaveBeenCalled()
+  })
+
+  it('builder configures step positional and confirm-reset option', () => {
+    const yargsMock = {
+      positional: vi.fn().mockReturnThis(),
+      option: vi.fn().mockReturnThis(),
+    }
+    const builder = resetCommand.builder as (y: unknown) => unknown
+    builder(yargsMock)
+
+    expect(yargsMock.positional).toHaveBeenCalledWith('step', expect.objectContaining({
+      type: 'string',
+    }))
+    expect(yargsMock.option).toHaveBeenCalledWith('confirm-reset', expect.objectContaining({
+      type: 'boolean',
+      default: false,
+    }))
+  })
+
+  it('uses argv.root when provided instead of findProjectRoot', async () => {
+    // Even though findProjectRoot returns null, argv.root should be used
+    mockFindProjectRoot.mockReturnValue(null)
+
+    writeState({ 'create-prd': { status: 'pending' } })
+
+    await resetCommand.handler({
+      step: 'create-prd',
+      root: tempDir,
+      $0: 'scaffold',
+      _: ['reset', 'create-prd'],
+    } as Parameters<typeof resetCommand.handler>[0])
+
+    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(writtenLines.join('')).toContain('already pending')
   })
 })

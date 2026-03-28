@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fs from 'node:fs'
+import type { OutputContext } from '../../cli/output/context.js'
+import type { MetaPromptFile } from '../../types/index.js'
 
 // Mock all external dependencies — vitest hoists vi.mock() calls automatically
 vi.mock('../../core/assembly/knowledge-loader.js', () => ({
@@ -60,18 +62,23 @@ function makeOutputMock() {
 function setupDefaults(output = makeOutputMock()) {
   vi.mocked(findProjectRoot).mockReturnValue(PROJECT_ROOT)
   vi.mocked(resolveOutputMode).mockReturnValue('auto')
-  vi.mocked(createOutputContext).mockReturnValue(output as any)
+  vi.mocked(createOutputContext).mockReturnValue(
+    output as unknown as OutputContext,
+  )
   vi.mocked(loadConfig).mockReturnValue({
-    config: { version: 2, methodology: 'deep', platforms: ['claude-code'] },
+    config: {
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+    },
     errors: [],
-  } as any)
+    warnings: [],
+  } as unknown as ReturnType<typeof loadConfig>)
   return output
 }
 
 describe('scaffold knowledge show', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-    vi.spyOn(process, 'exit').mockImplementation((() => {}) as any)
+    vi.spyOn(process, 'exit').mockImplementation((() => undefined) as unknown as () => never)
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
   })
 
@@ -80,7 +87,9 @@ describe('scaffold knowledge show', () => {
     vi.mocked(buildIndex)
       .mockReturnValueOnce(new Map([['api-design', '/global/api-design.md']]))
       .mockReturnValueOnce(new Map([['api-design', '/local/api-design.md']]))
-    vi.spyOn(fs, 'readFileSync').mockReturnValue('---\nname: api-design\ndescription: Local\ntopics: []\n---\n# Local Body' as any)
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      '---\nname: api-design\ndescription: Local\ntopics: []\n---\n# Local Body',
+    )
 
     await runCli(['knowledge', 'show', 'api-design'])
 
@@ -97,7 +106,9 @@ describe('scaffold knowledge show', () => {
     vi.mocked(buildIndex)
       .mockReturnValueOnce(new Map([['api-design', '/global/api-design.md']]))
       .mockReturnValueOnce(new Map())  // no local
-    vi.spyOn(fs, 'readFileSync').mockReturnValue('---\nname: api-design\ndescription: Global\ntopics: []\n---\n# Global Body' as any)
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      '---\nname: api-design\ndescription: Global\ntopics: []\n---\n# Global Body',
+    )
 
     await runCli(['knowledge', 'show', 'api-design'])
 
@@ -114,7 +125,7 @@ describe('scaffold knowledge show', () => {
     vi.mocked(buildIndex)
       .mockReturnValueOnce(new Map())
       .mockReturnValueOnce(new Map())
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as unknown as () => never)
 
     await runCli(['knowledge', 'show', 'nonexistent'])
     expect(exitSpy).toHaveBeenCalledWith(1)
@@ -124,7 +135,7 @@ describe('scaffold knowledge show', () => {
 describe('scaffold knowledge list', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-    vi.spyOn(process, 'exit').mockImplementation((() => {}) as any)
+    vi.spyOn(process, 'exit').mockImplementation((() => undefined) as unknown as () => never)
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
   })
 
@@ -137,9 +148,13 @@ describe('scaffold knowledge list', () => {
     const localEntries = new Map([
       ['api-design', '/fake/project/.scaffold/knowledge/api-design.md'],
     ])
-    vi.spyOn(fs, 'readFileSync').mockImplementation((p: any) => {
-      if (String(p).includes('.scaffold')) return '---\nname: api-design\ndescription: Local override\ntopics: []\n---\n'
-      if (String(p).includes('testing-strategy')) return '---\nname: testing-strategy\ndescription: Test strategy\ntopics: []\n---\n'
+    vi.spyOn(fs, 'readFileSync').mockImplementation((p: unknown) => {
+      if (String(p).includes('.scaffold')) {
+        return '---\nname: api-design\ndescription: Local override\ntopics: []\n---\n'
+      }
+      if (String(p).includes('testing-strategy')) {
+        return '---\nname: testing-strategy\ndescription: Test strategy\ntopics: []\n---\n'
+      }
       return '---\nname: api-design\ndescription: Global\ntopics: []\n---\n'
     })
     vi.mocked(buildIndex)
@@ -162,13 +177,15 @@ describe('scaffold knowledge list', () => {
     vi.mocked(buildIndex)
       .mockReturnValueOnce(new Map([['api-design', '/fake/project/knowledge/api-design.md']]))
       .mockReturnValueOnce(new Map())
-    vi.spyOn(fs, 'readFileSync').mockReturnValue('---\nname: api-design\ndescription: Global\ntopics: []\n---\n' as any)
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      '---\nname: api-design\ndescription: Global\ntopics: []\n---\n',
+    )
 
     await runCli(['knowledge', 'list', '--format', 'json'])
     expect(vi.mocked(output.result)).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({ name: 'api-design', source: 'global' }),
-      ])
+      ]),
     )
   })
 })
@@ -176,7 +193,7 @@ describe('scaffold knowledge list', () => {
 describe('scaffold knowledge reset', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-    vi.spyOn(process, 'exit').mockImplementation((() => {}) as any)
+    vi.spyOn(process, 'exit').mockImplementation((() => undefined) as unknown as () => never)
     vi.spyOn(fs, 'unlinkSync').mockImplementation(() => undefined)
   })
 
@@ -207,7 +224,7 @@ describe('scaffold knowledge reset', () => {
       if (String(cmd).includes('status')) return Buffer.from(' M .scaffold/knowledge/api-design.md')
       return Buffer.from('')
     })
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as unknown as () => never)
 
     await runCli(['knowledge', 'reset', 'api-design'])
     expect(exitSpy).toHaveBeenCalledWith(1)
@@ -244,14 +261,20 @@ describe('scaffold knowledge reset', () => {
 describe('scaffold knowledge update — target resolution', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-    vi.spyOn(process, 'exit').mockImplementation((() => {}) as any)
+    vi.spyOn(process, 'exit').mockImplementation((() => undefined) as unknown as () => never)
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
     // Re-setup assembler mock after resetAllMocks clears mockImplementation
-    vi.mocked(KnowledgeUpdateAssembler).mockImplementation(() => ({
-      assemble: vi.fn().mockReturnValue('## Task\nUpdate knowledge for {{name}}'),
-    }) as any)
+    vi.mocked(KnowledgeUpdateAssembler).mockImplementation(
+      () => ({
+        assemble: vi.fn().mockReturnValue(
+          '## Task\nUpdate knowledge for {{name}}',
+        ),
+      }) as unknown as InstanceType<typeof KnowledgeUpdateAssembler>,
+    )
     // Set up default mocks that tests can override
-    vi.mocked(discoverMetaPrompts).mockReturnValue(new Map() as any)
+    vi.mocked(discoverMetaPrompts).mockReturnValue(
+      new Map() as Map<string, MetaPromptFile>,
+    )
   })
 
   it('resolves entry name directly and writes prompt to stdout', async () => {
@@ -259,7 +282,7 @@ describe('scaffold knowledge update — target resolution', () => {
     vi.mocked(buildIndex)
       .mockReturnValue(new Map([['api-design', '/fake/project/knowledge/api-design.md']]))
     vi.spyOn(fs, 'readFileSync').mockReturnValue(
-      '---\nname: api-design\ndescription: desc\ntopics: []\n---\n# Body' as any
+      '---\nname: api-design\ndescription: desc\ntopics: []\n---\n# Body',
     )
     vi.spyOn(fs, 'existsSync').mockReturnValue(false)
 
@@ -280,11 +303,13 @@ describe('scaffold knowledge update — target resolution', () => {
         sections: {},
       }],
     ])
-    vi.mocked(discoverMetaPrompts).mockReturnValue(metaPromptMap as any)
+    vi.mocked(discoverMetaPrompts).mockReturnValue(
+      metaPromptMap as unknown as Map<string, MetaPromptFile>,
+    )
     vi.mocked(buildIndex)
       .mockReturnValue(new Map([['prd-craft', '/fake/project/knowledge/prd-craft.md']]))
     vi.spyOn(fs, 'readFileSync').mockReturnValue(
-      '---\nname: prd-craft\ndescription: desc\ntopics: []\n---\n# PRD Body' as any
+      '---\nname: prd-craft\ndescription: desc\ntopics: []\n---\n# PRD Body',
     )
     vi.spyOn(fs, 'existsSync').mockReturnValue(false)
 
@@ -297,8 +322,10 @@ describe('scaffold knowledge update — target resolution', () => {
   it('exits 1 with error when target not found', async () => {
     setupDefaults()
     vi.mocked(buildIndex).mockReturnValue(new Map())
-    vi.mocked(discoverMetaPrompts).mockReturnValue(new Map() as any)
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any)
+    vi.mocked(discoverMetaPrompts).mockReturnValue(
+      new Map() as Map<string, MetaPromptFile>,
+    )
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as unknown as () => never)
 
     await runCli(['knowledge', 'update', 'nonexistent'])
     expect(exitSpy).toHaveBeenCalledWith(1)
@@ -307,8 +334,10 @@ describe('scaffold knowledge update — target resolution', () => {
   it('exits 1 when --step target is not a valid step name', async () => {
     setupDefaults()
     vi.mocked(buildIndex).mockReturnValue(new Map())
-    vi.mocked(discoverMetaPrompts).mockReturnValue(new Map() as any)
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any)
+    vi.mocked(discoverMetaPrompts).mockReturnValue(
+      new Map() as Map<string, MetaPromptFile>,
+    )
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as unknown as () => never)
 
     await runCli(['knowledge', 'update', 'not-a-step', '--step'])
     expect(exitSpy).toHaveBeenCalledWith(1)
@@ -323,11 +352,13 @@ describe('scaffold knowledge update — target resolution', () => {
         body: '', sections: {}, filePath: '',
       }],
     ])
-    vi.mocked(discoverMetaPrompts).mockReturnValue(metaPromptMap as any)
+    vi.mocked(discoverMetaPrompts).mockReturnValue(
+      metaPromptMap as unknown as Map<string, MetaPromptFile>,
+    )
     vi.mocked(buildIndex)
       .mockReturnValue(new Map([['testing-strategy', '/fake/project/knowledge/testing-strategy.md']]))
     vi.spyOn(fs, 'readFileSync').mockReturnValue(
-      '---\nname: testing-strategy\ndescription: desc\ntopics: []\n---\n# Body' as any
+      '---\nname: testing-strategy\ndescription: desc\ntopics: []\n---\n# Body',
     )
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     vi.spyOn(fs, 'existsSync').mockReturnValue(false)

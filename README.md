@@ -631,7 +631,7 @@ The project is a TypeScript CLI (`@zigrivers/scaffold`) built with yargs, target
 
 ```
 src/
-├── cli/commands/     # 18 CLI command implementations
+├── cli/commands/     # 19 CLI command implementations
 ├── cli/middleware/    # Project root detection, output mode resolution
 ├── cli/output/       # Output strategies (interactive, json, auto)
 ├── core/assembly/    # Assembly engine — meta-prompt → full prompt
@@ -669,16 +669,18 @@ skills/               # 3 Claude Code skills (pipeline reference, runner, multi-
 
 ### Testing
 
-- **Vitest** for unit and E2E tests (67 test files, 772 tests)
+- **Vitest** for unit and E2E tests (73 test files, 997 tests, 90% coverage)
 - **Performance benchmarks** — assembly p95 < 500ms, state I/O p95 < 100ms, graph build p95 < 2s
-- **Shell script tests** via bats
-- Run: `npm test` (unit + E2E), `npm run test:bench` (benchmarks), `make check` (full CI gate)
+- **Shell script tests** via bats (70 tests covering dashboard, worktree, frontmatter, install/uninstall)
+- **Meta-evals** — 39 cross-system consistency checks validating pipeline ↔ command ↔ knowledge integrity
+- **Coverage thresholds** — CI enforces 84/80/88/84 minimums (statements/branches/functions/lines)
+- Run: `npm test` (unit + E2E), `npm run test:perf` (performance), `make check` (bash gates), `make check-all` (full CI gate)
 
 ### Contributing
 
 1. Meta-prompt content lives in `pipeline/` — edit the relevant `.md` file
 2. Run `scaffold build` to regenerate `commands/` from pipeline meta-prompts
-3. Run `npm run check` (lint + type-check + test) before submitting
+3. Run `make check-all` (lint + type-check + test + evals) before submitting
 4. Knowledge entries live in `knowledge/` — follow the existing frontmatter schema
 5. ADRs documenting architectural decisions are in `docs/v2/adrs/`
 

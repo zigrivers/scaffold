@@ -380,4 +380,176 @@ describe('migrateState', () => {
       expect(changed).toBe(false)
     })
   })
+
+  describe('regression tests', () => {
+    it('round-trip: migrate v1-shaped state → verify field integrity', () => {
+      const state = makeState({
+        'testing-strategy': { status: 'completed', produces: ['docs/prd.md', 'docs/tdd-standards.md'] },
+        'implementation-tasks': { status: 'in_progress' },
+        'review-tasks': { status: 'skipped' },
+        'add-playwright': { status: 'completed' },
+        'multi-model-review': { status: 'pending' },
+        'user-stories-multi-model-review': { status: 'completed' },
+        'claude-code-permissions': { status: 'pending' },
+        'create-prd': { status: 'completed', produces: ['docs/plan.md'] },
+      })
+      state.in_progress = {
+        step: 'implementation-tasks',
+        started: '2026-01-15T10:00:00.000Z',
+        partial_artifacts: ['docs/impl.md'],
+        actor: 'scaffold-run',
+      }
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(true)
+      // Step renames applied
+      expect(state.steps['tdd']).toBeDefined()
+      expect(state.steps['tdd'].status).toBe('completed')
+      expect(state.steps['tdd'].source).toBe('pipeline')
+      expect(state.steps['tdd'].produces).toEqual(['docs/plan.md', 'docs/tdd-standards.md'])
+      expect(state.steps['implementation-plan']).toBeDefined()
+      expect(state.steps['implementation-plan'].status).toBe('in_progress')
+      expect(state.steps['implementation-plan-review']).toBeDefined()
+      expect(state.steps['implementation-plan-review'].status).toBe('skipped')
+      expect(state.steps['add-e2e-testing']).toBeDefined()
+      expect(state.steps['add-e2e-testing'].status).toBe('completed')
+      expect(state.steps['automated-pr-review']).toBeDefined()
+      expect(state.steps['automated-pr-review'].status).toBe('pending')
+      // Retired steps removed
+      expect(state.steps['user-stories-multi-model-review']).toBeUndefined()
+      expect(state.steps['claude-code-permissions']).toBeUndefined()
+      // Untouched steps preserved
+      expect(state.steps['create-prd']).toBeDefined()
+      expect(state.steps['create-prd'].status).toBe('completed')
+      expect(state.steps['create-prd'].produces).toEqual(['docs/plan.md'])
+      // in_progress updated to new name
+      expect(state.in_progress?.step).toBe('implementation-plan')
+      expect(state.in_progress?.started).toBe('2026-01-15T10:00:00.000Z')
+      expect(state.in_progress?.partial_artifacts).toEqual(['docs/impl.md'])
+      expect(state.in_progress?.actor).toBe('scaffold-run')
+      // Top-level fields preserved
+      expect(state['schema-version']).toBe(1)
+      expect(state['scaffold-version']).toBe('2.1.2')
+      expect(state.init_methodology).toBe('deep')
+      expect(state['init-mode']).toBe('greenfield')
+    })
+
+    it('unknown step names in old state are preserved', () => {
+      const state = makeState({
+        'create-prd': { status: 'completed' },
+        'some-future-step': { status: 'pending' },
+        'another-unknown-step': { status: 'completed', produces: ['docs/something.md'] },
+      })
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(false)
+      expect(state.steps['some-future-step']).toBeDefined()
+      expect(state.steps['some-future-step'].status).toBe('pending')
+      expect(state.steps['another-unknown-step']).toBeDefined()
+      expect(state.steps['another-unknown-step'].status).toBe('completed')
+      expect(state.steps['another-unknown-step'].produces).toEqual(['docs/something.md'])
+    })
+
+    it('retired step mapping removes all three retired steps in one pass', () => {
+      const state = makeState({
+        'user-stories-multi-model-review': { status: 'completed' },
+        'claude-code-permissions': { status: 'skipped' },
+        'multi-model-review-tasks': { status: 'in_progress' },
+        'create-prd': { status: 'completed' },
+      })
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(true)
+      expect(state.steps['user-stories-multi-model-review']).toBeUndefined()
+      expect(state.steps['claude-code-permissions']).toBeUndefined()
+      expect(state.steps['multi-model-review-tasks']).toBeUndefined()
+      // Non-retired steps untouched
+      expect(state.steps['create-prd']).toBeDefined()
+      expect(state.steps['create-prd'].status).toBe('completed')
+    })
+
+    it('migration is idempotent — running twice produces same result', () => {
+      const state = makeState({
+        'testing-strategy': { status: 'completed' },
+        'implementation-tasks': { status: 'pending' },
+        'add-playwright': { status: 'completed' },
+        'user-stories-multi-model-review': { status: 'skipped' },
+        'create-prd': { status: 'completed', produces: ['docs/prd.md'] },
+      })
+
+      // First migration
+      const changed1 = migrateState(state)
+      expect(changed1).toBe(true)
+
+      // Snapshot state after first migration
+      const stepsAfterFirst = JSON.parse(JSON.stringify(state.steps))
+      const inProgressAfterFirst = JSON.parse(JSON.stringify(state.in_progress))
+
+      // Second migration — should be a no-op
+      const changed2 = migrateState(state)
+      expect(changed2).toBe(false)
+
+      // State is identical after second pass
+      expect(state.steps).toEqual(stepsAfterFirst)
+      expect(state.in_progress).toEqual(inProgressAfterFirst)
+    })
+
+    it('preserves in_progress pointing to a non-renamed step', () => {
+      const state = makeState({
+        'create-prd': { status: 'in_progress' },
+        'tdd': { status: 'completed' },
+      })
+      state.in_progress = {
+        step: 'create-prd',
+        started: '2026-03-01T08:00:00.000Z',
+        partial_artifacts: ['docs/plan.md'],
+        actor: 'user',
+      }
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(false)
+      expect(state.in_progress).not.toBeNull()
+      expect(state.in_progress?.step).toBe('create-prd')
+      expect(state.in_progress?.started).toBe('2026-03-01T08:00:00.000Z')
+      expect(state.in_progress?.partial_artifacts).toEqual(['docs/plan.md'])
+      expect(state.in_progress?.actor).toBe('user')
+    })
+
+    it('empty steps object — migration succeeds without error', () => {
+      const state = makeState({})
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(false)
+      expect(state.steps).toEqual({})
+      expect(state.in_progress).toBeNull()
+    })
+
+    it('state with extra unknown fields is preserved (forward compatibility)', () => {
+      const state = makeState({
+        'create-prd': { status: 'completed' },
+        'testing-strategy': { status: 'pending' },
+      })
+      // Add fields not in the current schema
+      const raw = state as unknown as Record<string, unknown>
+      raw['future-feature-flag'] = true
+      raw['analytics'] = { runs: 42, last_run: '2026-03-28' }
+      raw['custom-metadata'] = 'some value'
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(true)
+      // Migration applied
+      expect(state.steps['tdd']).toBeDefined()
+      expect(state.steps['testing-strategy']).toBeUndefined()
+      // Unknown fields survive
+      expect(raw['future-feature-flag']).toBe(true)
+      expect(raw['analytics']).toEqual({ runs: 42, last_run: '2026-03-28' })
+      expect(raw['custom-metadata']).toBe('some value')
+    })
+  })
 })

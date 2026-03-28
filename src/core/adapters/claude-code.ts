@@ -49,7 +49,6 @@ ${bodyContent}${knowledgeSection}${afterSection}
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   finalize(_input: AdapterFinalizeInput): AdapterFinalizeResult {
     return { files: [], errors: [] }
   }
@@ -59,7 +58,7 @@ ${bodyContent}${knowledgeSection}${afterSection}
  * Build the main body content from the meta-prompt.
  * Includes all sections except Purpose (which goes in long-description frontmatter).
  */
-function buildBodyContent(body: string, sections: Record<string, string>): string {
+function buildBodyContent(body: string, _sections: Record<string, string>): string {
   // If the body has structured sections, use the full body as-is
   // (it already has proper ## headings from the pipeline step)
   if (body.trim().length > 0) {
