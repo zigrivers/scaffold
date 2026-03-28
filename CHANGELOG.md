@@ -2,6 +2,13 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.19.0] — 2026-03-27
+
+### Added
+
+- **`scaffold complete <step>` command** — Marks a step as completed for steps executed outside `scaffold run` (e.g., via `scaffold run --auto` + manual execution). Handles `in_progress → completed`, `pending → completed`, already-completed clean exit, `in_progress` record cleanup, and fuzzy step name matching. 8 new tests.
+- **README updated** — CLI commands table, test counts, architecture section updated for all v2.13-v2.18 changes (51 steps, 19 multi-model commands, 45 knowledge entries, TDD in foundation, NO_BROWSER=true, finalization order).
+
 ## [2.18.0] — 2026-03-27
 
 ### Fixed
