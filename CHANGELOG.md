@@ -2,6 +2,14 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.25.0] — 2026-03-28
+
+### Added
+
+- **8 new conditional eval categories in `create-evals`** — Expands from 5 to 13 document-driven eval categories. Each is only generated when its source document exists: architecture conformance (system-architecture.md), API contract validation (api-contracts.md), security pattern verification (security-review.md), database schema conformance (database-schema.md), accessibility compliance (ux-spec.md), performance budget (plan.md NFRs), configuration validation (dev-setup.md), error handling completeness (coding-standards.md).
+- **Deep Guidance for all new categories** in eval-craft knowledge base — implementation patterns per stack, false positive mitigation, exclusion mechanisms, and anti-patterns.
+- **Methodology depth scaling** — Depth 1-2: 2 categories, Depth 3: 4, Depth 4: 8, Depth 5: all 13.
+
 ## [2.24.0] — 2026-03-28
 
 ### Added
