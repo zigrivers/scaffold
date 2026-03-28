@@ -66,6 +66,10 @@ export class StateManager {
     if (state.in_progress !== null) {
       throw psmAlreadyInProgress(step, state.in_progress.step)
     }
+    // Auto-create step entry if it doesn't exist (e.g., new step added after project init)
+    if (!state.steps[step]) {
+      state.steps[step] = { status: 'pending', source: 'pipeline', produces: [] }
+    }
     state.steps[step].status = 'in_progress'
     state.steps[step].at = new Date().toISOString()
     state.in_progress = {
