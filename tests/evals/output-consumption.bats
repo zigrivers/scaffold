@@ -5,31 +5,8 @@
 
 setup() {
   load eval_helper
+  source "${BATS_TEST_DIRNAME}/exemptions.bash"
 }
-
-# Steps whose outputs are terminal (consumed by the user, not pipeline).
-# Review, validation, and finalization steps produce docs for humans.
-TERMINAL_OUTPUT_EXEMPT=(
-  "implementation-plan"
-  "developer-onboarding-guide"
-  "session-handoff-brief"
-  "implementation-playbook"
-  "apply-fixes-and-freeze"
-  "ai-memory-setup"
-  "automated-pr-review"
-  "beads"
-  "create-evals"
-)
-
-# Output path patterns that are terminal by nature
-TERMINAL_PATH_PATTERNS=(
-  "docs/reviews/"
-  "docs/validation/"
-  "docs/user-stories-innovation"
-  "maestro/"
-  ".beads/"
-  "AGENTS.md"
-)
 
 is_terminal_exempt() {
   local name="$1"

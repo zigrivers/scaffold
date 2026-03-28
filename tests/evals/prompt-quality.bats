@@ -73,6 +73,69 @@ MIN_SECTION_LINES=2
   fi
 }
 
+@test "Methodology Scaling sections have both deep and mvp bullets" {
+  local failures=()
+  local checked=0
+
+  while IFS= read -r file; do
+    local scaling_section
+    scaling_section="$(awk '/^## Methodology Scaling/{found=1; next} /^## /{if(found) exit} found{print}' "$file")"
+    [[ -z "$scaling_section" ]] && continue
+
+    checked=$((checked + 1))
+
+    local has_deep has_mvp
+    has_deep="$(echo "$scaling_section" | grep -c '^- \*\*deep\*\*' || true)"
+    has_mvp="$(echo "$scaling_section" | grep -c '^- \*\*mvp\*\*' || true)"
+
+    if [[ "$has_deep" -eq 0 ]]; then
+      failures+=("$(basename "$file"): Methodology Scaling missing '- **deep**' bullet")
+    fi
+    if [[ "$has_mvp" -eq 0 ]]; then
+      # Steps with conditional: "if-needed" may have mvp say "Not applicable"
+      # but should still have the bullet present
+      failures+=("$(basename "$file"): Methodology Scaling missing '- **mvp**' bullet")
+    fi
+  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+
+  if [[ ${#failures[@]} -gt 0 ]]; then
+    printf "Methodology Scaling format issues (%d checked):\n" "$checked"
+    printf "  %s\n" "${failures[@]}"
+    return 1
+  fi
+
+  [[ "$checked" -gt 0 ]]
+}
+
+@test "Quality Criteria sections have depth tags (soft check)" {
+  local tagged_count=0
+  local total_count=0
+
+  while IFS= read -r file; do
+    local qc_section
+    qc_section="$(awk '/^## Quality Criteria/{found=1; next} /^## /{if(found) exit} found{print}' "$file")"
+    [[ -z "$qc_section" ]] && continue
+
+    total_count=$((total_count + 1))
+
+    local tag_count
+    tag_count="$(echo "$qc_section" | grep -c '(mvp)\|(deep)\|(depth' || true)"
+    if [[ "$tag_count" -gt 0 ]]; then
+      tagged_count=$((tagged_count + 1))
+    fi
+  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+
+  # Soft check: warn if fewer than 5 steps have depth tags, but don't fail
+  if [[ "$tagged_count" -lt 5 ]]; then
+    printf "WARNING: only %d/%d steps have depth-tagged Quality Criteria (minimum 5 recommended)\n" "$tagged_count" "$total_count"
+  else
+    printf "Quality Criteria depth tags: %d/%d steps tagged\n" "$tagged_count" "$total_count"
+  fi
+
+  # Always pass — this is a tracking metric that will become stricter in WP7
+  [[ "$total_count" -gt 0 ]]
+}
+
 @test "Mode Detection sections use consistent phrasing" {
   local failures=()
   local checked=0

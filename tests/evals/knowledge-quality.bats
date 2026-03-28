@@ -4,6 +4,7 @@
 
 setup() {
   load eval_helper
+  source "${BATS_TEST_DIRNAME}/exemptions.bash"
 }
 
 # Minimum line counts by category
@@ -83,6 +84,45 @@ get_min_lines() {
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Knowledge files missing code blocks:\n"
     printf "  %s\n" "${failures[@]}"
+    return 1
+  fi
+}
+
+is_knowledge_template() {
+  local name="$1"
+  for exempt in "${KNOWLEDGE_TEMPLATE_EXEMPT[@]}"; do
+    [[ "$name" == "$exempt" ]] && return 0
+  done
+  return 1
+}
+
+@test "all knowledge entries are referenced by at least one pipeline step" {
+  local orphans=()
+
+  # Collect all knowledge-base references from pipeline steps
+  local all_refs=""
+  while IFS= read -r file; do
+    local refs
+    refs="$(extract_field "$file" "knowledge-base" | sed 's/\[//;s/\]//' | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$')"
+    [[ -n "$refs" ]] && all_refs="${all_refs}${all_refs:+$'\n'}${refs}"
+  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  all_refs="$(echo "$all_refs" | sort -u)"
+
+  # Check each knowledge entry
+  while IFS= read -r file; do
+    local name
+    name="$(extract_field "$file" "name")"
+    [[ -z "$name" ]] && continue
+    is_knowledge_template "$name" && continue
+
+    if ! echo "$all_refs" | grep -qx "$name"; then
+      orphans+=("$name")
+    fi
+  done < <(find "${PROJECT_ROOT}/knowledge" -name '*.md' -type f)
+
+  if [[ ${#orphans[@]} -gt 0 ]]; then
+    printf "Orphaned knowledge entries (not referenced by any pipeline step):\n"
+    printf "  %s\n" "${orphans[@]}"
     return 1
   fi
 }

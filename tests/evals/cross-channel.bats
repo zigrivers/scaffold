@@ -4,13 +4,8 @@
 
 setup() {
   load eval_helper
+  source "${BATS_TEST_DIRNAME}/exemptions.bash"
 }
-
-# Commands that consolidate multiple pipeline steps (1:many mapping)
-CONSOLIDATION_COMMANDS=(
-  "prd-gap-analysis"
-  "user-stories-gaps"
-)
 
 is_consolidation() {
   local name="$1"
@@ -61,6 +56,7 @@ is_consolidation() {
 }
 
 @test "command After This Step targets match pipeline dependency graph" {
+  local failures=()
   local warnings=()
   local checked=0
 
@@ -69,6 +65,10 @@ is_consolidation() {
     name="$(extract_field "$pipeline_file" "name")"
     local cmd_file="${PROJECT_ROOT}/commands/${name}.md"
     [[ ! -f "$cmd_file" ]] && continue
+
+    local current_phase current_phase_num
+    current_phase="$(extract_field "$pipeline_file" "phase")"
+    current_phase_num="$(get_phase_number "$current_phase")"
 
     # Extract After This Step section
     local after_section
@@ -82,22 +82,54 @@ is_consolidation() {
     [[ -z "$next_commands" ]] && continue
     checked=$((checked + 1))
 
-    # For each next command, check if it depends on current step (reverse dep check)
+    # For each next command, verify the dependency relationship makes sense
     while IFS= read -r next_cmd; do
       [[ -z "$next_cmd" ]] && continue
       # Find the pipeline file for next_cmd
       local next_pipeline
       next_pipeline="$(grep -rl "^name: ${next_cmd}$" "${PROJECT_ROOT}/pipeline/" 2>/dev/null | head -1)"
+      # Non-pipeline commands (utilities) are exempt from dep checks
       [[ -z "$next_pipeline" ]] && continue
+
+      local next_phase next_phase_num
+      next_phase="$(extract_field "$next_pipeline" "phase")"
+      next_phase_num="$(get_phase_number "$next_phase")"
 
       # Check if next step has current step in its dependencies
       local next_deps
       next_deps="$(get_dep_refs "$next_pipeline" 2>/dev/null || true)"
-      # This is a soft check — dependency chains can be indirect
+
+      local has_direct=false
+      if echo "$next_deps" | grep -qx "$name"; then
+        has_direct=true
+      fi
+
+      # Valid if: direct dep, OR target is in same/later phase (forward flow),
+      # OR target is in earlier phase (update-mode back-reference)
+      if [[ "$has_direct" == "false" && "$next_phase_num" -gt "$current_phase_num" ]]; then
+        # Forward reference without direct dependency — check that at least
+        # the target is reachable through phase ordering (not a random jump)
+        local phase_gap=$(( next_phase_num - current_phase_num ))
+        if [[ "$phase_gap" -gt 3 ]]; then
+          warnings+=("${name} -> ${next_cmd}: forward ref spans ${phase_gap} phases without direct dep")
+        fi
+      fi
     done <<< "$next_commands"
   done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
 
-  # This is informational — just verify we checked a reasonable number
+  # Report warnings (informational, non-failing)
+  if [[ ${#warnings[@]} -gt 0 ]]; then
+    printf "After This Step warnings (%d commands checked):\n" "$checked"
+    printf "  %s\n" "${warnings[@]}"
+  fi
+
+  # Hard failures if any
+  if [[ ${#failures[@]} -gt 0 ]]; then
+    printf "After This Step dependency failures (%d checked):\n" "$checked"
+    printf "  %s\n" "${failures[@]}"
+    return 1
+  fi
+
   [[ "$checked" -gt 0 ]]
 }
 
