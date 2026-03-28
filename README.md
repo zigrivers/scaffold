@@ -1,6 +1,6 @@
 # Scaffold
 
-A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 51 structured pipeline steps — organized into 14 phases — and Claude Code handles the research, planning, and implementation for you.
+A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 50 structured pipeline steps — organized into 14 phases — and Claude Code handles the research, planning, and implementation for you.
 
 By the end, you'll have a fully planned, standards-documented, implementation-ready project with working code.
 
@@ -420,7 +420,7 @@ The `scaffold check` command reports which CLIs are available and recommends the
 
 ## Methodology Presets
 
-Not every project needs all 51 steps. Choose a methodology when you run `scaffold init`:
+Not every project needs all 50 steps. Choose a methodology when you run `scaffold init`:
 
 ### deep (depth 5)
 All steps enabled. Comprehensive analysis of every angle — domain modeling, ADRs, security review, traceability matrix, the works. At depth 4-5, review steps dispatch to Codex/Gemini CLIs for multi-model validation. Best for complex systems, team projects, or when you want thorough documentation.
@@ -658,10 +658,10 @@ src/
 ### Content layout
 
 ```
-pipeline/             # 51 meta-prompts organized by 14 phases
+pipeline/             # 50 meta-prompts organized by 14 phases
 knowledge/            # 45 domain expertise entries (core, product, review, validation, finalization)
 methodology/          # 3 YAML presets (deep, mvp, custom)
-commands/             # 67 Claude Code slash commands (51 pipeline + 16 utility)
+commands/             # 66 Claude Code slash commands (50 pipeline + 16 utility)
 skills/               # 3 Claude Code skills (pipeline reference, runner, multi-model dispatch)
 ```
 
