@@ -160,3 +160,54 @@ Implementation
 ```
 
 The vision document should inform the PRD, not the other way around. When the PRD and vision conflict, revisit the vision first.
+
+### Success Criteria & Measurement
+
+Success criteria in a vision document are directional — they define what "winning" looks like without the precision of a PRD's success metrics.
+
+#### Levels of Success Measurement
+
+- **Leading indicators** — Early signals that validate the vision direction. These are behavioral: are users doing the thing you expected? Are they coming back? Example: "Users who complete onboarding return within 48 hours."
+- **Year 1 milestones** — Concrete, time-bound achievements that demonstrate market fit. Example: "1,000 active users creating at least one project per week."
+- **Year 3 aspirations** — Ambitious but grounded targets that show the vision is being realized. These should feel like a stretch but not fantasy.
+- **Failure indicators** — What would make this a failure even if it ships on time and works correctly? Example: "If users create an account but never return after day 1, the core value proposition is wrong."
+
+#### Common Mistakes in Success Criteria
+
+- Vanity metrics ("1 million downloads") instead of engagement metrics ("daily active usage")
+- Unmeasurable aspirations ("users love the product") instead of observable behavior
+- Missing the "failure despite shipping" scenario — the most dangerous blind spot
+- Setting criteria so low they're guaranteed, removing the diagnostic value
+
+### Business Model Intuition
+
+The vision document captures directional thinking about sustainability, not a financial model.
+
+#### What to Include
+
+- **Revenue model** — How does this make money? Subscription, freemium, marketplace commission, enterprise licensing, usage-based? Pick one primary model and explain why.
+- **Unit economics direction** — What are the key cost drivers? What does a "unit" of value look like? Does the economics improve with scale?
+- **Go-to-market intuition** — How do users discover this product? Product-led growth, sales-led, community-driven, partnership channels? The answer shapes everything from pricing to features.
+
+#### What NOT to Include
+
+- Detailed financial projections (that's a business plan)
+- Multi-year revenue forecasts (that's a pitch deck)
+- Competitive pricing analysis (that's market research — do it, but don't put it in the vision)
+
+### Vision-to-PRD Handoff
+
+The vision document's primary downstream consumer is the PRD. A well-written vision makes PRD creation straightforward; a vague vision forces the PRD author to make strategic decisions that should have been settled upstream.
+
+#### Handoff Checklist
+
+Before declaring the vision ready for PRD creation, verify:
+
+1. **Problem Space** maps cleanly to PRD's Problem Statement
+2. **Target Audience** personas are specific enough for user stories
+3. **Guiding Principles** are concrete enough to resolve "should we build X?" questions
+4. **Competitive Landscape** provides enough context to differentiate features
+5. **Anti-Vision** is clear enough to reject out-of-scope feature requests
+6. **Open Questions** do not include anything that would block product definition
+
+If any of these fail, the vision needs another pass before the PRD can begin.
