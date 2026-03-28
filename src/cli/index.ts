@@ -19,6 +19,7 @@ import decisionsCommand from './commands/decisions.js'
 import knowledgeCommand from './commands/knowledge.js'
 import skillCommand from './commands/skill.js'
 import checkCommand from './commands/check.js'
+import completeCommand from './commands/complete.js'
 
 export async function runCli(argv: string[]): Promise<void> {
   await yargs(argv)
@@ -42,6 +43,7 @@ export async function runCli(argv: string[]): Promise<void> {
     .command(knowledgeCommand)
     .command(skillCommand)
     .command(checkCommand)
+    .command(completeCommand)
     .options({
       format: {
         type: 'string',
