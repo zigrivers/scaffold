@@ -7,6 +7,7 @@ dependencies: []
 outputs: [docs/plan.md]
 conditional: null
 knowledge-base: [prd-craft]
+reads: [create-vision]
 ---
 
 ## Purpose
@@ -55,3 +56,12 @@ Preserve existing decisions unless explicitly revisiting them.
   requested, constraints changed (timeline, budget, team), new user research
 - **Conflict resolution**: new features are appended to the feature list with
   clear versioning; changed constraints are documented with rationale for change
+
+### Understand the Vision
+
+**If `docs/vision.md` exists**: Read it completely. This is your strategic foundation — the vision document has already established the problem space, target audience, value proposition, competitive landscape, and guiding principles. Skip the vision discovery questions below and use the vision document as the North Star for this PRD. Reference it throughout, ensuring every requirement aligns with the stated vision and guiding principles. Focus your discovery questions on translating the vision into concrete product requirements rather than re-exploring strategic direction.
+
+**If `docs/vision.md` does NOT exist**:
+- What problem does this solve and for whom? Push me to be specific about the target user.
+- What does success look like? How will we know this is working?
+- What's the single most important thing this app must do well?
