@@ -6,7 +6,7 @@ order: 330
 dependencies: [dev-env-setup]
 outputs: [docs/git-workflow.md]
 conditional: null
-knowledge-base: [dev-environment]
+knowledge-base: [dev-environment, git-workflow-patterns]
 ---
 
 ## Purpose

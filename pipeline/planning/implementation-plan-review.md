@@ -6,7 +6,7 @@ order: 1220
 dependencies: [implementation-plan]
 outputs: [docs/reviews/review-tasks.md, docs/reviews/implementation-plan/task-coverage.json, docs/reviews/implementation-plan/review-summary.md]
 conditional: null
-knowledge-base: [review-methodology, review-implementation-tasks, task-decomposition]
+knowledge-base: [review-methodology, review-implementation-tasks, task-decomposition, multi-model-review-dispatch, review-step-template]
 ---
 
 ## Purpose

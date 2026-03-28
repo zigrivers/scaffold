@@ -15,6 +15,8 @@ All notable changes to Scaffold are documented here.
 ### Added
 
 - **Dependency coherence validation for presets** — New `validateDependencyCoherence()` function in preset-loader warns when enabled steps have disabled dependencies. The engine already treats disabled deps as satisfied (soft-dependency), but users now get explicit warnings about potential quality gaps.
+- **Wired orphaned knowledge entries** — Added `multi-model-review-dispatch` and `review-step-template` to all 13 review steps + `traceability-matrix`. These entries existed but were unreferenced.
+- **New knowledge entries** — Created `git-workflow-patterns` (branching, commits, PRs, merge policies, worktrees) and `automated-review-tooling` (dual-model CLI review, reconciliation, CI integration). Wired to `git-workflow` and `automated-pr-review` pipeline steps.
 - **`docs/comprehensive-alignment-audit.md`** — 8-module alignment audit covering dependency flow, methodology scaling, mode detection, quality criteria, knowledge system, command parity, implementation handoff, and meta-eval coverage.
 
 ## [2.31.0] — 2026-03-29

@@ -6,7 +6,7 @@ order: 820
 dependencies: [database-schema]
 outputs: [docs/reviews/review-database.md, docs/reviews/database/review-summary.md, docs/reviews/database/codex-review.json, docs/reviews/database/gemini-review.json]
 conditional: "if-needed"
-knowledge-base: [review-methodology, review-database-design]
+knowledge-base: [review-methodology, review-database-design, multi-model-review-dispatch, review-step-template]
 ---
 
 ## Purpose

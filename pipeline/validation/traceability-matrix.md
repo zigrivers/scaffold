@@ -7,7 +7,7 @@ dependencies: [implementation-plan-review, review-security]
 outputs: [docs/validation/traceability-matrix.md, docs/validation/traceability-matrix/review-summary.md, docs/validation/traceability-matrix/codex-review.json, docs/validation/traceability-matrix/gemini-review.json]
 reads: [story-tests, create-evals]
 conditional: null
-knowledge-base: [traceability]
+knowledge-base: [traceability, multi-model-review-dispatch]
 ---
 
 ## Purpose

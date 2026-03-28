@@ -6,7 +6,7 @@ order: 120
 dependencies: [create-prd]
 outputs: [docs/reviews/pre-review-prd.md, docs/reviews/prd/review-summary.md, docs/reviews/prd/codex-review.json, docs/reviews/prd/gemini-review.json]
 conditional: null
-knowledge-base: [review-methodology, review-prd, prd-craft, gap-analysis]
+knowledge-base: [review-methodology, review-prd, prd-craft, gap-analysis, multi-model-review-dispatch, review-step-template]
 ---
 
 ## Purpose

@@ -6,7 +6,7 @@ order: 620
 dependencies: [adrs]
 outputs: [docs/reviews/review-adrs.md, docs/reviews/adrs/review-summary.md, docs/reviews/adrs/codex-review.json, docs/reviews/adrs/gemini-review.json]
 conditional: null
-knowledge-base: [review-methodology, review-adr]
+knowledge-base: [review-methodology, review-adr, multi-model-review-dispatch, review-step-template]
 ---
 
 ## Purpose
