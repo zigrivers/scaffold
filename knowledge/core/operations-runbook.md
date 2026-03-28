@@ -4,6 +4,8 @@ description: Deployment pipeline, deployment strategies, monitoring, alerting, a
 topics: [operations, cicd, deployment, monitoring, incident-response, alerting, rollback]
 ---
 
+## Summary
+
 ## Dev Environment Reference
 
 Local development setup (prerequisites, env vars, one-command setup, database, hot reload, common commands, troubleshooting) is defined in `docs/dev-setup.md`, created by the Dev Setup prompt. The operations runbook should reference it rather than redefine it.
@@ -72,6 +74,8 @@ Operations adds (main branch only):
 - Store artifacts in a registry (Docker Hub, GitHub Container Registry, S3)
 - Tag artifacts with the git SHA for traceability
 - Set retention policies (keep last 30 days, keep releases forever)
+
+## Deep Guidance
 
 ## Deployment Strategies
 

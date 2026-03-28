@@ -10,6 +10,8 @@ A developer onboarding guide is the first document a new developer (human or AI 
 
 This document covers what an effective onboarding guide should contain, how to structure it, and what to avoid.
 
+## Summary
+
 ## Guide Structure
 
 The onboarding guide follows a deliberate progression from purpose to productivity:
@@ -53,6 +55,8 @@ data automatically and highlights discrepancies for review.
 - Full feature lists (that is the PRD)
 - Business metrics or revenue goals (irrelevant to contributors)
 - History of the project (unless it explains current technical decisions)
+
+## Deep Guidance
 
 ## 2. Architecture Overview
 

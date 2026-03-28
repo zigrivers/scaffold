@@ -4,6 +4,8 @@ description: Design token definitions, base component visual specs, dark mode pa
 topics: [design-system, tokens, colors, typography, spacing, components, dark-mode, pattern-library]
 ---
 
+## Summary
+
 ## Design Tokens
 
 Design tokens are the atomic values that define the visual language. They are variables, not hard-coded values. Every visual property in the application references a token.
@@ -65,6 +67,8 @@ Design tokens are the atomic values that define the visual language. They are va
 --color-overlay: rgba(0,0,0,0.5)  // Modal/dialog backdrop
 --color-focus-ring: rgba(37,99,235,0.5)  // Focus indicator
 ```
+
+## Deep Guidance
 
 ### Typography Tokens
 
