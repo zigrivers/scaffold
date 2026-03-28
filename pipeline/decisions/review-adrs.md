@@ -14,6 +14,9 @@ Multi-pass review of ADRs targeting ADR-specific failure modes: contradictory
 decisions, missing rationale, implied-but-unrecorded decisions, and unresolved
 trade-offs.
 
+At depth 4+, dispatches to external AI models (Codex, Gemini) for
+independent review validation.
+
 ## Inputs
 - docs/adrs/ (required) — ADRs to review
 - docs/domain-models/ (required) — for coverage checking
@@ -22,6 +25,9 @@ trade-offs.
 ## Expected Outputs
 - docs/reviews/review-adrs.md — findings and resolution log
 - docs/adrs/ — updated with fixes
+- docs/reviews/adrs/review-summary.md (depth 4+) — multi-model review synthesis
+- docs/reviews/adrs/codex-review.json (depth 4+, if available) — raw Codex findings
+- docs/reviews/adrs/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
 - All ADR-specific review passes executed
@@ -29,11 +35,18 @@ trade-offs.
 - Missing decisions identified and documented
 - Contradictions resolved
 - Downstream readiness confirmed (architecture phase can proceed)
+- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling
-- **deep**: All review passes. Full findings report. Fixes applied and re-validated.
+- **deep**: All review passes. Full findings report. Fixes applied and
+  re-validated. Multi-model review dispatched to Codex and Gemini if available,
+  with graceful fallback to Claude-only enhanced review.
 - **mvp**: Quick consistency check for contradictions only.
-- **custom:depth(1-5)**: Scale number of review passes with depth.
+- **custom:depth(1-5)**: Depth 1-3: scale number of review passes with depth.
+  Depth 4: full review + one external model (if CLI available). Depth 5:
+  full review + multi-model with reconciliation.
 
 ## Mode Detection
 Re-review mode if previous review exists. Check which findings were addressed.
+If multi-model review artifacts exist under docs/reviews/adrs/, preserve prior
+findings still valid.

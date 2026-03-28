@@ -16,6 +16,9 @@ Identify gaps where one platform was assumed but another was not considered,
 verify feature parity across targets, and ensure platform-specific testing,
 input patterns, and UX considerations are documented.
 
+At depth 4+, dispatches to external AI models (Codex, Gemini) for
+independent platform gap analysis.
+
 ## Inputs
 - docs/plan.md (required) — target platforms and version requirements
 - docs/tech-stack.md (required) — cross-platform framework and build approach
@@ -30,6 +33,9 @@ input patterns, and UX considerations are documented.
 ## Expected Outputs
 - docs/reviews/platform-parity-review.md — platform gap analysis report with
   findings per document, feature parity matrix, and recommended fixes
+- docs/reviews/platform-parity/review-summary.md (depth 4+) — multi-model review synthesis
+- docs/reviews/platform-parity/codex-review.json (depth 4+, if available) — raw Codex findings
+- docs/reviews/platform-parity/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
 - All target platforms identified from PRD and tech-stack.md
@@ -40,18 +46,24 @@ input patterns, and UX considerations are documented.
 - Navigation patterns appropriate per platform (sidebar vs. tab bar, etc.)
 - Offline/connectivity handling addressed per platform (if applicable)
 - Web version is treated as first-class (not afterthought) if PRD specifies it
+- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling
 - **deep**: Comprehensive platform audit across all documents, feature parity
   matrix, input pattern analysis, navigation pattern review, offline handling,
-  accessibility per platform, and detailed fix recommendations.
+  accessibility per platform, and detailed fix recommendations. Multi-model
+  review dispatched to Codex and Gemini if available, with graceful fallback
+  to Claude-only enhanced review.
 - **mvp**: Quick check of user stories and tech-stack for platform coverage.
   Identify top 3 platform gaps. Skip detailed feature parity matrix.
 - **custom:depth(1-5)**: Depth 1-2: user stories platform check. Depth 3: add
-  tech-stack and coding-standards. Depth 4: add feature parity matrix. Depth 5:
-  full suite across all documents.
+  tech-stack and coding-standards. Depth 4: add feature parity matrix + one
+  external model (if CLI available). Depth 5: full suite across all documents
+  + multi-model with reconciliation.
 
 ## Mode Detection
 Update mode if docs/reviews/platform-parity-review.md exists. In update mode:
 re-run audit against current documents, preserve prior findings still valid,
-note which gaps have been addressed since last review.
+note which gaps have been addressed since last review. If multi-model review
+artifacts exist under docs/reviews/platform-parity/, preserve prior findings
+still valid.

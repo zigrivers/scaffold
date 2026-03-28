@@ -14,6 +14,9 @@ Review database schema targeting schema-specific failure modes: entity coverage
 gaps, normalization trade-off issues, missing indexes, migration safety, and
 referential integrity vs. domain invariants.
 
+At depth 4+, dispatches to external AI models (Codex, Gemini) for
+independent review validation.
+
 ## Inputs
 - docs/database-schema.md (required) — schema to review
 - docs/domain-models/ (required) — for entity coverage
@@ -22,6 +25,9 @@ referential integrity vs. domain invariants.
 ## Expected Outputs
 - docs/reviews/review-database.md — findings and resolution log
 - docs/database-schema.md — updated with fixes
+- docs/reviews/database/review-summary.md (depth 4+) — multi-model review synthesis
+- docs/reviews/database/codex-review.json (depth 4+, if available) — raw Codex findings
+- docs/reviews/database/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
 - Entity coverage verified
@@ -29,11 +35,17 @@ referential integrity vs. domain invariants.
 - Index coverage for known query patterns verified
 - Migration safety assessed
 - Referential integrity matches domain invariants
+- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling
-- **deep**: Full multi-pass review targeting all schema failure modes.
+- **deep**: Full multi-pass review targeting all schema failure modes. Multi-model
+  review dispatched to Codex and Gemini if available, with graceful fallback
+  to Claude-only enhanced review.
 - **mvp**: Entity coverage check only.
-- **custom:depth(1-5)**: Scale passes with depth.
+- **custom:depth(1-5)**: Depth 1-3: scale passes with depth. Depth 4: full
+  review + one external model (if CLI available). Depth 5: full review +
+  multi-model with reconciliation.
 
 ## Mode Detection
-Re-review mode if previous review exists.
+Re-review mode if previous review exists. If multi-model review artifacts exist
+under docs/reviews/database/, preserve prior findings still valid.

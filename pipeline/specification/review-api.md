@@ -14,6 +14,9 @@ Review API contracts targeting API-specific failure modes: operation coverage
 gaps, error contract incompleteness, auth/authz gaps, versioning inconsistencies,
 payload shape mismatches with domain entities, and idempotency gaps.
 
+At depth 4+, dispatches to external AI models (Codex, Gemini) for
+independent review validation.
+
 ## Inputs
 - docs/api-contracts.md (required) — contracts to review
 - docs/domain-models/ (required) — for operation coverage
@@ -23,6 +26,9 @@ payload shape mismatches with domain entities, and idempotency gaps.
 ## Expected Outputs
 - docs/reviews/review-api.md — findings and resolution log
 - docs/api-contracts.md — updated with fixes
+- docs/reviews/api/review-summary.md (depth 4+) — multi-model review synthesis
+- docs/reviews/api/codex-review.json (depth 4+, if available) — raw Codex findings
+- docs/reviews/api/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
 - Operation coverage against domain model verified
@@ -30,11 +36,17 @@ payload shape mismatches with domain entities, and idempotency gaps.
 - Auth requirements specified for every endpoint
 - Versioning strategy consistent with ADRs
 - Idempotency documented for all mutating operations
+- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling
-- **deep**: Full multi-pass review targeting all API failure modes.
+- **deep**: Full multi-pass review targeting all API failure modes. Multi-model
+  review dispatched to Codex and Gemini if available, with graceful fallback
+  to Claude-only enhanced review.
 - **mvp**: Operation coverage check only.
-- **custom:depth(1-5)**: Scale passes with depth.
+- **custom:depth(1-5)**: Depth 1-3: scale passes with depth. Depth 4: full
+  review + one external model (if CLI available). Depth 5: full review +
+  multi-model with reconciliation.
 
 ## Mode Detection
-Re-review mode if previous review exists.
+Re-review mode if previous review exists. If multi-model review artifacts exist
+under docs/reviews/api/, preserve prior findings still valid.

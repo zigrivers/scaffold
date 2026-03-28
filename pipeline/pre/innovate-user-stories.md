@@ -16,6 +16,10 @@ innovation — `innovate-prd`) — it focuses on making existing features better
 through smart defaults,
 progressive disclosure, accessibility improvements, and AI-native capabilities.
 
+At depth 4+, dispatches to external AI models (Codex, Gemini) for
+independent UX innovation brainstorming — different models surface different
+enhancement opportunities.
+
 ## Inputs
 - docs/user-stories.md (required) — stories to enhance
 - docs/plan.md (required) — PRD boundaries (innovation must not exceed scope)
@@ -24,6 +28,9 @@ progressive disclosure, accessibility improvements, and AI-native capabilities.
 - docs/user-stories-innovation.md — innovation findings, suggestions with
   cost/impact assessment, and disposition (accepted/rejected/deferred)
 - docs/user-stories.md — updated with approved enhancements
+- docs/reviews/user-stories-innovation/review-summary.md (depth 4+) — multi-model innovation synthesis
+- docs/reviews/user-stories-innovation/codex-review.json (depth 4+, if available) — raw Codex suggestions
+- docs/reviews/user-stories-innovation/gemini-review.json (depth 4+, if available) — raw Gemini suggestions
 
 ## Quality Criteria
 - Enhancements are UX-level, not new features
@@ -31,17 +38,23 @@ progressive disclosure, accessibility improvements, and AI-native capabilities.
 - Each suggestion has a clear user benefit
 - Approved enhancements are integrated into existing stories (not new stories)
 - PRD scope boundaries are respected — no scope creep
+- (depth 4+) Multi-model suggestions deduplicated and synthesized with unique ideas from each model highlighted
 
 ## Methodology Scaling
 - **deep**: Full innovation pass across all three categories (high-value
   low-effort, differentiators, defensive gaps). Cost/impact matrix.
-  Detailed integration of approved enhancements into stories.
+  Detailed integration of approved enhancements into stories. Multi-model
+  innovation dispatched to Codex and Gemini if available, with graceful
+  fallback to Claude-only enhanced brainstorming.
 - **mvp**: Not applicable — this step is conditional and skipped in MVP.
 - **custom:depth(1-5)**: Depth 1-2: not typically enabled. Depth 3: quick
-  scan for obvious improvements. Depth 4-5: full innovation pass with
-  evaluation framework.
+  scan for obvious improvements. Depth 4: full innovation pass + one external
+  model (if CLI available). Depth 5: full innovation pass + multi-model with
+  deduplication and synthesis.
 
 ## Mode Detection
 If docs/user-stories-innovation.md exists, this is a re-innovation pass. Read
 previous suggestions and their disposition (accepted/rejected), focus on new
-opportunities from story changes since last run.
+opportunities from story changes since last run. If multi-model artifacts
+exist under docs/reviews/user-stories-innovation/, preserve prior suggestion
+dispositions.
