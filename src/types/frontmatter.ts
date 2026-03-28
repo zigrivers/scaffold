@@ -13,7 +13,7 @@ export const PHASES = [
   { number: 7, slug: 'architecture', displayName: 'System Architecture' },
   { number: 8, slug: 'specification', displayName: 'Specifications' },
   { number: 9, slug: 'quality', displayName: 'Quality Gates' },
-  { number: 10, slug: 'stories', displayName: 'Stories & Reviews' },
+  { number: 10, slug: 'parity', displayName: 'Platform Parity' },
   { number: 11, slug: 'consolidation', displayName: 'Consolidation' },
   { number: 12, slug: 'planning', displayName: 'Planning' },
   { number: 13, slug: 'validation', displayName: 'Validation' },
@@ -40,7 +40,7 @@ export interface MetaPromptFrontmatter {
   description: string
   /** Pipeline phase slug. See PHASES constant for valid values. */
   phase: string
-  /** Unique position 1-100. Primary tiebreaker in topological sort. */
+  /** Unique position. Phase-aligned: Phase N → N00-N99. Primary tiebreaker in topological sort. */
   order: number
   /** Step slugs that must complete before this step can run. */
   dependencies: string[]

@@ -2,7 +2,7 @@
 name: create-prd
 description: Create a product requirements document from a project idea
 phase: "pre"
-order: 1
+order: 110
 dependencies: []
 outputs: [docs/plan.md]
 conditional: null

@@ -2,7 +2,7 @@
 name: beads
 description: Initialize Beads task tracking with CLAUDE.md conventions and lessons file
 phase: "foundation"
-order: 40
+order: 210
 dependencies: []
 outputs: [.beads/, tasks/lessons.md, CLAUDE.md]
 conditional: "if-needed"

@@ -2,7 +2,7 @@
 name: innovate-prd
 description: Discover feature-level innovation opportunities in the PRD
 phase: "pre"
-order: 3
+order: 130
 dependencies: [review-prd]
 outputs: [docs/prd-innovation.md]
 conditional: "if-needed"

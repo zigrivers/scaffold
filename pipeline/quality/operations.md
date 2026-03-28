@@ -2,7 +2,7 @@
 name: operations
 description: Define deployment pipeline, deployment strategy, monitoring, alerting, and incident response
 phase: "quality"
-order: 21
+order: 930
 dependencies: [review-testing]
 outputs: [docs/operations-runbook.md]
 conditional: null

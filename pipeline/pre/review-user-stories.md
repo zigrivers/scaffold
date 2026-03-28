@@ -2,7 +2,7 @@
 name: review-user-stories
 description: Multi-pass review of user stories for PRD coverage, quality, and downstream readiness
 phase: "pre"
-order: 5
+order: 150
 dependencies: [user-stories]
 outputs: [docs/reviews/pre-review-user-stories.md]
 conditional: null

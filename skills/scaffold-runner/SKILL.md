@@ -286,7 +286,7 @@ Map natural language requests to concrete step lists using `scaffold status` out
 | architecture | System Architecture | system-architecture, review-architecture |
 | specification | Specifications | database-schema, review-database, api-contracts, review-api, ux-spec, review-ux |
 | quality | Quality Gates | review-testing, create-evals, operations, review-operations, security, review-security |
-| stories | Stories & Reviews | platform-parity-review |
+| parity | Platform Parity | platform-parity-review |
 | consolidation | Consolidation | claude-md-optimization, workflow-audit |
 | planning | Planning | implementation-plan, implementation-plan-review |
 | validation | Validation | cross-phase-consistency, traceability-matrix, decision-completeness, critical-path-walkthrough, implementability-dry-run, dependency-graph-validation, scope-creep-check |

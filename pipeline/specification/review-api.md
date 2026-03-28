@@ -2,7 +2,7 @@
 name: review-api
 description: Review API contracts for completeness and consistency
 phase: "specification"
-order: 16
+order: 840
 dependencies: [api-contracts]
 outputs: [docs/reviews/review-api.md]
 conditional: "if-needed"

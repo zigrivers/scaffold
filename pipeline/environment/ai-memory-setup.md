@@ -2,7 +2,7 @@
 name: ai-memory-setup
 description: Configure AI memory and context management with modular rules, optional MCP memory server, lifecycle hooks, and external context integration
 phase: "environment"
-order: 58
+order: 350
 dependencies: [git-workflow]
 outputs: [.claude/rules/, docs/ai-memory-setup.md]
 conditional: null

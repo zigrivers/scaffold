@@ -2,7 +2,7 @@
 name: review-operations
 description: Review operations runbook for completeness and safety
 phase: "quality"
-order: 22
+order: 940
 dependencies: [operations]
 outputs: [docs/reviews/review-operations.md]
 conditional: null

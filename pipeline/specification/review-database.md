@@ -2,7 +2,7 @@
 name: review-database
 description: Review database schema for correctness and completeness
 phase: "specification"
-order: 14
+order: 820
 dependencies: [database-schema]
 outputs: [docs/reviews/review-database.md]
 conditional: "if-needed"

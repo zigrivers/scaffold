@@ -5,53 +5,59 @@ default_depth: 3
 
 # All steps enabled by default at depth 3 — user overrides individual steps
 steps:
-  # Phase 2 — Foundation
-  beads: { enabled: true, conditional: "if-needed" }
-  tech-stack: { enabled: true }
-  coding-standards: { enabled: true }
-  project-structure: { enabled: true }
-  # Phase 3 — Environment
-  dev-env-setup: { enabled: true }
-  design-system: { enabled: true, conditional: "if-needed" }
-  git-workflow: { enabled: true }
-  automated-pr-review: { enabled: false }
-  ai-memory-setup: { enabled: true }
-  # Phase 4 — Integration
-  add-e2e-testing: { enabled: true, conditional: "if-needed" }
-  # Phase 1 — Product Definition
+  # Phase 1 — Product Definition (pre)
   create-prd: { enabled: true }
   review-prd: { enabled: true }
   innovate-prd: { enabled: false }
   user-stories: { enabled: true }
   review-user-stories: { enabled: true }
   innovate-user-stories: { enabled: false }
+  # Phase 2 — Project Foundation (foundation)
+  beads: { enabled: true, conditional: "if-needed" }
+  tech-stack: { enabled: true }
+  coding-standards: { enabled: true }
+  tdd: { enabled: true }
+  project-structure: { enabled: true }
+  # Phase 3 — Development Environment (environment)
+  dev-env-setup: { enabled: true }
+  design-system: { enabled: true, conditional: "if-needed" }
+  git-workflow: { enabled: true }
+  automated-pr-review: { enabled: false }
+  ai-memory-setup: { enabled: true }
+  # Phase 4 — Testing Integration (integration)
+  add-e2e-testing: { enabled: true, conditional: "if-needed" }
+  # Phase 5 — Domain Modeling (modeling)
   domain-modeling: { enabled: true }
   review-domain-modeling: { enabled: true }
+  # Phase 6 — Architecture Decisions (decisions)
   adrs: { enabled: true }
   review-adrs: { enabled: true }
+  # Phase 7 — System Architecture (architecture)
   system-architecture: { enabled: true }
   review-architecture: { enabled: true }
+  # Phase 8 — Specifications (specification)
   database-schema: { enabled: true, conditional: "if-needed" }
   review-database: { enabled: true, conditional: "if-needed" }
   api-contracts: { enabled: true, conditional: "if-needed" }
   review-api: { enabled: true, conditional: "if-needed" }
   ux-spec: { enabled: true, conditional: "if-needed" }
   review-ux: { enabled: true, conditional: "if-needed" }
-  tdd: { enabled: true }
+  # Phase 9 — Quality Gates (quality)
   review-testing: { enabled: true }
+  create-evals: { enabled: true }
   operations: { enabled: true }
   review-operations: { enabled: true }
   security: { enabled: true }
   review-security: { enabled: true }
-  create-evals: { enabled: true }
-  # Phase 10 — Stories & Reviews
+  # Phase 10 — Platform Parity (parity)
   platform-parity-review: { enabled: true, conditional: "if-needed" }
-  # Phase 11 — Consolidation
+  # Phase 11 — Consolidation (consolidation)
   claude-md-optimization: { enabled: true }
   workflow-audit: { enabled: true }
-  # Phase 12 — Planning
+  # Phase 12 — Planning (planning)
   implementation-plan: { enabled: true }
   implementation-plan-review: { enabled: true }
+  # Phase 13 — Validation (validation)
   cross-phase-consistency: { enabled: true }
   traceability-matrix: { enabled: true }
   decision-completeness: { enabled: true }
@@ -59,6 +65,7 @@ steps:
   implementability-dry-run: { enabled: true }
   dependency-graph-validation: { enabled: true }
   scope-creep-check: { enabled: true }
+  # Phase 14 — Finalization (finalization)
   apply-fixes-and-freeze: { enabled: true }
   developer-onboarding-guide: { enabled: true }
   implementation-playbook: { enabled: true }

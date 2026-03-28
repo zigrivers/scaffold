@@ -29,7 +29,7 @@ Use this skill ONLY when the user asks about:
 | 7 | `architecture` | System Architecture |
 | 8 | `specification` | Specifications |
 | 9 | `quality` | Quality Gates |
-| 10 | `stories` | Stories & Reviews |
+| 10 | `parity` | Platform Parity |
 | 11 | `consolidation` | Consolidation |
 | 12 | `planning` | Planning |
 | 13 | `validation` | Validation |
@@ -74,7 +74,7 @@ Use this skill ONLY when the user asks about:
 | 30 | Quality Gates | `/scaffold:review-operations` | Reviews operations runbook |
 | 31 | Quality Gates | `/scaffold:security` | Threat model, auth, data protection |
 | 32 | Quality Gates | `/scaffold:review-security` | Reviews security posture |
-| 33 | Stories & Reviews | `/scaffold:platform-parity-review` | **(optional)** Multi-platform projects |
+| 33 | Platform Parity | `/scaffold:platform-parity-review` | **(optional)** Multi-platform projects |
 | 34 | Consolidation | `/scaffold:claude-md-optimization` | Run BEFORE workflow-audit |
 | 35 | Consolidation | `/scaffold:workflow-audit` | Run AFTER claude-md-optimization |
 | 36 | Planning | `/scaffold:implementation-plan` | Creates full task graph |
@@ -105,38 +105,76 @@ Use this skill ONLY when the user asks about:
 | `/scaffold:prompt-pipeline` | Show the full pipeline reference |
 | `/scaffold:dashboard` | Open visual pipeline dashboard in browser |
 
-## Key Dependencies
+## Execution Model
+
+### Two Parallel Tracks
+
+After Phase 1 (Product Definition), the pipeline splits into **two independent tracks** that can run concurrently. They converge at Phase 12 (Planning).
 
 ```
-PRD → Tech Stack → Coding Standards → TDD Standards → Project Structure
-                                                            ↓
-PRD → User Stories → Domain Modeling → ADRs → System Architecture
-                                                      ↓
-                                               ┌──────┼──────┐
-                                            DB Schema  API   UX Spec
-                                                      ↓
-                        TDD → Review Testing → Create Evals
-                                    ↓
-                              Operations → Security (+ reviews)
-                                                      ↓
-Dev Setup → Git Workflow → AI Memory Setup → Claude.md Optimization → Workflow Audit
-                                                            ↓
-                              Implementation Plan → Review → Validation (7 parallel checks)
-                                                                    ↓
-                                                    Apply Fixes & Freeze → Onboarding → Playbook
-                                                                                          ↓
-                                                                                      Execution
+                           ┌─ Track A: Infrastructure ──────────────────────┐
+                           │                                                │
+Phase 1                    │  Phase 2 (foundation)                          │
+create-prd ─→ review-prd  │    tech-stack → coding-standards → tdd         │
+    ↓                      │                     ↓                          │
+user-stories               │    project-structure → dev-env-setup           │
+    ↓                      │         ↓                                      │
+review-user-stories ──┐    │    git-workflow → claude-md-optimization       │
+                      │    │         ↓              ↓                       │
+                      │    │    ai-memory-setup  workflow-audit              │
+                      │    │                                                │
+                      │    └────────────────────────────────────────────────┘
+                      │
+                      │    ┌─ Track B: Domain & Quality ───────────────────┐
+                      │    │                                                │
+                      └──→ │  Phase 5-8: domain-modeling → adrs →           │
+                           │    system-architecture → specs (DB/API/UX)     │
+                           │                                                │
+                           │  Phase 9: tdd → review-testing → operations    │
+                           │    → security (+ reviews for each)             │
+                           │                                                │
+                           └────────────────────────────────────────────────┘
+                                              ↓
+                              ┌───────────────┴───────────────┐
+                              │   Phase 12: Planning          │
+                              │   (convergence point —        │
+                              │    depends on both tracks)    │
+                              └───────────────┬───────────────┘
+                                              ↓
+                              Phase 13: Validation (7 parallel checks)
+                                              ↓
+                              Phase 14: Finalization → Execution
 ```
+
+### How Order Numbers Work
+
+The `order` field is a **tiebreaker**, not a sequence number. Execution order is determined by:
+
+1. **Dependency graph** (primary) — topological sort ensures prerequisites complete first
+2. **Order field** (secondary) — when multiple steps are eligible simultaneously, lower order runs first
+
+Order numbers are **phase-aligned**: Phase N uses orders in the N00 range (Phase 1 = 100s, Phase 2 = 200s, etc.). This makes it easy to identify which phase a step belongs to from its order alone.
+
+### Which Phases Can Run in Parallel
+
+Steps within the same track that don't depend on each other can run in parallel (in separate sessions/worktrees):
+
+- **Track A** and **Track B** are fully independent until Phase 12
+- Within Track B, specification steps (Phase 8) can parallelize: DB schema, API contracts, and UX spec all depend on review-architecture but not each other
+- Validation steps (Phase 13) all depend on implementation-plan-review but not each other — all 7 can run in parallel
 
 ## Critical Ordering Constraints
 
-1. **Beads Setup before everything else in Phase 2** — creates CLAUDE.md
-2. **Tech Stack before Coding Standards and TDD** — they reference it
-3. **Dev Setup before Git Workflow** — Git Workflow references lint/test commands
-4. **Git Workflow before AI Memory Setup** — memory rules are extracted from project docs created by earlier steps
-5. **User Stories before Domain Modeling** — domain models derive from stories
-6. **Domain Modeling → ADRs → Architecture** — linear chain through modeling phases
-7. **Architecture before Specification** — DB, API, UX specs derive from architecture (can parallelize)
+1. **Tech Stack before Coding Standards and TDD** — they reference it
+2. **Dev Setup before Git Workflow** — Git Workflow references lint/test commands
+3. **Git Workflow before AI Memory Setup** — memory rules are extracted from project docs
+4. **User Stories before Domain Modeling** — domain models derive from stories
+5. **Domain Modeling → ADRs → Architecture** — linear chain through modeling phases
+6. **Architecture before Specification** — DB, API, UX specs derive from architecture (can parallelize)
+7. **TDD → Review Testing → Operations → Security** — quality gate chain
+8. **Both tracks converge at Implementation Plan** — depends on tdd, operations, security, AND review-architecture
+9. **All 7 Validation checks before Apply Fixes & Freeze** — freeze requires all findings
+10. **Finalization before Execution** — agents need frozen docs and playbook
 8. **TDD → Review Testing → Operations → Security** — quality gate chain
 9. **Quality Gates before Consolidation** — consolidation verifies all docs including operations/security
 10. **Claude.md Optimization before Workflow Audit** — optimize first, verify second

@@ -2,7 +2,7 @@
 name: review-security
 description: Review security review for coverage and correctness
 phase: "quality"
-order: 24
+order: 960
 dependencies: [security]
 outputs: [docs/reviews/review-security.md]
 conditional: null

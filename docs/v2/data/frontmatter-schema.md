@@ -64,13 +64,13 @@ The following JSON Schema defines the structure that parsed YAML frontmatter mus
     },
     "phase": {
       "type": "string",
-      "enum": ["pre", "foundation", "environment", "integration", "modeling", "decisions", "architecture", "specification", "quality", "stories", "consolidation", "planning", "validation", "finalization"],
-      "description": "Pipeline phase identifier. 14 phases ordered by number: (1) pre, (2) foundation, (3) environment, (4) integration, (5) modeling, (6) decisions, (7) architecture, (8) specification, (9) quality, (10) stories, (11) consolidation, (12) planning, (13) validation, (14) finalization. Canonical definitions in src/types/frontmatter.ts PHASES constant."
+      "enum": ["pre", "foundation", "environment", "integration", "modeling", "decisions", "architecture", "specification", "quality", "parity", "consolidation", "planning", "validation", "finalization"],
+      "description": "Pipeline phase identifier. 14 phases ordered by number: (1) pre, (2) foundation, (3) environment, (4) integration, (5) modeling, (6) decisions, (7) architecture, (8) specification, (9) quality, (10) parity, (11) consolidation, (12) planning, (13) validation, (14) finalization. Canonical definitions in src/types/frontmatter.ts PHASES constant."
     },
     "order": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 100,
+      "maximum": 1500,
       "description": "Unique step position used as the primary tiebreaker in Kahn's algorithm topological sort. Lower values are dequeued first when multiple steps have zero in-degree. Each step has a unique order value."
     },
     "dependencies": {
@@ -202,7 +202,7 @@ Pipeline phase for display grouping and ordering.
 | 7 | `architecture` | System Architecture |
 | 8 | `specification` | Specifications |
 | 9 | `quality` | Quality Gates |
-| 10 | `stories` | Stories & Reviews |
+| 10 | `parity` | Platform Parity |
 | 11 | `consolidation` | Consolidation |
 | 12 | `planning` | Planning |
 | 13 | `validation` | Validation |

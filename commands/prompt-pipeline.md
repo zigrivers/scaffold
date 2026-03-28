@@ -88,7 +88,7 @@ Display the prompt pipeline order below. Do not read any files or run any comman
 | 31 | **Security** | `/scaffold:security` | Threat model, auth, data protection |
 | 32 | **Review Security** | `/scaffold:review-security` | Reviews security posture |
 
-### Phase 10 — Stories & Reviews (`stories`)
+### Phase 10 — Platform Parity (`parity`)
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
 | 33 | **Platform Parity Review** | `/scaffold:platform-parity-review` | **(optional)** Multi-platform projects |

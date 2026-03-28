@@ -2,7 +2,7 @@
 name: design-system
 description: Create a cohesive design system with tokens and component patterns for frontend
 phase: "environment"
-order: 51
+order: 320
 dependencies: [dev-env-setup]
 outputs: [docs/design-system.md]
 conditional: "if-needed"

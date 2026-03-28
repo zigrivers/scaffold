@@ -2,7 +2,7 @@
 name: implementation-playbook
 description: Create the playbook that AI agents follow during implementation
 phase: "finalization"
-order: 36
+order: 1430
 dependencies: [developer-onboarding-guide]
 outputs: [docs/implementation-playbook.md]
 conditional: null

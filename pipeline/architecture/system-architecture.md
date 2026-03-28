@@ -2,7 +2,7 @@
 name: system-architecture
 description: Design and document system architecture
 phase: "architecture"
-order: 11
+order: 710
 dependencies: [review-adrs]
 outputs: [docs/system-architecture.md]
 conditional: null

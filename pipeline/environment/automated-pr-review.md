@@ -2,7 +2,7 @@
 name: automated-pr-review
 description: Agent-driven automated PR review with external reviewers (Codex Cloud, Gemini Code Assist, or custom)
 phase: "environment"
-order: 53
+order: 340
 dependencies: [git-workflow]
 outputs: [AGENTS.md, docs/review-standards.md]
 conditional: "if-needed"

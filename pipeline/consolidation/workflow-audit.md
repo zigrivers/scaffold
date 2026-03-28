@@ -2,7 +2,7 @@
 name: workflow-audit
 description: Verify workflow consistency across all documentation files
 phase: "consolidation"
-order: 71
+order: 1120
 dependencies: [claude-md-optimization]
 outputs: [CLAUDE.md, docs/git-workflow.md]
 conditional: null

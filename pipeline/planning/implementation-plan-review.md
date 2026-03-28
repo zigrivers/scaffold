@@ -2,7 +2,7 @@
 name: implementation-plan-review
 description: Review implementation tasks for coverage, feasibility, and multi-model validation
 phase: "planning"
-order: 26
+order: 1220
 dependencies: [implementation-plan]
 outputs: [docs/reviews/review-tasks.md, docs/reviews/implementation-plan/task-coverage.json, docs/reviews/implementation-plan/review-summary.md]
 conditional: null
