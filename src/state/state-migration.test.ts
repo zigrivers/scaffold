@@ -345,6 +345,30 @@ describe('migrateState', () => {
       expect(state.steps['claude-code-permissions']).toBeUndefined()
     })
 
+    it('removes multi-model-review-tasks when pending', () => {
+      const state = makeState({
+        'multi-model-review-tasks': { status: 'pending' },
+        'implementation-plan-review': { status: 'pending' },
+      })
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(true)
+      expect(state.steps['multi-model-review-tasks']).toBeUndefined()
+      expect(state.steps['implementation-plan-review'].status).toBe('pending')
+    })
+
+    it('removes multi-model-review-tasks when completed', () => {
+      const state = makeState({
+        'multi-model-review-tasks': { status: 'completed' },
+      })
+
+      const changed = migrateState(state)
+
+      expect(changed).toBe(true)
+      expect(state.steps['multi-model-review-tasks']).toBeUndefined()
+    })
+
     it('returns false when retired step is not present', () => {
       const state = makeState({
         'create-prd': { status: 'completed' },
