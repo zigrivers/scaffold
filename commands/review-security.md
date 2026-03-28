@@ -126,7 +126,7 @@ When this step is complete, tell the user:
 ---
 **Review complete** — Security review findings documented in `docs/reviews/review-security.md`.
 
-**Next:** Run `/scaffold:implementation-plan` to create the implementation task graph informed by the reviewed security posture.
+**Next:** Run `/scaffold:claude-md-optimization` — Consolidate CLAUDE.md before implementation planning (starts Phase 6).
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

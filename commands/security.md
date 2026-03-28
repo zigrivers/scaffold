@@ -212,7 +212,9 @@ When this step is complete, tell the user:
 ---
 **Quality phase in progress** — `docs/security-review.md` created with OWASP analysis, threat model, auth patterns, data protection, and secrets management.
 
-**Next:** Run `/scaffold:create-evals` — Generate eval checks that verify code meets standards, or `/scaffold:implementation-plan` to begin the implementation phase.
+**Next:**
+- Run `/scaffold:review-security` — Review security posture for OWASP gaps and auth boundary mismatches.
+- Or skip review and proceed to `/scaffold:claude-md-optimization` — Consolidate CLAUDE.md (starts Phase 6).
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 
