@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.19.3] — 2026-03-27
+
+### Fixed
+
+- **Build error: `'complete'` not assignable to `LockableCommand`** — The `scaffold complete` command (v2.19.0) passed `'complete'` to `acquireLock()` but the `LockableCommand` type union didn't include it. TypeScript caught this during `brew install` build. Added `'complete'` to the union type.
+
 ## [2.19.2] — 2026-03-27
 
 ### Fixed
