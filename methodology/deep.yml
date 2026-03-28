@@ -43,6 +43,7 @@ steps:
   review-ux: { enabled: true, conditional: "if-needed" }
   # Phase 9 — Quality Gates (quality)
   review-testing: { enabled: true }
+  story-tests: { enabled: true }
   create-evals: { enabled: true }
   operations: { enabled: true }
   review-operations: { enabled: true }
