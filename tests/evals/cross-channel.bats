@@ -49,7 +49,7 @@ is_consolidation() {
         failures+=("${name}: output '${output_path}' not referenced in Mode Detection")
       fi
     done <<< "$outputs"
-    ((checked++))
+    checked=$((checked + 1))
   done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
 
   # Report
@@ -80,7 +80,7 @@ is_consolidation() {
     next_commands="$(echo "$after_section" | grep -o '/scaffold:[a-z-]*' | sed 's|/scaffold:||' | sort -u)"
 
     [[ -z "$next_commands" ]] && continue
-    ((checked++))
+    checked=$((checked + 1))
 
     # For each next command, check if it depends on current step (reverse dep check)
     while IFS= read -r next_cmd; do
