@@ -2,7 +2,7 @@
 name: coding-standards
 description: Create prescriptive coding standards tailored to the project's tech stack
 phase: "foundation"
-order: 43
+order: 230
 dependencies: [tech-stack]
 outputs: [docs/coding-standards.md]
 conditional: null

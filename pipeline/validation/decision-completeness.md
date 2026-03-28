@@ -2,7 +2,7 @@
 name: decision-completeness
 description: Verify all decisions are recorded, justified, non-contradictory
 phase: "validation"
-order: 29
+order: 1330
 dependencies: [implementation-plan-review, review-security]
 outputs: [docs/validation/decision-completeness.md]
 conditional: null

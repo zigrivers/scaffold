@@ -2,7 +2,7 @@
 name: add-e2e-testing
 description: Configure end-to-end testing (Playwright for web, Maestro for mobile) based on detected project platform
 phase: "integration"
-order: 60
+order: 410
 dependencies: [git-workflow]
 outputs: [docs/tdd-standards.md, tests/screenshots/, maestro/]
 conditional: "if-needed"

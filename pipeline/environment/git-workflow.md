@@ -2,7 +2,7 @@
 name: git-workflow
 description: Configure git workflow with branching, PRs, CI, and worktree scripts for parallel agents
 phase: "environment"
-order: 52
+order: 330
 dependencies: [dev-env-setup]
 outputs: [docs/git-workflow.md]
 conditional: null

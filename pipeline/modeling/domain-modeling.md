@@ -2,7 +2,7 @@
 name: domain-modeling
 description: Deep domain modeling across all identified project domains
 phase: "modeling"
-order: 7
+order: 510
 dependencies: [review-user-stories]
 outputs: [docs/domain-models/]
 conditional: null

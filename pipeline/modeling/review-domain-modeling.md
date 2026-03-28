@@ -2,7 +2,7 @@
 name: review-domain-modeling
 description: Review domain models for completeness, consistency, and downstream readiness
 phase: "modeling"
-order: 8
+order: 520
 dependencies: [domain-modeling]
 outputs: [docs/reviews/review-domain-modeling.md]
 conditional: null

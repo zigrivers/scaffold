@@ -2,7 +2,7 @@
 name: dev-env-setup
 description: Configure local dev environment with live reload and simple commands
 phase: "environment"
-order: 50
+order: 310
 dependencies: [project-structure]
 outputs: [docs/dev-setup.md]
 conditional: null

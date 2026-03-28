@@ -2,7 +2,7 @@
 name: api-contracts
 description: Specify API contracts for all system interfaces
 phase: "specification"
-order: 15
+order: 830
 dependencies: [review-architecture]
 outputs: [docs/api-contracts.md]
 conditional: "if-needed"

@@ -320,9 +320,9 @@ Plan for quality, security, and operations.
 | `security` | OWASP, threat modeling, security controls |
 | `review-security` | Security review — **highest priority for multi-model validation** |
 
-### Phase 10 — Stories & Reviews (stories)
+### Phase 10 — Platform Parity (parity)
 
-Cross-platform checks.
+Cross-platform parity audits.
 
 | Step | What It Does |
 |------|-------------|

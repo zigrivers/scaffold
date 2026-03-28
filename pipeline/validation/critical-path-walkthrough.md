@@ -2,7 +2,7 @@
 name: critical-path-walkthrough
 description: Walk critical user journeys end-to-end across all specs
 phase: "validation"
-order: 30
+order: 1340
 dependencies: [implementation-plan-review, review-security]
 outputs: [docs/validation/critical-path-walkthrough.md]
 conditional: null

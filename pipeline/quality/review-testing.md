@@ -2,7 +2,7 @@
 name: review-testing
 description: Review testing strategy for coverage gaps and feasibility
 phase: "quality"
-order: 20
+order: 910
 dependencies: [tdd]
 outputs: [docs/reviews/review-testing.md]
 conditional: null

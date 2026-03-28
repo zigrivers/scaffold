@@ -2,7 +2,7 @@
 name: create-evals
 description: Generate project-specific eval checks from standards documentation
 phase: "quality"
-order: 20.5
+order: 920
 dependencies: [tdd]
 outputs: [tests/evals/, docs/eval-standards.md]
 conditional: null

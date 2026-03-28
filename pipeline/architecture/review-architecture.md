@@ -2,7 +2,7 @@
 name: review-architecture
 description: Review system architecture for completeness and downstream readiness
 phase: "architecture"
-order: 12
+order: 720
 dependencies: [system-architecture]
 outputs: [docs/reviews/review-architecture.md]
 conditional: null

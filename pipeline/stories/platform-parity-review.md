@@ -1,8 +1,8 @@
 ---
 name: platform-parity-review
 description: Audit all documentation for platform-specific gaps across target platforms
-phase: "stories"
-order: 63
+phase: "parity"
+order: 1010
 dependencies: [user-stories]
 outputs: [docs/reviews/platform-parity-review.md]
 conditional: "if-needed"

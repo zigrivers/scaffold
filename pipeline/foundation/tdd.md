@@ -2,7 +2,7 @@
 name: tdd
 description: Define testing conventions and TDD standards for the tech stack
 phase: "foundation"
-order: 44
+order: 240
 dependencies: [coding-standards]
 outputs: [docs/tdd-standards.md]
 conditional: null

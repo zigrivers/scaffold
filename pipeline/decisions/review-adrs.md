@@ -2,7 +2,7 @@
 name: review-adrs
 description: Review ADRs for completeness, consistency, and decision quality
 phase: "decisions"
-order: 10
+order: 620
 dependencies: [adrs]
 outputs: [docs/reviews/review-adrs.md]
 conditional: null

@@ -2,7 +2,7 @@
 name: claude-md-optimization
 description: Consolidate and optimize CLAUDE.md for maximum signal density
 phase: "consolidation"
-order: 70
+order: 1110
 dependencies: [git-workflow]
 outputs: [CLAUDE.md]
 conditional: null

@@ -2,7 +2,7 @@
 name: ux-spec
 description: Specify user flows, interaction states, component architecture, accessibility, and responsive behavior
 phase: "specification"
-order: 17
+order: 850
 dependencies: [review-architecture]
 outputs: [docs/ux-spec.md]
 conditional: "if-needed"

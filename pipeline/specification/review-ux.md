@@ -2,7 +2,7 @@
 name: review-ux
 description: Review UX specification for completeness and usability
 phase: "specification"
-order: 18
+order: 860
 dependencies: [ux-spec]
 outputs: [docs/reviews/review-ux.md]
 conditional: "if-needed"
