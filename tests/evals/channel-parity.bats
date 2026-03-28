@@ -4,30 +4,11 @@
 
 setup() {
   load eval_helper
+  source "${BATS_TEST_DIRNAME}/exemptions.bash"
 }
 
 # Pipeline steps that are intentionally command-free (none currently)
 PIPELINE_EXEMPT=()
-
-# Commands that are utility/execution (no pipeline step expected)
-COMMAND_EXEMPT=(
-  "single-agent-start"
-  "single-agent-resume"
-  "multi-agent-start"
-  "multi-agent-resume"
-  "dashboard"
-  "knowledge"
-  "prompt-pipeline"
-  "session-analyzer"
-  "update"
-  "version"
-  "version-bump"
-  "release"
-  "quick-task"
-  "new-enhancement"
-  "prd-gap-analysis"
-  "user-stories-gaps"
-)
 
 is_exempt() {
   local name="$1"

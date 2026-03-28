@@ -4,6 +4,7 @@
 
 setup() {
   load eval_helper
+  source "${BATS_TEST_DIRNAME}/exemptions.bash"
 }
 
 # Commands under this line count are execution stubs — skip structural checks
@@ -50,15 +51,6 @@ MIN_LINES_FOR_STRUCTURE=50
     return 1
   fi
 }
-
-# Utility commands that don't need After This Step
-AFTER_STEP_EXEMPT=(
-  "prompt-pipeline"
-  "session-analyzer"
-  "update"
-  "version"
-  "dashboard"
-)
 
 is_after_exempt() {
   local name="$1"

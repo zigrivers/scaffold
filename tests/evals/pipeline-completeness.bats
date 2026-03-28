@@ -165,6 +165,40 @@ REQUIRED_SECTIONS=("## Purpose" "## Inputs" "## Expected Outputs" "## Quality Cr
   fi
 }
 
+@test "steps with Mode Detection also have Update Mode Specifics (warning)" {
+  local missing=()
+  local checked=0
+
+  while IFS= read -r file; do
+    local mode_section
+    mode_section="$(awk '/^## Mode Detection/{found=1; next} /^## /{if(found) exit} found{print}' "$file")"
+    [[ -z "$mode_section" ]] && continue
+
+    # Skip steps where Mode Detection says "Not applicable"
+    if echo "$mode_section" | grep -qi 'not applicable'; then
+      continue
+    fi
+
+    checked=$((checked + 1))
+
+    if ! grep -q '^## Update Mode Specifics' "$file"; then
+      missing+=("$(basename "$file")")
+    fi
+  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+
+  # Report findings but always pass — this is a tracking metric
+  local present=$(( checked - ${#missing[@]} ))
+  printf "Update Mode Specifics coverage: %d/%d steps with active Mode Detection\n" "$present" "$checked"
+
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    printf "WARNING: %d steps have Mode Detection but no Update Mode Specifics:\n" "${#missing[@]}"
+    printf "  %s\n" "${missing[@]}"
+  fi
+
+  # Always pass — will be tightened in a future WP
+  [[ "$checked" -gt 0 ]]
+}
+
 @test "conditional steps document their conditions in the body" {
   local failures=()
   while IFS= read -r file; do
