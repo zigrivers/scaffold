@@ -328,3 +328,7 @@ An ADR set is likely complete when:
 - **The ADR set covers all layers.** Backend, frontend (if applicable), database, infrastructure, developer tooling, deployment, testing, and security all have decisions recorded.
 - **Status is current.** No accepted ADRs that actually describe how things used to work. Superseded and deprecated ADRs are marked.
 - **Cross-references are complete.** Related ADRs link to each other. ADRs link to the requirements they address.
+
+## See Also
+
+- [tech-stack-selection](../core/tech-stack-selection.md) — Technology selection as ADRs

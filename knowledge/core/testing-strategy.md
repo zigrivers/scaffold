@@ -396,3 +396,7 @@ Initial data loaded into the test database for integration tests. Rules:
 **Skipped tests accumulate.** Tests marked as `skip` or `xit` that are never re-enabled. They represent either dead code or known bugs that nobody addresses. Fix: skipped tests are technical debt. Set a policy: fix or delete within one sprint.
 
 **No test naming convention.** Test descriptions like "test 1," "works correctly," or "handles the thing." Uninformative when tests fail. Fix: test names should describe the scenario and expected outcome: "returns 404 when user does not exist," "applies 10% discount for premium members."
+
+## See Also
+
+- [api-design](../core/api-design.md) — Contract testing patterns

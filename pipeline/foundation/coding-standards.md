@@ -5,6 +5,7 @@ phase: "foundation"
 order: 230
 dependencies: [tech-stack]
 outputs: [docs/coding-standards.md]
+reads: [create-prd]
 conditional: null
 knowledge-base: [coding-conventions]
 ---
@@ -53,3 +54,15 @@ Update mode if docs/coding-standards.md exists. In update mode: preserve naming
 conventions, lint rule customizations, commit message format, and project-specific
 patterns. Never change commit message format without checking git-workflow.md
 and CI config for references.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/coding-standards.md exists
+- **Preserve**: naming conventions, commit message format, lint/formatter
+  configurations, AI-specific coding rules, code review checklist, any
+  project-specific patterns added by the team
+- **Triggers for update**: tech stack changed (new language or framework
+  requires new patterns), new architecture patterns need coding conventions,
+  team identified recurring issues needing new rules
+- **Conflict resolution**: if tech stack added a new framework, add its
+  conventions as a new section rather than modifying existing sections;
+  verify commit format consistency with git-workflow.md before any changes

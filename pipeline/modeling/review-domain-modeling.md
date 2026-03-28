@@ -4,7 +4,7 @@ description: Review domain models for completeness, consistency, and downstream 
 phase: "modeling"
 order: 520
 dependencies: [domain-modeling]
-outputs: [docs/reviews/review-domain-modeling.md]
+outputs: [docs/reviews/review-domain-modeling.md, docs/reviews/domain-modeling/review-summary.md, docs/reviews/domain-modeling/codex-review.json, docs/reviews/domain-modeling/gemini-review.json]
 conditional: null
 knowledge-base: [review-methodology, review-domain-modeling]
 ---

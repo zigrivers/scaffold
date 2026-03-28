@@ -5,6 +5,7 @@ phase: "decisions"
 order: 610
 dependencies: [review-domain-modeling]
 outputs: [docs/adrs/]
+reads: [create-prd, domain-modeling]
 conditional: null
 knowledge-base: [adr-craft]
 ---
@@ -43,3 +44,14 @@ ADR category — tech stack decisions are documented here.
 If docs/adrs/ exists, operate in update mode: review existing ADRs against
 current domain models and requirements. Add new ADRs for undocumented decisions.
 Supersede ADRs whose context has changed.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/adrs/ directory exists with ADR files
+- **Preserve**: existing ADR numbers and titles, accepted decisions and their
+  rationale, supersession chain integrity, index.md decision log
+- **Triggers for update**: domain models changed (new architectural decisions
+  needed), requirements changed (existing decisions may need revisiting),
+  implementation revealed unforeseen trade-offs
+- **Conflict resolution**: never modify an accepted ADR — instead create a new
+  ADR that supersedes it, linking back to the original with explanation of
+  what changed

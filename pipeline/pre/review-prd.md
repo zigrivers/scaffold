@@ -4,7 +4,7 @@ description: Multi-pass review of the PRD for completeness, clarity, and downstr
 phase: "pre"
 order: 120
 dependencies: [create-prd]
-outputs: [docs/reviews/pre-review-prd.md]
+outputs: [docs/reviews/pre-review-prd.md, docs/reviews/prd/review-summary.md, docs/reviews/prd/codex-review.json, docs/reviews/prd/gemini-review.json]
 conditional: null
 knowledge-base: [review-methodology, review-prd, prd-craft, gap-analysis]
 ---

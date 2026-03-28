@@ -6,7 +6,7 @@ order: 1110
 dependencies: [git-workflow]
 outputs: [CLAUDE.md]
 conditional: null
-knowledge-base: []
+knowledge-base: [claude-md-patterns]
 ---
 
 ## Purpose
@@ -54,6 +54,20 @@ scannability.
   consistency pass. Depth 4: add gap analysis. Depth 5: full four-phase audit.
 
 ## Mode Detection
-Always operates in update mode (CLAUDE.md always exists by this point).
-Consolidate and restructure existing content. Do not add new workflow steps or
+Always operates in update mode (CLAUDE.md always exists by this point). Check
+for tracking comment `<!-- scaffold:claude-md-optimization v1 YYYY-MM-DD -->`
+to detect prior optimization. If present, compare current CLAUDE.md against
+the prior version date to identify sections added or changed since last
+optimization. Preserve manually-added sections (user customizations not from
+setup prompts). Only consolidate sections that originated from setup prompts —
+do not restructure user-authored content. Do not add new workflow steps or
 rules — only consolidate and clarify what already exists.
+
+## Update Mode Specifics
+- **Detect prior artifact**: tracking comment in CLAUDE.md with version and date
+- **Preserve**: manually-added sections, user-customized rules, project-specific
+  command aliases, any content not traceable to a pipeline setup prompt
+- **Triggers for update**: new setup prompts have appended sections since last
+  optimization, terminology inconsistencies introduced by incremental additions
+- **Conflict resolution**: if a user-customized section conflicts with a setup
+  prompt's output, keep the user version and flag the conflict in a comment

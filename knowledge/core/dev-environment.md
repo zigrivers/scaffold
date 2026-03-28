@@ -217,3 +217,7 @@ Separate `develop`, `release/*`, `hotfix/*`, `main` branches. Formalized release
 **No Clean Target**: Build artifacts accumulate, stale caches cause mystery failures. Fix: `make clean` removes generated artifacts. `make pristine` removes everything including `node_modules/` for a full reset.
 
 **CI Drift**: CI runs different commands than local dev. Fix: CI calls `make check`. If CI needs extras (artifact upload, deploy), those are separate steps after the quality gate. The gate itself is identical everywhere.
+
+## See Also
+
+- [ai-memory-management](../core/ai-memory-management.md) — Environment setup affects memory hooks

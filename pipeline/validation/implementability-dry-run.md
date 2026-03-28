@@ -4,7 +4,7 @@ description: Dry-run specs as implementing agent, catching ambiguity
 phase: "validation"
 order: 1350
 dependencies: [implementation-plan-review, review-security]
-outputs: [docs/validation/implementability-dry-run.md]
+outputs: [docs/validation/implementability-dry-run.md, docs/validation/implementability-dry-run/review-summary.md, docs/validation/implementability-dry-run/codex-review.json, docs/validation/implementability-dry-run/gemini-review.json]
 conditional: null
 knowledge-base: [implementability-review]
 ---
@@ -34,6 +34,19 @@ when simulating implementation.
 - Findings are actionable (specific file, section, and issue)
 - Severity categorization (P0-P3)
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+
+## Finding Disposition
+- **P0 (blocking)**: Must be resolved before proceeding to implementation. Create
+  fix tasks and re-run affected upstream steps.
+- **P1 (critical)**: Should be resolved; proceeding requires explicit risk acceptance
+  documented in an ADR. Flag to project lead.
+- **P2 (medium)**: Document in implementation plan as tech debt. May defer to
+  post-launch with tracking issue.
+- **P3 (minor)**: Log for future improvement. No action required before implementation.
+
+Findings are reported in the validation output file with severity, affected artifact,
+and recommended resolution. P0/P1 findings block the implementation-plan step from
+proceeding without acknowledgment.
 
 ## Methodology Scaling
 - **deep**: Exhaustive analysis with all sub-checks. Multi-model validation

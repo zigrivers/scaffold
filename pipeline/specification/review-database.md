@@ -4,9 +4,9 @@ description: Review database schema for correctness and completeness
 phase: "specification"
 order: 820
 dependencies: [database-schema]
-outputs: [docs/reviews/review-database.md]
+outputs: [docs/reviews/review-database.md, docs/reviews/database/review-summary.md, docs/reviews/database/codex-review.json, docs/reviews/database/gemini-review.json]
 conditional: "if-needed"
-knowledge-base: [review-methodology, review-database-schema]
+knowledge-base: [review-methodology, review-database-design]
 ---
 
 ## Purpose

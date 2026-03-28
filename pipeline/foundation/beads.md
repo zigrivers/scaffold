@@ -6,7 +6,7 @@ order: 210
 dependencies: []
 outputs: [.beads/, tasks/lessons.md, CLAUDE.md]
 conditional: "if-needed"
-knowledge-base: []
+knowledge-base: [task-tracking]
 ---
 
 ## Purpose
@@ -45,8 +45,24 @@ and autonomous behavior guidelines.
   add full command table and priority docs. Depth 4-5: full setup with cross-doc
   consistency and detailed autonomous behavior rules.
 
+## Conditional Evaluation
+Enable when: project uses Beads task tracking methodology (user selects Beads during
+setup), or user explicitly enables structured task management. Skip when: user prefers
+GitHub Issues, Linear, or another task tracker, or explicitly declines Beads setup.
+
 ## Mode Detection
 Update mode if .beads/ directory exists. In update mode: never re-initialize
 .beads/ (existing task data is irreplaceable), never overwrite tasks/lessons.md
 (only add missing sections), update CLAUDE.md Beads sections in-place preserving
 project-specific customizations.
+
+## Update Mode Specifics
+- **Detect prior artifact**: .beads/ directory exists with data files
+- **Preserve**: all existing task data in .beads/, tasks/lessons.md content
+  (patterns, anti-patterns, gotchas), CLAUDE.md Beads command table
+  customizations, git hook configurations
+- **Triggers for update**: new CLAUDE.md sections need Beads references,
+  Beads CLI version changed requiring command updates, git hooks need
+  reconfiguration after workflow changes
+- **Conflict resolution**: if CLAUDE.md Beads section was manually customized,
+  merge new content around existing customizations rather than replacing

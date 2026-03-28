@@ -43,4 +43,20 @@ step consumes those tokens, it does not redefine them.
   system. Depth 4-5: full specification with accessibility.
 
 ## Mode Detection
-Update mode if spec exists.
+Check for docs/ux-spec.md. If it exists, operate in update mode: read existing
+flows and component hierarchy, diff against updated user stories and system
+architecture. Preserve existing interaction patterns, state machines, and
+component data flow definitions. Add new flows for new user stories or features.
+Update component hierarchy if architecture changed frontend structure. Never
+remove documented accessibility requirements.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/ux-spec.md exists
+- **Preserve**: existing user flows, interaction state machines, component
+  hierarchy, accessibility requirements, responsive breakpoint definitions
+- **Triggers for update**: user stories added or changed, architecture changed
+  frontend components, design system tokens updated, API contracts changed
+  data shapes available to UI
+- **Conflict resolution**: if a user story was rewritten, update its flow
+  in-place rather than creating a duplicate; reconcile component hierarchy
+  changes with existing state machine definitions

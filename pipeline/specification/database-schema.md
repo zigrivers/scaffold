@@ -38,4 +38,19 @@ relationships, indexes, constraints, and migration strategy.
   constraints. Depth 4-5: full specification with migrations.
 
 ## Mode Detection
-Update mode if schema exists. Diff against current domain models.
+Check for docs/database-schema.md. If it exists, operate in update mode: read
+existing schema and diff against current domain models in docs/domain-models/.
+Preserve existing table definitions, relationships, constraints, and migration
+history. Add new entities from updated domain models. Update indexes for new
+query patterns identified in architecture data flows. Never drop existing
+tables without explicit user approval.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/database-schema.md exists
+- **Preserve**: existing table/collection definitions, relationships, constraints,
+  migration history, index justifications, seed data strategy
+- **Triggers for update**: domain models changed (new entities or relationships),
+  ADRs changed database technology, architecture introduced new query patterns
+- **Conflict resolution**: if domain model renamed an entity, create a migration
+  that renames rather than drops and recreates; flag breaking changes for user
+  review

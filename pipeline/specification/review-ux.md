@@ -4,9 +4,9 @@ description: Review UX specification for completeness and usability
 phase: "specification"
 order: 860
 dependencies: [ux-spec]
-outputs: [docs/reviews/review-ux.md]
+outputs: [docs/reviews/review-ux.md, docs/reviews/ux/review-summary.md, docs/reviews/ux/codex-review.json, docs/reviews/ux/gemini-review.json]
 conditional: "if-needed"
-knowledge-base: [review-methodology, review-ux-spec]
+knowledge-base: [review-methodology, review-ux-specification]
 ---
 
 ## Purpose

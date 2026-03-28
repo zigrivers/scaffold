@@ -5,6 +5,7 @@ phase: "planning"
 order: 1210
 dependencies: [tdd, operations, security, review-architecture, create-evals]
 outputs: [docs/implementation-plan.md]
+reads: [create-prd]
 conditional: null
 knowledge-base: [task-decomposition]
 ---
@@ -56,4 +57,21 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
   and sizing. Depth 4-5: full breakdown with parallelization.
 
 ## Mode Detection
-Update mode if tasks exist. Re-derive from updated architecture.
+Check for docs/implementation-plan.md. If it exists, operate in update mode:
+read existing task list and diff against current architecture, user stories,
+and specification documents. Preserve completed task statuses and existing
+dependency relationships. Add new tasks for new stories or architecture
+components. Re-derive wave plan if dependencies changed. Never remove tasks
+that are in-progress or completed.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/implementation-plan.md exists
+- **Preserve**: completed and in-progress task statuses, existing task IDs,
+  dependency relationships for stable tasks, wave assignments for tasks
+  already started, agent allocation history
+- **Triggers for update**: architecture changed (new components need tasks),
+  user stories added or changed, security review identified new requirements,
+  operations runbook added deployment tasks, specification docs changed
+- **Conflict resolution**: if architecture restructured a component that has
+  in-progress tasks, flag for user review rather than silently reassigning;
+  re-derive critical path only for unstarted tasks

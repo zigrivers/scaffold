@@ -4,7 +4,7 @@ description: Review operations runbook for completeness and safety
 phase: "quality"
 order: 940
 dependencies: [operations]
-outputs: [docs/reviews/review-operations.md]
+outputs: [docs/reviews/review-operations.md, docs/reviews/operations/review-summary.md, docs/reviews/operations/codex-review.json, docs/reviews/operations/gemini-review.json]
 conditional: null
 knowledge-base: [review-methodology, review-operations]
 ---

@@ -5,6 +5,7 @@ phase: "architecture"
 order: 710
 dependencies: [review-adrs]
 outputs: [docs/system-architecture.md]
+reads: [create-prd]
 conditional: null
 knowledge-base: [system-architecture]
 ---
@@ -43,3 +44,14 @@ organization. Project directory structure and module organization are defined he
 If outputs already exist, operate in update mode: read existing content, diff
 against current project state and new ADRs, propose targeted updates rather
 than regenerating.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/system-architecture.md exists
+- **Preserve**: component structure, data flow diagrams, module organization,
+  extension points, deployment topology decisions
+- **Triggers for update**: new ADRs introduced (technology or pattern changes),
+  domain models added new bounded contexts, PRD requirements changed system
+  boundaries, implementation revealed architectural gaps
+- **Conflict resolution**: if a new ADR contradicts the current architecture,
+  update the affected components and data flows while preserving unaffected
+  sections; flag breaking changes for user review

@@ -44,8 +44,7 @@ When modifying prompts:
 - Preserve the `# Name (Prompt)` heading convention — this is how prompts are identified
 - Keep the Setup Order table at the top in sync with the actual prompt sections below
 - Respect inter-prompt dependencies (documented in the dependency graph at line ~128)
-- Each prompt's "Process" section at the end defines its execution rules — don't remove these
-- After editing `prompts.md`, update the corresponding file in `commands/` to stay in sync (frontmatter + "After This Step" sections are maintained in `commands/` only, not in `prompts.md`)
+- After editing pipeline steps in `pipeline/`, rebuild commands with `scaffold build` to keep `commands/` in sync
 - Every document-creating prompt has a **Mode Detection** block and **Update Mode Specifics** block — when modifying prompts, preserve these blocks and keep them positioned after the opening paragraph and before the first content section
 - When adding a new document-creating prompt, include Mode Detection + Update Mode Specifics following the same pattern as existing prompts (check any existing prompt for the template)
 

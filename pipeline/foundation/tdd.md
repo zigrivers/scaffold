@@ -5,6 +5,7 @@ phase: "foundation"
 order: 240
 dependencies: [coding-standards]
 outputs: [docs/tdd-standards.md]
+reads: [create-prd]
 conditional: null
 knowledge-base: [testing-strategy]
 ---
@@ -40,4 +41,20 @@ code they write and establishes testing standards before implementation begins.
 - **custom:depth(1-5)**: Scale detail with depth.
 
 ## Mode Detection
-Update mode if strategy exists.
+Check for docs/tdd-standards.md. If it exists, operate in update mode: read
+existing strategy and diff against current tech stack, coding standards, and
+PRD. Preserve testing patterns, layer definitions, custom assertions, and test
+data strategy. Update coverage goals if PRD scope or tech stack changed.
+Re-generate only sections affected by upstream changes — do not rewrite
+stable layer definitions or custom assertion patterns.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/tdd-standards.md exists
+- **Preserve**: test pyramid layer definitions, custom assertion helpers, test
+  data strategy, quality gate thresholds, framework-specific patterns
+- **Triggers for update**: tech-stack.md changed (new test runner or framework),
+  coding-standards.md changed (naming conventions), PRD scope expanded (new
+  features needing test scenarios)
+- **Conflict resolution**: if tech stack changed test runner, migrate pattern
+  examples to new runner syntax; preserve coverage targets unless user requests
+  adjustment

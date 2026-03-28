@@ -31,6 +31,7 @@ vi.mock('../../state/state-manager.js', () => ({
       next_eligible: [],
       'extra-steps': [],
     })),
+    reconcileWithPipeline: vi.fn(() => false),
   })),
 }))
 
@@ -103,6 +104,7 @@ function mockStateWith(
     loadState: vi.fn(
       () => makeState({ steps, ...overrides }) as unknown as LoadReturn,
     ),
+    reconcileWithPipeline: vi.fn(() => false),
   }) as unknown as InstanceType<typeof StateManager>)
 }
 
@@ -156,6 +158,7 @@ describe('status command', () => {
       loadState: vi.fn(
         () => makeState() as unknown as LoadReturn,
       ),
+      reconcileWithPipeline: vi.fn(() => false),
     }) as unknown as InstanceType<typeof StateManager>)
   })
 
@@ -287,6 +290,42 @@ describe('status command', () => {
     expect(parsed.progress.pending).toBe(1)
     expect(parsed.progress.inProgress).toBe(1)
     expect(parsed.progress.total).toBe(6)
+  })
+
+  it('calls reconcileWithPipeline to add new pipeline steps to state', async () => {
+    const metaPrompts = new Map([
+      ['step-a', makeFrontmatter('step-a', 'quality', 900)],
+      ['step-b', makeFrontmatter('step-b', 'quality', 910)],
+      ['story-tests', makeFrontmatter('story-tests', 'quality', 915)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
+
+    // State only has step-a and step-b; story-tests is missing
+    const steps = {
+      'step-a': { status: 'completed', source: 'pipeline', produces: [] },
+      'step-b': { status: 'pending', source: 'pipeline', produces: [] },
+    }
+    // Track reconcileWithPipeline calls
+    const reconcileFn = vi.fn(() => false)
+    type LoadReturn = ReturnType<InstanceType<typeof StateManager>['loadState']>
+    MockStateManager.mockImplementation(() => ({
+      loadState: vi.fn(
+        () => makeState({ steps }) as unknown as LoadReturn,
+      ),
+      reconcileWithPipeline: reconcileFn,
+    }) as unknown as InstanceType<typeof StateManager>)
+
+    await statusCommand.handler(defaultArgv())
+
+    // Verify reconcileWithPipeline was called with pipeline steps
+    expect(reconcileFn).toHaveBeenCalledTimes(1)
+    const pipelineArg = reconcileFn.mock.calls[0][0] as Array<{ slug: string }>
+    const slugs = pipelineArg.map((s: { slug: string }) => s.slug)
+    expect(slugs).toContain('story-tests')
+    expect(slugs).toContain('step-a')
+    expect(slugs).toContain('step-b')
   })
 
   describe('--compact flag', () => {

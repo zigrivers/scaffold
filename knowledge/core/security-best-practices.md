@@ -521,3 +521,7 @@ Protect against compromised dependencies:
 **No rate limiting.** Login endpoints with unlimited attempts allow brute-force password attacks. API endpoints with no rate limits allow denial of service. Fix: implement rate limiting on all public endpoints. Start with conservative limits. Use exponential backoff for authentication failures.
 
 **Ignoring dependency vulnerabilities.** Running `npm audit` shows 47 vulnerabilities but nobody addresses them because "they're all low severity." Fix: set a policy and enforce it in CI. Critical and high vulnerabilities block deployment. Medium vulnerabilities have a SLA for resolution.
+
+## See Also
+
+- [operations-runbook](../core/operations-runbook.md) — Logging and monitoring sensitive data

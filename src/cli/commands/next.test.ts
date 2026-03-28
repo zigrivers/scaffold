@@ -31,6 +31,7 @@ vi.mock('../../state/state-manager.js', () => ({
       next_eligible: [],
       'extra-steps': [],
     })),
+    reconcileWithPipeline: vi.fn(() => false),
   })),
 }))
 
@@ -101,6 +102,7 @@ function mockStateWith(
     loadState: vi.fn(
       () => makeState({ steps }) as unknown as LoadReturn,
     ),
+    reconcileWithPipeline: vi.fn(() => false),
   }) as unknown as InstanceType<typeof StateManager>)
 }
 
@@ -158,6 +160,7 @@ describe('next command', () => {
       loadState: vi.fn(
         () => makeState() as unknown as LoadReturn,
       ),
+      reconcileWithPipeline: vi.fn(() => false),
     }) as unknown as InstanceType<typeof StateManager>)
   })
 

@@ -43,3 +43,12 @@ This is the foundation document that all subsequent phases reference.
 If docs/plan.md exists, operate in update mode: read existing content, identify
 what has changed or been learned since it was written, propose targeted updates.
 Preserve existing decisions unless explicitly revisiting them.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/plan.md exists
+- **Preserve**: problem statement, existing feature definitions, success criteria,
+  user personas, and scope boundaries unless user explicitly requests changes
+- **Triggers for update**: user provides new requirements, scope adjustment
+  requested, constraints changed (timeline, budget, team), new user research
+- **Conflict resolution**: new features are appended to the feature list with
+  clear versioning; changed constraints are documented with rationale for change

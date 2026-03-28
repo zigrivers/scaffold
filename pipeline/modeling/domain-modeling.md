@@ -5,6 +5,7 @@ phase: "modeling"
 order: 510
 dependencies: [review-user-stories]
 outputs: [docs/domain-models/]
+reads: [coding-standards]
 conditional: null
 knowledge-base: [domain-modeling]
 ---
@@ -55,3 +56,14 @@ and aggregate boundaries. User actions reveal the domain model.
 If docs/domain-models/ exists, operate in update mode: read existing models,
 identify changes needed based on updated PRD or new understanding. Preserve
 existing decisions unless explicitly revisiting them.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/domain-models/ directory exists with model files
+- **Preserve**: existing entity definitions, aggregate boundaries, domain events,
+  invariants, ubiquitous language terms, bounded context interfaces
+- **Triggers for update**: PRD features added or changed, user stories revealed
+  new domain concepts, innovation suggestions accepted new capabilities,
+  implementation revealed modeling gaps
+- **Conflict resolution**: if a new feature introduces an entity name that
+  conflicts with existing ubiquitous language, resolve by renaming the new
+  entity and documenting the distinction; never silently merge aggregates

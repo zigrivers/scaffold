@@ -17,6 +17,7 @@ Check if `docs/reviews/review-operations.md` already exists:
 3. Run all review passes again on the current operations runbook
 4. Focus on: remaining unresolved findings, regressions from fixes, and any new deployment or monitoring sections added since the last review
 5. Update the review report rather than replacing it — preserve the fix history
+6. If multi-model review artifacts exist under `docs/reviews/operations/` (e.g., `review-summary.md`, `codex-review.json`, `gemini-review.json`), preserve prior findings still valid.
 
 ## Review Process
 

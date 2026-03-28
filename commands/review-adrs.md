@@ -17,6 +17,7 @@ Check if `docs/reviews/review-adrs.md` already exists:
 3. Run all review passes again on the current ADR set
 4. Focus on: remaining unresolved findings, regressions from fixes, and any new ADRs added since the last review
 5. Update the review report rather than replacing it — preserve the fix history
+6. If multi-model review artifacts exist under `docs/reviews/adrs/` (e.g., `review-summary.md`, `codex-review.json`, `gemini-review.json`), preserve prior findings still valid.
 
 ## Review Process
 

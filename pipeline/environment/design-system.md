@@ -50,7 +50,24 @@ professional UI without requiring design expertise from the user.
   forms, cards, spacing. Depth 4: add navigation, data display, layout. Depth 5:
   full suite with dark mode and accessibility.
 
+## Conditional Evaluation
+Enable when: tech-stack.md includes a frontend framework (React, Vue, Angular, Svelte,
+etc.), plan.md describes a UI-based application, or project targets web/mobile
+platforms. Skip when: project is backend-only, a CLI tool, or a library with no UI.
+
 ## Mode Detection
 Update mode if docs/design-system.md exists. In update mode: never change color
 values, font families, or spacing scales without user approval. Preserve all
 theme config file customizations.
+
+## Update Mode Specifics
+- **Detect prior artifact**: docs/design-system.md exists
+- **Preserve**: color palette, typography scale, spacing scale, existing
+  component patterns, theme configuration files, dark mode token values,
+  responsive breakpoint definitions
+- **Triggers for update**: new UI features need new component patterns, UX spec
+  requires additional interaction states, accessibility audit identified contrast
+  issues, user requests design direction change
+- **Conflict resolution**: if a new component pattern conflicts with existing
+  token usage, extend the token set rather than modifying existing values;
+  always verify WCAG AA compliance after any color changes

@@ -4,7 +4,7 @@ description: Review ADRs for completeness, consistency, and decision quality
 phase: "decisions"
 order: 620
 dependencies: [adrs]
-outputs: [docs/reviews/review-adrs.md]
+outputs: [docs/reviews/review-adrs.md, docs/reviews/adrs/review-summary.md, docs/reviews/adrs/codex-review.json, docs/reviews/adrs/gemini-review.json]
 conditional: null
 knowledge-base: [review-methodology, review-adr]
 ---

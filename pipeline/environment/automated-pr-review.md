@@ -47,7 +47,24 @@ entire review-fix loop locally.
   + single-CLI review. Depth 4: add dual-model review. Depth 5: full suite
   with all options and legacy cleanup.
 
+## Conditional Evaluation
+Enable when: project uses GitHub for version control, team size > 1 or CI/CD is
+configured, or git-workflow.md establishes a PR-based workflow. Skip when: solo
+developer with no CI, depth < 3, or project uses a non-GitHub VCS host.
+
 ## Mode Detection
 Update mode if AGENTS.md exists. In update mode: preserve custom review rules,
 reviewer bot name, and round cap settings. Detect legacy GitHub Actions
 workflows (code-review-trigger.yml, code-review-handler.yml) and offer removal.
+
+## Update Mode Specifics
+- **Detect prior artifact**: AGENTS.md exists
+- **Preserve**: custom review rules, reviewer bot configuration, round cap
+  settings, severity definitions in docs/review-standards.md, CLI review
+  script customizations
+- **Triggers for update**: coding-standards.md changed (new review criteria),
+  tdd-standards.md changed (coverage expectations), new external reviewer
+  CLI became available, git-workflow.md changed PR workflow steps
+- **Conflict resolution**: if review criteria changed in coding-standards.md,
+  update AGENTS.md review rules to match; if both CLI reviewers are now
+  available, offer to enable dual-model review
