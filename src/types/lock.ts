@@ -1,4 +1,4 @@
-export type LockableCommand = 'run' | 'skip' | 'init' | 'reset' | 'adopt'
+export type LockableCommand = 'run' | 'skip' | 'init' | 'reset' | 'adopt' | 'complete'
 
 export interface LockFile {
   holder: string
