@@ -1,6 +1,6 @@
 # Scaffold
 
-A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 51 structured pipeline steps — organized into 14 phases — and Claude Code handles the research, planning, and implementation for you.
+A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 54 structured pipeline steps — organized into 15 phases — and Claude Code handles the research, planning, and implementation for you.
 
 By the end, you'll have a fully planned, standards-documented, implementation-ready project with working code.
 
@@ -188,21 +188,29 @@ scaffold init
 
 The init wizard detects your project type and walks you through choosing a methodology preset. It creates `.scaffold/` with your config, state, and decisions log.
 
-**2. Define your product**
+**2. Define your product vision**
 
 ```bash
-scaffold run create-prd
+scaffold run create-vision
 ```
 
 Or in Claude Code:
 
 ```
-/scaffold:create-prd I want to build a recipe sharing app where users can save, organize, and share recipes with friends
+/scaffold:create-vision I want to build a recipe sharing app where users can save, organize, and share recipes with friends
 ```
 
-Claude asks clarifying questions about your idea, researches best practices, and produces a detailed product requirements document. This becomes the foundation that all later steps build on.
+Claude asks strategic questions about your idea, researches the competitive landscape, and produces a vision document. This becomes the North Star that all later steps build on.
 
-**3. See what's next**
+**3. Create your PRD**
+
+```bash
+scaffold run create-prd
+```
+
+Claude translates the vision into detailed product requirements — features, user personas, success criteria, and scope boundaries.
+
+**4. See what's next**
 
 ```bash
 scaffold next
@@ -210,7 +218,7 @@ scaffold next
 
 Scaffold shows you which steps are now unblocked based on the dependency graph.
 
-**4. Keep following the pipeline**
+**5. Keep following the pipeline**
 
 ```bash
 scaffold run review-prd
@@ -221,6 +229,16 @@ scaffold run user-stories
 Each step tells you what to run next. Use `scaffold status` at any time to see the full pipeline state, `scaffold status --compact` for just the remaining work, or `scaffold dashboard` to open a visual progress dashboard in your browser.
 
 ## The Pipeline
+
+### Phase 0 — Product Vision (vision)
+
+Define why you're building it.
+
+| Step | What It Does |
+|------|-------------|
+| `create-vision` | Creates a strategic product vision document from your idea |
+| `review-vision` | Structured review of the vision for clarity, coherence, and downstream readiness |
+| `innovate-vision` | Strategic innovation pass on market positioning and opportunities *(optional)* |
 
 ### Phase 1 — Product Definition (pre)
 
