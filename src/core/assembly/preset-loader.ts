@@ -1,8 +1,10 @@
 import type { MethodologyPreset } from '../../types/index.js'
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
-import type { ScaffoldWarning } from '../../types/index.js'
 import { fileExists } from '../../utils/fs.js'
-import { presetMissing, presetParseError, presetInvalidStep, presetMissingStep, presetUnmetDependency } from '../../utils/errors.js'
+import {
+  presetMissing, presetParseError, presetInvalidStep,
+  presetMissingStep, presetUnmetDependency,
+} from '../../utils/errors.js'
 import yaml from 'js-yaml'
 import fs from 'node:fs'
 import path from 'node:path'

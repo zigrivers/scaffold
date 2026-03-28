@@ -277,7 +277,9 @@ export function presetMissingStep(step: string, preset: string): ScaffoldWarning
 export function presetUnmetDependency(step: string, dependency: string, preset: string): ScaffoldWarning {
   return {
     code: 'PRESET_UNMET_DEPENDENCY',
-    message: `Step "${step}" is enabled in preset "${preset}" but its dependency "${dependency}" is disabled. The engine will treat this as satisfied, but the step may produce lower quality output without "${dependency}".`,
+    message: `Step "${step}" is enabled in preset "${preset}" but its dependency ` +
+      `"${dependency}" is disabled. The engine treats this as satisfied, ` +
+      `but the step may produce lower quality output.`,
     context: { step, dependency, preset },
   }
 }
