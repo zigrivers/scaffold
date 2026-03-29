@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.38.1] — 2026-03-29
+
+### Fixed
+
+- **`scaffold complete`** — Now records `at` timestamp and `completed_by: 'user'` when marking steps as completed. Previously these fields were missing, causing the dashboard to show "—" for completion date on manually completed steps.
+
 ## [2.38.0] — 2026-03-29
 
 ### Added
