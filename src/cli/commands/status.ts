@@ -209,7 +209,11 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       output.info(`\nNext eligible: ${nextEligibleList}`)
 
       if (staleCommandCount > 0) {
-        output.warn(`\n⚠ ${staleCommandCount} commands are stale (pipeline/knowledge sources modified after last build). Run \`scaffold build\` to update.`)
+        output.warn(
+          `\n⚠ ${staleCommandCount} commands are stale` +
+          ' (pipeline/knowledge sources modified after last build).' +
+          ' Run `scaffold build` to update.',
+        )
       }
     }
 
