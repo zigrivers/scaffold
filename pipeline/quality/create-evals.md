@@ -5,7 +5,7 @@ phase: "quality"
 order: 920
 dependencies: [tdd, story-tests]
 outputs: [tests/evals/, docs/eval-standards.md]
-reads: []
+reads: [security, dev-env-setup, api-contracts, database-schema, ux-spec]
 conditional: null
 knowledge-base: [eval-craft, testing-strategy]
 ---
@@ -70,6 +70,7 @@ Supporting:
 - (deep) Adherence, security, and error-handling evals include exclusion mechanisms
 - (deep) docs/eval-standards.md explicitly documents what evals do NOT check
 - (deep) Full eval suite runs in under 30 seconds
+- (mvp) `make eval` (or equivalent) runs and all generated evals pass
 
 ## Methodology Scaling
 - **deep**: All 13 eval categories (conditional on doc existence). Stack-specific

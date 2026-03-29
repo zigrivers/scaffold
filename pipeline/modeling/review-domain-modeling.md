@@ -34,6 +34,9 @@ independent review validation.
 - Fix plan created for P0 and P1 findings
 - Fixes applied and re-validated
 - Downstream readiness confirmed (decisions phase can proceed)
+- Entity coverage verified (every PRD feature maps to at least one entity)
+- Aggregate boundaries verified (each aggregate protects at least one invariant)
+- Ubiquitous language consistency verified across all domain model files
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling
@@ -52,3 +55,10 @@ If docs/reviews/review-domain-modeling.md exists, this is a re-review. Read prev
 findings, check which were addressed, run review passes again on updated models.
 If multi-model review artifacts exist under docs/reviews/domain-modeling/,
 preserve prior findings still valid.
+
+## Update Mode Specifics
+
+- **Detect**: `docs/reviews/review-domain-modeling.md` exists with tracking comment
+- **Preserve**: Prior findings still valid, resolution decisions, multi-model review artifacts
+- **Triggers**: Upstream artifact changed since last review (compare tracking comment dates)
+- **Conflict resolution**: Previously resolved findings reappearing = regression; flag and re-evaluate

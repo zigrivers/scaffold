@@ -5,6 +5,7 @@
 
 setup() {
   load eval_helper
+  source "${BATS_TEST_DIRNAME}/exemptions.bash"
 }
 
 # Build the transitive closure of dependencies for a given step name.
@@ -43,8 +44,8 @@ get_transitive_deps() {
   echo "$visited"
 }
 
-@test "reads fields reference steps reachable through transitive dependencies (warning)" {
-  local unreachable=()
+@test "reads fields reference steps reachable through transitive dependencies or phase ordering" {
+  local violations=()
   local checked=0
 
   while IFS= read -r file; do
@@ -57,27 +58,50 @@ get_transitive_deps() {
     local trans_deps
     trans_deps="$(get_transitive_deps "$name")"
 
+    local reader_phase reader_phase_num
+    reader_phase="$(extract_field "$file" "phase")"
+    reader_phase_num="$(get_phase_number "$reader_phase")"
+
     while IFS= read -r read_ref; do
       [[ -z "$read_ref" ]] && continue
       checked=$((checked + 1))
 
-      if ! echo "$trans_deps" | grep -qx "$read_ref"; then
-        unreachable+=("${name}: reads '${read_ref}' not in transitive dependency closure")
+      # Already in transitive closure — OK
+      if echo "$trans_deps" | grep -qx "$read_ref"; then
+        continue
       fi
+
+      # Check exemption list (legitimate phase-ordering reads)
+      if is_phase_ordering_exempt "$name" "$read_ref"; then
+        continue
+      fi
+
+      # Check implicit phase ordering: target must be in same or earlier phase
+      local target_file target_phase target_phase_num
+      target_file="$(find "${PROJECT_ROOT}/pipeline" -name "${read_ref}.md" -type f | head -1)"
+      if [[ -n "$target_file" ]]; then
+        target_phase="$(extract_field "$target_file" "phase")"
+        target_phase_num="$(get_phase_number "$target_phase")"
+
+        # Same or earlier phase — implicit ordering makes it safe
+        if [[ "$target_phase_num" -le "$reader_phase_num" ]]; then
+          continue
+        fi
+      fi
+
+      # If we get here, this is a real violation
+      violations+=("${name}: reads '${read_ref}' not reachable (not in deps, not in earlier phase, not exempt)")
     done <<< "$reads_raw"
   done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
 
-  # Report findings — this is a tracking metric, not a hard failure
-  # Many reads entries reference earlier-phase steps through implicit ordering
-  local reachable=$(( checked - ${#unreachable[@]} ))
-  printf "Data flow coverage: %d/%d reads entries are transitively reachable\n" "$reachable" "$checked"
+  local reachable=$(( checked - ${#violations[@]} ))
+  printf "Data flow coverage: %d/%d reads entries are valid\n" "$reachable" "$checked"
 
-  if [[ ${#unreachable[@]} -gt 0 ]]; then
-    printf "WARNING: %d reads entries not in transitive dependency closure (implicit phase ordering):\n" "${#unreachable[@]}"
-    printf "  %s\n" "${unreachable[@]}"
+  if [[ ${#violations[@]} -gt 0 ]]; then
+    printf "Data flow violations (%d):\n" "${#violations[@]}"
+    printf "  %s\n" "${violations[@]}"
+    return 1
   fi
 
-  # Always pass — reads can reference steps through implicit phase ordering
-  # that isn't captured in the explicit dependency graph
   [[ "$checked" -gt 0 ]]
 }

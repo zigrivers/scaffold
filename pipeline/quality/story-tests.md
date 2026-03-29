@@ -5,7 +5,7 @@ phase: "quality"
 order: 915
 dependencies: [tdd, review-user-stories, review-architecture]
 outputs: [tests/acceptance/, docs/story-tests-map.md]
-reads: [tech-stack, coding-standards, project-structure]
+reads: [tech-stack, coding-standards, project-structure, api-contracts, database-schema, ux-spec]
 conditional: null
 knowledge-base: [testing-strategy, user-stories]
 ---

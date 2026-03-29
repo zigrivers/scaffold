@@ -9,6 +9,19 @@ Key personas may use desktop/laptop as their primary device. If the PRD specifie
 
 Review all project documentation to ensure every target platform is thoroughly addressed. Identify gaps where one platform was assumed but another wasn't considered.
 
+## Mode Detection
+
+Check for prior platform parity review artifacts:
+
+| Check | Look for |
+|-------|----------|
+| Review report | `docs/reviews/platform-parity-review.md` with `<!-- scaffold:platform-parity-review -->` |
+| Detailed summary | `docs/reviews/platform-parity/review-summary.md` |
+| Multi-model artifacts | `docs/reviews/platform-parity/codex-review.json` and `docs/reviews/platform-parity/gemini-review.json` |
+
+- **If found → UPDATE MODE**: Read prior findings, check what was addressed, focus on regressions and new platform gaps
+- **If not found → FRESH MODE**: Perform full platform parity analysis from scratch
+
 ---
 
 ## Phase 1: Establish Platform Context

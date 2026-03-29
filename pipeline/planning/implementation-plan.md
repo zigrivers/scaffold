@@ -5,7 +5,7 @@ phase: "planning"
 order: 1210
 dependencies: [tdd, operations, security, review-architecture, create-evals]
 outputs: [docs/implementation-plan.md]
-reads: [create-prd, story-tests]
+reads: [create-prd, story-tests, database-schema, api-contracts, ux-spec]
 conditional: null
 knowledge-base: [task-decomposition]
 ---
@@ -17,9 +17,9 @@ have clear inputs/outputs, and be small enough for a single agent session.
 The primary mapping is Story → Task(s), with PRD as the traceability root.
 
 ## Inputs
-- docs/system-architecture.md (required) — components to implement
-- docs/domain-models/ (required) — domain logic to implement
-- docs/adrs/ (required) — technology constraints
+- docs/system-architecture.md (optional — not available in MVP) — components to implement
+- docs/domain-models/ (optional — not available in MVP) — domain logic to implement
+- docs/adrs/ (optional — not available in MVP) — technology constraints
 - docs/plan.md (required) — features to trace tasks back to
 - docs/user-stories.md (required) — stories to derive tasks from
 - docs/tdd-standards.md (required) — testing requirements to incorporate into tasks
@@ -54,8 +54,11 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 - **deep**: Detailed task breakdown with story-to-task tracing. Dependency graph.
   Sizing estimates. Parallelization plan. Agent context requirements per task.
   Phased delivery milestones.
-- **mvp**: Ordered task list with brief descriptions. Key dependencies noted.
-  Enough to start working sequentially.
+- **mvp**: Ordered task list derived from PRD features and user stories only
+  (architecture, domain models, and ADRs are not available at this depth).
+  Each task has a brief description, rough size estimate, and key dependency.
+  Enough to start working sequentially. Skip architecture decomposition —
+  work directly from user story acceptance criteria.
 - **custom:depth(1-5)**: Depth 1-2: ordered list. Depth 3: add dependencies
   and sizing. Depth 4-5: full breakdown with parallelization.
 

@@ -5,6 +5,8 @@ long-description: "Reads domain models and ADRs, then creates docs/system-archit
 
 Read `docs/domain-models/`, `docs/adrs/`, and `docs/plan.md`, then design and document the system architecture. Create `docs/system-architecture.md` translating domain models and ADR decisions into a concrete component structure, data flows, and module organization.
 
+> **Note:** This command produces full-depth output. For lighter execution at a specific methodology depth, use the pipeline engine with presets.
+
 ## Mode Detection
 
 Before starting, check if `docs/system-architecture.md` already exists:
@@ -163,7 +165,7 @@ When this step is complete, tell the user:
 ---
 **Phase 3 in progress** — `docs/system-architecture.md` created with component design, data flows, and module structure.
 
-**Next:** Run `/scaffold:database-schema` (if project uses a database) or `/scaffold:api-contracts` (if project exposes APIs) — begin specification phase.
+**Next:** Run `/scaffold:review-architecture` — Review the architecture for domain coverage, ADR compliance, and data flow completeness. Then proceed to `/scaffold:database-schema` (if project uses a database) or `/scaffold:api-contracts` (if project exposes APIs) to begin the specification phase.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

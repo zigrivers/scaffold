@@ -5,6 +5,8 @@ long-description: "Reviews all validation phase findings, applies prioritized fi
 
 Apply all validation phase findings as prioritized fixes, re-validate the results, and freeze every documentation artifact for implementation. After freeze, only typo fixes and implementation-gap discoveries are allowed.
 
+> **Note:** This command produces full-depth output. For lighter execution at a specific methodology depth, use the pipeline engine with presets.
+
 ## Mode Detection
 
 Before starting, check if `docs/validation/fix-log.md` already exists:

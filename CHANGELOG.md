@@ -2,6 +2,47 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.34.0] — 2026-03-29
+
+### Added
+
+- **Round 2 alignment audit** — Comprehensive 8-module audit with 203 findings (7 BROKEN, 38 MISALIGNED, 63 MISSING, 95 WEAK), all addressed
+- **Vision steps in methodology presets** — All 3 vision steps now appear in mvp.yml, deep.yml, and custom-defaults.yml (Phase 0 section)
+- **Methodology depth documentation** — New `methodology/README.md` explaining depth levels 1-5, preset philosophy, and depth tag semantics
+- **Update Mode Specifics for 15 pipeline steps** — All 13 review steps and 3 finalization steps now have complete 4-field Update Mode Specifics blocks (Detect, Preserve, Triggers, Conflict resolution)
+- **`review-vision` knowledge entry** — New knowledge entry with 5 vision-specific review passes, severity examples, and finding report template
+- **Multi-model dispatch knowledge** — Added `multi-model-review-dispatch` to 9 pipeline steps (6 validation, 2 innovation, tech-stack) that reference depth 4+ dispatch
+- **4 new eval tests** — `build-drift.bats` (command freshness), `exemption-audit.bats` (exemption list bounds), `preset-exhaustiveness.bats` (preset coverage), and phase-sync eval in pipeline-completeness
+- **Data flow hard gate** — `data-flow.bats` promoted from warning-only to hard failure with phase-ordering exemption list
+- **14 missing quality criteria** — Added output-to-criterion mappings for linter config validity, .gitkeep scaffolding, CI YAML validity, `make eval` execution, freeze markers, handoff format, and more
+
+### Changed
+
+- **MVP path coherence** — `implementation-plan` and `implementation-playbook` now have explicit MVP-mode instructions for working without architecture/domain models. Required inputs downgraded to optional where unavailable in MVP.
+- **Agent start/resume commands** — All 4 commands now prioritize playbook over plan, reference onboarding guide, test skeletons, and `make eval` as quality gate
+- **new-enhancement command** — Now updates implementation playbook and handles frozen artifact amendments
+- **quick-task command** — Now references playbook quality gates and eval gate
+- **8 After This Step corrections** — Commands now recommend review steps before specification steps (create-prd→review-prd, domain-modeling→review-domain-modeling, system-architecture→review-architecture, etc.)
+- **13 commands gain depth note** — All 15 representative commands now carry "use pipeline engine with presets for lighter execution" note
+- **19 methodology scaling sections** — Replaced generic "scale with depth" text with step-specific depth breakdowns for 4 finalization steps, 7 validation steps, 6 review steps, and 2 innovation steps
+- **11 vague quality criteria replaced** — Measurable thresholds for vision conciseness, competitive honesty, guiding principles, anti-vision specificity, code review checklist actionability, and more
+- **6 steps gain depth-tagged criteria** — create-prd, create-vision, user-stories, adrs, innovate-prd, innovate-user-stories now have (mvp)/(deep) tags
+- **22 missing reads[] entries added** — Closes data flow gaps across dev-env-setup, project-structure, operations, workflow-audit, create-evals, tdd, story-tests, implementation-plan, security, ux-spec, and 10 more
+- **Mode Detection alignment** — automated-pr-review and ai-memory-setup pipeline detection now matches command logic (existence-first, then tracking comment)
+- **3 topic inconsistencies fixed** — `cicd`→`ci-cd`, `responsive`→`responsive-design`, `adrs`→`adr`
+- **3 knowledge entries gain Summary/Deep Guidance** — gap-analysis, review-domain-modeling, review-system-architecture restructured for CLI assembly optimization
+- **custom-defaults.yml comment** — Now accurately states "Most steps enabled by default" (was "All steps enabled")
+- **Eval system hardened** — Dynamic FINALIZATION_COMMANDS derivation, `validate_exempt_terminal_outputs` now invoked, stemming in build-drift description matching
+
+### Fixed
+
+- **review-testing race condition** — Added `system-architecture` to dependencies (was only in reads, which doesn't enforce ordering in parallel execution)
+- **innovate-prd missing output** — Added `docs/plan.md` to outputs array
+- **platform-parity-review impossible input** — Marked `docs/implementation-plan.md` as unavailable (runs before implementation-plan)
+- **review-domain-modeling had zero domain-specific criteria** — Added entity coverage, aggregate boundary, and ubiquitous language checks
+- **platform-parity-review missing review-methodology** — Added to knowledge-base
+- **platform-parity-review command missing Mode Detection** — Added full detection section with output path references
+
 ## [2.33.0] — 2026-03-29
 
 ### Added

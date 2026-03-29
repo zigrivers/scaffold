@@ -6,7 +6,7 @@ order: 1330
 dependencies: [implementation-plan-review, review-security]
 outputs: [docs/validation/decision-completeness.md, docs/validation/decision-completeness/review-summary.md, docs/validation/decision-completeness/codex-review.json, docs/validation/decision-completeness/gemini-review.json]
 conditional: null
-knowledge-base: [decision-completeness]
+knowledge-base: [decision-completeness, multi-model-review-dispatch]
 ---
 
 ## Purpose
@@ -55,9 +55,7 @@ proceeding without acknowledgment.
   dispatched to Codex and Gemini if available, with graceful fallback to
   Claude-only enhanced validation.
 - **mvp**: High-level scan for blocking issues only.
-- **custom:depth(1-5)**: Depth 1-3: scale thoroughness with depth. Depth 4:
-  full analysis + one external model (if CLI available). Depth 5: full
-  analysis + multi-model with reconciliation.
+- **custom:depth(1-5)**: Depth 1: verify each major tech choice has an ADR. Depth 2: add alternatives-considered check. Depth 3: full ADR completeness audit (rationale, consequences, status). Depth 4: add external model review of decision quality. Depth 5: multi-model reconciliation of decision coverage.
 
 ## Mode Detection
 Not applicable — validation always runs fresh against current artifacts. If

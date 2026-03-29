@@ -1,7 +1,7 @@
 ---
 name: operations-runbook
 description: Deployment pipeline, deployment strategies, monitoring, alerting, and incident response
-topics: [operations, cicd, deployment, monitoring, incident-response, alerting, rollback]
+topics: [operations, ci-cd, deployment, monitoring, incident-response, alerting, rollback]
 ---
 
 ## Summary

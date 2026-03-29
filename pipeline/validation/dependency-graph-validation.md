@@ -6,7 +6,7 @@ order: 1360
 dependencies: [implementation-plan-review, review-security]
 outputs: [docs/validation/dependency-graph-validation.md, docs/validation/dependency-graph-validation/review-summary.md, docs/validation/dependency-graph-validation/codex-review.json, docs/validation/dependency-graph-validation/gemini-review.json]
 conditional: null
-knowledge-base: [dependency-validation]
+knowledge-base: [dependency-validation, multi-model-review-dispatch]
 ---
 
 ## Purpose
@@ -56,9 +56,7 @@ proceeding without acknowledgment.
   dispatched to Codex and Gemini if available, with graceful fallback to
   Claude-only enhanced validation.
 - **mvp**: High-level scan for blocking issues only.
-- **custom:depth(1-5)**: Depth 1-3: scale thoroughness with depth. Depth 4:
-  full analysis + one external model (if CLI available). Depth 5: full
-  analysis + multi-model with reconciliation.
+- **custom:depth(1-5)**: Depth 1: cycle detection and basic ordering check. Depth 2: add transitive dependency completeness. Depth 3: full DAG validation with critical path identification and parallelization opportunities. Depth 4: add external model review. Depth 5: multi-model validation with optimization recommendations.
 
 ## Mode Detection
 Not applicable — validation always runs fresh against current artifacts. If

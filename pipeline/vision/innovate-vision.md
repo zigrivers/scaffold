@@ -32,7 +32,7 @@ not here.
 - Each suggestion has a clear strategic rationale
 - Each suggestion has an impact assessment (high/medium/low)
 - Each suggestion has an implementation cost estimate (trivial/moderate/significant)
-- Approved innovations are documented to the same standard as existing sections
+- Each approved innovation is integrated with the same subsection headings and detail level as existing vision sections
 - Vision scope is respected — no uncontrolled strategic drift
 - User approval is obtained before modifying the vision document
 

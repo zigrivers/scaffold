@@ -7,6 +7,8 @@ Deeply research best practices for coding standards for our tech stack — revie
 
 This document will be referenced by AI agents during every implementation task. It needs to be prescriptive with concrete examples, not abstract principles.
 
+> **Note:** This command produces full-depth output. For lighter execution at a specific methodology depth, use the pipeline engine with presets.
+
 ## Mode Detection
 
 Before starting, check if `docs/coding-standards.md` already exists:

@@ -16,8 +16,11 @@ Check your current state:
 - Keep working until `bd ready` shows no available tasks
 
 **Without Beads:**
-- Check `docs/implementation-plan.md` for your current progress
-- If a PR shows as merged, mark the corresponding task as complete in the plan
+- Read `docs/onboarding-guide.md` for project context (if it exists and you haven't already)
+- Use `docs/implementation-playbook.md` as the primary task reference (if it exists); fall back to `docs/implementation-plan.md` when no playbook is present
+- If a PR shows as merged, mark the corresponding task as complete in the plan/playbook
 - If there's in-progress work on your current branch, finish it
 - Otherwise, pick the next uncompleted task with no unfinished dependencies
+- If `tests/acceptance/` exists, check for TDD test skeletons that correspond to the current task
+- Before creating a PR, run `make eval` (or the equivalent eval command from CLAUDE.md Key Commands) as a required quality gate, in addition to `make check`
 - Keep working through the task list in dependency order

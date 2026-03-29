@@ -5,7 +5,7 @@ phase: "quality"
 order: 930
 dependencies: [review-testing]
 outputs: [docs/operations-runbook.md]
-reads: [system-architecture, adrs]
+reads: [system-architecture, adrs, dev-env-setup, git-workflow]
 conditional: null
 knowledge-base: [operations-runbook]
 ---

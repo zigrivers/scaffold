@@ -5,7 +5,7 @@ phase: "foundation"
 order: 240
 dependencies: [coding-standards]
 outputs: [docs/tdd-standards.md]
-reads: [create-prd]
+reads: [create-prd, system-architecture]
 conditional: null
 knowledge-base: [testing-strategy]
 ---
@@ -40,7 +40,7 @@ actual test framework and assertion library.
   test patterns per architecture pattern. Performance benchmarks. CI integration.
   Test data strategy. Mutation testing approach.
 - **mvp**: Test pyramid overview. Key testing patterns. What must pass before deploy.
-- **custom:depth(1-5)**: Scale detail with depth.
+- **custom:depth(1-5)**: Depth 1-2: test pyramid overview with key patterns and example test for each layer. Depth 3: add per-layer test patterns, coverage targets, CI integration, and test data strategy. Depth 4: add performance benchmarks, mutation testing approach, and cross-module integration patterns. Depth 5: full suite with contract testing, visual regression strategy, and automated quality gate calibration.
 
 ## Mode Detection
 Check for docs/tdd-standards.md. If it exists, operate in update mode: read

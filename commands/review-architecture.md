@@ -5,6 +5,8 @@ long-description: "Performs a structured multi-pass review of the system archite
 
 Perform a structured multi-pass review of the system architecture, targeting failure modes specific to architecture artifacts. Follow the review methodology from review-methodology knowledge base.
 
+> **Note:** This command produces full-depth output. For lighter execution at a specific methodology depth, use the pipeline engine with presets.
+
 ## Mode Detection
 
 Check if `docs/reviews/review-architecture.md` already exists:

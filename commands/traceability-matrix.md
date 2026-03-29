@@ -5,6 +5,10 @@ long-description: "Builds a full traceability matrix mapping every PRD requireme
 
 Build a traceability matrix that maps every PRD requirement through the full pipeline: PRD requirement to user story to domain model to architecture to database to API to UX to task to test. Every requirement must have a complete forward trace. Every artifact must have a backward trace to a requirement. Gaps in either direction are findings.
 
+> **Note:** This command produces full-depth output. For lighter execution at a specific methodology depth, use the pipeline engine with presets.
+
+> **Mode Detection**: This step always runs fresh. Previous validation artifacts are regenerated.
+
 ## Inputs
 
 Read all of these artifacts (skip any that do not exist):
@@ -134,7 +138,7 @@ When this step is complete, tell the user:
 ---
 **Validation: Traceability Matrix complete** — Full forward and backward tracing from PRD through implementation.
 
-**Next:** Run `/scaffold:decision-completeness` — Verify every technical decision has an ADR with rationale.
+**Next:** Run `/scaffold:apply-fixes-and-freeze` — Apply all validation findings and freeze documentation for implementation. Both `traceability-matrix` and `decision-completeness` are validation siblings that feed into this step.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

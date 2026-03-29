@@ -6,7 +6,11 @@ topics: [gap-analysis, requirements, completeness, ambiguity, edge-cases]
 
 # Gap Analysis
 
-Gap analysis is the systematic process of finding what is missing from a set of requirements or specifications. A gap is anything that an implementing team would need to know but that the document does not tell them. Gaps are not errors (things stated incorrectly) — they are omissions (things not stated at all).
+## Summary
+
+Gap analysis is the systematic process of finding what is missing from a set of requirements or specifications. A gap is anything that an implementing team would need to know but that the document does not tell them. Gaps are not errors (things stated incorrectly) — they are omissions (things not stated at all). The process uses section-by-section review, cross-reference checking, edge case enumeration, ambiguity detection, and contradiction detection to surface omissions before they become expensive implementation surprises.
+
+## Deep Guidance
 
 ## Systematic Analysis Approaches
 

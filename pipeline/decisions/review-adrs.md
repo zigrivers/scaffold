@@ -31,7 +31,7 @@ independent review validation.
 
 ## Quality Criteria
 - All ADR-specific review passes executed
-- Every finding categorized by severity
+- Every finding categorized P0-P3 with specific ADR number, section, and issue
 - Missing decisions identified and documented
 - Contradictions resolved
 - Downstream readiness confirmed (architecture phase can proceed)
@@ -50,3 +50,10 @@ independent review validation.
 Re-review mode if previous review exists. Check which findings were addressed.
 If multi-model review artifacts exist under docs/reviews/adrs/, preserve prior
 findings still valid.
+
+## Update Mode Specifics
+
+- **Detect**: `docs/reviews/review-adrs.md` exists with tracking comment
+- **Preserve**: Prior findings still valid, resolution decisions, multi-model review artifacts
+- **Triggers**: Upstream artifact changed since last review (compare tracking comment dates)
+- **Conflict resolution**: Previously resolved findings reappearing = regression; flag and re-evaluate

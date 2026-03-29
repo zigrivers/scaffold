@@ -5,6 +5,8 @@ long-description: "Reads system architecture, TDD standards, and existing CI/dev
 
 Read `docs/system-architecture.md`, `docs/tdd-standards.md`, `docs/adrs/`, `docs/dev-setup.md` (if it exists), and `docs/git-workflow.md` (if it exists), then define the production operational strategy. Create `docs/operations-runbook.md` covering deployment pipeline (extending the base CI from git-workflow), deployment strategy, monitoring, alerting, incident response, and rollback procedures.
 
+> **Note:** This command produces full-depth output. For lighter execution at a specific methodology depth, use the pipeline engine with presets.
+
 > **Prerequisites:** Run `review-testing` first.
 
 **Important — avoid duplication:**

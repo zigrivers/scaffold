@@ -117,7 +117,9 @@ When this step is complete, tell the user:
 ---
 **Phase 2 in progress** — `docs/tdd-standards.md` created.
 
-**Next:** Run `/scaffold:project-structure` — Define and scaffold project directory structure.
+**Next:** Run `/scaffold:review-testing` — Review TDD standards for completeness and stack alignment. Or run `/scaffold:story-tests` — Generate test skeletons from user story acceptance criteria.
+
+**Note:** `/scaffold:project-structure` runs independently and can proceed in parallel.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

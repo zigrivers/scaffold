@@ -6,7 +6,7 @@ order: 160
 dependencies: [review-user-stories]
 outputs: [docs/user-stories-innovation.md, docs/reviews/user-stories-innovation/review-summary.md, docs/reviews/user-stories-innovation/codex-review.json, docs/reviews/user-stories-innovation/gemini-review.json]
 conditional: "if-needed"
-knowledge-base: [user-stories, user-story-innovation]
+knowledge-base: [user-stories, user-story-innovation, multi-model-review-dispatch]
 ---
 
 ## Purpose
@@ -33,11 +33,11 @@ enhancement opportunities.
 - docs/reviews/user-stories-innovation/gemini-review.json (depth 4+, if available) — raw Gemini suggestions
 
 ## Quality Criteria
-- Enhancements are UX-level, not new features
-- Each suggestion has a cost estimate (trivial/moderate/significant)
-- Each suggestion has a clear user benefit
-- Approved enhancements are integrated into existing stories (not new stories)
-- PRD scope boundaries are respected — no scope creep
+- (mvp) Enhancements are UX-level, not new features
+- (mvp) Each suggestion has a cost estimate (trivial/moderate/significant)
+- (mvp) Each suggestion has a clear user benefit
+- (mvp) Approved enhancements are integrated into existing stories (not new stories)
+- (mvp) PRD scope boundaries are respected — no scope creep
 - User approval for each accepted innovation documented with date/method
 - (depth 4+) Multi-model suggestions deduplicated and synthesized with unique ideas from each model highlighted
 
@@ -48,8 +48,7 @@ enhancement opportunities.
   innovation dispatched to Codex and Gemini if available, with graceful
   fallback to Claude-only enhanced brainstorming.
 - **mvp**: Not applicable — this step is conditional and skipped in MVP.
-- **custom:depth(1-5)**: Depth 1-2: Quick scan only — identify 1-2 high-impact
-  innovations with brief cost/benefit. Skip multi-model analysis. Depth 3: quick
+- **custom:depth(1-5)**: Depth 1-2: skip (not enough context for meaningful innovation at this depth). Depth 3: quick
   scan for obvious improvements. Depth 4: full innovation pass + one external
   model (if CLI available). Depth 5: full innovation pass + multi-model with
   deduplication and synthesis.

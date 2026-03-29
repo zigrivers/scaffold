@@ -81,19 +81,22 @@ is_after_exempt() {
   fi
 }
 
-# Finalization-phase command slugs (phase 14) — these are terminal by design
-FINALIZATION_COMMANDS=(
-  "apply-fixes-and-freeze"
-  "developer-onboarding-guide"
-  "implementation-playbook"
-)
+# Dynamically derive finalization-phase command slugs from pipeline files
+get_finalization_commands() {
+  while IFS= read -r file; do
+    local phase
+    phase="$(extract_field "$file" "phase")"
+    if [[ "$phase" == "finalization" ]]; then
+      extract_field "$file" "name"
+    fi
+  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+}
 
 is_finalization() {
   local name="$1"
-  for fin in "${FINALIZATION_COMMANDS[@]}"; do
-    [[ "$name" == "$fin" ]] && return 0
-  done
-  return 1
+  local fin_cmds
+  fin_cmds="$(get_finalization_commands)"
+  echo "$fin_cmds" | grep -qx "$name"
 }
 
 @test "non-finalization commands with >50 lines have scaffold references (dead-end warning)" {

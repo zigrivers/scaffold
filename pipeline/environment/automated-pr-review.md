@@ -54,10 +54,12 @@ configured, or git-workflow.md establishes a PR-based workflow. Skip when: solo
 developer with no CI, depth < 3, or project uses a non-GitHub VCS host.
 
 ## Mode Detection
-Update mode if AGENTS.md contains a scaffold tracking comment
-(`<!-- scaffold:automated-pr-review -->`). In update mode: preserve custom review rules,
-reviewer bot name, and round cap settings. Detect legacy GitHub Actions
-workflows (code-review-trigger.yml, code-review-handler.yml) and offer removal.
+Check if AGENTS.md exists first. If it exists, check for scaffold tracking comment
+(`<!-- scaffold:automated-pr-review -->`).
+- If AGENTS.md exists with tracking comment: UPDATE MODE — preserve custom review rules,
+  reviewer bot name, and round cap settings. Detect legacy GitHub Actions
+  workflows (code-review-trigger.yml, code-review-handler.yml) and offer removal.
+- If AGENTS.md does not exist: FRESH MODE — configure from scratch.
 
 ## Update Mode Specifics
 - **Detect prior artifact**: AGENTS.md exists

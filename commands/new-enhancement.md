@@ -168,6 +168,10 @@ After updating both documents:
 - Verify no contradictions were introduced with existing features
 - Check that personas referenced exist in the PRD
 
+### Frozen Artifact Handling
+
+If documents have a freeze marker (`<!-- FROZEN: ... -->` or `<!-- scaffold:freeze ... -->`), this is an authorized post-freeze change. Note the amendment date and update the freeze marker (e.g., `<!-- FROZEN: original-date, amended YYYY-MM-DD for enhancement -->`).
+
 ---
 
 ## Phase 3: Task Creation
@@ -351,6 +355,7 @@ When this step is complete, tell the user:
 **Enhancement documented** — PRD updated, user stories created, Beads tasks ready.
 
 **Next (if applicable):**
+- If `docs/implementation-playbook.md` exists: Run `/scaffold:implementation-playbook` — Update wave assignments and add per-task context blocks for new tasks.
 - If you created **5+ tasks**: Run `/scaffold:implementation-plan-review` — Review task quality, coverage, and dependencies.
 - If the enhancement has **platform-specific behavior**: Run `/scaffold:platform-parity-review` — Check platform coverage.
 - If user stories were added or changed: Run `/scaffold:story-tests` — Regenerate test skeletons for new user stories.

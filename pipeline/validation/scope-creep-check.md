@@ -6,7 +6,7 @@ order: 1370
 dependencies: [implementation-plan-review, review-security]
 outputs: [docs/validation/scope-creep-check.md, docs/validation/scope-creep-check/review-summary.md, docs/validation/scope-creep-check/codex-review.json, docs/validation/scope-creep-check/gemini-review.json]
 conditional: null
-knowledge-base: [scope-management]
+knowledge-base: [scope-management, multi-model-review-dispatch]
 ---
 
 ## Purpose
@@ -58,9 +58,7 @@ proceeding without acknowledgment.
   dispatched to Codex and Gemini if available, with graceful fallback to
   Claude-only enhanced validation.
 - **mvp**: High-level scan for blocking issues only.
-- **custom:depth(1-5)**: Depth 1-3: scale thoroughness with depth. Depth 4:
-  full analysis + one external model (if CLI available). Depth 5: full
-  analysis + multi-model with reconciliation.
+- **custom:depth(1-5)**: Depth 1: feature count comparison (PRD vs implementation plan). Depth 2: add component-level tracing. Depth 3: full story-level and task-level audit against original PRD scope. Depth 4: add external model scope assessment. Depth 5: multi-model scope review with risk-weighted creep analysis.
 
 ## Mode Detection
 Not applicable — validation always runs fresh against current artifacts. If

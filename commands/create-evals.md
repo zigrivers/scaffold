@@ -5,6 +5,8 @@ long-description: "Reads project documentation and generates automated eval chec
 
 Read the project's documentation and generate automated eval checks that verify AI-generated code meets the project's own documented standards. Evals are test files in the project's own test framework — not a separate tool.
 
+> **Note:** This command produces full-depth output. For lighter execution at a specific methodology depth, use the pipeline engine with presets.
+
 ## Mode Detection
 
 Before starting, check if `tests/evals/` directory already exists:
@@ -374,9 +376,9 @@ When this step is complete, tell the user:
 ---
 **Phase 6 complete** — Eval infrastructure created in `tests/evals/`, `docs/eval-standards.md` documents what is and isn't checked.
 
-**Next:**
-- Run `/scaffold:operations` — Create operations runbook with deployment, monitoring, and incident response.
-- Or if operations is already done: proceed to `/scaffold:security` or `/scaffold:claude-md-optimization`.
+**Next:** Run `/scaffold:implementation-plan` — Convert user stories and standards into a dependency-ordered task graph.
+
+**Note:** `/scaffold:operations` and `/scaffold:security` are independent quality-phase steps that can run in parallel.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 
