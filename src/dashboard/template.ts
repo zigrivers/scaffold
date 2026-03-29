@@ -8,6 +8,7 @@ export function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
+/* eslint-disable max-len */
 export function buildTemplate(dataJson: string, data: DashboardData): string {
   const completedPct = data.progress.percentage
   const skippedPct = data.progress.total > 0
@@ -833,3 +834,4 @@ body.modal-open { overflow: hidden; }
 </body>
 </html>`
 }
+/* eslint-enable max-len */
