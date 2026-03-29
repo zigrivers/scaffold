@@ -176,6 +176,14 @@ When models actively disagree (one flags an issue, another says the same thing i
 3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
 
+### Consensus Classification
+
+When synthesizing multi-model findings, classify each finding:
+- **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
+- **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
+- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
+- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
+
 ### Output Format
 
 #### Review Summary (review-summary.md)

@@ -1,6 +1,6 @@
 ---
 description: "Design and document system architecture"
-long-description: "Design and document the system architecture, translating domain models and ADR"
+long-description: "Designs the system blueprint — which components exist, how data flows between them, where each module lives in the directory tree, and where extension points allow custom behavior."
 ---
 
 ## Purpose
@@ -24,7 +24,9 @@ lives and how components communicate.
 - (mvp) Every ADR constraint is respected in the architecture
 - (mvp) All components appear in at least one data flow diagram
 - (deep) Each extension point has interface definition, example usage scenario, and constraints on what can/cannot be extended
-- (mvp) Project directory structure is defined with file-level granularity
+- (mvp) System components map to modules defined in docs/project-structure.md
+- (deep) Component diagram shows all system components from domain models plus infrastructure
+- (deep) Data flow diagrams cover all happy-path user journeys from Must-have stories
 
 ## Methodology Scaling
 - **deep**: Full architecture document. Component diagrams, data flow diagrams,
@@ -32,8 +34,13 @@ lives and how components communicate.
   point inventory, deployment topology.
 - **mvp**: High-level component overview. Key data flows. Enough structure for
   an agent to start building without ambiguity.
-- **custom:depth(1-5)**: Depth 1-2: MVP-style. Depth 3: add component diagrams
-  and module boundaries. Depth 4-5: full architecture approach.
+- **custom:depth(1-5)**: Depth 1: high-level component overview with key data
+  flows. Depth 2: component overview with module boundaries and primary data
+  flows. Depth 3: add component diagrams, module boundaries, and state
+  management design. Depth 4: full architecture with extension point inventory,
+  deployment topology, and file-level module detail. Depth 5: full architecture
+  with cross-cutting concern analysis, failure mode documentation, and
+  scalability annotations.
 
 ## Mode Detection
 If outputs already exist, operate in update mode: read existing content, diff

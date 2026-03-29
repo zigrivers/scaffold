@@ -1,6 +1,6 @@
 ---
 description: "Discover strategic innovation opportunities in the product vision"
-long-description: "Discover strategic innovation opportunities within the product vision. This"
+long-description: "Explores untapped opportunities — adjacent markets, AI-native capabilities, ecosystem partnerships, and contrarian positioning — and proposes innovations for your approval."
 ---
 
 ## Purpose
@@ -29,6 +29,7 @@ not here.
 - (mvp) Recommended disposition stated for each: must-have, backlog, or reject with rationale
 - (deep) Impact assessments compared to existing document content
 - (deep) Each approved innovation is integrated with the same subsection headings and detail level as existing vision sections
+- (mvp) Each innovation marked with approval status: approved, deferred, or rejected, with user decision timestamp
 - Vision scope is respected — no uncontrolled strategic drift
 - User approval is obtained before modifying the vision document
 
@@ -36,10 +37,12 @@ not here.
 - **deep**: Full innovation pass across all 5 dimensions. Competitive research
   via web search. Detailed integration of approved innovations into vision.
 - **mvp**: Not applicable — this step is conditional and skipped in MVP.
-- **custom:depth(1-5)**: Depth 1-2: Quick scan only — identify 1-2 high-impact
-  strategic angles with brief rationale. Depth 3: quick scan for positioning
-  gaps and obvious market opportunities. Depth 4-5: full innovation pass
-  across all 5 dimensions.
+- **custom:depth(1-5)**:
+  - Depth 1: Skip (not enough context for meaningful innovation at this depth).
+  - Depth 2: Quick scan only — identify 1-2 high-impact strategic angles with brief rationale.
+  - Depth 3: Quick scan for positioning gaps and obvious market opportunities across dimensions 1-2.
+  - Depth 4: Full innovation pass across all 5 dimensions with competitive research.
+  - Depth 5: Full innovation pass across all 5 dimensions with competitive research and contrarian stress-test.
 
 ## Conditional Evaluation
 Enable when: project has competitive landscape content in vision.md, user

@@ -1,6 +1,6 @@
 ---
 description: "Research and document tech stack decisions with rationale for each choice"
-long-description: "Research frameworks, languages, databases, and tools that fit the PRD requirements,"
+long-description: "Researches technology options for your project — language, framework, database, hosting, auth — evaluates each against your requirements, and documents every choice with rationale and alternatives considered."
 ---
 
 ## Purpose
@@ -43,10 +43,12 @@ about ecosystem maturity, alternatives, and gotchas.
   to Claude-only enhanced research.
 - **mvp**: Core stack decisions only (language, framework, database, test runner).
   Brief rationale. Quick Reference with versions. 2-3 pages.
-- **custom:depth(1-5)**: Depth 1-2: MVP decisions. Depth 3: add infrastructure
-  and tooling. Depth 4: add AI compatibility analysis + one external model
-  (if CLI available). Depth 5: full competitive analysis and upgrade strategy
-  + multi-model with cross-referencing.
+- **custom:depth(1-5)**:
+  - Depth 1: Core stack decisions only (language, framework, database). Brief rationale. 1 page.
+  - Depth 2: Depth 1 + test runner choice and Quick Reference with versions. 2-3 pages.
+  - Depth 3: Add infrastructure, tooling, and developer experience recommendations.
+  - Depth 4: Add AI compatibility analysis + one external model research (if CLI available).
+  - Depth 5: Full competitive analysis per category, upgrade strategy, + multi-model with cross-referencing.
 
 ## Mode Detection
 Update mode if docs/tech-stack.md exists. In update mode: never change a
@@ -459,6 +461,14 @@ When models actively disagree (one flags an issue, another says the same thing i
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
 3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
+
+### Consensus Classification
+
+When synthesizing multi-model findings, classify each finding:
+- **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
+- **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
+- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
+- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
 
 ### Output Format
 

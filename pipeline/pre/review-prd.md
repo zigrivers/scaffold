@@ -37,7 +37,7 @@ independent review validation.
 - Fix plan created for P0 and P1 findings
 - Fixes applied and re-validated
 - (mvp) Downstream readiness confirmed (User Stories can proceed)
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling
 - **deep**: All 8 review passes from the knowledge base. Full findings report

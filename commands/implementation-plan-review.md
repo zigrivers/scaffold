@@ -1,6 +1,6 @@
 ---
 description: "Review implementation tasks for coverage, feasibility, and multi-model validation"
-long-description: "Review implementation tasks targeting task-specific failure modes: architecture"
+long-description: "Verifies every feature has implementation tasks, no task is too large for one session, the dependency graph has no cycles, and every acceptance criterion maps to at least one task."
 ---
 
 ## Purpose
@@ -44,9 +44,7 @@ and produce a structured coverage matrix and review summary.
 - **deep**: Full multi-pass review with multi-model validation. AC coverage
   matrix. Independent Codex/Gemini dispatches. Detailed reconciliation report.
 - **mvp**: Coverage check only. No external model dispatch.
-- **custom:depth(1-5)**: Depth 1-2: coverage check. Depth 3: add dependency
-  analysis and AC coverage matrix. Depth 4: add one external model. Depth 5:
-  full multi-model with reconciliation.
+- **custom:depth(1-5)**: Depth 1: architecture coverage check (every component has tasks). Depth 2: coverage check plus DAG validation and agent executability rules. Depth 3: add dependency analysis, AC coverage matrix, and task sizing audit. Depth 4: add one external model review (Codex or Gemini). Depth 5: full multi-model review with reconciliation and detailed findings report.
 
 ## Mode Detection
 Re-review mode if previous review exists. If multi-model review artifacts exist
@@ -1109,6 +1107,59 @@ If a task genuinely can't be split further without creating tasks that have no i
 
 **Ignoring the critical path.** Assigning agents to low-priority tasks while critical-path tasks wait for resources. Fix: always prioritize critical-path tasks. Non-critical tasks are parallelized around the critical path, not instead of it.
 
+### Critical Path and Wave Planning
+
+#### Identifying the Critical Path
+
+The critical path is the longest chain of sequentially dependent tasks from project start to finish. To find it:
+
+1. **Build the full DAG** — list every task and its dependencies (logical, file contention, infrastructure)
+2. **Assign effort estimates** — use story points or hours per task
+3. **Trace all paths** — walk from every root node (no dependencies) to every leaf node (no dependents)
+4. **Sum each path** — the path with the highest total effort is the critical path
+5. **Mark float** — non-critical tasks have float equal to (critical path length - their path length); they can slip by that amount without delaying the project
+
+Critical path tasks get top priority for agent assignment. Delays on these tasks delay the entire project; delays on non-critical tasks do not (up to their float).
+
+#### Wave Planning
+
+Waves group independent tasks for parallel execution. Each wave starts only after its dependency wave completes.
+
+```
+Wave 0: Project infrastructure (DB setup, CI pipeline, auth scaffold)
+Wave 1: Core data models, base API framework, design tokens
+Wave 2: Feature endpoints, UI components, middleware (per-feature)
+Wave 3: Integration flows, cross-feature wiring, E2E test scaffolds
+Wave 4: Polish, performance, E2E tests, documentation finalization
+```
+
+**Rules for wave construction:**
+- A task belongs to the earliest wave where all its dependencies are satisfied
+- Tasks within a wave have zero dependencies on each other
+- The number of useful parallel agents equals the task count of the widest wave
+- If one wave has 8 tasks and the next has 2, consider whether splitting wave-2 tasks could improve parallelism
+
+#### Agent Allocation by Wave
+
+Assign agents based on task type to maximize context reuse within an agent session:
+
+- **Backend agents** — API endpoints, database migrations, service logic. Context: architecture doc, API contracts, coding standards
+- **Frontend agents** — UI components, pages, client-side state. Context: UX spec, design system, component patterns
+- **Infrastructure agents** — CI/CD, deployment, config, monitoring. Context: dev setup, operations runbook
+- **Cross-cutting agents** — Auth, error handling, shared utilities. Context: security review, coding standards
+
+An agent working consecutive tasks of the same type retains relevant context and produces more consistent output.
+
+#### Parallelization Signals
+
+Tasks are safe to run in parallel when they share no file dependencies. Quick checklist:
+
+- **Different feature directories** — `src/features/auth/` vs `src/features/billing/` can always parallelize
+- **Different layers of different features** — backend auth + frontend billing have no file overlap
+- **Same feature, different layers** — only if the interface contract is agreed upfront (API shape, component props)
+- **Same file touched** — must be sequenced, no exceptions (merge conflicts are expensive)
+- **Shared utility creation** — block until the utility task merges, then dependents can parallelize
+
 ---
 
 ### multi-model-review-dispatch
@@ -1286,6 +1337,14 @@ When models actively disagree (one flags an issue, another says the same thing i
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
 3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
+
+### Consensus Classification
+
+When synthesizing multi-model findings, classify each finding:
+- **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
+- **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
+- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
+- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
 
 ### Output Format
 

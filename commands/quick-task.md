@@ -1,6 +1,6 @@
 ---
 description: "Create a focused task for a bug fix, refactor, or small improvement"
-long-description: "Create a focused, implementation-ready task for a small, well-defined piece"
+long-description: "Takes a one-off request (bug fix, refactor, performance tweak) and creates a single well-scoped task with acceptance criteria and a test plan — for work outside the main implementation plan."
 ---
 
 ## Purpose
@@ -47,16 +47,18 @@ prompt.
 - **mvp**: Complexity gate, basic acceptance criteria (happy path + one edge
   case), test plan with category and cases, file list. Skip duplicate check
   and detailed implementation notes.
-- **custom:depth(1-5)**: Depth 1-2: complexity gate, basic AC, test cases,
-  file list. Depth 3: add duplicate check, lessons.md review, regression
-  guards. Depth 4: add mocking strategy, specific coding standard references.
-  Depth 5: full analysis with innovation suggestions and cross-module impact.
+- **custom:depth(1-5)**: Depth 1: complexity gate, basic acceptance criteria
+  (happy path only), and file list. Depth 2: add one edge case to AC, test
+  cases mapped to criteria, and test file locations. Depth 3: add duplicate
+  check, lessons.md review, regression guards. Depth 4: add mocking strategy,
+  specific coding standard references. Depth 5: full analysis with innovation
+  suggestions and cross-module impact.
 
 ## Mode Detection
-This is a stateless execution command. No persistent document is created.
-- Always operates in CREATE MODE — produces a task definition.
-- If Beads is configured, the task is created via `bd create`.
-- If not, the task is documented inline and implementation begins.
+This is a task-creation execution command. Task persistence depends on context:
+- If Beads is configured, the task is persistent via `bd create`.
+- If not, the task is documented inline for immediate execution (not persistent).
+- Always operates in CREATE MODE — produces a task definition each time.
 
 ## Update Mode Specifics
 Not applicable — this creates a new task each time. If a similar task already
@@ -294,6 +296,9 @@ Present the task summary:
 - File paths match `docs/project-structure.md` conventions
 - Naming follows project patterns
 - Implementation notes reference specific standards, not generic advice
+
+#### Quality Gates
+- Quick tasks follow the same quality gates as all other tasks — see `docs/implementation-playbook.md` § Quality Gates
 
 #### Eval Gate
 - If `tests/evals/` exists, run `make eval` (or equivalent eval command from CLAUDE.md Key Commands) as a required pre-commit check

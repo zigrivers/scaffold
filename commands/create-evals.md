@@ -1,6 +1,6 @@
 ---
 description: "Generate project-specific eval checks from standards documentation"
-long-description: "Generate automated eval checks that verify AI-generated code meets the project's"
+long-description: "Generates automated checks that verify your code matches your documented standards — file placement, naming conventions, feature-to-test coverage, API contract alignment — using your project's own test framework."
 ---
 
 ## Purpose
@@ -51,12 +51,12 @@ Conditional (generated when source doc exists):
 Supporting:
 - tests/evals/helpers.* — shared utilities
 - docs/eval-standards.md — documents what is and isn't checked
-- make eval target added to Makefile/package.json
+- make eval target (or equivalent build command) added to project build configuration
 
 ## Quality Criteria
 - (mvp) Consistency + Structure evals generated
 - (mvp) Evals use the project's own test framework from docs/tech-stack.md
-- (mvp) All generated evals pass on the current codebase (no false positives)
+- (mvp) All generated evals pass on the current codebase when exclusion mechanisms are applied
 - (mvp) Eval results are binary PASS/FAIL, not scores
 - (mvp) make eval is separate from make test and make check (opt-in for CI)
 - (deep) All applicable eval categories generated including security, API, DB, accessibility (conditional on source doc existence)
@@ -64,7 +64,9 @@ Supporting:
 - (deep) docs/eval-standards.md explicitly documents what evals do NOT check
 - (deep) Full eval suite runs in under 30 seconds
 - (mvp) `make eval` (or equivalent) runs and all generated evals pass
+- (mvp) All core eval categories (consistency, structure, adherence, coverage, cross-doc) are generated
 - (deep) Eval false-positive assessment: each eval category documents at least one scenario where valid code might incorrectly fail, with exclusion mechanism
+- (deep) Every conditional eval category with a source document is generated
 
 ## Methodology Scaling
 - **deep**: All 13 eval categories (conditional on doc existence). Stack-specific
@@ -72,7 +74,8 @@ Supporting:
   conformance. API contract validation. Security patterns. Full suite.
 - **mvp**: Consistency + Structure only. Skip everything else.
 - **custom:depth(1-5)**:
-  - Depth 1-2: Consistency + Structure
+  - Depth 1: Consistency + Structure only
+  - Depth 2: Consistency + Structure with stack-specific patterns
   - Depth 3: Add Adherence + Cross-doc
   - Depth 4: Add Coverage + Architecture + Config + Error handling
   - Depth 5: All 13 categories (Security, API, Database, Accessibility, Performance)
@@ -1108,6 +1111,50 @@ Style observations, minor inconsistencies, documentation improvements. Not actio
 - "Coverage eval matched 'user profile' by file name only, not by test content — confidence is low"
 - "Makefile has 2 targets not listed in CLAUDE.md Key Commands, but they start with `_` (internal targets)"
 
+### Per-Category Implementation Guidance
+
+Concrete checks to implement for each eval category. For each category, these are the highest-value grep/scan targets.
+
+#### Adherence
+
+- **Naming conventions**: Grep source files for patterns that violate documented naming (e.g., `camelCase` in a `snake_case` project, uppercase constants that should be enums)
+- **Error handling patterns**: Scan for bare `catch {}`, swallowed errors (`catch (e) { /* ignore */ }`), and missing error propagation per `docs/coding-standards.md`
+- **Import rules**: Check for barrel import violations, circular imports, and forbidden cross-layer imports (e.g., UI importing directly from DB layer)
+- **TODO hygiene**: Grep for `TODO|FIXME|HACK` without a task ID tag like `[BD-xxx]` — untagged TODOs are tracking gaps
+
+#### Consistency
+
+- **Cross-doc refs match**: Extract all file path references from markdown docs (`docs/*.md`) and verify each referenced path exists on disk
+- **Format standardization**: Verify commit messages follow the documented pattern in `docs/coding-standards.md` by regex-matching `git log --oneline`
+- **Command table sync**: Parse the Key Commands table in `CLAUDE.md`, extract each backtick-quoted command, and verify a matching Makefile target or package.json script exists
+- **Config value consistency**: Check that port numbers, env var names, and feature flags in config files match what documentation describes
+
+#### Structure
+
+- **File placement rules**: For each source file, verify its directory matches the module placement rules in `docs/project-structure.md` (e.g., no feature code in `shared/`, no stray files in root)
+- **Test co-location**: For each source file with logic, verify a corresponding `.test.*` file exists per the documented convention (co-located or mirror directory)
+- **Shared code 2+ consumers**: Scan every file in `shared/`, `common/`, or `lib/` directories and count distinct importers — flag any with fewer than 2 consumers
+- **No orphan files**: Verify every source file is either imported by another file or is a documented entry point (main, index, CLI handler)
+
+#### Coverage
+
+- **Feature-to-code mapping**: Extract Must-have features from `docs/plan.md`, derive domain keywords, and grep source tree for 2+ keyword matches per feature
+- **AC-to-test mapping**: Extract acceptance criteria from `docs/user-stories.md`, extract keywords, and search test files for keyword co-occurrence (high confidence: exact AC ID reference; medium: 2+ domain keywords)
+- **API endpoint coverage**: Parse documented endpoints from `docs/api-contracts.md`, verify each has a route definition in code and at least one test file asserting its status codes
+
+#### Cross-doc
+
+- **Terminology consistency**: Extract key domain terms from the PRD and verify the same terms (not synonyms) appear in architecture, user stories, and coding standards docs
+- **Tech stack references**: Verify that technology names referenced across docs match the canonical list in `docs/tech-stack.md` (e.g., no doc says "Postgres" when the canonical name is "PostgreSQL")
+- **Path consistency**: Collect all file path references across all docs and verify they use the same path format (no mix of `src/features/` and `features/src/`)
+
+#### Security
+
+- **Auth middleware usage**: Parse the security review for protected routes, then verify each route definition includes auth middleware (`requireAuth`, `@authenticated`, or equivalent)
+- **Secret patterns**: Grep for hardcoded API keys, tokens, and passwords using known patterns (`AKIA...`, `sk_live_...`, `ghp_...`, and generic `password\s*=\s*['"][^'"]+`)
+- **Input validation**: For each API endpoint accepting user input, verify a validation step exists (Zod `.parse()`, Joi `.validate()`, express-validator chain, or equivalent)
+- **No secrets in git**: Run `git log --diff-filter=A --name-only` and check that no `.env`, credentials, or key files were ever committed
+
 ---
 
 ### testing-strategy
@@ -1506,6 +1553,73 @@ Initial data loaded into the test database for integration tests. Rules:
 **Skipped tests accumulate.** Tests marked as `skip` or `xit` that are never re-enabled. They represent either dead code or known bugs that nobody addresses. Fix: skipped tests are technical debt. Set a policy: fix or delete within one sprint.
 
 **No test naming convention.** Test descriptions like "test 1," "works correctly," or "handles the thing." Uninformative when tests fail. Fix: test names should describe the scenario and expected outcome: "returns 404 when user does not exist," "applies 10% discount for premium members."
+
+### From Acceptance Criteria to Test Cases
+
+Acceptance criteria are the bridge between user stories and automated tests. Every AC should produce one or more test cases with clear traceability.
+
+#### Given/When/Then to Arrange/Act/Assert
+
+The mapping is direct:
+
+- **Given** (precondition) becomes **Arrange** — set up test data, mock dependencies, configure state
+- **When** (action) becomes **Act** — call the function, hit the endpoint, trigger the event
+- **Then** (expected outcome) becomes **Assert** — verify return value, check database state, assert response body
+
+```typescript
+// AC: Given a user with 5 failed login attempts,
+//     When they attempt a 6th login,
+//     Then the account is locked and they see "Account locked"
+it('locks account after 5 failed attempts', async () => {
+  // Arrange: create user with 5 failed attempts
+  const user = await createUser({ failedAttempts: 5 });
+  // Act: attempt login
+  const res = await request(app).post('/login').send({ email: user.email, password: 'wrong' });
+  // Assert: locked
+  expect(res.status).toBe(423);
+  expect(res.body.error.message).toContain('Account locked');
+});
+```
+
+#### One AC, Multiple Test Cases
+
+Each AC produces at minimum one happy-path test. Then derive edge cases:
+
+- **Boundary values**: If the AC says "max 50 characters," test 49, 50, and 51
+- **Empty/null inputs**: If the AC assumes input exists, test what happens when it does not
+- **Concurrency**: If the AC describes a state change, test what happens with simultaneous requests
+
+#### Negative Case Derivation
+
+For every "Given X" in an AC, systematically test "Given NOT X":
+
+- AC says "Given user is authenticated" — test unauthenticated access (expect 401)
+- AC says "Given the order exists" — test with nonexistent order ID (expect 404)
+- AC says "Given valid payment details" — test with expired card, insufficient funds, invalid CVV
+
+#### Parameterized Tests for Similar ACs
+
+When multiple ACs follow the same pattern with different inputs, use data-driven tests:
+
+```typescript
+it.each([
+  ['empty email', { email: '', password: 'valid' }, 'Email is required'],
+  ['invalid email', { email: 'notanemail', password: 'valid' }, 'Invalid email format'],
+  ['short password', { email: 'a@b.com', password: '123' }, 'Password too short'],
+])('rejects registration with %s', async (_, input, expectedError) => {
+  const res = await request(app).post('/register').send(input);
+  expect(res.status).toBe(400);
+  expect(res.body.error.message).toContain(expectedError);
+});
+```
+
+#### Test Naming for Traceability
+
+Test names should mirror the AC wording so that when a test fails, the team can trace it back to the requirement without reading the test body:
+
+- AC: "User sees error when email is already taken" — Test: `'returns 409 when email is already taken'`
+- AC: "Profile updates immediately after save" — Test: `'updates profile and reflects changes on next fetch'`
+- Include the story or AC ID in the describe block when practical: `describe('US-002: Edit profile', () => { ... })`
 
 ## See Also
 

@@ -40,6 +40,7 @@ creative opportunities and competitive insights.
 - (mvp) PRD scope boundaries are respected — no uncontrolled scope creep
 - User approval is obtained before modifying the PRD
 - User approval for each accepted innovation documented as a question-response pair with timestamp (e.g., "Q: Accept feature X? A: Yes — 2025-01-15T14:30Z")
+- (mvp) Each innovation marked with approval status: approved, deferred, or rejected, with user decision timestamp
 - (depth 4+) Multi-model suggestions deduplicated and synthesized with unique ideas from each model highlighted
 
 ## Methodology Scaling

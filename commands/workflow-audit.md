@@ -1,6 +1,6 @@
 ---
 description: "Verify workflow consistency across all documentation files"
-long-description: "Cross-reference all documentation to ensure the canonical feature workflow is"
+long-description: "Audits every document that mentions workflow (CLAUDE.md, git-workflow, coding-standards, dev-setup) and fixes any inconsistencies in commit format, branch naming, PR steps, or key commands."
 ---
 
 ## Purpose
@@ -37,6 +37,7 @@ inconsistent command formats. Fix all issues found.
 - (deep) Worktree cleanup between tasks documented (cannot checkout main)
 - (deep) Agent crash recovery documented
 - (deep) No document contradicts the canonical workflow
+- (mvp) CLAUDE.md is the source of truth for workflow. All other documents must align with CLAUDE.md, not override it.
 - Tracking comment matches format: `<!-- scaffold:workflow-audit v1 YYYY-MM-DD -->`
 - Tracking comment added: <!-- scaffold:workflow-audit v1 YYYY-MM-DD -->
 
@@ -46,8 +47,7 @@ inconsistent command formats. Fix all issues found.
   Every workflow step verified in every document.
 - **mvp**: Quick consistency check of commit format, branch naming, and PR
   workflow across CLAUDE.md and git-workflow.md. Fix obvious contradictions.
-- **custom:depth(1-5)**: Depth 1-2: CLAUDE.md workflow check only. Depth 3: add
-  cross-doc consistency. Depth 4: add gap analysis. Depth 5: full six-phase audit.
+- **custom:depth(1-5)**: Depth 1: CLAUDE.md workflow section completeness check only. Depth 2: CLAUDE.md workflow check plus commit format and branch naming verification. Depth 3: add cross-doc consistency (git-workflow.md, coding-standards.md alignment). Depth 4: add gap analysis (missing steps, stale references, Makefile target verification). Depth 5: full six-phase audit (inventory, completeness, consistency, gap analysis, recommendations, execution).
 
 ## Mode Detection
 Always operates in update mode (all documents exist by this point). Check for

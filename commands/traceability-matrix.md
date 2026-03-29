@@ -1,6 +1,6 @@
 ---
 description: "Build traceability from PRD requirements through architecture to implementation tasks"
-long-description: "Build traceability from PRD requirements through user stories and architecture"
+long-description: "Builds a map showing that every PRD requirement traces through to user stories, architecture components, implementation tasks, and test cases — with no gaps in either direction."
 ---
 
 ## Purpose
@@ -27,14 +27,14 @@ coverage gaps.
 - docs/validation/traceability-matrix/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- (mvp) Every PRD requirement maps to >= 1 user story
+- (mvp) Every feature and user-facing behavior in the PRD's feature list maps to >= 1 user story
 - (mvp) Every user story maps to >= 1 implementation task
 - (deep) Every acceptance criterion maps to >= 1 test case (verified against `docs/story-tests-map.md`)
 - (deep) Every test case maps to >= 1 implementation task
-- (deep) No orphan items in either direction at any layer
+- (deep) Every Must-have and Should-have item maps to >= 1 downstream artifact. Nice-to-have items may be orphaned with explicit rationale.
 - (deep) Bidirectional traceability verified: PRD → Stories → Domain → Architecture → Tasks
 - Findings categorized P0-P3 with specific file, section, and issue for each
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Finding Disposition
 - **P0 (blocking)**: Must be resolved before proceeding to implementation. Create
@@ -457,6 +457,14 @@ When models actively disagree (one flags an issue, another says the same thing i
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
 3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
+
+### Consensus Classification
+
+When synthesizing multi-model findings, classify each finding:
+- **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
+- **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
+- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
+- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
 
 ### Output Format
 

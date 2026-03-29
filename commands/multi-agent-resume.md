@@ -1,6 +1,6 @@
 ---
 description: "Resume multi-agent work after a break"
-long-description: "Resume a named agent's implementation work in its worktree after a break."
+long-description: "Verifies the worktree, syncs with main, reconciles completed tasks, and resumes the agent's TDD loop from the previous session."
 ---
 
 ## Purpose
@@ -44,7 +44,8 @@ loop from where the agent left off.
   eval gates, detailed PR descriptions, between-task cleanup.
 - **mvp**: Verify worktree, check branch state, finish in-progress work or
   pick next task, TDD loop, make check, create PR.
-- **custom:depth(1-5)**: Depth 1-2: check branch and continue. Depth 3: add
+- **custom:depth(1-5)**: Depth 1: verify worktree and check current branch, continue in-progress work.
+  Depth 2: add git status assessment and Beads identity verification. Depth 3: add
   PR reconciliation, lessons.md review, sync with origin. Depth 4: add
   rebase, eval gates, between-task cleanup. Depth 5: full state audit with
   actor verification and branch cleanup.

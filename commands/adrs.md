@@ -1,6 +1,6 @@
 ---
 description: "Document architecture decisions as ADRs"
-long-description: "Identify and document all significant architecture decisions. Each decision gets"
+long-description: "Documents every significant design decision — what was chosen, what alternatives were considered with pros and cons, and what consequences follow — so future contributors understand why, not just what."
 ---
 
 ## Purpose
@@ -31,8 +31,13 @@ ADR category — tech stack decisions are documented here.
   related ADRs. Supersession tracking.
 - **mvp**: Core technology choices only (language, framework, database, hosting).
   Brief rationale. Single-paragraph ADRs.
-- **custom:depth(1-5)**: Depth 1-2: core tech choices. Depth 3: add pattern
-  and integration decisions. Depth 4-5: full evaluation with risk assessment.
+- **custom:depth(1-5)**: Depth 1: core tech choices only (language, framework,
+  database) with single-paragraph rationale. Depth 2: core tech choices plus
+  hosting and ORM with brief rationale. Depth 3: add pattern and integration
+  decisions with 2+ alternatives per decision. Depth 4: full evaluation with
+  3+ alternatives, risk assessment, and decision dependency tracking.
+  Depth 5: full evaluation with cross-references between related ADRs,
+  supersession tracking, and team expertise considerations.
 
 ## Mode Detection
 If docs/adrs/ exists, operate in update mode: review existing ADRs against

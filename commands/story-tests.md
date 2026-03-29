@@ -1,6 +1,6 @@
 ---
 description: "Generate test skeletons from user story acceptance criteria"
-long-description: "Generate test skeleton files from user story acceptance criteria, creating a"
+long-description: "Generates a test skeleton file for each user story — one pending test case per acceptance criterion, tagged with story and criterion IDs — giving agents a TDD starting point for every feature."
 ---
 
 ## Purpose
@@ -28,15 +28,17 @@ pending/skipped — developers implement them during TDD execution.
   ACs → test cases, and layer assignments (unit/integration/e2e)
 
 ## Quality Criteria
-- (mvp) Every user story in docs/user-stories.md has a corresponding test file
+- (mvp) Every Must-have user story has a corresponding test file
 - (mvp) Every acceptance criterion has at least one tagged test case
 - Test cases are tagged with story ID and AC ID for traceability
 - (deep) Test layer assignment: single-function ACs → unit; cross-component ACs → integration; full user journey ACs → e2e
 - Test files use the project's test framework from docs/tech-stack.md
-- All test cases are created as pending/skipped (not implemented)
+- All test cases are created as pending/skipped (or equivalent framework pause/skip mechanism) (not implemented)
 - docs/story-tests-map.md shows 100% AC-to-test-case coverage
 - Test file location follows conventions from docs/project-structure.md
 - (deep) Test data fixtures and dependencies documented for each test file
+- (deep) Each pending test case includes story ID and AC ID tags, GWT structure, and at least one assertion hint
+- (mvp) If api-contracts.md does not exist, API test skeletons derived from user story acceptance criteria instead
 
 ## Methodology Scaling
 - **deep**: All stories get test files. Negative test cases for every happy path
@@ -44,9 +46,12 @@ pending/skipped — developers implement them during TDD execution.
   e2e where applicable). Traceability matrix with confidence analysis.
 - **mvp**: Test files for Must-have stories only. One test case per AC. No
   layer splitting — all tests in acceptance/ directory.
-- **custom:depth(1-5)**: Depth 1: Must-have stories only. Depth 2: add
-  Should-have. Depth 3: add negative cases. Depth 4: add boundary conditions
-  and layer splitting. Depth 5: full suite with all stories and edge cases.
+- **custom:depth(1-5)**:
+  - Depth 1: Must-have stories only, one test case per AC
+  - Depth 2: Add Should-have stories
+  - Depth 3: Add negative test cases for every happy-path AC
+  - Depth 4: Add boundary condition tests and layer splitting (unit/integration/e2e)
+  - Depth 5: Full suite — all stories including Could-have, edge cases, and confidence analysis in traceability matrix
 
 ## Mode Detection
 Update mode if tests/acceptance/ directory exists. In update mode: add test
@@ -466,6 +471,73 @@ Initial data loaded into the test database for integration tests. Rules:
 **Skipped tests accumulate.** Tests marked as `skip` or `xit` that are never re-enabled. They represent either dead code or known bugs that nobody addresses. Fix: skipped tests are technical debt. Set a policy: fix or delete within one sprint.
 
 **No test naming convention.** Test descriptions like "test 1," "works correctly," or "handles the thing." Uninformative when tests fail. Fix: test names should describe the scenario and expected outcome: "returns 404 when user does not exist," "applies 10% discount for premium members."
+
+### From Acceptance Criteria to Test Cases
+
+Acceptance criteria are the bridge between user stories and automated tests. Every AC should produce one or more test cases with clear traceability.
+
+#### Given/When/Then to Arrange/Act/Assert
+
+The mapping is direct:
+
+- **Given** (precondition) becomes **Arrange** — set up test data, mock dependencies, configure state
+- **When** (action) becomes **Act** — call the function, hit the endpoint, trigger the event
+- **Then** (expected outcome) becomes **Assert** — verify return value, check database state, assert response body
+
+```typescript
+// AC: Given a user with 5 failed login attempts,
+//     When they attempt a 6th login,
+//     Then the account is locked and they see "Account locked"
+it('locks account after 5 failed attempts', async () => {
+  // Arrange: create user with 5 failed attempts
+  const user = await createUser({ failedAttempts: 5 });
+  // Act: attempt login
+  const res = await request(app).post('/login').send({ email: user.email, password: 'wrong' });
+  // Assert: locked
+  expect(res.status).toBe(423);
+  expect(res.body.error.message).toContain('Account locked');
+});
+```
+
+#### One AC, Multiple Test Cases
+
+Each AC produces at minimum one happy-path test. Then derive edge cases:
+
+- **Boundary values**: If the AC says "max 50 characters," test 49, 50, and 51
+- **Empty/null inputs**: If the AC assumes input exists, test what happens when it does not
+- **Concurrency**: If the AC describes a state change, test what happens with simultaneous requests
+
+#### Negative Case Derivation
+
+For every "Given X" in an AC, systematically test "Given NOT X":
+
+- AC says "Given user is authenticated" — test unauthenticated access (expect 401)
+- AC says "Given the order exists" — test with nonexistent order ID (expect 404)
+- AC says "Given valid payment details" — test with expired card, insufficient funds, invalid CVV
+
+#### Parameterized Tests for Similar ACs
+
+When multiple ACs follow the same pattern with different inputs, use data-driven tests:
+
+```typescript
+it.each([
+  ['empty email', { email: '', password: 'valid' }, 'Email is required'],
+  ['invalid email', { email: 'notanemail', password: 'valid' }, 'Invalid email format'],
+  ['short password', { email: 'a@b.com', password: '123' }, 'Password too short'],
+])('rejects registration with %s', async (_, input, expectedError) => {
+  const res = await request(app).post('/register').send(input);
+  expect(res.status).toBe(400);
+  expect(res.body.error.message).toContain(expectedError);
+});
+```
+
+#### Test Naming for Traceability
+
+Test names should mirror the AC wording so that when a test fails, the team can trace it back to the requirement without reading the test body:
+
+- AC: "User sees error when email is already taken" — Test: `'returns 409 when email is already taken'`
+- AC: "Profile updates immediately after save" — Test: `'updates profile and reflects changes on next fetch'`
+- Include the story or AC ID in the describe block when practical: `describe('US-002: Edit profile', () => { ... })`
 
 ## See Also
 

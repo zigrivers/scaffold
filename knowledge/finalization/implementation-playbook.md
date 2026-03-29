@@ -69,14 +69,16 @@ If a task does not have a context brief, the agent should create one from the sp
 
 When a per-task context block is incomplete, agents should consult this taxonomy to ensure they have sufficient context:
 
+**Before starting any task**, check `docs/story-tests-map.md` to find test skeletons for your task's user stories. If test skeletons exist, begin TDD with those pending tests rather than writing new ones.
+
 | Task Type | Required Docs | Additional Context |
 |-----------|--------------|-------------------|
-| Backend API | `docs/api-contracts.md`, `docs/database-schema.md`, `docs/domain-models/`, `docs/coding-standards.md`, `docs/tdd-standards.md` | Relevant ADR for API style choices |
-| Frontend UI | `docs/ux-spec.md`, `docs/design-system.md`, `docs/api-contracts.md`, `docs/coding-standards.md`, `docs/tdd-standards.md` | Component patterns from design system |
-| Database migration | `docs/database-schema.md`, `docs/domain-models/`, `docs/operations-runbook.md` | Rollback strategy from ops runbook |
-| Infrastructure/CI | `docs/dev-setup.md`, `docs/git-workflow.md`, `docs/operations-runbook.md` | Deployment pipeline stages |
-| Bug fix | Relevant source code, `docs/tdd-standards.md`, `docs/coding-standards.md` | Related test files, reproduction steps |
-| Security hardening | `docs/security-review.md`, `docs/api-contracts.md`, `docs/coding-standards.md` | OWASP checklist items from security review |
+| Backend API | `docs/api-contracts.md`, `docs/database-schema.md`, `docs/domain-models/`, `docs/coding-standards.md`, `docs/tdd-standards.md`, `docs/story-tests-map.md` | Relevant ADR for API style choices, `tests/acceptance/` skeletons |
+| Frontend UI | `docs/ux-spec.md`, `docs/design-system.md`, `docs/api-contracts.md`, `docs/coding-standards.md`, `docs/tdd-standards.md`, `docs/story-tests-map.md` | Component patterns from design system, `tests/acceptance/` skeletons |
+| Database migration | `docs/database-schema.md`, `docs/domain-models/`, `docs/operations-runbook.md`, `docs/story-tests-map.md` | Rollback strategy from ops runbook, `tests/acceptance/` skeletons |
+| Infrastructure/CI | `docs/dev-setup.md`, `docs/git-workflow.md`, `docs/operations-runbook.md`, `docs/story-tests-map.md` | Deployment pipeline stages |
+| Bug fix | Relevant source code, `docs/tdd-standards.md`, `docs/coding-standards.md`, `docs/story-tests-map.md` | Related test files, reproduction steps, `tests/acceptance/` skeletons |
+| Security hardening | `docs/security-review.md`, `docs/api-contracts.md`, `docs/coding-standards.md`, `docs/story-tests-map.md` | OWASP checklist items from security review, `tests/acceptance/` skeletons |
 
 ## Deep Guidance
 
@@ -460,6 +462,16 @@ When `make eval` fails during implementation:
    - **Security evals**: Missing input validation or auth check. Fix: add the missing security control per security-review.md.
 4. **If eval seems wrong**: Check if the eval itself is outdated. Flag for upstream review rather than working around it.
 
+**Eval Failure → Root Cause Reference**:
+
+| Eval Category | Root Cause Doc | What to Check |
+|---------------|---------------|---------------|
+| Adherence | `docs/coding-standards.md` | The specific pattern or convention that was violated |
+| Consistency | Cross-doc references | Naming, paths, and commands match across all documents |
+| Structure | `docs/project-structure.md` | File placement rules, directory conventions |
+| Coverage | `docs/story-tests-map.md` | Missing acceptance-criteria-to-test mapping |
+| Security | `docs/security-review.md` | The specific security control that was violated |
+
 **Spec gap discovered during implementation:**
 1. Document the gap with specific details (what's missing, what's needed)
 2. Check if an ADR or architecture decision covers the case
@@ -476,7 +488,9 @@ When `make eval` fails during implementation:
 
 When a task's upstream dependency hasn't merged or has failed:
 
-1. **Check the dependency task status** in docs/implementation-plan.md
+1. **Check the dependency task status** — Look at git branch status (`git log --oneline origin/main..origin/<branch>`), PR state (`gh pr view <branch>`), or the task tracking system (Beads `bd show <task-id>` / `docs/implementation-plan.md` status column) to determine whether the dependency is in-progress, merged, failed, or blocked.
 2. **If in-progress**: Wait for it to merge. Do not start work that depends on uncommitted changes.
 3. **If failed/blocked**: Flag for human review. The task may need to be reworked, reordered, or its dependency removed.
 4. **If the dependency is in a different agent's worktree**: Coordinate via AGENTS.md or the task tracking system. Never duplicate work.
+5. **Max wait**: If blocked for more than 30 minutes, find an unblocked task from the implementation plan and work on that instead. Do not idle.
+6. **Escalation**: If no unblocked tasks remain, document the blocker in a PR comment (or Beads note) and notify via AGENTS.md or the project's communication channel so the blocker is visible to all agents and the project owner.

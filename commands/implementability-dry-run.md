@@ -1,6 +1,6 @@
 ---
 description: "Dry-run specs as implementing agent, catching ambiguity"
-long-description: "Dry-run specs as implementing agent, catching ambiguity. Simulate what an"
+long-description: "Simulates picking up each task as an implementing agent and flags anything ambiguous — unclear acceptance criteria, missing input files, undefined error handling — that would force an agent to guess."
 ---
 
 ## Purpose
@@ -24,13 +24,13 @@ when simulating implementation.
 - docs/validation/implementability-dry-run/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- (mvp) Every task has sufficient input specification for an agent to start without guessing
+- (mvp) Every task specifies: input file paths, expected output artifacts, testable acceptance criteria, and references to upstream documents
 - (mvp) Every task has testable acceptance criteria
 - (deep) No task references undefined concepts, components, or APIs
 - (deep) Every task's dependencies are present in the implementation plan
 - (deep) Shared code patterns identified and documented (no duplication risk across tasks)
 - Findings categorized P0-P3 with specific file, section, and issue for each
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Finding Disposition
 - **P0 (blocking)**: Must be resolved before proceeding to implementation. Create
@@ -495,6 +495,14 @@ When models actively disagree (one flags an issue, another says the same thing i
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
 3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
+
+### Consensus Classification
+
+When synthesizing multi-model findings, classify each finding:
+- **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
+- **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
+- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
+- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
 
 ### Output Format
 

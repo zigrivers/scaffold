@@ -1,6 +1,6 @@
 ---
 description: "Create a product requirements document from a project idea"
-long-description: "Transform a project idea into a structured product requirements document that"
+long-description: "Translates your vision (or idea, if no vision exists) into a product requirements document with problem statement, user personas, prioritized feature list, constraints, non-functional requirements, and measurable success criteria."
 ---
 
 ## Purpose
@@ -32,9 +32,12 @@ throughout the entire pipeline.
   delivery plan. 15-20 pages.
 - **mvp**: Problem statement, core features list, primary user description,
   success criteria. 1-2 pages. Just enough to start building.
-- **custom:depth(1-5)**: Depth 1-2: MVP-style. Depth 3: add user personas
-  and feature prioritization. Depth 4-5: full competitive analysis and
-  phased delivery.
+- **custom:depth(1-5)**:
+  - Depth 1: MVP-style — problem statement, core features list, primary user. 1 page.
+  - Depth 2: MVP + success criteria and basic constraints. 1-2 pages.
+  - Depth 3: Add user personas and feature prioritization (MoSCoW). 3-5 pages.
+  - Depth 4: Add competitive analysis, risk assessment, and phased delivery plan. 8-12 pages.
+  - Depth 5: Full PRD with competitive analysis, phased delivery, and detailed non-functional requirements. 15-20 pages.
 
 ## Mode Detection
 If docs/plan.md exists, operate in update mode: read existing content, identify
@@ -407,6 +410,47 @@ Before considering a PRD complete:
 - [ ] Competitive context is provided
 - [ ] The PRD says WHAT, not HOW
 - [ ] Every stakeholder group has been considered (end users, admins, support, integrators)
+
+### Non-Functional Requirements — Specification and Quantification
+
+Every NFR must have three components: a **measurable target**, a **measurement method**, and an **acceptable threshold**. Without all three, an NFR is aspirational, not actionable.
+
+#### Performance
+
+- **Response time**: Specify percentile targets — e.g., "API p95 < 200ms, p99 < 500ms for read operations; p95 < 500ms for writes"
+- **Throughput**: Define sustained request rate — e.g., "System handles 500 requests/second under normal load"
+- **Concurrent users**: State peak capacity — e.g., "10,000 simultaneous authenticated sessions without degradation"
+- **Measurement**: Name the tool and method — "Measured via k6 load test against staging, run nightly in CI"
+
+#### Security
+
+- **Compliance standards**: Name the specific standards — OWASP Top 10, SOC2 Type II, PCI DSS Level 1, HIPAA
+- **Authentication requirements**: Specify method and strength — "OAuth 2.0 + PKCE, session timeout 30 min, MFA for admin roles"
+- **Data classification**: Label data tiers — "PII (encrypted at rest AES-256, in transit TLS 1.3), public (CDN-cacheable)"
+- **Audit logging**: Define what is logged — "All auth events, all data mutations, all admin actions; retained 90 days"
+
+#### Scalability
+
+- **Growth targets**: Quantify the horizon — "Support 10x current load within 12 months without architecture changes"
+- **Scaling strategy**: State horizontal vs vertical — "Stateless API servers behind load balancer; horizontal auto-scale at 70% CPU"
+- **Data volume**: Project storage growth — "100GB Year 1, 1TB Year 3; archive records older than 2 years to cold storage"
+
+#### Availability
+
+- **Uptime SLA**: State the target and what it means — "99.9% monthly (43 min downtime/month allowed)"
+- **RTO/RPO**: Recovery time objective and recovery point objective — "RTO: 15 min, RPO: 5 min (continuous replication)"
+- **Graceful degradation**: Define fallback behavior — "If payment provider is down, queue orders and retry; show user 'processing' status"
+- **Maintenance windows**: Specify schedule — "Zero-downtime deploys via rolling update; no scheduled maintenance windows"
+
+#### Accessibility
+
+- **WCAG level**: State the target — "WCAG 2.1 AA compliance for all public-facing pages"
+- **Screen reader support**: Name tested readers — "VoiceOver (macOS/iOS), NVDA (Windows); tested quarterly"
+- **Keyboard navigation**: Full keyboard operability for all interactive elements; visible focus indicators
+
+#### The Three-Part Rule
+
+Every NFR entry in the PRD must answer: *What is the target?* (p95 < 200ms), *How is it measured?* (k6 load test in CI), *What is acceptable?* (p95 between 200-300ms triggers warning; above 300ms blocks deploy). If any of the three is missing, the NFR is incomplete.
 
 ---
 

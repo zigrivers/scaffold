@@ -41,11 +41,12 @@ pending/skipped — developers implement them during TDD execution.
 - Test cases are tagged with story ID and AC ID for traceability
 - (deep) Test layer assignment: single-function ACs → unit; cross-component ACs → integration; full user journey ACs → e2e
 - Test files use the project's test framework from docs/tech-stack.md
-- All test cases are created as pending/skipped (not implemented)
+- All test cases are created as pending/skipped (or equivalent framework pause/skip mechanism) (not implemented)
 - docs/story-tests-map.md shows 100% AC-to-test-case coverage
 - Test file location follows conventions from docs/project-structure.md
 - (deep) Test data fixtures and dependencies documented for each test file
 - (deep) Each pending test case includes story ID and AC ID tags, GWT structure, and at least one assertion hint
+- (mvp) If api-contracts.md does not exist, API test skeletons derived from user story acceptance criteria instead
 
 ## Methodology Scaling
 - **deep**: All stories get test files. Negative test cases for every happy path

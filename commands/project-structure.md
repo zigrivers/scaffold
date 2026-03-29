@@ -1,6 +1,6 @@
 ---
 description: "Design directory layout and scaffold the actual project structure"
-long-description: "Design the directory layout optimized for parallel AI agent work (minimizing"
+long-description: "Designs a directory layout optimized for parallel AI agent work (minimizing file conflicts), documents where each type of file belongs, and creates the actual directories in your project."
 ---
 
 ## Purpose
@@ -43,9 +43,12 @@ with a Quick Reference section for file placement.
   screenshots, and generated vs. committed file inventory.
 - **mvp**: Directory tree with annotations, basic file placement table, .gitignore.
   Skip shared code strategy and high-contention analysis.
-- **custom:depth(1-5)**: Depth 1-2: tree + placement table. Depth 3: add shared
-  code rules. Depth 4: add contention analysis. Depth 5: full suite with barrel
-  policy and import aliases.
+- **custom:depth(1-5)**:
+  - Depth 1: Directory tree with purpose annotations and .gitignore. Minimal.
+  - Depth 2: Depth 1 + file placement table covering all file types.
+  - Depth 3: Add shared code strategy (2+ features before promoting to shared).
+  - Depth 4: Add high-contention file analysis with merge-conflict mitigation strategies.
+  - Depth 5: Full suite with barrel file policy, import path aliases, and generated vs. committed file inventory.
 
 ## Mode Detection
 Update mode if docs/project-structure.md exists. In update mode: never delete

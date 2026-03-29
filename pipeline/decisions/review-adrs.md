@@ -36,7 +36,7 @@ independent review validation.
 - (deep) Missing decisions identified and documented
 - (mvp) Contradictions resolved
 - (mvp) Downstream readiness confirmed (architecture phase can proceed)
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling
 - **deep**: All review passes. Full findings report. Fixes applied and

@@ -1,6 +1,6 @@
 ---
 description: "Discover UX-level enhancements and innovation opportunities in user stories"
-long-description: "Discover UX-level enhancements and innovation opportunities within the existing"
+long-description: "Identifies UX enhancement opportunities — progressive disclosure, smart defaults, accessibility improvements — and integrates approved changes into existing stories."
 ---
 
 ## Purpose
@@ -33,6 +33,7 @@ enhancement opportunities.
 - (mvp) Approved enhancements are integrated into existing stories (not new stories)
 - (mvp) PRD scope boundaries are respected — no scope creep
 - User approval for each accepted innovation documented as a question-response pair with timestamp (e.g., "Q: Accept enhancement X? A: Yes — 2025-01-15T14:30Z")
+- (mvp) Each innovation marked with approval status: approved, deferred, or rejected, with user decision timestamp
 - (depth 4+) Multi-model suggestions deduplicated and synthesized with unique ideas from each model highlighted
 
 ## Methodology Scaling
@@ -42,10 +43,12 @@ enhancement opportunities.
   innovation dispatched to Codex and Gemini if available, with graceful
   fallback to Claude-only enhanced brainstorming.
 - **mvp**: Not applicable — this step is conditional and skipped in MVP.
-- **custom:depth(1-5)**: Depth 1-2: skip (not enough context for meaningful innovation at this depth). Depth 3: quick
-  scan for obvious improvements. Depth 4: full innovation pass + one external
-  model (if CLI available). Depth 5: full innovation pass + multi-model with
-  deduplication and synthesis.
+- **custom:depth(1-5)**:
+  - Depth 1: Skip (not enough context for meaningful innovation at this depth).
+  - Depth 2: Skip (not enough context for meaningful innovation at this depth).
+  - Depth 3: Quick scan for obvious UX improvements and low-hanging enhancements.
+  - Depth 4: Full innovation pass across all three categories + one external model (if CLI available).
+  - Depth 5: Full innovation pass + multi-model with deduplication and synthesis.
 
 ## Conditional Evaluation
 Enable when: user stories review identifies UX gaps, project targets a consumer-facing
@@ -840,6 +843,14 @@ When models actively disagree (one flags an issue, another says the same thing i
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
 3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
+
+### Consensus Classification
+
+When synthesizing multi-model findings, classify each finding:
+- **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
+- **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
+- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
+- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
 
 ### Output Format
 

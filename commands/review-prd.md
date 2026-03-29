@@ -1,6 +1,6 @@
 ---
 description: "Multi-pass review of the PRD for completeness, clarity, and downstream readiness"
-long-description: "Deep multi-pass review of the PRD, targeting the specific failure modes of"
+long-description: "Reviews the PRD across eight passes — problem rigor, persona coverage, feature scoping, success criteria, internal consistency, constraints, non-functional requirements — and fixes blocking issues."
 ---
 
 ## Purpose
@@ -26,11 +26,11 @@ independent review validation.
 ## Quality Criteria
 - (mvp) Passes 1-2 executed with findings documented
 - All review passes executed with findings documented
-- Every finding categorized by severity (P0-P3)
+- Every finding categorized by severity: P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.
 - Fix plan created for P0 and P1 findings
 - Fixes applied and re-validated
 - (mvp) Downstream readiness confirmed (User Stories can proceed)
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling
 - **deep**: All 8 review passes from the knowledge base. Full findings report
@@ -39,10 +39,12 @@ independent review validation.
   to Claude-only enhanced review.
 - **mvp**: Passes 1-2 only (Problem Statement Rigor, Persona Coverage). Focus
   on blocking gaps — requirements too vague to write stories from.
-- **custom:depth(1-5)**: Depth 1-2: passes 1-2 only (Problem Statement Rigor,
-  Persona Coverage). Depth 3: passes 1-4 (add Feature Scoping, Success
-  Criteria). Depth 4: all 8 passes + one external model review (if CLI
-  available). Depth 5: all 8 passes + multi-model review with reconciliation.
+- **custom:depth(1-5)**:
+  - Depth 1: Pass 1 only (Problem Statement Rigor). One review pass.
+  - Depth 2: Passes 1-2 (Problem Statement Rigor, Persona Coverage). Two review passes.
+  - Depth 3: Passes 1-4 (add Feature Scoping, Success Criteria). Four review passes.
+  - Depth 4: All 8 passes + one external model review (if CLI available).
+  - Depth 5: All 8 passes + multi-model review with reconciliation.
 
 ## Mode Detection
 If docs/reviews/pre-review-prd.md exists, this is a re-review. Read previous
@@ -914,6 +916,47 @@ Before considering a PRD complete:
 - [ ] The PRD says WHAT, not HOW
 - [ ] Every stakeholder group has been considered (end users, admins, support, integrators)
 
+### Non-Functional Requirements — Specification and Quantification
+
+Every NFR must have three components: a **measurable target**, a **measurement method**, and an **acceptable threshold**. Without all three, an NFR is aspirational, not actionable.
+
+#### Performance
+
+- **Response time**: Specify percentile targets — e.g., "API p95 < 200ms, p99 < 500ms for read operations; p95 < 500ms for writes"
+- **Throughput**: Define sustained request rate — e.g., "System handles 500 requests/second under normal load"
+- **Concurrent users**: State peak capacity — e.g., "10,000 simultaneous authenticated sessions without degradation"
+- **Measurement**: Name the tool and method — "Measured via k6 load test against staging, run nightly in CI"
+
+#### Security
+
+- **Compliance standards**: Name the specific standards — OWASP Top 10, SOC2 Type II, PCI DSS Level 1, HIPAA
+- **Authentication requirements**: Specify method and strength — "OAuth 2.0 + PKCE, session timeout 30 min, MFA for admin roles"
+- **Data classification**: Label data tiers — "PII (encrypted at rest AES-256, in transit TLS 1.3), public (CDN-cacheable)"
+- **Audit logging**: Define what is logged — "All auth events, all data mutations, all admin actions; retained 90 days"
+
+#### Scalability
+
+- **Growth targets**: Quantify the horizon — "Support 10x current load within 12 months without architecture changes"
+- **Scaling strategy**: State horizontal vs vertical — "Stateless API servers behind load balancer; horizontal auto-scale at 70% CPU"
+- **Data volume**: Project storage growth — "100GB Year 1, 1TB Year 3; archive records older than 2 years to cold storage"
+
+#### Availability
+
+- **Uptime SLA**: State the target and what it means — "99.9% monthly (43 min downtime/month allowed)"
+- **RTO/RPO**: Recovery time objective and recovery point objective — "RTO: 15 min, RPO: 5 min (continuous replication)"
+- **Graceful degradation**: Define fallback behavior — "If payment provider is down, queue orders and retry; show user 'processing' status"
+- **Maintenance windows**: Specify schedule — "Zero-downtime deploys via rolling update; no scheduled maintenance windows"
+
+#### Accessibility
+
+- **WCAG level**: State the target — "WCAG 2.1 AA compliance for all public-facing pages"
+- **Screen reader support**: Name tested readers — "VoiceOver (macOS/iOS), NVDA (Windows); tested quarterly"
+- **Keyboard navigation**: Full keyboard operability for all interactive elements; visible focus indicators
+
+#### The Three-Part Rule
+
+Every NFR entry in the PRD must answer: *What is the target?* (p95 < 200ms), *How is it measured?* (k6 load test in CI), *What is acceptable?* (p95 between 200-300ms triggers warning; above 300ms blocks deploy). If any of the three is missing, the NFR is incomplete.
+
 ---
 
 ### gap-analysis
@@ -1401,6 +1444,14 @@ When models actively disagree (one flags an issue, another says the same thing i
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
 3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
+
+### Consensus Classification
+
+When synthesizing multi-model findings, classify each finding:
+- **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
+- **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
+- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
+- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
 
 ### Output Format
 

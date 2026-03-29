@@ -27,7 +27,8 @@ enabling parallel development with confidence.
   shapes, error contracts, auth requirements
 
 ## Quality Criteria
-- (mvp) Every domain operation that crosses a component boundary has an API endpoint
+- (mvp) Every domain operation that crosses a component boundary maps to >= 1 API endpoint
+- (mvp) If domain-models/ does not exist, API boundaries derived from user story acceptance criteria
 - (mvp) Every endpoint documents: success response code, error response codes, error response body schema, and at least 2 domain-specific error codes per endpoint with human-readable reason phrases (e.g., 400 `invalid_email`, 409 `user_already_exists`)
 - (mvp) Authentication and authorization requirements per endpoint
 - (deep) Versioning strategy documented (if applicable)

@@ -36,7 +36,7 @@ decisions.
 - (deep) Every ADR has alternatives-considered section with pros/cons
 - (deep) Every ADR referenced in `docs/system-architecture.md` exists in `docs/adrs/`
 - Findings categorized P0-P3 with specific file, section, and issue for each
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Finding Disposition
 - **P0 (blocking)**: Must be resolved before proceeding to implementation. Create

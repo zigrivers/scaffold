@@ -38,7 +38,7 @@ independent review validation.
 - (mvp) Entity coverage verified (every PRD feature maps to at least one entity)
 - (deep) Aggregate boundaries verified (each aggregate protects at least one invariant)
 - (deep) Ubiquitous language consistency verified across all domain model files
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling
 - **deep**: All review passes from the knowledge base. Full findings report

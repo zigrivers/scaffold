@@ -1,6 +1,6 @@
 ---
 description: "Translate PRD features into user stories with acceptance criteria"
-long-description: "Translate PRD features and requirements into user stories that define user-facing"
+long-description: "Breaks every PRD feature into user stories organized by epic, each with testable acceptance criteria in Given/When/Then format."
 ---
 
 ## Purpose
@@ -21,7 +21,7 @@ task decomposition downstream.
 ## Quality Criteria
 - (mvp) Every PRD feature maps to at least one user story
 - (deep) Stories follow INVEST criteria (Independent, Negotiable, Valuable, Estimable, Small, Testable)
-- (mvp) Acceptance criteria are testable — unambiguous pass/fail
+- (mvp) Acceptance criteria are testable — unambiguous pass/fail: (a) free of adjectives like 'valid', 'properly', 'quickly', (b) names specific inputs and expected outputs
 - (deep) No story has more than 7 acceptance criteria
 - (mvp) Every PRD persona is represented in at least one story
 - (mvp) Stories describe user behavior, not implementation details
@@ -33,9 +33,12 @@ task decomposition downstream.
   examples, story-to-domain-event mapping for domain modeling consumption.
 - **mvp**: Flat list of one-liner stories grouped by PRD section. One bullet
   per story for the primary success condition. No epics, no scope boundaries.
-- **custom:depth(1-5)**: Depth 1-2: flat list with brief acceptance criteria.
-  Depth 3: full template with IDs, epics, Given/When/Then. Depth 4-5: add
-  dependency mapping, traceability, UI/UX notes, story splitting rationale.
+- **custom:depth(1-5)**:
+  - Depth 1: Flat list of one-liner stories grouped by PRD section. One bullet per story.
+  - Depth 2: Flat list with brief acceptance criteria (1-2 criteria per story).
+  - Depth 3: Full template with story IDs, epics, Given/When/Then acceptance criteria.
+  - Depth 4: Add dependency mapping, traceability to PRD features, and UI/UX notes.
+  - Depth 5: Full suite with story splitting rationale, persona journey maps, and story-to-domain-event mapping.
 
 ## Mode Detection
 If docs/user-stories.md exists, operate in update mode: read existing stories,

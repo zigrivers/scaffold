@@ -31,7 +31,7 @@ strategically sound, and ready for the PRD to consume.
 - Fix plan created for P0 and P1 findings
 - Fixes applied and re-validated
 - (mvp) Every vision section has content specific enough to derive a PRD without asking strategic clarification questions
-- (depth 4+) Multi-model review findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model review findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling
 - **deep**: All 5 review passes. Full findings report with severity

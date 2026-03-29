@@ -1,6 +1,6 @@
 ---
 description: "Review ADRs for completeness, consistency, and decision quality"
-long-description: "Multi-pass review of ADRs targeting ADR-specific failure modes: contradictory"
+long-description: "Checks for contradictions between decisions, missing decisions implied by the architecture, and whether every choice has honest trade-off analysis."
 ---
 
 ## Purpose
@@ -25,20 +25,23 @@ independent review validation.
 
 ## Quality Criteria
 - (mvp) All ADR-specific review passes executed
-- (mvp) Every finding categorized P0-P3 with specific ADR number, section, and issue
+- (mvp) Every finding categorized P0-P3 with specific ADR number, section, and issue. Severity definitions: P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.
 - (deep) Missing decisions identified and documented
 - (mvp) Contradictions resolved
 - (mvp) Downstream readiness confirmed (architecture phase can proceed)
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling
 - **deep**: All review passes. Full findings report. Fixes applied and
   re-validated. Multi-model review dispatched to Codex and Gemini if available,
   with graceful fallback to Claude-only enhanced review.
 - **mvp**: Quick consistency check for contradictions only.
-- **custom:depth(1-5)**: Depth 1-3: scale number of review passes with depth.
-  Depth 4: full review + one external model (if CLI available). Depth 5:
-  full review + multi-model with reconciliation.
+- **custom:depth(1-5)**: Depth 1: single pass — contradiction check only.
+  Depth 2: two passes — contradiction check + missing rationale scan.
+  Depth 3: four passes — contradiction check, missing rationale, implied-but-
+  unrecorded decisions, and unresolved trade-offs. Depth 4: all passes +
+  one external model (if CLI available). Depth 5: all passes + multi-model
+  with reconciliation.
 
 ## Mode Detection
 Re-review mode if previous review exists. Check which findings were addressed.
@@ -706,6 +709,14 @@ When models actively disagree (one flags an issue, another says the same thing i
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
 3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
+
+### Consensus Classification
+
+When synthesizing multi-model findings, classify each finding:
+- **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
+- **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
+- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
+- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
 
 ### Output Format
 

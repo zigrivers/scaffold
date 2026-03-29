@@ -1,6 +1,6 @@
 ---
 description: "Break architecture into implementable tasks with dependencies"
-long-description: "Decompose user stories and system architecture into concrete, implementable"
+long-description: "Breaks your user stories and architecture into concrete tasks — each scoped to ~150 lines of code and 3 files max, with clear acceptance criteria, no ambiguous decisions, and explicit dependencies."
 ---
 
 ## Purpose
@@ -30,8 +30,8 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 
 ## Quality Criteria
 - (mvp) Every architecture component has implementation tasks
-- (mvp) Task dependencies form a valid DAG (no cycles)
-- (mvp) Each task produces ~150 lines of net-new application code (excluding tests and generated files)
+- (mvp) Task dependencies form a valid DAG (no cycles, verified by checking no task depends on a later-ordered task)
+- (mvp) Each task produces 150 +/- 50 lines of net-new application code (excluding tests and generated files)
 - (mvp) Tasks include acceptance criteria (how to know it's done)
 - (mvp) Tasks incorporate testing requirements from the testing strategy
 - (deep) Tasks reference corresponding test skeletons from tests/acceptance/ where applicable
@@ -39,7 +39,8 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 - (deep) Tasks incorporate operational requirements (monitoring, deployment) where applicable
 - (deep) Critical path is identified
 - (deep) Parallelization opportunities are marked with wave plan
-- (mvp) Every user story maps to at least one task
+- (mvp) Every user story maps to >= 1 task
+- (mvp) Every PRD feature maps to >= 1 user story, and every user story maps to >= 1 task (transitive traceability)
 - (deep) High-risk tasks are flagged with risk type and mitigation
 - (deep) Wave summary produced with agent allocation recommendation
 - (mvp) No task modifies more than 3 application files (test files excluded; exceptions require justification)
@@ -56,8 +57,32 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
   Each task has a brief description, rough size estimate, and key dependency.
   Enough to start working sequentially. Skip architecture decomposition —
   work directly from user story acceptance criteria.
-- **custom:depth(1-5)**: Depth 1-2: ordered list. Depth 3: add dependencies
-  and sizing. Depth 4-5: full breakdown with parallelization.
+- **custom:depth(1-5)**: Depth 1: ordered task list derived from PRD features only. Depth 2: ordered list with rough size estimates per task. Depth 3: add explicit dependencies and sizing (150-line budget, 3-file rule). Depth 4: full breakdown with dependency graph and parallelization plan. Depth 5: full breakdown with parallelization, wave assignments, agent allocation, and critical path analysis.
+
+## MVP-Specific Guidance (No Architecture Available)
+
+At MVP depth, the system architecture document does not exist. Task decomposition
+must work directly from user stories without explicit component definitions.
+
+**How to decompose stories into tasks without architecture:**
+
+1. **Derive implicit layers from tech stack**: Read docs/tech-stack.md. For a web
+   app: API layer (backend), UI layer (frontend), Data layer (database). Each
+   story typically decomposes into one task per affected layer.
+
+2. **Map each story to layers**: "User can register" → 3 tasks: API endpoint,
+   UI form, database table. "User can view dashboard" → 2 tasks: API data
+   endpoint, UI display component.
+
+3. **Use acceptance criteria to define task boundaries**: Each AC (Given/When/Then)
+   maps to test cases. Group test cases by layer. Each layer's test cases become
+   one task.
+
+4. **Order tasks by dependency**: Database migrations first, then API endpoints,
+   then UI components (bottom-up).
+
+5. **Split within layers when tasks exceed 150 lines**: Happy path in one task,
+   validation/error handling in another, edge cases in a third.
 
 ## Mode Detection
 Check for docs/implementation-plan.md. If it exists, operate in update mode:
@@ -613,6 +638,59 @@ If a task genuinely can't be split further without creating tasks that have no i
 **Premature shared utilities.** Creating "shared utility library" tasks before any feature needs them. This produces speculative abstractions that don't fit actual use cases. Fix: shared code emerges from feature work. Only create shared utility tasks after two or more features demonstrate the need.
 
 **Ignoring the critical path.** Assigning agents to low-priority tasks while critical-path tasks wait for resources. Fix: always prioritize critical-path tasks. Non-critical tasks are parallelized around the critical path, not instead of it.
+
+### Critical Path and Wave Planning
+
+#### Identifying the Critical Path
+
+The critical path is the longest chain of sequentially dependent tasks from project start to finish. To find it:
+
+1. **Build the full DAG** — list every task and its dependencies (logical, file contention, infrastructure)
+2. **Assign effort estimates** — use story points or hours per task
+3. **Trace all paths** — walk from every root node (no dependencies) to every leaf node (no dependents)
+4. **Sum each path** — the path with the highest total effort is the critical path
+5. **Mark float** — non-critical tasks have float equal to (critical path length - their path length); they can slip by that amount without delaying the project
+
+Critical path tasks get top priority for agent assignment. Delays on these tasks delay the entire project; delays on non-critical tasks do not (up to their float).
+
+#### Wave Planning
+
+Waves group independent tasks for parallel execution. Each wave starts only after its dependency wave completes.
+
+```
+Wave 0: Project infrastructure (DB setup, CI pipeline, auth scaffold)
+Wave 1: Core data models, base API framework, design tokens
+Wave 2: Feature endpoints, UI components, middleware (per-feature)
+Wave 3: Integration flows, cross-feature wiring, E2E test scaffolds
+Wave 4: Polish, performance, E2E tests, documentation finalization
+```
+
+**Rules for wave construction:**
+- A task belongs to the earliest wave where all its dependencies are satisfied
+- Tasks within a wave have zero dependencies on each other
+- The number of useful parallel agents equals the task count of the widest wave
+- If one wave has 8 tasks and the next has 2, consider whether splitting wave-2 tasks could improve parallelism
+
+#### Agent Allocation by Wave
+
+Assign agents based on task type to maximize context reuse within an agent session:
+
+- **Backend agents** — API endpoints, database migrations, service logic. Context: architecture doc, API contracts, coding standards
+- **Frontend agents** — UI components, pages, client-side state. Context: UX spec, design system, component patterns
+- **Infrastructure agents** — CI/CD, deployment, config, monitoring. Context: dev setup, operations runbook
+- **Cross-cutting agents** — Auth, error handling, shared utilities. Context: security review, coding standards
+
+An agent working consecutive tasks of the same type retains relevant context and produces more consistent output.
+
+#### Parallelization Signals
+
+Tasks are safe to run in parallel when they share no file dependencies. Quick checklist:
+
+- **Different feature directories** — `src/features/auth/` vs `src/features/billing/` can always parallelize
+- **Different layers of different features** — backend auth + frontend billing have no file overlap
+- **Same feature, different layers** — only if the interface contract is agreed upfront (API shape, component props)
+- **Same file touched** — must be sequenced, no exceptions (merge conflicts are expensive)
+- **Shared utility creation** — block until the utility task merges, then dependents can parallelize
 
 ---
 

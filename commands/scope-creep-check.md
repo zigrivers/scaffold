@@ -1,6 +1,6 @@
 ---
 description: "Verify specs stay aligned to PRD boundaries"
-long-description: "Verify specs stay aligned to PRD boundaries. Check that user stories,"
+long-description: "Compares everything that has been specified against the original PRD and flags anything that was not in the requirements — features, components, or tasks that crept in without justification."
 ---
 
 ## Purpose
@@ -32,7 +32,7 @@ differently, surfacing subtle creep.
 - (deep) No "gold-plating" — implementation tasks do not exceed story acceptance criteria
 - (deep) Feature count has not grown beyond PRD scope without documented justification
 - Findings categorized P0-P3 with specific file, section, and issue for each
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Finding Disposition
 - **P0 (blocking)**: Must be resolved before proceeding to implementation. Create
@@ -480,6 +480,14 @@ When models actively disagree (one flags an issue, another says the same thing i
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
 3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
+
+### Consensus Classification
+
+When synthesizing multi-model findings, classify each finding:
+- **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
+- **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
+- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
+- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
 
 ### Output Format
 

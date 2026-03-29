@@ -1,6 +1,6 @@
 ---
 description: "Review domain models for completeness, consistency, and downstream readiness"
-long-description: "Deep multi-pass review of the domain models, targeting the specific failure modes"
+long-description: "Verifies every PRD feature maps to a domain entity, checks that business rules are enforceable, and ensures the shared vocabulary is consistent across all project files."
 ---
 
 ## Purpose
@@ -24,14 +24,14 @@ independent review validation.
 
 ## Quality Criteria
 - (mvp) All review passes executed with findings documented
-- (mvp) Every finding categorized by severity (P0-P3)
+- (mvp) Every finding categorized by severity (P0-P3). Severity definitions: P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.
 - (mvp) Fix plan created for P0 and P1 findings
 - (mvp) Fixes applied and re-validated
 - (mvp) Downstream readiness confirmed (decisions phase can proceed)
 - (mvp) Entity coverage verified (every PRD feature maps to at least one entity)
 - (deep) Aggregate boundaries verified (each aggregate protects at least one invariant)
 - (deep) Ubiquitous language consistency verified across all domain model files
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling
 - **deep**: All review passes from the knowledge base. Full findings report
@@ -39,10 +39,12 @@ independent review validation.
   review dispatched to Codex and Gemini if available, with graceful fallback
   to Claude-only enhanced review.
 - **mvp**: Quick consistency check. Focus on blocking issues only.
-- **custom:depth(1-5)**: Depth 1-2: blocking issues only. Depth 3: add coverage
-  and consistency passes. Depth 4: full multi-pass review + one external model
-  (if CLI available). Depth 5: full multi-pass review + multi-model with
-  reconciliation.
+- **custom:depth(1-5)**: Depth 1: single pass — blocking issues only (entity
+  coverage against PRD). Depth 2: two passes — entity coverage + ubiquitous
+  language consistency. Depth 3: four passes — entity coverage, ubiquitous
+  language, aggregate boundary validation, and cross-domain consistency.
+  Depth 4: all review passes + one external model (if CLI available).
+  Depth 5: all review passes + multi-model with reconciliation.
 
 ## Mode Detection
 If docs/reviews/review-domain-modeling.md exists, this is a re-review. Read previous
@@ -789,6 +791,14 @@ When models actively disagree (one flags an issue, another says the same thing i
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
 3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
+
+### Consensus Classification
+
+When synthesizing multi-model findings, classify each finding:
+- **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
+- **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
+- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
+- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
 
 ### Output Format
 

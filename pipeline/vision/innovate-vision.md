@@ -36,6 +36,7 @@ not here.
 - (mvp) Recommended disposition stated for each: must-have, backlog, or reject with rationale
 - (deep) Impact assessments compared to existing document content
 - (deep) Each approved innovation is integrated with the same subsection headings and detail level as existing vision sections
+- (mvp) Each innovation marked with approval status: approved, deferred, or rejected, with user decision timestamp
 - Vision scope is respected — no uncontrolled strategic drift
 - User approval is obtained before modifying the vision document
 
