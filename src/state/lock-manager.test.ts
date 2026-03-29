@@ -2,9 +2,32 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
+import { execSync } from 'node:child_process'
 import { describe, it, expect, afterEach } from 'vitest'
 import { acquireLock, releaseLock, checkLock, isStale } from './lock-manager.js'
 import type { LockFile } from '../types/index.js'
+
+/**
+ * Get the actual start time of a PID via `ps`. Tests must use this instead of
+ * `new Date().toISOString()` for `processStartedAt` when using a real PID
+ * (like `process.pid`), because the lock-manager compares recorded vs. actual
+ * start time to detect PID recycling. Using wall-clock "now" causes flaky
+ * failures on slow CI runners where vitest started seconds before the test runs.
+ */
+function getProcessStartedAt(pid: number): string {
+  try {
+    const output = execSync(`ps -o lstart= -p ${pid}`, {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+    const trimmed = output.trim()
+    if (trimmed) {
+      const date = new Date(trimmed)
+      if (!isNaN(date.getTime())) return date.toISOString()
+    }
+  } catch { /* fall through */ }
+  return new Date().toISOString()
+}
 
 const tmpDirs: string[] = []
 
@@ -62,7 +85,7 @@ describe('acquireLock', () => {
       holder: os.hostname(),
       pid: process.pid,
       started: new Date().toISOString(),
-      processStartedAt: new Date().toISOString(),
+      processStartedAt: getProcessStartedAt(process.pid),
       command: 'run',
     }
     writeLock(dir, lock)
@@ -80,7 +103,7 @@ describe('acquireLock', () => {
       holder: 'some-host',
       pid: process.pid,
       started: new Date().toISOString(),
-      processStartedAt: new Date().toISOString(),
+      processStartedAt: getProcessStartedAt(process.pid),
       command: 'run',
     }
     writeLock(dir, lock)
@@ -203,7 +226,7 @@ describe('isStale', () => {
       holder: os.hostname(),
       pid: process.pid,
       started: new Date().toISOString(),
-      processStartedAt: new Date().toISOString(),
+      processStartedAt: getProcessStartedAt(process.pid),
       command: 'run',
     }
     // Current process is alive — isStale should return false
