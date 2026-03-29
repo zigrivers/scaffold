@@ -140,7 +140,14 @@ For each task:
    - Include in the PR description: what was implemented, key decisions, files changed
    - Follow the PR workflow from `docs/git-workflow.md` or CLAUDE.md
 
-7. **Update status**
+7. **Run code reviews (MANDATORY)**
+   - Run `/scaffold:review-pr` with the PR number from step 6
+   - This runs **all three** review channels: Codex CLI, Gemini CLI, and Superpowers code-reviewer subagent
+   - All three channels must execute (skip only if a tool is genuinely not installed)
+   - Fix any P0/P1 findings before proceeding
+   - Do NOT move to the next task until the review summary confirms all channels ran
+
+8. **Update status**
    - If Beads: task status is managed via `bd` commands
    - Without Beads: mark the task as complete in the plan/playbook
 
@@ -171,9 +178,10 @@ For each task:
 1. **TDD is not optional** — Write failing tests before implementation. No exceptions.
 2. **One task at a time** — Complete the current task fully before starting the next.
 3. **Quality gates before PR** — Never create a PR with failing checks.
-4. **Update status immediately** — Mark tasks complete as soon as the PR is created.
-5. **Consult lessons.md** — Check for relevant anti-patterns before each task.
-6. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
+4. **Code review before next task** — After creating a PR, run `/scaffold:review-pr` and fix all P0/P1 findings before moving on. All three review channels (Codex, Gemini, Superpowers) must execute.
+5. **Update status immediately** — Mark tasks complete as soon as review passes.
+6. **Consult lessons.md** — Check for relevant anti-patterns before each task.
+7. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
 
 ---
 

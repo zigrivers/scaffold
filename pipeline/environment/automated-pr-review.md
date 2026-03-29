@@ -29,7 +29,7 @@ entire review-fix loop locally.
 - scripts/cli-pr-review.sh (local CLI mode) — dual-model review with reconciliation
 - scripts/await-pr-review.sh (external bot mode) — polling script with JSON output
 - docs/git-workflow.md updated with review loop integration
-- CLAUDE.md updated with agent-driven review workflow
+- CLAUDE.md updated with agent-driven review workflow and review-pr hook
 
 ## Quality Criteria
 - (mvp) External reviewer configured and verified (AGENTS.md created)
@@ -38,6 +38,7 @@ entire review-fix loop locally.
 - (mvp) CLAUDE.md workflow documents the agent-driven loop
 - (mvp) No GitHub Actions workflows created (zero Actions minutes)
 - (mvp) No ANTHROPIC_API_KEY secret required
+- (mvp) Post-PR-creation hook configured in settings to remind agents to run review-pr
 - (deep) Legacy GitHub Actions workflows detected and cleanup offered
 - (deep) Dual-model review enabled when both CLIs available
 
@@ -77,3 +78,61 @@ Check if AGENTS.md exists first. If it exists, check for scaffold tracking comme
 - **Conflict resolution**: if review criteria changed in coding-standards.md,
   update AGENTS.md review rules to match; if both CLI reviewers are now
   available, offer to enable dual-model review
+
+## Instructions
+
+### Configure Review Enforcement Hook
+
+Add a Claude Code hook to the project's `.claude/settings.json` that fires after
+every `gh pr create` command. This injects a mandatory reminder into the agent's
+context at exactly the moment it needs to run reviews — preventing context decay
+from causing missed review channels.
+
+Add this to `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if echo \"$CC_BASH_COMMAND\" | grep -q 'gh pr create'; then echo '\\n⚠️  MANDATORY: Run /scaffold:review-pr now.\\nAll 3 review channels must execute before proceeding:\\n  1. Codex CLI\\n  2. Gemini CLI\\n  3. Superpowers code-reviewer subagent\\nDo NOT move to the next task until review is complete.'; fi"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Why a hook instead of just instructions?** Agents in long implementation sessions
+suffer from context decay — instructions from hundreds of messages ago are
+effectively invisible by the time the agent creates its third PR. The hook injects
+the reminder at exactly the right moment, every time, regardless of context length.
+
+### Add Review Workflow to CLAUDE.md
+
+Add the following to the project's CLAUDE.md in the Code Review section:
+
+```markdown
+## Code Review
+
+After creating a PR, run `/scaffold:review-pr <PR#>` to execute all three review
+channels (Codex CLI, Gemini CLI, Superpowers code-reviewer). Fix P0/P1 findings
+before moving to the next task. A post-hook on `gh pr create` will remind you.
+
+| Command | Purpose |
+|---------|---------|
+| `/scaffold:review-pr <PR#>` | Run all 3 review channels on a PR |
+| `scripts/cli-pr-review.sh <PR#>` | Run dual-model CLI review only |
+```
+
+### Configure AGENTS.md, Review Standards, and CLI Scripts
+
+Follow the existing instructions for creating AGENTS.md, docs/review-standards.md,
+and review scripts based on the project's coding standards and test requirements.
+These provide the review context that `/scaffold:review-pr` uses when dispatching
+to each channel.

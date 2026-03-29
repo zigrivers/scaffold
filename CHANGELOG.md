@@ -2,6 +2,14 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.42.0] — 2026-03-29
+
+### Added
+
+- **`/scaffold:review-pr` tool** — Single entry point for running all three code review channels (Codex CLI, Gemini CLI, Superpowers code-reviewer subagent) on a PR. Handles auth verification, independent dispatch, finding reconciliation, and fix loops. Agents call this once instead of remembering three separate invocations.
+- **Mandatory review step in `single-agent-start`** — Step 7 "Run code reviews" now requires agents to execute `/scaffold:review-pr` after creating every PR. Process rule 4 reinforces: all three review channels must run before moving to the next task.
+- **Review enforcement hook** — `automated-pr-review` now configures a Claude Code `PostToolUse` hook on `gh pr create` in target projects. The hook injects a mandatory reminder into the agent's context at PR creation time, preventing context decay from causing missed reviews.
+
 ## [2.41.0] — 2026-03-29
 
 ### Added
