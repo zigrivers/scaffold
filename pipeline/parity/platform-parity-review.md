@@ -20,6 +20,14 @@ input patterns, and UX considerations are documented.
 At depth 4+, dispatches to external AI models (Codex, Gemini) for
 independent platform gap analysis.
 
+## Conditional Evaluation
+This step is conditional ("if-needed"). Enable when:
+- The project targets 2+ platforms (e.g., web + mobile, iOS + Android)
+- `docs/tech-stack.md` lists a cross-platform framework (React Native, Flutter, Expo)
+- `docs/plan.md` mentions multiple deployment targets
+
+Skip when the project targets a single platform only.
+
 ## Inputs
 - docs/plan.md (required) — target platforms and version requirements
 - docs/tech-stack.md (required) — cross-platform framework and build approach
@@ -39,14 +47,14 @@ independent platform gap analysis.
 - docs/reviews/platform-parity/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- All target platforms identified from PRD and tech-stack.md
-- Every user story checked for platform-specific acceptance criteria
-- Feature parity matrix shows which features work on which platforms
-- Input pattern differences documented (touch vs. mouse, keyboard shortcuts, gestures)
-- Platform-specific testing documented (Playwright for web, Maestro for mobile)
-- Navigation patterns appropriate per platform (sidebar vs. tab bar, etc.)
-- Offline/connectivity handling addressed per platform (if applicable)
-- Web version is treated as first-class (not afterthought) if PRD specifies it
+- (mvp) All target platforms identified from PRD and tech-stack.md
+- (mvp) Every user story checked for platform-specific acceptance criteria
+- (deep) Feature parity matrix shows which features work on which platforms
+- (deep) Input pattern differences documented (touch vs. mouse, keyboard shortcuts, gestures)
+- (deep) Platform-specific testing documented (Playwright for web, Maestro for mobile)
+- (deep) Navigation patterns appropriate per platform (sidebar vs. tab bar, etc.)
+- (deep) Offline/connectivity handling addressed per platform (if applicable)
+- (deep) Web version is treated as first-class (not afterthought) if PRD specifies it
 - Fix plan documented for all P0/P1 findings with specific document and section to update
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 

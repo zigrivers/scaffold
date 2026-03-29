@@ -10,6 +10,17 @@ User stories translate PRD requirements into user-facing behavior with testable 
 
 Follows the review process defined in `review-methodology.md`.
 
+## Summary
+
+- **Pass 1 — PRD Coverage**: Every PRD feature, flow, and requirement has at least one corresponding user story; no silent coverage gaps.
+- **Pass 2 — Acceptance Criteria Quality**: Every story has testable, unambiguous Given/When/Then criteria covering happy path and at least one error/edge case.
+- **Pass 3 — Story Independence**: Stories can be implemented independently; dependencies are explicit, not hidden; no circular dependencies.
+- **Pass 4 — Persona Coverage**: Every PRD-defined persona has stories; every story maps to a valid, defined persona.
+- **Pass 5 — Sizing & Splittability**: No story too large for 1-3 agent sessions or too small to be meaningful; oversized stories have clear split points.
+- **Pass 6 — Downstream Readiness**: Domain entities, events, aggregate boundaries, and business rules are discoverable from acceptance criteria for domain modeling.
+
+## Deep Guidance
+
 ---
 
 ## Pass 1: PRD Coverage

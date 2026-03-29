@@ -303,6 +303,7 @@ When this step is complete, tell the user:
 **After implementation:**
 - If this fix revealed a pattern or gotcha: update `tasks/lessons.md`.
 - If this fix changed a convention or pattern: consider updating `docs/implementation-playbook.md` and `docs/coding-standards.md`.
+- After merging, consider running `/scaffold:version-bump` if the change is user-facing
 
 **Next:** Run `/scaffold:single-agent-start` or `/scaffold:single-agent-resume` to begin implementation (or `/scaffold:multi-agent-start <agent-name>` / `/scaffold:multi-agent-resume <agent-name>` for worktree agents).
 

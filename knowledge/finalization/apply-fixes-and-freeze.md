@@ -8,6 +8,18 @@ topics: [finalization, fixes, freeze, validation, documentation-quality]
 
 The apply-fixes-and-freeze step is the last gate before implementation begins. Its purpose is to resolve all actionable validation findings, verify the fixes don't introduce new issues, and mark the documentation as frozen. After this step, documents change only if implementation reveals a genuine gap.
 
+## Summary
+
+- **Fix prioritization**: P0 (blocking, must fix), P1 (significant gap, should fix), P2 (improvement, defer with rationale). Decision rule: would an agent produce incorrect code? (P0), have to guess? (P1), neither? (P2).
+- **Fix process**: Build fix plan (deduplicate, group by document, order by priority), apply minimal targeted fixes, re-validate affected checks, loop until zero new findings.
+- **Fix execution rules**: One finding per commit, fix forward not around, preserve document structure, cross-document fixes must be atomic.
+- **Re-validation**: Re-run the specific validation passes that flagged each fix. Spot-check adjacent sections. Verify counts and cross-references. Grep for old terms after renames.
+- **Documentation freeze**: All P0 and P1 resolved, re-validation clean. Add `<!-- FROZEN -->` marker to each artifact. No further content changes unless implementation reveals a genuine gap.
+- **Post-freeze rules**: Typo fixes allowed. Implementation-discovered gaps go through P0/P1 prioritization. No scope additions. No "nice to have" improvements.
+- **Common pitfalls**: Fixing symptoms instead of root causes, introducing new inconsistencies, over-fixing beyond implementation readiness, skipping re-validation, premature freeze.
+
+## Deep Guidance
+
 ## Fix Prioritization
 
 Validation phases produce findings at three priority levels. Address them in strict order:

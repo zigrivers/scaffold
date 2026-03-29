@@ -35,15 +35,15 @@ inconsistent command formats. Fix all issues found.
 - tasks/lessons.md — created if missing
 
 ## Quality Criteria
-- CLAUDE.md contains complete workflow (9 steps + AI review step 4.5)
-- Commit format is consistent everywhere (If Beads: [BD-<id>] type(scope): description. Without Beads: type(scope): description)
-- Branch naming is consistent everywhere (If Beads: bd-<task-id>/<short-desc>. Without Beads: <type>/<short-desc>)
-- PR workflow includes all 8 sub-steps with --delete-branch flag
-- If Beads: task closure uses bd close (not bd update --status completed)
-- Key Commands table matches actual Makefile/package.json commands
-- Worktree cleanup between tasks documented (cannot checkout main)
-- Agent crash recovery documented
-- No document contradicts the canonical workflow
+- (mvp) CLAUDE.md contains complete workflow (9 steps + AI review step 4.5)
+- (mvp) Commit format is consistent everywhere (If Beads: [BD-<id>] type(scope): description. Without Beads: type(scope): description)
+- (mvp) Branch naming is consistent everywhere (If Beads: bd-<task-id>/<short-desc>. Without Beads: <type>/<short-desc>)
+- (mvp) PR workflow includes all 8 sub-steps with --delete-branch flag
+- (mvp) If Beads: task closure uses bd close (not bd update --status completed)
+- (mvp) Key Commands table matches actual Makefile/package.json commands
+- (deep) Worktree cleanup between tasks documented (cannot checkout main)
+- (deep) Agent crash recovery documented
+- (deep) No document contradicts the canonical workflow
 - Tracking comment matches format: `<!-- scaffold:workflow-audit v1 YYYY-MM-DD -->`
 - Tracking comment added: <!-- scaffold:workflow-audit v1 YYYY-MM-DD -->
 

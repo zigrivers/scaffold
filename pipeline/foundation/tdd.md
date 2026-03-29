@@ -29,11 +29,12 @@ actual test framework and assertion library.
 - docs/tdd-standards.md — testing approach with coverage goals and patterns
 
 ## Quality Criteria
-- Test pyramid defined with coverage targets per layer
-- Testing patterns specified for each layer (unit, integration, e2e)
-- Quality gates defined (what must pass before merge)
+- (mvp) Test pyramid defined with coverage targets per layer
+- (mvp) Testing patterns specified for each layer (unit, integration, e2e)
+- (mvp) Quality gates defined (what must pass before merge)
 - Edge cases from domain invariants are test scenarios
-- Performance testing approach for critical paths
+- (deep) Performance testing approach for critical paths
+- (deep) Contract testing strategy documented for service boundaries
 
 ## Methodology Scaling
 - **deep**: Comprehensive strategy. Test matrix by layer and component. Specific

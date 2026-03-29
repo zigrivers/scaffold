@@ -31,14 +31,14 @@ independent review validation.
 - docs/reviews/ux/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- User journey coverage verified against PRD
-- Accessibility verified against WCAG level specified in ux-spec
-- Every user action has at minimum: loading, success, and error states documented
-- Design system consistency verified
-- Error states present for all failure-capable actions
-- Every finding categorized P0-P3 with specific flow, screen, and issue
-- Fix plan documented for all P0/P1 findings; fixes applied to ux-spec.md and re-validated
-- Downstream readiness confirmed — no unresolved P0 or P1 findings remain before quality phase proceeds
+- (mvp) User journey coverage verified against PRD
+- (mvp) Accessibility verified against WCAG level specified in ux-spec
+- (deep) Every user action has at minimum: loading, success, and error states documented
+- (deep) Design system consistency verified
+- (deep) Error states present for all failure-capable actions
+- (mvp) Every finding categorized P0-P3 with specific flow, screen, and issue
+- (mvp) Fix plan documented for all P0/P1 findings; fixes applied to ux-spec.md and re-validated
+- (mvp) Downstream readiness confirmed — no unresolved P0 or P1 findings remain before quality phase proceeds
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling

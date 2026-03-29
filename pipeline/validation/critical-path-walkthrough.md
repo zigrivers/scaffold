@@ -31,9 +31,9 @@ spec gaps along the critical path.
 - docs/validation/critical-path-walkthrough/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- Top critical user journeys (all Must-have epics, minimum 3) traced end-to-end
-- Every journey verified at each layer: PRD → Story → UX → API → Architecture → DB → Task
-- Each critical path verified against story acceptance criteria for behavioral correctness
+- (mvp) Top critical user journeys (all Must-have epics, minimum 3) traced end-to-end
+- (deep) Every journey verified at each layer: PRD → Story → UX → API → Architecture → DB → Task
+- (deep) Each critical path verified against story acceptance criteria for behavioral correctness
 - Missing layers or broken handoffs documented with specific gap description
 - Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
@@ -62,3 +62,9 @@ proceeding without acknowledgment.
 Not applicable — validation always runs fresh against current artifacts. If
 multi-model artifacts exist under docs/validation/critical-path-walkthrough/,
 they are regenerated each run.
+
+## Update Mode Specifics
+- **Detect**: `docs/validation/critical-path-walkthrough/` directory exists with prior multi-model artifacts
+- **Preserve**: Prior multi-model artifacts are regenerated each run (not preserved). However, if prior findings were resolved and documented, reference the resolution log to distinguish regressions from known-resolved issues.
+- **Triggers**: Any upstream artifact change triggers fresh validation
+- **Conflict resolution**: If a previously-resolved finding reappears, flag as regression rather than new finding

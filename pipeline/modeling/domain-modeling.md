@@ -38,8 +38,10 @@ and aggregate boundaries. User actions reveal the domain model.
 - (mvp) Entity relationships are explicit (not implied)
 - (mvp) Each aggregate boundary documents: the invariant it protects, the consistency boundary it enforces, and why included entities must change together
 - (deep) Domain events cover all state transitions
-- (deep) Invariants are testable assertions, not vague rules
+- (deep) Each invariant is phrased as a boolean condition checkable in code (e.g., `order.total >= 0`, `user.email matches /^[^@]+@[^@]+$/`), not a narrative description
 - Ubiquitous language is consistent across all domain models
+- (mvp) All entity and concept names used consistently across domain model files (ubiquitous language enforced)
+- (deep) Cross-aggregate event flows documented for every state change that crosses aggregate boundaries
 - (deep) Cross-domain relationships are documented at context boundaries
 
 ## Methodology Scaling

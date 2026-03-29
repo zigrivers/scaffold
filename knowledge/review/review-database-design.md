@@ -10,6 +10,19 @@ The database schema translates domain entities and their relationships into pers
 
 Follows the review process defined in `review-methodology.md`.
 
+## Summary
+
+- **Pass 1 — Entity Coverage**: Every domain entity requiring persistence maps to a table; no domain concept is missing from the schema.
+- **Pass 2 — Relationship Fidelity**: Schema relationships accurately reflect domain model cardinality and direction; no missing or fabricated foreign keys.
+- **Pass 3 — Normalization Justification**: Normalization level of each table is justified; deliberate denormalization has documented rationale tied to access patterns.
+- **Pass 4 — Index Coverage**: Indexes cover known query patterns from architecture data flows; no critical query requires a full table scan.
+- **Pass 5 — Constraint Enforcement**: Database constraints (NOT NULL, UNIQUE, CHECK, FK) enforce domain invariants where possible.
+- **Pass 6 — Migration Safety**: Migration plan handles rollbacks and data preservation; destructive operations identified; data migrations separated from schema migrations.
+- **Pass 7 — Cross-Schema Consistency**: Multi-database naming conventions, shared identifiers, and cross-database references are consistent.
+- **Pass 8 — Downstream Readiness**: Schema supports efficient CRUD, list/search queries, relationship traversal, and aggregates needed by API contracts.
+
+## Deep Guidance
+
 ---
 
 ## Pass 1: Entity Coverage

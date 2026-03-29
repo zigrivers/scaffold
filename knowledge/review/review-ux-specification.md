@@ -10,6 +10,18 @@ The UX specification translates user journeys from the PRD and component archite
 
 Follows the review process defined in `review-methodology.md`.
 
+## Summary
+
+- **Pass 1 — User Journey Coverage vs PRD**: Every user-facing PRD feature has a corresponding screen, flow, or interaction; non-happy-path journeys covered.
+- **Pass 2 — Accessibility Compliance**: WCAG level stated; keyboard navigation, screen reader support, color contrast, and focus management specified.
+- **Pass 3 — Interaction State Completeness**: Every component has all states defined: empty, loading, populated, error, disabled, and edge states.
+- **Pass 4 — Design System Consistency**: Colors, spacing, typography reference design system tokens, not one-off values.
+- **Pass 5 — Responsive Breakpoint Coverage**: Behavior defined for all breakpoints; navigation, data tables, and forms adapt appropriately.
+- **Pass 6 — Error State Handling**: Every user action that can fail has a designed error state with user-friendly messages and clear recovery paths.
+- **Pass 7 — Component Hierarchy vs Architecture**: Frontend components in UX spec align with architecture component boundaries and state management approach.
+
+## Deep Guidance
+
 ---
 
 ## Pass 1: User Journey Coverage vs PRD

@@ -25,10 +25,10 @@ issue is discovered during implementation.
 - Freeze marker added to each document (tracking comment)
 
 ## Quality Criteria
-- All P0 and P1 validation findings addressed
-- P2 findings addressed or explicitly deferred with rationale
+- (mvp) All P0 and P1 validation findings addressed
+- (deep) P2 findings addressed or explicitly deferred with rationale
 - Fix log documents what changed and why
-- Cross-phase-consistency validation re-run after fixes yields no new P0 or P1 findings
+- (deep) Cross-phase-consistency validation re-run after fixes yields no new P0 or P1 findings
 - Every frozen document contains a tracking comment matching `<!-- scaffold:step-name vN YYYY-MM-DD -->`
 
 ## Methodology Scaling

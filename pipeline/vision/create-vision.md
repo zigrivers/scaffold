@@ -34,6 +34,7 @@ throughout the entire pipeline.
 - (deep) Anti-vision contains >= 3 named traps, each referencing a concrete product direction or feature class
 - (deep) Business model addresses sustainability without being a full business plan
 - (mvp) Every section names at least one concrete decision or constraint
+- (mvp) Vision does not contradict docs/plan.md (if PRD exists in update mode)
 
 ## Methodology Scaling
 - **deep**: Comprehensive vision document. Full competitive research, detailed

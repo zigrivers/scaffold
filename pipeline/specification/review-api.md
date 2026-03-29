@@ -31,14 +31,14 @@ independent review validation.
 - docs/reviews/api/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- Operation coverage against domain model verified
-- Error contracts complete and consistent
-- Auth requirements specified for every endpoint
-- Versioning strategy consistent with ADRs
-- Idempotency documented for all mutating operations
-- Every finding categorized P0-P3 with specific endpoint, field, and issue
-- Fix plan documented for all P0/P1 findings; fixes applied to api-contracts.md and re-validated
-- Downstream readiness confirmed — no unresolved P0 or P1 findings remain before UX spec proceeds
+- (mvp) Operation coverage against domain model verified
+- (deep) Error contracts complete and consistent
+- (deep) Auth requirements specified for every endpoint
+- (deep) Versioning strategy consistent with ADRs
+- (deep) Idempotency documented for all mutating operations
+- (mvp) Every finding categorized P0-P3 with specific endpoint, field, and issue
+- (mvp) Fix plan documented for all P0/P1 findings; fixes applied to api-contracts.md and re-validated
+- (mvp) Downstream readiness confirmed — no unresolved P0 or P1 findings remain before UX spec proceeds
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling

@@ -33,14 +33,15 @@ independent coverage validation.
   synthesis with coverage verification
 
 ## Quality Criteria
+- (mvp) Pass 1 (PRD coverage) executed with findings documented
 - All review passes executed with findings documented
 - Every finding categorized by severity (P0-P3)
 - Fix plan created for P0 and P1 findings
 - Fixes applied and re-validated
-- Every story has at least one testable acceptance criterion, and every PRD feature maps to at least one story
+- (mvp) Every story has at least one testable acceptance criterion, and every PRD feature maps to at least one story
 - (depth 4+) Every atomic PRD requirement has a REQ-xxx ID in the requirements index
 - (depth 4+) Coverage matrix maps every REQ to at least one US (100% coverage target)
-- (depth 5) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling
 - **deep**: All 6 review passes from the knowledge base. Full findings report
@@ -61,7 +62,7 @@ preserve requirement IDs — never renumber REQ-xxx IDs.
 
 ## Update Mode Specifics
 
-- **Detect**: `docs/reviews/review-user-stories.md` exists with tracking comment
+- **Detect**: `docs/reviews/pre-review-user-stories.md` exists with tracking comment
 - **Preserve**: Prior findings still valid, REQ-xxx IDs, resolution decisions, multi-model review artifacts
 - **Triggers**: Upstream artifact changed since last review (compare tracking comment dates)
 - **Conflict resolution**: Previously resolved findings reappearing = regression; flag and re-evaluate

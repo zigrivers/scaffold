@@ -26,14 +26,15 @@ and autonomous behavior guidelines.
   Self-Improvement, and Autonomous Behavior sections
 
 ## Quality Criteria
-- `bd ready` executes without error (Beads is initialized)
-- .beads/ directory exists and contains Beads data files
-- Beads git hooks are installed (data-sync hooks, not code-quality hooks)
-- tasks/lessons.md exists with Patterns, Anti-Patterns, and Common Gotchas sections
-- CLAUDE.md contains Core Principles with all four tenets (Simplicity, No Laziness, TDD, Prove It)
-- CLAUDE.md contains Beads command reference table
+- (mvp) `bd ready` executes without error (Beads is initialized)
+- (mvp) .beads/ directory exists and contains Beads data files
+- (mvp) Beads git hooks are installed (data-sync hooks, not code-quality hooks)
+- (mvp) tasks/lessons.md exists with Patterns, Anti-Patterns, and Common Gotchas sections
+- (mvp) CLAUDE.md contains Core Principles with all four tenets (Simplicity, No Laziness, TDD, Prove It)
+- (mvp) CLAUDE.md contains Beads command reference table
 - CLAUDE.md contains commit-message convention requiring Beads task IDs
 - Bootstrap commit uses `[BD-0]` convention
+- (deep) Cross-doc consistency verified against git-workflow.md and coding-standards.md
 
 ## Methodology Scaling
 - **deep**: Full Beads setup with all CLAUDE.md sections, detailed command reference

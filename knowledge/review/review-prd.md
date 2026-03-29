@@ -10,6 +10,19 @@ The PRD is the foundation of the entire pipeline. Every subsequent phase builds 
 
 Follows the review process defined in `review-methodology.md`.
 
+## Summary
+
+- **Pass 1 — Problem Statement Rigor**: Verify the problem is specific, testable, grounded in evidence, and names a specific user group without prescribing solutions.
+- **Pass 2 — Persona & Stakeholder Coverage**: Ensure personas are goal-driven with constraints and context; 2-4 meaningful personas covering all stakeholder groups.
+- **Pass 3 — Feature Scoping Completeness**: Confirm in-scope, out-of-scope, and deferred lists exist; features are specific enough to estimate with prioritization applied.
+- **Pass 4 — Success Criteria Measurability**: Every criterion needs a target value, measurement method, and tie-back to the problem statement.
+- **Pass 5 — NFR Quantification**: All NFR categories addressed with quantified targets and conditions, not adjectives.
+- **Pass 6 — Constraint & Dependency Documentation**: Technical, timeline, budget, team, and regulatory constraints present with traceable downstream impact.
+- **Pass 7 — Error & Edge Case Coverage**: Sad paths for every feature with user input or external dependencies; failure modes for third-party integrations.
+- **Pass 8 — Downstream Readiness for User Stories**: Features specific enough to map to stories, personas specific enough to be actors, business rules explicit enough for acceptance criteria.
+
+## Deep Guidance
+
 ---
 
 ## Pass 1: Problem Statement Rigor

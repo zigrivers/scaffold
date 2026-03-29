@@ -30,11 +30,12 @@ independent review validation.
 - docs/reviews/prd/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
+- (mvp) Passes 1-2 executed with findings documented
 - All review passes executed with findings documented
 - Every finding categorized by severity (P0-P3)
 - Fix plan created for P0 and P1 findings
 - Fixes applied and re-validated
-- Downstream readiness confirmed (User Stories can proceed)
+- (mvp) Downstream readiness confirmed (User Stories can proceed)
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling

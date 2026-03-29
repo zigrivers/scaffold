@@ -2,6 +2,35 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.35.0] — 2026-03-29
+
+### Added
+
+- **Round 3 alignment audit** — 119 findings (2 BROKEN, 18 MISALIGNED, 27 MISSING, 72 WEAK), all addressed. Health score improved from 7.5/10 to 8.5/10.
+- **Quality Criteria depth tags** — All 54 pipeline steps now have `(mvp)`, `(deep)`, and `(depth 4+)` tags on Quality Criteria items, enabling agents to self-assess at the correct methodology depth
+- **New evals: handoff-quality.bats** — 5 tests validating implementation handoff completeness (playbook reads, agent start command references)
+- **New evals: methodology-content.bats** — 4 tests validating MVP/deep preset differences and depth tag coverage
+- **Eval failure recovery** — Implementation playbook knowledge entry now includes eval-specific troubleshooting guide
+- **Dependency failure protocol** — Playbook knowledge entry covers upstream task failure handling
+- **Version release integration** — new-enhancement and quick-task commands now reference version-bump after changes
+- **Freeze marker format** — Documented exact format in new-enhancement command
+- **Conditional Evaluation** — platform-parity-review now documents when to enable/skip
+- **Update Mode Specifics** — All 7 validation steps now have multi-model artifact handling guidance
+
+### Changed
+
+- **Quality Criteria measurability** — Replaced vague criteria in 15+ files (domain-modeling invariants, api-contracts errors, database-schema indexes, operations alerts, security validation, implementation-plan task sizing)
+- **Quality Criteria completeness** — Added missing criteria to 14 pipeline files (ubiquitous language, decision dependencies, pagination schema, rollback safety, responsive design, RTO/RPO, secret rotation, task locality, test fixtures, eval false-positives)
+- **Depth tag corrections** — create-prd NFR criterion moved from (deep) to (mvp); database-schema constraints moved from (deep) to (mvp)
+- **Knowledge structure** — 20 knowledge entries (200+ lines) now have Summary + Deep Guidance headers for assembly optimization
+- **Missing reads fields** — system-architecture, review-architecture, database-schema, implementation-playbook frontmatter now reflect body input requirements
+- **Innovation criteria** — innovate-vision, innovate-prd, innovate-user-stories now have measurable approval documentation criteria
+- **coding-standards triggers** — Update Mode now detects git-workflow.md commit format changes
+
+### Fixed
+
+- **review-user-stories path mismatch** — Update Mode Specifics Detect field corrected from `docs/reviews/review-user-stories.md` to `docs/reviews/pre-review-user-stories.md`
+
 ## [2.34.0] — 2026-03-29
 
 ### Added

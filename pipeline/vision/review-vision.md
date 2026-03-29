@@ -24,11 +24,13 @@ strategically sound, and ready for the PRD to consume.
 - docs/vision.md — updated with fixes
 
 ## Quality Criteria
+- (mvp) Passes 1 and 5 executed with findings documented
 - All 5 review passes executed with findings documented
 - Every finding categorized by severity (P0-P3)
 - Fix plan created for P0 and P1 findings
 - Fixes applied and re-validated
-- Every vision section has content specific enough to derive a PRD without asking strategic clarification questions
+- (mvp) Every vision section has content specific enough to derive a PRD without asking strategic clarification questions
+- (depth 4+) Multi-model review findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling
 - **deep**: All 5 review passes. Full findings report with severity

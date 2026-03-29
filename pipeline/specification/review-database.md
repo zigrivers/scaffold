@@ -30,14 +30,14 @@ independent review validation.
 - docs/reviews/database/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- Every domain entity has a corresponding table/collection or documented denormalization rationale
-- Normalization decisions justified
-- Index coverage for known query patterns verified
-- Migration safety assessed
-- Referential integrity matches domain invariants
-- Every finding categorized P0-P3 with specific table, column, and issue
-- Fix plan documented for all P0/P1 findings; fixes applied to database-schema.md and re-validated
-- Downstream readiness confirmed — no unresolved P0 or P1 findings remain before API contracts proceed
+- (mvp) Every domain entity has a corresponding table/collection or documented denormalization rationale
+- (mvp) Normalization decisions justified
+- (deep) Index coverage for known query patterns verified
+- (deep) Migration safety assessed
+- (mvp) Referential integrity matches domain invariants
+- (mvp) Every finding categorized P0-P3 with specific table, column, and issue
+- (mvp) Fix plan documented for all P0/P1 findings; fixes applied to database-schema.md and re-validated
+- (mvp) Downstream readiness confirmed — no unresolved P0 or P1 findings remain before API contracts proceed
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling

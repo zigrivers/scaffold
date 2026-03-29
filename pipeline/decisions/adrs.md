@@ -30,6 +30,7 @@ ADR category — tech stack decisions are documented here.
 - (mvp) Decisions trace to PRD requirements or domain model constraints
 - (mvp) No ADR contradicts another without explicit acknowledgment
 - (deep) Technology selections include team expertise and maintenance considerations
+- (deep) Decision dependencies documented — if ADR-002 depends on ADR-001's outcome, the dependency is explicit
 
 ## Methodology Scaling
 - **deep**: Comprehensive ADR set. 3+ alternatives per decision with detailed

@@ -8,6 +8,18 @@ topics: [validation, scope, creep, prd-alignment, gold-plating]
 
 Scope management validation compares every specification artifact against the PRD to ensure that the documented system matches what was actually requested. Features that cannot be traced to a PRD requirement are scope creep. Requirements that grew during documentation are scope inflation. Extra polish on non-critical features is gold-plating. This validation catches all three.
 
+## Summary
+
+- **Feature-to-PRD tracing**: Classify every capability as traced (maps to PRD), supporting (necessary infrastructure), or creep (no PRD justification).
+- **Scope inflation detection**: Compare each PRD requirement's original scope to its implementation scope; flag features that grew beyond what was requested.
+- **Gold-plating detection**: Over-abstraction, premature optimization, excessive error handling, and UI polish beyond requirements. Test: "If removed, would any PRD requirement be unmet?"
+- **Deferred scope leakage**: Verify explicitly deferred items (v2 features) do not appear in specifications, including partial infrastructure for deferred features.
+- **NFR scope alignment**: Implementation targets should match PRD targets, not exceed them (e.g., 99.9% uptime, not 99.99%).
+- **Decision framework**: When in doubt, defer. Scope additions are kept only if required for a PRD feature to work and do not significantly increase effort or operational complexity.
+- Run scope validation after all documentation phases and before implementation begins.
+
+## Deep Guidance
+
 ## Why Scope Grows
 
 Scope grows during the documentation pipeline for understandable reasons — but each growth increases implementation effort, risk, and timeline. Common causes:

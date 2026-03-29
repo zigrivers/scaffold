@@ -34,12 +34,12 @@ coverage gaps.
 - docs/validation/traceability-matrix/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- Every PRD requirement maps to >= 1 user story
-- Every user story maps to >= 1 implementation task
-- Every acceptance criterion maps to >= 1 test case (verified against `docs/story-tests-map.md`)
-- Every test case maps to >= 1 implementation task
-- No orphan items in either direction at any layer
-- Bidirectional traceability verified: PRD → Stories → Domain → Architecture → Tasks
+- (mvp) Every PRD requirement maps to >= 1 user story
+- (mvp) Every user story maps to >= 1 implementation task
+- (deep) Every acceptance criterion maps to >= 1 test case (verified against `docs/story-tests-map.md`)
+- (deep) Every test case maps to >= 1 implementation task
+- (deep) No orphan items in either direction at any layer
+- (deep) Bidirectional traceability verified: PRD → Stories → Domain → Architecture → Tasks
 - Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
@@ -67,3 +67,9 @@ proceeding without acknowledgment.
 Not applicable — validation always runs fresh against current artifacts. If
 multi-model artifacts exist under docs/validation/traceability-matrix/,
 they are regenerated each run.
+
+## Update Mode Specifics
+- **Detect**: `docs/validation/traceability-matrix/` directory exists with prior multi-model artifacts
+- **Preserve**: Prior multi-model artifacts are regenerated each run (not preserved). However, if prior findings were resolved and documented, reference the resolution log to distinguish regressions from known-resolved issues.
+- **Triggers**: Any upstream artifact change triggers fresh validation
+- **Conflict resolution**: If a previously-resolved finding reappears, flag as regression rather than new finding

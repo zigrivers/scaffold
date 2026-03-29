@@ -8,6 +8,18 @@ topics: [validation, consistency, naming, data-flow, contracts]
 
 Cross-phase consistency validation ensures that artifacts produced across different pipeline phases agree with each other. Inconsistencies compound: a renamed entity in one phase propagates confusion into every downstream artifact. This document covers what to check, how to check it, and what findings look like.
 
+## Summary
+
+- **Naming consistency**: Trace every named concept through all artifacts; flag spelling variations, abbreviations, or synonyms for the same concept.
+- **Shared assumptions**: Verify that assumptions made in later phases (cardinality, optionality, ordering, uniqueness) are explicitly stated in earlier artifacts.
+- **Data shape consistency**: Trace entity shapes field-by-field from domain model through schema, API, and UX; verify types, naming, and format alignment.
+- **Interface contract matching**: Architecture component interfaces must match their concrete definitions in API contracts; parameter names, types, and error cases aligned.
+- **Data flow completeness**: Walk each architecture data flow step-by-step verifying source/target APIs exist and data shapes match at every boundary.
+- **Constraint propagation**: ADR constraints (technology choices, patterns, NFRs) must be reflected in all downstream artifacts.
+- **Common patterns to watch**: Enum drift, optionality mismatch, orphaned events, ghost requirements, format divergence, soft-delete vs hard-delete differences, and pagination assumption conflicts.
+
+## Deep Guidance
+
 ## Why Inconsistencies Happen
 
 Each pipeline phase is authored at a different time, possibly by different agents, with evolving understanding of the project. Common causes:

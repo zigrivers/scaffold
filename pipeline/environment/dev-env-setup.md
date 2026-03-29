@@ -31,14 +31,14 @@ by the entire workflow.
 - CLAUDE.md updated with Key Commands table and Dev Environment section
 
 ## Quality Criteria
-- Dev server starts with a single command and supports live/hot reloading
-- Local database setup is scripted (if applicable)
-- .env.example documents all variables with comments
+- (mvp) Dev server starts with a single command and supports live/hot reloading
+- (deep) Local database setup is scripted (if applicable)
+- (deep) .env.example documents all variables with comments
 - Key Commands table in CLAUDE.md matches actual Makefile/package.json commands
-- Lint and test commands exist and are runnable
+- (mvp) Lint and test commands exist and are runnable
 - Verification checklist passes (install, dev server, browser, live reload, tests, db)
-- Setup process works for first-time clone (max 5 steps)
-- Makefile/package.json includes at minimum: dev, test, lint targets
+- (mvp) Setup process works for first-time clone (max 5 steps)
+- (mvp) Makefile/package.json includes at minimum: dev, test, lint targets
 
 ## Methodology Scaling
 - **deep**: Full environment with database setup, seed data, Docker Compose (if

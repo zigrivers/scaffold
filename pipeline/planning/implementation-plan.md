@@ -38,7 +38,7 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 ## Quality Criteria
 - (mvp) Every architecture component has implementation tasks
 - (mvp) Task dependencies form a valid DAG (no cycles)
-- (mvp) Each task estimated at 1-4 hours of agent work (produces <= 500 lines of net-new code)
+- (mvp) Each task estimated at 1-4 hours of agent work (produces <= 500 lines of net-new application code, excluding tests and generated files)
 - (mvp) Tasks include acceptance criteria (how to know it's done)
 - (mvp) Tasks incorporate testing requirements from the testing strategy
 - (deep) Tasks reference corresponding test skeletons from tests/acceptance/ where applicable
@@ -49,6 +49,8 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 - (mvp) Every user story maps to at least one task
 - (deep) High-risk tasks are flagged with risk type and mitigation
 - (deep) Wave summary produced with agent allocation recommendation
+- (mvp) No task modifies more than 5 files (flag for splitting if exceeded)
+- (deep) Critical path identified with estimated total duration
 
 ## Methodology Scaling
 - **deep**: Detailed task breakdown with story-to-task tracing. Dependency graph.

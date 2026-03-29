@@ -29,14 +29,14 @@ independent review validation.
 - docs/reviews/domain-modeling/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- All review passes executed with findings documented
-- Every finding categorized by severity (P0-P3)
-- Fix plan created for P0 and P1 findings
-- Fixes applied and re-validated
-- Downstream readiness confirmed (decisions phase can proceed)
-- Entity coverage verified (every PRD feature maps to at least one entity)
-- Aggregate boundaries verified (each aggregate protects at least one invariant)
-- Ubiquitous language consistency verified across all domain model files
+- (mvp) All review passes executed with findings documented
+- (mvp) Every finding categorized by severity (P0-P3)
+- (mvp) Fix plan created for P0 and P1 findings
+- (mvp) Fixes applied and re-validated
+- (mvp) Downstream readiness confirmed (decisions phase can proceed)
+- (mvp) Entity coverage verified (every PRD feature maps to at least one entity)
+- (deep) Aggregate boundaries verified (each aggregate protects at least one invariant)
+- (deep) Ubiquitous language consistency verified across all domain model files
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling

@@ -32,11 +32,11 @@ differently, surfacing subtle creep.
 - docs/validation/scope-creep-check/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- Every user story traces back to a PRD feature or requirement
-- Every architecture component traces to a PRD requirement
+- (mvp) Every user story traces back to a PRD feature or requirement
+- (mvp) Every architecture component traces to a PRD requirement
 - Items beyond PRD scope are flagged with disposition (remove, defer, or justify)
-- No "gold-plating" — implementation tasks do not exceed story acceptance criteria
-- Feature count has not grown beyond PRD scope without documented justification
+- (deep) No "gold-plating" — implementation tasks do not exceed story acceptance criteria
+- (deep) Feature count has not grown beyond PRD scope without documented justification
 - Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
@@ -64,3 +64,9 @@ proceeding without acknowledgment.
 Not applicable — validation always runs fresh against current artifacts. If
 multi-model artifacts exist under docs/validation/scope-creep-check/,
 they are regenerated each run.
+
+## Update Mode Specifics
+- **Detect**: `docs/validation/scope-creep-check/` directory exists with prior multi-model artifacts
+- **Preserve**: Prior multi-model artifacts are regenerated each run (not preserved). However, if prior findings were resolved and documented, reference the resolution log to distinguish regressions from known-resolved issues.
+- **Triggers**: Any upstream artifact change triggers fresh validation
+- **Conflict resolution**: If a previously-resolved finding reappears, flag as regression rather than new finding

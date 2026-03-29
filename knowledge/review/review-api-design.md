@@ -10,6 +10,19 @@ API contracts define the system's external and internal interfaces. They must co
 
 Follows the review process defined in `review-methodology.md`.
 
+## Summary
+
+- **Pass 1 — Operation Coverage**: Every domain operation crossing a component boundary has a corresponding API endpoint; no missing CRUD or query operations.
+- **Pass 2 — Error Contract Completeness**: Every endpoint has explicit error responses with status codes, body structure, and triggering conditions.
+- **Pass 3 — Auth/AuthZ Coverage**: Every endpoint specifies authentication and authorization requirements; no ambiguous access control.
+- **Pass 4 — Versioning Consistency**: API versioning strategy is consistent across all endpoints and aligns with the ADR.
+- **Pass 5 — Payload Shape vs Domain Entities**: Request/response payloads align with domain model entities in naming, types, and structure.
+- **Pass 6 — Idempotency**: Mutating operations document idempotency behavior; operations with side effects specify the mechanism.
+- **Pass 7 — Pagination/Filtering**: List endpoints have pagination, filter, and sort parameters documented with response metadata.
+- **Pass 8 — Downstream Readiness**: API provides everything needed for UX spec (screen data, error states) and implementation tasks (complexity, dependencies).
+
+## Deep Guidance
+
 ---
 
 ## Pass 1: Operation Coverage

@@ -35,14 +35,15 @@ pending/skipped — developers implement them during TDD execution.
   ACs → test cases, and layer assignments (unit/integration/e2e)
 
 ## Quality Criteria
-- Every user story in docs/user-stories.md has a corresponding test file
-- Every acceptance criterion has at least one tagged test case
+- (mvp) Every user story in docs/user-stories.md has a corresponding test file
+- (mvp) Every acceptance criterion has at least one tagged test case
 - Test cases are tagged with story ID and AC ID for traceability
-- Test layer assignment: single-function ACs → unit; cross-component ACs → integration; full user journey ACs → e2e
+- (deep) Test layer assignment: single-function ACs → unit; cross-component ACs → integration; full user journey ACs → e2e
 - Test files use the project's test framework from docs/tech-stack.md
 - All test cases are created as pending/skipped (not implemented)
 - docs/story-tests-map.md shows 100% AC-to-test-case coverage
 - Test file location follows conventions from docs/project-structure.md
+- (deep) Test data fixtures and dependencies documented for each test file
 
 ## Methodology Scaling
 - **deep**: All stories get test files. Negative test cases for every happy path

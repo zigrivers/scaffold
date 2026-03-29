@@ -8,6 +8,18 @@ topics: [validation, decisions, adr, completeness, contradictions]
 
 Decision completeness validation ensures that every architectural and design decision made during the pipeline has been explicitly recorded in an ADR, that no decisions contradict each other, and that no deferred decisions remain unresolved before implementation begins.
 
+## Summary
+
+- **Explicit decision extraction**: Walk every artifact and extract every technology choice, pattern selection, and constraint trade-off as a decision requiring an ADR.
+- **Implied decision mining**: Find undocumented decisions via absence-based, convention-based, technology-stack, pattern-based, and assumption-based detection techniques.
+- **ADR coverage verification**: Every decision needs an ADR with context, rationale, alternatives, consequences, and current status.
+- **Contradiction detection**: Check cross-ADR, ADR-vs-artifact, and cross-artifact contradictions; group decisions by topic and compare for consistency.
+- **Deferred decision resolution**: Search for TBD/TODO/pending markers; all must be resolved or documented as moot before implementation.
+- **Categories checklist**: Infrastructure/platform, data, API/communication, frontend, quality, operations, and process decisions all need coverage.
+- Prioritize missing ADRs by impact: critical (architecture, data, security), major (workflow, tooling), minor (conventions, formatting).
+
+## Deep Guidance
+
 ## Why Decision Completeness Matters
 
 Unrecorded decisions become tribal knowledge. When AI agents implement the system, they have no tribal knowledge — only documented decisions. Every implicit "we agreed that..." or "obviously we'd use..." that is not in an ADR is a gap that will cause agents to guess, and guesses introduce inconsistency.

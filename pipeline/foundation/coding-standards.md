@@ -63,7 +63,8 @@ and CI config for references.
   project-specific patterns added by the team
 - **Triggers for update**: tech stack changed (new language or framework
   requires new patterns), new architecture patterns need coding conventions,
-  team identified recurring issues needing new rules
+  team identified recurring issues needing new rules, commit message format
+  changed in docs/git-workflow.md
 - **Conflict resolution**: if tech stack added a new framework, add its
   conventions as a new section rather than modifying existing sections;
   verify commit format consistency with git-workflow.md before any changes

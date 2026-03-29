@@ -10,6 +10,18 @@ ADRs encode the "why" behind the architecture. They must be complete (every sign
 
 Follows the review process defined in `review-methodology.md`.
 
+## Summary
+
+- **Pass 1 — Decision Coverage**: Every significant architectural decision has an ADR; technology choices, pattern selections, and constraint trade-offs all recorded.
+- **Pass 2 — Rationale Quality**: Alternatives are genuinely viable (not straw-manned); consequences are honest with both positives and negatives.
+- **Pass 3 — Contradiction Detection**: No two ADRs make conflicting decisions without explicit acknowledgment; supersession relationships documented.
+- **Pass 4 — Implied Decision Mining**: Decisions visible in artifacts but never formally recorded as ADRs are identified and flagged.
+- **Pass 5 — Status Hygiene**: ADR statuses reflect reality; no stale "proposed" ADRs; supersession chains are clean.
+- **Pass 6 — Cross-Reference Integrity**: Cross-references between ADRs are correct and bidirectional; no broken or circular reference chains.
+- **Pass 7 — Downstream Readiness**: Technology and pattern decisions are finalized in "accepted" status so architecture can proceed without ambiguity.
+
+## Deep Guidance
+
 ---
 
 ## Pass 1: Decision Coverage

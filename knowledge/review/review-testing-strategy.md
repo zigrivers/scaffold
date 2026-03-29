@@ -10,6 +10,17 @@ The testing strategy defines how the system will be verified at every layer. It 
 
 Follows the review process defined in `review-methodology.md`.
 
+## Summary
+
+- **Pass 1 — Coverage Gaps by Layer**: Each architectural layer has test coverage defined; test pyramid is balanced (not top-heavy or bottom-heavy).
+- **Pass 2 — Domain Invariant Test Cases**: Every domain invariant has at least one corresponding test scenario covering positive and negative cases.
+- **Pass 3 — Test Environment Assumptions**: Test environment matches production constraints; database engines, service configurations, and test data are realistic.
+- **Pass 4 — Performance Test Coverage**: Performance-critical paths have benchmarks with specific thresholds; load and stress testing scenarios defined.
+- **Pass 5 — Integration Boundary Coverage**: All component integration points have integration tests using real (not mocked) dependencies.
+- **Pass 6 — Quality Gate Completeness**: CI pipeline gates cover linting, type checking, tests, and security scanning; gates block deployment on failure.
+
+## Deep Guidance
+
 ---
 
 ## Pass 1: Coverage Gaps by Layer

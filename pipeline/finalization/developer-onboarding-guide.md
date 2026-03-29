@@ -23,10 +23,10 @@ before their first task.
 - docs/onboarding-guide.md — developer onboarding guide
 
 ## Quality Criteria
-- Contains sections for: project purpose, architecture overview (with component diagram reference), top 3 coding patterns with examples, and a file/doc lookup table
-- Guide includes clone instructions, dependency install command, dev server start command, and test run command; every ADR referenced by number with one-sentence summary
-- Key architectural decisions are summarized (with pointers to ADRs)
-- Development workflow is clear (branch, code, test, PR)
+- (mvp) Contains sections for: project purpose, architecture overview (with component diagram reference), top 3 coding patterns with examples, and a file/doc lookup table
+- (mvp) Guide includes clone instructions, dependency install command, dev server start command, and test run command; every ADR referenced by number with one-sentence summary
+- (deep) Key architectural decisions are summarized (with pointers to ADRs)
+- (mvp) Development workflow is clear (branch, code, test, PR)
 
 ## Methodology Scaling
 - **deep**: Comprehensive guide. Architecture walkthrough, key pattern explanations,

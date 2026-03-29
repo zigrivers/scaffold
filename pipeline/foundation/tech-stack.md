@@ -33,13 +33,13 @@ about ecosystem maturity, alternatives, and gotchas.
 - docs/reviews/tech-stack/gemini-review.json (depth 4+, if available) — raw Gemini recommendations
 
 ## Quality Criteria
-- Every PRD feature cross-referenced against the proposed stack (no capability gaps)
-- Each technology choice documents what, why, why not alternatives, and AI compatibility
-- Architecture pattern chosen and justified (monolith vs. microservices, MVC vs. clean, etc.)
-- No speculative technologies ("might need someday")
-- Every choice is a decision, not a menu of options
-- Quick Reference section lists every dependency with version
-- Each technology choice documents AI compatibility assessment (training data availability, convention strength); total direct dependencies counted and justified
+- (mvp) Every PRD feature cross-referenced against the proposed stack (no capability gaps)
+- (mvp) Each technology choice documents what, why, why not alternatives, and AI compatibility
+- (mvp) Architecture pattern chosen and justified (monolith vs. microservices, MVC vs. clean, etc.)
+- (mvp) No speculative technologies ("might need someday")
+- (mvp) Every choice is a decision, not a menu of options
+- (mvp) Quick Reference section lists every dependency with version
+- (deep) Each technology choice documents AI compatibility assessment (training data availability, convention strength); total direct dependencies counted and justified
 - (depth 4+) Multi-model recommendations cross-referenced — agreements flagged as high-confidence, disagreements flagged for human decision
 
 ## Methodology Scaling
