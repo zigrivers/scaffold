@@ -91,7 +91,7 @@ Add this to `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "if echo \"$CC_BASH_COMMAND\" | grep -q 'gh pr create'; then echo '\\n⚠️  MANDATORY: Run all 3 code review channels before proceeding to the next task:\\n\\n  1. Codex CLI:\\n     Auth: codex login status 2>/dev/null\\n     Run:  codex exec --skip-git-repo-check -s read-only --ephemeral \"REVIEW_PROMPT\" 2>/dev/null\\n\\n  2. Gemini CLI:\\n     Auth: NO_BROWSER=true gemini -p \"respond with ok\" -o json 2>&1\\n     Run:  NO_BROWSER=true gemini -p \"REVIEW_PROMPT\" --output-format json --approval-mode yolo 2>/dev/null\\n\\n  3. Superpowers code-reviewer:\\n     Dispatch superpowers:code-reviewer subagent with BASE_SHA and HEAD_SHA\\n\\nIf auth fails: tell user to run ! codex login or ! gemini -p \"hello\"\\nFix all P0/P1 findings before moving on. Do NOT skip any channel.\\nFull instructions: scaffold run review-pr'; fi"
+            "command": "if echo \"$CC_BASH_COMMAND\" | grep -q 'gh pr create'; then echo '\\n⚠️  MANDATORY: Run all 3 code review channels before proceeding to the next task:\\n\\n  1. Codex CLI:\\n     Auth: codex login status 2>/dev/null\\n     Run:  codex exec --skip-git-repo-check -s read-only --ephemeral \"REVIEW_PROMPT\" 2>/dev/null\\n\\n  2. Gemini CLI:\\n     Auth: NO_BROWSER=true gemini -p \"respond with ok\" -o json 2>&1\\n     Run:  NO_BROWSER=true gemini -p \"REVIEW_PROMPT\" --output-format json --approval-mode yolo 2>/dev/null\\n\\n  3. Superpowers code-reviewer:\\n     Dispatch superpowers:code-reviewer subagent with BASE_SHA and HEAD_SHA\\n\\nIf auth fails: tell user to run ! codex login or ! gemini -p \"hello\"\\nFix all P0/P1/P2 findings before moving on. Do NOT skip any channel.\\nFull instructions: scaffold run review-pr'; fi"
           }
         ]
       }
@@ -118,7 +118,7 @@ Add the following to the project's CLAUDE.md in the Code Review section:
 ## Code Review
 
 After creating a PR, run `/scaffold:review-pr <PR#>` to execute all three review
-channels (Codex CLI, Gemini CLI, Superpowers code-reviewer). Fix P0/P1 findings
+channels (Codex CLI, Gemini CLI, Superpowers code-reviewer). Fix P0/P1/P2 findings
 before moving to the next task. A post-hook on `gh pr create` will remind you.
 
 | Command | Purpose |
@@ -410,8 +410,8 @@ The review step integrates into the standard PR flow:
 1. Agent creates PR
 2. Agent runs `scripts/cli-pr-review.sh` (or review runs automatically)
 3. Review findings are posted as PR comments or written to a local file
-4. Agent addresses P0/P1 findings, pushes fixes
-5. Re-review until no P0/P1 findings remain
+4. Agent addresses P0/P1/P2 findings, pushes fixes
+5. Re-review until no P0/P1/P2 findings remain
 6. PR is ready for merge
 
 ## Deep Guidance
@@ -475,7 +475,7 @@ fi
 
 `docs/review-standards.md` should define:
 - Severity levels with concrete examples per project
-- What constitutes a blocking review (P0/P1 threshold)
+- What constitutes a blocking review (P0/P1/P2 threshold)
 - Auto-approve criteria (when review can be skipped)
 - Review SLA (how long before auto-approve kicks in)
 
@@ -511,7 +511,7 @@ Finding Classification:
 └─────────────────┴──────────┴──────────┴───────────────────┘
 ```
 
-HIGH confidence findings are always addressed. MEDIUM confidence findings are addressed if P0/P1. Contradictions require the implementing agent to make a judgment call and document the reasoning.
+HIGH confidence findings are always addressed. MEDIUM confidence findings are addressed if P0/P1/P2. Contradictions require the implementing agent to make a judgment call and document the reasoning.
 
 ### Security-Focused Review Checklist
 

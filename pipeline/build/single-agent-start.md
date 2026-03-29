@@ -158,7 +158,7 @@ For each task:
      3. **Superpowers code-reviewer**: dispatch `superpowers:code-reviewer` subagent with BASE_SHA and HEAD_SHA
    - Verify auth before each CLI (`codex login status`, `NO_BROWSER=true gemini -p "respond with ok" -o json`)
    - All three channels must execute (skip only if a tool is genuinely not installed)
-   - Fix any P0/P1 findings before proceeding
+   - Fix any P0/P1/P2 findings before proceeding
    - Do NOT move to the next task until all channels have run
 
 8. **Update status**
@@ -192,7 +192,7 @@ For each task:
 1. **TDD is not optional** — Write failing tests before implementation. No exceptions.
 2. **One task at a time** — Complete the current task fully before starting the next.
 3. **Quality gates before PR** — Never create a PR with failing checks.
-4. **Code review before next task** — After creating a PR, run all three review channels (Codex CLI, Gemini CLI, Superpowers code-reviewer) and fix all P0/P1 findings before moving on.
+4. **Code review before next task** — After creating a PR, run all three review channels (Codex CLI, Gemini CLI, Superpowers code-reviewer) and fix all P0/P1/P2 findings before moving on.
 5. **Update status immediately** — Mark tasks complete as soon as review passes.
 6. **Consult lessons.md** — Check for relevant anti-patterns before each task.
 7. **Follow CLAUDE.md** — It is the authority on project conventions and commands.

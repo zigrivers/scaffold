@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.42.1] — 2026-03-29
+
+### Changed
+
+- **Code reviews now fix P0/P1/P2 findings** — Previously only P0/P1 (blocking/important) findings were mandatory. Now P2 (improvement) findings are also required before proceeding. Updated across all 4 build steps, review-pr tool, multi-model-dispatch skill templates, automated-review-tooling knowledge base, hooks, and CLAUDE.md. Only P3 (trivial nits) are skipped.
+
 ## [2.42.0] — 2026-03-29
 
 ### Added
