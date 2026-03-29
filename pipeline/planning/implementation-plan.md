@@ -38,7 +38,7 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 ## Quality Criteria
 - (mvp) Every architecture component has implementation tasks
 - (mvp) Task dependencies form a valid DAG (no cycles)
-- (mvp) Each task estimated at 1-4 hours of agent work (produces <= 500 lines of net-new application code, excluding tests and generated files)
+- (mvp) Each task produces ~150 lines of net-new application code (excluding tests and generated files)
 - (mvp) Tasks include acceptance criteria (how to know it's done)
 - (mvp) Tasks incorporate testing requirements from the testing strategy
 - (deep) Tasks reference corresponding test skeletons from tests/acceptance/ where applicable
@@ -49,7 +49,9 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 - (mvp) Every user story maps to at least one task
 - (deep) High-risk tasks are flagged with risk type and mitigation
 - (deep) Wave summary produced with agent allocation recommendation
-- (mvp) No task modifies more than 5 files (flag for splitting if exceeded)
+- (mvp) No task modifies more than 3 application files (test files excluded; exceptions require justification)
+- (mvp) No task contains unresolved design decisions (agents implement, they don't architect)
+- (mvp) Every code-producing task includes co-located test requirements
 - (deep) Critical path identified with estimated total duration
 
 ## Methodology Scaling
@@ -84,3 +86,24 @@ that are in-progress or completed.
 - **Conflict resolution**: if architecture restructured a component that has
   in-progress tasks, flag for user review rather than silently reassigning;
   re-derive critical path only for unstarted tasks
+
+## Task Size Constraints
+
+Before finalizing the implementation plan, scan every task against the five agent
+executability rules from the task-decomposition knowledge base:
+
+1. **Three-File Rule** — Count application files each task modifies (exclude test files).
+   Any task touching 4+ files must be split by layer or concern.
+2. **150-Line Budget** — Estimate net-new application code lines per task. Any task
+   likely to produce 200+ lines must be split by feature slice or entity.
+3. **Single-Concern Rule** — Check each task description for "and" connecting unrelated
+   work. Split if the task spans multiple architectural layers or feature domains.
+4. **Decision-Free Execution** — Verify all design decisions are resolved in the task
+   description. No "choose", "determine", "decide", or "evaluate options" language.
+   Resolve decisions inline before presenting the plan.
+5. **Test Co-location** — Confirm every code-producing task includes its test
+   requirements. No "write tests later" aggregation tasks.
+
+Tasks that fail any rule should be split inline. If a task genuinely can't be split
+further, annotate with `<!-- agent-size-exception: reason -->`. The implementation
+plan review will flag unjustified exceptions.
