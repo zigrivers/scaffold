@@ -49,10 +49,12 @@ creative opportunities and competitive insights.
   innovation dispatched to Codex and Gemini if available, with graceful
   fallback to Claude-only enhanced brainstorming.
 - **mvp**: Not applicable — this step is conditional and skipped in MVP.
-- **custom:depth(1-5)**: Depth 1-2: skip (not enough context for meaningful innovation at this depth). Depth 3: quick scan
-  for obvious gaps and missing expected features. Depth 4: full innovation
-  pass + one external model (if CLI available). Depth 5: full innovation pass
-  + multi-model with deduplication and synthesis.
+- **custom:depth(1-5)**:
+  - Depth 1: Skip (not enough context for meaningful innovation at this depth).
+  - Depth 2: Skip (not enough context for meaningful innovation at this depth).
+  - Depth 3: Quick scan for obvious gaps and missing expected features.
+  - Depth 4: Full innovation pass across all categories + one external model (if CLI available).
+  - Depth 5: Full innovation pass + multi-model with deduplication and synthesis.
 
 ## Conditional Evaluation
 Enable when: project has a competitive landscape section in plan.md, user explicitly

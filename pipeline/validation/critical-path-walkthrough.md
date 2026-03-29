@@ -32,7 +32,7 @@ spec gaps along the critical path.
 - docs/validation/critical-path-walkthrough/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- (mvp) Top critical user journeys (all Must-have epics, minimum 3) traced end-to-end
+- (mvp) User specifies >= 3 Must-have epics as critical user journeys; each traced end-to-end
 - (deep) Every journey verified at each layer: PRD → Story → UX → API → Architecture → DB → Task
 - (deep) Each critical path verified against story acceptance criteria for behavioral correctness
 - Missing layers or broken handoffs documented with specific gap description

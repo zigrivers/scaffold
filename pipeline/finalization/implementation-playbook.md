@@ -6,7 +6,7 @@ phase: "finalization"
 order: 1430
 dependencies: [developer-onboarding-guide]
 outputs: [docs/implementation-playbook.md]
-reads: [story-tests, create-evals, implementation-plan, database-schema, api-contracts, ux-spec, design-system, system-architecture, tdd, coding-standards, security, operations]
+reads: [story-tests, create-evals, implementation-plan, database-schema, api-contracts, ux-spec, design-system, system-architecture, tdd, coding-standards, security, operations, domain-modeling, adrs, create-prd, project-structure]
 conditional: null
 knowledge-base: [implementation-playbook]
 ---
@@ -47,7 +47,9 @@ format between agents, and success criteria.
 - (mvp) Success criteria per task (how to know it's done)
 - (deep) Handoff format between agents (what to communicate when passing work)
 - (mvp) Quality gates are defined (what must pass before a task is complete)
-- Quality gates include `make eval` (or equivalent) as a required check
+- (mvp) Test skeleton discovery: playbook instructs agents to check docs/story-tests-map.md before writing new tests
+- (mvp) Dependency-failure recovery: playbook documents what to do when a task's upstream dependency is blocked
+- (deep) Quality gates include `make eval` (or equivalent) as a required check when eval tests exist
 - (deep) Agent workflow references test skeleton implementation from tests/acceptance/
 - (deep) Handoff format includes at minimum: implementation summary, assumptions made, known limitations, gotchas, and files modified
 
@@ -59,7 +61,7 @@ format between agents, and success criteria.
   reference, commit format, and quality gate commands from CLAUDE.md. Skip
   per-task context blocks, wave assignments, and inter-agent handoff format.
   Reference docs/coding-standards.md and docs/tdd-standards.md directly.
-- **custom:depth(1-5)**: Depth 1-2: task execution order, basic coding conventions reference, commit format, and quality gate commands. Depth 3: add per-task context requirements, wave assignments, and quality gates per wave. Depth 4: add inter-agent communication protocol, handoff format, and error recovery procedures. Depth 5: full playbook with rollback procedures, eval integration, and per-task minimum context blocks.
+- **custom:depth(1-5)**: Depth 1: task execution order and commit format only. Depth 2: add basic coding conventions reference and quality gate commands. Depth 3: add per-task context requirements, wave assignments, and quality gates per wave. Depth 4: add inter-agent communication protocol, handoff format, and error recovery procedures. Depth 5: full playbook with rollback procedures, eval integration, and per-task minimum context blocks.
 
 ## Mode Detection
 Check if `docs/implementation-playbook.md` already exists.

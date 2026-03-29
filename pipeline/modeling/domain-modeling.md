@@ -39,9 +39,8 @@ and aggregate boundaries. User actions reveal the domain model.
 - (mvp) Entity relationships are explicit (not implied)
 - (mvp) Each aggregate boundary documents: the invariant it protects, the consistency boundary it enforces, and why included entities must change together
 - (deep) Domain events cover all state transitions
-- (deep) Each invariant is phrased as a boolean condition checkable in code (e.g., `order.total >= 0`, `user.email matches /^[^@]+@[^@]+$/`), not a narrative description
-- Ubiquitous language is consistent across all domain models
-- (mvp) All entity and concept names used consistently across domain model files (ubiquitous language enforced)
+- (mvp) Each invariant is phrased as a boolean condition checkable in code (e.g., `order.total >= 0`, `user.email matches /^[^@]+@[^@]+$/`), not a narrative description
+- (mvp) Every entity name in one domain-model file uses the same name (no synonyms) in all other domain-model files
 - (deep) Cross-aggregate event flows documented for every state change that crosses aggregate boundaries
 - (deep) Cross-domain relationships are documented at context boundaries
 
@@ -51,9 +50,12 @@ and aggregate boundaries. User actions reveal the domain model.
   relationships between bounded contexts. Separate file per domain.
 - **mvp**: Key entities and their relationships in a single file. Core business
   rules listed. Enough to inform architecture decisions.
-- **custom:depth(1-5)**: Depth 1-2: single-file entity overview. Depth 3: separate
-  files per domain with entities and events. Depth 4-5: full DDD approach with
-  context maps and detailed invariants.
+- **custom:depth(1-5)**: Depth 1: single-file entity list with key relationships.
+  Depth 2: single-file entity overview with attributes and core business rules.
+  Depth 3: separate files per domain with entities, events, and aggregate boundaries.
+  Depth 4: full DDD approach with context maps, detailed invariants, and domain
+  event flows. Depth 5: full DDD approach with cross-context integration contracts
+  and sequence diagrams for all cross-aggregate flows.
 
 ## Mode Detection
 If docs/domain-models/ exists, operate in update mode: read existing models,

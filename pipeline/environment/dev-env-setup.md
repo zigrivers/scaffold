@@ -47,9 +47,12 @@ by the entire workflow.
   troubleshooting section. Complete Key Commands table.
 - **mvp**: Dev server with live reload, basic lint and test commands, .env.example.
   Minimal docs. Key Commands table with essentials only.
-- **custom:depth(1-5)**: Depth 1-2: dev server + test command. Depth 3: add
-  database and env vars. Depth 4: add troubleshooting. Depth 5: full docs with
-  multi-platform support.
+- **custom:depth(1-5)**: Depth 1: dev server with live reload and a single test
+  command. Depth 2: dev server, test command, and basic lint command. Depth 3:
+  add database setup, .env.example, and environment variable management.
+  Depth 4: add troubleshooting section and watch mode tests. Depth 5: full
+  docs with multi-platform support (Mac, Linux, WSL), Docker Compose, and seed
+  data strategy.
 
 ## Mode Detection
 Update mode if docs/dev-setup.md exists. In update mode: preserve port assignments,

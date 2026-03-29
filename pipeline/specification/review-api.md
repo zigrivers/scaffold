@@ -37,8 +37,9 @@ independent review validation.
 - (deep) Auth requirements specified for every endpoint
 - (deep) Versioning strategy consistent with ADRs
 - (deep) Idempotency documented for all mutating operations
-- (mvp) Every finding categorized P0-P3 with specific endpoint, field, and issue
+- (mvp) Every finding categorized P0-P3 (P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.) with specific endpoint, field, and issue
 - (mvp) Fix plan documented for all P0/P1 findings; fixes applied to api-contracts.md and re-validated
+- (mvp) Review report includes explicit Readiness Status section
 - (mvp) Downstream readiness confirmed — no unresolved P0 or P1 findings remain before UX spec proceeds
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
@@ -47,7 +48,12 @@ independent review validation.
   review dispatched to Codex and Gemini if available, with graceful fallback
   to Claude-only enhanced review.
 - **mvp**: Operation coverage check only.
-- **custom:depth(1-5)**: Depth 1: endpoint coverage and response format pass only. Depth 2: add error handling and auth requirement passes. Depth 3: add idempotency, pagination, and versioning passes. Depth 4: add external model API review. Depth 5: multi-model review with reconciliation.
+- **custom:depth(1-5)**:
+  - Depth 1: Endpoint coverage and response format pass only (1 review pass)
+  - Depth 2: Add error handling and auth requirement passes (2 review passes)
+  - Depth 3: Add idempotency, pagination, and versioning passes (4 review passes)
+  - Depth 4: Add external model API review (4 review passes + external dispatch)
+  - Depth 5: Multi-model review with reconciliation (4 review passes + multi-model synthesis)
 
 ## Mode Detection
 Re-review mode if previous review exists. If multi-model review artifacts exist

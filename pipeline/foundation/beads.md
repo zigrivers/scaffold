@@ -43,9 +43,12 @@ and autonomous behavior guidelines.
   existing git-workflow.md and coding-standards.md.
 - **mvp**: Initialize Beads, create tasks/lessons.md, add minimal CLAUDE.md
   sections (Core Principles + Beads commands). Skip cross-doc checks.
-- **custom:depth(1-5)**: Depth 1-2: MVP Beads init + minimal CLAUDE.md. Depth 3:
-  add full command table and priority docs. Depth 4-5: full setup with cross-doc
-  consistency and detailed autonomous behavior rules.
+- **custom:depth(1-5)**:
+  - Depth 1: Initialize Beads + create tasks/lessons.md. Minimal CLAUDE.md with Core Principles only.
+  - Depth 2: Depth 1 + add Beads command reference table to CLAUDE.md.
+  - Depth 3: Add full command table, priority level documentation, and autonomous behavior rules.
+  - Depth 4: Full setup with cross-doc consistency checks against git-workflow.md and coding-standards.md.
+  - Depth 5: Full setup + detailed autonomous behavior rules + commit-message convention enforcement.
 
 ## Conditional Evaluation
 Enable when: project uses Beads task tracking methodology (user selects Beads during

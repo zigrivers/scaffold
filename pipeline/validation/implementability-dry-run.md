@@ -31,7 +31,7 @@ when simulating implementation.
 - docs/validation/implementability-dry-run/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- (mvp) Every task has sufficient input specification for an agent to start without guessing
+- (mvp) Every task specifies: input file paths, expected output artifacts, testable acceptance criteria, and references to upstream documents
 - (mvp) Every task has testable acceptance criteria
 - (deep) No task references undefined concepts, components, or APIs
 - (deep) Every task's dependencies are present in the implementation plan

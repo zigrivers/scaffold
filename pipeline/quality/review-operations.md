@@ -34,8 +34,10 @@ independent review validation.
 - (mvp) Monitoring verified against minimum set: latency, error rate, and saturation
 - (deep) Alert thresholds have rationale
 - (deep) Common failure scenarios have runbook entries
+- (mvp) At least production environment operations documented
 - (deep) Dev/staging/production environment differences documented in operations runbook
-- Every finding categorized P0-P3 with specific runbook section, metric, and issue
+- (deep) Each health check endpoint specifies expected status code, response time SLA, failure thresholds
+- Every finding categorized P0-P3 (P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.) with specific runbook section, metric, and issue
 - Fix plan documented for all P0/P1 findings; fixes applied to operations-runbook.md and re-validated
 - Downstream readiness confirmed — no unresolved P0 or P1 findings remain before security step proceeds
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
@@ -44,7 +46,12 @@ independent review validation.
 - **deep**: Full multi-pass review. Multi-model review dispatched to Codex and
   Gemini if available, with graceful fallback to Claude-only enhanced review.
 - **mvp**: Deployment coverage only.
-- **custom:depth(1-5)**: Depth 1: monitoring and logging pass only. Depth 2: add deployment and rollback pass. Depth 3: add incident response and scaling passes. Depth 4: add external model review. Depth 5: multi-model review with reconciliation.
+- **custom:depth(1-5)**:
+  - Depth 1: Monitoring and logging pass only (1 review pass)
+  - Depth 2: Add deployment and rollback pass (2 review passes)
+  - Depth 3: Add incident response and scaling passes (4 review passes)
+  - Depth 4: Add external model review (4 review passes + external dispatch)
+  - Depth 5: Multi-model review with reconciliation (4 review passes + multi-model synthesis)
 
 ## Mode Detection
 Re-review mode if previous review exists. If multi-model review artifacts exist

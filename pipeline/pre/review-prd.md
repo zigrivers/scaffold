@@ -33,7 +33,7 @@ independent review validation.
 ## Quality Criteria
 - (mvp) Passes 1-2 executed with findings documented
 - All review passes executed with findings documented
-- Every finding categorized by severity (P0-P3)
+- Every finding categorized by severity: P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.
 - Fix plan created for P0 and P1 findings
 - Fixes applied and re-validated
 - (mvp) Downstream readiness confirmed (User Stories can proceed)
@@ -46,10 +46,12 @@ independent review validation.
   to Claude-only enhanced review.
 - **mvp**: Passes 1-2 only (Problem Statement Rigor, Persona Coverage). Focus
   on blocking gaps — requirements too vague to write stories from.
-- **custom:depth(1-5)**: Depth 1-2: passes 1-2 only (Problem Statement Rigor,
-  Persona Coverage). Depth 3: passes 1-4 (add Feature Scoping, Success
-  Criteria). Depth 4: all 8 passes + one external model review (if CLI
-  available). Depth 5: all 8 passes + multi-model review with reconciliation.
+- **custom:depth(1-5)**:
+  - Depth 1: Pass 1 only (Problem Statement Rigor). One review pass.
+  - Depth 2: Passes 1-2 (Problem Statement Rigor, Persona Coverage). Two review passes.
+  - Depth 3: Passes 1-4 (add Feature Scoping, Success Criteria). Four review passes.
+  - Depth 4: All 8 passes + one external model review (if CLI available).
+  - Depth 5: All 8 passes + multi-model review with reconciliation.
 
 ## Mode Detection
 If docs/reviews/pre-review-prd.md exists, this is a re-review. Read previous

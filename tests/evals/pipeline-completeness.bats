@@ -165,7 +165,7 @@ REQUIRED_SECTIONS=("## Purpose" "## Inputs" "## Expected Outputs" "## Quality Cr
   fi
 }
 
-@test "steps with Mode Detection also have Update Mode Specifics (warning)" {
+@test "steps with Mode Detection also have Update Mode Specifics" {
   local missing=()
   local checked=0
 
@@ -174,8 +174,8 @@ REQUIRED_SECTIONS=("## Purpose" "## Inputs" "## Expected Outputs" "## Quality Cr
     mode_section="$(awk '/^## Mode Detection/{found=1; next} /^## /{if(found) exit} found{print}' "$file")"
     [[ -z "$mode_section" ]] && continue
 
-    # Skip steps where Mode Detection says "Not applicable"
-    if echo "$mode_section" | grep -qi 'not applicable'; then
+    # Skip steps where Mode Detection says "Not applicable" or "N/A"
+    if echo "$mode_section" | grep -qiE 'not applicable|N/A'; then
       continue
     fi
 
@@ -186,17 +186,15 @@ REQUIRED_SECTIONS=("## Purpose" "## Inputs" "## Expected Outputs" "## Quality Cr
     fi
   done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
 
-  # Report findings but always pass — this is a tracking metric
   local present=$(( checked - ${#missing[@]} ))
   printf "Update Mode Specifics coverage: %d/%d steps with active Mode Detection\n" "$present" "$checked"
 
   if [[ ${#missing[@]} -gt 0 ]]; then
-    printf "WARNING: %d steps have Mode Detection but no Update Mode Specifics:\n" "${#missing[@]}"
+    printf "FAIL: %d steps have Mode Detection but no Update Mode Specifics:\n" "${#missing[@]}"
     printf "  %s\n" "${missing[@]}"
   fi
 
-  # Always pass — will be tightened in a future WP
-  [[ "$checked" -gt 0 ]]
+  [[ ${#missing[@]} -eq 0 ]]
 }
 
 @test "eval_helper phase mappings cover all phases found in pipeline frontmatter" {

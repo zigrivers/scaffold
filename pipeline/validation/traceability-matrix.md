@@ -35,11 +35,11 @@ coverage gaps.
 - docs/validation/traceability-matrix/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- (mvp) Every PRD requirement maps to >= 1 user story
+- (mvp) Every feature and user-facing behavior in the PRD's feature list maps to >= 1 user story
 - (mvp) Every user story maps to >= 1 implementation task
 - (deep) Every acceptance criterion maps to >= 1 test case (verified against `docs/story-tests-map.md`)
 - (deep) Every test case maps to >= 1 implementation task
-- (deep) No orphan items in either direction at any layer
+- (deep) Every Must-have and Should-have item maps to >= 1 downstream artifact. Nice-to-have items may be orphaned with explicit rationale.
 - (deep) Bidirectional traceability verified: PRD → Stories → Domain → Architecture → Tasks
 - Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis

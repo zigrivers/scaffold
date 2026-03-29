@@ -64,7 +64,7 @@ Supporting:
 ## Quality Criteria
 - (mvp) Consistency + Structure evals generated
 - (mvp) Evals use the project's own test framework from docs/tech-stack.md
-- (mvp) All generated evals pass on the current codebase (no false positives)
+- (mvp) All generated evals pass on the current codebase when exclusion mechanisms are applied
 - (mvp) Eval results are binary PASS/FAIL, not scores
 - (mvp) make eval is separate from make test and make check (opt-in for CI)
 - (deep) All applicable eval categories generated including security, API, DB, accessibility (conditional on source doc existence)
@@ -72,7 +72,9 @@ Supporting:
 - (deep) docs/eval-standards.md explicitly documents what evals do NOT check
 - (deep) Full eval suite runs in under 30 seconds
 - (mvp) `make eval` (or equivalent) runs and all generated evals pass
+- (mvp) All core eval categories (consistency, structure, adherence, coverage, cross-doc) are generated
 - (deep) Eval false-positive assessment: each eval category documents at least one scenario where valid code might incorrectly fail, with exclusion mechanism
+- (deep) Every conditional eval category with a source document is generated
 
 ## Methodology Scaling
 - **deep**: All 13 eval categories (conditional on doc existence). Stack-specific
@@ -80,7 +82,8 @@ Supporting:
   conformance. API contract validation. Security patterns. Full suite.
 - **mvp**: Consistency + Structure only. Skip everything else.
 - **custom:depth(1-5)**:
-  - Depth 1-2: Consistency + Structure
+  - Depth 1: Consistency + Structure only
+  - Depth 2: Consistency + Structure with stack-specific patterns
   - Depth 3: Add Adherence + Cross-doc
   - Depth 4: Add Coverage + Architecture + Config + Error handling
   - Depth 5: All 13 categories (Security, API, Database, Accessibility, Performance)

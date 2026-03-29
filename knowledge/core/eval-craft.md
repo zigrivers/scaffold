@@ -1006,3 +1006,47 @@ Style observations, minor inconsistencies, documentation improvements. Not actio
 - "3 documentation files have no cross-references from other docs (possibly orphaned)"
 - "Coverage eval matched 'user profile' by file name only, not by test content — confidence is low"
 - "Makefile has 2 targets not listed in CLAUDE.md Key Commands, but they start with `_` (internal targets)"
+
+### Per-Category Implementation Guidance
+
+Concrete checks to implement for each eval category. For each category, these are the highest-value grep/scan targets.
+
+#### Adherence
+
+- **Naming conventions**: Grep source files for patterns that violate documented naming (e.g., `camelCase` in a `snake_case` project, uppercase constants that should be enums)
+- **Error handling patterns**: Scan for bare `catch {}`, swallowed errors (`catch (e) { /* ignore */ }`), and missing error propagation per `docs/coding-standards.md`
+- **Import rules**: Check for barrel import violations, circular imports, and forbidden cross-layer imports (e.g., UI importing directly from DB layer)
+- **TODO hygiene**: Grep for `TODO|FIXME|HACK` without a task ID tag like `[BD-xxx]` — untagged TODOs are tracking gaps
+
+#### Consistency
+
+- **Cross-doc refs match**: Extract all file path references from markdown docs (`docs/*.md`) and verify each referenced path exists on disk
+- **Format standardization**: Verify commit messages follow the documented pattern in `docs/coding-standards.md` by regex-matching `git log --oneline`
+- **Command table sync**: Parse the Key Commands table in `CLAUDE.md`, extract each backtick-quoted command, and verify a matching Makefile target or package.json script exists
+- **Config value consistency**: Check that port numbers, env var names, and feature flags in config files match what documentation describes
+
+#### Structure
+
+- **File placement rules**: For each source file, verify its directory matches the module placement rules in `docs/project-structure.md` (e.g., no feature code in `shared/`, no stray files in root)
+- **Test co-location**: For each source file with logic, verify a corresponding `.test.*` file exists per the documented convention (co-located or mirror directory)
+- **Shared code 2+ consumers**: Scan every file in `shared/`, `common/`, or `lib/` directories and count distinct importers — flag any with fewer than 2 consumers
+- **No orphan files**: Verify every source file is either imported by another file or is a documented entry point (main, index, CLI handler)
+
+#### Coverage
+
+- **Feature-to-code mapping**: Extract Must-have features from `docs/plan.md`, derive domain keywords, and grep source tree for 2+ keyword matches per feature
+- **AC-to-test mapping**: Extract acceptance criteria from `docs/user-stories.md`, extract keywords, and search test files for keyword co-occurrence (high confidence: exact AC ID reference; medium: 2+ domain keywords)
+- **API endpoint coverage**: Parse documented endpoints from `docs/api-contracts.md`, verify each has a route definition in code and at least one test file asserting its status codes
+
+#### Cross-doc
+
+- **Terminology consistency**: Extract key domain terms from the PRD and verify the same terms (not synonyms) appear in architecture, user stories, and coding standards docs
+- **Tech stack references**: Verify that technology names referenced across docs match the canonical list in `docs/tech-stack.md` (e.g., no doc says "Postgres" when the canonical name is "PostgreSQL")
+- **Path consistency**: Collect all file path references across all docs and verify they use the same path format (no mix of `src/features/` and `features/src/`)
+
+#### Security
+
+- **Auth middleware usage**: Parse the security review for protected routes, then verify each route definition includes auth middleware (`requireAuth`, `@authenticated`, or equivalent)
+- **Secret patterns**: Grep for hardcoded API keys, tokens, and passwords using known patterns (`AKIA...`, `sk_live_...`, `ghp_...`, and generic `password\s*=\s*['"][^'"]+`)
+- **Input validation**: For each API endpoint accepting user input, verify a validation step exists (Zod `.parse()`, Joi `.validate()`, express-validator chain, or equivalent)
+- **No secrets in git**: Run `git log --diff-filter=A --name-only` and check that no `.env`, credentials, or key files were ever committed
