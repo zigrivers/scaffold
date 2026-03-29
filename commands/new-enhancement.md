@@ -20,6 +20,7 @@ This is the full-weight entry point for work that goes beyond a quick fix.
 - docs/design-system.md (optional) — design tokens, component patterns (if frontend changes)
 - CLAUDE.md (required) — project conventions, key commands, workflow
 - .beads/ (conditional) — Beads task tracking if configured
+- docs/implementation-plan.md (required) — existing tasks and task numbering
 - Relevant source code if needed to understand current implementation
 
 ## Expected Outputs
@@ -30,7 +31,7 @@ This is the full-weight entry point for work that goes beyond a quick fix.
 
 ## Quality Criteria
 - (mvp) Impact analysis completed before documentation changes
-- (mvp) PRD feature description is thorough enough for an AI agent to build without follow-up questions
+- (mvp) PRD feature description includes: what the feature does, which persona it serves, at least 2 acceptance criteria, and scope boundary (what it does NOT include)
 - (mvp) User stories follow INVEST criteria
 - (mvp) Acceptance criteria are testable Given/When/Then scenarios
 - (mvp) Task dependencies are identified and documented
@@ -415,6 +416,8 @@ This is appropriate when:
 
 ### Phase 5: Version Release
 
+**Note**: Version release should happen after implementation is complete, not after this documentation step. If going straight to implementation, skip to "After This Step" guidance below.
+
 After all changes are applied and verified:
 
 1. Determine release type based on change scope:
@@ -439,6 +442,10 @@ When this step is complete, tell the user:
 - If the enhancement has **platform-specific behavior**: Run `/scaffold:platform-parity-review` — Check platform coverage.
 - If user stories were added or changed: Run `/scaffold:story-tests` — Regenerate test skeletons for new user stories.
 - If scope changed materially: Run `/scaffold:create-evals` — Update eval checks for new scope.
+- If impact analysis identified **Data Model changes**: Run `/scaffold:database-schema` to update the schema.
+- If impact analysis identified **API changes**: Run `/scaffold:api-contracts` to update contracts.
+- If impact analysis identified **UI changes**: Run `/scaffold:ux-spec` to update the UX specification.
+- If impact analysis identified **Architecture changes**: Run `/scaffold:system-architecture` to update architecture.
 - Otherwise: Run `/scaffold:single-agent-start` or `/scaffold:single-agent-resume` to begin implementation (or `/scaffold:multi-agent-start <agent-name>` / `/scaffold:multi-agent-resume <agent-name>` for worktree agents).
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`

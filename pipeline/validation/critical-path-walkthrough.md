@@ -35,8 +35,8 @@ spec gaps along the critical path.
 - (mvp) User specifies >= 3 Must-have epics as critical user journeys; each traced end-to-end
 - (deep) Every journey verified at each layer: PRD → Story → UX → API → Architecture → DB → Task
 - (deep) Each critical path verified against story acceptance criteria for behavioral correctness
-- Missing layers or broken handoffs documented with specific gap description
-- Findings categorized P0-P3 with specific file, section, and issue for each
+- (mvp) Missing layers or broken handoffs documented with specific gap description
+- (mvp) Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Finding Disposition

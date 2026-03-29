@@ -32,13 +32,13 @@ entire review-fix loop locally.
 - CLAUDE.md updated with agent-driven review workflow
 
 ## Quality Criteria
-- External reviewer configured and verified (AGENTS.md created)
-- Review standards document matches project coding conventions
-- Await script handles all exit conditions (approved, findings, cap, skip, timeout)
-- CLAUDE.md workflow documents the agent-driven loop
-- No GitHub Actions workflows created (zero Actions minutes)
-- No ANTHROPIC_API_KEY secret required
-- Legacy GitHub Actions workflows detected and cleanup offered
+- (mvp) External reviewer configured and verified (AGENTS.md created)
+- (mvp) Review standards document matches project coding conventions
+- (deep) Await script handles all exit conditions (approved, findings, cap, skip, timeout)
+- (mvp) CLAUDE.md workflow documents the agent-driven loop
+- (mvp) No GitHub Actions workflows created (zero Actions minutes)
+- (mvp) No ANTHROPIC_API_KEY secret required
+- (deep) Legacy GitHub Actions workflows detected and cleanup offered
 - (deep) Dual-model review enabled when both CLIs available
 
 ## Methodology Scaling

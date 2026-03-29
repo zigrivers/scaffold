@@ -46,8 +46,7 @@ inconsistent command formats. Fix all issues found.
 - (deep) Agent crash recovery documented
 - (deep) No document contradicts the canonical workflow
 - (mvp) CLAUDE.md is the source of truth for workflow. All other documents must align with CLAUDE.md, not override it.
-- Tracking comment matches format: `<!-- scaffold:workflow-audit v1 YYYY-MM-DD -->`
-- Tracking comment added: <!-- scaffold:workflow-audit v1 YYYY-MM-DD -->
+- (mvp) Tracking comment matches format: `<!-- scaffold:workflow-audit v1 YYYY-MM-DD -->`
 
 ## Methodology Scaling
 - **deep**: Full six-phase audit (inventory, completeness check with all

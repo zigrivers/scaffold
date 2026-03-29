@@ -13,8 +13,8 @@ and produce a structured coverage matrix and review summary.
 
 ## Inputs
 - docs/implementation-plan.md (required) — tasks to review
-- docs/system-architecture.md (required) — for coverage checking
-- docs/domain-models/ (required) — for completeness
+- docs/system-architecture.md (required at deep; optional — not available in MVP) — for coverage checking
+- docs/domain-models/ (required at deep; optional — not available in MVP) — for completeness
 - docs/user-stories.md (required) — for AC coverage mapping
 - docs/plan.md (required) — for traceability
 - docs/project-structure.md (required) — for file contention analysis
@@ -52,7 +52,7 @@ under docs/reviews/implementation-plan/, preserve prior findings still valid.
 
 ## Update Mode Specifics
 
-- **Detect**: `docs/reviews/review-implementation-plan.md` exists with tracking comment
+- **Detect**: `docs/reviews/review-tasks.md` exists with tracking comment
 - **Preserve**: Prior findings still valid, resolution decisions, multi-model review artifacts
 - **Triggers**: Upstream artifact changed since last review (compare tracking comment dates)
 - **Conflict resolution**: Previously resolved findings reappearing = regression; flag and re-evaluate

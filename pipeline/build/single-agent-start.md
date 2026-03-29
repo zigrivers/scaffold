@@ -123,6 +123,7 @@ For each task:
    - If Beads: branch as `bd-<id>/<desc>`
 
 2. **Red phase — write failing tests**
+   - Check `docs/story-tests-map.md` (if it exists) to find test skeletons that correspond to this task's user stories
    - Check `tests/acceptance/` for existing test skeletons that correspond to the task
    - If skeletons exist, use them as your starting point
    - Otherwise, write test cases from the task's acceptance criteria

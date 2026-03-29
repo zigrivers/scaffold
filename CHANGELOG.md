@@ -2,6 +2,30 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.41.0] — 2026-03-29
+
+### Added
+
+- **Round 6 alignment audit** — `docs/comprehensive-alignment-audit-round-6.md` with 58 findings across 8 modules. Zero BROKEN findings (R5 regressions confirmed fixed). Identified systemic QC tagging gap.
+- **New eval: depth-level-grouping.bats** — 3 tests preventing grouped depth levels (catches the recurring 2-R1 regression class)
+- **New eval: mvp-path-simulation.bats** — 3 tests validating MVP preset dependency chain integrity and step count
+- **Hardened build-drift.bats** — New test 3 validates QC phrase parity between pipeline and command files (78 total eval tests, up from 71)
+
+### Fixed
+
+- **93 untagged QC criteria** — Added depth tags (mvp/deep) to QC criteria across 32 pipeline steps. Agents at MVP depth can now distinguish required vs optional criteria.
+- **UMS Detect path mismatches** — `review-prd` and `implementation-plan-review` had wrong file paths in Update Mode Specifics Detect field, causing update-mode detection to look for nonexistent files.
+- **MVP input availability** — `implementation-plan-review` and `implementation-playbook` marked inputs as "required" that don't exist at MVP depth. Now correctly documented as "required at deep; optional — not available in MVP".
+- **implementation-plan QC contradiction** — "Every architecture component has implementation tasks" changed to (deep); new (mvp) criterion "Every user story has implementation tasks" added.
+- **new-enhancement gaps** — Added reads for architecture/domain/API/DB/UX docs for impact analysis; added implementation-plan.md to Inputs; added spec-layer artifact update guidance in After This Step; fixed premature version-bump in Phase 5.
+- **Multi-model consensus standardization** — `tech-stack` and `platform-parity-review` aligned to Consensus/Majority/Divergent taxonomy (was non-standard phrasing).
+- **Traceability language** — `scope-creep-check` changed "traces to" to standard "maps to".
+- **Knowledge structure** — Added Summary + Deep Guidance to `critical-path-analysis` and `implementability-review` (now 60/60 entries with proper structure).
+- **QC measurability** — Fixed vague "thorough" (new-enhancement), "addressed" (apply-fixes-and-freeze); removed redundant criteria (implementability-dry-run, workflow-audit); split mixed-depth criterion (developer-onboarding-guide).
+- **Review scope conflicts** — "All review passes executed" tagged (deep) in review-prd, review-user-stories, review-vision to resolve conflict with MVP-scoped "passes 1-2 only".
+- **Build step story-tests-map** — single-agent-start and multi-agent-start now reference docs/story-tests-map.md for test skeleton lookup.
+- **innovate-user-stories outputs** — Added docs/user-stories.md to frontmatter outputs (matching pattern of other innovate steps).
+
 ## [2.40.1] — 2026-03-29
 
 ### Added

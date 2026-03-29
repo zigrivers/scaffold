@@ -30,9 +30,9 @@ independent review validation.
 - (mvp) At least production environment operations documented
 - (deep) Dev/staging/production environment differences documented in operations runbook
 - (deep) Each health check endpoint specifies expected status code, response time SLA, failure thresholds
-- Every finding categorized P0-P3 (P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.) with specific runbook section, metric, and issue
-- Fix plan documented for all P0/P1 findings; fixes applied to operations-runbook.md and re-validated
-- Downstream readiness confirmed — no unresolved P0 or P1 findings remain before security step proceeds
+- (mvp) Every finding categorized P0-P3 (P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.) with specific runbook section, metric, and issue
+- (mvp) Fix plan documented for all P0/P1 findings; fixes applied to operations-runbook.md and re-validated
+- (mvp) Downstream readiness confirmed — no unresolved P0 or P1 findings remain before security step proceeds
 - (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling

@@ -29,7 +29,8 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
   assignment recommendations
 
 ## Quality Criteria
-- (mvp) Every architecture component has implementation tasks
+- (deep) Every architecture component has implementation tasks
+- (mvp) Every user story has implementation tasks
 - (mvp) Task dependencies form a valid DAG (no cycles, verified by checking no task depends on a later-ordered task)
 - (mvp) Each task produces 150 +/- 50 lines of net-new application code (excluding tests and generated files)
 - (mvp) Tasks include acceptance criteria (how to know it's done)

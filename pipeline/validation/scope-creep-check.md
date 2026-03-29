@@ -33,12 +33,12 @@ differently, surfacing subtle creep.
 - docs/validation/scope-creep-check/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- (mvp) Every user story traces back to a PRD feature or requirement
-- (mvp) Every architecture component traces to a PRD requirement
-- Items beyond PRD scope are flagged with disposition (remove, defer, or justify)
+- (mvp) Every user story maps to a PRD feature or requirement
+- (mvp) Every architecture component maps to a PRD requirement
+- (mvp) Items beyond PRD scope are flagged with disposition (remove, defer, or justify)
 - (deep) No "gold-plating" — implementation tasks do not exceed story acceptance criteria
 - (deep) Feature count has not grown beyond PRD scope without documented justification
-- Findings categorized P0-P3 with specific file, section, and issue for each
+- (mvp) Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Finding Disposition
