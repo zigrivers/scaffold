@@ -178,240 +178,365 @@ The PRD is always created as `docs/plan.md`. If you have a legacy `docs/prd.md` 
 
 ## Quick Start
 
-**1. Create a new project and initialize Scaffold**
+The fastest way to use Scaffold is through natural language inside Claude Code. The Scaffold Runner skill handles pipeline navigation, surfaces decision points before Claude picks defaults, and tracks your progress automatically. The examples below show what you'd type in a Claude Code session.
+
+### Starting a Brand New Project
+
+Let's say you want to build a neighborhood tool lending library — an app where neighbors can list tools they own and borrow from each other. Here's how that looks end to end.
+
+**Set up the project** (one-time, in your terminal):
 
 ```bash
-mkdir my-project && cd my-project
+mkdir tool-library && cd tool-library
 git init
 scaffold init
 ```
 
-The init wizard detects your project type and walks you through choosing a methodology preset. It creates `.scaffold/` with your config, state, and decisions log.
+The init wizard detects that this is a brand new project and asks you to pick a methodology. Choose **mvp** if you want to get to working code fast — it runs only 7 critical steps instead of the full 60. You can always switch to `deep` or `custom` later.
 
-**2. Define your product vision**
+**Open Claude Code in your project directory**, then start talking:
+
+```
+"I want to build a neighborhood tool lending library where neighbors can
+list tools they own, browse what's available nearby, and request to borrow
+items. Run the first scaffold step."
+```
+
+The runner picks up `create-vision` (the first eligible step), asks you a few strategic questions about your idea — who's the audience, what makes this different from existing apps, what does success look like — and produces `docs/vision.md`. This becomes the foundation everything else builds on.
+
+```
+"Run the next scaffold step"
+```
+
+Now it runs `create-prd`. Claude translates your vision into a detailed product requirements document with features, user personas, success criteria, and scope boundaries. The output lands in `docs/plan.md`.
+
+```
+"Next step"
+```
+
+`review-prd` — Claude reviews the PRD for gaps, ambiguity, and completeness, then suggests improvements. You decide which suggestions to accept.
+
+```
+"Keep going"
+```
+
+`user-stories` — Claude breaks the PRD into detailed user stories with acceptance criteria. Each story maps back to a specific requirement so nothing falls through the cracks.
+
+```
+"What's left?"
+```
+
+The runner shows your remaining steps and which ones are unblocked. With the `mvp` preset, you're almost there — just `review-user-stories`, `tdd`, `implementation-plan`, and `implementation-playbook` remain.
+
+```
+"Finish the remaining steps"
+```
+
+The runner executes each remaining step in order, pausing to surface decisions that need your input (testing framework preferences, depth level for reviews, etc.) rather than letting Claude guess silently.
+
+Once the pipeline is complete:
+
+```
+"Start building"
+```
+
+Claude picks up the first implementation task and begins writing code using TDD — tests first, then implementation. Your project now has architecture docs, coding standards, a test strategy, and a task graph, all produced from your original idea.
+
+> **CLI equivalent**: Everything above can also be done with `scaffold run create-vision`, `scaffold run create-prd`, `scaffold next`, etc. The runner skill adds interactive decision surfacing on top of these commands.
+
+### Adding Scaffold to an Existing Project
+
+Say you have a Next.js app with a handful of features built, but no documentation, formal test strategy, or architecture docs. Scaffold can backfill all of that.
+
+**In your project root:**
 
 ```bash
-scaffold run create-vision
+cd ~/projects/my-nextjs-app
+scaffold init
 ```
 
-Or in Claude Code:
+Scaffold detects that you already have code (package.json, source files, git history) and classifies the project as **brownfield**. It suggests the `deep` methodology since existing projects benefit from thorough documentation, but you can choose any preset.
 
-```
-/scaffold:create-vision I want to build a recipe sharing app where users can save, organize, and share recipes with friends
-```
-
-Claude asks strategic questions about your idea, researches the competitive landscape, and produces a vision document. This becomes the North Star that all later steps build on.
-
-**3. Create your PRD**
+If you already have docs that match Scaffold's expected outputs (a PRD, architecture doc, etc.), bootstrap your state:
 
 ```bash
-scaffold run create-prd
+scaffold adopt
 ```
 
-Claude translates the vision into detailed product requirements — features, user personas, success criteria, and scope boundaries.
+This scans your project for existing artifacts and marks those pipeline steps as complete so you don't redo work.
 
-**4. See what's next**
+**Now open Claude Code and skip what doesn't apply:**
+
+```
+"Skip create-vision and create-prd — I already know what I'm building"
+```
+
+The runner marks those steps as skipped with your reason logged.
+
+```
+"Run tech-stack"
+```
+
+Claude scans your existing dependencies, framework choices, and configuration, then documents everything in `docs/tech-stack.md` — formalizing decisions you've already made so future contributors (and AI agents) understand the rationale.
+
+```
+"Run tdd"
+```
+
+Claude sets up a testing strategy tailored to your existing stack — test runner config, coverage targets, TDD workflow conventions. If you already have some tests, it builds around them.
+
+```
+"Run coding-standards"
+```
+
+Claude analyzes your existing code patterns and creates `docs/coding-standards.md` with linter and formatter configs that match how you're already writing code.
+
+Continue through whatever steps make sense — `git-workflow`, `security`, `implementation-plan` — and skip the rest.
+
+**Later, when you want to add a new feature with full Scaffold rigor:**
+
+```
+"Run new-enhancement"
+```
+
+Claude walks you through adding a feature the right way — updating the PRD, creating new user stories, setting up tasks with dependencies, and kicking off implementation. All the planning docs stay in sync.
+
+### Checking Your Progress
+
+Scaffold persists your pipeline state in `.scaffold/state.json`, so you can close Claude Code, take a break, and pick up right where you left off.
+
+**In Claude Code** (natural language):
+
+```
+"Where am I in the pipeline?"    → full progress view with phase breakdown
+"What's next?"                   → shows the next unblocked step(s)
+"What's left?"                   → compact view of remaining steps only
+```
+
+**From the terminal** (CLI):
 
 ```bash
-scaffold next
+scaffold status              # full pipeline progress
+scaffold status --compact    # remaining work only
+scaffold next                # next eligible step(s)
+scaffold dashboard           # open a visual progress dashboard in your browser
 ```
 
-Scaffold shows you which steps are now unblocked based on the dependency graph.
+### Tips for New Users
 
-**5. Keep following the pipeline**
-
-```bash
-scaffold run review-prd
-scaffold run user-stories
-# ... and so on
-```
-
-Each step tells you what to run next. Use `scaffold status` at any time to see the full pipeline state, `scaffold status --compact` for just the remaining work, or `scaffold dashboard` to open a visual progress dashboard in your browser.
+- **You don't need every step.** The `mvp` preset runs just 7 steps and gets you building fast. Start there and switch to `deep` or `custom` if you want more rigor.
+- **"I'm not sure" is a valid answer.** When Claude asks a question you can't answer yet, say so — it'll suggest reasonable defaults and explain the trade-offs. You can revisit any decision later.
+- **You can re-run any step.** If your thinking evolves, use `scaffold reset <step>` to reset it, then run it again. Scaffold uses update mode — it improves the existing artifact rather than starting from scratch.
+- **Every step produces a real document.** Vision docs, PRDs, architecture decisions, test strategies — these all land in your project's `docs/` folder as markdown files. They're not throwaway; they're the source of truth your code is built from.
+- **The pipeline is a guide, not a cage.** Skip steps that don't apply (`scaffold skip <step> --reason "..."`). Run them out of order if you know what you're doing. Scaffold tracks dependencies so it'll tell you if you're missing a prerequisite.
+- **Depth controls thoroughness.** Each step runs at a depth from 1 (focused, fast) to 5 (exhaustive). The mvp preset defaults to depth 1; deep defaults to 5. You can override per step or per session: `"Use depth 3 for everything"`.
 
 ## The Pipeline
 
 ### Phase 0 — Product Vision (vision)
 
-Define why you're building it.
+You describe your idea and Claude turns it into a strategic vision document covering who it's for, what makes it different, and what success looks like. The review step stress-tests the vision for gaps, and the innovate step explores market positioning opportunities. Without this, later steps lack a clear North Star and features drift.
 
 | Step | What It Does |
 |------|-------------|
-| `create-vision` | Creates a strategic product vision document from your idea |
-| `review-vision` | Structured review of the vision for clarity, coherence, and downstream readiness |
-| `innovate-vision` | Strategic innovation pass on market positioning and opportunities *(optional)* |
+| `create-vision` | Claude asks about your idea — who it's for, what problem it solves, what makes it different — and produces a vision document with elevator pitch, target audience, competitive positioning, guiding principles, and success criteria. |
+| `review-vision` | Claude stress-tests the vision across five dimensions — clarity, audience precision, competitive rigor, strategic coherence, and whether the PRD can be written from it without ambiguity — and fixes what it finds. |
+| `innovate-vision` | Claude explores untapped opportunities — adjacent markets, AI-native capabilities, ecosystem partnerships, and contrarian positioning — and proposes innovations for your approval. *(optional)* |
 
 ### Phase 1 — Product Definition (pre)
 
-Define what you're building.
+Claude translates your vision into a detailed product requirements document (PRD) with features, user personas, constraints, and success criteria. Then it breaks the PRD into user stories — specific things users can do, each with testable acceptance criteria in Given/When/Then format. Review and innovation steps audit for gaps and suggest enhancements. Without this, you're building without a spec.
 
 | Step | What It Does |
 |------|-------------|
-| `create-prd` | Creates a detailed product requirements document from your idea |
-| `innovate-prd` | Reviews the PRD for missing pieces and suggests innovations |
-| `review-prd` | Structured review of the PRD for completeness and quality |
-| `user-stories` | Creates detailed user stories for every PRD feature |
-| `innovate-user-stories` | Gap analysis and UX innovation pass on user stories |
-| `review-user-stories` | Structured review with optional multi-model validation and requirements traceability at depth 4-5 |
+| `create-prd` | Claude translates your vision (or idea, if no vision exists) into a product requirements document with problem statement, user personas, prioritized feature list, constraints, non-functional requirements, and measurable success criteria. |
+| `innovate-prd` | Claude analyzes the PRD for feature-level gaps — competitive blind spots, UX enhancements, AI-native possibilities — and proposes additions for your approval. *(optional)* |
+| `review-prd` | Claude reviews the PRD across eight passes — problem rigor, persona coverage, feature scoping, success criteria, internal consistency, constraints, non-functional requirements — and fixes blocking issues. |
+| `user-stories` | Claude breaks every PRD feature into user stories ("As a [persona], I want [action], so that [outcome]") organized by epic, each with testable acceptance criteria in Given/When/Then format. |
+| `innovate-user-stories` | Claude identifies UX enhancement opportunities — progressive disclosure, smart defaults, accessibility improvements — and integrates approved changes into existing stories. *(optional)* |
+| `review-user-stories` | Claude verifies every PRD feature maps to at least one story, checks that acceptance criteria are specific enough to test, validates story independence, and builds a requirements traceability index at higher depths. |
 
 ### Phase 2 — Project Foundation (foundation)
 
-Set up tooling, standards, and project structure.
+Claude researches and documents your technology choices (language, framework, database) with rationale, creates coding standards tailored to your stack with actual linter configs, defines your testing strategy and test pyramid, and designs a directory layout optimized for parallel AI agent work. Without this, agents guess at conventions and produce inconsistent code.
 
 | Step | What It Does |
 |------|-------------|
-| `beads` | Initialize Beads task tracking and create CLAUDE.md *(optional)* |
-| `tech-stack` | Research and document technology choices; adds stack-specific safety rules |
-| `coding-standards` | Create coding standards with linter/formatter configs |
-| `tdd` | Define testing conventions, TDD workflow, test pyramid, coverage strategy |
-| `project-structure` | Design and scaffold the directory layout |
+| `beads` | Sets up Beads task tracking with a lessons-learned file for cross-session learning, and creates the initial CLAUDE.md skeleton with core principles and workflow conventions. *(optional)* |
+| `tech-stack` | Claude researches technology options for your project — language, framework, database, hosting, auth — evaluates each against your requirements, and documents every choice with rationale and alternatives considered. |
+| `coding-standards` | Claude creates coding standards tailored to your tech stack — naming conventions, error handling patterns, import organization, AI-specific rules — and generates working linter and formatter config files. |
+| `tdd` | Claude defines your testing approach — which types of tests to write at each layer, coverage targets, what to mock and what not to, test data patterns — so agents write the right tests from the start. |
+| `project-structure` | Claude designs a directory layout optimized for parallel AI agent work (minimizing file conflicts), documents where each type of file belongs, and creates the actual directories in your project. |
 
 ### Phase 3 — Development Environment (environment)
 
-Configure the working environment.
+Claude sets up your local dev environment with one-command startup and live reload, creates a design system with color palette, typography, and component patterns (web apps only), configures your git branching strategy with CI pipeline and worktree scripts for parallel agents, optionally sets up automated PR review with multi-model validation, and configures AI memory so conventions persist across sessions. Without this, you're manually configuring tooling instead of building.
 
 | Step | What It Does |
 |------|-------------|
-| `dev-env-setup` | Set up local dev environment with live reload |
-| `design-system` | Create design tokens and component patterns *(web apps only)* |
-| `git-workflow` | Configure branching, CI, worktree scripts, and project safety permissions |
-| `automated-pr-review` | Agent-driven PR review with local CLI or external reviewers *(optional)* |
-| `ai-memory-setup` | Configure AI memory: modular `.claude/rules/`, optional MCP memory server, external docs |
+| `dev-env-setup` | Claude configures your project so `make dev` (or equivalent) starts everything — dev server with live reload, local database, environment variables — and documents the setup in a getting-started guide. |
+| `design-system` | Claude creates a visual language — color palette (WCAG-compliant), typography scale, spacing system, component patterns — and generates working theme config files for your frontend framework. *(web apps only)* |
+| `git-workflow` | Claude sets up your branching strategy, commit message format, PR workflow, CI pipeline with lint and test jobs, and worktree scripts so multiple AI agents can work in parallel without conflicts. |
+| `automated-pr-review` | Claude configures automated code review — using Codex and/or Gemini CLIs for dual-model review when available, or an external bot — with severity definitions and review criteria tailored to your project. *(optional)* |
+| `ai-memory-setup` | Claude extracts conventions from your docs into path-scoped rule files that load automatically, optimizes CLAUDE.md with a pointer pattern, and optionally sets up persistent cross-session memory. |
 
 ### Phase 4 — Testing Integration (integration)
 
-Add E2E testing frameworks.
+Claude auto-detects your platform (web or mobile) and configures end-to-end testing — Playwright for web apps, Maestro for mobile/Expo. Skips automatically for backend-only projects. Without this, your test pyramid has no top level.
 
 | Step | What It Does |
 |------|-------------|
-| `add-e2e-testing` | Auto-detects platform, configures Playwright (web) and/or Maestro (mobile) *(optional)* |
+| `add-e2e-testing` | Claude detects whether your project is web or mobile, then configures Playwright (web) or Maestro (mobile) with a working smoke test, baseline screenshots, and guidance on when to use E2E vs. unit tests. *(optional)* |
 
 ### Phase 5 — Domain Modeling (modeling)
 
-Understand the problem domain.
+Claude analyzes your user stories to identify all the core concepts in your project — the entities (things like Users, Orders, Tools), their relationships, the rules that must always be true, and the events that happen when state changes. This becomes the shared language between all your docs and code. Without this, different docs use different names for the same concept and agents create duplicate logic.
 
 | Step | What It Does |
 |------|-------------|
-| `domain-modeling` | DDD analysis — bounded contexts, aggregates, value objects |
-| `review-domain-modeling` | Review of domain model for correctness and completeness |
+| `domain-modeling` | Claude analyzes your user stories to identify the core concepts in your project (entities, their relationships, the rules that must always hold true), and establishes a shared vocabulary that all docs and code will use. |
+| `review-domain-modeling` | Claude verifies every PRD feature maps to a domain entity, checks that business rules are enforceable, and ensures the shared vocabulary is consistent across all project files. |
 
 ### Phase 6 — Architecture Decisions (decisions)
 
-Record key technical decisions.
+Claude documents every significant technology and design decision as an Architecture Decision Record (ADR) — what was decided, what alternatives were considered, and why. The review catches contradictions and missing decisions. Without this, future contributors (human or AI) don't know *why* things are the way they are.
 
 | Step | What It Does |
 |------|-------------|
-| `adrs` | Creates Architecture Decision Records for major choices |
-| `review-adrs` | Review of ADRs for completeness and rationale |
+| `adrs` | Claude documents every significant design decision — what was chosen, what alternatives were considered with pros and cons, and what consequences follow — so future contributors understand *why*, not just *what*. |
+| `review-adrs` | Claude checks for contradictions between decisions, missing decisions implied by the architecture, and whether every choice has honest trade-off analysis. |
 
 ### Phase 7 — System Architecture (architecture)
 
-Design the system.
+Claude designs the system blueprint — which components exist, how data flows between them, where each piece of code lives, and how the system can be extended. This translates your domain model and decisions into a concrete structure that implementation will follow. Without this, agents make conflicting structural assumptions.
 
 | Step | What It Does |
 |------|-------------|
-| `system-architecture` | Component design, layering, patterns, scalability |
-| `review-architecture` | Structured architecture review |
+| `system-architecture` | Claude designs the system blueprint — which components exist, how data flows between them, where each module lives in the directory tree, and where extension points allow custom behavior. |
+| `review-architecture` | Claude verifies every domain concept lands in a component, every decision constraint is respected, no components are orphaned from data flows, and the module structure minimizes merge conflicts. |
 
 ### Phase 8 — Specifications (specification)
 
-Detail the interfaces.
+Claude creates detailed interface specifications for each layer of your system. Database schema translates domain entities into tables with constraints that enforce business rules. API contracts define every endpoint with request/response shapes, error codes, and auth requirements. UX spec maps out user flows, interaction states, accessibility requirements, and responsive behavior. Each is conditional — only generated if your project has that layer. Without these, agents guess at interfaces and implementations don't align.
 
 | Step | What It Does |
 |------|-------------|
-| `database-schema` | Database design — normalization, indexing, migrations *(if applicable)* |
-| `review-database` | Review of database schema *(if applicable)* |
-| `api-contracts` | REST/GraphQL contracts, versioning, error handling *(if applicable)* |
-| `review-api` | Review of API contracts *(if applicable)* |
-| `ux-spec` | Interaction design, usability, user flows *(if applicable)* |
-| `review-ux` | Review of UX specification *(if applicable)* |
+| `database-schema` | Claude translates your domain model into database tables with constraints that enforce business rules, indexes optimized for your API's query patterns, and a reversible migration strategy. *(if applicable)* |
+| `review-database` | Claude verifies every domain entity has a table, constraints enforce business rules at the database level, and indexes cover all query patterns from the API contracts. *(if applicable)* |
+| `api-contracts` | Claude specifies every API endpoint — request/response shapes, error codes with human-readable messages, auth requirements, pagination, and example payloads — so frontend and backend can be built in parallel. *(if applicable)* |
+| `review-api` | Claude checks that every domain operation has an endpoint, error responses include domain-specific codes, and auth requirements are specified for every route. *(if applicable)* |
+| `ux-spec` | Claude maps out every user flow with all interaction states (loading, error, empty, populated), defines accessibility requirements (WCAG level, keyboard nav), and specifies responsive behavior at each breakpoint. *(if applicable)* |
+| `review-ux` | Claude verifies every user story has a flow, accessibility requirements are met, all error states are documented, and the design system is used consistently. *(if applicable)* |
 
 ### Phase 9 — Quality (quality)
 
-Plan for quality, security, and operations.
+Claude reviews your testing strategy for coverage gaps, generates test skeleton files from your user story acceptance criteria (one test per criterion, ready for TDD), creates automated eval checks that verify code meets your documented standards, designs your deployment pipeline with monitoring and incident response, and conducts a security review covering OWASP Top 10, threat modeling, and input validation rules. Without this, quality is an afterthought bolted on at the end.
 
 | Step | What It Does |
 |------|-------------|
-| `review-testing` | Review of testing strategy |
-| `story-tests` | Generate tagged test skeletons from user story acceptance criteria — feeds into `create-evals` and `implementation-plan` |
-| `create-evals` | Generate project-specific eval checks from standards docs — used as quality gates during implementation |
-| `operations` | CI/CD, deployment, monitoring, runbooks |
-| `review-operations` | Review of operations plan |
-| `security` | OWASP, threat modeling, security controls |
-| `review-security` | Security review — **highest priority for multi-model validation** |
+| `review-testing` | Claude audits the testing strategy for coverage gaps by layer, verifies edge cases from domain invariants are tested, and checks that test environment assumptions match actual config. |
+| `story-tests` | Claude generates a test skeleton file for each user story — one pending test case per acceptance criterion, tagged with story and criterion IDs — giving agents a TDD starting point for every feature. |
+| `create-evals` | Claude generates automated checks that verify your code matches your documented standards — file placement, naming conventions, feature-to-test coverage, API contract alignment, and more — using your project's own test framework. |
+| `operations` | Claude designs your deployment pipeline (build, test, deploy, verify, rollback), defines monitoring metrics with alert thresholds, and writes incident response procedures with rollback instructions. |
+| `review-operations` | Claude verifies the full deployment lifecycle is documented, monitoring covers latency/errors/saturation, alert thresholds have rationale, and common failure scenarios have runbook entries. |
+| `security` | Claude conducts a security review of your entire system — OWASP Top 10 coverage, input validation rules for every user-facing field, data classification, secrets management, CORS policy, rate limiting, and a threat model covering all trust boundaries. |
+| `review-security` | Claude verifies OWASP coverage is complete, auth boundaries match API contracts, every secret is accounted for, and the threat model covers all trust boundaries. **Highest priority for multi-model review.** |
 
 ### Phase 10 — Platform Parity (parity)
 
-Cross-platform parity audits.
+For projects targeting multiple platforms (web + mobile, for example), Claude audits all documentation for platform-specific gaps — features that work on one platform but aren't specified for another, input pattern differences, and platform-specific testing coverage. Skips automatically for single-platform projects.
 
 | Step | What It Does |
 |------|-------------|
-| `platform-parity-review` | Audit platform coverage across docs *(multi-platform only)* |
+| `platform-parity-review` | Claude audits all documentation for platform-specific gaps — features missing on one platform, input pattern differences (touch vs. mouse), and platform-specific testing coverage. *(multi-platform only)* |
 
 ### Phase 11 — Consolidation (consolidation)
 
-Clean up and verify before planning implementation.
+Claude optimizes your CLAUDE.md to stay under 200 lines with critical patterns front-loaded, then audits all workflow documentation for consistency — making sure commit formats, branch naming, PR workflows, and key commands match across every doc. Without this, agents encounter conflicting instructions.
 
 | Step | What It Does |
 |------|-------------|
-| `claude-md-optimization` | Consolidate and optimize CLAUDE.md |
-| `workflow-audit` | Verify workflow consistency across all docs |
+| `claude-md-optimization` | Claude removes redundancy from CLAUDE.md, fixes terminology inconsistencies, front-loads critical patterns (TDD, commit format, worktrees), and keeps it under 200 lines so agents actually read and follow it. |
+| `workflow-audit` | Claude audits every document that mentions workflow (CLAUDE.md, git-workflow, coding-standards, dev-setup) and fixes any inconsistencies in commit format, branch naming, PR steps, or key commands. |
 
 ### Phase 12 — Planning (planning)
 
-Break work into implementable tasks.
+Claude decomposes your user stories and architecture into concrete, implementable tasks — each scoped to ~150 lines of code, limited to 3 files, with clear acceptance criteria and no ambiguous decisions for agents to guess at. The review validates coverage (every feature has tasks), checks the dependency graph for cycles, and runs multi-model validation at higher depths. Without this, agents don't know what to build or in what order.
 
 | Step | What It Does |
 |------|-------------|
-| `implementation-plan` | Decompose stories into a task graph with dependencies |
-| `implementation-plan-review` | Review task quality, coverage, sizing, and multi-model validation (depth 4+) |
+| `implementation-plan` | Claude breaks your user stories and architecture into concrete tasks — each scoped to ~150 lines of code and 3 files max, with clear acceptance criteria, no ambiguous decisions, and explicit dependencies. |
+| `implementation-plan-review` | Claude verifies every feature has implementation tasks, no task is too large for one session, the dependency graph has no cycles, and every acceptance criterion maps to at least one task. |
 
 ### Phase 13 — Validation (validation)
 
-Cross-phase audits before implementation.
+Seven cross-cutting audits that catch problems before implementation begins. Without this phase, hidden spec problems surface during implementation as expensive rework.
 
 | Step | What It Does |
 |------|-------------|
-| `scope-creep-check` | Detect scope drift from original PRD |
-| `dependency-graph-validation` | Verify task graph integrity |
-| `implementability-dry-run` | Can this actually be built as specified? |
-| `decision-completeness` | Audit ADRs for missing decisions |
-| `traceability-matrix` | Requirements → stories → test cases → tasks mapping |
-| `cross-phase-consistency` | Alignment check across all phases |
-| `critical-path-walkthrough` | Identify the critical implementation path |
+| `scope-creep-check` | Claude compares everything that's been specified against the original PRD and flags anything that wasn't in the requirements — features, components, or tasks that crept in without justification. |
+| `dependency-graph-validation` | Claude verifies the task dependency graph has no cycles (which would deadlock agents), no orphaned tasks, and no chains deeper than three sequential dependencies. |
+| `implementability-dry-run` | Claude simulates picking up each task as an implementing agent and flags anything ambiguous — unclear acceptance criteria, missing input files, undefined error handling — that would force an agent to guess. |
+| `decision-completeness` | Claude checks that every technology choice and architectural pattern has a recorded decision with rationale, and that no two decisions contradict each other. |
+| `traceability-matrix` | Claude builds a map showing that every PRD requirement traces through to user stories, architecture components, implementation tasks, and test cases — with no gaps in either direction. |
+| `cross-phase-consistency` | Claude traces every named concept (entities, fields, API endpoints) across all documents and flags any naming drift, terminology mismatches, or data shape inconsistencies. |
+| `critical-path-walkthrough` | Claude walks the most important user journeys end-to-end across every spec layer — PRD to stories to UX to API to database to tasks — and flags any broken handoffs or missing layers. |
 
 ### Phase 14 — Finalization (finalization)
 
-Lock it down and start building.
+Claude applies all findings from the validation phase, freezes documentation (ready for implementation), creates a developer onboarding guide (the "start here" document for anyone joining the project), and writes the implementation playbook — the operational document agents reference during every coding session. Without this, there's no bridge between planning and building.
 
 | Step | What It Does |
 |------|-------------|
-| `apply-fixes-and-freeze` | Apply all validation findings and freeze documentation |
-| `developer-onboarding-guide` | "Start here" guide for new contributors and AI agents |
-| `implementation-playbook` | Operational guide agents follow during implementation, with test skeleton and eval gate references |
+| `apply-fixes-and-freeze` | Claude applies all findings from the validation phase, fixes blocking issues, and freezes every document with a version marker — signaling that specs are implementation-ready. |
+| `developer-onboarding-guide` | Claude synthesizes all your frozen docs into a single onboarding narrative — project purpose, architecture overview, top coding patterns, key commands, and a quick-start checklist — so anyone joining the project knows exactly where to begin. |
+| `implementation-playbook` | Claude writes the playbook agents reference during every coding session — task execution order, which docs to read before each task, the TDD loop to follow, quality gates to pass, and the handoff format between agents. |
 
 ### Phase 15 — Build (build)
 
-Execute implementation. Steps are **stateless** — they don't track completion and are available for repeated use once Phase 14 is complete.
+Stateless execution steps that can be run repeatedly once Phase 14 is complete. Single-agent and multi-agent modes start the TDD implementation loop (claim a task, write a failing test, make it pass, refactor, commit, repeat). Resume commands restore session context after breaks. Quick-task handles one-off bug fixes outside the main plan. New-enhancement adds a feature with full planning rigor.
 
 | Step | What It Does |
 |------|-------------|
-| `single-agent-start` | Start the autonomous single-agent TDD execution loop |
-| `single-agent-resume` | Resume single-agent work after closing Claude Code |
-| `multi-agent-start` | Start parallel implementation with multiple agents in worktrees |
-| `multi-agent-resume` | Resume parallel agent work after a break |
-| `quick-task` | Create a focused task for a bug fix, refactor, or small improvement |
-| `new-enhancement` | Add a new feature to an already-scaffolded project |
+| `single-agent-start` | Claude claims the next task, writes a failing test, implements until it passes, refactors, runs quality gates, commits, and repeats — following the implementation playbook. |
+| `single-agent-resume` | Claude recovers context from the previous session — reads lessons learned, checks git state, reconciles merged PRs — and continues the TDD loop from where you left off. |
+| `multi-agent-start` | Claude sets up a named agent in an isolated git worktree so multiple agents can implement tasks simultaneously without file conflicts, each following the same TDD loop. |
+| `multi-agent-resume` | Claude verifies the worktree, syncs with main, reconciles completed tasks, and resumes the agent's TDD loop from the previous session. |
+| `quick-task` | Claude takes a one-off request (bug fix, refactor, performance tweak) and creates a single well-scoped task with acceptance criteria and a test plan — for work outside the main implementation plan. |
+| `new-enhancement` | Claude walks you through adding a feature the right way — updating the PRD, creating new user stories, running an innovation pass, and generating implementation tasks that integrate with your existing plan. |
 
 ## Multi-Model Review
 
-At depth 4-5, all 19 review and validation steps can dispatch independent reviews to Codex and/or Gemini CLIs. This catches blind spots that a single model misses — what Claude considers correct, Codex or Gemini may flag as problematic. Auth is verified before every dispatch — previous auth failures do not exempt subsequent dispatches.
+Just like you'd want more than one person reviewing a pull request, multi-model review gets independent perspectives from different AI models. When Claude, Codex, and Gemini independently flag the same issue, you know it's real. When they all approve, you can proceed with confidence.
+
+### Why Multiple Models?
+
+- **Different blind spots** — what Claude considers correct, another model may flag as problematic. Each model reasons differently about architecture, security, and edge cases.
+- **Independent review** — each model reviews your work without seeing what the others said, preventing groupthink.
+- **Confidence through agreement** — when two or three models flag the same issue, it's almost certainly real. When they all approve, you can move forward confidently.
+- **Catches what single-model misses** — security gaps, inconsistent naming across docs, missing edge cases, and specification contradictions that one model overlooks.
+
+### Quick Setup
+
+Multi-model review is optional. It requires installing one or both of these additional CLI tools:
+
+**Codex CLI** — OpenAI's command-line coding tool. Requires a ChatGPT subscription (Plus/Pro/Team).
+```bash
+npm install -g @openai/codex
+```
+
+**Gemini CLI** — Google's command-line coding tool. Free tier available with a Google account.
+```bash
+npm install -g @google/gemini-cli
+```
+
+You don't need both — Scaffold works with whichever CLIs are available. Having both gives the strongest review (three independent perspectives). See [Prerequisites](#prerequisites) for auth setup and verification commands.
 
 ### How It Works
 
-1. Claude completes its own structured multi-pass review first
-2. The artifact is bundled with upstream references into a review prompt
-3. Each available CLI reviews the artifact independently (they don't see each other's output)
-4. Findings are reconciled by confidence level:
+1. **Claude reviews first** — completes its own structured multi-pass review using different review lenses (coverage, consistency, quality, downstream readiness)
+2. **Independent external review** — the document being reviewed is sent to each available CLI. They don't see Claude's findings or each other's output — every review is independent.
+3. **Findings are reconciled** — Scaffold merges all findings by confidence level:
 
 | Scenario | Confidence | Action |
 |----------|-----------|--------|
@@ -421,35 +546,19 @@ At depth 4-5, all 19 review and validation steps can dispatch independent review
 | One flags P1, other approves | **Medium** | Review before fixing |
 | Models contradict each other | **Low** | Present both to user |
 
-### Which Steps Support It
+Scaffold verifies CLI authentication before every dispatch. If a token has expired, it tells you and provides the command to re-authenticate — it never silently skips a review.
 
-**All 11 domain review steps**: review-prd, review-domain-modeling, review-adrs, review-architecture, review-database, review-api, review-ux, review-testing, review-operations, review-security, implementation-plan-review
+### When It Runs
 
-**All 7 validation steps**: cross-phase-consistency, traceability-matrix, critical-path-walkthrough, implementability-dry-run, decision-completeness, dependency-graph-validation, scope-creep-check
+Multi-model review activates automatically at **depth 4-5** during any review or validation step — that's 20 steps in total, including all domain reviews (review-prd, review-architecture, review-security, etc.) and all 7 validation checks (traceability, scope creep, implementability, etc.).
 
-**Plus 2 steps with built-in multi-model**: review-user-stories (depth 5), automated-pr-review (local CLI mode)
+At depth 1-3, reviews are Claude-only — still thorough with multiple passes, but single-perspective. You control depth globally during `scaffold init`, per session (`"Use depth 5 for everything"`), or per step (`"Run review-security at depth 5"`).
 
-### CLI Invocation
+### What You Need
 
-The `multi-model-dispatch` skill documents the correct patterns:
-
-```bash
-# Codex (headless mode — use "exec", NOT bare "codex")
-codex exec --skip-git-repo-check -s read-only --ephemeral "Review this artifact..." 2>/dev/null
-
-# Gemini (headless mode — use "-p" flag, NO_BROWSER prevents consent prompt hang)
-NO_BROWSER=true gemini -p "Review this artifact..." --output-format json --approval-mode yolo 2>/dev/null
-```
-
-### Checking CLI Availability
-
-```bash
-scaffold check add-e2e-testing        # platform detection + brownfield
-scaffold check automated-pr-review    # GitHub remote + CLI detection
-scaffold check ai-memory-setup        # .claude/rules/, MCP servers, hooks
-```
-
-The `scaffold check` command reports which CLIs are available and recommends the appropriate review mode.
+- **Depth 4 or 5** — set during `scaffold init` or override per step
+- **At least one additional CLI** — Codex or Gemini (or both for triple-model review)
+- **Valid authentication** — Scaffold checks before every dispatch and tells you if credentials need refreshing
 
 ## Methodology Presets
 
@@ -669,6 +778,17 @@ Gemini's child process relaunch shows a consent prompt that hangs in non-TTY she
 
 **Codex CLI auth expired ("refresh token", "sign in again")**
 Run `! codex login` to re-authenticate interactively. For CI/headless: set `CODEX_API_KEY` env var. Check auth status with `codex login status`.
+
+**How does Scaffold invoke Codex/Gemini under the hood?**
+Scaffold handles CLI invocation automatically — you never need to type these commands. If you're debugging or curious, here are the headless invocation patterns:
+```bash
+# Codex (headless mode — use "exec", NOT bare "codex")
+codex exec --skip-git-repo-check -s read-only --ephemeral "Review this artifact..." 2>/dev/null
+
+# Gemini (headless mode — use "-p" flag, NO_BROWSER prevents consent prompt hang)
+NO_BROWSER=true gemini -p "Review this artifact..." --output-format json --approval-mode yolo 2>/dev/null
+```
+These are documented in detail in the `multi-model-dispatch` skill.
 
 **I upgraded and my pipeline shows old step names**
 Run `scaffold status` — the state manager automatically migrates old step names (e.g., `add-playwright` → `add-e2e-testing`, `multi-model-review` → `automated-pr-review`) and removes retired steps.
