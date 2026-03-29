@@ -2,6 +2,21 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.40.1] — 2026-03-29
+
+### Added
+
+- **Stale command detection in `scaffold status`** — Compares modification timestamps of pipeline/knowledge sources against generated commands. Warns when commands are out of date with count and fix command. Also available in JSON output as `staleCommands` field.
+- **Pre-commit hook for build drift** — New step 4 in the composite pre-commit hook blocks commits that stage `pipeline/` or `knowledge/` files without corresponding `commands/` changes. Prompts to run `scaffold build`.
+- **Alignment audit prompt** — Reusable 8-module audit prompt at `docs/alignment-audit-prompt.md` for periodic pipeline quality audits.
+- **Round 5 audit report** — `docs/comprehensive-alignment-audit-round-5.md` with 37 findings (down 57% from Round 4), including new End-to-End Path Simulation module.
+
+### Fixed
+
+- **Flaky `lock-manager.test.ts`** — Tests used wall-clock time for `processStartedAt` instead of actual process start time from `ps`. On slow CI runners, the >2s PID-recycling threshold triggered incorrectly. Now uses real process start time.
+- **MVP task decomposition stuck point** — `implementation-plan.md` now has "MVP-Specific Guidance" section explaining layer-based task decomposition when no architecture document exists.
+- **Depth regressions** — `operations.md` and `security.md` grouped depth levels (missed in Round 4 fix) expanded to per-level descriptions.
+
 ## [2.40.0] — 2026-03-29
 
 ### Changed
