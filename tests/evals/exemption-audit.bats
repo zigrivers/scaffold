@@ -51,13 +51,15 @@ count_commands() {
   fi
 }
 
-@test "AFTER_STEP_EXEMPT is below 25% of total pipeline steps" {
+@test "AFTER_STEP_EXEMPT is below 25% of total commands" {
   local total exempt_count threshold
-  total="$(count_pipeline_steps)"
+  # AFTER_STEP_EXEMPT applies to commands (used in command-structure.bats),
+  # so compare against total commands, not pipeline steps.
+  total="$(count_commands)"
   exempt_count="${#AFTER_STEP_EXEMPT[@]}"
   threshold=$(( total * EXEMPT_THRESHOLD_PCT / 100 ))
 
-  printf "AFTER_STEP_EXEMPT: %d entries (threshold: %d = %d%% of %d steps)\n" \
+  printf "AFTER_STEP_EXEMPT: %d entries (threshold: %d = %d%% of %d commands)\n" \
     "$exempt_count" "$threshold" "$EXEMPT_THRESHOLD_PCT" "$total"
 
   if [[ "$exempt_count" -gt "$threshold" ]]; then

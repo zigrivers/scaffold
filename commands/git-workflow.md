@@ -1,664 +1,499 @@
 ---
-description: "Configure git workflow for parallel agents"
-long-description: "Sets up docs/git-workflow.md with branching strategy, PR workflow, CI configuration, and worktree scripts for parallel agent execution."
+description: "Configure git workflow with branching, PRs, CI, and worktree scripts for parallel agents"
+long-description: "Configure the repository for parallel Claude Code sessions working simultaneously."
 ---
 
-Create `docs/git-workflow.md` and configure the repository to support parallel Claude Code sessions working simultaneously without conflicts.
+## Purpose
+Configure the repository for parallel Claude Code sessions working simultaneously.
+Define branching strategy (one task = one branch = one PR), commit standards
+(with Beads task IDs if configured, conventional commits otherwise), rebase
+strategy, PR workflow with squash-merge and auto-merge, worktree setup for
+parallel agents, CI pipeline, branch protection, and conflict prevention rules.
 
-Review CLAUDE.md, docs/tech-stack.md, and docs/coding-standards.md to understand the existing project conventions.
+## Inputs
+- CLAUDE.md (required) — Key Commands table for lint/test/install commands
+- docs/tech-stack.md (required) — CI environment setup (language, runtime)
+- docs/coding-standards.md (required) — commit message format reference
 
-**Command placeholders:** This prompt uses `<install-deps>`, `<lint>`, and `<test>` as placeholders. When creating `docs/git-workflow.md`, replace these with the actual commands from the project's CLAUDE.md Key Commands table (e.g., `npm install`, `make lint`, `make test`). These are configured by the Dev Setup prompt.
+## Expected Outputs
+- docs/git-workflow.md — branching strategy, commit standards, rebase strategy,
+  PR workflow (8 sub-steps), task closure, agent crash recovery, branch protection,
+  conflict prevention, and worktree documentation
+- scripts/setup-agent-worktree.sh — permanent worktree creation script
+- .github/workflows/ci.yml — CI workflow with lint and test jobs
+- .github/pull_request_template.md — PR template with task ID format
+- CLAUDE.md updated with Committing/PR Workflow, Task Closure, Parallel Sessions,
+  Worktree Awareness, and Code Review sections
 
-## Beads Detection
+## Quality Criteria
+- Branch naming format is consistent (Beads: bd-<task-id>/<desc>. Non-Beads: <type>/<desc>)
+- Commit format is consistent (Beads: [BD-<id>] type(scope): desc. Non-Beads: type(scope): desc)
+- PR workflow includes all 8 sub-steps (commit, AI review, rebase, push, create,
+  auto-merge with --delete-branch, watch CI, confirm merge)
+- Worktree script creates permanent worktrees with workspace branches
+- If Beads: BD_ACTOR environment variable documented for agent identity
+- CI workflow job name matches branch protection context
+- Branch cleanup documented for both single-agent and worktree-agent variants
+- Agent crash recovery procedure documented
+- Conflict prevention rule: don't parallelize tasks touching same files
+- (mvp) CI workflow YAML is valid and references commands from Key Commands table
 
-Check if `.beads/` directory exists. This determines task management conventions throughout:
-- **Beads project**: `.beads/` exists → use `bd` CLI for task tracking, `[BD-<id>]` commit prefixes, `bd-<id>/<desc>` branch naming, `BD_ACTOR` for parallel agents
-- **Non-Beads project**: `.beads/` does not exist → use conventional commits (`type(scope): description`), standard branch naming (`<type>/<desc>`, e.g. `feat/add-auth`, `fix/login-bug`), skip all `bd` command references
-
-Apply this detection throughout. Sections below use **"If Beads:"** / **"Without Beads:"** where conventions differ.
+## Methodology Scaling
+- **deep**: Full git workflow with all sections, CI pipeline, branch protection
+  via gh api, worktree script, PR template, agent crash recovery, batch branch
+  cleanup, and comprehensive CLAUDE.md updates.
+- **mvp**: Branching strategy, commit format, basic PR workflow, CI config.
+  Skip worktree script and crash recovery. Minimal CLAUDE.md updates.
+- **custom:depth(1-5)**: Depth 1-2: branching + commits + CI. Depth 3: add PR
+  workflow and branch protection. Depth 4: add worktrees and crash recovery.
+  Depth 5: full suite with all sections.
 
 ## Mode Detection
+Update mode if docs/git-workflow.md exists. In update mode: never rename CI jobs
+without checking branch protection rules, preserve worktree directory naming,
+keep setup-agent-worktree.sh customizations intact.
 
-Before starting, check if `docs/git-workflow.md` already exists:
+## Update Mode Specifics
+- **Detect prior artifact**: docs/git-workflow.md exists
+- **Preserve**: branch naming convention, commit message format, CI job names,
+  branch protection rules, worktree directory structure, PR template fields,
+  setup-agent-worktree.sh customizations
+- **Triggers for update**: coding-standards.md changed commit format, new CI
+  stages needed (e.g., evals added), Beads status changed (added or removed),
+  new worktree patterns needed for parallel execution
+- **Conflict resolution**: if CI job rename is required, update branch
+  protection rules in the same operation; verify CLAUDE.md workflow section
+  stays consistent after any changes
 
-**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+---
 
-**If the file exists → UPDATE MODE**:
-1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:git-workflow v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
-2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
-   - **ADD** — Required by current prompt but missing from existing doc
-   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
-   - **PRESERVE** — Project-specific decisions, rationale, and customizations
-3. **Cross-doc consistency**: Read related docs (`CLAUDE.md`, `docs/dev-setup.md`, `docs/coding-standards.md`) and verify updates won't contradict them. Skip any that don't exist yet.
-4. **Preview changes**: Present the user a summary:
-   | Action | Section | Detail |
-   |--------|---------|--------|
-   | ADD | ... | ... |
-   | RESTRUCTURE | ... | ... |
-   | PRESERVE | ... | ... |
-   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
-   Wait for user approval before proceeding.
-5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
-6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:git-workflow v<ver> <date> -->`
-7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+## Domain Knowledge
 
-**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+### dev-environment
 
-### Update Mode Specifics
-- **Primary output**: `docs/git-workflow.md`
-- **Secondary output**: `scripts/setup-agent-worktree.sh`, CI config files, CLAUDE.md workflow sections
-- **Preserve**: CI job names (branch protection references these), worktree script customizations, branch naming conventions, PR template customizations
-- **Related docs**: `CLAUDE.md`, `docs/dev-setup.md`, `docs/coding-standards.md`
-- **Special rules**: Never rename CI jobs without checking branch protection rules. Preserve worktree directory naming conventions. Keep the setup-agent-worktree.sh script's customizations intact.
+*Development environment setup patterns including Makefile conventions, live reload, and toolchain configuration*
 
-## The Core Problem
+# Dev Environment
 
-Multiple Claude Code agents will work in parallel, each picking up tasks and working on separate feature branches, pushing, creating PRs, and merging into main concurrently. The workflow must prevent merge conflicts, a broken main branch, and agents stepping on each other's work.
+A development environment should be reproducible, fast, and invisible. "It works on my machine" is a build system failure, not a developer excuse. This knowledge covers task runners, environment management, git hooks, CI integration, and toolchain patterns that make environments reliable across machines and team members.
 
-## CRITICAL: Permanent Worktrees for Parallel Agents
+## Summary
 
-Git only allows ONE branch checked out per working directory. Multiple Claude Code sessions in the same directory will fight over the git working tree — switching branches, stashing work, and corrupting changes.
+### Core Components
 
-**Solution: Each agent gets a permanent worktree created once. Agents use normal git branching inside their worktree.**
+Every project needs four environment pillars:
 
-```
-project/                  # Main repo (your orchestration point)
-project-agent-1/          # Agent 1's permanent worktree
-project-agent-2/          # Agent 2's permanent worktree
-project-agent-3/          # Agent 3's permanent worktree
-```
+1. **Build Tool / Task Runner** — A single entry point for all project tasks. Makefile is the universal choice (works everywhere, zero dependencies). Language-specific alternatives: `package.json` scripts, `pyproject.toml`, `go` tool.
+2. **Environment Management** — `.env` files for local config, `.env.example` committed as documentation, validation at startup, sensible development defaults.
+3. **Git Hooks** — Pre-commit (fast checks: lint, format, type check). Pre-push (slower checks: full test suite). Installed by `make hooks`.
+4. **CI/CD Integration** — CI runs the same commands as local development. `make check` in CI, `make check` locally. No divergent CI-specific scripts.
 
-### Setup Script
+### Makefile as Universal Task Runner
 
-Create `scripts/setup-agent-worktree.sh`:
+Makefile provides: discoverable interface (`make help`), dependency management between targets, idempotent execution, parallel execution (`make -j4`), and universal availability on any Unix system with zero installation. Language-specific task runners complement but do not replace it — `make test` calls `npm test` or `pytest`, keeping the stable interface independent of underlying tools. If the underlying tool changes (e.g., Jest to Vitest), only the Makefile target body changes — not CI or documentation.
 
+### The Setup Contract
+
+New developer from clone to green tests in three commands or fewer:
 ```bash
-#!/bin/bash
-# Creates a permanent worktree for a Claude Code agent.
-# Run once per agent. Agents use normal git branching inside their worktree.
-# Usage: ./scripts/setup-agent-worktree.sh <agent-name>
-# Example: ./scripts/setup-agent-worktree.sh Agent-1
-
-set -e
-
-AGENT_NAME="$1"
-
-if [ -z "$AGENT_NAME" ]; then
-    echo "Usage: $0 <agent-name>"
-    echo "Example: $0 Agent-1"
-    exit 1
-fi
-
-REPO_NAME=$(basename "$(pwd)")
-# Normalize agent name for directory (lowercase, hyphens)
-DIR_SUFFIX=$(echo "$AGENT_NAME" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
-WORKTREE_DIR="../${REPO_NAME}-${DIR_SUFFIX}"
-
-if [ -d "$WORKTREE_DIR" ]; then
-    echo "⚠️  Worktree already exists: $WORKTREE_DIR"
-    echo "   To launch: cd $WORKTREE_DIR && claude"
-    exit 0
-fi
-
-git fetch origin
-
-# Can't checkout main in multiple worktrees, so each agent gets a workspace branch
-WORKSPACE_BRANCH="${DIR_SUFFIX}-workspace"
-git worktree add "$WORKTREE_DIR" -b "$WORKSPACE_BRANCH" origin/main
-
-echo ""
-echo "✅ Permanent worktree created: $WORKTREE_DIR"
-echo ""
-echo "To launch Claude Code in this worktree:"
-echo "  cd $WORKTREE_DIR && claude"
-echo ""
-echo "This worktree is reusable across tasks. Do NOT remove it between tasks."
-echo ""
-echo "Agents create feature branches from origin/main:"
-echo "  git fetch origin"
-echo "  git checkout -b <type>/<desc> origin/main"
+git clone <repo>
+make setup    # Install dependencies, tools, hooks
+make check    # Verify everything works
 ```
 
-Make executable: `chmod +x scripts/setup-agent-worktree.sh`
+### Branching Strategy Summary
 
-### Agent Identity with BD_ACTOR (Beads only)
+**Trunk-Based**: All commits to main, feature flags for incomplete work. For small teams with strong tests and continuous deployment. **GitHub Flow**: Feature branches, PR review, squash merge. Best for most teams — simple and structured. **GitFlow**: Separate develop/release/hotfix branches. Only for scheduled releases or multi-version support. Most web apps do not need it.
 
-> **Skip this section if the project does not use Beads.**
+## Deep Guidance
 
-Beads resolves task assignee from: `--actor flag` > `$BD_ACTOR env var` > `git config user.name` > `$USER`
+### Makefile Patterns
 
-Without BD_ACTOR, all agents show as your git username, making it impossible to tell which agent owns which task.
+#### The Help Target
 
-```bash
-# Launch agents with distinct identities (Beads projects)
-cd ../project-agent-1 && BD_ACTOR="Agent-1" claude
-cd ../project-agent-2 && BD_ACTOR="Agent-2" claude
+Every Makefile starts with self-documentation:
+
+```makefile
+.DEFAULT_GOAL := help
+
+.PHONY: help
+help: ## Show available commands
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
+		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 ```
 
-### Full Parallel Launch Workflow
+Every public target gets a `## Description` comment. Internal targets use `_` prefix and no description.
 
-**One-time setup (run from main repo):**
-```bash
-./scripts/setup-agent-worktree.sh Agent-1
-./scripts/setup-agent-worktree.sh Agent-2
-./scripts/setup-agent-worktree.sh Agent-3
+#### Standard Target Set
+
+```makefile
+.PHONY: test lint format check setup clean hooks
+
+test: ## Run test suite
+	npm test
+
+lint: ## Run linters
+	npm run lint
+
+format: ## Format code
+	npm run format
+
+check: lint test ## Run all quality gates
+
+setup: ## Install dependencies and hooks
+	npm install
+	$(MAKE) hooks
+
+clean: ## Remove build artifacts
+	rm -rf dist/ node_modules/.cache/
+
+hooks: ## Install git hooks
+	@mkdir -p .git/hooks
+	@cp scripts/pre-commit.sh .git/hooks/pre-commit
+	@cp scripts/pre-push.sh .git/hooks/pre-push
+	@chmod +x .git/hooks/pre-commit .git/hooks/pre-push
 ```
 
-**Launch agents (each in its own terminal):**
-```bash
-# Without Beads:
-cd ../project-agent-1 && claude
-cd ../project-agent-2 && claude
+#### Dependency Chains and Parallel Execution
 
-# With Beads (adds BD_ACTOR for task attribution):
-cd ../project-agent-1 && BD_ACTOR="Agent-1" claude
-cd ../project-agent-2 && BD_ACTOR="Agent-2" claude
+Targets depend on other targets: `deploy: check build` runs lint, test, and build before deploying. For CI, parallelize independent targets: `$(MAKE) -j2 lint test`.
+
+#### Variables and Platform Compatibility
+
+Use `?=` for overridable variables: `TEST_FLAGS ?=` lets users run `make test TEST_FLAGS="--watch"`. Detect OS for platform-specific commands with `UNAME := $(shell uname -s)` and conditional blocks.
+
+### Environment Variable Management
+
+#### The .env Pattern
+
+```
+.env.example     # Committed — documents all variables with safe placeholders
+.env             # Gitignored — local overrides
+.env.test        # Gitignored — test environment
+.env.production  # Never on disk — injected by deployment platform
 ```
 
-**Inside their worktree, agents branch directly from origin/main:**
-```bash
-git fetch origin
-git checkout -b <type>/<description> origin/main   # e.g., feat/add-auth
-# work, commit, push, PR, watch CI, confirm merge...
-git fetch origin --prune
-git clean -fd
-<install-deps>
-# Continue to next task — create next feature branch from origin/main
-git checkout -b <type>/<next-description> origin/main
+`.env.example` is documentation: every variable listed with explanatory comments and placeholder values.
+
+#### Startup Validation
+
+Validate all environment variables at startup, not at point of use. Fail fast with clear messages:
+
+```typescript
+// src/config/env.ts — centralized env access
+function requireEnv(key: string): string {
+  const value = process.env[key];
+  if (!value) throw new Error(`Missing required env var: ${key}`);
+  return value;
+}
+
+export const config = {
+  database: { url: requireEnv('DATABASE_URL') },
+  auth: { jwtSecret: requireEnv('JWT_SECRET') },
+} as const;
 ```
 
-**If Beads:** Use `bd-<task-id>/<desc>` branch naming, run `bd close <id> && bd sync` after merge, and `bd ready` to find next task.
+No `process.env.SOMETHING` scattered throughout the codebase. Python equivalent: use `pydantic_settings.BaseSettings` for typed validation with defaults.
 
-**Note:** Worktree agents cannot `git checkout main` (main is checked out in the main repo). They always branch from `origin/main` and never return to main between tasks. Merged feature branches accumulate locally and are batch-cleaned periodically (see Cleanup section).
+### Live Reload by Stack
 
-### How Many Agents to Run
+| Stack | Tool | Command |
+|-------|------|---------|
+| Next.js / Vite | Built-in HMR | `next dev` / `vite dev` |
+| Express/Fastify | tsx watch | `tsx watch src/server.ts` |
+| FastAPI | uvicorn | `uvicorn app:app --reload` |
+| Go | air | `air` |
+| Shell | entr | `ls scripts/*.sh \| entr make test` |
 
-Match agent count to available parallel work, not some arbitrary max:
-- Only spin up as many agents as there are independent, non-overlapping tasks
-- If two tasks touch the same files, don't run them in parallel — sequence them instead
-- Running more agents than available parallel tasks wastes resources and invites conflicts
-- **If Beads:** Run `bd ready` to see how many unblocked tasks exist. Use Beads dependencies to enforce sequencing.
+For full-stack projects, run frontend and backend in parallel via `make dev` using `$(MAKE) -j2 dev-frontend dev-backend` or a process manager like `concurrently`.
 
-### Worktree Maintenance
+### Git Hook Strategies
 
-Permanent worktrees accumulate stale build artifacts and dependencies between tasks. Agents should clean their workspace between tasks:
+#### Pre-Commit (Fast, Under 10 Seconds)
 
-```bash
-git fetch origin --prune
-git clean -fd
-<install-deps>
-```
+Check only staged files when possible:
+- Formatting (run formatter check, fail if files would change)
+- Linting (staged files only via `lint-staged`)
+- Secrets scanning (detect accidentally committed API keys)
+- File size limits (prevent accidental binary commits)
 
-To batch-clean merged feature branches (run periodically):
-```bash
-git fetch origin --prune
-git branch --merged origin/main | grep -v "^\*\|workspace" | xargs -r git branch -d
-```
+#### Pre-Push (Thorough, Under 60 Seconds)
 
-### Worktree Management Commands
+Run the full quality gate:
+- Complete test suite
+- Full lint (all files, not just staged)
+- Build verification
 
-| Command | Purpose |
-|---------|---------|
-| `git worktree list` | Show all active worktrees |
-| `git worktree add <path> <branch>` | Create new worktree |
-| `git worktree remove <path>` | Remove worktree (only when reducing agent count) |
-| `git worktree prune` | Clean up stale worktree references |
+#### Installation
 
-### Single-Agent Mode
+Single command: `make hooks`. Wrap whichever hook manager the project uses (husky, pre-commit, lefthook, or plain shell scripts).
 
-If running only ONE Claude Code session at a time, worktrees are not needed. Standard branching in the main directory works fine.
+### CI/CD Integration
 
-## What the Document Must Cover
+#### The Mirror Principle
 
-### 1. Branching Strategy
-
-**If Beads:**
-- Branch naming: `bd-<task-id>/<short-description>` (tied to Beads task IDs)
-- Rule: one Beads task = one branch = one PR (no multi-task branches)
-- Always branch from `origin/main`: `git checkout -b bd-<task-id>/<desc> origin/main`
-
-**Without Beads:**
-- Branch naming: `<type>/<short-description>` (e.g., `feat/add-auth`, `fix/login-bug`, `docs/update-readme`)
-- Rule: one logical change = one branch = one PR
-- Always branch from `origin/main`: `git checkout -b <type>/<desc> origin/main`
-
-**Both:**
-- Branch lifecycle: create from origin/main → work → PR → squash merge → delete branch
-- Stale branch policy: branches open longer than 2 days should be rebased or split into smaller tasks
-
-### 2. Commit Standards
-
-**If Beads:** Commit message format: `[BD-<id>] type(scope): description`
-**Without Beads:** Commit message format: `type(scope): description` (conventional commits)
-
-- Types: feat, fix, test, refactor, docs, chore
-- Commit on each meaningful change — passing tests, completed function, etc.
-- Never commit: secrets, .env files, large binaries, build artifacts
-- Put the format in CLAUDE.md and trust agents to follow it (no validation hooks needed — they add friction and derail agents on formatting trivia)
-
-### 3. Rebase Strategy for Parallel Agents
-
-**Use rebase, not merge commits.** With squash-merge PRs, rebase keeps history clean and simple.
-
-- Before creating a PR, always rebase onto latest main: `git fetch origin && git rebase origin/main`
-- If rebase produces conflicts the agent cannot resolve confidently, it should: stop, push the branch as-is, note the conflict in the PR description, and move to the next task
-- Only use `--force-with-lease` on feature branches, never force push to main
-
-### 4. PR Workflow
-
-**Main branch is protected. Agents NEVER push directly to main.** The complete workflow:
-
-```bash
-# 1. Commit changes
-git add .
-git commit -m "type(scope): description"       # Without Beads
-git commit -m "[BD-<id>] type(scope): description"  # With Beads
-
-# 2. AI review (catch issues before external review)
-# Spawn a review subagent with fresh context:
-# - Read git diff origin/main...HEAD
-# - Check against CLAUDE.md and docs/coding-standards.md
-# - Report P0 (blocking), P1 (must fix), P2 (should fix), P3 (optional)
-# Fix all P0/P1 findings, then re-run make check (or project lint+test)
-# If a finding matches a recurring pattern, log it to tasks/lessons.md (if it exists)
-# Commit fixes: git commit -m "fix: address review findings"
-
-# 3. Rebase onto latest main
-git fetch origin && git rebase origin/main
-
-# 4. Push feature branch
-git push -u origin HEAD
-
-# 5. Create PR
-gh pr create --title "type(scope): description" --body "Summary of changes"
-# With Beads: --title "[BD-<id>] type(scope): description" --body "Closes BD-<id>"
-
-# 6. Enable auto-merge (merges after CI passes, deletes remote branch)
-gh pr merge --squash --auto --delete-branch
-
-# 7. Watch CI (blocks until checks pass or fail)
-gh pr checks --watch --fail-fast
-# If a check fails: fix locally, commit, push, re-run watch
-
-# 8. Confirm merge
-gh pr view --json state -q .state   # Must show "MERGED"
-# NEVER close the task until this shows MERGED
-```
-
-**Key PR commands:**
-
-| Command | Purpose |
-|---------|---------|
-| `gh pr create --title "..." --body "..."` | Create PR from current branch |
-| `gh pr merge --squash --auto --delete-branch` | Queue auto-merge after CI passes |
-| `gh pr checks --watch --fail-fast` | Watch CI, block until pass or fail |
-| `gh pr view --json state -q .state` | Confirm merge completed |
-| `gh pr list` | List open PRs |
-
-**Why `--squash --auto --delete-branch`:**
-- `--squash`: All branch commits become one clean commit on main
-- `--auto`: Queues merge for when CI passes
-- `--delete-branch`: Removes remote branch after merge (local cleaned up in task closure)
-
-**If merge is blocked:**
-- Don't use `--admin` to bypass CI
-- Watch with `gh pr checks --watch --fail-fast`, fix failures, push, re-watch
-
-### 5. Branch Cleanup and Next Task
-
-After merge is confirmed:
-
-**Single agent (main repo):**
-```bash
-git checkout main && git pull --rebase origin main
-git branch -d <branch-name>                # Local only; remote deleted by --delete-branch
-git fetch origin --prune                    # Clean up stale remote refs
-```
-
-**Worktree agent:**
-```bash
-git fetch origin --prune                    # Clean up stale remote refs
-git clean -fd
-<install-deps>
-# Next task branches directly from origin/main:
-git checkout -b <type>/<desc> origin/main
-```
-
-**If Beads**, also run after merge: `bd close <id> && bd sync`. Then `bd ready` to find the next task.
-
-Worktree agents cannot checkout main (it's checked out in the main repo). They always branch from `origin/main`. Merged local branches accumulate and are batch-cleaned periodically (see Worktree Maintenance).
-
-### 6. Agent Crash / Stale Work Recovery
-
-When an agent session dies mid-task:
-
-1. **Check the worktree state:**
-   ```bash
-   cd ../project-agent-N
-   git status                    # See uncommitted work
-   git log --oneline -5          # See what was committed
-   ```
-   **If Beads:** `bd list --actor Agent-N` to see what task was claimed.
-
-2. **If work is salvageable:** Commit it, push the branch, create the PR (or resume work in a new session)
-
-3. **If work should be discarded:**
-   ```bash
-   # Single agent (main repo):
-   git checkout main && git pull --rebase origin main
-   git branch -D <stale-branch>
-
-   # Worktree agent (use the workspace branch created during setup):
-   git checkout <agent-name>-workspace
-   git branch -D <stale-branch>
-
-   # If Beads, unclaim the task:
-   # bd update <task-id> --status ready
-   ```
-
-4. **Reset the worktree to clean state:**
-   ```bash
-   git clean -fd
-   <install-deps>
-   ```
-
-### 7. Main Branch Protection
-
-Configure branch protection on main with **CI checks required, but no human review gate** (since you're the sole developer orchestrating agents):
-
-```bash
-# Configure via GitHub CLI (run once)
-gh api repos/{owner}/{repo}/branches/main/protection -X PUT -f \
-  required_status_checks='{"strict":true,"contexts":["check"]}' \
-  enforce_admins=false \
-  required_pull_request_reviews=null \
-  restrictions=null
-```
-
-**Important:** The `contexts` value must match the CI job name. The CI template (above) uses job name `check`, so use `"contexts":["check"]`. If your CI uses a different job name, update the context to match. After the first PR triggers CI, verify the exact status check context name with:
-```bash
-gh api repos/{owner}/{repo}/commits/$(git rev-parse HEAD)/check-runs --jq '.check_runs[].name'
-```
-
-**If the `gh api` command fails**, configure branch protection via the GitHub web UI:
-1. Go to Settings → Branches → Add branch protection rule
-2. Branch name pattern: `main`
-3. Check: "Require status checks to pass before merging"
-4. Search and add status check: `check` (or your CI job name)
-5. Uncheck: "Require a pull request before merging" (or set required reviewers to 0)
-
-What this gives you:
-- PRs must pass CI before merging
-- No review approval required (you're the only human)
-- `enforce_admins=false` lets you push directly in emergencies
-- Agents cannot accidentally push to main
-
-If main breaks: you fix it directly with a hotfix PR, or push directly if `enforce_admins` is false.
-
-### 8. Conflict Prevention
-
-Keep it simple with one core rule:
-
-> **If two tasks touch the same files, don't run them in parallel.** Sequence them instead.
-
-Additional guardrails:
-- Keep PRs small and focused (one logical change = one PR). Smaller changes merge faster and conflict less.
-- Rebase before creating PRs to catch conflicts early
-- High-conflict files (route indexes, DB schemas, shared types) should be modified by one agent at a time
-- **If Beads:** enforce sequencing via `bd dep add <child> <parent>` dependencies
-
-### 9. .gitignore and Repository Hygiene
-- Ensure .gitignore is comprehensive for the project's tech stack
-- Files that must be tracked vs. generated
-- No code quality git hooks (linting, type checking, test runs) — let CI be the gatekeeper
-- **If Beads:** Beads data-sync hooks (`bd hooks install`) are the one exception — these sync task tracking data, not code quality checks
-
-### 10. Update CLAUDE.md
-
-Add the following sections to CLAUDE.md:
-
-**In Session Start section, add parallel agent note:**
-```markdown
-**If running multiple agents in parallel**: Each agent MUST be in its own permanent worktree. See docs/git-workflow.md for setup.
-```
-
-**Add Committing and PR Workflow section:**
-```markdown
-### Committing and Creating PRs
-
-**NEVER push directly to main** — it's protected. Always use feature branches and PRs:
-
-1. Commit: `git add . && git commit -m "type(scope): description"` (If Beads: prefix with `[BD-<id>]`)
-2. AI review: spawn a review subagent to check `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md — fix P0/P1 findings, re-run lint+test
-3. Rebase: `git fetch origin && git rebase origin/main`
-4. Push: `git push -u origin HEAD`
-5. Create PR: `gh pr create --title "type(scope): description" --body "Summary"` (If Beads: include `[BD-<id>]` in title, `Closes BD-<id>` in body)
-6. Auto-merge: `gh pr merge --squash --auto --delete-branch`
-7. Watch CI: `gh pr checks --watch --fail-fast` (fix failures, push, re-watch)
-8. Confirm: `gh pr view --json state -q .state` — must show "MERGED"
-```
-
-**Add Branch Cleanup and Next Task section:**
-```markdown
-### Branch Cleanup and Next Task
-
-After merge is confirmed (step 8 above):
-
-**Single agent (main repo):**
-```bash
-git checkout main && git pull --rebase origin main
-git branch -d <branch-name>
-git fetch origin --prune
-```
-
-**Worktree agent:**
-```bash
-git fetch origin --prune
-git clean -fd
-<install-deps>
-# Next task branches directly from origin/main:
-git checkout -b <type>/<desc> origin/main
-```
-
-If Beads: also run `bd close <id> && bd sync` after merge, and `bd ready` to find next task.
-
-- If tasks remain: create a feature branch and implement the next one
-- If none remain: session is complete
-- **Keep working until no tasks remain**
-
-**Note:** Worktree agents cannot checkout main (it's checked out in the main repo). They always branch from `origin/main`. Merged branches are batch-cleaned periodically.
-```
-
-**Add Parallel Sessions section:**
-```markdown
-### Parallel Sessions (Worktrees)
-
-When running **multiple Claude Code agents simultaneously**, each MUST have its own permanent git worktree (agents sharing a directory will corrupt each other's work).
-
-If Beads: also set BD_ACTOR environment variable for task attribution.
-
-**One-Time Setup (run from main repo):**
-```bash
-./scripts/setup-agent-worktree.sh Agent-1
-./scripts/setup-agent-worktree.sh Agent-2
-./scripts/setup-agent-worktree.sh Agent-3
-```
-
-**Launching Agents:**
-```bash
-cd ../project-agent-1 && claude
-cd ../project-agent-2 && claude
-# If Beads: BD_ACTOR="Agent-1" claude (for task attribution)
-```
-
-Inside their worktree, agents branch directly from `origin/main` (they cannot checkout main). Between tasks:
-```bash
-git fetch origin --prune
-git clean -fd && <install-deps>
-```
-```
-
-**Add Worktree Awareness section:**
-```markdown
-### Worktree Awareness
-
-If you are in a permanent worktree:
-- **Never run `git checkout main`** — main is checked out in the main repo; this will fail
-- Always branch from remote: `git checkout -b <type>/<desc> origin/main` (If Beads: `bd-<id>/<desc>`)
-- Clean workspace between tasks: `git fetch origin --prune && git clean -fd && <install-deps>`
-- **If Beads:** Verify your identity: `echo $BD_ACTOR` should show your agent name
-- To detect if in a worktree: `git rev-parse --git-dir` contains `/worktrees/`
-- Merged branches accumulate — they're batch-cleaned periodically, not per-task
-```
-
-**Add Code Review section:**
-```markdown
-### Code Review
-
-Before pushing, spawn a review subagent to check `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md:
-- Look for: convention violations, missing tests, security issues, logic errors
-- Fix P0/P1 findings, re-run lint+test
-- Log recurring patterns to tasks/lessons.md
-```
-
-**Add to Quick Reference table:**
-| Command | Purpose |
-|---------|---------|
-| `./scripts/setup-agent-worktree.sh <n>` | Create permanent worktree for agent |
-| `git worktree list` | List all active worktrees |
-| `gh pr create --title "..." --body "..."` | Create PR from current branch |
-| `gh pr merge --squash --auto --delete-branch` | Queue auto-merge after CI passes |
-| `gh pr checks --watch --fail-fast` | Watch CI until pass or fail |
-| `gh pr view --json state -q .state` | Confirm merge completed |
-
-If Beads, also include:
-| `BD_ACTOR="Agent-1" claude` | Launch agent with Beads identity |
-| `bd close <id>` | Close completed task |
-
-**Add row to "When to Consult Other Docs" table:**
-| Situation | Document |
-|-----------|----------|
-| Running multiple agents in parallel | docs/git-workflow.md |
-
-## What to Configure in the Repository
-
-After creating the documentation, actually set up:
-- [ ] `scripts/setup-agent-worktree.sh` for permanent agent worktrees
-- [ ] Branch protection on main: CI required, no review required (use `gh api` command from Section 7)
-- [ ] PR template (`.github/pull_request_template.md`)
-- [ ] .gitignore appropriate for the project's tech stack
-- [ ] CI workflow file for automated checks on PRs (see below)
-- [ ] `tasks/lessons.md` — if it doesn't already exist, create it for cross-session learning
-
-### CI Workflow File
-
-Create `.github/workflows/ci.yml` using the project's actual lint and test commands from CLAUDE.md Key Commands table. The template below uses placeholders — replace them with the real commands from `docs/dev-setup.md`:
+CI runs `make check` — the exact same command developers run locally. If it passes locally, it passes in CI. No environment-specific surprises.
 
 ```yaml
-name: CI
-on:
-  pull_request:
-    branches: [main]
-
+# .github/workflows/check.yml
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup environment
-        # Add language/runtime setup per docs/tech-stack.md
-        # e.g., uses: actions/setup-node@v4 / actions/setup-python@v5
-
-      - name: Install dependencies
-        run: <install-deps>
-
-      - name: Lint
-        run: <lint>
-
-      - name: Test
-        run: <test>
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - run: make check
 ```
 
-The `check` job name must match what's referenced in branch protection rules (Section 7). If the status check context name is different (e.g., `check / check`), update the branch protection accordingly.
+#### Caching
 
-### PR Template
+Cache dependencies keyed on lockfile hashes: `node_modules/` on `package-lock.json`, `.venv/` on `pyproject.toml`, `~/go/pkg/mod/` on `go.sum`.
 
-Create `.github/pull_request_template.md`:
+#### Job Structure
 
-```markdown
-## type(scope): description
-
-### What
-<!-- Brief description of changes -->
-
-### Testing
-- [ ] All tests pass
-- [ ] New tests added for new behavior
-- [ ] Lint passes
-- [ ] Manually verified (if UI change)
-
-### Screenshots
-<!-- If UI change, include before/after or key states -->
+Parallelize independent checks, gate dependent steps:
+```yaml
+jobs:
+  lint:  { steps: [checkout, setup, make lint] }
+  test:  { steps: [checkout, setup, make test] }
+  build: { needs: [lint, test], steps: [checkout, setup, make build] }
 ```
 
-## Project Safety Permissions
+### Branching Strategies — When to Use Each
 
-Create `.claude/settings.json` (checked into git) with **deny-only rules** to prevent destructive operations by AI agents. These protect the git workflow regardless of whether the user runs with `--dangerously-skip-permissions`:
+#### Trunk-Based Development
 
-```json
-{
-  "permissions": {
-    "allow": [],
-    "deny": [
-      "Bash(rm -rf *)",
-      "Bash(rm -rf /)",
-      "Bash(rm -r *)",
-      "Bash(sudo *)",
-      "Bash(git push --force *)",
-      "Bash(git push origin main)",
-      "Bash(git push -f origin main)",
-      "Bash(git push --force origin main)",
-      "Bash(git reset --hard *)",
-      "Bash(git worktree remove *)",
-      "Bash(bd edit *)"
-    ]
-  }
-}
+All developers commit to `main`. Feature flags gate incomplete work. Releases cut directly from `main`. Requires: strong test suite, feature flag infrastructure, team discipline. Best for: small teams (1-5), continuous deployment. Risk: broken commits affect everyone immediately.
+
+#### GitHub Flow
+
+Feature branches from `main`, PRs with review, squash merge back. `main` is always deployable. Best for: most teams, most projects. Keep branches short (1-3 days), rebase frequently. Risk: long-lived branches diverge.
+
+#### GitFlow
+
+Separate `develop`, `release/*`, `hotfix/*`, `main` branches. Formalized release process. Best for: scheduled releases (mobile, enterprise), multiple supported versions. Risk: branch complexity, merge conflicts. Most web apps do not need this.
+
+### Common Anti-Patterns
+
+**Scripts That Only Work on One OS**: `setup.sh` uses `apt-get`, breaks on macOS. Fix: detect OS and branch, or use devcontainers. Document OS-specific prerequisites.
+
+**Missing Setup Documentation**: New developer spends a day figuring out the build. Fix: `make setup` automates everything possible. `docs/dev-setup.md` covers the rest. Test by having a new team member follow it verbatim.
+
+**Hardcoded Paths**: Scripts reference `/Users/alice/projects/myapp/`. Fix: use relative paths or compute from `$(pwd)` / `$(dirname "$0")`. Never commit absolute paths.
+
+**No Clean Target**: Build artifacts accumulate, stale caches cause mystery failures. Fix: `make clean` removes generated artifacts. `make pristine` removes everything including `node_modules/` for a full reset.
+
+**CI Drift**: CI runs different commands than local dev. Fix: CI calls `make check`. If CI needs extras (artifact upload, deploy), those are separate steps after the quality gate. The gate itself is identical everywhere.
+
+## See Also
+
+- [ai-memory-management](../core/ai-memory-management.md) — Environment setup affects memory hooks
+
+---
+
+### git-workflow-patterns
+
+*Git branching strategies, commit conventions, PR workflows, merge policies, and CI integration patterns for AI-agent-driven development*
+
+# Git Workflow Patterns
+
+Structured git workflows for AI-agent-driven projects ensure consistent branching, meaningful commit history, automated quality gates, and smooth multi-agent collaboration via worktrees.
+
+## Summary
+
+### Branching Strategy
+
+The trunk-based development model works best for AI-agent workflows:
+
+- **Main branch** (`main`) — always deployable, protected by CI
+- **Feature branches** — short-lived, created per task or story (`feat/US-xxx-slug`, `fix/bug-description`)
+- **Worktree branches** — parallel agent execution using git worktrees (`agent/<name>/<task>`)
+
+Branch naming conventions:
+```
+feat/US-001-user-registration    # Feature work tied to a story
+fix/login-timeout-handling       # Bug fix
+chore/update-dependencies        # Maintenance
+docs/api-contract-updates        # Documentation only
 ```
 
-Create the directory if needed (`mkdir -p .claude`) and commit: `git add .claude/settings.json`.
+### Commit Conventions
 
-**Why these deny rules:**
-- `git push origin main` — agents use PRs, never push directly to main
-- `git push --force` — only `--force-with-lease` on feature branches is acceptable
-- `git reset --hard` — too destructive; use `git checkout` or `git stash` instead
-- `rm -rf` — recursive deletion requires human approval
-- `bd edit` — opens interactive editor, breaks AI agents
+Use Conventional Commits format for machine-parseable history:
 
-## What This Document Should NOT Be
-- A git tutorial — assume agents know git commands
-- Theoretical — every rule should be actionable
-- Separate from CLAUDE.md — update CLAUDE.md to reference the git workflow doc
+```
+<type>(<scope>): <description>
 
-## Process
-- After creating docs and configuration, commit everything to the repo
-- Create `.claude/settings.json` with deny rules and commit it
-- Test the workflow by verifying branch protection and CI checks are active
+[optional body]
+
+[optional footer(s)]
+```
+
+Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `ci`
+
+AI agent commits should include the Co-Authored-By trailer for attribution and auditability.
+
+### Pull Request Workflow
+
+Standard PR lifecycle:
+1. Create branch from `main`
+2. Implement changes with passing tests
+3. Push branch, create PR with structured description
+4. CI runs all quality gates (`make check` or equivalent)
+5. Review (automated or manual)
+6. Squash-merge to maintain clean history
+7. Delete branch after merge
+
+## Deep Guidance
+
+### Merge Policies
+
+- **Squash merge** for feature branches — keeps main history clean
+- **Merge commit** for release branches — preserves the merge point
+- **Never force-push** to main or shared branches
+- **Delete branches** after merge to prevent clutter
+
+### CI Integration
+
+Minimum CI pipeline for scaffold projects:
+1. **Lint** — ShellCheck, ESLint, or language-appropriate linter
+2. **Test** — Full test suite including evals
+3. **Build** — Verify compilation/bundling succeeds
+4. **Type check** — For typed languages (TypeScript, etc.)
+
+### Worktree Patterns for Multi-Agent Work
+
+Git worktrees enable parallel agent execution on the same repository:
+
+```bash
+# Create a worktree for an agent
+scripts/setup-agent-worktree.sh agent-name
+
+# Each worktree gets its own branch and working directory
+# Agents can work simultaneously without conflicts
+```
+
+Key rules:
+- Each agent works in its own worktree with its own branch
+- Agents coordinate via the implementation plan task assignments
+- Merge conflicts are resolved by the agent whose branch is behind
+- The main worktree is the coordination point
+
+### Branch Protection Rules
+
+Configure branch protection for `main`:
+- Require status checks to pass before merge
+- Require branches to be up to date before merge
+- Do not allow direct pushes
+- Require squash merging for feature branches
+
+### Commit Message Quality
+
+Good commit messages for AI agents:
+```
+feat(auth): add JWT token refresh endpoint
+
+Implements automatic token refresh when the access token expires
+within 5 minutes. Refresh tokens are rotated on each use.
+
+Closes US-015
+```
+
+Bad commit messages to avoid:
+- `fix stuff` — no context
+- `WIP` — should never be pushed
+- `update` — what was updated?
+
+### PR Description Template
+
+```
+### What changed
+- [1-3 bullet points describing the change]
+
+### Files modified
+- [Specific files/components modified]
+
+### How to test
+- [How to verify the changes work]
+
+### Related
+- [Story ID, issue link, or ADR reference]
+```
+
+### Conflict Resolution Strategy
+
+When multiple agents work in parallel:
+1. Agent finishing first merges normally
+2. Agent finishing second rebases onto updated main
+3. If conflicts arise, the second agent resolves them
+4. Never force-push over another agent's work
+
+Conflict resolution checklist:
+- Pull latest main before starting any task
+- Rebase frequently on long-running branches (every few commits)
+- If a rebase produces conflicts in files you didn't modify, investigate — another agent may have refactored the same area
+- After resolving conflicts, re-run the full test suite before pushing
+- Document unusual conflict resolutions in the commit message body
+
+### Release Workflow
+
+For version-tagged releases:
+1. Ensure all PRs are merged to main
+2. Run full quality gates on main
+3. Create a version tag (`v1.2.3`)
+4. Generate changelog from conventional commits
+5. Push tag to trigger release pipeline
+
+### Semantic Versioning
+
+Follow semver for version tags:
+- **MAJOR** (`X.0.0`) — breaking API changes, incompatible migrations
+- **MINOR** (`0.X.0`) — new features, backward-compatible additions
+- **PATCH** (`0.0.X`) — bug fixes, documentation, internal refactors
+
+Pre-release versions for staging: `v1.2.3-rc.1`, `v1.2.3-beta.1`
+
+### Git Hooks
+
+Pre-commit hooks for quality enforcement:
+```bash
+# .husky/pre-commit or .git/hooks/pre-commit
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Run linter on staged files
+make lint
+
+# Validate frontmatter on changed command files
+./scripts/validate-frontmatter.sh $(git diff --cached --name-only -- 'commands/*.md')
+```
+
+Pre-push hooks for broader validation:
+```bash
+# .husky/pre-push or .git/hooks/pre-push
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Run full test suite before pushing
+make test
+```
+
+### Common Anti-Patterns
+
+Patterns to avoid in AI-agent git workflows:
+
+1. **Long-lived branches** — branches older than 1 day risk merge conflicts. Keep branches short-lived.
+2. **Giant PRs** — PRs with 500+ lines changed are hard to review. Split into smaller, focused PRs.
+3. **Skipping hooks** — `--no-verify` hides real issues. Fix the root cause instead.
+4. **Rebasing shared branches** — only rebase branches that only you use. Shared branches use merge commits.
+5. **Committing generated files** — lock files yes, build output no. Use `.gitignore` aggressively.
+6. **Force-pushing to main** — this is never acceptable. Even if CI is broken, create a fix branch.
+7. **Mixing concerns in one commit** — each commit should be atomic and focused on one change.
+
+---
 
 ## After This Step
 
-When this step is complete, tell the user:
-
----
-**Phase 3 in progress** — `docs/git-workflow.md` created, CI configured, worktree script ready.
-
-**Next (choose one):**
-- **(Optional)** Run `/scaffold:automated-pr-review` — Set up automated PR review with external reviewers.
-- Run `/scaffold:ai-memory-setup` — Configure AI memory with modular rules, optional MCP memory server, and external context.
-- If your project has a **web frontend and/or mobile app**: Skip to `/scaffold:add-e2e-testing` — Configure E2E testing (starts Phase 4).
-- If **neither**: Skip to `/scaffold:user-stories` — Create user stories (starts Phase 5).
-
-**Pipeline reference:** `/scaffold:prompt-pipeline`
-
----
+Continue with: `/scaffold:claude-md-optimization`, `/scaffold:ai-memory-setup`, `/scaffold:automated-pr-review`, `/scaffold:add-e2e-testing`

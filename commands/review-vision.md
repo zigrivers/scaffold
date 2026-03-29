@@ -18,11 +18,13 @@ strategically sound, and ready for the PRD to consume.
 - docs/vision.md — updated with fixes
 
 ## Quality Criteria
+- (mvp) Passes 1 and 5 executed with findings documented
 - All 5 review passes executed with findings documented
 - Every finding categorized by severity (P0-P3)
 - Fix plan created for P0 and P1 findings
 - Fixes applied and re-validated
-- Downstream readiness confirmed (PRD can proceed without strategic ambiguity)
+- (mvp) Every vision section has content specific enough to derive a PRD without asking strategic clarification questions
+- (depth 4+) Multi-model review findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling
 - **deep**: All 5 review passes. Full findings report with severity
@@ -150,6 +152,17 @@ Or skip to: `/scaffold:create-prd` — Start product requirements.
 # Review Methodology
 
 This document defines the shared process for reviewing pipeline artifacts. It covers HOW to review, not WHAT to check — each artifact type has its own review knowledge base document with domain-specific passes and failure modes. Every review phase (1a through 10a) follows this process.
+
+## Summary
+
+- **Multi-pass review**: Each pass has a single focus (coverage, consistency, structure, downstream readiness). Passes are ordered broadest-to-most-specific.
+- **Finding severity**: P0 blocks next phase (must fix), P1 is a significant gap (should fix), P2 is an improvement opportunity (fix if time permits), P3 is nice-to-have (skip).
+- **Fix planning**: Group findings by root cause, same section, and same severity. Fix all P0s first, then P1s. Never fix ad hoc.
+- **Re-validation**: After applying fixes, re-run the specific passes that produced the findings. Stop when no new P0/P1 findings appear.
+- **Downstream readiness gate**: Final check verifies the next phase can proceed with these artifacts. Outcomes: pass, conditional pass, or fail.
+- **Review report**: Structured output with executive summary, findings by pass, fix plan, fix log, re-validation results, and downstream readiness assessment.
+
+## Deep Guidance
 
 ## Multi-Pass Review Structure
 
@@ -570,6 +583,761 @@ Before declaring the vision ready for PRD creation, verify:
 6. **Open Questions** do not include anything that would block product definition
 
 If any of these fail, the vision needs another pass before the PRD can begin.
+
+---
+
+### multi-model-review-dispatch
+
+*Patterns for dispatching reviews to external AI models (Codex, Gemini) at depth 4+, including fallback strategies and finding reconciliation*
+
+# Multi-Model Review Dispatch
+
+At higher methodology depths (4+), reviews benefit from independent validation by external AI models. Different models have different blind spots — Codex excels at code-centric analysis while Gemini brings strength in design and architectural reasoning. Dispatching to multiple models and reconciling their findings produces higher-quality reviews than any single model alone. This knowledge covers when to dispatch, how to dispatch, how to handle failures, and how to reconcile disagreements.
+
+## Summary
+
+### When to Dispatch
+
+Multi-model review activates at depth 4+ in the methodology scaling system:
+
+| Depth | Review Approach |
+|-------|----------------|
+| 1-2 | Claude-only, reduced pass count |
+| 3 | Claude-only, full pass count |
+| 4 | Full passes + one external model (if available) |
+| 5 | Full passes + multi-model with reconciliation |
+
+Dispatch is always optional. If no external model CLI is available, the review proceeds as a Claude-only enhanced review with additional self-review passes to partially compensate.
+
+### Model Selection
+
+| Model | Strength | Best For |
+|-------|----------|----------|
+| **Codex** (OpenAI) | Code analysis, implementation correctness, API contract validation | Code reviews, security reviews, API reviews, database schema reviews |
+| **Gemini** (Google) | Design reasoning, architectural patterns, broad context understanding | Architecture reviews, PRD reviews, UX reviews, domain model reviews |
+
+When both models are available at depth 5, dispatch to both and reconcile. At depth 4, choose the model best suited to the artifact type.
+
+### Graceful Fallback
+
+External models are never required. The fallback chain:
+1. Attempt dispatch to selected model(s)
+2. If CLI unavailable → skip that model, note in report
+3. If timeout → use partial results if any, note incompleteness
+4. If all external models fail → Claude-only enhanced review (additional self-review passes)
+
+The review never blocks on external model availability.
+
+## Deep Guidance
+
+### Dispatch Mechanics
+
+#### CLI Availability Check
+
+Before dispatching, verify the model CLI is installed and authenticated:
+
+```bash
+# Codex check
+which codex && codex --version 2>/dev/null
+
+# Gemini check (via Google Cloud CLI or dedicated tool)
+which gemini 2>/dev/null || (which gcloud && gcloud ai models list 2>/dev/null)
+```
+
+If the CLI is not found, skip dispatch immediately. Do not prompt the user to install it — this is a review enhancement, not a requirement.
+
+#### Prompt Formatting
+
+External model prompts must be self-contained. The external model has no access to the pipeline context, CLAUDE.md, or prior conversation. Every dispatch includes:
+
+1. **Artifact content** — The full text of the document being reviewed
+2. **Review focus** — What specific aspects to evaluate (coverage, consistency, correctness)
+3. **Upstream context** — Relevant upstream artifacts that the document should be consistent with
+4. **Output format** — Structured JSON for machine-parseable findings
+
+**Prompt template:**
+```
+You are reviewing the following [artifact type] for a software project.
+
+## Document Under Review
+[full artifact content]
+
+## Upstream Context
+[relevant upstream artifacts, summarized or in full]
+
+## Review Instructions
+Evaluate this document for:
+1. Coverage — Are all expected topics addressed?
+2. Consistency — Does it agree with the upstream context?
+3. Correctness — Are technical claims accurate?
+4. Completeness — Are there gaps that would block downstream work?
+
+## Output Format
+Respond with a JSON array of findings:
+[
+  {
+    "id": "F-001",
+    "severity": "P0|P1|P2|P3",
+    "category": "coverage|consistency|correctness|completeness",
+    "location": "section or line reference",
+    "finding": "description of the issue",
+    "suggestion": "recommended fix"
+  }
+]
+```
+
+#### Output Parsing
+
+External model output is parsed as JSON. Handle common parsing issues:
+- Strip markdown code fences (```json ... ```) if the model wraps output
+- Handle trailing commas in JSON arrays
+- Validate that each finding has the required fields (severity, category, finding)
+- Discard malformed entries rather than failing the entire parse
+
+Store raw output for audit:
+```
+docs/reviews/{artifact}/codex-review.json   — raw Codex findings
+docs/reviews/{artifact}/gemini-review.json  — raw Gemini findings
+docs/reviews/{artifact}/review-summary.md   — reconciled synthesis
+```
+
+### Timeout Handling
+
+External model calls can hang or take unreasonably long. Set reasonable timeouts:
+
+| Operation | Timeout | Rationale |
+|-----------|---------|-----------|
+| CLI availability check | 5 seconds | Should be instant |
+| Small artifact review (<2000 words) | 60 seconds | Quick read and analysis |
+| Medium artifact review (2000-10000 words) | 120 seconds | Needs more processing time |
+| Large artifact review (>10000 words) | 180 seconds | Maximum reasonable wait |
+
+#### Partial Result Handling
+
+If a timeout occurs mid-response:
+1. Check if the partial output contains valid JSON entries
+2. If yes, use the valid entries and note "partial results" in the report
+3. If no, treat as a model failure and fall back
+
+Never wait indefinitely. A review that completes in 3 minutes with Claude-only findings is better than one that blocks for 10 minutes waiting for an external model.
+
+### Finding Reconciliation
+
+When multiple models produce findings, reconciliation synthesizes them into a unified report.
+
+#### Consensus Analysis
+
+Compare findings across models to identify agreement and disagreement:
+
+**Consensus** — Multiple models flag the same issue (possibly with different wording). High confidence in the finding. Use the most specific description.
+
+**Single-source finding** — Only one model flags an issue. Lower confidence but still valuable. Include in the report with a note about which model found it.
+
+**Disagreement** — One model flags an issue that another model explicitly considers correct. Requires manual analysis.
+
+#### Reconciliation Process
+
+1. **Normalize findings.** Map each model's findings to a common schema (severity, category, location, description).
+
+2. **Match findings across models.** Two findings match if they reference the same location and describe the same underlying issue (even with different wording). Use location + category as the matching key.
+
+3. **Score by consensus.**
+   - Found by all models → confidence: high
+   - Found by majority → confidence: medium
+   - Found by one model → confidence: low (but still reported)
+
+4. **Resolve severity disagreements.** When models disagree on severity:
+   - If one says P0 and another says P1 → use P0 (err on the side of caution)
+   - If one says P1 and another says P3 → investigate the specific finding before deciding
+   - Document the disagreement in the synthesis report
+
+5. **Merge descriptions.** When multiple models describe the same finding differently, combine their perspectives. Model A might identify the symptom while Model B identifies the root cause.
+
+#### Disagreement Resolution
+
+When models actively disagree (one flags an issue, another says the same thing is correct):
+
+1. **Read both arguments.** Each model explains its reasoning. One may have a factual error.
+2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
+3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
+4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
+
+### Output Format
+
+#### Review Summary (review-summary.md)
+
+```markdown
+# Multi-Model Review Summary: [Artifact Name]
+
+## Models Used
+- Claude (primary reviewer)
+- Codex (external, depth 4+) — [available/unavailable/timeout]
+- Gemini (external, depth 5) — [available/unavailable/timeout]
+
+## Consensus Findings
+| # | Severity | Finding | Models | Confidence |
+|---|----------|---------|--------|------------|
+| 1 | P0 | [description] | Claude, Codex | High |
+| 2 | P1 | [description] | Claude, Codex, Gemini | High |
+
+## Single-Source Findings
+| # | Severity | Finding | Source | Confidence |
+|---|----------|---------|--------|------------|
+| 3 | P1 | [description] | Gemini | Low |
+
+## Disagreements
+| # | Topic | Claude | Codex | Resolution |
+|---|-------|--------|-------|------------|
+| 4 | [topic] | P1 issue | No issue | [resolution rationale] |
+
+## Reconciliation Notes
+[Any significant observations about model agreement patterns, recurring themes,
+or areas where external models provided unique value]
+```
+
+#### Raw JSON Preservation
+
+Always preserve the raw JSON output from external models, even after reconciliation. The raw findings serve as an audit trail and enable re-analysis if the reconciliation logic is later improved.
+
+```
+docs/reviews/{artifact}/
+  codex-review.json     — raw output from Codex
+  gemini-review.json    — raw output from Gemini
+  review-summary.md     — reconciled synthesis
+```
+
+### Quality Gates
+
+Minimum standards for a multi-model review to be considered complete:
+
+| Gate | Threshold | Rationale |
+|------|-----------|-----------|
+| Minimum finding count | At least 3 findings across all models | A review with zero findings likely missed something |
+| Coverage threshold | Every review pass has at least one finding or explicit "no issues found" note | Ensures all passes were actually executed |
+| Reconciliation completeness | All cross-model disagreements have documented resolutions | No unresolved conflicts |
+| Raw output preserved | JSON files exist for all models that were dispatched | Audit trail |
+
+If the primary Claude review produces zero findings and external models are unavailable, the review should explicitly note this as unusual and recommend a targeted re-review at a later stage.
+
+### Common Anti-Patterns
+
+**Blind trust of external findings.** An external model flags an issue and the reviewer includes it without verification. External models hallucinate — they may flag a "missing section" that actually exists, or cite a "contradiction" based on a misread. Fix: every external finding must be verified against the actual artifact before inclusion in the final report.
+
+**Ignoring disagreements.** Two models disagree, and the reviewer picks one without analysis. Fix: disagreements are the most valuable signal in multi-model review. They identify areas of genuine ambiguity or complexity. Always investigate and document the resolution.
+
+**Dispatching at low depth.** Running external model reviews at depth 1-2 where the review scope is intentionally minimal. The external model does a full analysis anyway, producing findings that are out of scope. Fix: only dispatch at depth 4+. Lower depths use Claude-only review with reduced pass count.
+
+**No fallback plan.** The review pipeline assumes external models are always available. When Codex is down, the review fails entirely. Fix: external dispatch is always optional. The fallback to Claude-only enhanced review must be implemented and tested.
+
+**Over-weighting consensus.** Two models agree on a finding, so it must be correct. But both models may share the same bias (e.g., both flag a pattern as an anti-pattern that is actually appropriate for this project's constraints). Fix: consensus increases confidence but does not guarantee correctness. All findings still require artifact-level verification.
+
+**Dispatching the full pipeline context.** Sending the entire project context (all docs, all code) to the external model. This exceeds context limits and dilutes focus. Fix: send only the artifact under review and the minimal upstream context needed for that specific review.
+
+**Ignoring partial results.** A model times out after producing 3 of 5 findings. The reviewer discards all results because the review is "incomplete." Fix: partial results are still valuable. Include them with a note about incompleteness. Three real findings are better than zero.
+
+---
+
+### review-step-template
+
+*Shared template pattern for review pipeline steps including multi-model dispatch, finding severity, and resolution workflow*
+
+# Review Step Template
+
+## Summary
+
+This entry documents the common structure shared by all 15+ review pipeline steps. Individual review steps customize this structure with artifact-specific failure modes and review passes, but the scaffolding is consistent across all reviews.
+
+**Purpose pattern**: Every review step targets domain-specific failure modes for a given artifact — not generic quality checks. Each pass has a specific focus, concrete checking instructions, and example findings.
+
+**Standard inputs**: Primary artifact being reviewed, upstream artifacts for cross-reference validation, `review-methodology` knowledge + artifact-specific review knowledge entry.
+
+**Standard outputs**: Review document (`docs/reviews/review-{artifact}.md`), updated primary artifact with P0/P1 fixes applied, and at depth 4+: multi-model artifacts (`codex-review.json`, `gemini-review.json`, `review-summary.md`) under `docs/reviews/{artifact}/`.
+
+**Finding severity**: P0 (blocking — must fix), P1 (significant — fix before implementation), P2 (improvement — fix if time permits), P3 (nitpick — log for later).
+
+**Methodology scaling**: Depth 1-2 runs top passes only (P0 focus). Depth 3 runs all passes. Depth 4-5 adds multi-model dispatch to Codex/Gemini with finding synthesis.
+
+**Mode detection**: First review runs all passes from scratch. Re-review preserves prior findings, marks resolved ones, and reports NEW/EXISTING/RESOLVED status.
+
+**Frontmatter conventions**: Reviews are order = creation step + 10, always include `review-methodology` in knowledge-base, and are never conditional.
+
+## Deep Guidance
+
+### Purpose Pattern
+
+Every review step follows the pattern:
+
+> Review **[artifact]** targeting **[domain]**-specific failure modes.
+
+The review does not check generic quality ("is this document complete?"). Instead, it runs artifact-specific passes that target the known ways that artifact type fails. Each pass has a specific focus, concrete checking instructions, and example findings.
+
+### Standard Inputs
+
+Every review step reads:
+- **Primary artifact**: The document being reviewed (e.g., `docs/domain-models.md`, `docs/api-contracts.md`)
+- **Upstream artifacts**: Documents the primary artifact was built from (e.g., PRD, domain models, ADRs) -- used for cross-reference validation
+- **Knowledge base entries**: `review-methodology` (shared process) + artifact-specific review knowledge (e.g., `review-api-design`, `review-database-design`)
+
+### Standard Outputs
+
+Every review step produces:
+- **Review document**: `docs/reviews/review-{artifact}.md` -- findings organized by pass, with severity and trace information
+- **Updated artifact**: The primary artifact with fixes applied for P0/P1 findings
+- **Depth 4+ multi-model artifacts** (when methodology depth >= 4):
+  - `docs/reviews/{artifact}/codex-review.json` -- Codex independent review findings
+  - `docs/reviews/{artifact}/gemini-review.json` -- Gemini independent review findings
+  - `docs/reviews/{artifact}/review-summary.md` -- Synthesized findings from all models
+
+### Finding Severity Levels
+
+All review steps use the same four-level severity scale:
+
+| Level | Name | Meaning | Action |
+|-------|------|---------|--------|
+| P0 | Blocking | Cannot proceed to downstream steps without fixing | Must fix before moving on |
+| P1 | Significant | Downstream steps can proceed but will encounter problems | Fix before implementation |
+| P2 | Improvement | Artifact works but could be better | Fix if time permits |
+| P3 | Nitpick | Style or preference | Log for future cleanup |
+
+### Finding Format
+
+Each finding includes:
+- **Pass**: Which review pass discovered it (e.g., "Pass 3 -- Auth/AuthZ Coverage")
+- **Priority**: P0-P3
+- **Location**: Specific section, line, or element in the artifact
+- **Issue**: What is wrong, with concrete details
+- **Impact**: What goes wrong downstream if this is not fixed
+- **Recommendation**: Specific fix, not just "fix this"
+- **Trace**: Link back to upstream artifact that establishes the requirement (e.g., "PRD Section 3.2 -> Architecture DF-005")
+
+### Example Finding
+
+```markdown
+### Finding F-003 (P1)
+- **Pass**: Pass 2 — Entity Coverage
+- **Location**: docs/domain-models/order.md, Section "Order Aggregate"
+- **Issue**: Order aggregate does not include a `cancellationReason` field, but PRD
+  Section 4.1 requires cancellation reason tracking for analytics.
+- **Impact**: Implementation will lack cancellation reason; analytics pipeline will
+  receive null values, causing dashboard gaps.
+- **Recommendation**: Add `cancellationReason: CancellationReason` value object to
+  Order aggregate with enum values: USER_REQUEST, PAYMENT_FAILED, OUT_OF_STOCK,
+  ADMIN_ACTION.
+- **Trace**: PRD §4.1 → User Story US-014 → Domain Model: Order Aggregate
+```
+
+### Review Document Structure
+
+Every review output document follows a consistent structure:
+
+```markdown
+  # Review: [Artifact Name]
+
+  **Date**: YYYY-MM-DD
+  **Methodology**: deep | mvp | custom:depth(N)
+  **Status**: INITIAL | RE-REVIEW
+  **Models**: Claude | Claude + Codex | Claude + Codex + Gemini
+
+  ## Findings Summary
+  - Total findings: N (P0: X, P1: Y, P2: Z, P3: W)
+  - Passes run: N of M
+  - Artifacts checked: [list]
+
+  ## Findings by Pass
+
+  ### Pass 1 — [Pass Name]
+  [Findings listed by severity, highest first]
+
+  ### Pass 2 — [Pass Name]
+  ...
+
+  ## Resolution Log
+  | Finding | Severity | Status | Resolution |
+  |---------|----------|--------|------------|
+  | F-001   | P0       | RESOLVED | Fixed in commit abc123 |
+  | F-002   | P1       | EXISTING | Deferred — tracked in ADR-015 |
+
+  ## Multi-Model Synthesis (depth 4+)
+  ### Convergent Findings
+  [Issues found by 2+ models — high confidence]
+
+  ### Divergent Findings
+  [Issues found by only one model — requires manual triage]
+```
+
+### Methodology Scaling Pattern
+
+Review steps scale their thoroughness based on the methodology depth setting:
+
+### Depth 1-2 (MVP/Minimal)
+- Run only the highest-impact passes (typically passes 1-3)
+- Single-model review only
+- Focus on P0 findings; skip P2/P3
+- Abbreviated finding descriptions
+
+### Depth 3 (Standard)
+- Run all review passes
+- Single-model review
+- Report all severity levels
+- Full finding descriptions with trace information
+
+### Depth 4-5 (Comprehensive)
+- Run all review passes
+- Multi-model dispatch: send the artifact to Codex and Gemini for independent analysis
+- Synthesize findings from all models, flagging convergent findings (multiple models found the same issue) as higher confidence
+- Cross-artifact consistency checks against all upstream documents
+- Full finding descriptions with detailed trace and impact analysis
+
+### Depth Scaling Example
+
+At depth 2 (MVP), a domain model review might produce:
+
+```markdown
+  # Review: Domain Models (MVP)
+  ## Findings Summary
+  - Total findings: 3 (P0: 1, P1: 2)
+  - Passes run: 3 of 10
+  ## Findings
+  ### F-001 (P0) — Missing aggregate root for Payment bounded context
+  ### F-002 (P1) — Order entity lacks status field referenced in user stories
+  ### F-003 (P1) — No domain event defined for order completion
+```
+
+At depth 5 (comprehensive), the same review would run all 10 passes, dispatch to
+Codex and Gemini, and produce a full synthesis with 15-30 findings across all
+severity levels.
+
+### Mode Detection Pattern
+
+Every review step checks whether this is a first review or a re-review:
+
+**First review**: No prior review document exists. Run all passes from scratch.
+
+**Re-review**: A prior review document exists (`docs/reviews/review-{artifact}.md`). The step:
+1. Reads the prior review findings
+2. Checks which findings were addressed (fixed in the artifact)
+3. Marks resolved findings as "RESOLVED" rather than removing them
+4. Runs all passes again looking for new issues or regressions
+5. Reports findings as "NEW", "EXISTING" (still unfixed), or "RESOLVED"
+
+This preserves review history and makes progress visible.
+
+### Resolution Workflow
+
+The standard workflow from review to resolution:
+
+1. **Review**: Run the review step, producing findings
+2. **Triage**: Categorize findings by severity; confirm P0s are genuine blockers
+3. **Fix**: Update the primary artifact to address P0 and P1 findings
+4. **Re-review**: Run the review step again in re-review mode
+5. **Verify**: Confirm all P0 findings are resolved; P1 findings are resolved or have documented justification for deferral
+6. **Proceed**: Move to the next pipeline phase
+
+For depth 4+ reviews, the multi-model dispatch happens in both the initial review and the re-review, ensuring fixes do not introduce new issues visible to other models.
+
+### Frontmatter Pattern
+
+Review steps follow a consistent frontmatter structure:
+
+```yaml
+---
+name: review-{artifact}
+description: "Review {artifact} for completeness, consistency, and downstream readiness"
+phase: "{phase-slug}"
+order: {N}20  # Reviews are always 10 after their creation step
+dependencies: [{creation-step}]
+outputs: [docs/reviews/review-{artifact}.md, docs/reviews/{artifact}/review-summary.md, docs/reviews/{artifact}/codex-review.json, docs/reviews/{artifact}/gemini-review.json]
+conditional: null
+knowledge-base: [review-methodology, review-{artifact-domain}]
+---
+```
+
+Key conventions:
+- Review steps always have order = creation step order + 10
+- Primary output uses `review-` prefix; multi-model directory uses bare artifact name
+- Knowledge base always includes `review-methodology` plus a domain-specific entry
+- Reviews are never conditional — if the creation step ran, the review runs
+
+### Common Anti-Patterns
+
+### Reviewing Without Upstream Context
+Running a review without loading the upstream artifacts that define requirements.
+The review cannot verify traceability if it does not have the PRD, domain models,
+or ADRs that establish what the artifact should contain.
+
+### Severity Inflation
+Marking everything as P0 to force immediate action. This undermines the severity
+system and causes triage fatigue. Reserve P0 for genuine blockers where downstream
+steps will fail or produce incorrect output.
+
+### Fix Without Re-Review
+Applying fixes to findings without re-running the review. Fixes can introduce new
+issues or incompletely address the original finding. Always re-review after fixes.
+
+### Ignoring Convergent Multi-Model Findings
+When multiple models independently find the same issue, it has high confidence.
+Dismissing convergent findings without strong justification undermines the value
+of multi-model review.
+
+### Removing Prior Findings
+Deleting findings from a re-review output instead of marking them RESOLVED. This
+loses review history and makes it impossible to track what was caught and fixed.
+
+---
+
+### review-vision
+
+*Vision-specific review passes, failure modes, and quality criteria for product vision documents*
+
+# Review: Product Vision
+
+The product vision document sets the strategic direction for everything downstream. It defines why the product exists, who it serves, what makes it different, and what traps to avoid. A weak vision produces a PRD that lacks focus, user stories that lack purpose, and an architecture that lacks guiding constraints. This review uses 5 passes targeting the specific ways vision artifacts fail.
+
+Follows the review process defined in `review-methodology.md`.
+
+---
+
+## Summary
+
+Vision review validates that the product vision is specific enough to guide decisions, inspiring enough to align a team, and honest enough to withstand scrutiny. The 5 passes target: (1) vision clarity -- is the vision statement specific, inspiring, and actionable, (2) target audience -- are users defined by behaviors and motivations rather than demographics, (3) competitive landscape -- is the analysis honest about strengths and not just weaknesses, (4) guiding principles -- do they create real tradeoffs with X-over-Y format, and (5) anti-vision -- does it name specific traps rather than vague disclaimers.
+
+---
+
+## Deep Guidance
+
+## Pass 1: Vision Clarity
+
+### What to Check
+
+- Is the vision statement specific to THIS product, not a generic mission statement?
+- Does it inspire action, not just describe a category?
+- Is it actionable -- could a team use it to make a yes/no decision about a feature?
+- Does it avoid jargon, buzzwords, and empty superlatives ("best-in-class," "world-class," "revolutionary")?
+- Is it short enough to remember (1-3 sentences)?
+
+### Why This Matters
+
+The vision statement is the single most referenced artifact in the pipeline. It appears in PRD context, guides user story prioritization, and informs architecture trade-offs. A generic vision like "make the best project management tool" provides zero signal -- it cannot distinguish between features to build and features to skip. A specific vision like "help 2-person freelance teams track client work without learning project management" makes every downstream decision easier.
+
+### How to Check
+
+1. Read the vision statement in isolation -- does it name a specific outcome for a specific group?
+2. Try the "swap test" -- could you replace the product name with a competitor's name and have the vision still be true? If yes, it is not specific enough
+3. Try the "decision test" -- present two hypothetical features and ask whether the vision helps you choose between them. If it does not, the vision is too vague
+4. Check for buzzwords: "leverage," "synergy," "best-in-class," "end-to-end," "seamless" -- these add words without adding meaning
+5. Check length -- if the vision takes more than 30 seconds to read aloud, it is too long to internalize
+
+### What a Finding Looks Like
+
+- P0: "Vision statement is 'To be the leading platform for enterprise collaboration.' This could describe Slack, Teams, Notion, or Confluence. It names no specific user group, no specific problem, and no specific differentiation."
+- P1: "Vision statement is specific but contains 'seamless end-to-end experience' -- this phrase adds no decision-making value. Replace with the specific experience being described."
+- P2: "Vision is 4 paragraphs long. Distill to 1-3 sentences that a team member could recite from memory."
+
+### Common Failure Modes
+
+- **Category description**: The vision describes a market category, not a product direction ("We build developer tools")
+- **Aspiration without specificity**: The vision is inspiring but cannot guide decisions ("Empower teams to do their best work")
+- **Solution masquerading as vision**: The vision describes a technology choice, not a user outcome ("AI-powered analytics platform")
+
+---
+
+## Pass 2: Target Audience
+
+### What to Check
+
+- Is the target audience defined by behaviors, motivations, and constraints -- not demographics?
+- Does the audience description create clear inclusion/exclusion criteria?
+- Are there signs of the "everyone" trap (audience so broad it provides no prioritization signal)?
+- Does the audience description explain WHY these people need this product specifically?
+
+### Why This Matters
+
+Demographics (age, location, job title) do not predict product needs. Behaviors and motivations do. "Marketing managers aged 30-45" tells you nothing about what to build. "Solo marketers who manage 5+ channels without a team and need to appear more capable than they are" tells you everything. The audience definition flows directly into PRD personas -- vague audiences produce vague personas produce vague user stories.
+
+### How to Check
+
+1. Check whether the audience is defined by observable behaviors ("currently uses spreadsheets to track...") versus demographics ("25-40 year old professionals")
+2. Check for motivations -- WHY does this audience need the product? What is the underlying drive?
+3. Check for constraints -- what limits this audience? Budget? Time? Technical skill? Team size?
+4. Apply the "exclusion test" -- does the audience definition clearly exclude some potential users? If not, it is too broad
+5. Check that the audience connects to the vision -- is this the audience that the vision serves?
+
+### What a Finding Looks Like
+
+- P0: "Target audience is 'businesses of all sizes.' This excludes nobody and provides no prioritization signal. The PRD cannot write meaningful personas from this."
+- P1: "Target audience mentions 'small business owners' but defines them only by company size (<50 employees), not by behaviors, pain points, or motivations."
+- P2: "Audience description is behavior-based but does not explain why existing solutions fail this group."
+
+### Common Failure Modes
+
+- **Demographic-only**: Defined by who they are, not what they do ("SMB owners aged 25-45")
+- **Too broad**: Audience includes everyone ("teams of any size in any industry")
+- **Missing motivation**: Describes the audience but not why they need THIS product
+- **No exclusion criteria**: Cannot determine who is NOT the target audience
+
+---
+
+## Pass 3: Competitive Landscape
+
+### What to Check
+
+- Does the competitive analysis honestly assess competitors' strengths, not just their weaknesses?
+- Are competitors named specifically, not referred to generically ("existing solutions")?
+- Is the differentiation based on substance (different approach, different audience, different trade-offs) not superficiality ("better UX")?
+- Does the analysis acknowledge what competitors do well that this product will NOT try to replicate?
+
+### Why This Matters
+
+A competitive landscape that only lists competitor weaknesses produces false confidence. Competitors have strengths -- users chose them for reasons. Understanding those reasons prevents building a product that is strictly worse in dimensions users care about. Differentiation based on "we'll just do it better" is not differentiation -- it is a bet that the team is more competent than established competitors with more resources.
+
+### How to Check
+
+1. For each named competitor, check that at least one genuine strength is acknowledged
+2. Check that differentiation is structural (different trade-off, different audience segment, different approach) not aspirational ("better design")
+3. Verify competitors are named specifically -- "Competitor X" or "the market" provides no signal
+4. Check whether the analysis acknowledges what the product will NOT compete on (conceding dimensions to competitors)
+5. Look for the "better at everything" anti-pattern -- if the product claims superiority in every dimension, the analysis is dishonest
+
+### What a Finding Looks Like
+
+- P0: "Competitive section lists 4 competitors but only describes their weaknesses. No competitor strengths are acknowledged. This produces a false picture of the market and prevents honest differentiation."
+- P1: "Differentiation claim is 'better user experience.' This is not structural differentiation -- every product claims this. What specific design trade-off creates a different experience?"
+- P2: "Competitors are referred to as 'existing solutions' and 'current tools' without naming them. Specific names enable specific analysis."
+
+### Common Failure Modes
+
+- **Weakness-only analysis**: Lists only what competitors do poorly, creating false confidence
+- **Aspirational differentiation**: Claims superiority without structural basis ("we'll be faster, simpler, and more powerful")
+- **Generic competitors**: References "the market" or "existing solutions" without naming specific products
+- **Missing concessions**: Does not acknowledge what the product will deliberately NOT compete on
+
+---
+
+## Pass 4: Guiding Principles
+
+### What to Check
+
+- Are principles in X-over-Y format, creating real trade-offs?
+- Does each principle rule out a specific, tempting alternative?
+- Could a reasonable person disagree with the principle (i.e., the "over Y" option is genuinely attractive)?
+- Are principles specific enough to resolve a real product decision?
+
+### Why This Matters
+
+Guiding principles that do not create trade-offs are platitudes. "We value quality" is not a principle -- nobody advocates for poor quality. "We value correctness over speed-to-market" is a principle because speed-to-market is genuinely valuable and someone could reasonably choose it. X-over-Y format forces the vision author to name what the product will sacrifice, which is the only way principles become useful for downstream decision-making.
+
+### How to Check
+
+1. For each principle, check for X-over-Y structure -- is something being chosen OVER something else?
+2. Apply the "reasonable disagreement" test -- would a smart, well-intentioned person choose Y over X? If not, the principle is a platitude
+3. Construct a hypothetical product decision and check whether the principle resolves it
+4. Check that the set of principles covers the most common trade-off dimensions for this product type (simplicity vs. power, speed vs. correctness, flexibility vs. consistency, etc.)
+5. Verify no two principles contradict each other
+
+### What a Finding Looks Like
+
+- P0: "Principles include 'We value simplicity, quality, and user delight.' These are not trade-offs -- they are universally desirable attributes. No team would advocate for complexity, poor quality, or user frustration."
+- P1: "Principle 'Convention over configuration' is in X-over-Y format but does not specify what conventions or what configuration options are sacrificed. Too abstract to resolve a real decision."
+- P2: "Principles are well-formed but do not cover the speed-vs-correctness dimension, which is a common tension for this product type."
+
+### Common Failure Modes
+
+- **Platitudes**: Principles everyone agrees with ("we value quality") that rule out nothing
+- **Missing sacrifice**: X-over-Y format but Y is not genuinely attractive ("quality over bugs")
+- **Too abstract**: Principles are directionally correct but too vague to resolve specific decisions
+- **Contradictory pairs**: Two principles that cannot both be followed ("move fast" and "never ship bugs")
+
+---
+
+## Pass 5: Anti-Vision
+
+### What to Check
+
+- Does the anti-vision name specific, tempting traps -- not vague disclaimers?
+- Are the anti-vision items things the team could plausibly drift into (not absurd strawmen)?
+- Does each item explain WHY it is tempting and HOW to recognize the drift?
+- Is the anti-vision specific to THIS product, not generic warnings?
+
+### Why This Matters
+
+The anti-vision is the vision's immune system. It names the specific failure modes that are most likely given the product's domain, team, and competitive landscape. Without it, teams drift toward common traps without recognizing the drift. A good anti-vision makes the team uncomfortable because it names things they might actually do -- not things no reasonable team would do.
+
+### How to Check
+
+1. For each anti-vision item, check specificity -- does it name a concrete behavior or outcome, not a vague category?
+2. Apply the "temptation test" -- is this something the team could plausibly drift into? If the answer is "obviously not," the anti-vision item is a strawman
+3. Check whether each item explains the mechanism: why is this trap tempting, and what are the early warning signs?
+4. Verify the anti-vision items connect to the product domain -- are they specific to THIS type of product?
+5. Check that anti-vision items complement guiding principles -- if a principle says "simplicity over power," the anti-vision should name a specific way the product might become complex
+
+### What a Finding Looks Like
+
+- P0: "Anti-vision section says 'We will not build a bad product.' This is not an anti-vision -- it is a tautology. Name specific traps: 'We will not become a feature-comparison checklist tool that matches competitors feature-for-feature while losing our core simplicity advantage.'"
+- P1: "Anti-vision names 'scope creep' as a trap but does not explain which specific scope expansion is most tempting for this product or how to recognize it early."
+- P2: "Anti-vision items are specific but do not connect to the guiding principles. Each principle's 'Y' (the sacrificed value) should have a corresponding anti-vision item that names the drift toward Y."
+
+### Common Failure Modes
+
+- **Vague disclaimers**: "We won't lose focus" -- too generic to be actionable
+- **Absurd strawmen**: Names failures no team would pursue ("we won't build an insecure product")
+- **Missing mechanism**: Names the trap but not why it is tempting or how to detect drift
+- **Generic warnings**: Anti-vision items apply to any product, not THIS product specifically
+
+---
+
+## Finding Report Template
+
+```markdown
+## Vision Review Report
+
+### Pass 1: Vision Clarity
+- **P1**: Vision statement "Build the best project management tool" is a category description, not a product vision. It cannot guide feature trade-offs. Recommendation: rewrite as a specific change statement.
+
+### Pass 2: Target Audience
+- No findings
+
+### Pass 3: Competitive Landscape
+- **P2**: Competitor "Acme" is described by weaknesses only. Add at least one acknowledged strength.
+
+### Pass 4: Guiding Principles
+- **P0**: Principles are platitudes ("quality", "simplicity") without X-over-Y trade-offs. Cannot resolve downstream decisions.
+
+### Pass 5: Anti-Vision
+- **P1**: Anti-vision says "avoid scope creep" without naming which specific scope expansion is tempting.
+
+### Summary
+- P0: 1 | P1: 2 | P2: 1 | P3: 0
+- Blocks downstream: Yes (P0 in guiding principles)
+```
+
+## Severity Examples for Vision Documents
+
+### P0 (Blocks downstream phases)
+
+- Vision statement is a category description that cannot guide any decision
+- Target audience is "everyone" -- PRD cannot write meaningful personas
+- No guiding principles exist -- all downstream trade-offs are unresolved
+- Anti-vision is absent entirely
+
+### P1 (Causes significant downstream quality issues)
+
+- Vision is specific but contains unfalsifiable claims
+- Target audience is demographic-only with no behavioral definition
+- Competitive analysis lists only competitor weaknesses
+- Principles exist but are platitudes without real trade-offs
+
+### P2 (Minor issues, fix during iteration)
+
+- Vision is slightly too long to memorize
+- One competitor is described generically rather than by name
+- One principle is well-formed but could be more specific
+- Anti-vision items are specific but miss one common trap for this product type
+
+### P3 (Observations for future improvement)
+
+- Competitive landscape could include an emerging competitor
+- Anti-vision could add early warning indicators for each trap
+- Principles could be ordered by frequency of application
 
 ---
 

@@ -1,238 +1,292 @@
 ---
-description: "Initialize Beads task tracking in this project"
-long-description: "Sets up the Beads issue tracker (.beads/ directory), creates CLAUDE.md with project conventions, and establishes task management workflow for AI agents."
+description: "Initialize Beads task tracking with CLAUDE.md conventions and lessons file"
+long-description: "Initialize the Beads issue tracker for AI-friendly task tracking, create the"
 ---
-Set up **Beads** (https://github.com/steveyegge/beads) in this project for AI-friendly task tracking. Beads is already installed on the system (the `bd` CLI should be available).
+
+## Purpose
+Initialize the Beads issue tracker for AI-friendly task tracking, create the
+lessons-learned file for cross-session memory, and establish the initial CLAUDE.md
+skeleton with core principles, task management commands, self-improvement rules,
+and autonomous behavior guidelines.
+
+## Inputs
+- Project root directory (required) — must be a git repository
+- Existing CLAUDE.md (optional) — if present, operates in update mode
+
+## Expected Outputs
+- .beads/ directory — initialized Beads data store with git hooks
+- tasks/lessons.md — patterns and anti-patterns file for cross-session learning
+- CLAUDE.md — initial skeleton with Core Principles, Task Management (Beads),
+  Self-Improvement, and Autonomous Behavior sections
+
+## Quality Criteria
+- (mvp) `bd ready` executes without error (Beads is initialized)
+- (mvp) .beads/ directory exists and contains Beads data files
+- (mvp) Beads git hooks are installed (data-sync hooks, not code-quality hooks)
+- (mvp) tasks/lessons.md exists with Patterns, Anti-Patterns, and Common Gotchas sections
+- (mvp) CLAUDE.md contains Core Principles with all four tenets (Simplicity, No Laziness, TDD, Prove It)
+- (mvp) CLAUDE.md contains Beads command reference table
+- CLAUDE.md contains commit-message convention requiring Beads task IDs
+- Bootstrap commit uses `[BD-0]` convention
+- (deep) Cross-doc consistency verified against git-workflow.md and coding-standards.md
+
+## Methodology Scaling
+- **deep**: Full Beads setup with all CLAUDE.md sections, detailed command reference
+  table, priority level documentation, and cross-doc consistency checks against
+  existing git-workflow.md and coding-standards.md.
+- **mvp**: Initialize Beads, create tasks/lessons.md, add minimal CLAUDE.md
+  sections (Core Principles + Beads commands). Skip cross-doc checks.
+- **custom:depth(1-5)**: Depth 1-2: MVP Beads init + minimal CLAUDE.md. Depth 3:
+  add full command table and priority docs. Depth 4-5: full setup with cross-doc
+  consistency and detailed autonomous behavior rules.
+
+## Conditional Evaluation
+Enable when: project uses Beads task tracking methodology (user selects Beads during
+setup), or user explicitly enables structured task management. Skip when: user prefers
+GitHub Issues, Linear, or another task tracker, or explicitly declines Beads setup.
 
 ## Mode Detection
+Update mode if .beads/ contains a config.json or tasks directory (not just an
+empty directory). In update mode: never re-initialize
+.beads/ (existing task data is irreplaceable), never overwrite tasks/lessons.md
+(only add missing sections), update CLAUDE.md Beads sections in-place preserving
+project-specific customizations.
 
-Before starting, check if `.beads/` directory already exists:
-
-**If `.beads/` does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
-
-**If `.beads/` exists → UPDATE MODE**:
-1. **Read & analyze**: Read `CLAUDE.md` completely. Check for Beads-related sections (Task Management, Core Principles, Self-Improvement, Autonomous Behavior). Check `tasks/lessons.md` for existing entries.
-2. **Diff against current structure**: Compare the existing CLAUDE.md Beads sections against what this prompt would produce fresh. Categorize every piece of content:
-   - **ADD** — Required by current prompt but missing from existing CLAUDE.md
-   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
-   - **PRESERVE** — Project-specific decisions, rationale, and customizations
-3. **Cross-doc consistency**: Read `docs/git-workflow.md` and `docs/coding-standards.md` and verify updates won't contradict them. Skip any that don't exist yet.
-4. **Preview changes**: Present the user a summary:
-   | Action | Section | Detail |
-   |--------|---------|--------|
-   | ADD | ... | ... |
-   | RESTRUCTURE | ... | ... |
-   | PRESERVE | ... | ... |
-   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
-   Wait for user approval before proceeding.
-5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
-6. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
-
-**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
-
-### Update Mode Specifics
-- **Primary output**: `.beads/` directory, `CLAUDE.md` Beads sections, `tasks/lessons.md`
-- **Preserve**: All `tasks/lessons.md` entries, existing Beads task data, project-specific CLAUDE.md customizations
-- **Related docs**: `docs/git-workflow.md`, `docs/coding-standards.md`
-- **Special rules**: **Never re-initialize `.beads/`** — existing task data is irreplaceable. Never overwrite `tasks/lessons.md` — only add missing sections. Update CLAUDE.md Beads sections in-place.
-
-## Why Beads
-
-This project can use parallel Claude Code sessions. Beads provides:
-- Persistent memory across sessions (git-backed)
-- Dependency-aware task tracking (know what's blocked vs ready)
-- Merge-safe IDs (no conflicts between agents)
-- Fast queries (`bd ready` shows unblocked work)
-
-## Setup Steps
-
-1. **Initialize Beads** in the project root:
-   ```bash
-   bd init --quiet
-   ```
-
-2. **Install git hooks** for automatic sync:
-   ```bash
-   bd hooks install
-   ```
-   Note: These are Beads data-sync hooks only (not code quality hooks). They ensure task data is committed alongside code changes. This is separate from CI checks which handle linting and tests.
-
-3. **Verify setup**:
-   ```bash
-   bd ready        # Should return empty (no tasks yet)
-   ls .beads/      # Should show Beads data directory
-   ```
-
-4. **Create tasks/lessons.md** for capturing patterns and anti-patterns:
-   ```bash
-   mkdir -p tasks
-   cat > tasks/lessons.md << 'EOF'
-   # Lessons Learned
-
-   Patterns and anti-patterns discovered during development. Review before starting new tasks.
-
-   ## Patterns (Do This)
-
-   <!-- Add patterns as you discover them -->
-
-   ## Anti-Patterns (Avoid This)
-
-   <!-- Add anti-patterns as you discover them -->
-
-   ## Common Gotchas
-
-   <!-- Add gotchas specific to this project -->
-   EOF
-   ```
-
-5. **Create or update CLAUDE.md** with the sections below.
-
-   If CLAUDE.md does not exist, create it first. This is the initial skeleton — subsequent setup prompts (Git Workflow, Dev Setup, Playwright/Maestro, etc.) will add their own sections:
-
-   ```markdown
-   # CLAUDE.md
-
-   <!-- Core Principles and Task Management added by Beads Setup -->
-   <!-- Git workflow, dev commands, and testing sections will be added by later setup prompts -->
-   ```
-
-   Then add the sections below to it.
-
-6. **Commit the setup**:
-   ```bash
-   git add .beads/ tasks/lessons.md CLAUDE.md
-   git commit -m "[BD-0] chore: initialize Beads task tracking"
-   ```
-   Note: `[BD-0]` is a bootstrap convention for setup commits made before any real tasks exist. The first real task created via `bd create` will receive an auto-generated ID.
-
-## CLAUDE.md Sections to Add
-
-### Core Principles
-
-Add at the very top of CLAUDE.md:
-
-```markdown
-## Core Principles
-
-- **Simplicity First**: Make every change as simple as possible. Minimal code, minimal impact. Don't over-engineer.
-- **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
-- **TDD Always**: Write failing tests first, then make them pass, then refactor. No exceptions.
-- **Prove It Works**: Never mark a task complete without demonstrating correctness — tests pass, logs clean, behavior verified.
-```
-
-### Task Management (Beads)
-
-```markdown
-## Task Management (Beads)
-
-All task tracking lives in Beads — no separate todo files.
-
-### Creating Tasks
-```bash
-bd create "Imperative, specific title" -p <0-3>
-bd update <id> --claim                   # Always claim after creating
-bd dep add <child> <parent>              # Child blocked by parent
-```
-
-Priority levels:
-- 0 = blocking release
-- 1 = must-have v1
-- 2 = should-have
-- 3 = nice-to-have
-
-Good titles: `"Fix streak calculation for timezone edge case"`
-Bad titles: `"Backend stuff"`
-
-### Closing Tasks
-```bash
-bd close <id>                            # Marks complete — use this, not bd update --status completed
-bd sync                                  # Force sync to git
-```
-
-### Beads Commands
-| Command | Purpose |
-|---------|---------|
-| `bd ready` | Show unblocked tasks ready for work |
-| `bd create "Title" -p N` | Create task with priority |
-| `bd update <id> --status S` | Update status (in_progress, blocked, etc.) |
-| `bd update <id> --claim` | Claim task (uses BD_ACTOR for attribution) |
-| `bd close <id>` | Close completed task |
-| `bd dep add <child> <parent>` | Add dependency |
-| `bd dep tree <id>` | View dependency graph |
-| `bd show <id>` | Full task details |
-| `bd sync` | Force sync to git |
-| `bd list` | List all tasks |
-| `bd dep cycles` | Debug stuck/circular dependencies |
-
-**NEVER** use `bd edit` — it opens an interactive editor and breaks AI agents.
-
-### Every Commit Needs a Task (Beads Projects)
-
-When Beads is configured, all commits require a Beads task ID in the message: `[BD-<id>] type(scope): description`
-
-Note: Projects that skip the Beads step use conventional commits instead (`type(scope): description` without a task ID prefix). See `docs/coding-standards.md` for the project's commit format.
-
-If you encounter a bug or need to make an ad-hoc fix:
-```bash
-bd create "fix: <description>" -p 1
-bd update <id> --claim
-# implement fix, then close when done
-bd close <id>
-```
-This keeps Beads as the single source of truth for all changes.
-```
-
-### Self-Improvement
-
-```markdown
-## Self-Improvement
-
-- After ANY correction from the user: update `tasks/lessons.md` with the pattern
-- Write rules that prevent the same mistake recurring
-- Review `tasks/lessons.md` at session start before picking up work
-```
-
-### Autonomous Behavior
-
-```markdown
-## Autonomous Behavior
-
-- **Fix bugs on sight**: When encountering bugs, errors, or failing tests — create a Beads task and fix them. Zero hand-holding required.
-- **Use subagents**: Offload research, exploration, and parallel analysis to subagents. Keeps main context clean.
-- **Keep working**: Continue until `bd ready` returns no available tasks.
-- **Re-plan when stuck**: If implementation goes sideways, stop and rethink your approach rather than pushing through. (Do NOT enter interactive `/plan` mode — just think through the problem and adjust.)
-```
-
-## What This Prompt Does NOT Set Up
-
-The following are handled by separate prompts that run later:
-- **Git workflow** (branching, PRs, merge strategy) → Git Workflow prompt
-- **Full development workflow** (session start → implementation → PR → task closure → next task) → CLAUDE.md Optimization + Workflow Audit prompts
-- **Parallel agent worktrees** → Git Workflow prompt
-- **CI/CD pipeline** → Git Workflow prompt
-- **TDD standards** → TDD prompt
-- **Coding standards** → Coding Standards prompt
-
-This prompt establishes Beads as the task tracking system and adds the Beads reference to CLAUDE.md. The full workflow that ties Beads into git, PRs, and CI is composed by later prompts.
-
-## After Setup
-
-Tell me:
-1. That Beads is initialized
-2. What files were created in .beads/
-3. That tasks/lessons.md was created
-4. That CLAUDE.md has been updated with Beads sections
-5. Any issues encountered
-
-## After This Step
-
-When this step is complete, tell the user:
+## Update Mode Specifics
+- **Detect prior artifact**: .beads/ directory exists with data files
+- **Preserve**: all existing task data in .beads/, tasks/lessons.md content
+  (patterns, anti-patterns, gotchas), CLAUDE.md Beads command table
+  customizations, git hook configurations
+- **Triggers for update**: new CLAUDE.md sections need Beads references,
+  Beads CLI version changed requiring command updates, git hooks need
+  reconfiguration after workflow changes
+- **Conflict resolution**: if CLAUDE.md Beads section was manually customized,
+  merge new content around existing customizations rather than replacing
 
 ---
-**Phase 2 started** — Beads initialized, `tasks/lessons.md` created, `CLAUDE.md` updated.
 
-**Next:** Run `/scaffold:tech-stack` — Research and document tech stack decisions.
+## Domain Knowledge
 
-**Pipeline reference:** `/scaffold:prompt-pipeline`
+### task-tracking
 
----
+*Task tracking patterns including Beads methodology, task hierarchies, progress tracking, and lessons-learned workflows*
+
+# Task Tracking
+
+Structured task tracking for AI agents ensures work continuity across sessions, prevents drift, and builds institutional memory. This knowledge covers the Beads methodology, task hierarchies, progress conventions, and the lessons-learned workflow that turns mistakes into permanent improvements.
+
+## Summary
+
+### Beads Methodology Overview
+
+Beads is an AI-friendly issue tracker designed for single-developer and AI-agent workflows. Unlike heavyweight project management tools (Jira, Linear), Beads stores task data in the repository itself, making it accessible to AI agents without external API integration.
+
+Core properties:
+- **Repository-local** — Task data lives in `.beads/`, committed alongside code
+- **Git-hook synced** — Task state updates automatically on commit via data-sync hooks
+- **CLI-driven** — All operations via `bd` commands (create, list, status, ready)
+- **ID-prefixed commits** — Every commit message includes `[BD-xxx]` for traceability
+
+### Task Hierarchy
+
+Tasks organize into three levels:
+
+| Level | Scope | Example | Typical Count |
+|-------|-------|---------|---------------|
+| **Epic** | Large feature or milestone | "User authentication system" | 3-8 per project |
+| **Task** | Single agent session (30-90 min) | "Implement login endpoint with validation" | 10-50 per project |
+| **Subtask** | Atomic unit within a task | "Add password hashing util" | 0-5 per task |
+
+Epics group related tasks. Tasks are the unit of work assignment — one task per agent session. Subtasks are optional decomposition within a task, useful when a task has distinct testable steps.
+
+### Progress Tracking
+
+Track task status through a simple state machine:
+
+```
+ready → in-progress → review → done
+                  ↘ blocked
+```
+
+- **ready** — All dependencies met, can start immediately
+- **in-progress** — Agent is actively working on it
+- **review** — Implementation complete, awaiting PR merge
+- **done** — PR merged, tests passing on main
+- **blocked** — Cannot proceed, dependency or question unresolved
+
+### Lessons-Learned Workflow
+
+The `tasks/lessons.md` file captures patterns discovered during work. It has three sections:
+
+1. **Patterns** — Approaches that worked well (reuse these)
+2. **Anti-Patterns** — Approaches that failed (avoid these)
+3. **Common Gotchas** — Project-specific traps (watch for these)
+
+After ANY correction from the user, immediately update `tasks/lessons.md` with the pattern. Write the rule so that it prevents the same mistake in future sessions.
+
+## Deep Guidance
+
+### Beads Setup and Commands
+
+#### Initialization
+
+```bash
+bd init              # Creates .beads/ directory with data store and git hooks
+```
+
+Initialization creates:
+- `.beads/` — Data directory (committed to git)
+- Git hooks for automatic data sync (these are Beads data hooks, not code-quality hooks like pre-commit linters)
+- Initial `[BD-0]` bootstrap convention
+
+#### Core Commands
+
+| Command | Purpose | When to Use |
+|---------|---------|-------------|
+| `bd create "title"` | Create a new task | Starting new work |
+| `bd list` | Show all tasks | Session start, planning |
+| `bd status BD-xxx` | Check task state | Before picking up work |
+| `bd start BD-xxx` | Mark task in-progress | Beginning work on a task |
+| `bd done BD-xxx` | Mark task complete | After PR merged |
+| `bd ready` | List tasks ready to start | Picking next task |
+| `bd block BD-xxx "reason"` | Mark task blocked | When dependency is unmet |
+
+#### Commit Message Convention
+
+Every commit references its Beads task:
+
+```
+[BD-42] feat(api): implement user registration endpoint
+
+- Add POST /api/v1/auth/register
+- Add input validation with zod schema
+- Add integration tests for happy path and validation errors
+```
+
+The `[BD-xxx]` prefix enables:
+- Automatic task-to-commit traceability
+- Progress tracking based on commit activity
+- Session reconstruction (which commits belong to which task)
+
+### Task Lifecycle Patterns
+
+#### Session Start Protocol
+
+1. Review `tasks/lessons.md` for recent patterns and corrections
+2. Run `bd ready` to see available tasks
+3. Pick the highest-priority ready task (or continue an in-progress task)
+4. Run `bd start BD-xxx` to claim the task
+5. Read the task description and acceptance criteria before writing code
+
+#### Session End Protocol
+
+1. Commit all work with `[BD-xxx]` prefix
+2. If task is complete: create PR, run `bd done BD-xxx`
+3. If task is incomplete: leave clear notes about current state and next steps
+4. If lessons were learned: update `tasks/lessons.md`
+
+#### Task Completion Criteria
+
+A task is done when:
+- All acceptance criteria from the task description are met
+- Tests pass (`make check` or equivalent)
+- Code follows project coding standards
+- Changes are committed with proper `[BD-xxx]` message
+- PR is created (or merged, depending on workflow)
+
+Do not mark a task done based on "it seems to work." Prove it works — tests pass, logs clean, behavior verified.
+
+### Lessons-Learned Workflow — Extended
+
+#### When to Capture
+
+Capture a lesson immediately when:
+- The user corrects your approach or output
+- A test fails due to a pattern you should have known
+- You discover a project-specific convention by reading code
+- A dependency or tool behaves differently than expected
+- A workaround is needed for a known issue
+
+#### How to Write Lessons
+
+Each lesson should be specific, actionable, and preventive:
+
+**Good lesson:**
+```markdown
+### Anti-Pattern: Using `git push -f` on shared branches
+- **Trigger:** Pushed force to a branch with an open PR
+- **Impact:** Overwrote collaborator's review comments
+- **Rule:** Never force-push to branches with open PRs. Use `git push --force-with-lease` if force is truly needed.
+```
+
+**Bad lesson:**
+```markdown
+### Be careful with git
+- Don't break things
+```
+
+The lesson must contain enough detail that a future agent (or the same agent in a new session) can apply the rule without additional context.
+
+#### Integration with CLAUDE.md
+
+The CLAUDE.md Self-Improvement section establishes the contract:
+
+> After ANY correction from the user: update `tasks/lessons.md` with the pattern.
+> Write rules that prevent the same mistake recurring.
+> Review `tasks/lessons.md` at session start before picking up work.
+
+This creates a feedback loop: correction → lesson → rule → prevention. Each session starts by reviewing lessons, ensuring that past mistakes inform current work.
+
+#### Cross-Session Memory
+
+`tasks/lessons.md` is the primary cross-session learning mechanism. It persists in the repository and is loaded via CLAUDE.md references. For projects using MCP memory servers (Tier 2 memory), lessons can also be stored in the knowledge graph for structured querying — but `tasks/lessons.md` remains the canonical file. Do not duplicate entries across both systems.
+
+### Progress Tracking Conventions
+
+#### Status Files
+
+For complex projects, maintain a progress summary:
+
+```markdown
+# Progress
+
+## Current Sprint
+- [x] BD-10: Database schema migration (done)
+- [x] BD-11: Auth middleware (done)
+- [ ] BD-12: User registration endpoint (in-progress)
+- [ ] BD-13: Login endpoint (ready)
+- [ ] BD-14: Profile management (blocked — needs BD-12)
+
+## Blocked
+- BD-14: Waiting on BD-12 (user model finalization)
+```
+
+#### Completion Criteria Checklists
+
+Each task should define explicit completion criteria, not vague goals:
+
+```markdown
+## BD-12: User registration endpoint
+
+### Done when:
+- [ ] POST /api/v1/auth/register endpoint exists
+- [ ] Input validation rejects invalid email, weak password
+- [ ] Password is hashed with bcrypt (cost factor 12)
+- [ ] Duplicate email returns 409 Conflict
+- [ ] Integration test covers happy path + 3 error cases
+- [ ] `make check` passes
+```
+
+### Common Anti-Patterns
+
+**Stale tasks.** Tasks created during planning but never updated as the project evolves. The task list says "implement X" but X was descoped two sessions ago. Fix: review the task list at the start of each session. Archive or close tasks that no longer apply.
+
+**Unclear completion criteria.** "Implement the feature" with no acceptance criteria, no test requirements, no file paths. An agent starting this task has to guess what "done" means. Fix: every task specifies exact deliverables, test requirements, and a verifiable definition of done.
+
+**Missing lessons.** The user corrects the same mistake three sessions in a row because nobody captured it in `tasks/lessons.md`. Fix: treat lesson capture as mandatory, not optional. After every correction, update the file before continuing with other work.
+
+**Task ID drift.** Commits stop including `[BD-xxx]` prefixes partway through the project. Traceability breaks down. Fix: make task ID inclusion a habit enforced by review. If using a pre-commit hook, validate the prefix.
+
+**Overloaded tasks.** A single task covers "implement the API, write the UI, add tests, update docs." This overflows a single session and makes progress tracking meaningless. Fix: split into tasks that each fit in one agent session (30-90 minutes).
+
+**Lessons without rules.** A lesson says "we had trouble with X" but doesn't state a preventive rule. Future sessions read the lesson but don't know what to do differently. Fix: every lesson must include a concrete rule — "Always do Y" or "Never do Z" — not just a description of what went wrong.

@@ -1,171 +1,451 @@
 ---
-description: "Design database schema from domain models with indexes, constraints, and migrations"
-long-description: "Reads domain models and architecture, then creates docs/database-schema.md defining tables, relationships, indexes, constraints, normalization decisions, and migration strategy."
+description: "Design database schema from domain models"
+long-description: "Translate domain models into a concrete database schema. Define tables/collections,"
 ---
 
-Read `docs/domain-models/`, `docs/system-architecture.md`, `docs/adrs/`, `docs/plan.md`, `docs/tech-stack.md` (for database engine and ORM choice), and `docs/user-stories.md` (for query patterns and data requirements). Also read `docs/api-contracts.md` if it exists (for payload-to-schema alignment). Create `docs/database-schema.md` translating domain entities into concrete tables/collections with relationships, indexes, constraints, and a migration strategy.
+## Purpose
+Translate domain models into a concrete database schema. Define tables/collections,
+relationships, indexes, constraints, and migration strategy. Every domain entity
+maps to a table with appropriate normalization, and every domain invariant is
+enforced at the database level through constraints. Indexing strategy is derived
+from the application's query patterns.
 
-> **Note:** This command produces full-depth output. For lighter execution at a specific methodology depth, use the pipeline engine with presets.
+## Inputs
+- docs/domain-models/ (required) — entities and relationships to model
+- docs/system-architecture.md (required) — data layer architecture decisions
+- docs/adrs/ (required) — technology choices (database type, ORM)
 
-> **When to use this step:** Only for projects with a database. Skip if your project is purely frontend, static, or serverless without persistent storage.
+## Expected Outputs
+- docs/database-schema.md — schema design with tables, relationships, indexes,
+  constraints, and migration strategy
+
+## Quality Criteria
+- (mvp) Every domain entity maps to a table/collection (or justified denormalization)
+- (mvp) Relationships match domain model relationships
+- (mvp) Constraints enforce domain invariants at the database level
+- (deep) Migration strategy specifies: migration tool, forward migration approach, rollback approach, and data preservation policy
+- (deep) Every migration is reversible (rollback script or equivalent exists)
+- (mvp) Indexes cover all query patterns referenced in docs/api-contracts.md (if it exists)
+
+## Methodology Scaling
+- **deep**: Full schema specification. CREATE TABLE statements or equivalent.
+  Index justification with query patterns. Normalization analysis. Migration
+  plan with rollback strategy. Seed data strategy.
+- **mvp**: Entity-to-table mapping. Key relationships. Primary indexes only.
+- **custom:depth(1-5)**: Depth 1-2: mapping only. Depth 3: add indexes and
+  constraints. Depth 4-5: full specification with migrations.
 
 ## Mode Detection
+Check for docs/database-schema.md. If it exists, operate in update mode: read
+existing schema and diff against current domain models in docs/domain-models/.
+Preserve existing table definitions, relationships, constraints, and migration
+history. Add new entities from updated domain models. Update indexes for new
+query patterns identified in architecture data flows. Never drop existing
+tables without explicit user approval.
 
-Before starting, check if `docs/database-schema.md` already exists:
-
-**If the file does NOT exist -> FRESH MODE**: Skip to the next section and create from scratch.
-
-**If the file exists -> UPDATE MODE**:
-1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:database-schema v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
-2. **Diff against current structure**: Compare existing schema against what this prompt would produce fresh. Categorize:
-   - **ADD** — Tables, indexes, or constraints missing from existing schema
-   - **RESTRUCTURE** — Exists but doesn't match current domain models or best practices
-   - **PRESERVE** — Project-specific denormalization decisions, custom indexes, migration history
-3. **Cross-doc consistency**: Read related docs and verify schema aligns with current domain models and architecture. Skip any that don't exist.
-4. **Preview changes**: Present the user a summary table. Wait for approval before proceeding.
-5. **Execute update**: Update schema, respecting preserve rules.
-6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:database-schema v<ver> <date> -->`
-7. **Post-update summary**: Report tables added, sections restructured, content preserved, and cross-doc issues.
-
-**In both modes**, follow all instructions below.
-
-### Update Mode Specifics
-- **Primary output**: `docs/database-schema.md`
-- **Preserve**: Denormalization decisions with documented rationale, custom indexes with query pattern justification, migration history, seed data strategy
-- **Related docs**: `docs/domain-models/`, `docs/system-architecture.md`, `docs/adrs/`
-- **Special rules**: Never remove an index without verifying it's unused. Preserve all migration files and rollback strategies. Keep denormalization rationale intact.
+## Update Mode Specifics
+- **Detect prior artifact**: docs/database-schema.md exists
+- **Preserve**: existing table/collection definitions, relationships, constraints,
+  migration history, index justifications, seed data strategy
+- **Triggers for update**: domain models changed (new entities or relationships),
+  ADRs changed database technology, architecture introduced new query patterns
+- **Conflict resolution**: if domain model renamed an entity, create a migration
+  that renames rather than drops and recreates; flag breaking changes for user
+  review
 
 ---
 
-## What the Document Must Cover
+## Domain Knowledge
 
-### 1. Entity-to-Table Mapping
+### database-design
 
-For each domain entity, define the corresponding table:
+*Database schema design, normalization, indexing, and migration patterns*
 
-**Identity columns** — default to UUIDs for new projects (no coordination issues in multi-agent development). Use ULID if time-ordering helps index locality. Auto-increment only for internal sequences.
+## Summary
 
-**Column definitions** with types, nullability, and defaults:
+## From Domain Models to Schema
+
+The domain model defines what the business cares about. The database schema defines how that information is stored. The mapping between them is deliberate, not automatic.
+
+### Mapping Entities to Tables
+
+Each entity in the domain model typically maps to a database table. The entity's attributes become columns. The entity's identity becomes the primary key.
+
+**Identity columns:**
+
+- **UUID/ULID:** Best for distributed systems, no coordination needed. ULIDs add time-ordering which helps with index locality. Use `uuid` or `text` column type.
+- **Auto-increment integer:** Simpler, smaller, faster joins. Leaks information (total count, creation order). Requires a single sequence source.
+- **Natural key:** Use the business identifier if one exists and is truly immutable (ISBN, country code). Rarely appropriate for mutable business concepts.
+
+**Recommendation:** Default to UUIDs for new projects. They work everywhere, don't leak information, and avoid coordination issues in multi-agent development (two agents can create records simultaneously without ID conflicts).
+
+### Handling Aggregates
+
+An aggregate's internal structure doesn't necessarily map to a single table. Common patterns:
+
+**Single table per aggregate** — When the aggregate is simple (root entity + value objects), store everything in one table with column groups or JSON columns for value objects.
+
 ```sql
 CREATE TABLE orders (
   id UUID PRIMARY KEY,
   customer_id UUID NOT NULL REFERENCES customers(id),
   status TEXT NOT NULL DEFAULT 'draft',
+  -- Shipping address (value object) stored as columns
+  shipping_street TEXT,
+  shipping_city TEXT,
+  shipping_state TEXT,
+  shipping_zip TEXT,
+  shipping_country TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ```
 
-**Timestamp discipline** — every table gets `created_at` and `updated_at` columns. Always.
+**Multiple tables per aggregate** — When the aggregate has internal entities (e.g., Order with OrderLines), use a parent table and child tables. The child table's foreign key to the parent enforces the aggregate boundary.
 
-**NOT NULL discipline** — default to `NOT NULL` for every column. Allow NULL only when the domain explicitly models absence. Document what NULL means when allowed.
+```sql
+CREATE TABLE order_lines (
+  id UUID PRIMARY KEY,
+  order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  product_id UUID NOT NULL REFERENCES products(id),
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  unit_price_cents INTEGER NOT NULL CHECK (unit_price_cents >= 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
 
-### 2. Aggregate Handling
+The `ON DELETE CASCADE` expresses that order lines have no lifecycle independent of their order — they're internal to the aggregate.
 
-- **Single table per simple aggregate**: Root entity + value objects stored as column groups or JSONB.
-- **Multiple tables per complex aggregate**: Parent table + child tables with foreign key expressing the boundary. Use `ON DELETE CASCADE` for aggregate internals.
-- **Value objects**: Embed as columns (always loaded with entity), JSONB (complex/rarely queried), or lookup table (limited valid values).
+### Representing Value Objects
 
-### 3. Relationships
+Value objects have no identity. Storage options:
 
-- **One-to-one**: Foreign key on dependent side. Consider if it should be columns in the same table.
-- **One-to-many**: Foreign key on the "many" side.
-- **Many-to-many**: Junction table with two foreign keys and `created_at`.
-- **Self-referencing**: Nullable foreign key to the same table (hierarchies, trees).
+**Embedded columns** — Store the value object's attributes as columns in the parent entity's table. Best when the value object is always loaded with the entity.
 
-Every relationship in the domain model must have a corresponding foreign key constraint.
+```sql
+-- Money value object embedded in order_lines
+unit_price_cents INTEGER NOT NULL,
+unit_price_currency TEXT NOT NULL DEFAULT 'USD'
+```
 
-### 4. Normalization Decisions
+**JSON/JSONB column** — Store the value object as a JSON document. Best when the value object is complex, rarely queried directly, or has a variable structure.
 
-Normalize to 3NF by default. Document every deliberate denormalization with:
-- What is denormalized and why
-- The read-to-write ratio that justifies it
-- The update strategy (triggers, application logic, async sync)
-- The acceptable inconsistency window
+```sql
+metadata JSONB NOT NULL DEFAULT '{}'
+```
 
-Common patterns: computed columns (order totals), duplicated attributes (customer name on orders), materialized views.
+**Lookup table** — Store value objects with limited valid values in a reference table. Best for enums with associated data (status codes with descriptions, country codes with names).
 
-### 5. Indexing Strategy
+## Deep Guidance
 
-**Derive indexes from query patterns.** Before creating indexes, enumerate the application's queries:
+### Modeling Relationships
 
-| Query | Used By | Frequency | Index Needed |
-|-------|---------|-----------|-------------|
-| Orders by customer, newest first | Order list page | High | `(customer_id, created_at DESC)` |
-| Active subscriptions by user | Auth middleware | Every request | `(user_id) WHERE status = 'active'` |
+**One-to-one:** Use a foreign key in either table (typically the dependent side). Consider: could this be columns in the same table instead?
 
-**Index types to consider:**
-- Foreign key indexes (almost always needed)
-- Covering indexes (INCLUDE columns to avoid heap access)
-- Partial indexes (WHERE clause for hot subsets)
-- Composite indexes (leftmost prefix rule — equality columns first, then range columns)
+**One-to-many:** Foreign key on the "many" side referencing the "one" side. The most common relationship type.
 
-**Anti-patterns to avoid:** Over-indexing, redundant indexes, unused indexes.
+**Many-to-many:** Junction table with two foreign keys. Include created_at to track when the relationship was established. Consider whether the junction table needs its own identity (entity) or is purely a relationship (value).
 
-### 6. Constraint Design
+```sql
+-- Junction table for many-to-many
+CREATE TABLE user_roles (
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+  granted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  granted_by UUID REFERENCES users(id),
+  PRIMARY KEY (user_id, role_id)
+);
+```
 
-- **CHECK constraints** from domain invariants: `quantity > 0`, `end_date > start_date`, status enums
-- **UNIQUE constraints** from business rules: unique email per tenant, one active subscription per user
-- **Foreign key constraints** from every relationship
-- **Money**: Store as integer cents or DECIMAL/NUMERIC — never floating point
+**Self-referencing:** An entity that relates to other instances of itself (organizational hierarchy, comment threads, category trees). Use a nullable foreign key to the same table.
 
-### 7. Migration Strategy
+```sql
+CREATE TABLE categories (
+  id UUID PRIMARY KEY,
+  name TEXT NOT NULL,
+  parent_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0
+);
+```
 
-- **Schema versioning**: Timestamp-based migration names (`20260314120000_create_users.sql`)
-- **Backwards-compatible migrations**: Safe operations (add column, add table, add index CONCURRENTLY) vs. unsafe operations (drop column, rename column, change type)
-- **Data migrations**: Idempotent, tested with production-like data volumes
-- **Rollback strategy**: Every migration has a tested reverse migration. Document irreversible migrations clearly.
-- **Zero-downtime pattern**: Expand -> Migrate (dual-write + backfill) -> Contract
+## Normalization Decisions
 
-### 8. NoSQL Considerations (if applicable)
+### Normal Forms in Practice
 
-If the project uses a document database:
-- Design around query patterns, not entity relationships
-- Embedding vs. referencing decision for each relationship
-- Partition key selection for distributed databases
-- Denormalization is expected — document the update strategy for duplicated data
+**First normal form (1NF):** Each column holds atomic values (no arrays, no comma-separated lists). In SQL databases, this is usually enforced by the type system. Exception: PostgreSQL arrays and JSON columns deliberately violate 1NF for good reasons.
+
+**Second normal form (2NF):** Every non-key column depends on the entire primary key, not just part of it. Violations typically appear in tables with composite primary keys.
+
+**Third normal form (3NF):** Every non-key column depends on the primary key, not on another non-key column. Example violation: storing both `zip_code` and `city` when city is determined by zip code.
+
+**Practical rule:** Normalize to 3NF by default. Denormalize deliberately with documented rationale.
+
+### When to Denormalize
+
+Denormalization trades data integrity for read performance. Only do it when:
+
+- You have measured a performance problem (not assumed one)
+- The read-to-write ratio strongly favors reads (>10:1)
+- The denormalized data has a clear update strategy (triggers, application logic, async sync)
+- The inconsistency window is acceptable for the use case
+
+**Common denormalization patterns:**
+
+**Computed columns:** Store a calculated value (order total, item count, average rating) instead of computing it on every read.
+
+```sql
+ALTER TABLE orders ADD COLUMN total_cents INTEGER;
+-- Updated by application logic when order lines change
+```
+
+**Duplicated attributes:** Copy frequently-joined data into the table that reads it. Store `customer_name` in the orders table to avoid joining to customers on every order list query.
+
+**Materialized views / read models:** Create a dedicated read-optimized table (or materialized view) that denormalizes across multiple source tables. Updated asynchronously when source data changes.
+
+### Read Model vs. Write Model Separation
+
+In complex domains, the shape of data for writing (enforcing invariants) differs from the shape for reading (displaying to users). Separating these concerns:
+
+- **Write model:** Normalized, invariant-enforcing, aggregate-aligned. Optimized for correctness.
+- **Read model:** Denormalized, query-optimized, possibly pre-aggregated. Optimized for speed.
+
+This doesn't require full CQRS — it can be as simple as a materialized view or a denormalized table refreshed by triggers.
+
+## Indexing Strategy
+
+### Primary Keys
+
+Every table must have a primary key. The primary key automatically gets a unique index.
+
+- Use UUID or ULID for application-generated IDs
+- Use `SERIAL`/`BIGSERIAL` only for internal sequences (migration version numbers, internal counters)
+- Composite primary keys are appropriate for junction tables; avoid them for entity tables
+
+### Foreign Keys
+
+Every foreign key should reference a primary key or unique constraint on the target table. Foreign keys automatically enforce referential integrity.
+
+**Cascade behavior decisions:**
+
+- `ON DELETE CASCADE` — When the parent is deleted, delete the children. Appropriate for aggregate internals (order lines deleted with order).
+- `ON DELETE SET NULL` — When the parent is deleted, null out the reference. Appropriate for optional relationships.
+- `ON DELETE RESTRICT` (default) — Prevent parent deletion if children exist. Appropriate when orphaned children would be a data integrity problem.
+
+Foreign key columns should almost always be indexed. Without an index, any operation on the parent table requires a full scan of the child table to check for references.
+
+### Covering Indexes
+
+A covering index contains all columns needed to satisfy a query, eliminating the need to access the table's heap. Useful for frequently-executed queries with predictable column access patterns.
+
+```sql
+-- Covers: SELECT id, status, created_at FROM orders WHERE customer_id = ? ORDER BY created_at DESC
+CREATE INDEX idx_orders_customer_status ON orders (customer_id, created_at DESC)
+  INCLUDE (status);
+```
+
+### Partial Indexes
+
+An index on a subset of rows, defined by a WHERE clause. Smaller, faster, and more specific than a full-table index.
+
+```sql
+-- Only index active subscriptions (most queries filter for active)
+CREATE INDEX idx_active_subscriptions ON subscriptions (user_id, plan_id)
+  WHERE status = 'active';
+```
+
+### Composite Indexes
+
+Multi-column indexes follow the "leftmost prefix" rule: the index on `(a, b, c)` can satisfy queries filtering on `a`, `a + b`, or `a + b + c`, but not `b` or `c` alone.
+
+**Column order matters:** Put the most selective column first (the one that eliminates the most rows). For range queries, put the equality column first, then the range column.
+
+```sql
+-- For queries: WHERE tenant_id = ? AND created_at > ?
+-- tenant_id (equality) comes before created_at (range)
+CREATE INDEX idx_events_tenant_date ON events (tenant_id, created_at);
+```
+
+### Deriving Index Needs from Query Patterns
+
+Before creating indexes, enumerate the application's query patterns:
+
+| Query | Used By | Frequency | Current Performance |
+|-------|---------|-----------|-------------------|
+| Orders by customer, newest first | Order list page | High | Needs index |
+| Active subscriptions by user | Auth middleware | Every request | Critical path |
+| Products by category with price range | Browse page | High | Needs composite index |
+
+Create indexes to cover the high-frequency and critical-path queries. Resist creating indexes for every possible query — each index slows down writes and consumes storage.
+
+### Index Anti-Patterns
+
+- **Over-indexing:** An index for every column. Slows writes, wastes storage, confuses the query planner.
+- **Redundant indexes:** An index on `(a)` when an index on `(a, b)` already exists. The composite index covers single-column queries on `a`.
+- **Unused indexes:** Indexes created during development that no query uses. Audit with `pg_stat_user_indexes` (PostgreSQL) or equivalent.
+
+## Constraint Design
+
+### CHECK Constraints from Domain Invariants
+
+Every domain invariant that can be expressed as a column-level or row-level constraint should be:
+
+```sql
+-- Domain invariant: quantity must be positive
+quantity INTEGER NOT NULL CHECK (quantity > 0)
+
+-- Domain invariant: end date must be after start date
+CHECK (end_date > start_date)
+
+-- Domain invariant: status must be one of defined values
+status TEXT NOT NULL CHECK (status IN ('draft', 'active', 'suspended', 'cancelled'))
+
+-- Domain invariant: discount percentage between 0 and 100
+discount_percent NUMERIC NOT NULL CHECK (discount_percent >= 0 AND discount_percent <= 100)
+```
+
+### Unique Constraints from Business Rules
+
+Business rules that require uniqueness should be enforced at the database level, not just the application level:
+
+```sql
+-- Business rule: email must be unique per tenant
+ALTER TABLE users ADD CONSTRAINT uq_users_tenant_email
+  UNIQUE (tenant_id, email);
+
+-- Business rule: only one active subscription per user
+CREATE UNIQUE INDEX uq_one_active_sub ON subscriptions (user_id)
+  WHERE status = 'active';
+```
+
+### Foreign Key Constraints from Relationships
+
+Every relationship in the domain model should have a corresponding foreign key constraint. Unconstrained references allow orphaned data.
+
+### NOT NULL Discipline
+
+Default to `NOT NULL` for every column. Allow NULL only when the domain explicitly models the absence of a value (e.g., "user has not set a phone number"). If NULL is allowed, document what it means.
+
+**Anti-pattern: NULL as a default.** Columns that allow NULL because nobody thought about whether the value is optional. This leads to unexpected NULLs propagating through queries and application logic.
+
+## Migration Patterns
+
+### Schema Versioning
+
+Every schema change is a migration with a unique version identifier. Migrations are ordered and applied sequentially. Common approaches:
+
+- **Timestamp-based:** `20260314120000_create_users.sql` — prevents ordering conflicts between developers
+- **Sequential:** `001_create_users.sql`, `002_add_orders.sql` — simpler but conflicts when two developers create the next migration simultaneously
+
+### Backwards-Compatible Migrations
+
+Migrations that can be applied without breaking the running application:
+
+**Safe operations:**
+- Adding a column with a default value or allowing NULL
+- Adding a new table
+- Adding an index (CONCURRENTLY in PostgreSQL)
+- Adding a CHECK constraint (NOT VALID initially, then VALIDATE separately)
+
+**Unsafe operations (require coordination):**
+- Dropping a column (application may still reference it)
+- Renaming a column (breaks existing queries)
+- Changing a column type (may fail if data can't be converted)
+- Adding a NOT NULL constraint to an existing column with NULL values
+
+### Data Migrations
+
+Schema changes that also require data transformation:
+
+```sql
+-- Schema migration: add new column
+ALTER TABLE users ADD COLUMN full_name TEXT;
+
+-- Data migration: populate from existing columns
+UPDATE users SET full_name = first_name || ' ' || last_name;
+
+-- Schema migration: make it non-nullable after population
+ALTER TABLE users ALTER COLUMN full_name SET NOT NULL;
+```
+
+Data migrations should be idempotent (safe to run twice) and tested with production-like data volumes. A migration that runs in 1 second on 1000 rows may take 30 minutes on 10 million rows.
+
+### Rollback Strategies
+
+Every migration should have a reverse migration (down migration). Test rollbacks before deploying:
+
+```sql
+-- Up: add status column
+ALTER TABLE orders ADD COLUMN status TEXT NOT NULL DEFAULT 'draft';
+
+-- Down: remove status column (data loss — document this)
+ALTER TABLE orders DROP COLUMN status;
+```
+
+Some migrations are irreversible (dropping a column deletes data permanently). Document these clearly and ensure backups exist before running.
+
+### Zero-Downtime Migrations
+
+For production systems that cannot tolerate downtime:
+
+1. **Expand:** Add new column/table without removing old one
+2. **Migrate:** Dual-write to both old and new. Backfill historical data.
+3. **Contract:** Remove old column/table after verification
+
+This three-phase approach prevents data loss and allows rollback at each step.
+
+## NoSQL Considerations
+
+### When to Use NoSQL
+
+- **Document databases (MongoDB, DynamoDB):** When the data is naturally document-shaped, schema varies between records, or you need horizontal scaling for simple key-value or key-document access patterns.
+- **Key-value stores (Redis, Memcached):** Caching, session storage, rate limiting. Not a primary data store.
+- **Wide-column stores (Cassandra, ScyllaDB):** Time-series data, write-heavy workloads, multi-region replication.
+- **Graph databases (Neo4j):** When the primary queries traverse relationships (social networks, recommendation engines, fraud detection).
+
+### Document Design
+
+In document databases, design around query patterns rather than entity relationships:
+
+**Embedding vs. referencing:**
+
+- **Embed** when the child data is always read with the parent, has a bounded size, and doesn't need independent access. Example: embed OrderLines within an Order document.
+- **Reference** when the child data has its own lifecycle, is accessed independently, or could grow unboundedly. Example: reference User from Order by ID.
+
+**Denormalization by default:** Document databases expect denormalized data. Duplicating data across documents is normal and expected. The trade-off: faster reads, more complex writes (must update all copies).
+
+### Partition Key Selection
+
+For distributed databases (DynamoDB, Cassandra), the partition key determines data distribution and query capability:
+
+- Choose a partition key with high cardinality (many distinct values) for even distribution
+- Queries must include the partition key — design around your access patterns
+- Avoid hot partitions (one key receiving disproportionate traffic)
+- Common choices: tenant_id, user_id, date-based for time-series
+
+## Common Pitfalls
+
+**Over-normalization.** Splitting every concept into its own table produces a schema that requires 10 joins to answer a simple question. The join cost exceeds any benefit from reduced data duplication. Fix: denormalize when read patterns consistently need the joined data.
+
+**Missing indexes for common queries.** Every page load runs a full table scan because nobody added an index for the query that drives it. Fix: enumerate query patterns before deployment. Add indexes for high-frequency queries.
+
+**Migration ordering issues.** Two developers create migrations that conflict — both add a column with the same name, or one depends on a table the other creates. Fix: use timestamp-based migration names. Review migration PRs for conflicts. In parallel agent development, sequence migrations through task dependencies.
+
+**Not testing rollbacks.** A migration runs successfully in development but the rollback fails in staging, leaving the database in an inconsistent state. Fix: every migration must have a tested rollback. Include rollback testing in CI.
+
+**Storing money as floating point.** `FLOAT` and `DOUBLE` cannot represent all decimal values exactly. `19.99` becomes `19.989999999999998`. Fix: store money as integer cents or use `DECIMAL`/`NUMERIC` types.
+
+**Missing timestamps.** Tables without `created_at` and `updated_at` columns. When something goes wrong, you can't tell when the data was created or last changed. Fix: add timestamp columns to every table, populated automatically by defaults or triggers.
+
+**Allowing unbounded growth in aggregate tables.** An events or logs table that grows without limit, eventually consuming all storage and degrading query performance. Fix: define a retention policy and implement it (archival, partitioning, or deletion).
+
+**Using the database as a message queue.** Polling a table for new rows to process. This creates lock contention, wastes resources, and scales poorly. Fix: use a proper message queue (Redis, RabbitMQ, SQS) for event-driven processing.
+
+## See Also
+
+- [domain-modeling](../core/domain-modeling.md) — Domain entities map to database schema
 
 ---
-
-## Quality Criteria
-
-- Every domain entity maps to a table/collection (or has a justified denormalization)
-- Relationships match domain model relationships exactly
-- Indexes cover all known query patterns from architecture data flows
-- Constraints enforce domain invariants at the database level
-- Migration strategy handles schema evolution with rollback
-- Money is never stored as floating point
-- Every table has timestamp columns
-- NULL is only allowed with documented meaning
-
----
-
-## Process
-
-1. **Read all inputs** — Read `docs/domain-models/`, `docs/system-architecture.md`, `docs/adrs/`, `docs/tech-stack.md`, and `docs/user-stories.md` completely. Read `docs/api-contracts.md` if it exists.
-2. **Use AskUserQuestionTool** for these decisions:
-   - **Database engine**: Confirm the database choice from ADRs (PostgreSQL, SQLite, MongoDB, etc.)
-   - **Schema depth**: Full CREATE TABLE statements with index justification, or entity-to-table mapping with key relationships?
-   - **Migration tooling**: Preferred migration tool (Prisma, Drizzle, Alembic, raw SQL, etc.)?
-3. **Use subagents** to research schema patterns for the project's database engine and ORM
-4. **Map entities to tables** — translate every domain entity, value object, and relationship
-5. **Design indexes** — enumerate query patterns from data flows, create covering indexes for high-frequency queries
-6. **Define constraints** — translate every domain invariant to a database constraint
-7. **Document migration strategy** — including rollback and zero-downtime patterns
-8. **Cross-validate** — verify every domain entity is represented, every relationship has a FK, every invariant has a constraint
-9. If using Beads: create a task (`bd create "docs: database schema" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 
 ## After This Step
 
-When this step is complete, tell the user:
-
----
-**Specification phase in progress** — `docs/database-schema.md` created with tables, indexes, constraints, and migration strategy.
-
-**Next:**
-- Run `/scaffold:review-database` — Review the schema for coverage, normalization, and migration safety.
-- Or skip review and proceed to `/scaffold:api-contracts` (if project exposes APIs) or `/scaffold:ux-spec` (if project has a frontend).
-
-**Pipeline reference:** `/scaffold:prompt-pipeline`
-
----
+Continue with: `/scaffold:review-database`

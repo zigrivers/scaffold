@@ -49,8 +49,9 @@ independent review validation.
 - **custom:depth(1-5)**: Depth 1: test coverage and pyramid balance pass only. Depth 2: add test quality and naming convention passes. Depth 3: add edge case coverage and CI integration passes. Depth 4: add external model review. Depth 5: multi-model review with reconciliation.
 
 ## Mode Detection
-Re-review mode if previous review exists. If multi-model review artifacts exist
-under docs/reviews/testing/, preserve prior findings still valid.
+Re-review mode if docs/reviews/review-testing.md or docs/reviews/testing/
+directory exists. If multi-model review artifacts exist under
+docs/reviews/testing/, preserve prior findings still valid.
 
 ## Update Mode Specifics
 

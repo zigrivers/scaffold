@@ -1,417 +1,477 @@
 ---
-description: "Configure E2E testing for your project"
-long-description: "Detects project platform (web, mobile, or both) from tech-stack.md and package.json, then configures Playwright and/or Maestro with test patterns, screenshot management, and documentation updates. Self-skips for backend-only projects."
+description: "Configure end-to-end testing (Playwright for web, Maestro for mobile) based on detected project platform"
+long-description: "Automatically detects project platform type from tech-stack.md and package.json"
 ---
 
-Configure end-to-end testing for this project. This step auto-detects which platform(s) the project targets and configures the appropriate E2E framework(s).
+## Purpose
+Automatically detects project platform type from tech-stack.md and package.json
+to determine which E2E framework(s) to configure. Configures Playwright for web
+frontends, Maestro for mobile/Expo apps, or both for multi-platform projects.
+Self-skips for backend-only or library projects with no UI.
 
-> **When to use this step:** Only for projects with a web or mobile frontend. Skip if your project is a CLI tool, API-only backend, or library. The step will auto-skip if no frontend is detected, but you can skip it proactively.
+## Inputs
+- docs/tech-stack.md (required) — frontend framework and rendering approach
+- docs/tdd-standards.md (required) — E2E placeholder section to fill
+- docs/coding-standards.md (required for mobile) — testID conventions to add
+- CLAUDE.md (required) — browser/mobile testing section to add
+- package.json (read-only) — dependency detection for platform and brownfield signals
+- docs/user-stories.md (optional) — key user flows for visual verification
 
-Review docs/tech-stack.md, docs/tdd-standards.md, and CLAUDE.md to understand the existing project conventions.
+## Expected Outputs
+Outputs vary by detected platform:
+- (web) Playwright config file, tests/screenshots/ directories, CLAUDE.md and
+  tdd-standards.md browser testing sections
+- (mobile) maestro/ directory with config, flows, shared sub-flows, screenshots,
+  package.json test scripts, coding-standards.md testID conventions, CLAUDE.md
+  and tdd-standards.md mobile testing sections
+- (both) All of the above
 
-## Step 0: Platform Detection & Applicability
+## Quality Criteria
+- (mvp) Platform detection is explicit and logged (web, mobile, both, or skip)
+- (mvp) (web) Playwright config uses framework-specific dev server command and port
+- (mvp) (web) Smoke test passes (navigate, screenshot, close)
+- (mvp) (mobile) Maestro CLI installed, sample flow executes, screenshot captured
+- (mobile) testID naming convention defined and documented
+- (mvp) E2E section in tdd-standards.md distinguishes when to use E2E vs unit tests
+- Baseline screenshots committed, current screenshots gitignored
+- CLAUDE.md contains browser/mobile testing section
+- tdd-standards.md E2E section updated with when-to-use guidance
+- (deep) CI integration configured for E2E test execution
+- (deep) Sub-flows defined for common user journeys
 
-Before doing anything else, determine if this step applies and which sections to run.
+## Methodology Scaling
+- **deep**: Full setup for all detected platforms. All visual testing patterns,
+  baseline management, responsive verification, CI integration, sub-flows for
+  common journeys, and comprehensive documentation updates.
+- **mvp**: Basic config and smoke test for detected platform. Minimal docs
+  updates. Two viewports for web, single platform for mobile.
+- **custom:depth(1-5)**: Depth 1-2: config + smoke test. Depth 3: add patterns,
+  naming, testID rules. Depth 4: add CI integration, both mobile platforms.
+  Depth 5: full suite with baseline management and sub-flows.
 
-### Detect Platform Type
-
-1. **Read** `docs/tech-stack.md` and `package.json` (or `app.json` for Expo projects)
-2. **Identify platform signals:**
-
-**Web app signals** (any of these → configure Playwright):
-- `react-dom`, `next`, `@remix-run/react`, `gatsby`, `@sveltejs/kit`, `svelte`, `vue`, `@angular/core`, `vite` in package.json dependencies
-- Tech-stack.md mentions a web frontend framework, SSR, or SPA rendering
-
-**Mobile app signals** (any of these → configure Maestro):
-- `expo`, `react-native` in package.json dependencies
-- `app.json` or `app.config.js` exists with Expo configuration
-- Tech-stack.md mentions Expo, React Native, or mobile platforms
-
-3. **Decision:**
-
-| Detection Result | Action |
-|-----------------|--------|
-| Web only | Run **Playwright sections only**, skip all Maestro sections |
-| Mobile only | Run **Maestro sections only**, skip all Playwright sections |
-| Both web and mobile | Run **both** Playwright and Maestro sections |
-| Neither detected | **AUTO-SKIP**: Tell the user "No web or mobile frontend detected in tech-stack or package.json. Skipping E2E testing setup." Then stop. |
-
-State the detection result explicitly before proceeding (e.g., "Detected: web app (Next.js). Configuring Playwright.").
-
-### Brownfield Detection
-
-After determining the platform, check if E2E testing is already configured:
-
-**Playwright brownfield signals:**
-- `@playwright/test` in package.json dependencies or devDependencies
-- `playwright.config.ts` or `playwright.config.js` exists in project root
-- `tests/screenshots/` or `tests/e2e/` directory exists with content
-
-**Maestro brownfield signals:**
-- `maestro/` directory exists with `.yaml` flow files
-- `maestro/config.yaml` exists
-- package.json has a `test:e2e` script referencing `maestro`
-
-**If brownfield detected** → Inform the user ("Detected existing Playwright configuration. Running in update mode.") and proceed directly to update mode for that platform. Skip the fresh/update mode detection question.
-
-**If no brownfield detected** → Proceed to Mode Detection as normal.
-
----
+## Conditional Evaluation
+Enable when: tech-stack.md indicates a web frontend (Playwright) or mobile app
+(Maestro). Detection signals: React/Vue/Angular/Svelte in tech-stack (web),
+Expo/React Native (mobile), or explicit UI layer in architecture. Self-skips for
+backend-only or library projects with no UI.
 
 ## Mode Detection
+Check for existing E2E config: Playwright config file (playwright.config.ts or
+.js) and/or maestro/ directory. If either exists, run in update mode for that
+platform. Preserve baseline screenshots, custom viewports, existing flows,
+and environment variables.
 
-**Skip this section if brownfield detection already determined the mode.**
-
-Check if E2E config files already exist:
-- Playwright: `playwright.config.ts`, `playwright.config.js`, or `tests/screenshots/`
-- Maestro: `maestro/` directory
-
-**If no config exists → FRESH MODE**: Create from scratch.
-
-**If config exists → UPDATE MODE**:
-1. **Read & analyze**: Read existing config files, the E2E sections of `docs/tdd-standards.md`, and testing sections of `CLAUDE.md`. Check for tracking comments: `// scaffold:playwright v<ver> <date>` or `# scaffold:maestro v<ver> <date>`. If absent, treat as legacy — be extra conservative.
-2. **Diff against current structure**: Categorize content as ADD / RESTRUCTURE / PRESERVE.
-3. **Cross-doc consistency**: Verify updates won't contradict `docs/tdd-standards.md`, `docs/dev-setup.md`, `CLAUDE.md`.
-4. **Preview changes**: Present summary table. Wait for user approval.
-5. **Execute update**: Add missing sections, preserve project-specific content.
-6. **Update tracking comments** on config files.
-7. **Report** what was added, restructured, and preserved.
-
-### Update Mode Specifics
-- **Preserve**: Baseline screenshots (never delete), custom viewport configurations, existing flow files, sub-flows, testID conventions, environment variables
-- **Related docs**: `docs/tdd-standards.md`, `docs/dev-setup.md`, `CLAUDE.md`
-- **Special rules**: Update tdd-standards.md E2E sections in-place (don't append duplicates)
+## Update Mode Specifics
+- **Detect prior artifact**: playwright.config.ts/.js exists and/or maestro/
+  directory exists with flow files
+- **Preserve**: baseline screenshots, custom viewports, existing test flows,
+  environment variables, testID naming conventions
+- **Triggers for update**: new user stories with UI interactions added,
+  platform targets changed in tech-stack.md, tdd-standards.md E2E section updated
+- **Conflict resolution**: preserve existing baselines, add new flows alongside
+  existing ones rather than replacing
 
 ---
 
-## Web App Testing (Playwright)
+## Domain Knowledge
 
-**Skip this entire section if platform detection found no web frontend.**
+### testing-strategy
 
-### Objectives
+*Test pyramid, testing patterns, coverage strategy, and quality gates*
 
-1. Configure Playwright for the project's frontend testing needs
-2. Establish patterns for visual verification of frontend features
-3. Integrate browser testing into the existing TDD workflow
-4. Update CLAUDE.md with browser testing procedures
+# Testing Strategy
 
-### Framework-Specific Configuration
+Expert knowledge for test pyramid design, testing patterns, coverage strategy, and quality gates across all test levels.
 
-Read `docs/tech-stack.md` and `package.json` to determine the web framework, then generate the appropriate Playwright configuration with the correct dev server:
+## Summary
 
-| Framework | webServer.command | Default Port | Base URL |
-|-----------|------------------|-------------|----------|
-| **Next.js** | `npm run dev` | 3000 | `http://localhost:3000` |
-| **Vite** (React/Vue/Svelte) | `npx vite --port 5173` | 5173 | `http://localhost:5173` |
-| **Remix** | `npm run dev` | 3000 | `http://localhost:3000` |
-| **Gatsby** | `npm run develop` | 8000 | `http://localhost:8000` |
-| **SvelteKit** | `npm run dev` | 5173 | `http://localhost:5173` |
-| **Angular** | `npm start` | 4200 | `http://localhost:4200` |
-| **Unknown/Other** | `npm start` | — | Ask user for URL |
+### Test Pyramid
 
-Generate `playwright.config.ts` (or `.js`) using the detected framework:
+```
+        /  E2E Tests  \         Few, slow, high confidence
+       / Integration    \       Moderate, medium speed
+      /   Unit Tests      \     Many, fast, focused
+     ________________________
+```
+
+### Test Level Definitions
+
+- **Unit Tests** — Single function/method/class in isolation. No I/O, deterministic, millisecond execution. Test pure business logic, state machines, edge cases, error handling.
+- **Integration Tests** — Interaction between 2+ components with real infrastructure. Seconds to execute. Test API handlers, DB queries, auth middleware, external service integrations.
+- **E2E Tests** — Complete user flows with real browser/device. Seconds to minutes. Test critical user journeys only (5-15 tests for most apps).
+
+### Basic Patterns
+
+- **Arrange/Act/Assert (AAA)** — Set up conditions, perform action, verify result.
+- **Given/When/Then (BDD)** — Behavior-oriented variant for integration and E2E tests.
+- **Test Doubles** — Stubs (return predetermined data), Mocks (verify interactions), Spies (wrap real implementations), Fakes (simplified working implementations).
+
+### What NOT to Mock
+
+- The thing you're testing
+- Value objects and simple data transformations
+- The database in integration tests
+- Too many things (if 10 mocks needed, refactor the code)
+
+## Deep Guidance
+
+### Unit Tests — Extended
+
+**What they test:** A single function, method, or class in isolation from all external dependencies (database, network, file system, other modules).
+
+**Characteristics:**
+- Execute in milliseconds
+- No I/O (no database, no network, no file system)
+- Deterministic (same input always produces same output)
+- Can run in any order and in parallel
+- External dependencies are replaced with test doubles
+
+**What to unit test:**
+- Pure business logic (calculations, transformations, validations)
+- State machines and state transitions
+- Edge cases and boundary conditions
+- Error handling logic
+- Data formatting and parsing
+
+**What NOT to unit test:**
+- Framework behavior (don't test that Express routes requests correctly)
+- Configuration (don't test that environment variables are read)
+- Trivial getters/setters with no logic
+- Third-party library functions
+
+**Example structure:**
 
 ```typescript
-// scaffold:playwright v1 YYYY-MM-DD
-import { defineConfig } from '@playwright/test'
+describe('calculateOrderTotal', () => {
+  it('sums line item prices', () => {
+    const lines = [
+      { quantity: 2, unitPrice: 1000 },  // $10.00 each
+      { quantity: 1, unitPrice: 2500 },  // $25.00
+    ];
+    expect(calculateOrderTotal(lines)).toBe(4500); // $45.00
+  });
 
-export default defineConfig({
-  testDir: './tests/e2e',
-  outputDir: './tests/screenshots/current',
-  webServer: {
-    command: '<framework-specific command>',
-    url: '<framework-specific URL>',
-    reuseExistingServer: !process.env.CI,
-  },
-  use: {
-    baseURL: '<framework-specific URL>',
-    screenshot: 'only-on-failure',
-  },
-  projects: [
-    { name: 'desktop', use: { viewport: { width: 1280, height: 800 } } },
-    { name: 'mobile', use: { viewport: { width: 375, height: 812 } } },
-  ],
-})
+  it('returns zero for empty order', () => {
+    expect(calculateOrderTotal([])).toBe(0);
+  });
+
+  it('rejects negative quantities', () => {
+    const lines = [{ quantity: -1, unitPrice: 1000 }];
+    expect(() => calculateOrderTotal(lines)).toThrow('Quantity must be positive');
+  });
+});
 ```
 
-### Available MCP Commands
+### Integration Tests — Extended
 
-You have access to these Playwright MCP tools:
+**What they test:** The interaction between two or more components, including real infrastructure (database, API calls between layers, message queues).
 
-**Navigation & Page Management:**
-- `browser_navigate` — Navigate to a URL
-- `browser_navigate_back` — Go back in history
-- `browser_wait_for` — Wait for text or timeout
-- `browser_close` — Close the browser session
-- `browser_tabs` — Manage browser tabs
-- `browser_install` — Install the browser
+**Characteristics:**
+- Execute in seconds
+- Use real infrastructure (test database, local services)
+- May require setup and teardown (database seeding, service startup)
+- Test that components integrate correctly, not that each component works in isolation
 
-**Interaction:**
-- `browser_click` — Click an element
-- `browser_type` — Type text into an element
-- `browser_fill_form` — Fill multiple form fields
-- `browser_select_option` — Select dropdown option
-- `browser_hover` — Hover over an element
-- `browser_drag` — Drag and drop
-- `browser_press_key` — Press a keyboard key
-- `browser_file_upload` — Upload files
-- `browser_handle_dialog` — Handle browser dialogs
+**What to integration test:**
+- API endpoint handlers (request -> business logic -> database -> response)
+- Database query builders and repositories (do queries return correct data?)
+- Authentication/authorization middleware (does the auth chain work end-to-end?)
+- External service integrations (with a test/sandbox instance or contract tests)
 
-**Inspection & Verification:**
-- `browser_take_screenshot` — Capture a screenshot
-- `browser_snapshot` — Capture accessibility snapshot
-- `browser_evaluate` — Execute JavaScript
-- `browser_resize` — Resize the browser window
-- `browser_run_code` — Run a Playwright code snippet
-- `browser_console_messages` — Return console messages
-- `browser_network_requests` — Return network requests
+**API endpoint integration test example:**
 
-### Screenshot Organization
+```typescript
+describe('POST /api/v1/users', () => {
+  beforeEach(async () => {
+    await db.users.deleteAll();  // Clean slate
+  });
 
-```
-tests/screenshots/
-  baseline/          # Known-good reference screenshots (committed)
-  current/           # Screenshots from current test run (gitignored)
-  diff/              # Visual diff outputs
-```
+  it('creates a user and returns 201', async () => {
+    const response = await request(app)
+      .post('/api/v1/users')
+      .send({ email: 'test@example.com', password: 'SecurePass123!' })
+      .expect(201);
 
-Naming convention: `{story-id}_{feature}_{viewport}_{state}.png`
-Example: `US-012_checkout_mobile_empty-cart.png`
+    expect(response.body.user.email).toBe('test@example.com');
+    expect(response.body.user).not.toHaveProperty('password');  // Never return password
 
-### Visual Testing Patterns
+    // Verify the user actually exists in the database
+    const dbUser = await db.users.findByEmail('test@example.com');
+    expect(dbUser).not.toBeNull();
+  });
 
-**Page Load Verification**
-```
-1. browser_navigate to URL
-2. browser_wait_for critical element or network idle
-3. browser_take_screenshot for visual verification
+  it('returns 409 when email already exists', async () => {
+    await db.users.create({ email: 'taken@example.com', password: 'hash' });
+
+    const response = await request(app)
+      .post('/api/v1/users')
+      .send({ email: 'taken@example.com', password: 'SecurePass123!' })
+      .expect(409);
+
+    expect(response.body.error.code).toBe('ALREADY_EXISTS');
+  });
+});
 ```
 
-**User Flow Verification**
-```
-1. browser_navigate to starting point
-2. browser_fill_form / browser_click through the flow
-3. browser_wait_for expected outcome
-4. browser_take_screenshot at key states
-5. browser_evaluate to assert DOM state if needed
-```
+### End-to-End (E2E) Tests — Extended
 
-**Responsive Verification**
-```
-For each viewport (desktop, tablet, mobile):
-  1. browser_resize to target dimensions
-  2. browser_navigate
-  3. browser_take_screenshot
-```
+**What they test:** Complete user flows from the user's perspective, using a real browser (for web apps) or real device/emulator (for mobile apps).
 
-**Error State Verification**
-```
-1. browser_navigate
-2. Trigger error condition (invalid input, failed request)
-3. browser_wait_for error UI
-4. browser_take_screenshot
-5. browser_evaluate to verify error message content
-```
+**Characteristics:**
+- Execute in seconds to minutes
+- Use a full running application stack
+- Simulate real user behavior (clicks, typing, navigation)
+- Most expensive to maintain and slowest to run
+- Highest confidence that the system works as users expect
 
-### Update TDD Standards (Playwright)
+**What to E2E test:**
+- Critical user journeys (registration, login, core business flow, payment)
+- Flows that integrate multiple features (add to cart -> checkout -> payment -> confirmation)
+- Accessibility checks on key pages
 
-Fill in the E2E placeholder section in `docs/tdd-standards.md`:
+**What NOT to E2E test:**
+- Every possible validation error (covered by unit/integration tests)
+- Internal API behavior (covered by integration tests)
+- Visual pixel-perfection (use visual regression testing tools separately)
 
-```markdown
-### 7. E2E / Visual Testing (Playwright)
+**Keep E2E tests focused:**
+- 5-15 E2E tests for most applications
+- Each tests a complete user journey, not a single interaction
+- If an E2E test breaks, it reveals a real user-facing problem
 
-**When to write Playwright tests:**
-- Verifying UI renders correctly after implementing a feature
-- Testing complete user flows end-to-end
-- Checking responsive layouts at multiple viewports
-- Capturing error states and visual regressions
+### Test Doubles — Detailed Patterns
 
-**When NOT to use Playwright:**
-- Testing business logic (use unit tests)
-- Testing API endpoints (use integration tests)
+#### Stubs
 
-**Playwright tests are written AFTER the feature works**, as verification.
+Return predetermined responses. Use when you need to control what a dependency returns.
 
-**Required tests per UI story:**
-- Happy path at desktop (1280px) and mobile (375px)
-- Primary error state screenshot
-- Key interactive states (loading, empty, populated)
-
-**Screenshot naming:** `{story-id}_{feature}_{viewport}_{state}.png`
-
-**Baseline management:**
-- Baselines committed to `tests/screenshots/baseline/`
-- Current runs in `tests/screenshots/current/` (gitignored)
+```typescript
+const userRepo = { findById: jest.fn().mockResolvedValue({ id: '1', name: 'Alice' }) };
 ```
 
-### Update CLAUDE.md (Playwright)
+#### Mocks
 
-Add a "Browser Testing with Playwright MCP" section covering: when to use, verification process, screenshot naming, common patterns, and rules (always wait before screenshot, always close browser, test both desktop and mobile).
+Record calls and verify interactions. Use when you need to verify that a dependency was called correctly.
 
-### Playwright Permissions
-
-Add bare server-name entry to `~/.claude/settings.json` allow array:
-```json
-"mcp__plugin_playwright_playwright"
+```typescript
+const emailService = { send: jest.fn() };
+// ... execute code ...
+expect(emailService.send).toHaveBeenCalledWith({
+  to: 'alice@example.com',
+  subject: 'Welcome!'
+});
 ```
 
-Create `.claude/settings.local.json` with individual tool entries as fallback.
+#### Spies
 
-### What NOT to Do (Playwright)
-- Don't use Playwright for testing business logic
-- Don't store screenshots in git unless they're intentional baselines
-- Don't skip the wait step — flaky screenshots waste time
-- Don't leave browser sessions open — always close when done
+Wrap real implementations and record calls. Use when you want real behavior but also want to verify calls.
 
----
+#### Fakes
 
-## Mobile App Testing (Maestro)
+Working implementations with simplified behavior. Use for expensive dependencies in tests (in-memory database instead of real database).
 
-**Skip this entire section if platform detection found no mobile framework.**
+#### When to Use Which
 
-### What is Maestro
+- Stub external services (HTTP APIs, email, payment)
+- Mock side-effect-producing dependencies (to verify they're called)
+- Spy on internal functions (to verify call patterns without changing behavior)
+- Fake databases in unit tests (in-memory implementations of repository interfaces)
 
-Maestro is a mobile UI testing framework ideal for Expo/React Native apps. It uses YAML flow files to define user interactions and assertions, with automatic UI settling.
+### What NOT to Mock — Extended
 
-### Expo-Specific Detection
+- **The thing you're testing.** If you mock the function under test, you're testing the mock, not the code.
+- **Value objects and simple data transformations.** Use real instances; they're fast and deterministic.
+- **The database in integration tests.** The point of integration tests is to test real database interactions.
+- **Too many things.** If a test requires 10 mocks, the code under test has too many dependencies. Refactor the code, not the test.
 
-Read `app.json` (or `app.config.js`) and `package.json` to determine:
+### Snapshot Testing
 
-1. **Expo SDK version**: Check `expo` dependency version. SDK 50+ supports `expo-dev-client` natively.
-2. **EAS Build detection**: Check for `eas.json` in project root. If present, document EAS Build commands for creating development builds.
-3. **Managed vs bare workflow**: Check for `ios/` and `android/` directories.
-   - **Managed** (no native dirs): Use `npx expo prebuild` then `npx expo run:ios`
-   - **Bare** (native dirs exist): Use `npx react-native run-ios` or native build tools
-4. **Config plugins**: Check `app.json` for `expo.plugins` — may affect build configuration.
+Captures the output of a component or function and compares it to a stored reference:
 
-### Installation & Configuration
+**When to use:** Catching unintended changes to serializable output (React component trees, API response shapes, configuration objects).
 
-```bash
-# macOS
-curl -Ls "https://get.maestro.mobile.dev" | bash
-maestro --version
+**When NOT to use:** For testing correctness (snapshots don't assert meaning, only shape). Don't use as a substitute for specific assertions.
+
+**Rules:**
+- Review snapshot changes carefully — don't just update blindly
+- Keep snapshots small (snapshot a component, not an entire page)
+- Use inline snapshots for small outputs
+
+### Contract Testing
+
+Verify that a service provider and its consumers agree on the API contract:
+
+- The consumer defines a contract (expected request/response pairs)
+- The provider runs the consumer's contracts as tests
+- If the provider changes break a consumer contract, tests fail before deployment
+
+Best for: microservices, separate frontend/backend teams, or any system where the API producer and consumer are developed independently.
+
+### Coverage Strategy — In Depth
+
+#### Coverage Targets by Layer
+
+Coverage targets should vary by the criticality and testability of each layer:
+
+| Layer | Coverage Target | Rationale |
+|-------|----------------|-----------|
+| Domain logic (pure business rules) | 90-100% branch | Business rules are the core value; they must be correct |
+| API endpoints | 80-90% branch | Integration tests cover happy path and major error paths |
+| UI components | 70-80% branch | Component tests cover rendering and interaction |
+| Infrastructure (adapters, config) | 50-70% line | Low logic density; over-testing adds maintenance burden |
+| Generated code | 0% | Don't test generated code; test the generator |
+
+#### Meaningful vs. Vanity Coverage
+
+**Meaningful coverage** tests behavior that could break:
+- Branch coverage (both sides of every `if` statement)
+- Boundary value testing (0, 1, N, max, max+1)
+- Error path coverage (every `catch` block has a test that triggers it)
+
+**Vanity coverage** inflates the number without adding value:
+- Testing that a constructor sets properties (tests language features, not logic)
+- Testing obvious delegation (service calls repository, returns result)
+- Achieving 100% line coverage by testing every getter/setter
+
+### Mutation Testing
+
+Mutation testing introduces small changes (mutations) to production code and checks whether tests detect them. If a mutation survives (tests still pass), the tests are weak.
+
+Common mutations:
+- Flipping `>` to `>=`
+- Changing `&&` to `||`
+- Replacing a return value with `null`
+- Removing a function call
+
+Tools: Stryker (JavaScript/TypeScript), mutmut (Python), PITest (Java).
+
+Use mutation testing periodically (not on every CI run — it's slow) to assess test suite quality.
+
+### Quality Gates — Detailed
+
+#### Pre-Commit Checks
+
+Run on every commit (should complete in <10 seconds):
+
+- **Linting:** Code style violations (ESLint, Ruff, ShellCheck)
+- **Type checking:** Static type errors (TypeScript compiler, mypy)
+- **Formatting:** Code formatting (Prettier, Black, gofmt)
+
+These are fast, catch obvious mistakes, and prevent noisy diffs in PRs.
+
+#### CI Pipeline Checks
+
+Run on every push and PR (should complete in <5 minutes):
+
+- **All pre-commit checks** (redundant but catches bypassed hooks)
+- **Unit tests** with coverage report
+- **Integration tests** with test database
+- **Build verification** (the application compiles and builds successfully)
+- **Security audit** (dependency vulnerability scan)
+
+#### Pre-Merge Requirements
+
+Before a PR can be merged:
+
+- All CI checks pass
+- Code review approved (by human or AI reviewer)
+- No merge conflicts
+- Branch is up-to-date with main (or rebased)
+
+#### Performance Benchmarks (Optional)
+
+For performance-critical applications:
+
+- Benchmark tests run in CI
+- Results compared against baseline
+- Significant regressions (>10% degradation) block merge
+- Baselines updated when intentional changes affect performance
+
+### Test Data Management
+
+#### Fixtures
+
+Static test data stored in files or constants. Best for:
+- Reference data (country lists, category hierarchies, status enums)
+- Large datasets for performance tests
+- Complex object graphs that are tedious to construct in code
+
+```typescript
+// fixtures/users.ts
+export const validUser = {
+  email: 'test@example.com',
+  displayName: 'Test User',
+  password: 'SecurePassword123!',
+};
+
+export const adminUser = {
+  ...validUser,
+  email: 'admin@example.com',
+  role: 'admin',
+};
 ```
 
-Create the Maestro directory structure:
-```
-maestro/
-├── flows/                    # Test flow files by feature
-│   ├── auth/
-│   ├── onboarding/
-│   └── ...
-├── shared/                   # Reusable sub-flows
-│   ├── login.yaml
-│   └── logout.yaml
-├── screenshots/
-│   ├── baseline/            # Known-good references (committed)
-│   └── current/             # Current test run (gitignored)
-└── config.yaml              # Maestro configuration
-```
+#### Factories
 
-Create `maestro/config.yaml` using the detected app bundle ID from `app.json`:
-```yaml
-# scaffold:maestro v1 YYYY-MM-DD
-appId: ${APP_BUNDLE_ID}
-flows:
-  - flows/**/*.yaml
-env:
-  TEST_USER_EMAIL: test@example.com
-  TEST_USER_PASSWORD: testpassword123
-```
+Functions that generate test data with sensible defaults and selective overrides. Best for:
+- Creating many variations of the same entity
+- Ensuring test data is always valid
+- Keeping tests focused on what varies (not boilerplate setup)
 
-### Maestro Commands Reference
-
-**App Lifecycle:** `launchApp`, `launchApp: { clearState: true }`, `stopApp`
-
-**Navigation & Interaction:** `tapOn`, `longPressOn`, `inputText`, `eraseText`, `scroll`, `scrollUntilVisible`, `swipe`, `back`, `hideKeyboard`
-
-**Assertions:** `assertVisible`, `assertNotVisible`, `assertTrue`
-
-**Waiting:** `waitForAnimationToEnd`, `extendedWaitUntil`
-
-**Screenshots:** `takeScreenshot: "path/name"`
-
-**Flow Control:** `runFlow`, `runFlow` with parameters, conditional `when`, `repeat`
-
-### Testing Patterns
-
-**Screen Verification:** Launch → login → assert visible → screenshot
-**User Flow:** Launch → navigate → fill form → submit → verify success → screenshot
-**Error State:** Launch → trigger error → assert error message → screenshot
-**Reusable Sub-flow:** Login flow parameterized with env vars
-**Device Testing:** Same flow on multiple devices (`--device` flag)
-
-### testID Conventions
-
-Add to `docs/coding-standards.md`:
-- All interactive elements MUST have a `testID` prop
-- Naming convention: `{feature}-{element}-{descriptor}`
-- Examples: `auth-email-input`, `session-create-button`, `nav-home-tab`
-
-### Scripts
-
-Add to `package.json`:
-```json
-{
-  "scripts": {
-    "test:e2e": "maestro test maestro/flows/",
-    "test:e2e:ios": "maestro test maestro/flows/ --device 'iPhone 15'",
-    "test:e2e:android": "maestro test maestro/flows/ --device 'emulator'",
-    "test:e2e:flow": "maestro test",
-    "maestro:studio": "maestro studio"
-  }
+```typescript
+function createUser(overrides: Partial<User> = {}): User {
+  return {
+    id: randomUUID(),
+    email: `user-${randomId()}@example.com`,
+    displayName: 'Test User',
+    status: 'active',
+    createdAt: new Date(),
+    ...overrides,
+  };
 }
+
+// Usage: only specify what matters for this test
+const suspendedUser = createUser({ status: 'suspended' });
 ```
 
-### Update TDD Standards (Maestro)
+#### Seeds
 
-Add to the E2E section in `docs/tdd-standards.md`:
-- When to write Maestro flows (E2E user journeys, visual verification)
-- When NOT to use Maestro (unit logic, API testing)
-- Maestro flows are written AFTER the feature works
-- Required: happy path + primary error states per user story
+Initial data loaded into the test database for integration tests. Rules:
+- Seed data represents realistic scenarios (not just one record per table)
+- Seed data is idempotent (safe to run twice)
+- Seed data is minimal (only what tests need; don't replicate production)
+- Seed data includes edge cases (user with no orders, order with many items)
 
-### Update CLAUDE.md (Maestro)
+#### Test Database Management
 
-Add a "Mobile Testing with Maestro" section covering: when to use, prerequisites (dev build running), verification process, creating test flows, testID requirements, key commands, and rules (always waitForAnimationToEnd, use testID selectors, test both platforms).
+**Transaction rollback pattern:** Each test runs inside a database transaction that is rolled back after the test. Fast, clean, but doesn't test commit behavior.
 
-### Development Build Requirement
+**Truncate-and-seed pattern:** Before each test (or test suite), truncate all tables and re-seed. Slower but tests real commit behavior.
 
-Maestro requires a development build (not Expo Go) for reliable testID access:
-```bash
-npx expo prebuild
-npx expo run:ios  # or run:android
-```
+**Dedicated test database:** Each test run creates a fresh database. Slowest but most isolated.
 
-### Verification (Maestro)
+**Recommendation:** Use transaction rollback for unit-level database tests. Use truncate-and-seed for integration test suites. Use dedicated databases for CI.
 
-After setup, verify:
-1. Maestro CLI installed and accessible
-2. Development build created and running on simulator
-3. Sample verification flow executes successfully
-4. Screenshot captured to correct directory
-5. testID props accessible in the app
+### Common Pitfalls
 
----
+**Testing implementation details.** "Verify that `_processPayment` was called with exactly these parameters." This test breaks whenever the internal implementation changes, even if the observable behavior is unchanged. Fix: test the observable outcome, not the internal mechanism.
 
-## Process
+**Flaky tests.** Tests that pass sometimes and fail other times. Common causes: time-dependent logic, race conditions, shared mutable state, network dependencies, random ordering. Fix: each flaky test is a bug. Fix the root cause (mock time, eliminate shared state, isolate network calls) or delete the test. Never ignore flaky tests.
 
-1. **Detect platform** — Read tech-stack.md and package.json. Determine web, mobile, both, or skip.
-2. **Check brownfield** — Look for existing Playwright config or Maestro directory.
-3. **Configure detected platforms** — Run the applicable section(s) above.
-4. **Update documentation** — CLAUDE.md, tdd-standards.md, coding-standards.md (if mobile).
-5. **Run verification** — Smoke test for each configured platform.
-6. **Ask user** — Confirm viewport sizes, test devices, baseline strategy, and any project-specific conventions.
+**Slow test suites.** A test suite that takes 20 minutes to run discourages running tests frequently. Common causes: E2E tests doing unit-level work, no test parallelization, unnecessary database setup per test, sleeping in tests. Fix: move fine-grained logic tests to unit level. Parallelize test execution. Use transaction rollback instead of database recreation.
 
-## After This Step
+**Testing through the UI for logic tests.** An E2E test that clicks through a form to verify that email validation works. This is a unit test masquerading as an E2E test — it's 100x slower and 10x more fragile. Fix: test validation logic with a unit test. Use E2E only for verifying the full user flow.
 
-When this step is complete, tell the user:
+**No test data strategy.** Tests that create data inline with inconsistent formats, duplicate setup logic, and fragile assumptions. Fix: use factories for all test data. Define fixtures for static reference data. Establish seed data for integration tests.
 
----
-**Phase 4 complete** — E2E testing configured for detected platform(s).
+**100% coverage as a goal.** Pursuing 100% line coverage leads to tests that test trivial code, tests that are coupled to implementation, and team resistance to writing more tests. Fix: set meaningful coverage targets per layer. Focus on branch coverage over line coverage. Use mutation testing to assess quality.
 
-**Next:** Run `/scaffold:user-stories` — Create user stories covering every PRD feature (starts Phase 5).
+**Testing the framework.** "Test that the Express router returns 404 for an undefined route." This tests Express, not your code. Fix: test your handlers, your middleware, your business logic. Assume the framework works correctly.
 
-**Pipeline reference:** `/scaffold:prompt-pipeline`
+**Skipped tests accumulate.** Tests marked as `skip` or `xit` that are never re-enabled. They represent either dead code or known bugs that nobody addresses. Fix: skipped tests are technical debt. Set a policy: fix or delete within one sprint.
 
----
+**No test naming convention.** Test descriptions like "test 1," "works correctly," or "handles the thing." Uninformative when tests fail. Fix: test names should describe the scenario and expected outcome: "returns 404 when user does not exist," "applies 10% discount for premium members."
+
+## See Also
+
+- [api-design](../core/api-design.md) — Contract testing patterns

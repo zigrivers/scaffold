@@ -1,454 +1,501 @@
 ---
-description: "Set up automated PR review with AI reviewers"
-long-description: "Configures agent-driven automated PR review using local CLI reviewers (Codex, Gemini) or external GitHub App reviewers. The agent manages the entire review-fix loop locally — zero GitHub Actions workflows, zero Actions minutes consumed."
+description: "Agent-driven automated PR review with external reviewers (Codex Cloud, Gemini Code Assist, or custom)"
+long-description: "Configure an agent-driven automated PR review system using local CLI reviewers"
 ---
 
-Set up automated PR review for this project. The system uses independent AI reviewers to catch issues that local self-review misses, with the agent managing the entire fix loop locally.
+## Purpose
+Configure an agent-driven automated PR review system using local CLI reviewers
+(Codex, Gemini — runs both when available for dual-model quality) or external
+GitHub App reviewers. Zero GitHub Actions workflows. The agent manages the
+entire review-fix loop locally.
 
-> **When to use this step:** Only for projects hosted on GitHub that use pull requests. Skip if your project is local-only, uses a different hosting platform, or does not use a PR-based workflow.
+## Inputs
+- docs/coding-standards.md (required) — review criteria reference
+- docs/tdd-standards.md (required) — test coverage expectations
+- docs/git-workflow.md (required) — PR workflow to integrate with
+- CLAUDE.md (required) — workflow sections to update
 
-**This step does NOT create any GitHub Actions workflows.** All review orchestration runs locally via the agent. Two review modes are available: local CLI review (fastest, recommended) and external bot review (GitHub App-based, with polling).
+## Expected Outputs
+- AGENTS.md — Reviewer instructions with project-specific rules
+- docs/review-standards.md — severity definitions (P0-P3) and review criteria
+- scripts/cli-pr-review.sh (local CLI mode) — dual-model review with reconciliation
+- scripts/await-pr-review.sh (external bot mode) — polling script with JSON output
+- docs/git-workflow.md updated with review loop integration
+- CLAUDE.md updated with agent-driven review workflow
 
-Review docs/coding-standards.md, docs/tdd-standards.md, docs/git-workflow.md, and CLAUDE.md to understand the existing project conventions.
+## Quality Criteria
+- External reviewer configured and verified (AGENTS.md created)
+- Review standards document matches project coding conventions
+- Await script handles all exit conditions (approved, findings, cap, skip, timeout)
+- CLAUDE.md workflow documents the agent-driven loop
+- No GitHub Actions workflows created (zero Actions minutes)
+- No ANTHROPIC_API_KEY secret required
+- Legacy GitHub Actions workflows detected and cleanup offered
+- (deep) Dual-model review enabled when both CLIs available
 
-## Step 0: Applicability Check
+## Methodology Scaling
+- **deep**: Full setup with local CLI review (dual-model when both available),
+  review-standards.md, AGENTS.md, and comprehensive CLAUDE.md workflow.
+  Falls back to external bot review if no CLIs available.
+- **mvp**: Step is disabled. Local self-review from git-workflow suffices.
+- **custom:depth(1-5)**: Depth 1-2: disabled. Depth 3: basic review-standards.md
+  + single-CLI review. Depth 4: add dual-model review. Depth 5: full suite
+  with all options and legacy cleanup.
 
-Before proceeding, verify this step applies:
-
-1. **Check for GitHub remote**: Run `git remote -v`. If no `github.com` remote exists, this step doesn't apply — tell the user and stop.
-2. **Check for CI**: Verify `.github/workflows/` directory exists (git-workflow step should have created it). If not, warn the user that CI should be set up first.
-3. **Check for existing review setup**: If `AGENTS.md` exists at the repo root, this is an update (proceed to Mode Detection).
+## Conditional Evaluation
+Enable when: project uses GitHub for version control, team size > 1 or CI/CD is
+configured, or git-workflow.md establishes a PR-based workflow. Skip when: solo
+developer with no CI, depth < 3, or project uses a non-GitHub VCS host.
 
 ## Mode Detection
+Check if AGENTS.md exists first. If it exists, check for scaffold tracking comment
+(`<!-- scaffold:automated-pr-review -->`).
+- If AGENTS.md exists with tracking comment: UPDATE MODE — preserve custom review rules,
+  reviewer bot name, and round cap settings. Detect legacy GitHub Actions
+  workflows (code-review-trigger.yml, code-review-handler.yml) and offer removal.
+- If AGENTS.md does not exist: FRESH MODE — configure from scratch.
 
-Check if `AGENTS.md` already exists at the repo root:
-
-**If AGENTS.md does NOT exist → FRESH MODE**: Create from scratch.
-
-**If AGENTS.md exists → UPDATE MODE**:
-1. **Read & analyze**: Read `AGENTS.md`, `docs/review-standards.md`, and `scripts/await-pr-review.sh`. Check for tracking comment on line 1 of AGENTS.md: `<!-- scaffold:automated-pr-review v<ver> <date> -->`. If absent, treat as legacy — be conservative.
-2. **Diff against current structure**: Categorize as ADD / RESTRUCTURE / PRESERVE.
-3. **Legacy workflow detection**: Check for `.github/workflows/code-review-trigger.yml`, `code-review-handler.yml`, `codex-timeout.yml`, or `post-merge-followup.yml`. If any exist, inform the user: "Found legacy GitHub Actions review workflows. These are no longer needed — the review loop is now agent-driven. Want me to remove them?" Also check for `.github/review-prompts/` directory.
-4. **Preview changes**: Present summary table. Wait for user approval.
-5. **Execute update**: Add missing sections, preserve custom rules.
-6. **Update tracking comment**.
-
-### Update Mode Specifics
-- **Preserve**: Custom review rules in AGENTS.md, reviewer bot name, round cap settings, custom severity rules in review-standards.md
-- **Remove (with confirmation)**: Legacy GitHub Actions workflows, `.github/review-prompts/` directory, `ANTHROPIC_API_KEY` secret references
-
----
-
-## Step 1: Detect Available Reviewers & Choose Mode
-
-Detect what's available locally:
-
-```bash
-command -v codex && echo "Codex CLI available" || echo "Codex CLI not found"
-command -v gemini && echo "Gemini CLI available" || echo "Gemini CLI not found"
-```
-
-### Auto-Select Logic
-
-**If at least one CLI is available → default to local CLI review (Option A).** Inform the user:
-- "Detected [codex/gemini/both]. Using local CLI review (fastest, no external services needed)."
-- If both available: "Both Codex and Gemini CLIs detected — will run dual-model review for highest quality."
-- Do NOT ask the user to choose — just proceed with local CLI mode. Only ask if the user wants to override to an external bot mode.
-
-**If no CLI is available → ask the user** which external bot to configure using AskUserQuestionTool.
-
-### Option A — Local CLI Review (default when CLIs available)
-
-- The agent captures the PR diff and runs it through Codex and/or Gemini CLI locally
-- Results are immediate — no polling, no waiting for external bots
-- If **both CLIs available**: Run both independently, reconcile findings (highest quality)
-- If **one CLI available**: Run that one (still catches different-model blind spots)
-- Cost: included in existing subscriptions, no additional credits per review
-
-### Option B — Codex Cloud (fallback when no local CLI)
-
-- Requires: ChatGPT subscription + Codex Cloud GitHub App installed on repo
-- Bot posts PR review comments; agent polls for results via `gh api`
-- Slower than local CLI (must wait for external service)
-
-### Option C — Gemini Code Assist (fallback when no local CLI)
-
-- Requires: Google Cloud project + Gemini Code Assist enabled on repo
-- Same polling pattern as Option B
-
-### Option D — Custom reviewer bot
-
-- User provides: bot username, approval signal text
-- Works with any bot that posts GitHub PR reviews
-
-Options B-D use the external bot flow (AGENTS.md + await script). Option A uses the local CLI flow.
-
-## Prerequisites
-
-Based on the reviewer choice:
-
-| Mode | Requirement |
-|------|-------------|
-| Local CLI (both) | `codex` CLI + `gemini` CLI installed and authenticated |
-| Local CLI (single) | `codex` CLI or `gemini` CLI installed and authenticated |
-| Codex Cloud | ChatGPT subscription + "ChatGPT Codex Connector" GitHub App on repo |
-| Gemini Code Assist | Google Cloud project + Gemini Code Assist enabled on repo |
-| Custom | Reviewer bot installed and configured on repo |
-
-**Not required** (regardless of mode):
-- No Anthropic API key secret needed (fixes run locally)
-- No GitHub App (Claude) installation needed
-- No GitHub Actions workflows (zero Actions minutes)
+## Update Mode Specifics
+- **Detect prior artifact**: AGENTS.md exists
+- **Preserve**: custom review rules, reviewer bot configuration, round cap
+  settings, severity definitions in docs/review-standards.md, CLI review
+  script customizations
+- **Triggers for update**: coding-standards.md changed (new review criteria),
+  tdd-standards.md changed (coverage expectations), new external reviewer
+  CLI became available, git-workflow.md changed PR workflow steps
+- **Conflict resolution**: if review criteria changed in coding-standards.md,
+  update AGENTS.md review rules to match; if both CLI reviewers are now
+  available, offer to enable dual-model review
 
 ---
 
-## Step 2: Create Review Standards
+## Domain Knowledge
 
-Create `docs/review-standards.md`:
+### review-methodology
+
+*Shared process for conducting multi-pass reviews of documentation artifacts*
+
+# Review Methodology
+
+This document defines the shared process for reviewing pipeline artifacts. It covers HOW to review, not WHAT to check — each artifact type has its own review knowledge base document with domain-specific passes and failure modes. Every review phase (1a through 10a) follows this process.
+
+## Summary
+
+- **Multi-pass review**: Each pass has a single focus (coverage, consistency, structure, downstream readiness). Passes are ordered broadest-to-most-specific.
+- **Finding severity**: P0 blocks next phase (must fix), P1 is a significant gap (should fix), P2 is an improvement opportunity (fix if time permits), P3 is nice-to-have (skip).
+- **Fix planning**: Group findings by root cause, same section, and same severity. Fix all P0s first, then P1s. Never fix ad hoc.
+- **Re-validation**: After applying fixes, re-run the specific passes that produced the findings. Stop when no new P0/P1 findings appear.
+- **Downstream readiness gate**: Final check verifies the next phase can proceed with these artifacts. Outcomes: pass, conditional pass, or fail.
+- **Review report**: Structured output with executive summary, findings by pass, fix plan, fix log, re-validation results, and downstream readiness assessment.
+
+## Deep Guidance
+
+## Multi-Pass Review Structure
+
+### Why Multiple Passes
+
+A single read-through catches surface errors but misses structural problems. The human tendency (and the AI tendency) is to get anchored on the first issue found and lose track of the broader picture. Multi-pass review forces systematic coverage by constraining each pass to one failure mode category.
+
+Each pass has a single focus: coverage, consistency, structural integrity, or downstream readiness. The reviewer re-reads the artifact with fresh eyes each time, looking for one thing. This is slower than a single pass but catches 3-5x more issues in practice.
+
+### Pass Ordering
+
+Order passes from broadest to most specific:
+
+1. **Coverage passes first** — Is everything present that should be? Missing content is the highest-impact failure mode because it means entire aspects of the system are unspecified. Coverage gaps compound downstream: a missing domain in the domain modeling step means missing ADRs in the decisions step, missing components in the architecture step, missing tables in the specification step, and so on.
+
+2. **Consistency passes second** — Does everything agree with itself and with upstream artifacts? Inconsistencies are the second-highest-impact failure because they create ambiguity for implementing agents. When two documents disagree, the agent guesses — and guesses wrong.
+
+3. **Structural integrity passes third** — Is the artifact well-formed? Are relationships explicit? Are boundaries clean? Structural issues cause implementation friction: circular dependencies, unclear ownership, ambiguous boundaries.
+
+4. **Downstream readiness last** — Can the next phase proceed? This pass validates that the artifact provides everything its consumers need. It is the gate that determines whether to proceed or iterate.
+
+### Pass Execution
+
+For each pass:
+
+1. State the pass name and what you are looking for
+2. Re-read the entire artifact (or the relevant sections) with only that lens
+3. Record every finding, even if minor — categorize later
+4. Do not fix anything during a pass — record only
+5. After completing all findings for this pass, move to the next pass
+
+Do not combine passes. The discipline of single-focus reading is the mechanism that catches issues a general-purpose review misses.
+
+## Finding Categorization
+
+Every finding gets a severity level. Severity determines whether the finding blocks progress or gets deferred.
+
+### P0: Blocks Next Phase
+
+The artifact cannot be consumed by the next pipeline phase in its current state. The next phase would produce incorrect output or be unable to proceed.
+
+**Examples:**
+- A domain entity referenced by three other models is completely undefined
+- An ADR contradicts another ADR with no acknowledgment, and the architecture depends on both
+- A database schema is missing tables for an entire bounded context
+- An API endpoint references a data type that does not exist in any domain model
+
+**Action:** Must fix before proceeding. No exceptions.
+
+### P1: Significant Gap
+
+The artifact is usable but has a meaningful gap that will cause rework downstream. The next phase can proceed but will need to make assumptions that may be wrong.
+
+**Examples:**
+- An aggregate is missing one invariant that affects validation logic
+- An ADR lists alternatives but does not evaluate them
+- A data flow diagram omits error paths
+- An API endpoint is missing error response definitions
+
+**Action:** Should fix before proceeding. Fix unless the cost of fixing now significantly exceeds the cost of fixing during the downstream phase (rare).
+
+### P2: Improvement Opportunity
+
+The artifact is correct and usable but could be clearer, more precise, or better organized. The next phase can proceed without issue.
+
+**Examples:**
+- A domain model uses informal language where a precise definition would help
+- An ADR's consequences section is vague but the decision is clear
+- A diagram uses inconsistent notation but the meaning is unambiguous
+- An API contract could benefit from more examples
+
+**Action:** Fix if time permits. Log for future improvement.
+
+### P3: Nice-to-Have
+
+Stylistic, formatting, or polish issues. No impact on correctness or downstream consumption.
+
+**Examples:**
+- Inconsistent heading capitalization
+- A diagram could be reformatted for readability
+- A section could be reordered for flow
+- Minor wording improvements
+
+**Action:** Fix during finalization phase if at all. Do not spend review time on these.
+
+## Fix Planning
+
+After all passes are complete and findings are categorized, create a fix plan before making any changes. Ad hoc fixing (fixing issues as you find them) risks:
+
+- Introducing new issues while fixing old ones
+- Fixing a symptom instead of a root cause (two findings may share one fix)
+- Spending time on P2/P3 issues before P0/P1 are resolved
+
+### Grouping Findings
+
+Group related findings into fix batches:
+
+1. **Same root cause** — Multiple findings that stem from a single missing concept, incorrect assumption, or structural issue. Fix the root cause once.
+2. **Same section** — Findings in the same part of the artifact that can be addressed in a single editing pass.
+3. **Same severity** — Process all P0s first, then P1s. Do not interleave.
+
+### Prioritizing by Downstream Impact
+
+Within the same severity level, prioritize fixes that have the most downstream impact:
+
+- Fixes that affect multiple downstream phases rank higher than single-phase impacts
+- Fixes that change structure (adding entities, changing boundaries) rank higher than fixes that change details (clarifying descriptions, adding examples)
+- Fixes to artifacts consumed by many later phases rank higher (domain models affect everything; API contracts affect fewer phases)
+
+### Fix Plan Format
 
 ```markdown
-<!-- scaffold:automated-pr-review v1 YYYY-MM-DD -->
-# Review Standards
+## Fix Plan
 
-## Source Documents
-Reviewers should check code against:
-- CLAUDE.md (project rules, key commands)
-- docs/coding-standards.md (code conventions)
-- docs/tdd-standards.md (test requirements)
-- docs/project-structure.md (file placement)
+### Batch 1: [Root cause or theme] (P0)
+- Finding 1.1: [description]
+- Finding 1.3: [description]
+- Fix approach: [what to change and why]
+- Affected sections: [list]
 
-## Review Priorities
-1. Correctness — does it do what the story requires?
-2. Security — no injection, no secrets in code, proper auth checks
-3. Test coverage — new code has tests, tests actually test behavior
-4. Standards compliance — follows documented coding standards
-5. Performance — no obvious N+1 queries, unbounded loops, or memory leaks
-6. Maintainability — clear names, no dead code, reasonable complexity
+### Batch 2: [Root cause or theme] (P0)
+- Finding 2.1: [description]
+- Fix approach: [what to change and why]
+- Affected sections: [list]
 
-## Severity Levels
-
-| Level | Meaning | Action |
-|-------|---------|--------|
-| P0 (critical) | Data loss, security vulnerability, or crash in production | Must fix before merge |
-| P1 (high) | Bug in normal usage, or MUST-level standards violation | Must fix before merge |
-| P2 (medium) | Code smell, missing edge case, SHOULD-level violation | Fix during local self-review |
-| P3 (low) | Suggestion for improvement, not a defect | Optional, do not block merge |
-
-## What NOT to Flag
-- Style issues caught by linter (formatting, import ordering)
-- Minor naming preferences (unless genuinely confusing)
-- Refactoring suggestions unrelated to the PR's purpose
+### Batch 3: [Root cause or theme] (P1)
+...
 ```
 
-## Step 3: Create AGENTS.md
+## Re-Validation
 
-Create `AGENTS.md` at the repo root (this is what Codex Cloud / Gemini reads):
+After applying all fixes in a batch, re-run the specific passes that produced the findings in that batch. This is not optional — fixes routinely introduce new issues.
+
+### What to Check
+
+1. The original findings are resolved (the specific issues no longer exist)
+2. The fix did not break anything checked by the same pass (re-read the full pass scope, not just the fixed section)
+3. The fix did not introduce inconsistencies with other parts of the artifact (quick consistency check)
+
+### When to Stop
+
+Re-validation is complete when:
+- All P0 and P1 findings are resolved
+- Re-validation produced no new P0 or P1 findings
+- Any new P2/P3 findings are logged but do not block progress
+
+If re-validation produces new P0/P1 findings, create a new fix batch and repeat. If this cycle repeats more than twice, the artifact likely has a structural problem that requires rethinking a section rather than patching individual issues.
+
+## Downstream Readiness Gate
+
+The final check in every review: can the next phase proceed with these artifacts?
+
+### How to Evaluate
+
+1. Read the meta-prompt for the next phase — what inputs does it require?
+2. For each required input, verify the current artifact provides it with sufficient detail and clarity
+3. For each quality criterion in the next phase's meta-prompt, verify the current artifact supports it
+4. Identify any questions the next phase's author would need to ask — each question is a gap
+
+### Gate Outcomes
+
+- **Pass** — The next phase can proceed. All required information is present and unambiguous.
+- **Conditional pass** — The next phase can proceed but should be aware of specific limitations or assumptions. Document these as handoff notes.
+- **Fail** — The next phase cannot produce correct output. Specific gaps must be addressed first.
+
+A conditional pass is the most common outcome. Document the conditions clearly so the next phase knows what assumptions it is inheriting.
+
+## Review Report Format
+
+Every review produces a structured report. This format ensures consistency across all review phases and makes it possible to track review quality over time.
 
 ```markdown
-<!-- scaffold:automated-pr-review v1 YYYY-MM-DD -->
+# Review Report: [Artifact Name]
+
+## Executive Summary
+[2-3 sentences: overall artifact quality, number of findings by severity,
+whether downstream gate passed]
+
+## Findings by Pass
+
+### Pass N: [Pass Name]
+| # | Severity | Finding | Location |
+|---|----------|---------|----------|
+| 1 | P0 | [description] | [section/line] |
+| 2 | P1 | [description] | [section/line] |
+
+### Pass N+1: [Pass Name]
+...
+
+## Fix Plan
+[Grouped fix batches as described above]
+
+## Fix Log
+| Batch | Findings Addressed | Changes Made | New Issues |
+|-------|-------------------|--------------|------------|
+| 1 | 1.1, 1.3 | [summary] | None |
+| 2 | 2.1 | [summary] | 2.1a (P2) |
+
+## Re-Validation Results
+[Which passes were re-run, what was found]
+
+## Downstream Readiness Assessment
+- **Gate result:** Pass | Conditional Pass | Fail
+- **Handoff notes:** [specific items the next phase should be aware of]
+- **Remaining P2/P3 items:** [count and brief summary, for future reference]
+```
+
+---
+
+### automated-review-tooling
+
+*Patterns for setting up automated PR code review using AI models (Codex, Gemini) via local CLI, including dual-model review, reconciliation, and CI integration*
+
+# Automated Review Tooling
+
+Automated PR review leverages AI models to provide consistent, thorough code review without manual reviewer bottlenecks. This knowledge covers the local CLI approach (no GitHub Actions), dual-model review patterns, and integration with the PR workflow.
+
+## Summary
+
+### Architecture: Local CLI Review
+
+The scaffold approach uses local CLI review rather than GitHub Actions:
+- **No CI secrets required** — models run locally via CLI tools
+- **Dual-model review** — run Codex and Gemini (when available) for independent perspectives
+- **Agent-managed loop** — Claude orchestrates the review-fix cycle locally
+
+Components:
+- `AGENTS.md` — reviewer instructions with project-specific rules
+- `docs/review-standards.md` — severity definitions (P0-P3) and criteria
+- `scripts/cli-pr-review.sh` — dual-model review script
+- `scripts/await-pr-review.sh` — polling script for external bot mode
+
+### Review Severity Levels
+
+Consistent with the pipeline's review step severity:
+- **P0 (blocking)** — must fix before merge (security, data loss, broken functionality)
+- **P1 (important)** — should fix before merge (bugs, missing tests, performance)
+- **P2 (suggestion)** — consider fixing (style, naming, documentation)
+- **P3 (nit)** — optional (personal preference, minor optimization)
+
+### Dual-Model Review Pattern
+
+When both Codex CLI and Gemini CLI are available:
+1. Run both reviewers independently on the PR diff
+2. Collect findings from each
+3. Reconcile: consensus findings get higher confidence
+4. Disagreements are flagged for the implementing agent to resolve
+
+### Integration with PR Workflow
+
+The review step integrates into the standard PR flow:
+1. Agent creates PR
+2. Agent runs `scripts/cli-pr-review.sh` (or review runs automatically)
+3. Review findings are posted as PR comments or written to a local file
+4. Agent addresses P0/P1 findings, pushes fixes
+5. Re-review until no P0/P1 findings remain
+6. PR is ready for merge
+
+## Deep Guidance
+
+### AGENTS.md Structure
+
+The `AGENTS.md` file provides reviewer instructions:
+
+```markdown
 # Code Review Instructions
 
-## Reviewer Role
-You are reviewing a pull request. Read the diff carefully and check against the standards in `docs/review-standards.md`.
+## Project Context
+[Brief description of what this project does]
 
-## Focus Areas
-- P0 and P1 issues ONLY — do not flag P2/P3 issues
-- Security: secrets in code, injection vulnerabilities, auth bypasses
-- Correctness: logic errors, off-by-one, null handling, race conditions
-- Tests: new code without tests, tests that don't test actual behavior
-- Standards: violations of MUST rules in docs/coding-standards.md
+## Review Focus Areas
+- Security: [project-specific security concerns]
+- Performance: [known hot paths or constraints]
+- Testing: [coverage requirements, test patterns]
 
-## Approval Signal
-If you find NO P0 or P1 issues, your review MUST include this exact text:
-```
-APPROVED: No P0/P1 issues found.
-```
+## Coding Standards Reference
+See docs/coding-standards.md for:
+- Naming conventions
+- Error handling patterns
+- Logging standards
 
-## Findings Format
-For each finding, provide:
-- File and line number
-- Severity (P0 or P1)
-- What's wrong
-- Suggested fix (specific code, not vague guidance)
+## Known Patterns
+[Project-specific patterns reviewers should enforce]
 
-## Rules
-- DO NOT flag style issues (linter handles those)
-- DO NOT suggest refactoring beyond the PR scope
-- DO NOT invent new requirements
-- Every finding MUST include a specific suggested fix
+## Out of Scope
+[Things reviewers should NOT flag]
 ```
 
-Customize the focus areas based on `docs/coding-standards.md` and `docs/tdd-standards.md`.
+### CLI Review Script Pattern
 
-## Step 4: Create Await Script
-
-Create `scripts/await-pr-review.sh` — the agent uses this to poll for external reviews:
+The `cli-pr-review.sh` script follows this structure:
 
 ```bash
 #!/usr/bin/env bash
-# await-pr-review.sh — Poll for external PR review and return structured results
-# Usage: scripts/await-pr-review.sh <pr-number> [options]
-#
-# Options:
-#   --max-rounds N       Max review rounds before cap (default: 3)
-#   --timeout SECONDS    Per-round timeout (default: 900)
-#   --reviewer BOT       Bot username to watch for (default: chatgpt-codex-connector[bot])
-#   --poll-interval S    Seconds between polls (default: 30)
-#
-# Exit codes:
-#   0  Approved (reviewer posted approval signal)
-#   1  Findings posted (agent should fix and re-push)
-#   2  Round cap reached (merge with warning)
-#   3  Skipped (human /skip-review or /lgtm comment)
-#   4  Timeout (no review within timeout)
-#   5  Error
-#
-# Stdout: JSON with { status, round, findings[], reviewer }
+set -euo pipefail
+
+# 1. Get the PR diff
+diff=$(gh pr diff "$PR_NUMBER")
+
+# 2. Run Codex review (if available)
+if command -v codex &>/dev/null; then
+  codex_findings=$(echo "$diff" | codex review --context AGENTS.md)
+fi
+
+# 3. Run Gemini review (if available)
+if command -v gemini &>/dev/null; then
+  gemini_findings=$(echo "$diff" | gemini review --context AGENTS.md)
+fi
+
+# 4. Reconcile findings
+# - Findings from both models: HIGH confidence
+# - Findings from one model: MEDIUM confidence
+# - Contradictions: flagged for human review
 ```
 
-The script should:
-1. Accept PR number as first argument
-2. Get the current HEAD SHA via `gh api`
-3. Poll `gh api repos/{owner}/{repo}/pulls/{pr}/reviews` for a review from the configured bot matching the current SHA
-4. Check for human override comments (`/skip-review` or `/lgtm`) from repo members
-5. When review found: parse for approval signal or extract findings
-6. Output JSON with status and findings to stdout
-7. Use `--poll-interval` between checks, respect `--timeout`
+### Review Standards Document
 
-Include the full script implementation appropriate for the project's shell conventions (reference docs/coding-standards.md for shell script standards).
+`docs/review-standards.md` should define:
+- Severity levels with concrete examples per project
+- What constitutes a blocking review (P0/P1 threshold)
+- Auto-approve criteria (when review can be skipped)
+- Review SLA (how long before auto-approve kicks in)
 
-**Note:** The await script is only needed for external bot review (Options B-D). For local CLI review (Option A), skip this step.
+### Fallback When Models Unavailable
 
-## Step 4b: Create Local CLI Review Script (Option A Only)
+If neither Codex nor Gemini CLI is available:
+1. Claude performs an enhanced self-review of the diff
+2. Focus on the AGENTS.md review criteria
+3. Apply the same severity classification
+4. Document that the review was single-model
 
-**Skip this step if the user chose external bot review (Options B-D).**
+### Updating Review Standards Over Time
 
-Create `scripts/cli-pr-review.sh` — the agent runs this to get immediate local review results:
+As the project evolves:
+- Add new review focus areas when new patterns emerge
+- Remove rules that linters now enforce automatically
+- Update AGENTS.md when architecture changes
+- Track false-positive rates and adjust thresholds
 
-```bash
-#!/usr/bin/env bash
-# cli-pr-review.sh — Run local CLI review of PR diff using Codex and/or Gemini
-# Usage: scripts/cli-pr-review.sh [options]
-#
-# Options:
-#   --pr NUMBER          PR number (uses gh pr diff) or omit for local diff
-#   --skip-codex         Skip Codex CLI even if available
-#   --skip-gemini        Skip Gemini CLI even if available
-#   --review-standards   Path to review standards (default: docs/review-standards.md)
-#
-# Exit codes:
-#   0  No P0/P1 findings from any reviewer
-#   1  P0/P1 findings found (fix needed)
-#   5  Error (no CLI available, API failure)
-#
-# Stdout: JSON with { reviewers[], findings[], consensus[] }
+### Review Finding Reconciliation
+
+When running dual-model review, reconcile findings systematically:
+
+```
+Finding Classification:
+┌─────────────────┬──────────┬──────────┬───────────────────┐
+│                 │ Codex    │ Gemini   │ Action            │
+├─────────────────┼──────────┼──────────┼───────────────────┤
+│ Same issue      │ Found    │ Found    │ HIGH confidence   │
+│ Unique finding  │ Found    │ -        │ MEDIUM confidence │
+│ Unique finding  │ -        │ Found    │ MEDIUM confidence │
+│ Contradiction   │ Fix X    │ Keep X   │ Flag for agent    │
+└─────────────────┴──────────┴──────────┴───────────────────┘
 ```
 
-The script should:
-1. Detect available CLIs (`command -v codex`, `command -v gemini`)
-2. **Verify auth before dispatch** (follows multi-model-dispatch skill patterns):
-   - Codex: `codex login status 2>/dev/null` (exit 0 = authenticated)
-   - Gemini: `NO_BROWSER=true gemini -p "respond with ok" -o json 2>/dev/null` (exit 41 = auth failure)
-   - If a CLI fails auth: print warning with recovery command (`codex login` or `gemini -p "hello"`), skip that CLI but continue with the other
-   - If both fail auth → exit 5 with message "Both CLIs need re-authentication"
-3. If neither available or authenticated → exit 5 with error message
-4. Capture the diff: `gh pr diff <pr>` (if PR number given) or `git diff origin/main...HEAD`
-5. Read `docs/review-standards.md` for severity definitions and focus areas
-6. Read `docs/coding-standards.md` and `docs/tdd-standards.md` for project-specific rules
-7. Bundle diff + review context into a review prompt:
-   - "Review this code diff. For each issue found, report: file, line, severity (P0/P1 only), description, and suggested fix. If no P0/P1 issues, respond with: APPROVED: No P0/P1 issues found."
-8. For each authenticated CLI, run the review independently:
-   - `codex` — Run with the review prompt, capture structured output
-   - `gemini` — Run with the same prompt independently (do not share one model's output with the other)
-9. Parse outputs and reconcile findings:
-   - **Both models agree on a finding** → High confidence, include in results
-   - **One model only, P0** → Include (P0 is critical enough to act on from a single model)
-   - **One model only, P1** → Include with note "single-model finding"
-   - **Contradictions** → Include both with note for agent to adjudicate
-10. Output JSON to stdout:
-   ```json
-   {
-     "reviewers": ["codex", "gemini"],
-     "approved": false,
-     "findings": [
-       {
-         "file": "src/api/auth.ts",
-         "line": 42,
-         "severity": "P0",
-         "description": "SQL injection via unsanitized user input",
-         "suggestion": "Use parameterized query: db.query('SELECT * FROM users WHERE id = $1', [userId])",
-         "source": "both",
-         "confidence": "high"
-       }
-     ],
-     "consensus": {
-       "total_findings": 3,
-       "agreed": 2,
-       "codex_only": 1,
-       "gemini_only": 0
-     }
-   }
-   ```
-11. Exit 0 if no P0/P1 findings, exit 1 if findings present
+HIGH confidence findings are always addressed. MEDIUM confidence findings are addressed if P0/P1. Contradictions require the implementing agent to make a judgment call and document the reasoning.
 
-Include the full script implementation. For Codex CLI invocation, use:
-```bash
-echo "$REVIEW_PROMPT" | codex exec --skip-git-repo-check -s read-only --ephemeral - 2>/dev/null
-```
+### Security-Focused Review Checklist
 
-For Gemini CLI invocation, use the appropriate command format for the installed version.
+Every automated review should check:
+- No secrets or credentials in the diff (API keys, passwords, tokens)
+- No `eval()` or equivalent unsafe operations introduced
+- SQL queries use parameterized queries (no string concatenation)
+- User input is validated before use
+- Authentication/authorization checks are present on new endpoints
+- Dependencies added are from trusted sources with known versions
 
-### Dual-Model Reconciliation Rules
+### Performance Review Patterns
 
-When both CLIs are available and both produce results:
+Look for these performance anti-patterns:
+- N+1 queries (loop with individual DB calls)
+- Missing pagination on list endpoints
+- Synchronous operations that should be async
+- Large objects passed by value instead of reference
+- Missing caching for expensive computations
+- Unbounded growth in arrays or maps
 
-| Scenario | Action | Confidence |
-|----------|--------|-----------|
-| Both flag same file+issue | Include once | High — fix immediately |
-| Both approve (no findings) | Approved | High — merge confidently |
-| One flags P0, other approves | Include finding | High — P0 is critical |
-| One flags P1, other approves | Include finding | Medium — review before fixing |
-| Models contradict each other | Include both | Low — agent adjudicates |
+### Integration with CLAUDE.md
 
-This gives the best quality: two independent models catch different blind spots, and consensus findings have the highest confidence.
-
-## Step 5: Update CLAUDE.md
-
-Add or update the "Code Review" section in CLAUDE.md. Use the appropriate workflow based on the reviewer mode chosen in Step 1.
-
-### For Local CLI Review (Option A):
+The workflow-audit step should add review commands to CLAUDE.md:
 
 ```markdown
 ## Code Review
-
-### PR Workflow with Local CLI Review
-
-When creating PRs, follow this workflow:
-
-1. Run `make check` (lint + test)
-2. Spawn review subagent (local self-review against docs/review-standards.md)
-3. Fix any P0/P1/P2 findings locally
-4. Push branch and create PR: `gh pr create`
-5. Wait for CI: `gh pr checks --watch`
-6. Run local CLI review: `scripts/cli-pr-review.sh --pr <pr-number>`
-7. Handle review result:
-   - **Exit 0 (approved)**: Merge with `gh pr merge --squash --delete-branch`
-   - **Exit 1 (findings)**: Read JSON output. For high-confidence findings (both models agree), fix immediately. For single-model findings, review before fixing. Run tests, push, go to step 6.
-   - **Exit 5 (error)**: Warn user (CLI not available or API failure)
-8. Confirm merge succeeded
-
-### Review Configuration
-- Review mode: local CLI
-- Reviewers: [codex, gemini, or both — as detected]
-- Max fix rounds: 3
-- Review standards: docs/review-standards.md
+| Command | Purpose |
+|---------|---------|
+| `scripts/cli-pr-review.sh <PR#>` | Run dual-model review |
+| `scripts/await-pr-review.sh <PR#>` | Poll for external review |
 ```
 
-### For External Bot Review (Options B-D):
+This ensures agents always know how to trigger reviews without consulting separate docs.
 
-```markdown
-## Code Review
+### Common False Positives
 
-### PR Workflow with External Review
+Track and suppress recurring false positives:
+- Test files flagged for "hardcoded values" (test fixtures are intentional)
+- Migration files flagged for "raw SQL" (migrations must use raw SQL)
+- Generated files flagged for style issues (generated code has its own conventions)
 
-When creating PRs, follow this workflow:
+Add suppressions to AGENTS.md under "Out of Scope" to prevent repeated false findings.
 
-1. Run `make check` (lint + test)
-2. Spawn review subagent (local self-review against docs/review-standards.md)
-3. Fix any P0/P1/P2 findings locally
-4. Push branch and create PR: `gh pr create`
-5. Wait for CI: `gh pr checks --watch`
-6. Wait for external review: `scripts/await-pr-review.sh <pr-number>`
-7. Handle review result:
-   - **Exit 0 (approved)**: Merge with `gh pr merge --squash --delete-branch`
-   - **Exit 1 (findings)**: Read JSON output, fix issues locally, run tests, push. Go to step 6.
-   - **Exit 2 (round cap)**: Merge with warning. Create follow-up issue: `gh issue create --title "Review follow-up: PR #N" --body "Unresolved P0/P1 findings after round cap"`
-   - **Exit 3 (skipped)**: Merge immediately (human override)
-   - **Exit 4 (timeout)**: Merge with timeout note
-   - **Exit 5 (error)**: Warn user, do not merge automatically
-8. Confirm merge succeeded
+### Review Metrics and Continuous Improvement
 
-### Review Configuration
-- Review mode: external bot
-- External reviewer: [configured bot name]
-- Max rounds: 3
-- Round timeout: 15 minutes
-- Review standards: docs/review-standards.md
-```
+Track these metrics over time to improve review quality:
+- **False positive rate** — findings that are dismissed without action
+- **Escape rate** — bugs that reach production despite review
+- **Time to resolve** — average time between finding and fix
+- **Coverage** — percentage of PRs that receive automated review
+- **Model agreement rate** — how often Codex and Gemini agree
 
-## Step 6: Update git-workflow.md
-
-Add a brief section to `docs/git-workflow.md` noting the external review integration:
-
-```markdown
-## External Code Review
-
-When automated PR review is configured (see `AGENTS.md`), the PR workflow includes
-an external review step after CI passes. The agent polls for the external review
-using `scripts/await-pr-review.sh` and handles findings locally.
-
-See CLAUDE.md "Code Review" section for the full agent workflow.
-```
-
-## Step 7: Legacy Cleanup (Update Mode Only)
-
-If legacy GitHub Actions review workflows were detected in Mode Detection:
-
-1. Remove `.github/workflows/code-review-trigger.yml` (if exists)
-2. Remove `.github/workflows/code-review-handler.yml` (if exists)
-3. Remove `.github/workflows/codex-timeout.yml` (if exists)
-4. Remove `.github/workflows/post-merge-followup.yml` (if exists)
-5. Remove `.github/review-prompts/` directory (if exists)
-6. Remove `ANTHROPIC_API_KEY` secret reference from any documentation
-7. Inform user: "Removed N legacy workflow files. The review loop is now fully agent-driven."
-
----
-
-## Safety Rails
-
-| Rail | Mode | Implementation |
-|------|------|---------------|
-| **Round cap** | Both | Max 3 fix rounds. Agent merges after cap with follow-up issue. |
-| **Timeout** | External only | `--timeout` in await script (default 15 min). Agent merges with timeout note. |
-| **Human override** | External only | `/skip-review` or `/lgtm` comment from repo member bypasses review. |
-| **Docs-only skip** | Both | Agent checks diff — if only `.md`, `.yaml`, `.json`, `.toml`, `.lock` files changed, skip review. |
-| **Read-only reviewer** | External only | Bot has no write access. Only the agent pushes fixes. |
-| **Follow-up tracking** | Both | When round cap hit, agent creates GitHub Issue for unresolved findings. |
-| **Dual-model reconciliation** | Local CLI | When both CLIs available, independent reviews are reconciled by confidence level. |
-
-## What NOT to Do
-
-- Don't create GitHub Actions workflows (the whole point is zero Actions minutes)
-- Don't require ANTHROPIC_API_KEY as a GitHub secret (fixes run locally)
-- Don't include Tier 1 (local self-review) content — git-workflow already handles that
-- Don't share one model's review with the other during dual-model review (independent reviews)
-
-## Process
-
-1. Check applicability (GitHub remote, CI setup)
-2. Detect available CLIs (`codex`, `gemini`)
-3. Ask user to choose reviewer mode (local CLI / external bot)
-4. Verify prerequisites: For local CLI mode, run `codex login status` and `gemini -p "respond with ok" -o json` to verify auth. If auth fails, tell the user to run `! codex login` or `! gemini -p "hello"` for interactive recovery. For external bot mode, verify the GitHub App is installed on the repo.
-5. Create docs/review-standards.md
-6. Create AGENTS.md with review instructions
-7. Create review script: `scripts/cli-pr-review.sh` (local) or `scripts/await-pr-review.sh` (external)
-8. Update CLAUDE.md with appropriate review workflow
-9. Update docs/git-workflow.md with review integration note
-10. If update mode: offer to clean up legacy GitHub Actions workflows
-11. Test: create a small test PR and run the review script to verify it works
-
-## After This Step
-
-When this step is complete, tell the user:
-
----
-**Phase 3 in progress** — Automated PR review configured with agent-driven loop.
-
-**Next:**
-- Run `/scaffold:ai-memory-setup` — Configure AI memory with modular rules, optional MCP memory server, and external context.
-- Run `/scaffold:add-e2e-testing` — Configure E2E testing (if project has web or mobile frontend).
-- Or skip to `/scaffold:user-stories` — Create user stories (starts Phase 5).
-
-**Pipeline reference:** `/scaffold:prompt-pipeline`
-
----
+Use these metrics to calibrate severity thresholds and update AGENTS.md focus areas.

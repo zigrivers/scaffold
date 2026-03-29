@@ -1,179 +1,177 @@
 ---
-description: "Configure AI memory and context management"
-long-description: "Sets up a tiered AI memory stack: modular .claude/rules/ extracted from project docs (Tier 1), optional MCP memory server with lifecycle hooks and decision logging (Tier 2), and optional external library documentation server (Tier 3). Improves agent effectiveness across sessions while keeping context lean."
+description: "Configure AI memory and context management with modular rules, optional MCP memory server, lifecycle hooks, and external context integration"
+long-description: "Set up a tiered AI memory stack that improves agent effectiveness across sessions."
 ---
 
-Configure AI memory and context management for this project. The goal is to make AI agents more effective across sessions by ensuring the right context is available at the right time without drowning the agent in irrelevant information.
+## Purpose
+Set up a tiered AI memory stack that improves agent effectiveness across sessions.
+Tier 1 (modular rules) extracts conventions from existing project docs into
+path-scoped `.claude/rules/` files, keeping CLAUDE.md lean. Tier 2 (persistent
+memory) configures an MCP memory server and lifecycle hooks for cross-session
+decision capture. Tier 3 (external context) adds library documentation servers
+to prevent API hallucination. Users choose which tiers to enable.
 
-Read CLAUDE.md, docs/coding-standards.md, docs/tech-stack.md, and docs/git-workflow.md to understand existing project conventions.
+## Inputs
+- docs/coding-standards.md (required) — source for code convention rules
+- docs/tech-stack.md (required) — source for technology-specific rules
+- docs/git-workflow.md (required) — source for workflow rules
+- CLAUDE.md (required) — will be optimized after rules extraction
+- package.json or equivalent (optional) — dependency list for Tier 3 assessment
+
+## Expected Outputs
+- .claude/rules/ directory with path-scoped rule files extracted from project docs
+- docs/ai-memory-setup.md — documentation of configured memory stack
+- CLAUDE.md updated with pointer pattern (references rules instead of inline content)
+- (Tier 2) .claude/settings.json with MCP memory server and hook configuration
+- (Tier 2) docs/decisions/ directory for structured decision logging
+- (Tier 3) .claude/settings.json with external context MCP server
+
+## Quality Criteria
+- (mvp) .claude/rules/ files use valid YAML frontmatter with description and globs fields
+- (mvp) Each rule file targets a specific concern (no catch-all files)
+- (mvp) Total rule content stays under 500 lines across all files
+- (mvp) CLAUDE.md references rules via pointer pattern, stays under 200 lines
+- (mvp) Rules accurately reflect the conventions in source documents (no drift)
+- (deep) MCP memory server responds to basic queries
+- (deep) At least PreCompact hook is configured and functional
+- (deep) Library doc server returns results for project dependencies
+
+## Methodology Scaling
+- **deep**: All three tiers offered. Tier 1 generates comprehensive rules from
+  all project docs. Tier 2 recommends hmem or Claude-Mem for thorough capture.
+  Tier 3 configured with appropriate library doc server.
+- **mvp**: Tier 1 only (modular rules). Quick extraction of essential conventions
+  into 2-3 rule files. Skip Tier 2 and 3. Minimal CLAUDE.md optimization.
+- **custom:depth(1-5)**: Depth 1-2: Tier 1 basics (2-3 rule files). Depth 3:
+  full Tier 1 + offer Tier 2. Depth 4-5: all tiers with comprehensive setup.
 
 ## Mode Detection
+Check if `.claude/rules/` directory or docs/ai-memory-setup.md exists first. If
+`.claude/rules/` exists, check for scaffold tracking comments (e.g.,
+`<!-- scaffold:ai-memory-setup -->`) in rule files for conservativeness calibration.
+- If `.claude/rules/` exists with tracking comments: UPDATE MODE — preserve existing
+  rule files and their customizations, add missing rules for new conventions,
+  update rules where source docs have changed. Never delete user-customized rules.
+  If MCP server already configured, verify and update rather than replace.
+- If `.claude/rules/` does not exist: FRESH MODE — create rules directory and generate
+  rule files from scratch.
 
-Before starting, check if `.claude/rules/` directory exists:
+## Update Mode Specifics
+- **Detect prior artifact**: .claude/rules/ directory exists with rule files
+- **Preserve**: existing rule files and their YAML frontmatter, user-customized
+  rules, MCP server configurations, hook settings, CLAUDE.md pointer patterns
+- **Triggers for update**: source docs changed (coding-standards.md, tech-stack.md,
+  git-workflow.md), new conventions added that need rule extraction, new
+  dependencies added that need Tier 3 doc servers
+- **Conflict resolution**: if a source doc changed a convention, update the
+  corresponding rule file but preserve any user-added rules in that file;
+  never exceed 500-line total rule budget without consolidating
 
-**If the directory does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+---
 
-**If the directory exists → UPDATE MODE**:
-1. **Read & analyze**: Read all existing rule files in `.claude/rules/`. List each file with its description and globs.
-2. **Diff against current sources**: Compare rule content against current project docs (coding-standards.md, tech-stack.md, git-workflow.md). Categorize:
-   - **ADD** — Conventions in docs not yet captured in rules
-   - **UPDATE** — Rules that have drifted from current doc content
-   - **PRESERVE** — User-customized rules not derived from scaffold docs
-3. **Check MCP configuration**: Read `.claude/settings.json` if it exists. Note any existing MCP servers and hooks.
-4. **Preview changes**: Present the user a summary:
-   | Action | Target | Detail |
-   |--------|--------|--------|
-   | ADD | ... | ... |
-   | UPDATE | ... | ... |
-   | PRESERVE | ... | ... |
-   Wait for user approval before proceeding.
-5. **Execute update**: Add missing rules, update drifted rules, preserve user customizations. Never delete user-created rule files.
-6. **Post-update summary**: Report rules added, rules updated, rules preserved, and any MCP configuration changes.
+## Domain Knowledge
 
-**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+### ai-memory-management
 
-### Update Mode Specifics
-- **Primary output**: `.claude/rules/` directory
-- **Secondary output**: `docs/ai-memory-setup.md`, `.claude/settings.json`, CLAUDE.md updates
-- **Preserve**: All user-created rule files, existing MCP server configurations, custom hooks, `docs/decisions/` content
-- **Related docs**: `docs/coding-standards.md`, `docs/tech-stack.md`, `docs/git-workflow.md`, `CLAUDE.md`
-- **Special rules**: Never remove a rule file the user created manually. Never replace an MCP server configuration without asking. Never modify `docs/decisions/` entries.
+*AI memory and context management patterns for Claude Code projects including modular rules, MCP memory servers, lifecycle hooks, decision logging, and external context integration*
 
-## Decision Points
+# AI Memory Management
 
-Use AskUserQuestionTool for these decisions:
+AI coding agents forget everything between sessions. Memory management is the practice of making that forgetting graceful — ensuring the right context is available at the right time without drowning the agent in irrelevant information. This knowledge covers the full spectrum from lightweight rule files to persistent memory servers.
 
-1. **Which memory tiers to enable?** Present all three tiers with descriptions. Tier 1 (Modular Rules) is always recommended. Tier 2 (Persistent Memory) and Tier 3 (External Context) are optional.
-2. **(Tier 2) Which MCP memory server?** Options: MCP Knowledge Graph (`@modelcontextprotocol/server-memory` — official, stable, recommended), or a custom MCP server the user already has configured. Auto-detect: check if any MCP memory server is already in `.claude/settings.json`.
-3. **(Tier 2) Which lifecycle hooks?** Options: PreCompact only (recommended — highest value, lowest noise), PreCompact + Stop (captures session summaries too), All three (PreCompact + Stop + PreToolUse — verbose, for complex projects).
-4. **(Tier 3) Which library doc server?** Options: Context7 (most popular, 1K free requests/month), Nia (comprehensive, 3K+ indexed packages), Docfork (9K+ libraries, MIT, self-hostable). Only offer if the project has external dependencies.
+## Summary
 
-## Tier 1: Modular Rules
+### The Memory Hierarchy
 
-This tier is always applicable. Extract conventions from existing project documents into path-scoped `.claude/rules/` files.
+AI memory operates in layers, each with different persistence and token cost:
 
-### Step 1.1: Audit Existing Docs
+| Layer | Persistence | Token Cost | Examples |
+|-------|------------|------------|----------|
+| **Context window** | Current session only | High (1:1) | Files read, conversation history |
+| **CLAUDE.md / rules** | Permanent (git-tracked) | Medium (loaded at start) | Conventions, commands, workflow |
+| **Auto-memory** | Cross-session (local) | Low (loaded on demand) | User preferences, project patterns |
+| **MCP memory server** | Cross-session (structured) | Low (queried on demand) | Decisions, lessons, error patterns |
+| **External docs** | Always current | Zero until queried | Library APIs, framework docs |
 
-Read these files completely and extract every actionable convention:
+### Core Principle: Signal Over Volume
 
-| Source Document | What to Extract |
-|----------------|-----------------|
-| `docs/coding-standards.md` | Naming conventions, import ordering, formatting rules, error handling patterns, type annotation rules |
-| `docs/tech-stack.md` | Technology-specific patterns, framework conventions, library usage patterns |
-| `docs/git-workflow.md` | Commit message format, branch naming, PR workflow steps |
-| `docs/tdd-standards.md` | Test naming, test structure, mocking rules, coverage requirements |
-| `docs/dev-setup.md` | Build commands, environment variables, tool usage |
+ETH Zurich research (2026) found that dumping context into AI sessions hurts more than it helps — 3% performance decrease with 20% cost increase for LLM-generated context files. The key insight: **only store what cannot be derived from the code itself.** Custom build commands, project-specific conventions, decision rationale, and team agreements are high-signal. Code patterns, file structure, and API shapes are low-signal (the agent can read the code).
 
-Skip any docs that don't exist yet.
+### The Three-Tier Memory Stack
 
-### Step 1.2: Plan Rule Files
+**Tier 1 — Modular Rules** (`.claude/rules/`): Path-scoped convention files loaded automatically based on what files the agent is working with. Zero manual effort after setup. Keeps CLAUDE.md lean.
 
-Group extracted conventions by file scope. Each rule file should target a specific concern and set of file patterns.
+**Tier 2 — Persistent Memory** (MCP server + hooks): Structured cross-session memory that captures decisions, lessons, and error patterns automatically via lifecycle hooks. Survives session boundaries.
 
-**Standard rule file plan:**
+**Tier 3 — External Context** (library doc servers): Version-specific documentation for project dependencies, queried on demand. Prevents API hallucination.
 
-| Rule File | Globs | Source |
-|-----------|-------|--------|
-| `code-style.md` | `src/**/*.{ts,tsx,js,jsx,py,go,rs}` | coding-standards.md — naming, formatting, imports |
-| `testing.md` | `**/*.{test,spec}.{ts,tsx,js,jsx}`, `tests/**/*` | tdd-standards.md — test patterns, mocking rules |
-| `git-conventions.md` | (always active — no globs) | git-workflow.md — commit format, branch naming, PR steps |
-| `api-routes.md` | `src/api/**/*`, `src/routes/**/*`, `app/api/**/*` | coding-standards.md + tech-stack.md — API patterns |
-| `database.md` | `**/schema.*`, `**/migrations/**/*`, `**/models/**/*` | coding-standards.md — ORM patterns, migration rules |
-| `frontend.md` | `src/components/**/*`, `src/pages/**/*`, `app/**/*.tsx` | coding-standards.md + tech-stack.md — component patterns |
-| `memory-hygiene.md` | (always active — no globs) | New — rules for what agents should/shouldn't save to memory |
+## Deep Guidance
 
-**Only create rule files relevant to this project.** If the project has no database, skip `database.md`. If it's backend-only, skip `frontend.md`. Read `docs/tech-stack.md` to determine which files apply.
+### Tier 1: Modular Rules
 
-### Step 1.3: Create Rule Files
+#### `.claude/rules/` Architecture
 
-For each planned rule file, create it in `.claude/rules/` with this format:
+Claude Code loads rule files from `.claude/rules/` based on path-scoping defined in YAML frontmatter. This replaces the pattern of stuffing everything into CLAUDE.md.
 
+**File structure:**
+```
+.claude/
+  rules/
+    code-style.md          # Always active — naming, formatting, imports
+    testing.md             # Active when working in test files
+    api-endpoints.md       # Active when working in API route files
+    database.md            # Active when working with schema/migration files
+    frontend.md            # Active when working in UI component files
+    memory-hygiene.md      # Always active — what to save/not save in memory
+```
+
+**Rule file format:**
 ```markdown
 ---
-description: [One-line description of what these rules cover]
-globs: ["glob/pattern/**/*.ts"]
+description: TypeScript naming and import conventions
+globs: ["src/**/*.ts", "src/**/*.tsx"]
 ---
 
-- [Actionable rule extracted from docs]
-- [Another actionable rule]
+- Use camelCase for variables/functions, PascalCase for types/classes
+- Import order: external packages, then internal modules, then relative imports
+- Prefer named exports over default exports
 ```
 
-**Rule writing guidelines:**
-- Each rule must be a single, actionable instruction
-- State what to do differently from defaults — don't restate obvious conventions
-- Use specific examples: "Use `camelCase` for variables" not "Use consistent naming"
-- Keep each rule file under 50 lines — if longer, split into two files
-- Total across all rule files should stay under 500 lines
-- Never include rules that duplicate what's already in CLAUDE.md
+**Key principles:**
+- Each rule file targets a specific concern and file pattern
+- Rules activate only when the agent works on matching files — no wasted tokens
+- Total rule content across all files should stay under 500 lines
+- Rules state what to do differently from defaults — don't restate obvious conventions
+- Extract rules from existing docs (coding-standards.md, tech-stack.md, git-workflow.md) rather than writing from scratch
 
-**Always create `memory-hygiene.md`** regardless of project type:
+#### CLAUDE.md Optimization
+
+After creating rules, CLAUDE.md should use the pointer pattern:
 
 ```markdown
----
-description: Rules for what AI agents should and should not save to memory
----
-
-- Save decisions and their rationale — these cannot be derived from code
-- Save corrections from the user — patterns to avoid repeating mistakes
-- Save team conventions not captured in docs — implicit knowledge
-- Do NOT save code patterns — read the code instead
-- Do NOT save file structure — use glob/grep instead
-- Do NOT save git history — use git log/blame instead
-- Do NOT save debugging solutions — the fix is in the code, context in the commit
-- When saving, include WHY not just WHAT — rationale enables judgment in edge cases
-- Review tasks/lessons.md before saving to avoid duplicates
+## Coding Conventions
+See `docs/coding-standards.md` for full reference. Key rules in `.claude/rules/code-style.md`.
 ```
 
-### Step 1.4: Optimize CLAUDE.md
+This replaces inline convention blocks, keeping CLAUDE.md under 200 lines (the empirically-validated adherence threshold).
 
-After creating rule files, update CLAUDE.md to use the pointer pattern:
+### Tier 2: Persistent Memory
 
-1. Read current CLAUDE.md completely
-2. Identify sections that duplicate content now covered by `.claude/rules/` files
-3. Replace inline convention blocks with pointers:
-   ```markdown
-   ## Coding Conventions
-   See `docs/coding-standards.md` for full reference. Path-scoped rules in `.claude/rules/`.
-   ```
-4. Verify CLAUDE.md stays under 200 lines after optimization
-5. Do NOT remove sections that contain project-specific information not in rules
+#### MCP Memory Servers
 
-### Step 1.5: Validate Rules
+**Recommended: MCP Knowledge Graph** (`@modelcontextprotocol/server-memory`)
+- Official MCP server from the Model Context Protocol project
+- Stores entities, relations, and observations in a local JSON file
+- Zero setup: `npx -y @modelcontextprotocol/server-memory`
+- Entities persist across sessions — decisions, patterns, project facts
+- Best for: All projects (stable, official, zero dependencies beyond Node)
 
-For each created rule file:
-1. Verify the globs match actual files in the project (`ls` or `find` the patterns)
-2. Verify no two rule files have identical globs (avoid double-loading)
-3. Verify rules accurately reflect the source document (re-read the source and compare)
-4. Run `wc -l .claude/rules/*.md` — total should be under 500 lines
+**Alternative: Custom MCP server**
+- If the user has a preferred MCP memory server already installed, use it
+- The key requirement is that it exposes MCP tools for storing and retrieving structured memory
+- Examples from the ecosystem: Engram (if installed), hmem (if installed), ContextVault
 
-## Tier 2: Persistent Memory
-
-Skip this tier if the user did not opt in.
-
-### Step 2.1: Detect Existing Memory Tools
-
-```bash
-# Check if an MCP memory server is already configured
-cat .claude/settings.json 2>/dev/null | python3 -c "
-import json, sys
-try:
-  cfg = json.load(sys.stdin)
-  servers = cfg.get('mcpServers', {})
-  for name in servers:
-    if 'memory' in name.lower() or 'knowledge' in name.lower():
-      print(f'MCP memory server configured: {name}')
-      sys.exit(0)
-  print('No MCP memory server configured')
-except: print('No .claude/settings.json found')
-" 2>/dev/null
-```
-
-If a memory server is already configured, verify it works rather than replacing it.
-
-### Step 2.2: MCP Memory Server Setup
-
-Configure the MCP Knowledge Graph server — the official `@modelcontextprotocol/server-memory` package. It stores entities, relations, and observations in a local JSON file.
-
+**Configuration pattern** (`.claude/settings.json`):
 ```json
 {
   "mcpServers": {
@@ -188,19 +186,12 @@ Configure the MCP Knowledge Graph server — the official `@modelcontextprotocol
 }
 ```
 
-The `MEMORY_FILE_PATH` should use an absolute path or a path relative to the project root. The server stores a knowledge graph of entities and their relationships — decisions, patterns, and project facts persist across sessions.
+#### Lifecycle Hooks
 
-Add `.claude/memory-graph.json` to `.gitignore` (memory is local to the developer, not shared via git).
+Hooks automate memory capture at key session events:
 
-**If the user has a different MCP memory server** they prefer (e.g., one they've already installed), use their configuration instead. The key requirement is that it exposes MCP tools for storing and retrieving structured memory.
+**PreCompact** (highest value) — Triggers before context compression. Logs when compaction occurs for debugging context loss.
 
-**Important**: Merge into existing `.claude/settings.json` — do not overwrite. Read the file first, add the `mcpServers` entry, write back.
-
-### Step 2.3: Lifecycle Hooks
-
-Based on the user's hook choices, add hook configuration to `.claude/settings.json`:
-
-**PreCompact hook** (always recommended):
 ```json
 {
   "hooks": {
@@ -213,135 +204,85 @@ Based on the user's hook choices, add hook configuration to `.claude/settings.js
 }
 ```
 
-**Stop hook** (optional):
+File-logging for compaction events:
 ```json
 {
   "hooks": {
-    "Stop": [{
+    "PreCompact": [{
       "type": "command",
-      "command": "echo \"$(date '+%Y-%m-%d %H:%M:%S') — Session ended\" >> .claude/compaction-log.txt",
+      "command": "date '+%Y-%m-%d %H:%M' >> .claude/compaction-log.txt && echo 'Context compacted' >> .claude/compaction-log.txt",
       "timeout": 5000
     }]
   }
 }
 ```
 
-Note: These hooks log compaction and session events for debugging context loss. The MCP Knowledge Graph server configured in Step 2.2 handles persistent memory storage — Claude Code's built-in auto-memory and the MCP server work together to preserve important context across sessions. The hooks provide an audit trail of when compaction occurs.
+**Stop** — Triggers when a session ends. Good for capturing session-level summaries.
 
-**Merge hooks into existing configuration** — do not overwrite existing hooks.
+**PreToolUse** — Triggers before tool calls. Can log decisions about file modifications. Use sparingly — high frequency means high overhead.
 
-### Step 2.3b: Update .gitignore
+**Hook selection guidance:**
+- Start with PreCompact only — it captures the most value with least noise
+- Hook commands must produce a side effect (write to MCP server, append to file) — echoing to `/dev/null` provides zero value
+- Add Stop if sessions frequently end with unrecorded decisions
+- Avoid PreToolUse unless you have a specific logging need — it fires constantly
 
-After configuring the MCP memory server and hooks, update `.gitignore` to exclude local memory databases and logs:
+#### Decision Logging
 
-```bash
-# Add to .gitignore if not already present
+Decisions are the highest-value memory type because they cannot be derived from code. A decision log captures what was chosen, what was rejected, and why.
+
+**Structure:**
+```
+docs/decisions/
+  DECISIONS.md          # Index of all decisions
+  001-auth-strategy.md  # Individual decision records
+  002-database-choice.md
 ```
 
-Entries to add (only for the configured server):
-
-| Component | .gitignore Entry |
-|-----------|-----------------|
-| MCP Knowledge Graph | `.claude/memory-graph.json` |
-| Compaction log | `.claude/compaction-log.txt` |
-
-Read `.gitignore` first, check if entries already exist, and only append missing ones. Memory databases are local — they should never be committed to git.
-
-### Step 2.4: Decision Logging Structure
-
-Create the decision logging structure:
-
-```bash
-mkdir -p docs/decisions
-```
-
-Create `docs/decisions/README.md`:
-
-Check if `.beads/` exists to determine whether to include Beads task ID in the decision format.
-
+**Decision entry format:**
 ```markdown
-# Decision Log
+## DEC-001: JWT over session cookies for auth
 
-This directory captures **implementation decisions** made during development.
-Decisions are the highest-value memory type — they cannot be derived from code.
-
-## Decision Log vs ADRs vs Lessons
-
-| Type | Location | Scope | Example |
-|------|----------|-------|---------|
-| **Decision Log** | `docs/decisions/` | Day-to-day implementation choices | "Use JWT over session cookies for auth" |
-| **ADRs** | `docs/adrs/` | Architecture-level decisions | "Adopt event-driven architecture for notifications" |
-| **Lessons** | `tasks/lessons.md` | Recurring patterns and anti-patterns | "Always run migrations before seeding" |
-
-**Rule of thumb**: If the decision shapes the system's structure → ADR. If it's an implementation choice within an established structure → Decision Log. If it's a pattern you want to remember → Lessons.
-
-## Format
-
-Each decision file follows this structure:
-
-```
-## DEC-NNN: [Short title]
-
-**Date:** YYYY-MM-DD
-**Task:** [BD-xxx or N/A if no Beads]
-**Context:** [What situation prompted this decision]
-**Decision:** [What was chosen]
-**Rejected:** [What alternatives were considered and why they were rejected]
-**Consequences:** [What this decision means for future work]
+**Date:** 2026-03-27
+**Context:** Need stateless auth for API-first architecture
+**Decision:** Use JWT with short-lived access tokens + refresh tokens
+**Rejected:** Session cookies (requires sticky sessions), OAuth-only (too complex for MVP)
+**Consequences:** Need token refresh logic in frontend, need secure token storage
 ```
 
-If Beads is not configured, omit the **Task:** line.
+This complements ADRs (which cover architecture-level decisions) by capturing day-to-day implementation decisions that would otherwise be lost between sessions.
 
-## When to Log a Decision
+#### Session Handoff Patterns
 
-- Choosing between two viable approaches
-- Rejecting a library, tool, or pattern
-- Making a trade-off (performance vs. readability, etc.)
-- User explicitly asks to "remember" a decision
-- A correction reveals a non-obvious convention
+When context hits limits, structured handoff preserves continuity:
 
-## When NOT to Log
+1. **Before compaction**: Save current task state, open questions, and recent decisions
+2. **After compaction**: Claude Code auto-reloads CLAUDE.md and auto-memory, but loses working context
+3. **Recovery**: Agent reads decision log and memory server to reconstruct working state
 
-- Obvious choices with no viable alternative
-- Decisions already captured in ADRs (docs/adrs/)
-- Temporary debugging choices
-- Decisions already in tasks/lessons.md
-```
+The `/compact` command is the natural handoff point. A PreCompact hook that saves session state ensures nothing critical is lost.
 
-### Step 2.5: Update CLAUDE.md for Memory
+### Tier 3: External Context
 
-Add a "Memory & Context" section to CLAUDE.md:
+#### Library Documentation Servers
 
-```markdown
-## Memory & Context
-- Path-scoped rules in `.claude/rules/` — loaded automatically per file type
-- Decision log in `docs/decisions/` — log non-obvious implementation decisions
-- MCP memory server configured — use for cross-session pattern recall
-- See `docs/ai-memory-setup.md` for full memory stack documentation
-```
+AI agents hallucinate APIs — they generate plausible but incorrect function signatures, especially for rapidly-evolving libraries. External doc servers solve this by providing current, version-specific documentation on demand.
 
-## Tier 3: External Context
+**Context7** (by Upstash) — Most popular, fetches current library docs via MCP
+- Covers major frameworks (React, Next.js, Vue, Angular, etc.)
+- Free tier: 1,000 requests/month
+- Caution: had a security vulnerability (patched) — review before enabling
 
-Skip this tier if the user did not opt in.
+**Nia** (by Nozomio) — Indexes codebases + 3,000+ pre-indexed packages
+- Cross-session context persistence
+- Deep research agent for complex questions
+- Y Combinator backed, more comprehensive than Context7
 
-### Step 3.1: Assess Dependencies
+**Docfork** — 9,000+ libraries, MIT license
+- "Cabinets" for project-specific documentation isolation
+- Self-hostable
 
-Read `package.json` (or equivalent dependency file). Count external dependencies and identify rapidly-evolving frameworks.
-
-**High-value targets for external docs:**
-- React, Next.js, Remix, Vue, Nuxt, Svelte, SvelteKit, Angular
-- Prisma, Drizzle, TypeORM, Sequelize
-- tRPC, GraphQL, gRPC
-- Tailwind CSS, Radix UI, shadcn/ui
-- Expo, React Native
-
-If the project has 0 external dependencies or only uses stable standard libraries, recommend skipping this tier.
-
-### Step 3.2: Configure Library Doc Server
-
-Based on the user's choice:
-
-**Context7 configuration:**
+**Configuration pattern:**
 ```json
 {
   "mcpServers": {
@@ -353,113 +294,24 @@ Based on the user's choice:
 }
 ```
 
-**Nia configuration:**
-```json
-{
-  "mcpServers": {
-    "nia": {
-      "command": "npx",
-      "args": ["-y", "@nozomio/nia-mcp@latest"]
-    }
-  }
-}
-```
+**When to enable:** Projects with 3+ external dependencies, especially rapidly-evolving frameworks (React, Next.js, Svelte). Skip for standard library-only projects or well-established stable APIs.
 
-**Docfork configuration:**
-```json
-{
-  "mcpServers": {
-    "docfork": {
-      "command": "npx",
-      "args": ["-y", "docfork-mcp@latest"]
-    }
-  }
-}
-```
+### Anti-Patterns
 
-**Merge into existing `.claude/settings.json`** — do not overwrite.
+| Anti-Pattern | Why It Fails | Instead |
+|-------------|-------------|---------|
+| Dumping entire codebase into context | Drowns signal in noise, costs tokens | Let the agent read files on demand |
+| Storing code patterns in memory | Duplicates what's in the code; goes stale | Store decisions and rationale only |
+| Huge CLAUDE.md (500+ lines) | Adherence drops sharply above 200 lines | Use .claude/rules/ for specifics |
+| Memory without structure | Unstructured notes become unsearchable noise | Use categories (decision, lesson, error) |
+| Capturing everything | Token cost with diminishing returns | Capture what can't be derived from code |
+| Multiple overlapping memory tools | Conflicting context, duplicated entries | Pick one MCP server, use it consistently |
 
-### Step 3.3: Verify External Context
+### Integration with Beads
 
-After configuration, verify the server responds:
-1. Restart Claude Code (or reload MCP servers) for the new configuration to take effect
-2. Test by querying documentation for one of the project's key dependencies
-3. If the server fails to start, check the error and suggest troubleshooting steps
-
-## Documentation
-
-Create `docs/ai-memory-setup.md` documenting the configured memory stack:
-
-```markdown
-<!-- scaffold:ai-memory-setup v1.0 YYYY-MM-DD -->
-# AI Memory & Context Management
-
-## Memory Stack
-
-| Tier | Status | Components |
-|------|--------|------------|
-| Tier 1: Modular Rules | ✅ Enabled | .claude/rules/ (N files, N lines total) |
-| Tier 2: Persistent Memory | ✅/⬜ | [MCP server name], [hooks enabled] |
-| Tier 3: External Context | ✅/⬜ | [Library doc server name] |
-
-## Rule Files
-
-| File | Scope | Lines | Source |
-|------|-------|-------|--------|
-| code-style.md | src/**/*.ts | N | coding-standards.md |
-| ... | ... | ... | ... |
-
-## MCP Servers
-
-[List configured MCP servers with their purpose]
-
-## Lifecycle Hooks
-
-[List configured hooks with their trigger and purpose]
-
-## Maintenance
-
-### Adding Rules
-Create a new `.md` file in `.claude/rules/` with YAML frontmatter containing `description` and `globs` fields.
-
-### Updating Rules
-When coding conventions change, update both the source doc and the corresponding rule file.
-
-### Decision Logging
-Log non-obvious decisions to `docs/decisions/DEC-NNN-title.md`. See `docs/decisions/README.md` for format.
-
-### Memory Hygiene
-Review `.claude/rules/memory-hygiene.md` for what should and should not be saved to memory.
-```
-
-## Process
-
-1. Read all source documents (coding-standards.md, tech-stack.md, git-workflow.md, tdd-standards.md, dev-setup.md)
-2. Present tier choices to the user (AskUserQuestionTool)
-3. Execute Tier 1: Extract conventions into `.claude/rules/` files
-4. Optimize CLAUDE.md with pointer pattern
-5. Validate rule files (globs match real files, no duplicates, under 500 lines total)
-6. (Tier 2) Detect and configure MCP memory server
-7. (Tier 2) Configure lifecycle hooks
-8. (Tier 2) Create decision logging structure
-9. (Tier 3) Assess dependencies and configure library doc server
-10. Write `docs/ai-memory-setup.md` documentation
-11. Verify the complete memory stack
-
-## After This Step
-
-When this step is complete, tell the user:
-
----
-**Memory setup complete** — AI memory stack configured and documented in `docs/ai-memory-setup.md`.
-
-**Configured:**
-- `.claude/rules/` — [N] path-scoped rule files ([N] lines total)
-- [Tier 2 summary if enabled]
-- [Tier 3 summary if enabled]
-
-**Next:** Run `/scaffold:add-e2e-testing` to configure end-to-end testing, or `/scaffold:create-prd` to begin product definition.
-
-**Pipeline reference:** `/scaffold:prompt-pipeline`
-
----
+When Beads is configured, memory complements task tracking:
+- **Beads** tracks what work to do (tasks, dependencies, status)
+- **Memory** tracks how to do work better (patterns, decisions, lessons)
+- Decision log entries can reference Beads task IDs for traceability
+- `tasks/lessons.md` remains the cross-session learning file; MCP memory adds structured queryability
+- Don't duplicate: if a pattern is in `tasks/lessons.md`, don't also store it in the MCP server

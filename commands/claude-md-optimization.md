@@ -1,271 +1,331 @@
 ---
-description: "Consolidate and optimize CLAUDE.md"
-long-description: "Reorganizes and deduplicates CLAUDE.md to maximize signal density, ensuring all project conventions are clear and non-redundant for AI agents."
+description: "Consolidate and optimize CLAUDE.md for maximum signal density"
+long-description: "Review all project documentation and consolidate CLAUDE.md into the definitive,"
 ---
 
-Review all project documentation and consolidate CLAUDE.md into the definitive, optimized reference for AI agents working on this project.
+## Purpose
+Review all project documentation and consolidate CLAUDE.md into the definitive,
+optimized reference for AI agents. Eliminate redundancy from incremental additions
+by multiple setup prompts, fix inconsistencies in terminology and commands, fill
+gaps in workflow coverage, and front-load the most critical information for agent
+scannability.
+
+## Inputs
+- CLAUDE.md (required) — current state with incremental additions
+- docs/plan.md (required) — PRD for context
+- docs/tech-stack.md (required) — technology choices
+- docs/coding-standards.md (required) — code conventions
+- docs/tdd-standards.md (required) — testing approach
+- docs/git-workflow.md (required) — branching and PR workflow
+- docs/project-structure.md (required) — file placement rules
+- docs/user-stories.md (optional) — feature context
+
+## Expected Outputs
+- CLAUDE.md — restructured and consolidated with Core Principles, Git Workflow,
+  Workflow (session start through next task), Parallel Sessions, Quick Reference
+  (structure, Key Commands, doc lookup), Rules (git, code, coordination, error
+  recovery), Browser/E2E Testing, Self-Improvement, Autonomous Behavior
+
+## Quality Criteria
+- (mvp) No duplicated instructions within CLAUDE.md
+- (mvp) No verbatim repetition of content from other docs (reference instead)
+- (mvp) Consistent terminology throughout (task vs. ticket, etc.)
+- (mvp) Key Commands table matches actual Makefile/package.json commands
+- Critical patterns are prominent (TDD, never push to main, keep working,
+  verify before commit, worktrees for parallel). If Beads: every commit needs task ID.
+- (deep) CLAUDE.md is <= 200 lines or critical patterns appear in the first 50 lines
+- (deep) Workflow scenarios cover error cases (test failures, merge conflicts, CI failures,
+  crashed sessions, blocked tasks)
+- Tracking comment added: <!-- scaffold:claude-md-optimization v1 YYYY-MM-DD -->
+
+## Methodology Scaling
+- **deep**: Full four-phase analysis (redundancy, consistency, gap, priority audits)
+  with detailed changelog. Comprehensive error recovery section. All nine critical
+  patterns verified present and prominent.
+- **mvp**: Quick pass to remove obvious duplicates and ensure workflow section is
+  complete. Fix any command inconsistencies. Skip detailed audit.
+- **custom:depth(1-5)**: Depth 1-2: dedup + workflow check. Depth 3: add
+  consistency pass. Depth 4: add gap analysis. Depth 5: full four-phase audit.
 
 ## Mode Detection
+Always operates in update mode (CLAUDE.md always exists by this point). Check
+for tracking comment `<!-- scaffold:claude-md-optimization v1 YYYY-MM-DD -->`
+to detect prior optimization. If present, compare current CLAUDE.md against
+the prior version date to identify sections added or changed since last
+optimization. Preserve manually-added sections (user customizations not from
+setup prompts). Only consolidate sections that originated from setup prompts —
+do not restructure user-authored content. Do not add new workflow steps or
+rules — only consolidate and clarify what already exists.
 
-Before starting, check if `CLAUDE.md` contains a tracking comment `<!-- scaffold:claude-md-optimization v1 YYYY-MM-DD -->`:
+## Update Mode Specifics
+- **Detect prior artifact**: tracking comment in CLAUDE.md with version and date
+- **Preserve**: manually-added sections, user-customized rules, project-specific
+  command aliases, any content not traceable to a pipeline setup prompt
+- **Triggers for update**: new setup prompts completed, coding-standards updated,
+  tdd-standards updated, git-workflow updated, terminology inconsistencies
+  introduced by incremental additions
+- **Conflict resolution**: if a user-customized section conflicts with a setup
+  prompt's output, keep the user version and flag the conflict in a comment
 
-**If the tracking comment is NOT found → FRESH MODE**: Skip to the next section and consolidate from scratch.
+---
 
-**If the tracking comment IS found → UPDATE MODE**:
-1. **Read & analyze**: Read the existing CLAUDE.md completely. Note the version date from the tracking comment.
-2. **Identify changes since last optimization**: Check which setup prompts have appended new sections or modified existing content since the last optimization date.
-3. **Preserve user customizations**: Identify manually-added sections, user-customized rules, and project-specific command aliases — do not restructure these.
-4. **Propose targeted updates**: Present the user a summary of what will be consolidated, deduplicated, or restructured. Only consolidate sections that originated from setup prompts.
-5. **Execute update**: Apply consolidation while preserving all user-authored content. If a user-customized section conflicts with a setup prompt's output, keep the user version and flag the conflict in a comment.
-6. **Update tracking comment**: Update the date in `<!-- scaffold:claude-md-optimization v1 YYYY-MM-DD -->`.
+## Domain Knowledge
 
-**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+### claude-md-patterns
 
-## Beads Detection
+*Patterns for structuring CLAUDE.md files including section organization, rule authoring, pointer patterns, and merge strategies*
 
-Check if `.beads/` directory exists. This determines whether task management sections use Beads commands or conventional alternatives:
-- **Beads project**: `.beads/` exists → include Beads command references, `bd` CLI workflows, `[BD-<id>]` commit prefixes, `BD_ACTOR` for parallel agents
-- **Non-Beads project**: `.beads/` does not exist → use conventional commits (`type(scope): description`), standard branch naming (`feat/`, `fix/`), skip all `bd` command references
+# CLAUDE.md Patterns
 
-Apply this detection throughout all sections below. When this prompt says "If Beads:" or "Without Beads:", use the detected mode.
+CLAUDE.md is the primary instruction file for AI coding agents. It is loaded at the start of every session and defines how the agent should behave within a project. A well-structured CLAUDE.md dramatically improves agent adherence; a poorly structured one gets ignored or causes conflicts. This knowledge covers structure, authoring, the pointer pattern, and the merge strategy for multi-step pipeline updates.
 
-## Context
+## Summary
 
-Throughout project setup, multiple prompts have added sections to CLAUDE.md:
-- Core workflow and TDD process
-- Task management (Beads, if configured)
-- Git workflow procedures (branching, PRs, protected main)
-- Parallel agent coordination (worktrees)
-- Browser testing with Playwright or Maestro
-- Project structure quick reference
+### Purpose
 
-These incremental additions may have created redundancy, inconsistency, or gaps. This prompt consolidates everything into a single, tight document.
+CLAUDE.md is a project-level instruction file that AI agents (Claude Code, Codex, etc.) read at session start. It answers three questions:
+1. **What are the rules?** — Coding conventions, git workflow, testing requirements
+2. **How do I do common tasks?** — Key commands, PR workflow, deployment
+3. **What should I avoid?** — Anti-patterns, forbidden operations, common pitfalls
 
-**Ordering note:** This prompt should run BEFORE the Workflow Audit prompt. This prompt consolidates; the Workflow Audit verifies alignment with the canonical workflow.
+### Section Organization
 
-## Rules Detection
+A well-structured CLAUDE.md follows this order, from most-referenced to least:
 
-Check if `.claude/rules/` directory exists. If it does:
-- **Rules exist**: Read all `.md` files in `.claude/rules/`. These contain path-scoped conventions extracted from project docs. CLAUDE.md should use the **pointer pattern** — reference rules and docs instead of inlining their content.
-- **No rules**: Proceed normally. Recommend running `/scaffold:ai-memory-setup` in the After This Step guidance if CLAUDE.md exceeds 200 lines.
+| Section | Purpose | Example Content |
+|---------|---------|-----------------|
+| **Core Principles** | 3-5 non-negotiable tenets | TDD, simplicity, no laziness |
+| **Project Overview** | What this project is (1-2 sentences) | "Prompt pipeline for scaffolding projects" |
+| **Key Commands** | Commands the agent runs constantly | `make check`, `make test`, `npm run dev` |
+| **Workflow** | How to do common operations | Branch, commit, PR, merge flow |
+| **Structure Quick Reference** | Where files go | Directory table with purpose |
+| **Environment** | Dev setup specifics | Build tool, test runner, linter |
+| **Rules** | Specific do/don't instructions | "Never push to main directly" |
+| **Self-Improvement** | Learning feedback loop | Lessons file, correction capture |
+| **Autonomous Behavior** | What the agent should do proactively | Fix bugs on sight, use subagents |
+| **Doc Lookup Table** | Where to find detailed docs | Question-to-document mapping |
 
-When rules exist, actively move inline convention blocks from CLAUDE.md into rule files or replace them with pointers:
+### Rule Authoring Best Practices
+
+Rules must be specific, actionable, and testable:
+
+**Good rules:**
+- "Run `make check` before every commit"
+- "Never push directly to main — always use branch + PR"
+- "Every commit message starts with `[BD-xxx]` task ID"
+
+**Bad rules:**
+- "Write clean code" — what does clean mean?
+- "Be careful with git" — what specific actions to take/avoid?
+- "Follow best practices" — which ones?
+
+### The Pointer Pattern
+
+Reference external docs instead of duplicating content inline:
+
 ```markdown
 ## Coding Conventions
-See `docs/coding-standards.md` for full reference. Path-scoped rules in `.claude/rules/`.
+See `docs/coding-standards.md` for full reference. Key rules in `.claude/rules/code-style.md`.
 ```
 
-## Documents to Review
+This keeps CLAUDE.md under 200 lines (the empirically-validated adherence threshold) while preserving access to detailed docs. The agent reads referenced docs on demand rather than processing everything at session start.
 
-Read and cross-reference ALL of these:
-- `CLAUDE.md` (current state)
-- `.claude/rules/*.md` (if directory exists — modular rules for AI agents)
-- `docs/plan.md` (PRD)
-- `docs/tech-stack.md`
-- `docs/coding-standards.md`
-- `docs/tdd-standards.md`
-- `docs/git-workflow.md`
-- `docs/project-structure.md`
-- `docs/user-stories.md`
+## Deep Guidance
 
-## Analysis Phase
+### Section Organization — Extended
 
-### 1. Redundancy Audit
-- Identify instructions that appear in multiple places within CLAUDE.md
-- Identify CLAUDE.md content that duplicates what's in other docs verbatim
-- Principle: CLAUDE.md should reference other docs, not repeat them
+#### Front-Loading Critical Information
 
-### 2. Consistency Audit
-- Terminology: Are we consistent? (task vs. ticket, feature vs. story, etc.)
-- Commands: Are task management commands (if any), git commands, and test commands shown consistently?
-- Workflow steps: Does the session-start and session-end sequence appear once, clearly?
-- **If Beads:** Branching pattern uses `git checkout -b bd-<id>/<desc> origin/main` consistently. Commit format uses `[BD-<id>] type(scope): description` consistently.
-- **Without Beads:** Branching pattern uses `git checkout -b <type>/<desc> origin/main` (e.g., `feat/add-auth`, `fix/login-bug`). Commit format uses conventional commits: `type(scope): description`.
+Agents skim CLAUDE.md. The first 50 lines get the most attention. Place the most violated rules and most-used commands at the top. Core Principles and Key Commands should appear before any detailed documentation.
 
-### 3. Gap Audit
-- Is every doc referenced appropriately? (Agent should know when to consult each)
-- Are there workflow scenarios not covered? (What if tests fail? What if there's a merge conflict? What if push to main is rejected? What if an agent session crashes mid-task?)
-- Are the most common agent mistakes addressed with explicit rules?
-- Is the parallel agent workflow clear? (Permanent worktrees with workspace branches, agents cannot checkout main, always branch from origin/main)
-- Is the PR workflow explicit and complete? (Rebase, push, create PR, auto-merge with --delete-branch, watch CI, confirm merge)
-- Is branch cleanup documented with both variants? (Single agent: checkout main, delete branch, prune. Worktree: fetch, prune, clean.)
-- **If Beads:** Is task closure clear? (`bd close`, `bd sync` after merge.) Is the continuous work loop clear? (Keep working until `bd ready` returns nothing.) Is it clear every commit requires a task ID? (`[BD-<id>]` prefix.)
-- **Without Beads:** Is the continuous work loop clear? (Keep working on assigned tasks until done.)
-- Does the Key Commands table include all project-specific commands? (lint, test, install, dev server — these must match what's in Makefile/package.json/pyproject.toml, and the workflow references this table instead of hardcoding commands)
-- Does the planning guidance explicitly warn against Claude Code's interactive `/plan` mode? (Agents should think through their approach, NOT enter `/plan` which blocks autonomous execution)
-- Does CLAUDE.md include anti-sycophancy guidance? (Agent should push back on approaches with clear problems rather than agreeing — state the downside, propose alternatives, accept override)
-- Does CLAUDE.md include scope discipline? (Agent should flag when a task is growing beyond its original scope and suggest breaking it into phases)
-- Are critical rules written in structured formats (numbered steps, tables, bold imperatives) rather than buried in prose paragraphs?
+#### The 200-Line Threshold
 
-### 4. Priority Audit
-- What are the most important things an agent must do correctly?
-  - TDD (failing test first)
-  - Never push to main (always PR with squash)
-  - Keep working until no tasks remain
-  - Verify before committing (tests pass, lint clean)
-  - Use worktrees for parallel agents
-  - **If Beads:** Every commit needs a Beads task ID (`[BD-<id>]` prefix)
-- Are these prominent and unambiguous, or buried in prose?
-- Could an agent skim CLAUDE.md in 30 seconds and get the critical points?
+Research and practical experience show that agent adherence drops sharply when CLAUDE.md exceeds ~200 lines. Beyond that length, agents start selectively ignoring instructions — particularly those in the middle or bottom of the file.
 
-## CLAUDE.md Structure
+Strategies to stay under 200 lines:
+- Use the pointer pattern for anything longer than 5 lines
+- Move path-scoped conventions to `.claude/rules/` files
+- Keep tables compact (no verbose descriptions)
+- Eliminate redundancy (same rule stated multiple ways)
 
-After analysis, restructure CLAUDE.md to follow this format:
+#### Section Templates
 
+**Core Principles** — 3-5 tenets, each a single sentence with a bold label:
 ```markdown
-# CLAUDE.md
-
 ## Core Principles
-[3-5 non-negotiable rules - the things that matter most. Candidates: TDD always, never push to main, honesty over agreement (push back on flawed approaches rather than complying), scope discipline (flag scope creep, suggest phased approach)]
-
-## Git Workflow (CRITICAL)
-[Never commit to main, full PR workflow: rebase → push → create PR → auto-merge with --delete-branch → watch CI → confirm merge, key commands]
-
-## Workflow
-
-### Session Start
-[Exact steps - review lessons file (if exists), check for available tasks, etc. **If Beads:** `bd ready` to find next task.]
-
-### Plan Before Building
-[Think through approach for non-trivial work. Write specs upfront. CRITICAL: Do NOT enter Claude Code's interactive `/plan` mode — it blocks autonomous execution. Just think through the problem internally.]
-
-### Implementation Loop
-[TDD cycle repeating per piece of functionality, verification using Key Commands lint+test, AI review subagent before push (checks diff against CLAUDE.md + coding-standards.md, fix P0/P1). Multiple commits per task are normal — they squash-merge. Rebase onto origin/main before push. One clear flow. **If Beads:** commits use `[BD-<id>] type(scope): description` format. **Without Beads:** commits use `type(scope): description` (conventional commits).]
-
-### Task Closure and Next Task
-[Confirm merge. Single agent: checkout main, delete branch, prune. Worktree agent: fetch, prune, clean, branch from origin/main (cannot checkout main). Keep working until no tasks remain. **If Beads:** `bd close <id>`, `bd sync` after merge.]
-
-### Session End
-[Exact steps - mandatory, in order]
-
-## Parallel Sessions (Worktrees)
-[For multiple simultaneous agents - permanent worktrees with workspace branches, agents cannot checkout main (it's checked out in main repo), always branch from origin/main, workspace cleanup between tasks, batch branch cleanup. **If Beads:** BD_ACTOR for agent attribution.]
-
-## Quick Reference
-
-### Project Structure
-[Where things go - table or brief list, link to full doc]
-
-### Key Commands
-[Git, PR commands — these are universal. **If Beads:** include Beads commands (`bd ready`, `bd create`, `bd close`, etc.).]
-[Lint, test, install, dev server commands — these are project-specific, populated by the Dev Setup prompt. The workflow references this table instead of hardcoding commands.]
-
-### When to Consult Other Docs
-[Progressive disclosure: this table is the primary mechanism for keeping CLAUDE.md lean. Instead of duplicating guide content, agents load situational context on-demand when they hit a matching scenario.]
-| Situation | Document |
-|-----------|----------|
-| Need to understand a feature | docs/user-stories.md |
-| Architecture decision questions | docs/tech-stack.md |
-| Code style question | docs/coding-standards.md |
-| Testing approach question | docs/tdd-standards.md |
-| Git/branching question | docs/git-workflow.md |
-| Where to put a file | docs/project-structure.md |
-| Running multiple agents in parallel | docs/git-workflow.md |
-| Review criteria / severity definitions | docs/review-standards.md |
-| Codex Cloud review instructions | AGENTS.md |
-| AI memory stack documentation | docs/ai-memory-setup.md |
-
-## Rules
-
-[**If `.claude/rules/` exists**: Reference the rules directory here — "Path-scoped rules in `.claude/rules/` activate automatically per file type. See `docs/ai-memory-setup.md` for details." Do NOT inline rule content.]
-
-### Git Rules
-[Branch format, commit format, forbidden actions like push to main, --force-with-lease only. **If Beads:** commit format uses `[BD-<id>]` prefix and branch format uses `bd-<id>/`. **Without Beads:** conventional commits and `<type>/` branch prefixes.]
-
-### Code Rules
-[AI-Specific pitfalls to avoid - consolidated from all docs]
-
-### Coordination
-[High-conflict files and how to handle them]
-
-### Error Recovery
-[What to do when things go wrong - test failures, merge conflicts, blocked tasks, CI failures, crashed agent sessions, orphaned worktree work]
-
-## Browser/E2E Testing
-[Playwright MCP or Maestro usage - keep brief, patterns only]
-
-## Self-Improvement
-[Lessons file location, when to update it, periodic CLAUDE.md health check: regularly ask "Is every instruction still earning its place in always-loaded context?" and move stale or situational rules to docs/]
-
-## Autonomous Behavior
-[Fix bugs on sight, keep working until no tasks, use subagents]
-[**If Beads:** Every fix/enhancement needs a Beads task — commit messages require task ID]
+- **Simplicity First**: Make every change as simple as possible.
+- **TDD Always**: Write failing tests first, then make them pass.
+- **Prove It Works**: Never mark a task complete without demonstrating correctness.
 ```
 
-## Optimization Principles
+**Key Commands** — Table format, sorted by frequency of use:
+```markdown
+## Key Commands
+| Command | Purpose |
+|---------|---------|
+| `make check` | Run all quality gates |
+| `make test` | Run test suite |
+| `make lint` | Run linters |
+```
 
-### Every Instruction Must Earn Its Place
-CLAUDE.md is loaded into context on every interaction — every line costs tokens and attention. Apply the "earn its place" test: if an instruction doesn't directly change agent behavior on most tasks, move it to a situational doc and reference it instead. If something is in another doc, reference it — don't repeat it.
+**Doc Lookup Table** — Question-to-document mapping:
+```markdown
+## When to Consult Other Docs
+| Question | Document |
+|----------|----------|
+| How do I branch and commit? | `docs/git-workflow.md` |
+| What are the coding conventions? | `docs/coding-standards.md` |
+```
 
-**If `.claude/rules/` exists**: Convention-specific rules (naming, formatting, imports, test patterns) belong in path-scoped rule files, NOT in CLAUDE.md. Rule files activate automatically when the agent works on matching files. Move any inline convention blocks to the appropriate rule file and replace with a pointer. Target: CLAUDE.md under 200 lines total.
+### Rule Authoring — Extended
 
-### Scannability
-- Use tables for lookups
-- Use numbered steps for sequences
-- Use bullet points sparingly and only for truly parallel items
-- Bold the most critical words in any rule
+#### The Testability Criterion
 
-### Structured Formats for Critical Rules
-For rules agents MUST follow without exception, use structured formats — numbered steps, tables, or bold imperatives — over plain prose paragraphs. Agents process structured content more reliably than narrative text. Reserve prose for context and rationale.
+Every rule should be verifiable. If you cannot check whether the rule was followed, the rule is too vague.
 
-### Front-Load the Important Stuff
-The first thing an agent reads should be the most important. Core principles and session-start workflow should be at the top, not buried after background context.
+| Rule | Testable? | Fix |
+|------|-----------|-----|
+| "Write good tests" | No | "Every new function has at least one unit test" |
+| "Use proper naming" | No | "Use camelCase for variables, PascalCase for types" |
+| "Run `make check` before commits" | Yes | — |
+| "Never commit `.env` files" | Yes | — |
 
-### Actionable Over Aspirational
-Every sentence should either be:
-- A specific action to take
-- A specific thing to avoid
-- A pointer to where to find more detail
+#### Conflict Resolution
 
-Remove any "philosophy" or "background" that doesn't directly change agent behavior.
+Rules can conflict. When they do, the resolution order is:
+1. CLAUDE.md rules override general conventions
+2. More specific rules override more general rules
+3. Later rules override earlier rules (if truly contradictory)
+4. Project-specific rules override ecosystem defaults
 
-### Key Commands Is Source of Truth
-The Key Commands table in Quick Reference is the single source of truth for project-specific commands (lint, test, install, dev server). The canonical workflow, git workflow, CI pipeline, and worktree cleanup all reference this table instead of hardcoding commands. Do NOT remove, rename, or split this table. Ensure all project commands are present and match the actual Makefile/package.json/pyproject.toml.
+Document known conflicts explicitly: "This project uses tabs despite the TypeScript convention of spaces — see `.editorconfig`."
 
-## What to Deliver
+#### Negative Rules vs. Positive Rules
 
-1. **Analysis summary**: Brief list of redundancies, inconsistencies, and gaps found
-2. **Optimized CLAUDE.md**: The restructured, consolidated document
-3. **Changelog**: What was removed, what was added, what was reorganized
-4. **Verification checklist**: Confirm the critical patterns are explicit and prominent
+Prefer positive rules ("always do X") over negative rules ("never do Y") when possible. Positive rules tell the agent what to do; negative rules only eliminate one option from an infinite set.
 
-## Process
+Exception: safety-critical negative rules are valuable. "Never push to main directly" and "Never commit secrets" are clearer as negatives.
 
-- Do NOT use AskUserQuestionTool unless you find a genuine conflict between docs that requires a decision
-- Do NOT add new workflow steps or rules — only consolidate and clarify what already exists
-- Do NOT remove anything that was intentionally added by previous prompts — consolidate it
-- After rewriting, read CLAUDE.md fresh and verify an agent could follow it without consulting other docs for the basic workflow
-- Add a tracking comment as the last line of `CLAUDE.md`: `<!-- scaffold:claude-md-optimization v1 YYYY-MM-DD -->` (use actual date)
+### Pointer Pattern — Extended
 
-### Critical Patterns to Verify Are Present
+#### When to Inline vs. Point
 
-Before finalizing, verify CLAUDE.md explicitly covers:
+| Content Type | Inline in CLAUDE.md | Point to External Doc |
+|-------------|--------------------|-----------------------|
+| Core principles | Yes | No |
+| Key commands table | Yes | No |
+| Workflow summary (5-10 lines) | Yes | Detailed version elsewhere |
+| Coding conventions (full) | No | `docs/coding-standards.md` |
+| Git workflow (full) | No | `docs/git-workflow.md` |
+| Project structure (full) | No | `docs/project-structure.md` |
+| Design system rules | No | `docs/design-system.md` |
 
-1. **Never push to main** — main is protected, all changes via PR
-2. **PR workflow** — rebase onto origin/main, then `gh pr create`, then `gh pr merge --squash --auto --delete-branch`, then `gh pr checks --watch --fail-fast`, then `gh pr view --json state -q .state` must show "MERGED"
-3. **AI review before push** — spawn review subagent to check diff against CLAUDE.md + docs/coding-standards.md, fix P0/P1 findings, re-run lint+test, log recurring patterns to tasks/lessons.md (if it exists)
-4. **Branch cleanup** — two variants: single agent (checkout main, delete branch, prune) and worktree agent (fetch, prune, clean — cannot checkout main)
-5. **Continuous work loop** — clean workspace between tasks, keep working until no tasks remain
-6. **Parallel agent setup** — permanent worktrees with workspace branches, agents always branch from `origin/main`, never `git checkout main`
-7. **TDD always** — failing test before implementation, loop repeats per piece of functionality, multiple commits per task squash-merge
-8. **Error recovery** — test failures, merge conflicts, CI failures, crashed sessions, orphaned worktree work
-9. **Honesty over agreement** — if an approach has clear problems, say so directly, explain the downside, propose an alternative, and accept override. Never comply with a flawed approach just to avoid friction
-10. **Scope discipline** — flag when a task is growing beyond its original scope, suggest breaking it into phases, and get explicit confirmation before expanding
+The rule: if the content is referenced multiple times per session, inline a summary. If it is referenced occasionally, point to it.
 
-**If Beads, also verify:**
-11. **Task closure** — `bd close <id>` and `bd sync` after merge (both single-agent and worktree variants)
-12. **Every commit needs a Beads task** — commit messages require `[BD-<id>]` format
-13. **BD_ACTOR** — set in parallel agent worktrees for attribution
+#### Cross-Reference Format
+
+Use consistent pointer format throughout:
+```markdown
+See `docs/coding-standards.md` for full reference.
+```
+
+Not:
+```markdown
+Refer to the coding standards document for more details.
+```
+
+The first format gives the agent an exact file path to read. The second requires the agent to search for the file.
+
+### Merge Strategy for Multi-Step Pipeline Updates
+
+Seven pipeline steps modify CLAUDE.md during project scaffolding. Each step owns specific sections and must not overwrite sections owned by other steps. This section ownership model prevents destructive overwrites when steps execute sequentially.
+
+#### Section Ownership Map
+
+| Pipeline Step | CLAUDE.md Sections Owned | Operation |
+|--------------|-------------------------|-----------|
+| **beads** | Core Principles, Task Management (Beads commands), Self-Improvement, Autonomous Behavior | Creates initial skeleton |
+| **project-structure** | Project Structure Quick Reference | Adds/updates directory table |
+| **dev-env-setup** | Key Commands, Dev Environment | Adds/updates command table and env section |
+| **git-workflow** | Committing and Creating PRs, Parallel Sessions (Worktrees) | Adds/updates workflow sections |
+| **design-system** | Design System, Browser Testing | Adds/updates design system section |
+| **ai-memory-setup** | Pointer restructuring (cross-cutting) | Replaces inline content with pointers to `.claude/rules/` |
+| **automated-pr-review** | Code Review workflow | Adds/updates review workflow section |
+
+#### Merge Rules
+
+1. **Additive by default.** Each step adds its sections without modifying sections owned by other steps. If a section does not exist, create it. If it exists and belongs to this step, update it in-place.
+
+2. **Never delete unrecognized sections.** If CLAUDE.md contains sections not in the ownership map (user customizations, project-specific sections), preserve them. Move them to the end if they conflict with the expected layout, but never remove them.
+
+3. **Beads goes first.** The `beads` step creates the initial CLAUDE.md skeleton. All subsequent steps add to this skeleton. If `beads` was skipped (project does not use Beads), subsequent steps must still create their sections — they just skip the Beads-specific content.
+
+4. **ai-memory-setup is cross-cutting.** Unlike other steps that add sections, `ai-memory-setup` restructures existing sections by replacing inline content blocks with pointer references to `.claude/rules/` files. It operates across sections owned by other steps but only changes the representation (inline → pointer), not the substance.
+
+5. **claude-md-optimization consolidates.** The final consolidation step (`claude-md-optimization`) reviews the accumulated CLAUDE.md, removes redundancy introduced by incremental additions, fixes inconsistencies in terminology, and reorders for scannability. It operates on all sections but does not add new workflow steps or rules — only consolidates and clarifies what exists.
+
+6. **Preserve tracking comments.** Steps that add tracking comments (`<!-- scaffold:step-name v1 YYYY-MM-DD -->`) must preserve comments from other steps. These comments enable update detection.
+
+7. **Update mode is the norm.** After initial creation by `beads`, all subsequent steps operate in update mode. They check for existing content, preserve customizations, and update in-place rather than replacing.
+
+#### Conflict Scenarios
+
+**Two steps reference the same command.** Example: `dev-env-setup` adds `make check` to Key Commands and `git-workflow` references `make check` in the PR workflow. Resolution: the Key Commands table (owned by `dev-env-setup`) is the single source of truth for command definitions. Other sections reference commands but do not redefine them.
+
+**ai-memory-setup restructures a section another step just added.** This is expected and by design. The `ai-memory-setup` step runs after environment steps and converts verbose inline blocks to compact pointer references. The referenced docs must exist before the pointer is valid.
+
+**User adds custom sections between pipeline runs.** Subsequent pipeline steps must detect and preserve custom sections. Use the tracking comment (`<!-- scaffold:step-name -->`) to identify pipeline-managed sections vs. user-added sections.
+
+### Update Mode Handling
+
+#### Detecting Existing Content
+
+Every pipeline step that modifies CLAUDE.md implements mode detection:
+- If the file does not exist → create mode (write full skeleton)
+- If the file exists → update mode (modify owned sections in-place)
+
+Update mode is the common case. After the first `beads` run, every subsequent step encounters an existing CLAUDE.md.
+
+#### Preserving Custom Sections
+
+Users customize CLAUDE.md between pipeline runs. Common customizations:
+- Adding project-specific rules
+- Adding custom command aliases
+- Adding team-specific workflow notes
+- Adding integration-specific sections (deployment, monitoring)
+
+Pipeline steps must preserve all content they do not own. The safest pattern is:
+1. Read the existing CLAUDE.md
+2. Identify sections owned by this step (by heading or tracking comment)
+3. Replace only those sections with updated content
+4. Leave everything else untouched
+
+#### Additive Updates
+
+When updating a section, prefer additive changes over destructive ones:
+- Add new table rows rather than replacing the entire table
+- Add new subsections rather than rewriting the section
+- Append to lists rather than replacing them
+- Only remove content if it is demonstrably wrong or duplicated
+
+### Common Anti-Patterns
+
+**Inline everything.** CLAUDE.md becomes 500+ lines with full coding standards, complete git workflow, entire project structure. Agent adherence drops, load time increases, signal drowns in noise. Fix: use the pointer pattern. Keep CLAUDE.md under 200 lines.
+
+**Stale commands.** Key Commands table references `npm test` but the project switched to `bun test` two months ago. The agent runs the wrong command and wastes a cycle. Fix: keep Key Commands in sync with actual build tool configuration. The `claude-md-optimization` step verifies this.
+
+**Conflicting rules.** CLAUDE.md says "always use conventional commits" in one section and "use `[BD-xxx]` prefix" in another, with no guidance on which takes precedence. Fix: consolidate commit message rules in one place. If both apply, show the combined format: `[BD-42] feat(api): implement endpoint`.
+
+**Redundant instructions.** The same rule appears in Core Principles, Workflow, and Rules sections with slightly different wording. The agent may follow one version and violate another. Fix: state each rule once in its canonical section. Other sections reference it.
+
+**Missing doc lookup.** CLAUDE.md references "the git workflow" but does not specify the file path. The agent searches, guesses, or ignores the reference. Fix: always include exact file paths in references.
+
+**No update mode.** A pipeline step blindly writes a complete CLAUDE.md, overwriting sections added by earlier steps. Fix: every step that modifies CLAUDE.md must read it first, identify its owned sections, and update only those sections.
+
+**Over-specifying autonomous behavior.** CLAUDE.md micro-manages every agent decision: "If you see a typo, fix it. If you see a missing import, add it. If you see..." This wastes lines on things the agent would do anyway. Fix: autonomous behavior should cover non-obvious expectations — "fix bugs on sight," "use subagents for research," "re-plan when stuck." Skip obvious behaviors.
+
+---
 
 ## After This Step
 
-When this step is complete, tell the user:
-
----
-**Phase 6 in progress** — `CLAUDE.md` consolidated and optimized.
-
-**Next:** Run `/scaffold:workflow-audit` — Verify workflow consistency across all docs.
-
-**Pipeline reference:** `/scaffold:prompt-pipeline`
-
----
+Continue with: `/scaffold:workflow-audit`
