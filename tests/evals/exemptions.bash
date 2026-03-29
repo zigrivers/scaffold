@@ -3,12 +3,8 @@
 # Sourced by individual eval files to avoid duplicating lists.
 
 # --- channel-parity.bats ---
-# Commands that are utility/execution (no pipeline step expected)
+# Commands that are tools or utilities (source in tools/, not pipeline/)
 COMMAND_EXEMPT=(
-  "single-agent-start"
-  "single-agent-resume"
-  "multi-agent-start"
-  "multi-agent-resume"
   "dashboard"
   "knowledge"
   "prompt-pipeline"
@@ -17,8 +13,6 @@ COMMAND_EXEMPT=(
   "version"
   "version-bump"
   "release"
-  "quick-task"
-  "new-enhancement"
   "prd-gap-analysis"
   "user-stories-gaps"
 )

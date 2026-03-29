@@ -31,7 +31,7 @@ describe('parsePhases', () => {
 
   it('throws on out-of-range phase number', () => {
     expect(() => parsePhases('99')).toThrow()
-    expect(() => parsePhases('15')).toThrow()
+    expect(() => parsePhases('16')).toThrow()
   })
 
   it('accepts phase 0', () => {
@@ -54,7 +54,7 @@ describe('parseThrough', () => {
 
   it('throws for invalid N', () => {
     expect(() => parseThrough(-1)).toThrow()
-    expect(() => parseThrough(15)).toThrow()
+    expect(() => parseThrough(16)).toThrow()
   })
 
   it('accepts through 0', () => {
@@ -96,6 +96,7 @@ describe('resolveStepsForPhases', () => {
     name: '', description: '', phase: 'pre', order: 0,
     dependencies: [], outputs: [], conditional: null,
     knowledgeBase: [], reads: [],
+    stateless: false, category: 'pipeline' as const,
   }
   const metaPrompts: MetaPromptFrontmatter[] = [
     { ...BASE, name: 'create-prd', description: 'Create PRD', phase: 'pre', order: 110 },

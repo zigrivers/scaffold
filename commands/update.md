@@ -1,11 +1,17 @@
 ---
 description: "Check for and apply scaffold updates"
-long-description: "Checks the scaffold plugin registry for newer versions and guides you through updating commands and skills to the latest release."
+long-description: "Check for and apply updates to the scaffold prompt pipeline. Detects the"
 ---
 
-Check for and apply updates to the scaffold prompt pipeline. Follow these steps exactly:
+## Purpose
 
-## Step 1 — Detect Installation Method
+Check for and apply updates to the scaffold prompt pipeline. Detects the
+installation method, fetches the latest version, shows what changed, and
+applies the update.
+
+## Instructions
+
+### Step 1 — Detect Installation Method
 
 Check which installation method is in use:
 
@@ -14,7 +20,7 @@ Check which installation method is in use:
 
 Report the detected method to the user.
 
-## Step 2 — Fetch Latest Version
+### Step 2 — Fetch Latest Version
 
 Clone or pull the latest scaffold repo:
 
@@ -28,13 +34,13 @@ else
 fi
 ```
 
-## Step 3 — Show What Changed
+### Step 3 — Show What Changed
 
 Read `~/.cache/scaffold/CHANGELOG.md` and display the entries to the user so they can see what's new.
 
 If `~/.claude/commands/.scaffold-version` exists, read it to determine the currently installed version and highlight only the newer entries.
 
-## Step 4 — Apply Update
+### Step 4 — Apply Update
 
 **For user command installs** (files in `~/.claude/commands/`):
 
@@ -77,9 +83,9 @@ Update the plugin in-place by pulling the latest code into the marketplace clone
 
 7. **Best-effort timestamp sync** — Update the `lastUpdated` field for `zigrivers-scaffold` in `~/.claude/plugins/known_marketplaces.json`. Same error handling approach — skip silently on failure.
 
-8. Report the result: old SHA → new SHA, old version → new version.
+8. Report the result: old SHA to new SHA, old version to new version.
 
-## Step 5 — Confirm
+### Step 5 — Confirm
 
 After updating, tell the user:
 
@@ -92,8 +98,8 @@ Check the changelog above for what's new. If any prompts you've already run were
 
 ---
 
-## Process
+## Process Rules
 
-- Run each step in order
-- Do NOT skip the changelog display — users need to see what changed
-- If any step fails, report the error clearly and suggest running `./scripts/update.sh` from the scaffold repo directory as a fallback
+1. Run each step in order.
+2. Do NOT skip the changelog display — users need to see what changed.
+3. If any step fails, report the error clearly and suggest running `./scripts/update.sh` from the scaffold repo directory as a fallback.

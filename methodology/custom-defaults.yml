@@ -74,3 +74,10 @@ steps:
   apply-fixes-and-freeze: { enabled: true }
   developer-onboarding-guide: { enabled: true }
   implementation-playbook: { enabled: true }
+  # Phase 15 — Build (build) — stateless, on-demand execution steps
+  single-agent-start: { enabled: true }
+  single-agent-resume: { enabled: true }
+  multi-agent-start: { enabled: true }
+  multi-agent-resume: { enabled: true }
+  quick-task: { enabled: true }
+  new-enhancement: { enabled: true }

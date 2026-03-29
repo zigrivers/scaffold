@@ -66,39 +66,55 @@ export function loadMetaPrompt(filePath: string): MetaPromptFile {
 }
 
 /**
+ * Scan a directory recursively for all .md files.
+ * Adds to the provided result map (frontmatter.name → MetaPromptFile).
+ * Files that fail to load are skipped with a warning.
+ */
+function walkAndLoad(dir: string, result: Map<string, MetaPromptFile>): void {
+  let entries: fs.Dirent[]
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true })
+  } catch {
+    return
+  }
+
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name)
+    if (entry.isDirectory()) {
+      walkAndLoad(fullPath, result)
+    } else if (entry.isFile() && entry.name.endsWith('.md')) {
+      try {
+        const metaPrompt = loadMetaPrompt(fullPath)
+        result.set(metaPrompt.frontmatter.name, metaPrompt)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        process.stderr.write(
+          `[meta-prompt-loader] Skipping ${fullPath}: ${message}\n`,
+        )
+      }
+    }
+  }
+}
+
+/**
  * Scan pipelineDir recursively for all .md files.
  * Returns a map of frontmatter.name → MetaPromptFile.
  * Files that fail to load are skipped with a warning.
  */
 export function discoverMetaPrompts(pipelineDir: string): Map<string, MetaPromptFile> {
   const result = new Map<string, MetaPromptFile>()
+  walkAndLoad(pipelineDir, result)
+  return result
+}
 
-  function walkDir(dir: string): void {
-    let entries: fs.Dirent[]
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true })
-    } catch {
-      return
-    }
-
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name)
-      if (entry.isDirectory()) {
-        walkDir(fullPath)
-      } else if (entry.isFile() && entry.name.endsWith('.md')) {
-        try {
-          const metaPrompt = loadMetaPrompt(fullPath)
-          result.set(metaPrompt.frontmatter.name, metaPrompt)
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err)
-          process.stderr.write(
-            `[meta-prompt-loader] Skipping ${fullPath}: ${message}\n`,
-          )
-        }
-      }
-    }
-  }
-
-  walkDir(pipelineDir)
+/**
+ * Scan both pipeline and tools directories for meta-prompts.
+ * Returns a unified map of frontmatter.name → MetaPromptFile.
+ * Tools directory is optional — if it doesn't exist, only pipeline steps are returned.
+ */
+export function discoverAllMetaPrompts(pipelineDir: string, toolsDir: string): Map<string, MetaPromptFile> {
+  const result = new Map<string, MetaPromptFile>()
+  walkAndLoad(pipelineDir, result)
+  walkAndLoad(toolsDir, result)
   return result
 }

@@ -1,7 +1,7 @@
 export interface DependencyNode {
   slug: string
-  phase: string
-  order: number
+  phase: string | null
+  order: number | null
   dependencies: string[]
   enabled: boolean
 }

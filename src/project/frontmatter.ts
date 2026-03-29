@@ -26,19 +26,47 @@ const KNOWN_YAML_KEYS = new Set([
   'conditional',
   'knowledge-base',
   'reads',
+  'stateless',
+  'category',
+  'argument-hint',
 ])
 
+// Valid categories for meta-prompt source classification
+const VALID_CATEGORIES = ['pipeline', 'tool'] as const
+
 // Zod schema for frontmatter validation
+// Tools (category: 'tool') allow null phase/order and empty outputs.
+// Pipeline steps (category: 'pipeline') require phase/order and non-empty outputs.
 const frontmatterSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9-]*$/, 'name must be kebab-case'),
   description: z.string().max(200),
-  phase: z.enum(PHASES.map(p => p.slug) as [string, ...string[]]),
-  order: z.number().min(0).max(1500),
+  phase: z.enum(PHASES.map(p => p.slug) as [string, ...string[]]).nullable().default(null),
+  order: z.number().min(0).max(1599).nullable().default(null),
   dependencies: z.array(z.string().regex(/^[a-z][a-z0-9-]*$/)).default([]),
-  outputs: z.array(z.string()).nonempty(),
+  outputs: z.array(z.string()).default([]),
   conditional: z.enum(['if-needed']).nullable().default(null),
   knowledgeBase: z.array(z.string()).default([]),
   reads: z.array(z.string().regex(/^[a-z][a-z0-9-]*$/)).default([]),
+  stateless: z.boolean().default(false),
+  category: z.enum(VALID_CATEGORIES).default('pipeline'),
+}).superRefine((data, ctx) => {
+  // Pipeline steps require phase, order, and non-empty outputs
+  if (data.category === 'pipeline') {
+    if (data.phase === null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'phase is required for pipeline steps', path: ['phase'] })
+    }
+    if (data.order === null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'order is required for pipeline steps', path: ['order'] })
+    }
+    // Stateless pipeline steps (build phase) can have empty outputs
+    if (!data.stateless && data.outputs.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'outputs must not be empty for stateful pipeline steps',
+        path: ['outputs'],
+      })
+    }
+  }
 })
 
 interface ParseResult {
@@ -132,13 +160,29 @@ function normalizeRawObject(raw: Record<string, unknown>): Record<string, unknow
 
   // FAILSAFE_SCHEMA returns all scalars as strings — coerce order to number
   if (typeof normalized['order'] === 'string') {
-    const n = Number(normalized['order'])
-    normalized['order'] = isNaN(n) ? normalized['order'] : n
+    if (normalized['order'] === 'null') {
+      normalized['order'] = null
+    } else {
+      const n = Number(normalized['order'])
+      normalized['order'] = isNaN(n) ? normalized['order'] : n
+    }
   }
 
   // FAILSAFE_SCHEMA returns null as the string "null" — coerce to actual null
   if (normalized['conditional'] === 'null') {
     normalized['conditional'] = null
+  }
+
+  // Coerce phase "null" string to actual null (for tools)
+  if (normalized['phase'] === 'null') {
+    normalized['phase'] = null
+  }
+
+  // FAILSAFE_SCHEMA returns booleans as strings — coerce stateless
+  if (normalized['stateless'] === 'true') {
+    normalized['stateless'] = true
+  } else if (normalized['stateless'] === 'false') {
+    normalized['stateless'] = false
   }
 
   // Coerce arrays parsed via FAILSAFE_SCHEMA (values remain strings, which is correct)
@@ -236,6 +280,8 @@ export function parseAndValidate(filePath: string): {
     conditional: null,
     knowledgeBase: [],
     reads: [],
+    stateless: false,
+    category: 'pipeline',
   }
 
   let content: string

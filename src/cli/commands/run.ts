@@ -5,8 +5,11 @@ import { StateManager } from '../../state/state-manager.js'
 import { acquireLock, releaseLock } from '../../state/lock-manager.js'
 import { analyzeCrash } from '../../state/completion.js'
 import { AssemblyEngine } from '../../core/assembly/engine.js'
-import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
-import { getPackagePipelineDir, getPackageMethodologyDir, getPackageKnowledgeDir } from '../../utils/fs.js'
+import { discoverAllMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
+import {
+  getPackagePipelineDir, getPackageMethodologyDir,
+  getPackageKnowledgeDir, getPackageToolsDir,
+} from '../../utils/fs.js'
 import { buildIndexWithOverrides, loadEntries } from '../../core/assembly/knowledge-loader.js'
 import { loadInstructions } from '../../core/assembly/instruction-loader.js'
 import { resolveDepth } from '../../core/assembly/depth-resolver.js'
@@ -88,7 +91,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     // Step 2: Discover meta-prompts and pipeline
     // -----------------------------------------------------------------------
     const pipelineDir = getPackagePipelineDir(projectRoot)
-    const metaPrompts = discoverMetaPrompts(pipelineDir)
+    const toolsDir = getPackageToolsDir(projectRoot)
+    const metaPrompts = discoverAllMetaPrompts(pipelineDir, toolsDir)
 
     const metaPrompt = metaPrompts.get(step)
     if (!metaPrompt) {
@@ -226,22 +230,27 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
 
     topologicalSort(graph)
 
-    const stepNode = graph.nodes.get(step)
-    const deps = stepNode?.dependencies ?? []
-    const unmetDeps = deps.filter(dep => {
-      const depStatus = state.steps[dep]?.status
-      return depStatus !== 'completed' && depStatus !== 'skipped'
-    })
+    // Tools (category: 'tool') are not in the dependency graph — skip dep checking
+    const isTool = metaPrompt.frontmatter.category === 'tool'
+    const stepNode = isTool ? undefined : graph.nodes.get(step)
+    const deps = stepNode?.dependencies ?? metaPrompt.frontmatter.dependencies ?? []
 
-    if (unmetDeps.length > 0) {
-      output.error({
-        code: 'DEP_UNMET',
-        message: `Step '${step}' has unmet dependencies: ${unmetDeps.join(', ')}`,
-        exitCode: 2,
-        recovery: `Complete these steps first: ${unmetDeps.join(', ')}`,
+    if (!isTool) {
+      const unmetDeps = deps.filter(dep => {
+        const depStatus = state.steps[dep]?.status
+        return depStatus !== 'completed' && depStatus !== 'skipped'
       })
-      if (lockAcquired) releaseLock(projectRoot)
-      process.exit(2)
+
+      if (unmetDeps.length > 0) {
+        output.error({
+          code: 'DEP_UNMET',
+          message: `Step '${step}' has unmet dependencies: ${unmetDeps.join(', ')}`,
+          exitCode: 2,
+          recovery: `Complete these steps first: ${unmetDeps.join(', ')}`,
+        })
+        if (lockAcquired) releaseLock(projectRoot)
+        process.exit(2)
+      }
     }
 
     // -----------------------------------------------------------------------
@@ -295,9 +304,12 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     }
 
     // -----------------------------------------------------------------------
-    // Step 7: Set step to in_progress
+    // Step 7: Set step to in_progress (skip for stateless steps)
     // -----------------------------------------------------------------------
-    stateManager.setInProgress(step, 'scaffold-run')
+    const isStateless = metaPrompt.frontmatter.stateless === true
+    if (!isStateless) {
+      stateManager.setInProgress(step, 'scaffold-run')
+    }
 
     try {
       // Reload state after setInProgress
@@ -379,24 +391,43 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       // -----------------------------------------------------------------------
       if (outputMode === 'auto' || outputMode === 'json') {
         // In auto/json mode: output the structured result and exit 0
-        // Step stays in_progress for crash recovery awareness
+        // For stateful steps, step stays in_progress for crash recovery awareness
         if (outputMode === 'json') {
-          // Reload state for next eligible
-          const stateForEligible = stateManager.loadState()
-          const nextSteps = computeEligible(graph, stateForEligible.steps)
-          output.result({
-            step,
-            status: 'completed',
-            depth,
-            depth_source: provenance,
-            nextEligible: nextSteps,
-          })
+          if (isStateless) {
+            output.result({
+              step,
+              status: 'stateless',
+              depth,
+              depth_source: provenance,
+            })
+          } else {
+            // Reload state for next eligible
+            const stateForEligible = stateManager.loadState()
+            const nextSteps = computeEligible(graph, stateForEligible.steps)
+            output.result({
+              step,
+              status: 'completed',
+              depth,
+              depth_source: provenance,
+              nextEligible: nextSteps,
+            })
+          }
         }
         if (lockAcquired) releaseLock(projectRoot)
         process.exit(0)
       }
 
       // Interactive mode: prompt user for completion
+      if (isStateless) {
+        // Stateless steps don't track completion — just release lock and exit
+        if (lockAcquired) releaseLock(projectRoot)
+        if (outputMode === 'interactive') {
+          output.info(`Stateless step '${step}' executed. Available for re-use anytime.`)
+        }
+        process.exit(0)
+        return
+      }
+
       const isComplete = await output.confirm(`Step '${step}' complete?`, true)
       if (!isComplete) {
         const shouldSkip = await output.confirm('Mark as skipped instead?', false)

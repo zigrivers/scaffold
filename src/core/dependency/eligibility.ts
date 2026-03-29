@@ -38,7 +38,7 @@ export function computeEligible(
   return eligible.sort((a, b) => {
     const nodeA = graph.nodes.get(a)!
     const nodeB = graph.nodes.get(b)!
-    return nodeA.order - nodeB.order || a.localeCompare(b)
+    return (nodeA.order ?? 9999) - (nodeB.order ?? 9999) || a.localeCompare(b)
   })
 }
 
@@ -53,7 +53,7 @@ export function getParallelSets(graph: DependencyGraph): string[][] {
 
   for (const [slug, node] of graph.nodes) {
     if (!node.enabled) continue
-    const { phase } = node
+    const phase = node.phase ?? '__none__'
     if (!phaseMap.has(phase)) phaseMap.set(phase, [])
     phaseMap.get(phase)!.push(slug)
   }
@@ -66,7 +66,7 @@ export function getParallelSets(graph: DependencyGraph): string[][] {
     (phaseMap.get(phase) ?? []).sort((a, b) => {
       const nodeA = graph.nodes.get(a)!
       const nodeB = graph.nodes.get(b)!
-      return nodeA.order - nodeB.order || a.localeCompare(b)
+      return (nodeA.order ?? 9999) - (nodeB.order ?? 9999) || a.localeCompare(b)
     }),
   )
 }

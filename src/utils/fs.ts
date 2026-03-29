@@ -61,6 +61,19 @@ export function getPackageKnowledgeDir(projectRoot?: string): string {
 }
 
 /**
+ * Resolve the tools directory.
+ * If projectRoot is provided and contains tools/, use that (dev/test mode).
+ * Otherwise use the package's bundled tools/.
+ */
+export function getPackageToolsDir(projectRoot?: string): string {
+  if (projectRoot) {
+    const local = path.join(projectRoot, 'tools')
+    if (fs.existsSync(local)) return local
+  }
+  return path.join(getPackageRoot(), 'tools')
+}
+
+/**
  * Resolve the methodology directory.
  * If projectRoot is provided and contains methodology/, use that (dev/test mode).
  * Otherwise use the package's bundled methodology/.

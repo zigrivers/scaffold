@@ -14,6 +14,9 @@ This skill provides an intelligent interactive layer between the user and the `s
 - User asks to run any pipeline step by name (e.g., "create the PRD", "set up testing")
 - User asks to run multiple steps: "run all reviews", "run phases 5-8", "finish the pipeline", "run the next 5 steps"
 - User asks to re-run groups: "re-run all reviews", "redo quality gates", "re-run from user-stories onward"
+- User says "start building", "begin implementation", "run agent", "start agent"
+- User asks about tools: "bump version", "create a release", "show version"
+- User says "what can I build?" or "what tools are available?"
 - Working in a project with a `.scaffold/` directory
 
 ## Core Workflow: Smart Scaffold Execution
@@ -118,6 +121,54 @@ After the step completes:
    Want me to continue with the next step?
    ```
 
+## Stateless Step Execution
+
+Build phase steps (phase 15) and tools are **stateless** — they don't track completion state. When executing a stateless step, modify the Smart Scaffold Execution workflow:
+
+### Modified Post-Execution (replaces Step 6 for stateless steps)
+
+After executing a stateless step:
+
+1. **Skip** `scaffold complete <step>` — stateless steps have no completion state
+2. **Skip** "show what's next" — build steps are always available
+3. **Instead**: Show a brief execution summary and offer to run another build step or tool:
+   ```
+   Step executed. Build phase steps are always available for re-use.
+   Run another? single-agent-start | quick-task | new-enhancement | ...
+   ```
+
+### Resume Step Visibility
+
+`single-agent-resume` and `multi-agent-resume` are conditionally shown — only offer them when evidence of prior agent activity exists:
+- Feature branches (e.g., `bd-*` branches) in git
+- In-progress tasks (Beads `bd list` shows in_progress, or implementation plan tasks marked started)
+- Open PRs from previous agent work
+
+If no prior activity is detected, suggest `single-agent-start` or `multi-agent-start` instead.
+
+## Tool Execution
+
+Tools (version-bump, release, version, update, dashboard, prompt-pipeline, session-analyzer) are utility commands orthogonal to the pipeline.
+
+### Differences from Pipeline Steps
+
+- **No eligibility check** — tools are always available, regardless of pipeline progress
+- **No state tracking** — tools don't appear in `scaffold next` or `scaffold status`
+- **Argument passthrough** — tools support CLI arguments: `scaffold run release --dry-run`, `scaffold run version-bump patch`
+
+### Tool Execution Flow
+
+1. **Skip eligibility** — don't run `scaffold next` to check
+2. **Preview** — `scaffold run <tool> --auto 2>&1` (same as pipeline steps)
+3. **Extract decisions** — same process as pipeline steps
+4. **Execute** — follow the assembled prompt faithfully
+5. **No completion** — skip `scaffold complete`, skip "what's next"
+
+### Accessing Tools
+
+- `scaffold run <tool-name>` — run a specific tool
+- `scaffold list --tools` — show available tools (when implemented)
+
 ## Session Preferences
 
 Track these preferences within the current session to avoid re-asking:
@@ -160,6 +211,14 @@ Respond to these natural language requests:
 | "Show the full pipeline" | Run `scaffold list`, present with status indicators |
 | "Open the dashboard" | Run `scaffold dashboard` |
 | "Switch to MVP" / "Change depth" | Run `scaffold init --methodology <preset>` |
+| "Start building" / "Begin implementation" | `scaffold run single-agent-start` |
+| "Start multi-agent" / "Set up agents" | `scaffold run multi-agent-start <agent-name>` |
+| "Quick task" / "Bug fix" / "Small fix" | `scaffold run quick-task <description>` |
+| "New feature" / "Add enhancement" | `scaffold run new-enhancement <description>` |
+| "Bump version" / "Version bump" | `scaffold run version-bump` |
+| "Create release" / "Release" | `scaffold run release` |
+| "What tools are available?" | `scaffold list --tools` |
+| "Show version" | `scaffold run version` |
 
 ### Re-running Steps
 
@@ -294,6 +353,7 @@ Map natural language requests to concrete step lists using `scaffold status` out
 | planning | Planning | implementation-plan, implementation-plan-review |
 | validation | Validation | cross-phase-consistency, traceability-matrix, decision-completeness, critical-path-walkthrough, implementability-dry-run, dependency-graph-validation, scope-creep-check |
 | finalization | Finalization | apply-fixes-and-freeze, developer-onboarding-guide, implementation-playbook |
+| build | Build | single-agent-start, single-agent-resume, multi-agent-start, multi-agent-resume, quick-task, new-enhancement |
 
 ### Resolution Process
 

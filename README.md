@@ -1,6 +1,6 @@
 # Scaffold
 
-A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 54 structured pipeline steps — organized into 15 phases — and Claude Code handles the research, planning, and implementation for you.
+A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 60 structured pipeline steps — organized into 16 phases — plus 7 utility tools, and Claude Code handles the research, planning, and implementation for you.
 
 By the end, you'll have a fully planned, standards-documented, implementation-ready project with working code.
 
@@ -29,7 +29,7 @@ Either way, Scaffold constructs the prompt and Claude does the work. The CLI tra
 
 **Assembly engine** — At execution time, Scaffold builds a 7-section prompt from: system metadata, the meta-prompt, knowledge base entries, project context (artifacts from prior steps), methodology settings, layered instructions, and depth-specific execution guidance.
 
-**Knowledge base** — 53 domain expertise entries in `knowledge/` covering testing strategy, domain modeling, API design, security best practices, eval craft, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
+**Knowledge base** — 60 domain expertise entries in `knowledge/` organized in seven categories (core, product, review, validation, finalization, execution, tools) covering testing strategy, domain modeling, API design, security best practices, eval craft, TDD execution, task claiming, worktree management, release management, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
 
 **Methodology presets** — Three built-in presets control which steps run and how deep the analysis goes:
 - **deep** (depth 5) — all steps enabled, exhaustive analysis
@@ -389,6 +389,19 @@ Lock it down and start building.
 | `developer-onboarding-guide` | "Start here" guide for new contributors and AI agents |
 | `implementation-playbook` | Operational guide agents follow during implementation, with test skeleton and eval gate references |
 
+### Phase 15 — Build (build)
+
+Execute implementation. Steps are **stateless** — they don't track completion and are available for repeated use once Phase 14 is complete.
+
+| Step | What It Does |
+|------|-------------|
+| `single-agent-start` | Start the autonomous single-agent TDD execution loop |
+| `single-agent-resume` | Resume single-agent work after closing Claude Code |
+| `multi-agent-start` | Start parallel implementation with multiple agents in worktrees |
+| `multi-agent-resume` | Resume parallel agent work after a break |
+| `quick-task` | Create a focused task for a bug fix, refactor, or small improvement |
+| `new-enhancement` | Add a new feature to an already-scaffolded project |
+
 ## Multi-Model Review
 
 At depth 4-5, all 19 review and validation steps can dispatch independent reviews to Codex and/or Gemini CLIs. This catches blind spots that a single model misses — what Claude considers correct, Codex or Gemini may flag as problematic. Auth is verified before every dispatch — previous auth failures do not exempt subsequent dispatches.
@@ -440,7 +453,7 @@ The `scaffold check` command reports which CLIs are available and recommends the
 
 ## Methodology Presets
 
-Not every project needs all 51 steps. Choose a methodology when you run `scaffold init`:
+Not every project needs all 60 steps. Choose a methodology when you run `scaffold init`:
 
 ### deep (depth 5)
 All steps enabled. Comprehensive analysis of every angle — domain modeling, ADRs, security review, traceability matrix, the works. At depth 4-5, review steps dispatch to Codex/Gemini CLIs for multi-model validation. Best for complex systems, team projects, or when you want thorough documentation.
@@ -520,13 +533,15 @@ scaffold dashboard
 
 ## Knowledge System
 
-Scaffold ships with 51 domain expertise entries organized in five categories:
+Scaffold ships with 60 domain expertise entries organized in seven categories:
 
 - **core/** (25 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, design system tokens, user story innovation, AI memory management, coding conventions, tech stack selection, project structure patterns, task tracking, CLAUDE.md patterns, multi-model review dispatch, review step template, dev environment, git workflow patterns, automated review tooling
 - **product/** (3 entries) — PRD craft, PRD innovation, gap analysis
 - **review/** (13 entries) — review methodology (shared), plus domain-specific review passes for PRD, user stories, domain modeling, ADRs, architecture, API design, database design, UX specification, testing, security, operations, implementation tasks
 - **validation/** (7 entries) — critical path analysis, cross-phase consistency, scope management, traceability, implementability, decision completeness, dependency validation
 - **finalization/** (3 entries) — implementation playbook, developer onboarding, apply-fixes-and-freeze
+- **execution/** (4 entries) — TDD execution loop, task claiming strategy, worktree management, enhancement workflow
+- **tools/** (3 entries) — release management, version strategy, session analysis
 
 Each pipeline step declares which knowledge entries it needs in its frontmatter. The assembly engine injects them automatically. Knowledge files with a `## Deep Guidance` section are optimized for the CLI — only the deep guidance content is loaded into the assembled prompt, skipping the summary to avoid redundancy with the prompt text.
 
@@ -543,21 +558,38 @@ scaffold knowledge reset testing-strategy  # Remove override, revert to global
 
 Local overrides are committable — the whole team shares enriched, project-specific guidance.
 
-## After the Pipeline: Ongoing Commands
+## After the Pipeline: Tools & Ongoing Commands
 
-Once your project is scaffolded and you're building features, these slash commands are available in Claude Code:
+Once your project is scaffolded and you're building features, two categories of commands are available:
+
+### Build Phase (Phase 15)
+
+These are stateless pipeline steps — they appear in `scaffold next` once Phase 14 is complete and can be run repeatedly:
 
 | Command | When to Use |
 |---------|-------------|
-| `/scaffold:new-enhancement` | Add a new feature to an already-scaffolded project. Updates the PRD, creates new user stories, and sets up tasks with dependencies. |
-| `/scaffold:quick-task` | Create a focused task for a bug fix, refactor, or small improvement. |
-| `/scaffold:version-bump` | Mark a milestone with a version number without the full release ceremony. |
-| `/scaffold:release` | Ship a new version — changelog, Git tag, and GitHub release. Supports `--dry-run`, `current`, and `rollback`. |
-| `/scaffold:single-agent-start` | Start the autonomous implementation loop — Claude picks up tasks and builds. |
-| `/scaffold:single-agent-resume` | Resume where you left off after closing Claude Code. |
-| `/scaffold:multi-agent-start` | Start parallel implementation with multiple agents in worktrees. |
-| `/scaffold:multi-agent-resume` | Resume parallel agent work after a break. |
-| `/scaffold:prompt-pipeline` | Print the full pipeline reference table. |
+| `scaffold run single-agent-start` | Start the autonomous implementation loop — Claude picks up tasks and builds. |
+| `scaffold run single-agent-resume` | Resume where you left off after closing Claude Code. |
+| `scaffold run multi-agent-start` | Start parallel implementation with multiple agents in worktrees. |
+| `scaffold run multi-agent-resume` | Resume parallel agent work after a break. |
+| `scaffold run quick-task` | Create a focused task for a bug fix, refactor, or small improvement. |
+| `scaffold run new-enhancement` | Add a new feature to an already-scaffolded project. Updates the PRD, creates new user stories, and sets up tasks with dependencies. |
+
+### Utility Tools
+
+These are orthogonal to the pipeline — usable at any time, not tied to pipeline state. Defined in `tools/` with `category: tool` frontmatter:
+
+| Command | When to Use |
+|---------|-------------|
+| `scaffold run version-bump` | Mark a milestone with a version number without the full release ceremony. |
+| `scaffold run release` | Ship a new version — changelog, Git tag, and GitHub release. Supports `--dry-run`, `current`, and `rollback`. |
+| `scaffold run version` | Show the current Scaffold version. |
+| `scaffold run update` | Update Scaffold to the latest version. |
+| `scaffold run dashboard` | Open a visual progress dashboard in your browser. |
+| `scaffold run prompt-pipeline` | Print the full pipeline reference table. |
+| `scaffold run session-analyzer` | Analyze Claude Code session logs for patterns and insights. |
+
+All of these are also available as slash commands (`/scaffold:release`, `/scaffold:quick-task`, etc.) when the plugin is installed.
 
 ## Releasing Your Project
 
@@ -591,7 +623,7 @@ Options: `--dry-run` to preview, `minor`/`major`/`patch` to specify the bump, `c
 | **CLAUDE.md** | A configuration file in your project root that tells Claude Code how to work in your project. |
 | **Depth** | A 1-5 scale controlling how thorough each step's analysis is, from MVP-focused (1) to exhaustive (5). |
 | **Frontmatter** | The YAML metadata block at the top of meta-prompt files, declaring dependencies, outputs, knowledge entries, and other configuration. |
-| **Knowledge base** | 49 domain expertise entries that get injected into prompts. Can be extended with project-local overrides. |
+| **Knowledge base** | 60 domain expertise entries that get injected into prompts. Can be extended with project-local overrides. |
 | **MCP** | Model Context Protocol. A way for Claude to use external tools like a headless browser. |
 | **Meta-prompt** | A short intent declaration in `pipeline/` that gets assembled into a full prompt at runtime. |
 | **Methodology** | A preset (deep, mvp, custom) controlling which steps run and at what depth. |
@@ -678,10 +710,11 @@ src/
 ### Content layout
 
 ```
-pipeline/             # 51 meta-prompts organized by 14 phases
-knowledge/            # 49 domain expertise entries (core, product, review, validation, finalization)
+pipeline/             # 60 meta-prompts organized by 16 phases (phases 0-15, including build)
+tools/                # 7 tool meta-prompts (stateless, category: tool)
+knowledge/            # 60 domain expertise entries (core, product, review, validation, finalization, execution, tools)
 methodology/          # 3 YAML presets (deep, mvp, custom)
-commands/             # 67 Claude Code slash commands (51 pipeline + 16 utility)
+commands/             # 80 Claude Code slash commands (60 pipeline + 13 build-phase + 7 tools)
 skills/               # 3 Claude Code skills (pipeline reference, runner, multi-model dispatch)
 ```
 

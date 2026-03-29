@@ -57,6 +57,8 @@ function makeMetaPrompt(name: string, conditional: string | null = null) {
       conditional,
       knowledgeBase: [],
       reads: [],
+      stateless: false,
+      category: 'pipeline' as const,
     },
     body: '',
     sections: {},

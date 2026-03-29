@@ -96,16 +96,16 @@ is_knowledge_template() {
   return 1
 }
 
-@test "all knowledge entries are referenced by at least one pipeline step" {
+@test "all knowledge entries are referenced by at least one pipeline step or tool" {
   local orphans=()
 
-  # Collect all knowledge-base references from pipeline steps
+  # Collect all knowledge-base references from pipeline steps and tools
   local all_refs=""
   while IFS= read -r file; do
     local refs
-    refs="$(extract_field "$file" "knowledge-base" | sed 's/\[//;s/\]//' | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$')"
+    refs="$(extract_field "$file" "knowledge-base" | sed 's/\[//;s/\]//' | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$' || true)"
     [[ -n "$refs" ]] && all_refs="${all_refs}${all_refs:+$'\n'}${refs}"
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/pipeline" "${PROJECT_ROOT}/tools" -name '*.md' -type f 2>/dev/null)
   all_refs="$(echo "$all_refs" | sort -u)"
 
   # Check each knowledge entry
@@ -121,7 +121,7 @@ is_knowledge_template() {
   done < <(find "${PROJECT_ROOT}/knowledge" -name '*.md' -type f)
 
   if [[ ${#orphans[@]} -gt 0 ]]; then
-    printf "Orphaned knowledge entries (not referenced by any pipeline step):\n"
+    printf "Orphaned knowledge entries (not referenced by any pipeline step or tool):\n"
     printf "  %s\n" "${orphans[@]}"
     return 1
   fi
