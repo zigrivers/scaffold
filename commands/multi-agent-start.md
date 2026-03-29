@@ -160,7 +160,14 @@ For each task:
    - Include in the PR description: what was implemented, key decisions, files changed, agent name
    - Follow the PR workflow from `docs/git-workflow.md` or CLAUDE.md
 
-7. **Between-task cleanup**
+7. **Run code reviews (MANDATORY)**
+   - Run `/scaffold:review-pr` with the PR number from step 6
+   - This runs **all three** review channels: Codex CLI, Gemini CLI, and Superpowers code-reviewer subagent
+   - All three channels must execute (skip only if a tool is genuinely not installed)
+   - Fix any P0/P1 findings before proceeding
+   - Do NOT move to the next task until the review summary confirms all channels ran
+
+8. **Between-task cleanup**
    - `git fetch origin --prune && git clean -fd`
    - Run the install command from CLAUDE.md Key Commands
    - This ensures a clean state before the next task
@@ -199,8 +206,9 @@ For each task:
 3. **Clean between tasks** — Run cleanup after each task to prevent state leakage.
 4. **TDD is not optional** — Write failing tests before implementation. No exceptions.
 5. **Quality gates before PR** — Never create a PR with failing checks.
-6. **Avoid task conflicts** — Check what other agents are working on before claiming.
-7. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
+6. **Code review before next task** — After creating a PR, run `/scaffold:review-pr` and fix all P0/P1 findings before moving on. All three review channels (Codex, Gemini, Superpowers) must execute.
+7. **Avoid task conflicts** — Check what other agents are working on before claiming.
+8. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
 
 ---
 

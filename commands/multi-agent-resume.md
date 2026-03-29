@@ -156,7 +156,14 @@ Once in-progress work is complete (or if there was none):
    - Create a pull request: `gh pr create`
    - Include agent name in PR description for traceability
 
-3. **Between-task cleanup**
+3. **Run code reviews (MANDATORY)**
+   - Run `/scaffold:review-pr` with the PR number from step 2
+   - This runs **all three** review channels: Codex CLI, Gemini CLI, and Superpowers code-reviewer subagent
+   - All three channels must execute (skip only if a tool is genuinely not installed)
+   - Fix any P0/P1 findings before proceeding
+   - Do NOT move to the next task until the review summary confirms all channels ran
+
+4. **Between-task cleanup**
    - `git fetch origin --prune && git clean -fd`
    - Run the install command from CLAUDE.md Key Commands
 
@@ -207,7 +214,8 @@ Once in-progress work is complete (or if there was none):
 4. **Clean between tasks** — Run cleanup after each task to prevent state leakage.
 5. **TDD is not optional** — Continue the red-green-refactor cycle for any in-progress work.
 6. **Quality gates before PR** — Never create a PR with failing checks.
-7. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
+7. **Code review before next task** — After creating a PR, run `/scaffold:review-pr` and fix all P0/P1 findings before moving on. All three review channels (Codex, Gemini, Superpowers) must execute.
+8. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
 
 ---
 

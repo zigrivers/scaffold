@@ -144,7 +144,14 @@ Once in-progress work is complete (or if there was none):
    - Create a pull request: `gh pr create`
    - Follow the PR workflow from `docs/git-workflow.md` or CLAUDE.md
 
-3. **Claim next task**
+3. **Run code reviews (MANDATORY)**
+   - Run `/scaffold:review-pr` with the PR number from step 2
+   - This runs **all three** review channels: Codex CLI, Gemini CLI, and Superpowers code-reviewer subagent
+   - All three channels must execute (skip only if a tool is genuinely not installed)
+   - Fix any P0/P1 findings before proceeding
+   - Do NOT move to the next task until the review summary confirms all channels ran
+
+4. **Claim next task**
    - Return to main: `git checkout main && git pull origin main`
    - Pick the next task following the same process as `/scaffold:single-agent-start`
    - Continue the TDD execution loop
@@ -183,7 +190,8 @@ Once in-progress work is complete (or if there was none):
 3. **Reconcile task status** — Merged PRs must be reflected in the task tracker.
 4. **TDD is not optional** — Continue the red-green-refactor cycle for any in-progress work.
 5. **Quality gates before PR** — Never create a PR with failing checks.
-6. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
+6. **Code review before next task** — After creating a PR, run `/scaffold:review-pr` and fix all P0/P1 findings before moving on. All three review channels (Codex, Gemini, Superpowers) must execute.
+7. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
 
 ---
 
