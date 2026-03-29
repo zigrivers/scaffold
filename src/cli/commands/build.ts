@@ -5,7 +5,10 @@ import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { loadConfig } from '../../config/loader.js'
 import { discoverAllMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
-import { getPackagePipelineDir, getPackageMethodologyDir, getPackageKnowledgeDir, getPackageToolsDir } from '../../utils/fs.js'
+import {
+  getPackagePipelineDir, getPackageMethodologyDir,
+  getPackageKnowledgeDir, getPackageToolsDir,
+} from '../../utils/fs.js'
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { detectCycles, topologicalSort } from '../../core/dependency/dependency.js'

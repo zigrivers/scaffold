@@ -60,7 +60,11 @@ const frontmatterSchema = z.object({
     }
     // Stateless pipeline steps (build phase) can have empty outputs
     if (!data.stateless && data.outputs.length === 0) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'outputs must not be empty for stateful pipeline steps', path: ['outputs'] })
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'outputs must not be empty for stateful pipeline steps',
+        path: ['outputs'],
+      })
     }
   }
 })

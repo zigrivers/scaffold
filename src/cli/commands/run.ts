@@ -6,7 +6,10 @@ import { acquireLock, releaseLock } from '../../state/lock-manager.js'
 import { analyzeCrash } from '../../state/completion.js'
 import { AssemblyEngine } from '../../core/assembly/engine.js'
 import { discoverAllMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
-import { getPackagePipelineDir, getPackageMethodologyDir, getPackageKnowledgeDir, getPackageToolsDir } from '../../utils/fs.js'
+import {
+  getPackagePipelineDir, getPackageMethodologyDir,
+  getPackageKnowledgeDir, getPackageToolsDir,
+} from '../../utils/fs.js'
 import { buildIndexWithOverrides, loadEntries } from '../../core/assembly/knowledge-loader.js'
 import { loadInstructions } from '../../core/assembly/instruction-loader.js'
 import { resolveDepth } from '../../core/assembly/depth-resolver.js'
