@@ -25,7 +25,7 @@ The three channels are:
 ## Expected Outputs
 
 - All three review channels executed (or fallback documented)
-- P0/P1 findings fixed before proceeding
+- P0/P1/P2 findings fixed before proceeding
 - Review summary with per-channel results and reconciliation
 
 ## Instructions
@@ -79,7 +79,7 @@ The review prompt must include:
 - The PR diff
 - Coding standards from docs/coding-standards.md
 - Review standards from docs/review-standards.md (if exists)
-- Instruction to report only P0/P1 findings as JSON with severity, location (file:line), description, and suggestion
+- Instruction to report P0/P1/P2 findings as JSON with severity, location (file:line), description, and suggestion
 
 #### Channel 2: Gemini CLI
 
@@ -159,16 +159,16 @@ Output a review summary in this format:
 [Contradictions between channels]
 
 ### Verdict
-[All channels approve / Fix required (list P0/P1 items) / User adjudication needed]
+[All channels approve / Fix required (list P0/P1/P2 items) / User adjudication needed]
 ```
 
-### Step 6: Fix P0/P1 Findings
+### Step 6: Fix P0/P1/P2 Findings
 
-If any P0 or P1 findings exist:
+If any P0, P1, or P2 findings exist:
 1. Fix them in the code
 2. Push the fixes: `git push`
 3. Re-run the channels that produced findings to verify fixes
-4. After 3 fix rounds with unresolved P0/P1 findings, stop and ask the user for direction — do NOT merge automatically. Document remaining findings and let the user decide whether to continue fixing, create follow-up issues, or override.
+4. After 3 fix rounds with unresolved P0/P1/P2 findings, stop and ask the user for direction — do NOT merge automatically. Document remaining findings and let the user decide whether to continue fixing, create follow-up issues, or override.
 
 ### Step 7: Confirm Completion
 
@@ -195,7 +195,7 @@ Do NOT proceed to the next task or merge until this confirmation is output.
 1. **All three channels are mandatory** — skip only when the tool is genuinely unavailable (not installed), never by choice.
 2. **Auth failures are not silent** — always surface to the user with recovery instructions.
 3. **Independence** — never share one channel's output with another. Each reviews the diff independently.
-4. **Fix before proceeding** — P0/P1 findings must be resolved before moving to the next task.
+4. **Fix before proceeding** — P0/P1/P2 findings must be resolved before moving to the next task.
 5. **Document everything** — the review summary must show which channels ran and which were skipped, with reasons.
 
 ---
@@ -527,8 +527,8 @@ The review step integrates into the standard PR flow:
 1. Agent creates PR
 2. Agent runs `scripts/cli-pr-review.sh` (or review runs automatically)
 3. Review findings are posted as PR comments or written to a local file
-4. Agent addresses P0/P1 findings, pushes fixes
-5. Re-review until no P0/P1 findings remain
+4. Agent addresses P0/P1/P2 findings, pushes fixes
+5. Re-review until no P0/P1/P2 findings remain
 6. PR is ready for merge
 
 ## Deep Guidance
@@ -592,7 +592,7 @@ fi
 
 `docs/review-standards.md` should define:
 - Severity levels with concrete examples per project
-- What constitutes a blocking review (P0/P1 threshold)
+- What constitutes a blocking review (P0/P1/P2 threshold)
 - Auto-approve criteria (when review can be skipped)
 - Review SLA (how long before auto-approve kicks in)
 
@@ -628,7 +628,7 @@ Finding Classification:
 └─────────────────┴──────────┴──────────┴───────────────────┘
 ```
 
-HIGH confidence findings are always addressed. MEDIUM confidence findings are addressed if P0/P1. Contradictions require the implementing agent to make a judgment call and document the reasoning.
+HIGH confidence findings are always addressed. MEDIUM confidence findings are addressed if P0/P1/P2. Contradictions require the implementing agent to make a judgment call and document the reasoning.
 
 ### Security-Focused Review Checklist
 

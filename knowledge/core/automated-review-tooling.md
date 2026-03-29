@@ -45,8 +45,8 @@ The review step integrates into the standard PR flow:
 1. Agent creates PR
 2. Agent runs `scripts/cli-pr-review.sh` (or review runs automatically)
 3. Review findings are posted as PR comments or written to a local file
-4. Agent addresses P0/P1 findings, pushes fixes
-5. Re-review until no P0/P1 findings remain
+4. Agent addresses P0/P1/P2 findings, pushes fixes
+5. Re-review until no P0/P1/P2 findings remain
 6. PR is ready for merge
 
 ## Deep Guidance
@@ -110,7 +110,7 @@ fi
 
 `docs/review-standards.md` should define:
 - Severity levels with concrete examples per project
-- What constitutes a blocking review (P0/P1 threshold)
+- What constitutes a blocking review (P0/P1/P2 threshold)
 - Auto-approve criteria (when review can be skipped)
 - Review SLA (how long before auto-approve kicks in)
 
@@ -146,7 +146,7 @@ Finding Classification:
 └─────────────────┴──────────┴──────────┴───────────────────┘
 ```
 
-HIGH confidence findings are always addressed. MEDIUM confidence findings are addressed if P0/P1. Contradictions require the implementing agent to make a judgment call and document the reasoning.
+HIGH confidence findings are always addressed. MEDIUM confidence findings are addressed if P0/P1/P2. Contradictions require the implementing agent to make a judgment call and document the reasoning.
 
 ### Security-Focused Review Checklist
 

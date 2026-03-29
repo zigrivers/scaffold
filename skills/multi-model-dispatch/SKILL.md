@@ -141,12 +141,13 @@ When dispatching a review, bundle all relevant context into the prompt. Each CLI
 ### Template for Artifact Review
 
 ```
-You are reviewing a project artifact for quality issues. Focus on P0 (critical) and P1 (high) issues only.
+You are reviewing a project artifact for quality issues. Report P0 (critical), P1 (high), and P2 (medium) issues.
 
 ## Severity Definitions
 - P0: Will cause implementation failure, data loss, security vulnerability, or fundamental architectural flaw
 - P1: Will cause bugs in normal usage, inconsistency across documents, or blocks downstream work
-- Do NOT report P2/P3 issues (suggestions, style, minor improvements)
+- P2: Improvement opportunity — style, naming, documentation, minor optimization
+- Do NOT report P3 issues (personal preference, trivial nits)
 
 ## Review Standards
 [paste contents of docs/review-standards.md if it exists, otherwise use severity definitions above]
@@ -163,7 +164,7 @@ Respond with a JSON object:
   "approved": true/false,
   "findings": [
     {
-      "severity": "P0" or "P1",
+      "severity": "P0" or "P1" or "P2",
       "location": "section or line reference",
       "description": "what's wrong",
       "suggestion": "specific fix"
@@ -172,13 +173,13 @@ Respond with a JSON object:
   "summary": "one-line assessment"
 }
 
-If no P0/P1 issues found, respond with: { "approved": true, "findings": [], "summary": "No P0/P1 issues found." }
+If no P0/P1/P2 issues found, respond with: { "approved": true, "findings": [], "summary": "No issues found." }
 ```
 
 ### Template for PR Diff Review
 
 ```
-You are reviewing a pull request diff. Focus on P0 and P1 issues only.
+You are reviewing a pull request diff. Report P0, P1, and P2 issues.
 
 ## Review Standards
 [paste docs/review-standards.md]
