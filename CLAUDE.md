@@ -95,6 +95,43 @@ See `docs/git-workflow.md` for the full workflow.
 
 Before pushing, review `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md. Fix any issues and re-run `make check`. Log recurring patterns to tasks/lessons.md.
 
+### Mandatory 3-Channel PR Review
+
+After creating every PR, run **all three** code review channels before moving to the next task. A PostToolUse hook on `gh pr create` will remind you.
+
+**Channel 1 — Codex CLI:**
+```bash
+# Verify auth (tokens expire mid-session — always check)
+codex login status 2>/dev/null
+# Run review (replace REVIEW_PROMPT with the actual prompt including PR diff)
+codex exec --skip-git-repo-check -s read-only --ephemeral "REVIEW_PROMPT" 2>/dev/null
+```
+If auth fails: tell user to run `! codex login`
+
+**Channel 2 — Gemini CLI:**
+```bash
+# Verify auth (exit 41 = auth failure)
+NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1
+# Run review
+NO_BROWSER=true gemini -p "REVIEW_PROMPT" --output-format json --approval-mode yolo 2>/dev/null
+```
+If auth fails: tell user to run `! gemini -p "hello"`
+
+**Channel 3 — Superpowers code-reviewer:**
+```bash
+# Get SHAs for the PR
+BASE_SHA=$(gh pr view --json baseRefOid -q .baseRefOid)
+HEAD_SHA=$(gh pr view --json headRefOid -q .headRefOid)
+```
+Dispatch `superpowers:code-reviewer` subagent with the base/head SHAs and PR description.
+
+**Rules:**
+- All 3 channels are mandatory — skip only if a tool is genuinely not installed
+- Auth failures are NOT silent fallbacks — surface to the user with recovery commands
+- Each channel reviews independently — never share one channel's output with another
+- Fix all P0/P1 findings before proceeding to the next task
+- After 3 fix rounds with unresolved findings, stop and ask the user — do NOT merge automatically
+
 ## Project Structure Quick Reference
 
 See `docs/project-structure.md` for the full authoritative guide.

@@ -8,6 +8,7 @@ COMMAND_EXEMPT=(
   "dashboard"
   "knowledge"
   "prompt-pipeline"
+  "review-pr"
   "session-analyzer"
   "update"
   "version"

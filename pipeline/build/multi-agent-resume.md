@@ -167,11 +167,22 @@ Once in-progress work is complete (or if there was none):
    - Create a pull request: `gh pr create`
    - Include agent name in PR description for traceability
 
-3. **Between-task cleanup**
+3. **Run code reviews (MANDATORY)**
+   - Run the review-pr tool: `scaffold run review-pr` (CLI) or `/scaffold:review-pr` (plugin)
+   - This runs **all three** review channels on the PR diff:
+     1. **Codex CLI**: `codex exec --skip-git-repo-check -s read-only --ephemeral "REVIEW_PROMPT" 2>/dev/null`
+     2. **Gemini CLI**: `NO_BROWSER=true gemini -p "REVIEW_PROMPT" --output-format json --approval-mode yolo 2>/dev/null`
+     3. **Superpowers code-reviewer**: dispatch `superpowers:code-reviewer` subagent with BASE_SHA and HEAD_SHA
+   - Verify auth before each CLI (`codex login status`, `NO_BROWSER=true gemini -p "respond with ok" -o json`)
+   - All three channels must execute (skip only if a tool is genuinely not installed)
+   - Fix any P0/P1 findings before proceeding
+   - Do NOT move to the next task until all channels have run
+
+4. **Between-task cleanup**
    - `git fetch origin --prune && git clean -fd`
    - Run the install command from CLAUDE.md Key Commands
 
-4. **Claim next task**
+5. **Claim next task**
    - Branch from remote: `git fetch origin && git checkout -b <branch-name> origin/main`
    - Pick the next task following the same process as `/scaffold:multi-agent-start`
    - Continue the TDD execution loop
@@ -218,7 +229,8 @@ Once in-progress work is complete (or if there was none):
 4. **Clean between tasks** — Run cleanup after each task to prevent state leakage.
 5. **TDD is not optional** — Continue the red-green-refactor cycle for any in-progress work.
 6. **Quality gates before PR** — Never create a PR with failing checks.
-7. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
+7. **Code review before next task** — After creating a PR, run all three review channels (Codex CLI, Gemini CLI, Superpowers code-reviewer) and fix all P0/P1 findings before moving on.
+8. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
 
 ---
 
