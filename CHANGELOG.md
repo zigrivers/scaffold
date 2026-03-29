@@ -2,6 +2,17 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.40.0] — 2026-03-29
+
+### Changed
+
+- **QC measurability** — Standardized traceability language to "maps to >= N" across all spec/planning steps; added framework fallbacks to tdd, coding-standards, story-tests, create-evals; added conditional fallbacks to 4 spec steps for missing domain models
+- **Multi-model consensus** — All 19 multi-model steps now define Consensus/Majority/Divergent/Unique classification; multi-model-review-dispatch knowledge entry updated with consensus framework
+- **Innovation approval** — 3 innovate steps now require approval status (approved/deferred/rejected) with timestamp
+- **Implementation handoff** — Playbook knowledge deepened: story-tests-map in context table for all task types, dependency-failure recovery expanded (status check + 30min pivot + escalation), eval failure category-to-root-cause mapping added
+- **Post-pipeline workflows** — new-enhancement now requires playbook update (was optional); quick-task explicitly references playbook quality gates
+- **Command rebuild** — All 60 commands regenerated from updated pipeline sources via `scaffold build`
+
 ## [2.39.0] — 2026-03-29
 
 ### Added
