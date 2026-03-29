@@ -191,7 +191,7 @@ Respond to these natural language requests:
 |---|---|
 | "What's next?" / "Next step" | Run `scaffold next`, present eligible steps |
 | "Where am I?" / "Pipeline status" | Run `scaffold status`, present progress summary |
-| "What does X do?" | Run `scaffold info <step>`, present purpose and dependencies |
+| "What does X do?" | Run `scaffold info <step>`, present purpose, summary, and dependencies |
 | "Is X applicable?" / "Do I need X?" | Run `scaffold check <step>` to detect platform and brownfield status |
 | "Set up memory" / "Configure AI memory" / "Add memory" | Run `scaffold run ai-memory-setup` — sets up modular rules, optional MCP memory server, and external context |
 | "Set up testing" / "Add Playwright" / "Add Maestro" | Run `scaffold run add-e2e-testing` — auto-detects web/mobile and configures the right framework(s) |
@@ -336,24 +336,24 @@ Map natural language requests to concrete step lists using `scaffold status` out
 
 **Phase name reference** (for resolving phase-based requests):
 
-| Phase Name | Also Known As | Steps |
-|---|---|---|
-| vision | Product Vision | create-vision, review-vision, innovate-vision |
-| pre | Product Definition | create-prd, review-prd, innovate-prd, user-stories, review-user-stories, innovate-user-stories |
-| foundation | Project Foundation | beads, tech-stack, coding-standards, tdd, project-structure |
-| environment | Dev Environment | dev-env-setup, design-system, git-workflow, automated-pr-review, ai-memory-setup |
-| integration | Testing Integration | add-e2e-testing |
-| modeling | Domain Modeling | domain-modeling, review-domain-modeling |
-| decisions | Architecture Decisions | adrs, review-adrs |
-| architecture | System Architecture | system-architecture, review-architecture |
-| specification | Specifications | database-schema, review-database, api-contracts, review-api, ux-spec, review-ux |
-| quality | Quality Gates | review-testing, story-tests, create-evals, operations, review-operations, security, review-security |
-| parity | Platform Parity | platform-parity-review |
-| consolidation | Consolidation | claude-md-optimization, workflow-audit |
-| planning | Planning | implementation-plan, implementation-plan-review |
-| validation | Validation | cross-phase-consistency, traceability-matrix, decision-completeness, critical-path-walkthrough, implementability-dry-run, dependency-graph-validation, scope-creep-check |
-| finalization | Finalization | apply-fixes-and-freeze, developer-onboarding-guide, implementation-playbook |
-| build | Build | single-agent-start, single-agent-resume, multi-agent-start, multi-agent-resume, quick-task, new-enhancement |
+| Phase Name | Also Known As | Description | Steps |
+|---|---|---|---|
+| vision | Product Vision | Transforms your idea into a strategic vision document covering who it's for, what makes it different, and what success looks like. | create-vision, review-vision, innovate-vision |
+| pre | Product Definition | Translates your vision into a PRD with features, personas, and success criteria, then breaks it into user stories with testable acceptance criteria. | create-prd, review-prd, innovate-prd, user-stories, review-user-stories, innovate-user-stories |
+| foundation | Project Foundation | Researches and documents technology choices, creates coding standards with linter configs, defines testing strategy, and designs directory layout for parallel agent work. | beads, tech-stack, coding-standards, tdd, project-structure |
+| environment | Dev Environment | Sets up local dev environment, design system (web only), git workflow with CI and worktree scripts, automated PR review, and AI memory persistence. | dev-env-setup, design-system, git-workflow, automated-pr-review, ai-memory-setup |
+| integration | Testing Integration | Auto-detects platform and configures E2E testing — Playwright for web, Maestro for mobile. Skips for backend-only projects. | add-e2e-testing |
+| modeling | Domain Modeling | Identifies core concepts (entities, relationships, invariants, events) and establishes a shared vocabulary across all docs and code. | domain-modeling, review-domain-modeling |
+| decisions | Architecture Decisions | Documents every significant design decision with alternatives considered and consequences, so future contributors know why things are the way they are. | adrs, review-adrs |
+| architecture | System Architecture | Designs the system blueprint — components, data flows, module structure, and extension points that implementation will follow. | system-architecture, review-architecture |
+| specification | Specifications | Creates interface specs for each system layer: database schema with constraints, API contracts with endpoints and error codes, UX flows with accessibility. Each conditional. | database-schema, review-database, api-contracts, review-api, ux-spec, review-ux |
+| quality | Quality Gates | Reviews testing strategy, generates test skeletons from acceptance criteria, creates eval checks, designs deployment pipeline, and conducts OWASP security review. | review-testing, story-tests, create-evals, operations, review-operations, security, review-security |
+| parity | Platform Parity | Audits documentation for platform-specific gaps across target platforms. Skips for single-platform projects. | platform-parity-review |
+| consolidation | Consolidation | Optimizes CLAUDE.md under 200 lines with critical patterns front-loaded, then audits all workflow docs for consistency. | claude-md-optimization, workflow-audit |
+| planning | Planning | Decomposes stories and architecture into concrete tasks scoped to ~150 lines of code and 3 files max, with clear acceptance criteria. | implementation-plan, implementation-plan-review |
+| validation | Validation | Seven cross-cutting audits catching scope creep, dependency cycles, implementability ambiguities, traceability gaps, naming drift, and broken handoffs. | cross-phase-consistency, traceability-matrix, decision-completeness, critical-path-walkthrough, implementability-dry-run, dependency-graph-validation, scope-creep-check |
+| finalization | Finalization | Applies validation findings, freezes docs, creates developer onboarding guide, and writes the implementation playbook agents follow during every coding session. | apply-fixes-and-freeze, developer-onboarding-guide, implementation-playbook |
+| build | Build | Stateless execution steps: TDD implementation loop (single/multi-agent), session resume, quick tasks, and new feature enhancements. | single-agent-start, single-agent-resume, multi-agent-start, multi-agent-resume, quick-task, new-enhancement |
 
 ### Resolution Process
 
@@ -392,7 +392,7 @@ For each step in the batch:
 
 #### A. Pre-Step
 
-1. **Report progress**: `"Step 3/7: operations — Deployment, monitoring, incident response"`
+1. **Report progress**: Use the step's summary from `scaffold info <step>` for context: `"Step 3/7: operations — Designs your deployment pipeline, defines monitoring metrics with alert thresholds, and writes incident response procedures."`
 2. **If re-run**: Reset the step first: `scaffold reset <step> --force`
 3. **Check eligibility**: Run `scaffold next` and verify the step is eligible. If not, report the blocker and either:
    - Wait for user input (if the blocker is external)
@@ -571,14 +571,20 @@ If the rework config has `fresh: true`, delete the existing artifact before runn
 
 When `config.auto` is false (the default):
 - After completing the last step in a phase, pause execution
-- Show a phase summary:
+- Show a phase summary (use the phase description from the reference table for context):
   ```
   Phase 1 (Product Definition) complete: 3/3 steps
+  Translates your vision into a PRD with features, personas, and success criteria,
+  then breaks it into user stories with testable acceptance criteria.
     ✓ create-prd — updated docs/plan.md
     ✓ review-prd — 2 issues found and fixed
     ✓ innovate-prd — added competitive analysis
 
-  Continue to Phase 2 (Project Foundation)? [Yes / Stop here]
+  Next: Phase 2 (Project Foundation) — Researches and documents technology choices,
+  creates coding standards with linter configs, defines testing strategy, and designs
+  directory layout for parallel agent work.
+
+  Continue? [Yes / Stop here]
   ```
 - Wait for user confirmation before proceeding to the next phase
 
