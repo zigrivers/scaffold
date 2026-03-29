@@ -51,9 +51,7 @@ and produce a structured coverage matrix and review summary.
 - **deep**: Full multi-pass review with multi-model validation. AC coverage
   matrix. Independent Codex/Gemini dispatches. Detailed reconciliation report.
 - **mvp**: Coverage check only. No external model dispatch.
-- **custom:depth(1-5)**: Depth 1-2: coverage check. Depth 3: add dependency
-  analysis and AC coverage matrix. Depth 4: add one external model. Depth 5:
-  full multi-model with reconciliation.
+- **custom:depth(1-5)**: Depth 1: architecture coverage check (every component has tasks). Depth 2: coverage check plus DAG validation and agent executability rules. Depth 3: add dependency analysis, AC coverage matrix, and task sizing audit. Depth 4: add one external model review (Codex or Gemini). Depth 5: full multi-model review with reconciliation and detailed findings report.
 
 ## Mode Detection
 Re-review mode if previous review exists. If multi-model review artifacts exist

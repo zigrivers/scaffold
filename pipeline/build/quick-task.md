@@ -58,16 +58,18 @@ prompt.
 - **mvp**: Complexity gate, basic acceptance criteria (happy path + one edge
   case), test plan with category and cases, file list. Skip duplicate check
   and detailed implementation notes.
-- **custom:depth(1-5)**: Depth 1-2: complexity gate, basic AC, test cases,
-  file list. Depth 3: add duplicate check, lessons.md review, regression
-  guards. Depth 4: add mocking strategy, specific coding standard references.
-  Depth 5: full analysis with innovation suggestions and cross-module impact.
+- **custom:depth(1-5)**: Depth 1: complexity gate, basic acceptance criteria
+  (happy path only), and file list. Depth 2: add one edge case to AC, test
+  cases mapped to criteria, and test file locations. Depth 3: add duplicate
+  check, lessons.md review, regression guards. Depth 4: add mocking strategy,
+  specific coding standard references. Depth 5: full analysis with innovation
+  suggestions and cross-module impact.
 
 ## Mode Detection
-This is a stateless execution command. No persistent document is created.
-- Always operates in CREATE MODE — produces a task definition.
-- If Beads is configured, the task is created via `bd create`.
-- If not, the task is documented inline and implementation begins.
+This is a task-creation execution command. Task persistence depends on context:
+- If Beads is configured, the task is persistent via `bd create`.
+- If not, the task is documented inline for immediate execution (not persistent).
+- Always operates in CREATE MODE — produces a task definition each time.
 
 ## Update Mode Specifics
 Not applicable — this creates a new task each time. If a similar task already

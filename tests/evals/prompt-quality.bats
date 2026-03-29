@@ -107,9 +107,10 @@ MIN_SECTION_LINES=4
   [[ "$checked" -gt 0 ]]
 }
 
-@test "Quality Criteria sections have depth tags (soft check)" {
+@test "Quality Criteria sections have depth tags" {
   local tagged_count=0
   local total_count=0
+  local untagged=()
 
   while IFS= read -r file; do
     local qc_section
@@ -122,18 +123,22 @@ MIN_SECTION_LINES=4
     tag_count="$(echo "$qc_section" | grep -c '(mvp)\|(deep)\|(depth' || true)"
     if [[ "$tag_count" -gt 0 ]]; then
       tagged_count=$((tagged_count + 1))
+    else
+      untagged+=("$(basename "$file")")
     fi
   done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
 
-  # Soft check: warn if fewer than 5 steps have depth tags, but don't fail
-  if [[ "$tagged_count" -lt 5 ]]; then
-    printf "WARNING: only %d/%d steps have depth-tagged Quality Criteria (minimum 5 recommended)\n" "$tagged_count" "$total_count"
-  else
-    printf "Quality Criteria depth tags: %d/%d steps tagged\n" "$tagged_count" "$total_count"
+  printf "Quality Criteria depth tags: %d/%d steps tagged\n" "$tagged_count" "$total_count"
+
+  if [[ "$tagged_count" -lt 35 ]]; then
+    printf "FAIL: only %d steps have depth-tagged Quality Criteria (minimum 35 required)\n" "$tagged_count"
+    if [[ ${#untagged[@]} -gt 0 ]]; then
+      printf "Untagged steps:\n"
+      printf "  %s\n" "${untagged[@]}"
+    fi
   fi
 
-  # Always pass — this is a tracking metric that will become stricter in WP7
-  [[ "$total_count" -gt 0 ]]
+  [[ "$tagged_count" -ge 35 ]]
 }
 
 @test "Mode Detection sections use consistent phrasing" {

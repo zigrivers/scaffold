@@ -36,7 +36,7 @@ independent review validation.
 - (deep) Index coverage for known query patterns verified
 - (deep) Migration safety assessed
 - (mvp) Referential integrity matches domain invariants
-- (mvp) Every finding categorized P0-P3 with specific table, column, and issue
+- (mvp) Every finding categorized P0-P3 (P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.) with specific table, column, and issue
 - (mvp) Fix plan documented for all P0/P1 findings; fixes applied to database-schema.md and re-validated
 - (mvp) Downstream readiness confirmed — no unresolved P0 or P1 findings remain before API contracts proceed
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
@@ -46,7 +46,12 @@ independent review validation.
   review dispatched to Codex and Gemini if available, with graceful fallback
   to Claude-only enhanced review.
 - **mvp**: Entity coverage check only.
-- **custom:depth(1-5)**: Depth 1: entity coverage and normalization pass only. Depth 2: add index strategy and migration safety passes. Depth 3: add query performance and data integrity passes. Depth 4: add external model review. Depth 5: multi-model review with reconciliation.
+- **custom:depth(1-5)**:
+  - Depth 1: Entity coverage and normalization pass only (1 review pass)
+  - Depth 2: Add index strategy and migration safety passes (2 review passes)
+  - Depth 3: Add query performance and data integrity passes (4 review passes)
+  - Depth 4: Add external model review (4 review passes + external dispatch)
+  - Depth 5: Multi-model review with reconciliation (4 review passes + multi-model synthesis)
 
 ## Mode Detection
 Re-review mode if previous review exists. If multi-model review artifacts exist

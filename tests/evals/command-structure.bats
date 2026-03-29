@@ -102,8 +102,8 @@ is_finalization() {
   echo "$fin_cmds" | grep -qx "$name"
 }
 
-@test "non-finalization commands with >50 lines have scaffold references (dead-end warning)" {
-  local warnings=()
+@test "non-finalization commands with >50 lines have scaffold references (max 3 dead-ends)" {
+  local dead_ends=()
   local checked=0
 
   for cmd_file in "${PROJECT_ROOT}"/commands/*.md; do
@@ -117,18 +117,20 @@ is_finalization() {
     checked=$((checked + 1))
 
     if ! grep -q '/scaffold:' "$cmd_file"; then
-      warnings+=("${slug}.md (${lines} lines): no /scaffold: reference — potential dead-end command")
+      dead_ends+=("${slug}.md (${lines} lines): no /scaffold: reference — dead-end command")
     fi
   done
 
-  if [[ ${#warnings[@]} -gt 0 ]]; then
-    printf "WARNING: potential dead-end commands (%d checked, %d without /scaffold: references):\n" "$checked" "${#warnings[@]}"
-    printf "  %s\n" "${warnings[@]}"
+  if [[ ${#dead_ends[@]} -gt 0 ]]; then
+    printf "Dead-end commands (%d checked, %d without /scaffold: references):\n" "$checked" "${#dead_ends[@]}"
+    printf "  %s\n" "${dead_ends[@]}"
   fi
 
-  # Soft check — warn but don't fail. Uncomment return 1 to enforce.
-  # [[ ${#warnings[@]} -eq 0 ]]
-  [[ "$checked" -gt 0 ]]
+  if [[ ${#dead_ends[@]} -gt 3 ]]; then
+    printf "FAIL: more than 3 dead-end commands (%d found)\n" "${#dead_ends[@]}"
+  fi
+
+  [[ ${#dead_ends[@]} -le 3 ]]
 }
 
 @test "After This Step references point to existing commands" {

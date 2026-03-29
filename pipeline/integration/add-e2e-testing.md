@@ -46,6 +46,7 @@ Outputs vary by detected platform:
 - tdd-standards.md E2E section updated with when-to-use guidance
 - (deep) CI integration configured for E2E test execution
 - (deep) Sub-flows defined for common user journeys
+- (deep for multi-platform) Smoke test names and intent are consistent between Playwright and Maestro
 
 ## Methodology Scaling
 - **deep**: Full setup for all detected platforms. All visual testing patterns,
@@ -53,9 +54,12 @@ Outputs vary by detected platform:
   common journeys, and comprehensive documentation updates.
 - **mvp**: Basic config and smoke test for detected platform. Minimal docs
   updates. Two viewports for web, single platform for mobile.
-- **custom:depth(1-5)**: Depth 1-2: config + smoke test. Depth 3: add patterns,
-  naming, testID rules. Depth 4: add CI integration, both mobile platforms.
-  Depth 5: full suite with baseline management and sub-flows.
+- **custom:depth(1-5)**:
+  - Depth 1: Config + smoke test for primary platform only
+  - Depth 2: Config + smoke test with basic viewport/device coverage
+  - Depth 3: Add patterns, naming conventions, and testID rules
+  - Depth 4: Add CI integration and both mobile platforms
+  - Depth 5: Full suite with baseline management, sub-flows, and cross-platform consistency
 
 ## Conditional Evaluation
 Enable when: tech-stack.md indicates a web frontend (Playwright) or mobile app

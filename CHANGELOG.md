@@ -2,6 +2,23 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.39.0] — 2026-03-29
+
+### Added
+
+- **New eval: quality-criteria-measurability.bats** — 2 tests validating that Quality Criteria use measurable language and multi-model criteria define consensus thresholds
+- **New eval: knowledge-injection.bats** — 3 tests validating knowledge entry structure (Summary+Deep Guidance), reference resolution, and entry count limits
+- **Handoff quality improvements** — Implementation playbook now reads domain-models, ADRs, vision, and project-structure; includes test skeleton discovery and dependency-failure recovery guidance
+
+### Changed
+
+- **Depth documentation** — All 45 pipeline steps with grouped depth levels (e.g., "Depth 1-2") now have explicit per-level descriptions (Depth 1 through Depth 5)
+- **Quality Criteria measurability** — Fixed 3 BROKEN criteria (create-evals contradiction, implementation-playbook make eval at MVP, system-architecture directory structure duplication) and improved 30+ vague criteria across all phases with measurable thresholds
+- **P0-P3 severity standardization** — All review steps now use consistent definitions: P0=Breaks downstream work, P1=Prevents quality milestone, P2=Known tech debt, P3=Polish
+- **Mode Detection accuracy** — new-enhancement correctly labeled as "document-modifying" (was "stateless"); quick-task clarifies Beads vs inline persistence
+- **Knowledge deepening** — eval-craft (per-category guidance), task-decomposition (critical path/wave planning), prd-craft (NFR quantification), testing-strategy (AC-to-test mapping)
+- **Eval gate promotions** — prompt-quality depth tags (threshold 5→35), pipeline-completeness Update Mode Specifics (warning→hard fail), command-structure dead-ends (warning→max 3)
+
 ## [2.38.1] — 2026-03-29
 
 ### Fixed

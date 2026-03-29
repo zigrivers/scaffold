@@ -33,7 +33,7 @@ drift patterns.
 - (mvp) Entity names are consistent across domain models, database schema, and API contracts (zero mismatches)
 - (mvp) Technology references match `docs/tech-stack.md` in all documents
 - (deep) Data flow descriptions in architecture match API endpoint definitions
-- (deep) Terminology is consistent (same concept never uses two different names)
+- (deep) Every named entity in the domain model has exactly one name used consistently across domain-models/, api-contracts.md, database-schema.md, and ux-spec.md
 - Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 

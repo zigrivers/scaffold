@@ -36,7 +36,7 @@ pending/skipped — developers implement them during TDD execution.
   ACs → test cases, and layer assignments (unit/integration/e2e)
 
 ## Quality Criteria
-- (mvp) Every user story in docs/user-stories.md has a corresponding test file
+- (mvp) Every Must-have user story has a corresponding test file
 - (mvp) Every acceptance criterion has at least one tagged test case
 - Test cases are tagged with story ID and AC ID for traceability
 - (deep) Test layer assignment: single-function ACs → unit; cross-component ACs → integration; full user journey ACs → e2e
@@ -45,6 +45,7 @@ pending/skipped — developers implement them during TDD execution.
 - docs/story-tests-map.md shows 100% AC-to-test-case coverage
 - Test file location follows conventions from docs/project-structure.md
 - (deep) Test data fixtures and dependencies documented for each test file
+- (deep) Each pending test case includes story ID and AC ID tags, GWT structure, and at least one assertion hint
 
 ## Methodology Scaling
 - **deep**: All stories get test files. Negative test cases for every happy path
@@ -52,9 +53,12 @@ pending/skipped — developers implement them during TDD execution.
   e2e where applicable). Traceability matrix with confidence analysis.
 - **mvp**: Test files for Must-have stories only. One test case per AC. No
   layer splitting — all tests in acceptance/ directory.
-- **custom:depth(1-5)**: Depth 1: Must-have stories only. Depth 2: add
-  Should-have. Depth 3: add negative cases. Depth 4: add boundary conditions
-  and layer splitting. Depth 5: full suite with all stories and edge cases.
+- **custom:depth(1-5)**:
+  - Depth 1: Must-have stories only, one test case per AC
+  - Depth 2: Add Should-have stories
+  - Depth 3: Add negative test cases for every happy-path AC
+  - Depth 4: Add boundary condition tests and layer splitting (unit/integration/e2e)
+  - Depth 5: Full suite — all stories including Could-have, edge cases, and confidence analysis in traceability matrix
 
 ## Mode Detection
 Update mode if tests/acceptance/ directory exists. In update mode: add test

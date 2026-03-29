@@ -38,8 +38,8 @@ independent review validation.
 - (deep) Secrets management covers: all environment variables, API keys, database credentials, and third-party tokens
 - (deep) Dependency audit scope covers all dependencies
 - (deep) Threat model covers all trust boundaries
-- (deep) Data classification covers every entity in the domain model
-- Every finding categorized P0-P3 with specific control, boundary, and issue
+- (deep) If docs/domain-models/ exists, data classification covers every entity in the domain model. Otherwise, data classification derived from user stories and API contracts.
+- Every finding categorized P0-P3 (P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.) with specific control, boundary, and issue
 - Fix plan documented for all P0/P1 findings; fixes applied to security-review.md and re-validated
 - Downstream readiness confirmed — no unresolved P0 or P1 findings remain before planning phase proceeds
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
@@ -48,7 +48,12 @@ independent review validation.
 - **deep**: Full multi-pass review. Multi-model review dispatched to Codex and
   Gemini if available, with graceful fallback to Claude-only enhanced review.
 - **mvp**: OWASP coverage check only.
-- **custom:depth(1-5)**: Depth 1: OWASP top 10 and secrets management pass only. Depth 2: add auth boundary and input validation passes. Depth 3: add dependency audit and data protection passes. Depth 4: add external model security review. Depth 5: multi-model security review with reconciliation.
+- **custom:depth(1-5)**:
+  - Depth 1: OWASP top 10 and secrets management pass only (1 review pass)
+  - Depth 2: Add auth boundary and input validation passes (2 review passes)
+  - Depth 3: Add dependency audit and data protection passes (4 review passes)
+  - Depth 4: Add external model security review (4 review passes + external dispatch)
+  - Depth 5: Multi-model security review with reconciliation (4 review passes + multi-model synthesis)
 
 ## Mode Detection
 Re-review mode if previous review exists. If multi-model review artifacts exist

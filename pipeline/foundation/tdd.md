@@ -30,7 +30,7 @@ actual test framework and assertion library.
 - docs/tdd-standards.md — testing approach with coverage goals and patterns
 
 ## Quality Criteria
-- (mvp) Test pyramid defined with coverage targets per layer
+- (mvp) Test pyramid defined with coverage targets per layer (defined per layer, e.g., 80% unit, 50% integration)
 - (mvp) Testing patterns specified for each layer (unit, integration, e2e)
 - (mvp) Quality gates defined (what must pass before merge)
 - Edge cases from domain invariants are test scenarios
@@ -42,7 +42,12 @@ actual test framework and assertion library.
   test patterns per architecture pattern. Performance benchmarks. CI integration.
   Test data strategy. Mutation testing approach.
 - **mvp**: Test pyramid overview. Key testing patterns. What must pass before deploy.
-- **custom:depth(1-5)**: Depth 1-2: test pyramid overview with key patterns and example test for each layer. Depth 3: add per-layer test patterns, coverage targets, CI integration, and test data strategy. Depth 4: add performance benchmarks, mutation testing approach, and cross-module integration patterns. Depth 5: full suite with contract testing, visual regression strategy, and automated quality gate calibration.
+- **custom:depth(1-5)**:
+  - Depth 1: Test pyramid overview with key patterns. What must pass before deploy.
+  - Depth 2: Depth 1 + example test for each layer using the project's actual test framework.
+  - Depth 3: Add per-layer test patterns, coverage targets, CI integration, and test data strategy.
+  - Depth 4: Add performance benchmarks, mutation testing approach, and cross-module integration patterns.
+  - Depth 5: Full suite with contract testing, visual regression strategy, and automated quality gate calibration.
 
 ## Mode Detection
 Check for docs/tdd-standards.md. If it exists, operate in update mode: read

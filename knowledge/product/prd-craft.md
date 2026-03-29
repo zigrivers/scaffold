@@ -343,3 +343,44 @@ Before considering a PRD complete:
 - [ ] Competitive context is provided
 - [ ] The PRD says WHAT, not HOW
 - [ ] Every stakeholder group has been considered (end users, admins, support, integrators)
+
+### Non-Functional Requirements — Specification and Quantification
+
+Every NFR must have three components: a **measurable target**, a **measurement method**, and an **acceptable threshold**. Without all three, an NFR is aspirational, not actionable.
+
+#### Performance
+
+- **Response time**: Specify percentile targets — e.g., "API p95 < 200ms, p99 < 500ms for read operations; p95 < 500ms for writes"
+- **Throughput**: Define sustained request rate — e.g., "System handles 500 requests/second under normal load"
+- **Concurrent users**: State peak capacity — e.g., "10,000 simultaneous authenticated sessions without degradation"
+- **Measurement**: Name the tool and method — "Measured via k6 load test against staging, run nightly in CI"
+
+#### Security
+
+- **Compliance standards**: Name the specific standards — OWASP Top 10, SOC2 Type II, PCI DSS Level 1, HIPAA
+- **Authentication requirements**: Specify method and strength — "OAuth 2.0 + PKCE, session timeout 30 min, MFA for admin roles"
+- **Data classification**: Label data tiers — "PII (encrypted at rest AES-256, in transit TLS 1.3), public (CDN-cacheable)"
+- **Audit logging**: Define what is logged — "All auth events, all data mutations, all admin actions; retained 90 days"
+
+#### Scalability
+
+- **Growth targets**: Quantify the horizon — "Support 10x current load within 12 months without architecture changes"
+- **Scaling strategy**: State horizontal vs vertical — "Stateless API servers behind load balancer; horizontal auto-scale at 70% CPU"
+- **Data volume**: Project storage growth — "100GB Year 1, 1TB Year 3; archive records older than 2 years to cold storage"
+
+#### Availability
+
+- **Uptime SLA**: State the target and what it means — "99.9% monthly (43 min downtime/month allowed)"
+- **RTO/RPO**: Recovery time objective and recovery point objective — "RTO: 15 min, RPO: 5 min (continuous replication)"
+- **Graceful degradation**: Define fallback behavior — "If payment provider is down, queue orders and retry; show user 'processing' status"
+- **Maintenance windows**: Specify schedule — "Zero-downtime deploys via rolling update; no scheduled maintenance windows"
+
+#### Accessibility
+
+- **WCAG level**: State the target — "WCAG 2.1 AA compliance for all public-facing pages"
+- **Screen reader support**: Name tested readers — "VoiceOver (macOS/iOS), NVDA (Windows); tested quarterly"
+- **Keyboard navigation**: Full keyboard operability for all interactive elements; visible focus indicators
+
+#### The Three-Part Rule
+
+Every NFR entry in the PRD must answer: *What is the target?* (p95 < 200ms), *How is it measured?* (k6 load test in CI), *What is acceptable?* (p95 between 200-300ms triggers warning; above 300ms blocks deploy). If any of the three is missing, the NFR is incomplete.

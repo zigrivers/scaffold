@@ -40,9 +40,12 @@ throughout the entire pipeline.
   delivery plan. 15-20 pages.
 - **mvp**: Problem statement, core features list, primary user description,
   success criteria. 1-2 pages. Just enough to start building.
-- **custom:depth(1-5)**: Depth 1-2: MVP-style. Depth 3: add user personas
-  and feature prioritization. Depth 4-5: full competitive analysis and
-  phased delivery.
+- **custom:depth(1-5)**:
+  - Depth 1: MVP-style — problem statement, core features list, primary user. 1 page.
+  - Depth 2: MVP + success criteria and basic constraints. 1-2 pages.
+  - Depth 3: Add user personas and feature prioritization (MoSCoW). 3-5 pages.
+  - Depth 4: Add competitive analysis, risk assessment, and phased delivery plan. 8-12 pages.
+  - Depth 5: Full PRD with competitive analysis, phased delivery, and detailed non-functional requirements. 15-20 pages.
 
 ## Mode Detection
 If docs/plan.md exists, operate in update mode: read existing content, identify

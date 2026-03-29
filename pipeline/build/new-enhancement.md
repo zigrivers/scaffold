@@ -57,15 +57,16 @@ This is the full-weight entry point for work that goes beyond a quick fix.
 - **mvp**: Streamlined discovery, basic impact analysis, PRD feature addition,
   minimal user stories with acceptance criteria, task list with dependencies.
   Skip innovation pass, competitive analysis, and follow-up recommendations.
-- **custom:depth(1-5)**: Depth 1-2: basic impact check, PRD update, stories,
-  task creation. Depth 3: add impact analysis, dependency management, cross-
-  reference check. Depth 4: add innovation pass, frozen artifact handling,
-  migration considerations. Depth 5: full workflow with competitive analysis,
-  AI-native possibilities, and follow-up review recommendations.
+- **custom:depth(1-5)**: Depth 1: basic PRD feature addition, minimal user stories,
+  task creation. Depth 2: add impact check and dependency identification. Depth 3:
+  add detailed impact analysis, dependency management, cross-reference check. Depth 4:
+  add innovation pass, frozen artifact handling, migration considerations. Depth 5:
+  full workflow with competitive analysis, AI-native possibilities, and follow-up
+  review recommendations.
 
 ## Mode Detection
-This is a stateless execution command. It updates existing documents (plan.md,
-user-stories.md) but does not create a new standalone output document.
+This is a document-modifying execution command. It updates existing documents
+(plan.md, user-stories.md) in place but does not create a new standalone output.
 - Always operates in ENHANCEMENT MODE.
 - PRD and user stories are updated in place (append, do not replace).
 

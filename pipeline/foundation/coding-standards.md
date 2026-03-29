@@ -32,7 +32,7 @@ self-review checklist.
 
 ## Quality Criteria
 - Every standard references the specific tech stack, not generic principles
-- Includes runnable code examples showing the RIGHT way for the stack
+- Includes >= 2 runnable code examples per section showing the RIGHT way for the stack
 - Commit message format is [BD-<id>] type(scope): description
 - AI-specific coding rules section addresses common AI mistakes (dead code,
   duplication, magic numbers, premature abstraction, unnecessary features)
@@ -47,9 +47,12 @@ self-review checklist.
   linter/formatter configuration with custom rules. 15-20 pages.
 - **mvp**: Core naming conventions, commit format, import ordering, error handling
   approach, and AI-specific rules. Basic linter config. 3-5 pages.
-- **custom:depth(1-5)**: Depth 1-2: MVP conventions. Depth 3: add security and
-  database patterns. Depth 4: add API design and logging. Depth 5: full suite
-  with all sections and custom linter rules.
+- **custom:depth(1-5)**:
+  - Depth 1: Core naming conventions, commit format, and import ordering. 1-2 pages.
+  - Depth 2: Depth 1 + error handling approach and AI-specific rules. Basic linter config. 3-5 pages.
+  - Depth 3: Add security and database access patterns. 5-8 pages.
+  - Depth 4: Add API design and logging conventions. 8-12 pages.
+  - Depth 5: Full suite with all sections, custom linter rules, and code review checklist. 15-20 pages.
 
 ## Mode Detection
 Update mode if docs/coding-standards.md exists. In update mode: preserve naming

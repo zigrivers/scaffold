@@ -37,8 +37,9 @@ independent review validation.
 - (deep) Every user action has at minimum: loading, success, and error states documented
 - (deep) Design system consistency verified
 - (deep) Error states present for all failure-capable actions
-- (mvp) Every finding categorized P0-P3 with specific flow, screen, and issue
+- (mvp) Every finding categorized P0-P3 (P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.) with specific flow, screen, and issue
 - (mvp) Fix plan documented for all P0/P1 findings; fixes applied to ux-spec.md and re-validated
+- (mvp) Review report includes explicit Readiness Status section
 - (mvp) Downstream readiness confirmed — no unresolved P0 or P1 findings remain before quality phase proceeds
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
@@ -46,7 +47,12 @@ independent review validation.
 - **deep**: Full multi-pass review. Multi-model review dispatched to Codex and
   Gemini if available, with graceful fallback to Claude-only enhanced review.
 - **mvp**: Journey coverage only.
-- **custom:depth(1-5)**: Depth 1: flow completeness and accessibility pass only. Depth 2: add responsive design and error state passes. Depth 3: add interaction patterns and platform consistency passes. Depth 4: add external model UX review. Depth 5: multi-model review with reconciliation.
+- **custom:depth(1-5)**:
+  - Depth 1: Flow completeness and accessibility pass only (1 review pass)
+  - Depth 2: Add responsive design and error state passes (2 review passes)
+  - Depth 3: Add interaction patterns and platform consistency passes (4 review passes)
+  - Depth 4: Add external model UX review (4 review passes + external dispatch)
+  - Depth 5: Multi-model review with reconciliation (4 review passes + multi-model synthesis)
 
 ## Mode Detection
 Re-review mode if previous review exists. If multi-model review artifacts exist

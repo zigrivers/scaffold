@@ -51,7 +51,8 @@ continues the TDD execution loop from where you left off.
   guide, consult lessons.md, reconcile all open PRs, detailed PR descriptions.
 - **mvp**: Quick git state check, identify in-progress work, finish or pick
   next task, TDD loop, make check, create PR.
-- **custom:depth(1-5)**: Depth 1-2: check branch and continue. Depth 3: add
+- **custom:depth(1-5)**: Depth 1: check current branch and continue in-progress work.
+  Depth 2: add git status assessment and uncommitted change detection. Depth 3: add
   PR reconciliation and lessons.md review. Depth 4: add rebase, full test
   suite validation, onboarding review. Depth 5: full state audit with branch
   cleanup and eval gates.

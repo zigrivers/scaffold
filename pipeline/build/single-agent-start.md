@@ -45,6 +45,7 @@ complete.
 - (mvp) Task status is updated after each completion
 - (deep) Test skeletons from tests/acceptance/ are used as starting points when available
 - (deep) lessons.md is consulted before each task for relevant anti-patterns
+- (deep) Before starting each task, agent consults tasks/lessons.md and documents which lesson was applied
 - (deep) PR description includes implementation summary, assumptions, and files modified
 
 ## Methodology Scaling
@@ -54,7 +55,8 @@ complete.
 - **mvp**: Quick git/dependency check, read playbook or plan, pick next task,
   TDD loop, make check, create PR. Skip onboarding guide review and detailed
   PR annotations.
-- **custom:depth(1-5)**: Depth 1-2: minimal pre-flight, TDD loop, make check.
+- **custom:depth(1-5)**: Depth 1: git status check, TDD loop, make check.
+  Depth 2: add dependency check and test suite health verification before starting.
   Depth 3: add lessons.md review and test skeleton usage. Depth 4: add
   onboarding guide, eval gates, detailed PR descriptions. Depth 5: full
   pre-flight suite, all quality gates, cross-reference with upstream docs.

@@ -27,7 +27,7 @@ strategically sound, and ready for the PRD to consume.
 ## Quality Criteria
 - (mvp) Passes 1 and 5 executed with findings documented
 - All 5 review passes executed with findings documented
-- Every finding categorized by severity (P0-P3)
+- Every finding categorized by severity: P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.
 - Fix plan created for P0 and P1 findings
 - Fixes applied and re-validated
 - (mvp) Every vision section has content specific enough to derive a PRD without asking strategic clarification questions
@@ -38,9 +38,12 @@ strategically sound, and ready for the PRD to consume.
   categorization. Fixes applied and re-validated.
 - **mvp**: Passes 1 and 5 only (Vision Clarity and Downstream Readiness).
   Focus on blocking gaps — is the vision clear enough to write a PRD from?
-- **custom:depth(1-5)**: Depth 1-2: passes 1 and 5 only. Depth 3: passes 1,
-  2, 5 (add Audience Precision). Depth 4: passes 1-3, 5 (add Competitive
-  Rigor). Depth 5: all 5 passes.
+- **custom:depth(1-5)**:
+  - Depth 1: Pass 1 only (Vision Clarity). Single review pass.
+  - Depth 2: Passes 1 and 5 (Vision Clarity, Downstream Readiness). Two review passes.
+  - Depth 3: Passes 1, 2, 5 (add Audience Precision). Three review passes.
+  - Depth 4: Passes 1-3, 5 (add Competitive Rigor) + one external model review (if CLI available). Four review passes.
+  - Depth 5: All 5 passes + multi-model review with reconciliation. Five review passes.
 
 ## Mode Detection
 If docs/reviews/vision-review-vision.md exists, this is a re-review. Read
@@ -115,10 +118,10 @@ Evaluate whether the PRD can be written from this vision:
 ### Review Process
 
 1. Execute each pass, documenting findings with severity (P0-P3):
-   - P0: Vision is fundamentally unclear or contradictory — blocks all downstream work
-   - P1: Significant gap that would cause PRD to make wrong assumptions
-   - P2: Minor gap or vagueness that could be improved
-   - P3: Nitpick or style suggestion
+   - P0: Breaks downstream work — vision is fundamentally unclear or contradictory
+   - P1: Prevents quality milestone — significant gap that would cause PRD to make wrong assumptions
+   - P2: Known tech debt — minor gap or vagueness that could be improved
+   - P3: Polish — nitpick or style suggestion
 2. Create a fix plan for all P0 and P1 findings
 3. Present the fix plan to the user for approval
 4. Apply approved fixes to docs/vision.md

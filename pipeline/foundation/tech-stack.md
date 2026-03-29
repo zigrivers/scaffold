@@ -51,10 +51,12 @@ about ecosystem maturity, alternatives, and gotchas.
   to Claude-only enhanced research.
 - **mvp**: Core stack decisions only (language, framework, database, test runner).
   Brief rationale. Quick Reference with versions. 2-3 pages.
-- **custom:depth(1-5)**: Depth 1-2: MVP decisions. Depth 3: add infrastructure
-  and tooling. Depth 4: add AI compatibility analysis + one external model
-  (if CLI available). Depth 5: full competitive analysis and upgrade strategy
-  + multi-model with cross-referencing.
+- **custom:depth(1-5)**:
+  - Depth 1: Core stack decisions only (language, framework, database). Brief rationale. 1 page.
+  - Depth 2: Depth 1 + test runner choice and Quick Reference with versions. 2-3 pages.
+  - Depth 3: Add infrastructure, tooling, and developer experience recommendations.
+  - Depth 4: Add AI compatibility analysis + one external model research (if CLI available).
+  - Depth 5: Full competitive analysis per category, upgrade strategy, + multi-model with cross-referencing.
 
 ## Mode Detection
 Update mode if docs/tech-stack.md exists. In update mode: never change a

@@ -38,7 +38,7 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 
 ## Quality Criteria
 - (mvp) Every architecture component has implementation tasks
-- (mvp) Task dependencies form a valid DAG (no cycles)
+- (mvp) Task dependencies form a valid DAG (no cycles, verified by checking no task depends on a later-ordered task)
 - (mvp) Each task produces ~150 lines of net-new application code (excluding tests and generated files)
 - (mvp) Tasks include acceptance criteria (how to know it's done)
 - (mvp) Tasks incorporate testing requirements from the testing strategy
@@ -48,6 +48,7 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 - (deep) Critical path is identified
 - (deep) Parallelization opportunities are marked with wave plan
 - (mvp) Every user story maps to at least one task
+- (mvp) Every PRD feature traces through stories to tasks (transitive traceability)
 - (deep) High-risk tasks are flagged with risk type and mitigation
 - (deep) Wave summary produced with agent allocation recommendation
 - (mvp) No task modifies more than 3 application files (test files excluded; exceptions require justification)
@@ -64,8 +65,7 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
   Each task has a brief description, rough size estimate, and key dependency.
   Enough to start working sequentially. Skip architecture decomposition —
   work directly from user story acceptance criteria.
-- **custom:depth(1-5)**: Depth 1-2: ordered list. Depth 3: add dependencies
-  and sizing. Depth 4-5: full breakdown with parallelization.
+- **custom:depth(1-5)**: Depth 1: ordered task list derived from PRD features only. Depth 2: ordered list with rough size estimates per task. Depth 3: add explicit dependencies and sizing (150-line budget, 3-file rule). Depth 4: full breakdown with dependency graph and parallelization plan. Depth 5: full breakdown with parallelization, wave assignments, agent allocation, and critical path analysis.
 
 ## Mode Detection
 Check for docs/implementation-plan.md. If it exists, operate in update mode:
