@@ -2,6 +2,18 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.36.0] — 2026-03-29
+
+### Added
+
+- **Agent Executability Heuristics** — Five formalized rules for AI-agent-friendly task sizing added to the `task-decomposition` knowledge base: Three-File Rule (max 3 application files), 150-Line Budget (~150 lines net-new code), Single-Concern Rule (no "and" connecting unrelated work), Decision-Free Execution (all design decisions resolved upfront), and Test Co-location (tests in the same task as the code they test). Hard rules with an escape hatch (`<!-- agent-size-exception: reason -->`).
+- **Pass 8: Agent Executability** — New review pass in `implementation-plan-review` that evaluates every task against the 5 agent sizing rules. Flags oversized tasks with specific split recommendations. Severity: P0 for 6+ files or 300+ lines, P1 for rule violations without justification.
+
+### Changed
+
+- **Task sizing limits tightened** — `implementation-plan` quality criteria updated from "≤500 lines / 5 files" to "~150 lines / 3 files" with mandatory decision-free execution and test co-location requirements.
+- **Implementation plan review** now includes agent executability as a quality gate at all methodology depths (mvp through deep).
+
 ## [2.35.0] — 2026-03-29
 
 ### Added
