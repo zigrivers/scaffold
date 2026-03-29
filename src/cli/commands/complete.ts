@@ -88,6 +88,8 @@ const completeCommand: CommandModule<Record<string, unknown>, CompleteArgs> = {
         status: 'completed',
         source: stepEntry.source ?? 'pipeline',
         produces: stepEntry.produces ?? [],
+        at: new Date().toISOString(),
+        completed_by: 'user',
       }
 
       // Clear in_progress if it references this step
