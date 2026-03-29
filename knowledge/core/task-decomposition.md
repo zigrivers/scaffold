@@ -16,7 +16,14 @@ User stories bridge PRD features and implementation tasks. Each story decomposes
 
 ### Task Sizing
 
-Each task should be completable in a single AI agent session (30-90 minutes of agent time). A well-sized task has a clear title (usable as commit message), touches 1-5 files, produces a testable result, and has no ambiguity about "done."
+Each task should be completable in a single AI agent session (30-90 minutes of agent time). A well-sized task has a clear title (usable as commit message), touches 1-3 application files (hard limit; justify exceptions), produces ~150 lines of net-new application code (excluding tests and generated files), and has no ambiguity about "done."
+
+Five rules govern agent-friendly task sizing:
+1. **Three-File Rule** — Max 3 application files modified (test files excluded)
+2. **150-Line Budget** — Max ~150 lines of net-new application code per task
+3. **Single-Concern Rule** — One task does one thing (no "and" connecting unrelated work)
+4. **Decision-Free Execution** — All design decisions resolved in the task description; agents implement, they don't architect
+5. **Test Co-location** — Tests live in the same task as the code they test; no deferred testing
 
 Split large tasks by layer (API, UI, DB, tests), by feature slice (happy path, validation, edge cases), or by entity. Combine tiny tasks that touch the same file and have no independent value.
 
@@ -157,8 +164,11 @@ Each task should be completable in a single AI agent session (typically 30-90 mi
 
 **A well-sized task:**
 - Has a clear, specific title that could be a commit message
-- Touches 1-5 files (not counting test files)
-- Produces a testable, verifiable result
+- Touches 1-3 application files (hard limit; test files excluded from count)
+- Produces ~150 lines of net-new application code (excluding tests and generated files)
+- Does exactly one thing (passes the single-concern test: describable without "and")
+- Requires no design decisions from the agent (all choices resolved in the description)
+- Includes co-located tests (the task isn't done until tests pass)
 - Has no ambiguity about what "done" means
 - Can be code-reviewed independently
 
