@@ -1,6 +1,7 @@
 ---
 name: git-workflow
 description: Configure git workflow with branching, PRs, CI, and worktree scripts for parallel agents
+summary: "Sets up your branching strategy, commit message format, PR workflow, CI pipeline with lint and test jobs, and worktree scripts so multiple AI agents can work in parallel without conflicts."
 phase: "environment"
 order: 330
 dependencies: [dev-env-setup]

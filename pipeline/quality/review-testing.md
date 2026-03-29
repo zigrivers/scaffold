@@ -1,6 +1,7 @@
 ---
 name: review-testing
 description: Review testing strategy for coverage gaps and feasibility
+summary: "Audits the testing strategy for coverage gaps by layer, verifies edge cases from domain invariants are tested, and checks that test environment assumptions match actual config."
 phase: "quality"
 order: 910
 dependencies: [tdd, system-architecture]

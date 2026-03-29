@@ -1,6 +1,7 @@
 ---
 name: cross-phase-consistency
 description: Audit naming, assumptions, data flows, interface contracts across all phases
+summary: "Traces every named concept (entities, fields, API endpoints) across all documents and flags any naming drift, terminology mismatches, or data shape inconsistencies."
 phase: "validation"
 order: 1310
 dependencies: [implementation-plan-review, review-security]

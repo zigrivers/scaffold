@@ -1,6 +1,7 @@
 ---
 name: project-structure
 description: Design directory layout and scaffold the actual project structure
+summary: "Designs a directory layout optimized for parallel AI agent work (minimizing file conflicts), documents where each type of file belongs, and creates the actual directories in your project."
 phase: "foundation"
 order: 250
 dependencies: [tech-stack, coding-standards]

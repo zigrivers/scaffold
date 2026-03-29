@@ -1,6 +1,7 @@
 ---
 name: implementability-dry-run
 description: Dry-run specs as implementing agent, catching ambiguity
+summary: "Simulates picking up each task as an implementing agent and flags anything ambiguous — unclear acceptance criteria, missing input files, undefined error handling — that would force an agent to guess."
 phase: "validation"
 order: 1350
 dependencies: [implementation-plan-review, review-security]

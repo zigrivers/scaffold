@@ -1,6 +1,7 @@
 ---
 name: implementation-playbook
 description: Create the playbook that AI agents follow during implementation
+summary: "Writes the playbook agents reference during every coding session — task execution order, which docs to read before each task, the TDD loop to follow, quality gates to pass, and the handoff format between agents."
 phase: "finalization"
 order: 1430
 dependencies: [developer-onboarding-guide]

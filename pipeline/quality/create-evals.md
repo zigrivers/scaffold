@@ -1,6 +1,7 @@
 ---
 name: create-evals
 description: Generate project-specific eval checks from standards documentation
+summary: "Generates automated checks that verify your code matches your documented standards — file placement, naming conventions, feature-to-test coverage, API contract alignment — using your project's own test framework."
 phase: "quality"
 order: 920
 dependencies: [tdd, story-tests]

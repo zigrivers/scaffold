@@ -2,6 +2,30 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.38.0] — 2026-03-29
+
+### Added
+
+- **Phase descriptions** — All 16 phases in the PHASES constant now include a 2-3 sentence `description` field explaining what the phase accomplishes and why it matters.
+- **Step summaries** — New optional `summary` frontmatter field (max 500 chars) on all 60 pipeline meta-prompts, providing action-oriented descriptions of what each step does and produces.
+- **Dashboard v3** — Complete rewrite of the pipeline dashboard with phase-grouped layout, collapsible sections, step detail modals (with meta-prompt body), What's Next banner, decision log, dark/light theme, responsive design.
+- **Dashboard step drill-down** — Click any step to see its summary, metadata (status, date, depth, dependencies, outputs), and the meta-prompt that drives it.
+
+### Changed
+
+- **README Quick Start** — Comprehensive rewrite for less technical users, featuring scaffold runner skill as primary interface with greenfield and brownfield examples.
+- **README Pipeline section** — All 16 phase descriptions and 60 step descriptions rewritten in plain language explaining what Claude does and what the user gets.
+- **README Multi-Model Review** — Tiered rewrite with code review analogy, quick setup guide, and streamlined structure. Raw CLI invocation moved to FAQ.
+- **`scaffold next`** — Now shows step summary (falls back to description) for richer output.
+- **`scaffold info`** — Now shows step summary in both human-readable and JSON output.
+- **`scaffold build`** — Prefers step summary for longDescription in generated command files.
+- **Scaffold Runner skill** — Phase reference table now includes descriptions; batch progress and rework pause templates use step summaries and phase descriptions.
+- **Scaffold Pipeline skill** — Phases table now includes descriptions and missing Phase 0 (vision).
+- **Dashboard generator** — Extended with phase grouping, enriched step metadata, next eligible computation, and scaffold version.
+- **Dashboard template** — Replaced barebones flat list with full-featured phase-grouped UI.
+- **Dashboard CLI** — Now loads meta-prompts to provide enriched data to the dashboard.
+- **Dashboard tool meta-prompt** — Updated to reference v2 CLI instead of v1 bash script.
+
 ## [2.37.0] — 2026-03-29
 
 ### Added

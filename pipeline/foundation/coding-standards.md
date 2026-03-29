@@ -1,6 +1,7 @@
 ---
 name: coding-standards
 description: Create prescriptive coding standards tailored to the project's tech stack
+summary: "Creates coding standards tailored to your tech stack — naming conventions, error handling patterns, import organization, AI-specific rules — and generates working linter and formatter config files."
 phase: "foundation"
 order: 230
 dependencies: [tech-stack]

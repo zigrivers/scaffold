@@ -1,6 +1,7 @@
 ---
 name: api-contracts
 description: Specify API contracts for all system interfaces
+summary: "Specifies every API endpoint — request/response shapes, error codes with human-readable messages, auth requirements, pagination, and example payloads — so frontend and backend can be built in parallel."
 phase: "specification"
 order: 830
 dependencies: [review-architecture]

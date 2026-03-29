@@ -1,6 +1,7 @@
 ---
 name: review-api
 description: Review API contracts for completeness and consistency
+summary: "Checks that every domain operation has an endpoint, error responses include domain-specific codes, and auth requirements are specified for every route."
 phase: "specification"
 order: 840
 dependencies: [api-contracts]

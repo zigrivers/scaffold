@@ -1,6 +1,7 @@
 ---
 name: tdd
 description: Define testing conventions and TDD standards for the tech stack
+summary: "Defines your testing approach — which types of tests to write at each layer, coverage targets, what to mock and what not to, test data patterns — so agents write the right tests from the start."
 phase: "foundation"
 order: 240
 dependencies: [coding-standards]

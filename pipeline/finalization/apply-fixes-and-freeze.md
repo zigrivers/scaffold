@@ -1,6 +1,7 @@
 ---
 name: apply-fixes-and-freeze
 description: Apply validation findings and freeze documentation
+summary: "Applies all findings from the validation phase, fixes blocking issues, and freezes every document with a version marker — signaling that specs are implementation-ready."
 phase: "finalization"
 order: 1410
 dependencies: [cross-phase-consistency, traceability-matrix, decision-completeness, critical-path-walkthrough, implementability-dry-run, dependency-graph-validation, scope-creep-check]

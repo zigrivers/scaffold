@@ -1,6 +1,7 @@
 ---
 name: ai-memory-setup
 description: Configure AI memory and context management with modular rules, optional MCP memory server, lifecycle hooks, and external context integration
+summary: "Extracts conventions from your docs into path-scoped rule files that load automatically, optimizes CLAUDE.md with a pointer pattern, and optionally sets up persistent cross-session memory."
 phase: "environment"
 order: 350
 dependencies: [git-workflow]

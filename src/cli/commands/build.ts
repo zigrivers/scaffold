@@ -164,9 +164,11 @@ const buildCommand: CommandModule<Record<string, unknown>, BuildArgs> = {
         const kbNames = meta.frontmatter.knowledgeBase ?? []
         const { entries: kbEntries } = loadFullEntries(kbIndex, kbNames)
 
-        // Build Purpose-derived long description
+        // Build long description: prefer summary, then Purpose section first line, then description
         const purposeSection = meta.sections['Purpose'] ?? ''
-        const longDescription = purposeSection.split('\n')[0]?.trim() ?? meta.frontmatter.description
+        const longDescription = meta.frontmatter.summary
+          ?? purposeSection.split('\n')[0]?.trim()
+          ?? meta.frontmatter.description
 
         const input: AdapterStepInput = {
           slug: stepSlug,

@@ -1,6 +1,7 @@
 ---
 name: review-operations
 description: Review operations runbook for completeness and safety
+summary: "Verifies the full deployment lifecycle is documented, monitoring covers latency/errors/saturation, alert thresholds have rationale, and common failure scenarios have runbook entries."
 phase: "quality"
 order: 940
 dependencies: [operations]

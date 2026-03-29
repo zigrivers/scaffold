@@ -1,6 +1,7 @@
 ---
 name: adrs
 description: Document architecture decisions as ADRs
+summary: "Documents every significant design decision — what was chosen, what alternatives were considered with pros and cons, and what consequences follow — so future contributors understand why, not just what."
 phase: "decisions"
 order: 610
 dependencies: [review-domain-modeling]

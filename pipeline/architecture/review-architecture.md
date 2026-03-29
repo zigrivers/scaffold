@@ -1,6 +1,7 @@
 ---
 name: review-architecture
 description: Review system architecture for completeness and downstream readiness
+summary: "Verifies every domain concept lands in a component, every decision constraint is respected, no components are orphaned from data flows, and the module structure minimizes merge conflicts."
 phase: "architecture"
 order: 720
 dependencies: [system-architecture]

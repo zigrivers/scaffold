@@ -1,6 +1,7 @@
 ---
 name: innovate-user-stories
 description: Discover UX-level enhancements and innovation opportunities in user stories
+summary: "Identifies UX enhancement opportunities — progressive disclosure, smart defaults, accessibility improvements — and integrates approved changes into existing stories."
 phase: "pre"
 order: 160
 dependencies: [review-user-stories]

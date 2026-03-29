@@ -1,6 +1,7 @@
 ---
 name: innovate-vision
 description: Discover strategic innovation opportunities in the product vision
+summary: "Explores untapped opportunities — adjacent markets, AI-native capabilities, ecosystem partnerships, and contrarian positioning — and proposes innovations for your approval."
 phase: "vision"
 order: 030
 dependencies: [review-vision]

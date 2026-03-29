@@ -1,6 +1,7 @@
 ---
 name: developer-onboarding-guide
 description: Create a guide for developers (human or AI) joining the project
+summary: "Synthesizes all frozen docs into a single onboarding narrative — project purpose, architecture overview, top coding patterns, key commands, and a quick-start checklist — so anyone joining the project knows exactly where to begin."
 phase: "finalization"
 order: 1420
 dependencies: [apply-fixes-and-freeze]

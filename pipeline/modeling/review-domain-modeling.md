@@ -1,6 +1,7 @@
 ---
 name: review-domain-modeling
 description: Review domain models for completeness, consistency, and downstream readiness
+summary: "Verifies every PRD feature maps to a domain entity, checks that business rules are enforceable, and ensures the shared vocabulary is consistent across all project files."
 phase: "modeling"
 order: 520
 dependencies: [domain-modeling]

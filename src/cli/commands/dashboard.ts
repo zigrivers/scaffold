@@ -10,6 +10,8 @@ import { StateManager } from '../../state/state-manager.js'
 import { readDecisions } from '../../state/decision-logger.js'
 import { loadConfig } from '../../config/loader.js'
 import { generateDashboardData, generateHtml } from '../../dashboard/generator.js'
+import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
+import { getPackagePipelineDir } from '../../utils/fs.js'
 import type { PipelineState } from '../../types/index.js'
 
 interface DashboardArgs {
@@ -87,27 +89,30 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
       state.config_methodology ??
       'unknown'
 
-    // 6. Generate dashboard data
-    const dashboardData = generateDashboardData({ state, decisions, methodology })
+    // 6. Load meta-prompts for enriched step data
+    const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))
 
-    // 7. JSON-only mode — output data and exit
+    // 7. Generate dashboard data
+    const dashboardData = generateDashboardData({ state, decisions, methodology, metaPrompts })
+
+    // 8. JSON-only mode — output data and exit
     if (argv['json-only']) {
       output.result(dashboardData)
       process.exit(0)
       return
     }
 
-    // 8. Generate HTML
+    // 9. Generate HTML
     const html = generateHtml(dashboardData)
 
-    // 9. Determine output path
+    // 10. Determine output path
     const outputPath = argv.output ?? path.join(os.tmpdir(), `scaffold-dashboard-${Date.now()}.html`)
 
-    // 10. Create parent directory if needed and write file
+    // 11. Create parent directory if needed and write file
     fs.mkdirSync(path.dirname(outputPath), { recursive: true })
     fs.writeFileSync(outputPath, html, 'utf8')
 
-    // 11. Open in browser (unless --no-open)
+    // 12. Open in browser (unless --no-open)
     if (!argv['no-open']) {
       let opener = 'xdg-open'
       if (process.platform === 'darwin') opener = 'open'
@@ -119,7 +124,7 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
       }
     }
 
-    // 12. Report success
+    // 13. Report success
     output.success(`Dashboard generated: ${outputPath}`)
     process.exit(0)
   },

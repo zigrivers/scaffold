@@ -1,6 +1,7 @@
 ---
 name: quick-task
 description: Create a focused task for a bug fix, refactor, or small improvement
+summary: "Takes a one-off request (bug fix, refactor, performance tweak) and creates a single well-scoped task with acceptance criteria and a test plan — for work outside the main implementation plan."
 phase: "build"
 order: 1550
 dependencies: [implementation-playbook]

@@ -18,6 +18,7 @@ import {
 const KNOWN_YAML_KEYS = new Set([
   'name',
   'description',
+  'summary',
   'phase',
   'order',
   'dependencies',
@@ -40,6 +41,7 @@ const VALID_CATEGORIES = ['pipeline', 'tool'] as const
 const frontmatterSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9-]*$/, 'name must be kebab-case'),
   description: z.string().max(200),
+  summary: z.string().max(500).nullable().default(null),
   phase: z.enum(PHASES.map(p => p.slug) as [string, ...string[]]).nullable().default(null),
   order: z.number().min(0).max(1599).nullable().default(null),
   dependencies: z.array(z.string().regex(/^[a-z][a-z0-9-]*$/)).default([]),
@@ -273,6 +275,7 @@ export function parseAndValidate(filePath: string): {
   const emptyFrontmatter: MetaPromptFrontmatter = {
     name: '',
     description: '',
+    summary: null,
     phase: '',
     order: 0,
     dependencies: [],

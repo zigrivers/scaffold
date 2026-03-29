@@ -1,6 +1,7 @@
 ---
 name: dependency-graph-validation
 description: Verify task dependency graphs are acyclic, complete, correctly ordered
+summary: "Verifies the task dependency graph has no cycles (which would deadlock agents), no orphaned tasks, and no chains deeper than three sequential dependencies."
 phase: "validation"
 order: 1360
 dependencies: [implementation-plan-review, review-security]

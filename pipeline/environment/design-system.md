@@ -1,6 +1,7 @@
 ---
 name: design-system
 description: Create a cohesive design system with tokens and component patterns for frontend
+summary: "Creates a visual language — color palette (WCAG-compliant), typography scale, spacing system, component patterns — and generates working theme config files for your frontend framework."
 phase: "environment"
 order: 320
 dependencies: [dev-env-setup]

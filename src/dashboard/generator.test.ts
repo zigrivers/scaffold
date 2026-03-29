@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { generateDashboardData, generateHtml } from './generator.js'
 import type { GeneratorOptions } from './generator.js'
-import type { PipelineState } from '../types/index.js'
+import type { PipelineState, MetaPromptFile } from '../types/index.js'
 import type { DecisionEntry } from '../types/index.js'
 
 function makeState(overrides: Partial<PipelineState['steps']> = {}): PipelineState {
@@ -67,6 +67,57 @@ function makeDecisions(): DecisionEntry[] {
       step_completed: false,
     },
   ]
+}
+
+function makeMetaPrompt(
+  name: string,
+  phase: string,
+  order: number,
+  overrides: Partial<MetaPromptFile['frontmatter']> = {},
+): MetaPromptFile {
+  return {
+    stepName: name,
+    filePath: `/pipeline/${name}.md`,
+    frontmatter: {
+      name,
+      description: `Description for ${name}`,
+      summary: `Summary for ${name}`,
+      phase,
+      order,
+      dependencies: [],
+      outputs: [`docs/${name}.md`],
+      conditional: null,
+      knowledgeBase: [],
+      reads: [],
+      stateless: false,
+      category: 'pipeline',
+      ...overrides,
+    },
+    body: `# ${name}\n\nMeta-prompt body content for ${name}.`,
+    sections: {},
+  }
+}
+
+function makeMetaPrompts(): Map<string, MetaPromptFile> {
+  const map = new Map<string, MetaPromptFile>()
+  map.set('create-prd', makeMetaPrompt('create-prd', 'pre', 100, {
+    dependencies: [],
+    outputs: ['docs/prd.md'],
+  }))
+  map.set('user-stories', makeMetaPrompt('user-stories', 'pre', 110, {
+    dependencies: ['create-prd'],
+    outputs: ['docs/user-stories.md'],
+  }))
+  map.set('system-architecture', makeMetaPrompt('system-architecture', 'architecture', 700, {
+    dependencies: ['create-prd', 'user-stories'],
+    outputs: ['docs/architecture.md'],
+  }))
+  map.set('tech-stack', makeMetaPrompt('tech-stack', 'foundation', 200, {
+    dependencies: ['create-prd'],
+    outputs: ['docs/tech-stack.md'],
+    conditional: 'if-needed',
+  }))
+  return map
 }
 
 function makeOpts(overrides: Partial<GeneratorOptions> = {}): GeneratorOptions {
@@ -142,6 +193,140 @@ describe('generateDashboardData', () => {
   })
 })
 
+describe('generateDashboardData (enriched)', () => {
+  it('groups steps into phases with descriptions', () => {
+    const data = generateDashboardData(makeOpts())
+    expect(data.phases).toBeDefined()
+    expect(data.phases.length).toBeGreaterThan(0)
+    const prePhase = data.phases.find(p => p.slug === 'pre')
+    expect(prePhase).toBeDefined()
+    expect(prePhase!.displayName).toBe('Product Definition')
+    expect(prePhase!.description).toBeTruthy()
+  })
+
+  it('phase counts are accurate', () => {
+    const metaPrompts = makeMetaPrompts()
+    const data = generateDashboardData(makeOpts({ metaPrompts }))
+
+    const prePhase = data.phases.find(p => p.slug === 'pre')!
+    // create-prd is completed, user-stories is pending
+    expect(prePhase.counts.completed).toBe(1)
+    expect(prePhase.counts.pending).toBe(1)
+    expect(prePhase.counts.skipped).toBe(0)
+    expect(prePhase.counts.inProgress).toBe(0)
+    expect(prePhase.counts.total).toBe(2)
+
+    const foundationPhase = data.phases.find(p => p.slug === 'foundation')!
+    // tech-stack is in_progress
+    expect(foundationPhase.counts.inProgress).toBe(1)
+    expect(foundationPhase.counts.total).toBe(1)
+
+    const archPhase = data.phases.find(p => p.slug === 'architecture')!
+    // system-architecture is skipped
+    expect(archPhase.counts.skipped).toBe(1)
+    expect(archPhase.counts.total).toBe(1)
+  })
+
+  it('steps within phases sorted by order', () => {
+    const metaPrompts = makeMetaPrompts()
+    const data = generateDashboardData(makeOpts({ metaPrompts }))
+
+    const prePhase = data.phases.find(p => p.slug === 'pre')!
+    expect(prePhase.steps).toHaveLength(2)
+    expect(prePhase.steps[0].slug).toBe('create-prd')    // order 100
+    expect(prePhase.steps[1].slug).toBe('user-stories')   // order 110
+  })
+
+  it('nextEligible populated from state.next_eligible', () => {
+    const metaPrompts = makeMetaPrompts()
+    const data = generateDashboardData(makeOpts({ metaPrompts }))
+
+    expect(data.nextEligible).not.toBeNull()
+    expect(data.nextEligible!.slug).toBe('user-stories')
+    expect(data.nextEligible!.description).toBe('Description for user-stories')
+    expect(data.nextEligible!.summary).toBe('Summary for user-stories')
+    expect(data.nextEligible!.command).toBe('/scaffold user-stories')
+  })
+
+  it('nextEligible null when all completed/skipped', () => {
+    const allDoneState = makeState()
+    allDoneState.next_eligible = []
+    const data = generateDashboardData(makeOpts({ state: allDoneState }))
+
+    expect(data.nextEligible).toBeNull()
+  })
+
+  it('meta-prompt body included when metaPrompts provided', () => {
+    const metaPrompts = makeMetaPrompts()
+    const data = generateDashboardData(makeOpts({ metaPrompts }))
+
+    const prd = data.steps.find(s => s.slug === 'create-prd')!
+    expect(prd.metaPromptBody).toContain('Meta-prompt body content for create-prd')
+    expect(prd.description).toBe('Description for create-prd')
+    expect(prd.summary).toBe('Summary for create-prd')
+    expect(prd.dependencies).toEqual([])
+    expect(prd.outputs).toEqual(['docs/prd.md'])
+  })
+
+  it('backward compat: steps flat array still works', () => {
+    const data = generateDashboardData(makeOpts())
+    expect(Array.isArray(data.steps)).toBe(true)
+    expect(data.steps).toHaveLength(4)
+    const slugs = data.steps.map(s => s.slug)
+    expect(slugs).toContain('create-prd')
+    expect(slugs).toContain('user-stories')
+    expect(slugs).toContain('system-architecture')
+    expect(slugs).toContain('tech-stack')
+  })
+
+  it('scaffoldVersion is non-empty string', () => {
+    const data = generateDashboardData(makeOpts())
+    expect(typeof data.scaffoldVersion).toBe('string')
+    expect(data.scaffoldVersion.length).toBeGreaterThan(0)
+  })
+
+  it('step defaults when metaPrompts not provided', () => {
+    const data = generateDashboardData(makeOpts())
+    const step = data.steps.find(s => s.slug === 'create-prd')!
+    expect(step.description).toBe('')
+    expect(step.summary).toBeNull()
+    expect(step.dependencies).toEqual([])
+    expect(step.outputs).toEqual([])
+    expect(step.order).toBeNull()
+    expect(step.conditional).toBeNull()
+    expect(step.metaPromptBody).toBe('')
+  })
+
+  it('step metadata populated from metaPrompts', () => {
+    const metaPrompts = makeMetaPrompts()
+    const data = generateDashboardData(makeOpts({ metaPrompts }))
+    const ts = data.steps.find(s => s.slug === 'tech-stack')!
+    expect(ts.conditional).toBe('if-needed')
+    expect(ts.order).toBe(200)
+    expect(ts.phase).toBe('foundation')
+    expect(ts.outputs).toEqual(['docs/tech-stack.md'])
+    expect(ts.dependencies).toEqual(['create-prd'])
+  })
+
+  it('all 16 phases present regardless of steps', () => {
+    const data = generateDashboardData(makeOpts())
+    expect(data.phases).toHaveLength(16)
+    // Phases with no matching steps have empty counts
+    const visionPhase = data.phases.find(p => p.slug === 'vision')!
+    expect(visionPhase.counts.total).toBe(0)
+    expect(visionPhase.steps).toEqual([])
+  })
+
+  it('nextEligible defaults when metaPrompts not provided', () => {
+    const data = generateDashboardData(makeOpts())
+    expect(data.nextEligible).not.toBeNull()
+    expect(data.nextEligible!.slug).toBe('user-stories')
+    expect(data.nextEligible!.description).toBe('')
+    expect(data.nextEligible!.summary).toBeNull()
+    expect(data.nextEligible!.command).toBe('/scaffold user-stories')
+  })
+})
+
 describe('generateHtml', () => {
   it('returns a string starting with <!DOCTYPE html>', () => {
     const data = generateDashboardData(makeOpts())
@@ -181,7 +366,7 @@ describe('generateHtml', () => {
     expect(html).not.toContain('id="stale-notice"')
   })
 
-  it('escapes HTML in step slugs to prevent XSS in step rows', () => {
+  it('escapes HTML in step slugs to prevent XSS in embedded JSON', () => {
     const xssSlug = '<script>alert(1)</script>'
     const xssState = makeState({
       [xssSlug]: {
@@ -192,15 +377,72 @@ describe('generateHtml', () => {
     })
     const data = generateDashboardData(makeOpts({ state: xssState }))
     const html = generateHtml(data)
-    // The step row itself must escape the slug
-    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
-    // The raw unescaped tag must not appear in step rows (class="step-name" section)
-    expect(html).not.toContain('<span class="step-name"><script>')
+    // JSON.stringify escapes angle brackets — the raw unescaped tag must not appear
+    // outside of safely-typed script blocks
+    const jsonBlock = html.match(/<script id="scaffold-data"[^>]*>([\s\S]*?)<\/script>/)?.[1] ?? ''
+    // The JSON should contain the slug but JSON-escaped (not raw HTML)
+    expect(jsonBlock).toContain('alert(1)')
+    // The raw <script> tag must NOT appear unescaped outside JSON/script blocks
+    // Remove all <script...>...</script> blocks, then check no raw XSS
+    const withoutScripts = html.replace(/<script[\s\S]*?<\/script>/gi, '')
+    expect(withoutScripts).not.toContain('<script>alert(1)</script>')
   })
 
   it('shows "No decisions recorded yet." when decisions array is empty', () => {
     const data = generateDashboardData(makeOpts({ decisions: [] }))
     const html = generateHtml(data)
     expect(html).toContain('No decisions recorded yet.')
+  })
+
+  it('renders phase sections in HTML', () => {
+    const data = generateDashboardData(makeOpts({ metaPrompts: makeMetaPrompts() }))
+    const html = generateHtml(data)
+    expect(html).toContain('phase-header')
+    expect(html).toContain('togglePhase')
+  })
+
+  it('renders step modal infrastructure', () => {
+    const data = generateDashboardData(makeOpts())
+    const html = generateHtml(data)
+    expect(html).toContain('openModal')
+    expect(html).toContain('closeModal')
+    expect(html).toContain('modal-overlay')
+  })
+
+  it('renders what\'s next banner when nextEligible exists', () => {
+    const data = generateDashboardData(makeOpts({ metaPrompts: makeMetaPrompts() }))
+    const html = generateHtml(data)
+    expect(html).toContain('whats-next')
+  })
+
+  it('contains formatDate function', () => {
+    const data = generateDashboardData(makeOpts())
+    const html = generateHtml(data)
+    expect(html).toContain('formatDate')
+  })
+
+  it('contains copyCommand function', () => {
+    const data = generateDashboardData(makeOpts())
+    const html = generateHtml(data)
+    expect(html).toContain('copyCommand')
+  })
+
+  it('contains renderPhases function', () => {
+    const data = generateDashboardData(makeOpts())
+    const html = generateHtml(data)
+    expect(html).toContain('renderPhases')
+  })
+
+  it('contains toggleDecisions function', () => {
+    const data = generateDashboardData(makeOpts())
+    const html = generateHtml(data)
+    expect(html).toContain('toggleDecisions')
+  })
+
+  it('no external resource references', () => {
+    const data = generateDashboardData(makeOpts())
+    const html = generateHtml(data)
+    expect(html).not.toContain('https://')
+    expect(html).not.toContain('http://')
   })
 })

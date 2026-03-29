@@ -1,6 +1,7 @@
 ---
 name: create-prd
 description: Create a product requirements document from a project idea
+summary: "Translates your vision (or idea, if no vision exists) into a product requirements document with problem statement, user personas, prioritized feature list, constraints, non-functional requirements, and measurable success criteria."
 phase: "pre"
 order: 110
 dependencies: []

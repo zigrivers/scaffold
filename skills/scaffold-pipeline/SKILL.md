@@ -18,23 +18,24 @@ Use this skill ONLY when the user asks about:
 
 16 phases, each with a slug (used in frontmatter) and display name. Canonical source: `src/types/frontmatter.ts` `PHASES` constant.
 
-| # | Slug | Display Name |
-|---|------|-------------|
-| 1 | `pre` | Product Definition |
-| 2 | `foundation` | Project Foundation |
-| 3 | `environment` | Development Environment |
-| 4 | `integration` | Testing Integration |
-| 5 | `modeling` | Domain Modeling |
-| 6 | `decisions` | Architecture Decisions |
-| 7 | `architecture` | System Architecture |
-| 8 | `specification` | Specifications |
-| 9 | `quality` | Quality Gates |
-| 10 | `parity` | Platform Parity |
-| 11 | `consolidation` | Consolidation |
-| 12 | `planning` | Planning |
-| 13 | `validation` | Validation |
-| 14 | `finalization` | Finalization |
-| 15 | `build` | Build |
+| # | Slug | Display Name | Description |
+|---|------|-------------|-------------|
+| 0 | `vision` | Product Vision | Transforms your idea into a strategic vision document covering who it's for, what makes it different, and what success looks like. |
+| 1 | `pre` | Product Definition | Translates your vision into a PRD with features, personas, and success criteria, then breaks it into user stories with testable acceptance criteria. |
+| 2 | `foundation` | Project Foundation | Researches and documents technology choices, creates coding standards with linter configs, defines testing strategy, and designs directory layout. |
+| 3 | `environment` | Development Environment | Sets up local dev environment, design system (web only), git workflow with CI and worktrees, automated PR review, and AI memory persistence. |
+| 4 | `integration` | Testing Integration | Auto-detects platform and configures E2E testing — Playwright for web, Maestro for mobile. Skips for backend-only. |
+| 5 | `modeling` | Domain Modeling | Identifies core concepts (entities, relationships, invariants, events) and establishes a shared vocabulary across all docs and code. |
+| 6 | `decisions` | Architecture Decisions | Documents every significant design decision with alternatives and consequences, so future contributors know why. |
+| 7 | `architecture` | System Architecture | Designs the system blueprint — components, data flows, module structure, and extension points. |
+| 8 | `specification` | Specifications | Creates interface specs: database schema with constraints, API contracts with error codes, UX flows with accessibility. Each conditional. |
+| 9 | `quality` | Quality Gates | Reviews testing, generates test skeletons, creates eval checks, designs deployment pipeline, and conducts security review. |
+| 10 | `parity` | Platform Parity | Audits documentation for platform-specific gaps. Skips for single-platform projects. |
+| 11 | `consolidation` | Consolidation | Optimizes CLAUDE.md under 200 lines and audits all workflow docs for consistency. |
+| 12 | `planning` | Planning | Decomposes stories into concrete tasks scoped to ~150 lines and 3 files max, with clear acceptance criteria. |
+| 13 | `validation` | Validation | Seven cross-cutting audits: scope creep, dependency cycles, implementability, traceability, naming drift, broken handoffs, decision completeness. |
+| 14 | `finalization` | Finalization | Applies validation findings, freezes docs, creates onboarding guide, and writes the implementation playbook. |
+| 15 | `build` | Build | Stateless TDD execution: single/multi-agent modes, session resume, quick tasks, and new feature enhancements. |
 
 ## Pipeline Order
 

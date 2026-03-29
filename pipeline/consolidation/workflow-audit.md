@@ -1,6 +1,7 @@
 ---
 name: workflow-audit
 description: Verify workflow consistency across all documentation files
+summary: "Audits every document that mentions workflow (CLAUDE.md, git-workflow, coding-standards, dev-setup) and fixes any inconsistencies in commit format, branch naming, PR steps, or key commands."
 phase: "consolidation"
 order: 1120
 dependencies: [claude-md-optimization]

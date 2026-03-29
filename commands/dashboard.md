@@ -1,47 +1,41 @@
 ---
 description: "Open visual pipeline dashboard in browser"
-long-description: "Generate and open a self-contained HTML dashboard showing the full Scaffold"
+long-description: "Open a visual pipeline dashboard in the browser showing progress, phase grouping,"
 ---
 
 ## Purpose
 
-Generate and open a self-contained HTML dashboard showing the full Scaffold
-pipeline with completion status, descriptions, and "what's next" guidance.
+Open a visual pipeline dashboard in the browser showing progress, phase grouping,
+step details, and what's next.
 
 ## Instructions
 
-Run the following command to generate and open the dashboard:
+Run the `scaffold dashboard` CLI command:
 
 ```bash
-bash "$(dirname "$(find ~/.claude/plugins -path '*/scaffold/scripts/generate-dashboard.sh' 2>/dev/null | head -1)")/generate-dashboard.sh"
+scaffold dashboard
 ```
-
-If the script is not found at the plugin path, try running it from the local repo:
-
-```bash
-bash scripts/generate-dashboard.sh
-```
-
-### What It Shows
-
-- **Progress bar** with color-coded segments (green = completed, blue = likely done, gray = skipped)
-- **Summary cards** with counts for completed, skipped, pending, and total prompts
-- **"What's Next" banner** highlighting the recommended next command
-- **Phase sections** (collapsible) with prompt cards showing status, descriptions, and click-to-copy commands
-- **Dependency indicators** showing which prompts are blocked
-- **Beads task counts** (when `bd` is available)
-- **Dark/light mode** (automatic, follows system preference)
-
-### Modes
-
-- **With `.scaffold/` directory**: Shows actual progress — completed/skipped/pending status from config and artifact detection
-- **Without `.scaffold/` directory**: Shows full pipeline overview as a reference guide (all prompts pending)
 
 ### Flags
 
 - `--no-open` — Generate HTML but don't open in browser
 - `--json-only` — Output JSON data to stdout (for scripting)
 - `--output FILE` — Write HTML to a specific file path
+
+### What It Shows
+
+- **Progress bar** with color-coded segments (completed, skipped, pending)
+- **Summary cards** with counts for completed, skipped, pending, and total steps
+- **Phase-grouped steps** in collapsible sections, organized by the 16 pipeline phases
+- **Step detail modals** with descriptions, dependencies, outputs, and full prompt content
+- **"What's Next" banner** highlighting the recommended next step
+- **Decision log** showing recorded project decisions
+- **Dark/light theme** (automatic, follows system preference)
+
+### Modes
+
+- **With `.scaffold/` directory**: Shows actual progress — completed/skipped/pending status from state
+- **Without `.scaffold/` directory**: Shows full pipeline overview as a reference guide (all steps pending)
 
 ## Process Rules
 

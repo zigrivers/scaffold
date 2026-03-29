@@ -1,6 +1,7 @@
 ---
 name: implementation-plan
 description: Break architecture into implementable tasks with dependencies
+summary: "Breaks your user stories and architecture into concrete tasks — each scoped to ~150 lines of code and 3 files max, with clear acceptance criteria, no ambiguous decisions, and explicit dependencies."
 phase: "planning"
 order: 1210
 dependencies: [tdd, operations, security, review-architecture, create-evals]
