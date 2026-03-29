@@ -1,6 +1,6 @@
 ---
 description: "Design database schema from domain models"
-long-description: "Translate domain models into a concrete database schema. Define tables/collections,"
+long-description: "Translates your domain model into database tables with constraints that enforce business rules, indexes optimized for your API query patterns, and a reversible migration strategy."
 ---
 
 ## Purpose
@@ -21,19 +21,26 @@ from the application's query patterns.
 
 ## Quality Criteria
 - (mvp) Every domain entity maps to a table/collection (or justified denormalization)
+- (mvp) If domain-models/ does not exist, entities derived from user story nouns and PRD feature descriptions
 - (mvp) Relationships match domain model relationships
 - (mvp) Constraints enforce domain invariants at the database level
 - (deep) Migration strategy specifies: migration tool, forward migration approach, rollback approach, and data preservation policy
 - (deep) Every migration is reversible (rollback script or equivalent exists)
 - (mvp) Indexes cover all query patterns referenced in docs/api-contracts.md (if it exists)
+- (mvp) Schema does not contradict upstream domain models (entity names, relationships, and invariants match docs/domain-models/)
 
 ## Methodology Scaling
 - **deep**: Full schema specification. CREATE TABLE statements or equivalent.
   Index justification with query patterns. Normalization analysis. Migration
   plan with rollback strategy. Seed data strategy.
 - **mvp**: Entity-to-table mapping. Key relationships. Primary indexes only.
-- **custom:depth(1-5)**: Depth 1-2: mapping only. Depth 3: add indexes and
-  constraints. Depth 4-5: full specification with migrations.
+- **custom:depth(1-5)**: Depth 1: entity-to-table mapping with primary keys
+  only. Depth 2: entity-to-table mapping with key relationships and primary
+  indexes. Depth 3: add secondary indexes, constraints enforcing domain
+  invariants, and normalization analysis. Depth 4: full specification with
+  migration plan, rollback strategy, and index justification with query
+  patterns. Depth 5: full specification with seed data strategy, performance
+  annotations, and multi-environment migration considerations.
 
 ## Mode Detection
 Check for docs/database-schema.md. If it exists, operate in update mode: read

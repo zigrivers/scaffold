@@ -1,6 +1,6 @@
 ---
 description: "Agent-driven automated PR review with external reviewers (Codex Cloud, Gemini Code Assist, or custom)"
-long-description: "Configure an agent-driven automated PR review system using local CLI reviewers"
+long-description: "Configures automated code review — using Codex and/or Gemini CLIs for dual-model review when available, or an external bot — with severity definitions and review criteria tailored to your project."
 ---
 
 ## Purpose
@@ -38,9 +38,12 @@ entire review-fix loop locally.
   review-standards.md, AGENTS.md, and comprehensive CLAUDE.md workflow.
   Falls back to external bot review if no CLIs available.
 - **mvp**: Step is disabled. Local self-review from git-workflow suffices.
-- **custom:depth(1-5)**: Depth 1-2: disabled. Depth 3: basic review-standards.md
-  + single-CLI review. Depth 4: add dual-model review. Depth 5: full suite
-  with all options and legacy cleanup.
+- **custom:depth(1-5)**: Depth 1: disabled — local self-review from git-workflow
+  suffices. Depth 2: disabled — same as depth 1. Depth 3: basic
+  review-standards.md + single-CLI review (whichever CLI is available).
+  Depth 4: add dual-model review when both CLIs available, AGENTS.md with
+  project-specific rules. Depth 5: full suite with dual-model review,
+  legacy Actions cleanup, and comprehensive CLAUDE.md workflow integration.
 
 ## Conditional Evaluation
 Enable when: project uses GitHub for version control, team size > 1 or CI/CD is

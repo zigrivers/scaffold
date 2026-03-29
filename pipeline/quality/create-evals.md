@@ -59,7 +59,7 @@ Conditional (generated when source doc exists):
 Supporting:
 - tests/evals/helpers.* — shared utilities
 - docs/eval-standards.md — documents what is and isn't checked
-- make eval target added to Makefile/package.json
+- make eval target (or equivalent build command) added to project build configuration
 
 ## Quality Criteria
 - (mvp) Consistency + Structure evals generated

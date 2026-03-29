@@ -1,6 +1,6 @@
 ---
 description: "Specify user flows, interaction states, component architecture, accessibility, and responsive behavior"
-long-description: "Define the user experience specification: user flows, interaction state machines,"
+long-description: "Maps out every user flow with all interaction states (loading, error, empty, populated), defines accessibility requirements (WCAG level, keyboard nav), and specifies responsive behavior at each breakpoint."
 ---
 
 ## Purpose
@@ -21,7 +21,8 @@ step consumes those tokens, it does not redefine them.
 - docs/ux-spec.md — UX specification with flows, components, design system
 
 ## Quality Criteria
-- (mvp) Every PRD user journey has a corresponding flow with all states documented
+- (mvp) Every user story's acceptance criteria maps to >= 1 documented flow
+- (mvp) If design-system.md does not exist, use framework defaults for spacing, typography, and color
 - (mvp) Component hierarchy covers all UI states (loading, error, empty, populated)
 - References design tokens from docs/design-system.md (does not redefine them)
 - (deep) Accessibility requirements documented (WCAG level, keyboard nav, screen readers)
@@ -34,8 +35,13 @@ step consumes those tokens, it does not redefine them.
   Complete design system. Interaction state machines. Accessibility audit
   checklist. Animation and transition specs.
 - **mvp**: Key user flows. Core component list. Basic design tokens.
-- **custom:depth(1-5)**: Depth 1-2: flows and components. Depth 3: add design
-  system. Depth 4-5: full specification with accessibility.
+- **custom:depth(1-5)**: Depth 1: key user flows with primary states (success
+  and error). Depth 2: user flows with core component list and basic state
+  documentation. Depth 3: add design system token references, interaction state
+  machines, and responsive behavior. Depth 4: full specification with
+  accessibility audit, keyboard navigation, and screen reader considerations.
+  Depth 5: full specification with animation/transition specs, comprehensive
+  WCAG compliance checklist, and detailed wireframe descriptions.
 
 ## Mode Detection
 Check for docs/ux-spec.md. If it exists, operate in update mode: read existing

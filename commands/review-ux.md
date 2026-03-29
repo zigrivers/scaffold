@@ -1,6 +1,6 @@
 ---
 description: "Review UX specification for completeness and usability"
-long-description: "Review UX specification targeting UX-specific failure modes: user journey gaps,"
+long-description: "Verifies every user story has a flow, accessibility requirements are met, all error states are documented, and the design system is used consistently."
 ---
 
 ## Purpose
@@ -29,16 +29,22 @@ independent review validation.
 - (deep) Every user action has at minimum: loading, success, and error states documented
 - (deep) Design system consistency verified
 - (deep) Error states present for all failure-capable actions
-- (mvp) Every finding categorized P0-P3 with specific flow, screen, and issue
+- (mvp) Every finding categorized P0-P3 (P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.) with specific flow, screen, and issue
 - (mvp) Fix plan documented for all P0/P1 findings; fixes applied to ux-spec.md and re-validated
+- (mvp) Review report includes explicit Readiness Status section
 - (mvp) Downstream readiness confirmed — no unresolved P0 or P1 findings remain before quality phase proceeds
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling
 - **deep**: Full multi-pass review. Multi-model review dispatched to Codex and
   Gemini if available, with graceful fallback to Claude-only enhanced review.
 - **mvp**: Journey coverage only.
-- **custom:depth(1-5)**: Depth 1: flow completeness and accessibility pass only. Depth 2: add responsive design and error state passes. Depth 3: add interaction patterns and platform consistency passes. Depth 4: add external model UX review. Depth 5: multi-model review with reconciliation.
+- **custom:depth(1-5)**:
+  - Depth 1: Flow completeness and accessibility pass only (1 review pass)
+  - Depth 2: Add responsive design and error state passes (2 review passes)
+  - Depth 3: Add interaction patterns and platform consistency passes (4 review passes)
+  - Depth 4: Add external model UX review (4 review passes + external dispatch)
+  - Depth 5: Multi-model review with reconciliation (4 review passes + multi-model synthesis)
 
 ## Mode Detection
 Re-review mode if previous review exists. If multi-model review artifacts exist
@@ -714,6 +720,14 @@ When models actively disagree (one flags an issue, another says the same thing i
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
 3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
+
+### Consensus Classification
+
+When synthesizing multi-model findings, classify each finding:
+- **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
+- **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
+- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
+- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
 
 ### Output Format
 

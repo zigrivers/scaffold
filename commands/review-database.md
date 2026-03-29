@@ -1,6 +1,6 @@
 ---
 description: "Review database schema for correctness and completeness"
-long-description: "Review database schema targeting schema-specific failure modes: entity coverage"
+long-description: "Verifies every domain entity has a table, constraints enforce business rules at the database level, and indexes cover all query patterns from the API contracts."
 ---
 
 ## Purpose
@@ -29,17 +29,22 @@ independent review validation.
 - (deep) Index coverage for known query patterns verified
 - (deep) Migration safety assessed
 - (mvp) Referential integrity matches domain invariants
-- (mvp) Every finding categorized P0-P3 with specific table, column, and issue
+- (mvp) Every finding categorized P0-P3 (P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.) with specific table, column, and issue
 - (mvp) Fix plan documented for all P0/P1 findings; fixes applied to database-schema.md and re-validated
 - (mvp) Downstream readiness confirmed — no unresolved P0 or P1 findings remain before API contracts proceed
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling
 - **deep**: Full multi-pass review targeting all schema failure modes. Multi-model
   review dispatched to Codex and Gemini if available, with graceful fallback
   to Claude-only enhanced review.
 - **mvp**: Entity coverage check only.
-- **custom:depth(1-5)**: Depth 1: entity coverage and normalization pass only. Depth 2: add index strategy and migration safety passes. Depth 3: add query performance and data integrity passes. Depth 4: add external model review. Depth 5: multi-model review with reconciliation.
+- **custom:depth(1-5)**:
+  - Depth 1: Entity coverage and normalization pass only (1 review pass)
+  - Depth 2: Add index strategy and migration safety passes (2 review passes)
+  - Depth 3: Add query performance and data integrity passes (4 review passes)
+  - Depth 4: Add external model review (4 review passes + external dispatch)
+  - Depth 5: Multi-model review with reconciliation (4 review passes + multi-model synthesis)
 
 ## Mode Detection
 Re-review mode if previous review exists. If multi-model review artifacts exist
@@ -727,6 +732,14 @@ When models actively disagree (one flags an issue, another says the same thing i
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
 3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
+
+### Consensus Classification
+
+When synthesizing multi-model findings, classify each finding:
+- **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
+- **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
+- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
+- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
 
 ### Output Format
 

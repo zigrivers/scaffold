@@ -30,9 +30,9 @@ actual test framework and assertion library.
 - docs/tdd-standards.md — testing approach with coverage goals and patterns
 
 ## Quality Criteria
-- (mvp) Test pyramid defined with coverage targets per layer (defined per layer, e.g., 80% unit, 50% integration)
+- (mvp) Test pyramid (or equivalent testing model for non-layered architectures) defined with coverage targets per layer (defined per layer, e.g., 80% unit, 50% integration)
 - (mvp) Testing patterns specified for each layer (unit, integration, e2e)
-- (mvp) Quality gates defined (what must pass before merge)
+- (mvp) Quality gates defined: list of commands to run before merge, with expected pass criteria for each
 - Edge cases from domain invariants are test scenarios
 - (deep) Performance testing approach for critical paths
 - (deep) Contract testing strategy documented for service boundaries

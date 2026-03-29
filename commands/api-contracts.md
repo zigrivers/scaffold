@@ -1,6 +1,6 @@
 ---
 description: "Specify API contracts for all system interfaces"
-long-description: "Define API contracts for all system interfaces — REST endpoints, GraphQL schema,"
+long-description: "Specifies every API endpoint — request/response shapes, error codes with human-readable messages, auth requirements, pagination, and example payloads — so frontend and backend can be built in parallel."
 ---
 
 ## Purpose
@@ -20,7 +20,8 @@ enabling parallel development with confidence.
   shapes, error contracts, auth requirements
 
 ## Quality Criteria
-- (mvp) Every domain operation that crosses a component boundary has an API endpoint
+- (mvp) Every domain operation that crosses a component boundary maps to >= 1 API endpoint
+- (mvp) If domain-models/ does not exist, API boundaries derived from user story acceptance criteria
 - (mvp) Every endpoint documents: success response code, error response codes, error response body schema, and at least 2 domain-specific error codes per endpoint with human-readable reason phrases (e.g., 400 `invalid_email`, 409 `user_already_exists`)
 - (mvp) Authentication and authorization requirements per endpoint
 - (deep) Versioning strategy documented (if applicable)
@@ -28,6 +29,7 @@ enabling parallel development with confidence.
 - (deep) Idempotency documented for mutating operations
 - (deep) Pagination schema documented for all list endpoints (cursor or offset, page size limits, total count)
 - (mvp) Example request and response payloads included for each endpoint
+- (mvp) Every API endpoint from system-architecture.md is specified
 
 ## Methodology Scaling
 - **deep**: OpenAPI-style specification. Full request/response schemas with
@@ -35,8 +37,13 @@ enabling parallel development with confidence.
   SDK generation considerations.
 - **mvp**: Endpoint list with HTTP methods and brief descriptions. Key
   request/response shapes. Auth approach.
-- **custom:depth(1-5)**: Depth 1-2: endpoint list. Depth 3: add schemas and
-  error contracts. Depth 4-5: full OpenAPI-style spec.
+- **custom:depth(1-5)**: Depth 1: endpoint list with HTTP methods and brief
+  descriptions. Depth 2: endpoint list with key request/response shapes and
+  auth approach. Depth 3: add full schemas, error contracts with domain-specific
+  codes, and example payloads. Depth 4: full OpenAPI-style spec with rate
+  limiting, pagination, and idempotency documentation. Depth 5: full spec
+  with SDK generation considerations, versioning strategy, and auth flow
+  diagrams.
 
 ## Mode Detection
 Check for docs/api-contracts.md. If it exists, operate in update mode: read

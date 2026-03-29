@@ -445,7 +445,7 @@ When this step is complete, tell the user:
 **Enhancement documented** — PRD updated, user stories created, tasks ready.
 
 **Next (if applicable):**
-- If `docs/implementation-playbook.md` exists: Run `/scaffold:implementation-playbook` — Update wave assignments and add per-task context blocks for new tasks.
+- If `docs/implementation-playbook.md` exists: Run `/scaffold:implementation-playbook` to update wave assignments and add per-task context blocks for new tasks. **This is required** to keep the playbook in sync with the implementation plan.
 - If you created **5+ tasks**: Run `/scaffold:implementation-plan-review` — Review task quality, coverage, and dependencies.
 - If the enhancement has **platform-specific behavior**: Run `/scaffold:platform-parity-review` — Check platform coverage.
 - If user stories were added or changed: Run `/scaffold:story-tests` — Regenerate test skeletons for new user stories.

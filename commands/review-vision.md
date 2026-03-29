@@ -1,6 +1,6 @@
 ---
 description: "Multi-pass review of the product vision for clarity, coherence, and downstream readiness"
-long-description: "Deep multi-pass review of the product vision document, targeting the specific"
+long-description: "Stress-tests the vision across five dimensions — clarity, audience precision, competitive rigor, strategic coherence, and whether the PRD can be written from it without ambiguity — and fixes what it finds."
 ---
 
 ## Purpose
@@ -20,20 +20,23 @@ strategically sound, and ready for the PRD to consume.
 ## Quality Criteria
 - (mvp) Passes 1 and 5 executed with findings documented
 - All 5 review passes executed with findings documented
-- Every finding categorized by severity (P0-P3)
+- Every finding categorized by severity: P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.
 - Fix plan created for P0 and P1 findings
 - Fixes applied and re-validated
 - (mvp) Every vision section has content specific enough to derive a PRD without asking strategic clarification questions
-- (depth 4+) Multi-model review findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model review findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling
 - **deep**: All 5 review passes. Full findings report with severity
   categorization. Fixes applied and re-validated.
 - **mvp**: Passes 1 and 5 only (Vision Clarity and Downstream Readiness).
   Focus on blocking gaps — is the vision clear enough to write a PRD from?
-- **custom:depth(1-5)**: Depth 1-2: passes 1 and 5 only. Depth 3: passes 1,
-  2, 5 (add Audience Precision). Depth 4: passes 1-3, 5 (add Competitive
-  Rigor). Depth 5: all 5 passes.
+- **custom:depth(1-5)**:
+  - Depth 1: Pass 1 only (Vision Clarity). Single review pass.
+  - Depth 2: Passes 1 and 5 (Vision Clarity, Downstream Readiness). Two review passes.
+  - Depth 3: Passes 1, 2, 5 (add Audience Precision). Three review passes.
+  - Depth 4: Passes 1-3, 5 (add Competitive Rigor) + one external model review (if CLI available). Four review passes.
+  - Depth 5: All 5 passes + multi-model review with reconciliation. Five review passes.
 
 ## Mode Detection
 If docs/reviews/vision-review-vision.md exists, this is a re-review. Read
@@ -108,10 +111,10 @@ Evaluate whether the PRD can be written from this vision:
 ### Review Process
 
 1. Execute each pass, documenting findings with severity (P0-P3):
-   - P0: Vision is fundamentally unclear or contradictory — blocks all downstream work
-   - P1: Significant gap that would cause PRD to make wrong assumptions
-   - P2: Minor gap or vagueness that could be improved
-   - P3: Nitpick or style suggestion
+   - P0: Breaks downstream work — vision is fundamentally unclear or contradictory
+   - P1: Prevents quality milestone — significant gap that would cause PRD to make wrong assumptions
+   - P2: Known tech debt — minor gap or vagueness that could be improved
+   - P3: Polish — nitpick or style suggestion
 2. Create a fix plan for all P0 and P1 findings
 3. Present the fix plan to the user for approval
 4. Apply approved fixes to docs/vision.md
@@ -761,6 +764,14 @@ When models actively disagree (one flags an issue, another says the same thing i
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
 3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
+
+### Consensus Classification
+
+When synthesizing multi-model findings, classify each finding:
+- **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
+- **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
+- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
+- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
 
 ### Output Format
 

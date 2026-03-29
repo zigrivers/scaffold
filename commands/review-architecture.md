@@ -1,6 +1,6 @@
 ---
 description: "Review system architecture for completeness and downstream readiness"
-long-description: "Multi-pass review of the system architecture targeting architecture-specific"
+long-description: "Verifies every domain concept lands in a component, every decision constraint is respected, no components are orphaned from data flows, and the module structure minimizes merge conflicts."
 ---
 
 ## Purpose
@@ -32,9 +32,9 @@ independent review validation.
 - (deep) Data flow completeness verified (no orphaned components)
 - (deep) Module structure assessed for merge conflict risk, circular dependency risk, and import depth
 - (mvp) Downstream readiness confirmed (specification, quality, and planning steps can proceed)
-- (mvp) Every finding categorized P0-P3 with specific component, section, and issue
+- (mvp) Every finding categorized P0-P3 with specific component, section, and issue. Severity definitions: P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.
 - (mvp) Fix plan documented for all P0/P1 findings; fixes applied to system-architecture.md and re-validated
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling
 - **deep**: All 10 review passes (coverage, constraints, data flows, module
@@ -43,9 +43,12 @@ independent review validation.
   review dispatched to Codex and Gemini if available, with graceful fallback
   to Claude-only enhanced review.
 - **mvp**: Domain coverage and ADR compliance checks only.
-- **custom:depth(1-5)**: Depth 1-3: scale number of passes with depth.
-  Depth 4: all passes + one external model (if CLI available). Depth 5:
-  all passes + multi-model with reconciliation.
+- **custom:depth(1-5)**: Depth 1: two passes — domain coverage and ADR
+  compliance only. Depth 2: four passes — domain coverage, ADR compliance,
+  data flow completeness, and internal consistency. Depth 3: seven passes —
+  add module structure, state consistency, and diagram integrity. Depth 4:
+  all 10 passes + one external model (if CLI available). Depth 5: all 10
+  passes + multi-model with reconciliation.
 
 ## Mode Detection
 Re-review mode if previous review exists. If multi-model review artifacts exist
@@ -791,6 +794,14 @@ When models actively disagree (one flags an issue, another says the same thing i
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
 3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
+
+### Consensus Classification
+
+When synthesizing multi-model findings, classify each finding:
+- **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
+- **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
+- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
+- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
 
 ### Output Format
 

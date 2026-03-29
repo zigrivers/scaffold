@@ -35,11 +35,11 @@ and aggregate boundaries. User actions reveal the domain model.
 - docs/domain-models/index.md — overview of all domains and their relationships
 
 ## Quality Criteria
-- (mvp) Every PRD feature maps to at least one domain
+- (mvp) Every PRD feature maps to >= 1 domain
 - (mvp) Entity relationships are explicit (not implied)
 - (mvp) Each aggregate boundary documents: the invariant it protects, the consistency boundary it enforces, and why included entities must change together
 - (deep) Domain events cover all state transitions
-- (mvp) Each invariant is phrased as a boolean condition checkable in code (e.g., `order.total >= 0`, `user.email matches /^[^@]+@[^@]+$/`), not a narrative description
+- (mvp) Each invariant is expressible as a runtime-checkable condition (assertion, validation rule, or database constraint) (e.g., `order.total >= 0`, `user.email matches /^[^@]+@[^@]+$/`), not a narrative description
 - (mvp) Every entity name in one domain-model file uses the same name (no synonyms) in all other domain-model files
 - (deep) Cross-aggregate event flows documented for every state change that crosses aggregate boundaries
 - (deep) Cross-domain relationships are documented at context boundaries

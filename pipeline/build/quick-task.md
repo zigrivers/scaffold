@@ -308,6 +308,9 @@ Present the task summary:
 - Naming follows project patterns
 - Implementation notes reference specific standards, not generic advice
 
+#### Quality Gates
+- Quick tasks follow the same quality gates as all other tasks — see `docs/implementation-playbook.md` § Quality Gates
+
 #### Eval Gate
 - If `tests/evals/` exists, run `make eval` (or equivalent eval command from CLAUDE.md Key Commands) as a required pre-commit check
 

@@ -1,6 +1,6 @@
 ---
 description: "Audit naming, assumptions, data flows, interface contracts across all phases"
-long-description: "Audit naming, assumptions, data flows, interface contracts across all phases."
+long-description: "Traces every named concept (entities, fields, API endpoints) across all documents and flags any naming drift, terminology mismatches, or data shape inconsistencies."
 ---
 
 ## Purpose
@@ -26,9 +26,9 @@ drift patterns.
 - (mvp) Entity names are consistent across domain models, database schema, and API contracts (zero mismatches)
 - (mvp) Technology references match `docs/tech-stack.md` in all documents
 - (deep) Data flow descriptions in architecture match API endpoint definitions
-- (deep) Terminology is consistent (same concept never uses two different names)
+- (deep) Every named entity in the domain model has exactly one name used consistently across domain-models/, api-contracts.md, database-schema.md, and ux-spec.md
 - Findings categorized P0-P3 with specific file, section, and issue for each
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Finding Disposition
 - **P0 (blocking)**: Must be resolved before proceeding to implementation. Create
@@ -434,6 +434,14 @@ When models actively disagree (one flags an issue, another says the same thing i
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
 3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
+
+### Consensus Classification
+
+When synthesizing multi-model findings, classify each finding:
+- **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
+- **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
+- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
+- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
 
 ### Output Format
 

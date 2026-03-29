@@ -42,7 +42,7 @@ independent coverage validation.
 - (mvp) Every story has at least one testable acceptance criterion, and every PRD feature maps to at least one story
 - (depth 4+) Every atomic PRD requirement has a REQ-xxx ID in the requirements index
 - (depth 4+) Coverage matrix maps every REQ to at least one US (100% coverage target)
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling
 - **deep**: All 6 review passes from the knowledge base. Full findings report

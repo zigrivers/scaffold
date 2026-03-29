@@ -1,6 +1,6 @@
 ---
 description: "Configure end-to-end testing (Playwright for web, Maestro for mobile) based on detected project platform"
-long-description: "Automatically detects project platform type from tech-stack.md and package.json"
+long-description: "Detects whether your project is web or mobile, then configures Playwright (web) or Maestro (mobile) with a working smoke test, baseline screenshots, and guidance on when to use E2E vs. unit tests."
 ---
 
 ## Purpose
@@ -38,6 +38,7 @@ Outputs vary by detected platform:
 - tdd-standards.md E2E section updated with when-to-use guidance
 - (deep) CI integration configured for E2E test execution
 - (deep) Sub-flows defined for common user journeys
+- (deep for multi-platform) Smoke test names and intent are consistent between Playwright and Maestro
 
 ## Methodology Scaling
 - **deep**: Full setup for all detected platforms. All visual testing patterns,
@@ -45,9 +46,12 @@ Outputs vary by detected platform:
   common journeys, and comprehensive documentation updates.
 - **mvp**: Basic config and smoke test for detected platform. Minimal docs
   updates. Two viewports for web, single platform for mobile.
-- **custom:depth(1-5)**: Depth 1-2: config + smoke test. Depth 3: add patterns,
-  naming, testID rules. Depth 4: add CI integration, both mobile platforms.
-  Depth 5: full suite with baseline management and sub-flows.
+- **custom:depth(1-5)**:
+  - Depth 1: Config + smoke test for primary platform only
+  - Depth 2: Config + smoke test with basic viewport/device coverage
+  - Depth 3: Add patterns, naming conventions, and testID rules
+  - Depth 4: Add CI integration and both mobile platforms
+  - Depth 5: Full suite with baseline management, sub-flows, and cross-platform consistency
 
 ## Conditional Evaluation
 Enable when: tech-stack.md indicates a web frontend (Playwright) or mobile app
@@ -471,6 +475,73 @@ Initial data loaded into the test database for integration tests. Rules:
 **Skipped tests accumulate.** Tests marked as `skip` or `xit` that are never re-enabled. They represent either dead code or known bugs that nobody addresses. Fix: skipped tests are technical debt. Set a policy: fix or delete within one sprint.
 
 **No test naming convention.** Test descriptions like "test 1," "works correctly," or "handles the thing." Uninformative when tests fail. Fix: test names should describe the scenario and expected outcome: "returns 404 when user does not exist," "applies 10% discount for premium members."
+
+### From Acceptance Criteria to Test Cases
+
+Acceptance criteria are the bridge between user stories and automated tests. Every AC should produce one or more test cases with clear traceability.
+
+#### Given/When/Then to Arrange/Act/Assert
+
+The mapping is direct:
+
+- **Given** (precondition) becomes **Arrange** — set up test data, mock dependencies, configure state
+- **When** (action) becomes **Act** — call the function, hit the endpoint, trigger the event
+- **Then** (expected outcome) becomes **Assert** — verify return value, check database state, assert response body
+
+```typescript
+// AC: Given a user with 5 failed login attempts,
+//     When they attempt a 6th login,
+//     Then the account is locked and they see "Account locked"
+it('locks account after 5 failed attempts', async () => {
+  // Arrange: create user with 5 failed attempts
+  const user = await createUser({ failedAttempts: 5 });
+  // Act: attempt login
+  const res = await request(app).post('/login').send({ email: user.email, password: 'wrong' });
+  // Assert: locked
+  expect(res.status).toBe(423);
+  expect(res.body.error.message).toContain('Account locked');
+});
+```
+
+#### One AC, Multiple Test Cases
+
+Each AC produces at minimum one happy-path test. Then derive edge cases:
+
+- **Boundary values**: If the AC says "max 50 characters," test 49, 50, and 51
+- **Empty/null inputs**: If the AC assumes input exists, test what happens when it does not
+- **Concurrency**: If the AC describes a state change, test what happens with simultaneous requests
+
+#### Negative Case Derivation
+
+For every "Given X" in an AC, systematically test "Given NOT X":
+
+- AC says "Given user is authenticated" — test unauthenticated access (expect 401)
+- AC says "Given the order exists" — test with nonexistent order ID (expect 404)
+- AC says "Given valid payment details" — test with expired card, insufficient funds, invalid CVV
+
+#### Parameterized Tests for Similar ACs
+
+When multiple ACs follow the same pattern with different inputs, use data-driven tests:
+
+```typescript
+it.each([
+  ['empty email', { email: '', password: 'valid' }, 'Email is required'],
+  ['invalid email', { email: 'notanemail', password: 'valid' }, 'Invalid email format'],
+  ['short password', { email: 'a@b.com', password: '123' }, 'Password too short'],
+])('rejects registration with %s', async (_, input, expectedError) => {
+  const res = await request(app).post('/register').send(input);
+  expect(res.status).toBe(400);
+  expect(res.body.error.message).toContain(expectedError);
+});
+```
+
+#### Test Naming for Traceability
+
+Test names should mirror the AC wording so that when a test fails, the team can trace it back to the requirement without reading the test body:
+
+- AC: "User sees error when email is already taken" — Test: `'returns 409 when email is already taken'`
+- AC: "Profile updates immediately after save" — Test: `'updates profile and reflects changes on next fetch'`
+- Include the story or AC ID in the describe block when practical: `describe('US-002: Edit profile', () => { ... })`
 
 ## See Also
 

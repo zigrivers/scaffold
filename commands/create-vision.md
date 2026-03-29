@@ -1,6 +1,6 @@
 ---
 description: "Create a comprehensive product vision document from a project idea"
-long-description: "Transform a project idea into a strategic product vision document that defines"
+long-description: "Asks about your idea — who it's for, what problem it solves, what makes it different — and produces a vision document with elevator pitch, target audience, competitive positioning, guiding principles, and success criteria."
 ---
 
 ## Purpose
@@ -23,7 +23,7 @@ throughout the entire pipeline.
 - (mvp) Vision statement describes positive change in the world, not a product feature
 - (mvp) Vision statement is a single sentence of 25 words or fewer
 - (mvp) Target audience defined by behaviors and motivations, not demographics
-- (deep) For each competitor, at least one strength is documented alongside weaknesses
+- (deep) Each named competitor has >= 1 documented strength and >= 1 documented weakness with specific examples
 - (mvp) Each guiding principle is framed as 'We choose X over Y' where Y is a legitimate alternative
 - (deep) Anti-vision contains >= 3 named traps, each referencing a concrete product direction or feature class
 - (deep) Business model addresses sustainability without being a full business plan
@@ -36,9 +36,12 @@ throughout the entire pipeline.
   analysis, multi-year success horizon. 3-5 pages.
 - **mvp**: Vision statement, target audience, core problem, value proposition,
   2-3 guiding principles. 1 page. Enough to anchor the PRD.
-- **custom:depth(1-5)**: Depth 1-2: MVP-style. Depth 3: add competitive
-  landscape and anti-vision. Depth 4: add business model and strategic risks.
-  Depth 5: full document with all 12 sections.
+- **custom:depth(1-5)**:
+  - Depth 1: MVP-style — vision statement, target audience, core problem, value proposition. 1 page.
+  - Depth 2: MVP + 2-3 guiding principles with tradeoff framing. 1-2 pages.
+  - Depth 3: Add competitive landscape and anti-vision. 2-3 pages.
+  - Depth 4: Add business model, strategic risks, and success horizon. 3-4 pages.
+  - Depth 5: Full document with all 12 sections, multi-year success criteria. 3-5 pages.
 
 ## Mode Detection
 If docs/vision.md exists, this is an update. Read and analyze the existing

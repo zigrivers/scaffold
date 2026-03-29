@@ -1,6 +1,6 @@
 ---
 description: "Define testing conventions and TDD standards for the tech stack"
-long-description: "Define the project's testing conventions, TDD workflow, test pyramid, coverage"
+long-description: "Defines your testing approach — which types of tests to write at each layer, coverage targets, what to mock and what not to, test data patterns — so agents write the right tests from the start."
 ---
 
 ## Purpose
@@ -22,9 +22,9 @@ actual test framework and assertion library.
 - docs/tdd-standards.md — testing approach with coverage goals and patterns
 
 ## Quality Criteria
-- (mvp) Test pyramid defined with coverage targets per layer
+- (mvp) Test pyramid (or equivalent testing model for non-layered architectures) defined with coverage targets per layer (defined per layer, e.g., 80% unit, 50% integration)
 - (mvp) Testing patterns specified for each layer (unit, integration, e2e)
-- (mvp) Quality gates defined (what must pass before merge)
+- (mvp) Quality gates defined: list of commands to run before merge, with expected pass criteria for each
 - Edge cases from domain invariants are test scenarios
 - (deep) Performance testing approach for critical paths
 - (deep) Contract testing strategy documented for service boundaries
@@ -34,7 +34,12 @@ actual test framework and assertion library.
   test patterns per architecture pattern. Performance benchmarks. CI integration.
   Test data strategy. Mutation testing approach.
 - **mvp**: Test pyramid overview. Key testing patterns. What must pass before deploy.
-- **custom:depth(1-5)**: Depth 1-2: test pyramid overview with key patterns and example test for each layer. Depth 3: add per-layer test patterns, coverage targets, CI integration, and test data strategy. Depth 4: add performance benchmarks, mutation testing approach, and cross-module integration patterns. Depth 5: full suite with contract testing, visual regression strategy, and automated quality gate calibration.
+- **custom:depth(1-5)**:
+  - Depth 1: Test pyramid overview with key patterns. What must pass before deploy.
+  - Depth 2: Depth 1 + example test for each layer using the project's actual test framework.
+  - Depth 3: Add per-layer test patterns, coverage targets, CI integration, and test data strategy.
+  - Depth 4: Add performance benchmarks, mutation testing approach, and cross-module integration patterns.
+  - Depth 5: Full suite with contract testing, visual regression strategy, and automated quality gate calibration.
 
 ## Mode Detection
 Check for docs/tdd-standards.md. If it exists, operate in update mode: read
@@ -455,6 +460,73 @@ Initial data loaded into the test database for integration tests. Rules:
 **Skipped tests accumulate.** Tests marked as `skip` or `xit` that are never re-enabled. They represent either dead code or known bugs that nobody addresses. Fix: skipped tests are technical debt. Set a policy: fix or delete within one sprint.
 
 **No test naming convention.** Test descriptions like "test 1," "works correctly," or "handles the thing." Uninformative when tests fail. Fix: test names should describe the scenario and expected outcome: "returns 404 when user does not exist," "applies 10% discount for premium members."
+
+### From Acceptance Criteria to Test Cases
+
+Acceptance criteria are the bridge between user stories and automated tests. Every AC should produce one or more test cases with clear traceability.
+
+#### Given/When/Then to Arrange/Act/Assert
+
+The mapping is direct:
+
+- **Given** (precondition) becomes **Arrange** — set up test data, mock dependencies, configure state
+- **When** (action) becomes **Act** — call the function, hit the endpoint, trigger the event
+- **Then** (expected outcome) becomes **Assert** — verify return value, check database state, assert response body
+
+```typescript
+// AC: Given a user with 5 failed login attempts,
+//     When they attempt a 6th login,
+//     Then the account is locked and they see "Account locked"
+it('locks account after 5 failed attempts', async () => {
+  // Arrange: create user with 5 failed attempts
+  const user = await createUser({ failedAttempts: 5 });
+  // Act: attempt login
+  const res = await request(app).post('/login').send({ email: user.email, password: 'wrong' });
+  // Assert: locked
+  expect(res.status).toBe(423);
+  expect(res.body.error.message).toContain('Account locked');
+});
+```
+
+#### One AC, Multiple Test Cases
+
+Each AC produces at minimum one happy-path test. Then derive edge cases:
+
+- **Boundary values**: If the AC says "max 50 characters," test 49, 50, and 51
+- **Empty/null inputs**: If the AC assumes input exists, test what happens when it does not
+- **Concurrency**: If the AC describes a state change, test what happens with simultaneous requests
+
+#### Negative Case Derivation
+
+For every "Given X" in an AC, systematically test "Given NOT X":
+
+- AC says "Given user is authenticated" — test unauthenticated access (expect 401)
+- AC says "Given the order exists" — test with nonexistent order ID (expect 404)
+- AC says "Given valid payment details" — test with expired card, insufficient funds, invalid CVV
+
+#### Parameterized Tests for Similar ACs
+
+When multiple ACs follow the same pattern with different inputs, use data-driven tests:
+
+```typescript
+it.each([
+  ['empty email', { email: '', password: 'valid' }, 'Email is required'],
+  ['invalid email', { email: 'notanemail', password: 'valid' }, 'Invalid email format'],
+  ['short password', { email: 'a@b.com', password: '123' }, 'Password too short'],
+])('rejects registration with %s', async (_, input, expectedError) => {
+  const res = await request(app).post('/register').send(input);
+  expect(res.status).toBe(400);
+  expect(res.body.error.message).toContain(expectedError);
+});
+```
+
+#### Test Naming for Traceability
+
+Test names should mirror the AC wording so that when a test fails, the team can trace it back to the requirement without reading the test body:
+
+- AC: "User sees error when email is already taken" — Test: `'returns 409 when email is already taken'`
+- AC: "Profile updates immediately after save" — Test: `'updates profile and reflects changes on next fetch'`
+- Include the story or AC ID in the describe block when practical: `describe('US-002: Edit profile', () => { ... })`
 
 ## See Also
 

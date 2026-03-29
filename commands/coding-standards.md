@@ -1,6 +1,6 @@
 ---
 description: "Create prescriptive coding standards tailored to the project's tech stack"
-long-description: "Define the project's coding conventions with concrete, stack-specific examples"
+long-description: "Creates coding standards tailored to your tech stack — naming conventions, error handling patterns, import organization, AI-specific rules — and generates working linter and formatter config files."
 ---
 
 ## Purpose
@@ -24,12 +24,12 @@ self-review checklist.
 
 ## Quality Criteria
 - Every standard references the specific tech stack, not generic principles
-- Includes runnable code examples showing the RIGHT way for the stack
+- Includes >= 2 runnable code examples per section showing the RIGHT way for the stack
 - Commit message format is [BD-<id>] type(scope): description
 - AI-specific coding rules section addresses common AI mistakes (dead code,
   duplication, magic numbers, premature abstraction, unnecessary features)
 - Linter/formatter configs created and referenced from the document
-- Every standard has a corresponding linter rule, code review checklist item, or test pattern that enforces it
+- Every standard has a corresponding linter rule, formatter rule, code review checklist item, or test pattern that enforces it (where applicable tools exist)
 - Every code review checklist item is a binary yes/no question
 - (mvp) Linter/formatter config files are valid (lint command runs without config errors)
 
@@ -39,9 +39,12 @@ self-review checklist.
   linter/formatter configuration with custom rules. 15-20 pages.
 - **mvp**: Core naming conventions, commit format, import ordering, error handling
   approach, and AI-specific rules. Basic linter config. 3-5 pages.
-- **custom:depth(1-5)**: Depth 1-2: MVP conventions. Depth 3: add security and
-  database patterns. Depth 4: add API design and logging. Depth 5: full suite
-  with all sections and custom linter rules.
+- **custom:depth(1-5)**:
+  - Depth 1: Core naming conventions, commit format, and import ordering. 1-2 pages.
+  - Depth 2: Depth 1 + error handling approach and AI-specific rules. Basic linter config. 3-5 pages.
+  - Depth 3: Add security and database access patterns. 5-8 pages.
+  - Depth 4: Add API design and logging conventions. 8-12 pages.
+  - Depth 5: Full suite with all sections, custom linter rules, and code review checklist. 15-20 pages.
 
 ## Mode Detection
 Update mode if docs/coding-standards.md exists. In update mode: preserve naming

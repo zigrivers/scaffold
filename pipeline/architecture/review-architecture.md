@@ -42,7 +42,7 @@ independent review validation.
 - (mvp) Downstream readiness confirmed (specification, quality, and planning steps can proceed)
 - (mvp) Every finding categorized P0-P3 with specific component, section, and issue. Severity definitions: P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.
 - (mvp) Fix plan documented for all P0/P1 findings; fixes applied to system-architecture.md and re-validated
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling
 - **deep**: All 10 review passes (coverage, constraints, data flows, module

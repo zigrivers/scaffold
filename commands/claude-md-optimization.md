@@ -1,6 +1,6 @@
 ---
 description: "Consolidate and optimize CLAUDE.md for maximum signal density"
-long-description: "Review all project documentation and consolidate CLAUDE.md into the definitive,"
+long-description: "Removes redundancy from CLAUDE.md, fixes terminology inconsistencies, front-loads critical patterns (TDD, commit format, worktrees), and keeps it under 200 lines so agents actually read and follow it."
 ---
 
 ## Purpose
@@ -44,8 +44,7 @@ scannability.
   patterns verified present and prominent.
 - **mvp**: Quick pass to remove obvious duplicates and ensure workflow section is
   complete. Fix any command inconsistencies. Skip detailed audit.
-- **custom:depth(1-5)**: Depth 1-2: dedup + workflow check. Depth 3: add
-  consistency pass. Depth 4: add gap analysis. Depth 5: full four-phase audit.
+- **custom:depth(1-5)**: Depth 1: remove duplicated instructions within CLAUDE.md. Depth 2: dedup plus workflow section completeness check. Depth 3: add terminology consistency pass across all sections. Depth 4: add gap analysis (missing patterns, stale command references). Depth 5: full four-phase audit (redundancy, consistency, gap, priority).
 
 ## Mode Detection
 Always operates in update mode (CLAUDE.md always exists by this point). Check

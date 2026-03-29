@@ -1,6 +1,6 @@
 ---
 description: "Audit all documentation for platform-specific gaps across target platforms"
-long-description: "When the project targets multiple platforms (web, iOS, Android, desktop), audit"
+long-description: "Audits all documentation for platform-specific gaps — features missing on one platform, input pattern differences (touch vs. mouse), and platform-specific testing coverage."
 ---
 
 ## Purpose
@@ -48,6 +48,7 @@ Skip when the project targets a single platform only.
 - (deep) Navigation patterns appropriate per platform (sidebar vs. tab bar, etc.)
 - (deep) Offline/connectivity handling addressed per platform (if applicable)
 - (deep) Web version is treated as first-class (not afterthought) if PRD specifies it
+- Every finding categorized P0-P3 (P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.)
 - Fix plan documented for all P0/P1 findings with specific document and section to update
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
@@ -59,10 +60,12 @@ Skip when the project targets a single platform only.
   to Claude-only enhanced review.
 - **mvp**: Quick check of user stories and tech-stack for platform coverage.
   Identify top 3 platform gaps. Skip detailed feature parity matrix.
-- **custom:depth(1-5)**: Depth 1-2: user stories platform check. Depth 3: add
-  tech-stack and coding-standards. Depth 4: add feature parity matrix + one
-  external model (if CLI available). Depth 5: full suite across all documents
-  + multi-model with reconciliation.
+- **custom:depth(1-5)**:
+  - Depth 1: User stories platform check only (1 review pass)
+  - Depth 2: User stories platform check with basic gap identification (1 review pass)
+  - Depth 3: Add tech-stack and coding-standards platform audit (3 review passes)
+  - Depth 4: Add feature parity matrix + one external model if CLI available (3 review passes + external dispatch)
+  - Depth 5: Full suite across all documents + multi-model with reconciliation (3 review passes + multi-model synthesis)
 
 ## Mode Detection
 Update mode if docs/reviews/platform-parity-review.md exists. In update mode:
@@ -454,6 +457,14 @@ When models actively disagree (one flags an issue, another says the same thing i
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
 3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
+
+### Consensus Classification
+
+When synthesizing multi-model findings, classify each finding:
+- **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
+- **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
+- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
+- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
 
 ### Output Format
 

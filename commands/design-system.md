@@ -1,6 +1,6 @@
 ---
 description: "Create a cohesive design system with tokens and component patterns for frontend"
-long-description: "Define a complete visual language (colors, typography, spacing, borders, shadows)"
+long-description: "Creates a visual language — color palette (WCAG-compliant), typography scale, spacing system, component patterns — and generates working theme config files for your frontend framework."
 ---
 
 ## Purpose
@@ -27,7 +27,7 @@ professional UI without requiring design expertise from the user.
 ## Quality Criteria
 - (mvp) All colors meet WCAG AA contrast requirements
 - (mvp) Typography scale uses a consistent modular ratio; body text >= 16px; line height >= 1.5 for body text
-- (mvp) Spacing uses a consistent base unit (e.g., 4px increments)
+- (mvp) Spacing uses a consistent system appropriate to the frontend framework (e.g., 4px base unit, Tailwind spacing scale, or Material Design grid)
 - (deep) Component patterns cover buttons, forms, cards, feedback, navigation, data display
 - (mvp) Theme configuration files actually work (verified by running dev server)
 - (deep) Both light and dark mode token values provided (if dark mode requested)
@@ -40,9 +40,11 @@ professional UI without requiring design expertise from the user.
   page demonstrating all patterns. 15-20 pages.
 - **mvp**: Color palette, typography, spacing scale, and button/form/card patterns.
   No dark mode. Basic theme config. 3-5 pages.
-- **custom:depth(1-5)**: Depth 1-2: colors + typography + buttons. Depth 3: add
-  forms, cards, spacing. Depth 4: add navigation, data display, layout. Depth 5:
-  full suite with dark mode and accessibility.
+- **custom:depth(1-5)**: Depth 1: color palette and typography scale only.
+  Depth 2: colors, typography, and button patterns. Depth 3: add forms, cards,
+  and spacing scale. Depth 4: add navigation, data display, layout system, and
+  responsive breakpoints. Depth 5: full suite with dark mode, accessibility
+  audit, and animation guidelines.
 
 ## Conditional Evaluation
 Enable when: tech-stack.md includes a frontend framework (React, Vue, Angular, Svelte,

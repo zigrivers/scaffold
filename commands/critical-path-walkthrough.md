@@ -1,6 +1,6 @@
 ---
 description: "Walk critical user journeys end-to-end across all specs"
-long-description: "Walk critical user journeys end-to-end across all specs. Trace the most"
+long-description: "Walks the most important user journeys end-to-end across every spec layer — PRD to stories to UX to API to database to tasks — and flags any broken handoffs or missing layers."
 ---
 
 ## Purpose
@@ -25,12 +25,12 @@ spec gaps along the critical path.
 - docs/validation/critical-path-walkthrough/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- (mvp) Top critical user journeys (all Must-have epics, minimum 3) traced end-to-end
+- (mvp) User specifies >= 3 Must-have epics as critical user journeys; each traced end-to-end
 - (deep) Every journey verified at each layer: PRD → Story → UX → API → Architecture → DB → Task
 - (deep) Each critical path verified against story acceptance criteria for behavioral correctness
 - Missing layers or broken handoffs documented with specific gap description
 - Findings categorized P0-P3 with specific file, section, and issue for each
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Finding Disposition
 - **P0 (blocking)**: Must be resolved before proceeding to implementation. Create
@@ -446,6 +446,14 @@ When models actively disagree (one flags an issue, another says the same thing i
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
 3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
+
+### Consensus Classification
+
+When synthesizing multi-model findings, classify each finding:
+- **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
+- **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
+- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
+- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
 
 ### Output Format
 

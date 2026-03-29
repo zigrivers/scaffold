@@ -29,6 +29,7 @@ from the application's query patterns.
 
 ## Quality Criteria
 - (mvp) Every domain entity maps to a table/collection (or justified denormalization)
+- (mvp) If domain-models/ does not exist, entities derived from user story nouns and PRD feature descriptions
 - (mvp) Relationships match domain model relationships
 - (mvp) Constraints enforce domain invariants at the database level
 - (deep) Migration strategy specifies: migration tool, forward migration approach, rollback approach, and data preservation policy

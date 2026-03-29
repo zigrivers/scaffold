@@ -1,6 +1,6 @@
 ---
 description: "Apply validation findings and freeze documentation"
-long-description: "Review all validation phase findings, create a prioritized fix plan, apply fixes"
+long-description: "Applies all findings from the validation phase, fixes blocking issues, and freezes every document with a version marker — signaling that specs are implementation-ready."
 ---
 
 ## Purpose
@@ -28,7 +28,7 @@ issue is discovered during implementation.
 ## Methodology Scaling
 - **deep**: All findings addressed. Full fix log. Final consistency check.
 - **mvp**: P0 findings only. Brief fix log.
-- **custom:depth(1-5)**: Depth 1-2: address P0 findings only with brief fix log. Depth 3: address P0-P1 findings with detailed fix log and deferred rationale. Depth 4: address P0-P2 with full deferred rationale and re-validation passes. Depth 5: all findings addressed, final consistency re-check, and freeze verification audit.
+- **custom:depth(1-5)**: Depth 1: address P0 findings only with minimal fix log. Depth 2: address P0 findings with brief fix log and freeze markers on updated documents. Depth 3: address P0-P1 findings with detailed fix log and deferred rationale. Depth 4: address P0-P2 with full deferred rationale and re-validation passes. Depth 5: all findings addressed, final consistency re-check, and freeze verification audit.
 
 ## Mode Detection
 Check if `docs/validation/fix-log.md` already exists.

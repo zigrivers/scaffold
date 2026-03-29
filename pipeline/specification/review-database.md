@@ -39,7 +39,7 @@ independent review validation.
 - (mvp) Every finding categorized P0-P3 (P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.) with specific table, column, and issue
 - (mvp) Fix plan documented for all P0/P1 findings; fixes applied to database-schema.md and re-validated
 - (mvp) Downstream readiness confirmed — no unresolved P0 or P1 findings remain before API contracts proceed
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling
 - **deep**: Full multi-pass review targeting all schema failure modes. Multi-model

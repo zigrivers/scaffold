@@ -41,7 +41,7 @@ independent review validation.
 - (mvp) Fix plan documented for all P0/P1 findings; fixes applied to ux-spec.md and re-validated
 - (mvp) Review report includes explicit Readiness Status section
 - (mvp) Downstream readiness confirmed — no unresolved P0 or P1 findings remain before quality phase proceeds
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling
 - **deep**: Full multi-pass review. Multi-model review dispatched to Codex and

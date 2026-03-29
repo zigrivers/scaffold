@@ -1,6 +1,6 @@
 ---
 description: "Define deployment pipeline, deployment strategy, monitoring, alerting, and incident response"
-long-description: "Define the production operational strategy: deployment pipeline (extending the"
+long-description: "Designs your deployment pipeline (build, test, deploy, verify, rollback), defines monitoring metrics with alert thresholds, and writes incident response procedures with rollback instructions."
 ---
 
 ## Purpose
@@ -40,8 +40,12 @@ development setup rather than redefining it.
 - **deep**: Full runbook. Deployment topology diagrams. Monitoring dashboard
   specs. Alert playbooks. DR plan. Capacity planning.
 - **mvp**: Deploy command. Basic monitoring. Rollback procedure.
-- **custom:depth(1-5)**: Depth 1-2: MVP-style. Depth 3: add monitoring and
-  alerts. Depth 4-5: full runbook with DR.
+- **custom:depth(1-5)**: Depth 1: deploy command and basic rollback procedure.
+  Depth 2: add basic monitoring metrics (latency, error rate, saturation).
+  Depth 3: add alert thresholds, incident response outline, health check
+  endpoints. Depth 4: full runbook with deployment topology, monitoring
+  dashboards, and DR plan. Depth 5: full runbook with capacity planning,
+  secret rotation testing, and multi-region considerations.
 
 ## Mode Detection
 Check for docs/operations-runbook.md. If it exists, operate in update mode:

@@ -1,6 +1,6 @@
 ---
 description: "Review testing strategy for coverage gaps and feasibility"
-long-description: "Review testing strategy targeting testing-specific failure modes: coverage gaps"
+long-description: "Audits the testing strategy for coverage gaps by layer, verifies edge cases from domain invariants are tested, and checks that test environment assumptions match actual config."
 ---
 
 ## Purpose
@@ -25,21 +25,26 @@ independent review validation.
 
 ## Quality Criteria
 - (mvp) Coverage gaps by layer documented with severity
-- (deep) Domain invariant test cases verified
+- (deep) If docs/domain-models/ exists, domain invariant test cases verified. Otherwise, test invariants derived from story acceptance criteria.
 - (deep) Each test environment assumption verified against actual environment config or flagged as unverifiable
 - (deep) Performance test coverage assessed against NFRs
 - (deep) Integration boundaries have integration tests defined
-- Every finding categorized P0-P3 with specific test layer, gap, and issue
+- Every finding categorized P0-P3 (P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.) with specific test layer, gap, and issue
 - Fix plan documented for all P0/P1 findings; fixes applied to tdd-standards.md and re-validated
 - Downstream readiness confirmed — no unresolved P0 or P1 findings remain before operations step proceeds
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling
 - **deep**: Full multi-pass review targeting all testing failure modes. Multi-model
   review dispatched to Codex and Gemini if available, with graceful fallback
   to Claude-only enhanced review.
 - **mvp**: Coverage gap check only.
-- **custom:depth(1-5)**: Depth 1: test coverage and pyramid balance pass only. Depth 2: add test quality and naming convention passes. Depth 3: add edge case coverage and CI integration passes. Depth 4: add external model review. Depth 5: multi-model review with reconciliation.
+- **custom:depth(1-5)**:
+  - Depth 1: Test coverage and pyramid balance pass only (1 review pass)
+  - Depth 2: Add test quality and naming convention passes (2 review passes)
+  - Depth 3: Add edge case coverage and CI integration passes (4 review passes)
+  - Depth 4: Add external model review (4 review passes + external dispatch)
+  - Depth 5: Multi-model review with reconciliation (4 review passes + multi-model synthesis)
 
 ## Mode Detection
 Re-review mode if docs/reviews/review-testing.md or docs/reviews/testing/
@@ -698,6 +703,14 @@ When models actively disagree (one flags an issue, another says the same thing i
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
 3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
+
+### Consensus Classification
+
+When synthesizing multi-model findings, classify each finding:
+- **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
+- **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
+- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
+- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
 
 ### Output Format
 

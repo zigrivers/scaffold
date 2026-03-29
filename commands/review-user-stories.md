@@ -1,6 +1,6 @@
 ---
 description: "Multi-pass review of user stories for PRD coverage, quality, and downstream readiness"
-long-description: "Deep multi-pass review of user stories, targeting failure modes specific to"
+long-description: "Verifies every PRD feature maps to at least one story, checks that acceptance criteria are specific enough to test, validates story independence, and builds a requirements traceability index at higher depths."
 ---
 
 ## Purpose
@@ -29,13 +29,13 @@ independent coverage validation.
 ## Quality Criteria
 - (mvp) Pass 1 (PRD coverage) executed with findings documented
 - All review passes executed with findings documented
-- Every finding categorized by severity (P0-P3)
+- Every finding categorized by severity: P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.
 - Fix plan created for P0 and P1 findings
 - Fixes applied and re-validated
 - (mvp) Every story has at least one testable acceptance criterion, and every PRD feature maps to at least one story
 - (depth 4+) Every atomic PRD requirement has a REQ-xxx ID in the requirements index
 - (depth 4+) Coverage matrix maps every REQ to at least one US (100% coverage target)
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling
 - **deep**: All 6 review passes from the knowledge base. Full findings report
@@ -44,9 +44,12 @@ independent coverage validation.
   Gemini if available, with graceful fallback to Claude-only enhanced review.
 - **mvp**: Pass 1 only (PRD coverage). Focus on blocking gaps — PRD features
   with no corresponding story.
-- **custom:depth(1-5)**: Depth 1: pass 1 only. Depth 2: passes 1-2.
-  Depth 3: passes 1-4. Depth 4: all 6 passes + requirements index + coverage
-  matrix. Depth 5: all of depth 4 + multi-model review (if CLIs available).
+- **custom:depth(1-5)**:
+  - Depth 1: Pass 1 only (PRD coverage). One review pass.
+  - Depth 2: Passes 1-2 (PRD coverage, acceptance criteria quality). Two review passes.
+  - Depth 3: Passes 1-4 (add story independence, INVEST criteria). Four review passes.
+  - Depth 4: All 6 passes + requirements index + coverage matrix + one external model (if CLI available).
+  - Depth 5: All of depth 4 + multi-model review with reconciliation (if CLIs available).
 
 ## Mode Detection
 If docs/reviews/pre-review-user-stories.md exists, this is a re-review. Read
@@ -705,6 +708,14 @@ When models actively disagree (one flags an issue, another says the same thing i
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
 3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
+
+### Consensus Classification
+
+When synthesizing multi-model findings, classify each finding:
+- **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
+- **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
+- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
+- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
 
 ### Output Format
 
