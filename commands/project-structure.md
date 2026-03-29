@@ -1,238 +1,305 @@
 ---
-description: "Define and scaffold project directory structure"
-long-description: "Designs the directory layout in docs/project-structure.md and scaffolds the actual folders and placeholder files to match the documented structure."
+description: "Design directory layout and scaffold the actual project structure"
+long-description: "Design the directory layout optimized for parallel AI agent work (minimizing"
 ---
 
-Research best practices for project structure based on our tech stack and standards. Review docs/tech-stack.md, docs/coding-standards.md, docs/tdd-standards.md, and docs/plan.md, then create docs/project-structure.md and scaffold the actual directory structure.
+## Purpose
+Design the directory layout optimized for parallel AI agent work (minimizing
+merge conflicts and maximizing task independence), document file placement rules,
+and scaffold the actual directories and placeholder files. Updates CLAUDE.md
+with a Quick Reference section for file placement.
+
+## Inputs
+- docs/tech-stack.md (required) — framework conventions determine structure
+- docs/coding-standards.md (required) — naming and organization conventions
+- docs/tdd-standards.md (optional) — test co-location rules
+- docs/plan.md (required) — features inform organization strategy choice
+
+## Expected Outputs
+- docs/project-structure.md — complete directory tree with purpose annotations,
+  module organization strategy, file placement rules, shared code strategy,
+  import conventions, barrel file policy, test file location, and generated
+  vs. committed file rules
+- Scaffolded directories with .gitkeep files
+- Updated .gitignore for the tech stack
+- CLAUDE.md updated with Project Structure Quick Reference section
+
+## Quality Criteria
+- Module organization strategy chosen and justified (feature-based, layer-based, or hybrid)
+- File placement table covers all file types (routes, services, models, types, utils, tests)
+- High-contention files identified with merge-conflict mitigation strategies
+- Shared utilities rule enforced (2+ features before promoting to shared)
+- Import conventions defined with ordering rules
+- Test file location aligns with tdd-standards.md (if it exists)
+- .gitignore covers all generated files for the tech stack
+- Structure follows the chosen framework's conventions
+- CLAUDE.md contains Project Structure Quick Reference section with file placement table
+- (mvp) All documented directories exist on disk with .gitkeep placeholder files
+- CLAUDE.md Project Structure Quick Reference matches the directory tree in docs/project-structure.md
+
+## Methodology Scaling
+- **deep**: Comprehensive structure with high-contention analysis, shared code
+  strategy, import path aliases, barrel file policy, responsive breakpoints for
+  screenshots, and generated vs. committed file inventory.
+- **mvp**: Directory tree with annotations, basic file placement table, .gitignore.
+  Skip shared code strategy and high-contention analysis.
+- **custom:depth(1-5)**: Depth 1-2: tree + placement table. Depth 3: add shared
+  code rules. Depth 4: add contention analysis. Depth 5: full suite with barrel
+  policy and import aliases.
 
 ## Mode Detection
+Update mode if docs/project-structure.md exists. In update mode: never delete
+existing directories (only add new ones), preserve module organization strategy
+choice, update CLAUDE.md Quick Reference section in-place.
 
-Before starting, check if `docs/project-structure.md` already exists:
+## Update Mode Specifics
+- **Detect prior artifact**: docs/project-structure.md exists
+- **Preserve**: module organization strategy (feature-based, layer-based, hybrid),
+  existing directory tree, file placement rules, import conventions, barrel file
+  policy, .gitignore entries
+- **Triggers for update**: new features require new directories, architecture
+  changed module boundaries, tech stack added new file types needing placement
+  rules, tdd-standards.md changed test co-location rules
+- **Conflict resolution**: if architecture restructured modules, add new
+  directories but do not remove existing ones until migration is complete;
+  update CLAUDE.md Quick Reference to reflect additions
 
-**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+---
 
-**If the file exists → UPDATE MODE**:
-1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:project-structure v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
-2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
-   - **ADD** — Required by current prompt but missing from existing doc
-   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
-   - **PRESERVE** — Project-specific decisions, rationale, and customizations
-3. **Cross-doc consistency**: Read related docs (`docs/tech-stack.md`, `docs/coding-standards.md`, `docs/tdd-standards.md`) and verify updates won't contradict them. Skip any that don't exist yet.
-4. **Preview changes**: Present the user a summary:
-   | Action | Section | Detail |
-   |--------|---------|--------|
-   | ADD | ... | ... |
-   | RESTRUCTURE | ... | ... |
-   | PRESERVE | ... | ... |
-   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
-   Wait for user approval before proceeding.
-5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
-6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:project-structure v<ver> <date> -->`
-7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+## Domain Knowledge
 
-**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+### project-structure-patterns
 
-### Update Mode Specifics
-- **Primary output**: `docs/project-structure.md`
-- **Secondary output**: Scaffolded directories, `.gitignore`, CLAUDE.md "Project Structure Quick Reference" section
-- **Preserve**: Module organization decisions, file placement rules, import conventions, high-contention file lists
-- **Related docs**: `docs/tech-stack.md`, `docs/coding-standards.md`, `docs/tdd-standards.md`
-- **Special rules**: **Never delete existing directories** — only add new ones. Preserve the module organization strategy choice (feature-based/layer-based/hybrid). Update the CLAUDE.md Quick Reference section in-place.
+*Directory layout patterns by framework, module organization, and file placement rules*
 
-## Why This Matters for AI Development
+# Project Structure Patterns
 
-With up to 10 Claude Code agents working in parallel, project structure directly impacts:
-- **Merge conflict frequency** — Poor structure means agents constantly edit the same files
-- **Context window efficiency** — Clear boundaries mean agents load only what they need
-- **Task independence** — Good structure lets agents complete tasks without coordinating
+Directory structure is the physical manifestation of architectural decisions. A well-organized project communicates its architecture through the file tree alone — a new developer should understand the system's boundaries by reading directory names. This knowledge covers core layout patterns, framework-specific conventions, and the rules that keep structures clean as projects grow.
 
-## What the Document Must Cover
+## Summary
 
-### 1. Directory Tree
+### Core Patterns
 
-Provide the complete directory structure with purpose annotations:
+Three fundamental approaches to organizing source code:
 
-```
-/
-├── src/                    # Application source code
-│   ├── [layer or feature folders with explanation]
-│   └── ...
-├── tests/                  # Test files (structure mirrors src/)
-├── docs/                   # Project documentation
-├── scripts/                # Build, deploy, and utility scripts
-├── config/                 # Configuration files
-└── ...
-```
+1. **Feature-Based (Vertical Slices)** — Group by business domain. Each feature directory contains its own components, services, tests, and types. Best for: domain-rich applications, teams organized by feature.
+2. **Layer-Based (Horizontal Layers)** — Group by technical concern. Separate directories for controllers, services, repositories, models. Best for: small projects, CRUD-heavy apps, teams organized by specialization.
+3. **Hybrid** — Feature-based at the top level, layer-based within each feature. Most common in practice. Combines domain clarity with technical organization.
 
-The structure should follow our tech stack's conventions (e.g., Next.js has specific expectations, FastAPI projects have different patterns).
+### The Co-Location Principle
 
-### 2. Module Organization Strategy
+Files that change together should live together. A feature's component, styles, tests, types, and utilities belong in the same directory — not scattered across `components/`, `styles/`, `tests/`, `types/`, and `utils/`. Co-location reduces the cognitive cost of changes.
 
-Decide and document ONE of these approaches (based on what fits our stack and PRD best):
+### The Shared Code Rule
 
-**Feature-based (vertical slices)**
-```
-src/
-├── auth/
-│   ├── routes.py
-│   ├── services.py
-│   ├── models.py
-│   └── tests/
-├── sessions/
-│   ├── routes.py
-│   ├── services.py
-│   ├── models.py
-│   └── tests/
-```
+Code belongs in a shared directory (`shared/`, `common/`, `lib/`) only when it has 2 or more consumers. A "shared" utility used by one feature is misplaced — it belongs in that feature's directory. Premature extraction into shared code creates coupling without benefit.
 
-**Layer-based (horizontal slices)**
+### When to Restructure
+
+Restructure when: navigation becomes difficult (too many files in one directory), features are tangled (changing one feature touches many directories), or onboarding developers consistently get lost. Do not restructure for aesthetic reasons or because a blog post recommended a different layout.
+
+### Test Placement
+
+Co-located tests (`service.test.ts` next to `service.ts`) for unit tests — easy to find, move with refactors. Mirror directory (`tests/` mirroring `src/`) for integration and E2E tests that span modules.
+
+### Config vs. Application Code
+
+Tooling config files (`tsconfig.json`, `eslint.config.js`, `Makefile`) live at project root by convention. Application config (`src/config/`) holds runtime settings (database URLs, feature flags). Never mix the two locations.
+
+## Deep Guidance
+
+### Feature-Based Structure
+
+Feature-based organization maps directly to the product's domain model:
+
 ```
 src/
-├── routes/
-├── services/
-├── models/
-├── repositories/
+  features/
+    auth/
+      components/LoginForm.tsx, LoginForm.test.tsx
+      hooks/useAuth.ts, useAuth.test.ts
+      services/auth-service.ts, auth-service.test.ts
+      types.ts
+      index.ts           # public API barrel — other features import from here
+    billing/
+      components/, hooks/, services/, types.ts, index.ts
+  shared/
+    components/          # truly shared: Button, Modal, Input
+    hooks/               # truly shared: useDebounce, useLocalStorage
+    utils/               # truly shared: formatDate, validateEmail
 ```
 
-**Hybrid (layers within features)**
+**The index.ts barrel** defines each feature's public API. Other features import from `@/features/auth`, never from internal paths. This creates explicit boundaries — internal refactoring cannot break consumers.
+
+**When it breaks down**: Heavy cross-cutting concerns (every feature needs auth context, analytics, error boundaries). Solution: shared infrastructure lives in `shared/` or `infrastructure/`.
+
+### Layer-Based Structure
+
+Layer-based organization mirrors the technical architecture:
+
 ```
 src/
-├── features/
-│   ├── auth/
-│   └── sessions/
-├── shared/
-│   ├── middleware/
-│   └── utils/
+  controllers/auth-controller.ts, billing-controller.ts
+  services/auth-service.ts, billing-service.ts
+  repositories/user-repository.ts, invoice-repository.ts
+  models/user.ts, invoice.ts
+  middleware/auth-middleware.ts, logging-middleware.ts
 ```
 
-Explain WHY the chosen approach fits our project. Feature-based typically causes fewer merge conflicts with parallel agents.
+Clear dependency direction: controllers depend on services, services on repositories, never reverse. Breaks down beyond ~20 files per directory — that signals the need for feature grouping.
 
-### 3. File Placement Rules
+### Framework-Specific Patterns
 
-For each file type, specify exactly where it goes:
+#### Next.js (App Router)
 
-| File Type | Location | Naming Convention | Example |
-|-----------|----------|-------------------|---------|
-| API routes/controllers | | | |
-| Business logic/services | | | |
-| Database models | | | |
-| Type definitions | | | |
-| Utility functions | | | |
-| Constants/config | | | |
-| Middleware | | | |
-| Unit tests | | | |
-| Integration tests | | | |
-| E2E tests | | | |
-| Screenshots (Playwright) | | | |
-
-### 4. Shared Code Strategy
-
-This is critical for parallel agent work. Define:
-
-**High-contention files** (multiple agents likely to touch):
-- Main route index / app entry point
-- Database schema / migrations
-- Shared type definitions
-- Environment config
-
-**Mitigation approach for each:**
-- How to structure these files to minimize conflicts
-- When to split vs. keep together
-- Merge resolution guidance if conflicts occur
-
-**Shared utilities rules:**
-- When to add to shared utils vs. keep in feature folder
-- Required: utility must be used by 2+ features before promoting to shared
-- Shared code must have tests before other features can depend on it
-
-### 5. Import Conventions
-
-Define import order and style (should align with coding-standards.md):
 ```
-1. Standard library
-2. Third-party packages
-3. Internal shared modules
-4. Feature-local modules
+app/
+  layout.tsx, page.tsx
+  (auth)/login/page.tsx, signup/page.tsx    # route group (no URL segment)
+  dashboard/layout.tsx, page.tsx, settings/page.tsx
+  api/users/route.ts
+src/features/, src/shared/
 ```
 
-Define path alias conventions if applicable (e.g., `@/components`, `@shared/utils`).
+Conventions: `page.tsx` defines routes, `layout.tsx` for nested layouts, `loading.tsx` for suspense, `error.tsx` for error boundaries. Route groups `(name)` organize without URL impact. Server Components default — mark `'use client'` explicitly.
 
-### 6. Index/Barrel File Policy
+#### Express / Fastify
 
-Decide one of:
-- **Use barrel files**: Every folder has an `index.ts` that re-exports public API
-- **No barrel files**: Import directly from source files
-- **Hybrid**: Barrel files only for shared modules
-
-Document the reasoning and be consistent.
-
-### 7. Test File Location
-
-Decide one of:
-- **Co-located**: `feature/component.ts` + `feature/component.test.ts`
-- **Mirrored**: `src/feature/component.ts` → `tests/feature/component.test.ts`
-- **Hybrid**: Unit tests co-located, integration/E2E tests separate
-
-Must align with docs/tdd-standards.md.
-
-### 8. Generated vs. Committed Files
-
-Specify which files/folders:
-- Must be committed (source code, config, migrations)
-- Must NOT be committed (node_modules, __pycache__, .env, build output)
-- Should be committed only as baselines (screenshot references)
-
-Verify .gitignore covers all generated files.
-
-## What to Actually Create
-
-After documenting, scaffold the project:
-
-1. **Create all directories** from the structure (empty directories can have `.gitkeep`)
-2. **Create placeholder files** where appropriate:
-   - `src/shared/utils/.gitkeep`
-   - `tests/.gitkeep`
-   - Empty `__init__.py` files for Python projects
-3. **Create or update .gitignore** to match the structure
-4. **Update CLAUDE.md** with a quick-reference section:
-
-```markdown
-## Project Structure Quick Reference
-
-- Feature code: `src/features/{feature-name}/`
-- Shared utilities: `src/shared/` (only after 2+ features use it)
-- Tests: Co-located as `{filename}.test.{ext}`
-- Screenshots: `tests/screenshots/{story-id}_{description}.png`
-- New migrations: `src/db/migrations/` (coordinate via Beads to avoid conflicts)
-
-Before creating a new file, check project-structure.md for the correct location.
+```
+src/
+  routes/auth.routes.ts, index.ts     # route definitions (thin)
+  handlers/auth.handler.ts            # request/response logic
+  services/, repositories/, models/, middleware/
+  app.ts, server.ts
 ```
 
-## What This Document Should NOT Be
+Separate routes from handlers. Routes define paths and middleware chains. Handlers contain logic and are independently testable.
 
-- An explanation of what directories are — assume the reader knows what `src/` means
-- Flexible — the structure should be prescriptive so all agents follow it consistently
-- Theoretical — every rule should be tied to our actual tech stack and project needs
+#### FastAPI
 
-## Process
+```
+src/app/
+  routers/auth.py, billing.py
+  services/, repositories/
+  models/          # Pydantic schemas
+  db/              # SQLAlchemy models
+  core/config.py, security.py, dependencies.py
+  main.py
+```
 
-- Use subagents to research project structure best practices for our specific tech stack
-- Review docs/plan.md to understand the features being built — this informs whether feature-based or layer-based organization makes more sense
-- Use AskUserQuestionTool for key decisions: organization strategy, test location, barrel file policy
-- After documenting, actually create the directory structure and commit it
-- Verify the structure works by checking that imports resolve correctly (if tooling is set up)
-- If using Beads: create a task before starting (`bd create "docs: <document being created>" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
-- If this work surfaces implementation tasks (bugs, missing infrastructure), create separate Beads tasks for those — don't try to do them now
+Convention: `routers/` not `routes/`. Pydantic models for API schemas, separate ORM models for database. Dependency injection via `Depends()`.
+
+#### Go
+
+```
+cmd/server/main.go, cli/main.go
+internal/
+  auth/handler.go, service.go, repository.go, handler_test.go
+  billing/...
+  platform/postgres/, redis/, http/
+pkg/validate/, money/
+```
+
+Convention: `cmd/` for entry points, `internal/` for private code (compiler-enforced), `pkg/` for reusable libraries. Flat package structure preferred.
+
+### Monorepo Patterns
+
+Use a monorepo when packages share types/utilities, you need atomic cross-package changes, or packages are tightly coupled. Do not use when packages are independently deployable with no shared code.
+
+```
+packages/
+  web/src/, package.json
+  api/src/, package.json
+  shared/src/, package.json
+  config/eslint-base.js, tsconfig-base.json
+package.json       # workspace configuration
+turbo.json         # build orchestration
+```
+
+Packages import from `@myorg/shared`, never from relative paths across package boundaries. Workspace resolution handles local development.
+
+### The Hybrid Pattern — Detailed Example
+
+The hybrid approach is the most practical for medium-to-large applications. Features at the top, layers within:
+
+```
+src/
+  features/
+    auth/
+      controller.ts      # HTTP handler / route handler
+      service.ts          # Business logic
+      repository.ts       # Data access
+      model.ts            # Domain types
+      service.test.ts     # Unit tests co-located
+      controller.test.ts
+    billing/
+      controller.ts
+      service.ts
+      repository.ts
+      model.ts
+      ...
+  shared/
+    middleware/           # Cross-cutting: auth, logging, rate-limit
+    utils/               # Truly shared utilities (2+ consumers)
+    types/               # Shared type definitions
+  config/                # Application configuration
+  app.ts                 # Application bootstrap
+  server.ts              # Server entry point
+```
+
+Each feature is self-contained. Adding a new feature means creating a new directory — no changes to existing features. Deleting a feature means removing one directory (plus cleanup of any shared references).
+
+### Config File Placement
+
+Config files live in the project root by universal convention: `package.json`, `tsconfig.json`, `eslint.config.js`, `pyproject.toml`, `go.mod`, `Makefile`, `Dockerfile`. Do not move them into a `config/` directory — tooling expects them at root. Application configuration (database URLs, feature flags) belongs in `src/config/`.
+
+### Generated File Handling
+
+Generated files (API clients, GraphQL types, migrations) need special treatment:
+- **Dedicated directory**: `src/generated/` or `__generated__/` — clearly non-hand-edited
+- **Linter exclusion**: `**/generated/**` excluded from lint configs
+- **Regeneration command**: `make generate` documented in CLAUDE.md
+- **Git decision**: Generated-from-committed-specs can be gitignored; generated-from-external-sources should be committed
+
+### Entry Points and Barrel Files
+
+**Entry points** (`main.ts`, `server.ts`, `index.ts` at project root, route files) are imported by the framework, not by other source files. Structure evals must exclude them from orphan detection.
+
+**Barrel files** (`index.ts` in feature directories) re-export the feature's public API. Rules:
+- One barrel per feature directory
+- Only re-export what other features need — internal utilities stay unexported
+- Never create barrel files in leaf directories (they add indirection without value)
+- Avoid circular dependencies by keeping barrel imports one-directional (features import from shared, never reverse)
+
+### Common Anti-Patterns
+
+**God Directories**: `src/utils/` has 47 files, `src/components/` has 93. Fix: move utilities into their consuming features. Only genuinely shared items (3+ consumers) stay in `shared/`.
+
+**Premature Abstraction into Shared**: Creating `shared/formatCurrency.ts` "because someone might need it later." Fix: enforce the 2+ consumer rule. Code enters `shared/` only when a second consumer actually needs it.
+
+**Inconsistent Depth**: 5-level nesting next to 2-level nesting. Fix: define maximum nesting depth (3-4 levels from `src/`). Deep nesting signals a feature should be split.
+
+**Orphaned Files**: Files not imported by anything and not entry points, accumulated during refactors. Fix: structure evals detect orphans in CI.
+
+### Migration Between Structures
+
+Moving from layer-based to feature-based (the most common migration):
+
+1. Create feature directories alongside existing layers
+2. Move one feature at a time — start with the most self-contained (fewest cross-feature dependencies)
+3. Update imports as you move — no redirect files
+4. Verify tests pass after each feature migration
+5. Delete empty layer directories once all features extracted
+6. Update `docs/project-structure.md`
+
+Move one feature per PR. Each PR leaves the project working with passing tests. Five small PRs over a week is safer than one massive PR touching every file.
+
+## See Also
+
+- [system-architecture](../core/system-architecture.md) — Architecture manifests in file structure
+
+---
 
 ## After This Step
 
-When this step is complete, tell the user:
-
----
-**Phase 2 complete** — `docs/project-structure.md` created and directories scaffolded.
-
-**Next:** Run `/scaffold:dev-env-setup` — Set up local dev environment with live reload (starts Phase 3).
-
-**Pipeline reference:** `/scaffold:prompt-pipeline`
-
----
+Continue with: `/scaffold:dev-env-setup`

@@ -30,17 +30,20 @@ MIN_LINES_FOR_STRUCTURE=50
 @test "pipeline commands with Mode Detection also have Process and After This Step" {
   local failures=()
   for cmd_file in "${PROJECT_ROOT}"/commands/*.md; do
-    local lines
+    local slug lines
+    slug="$(basename "$cmd_file" .md)"
     lines="$(count_lines "$cmd_file")"
     [[ "$lines" -lt "$MIN_LINES_FOR_STRUCTURE" ]] && continue
 
     # Only check commands that have Mode Detection (document-creating commands)
     grep -q '## Mode Detection' "$cmd_file" || continue
 
-    if ! grep -q '## Process\|## Review Process\|^[0-9]\+\.\s' "$cmd_file"; then
+    # Accept v1 Process/Review Process sections OR v2 structured sections (Inputs/Expected Outputs/Quality Criteria)
+    if ! grep -q '## Process\|## Review Process\|## Inputs\|## Expected Outputs\|## Quality Criteria\|^[0-9]\+\.\s' "$cmd_file"; then
       failures+=("$(basename "$cmd_file"): has Mode Detection but no Process section")
     fi
     if ! grep -q '## After This Step' "$cmd_file"; then
+      is_after_exempt "$slug" && continue
       failures+=("$(basename "$cmd_file"): has Mode Detection but no After This Step section")
     fi
   done

@@ -31,16 +31,20 @@ is_consolidation() {
     # Extract outputs from pipeline step
     outputs="$(extract_field "$pipeline_file" "outputs" | sed 's/\[//;s/\]//' | tr ',' '\n' | sed 's/^ *//')"
 
-    # Extract Mode Detection section from command (between ## Mode Detection and next ##)
+    # Extract Mode Detection + Update Mode Specifics sections from command.
+    # In v2, output paths may appear in either section.
     local mode_section
-    mode_section="$(awk '/^## Mode Detection/{found=1; next} /^## /{if(found) exit} found{print}' "$cmd_file")"
+    mode_section="$(awk '/^## (Mode Detection|Update Mode Specifics)/{found=1; next} /^## [^MU]|^---$/{if(found) found=0} found{print}' "$cmd_file")"
 
     while IFS= read -r output_path; do
       [[ -z "$output_path" ]] && continue
-      # Check if the output path (or its basename) appears in Mode Detection
-      local basename_path
+      # Check if the output path (or its basename) appears in Mode Detection / Update Mode Specifics
+      local basename_path dir_path
       basename_path="$(basename "$output_path")"
-      if ! echo "$mode_section" | grep -q "$output_path\|$basename_path"; then
+      dir_path="$(dirname "$output_path")/"
+
+      # Match exact path, basename, or parent directory reference
+      if ! echo "$mode_section" | grep -q "$output_path\|$basename_path\|$dir_path"; then
         failures+=("${name}: output '${output_path}' not referenced in Mode Detection")
       fi
     done <<< "$outputs"

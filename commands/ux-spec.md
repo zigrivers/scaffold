@@ -1,178 +1,316 @@
 ---
 description: "Specify user flows, interaction states, component architecture, accessibility, and responsive behavior"
-long-description: "Reads PRD, user stories, and system architecture, then creates docs/ux-spec.md defining user flows, interaction state machines, component architecture, accessibility requirements, and responsive behavior. References docs/design-system.md for visual tokens rather than redefining them."
+long-description: "Define the user experience specification: user flows, interaction state machines,"
 ---
 
-Read `docs/plan.md`, `docs/user-stories.md`, `docs/system-architecture.md`, `docs/coding-standards.md` (for component naming and accessibility conventions), `docs/design-system.md` (if it exists), and `docs/api-contracts.md` (if it exists), then create the UX specification. Produce `docs/ux-spec.md` as the interaction and behavior blueprint for the frontend — user flows, component architecture, accessibility, and responsive behavior. Visual tokens and component appearance come from `docs/design-system.md` — this step consumes those tokens, it does not redefine them.
+## Purpose
+Define the user experience specification: user flows, interaction state machines,
+component architecture (hierarchy and data flow), accessibility requirements, and
+responsive behavior. This is the interaction and behavior blueprint for the frontend.
+Visual tokens and component appearance are defined in `docs/design-system.md` — this
+step consumes those tokens, it does not redefine them.
+
+## Inputs
+- docs/plan.md (required) — user requirements and personas
+- docs/system-architecture.md (required) — frontend architecture
+- docs/api-contracts.md (optional) — data shapes for UI components
+- docs/user-stories.md (required) — user journeys driving flow design
+- docs/design-system.md (optional) — design tokens and component visual specs to reference
+
+## Expected Outputs
+- docs/ux-spec.md — UX specification with flows, components, design system
+
+## Quality Criteria
+- (mvp) Every PRD user journey has a corresponding flow with all states documented
+- (mvp) Component hierarchy covers all UI states (loading, error, empty, populated)
+- References design tokens from docs/design-system.md (does not redefine them)
+- (deep) Accessibility requirements documented (WCAG level, keyboard nav, screen readers)
+- (deep) Responsive breakpoints defined with layout behavior per breakpoint
+- (mvp) Error states documented for every user action that can fail
+- (deep) All documented user flows verified at responsive breakpoints (mobile, tablet, desktop) with behavior differences noted
+
+## Methodology Scaling
+- **deep**: Full UX specification. Detailed wireframes described in prose.
+  Complete design system. Interaction state machines. Accessibility audit
+  checklist. Animation and transition specs.
+- **mvp**: Key user flows. Core component list. Basic design tokens.
+- **custom:depth(1-5)**: Depth 1-2: flows and components. Depth 3: add design
+  system. Depth 4-5: full specification with accessibility.
 
 ## Mode Detection
+Check for docs/ux-spec.md. If it exists, operate in update mode: read existing
+flows and component hierarchy, diff against updated user stories and system
+architecture. Preserve existing interaction patterns, state machines, and
+component data flow definitions. Add new flows for new user stories or features.
+Update component hierarchy if architecture changed frontend structure. Never
+remove documented accessibility requirements.
 
-Before starting, check if `docs/ux-spec.md` already exists:
-
-**If the file does NOT exist -> FRESH MODE**: Skip to the next section and create from scratch.
-
-**If the file exists -> UPDATE MODE**:
-1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:ux-spec v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
-2. **Diff against current structure**: Compare existing sections against what this prompt would produce fresh. Categorize:
-   - **ADD** — Required sections or flows missing from existing spec
-   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure
-   - **PRESERVE** — Project-specific design decisions, custom component specs, accessibility customizations
-3. **Cross-doc consistency**: Read related docs and verify UX spec aligns with current requirements and API contracts.
-4. **Preview changes**: Present the user a summary table. Wait for approval before proceeding.
-5. **Execute update**: Update spec, respecting preserve rules.
-6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:ux-spec v<ver> <date> -->`
-7. **Post-update summary**: Report sections added, restructured, preserved, and cross-doc issues.
-
-**In both modes**, follow all instructions below.
-
-### Update Mode Specifics
-- **Primary output**: `docs/ux-spec.md`
-- **Preserve**: Custom component architecture decisions, accessibility level decisions, responsive breakpoint choices, user flow mappings
-- **Related docs**: `docs/plan.md`, `docs/user-stories.md`, `docs/system-architecture.md`, `docs/api-contracts.md`, `docs/design-system.md`
-- **Special rules**: Preserve component specifications that are already implemented. Reference design tokens from `docs/design-system.md` — do not redefine token values here.
+## Update Mode Specifics
+- **Detect prior artifact**: docs/ux-spec.md exists
+- **Preserve**: existing user flows, interaction state machines, component
+  hierarchy, accessibility requirements, responsive breakpoint definitions
+- **Triggers for update**: user stories added or changed, architecture changed
+  frontend components, design system tokens updated, API contracts changed
+  data shapes available to UI
+- **Conflict resolution**: if a user story was rewritten, update its flow
+  in-place rather than creating a duplicate; reconcile component hierarchy
+  changes with existing state machine definitions
 
 ---
 
-## What the Document Must Cover
+## Domain Knowledge
 
-### 1. User Flows
+### ux-specification
 
-Map each user story's acceptance criteria to screen states and transitions. For each core flow:
+*UX documentation patterns — user flows, interaction states, component architecture, accessibility, and responsive behavior*
 
-- **Entry point**: How the user arrives (URL, navigation click, redirect, deep link)
-- **Preconditions**: What must be true (authenticated? specific role? data exists?)
-- **Happy path**: Primary sequence from start to goal completion
-- **Decision points**: Where the flow branches based on user choice or system state
-- **Error paths**: What happens on validation failure, network error, auth expiry, rate limiting
-- **Empty states**: First-time use, no data, no search results
-- **Exit points**: Success confirmation, redirect, return to previous screen
+# UX Specification
 
-**State diagrams for complex interactions:**
+## Summary
+
+- **User flow documentation**: Map each story's Given/When/Then scenarios to screen states and transitions. Document entry points, preconditions, happy path, decision points, error paths, empty states, and exit points.
+- **Component architecture**: Organize components as atoms (base), molecules (composite), organisms (feature), templates (layouts), and pages. Define prop/data flow with top-down props and events/callbacks up.
+- **Design system reference**: Consume design tokens from `docs/design-system.md` by name (e.g., `--color-error`, `--space-4`). Never hard-code values.
+- **Accessibility**: Target WCAG AA as baseline. Keyboard navigation for all interactive elements, semantic HTML, screen reader support with ARIA, 4.5:1 color contrast, and proper focus management.
+- **Responsive design**: Mobile-first breakpoints (mobile < 640px, tablet 640-1024px, desktop 1024-1280px, large > 1280px). Touch targets minimum 44x44px. Document layout behavior per breakpoint.
+- **Common pitfalls**: Designing for happy path only, accessibility as afterthought, missing loading states, breaking text on resize, and modal abuse for content that should be pages.
+
+## Deep Guidance
+
+## User Flow Documentation
+
+### Journey Mapping
+
+User stories (`docs/user-stories.md`) define what users do — each story's acceptance criteria describe a user journey. UX specification defines what users see and how they interact while performing those journeys. Map each story's Given/When/Then scenarios to screen states and transitions.
+
+A user flow documents every step a user takes to accomplish a goal, including all decision points, error states, and alternative paths. User flows are the bridge between user stories and implementable UI specifications.
+
+**Structure of a user flow:**
+
+1. **Entry point** — How the user arrives (direct URL, navigation click, redirect, deep link)
+2. **Preconditions** — What must be true before this flow starts (authenticated? specific role? data exists?)
+3. **Happy path** — The primary sequence of steps from start to goal completion
+4. **Decision points** — Where the flow branches based on user choice or system state
+5. **Error paths** — What happens when validation fails, network errors occur, or the user enters invalid data
+6. **Empty states** — What the user sees when there's no data yet (first-time use, no search results, no activity)
+7. **Exit points** — How the flow ends (success confirmation, redirect, return to previous screen)
+
+**Example: User Registration Flow**
+
 ```
-Form: IDLE -> DIRTY -> VALIDATING -> VALID -> SUBMITTING -> SUCCESS
-                                  -> INVALID -> DIRTY (user edits)
-                                              SUBMITTING -> ERROR -> DIRTY
-```
+Entry: /register page (from landing page CTA or direct URL)
+Preconditions: User is NOT authenticated
 
-### 2. Component Architecture
-
-Organize components in a hierarchy:
-
-- **Atoms** (base components): Button, Input, Label, Icon, Badge, Avatar — implement design tokens directly
-- **Molecules** (composites): FormField (Label + Input + Error), SearchBar (Input + Button + Suggestions), UserCard (Avatar + Text + Badge)
-- **Organisms** (features): NavigationBar, OrderSummary, DataTable with pagination
-- **Templates** (layouts): DashboardLayout (sidebar + header + content), AuthLayout (centered card)
-- **Pages**: Templates filled with data and connected to state
-
-**Data flow**: Top-down via props, events/callbacks up. Server state via data-fetching tools (React Query, SWR). Client state managed locally or in a store.
-
-**Shared vs. page-specific**: Components start page-specific. Promote to shared when a second feature needs the same component.
-
-### 3. Design System Reference
-
-If `docs/design-system.md` exists, reference its tokens (colors, typography, spacing, borders, shadows) and component visual specs (buttons, forms, cards, feedback). Do NOT redefine token values — just reference them by name.
-
-If `docs/design-system.md` does not exist, note which design tokens and component patterns the UX flows require, so the design-system step can address them later. Use placeholder references like `--color-primary`, `--space-4` rather than inventing concrete values.
-
-### 4. Accessibility (WCAG AA Baseline)
-
-**Keyboard navigation:**
-- Tab order follows visual reading order
-- Focus indicators visible and enhanced (not just browser default)
-- Modal dialogs trap focus; Escape closes them
-- Skip links for keyboard users to bypass navigation
-- Arrow keys for composite widgets (tabs, menus, radio groups)
-
-**Screen reader support:**
-- Semantic HTML (`nav`, `main`, `aside`, `header`, `footer`, `button`)
-- All images have descriptive `alt` text (decorative: `alt=""`)
-- Form fields have associated `<label>` or `aria-label`
-- Dynamic content uses `aria-live` regions
-- Tables have `<th>` with proper scope
-
-**Color contrast:**
-- 4.5:1 for normal text, 3:1 for large text (18px+ or 14px+ bold)
-- Interactive elements distinguishable by more than color (add icons, underlines)
-- Error states use icon + color, not color alone
-
-**Focus management:**
-- Modal open: focus first interactive element inside
-- Modal close: return focus to trigger element
-- Item deleted: focus next item (or previous if last)
-
-### 5. Responsive Design
-
-**Breakpoints:**
-```
-Mobile:        < 640px
-Tablet:        640-1024px
-Desktop:       1024-1280px
-Large Desktop: > 1280px
+1. User sees registration form (email, password, confirm password)
+2. User fills in fields
+   -> Inline validation:
+      - Email: valid format check on blur
+      - Password: strength indicator updates on keypress
+      - Confirm password: match check on blur
+3. User clicks "Create Account"
+4. Client-side validation
+   -> FAIL: highlight invalid fields, show specific error messages, focus first error
+   -> PASS: submit to API
+5. Server-side validation
+   -> Email already exists: show error "An account with this email already exists" with link to login
+   -> Rate limited: show error "Too many attempts. Please try again in X minutes."
+   -> PASS: create account, send verification email
+6. Redirect to /verify-email with message "Check your email for a verification link"
+7. User clicks verification link in email
+   -> Token expired: show error with "Resend verification" button
+   -> Token valid: activate account, redirect to /onboarding
 ```
 
-**Layout behavior per breakpoint:**
+### State Diagrams for Interactions
+
+Complex UI interactions benefit from state diagrams that show all possible states and transitions:
+
+```
+Form States:
+  IDLE -> DIRTY (user types)
+  DIRTY -> VALIDATING (user triggers validation)
+  VALIDATING -> VALID (all fields pass)
+  VALIDATING -> INVALID (one or more fields fail)
+  VALID -> SUBMITTING (user clicks submit)
+  SUBMITTING -> SUCCESS (server accepts)
+  SUBMITTING -> ERROR (server rejects)
+  ERROR -> DIRTY (user modifies input)
+```
+
+State diagrams prevent missed states. Common missed states include:
+- Loading/submitting states (user clicks button twice)
+- Partial data states (some fields loaded, others still fetching)
+- Stale data states (data on screen is outdated)
+- Offline/reconnecting states (network drops mid-operation)
+
+### Documenting Error Paths
+
+Every error that can occur must have a specified user experience:
+
+| Error Type | User Sees | User Can Do |
+|------------|-----------|-------------|
+| Validation error | Inline error message next to field | Fix the field and resubmit |
+| Auth error (401) | Redirect to login with return URL | Log in and return to where they were |
+| Permission error (403) | "You don't have permission" message | Contact admin or navigate away |
+| Not found (404) | Custom 404 page with navigation | Go home or search |
+| Server error (500) | "Something went wrong" with retry | Retry the action |
+| Network error | "Connection lost" banner | Wait for reconnection or refresh |
+| Rate limit (429) | "Too many attempts" with countdown | Wait and retry |
+
+## Component Architecture
+
+### Component Hierarchy
+
+Organize components in a hierarchy from primitive to composed:
+
+**Atoms (base components):** The smallest reusable UI elements. Button, Input, Label, Icon, Badge, Avatar. These implement the design system tokens directly.
+
+**Molecules (composite components):** Combinations of atoms that function as a unit. FormField (Label + Input + ErrorMessage), SearchBar (Input + Button + Suggestions), UserCard (Avatar + Text + Badge).
+
+**Organisms (feature components):** Complex UI sections composed of molecules and atoms. NavigationBar, OrderSummary, UserProfile, DataTable with pagination.
+
+**Templates (page layouts):** Structural layouts that arrange organisms on a page. DashboardLayout (sidebar + header + content area), AuthLayout (centered card), SettingsLayout (nav tabs + content).
+
+**Pages:** Specific instances of templates filled with real data and connected to state management.
+
+### Prop and Data Flow
+
+Define how data flows through the component tree:
+
+**Top-down data flow (props):** Parent components pass data to children via props. Children never modify props directly.
+
+**Events/callbacks up:** Children communicate to parents via callback functions passed as props. A child input field calls `onChange` to notify the parent of new values.
+
+**Shared state:** When multiple components at different levels of the tree need the same data, lift state to their nearest common ancestor or use a state management solution (Context, Zustand, Redux).
+
+**Server state vs. client state:** Server state (user data, orders, products) comes from API calls and should be managed with data-fetching tools (React Query, SWR, Apollo). Client state (UI toggles, form inputs, modal visibility) is managed locally.
+
+### Composition Patterns
+
+**Slot/children pattern:** Components accept children to render in designated areas, allowing flexible composition without prop explosion.
+
+**Compound components:** Related components that share state implicitly. A `Tabs` component with `TabList`, `Tab`, and `TabPanel` children that coordinate active state internally.
+
+**Render props/hooks:** When component logic needs to be shared without coupling to specific UI. Extract the logic into a hook; multiple components can use the same hook with different UIs.
+
+### Shared vs. Page-Specific Components
+
+**Shared components** (design system components): reusable across the entire application. Must be generic, well-tested, accessible, and documented. Live in a `components/shared/` or `components/ui/` directory.
+
+**Page-specific components:** Used only within a single page or feature. Can be more specialized and less generic. Live within the feature directory (e.g., `features/orders/components/`).
+
+**Promotion rule:** A component starts as page-specific. When a second feature needs the same component, promote it to shared. Don't pre-optimize by making everything shared from the start.
+
+## Design System Reference
+
+Design tokens (colors, typography, spacing, borders, shadows), base component visual specs, dark mode patterns, and the pattern library are defined in `docs/design-system.md`. The UX specification consumes these tokens — it does not redefine them.
+
+When specifying component behavior in user flows and interaction states, reference design system tokens by name (e.g., `--color-error`, `--space-4`) rather than hard-coding values. If `docs/design-system.md` does not exist yet, note which tokens are needed and defer visual decisions to the design-system step.
+
+## Accessibility
+
+### WCAG Compliance Levels
+
+- **Level A (minimum):** All images have alt text. All form fields have labels. Content is navigable by keyboard. No content causes seizures.
+- **Level AA (standard target):** Color contrast ratio of 4.5:1 for normal text, 3:1 for large text. Text can be resized to 200% without loss of functionality. Focus indicators are visible.
+- **Level AAA (enhanced):** Color contrast ratio of 7:1. Sign language interpretation for audio. Extended audio descriptions.
+
+Target Level AA as the baseline. Specific critical interactions (login, payment, emergency) should meet Level AAA.
+
+### Keyboard Navigation
+
+Every interactive element must be reachable and operable by keyboard:
+
+- **Tab order** follows the visual reading order (left to right, top to bottom)
+- **Focus indicators** are visible and distinct (not just browser default — enhance it)
+- **Modal dialogs** trap focus within the modal when open
+- **Escape** closes modals, dropdowns, and popovers
+- **Enter/Space** activates buttons and links
+- **Arrow keys** navigate within composite widgets (tabs, menus, radio groups)
+- **Skip links** allow keyboard users to skip repetitive navigation
+
+### Screen Reader Support
+
+- Use semantic HTML elements (`nav`, `main`, `aside`, `header`, `footer`, `article`, `section`, `button`)
+- All images have descriptive `alt` text (decorative images use `alt=""`)
+- Form fields have associated `<label>` elements (or `aria-label` when a visible label isn't feasible)
+- Dynamic content updates use `aria-live` regions to announce changes
+- Custom interactive components use appropriate ARIA roles and properties
+- Tables have headers (`<th>`) with proper scope
+
+### Color Contrast
+
+- Text on backgrounds must meet 4.5:1 contrast ratio (3:1 for large text, 18px+ or 14px+ bold)
+- Interactive elements must be distinguishable by more than color alone (add icons, underlines, or patterns)
+- Error states must use more than red color — add an icon, bold text, or border
+- Verify contrast with tools like axe, Lighthouse, or the WebAIM contrast checker
+
+### Focus Management
+
+- When a modal opens, move focus to the first interactive element inside it
+- When a modal closes, return focus to the element that triggered it
+- When an item is deleted from a list, move focus to the next item (or the previous if it was the last)
+- When navigating to a new page section, move focus to the heading of that section
+- Never remove focus outlines unless you replace them with a better indicator
+
+## Responsive Design
+
+### Breakpoint Strategy
+
+Define breakpoints that match actual device usage patterns:
+
+```
+Mobile:        < 640px    (phones in portrait)
+Tablet:        640-1024px (tablets, phones in landscape)
+Desktop:       1024-1280px (laptops)
+Large Desktop: > 1280px   (external monitors)
+```
+
+**Mobile-first vs. desktop-first:**
+
+- **Mobile-first (recommended):** Write base styles for mobile, then add complexity with `min-width` media queries. Forces prioritization of essential content. Produces less CSS.
+- **Desktop-first:** Write base styles for desktop, then simplify with `max-width` media queries. Appropriate when the primary audience is desktop users and mobile is secondary.
+
+### Layout Behavior Per Breakpoint
+
+Document how each major layout component adapts:
 
 | Component | Mobile | Tablet | Desktop |
 |-----------|--------|--------|---------|
 | Navigation | Hamburger menu | Collapsed sidebar | Full sidebar |
 | Content grid | 1 column | 2 columns | 3-4 columns |
 | Data tables | Card view (stacked) | Scrollable table | Full table |
-| Modals | Full screen | Centered 80% | Centered fixed width |
-| Forms | Single column | Single column | Two-column for long forms |
+| Modals | Full screen | Centered, 80% width | Centered, fixed width |
+| Form layout | Single column | Single column | Two-column for long forms |
 
-**Touch targets**: Minimum 44x44px on mobile. Sufficient spacing between interactive elements.
+### Touch Targets
 
-**Mobile-first recommended**: Base styles for mobile, add complexity with `min-width` media queries.
+Mobile touch targets must be at least 44x44px (Apple) or 48x48px (Material). Ensure:
+- Buttons and links are large enough to tap accurately
+- Spacing between interactive elements prevents accidental taps
+- Form inputs are tall enough for comfortable finger input
 
-### 6. Pattern Library
+### Responsive Images
 
-Document recurring UI patterns:
-- Search with autocomplete (debounced, keyboard nav, "no results" state)
-- Confirmation dialogs (before destructive actions, "Cancel" as primary)
-- Inline editing (click to edit, Enter to save, Escape to cancel)
-- Bulk actions (select all, individual select, toolbar on selection)
-- Wizard/stepper (progress indicator, back/next, save between steps)
+- Use `srcset` and `sizes` attributes for responsive image loading
+- Serve appropriate image formats (WebP with JPEG fallback)
+- Lazy load images below the fold
+- Define aspect ratios to prevent layout shift during loading
+
+## Common Pitfalls
+
+**Designing for the happy path only.** A spec that shows what the screen looks like with data but not without data, not during loading, not after an error, and not when the user's name is 47 characters long. Fix: document every state — loading, empty, error, edge-case content lengths, and permission-limited views.
+
+**Accessibility as afterthought.** Building the entire UI first, then trying to add accessibility. Results in ARIA hacks layered on top of inaccessible markup. Fix: use semantic HTML from the start. Test keyboard navigation during development, not after.
+
+**Missing loading states.** The page shows nothing (white screen) while data loads, then content pops in. Users think the app is broken. Fix: use skeleton loaders that match the shape of the content being loaded.
+
+**Breaking text on resize.** Content that looks fine at the design width but overflows, truncates, or overlaps at other widths. Fix: test with variable-length content and multiple viewport widths. Use CSS that handles overflow gracefully (truncation with ellipsis, wrapping, or scrolling).
+
+**Modal abuse.** Using modals for content that should be a page (long forms, complex workflows, multi-step processes). Modals are for brief, focused interactions. Fix: if the modal content would benefit from a back button or URL, it should be a page.
 
 ---
-
-## Quality Criteria
-
-- Every PRD user journey has a corresponding flow with all states documented
-- Component hierarchy covers all UI states (loading, error, empty, populated)
-- Design tokens referenced from `docs/design-system.md` — not redefined in this document
-- Accessibility requirements meet WCAG AA (keyboard nav, screen readers, contrast)
-- Responsive breakpoints defined with layout behavior specified per breakpoint
-- Error states documented for every user action that can fail
-- No missed states: loading, submitting, partial data, stale data, offline
-
----
-
-## Process
-
-1. **Read all inputs** — Read `docs/plan.md`, `docs/user-stories.md`, `docs/system-architecture.md`, and `docs/coding-standards.md`. Read `docs/api-contracts.md` for data shapes if it exists. Read `docs/design-system.md` if it exists — reference its tokens throughout.
-2. **Use AskUserQuestionTool** for these decisions:
-   - **UX depth**: Full specification with detailed wireframe descriptions, or key flows with core component list?
-   - **Accessibility level**: WCAG AA (standard) or AAA (enhanced) for critical flows?
-3. **Use subagents** to research UX patterns for the project's specific frontend framework
-4. **Map stories to flows** — create user flow documentation for every core journey
-5. **Define component hierarchy** — atoms through pages, with state specifications for every component
-6. **Document accessibility requirements** — keyboard, screen reader, contrast, focus management
-7. **Define responsive behavior** — layout changes per breakpoint, touch targets
-8. **Cross-validate** — verify every user story has a flow, every flow has error states, every component has all states
-9. If using Beads: create a task (`bd create "docs: UX specification" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 
 ## After This Step
 
-When this step is complete, tell the user:
-
----
-**Specification phase complete** — `docs/ux-spec.md` created with user flows, component architecture, accessibility, and responsive behavior.
-
-**Next:**
-- Run `/scaffold:review-ux` — Review the UX spec for journey coverage, accessibility, and design system consistency.
-- Or skip review and proceed to remaining spec steps (`/scaffold:database-schema`, `/scaffold:api-contracts`) if not yet done.
-- Or proceed to quality gates (`/scaffold:review-testing`) if all applicable spec steps are complete.
-
-**Pipeline reference:** `/scaffold:prompt-pipeline`
-
----
+Continue with: `/scaffold:review-ux`

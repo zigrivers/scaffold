@@ -19,15 +19,16 @@ throughout the entire pipeline.
 - docs/vision.md — Product vision document
 
 ## Quality Criteria
-- Problem statement is specific and testable (not vague aspirations)
-- Vision statement describes positive change in the world, not a product feature
-- Vision statement is concise enough to remember after hearing once
-- Target audience defined by behaviors and motivations, not demographics
-- Competitive landscape is honest about competitor strengths, not just weaknesses
-- Guiding principles create real tradeoffs (someone could reasonably disagree)
-- Anti-vision names specific traps, not vague disclaimers
-- Business model addresses sustainability without being a full business plan
-- Every section is specific enough to guide PRD writing without strategic ambiguity
+- (mvp) Problem statement is specific and testable (not vague aspirations)
+- (mvp) Vision statement describes positive change in the world, not a product feature
+- (mvp) Vision statement is a single sentence of 25 words or fewer
+- (mvp) Target audience defined by behaviors and motivations, not demographics
+- (deep) For each competitor, at least one strength is documented alongside weaknesses
+- (mvp) Each guiding principle is framed as 'We choose X over Y' where Y is a legitimate alternative
+- (deep) Anti-vision contains >= 3 named traps, each referencing a concrete product direction or feature class
+- (deep) Business model addresses sustainability without being a full business plan
+- (mvp) Every section names at least one concrete decision or constraint
+- (mvp) Vision does not contradict docs/plan.md (if PRD exists in update mode)
 
 ## Methodology Scaling
 - **deep**: Comprehensive vision document. Full competitive research, detailed

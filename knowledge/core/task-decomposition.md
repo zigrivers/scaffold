@@ -16,7 +16,14 @@ User stories bridge PRD features and implementation tasks. Each story decomposes
 
 ### Task Sizing
 
-Each task should be completable in a single AI agent session (30-90 minutes of agent time). A well-sized task has a clear title (usable as commit message), touches 1-5 files, produces a testable result, and has no ambiguity about "done."
+Each task should be completable in a single AI agent session (30-90 minutes of agent time). A well-sized task has a clear title (usable as commit message), touches 1-3 application files (hard limit; justify exceptions), produces ~150 lines of net-new application code (excluding tests and generated files), and has no ambiguity about "done."
+
+Five rules govern agent-friendly task sizing:
+1. **Three-File Rule** — Max 3 application files modified (test files excluded)
+2. **150-Line Budget** — Max ~150 lines of net-new application code per task
+3. **Single-Concern Rule** — One task does one thing (no "and" connecting unrelated work)
+4. **Decision-Free Execution** — All design decisions resolved in the task description; agents implement, they don't architect
+5. **Test Co-location** — Tests live in the same task as the code they test; no deferred testing
 
 Split large tasks by layer (API, UI, DB, tests), by feature slice (happy path, validation, edge cases), or by entity. Combine tiny tasks that touch the same file and have no independent value.
 
@@ -157,8 +164,11 @@ Each task should be completable in a single AI agent session (typically 30-90 mi
 
 **A well-sized task:**
 - Has a clear, specific title that could be a commit message
-- Touches 1-5 files (not counting test files)
-- Produces a testable, verifiable result
+- Touches 1-3 application files (hard limit; test files excluded from count)
+- Produces ~150 lines of net-new application code (excluding tests and generated files)
+- Does exactly one thing (passes the single-concern test: describable without "and")
+- Requires no design decisions from the agent (all choices resolved in the description)
+- Includes co-located tests (the task isn't done until tests pass)
 - Has no ambiguity about what "done" means
 - Can be code-reviewed independently
 
@@ -375,6 +385,111 @@ Does NOT assume:
 - Users table exists (this task creates it)
 - Any auth endpoints exist (this is the first)
 ```
+
+### Agent Executability Heuristics
+
+Five formalized rules for ensuring tasks are the right size for AI agent execution. These are hard rules with an escape hatch — tasks exceeding limits must be split unless the author provides explicit justification via `<!-- agent-size-exception: reason -->`.
+
+#### Rule 1: Three-File Rule
+
+A task modifies at most 3 application files (test files don't count toward this limit). If it would touch more, split by layer or concern.
+
+**Why 3:** Reading 3 files plus their context (imports, types, interfaces) consumes roughly 40-60% of a standard agent context window, leaving room for the task description, test code, and reasoning. At 5+ files, context pressure causes agents to lose track of cross-file consistency.
+
+**Splitting when exceeded:**
+- 4 files across 2 layers → split into one task per layer
+- 5 files in the same layer → split by entity or concern within the layer
+- Config files touched alongside application files → separate config task if non-trivial
+
+#### Rule 2: 150-Line Budget
+
+A task produces at most ~150 lines of net-new application code (excluding tests, generated files, and config). This keeps the entire change reviewable in one screen and within agent context budgets.
+
+**Why 150:** Agent output quality degrades measurably after ~200 lines of new code in a single session. At 150 lines, the agent can hold the entire change in context while writing tests and verifying correctness.
+
+**Estimating line count from task descriptions:**
+- A CRUD endpoint with validation: ~80-120 lines
+- A UI component with state management: ~100-150 lines
+- A database migration with seed data: ~50-80 lines
+- A full feature slice (API + UI + tests): ~300+ lines — MUST split
+
+#### Rule 3: Single-Concern Rule
+
+A task does exactly one thing. The test: can you describe what this task does in one sentence without "and"?
+
+**Passes the test:**
+- "Implement the user registration endpoint with input validation" (validation is part of the endpoint)
+- "Create the order model with database migration" (migration is part of model creation)
+
+**Fails the test:**
+- "Add the API endpoint AND update the dashboard" — two tasks
+- "Implement authentication AND set up the database" — two tasks
+- "Build the payment form AND integrate with Stripe AND add webhook handling" — three tasks
+
+**Splitting signals:**
+- Task description contains "and" connecting unrelated work
+- Task spans multiple architectural layers (API + frontend + database in one task)
+- Task affects multiple bounded contexts or feature domains
+- Task has acceptance criteria for two distinct user-facing behaviors
+
+#### Rule 4: Decision-Free Execution
+
+The task description must resolve all design decisions upfront. The agent implements, it doesn't architect. No task should require the agent to:
+
+- Choose between patterns (repository vs active record, REST vs GraphQL)
+- Select libraries or tools
+- Decide module structure or file organization
+- Determine API contract shapes (these come from upstream specs)
+
+**Red flags in task descriptions:**
+- "Choose the best approach for..."
+- "Determine whether to use X or Y"
+- "Decide how to structure..."
+- "Evaluate options for..."
+- "Select the most appropriate..."
+- "Figure out the best way to..."
+
+If a task contains any of these, the decision belongs in the task description — resolved by the plan author — not left to agent judgment. Local implementation choices (variable names, loop style, internal helper structure) are fine.
+
+#### Rule 5: Test Co-location
+
+Tests live in the same task as the code they test. The task follows TDD: write the failing test, then the implementation, then verify. The task isn't done until tests pass.
+
+**Anti-pattern:** "Tasks 1-8: implement features. Task 9: write tests for everything." This produces untestable code, violates TDD, and creates a single massive testing task that exceeds all size limits.
+
+**What co-location looks like:**
+```
+Task: Implement user registration endpoint
+  1. Write failing integration test (POST /register with valid data → 201)
+  2. Implement endpoint to make test pass
+  3. Write failing validation test (invalid email → 400)
+  4. Add validation to make test pass
+  5. Commit
+```
+
+#### Escape Hatch
+
+If a task genuinely can't be split further without creating tasks that have no independent value, add an explicit annotation in the task description: `<!-- agent-size-exception: [reason] -->`. The review pass flags unjustified exceptions but accepts reasoned ones.
+
+**Valid exception reasons:**
+- "Migration task touches 4 files but they're all trivial one-line renames"
+- "Config file changes across 4 files are mechanical and identical in structure"
+- "Test setup file is large but generated from a template"
+
+**Invalid exception reasons:**
+- "It's easier to do it all at once" (convenience is not a justification)
+- "The files are related" (related files can still be separate tasks)
+- "It would create too many tasks" (more small tasks > fewer large tasks)
+
+#### Concrete "Too Big" Examples
+
+| Task (Too Big) | Violations | Split Into |
+|---------------|-----------|------------|
+| "Implement user authentication" (8+ files, registration + login + reset + middleware) | Three-File, Single-Concern | 4 tasks: registration endpoint, login endpoint, password reset flow, auth middleware |
+| "Build the settings page with all preferences" (6 files, multiple forms + APIs) | Three-File, 150-Line, Single-Concern | Per-group: profile settings, notification settings, security settings |
+| "Set up database with all migrations and seed data" (10+ files, every entity) | Three-File, 150-Line | Per-entity: users table, orders table, products table, then seed data task |
+| "Create API client with retry, caching, and auth" (4 concerns in one module) | Single-Concern, Decision-Free | 3 tasks: base client with auth, retry middleware, cache layer |
+| "Implement the dashboard with charts, filters, and real-time updates" (5+ files, 300+ lines) | All five rules | 4 tasks: dashboard layout + routing, chart components, filter system, WebSocket integration |
 
 ### Common Pitfalls
 

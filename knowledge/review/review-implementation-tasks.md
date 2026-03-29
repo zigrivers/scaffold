@@ -6,7 +6,7 @@ topics: [review, tasks, planning, decomposition, agents]
 
 # Review: Implementation Tasks
 
-The implementation tasks document translates the architecture into discrete, actionable work items that AI agents can execute. Each task must be self-contained enough for a single agent session, correctly ordered by dependency, and clear enough to implement without asking questions. This review uses 7 passes targeting the specific ways implementation tasks fail.
+The implementation tasks document translates the architecture into discrete, actionable work items that AI agents can execute. Each task must be self-contained enough for a single agent session, correctly ordered by dependency, and clear enough to implement without asking questions. This review uses 8 passes targeting the specific ways implementation tasks fail.
 
 Follows the review process defined in `review-methodology.md`.
 
@@ -19,6 +19,7 @@ Follows the review process defined in `review-methodology.md`.
 - **Pass 5 — Critical Path Accuracy**: The identified critical path is actually the longest dependency chain; near-critical paths identified.
 - **Pass 6 — Parallelization Validity**: Tasks marked as parallel are truly independent; no shared state, files, or undeclared dependencies.
 - **Pass 7 — Agent Context**: Each task specifies which documents/sections the implementing agent should read; context is sufficient and minimal.
+- **Pass 8 — Agent Executability**: Every task complies with the 5 agent sizing rules (three-file, 150-line, single-concern, decision-free, test co-location); exceptions are justified.
 
 ## Deep Guidance
 
@@ -212,6 +213,50 @@ AI agents have limited context windows. If a task does not specify what to read,
 - P0: "Task 'Implement order creation endpoint' lists no context documents. The agent needs the API contract (endpoint spec), database schema (orders table), domain model (Order aggregate invariants), and architecture section (Order Service design)."
 - P1: "Task 'Build user dashboard' references the architecture document but not the UX spec. The agent will build the component structure correctly but not the visual design."
 - P2: "Task context references 'docs/system-architecture.md' without specifying which section. The agent will load the entire 2000-line document instead of the relevant 100-line section."
+
+---
+
+## Pass 8: Agent Executability
+
+### What to Check
+
+Every task complies with the five agent executability rules. Tasks exceeding limits without justification must be split.
+
+- **Three-File Rule**: Count application files each task modifies (test files excluded). Flag any task touching 4+ files. Check for `<!-- agent-size-exception -->` annotations on flagged tasks.
+- **150-Line Budget**: Estimate net-new lines per task based on the task description scope. Flag tasks likely to produce 200+ lines. Signals: "implement X with Y and Z", multiple acceptance criteria spanning different modules, multi-layer work.
+- **Single-Concern Rule**: Check each task description for "and" connecting unrelated work. Flag tasks spanning multiple architectural layers or feature domains.
+- **Decision-Free Execution**: Scan for unresolved design decisions. Red flags: "choose", "determine", "decide", "evaluate options", "select the best approach", "pick the right", "figure out". Every design choice must be resolved in the task description.
+- **Test Co-location**: Verify every task that produces application code also includes test requirements. Flag any "write tests for tasks X-Y" aggregation pattern. Flag tasks with no test mention.
+
+### Why This Matters
+
+Large tasks are the #1 cause of AI agent failure during implementation. When a task requires reading 5+ files, holding multiple abstractions in context, and writing 300+ lines — agents lose coherence, make inconsistent changes, or run out of context window. Tasks with unresolved design decisions cause agents to make architectural choices they shouldn't, producing inconsistent implementations across tasks. Deferred testing produces untestable code and violates TDD.
+
+### How to Check
+
+1. For each task, count the application files it modifies (exclude test files). Flag 4+ files.
+2. Estimate net-new application code lines from the task scope. Flag 200+ estimated lines.
+3. Read the task description. Does it contain "and" connecting distinct concerns? Flag it.
+4. Scan for decision language: "choose", "determine", "decide", "evaluate", "select", "figure out". Flag any unresolved decisions.
+5. Check test requirements. Does every code-producing task specify what to test? Flag tasks with no test mention or deferred testing.
+6. For flagged tasks, check for `<!-- agent-size-exception: reason -->`. Accept justified exceptions; flag unjustified ones.
+7. For each P0/P1 finding, provide a specific split recommendation: name the sub-tasks, list files each owns, specify dependencies between them.
+
+### Severity
+
+- P0: Task exceeds 6+ files or 300+ estimated lines — must split immediately, no exceptions
+- P1: Task violates three-file rule without justification — must split or add exception annotation
+- P1: Task violates 150-line budget without justification — must split or justify
+- P1: Task contains unresolved design decisions — must resolve in task description
+- P2: Task has "and" connecting concerns but stays within limits — recommend split
+- P2: Test requirements vague ("add appropriate tests") or deferred — strengthen with specifics
+- P3: Task near limits (3 files, ~150 lines) — note as borderline, no action required
+
+### What a Finding Looks Like
+
+- P1: "Task BD-15 'Implement order management API' modifies 5 files (routes, controller, service, validator, model). Violates three-file rule. Split into: BD-15a 'Create order model and migration' (1 file + migration), BD-15b 'Implement order service with validation' (2 files), BD-15c 'Add order routes and controller' (2 files, depends on BD-15a, BD-15b)."
+- P1: "Task BD-22 'Build settings page' says 'determine whether to use tabs or accordion for organizing preferences.' This is an unresolved design decision. The task description must specify the layout pattern."
+- P2: "Task BD-08 'Set up error handling AND configure logging' connects two concerns with 'and'. Recommend splitting into error handling task and logging task."
 
 ---
 

@@ -12,7 +12,8 @@ knowledge-base: [review-methodology, review-implementation-tasks, task-decomposi
 ## Purpose
 Review implementation tasks targeting task-specific failure modes: architecture
 coverage gaps, missing dependencies, tasks too large or too vague for agents,
-critical path inaccuracy, and invalid parallelization assumptions. At depth 4+,
+agent executability violations, critical path inaccuracy, and invalid
+parallelization assumptions. At depth 4+,
 dispatch to independent AI models (Codex/Gemini CLIs) for multi-model validation
 and produce a structured coverage matrix and review summary.
 
@@ -41,6 +42,8 @@ and produce a structured coverage matrix and review summary.
 - (deep) Parallelization assumptions are valid
 - (deep) Every acceptance criterion maps to at least one task (100% AC coverage)
 - (deep) Every task has verb-first description, >= 1 input file reference, >= 1 acceptance criterion, and defined output artifact
+- (mvp) Every task complies with agent executability rules (3-file, 150-line, single-concern, decision-free, test co-location)
+- (mvp) Tasks exceeding limits have explicit `<!-- agent-size-exception -->` justification
 - (depth 4+) Independent model reviews completed and reconciled
 
 ## Methodology Scaling

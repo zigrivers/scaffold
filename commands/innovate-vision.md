@@ -23,10 +23,12 @@ not here.
 
 ## Quality Criteria
 - Innovations are strategic-level, not feature-level
-- Each suggestion has a clear strategic rationale
-- Each suggestion has an impact assessment (high/medium/low)
-- Each suggestion has an implementation cost estimate (trivial/moderate/significant)
-- Approved innovations are documented to the same standard as existing sections
+- (mvp) Each innovation categorized: market opportunity, positioning, AI-native, ecosystem, or contrarian
+- (mvp) Each innovation includes: what to change, why, impact (high/medium/low), cost estimate
+- (mvp) Each suggestion has an implementation cost estimate (trivial/moderate/significant)
+- (mvp) Recommended disposition stated for each: must-have, backlog, or reject with rationale
+- (deep) Impact assessments compared to existing document content
+- (deep) Each approved innovation is integrated with the same subsection headings and detail level as existing vision sections
 - Vision scope is respected — no uncontrolled strategic drift
 - User approval is obtained before modifying the vision document
 

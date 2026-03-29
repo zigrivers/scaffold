@@ -85,11 +85,12 @@ Supporting:
   - Depth 5: All 13 categories (Security, API, Database, Accessibility, Performance)
 
 ## Mode Detection
-Update mode if tests/evals/ directory exists. In update mode: regenerate
-consistency, structure, cross-doc, and conditional category evals. Preserve
-adherence, security, and error-handling eval exclusions. Regenerate coverage
-evals only if plan.md or user-stories.md changed. Add/remove conditional
-categories based on whether their source doc exists.
+Update mode if tests/evals/ directory or docs/eval-standards.md exists. In
+update mode: regenerate consistency, structure, cross-doc, and conditional
+category evals. Preserve adherence, security, and error-handling eval
+exclusions. Regenerate coverage evals only if plan.md or user-stories.md
+changed. Add/remove conditional categories based on whether their source doc
+exists.
 
 ## Update Mode Specifics
 - **Detect prior artifact**: tests/evals/ directory exists with eval test files

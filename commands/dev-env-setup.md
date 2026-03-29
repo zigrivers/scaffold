@@ -1,259 +1,292 @@
 ---
-description: "Set up local dev environment with live reload"
-long-description: "Creates docs/dev-setup.md and configures Makefile commands for linting, testing, building, and running the project with hot-reload support."
+description: "Configure local dev environment with live reload and simple commands"
+long-description: "Set up a complete local development environment with a one-command dev experience,"
 ---
 
-Set up a complete local development environment for this project based on docs/tech-stack.md, docs/project-structure.md, and docs/tdd-standards.md (if it exists). The goal is a one-command dev experience with live reloading so I can see changes in real-time as work progresses.
+## Purpose
+Set up a complete local development environment with a one-command dev experience,
+live/hot reloading, local database configuration, environment variable management,
+and beginner-friendly documentation. Populates the CLAUDE.md Key Commands table
+which becomes the single source of truth for project-specific commands referenced
+by the entire workflow.
 
-I'm not a professional developer, so the setup should be beginner-friendly with clear instructions for common tasks.
+## Inputs
+- docs/tech-stack.md (required) — determines dev server, database, and tooling
+- docs/project-structure.md (required) — where config files live
+- docs/coding-standards.md (optional) — linter/formatter already configured
+- docs/tdd-standards.md (optional) — test runner, flags, coverage thresholds, quality gates
+
+## Expected Outputs
+- docs/dev-setup.md — getting started guide, daily development, common tasks,
+  troubleshooting, and AI agent instructions
+- Makefile or package.json scripts (dev, test, test:watch, lint, db-setup, db-reset)
+- .env.example with all required variables and sensible local defaults
+- CLAUDE.md updated with Key Commands table and Dev Environment section
+
+## Quality Criteria
+- (mvp) Dev server starts with a single command and supports live/hot reloading
+- (deep) Local database setup is scripted (if applicable)
+- (deep) .env.example documents all variables with comments
+- Key Commands table in CLAUDE.md matches actual Makefile/package.json commands
+- (mvp) Lint and test commands exist and are runnable
+- Verification checklist passes (install, dev server, browser, live reload, tests, db)
+- (mvp) Setup process works for first-time clone (max 5 steps)
+- (mvp) Makefile/package.json includes at minimum: dev, test, lint targets
+
+## Methodology Scaling
+- **deep**: Full environment with database setup, seed data, Docker Compose (if
+  needed), watch mode tests, multi-platform instructions (Mac, Linux, WSL),
+  troubleshooting section. Complete Key Commands table.
+- **mvp**: Dev server with live reload, basic lint and test commands, .env.example.
+  Minimal docs. Key Commands table with essentials only.
+- **custom:depth(1-5)**: Depth 1-2: dev server + test command. Depth 3: add
+  database and env vars. Depth 4: add troubleshooting. Depth 5: full docs with
+  multi-platform support.
 
 ## Mode Detection
+Update mode if docs/dev-setup.md exists. In update mode: preserve port assignments,
+custom scripts, .env variable names, database configuration, and Makefile
+customizations. Update CLAUDE.md Key Commands section in-place.
 
-Before starting, check if `docs/dev-setup.md` already exists:
+## Update Mode Specifics
+- **Detect prior artifact**: docs/dev-setup.md exists
+- **Preserve**: port assignments, .env variable names and defaults, database
+  connection strings, custom Makefile targets, troubleshooting entries
+- **Triggers for update**: tech stack changed (new dev server or database),
+  project structure changed (new config file locations), new dependencies
+  require setup steps, tdd-standards.md changed test commands
+- **Conflict resolution**: if a new dependency conflicts with an existing port
+  or env var, propose a non-breaking alternative; always update CLAUDE.md Key
+  Commands table to match actual Makefile/package.json after changes
 
-**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+---
 
-**If the file exists → UPDATE MODE**:
-1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:dev-setup v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
-2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
-   - **ADD** — Required by current prompt but missing from existing doc
-   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
-   - **PRESERVE** — Project-specific decisions, rationale, and customizations
-3. **Cross-doc consistency**: Read related docs (`docs/tech-stack.md`, `docs/project-structure.md`, `docs/git-workflow.md`) and verify updates won't contradict them. Skip any that don't exist yet.
-4. **Preview changes**: Present the user a summary:
-   | Action | Section | Detail |
-   |--------|---------|--------|
-   | ADD | ... | ... |
-   | RESTRUCTURE | ... | ... |
-   | PRESERVE | ... | ... |
-   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
-   Wait for user approval before proceeding.
-5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
-6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:dev-setup v<ver> <date> -->`
-7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+## Domain Knowledge
 
-**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+### dev-environment
 
-### Update Mode Specifics
-- **Primary output**: `docs/dev-setup.md`
-- **Secondary output**: Makefile/scripts, `.env.example`, CLAUDE.md "Key Commands" section
-- **Preserve**: Port assignments, custom scripts, `.env` variable names and values, database configuration, Makefile customizations
-- **Related docs**: `docs/tech-stack.md`, `docs/project-structure.md`, `docs/git-workflow.md`
-- **Special rules**: Never change port assignments without checking for references in other config files. Preserve all `.env.example` variables. Update CLAUDE.md Key Commands section in-place.
+*Development environment setup patterns including Makefile conventions, live reload, and toolchain configuration*
 
-## Objectives
+# Dev Environment
 
-1. Configure a local dev server with live/hot reloading
-2. Set up the local database (if applicable)
-3. Configure environment variables for local development
-4. Create simple commands for common tasks
-5. Document everything clearly for a non-engineer
-6. Verify the setup works end-to-end
+A development environment should be reproducible, fast, and invisible. "It works on my machine" is a build system failure, not a developer excuse. This knowledge covers task runners, environment management, git hooks, CI integration, and toolchain patterns that make environments reliable across machines and team members.
 
-## What to Configure
+## Summary
 
-### 1. Dev Server with Live Reloading
+### Core Components
 
-Set up the appropriate dev server for our tech stack with:
-- **Hot reloading / live reload**: Changes to code automatically refresh the browser or restart the server
-- **Fast startup**: Dev server should start in seconds, not minutes
-- **Error overlay**: Errors should display clearly in the browser (for frontend) or terminal (for backend)
-- **Source maps**: For debugging in browser dev tools (if applicable)
+Every project needs four environment pillars:
 
-Common setups by stack (configure what matches our tech-stack.md):
-- **Frontend (React/Vue/Svelte)**: Vite, Next.js dev mode, or Create React App
-- **Backend (Python)**: Uvicorn with `--reload`, Flask debug mode, or Django runserver
-- **Backend (Node)**: Nodemon, ts-node-dev, or framework-specific (Next.js, Fastify)
-- **Full-stack**: Concurrent processes for frontend + backend with a single command
+1. **Build Tool / Task Runner** — A single entry point for all project tasks. Makefile is the universal choice (works everywhere, zero dependencies). Language-specific alternatives: `package.json` scripts, `pyproject.toml`, `go` tool.
+2. **Environment Management** — `.env` files for local config, `.env.example` committed as documentation, validation at startup, sensible development defaults.
+3. **Git Hooks** — Pre-commit (fast checks: lint, format, type check). Pre-push (slower checks: full test suite). Installed by `make hooks`.
+4. **CI/CD Integration** — CI runs the same commands as local development. `make check` in CI, `make check` locally. No divergent CI-specific scripts.
 
-### 2. Database Setup (if applicable)
+### Makefile as Universal Task Runner
 
-Based on tech-stack.md, set up local database:
-- **SQLite**: No setup needed, but configure the dev database path
-- **PostgreSQL/MySQL**: Docker Compose setup OR instructions for local install
-- **In-memory option**: For fast testing without persistence
+Makefile provides: discoverable interface (`make help`), dependency management between targets, idempotent execution, parallel execution (`make -j4`), and universal availability on any Unix system with zero installation. Language-specific task runners complement but do not replace it — `make test` calls `npm test` or `pytest`, keeping the stable interface independent of underlying tools. If the underlying tool changes (e.g., Jest to Vitest), only the Makefile target body changes — not CI or documentation.
 
-Include:
-- Database creation/initialization script
-- Seed data script (sample data to work with during development)
-- Database reset command (drop and recreate)
-- Migration commands clearly documented
+### The Setup Contract
 
-### 3. Environment Variables
-
-Create environment configuration:
-- `.env.example` — Template with all required variables (committed to git)
-- `.env` — Actual local config (gitignored)
-- Clear comments explaining each variable
-- Sensible defaults for local development
-
-Document which variables are required vs. optional for local dev.
-
-### 4. Simple Commands (scripts or Makefile)
-
-Create easy-to-remember commands for common tasks. Use whatever fits our stack.
-
-**If `docs/tdd-standards.md` exists**: Read it to determine the test runner, test command flags (watch mode, coverage thresholds), and quality gate definitions. The test commands below should match what tdd-standards specifies.
-
-**Option A: package.json scripts (Node projects)**
-```json
-{
-  "scripts": {
-    "dev": "starts everything needed for development",
-    "test": "runs all tests",
-    "test:watch": "runs tests in watch mode",
-    "db:setup": "creates and seeds database",
-    "db:reset": "drops and recreates database",
-    "lint": "checks code style",
-    "build": "creates production build"
-  }
-}
+New developer from clone to green tests in three commands or fewer:
+```bash
+git clone <repo>
+make setup    # Install dependencies, tools, hooks
+make check    # Verify everything works
 ```
 
-**Option B: Makefile (Python or polyglot projects)**
+### Branching Strategy Summary
+
+**Trunk-Based**: All commits to main, feature flags for incomplete work. For small teams with strong tests and continuous deployment. **GitHub Flow**: Feature branches, PR review, squash merge. Best for most teams — simple and structured. **GitFlow**: Separate develop/release/hotfix branches. Only for scheduled releases or multi-version support. Most web apps do not need it.
+
+## Deep Guidance
+
+### Makefile Patterns
+
+#### The Help Target
+
+Every Makefile starts with self-documentation:
+
 ```makefile
-dev:        # Start dev server with live reload
-test:       # Run all tests
-db-setup:   # Create and seed database
-db-reset:   # Drop and recreate database
-lint:       # Check code style
+.DEFAULT_GOAL := help
+
+.PHONY: help
+help: ## Show available commands
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
+		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 ```
 
-**Option C: Scripts directory**
-```
-scripts/
-├── dev.sh          # Start dev server
-├── test.sh         # Run tests
-├── db-setup.sh     # Database setup
-└── db-reset.sh     # Database reset
-```
+Every public target gets a `## Description` comment. Internal targets use `_` prefix and no description.
 
-Whichever approach, the commands should be:
-- Memorable (not cryptic flags)
-- Documented (help text or comments)
-- Idempotent where possible (safe to run twice)
+#### Standard Target Set
 
-### 5. Dependency Installation
+```makefile
+.PHONY: test lint format check setup clean hooks
 
-Create a clear setup process for first-time installation:
-```
-1. Clone the repo
-2. Copy .env.example to .env
-3. Run [single install command]
-4. Run [single setup command]
-5. Run [dev command]
-6. Open http://localhost:[port]
-```
+test: ## Run test suite
+	npm test
 
-This should work on Mac, Linux, and Windows (WSL) if possible.
+lint: ## Run linters
+	npm run lint
 
-### 6. Documentation
+format: ## Format code
+	npm run format
 
-Create `docs/dev-setup.md` covering:
+check: lint test ## Run all quality gates
 
-**Getting Started**
-- Prerequisites (Node version, Python version, Docker, etc.)
-- Step-by-step first-time setup
-- How to verify setup worked
+setup: ## Install dependencies and hooks
+	npm install
+	$(MAKE) hooks
 
-**Daily Development**
-- How to start the dev server
-- How to run tests
-- How to view the app in browser
-- How to stop everything
+clean: ## Remove build artifacts
+	rm -rf dist/ node_modules/.cache/
 
-**Common Tasks**
-- Adding a new dependency
-- Creating a database migration
-- Resetting to a clean state
-- Viewing logs
-
-**Troubleshooting**
-- Port already in use
-- Database connection failed
-- Dependencies out of sync
-- "It works on my machine" issues
-
-**For AI Agents**
-- Commands to start dev server before Playwright testing
-- How to verify the server is running
-- How to check logs for errors
-
-### 7. Update CLAUDE.md
-
-Add a Dev Environment section AND populate the Key Commands table. The Key Commands table is the single source of truth for project-specific commands — the entire workflow references it instead of hardcoding commands.
-
-**Add Key Commands table** to the Quick Reference section of CLAUDE.md. This is the single source of truth for project-specific commands — the entire workflow, CI pipeline, and worktree cleanup reference this table instead of hardcoding commands.
-
-If a "Beads Commands" table exists (from Beads Setup), merge those commands into this table and remove the old table.
-```markdown
-### Key Commands
-
-| Task | Command |
-|------|---------|
-| Start dev server | `<actual command>` |
-| Run lint | `<actual command>` |
-| Run tests | `<actual command>` |
-| Run tests (watch) | `<actual command>` |
-| Install dependencies | `<actual command>` |
-| Reset database | `<actual command>` |
-| View logs | `<actual command>` |
-<!-- If using Beads, also include these rows: -->
-<!-- | Pick next task | `bd ready` | -->
-<!-- | Claim task | `bd update <id> --status in_progress --claim` | -->
-<!-- | Create task | `bd create "title" -p N` | -->
-<!-- | Close task | `bd close <id>` | -->
-<!-- | Sync tasks | `bd sync` | -->
+hooks: ## Install git hooks
+	@mkdir -p .git/hooks
+	@cp scripts/pre-commit.sh .git/hooks/pre-commit
+	@cp scripts/pre-push.sh .git/hooks/pre-push
+	@chmod +x .git/hooks/pre-commit .git/hooks/pre-push
 ```
 
-Replace `<actual command>` with the real commands configured in this setup (e.g., `make lint`, `npm run lint`, `ruff check .`).
+#### Dependency Chains and Parallel Execution
 
+Targets depend on other targets: `deploy: check build` runs lint, test, and build before deploying. For CI, parallelize independent targets: `$(MAKE) -j2 lint test`.
 
-**Add Dev Environment section:**
+#### Variables and Platform Compatibility
 
-## Verification
+Use `?=` for overridable variables: `TEST_FLAGS ?=` lets users run `make test TEST_FLAGS="--watch"`. Detect OS for platform-specific commands with `UNAME := $(shell uname -s)` and conditional blocks.
 
-After setup, verify everything works:
+### Environment Variable Management
 
-1. [ ] Run the install command — completes without errors
-2. [ ] Run the dev command — server starts successfully
-3. [ ] Open the app in browser — something renders (even if just "Hello World")
-4. [ ] Make a small code change — browser updates automatically (live reload works)
-5. [ ] Run the test command — tests execute (even if there are no tests yet)
-6. [ ] Run database commands — database creates/resets successfully (if applicable)
+#### The .env Pattern
 
-If any step fails, fix it before considering this complete.
+```
+.env.example     # Committed — documents all variables with safe placeholders
+.env             # Gitignored — local overrides
+.env.test        # Gitignored — test environment
+.env.production  # Never on disk — injected by deployment platform
+```
 
-## What NOT to Do
+`.env.example` is documentation: every variable listed with explanatory comments and placeholder values.
 
-- Don't require Docker unless the tech stack specifically needs it — adds complexity for beginners
-- Don't set up production deployment — this is dev only
-- Don't configure CI/CD here — that's in git-workflow.md
-- Don't add optional tooling "nice-to-haves" — keep it minimal and working
+#### Startup Validation
 
-## Process
-- If using Beads: create a task before starting (`bd create "docs: <document being created>" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
-- If this work surfaces implementation tasks (bugs, missing infrastructure), create separate tasks for those — don't try to do them now
-- Review docs/tech-stack.md to understand exactly what needs to be configured
-- Review docs/project-structure.md to understand where config files should live
-- Use AskUserQuestionTool to ask about:
-  - Preferred ports (or use sensible defaults)
-  - Docker vs. local database preference
-  - Any services I already have installed
-- After setup, walk me through the verification steps so I can confirm it works
-- Commit all configuration files (except .env) to the repo
+Validate all environment variables at startup, not at point of use. Fail fast with clear messages:
+
+```typescript
+// src/config/env.ts — centralized env access
+function requireEnv(key: string): string {
+  const value = process.env[key];
+  if (!value) throw new Error(`Missing required env var: ${key}`);
+  return value;
+}
+
+export const config = {
+  database: { url: requireEnv('DATABASE_URL') },
+  auth: { jwtSecret: requireEnv('JWT_SECRET') },
+} as const;
+```
+
+No `process.env.SOMETHING` scattered throughout the codebase. Python equivalent: use `pydantic_settings.BaseSettings` for typed validation with defaults.
+
+### Live Reload by Stack
+
+| Stack | Tool | Command |
+|-------|------|---------|
+| Next.js / Vite | Built-in HMR | `next dev` / `vite dev` |
+| Express/Fastify | tsx watch | `tsx watch src/server.ts` |
+| FastAPI | uvicorn | `uvicorn app:app --reload` |
+| Go | air | `air` |
+| Shell | entr | `ls scripts/*.sh \| entr make test` |
+
+For full-stack projects, run frontend and backend in parallel via `make dev` using `$(MAKE) -j2 dev-frontend dev-backend` or a process manager like `concurrently`.
+
+### Git Hook Strategies
+
+#### Pre-Commit (Fast, Under 10 Seconds)
+
+Check only staged files when possible:
+- Formatting (run formatter check, fail if files would change)
+- Linting (staged files only via `lint-staged`)
+- Secrets scanning (detect accidentally committed API keys)
+- File size limits (prevent accidental binary commits)
+
+#### Pre-Push (Thorough, Under 60 Seconds)
+
+Run the full quality gate:
+- Complete test suite
+- Full lint (all files, not just staged)
+- Build verification
+
+#### Installation
+
+Single command: `make hooks`. Wrap whichever hook manager the project uses (husky, pre-commit, lefthook, or plain shell scripts).
+
+### CI/CD Integration
+
+#### The Mirror Principle
+
+CI runs `make check` — the exact same command developers run locally. If it passes locally, it passes in CI. No environment-specific surprises.
+
+```yaml
+# .github/workflows/check.yml
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - run: make check
+```
+
+#### Caching
+
+Cache dependencies keyed on lockfile hashes: `node_modules/` on `package-lock.json`, `.venv/` on `pyproject.toml`, `~/go/pkg/mod/` on `go.sum`.
+
+#### Job Structure
+
+Parallelize independent checks, gate dependent steps:
+```yaml
+jobs:
+  lint:  { steps: [checkout, setup, make lint] }
+  test:  { steps: [checkout, setup, make test] }
+  build: { needs: [lint, test], steps: [checkout, setup, make build] }
+```
+
+### Branching Strategies — When to Use Each
+
+#### Trunk-Based Development
+
+All developers commit to `main`. Feature flags gate incomplete work. Releases cut directly from `main`. Requires: strong test suite, feature flag infrastructure, team discipline. Best for: small teams (1-5), continuous deployment. Risk: broken commits affect everyone immediately.
+
+#### GitHub Flow
+
+Feature branches from `main`, PRs with review, squash merge back. `main` is always deployable. Best for: most teams, most projects. Keep branches short (1-3 days), rebase frequently. Risk: long-lived branches diverge.
+
+#### GitFlow
+
+Separate `develop`, `release/*`, `hotfix/*`, `main` branches. Formalized release process. Best for: scheduled releases (mobile, enterprise), multiple supported versions. Risk: branch complexity, merge conflicts. Most web apps do not need this.
+
+### Common Anti-Patterns
+
+**Scripts That Only Work on One OS**: `setup.sh` uses `apt-get`, breaks on macOS. Fix: detect OS and branch, or use devcontainers. Document OS-specific prerequisites.
+
+**Missing Setup Documentation**: New developer spends a day figuring out the build. Fix: `make setup` automates everything possible. `docs/dev-setup.md` covers the rest. Test by having a new team member follow it verbatim.
+
+**Hardcoded Paths**: Scripts reference `/Users/alice/projects/myapp/`. Fix: use relative paths or compute from `$(pwd)` / `$(dirname "$0")`. Never commit absolute paths.
+
+**No Clean Target**: Build artifacts accumulate, stale caches cause mystery failures. Fix: `make clean` removes generated artifacts. `make pristine` removes everything including `node_modules/` for a full reset.
+
+**CI Drift**: CI runs different commands than local dev. Fix: CI calls `make check`. If CI needs extras (artifact upload, deploy), those are separate steps after the quality gate. The gate itself is identical everywhere.
+
+## See Also
+
+- [ai-memory-management](../core/ai-memory-management.md) — Environment setup affects memory hooks
+
+---
 
 ## After This Step
 
-When this step is complete, tell the user:
-
----
-**Phase 3 in progress** — Dev environment configured, `docs/dev-setup.md` created.
-
-**Next:**
-- If your project has a **frontend**: Run `/scaffold:design-system` — Create a cohesive design system.
-- If your project is **backend-only**: Skip to `/scaffold:git-workflow` — Configure git workflow for parallel agents.
-
-**Pipeline reference:** `/scaffold:prompt-pipeline`
-
----
+Continue with: `/scaffold:design-system`, `/scaffold:git-workflow`

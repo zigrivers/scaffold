@@ -1,223 +1,602 @@
 ---
-description: "Conduct security review with threat modeling, OWASP analysis, and auth patterns"
-long-description: "Reads system architecture and API contracts, then creates docs/security-review.md covering OWASP Top 10 analysis, threat modeling (STRIDE), authentication/authorization patterns, data protection, secrets management, and dependency auditing."
+description: "Security review and documentation"
+long-description: "Conduct a security review of the entire system design. Document security"
 ---
 
-Read `docs/system-architecture.md`, `docs/api-contracts.md`, `docs/database-schema.md`, and `docs/operations-runbook.md`, then conduct a security review of the entire system design. Create `docs/security-review.md` documenting security controls, threat model, auth/authz approach, data protection, and secrets management.
+## Purpose
+Conduct a security review of the entire system design. Document security
+controls, threat model, auth/authz approach, data protection, secrets
+management, and dependency audit strategy. The review covers OWASP Top 10
+analysis specific to this project's stack and architecture, plus STRIDE
+threat modeling across all trust boundaries.
 
-> **Note:** This command produces full-depth output. For lighter execution at a specific methodology depth, use the pipeline engine with presets.
+## Inputs
+- docs/system-architecture.md (required) — attack surface
+- docs/api-contracts.md (optional) — auth/authz boundaries
+- docs/database-schema.md (optional) — data protection needs
+- docs/operations-runbook.md (required) — secrets and deployment security
 
-> **Prerequisites:** Run `review-operations` first.
+## Expected Outputs
+- docs/security-review.md — security review and controls document
+
+## Quality Criteria
+- (mvp) OWASP top 10 addressed for this specific project
+- (mvp) Every API endpoint has authentication and authorization requirements specified
+- (mvp) Auth/authz boundaries defined and consistent with API contracts
+- (mvp) Input validation rules defined for each user-facing field: data type, maximum length, regex pattern (where applicable), and rejection error message
+- (deep) Data classified by sensitivity with handling requirements
+- (mvp) Secrets management strategy documented with rotation policy (no hardcoded secrets in code)
+- (deep) CORS policy explicitly configured per origin (not wildcard in production)
+- (deep) Rate limiting defined for public-facing endpoints with specific thresholds
+- (deep) Threat model covers all trust boundaries
+- (deep) Dependency audit strategy documented (automated scanning, update cadence)
+- (deep) Dependency audit integrated into CI
+- (deep) Secret rotation testing documented (how to rotate each secret type without downtime)
+
+## Methodology Scaling
+- **deep**: Full threat model (STRIDE). OWASP analysis per component.
+  Data classification matrix. Secrets rotation plan. Penetration testing
+  scope. Compliance checklist (if applicable).
+- **mvp**: Key security controls. Auth approach. No secrets in code.
+  Basic input validation strategy.
+- **custom:depth(1-5)**: Depth 1-2: MVP-style. Depth 3: add threat model.
+  Depth 4-5: full security review.
 
 ## Mode Detection
+Check for docs/security-review.md. If it exists, operate in update mode: read
+existing security controls and threat model, diff against current system
+architecture and API contracts. Preserve existing threat model entries, auth
+decisions, and data classification. Add new threat boundaries for new
+components. Update auth requirements if API contracts changed.
 
-Before starting, check if `docs/security-review.md` already exists:
-
-**If the file does NOT exist -> FRESH MODE**: Skip to the next section and create from scratch.
-
-**If the file exists -> UPDATE MODE**:
-1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:security v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
-2. **Diff against current structure**: Compare existing sections against what this prompt would produce fresh. Categorize:
-   - **ADD** — Threat categories or controls missing from existing review
-   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure
-   - **PRESERVE** — Project-specific threat assessments, custom security controls, compliance decisions
-3. **Cross-doc consistency**: Read related docs and verify security controls align with current architecture and API contracts.
-4. **Preview changes**: Present the user a summary table. Wait for approval before proceeding.
-5. **Execute update**: Update review, respecting preserve rules.
-6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:security v<ver> <date> -->`
-7. **Post-update summary**: Report sections added, restructured, preserved, and cross-doc issues.
-
-**In both modes**, follow all instructions below.
-
-### Update Mode Specifics
-- **Primary output**: `docs/security-review.md`
-- **Preserve**: Project-specific threat assessments, compliance requirements, custom security headers, rate limit decisions, data classification with custom handling rules
-- **Related docs**: `docs/system-architecture.md`, `docs/api-contracts.md`, `docs/database-schema.md`, `docs/operations-runbook.md`
-- **Special rules**: Never downgrade a security control without explicit user approval. Preserve compliance-related decisions.
+## Update Mode Specifics
+- **Detect prior artifact**: docs/security-review.md exists
+- **Preserve**: threat model entries, data classification matrix, auth/authz
+  decisions, secrets management strategy, dependency audit configuration,
+  compliance checklist items
+- **Triggers for update**: architecture added new components (new attack surface),
+  API contracts changed auth requirements, database schema changed data
+  sensitivity, operations runbook changed deployment security
+- **Conflict resolution**: if a new component introduces a trust boundary
+  that conflicts with existing auth approach, document both and flag for
+  user decision; never weaken existing security controls without approval
 
 ---
 
-## What the Document Must Cover
+## Domain Knowledge
 
-### 1. OWASP Top 10 Analysis
+### security-best-practices
 
-For each OWASP category, assess the specific risk to THIS project and define mitigations:
+*OWASP Top 10, authentication, authorization, data protection, and threat modeling*
 
-**A01: Broken Access Control**
-- Enumerate all endpoints that serve user-specific data
-- Verify resource-level authorization (not just role checks)
-- Deny by default: every endpoint requires explicit permission
-- Server-side enforcement — never rely on client-side checks
+## Summary
 
-**A02: Cryptographic Failures**
+## OWASP Top 10
+
+The OWASP Top 10 represents the most critical security risks to web applications. Every project should evaluate each risk and implement appropriate mitigations.
+
+### A01: Broken Access Control
+
+Users act outside their intended permissions: accessing other users' data, modifying records they shouldn't, escalating privileges.
+
+**Attack patterns:**
+- Modifying URL parameters to access another user's resource (`/api/users/123` -> `/api/users/456`)
+- Bypassing access control checks by sending requests directly to the API (skipping frontend checks)
+- Privilege escalation by manipulating JWT claims or session data
+- Accessing admin endpoints without admin role
+
+**Mitigations:**
+- Deny by default: every endpoint requires explicit permission grants
+- Verify resource ownership on every request, not just at the UI level
+- Use parameterized access control (the user can access records where `owner_id = authenticated_user_id`)
+- Server-side enforcement — never rely on client-side checks alone
+- Log and alert on access control failures
+
+```typescript
+// BAD: Only checks if user is authenticated, not if they own the resource
+app.get('/api/orders/:id', requireAuth, async (req, res) => {
+  const order = await db.orders.findById(req.params.id);
+  res.json(order);
+});
+
+// GOOD: Verifies the authenticated user owns the requested resource
+app.get('/api/orders/:id', requireAuth, async (req, res) => {
+  const order = await db.orders.findById(req.params.id);
+  if (!order || order.userId !== req.user.id) {
+    return res.status(404).json({ error: { code: 'NOT_FOUND' } });
+  }
+  res.json(order);
+});
+```
+
+### A02: Cryptographic Failures
+
+Sensitive data exposed due to weak or missing encryption.
+
+**At-risk data:** Passwords, credit card numbers, health records, personal data, API keys, session tokens.
+
+**Mitigations:**
 - Classify data by sensitivity (public, internal, confidential, restricted)
-- Encryption at rest for sensitive data, TLS 1.2+ for all data in transit
-- Password hashing: bcrypt (cost 12+), scrypt, or Argon2id — NEVER MD5/SHA-256
-- Don't store sensitive data you don't need
+- Encrypt sensitive data at rest (database encryption, encrypted backups)
+- Use TLS 1.2+ for all data in transit (HTTPS everywhere, no mixed content)
+- Hash passwords with bcrypt, scrypt, or Argon2 (NEVER MD5 or SHA-256 for passwords)
+- Don't store sensitive data you don't need — the safest data is data you don't have
 
-**A03: Injection**
-- Parameterized queries for all database access (never string concatenation)
-- ORM/query builders that parameterize automatically
-- Input validation and sanitization at every trust boundary
+## Deep Guidance
+
+### A03: Injection
+
+Untrusted data sent to an interpreter as part of a command or query, causing unintended execution.
+
+**SQL injection:**
+
+```typescript
+// BAD: String concatenation — vulnerable
+const query = `SELECT * FROM users WHERE email = '${email}'`;
+
+// GOOD: Parameterized query — safe
+const query = `SELECT * FROM users WHERE email = $1`;
+const result = await db.query(query, [email]);
+
+// GOOD: ORM with parameterized API — safe
+const user = await db.users.findFirst({ where: { email } });
+```
+
+**NoSQL injection:**
+
+```typescript
+// BAD: User input directly in query object
+db.users.find({ email: req.body.email, password: req.body.password });
+// Attacker sends: { "password": { "$ne": "" } } — bypasses password check
+
+// GOOD: Validate and sanitize input types before use
+const email = String(req.body.email);
+const passwordHash = await hash(String(req.body.password));
+db.users.find({ email, passwordHash });
+```
+
+**Command injection:**
+
+```typescript
+// BAD: User input in shell command
+exec(`convert ${userFilename} output.png`);
+
+// GOOD: Use library APIs instead of shell commands
+sharp(userFilePath).toFile('output.png');
+```
+
+**Prevention rules:**
+- Use parameterized queries for all database access
+- Use ORM/query builders that parameterize automatically
+- Validate and sanitize all user input at the boundary
 - Never construct shell commands from user input
 
-**A04: Insecure Design**
-- Rate limiting on all authentication endpoints
-- Generic error messages for auth failures (no user enumeration)
-- Account lockout policy
-- Threat modeling during design, not after implementation
+### A04: Insecure Design
 
-**A05: Security Misconfiguration**
-- No debug mode in production
-- Security headers on all responses (CSP, X-Frame-Options, HSTS, etc.)
+Security flaws from missing or ineffective control design, as opposed to implementation bugs. These are architectural problems.
+
+**Examples:**
+- Password reset via security questions (attackable)
+- No rate limiting on login endpoint (brute force possible)
+- No account lockout policy (unlimited password attempts)
+- Returning different error messages for "user not found" vs. "wrong password" (user enumeration)
+
+**Mitigations:**
+- Threat model during design phase, not after implementation
+- Use established security patterns (don't invent custom auth)
+- Rate limit all authentication endpoints
+- Return generic error messages for auth failures ("Invalid credentials" for both wrong email and wrong password)
+- Require MFA for sensitive operations
+
+### A05: Security Misconfiguration
+
+Default credentials, unnecessary features enabled, verbose error messages, missing security headers.
+
+**Common misconfigurations:**
+- Debug mode enabled in production (stack traces exposed)
+- Default database passwords unchanged
+- Directory listing enabled on web server
+- Unnecessary HTTP methods enabled (TRACE, OPTIONS returning too much)
+- Missing security headers (CSP, X-Frame-Options, X-Content-Type-Options)
+
+**Mitigations:**
+- Hardened configuration for each environment (dev uses relaxed settings; production uses strict settings)
 - Remove default accounts and sample data before deployment
-- Hardened configuration per environment
+- Disable stack traces and verbose error messages in production
+- Set security headers on all responses:
 
-**A06: Vulnerable Components**
-- Dependency audit on every CI build (`npm audit`, `pip audit`, etc.)
-- Policy: Critical/High block merge, Medium fix within sprint, Low track
-- Pin versions via lockfiles
+```
+Content-Security-Policy: default-src 'self'; script-src 'self'
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+```
+
+### A06: Vulnerable and Outdated Components
+
+Using libraries with known vulnerabilities.
+
+**Mitigations:**
+- Run dependency audit on every CI build (`npm audit`, `pip audit`, `cargo audit`)
+- Subscribe to security advisories for critical dependencies
+- Update dependencies regularly (weekly for patch versions, monthly for minor)
+- Pin dependency versions (use lockfiles: `package-lock.json`, `poetry.lock`)
 - Remove unused dependencies
+- Prefer dependencies with active maintenance and security response processes
 
-**A07: Authentication Failures**
-- Password complexity requirements (minimum 8 chars, no common passwords)
-- Rate limit login attempts (5/min per IP and account)
-- Account lockout (10 consecutive failures, 30-min unlock)
-- Secure cookies: HttpOnly, Secure, SameSite
-- Session invalidation on password change
+### A07: Identification and Authentication Failures
 
-**A08: Integrity Failures**
-- Lockfile checksums verified in CI
-- CI/CD config changes reviewed with same rigor as app code
-- Subresource Integrity for CDN scripts
+Broken authentication mechanisms that allow attackers to assume identities.
 
-**A09: Logging and Monitoring Failures**
-- Log: auth attempts, authz failures, validation failures, permission changes, admin actions
-- NEVER log: passwords, tokens, API keys, PII, credit cards
-- Structured JSON logging with correlation IDs
+**Common failures:**
+- Permitting weak passwords ("123456", "password")
+- Storing passwords in plaintext or with reversible encryption
+- Missing brute-force protection
+- Session tokens in URLs (exposed in logs and browser history)
+- Session not invalidated after logout or password change
 
-**A10: SSRF**
-- Validate and whitelist URL schemes
-- Block internal IP ranges and cloud metadata endpoints
-- Use URL parser to normalize before fetching
+**Mitigations:**
+- Enforce password complexity requirements (minimum 8 characters, no common passwords list)
+- Hash passwords with Argon2id, bcrypt (cost factor 12+), or scrypt
+- Rate limit login attempts (5 failures per minute per IP and per account)
+- Implement account lockout (lock after 10 consecutive failures, unlock after 30 minutes)
+- Invalidate all sessions when password changes
+- Use secure, HttpOnly, SameSite cookies for session tokens
+- Implement MFA for sensitive applications
 
-### 2. Authentication Design
+### A08: Software and Data Integrity Failures
 
-**For the chosen auth mechanism** (from ADRs), specify:
+Code and infrastructure that doesn't verify integrity: unverified CI/CD pipelines, auto-updated dependencies, unsigned software.
 
-**Session-based:**
-- Cryptographically random session IDs (128+ bits)
-- Server-side session storage
-- Cookie flags: HttpOnly, Secure, SameSite=Lax/Strict
-- Session rotation after login
-- Expiration: absolute (24h) and idle (30min)
+**Mitigations:**
+- Verify dependency integrity (lockfile checksums)
+- Use signed commits for critical code paths
+- Review CI/CD pipeline configuration changes with the same rigor as application code
+- Don't auto-merge dependency updates without CI verification
+- Use Subresource Integrity (SRI) for CDN-loaded scripts
 
-**JWT:**
-- Strong algorithm (RS256 or ES256, not HS256 with weak secret)
-- Short expiration (15-60 min)
-- Refresh tokens in HttpOnly cookies
-- Never store in localStorage (XSS-accessible)
-- Validate signature, expiration, issuer, audience on every request
+### A09: Security Logging and Monitoring Failures
 
-**MFA** — required for sensitive applications:
-- TOTP via authenticator apps, WebAuthn/FIDO2, or SMS (weakest)
-- Recovery codes (one-time use) for lost devices
+Insufficient logging to detect, investigate, or alert on attacks.
 
-### 3. Authorization Patterns
+**What to log:**
+- All authentication attempts (success and failure, with IP and user agent)
+- Authorization failures (user tried to access something they shouldn't)
+- Input validation failures (potential injection attempts)
+- Changes to user permissions or roles
+- Administrative actions (user creation, role changes, config changes)
+- Application errors (5xx responses with context)
 
-- **RBAC**: Roles with permissions. Simple, covers 80% of needs.
-- **ABAC**: Attribute-based decisions for complex rules (multi-tenancy, data classification).
-- **Resource-level**: Instance-level ownership checks on every request, not just type-level role checks.
-- Per-endpoint permission matrix matching API contracts.
+**What NEVER to log:**
+- Passwords (even failed ones — they might be the correct password for a different account)
+- Session tokens, API keys, or JWT tokens
+- Credit card numbers, SSNs, or other PII
+- Full request bodies of sensitive endpoints (login, payment)
 
-### 4. Data Protection
+**Log format:** Use structured logging (JSON) with correlation IDs for request tracing. Include timestamp, severity, source, action, actor, target, and result.
 
-**Data classification matrix:**
+### A10: Server-Side Request Forgery (SSRF)
+
+The application fetches a URL provided by the user, allowing the attacker to make requests from the server's network position (accessing internal services, cloud metadata endpoints).
+
+**Mitigations:**
+- Validate and whitelist allowed URL schemes (only `https://`)
+- Block requests to internal IP ranges (10.x, 172.16-31.x, 192.168.x, 169.254.x, localhost)
+- Block requests to cloud metadata endpoints (169.254.169.254)
+- Use a URL parser to normalize and validate before fetching
+- Run URL-fetching services in an isolated network segment
+
+## Authentication Patterns
+
+### Session-Based Authentication
+
+**How it works:**
+1. User submits credentials
+2. Server validates credentials, creates a session record (in database or Redis)
+3. Server sends a session ID in a Set-Cookie header (HttpOnly, Secure, SameSite)
+4. Browser automatically sends the cookie on subsequent requests
+5. Server looks up the session record to identify the user
+
+**When to use:** Server-rendered web applications, applications where the backend controls the frontend.
+
+**Security requirements:**
+- Session IDs must be cryptographically random (128+ bits of entropy)
+- Store sessions server-side (never trust session data stored client-side)
+- Set cookie flags: `HttpOnly` (no JavaScript access), `Secure` (HTTPS only), `SameSite=Lax` or `Strict` (CSRF protection)
+- Rotate session ID after login (prevent session fixation)
+- Set session expiration (absolute timeout: 24 hours, idle timeout: 30 minutes)
+- Invalidate sessions on logout, password change, and privilege change
+
+### JWT Authentication
+
+**How it works:**
+1. User submits credentials
+2. Server validates credentials, generates a signed JWT containing claims (user ID, roles, expiration)
+3. Server returns the JWT in the response body
+4. Client stores the JWT (typically in memory, NOT in localStorage)
+5. Client sends the JWT in the `Authorization: Bearer <token>` header on each request
+6. Server validates the JWT signature and extracts claims
+
+**When to use:** API-first applications, SPAs, mobile apps, microservices where session sharing is impractical.
+
+**Security requirements:**
+- Sign with a strong algorithm (RS256 or ES256, not HS256 with a weak secret)
+- Set short expiration (15-60 minutes)
+- Use refresh tokens (stored HttpOnly cookie) for re-authentication
+- Never store JWTs in localStorage (XSS-accessible) — use HttpOnly cookies or in-memory only
+- Include only necessary claims (don't put sensitive data in the payload — it's base64, not encrypted)
+- Validate the token on every request (signature, expiration, issuer, audience)
+
+### Multi-Factor Authentication (MFA)
+
+Add MFA for any application that handles sensitive data, financial transactions, or administrative actions.
+
+**Implementation options:**
+- TOTP (Time-based One-Time Password) via authenticator apps (Google Authenticator, Authy)
+- WebAuthn / FIDO2 hardware keys (strongest, best UX)
+- SMS codes (weakest — vulnerable to SIM swapping, but better than nothing)
+- Email codes (moderate — depends on email security)
+
+**Recovery:** Always provide recovery codes (one-time use) in case the user loses their MFA device.
+
+## Authorization Patterns
+
+### Role-Based Access Control (RBAC)
+
+Users are assigned roles. Roles have permissions. Authorization checks whether the user's role has the required permission.
+
+```
+User: alice@example.com
+  Role: admin
+    Permissions: users:read, users:write, users:delete, orders:read, orders:write
+
+User: bob@example.com
+  Role: member
+    Permissions: orders:read, orders:write (own orders only)
+```
+
+**Best for:** Most applications. Simple to implement, easy to understand, covers 80% of authorization needs.
+
+### Attribute-Based Access Control (ABAC)
+
+Authorization decisions based on attributes of the user, the resource, and the context.
+
+**Example policy:**
+- User can read a document if: user.department == document.department AND document.classification <= user.clearanceLevel
+- User can modify a resource if: user.id == resource.ownerId OR user.role == 'admin'
+
+**Best for:** Complex authorization requirements that RBAC can't express cleanly (multi-tenancy, data classification, time-based access).
+
+### Resource-Level Permissions
+
+Authorization checks that verify the user can access a specific resource instance, not just the resource type.
+
+```typescript
+// Type-level: "Can this user access orders?" — Role check
+// Instance-level: "Can this user access THIS order?" — Ownership check
+
+async function authorizeOrderAccess(userId: string, orderId: string): boolean {
+  const order = await db.orders.findById(orderId);
+  return order && (order.userId === userId || await isAdmin(userId));
+}
+```
+
+Always implement instance-level checks for user-owned resources. Type-level checks alone allow users to access each other's data.
+
+## Data Protection
+
+### Encryption at Rest
+
+Sensitive data stored in databases, files, or backups should be encrypted:
+
+- **Database-level encryption:** Transparent Data Encryption (TDE) encrypts the entire database. No application changes needed. Protects against physical storage theft.
+- **Column-level encryption:** Encrypt specific sensitive columns (SSN, credit card). Application decrypts as needed. More granular control.
+- **Backup encryption:** All database backups and file exports must be encrypted. An unencrypted backup negates database encryption.
+
+### Encryption in Transit
+
+All network communication should use TLS:
+
+- **HTTPS everywhere:** No HTTP endpoints, no mixed content
+- **TLS version:** 1.2 minimum, 1.3 preferred
+- **HSTS header:** Force HTTPS for all future requests: `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+- **Internal services:** Use TLS for service-to-service communication too, not just client-facing
+
+### PII Handling
+
+Personally Identifiable Information requires special handling:
+
+- **Inventory:** Know what PII you store and where (data mapping exercise)
+- **Minimization:** Don't collect PII you don't need
+- **Retention:** Define how long you keep PII and what triggers deletion
+- **Access logging:** Log who accessed PII and when
+- **Right to deletion:** Implement user data deletion (GDPR Article 17, CCPA)
+- **Pseudonymization:** Replace identifying data with pseudonyms where full PII isn't needed
+
+### Data Classification
+
+Classify all data by sensitivity:
 
 | Level | Examples | Controls |
 |-------|---------|----------|
-| Public | Marketing, docs | No restrictions |
-| Internal | Metrics, non-PII | Authentication required |
-| Confidential | PII, financial | Encryption, access logging, retention |
-| Restricted | Passwords, keys | Encryption, strict ACL, rotation |
+| Public | Marketing content, public API docs | No restrictions |
+| Internal | Internal metrics, non-PII user data | Authentication required |
+| Confidential | PII, financial data, health data | Encryption, access logging, retention policy |
+| Restricted | Passwords, encryption keys, API secrets | Encryption, strict access control, rotation |
 
-**Encryption**: At rest (database, backups) and in transit (TLS everywhere, including internal).
+## Secrets Management
 
-**PII handling**: Inventory, minimization, retention policy, access logging, right to deletion (GDPR/CCPA).
+### Environment Variables
 
-### 5. Secrets Management
+The simplest secrets management: store secrets in environment variables, never in code.
 
-- Environment variables for secrets, never in code
-- `.env` gitignored, `.env.example` committed with placeholders
+**Rules:**
+- Never commit secrets to git (use `.gitignore` for `.env` files)
 - Never log secrets (redact in logging middleware)
-- Never pass secrets in URLs
-- Pre-commit hooks to scan for accidental secret commits (git-secrets, gitleaks)
-- Production: dedicated secrets manager (AWS Secrets Manager, Vault, etc.)
-- Key rotation plan without downtime (support multiple active keys during transition)
+- Never pass secrets in URLs (URLs appear in logs, browser history, Referer headers)
+- Use `.env.example` with placeholder values as a template
 
-### 6. Threat Model (STRIDE)
+### Vault Systems
 
-| Category | Threat | Project-Specific Example | Mitigation |
-|----------|--------|--------------------------|------------|
-| Spoofing | Impersonation | (project-specific) | MFA, strong passwords |
-| Tampering | Data modification | (project-specific) | TLS, input validation |
-| Repudiation | Denied actions | (project-specific) | Audit logging |
-| Info Disclosure | Data exposure | (project-specific) | Encryption, ACL |
-| Denial of Service | Unavailability | (project-specific) | Rate limiting, CDN |
-| Elevation of Privilege | Unauthorized access | (project-specific) | Input validation, least privilege |
+For production environments, use a dedicated secrets manager:
 
-**Attack surface analysis**: Enumerate all entry points (HTTP endpoints, WebSocket, database ports, admin panels, CI/CD webhooks) and assess what an attacker could do at each.
+- **Cloud-native:** AWS Secrets Manager, Google Secret Manager, Azure Key Vault
+- **Self-hosted:** HashiCorp Vault, Infisical, Doppler
 
-**Trust boundaries**: Browser-to-server (untrusted), server-to-database (trusted), server-to-external-API (partially trusted), service-to-service (depends on network isolation).
+**Benefits over environment variables:**
+- Access control and audit logging
+- Automatic rotation
+- Dynamic secrets (database credentials generated on demand)
+- Encryption at rest and in transit
 
-### 7. Dependency Auditing
+### Key Rotation
 
-- Vulnerability scanning in CI for every build
-- License compliance check (MIT/Apache/BSD safe; GPL/AGPL need attention)
-- Supply chain security: lockfiles committed, `npm ci` for installs, review dependency changes
-- Minimize dependency count to reduce attack surface
+Secrets should be rotatable without downtime:
+
+- **JWT signing keys:** Support multiple active keys. Add new key, start signing with it, keep old key for validation during transition, remove old key after all tokens expire.
+- **API keys:** Issue new key, update consumers, revoke old key.
+- **Database passwords:** Update the secret store, restart application (zero-downtime if using connection pool draining).
+- **Encryption keys:** Re-encrypt data with new key during a migration. Support decrypting with both old and new keys during transition.
+
+### Never Commit Secrets
+
+Prevent accidental secret commits:
+
+- Add `.env`, `*.pem`, `*.key` to `.gitignore`
+- Use pre-commit hooks to scan for secrets (git-secrets, detect-secrets, gitleaks)
+- Run secret scanning in CI (GitHub secret scanning, TruffleHog)
+- If a secret is committed: rotate it immediately (assume it's compromised), remove from history with `git filter-branch` or BFG Repo Cleaner
+
+## Threat Modeling
+
+### STRIDE Model
+
+Analyze threats using the STRIDE categories:
+
+| Category | Threat | Example | Mitigation |
+|----------|--------|---------|------------|
+| **S**poofing | Attacker impersonates a user | Stolen credentials | MFA, strong password policy |
+| **T**ampering | Attacker modifies data | Man-in-the-middle attack | TLS, input validation, integrity checks |
+| **R**epudiation | User denies performing an action | "I didn't delete that" | Audit logging, non-repudiation |
+| **I**nformation Disclosure | Sensitive data exposed | Database dump leaked | Encryption, access control, data classification |
+| **D**enial of Service | Service made unavailable | DDoS attack | Rate limiting, CDN, auto-scaling |
+| **E**levation of Privilege | User gains unauthorized access | SQL injection to admin | Input validation, principle of least privilege |
+
+### Attack Surface Analysis
+
+Enumerate all entry points where attackers can interact with the system:
+
+- **Network:** HTTP endpoints, WebSocket connections, database ports
+- **Data inputs:** Form fields, URL parameters, headers, file uploads, API request bodies
+- **Authentication:** Login page, password reset, API key endpoints, OAuth callbacks
+- **Infrastructure:** Admin panels, monitoring endpoints, health checks, CI/CD webhooks
+
+For each entry point, assess: what could an attacker do? What data could they access? What operations could they trigger?
+
+### Trust Boundaries
+
+Identify where trust levels change:
+
+- **Browser to server:** User input is untrusted. Validate everything.
+- **Server to database:** Application code is trusted. Database constraints are the last line of defense.
+- **Server to external API:** External API responses are partially trusted. Validate response shapes.
+- **Internal service to internal service:** Trust level depends on network isolation. In a shared network, verify identity.
+
+### Data Flow Analysis for Threats
+
+Trace sensitive data through the system and identify exposure points:
+
+```
+User enters password
+  -> HTTPS to API server (encrypted in transit: OK)
+    -> Validation middleware (password in memory: OK, brief)
+      -> Auth service (hashed with bcrypt: OK)
+        -> Database (stored as hash: OK)
+          -> Backup system (encrypted backup: OK)
+        -> Log system (THREAT: is password logged? Must not be!)
+```
+
+For each sensitive data flow, verify:
+- Is it encrypted in transit?
+- Is it encrypted at rest?
+- Who can access it? (Users, admins, services, backup systems, log systems)
+- How long is it retained?
+- How is it deleted?
+
+## Dependency Auditing
+
+### Known Vulnerability Scanning
+
+Run automated vulnerability scanning on every CI build:
+
+```bash
+# Node.js
+npm audit --audit-level=high
+
+# Python
+pip audit
+
+# Go
+govulncheck ./...
+
+# Rust
+cargo audit
+```
+
+**Policy:**
+- **Critical vulnerabilities:** Block merge. Fix immediately.
+- **High vulnerabilities:** Block merge. Fix within 24 hours.
+- **Medium vulnerabilities:** Warning. Fix within one sprint.
+- **Low vulnerabilities:** Track. Fix when convenient.
+
+### License Compliance
+
+Verify that dependency licenses permit your intended use:
+
+**Generally safe:** MIT, Apache 2.0, BSD, ISC
+
+**Requires attention:** LGPL (linking restrictions), MPL (file-level copyleft)
+
+**Potentially problematic:** GPL (copyleft — entire project must be GPL), AGPL (network use triggers copyleft), SSPL (commercial use restrictions)
+
+**No license:** Treat as all rights reserved — do not use without explicit permission.
+
+### Supply Chain Security
+
+Protect against compromised dependencies:
+
+- **Lockfiles:** Always commit lockfiles. They pin exact versions and include integrity hashes.
+- **Verify checksums:** `npm ci` (not `npm install`) verifies against lockfile checksums.
+- **Review dependency changes:** When updating, check the changelog and diff for unexpected changes.
+- **Minimize dependencies:** Fewer dependencies mean less attack surface. Consider whether you really need that utility library.
+- **Monitor for compromised packages:** Subscribe to security advisories for critical dependencies. Watch for maintainer account takeovers.
+
+## Common Pitfalls
+
+**Authentication as afterthought.** Building all endpoints without auth, then adding it at the end. This leaves forgotten endpoints unprotected and creates inconsistent auth patterns. Fix: design auth requirements for every endpoint during API design. Implement auth middleware before any endpoint handlers.
+
+**Overly permissive defaults.** Default user role has admin access, default CORS allows all origins, default rate limits are too generous. Fix: deny by default. Each permission must be explicitly granted. CORS allows specific origins only. Rate limits start conservative and are relaxed based on monitoring.
+
+**Missing input validation at boundaries.** Trusting that the frontend validates input, so the backend skips validation. Fix: validate at every trust boundary. Frontend validation is a UX convenience; backend validation is a security requirement.
+
+**Logging sensitive data.** Request logging that includes passwords, tokens, or PII in the log files. Fix: implement a logging middleware that redacts sensitive fields before logging. Test that redaction works.
+
+**Storing secrets in git.** An API key committed in the first commit, now buried in git history. Fix: use git-secrets or gitleaks in pre-commit hooks. If a secret is committed, rotate it immediately — removing it from git history is not sufficient because it may have been cloned.
+
+**Relying on security through obscurity.** "Nobody will find the admin endpoint at /api/sekrit-admin." Fix: assume attackers will find every endpoint. Every endpoint must have proper authentication and authorization regardless of its discoverability.
+
+**No rate limiting.** Login endpoints with unlimited attempts allow brute-force password attacks. API endpoints with no rate limits allow denial of service. Fix: implement rate limiting on all public endpoints. Start with conservative limits. Use exponential backoff for authentication failures.
+
+**Ignoring dependency vulnerabilities.** Running `npm audit` shows 47 vulnerabilities but nobody addresses them because "they're all low severity." Fix: set a policy and enforce it in CI. Critical and high vulnerabilities block deployment. Medium vulnerabilities have a SLA for resolution.
+
+## See Also
+
+- [operations-runbook](../core/operations-runbook.md) — Logging and monitoring sensitive data
 
 ---
-
-## Quality Criteria
-
-- OWASP Top 10 addressed for this specific project (not generic)
-- Auth/authz boundaries defined and consistent with API contracts
-- Data classified by sensitivity with handling requirements per level
-- Secrets management strategy: no secrets in code, rotation plan defined
-- Threat model covers all trust boundaries
-- Dependency audit integrated into CI with severity-based policy
-- Per-endpoint authorization matrix matches API contracts
-- Security headers defined for all responses
-
----
-
-## Process
-
-1. **Read all inputs** — Read `docs/system-architecture.md`, `docs/api-contracts.md`, `docs/database-schema.md`, and `docs/operations-runbook.md`. Skip any that don't exist.
-2. **Use AskUserQuestionTool** for these decisions:
-   - **Security depth**: Full STRIDE threat model with OWASP analysis per component, or key controls with auth and data protection?
-   - **Compliance requirements**: GDPR, HIPAA, PCI DSS, SOC 2, or none?
-   - **Auth mechanism**: Confirm from ADRs (session, JWT, OAuth)
-   - **MFA requirement**: Required for all users, admin-only, or not for v1?
-3. **Use subagents** to research security patterns for the project's specific stack and hosting platform
-4. **Conduct OWASP analysis** — assess each category against the project's specific architecture
-5. **Design auth/authz** — authentication mechanism, authorization model, per-endpoint requirements
-6. **Classify data** — sensitivity levels with handling requirements
-7. **Build threat model** — STRIDE analysis, attack surface, trust boundaries
-8. **Define secrets management** — environment variables, vault, rotation, pre-commit scanning
-9. **Cross-validate** — verify auth requirements match API contracts, data classification matches schema
-10. If using Beads: create a task (`bd create "docs: security review" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
 
 ## After This Step
 
-When this step is complete, tell the user:
-
----
-**Quality phase in progress** — `docs/security-review.md` created with OWASP analysis, threat model, auth patterns, data protection, and secrets management.
-
-**Next:** Run `/scaffold:review-security` — Review security posture for OWASP gaps and auth boundary mismatches.
-
-**Pipeline reference:** `/scaffold:prompt-pipeline`
-
----
+Continue with: `/scaffold:implementation-plan`, `/scaffold:review-security`

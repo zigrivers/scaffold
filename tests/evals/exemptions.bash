@@ -47,13 +47,24 @@ TERMINAL_PATH_PATTERNS=(
 )
 
 # --- command-structure.bats ---
-# Utility commands that don't need After This Step
+# Utility commands and terminal pipeline steps that don't need After This Step.
+# Terminal steps have no downstream dependents in the dependency graph.
 AFTER_STEP_EXEMPT=(
   "prompt-pipeline"
   "session-analyzer"
   "update"
   "version"
   "dashboard"
+  "add-e2e-testing"
+  "ai-memory-setup"
+  "automated-pr-review"
+  "beads"
+  "design-system"
+  "implementation-playbook"
+  "innovate-prd"
+  "innovate-user-stories"
+  "platform-parity-review"
+  "workflow-audit"
 )
 
 # --- cross-channel.bats ---

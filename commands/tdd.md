@@ -1,126 +1,467 @@
 ---
-description: "Create TDD standards for the tech stack"
-long-description: "Creates docs/tdd-standards.md defining test structure, coverage thresholds, testing patterns, and CI integration specific to the project's tech stack."
+description: "Define testing conventions and TDD standards for the tech stack"
+long-description: "Define the project's testing conventions, TDD workflow, test pyramid, coverage"
 ---
 
-Deeply research test-driven development (TDD) best practices for our tech stack — review docs/tech-stack.md and docs/coding-standards.md — then create docs/tdd-standards.md as the definitive testing reference for this project.
+## Purpose
+Define the project's testing conventions, TDD workflow, test pyramid, coverage
+goals, quality gates, and testing patterns. This tells agents how to test the
+code they write and establishes testing standards before implementation begins.
+Includes concrete reference examples for each test category using the project's
+actual test framework and assertion library.
 
-This document will be referenced by AI agents during every implementation task. It needs to be prescriptive and concrete, not theoretical.
+## Inputs
+- docs/tech-stack.md (required) — determines test runner, assertion library, and framework-specific testing patterns
+- docs/coding-standards.md (required) — naming conventions and code patterns that apply to test files
+- docs/plan.md (required) — features inform which testing scenarios matter most
+- docs/system-architecture.md (optional) — if available, layers to test
+- docs/domain-models/ (optional) — if available, business rules to verify
+- docs/adrs/ (optional) — if available, testing technology choices
 
-> **Note:** This command produces full-depth output. For lighter execution at a specific methodology depth, use the pipeline engine with presets: `scaffold run --preset mvp`
+## Expected Outputs
+- docs/tdd-standards.md — testing approach with coverage goals and patterns
+
+## Quality Criteria
+- (mvp) Test pyramid defined with coverage targets per layer
+- (mvp) Testing patterns specified for each layer (unit, integration, e2e)
+- (mvp) Quality gates defined (what must pass before merge)
+- Edge cases from domain invariants are test scenarios
+- (deep) Performance testing approach for critical paths
+- (deep) Contract testing strategy documented for service boundaries
+
+## Methodology Scaling
+- **deep**: Comprehensive strategy. Test matrix by layer and component. Specific
+  test patterns per architecture pattern. Performance benchmarks. CI integration.
+  Test data strategy. Mutation testing approach.
+- **mvp**: Test pyramid overview. Key testing patterns. What must pass before deploy.
+- **custom:depth(1-5)**: Depth 1-2: test pyramid overview with key patterns and example test for each layer. Depth 3: add per-layer test patterns, coverage targets, CI integration, and test data strategy. Depth 4: add performance benchmarks, mutation testing approach, and cross-module integration patterns. Depth 5: full suite with contract testing, visual regression strategy, and automated quality gate calibration.
 
 ## Mode Detection
+Check for docs/tdd-standards.md. If it exists, operate in update mode: read
+existing strategy and diff against current tech stack, coding standards, and
+PRD. Preserve testing patterns, layer definitions, custom assertions, and test
+data strategy. Update coverage goals if PRD scope or tech stack changed.
+Re-generate only sections affected by upstream changes — do not rewrite
+stable layer definitions or custom assertion patterns.
 
-Before starting, check if `docs/tdd-standards.md` already exists:
+## Update Mode Specifics
+- **Detect prior artifact**: docs/tdd-standards.md exists
+- **Preserve**: test pyramid layer definitions, custom assertion helpers, test
+  data strategy, quality gate thresholds, framework-specific patterns
+- **Triggers for update**: tech-stack.md changed (new test runner or framework),
+  coding-standards.md changed (naming conventions), PRD scope expanded (new
+  features needing test scenarios)
+- **Conflict resolution**: if tech stack changed test runner, migrate pattern
+  examples to new runner syntax; preserve coverage targets unless user requests
+  adjustment
 
-**If the file does NOT exist → FRESH MODE**: Skip to the next section and create from scratch.
+---
 
-**If the file exists → UPDATE MODE**:
-1. **Read & analyze**: Read the existing document completely. Check for a tracking comment on line 1: `<!-- scaffold:tdd-standards v<ver> <date> -->`. If absent, treat as legacy/manual — be extra conservative.
-2. **Diff against current structure**: Compare the existing document's sections against what this prompt would produce fresh. Categorize every piece of content:
-   - **ADD** — Required by current prompt but missing from existing doc
-   - **RESTRUCTURE** — Exists but doesn't match current prompt's structure or best practices
-   - **PRESERVE** — Project-specific decisions, rationale, and customizations
-3. **Cross-doc consistency**: Read related docs (`docs/tech-stack.md`, `docs/coding-standards.md`, `docs/project-structure.md`) and verify updates won't contradict them. Skip any that don't exist yet.
-4. **Preview changes**: Present the user a summary:
-   | Action | Section | Detail |
-   |--------|---------|--------|
-   | ADD | ... | ... |
-   | RESTRUCTURE | ... | ... |
-   | PRESERVE | ... | ... |
-   If >60% of content is unrecognized PRESERVE, note: "Document has been significantly customized. Update will add missing sections but won't force restructuring."
-   Wait for user approval before proceeding.
-5. **Execute update**: Restructure to match current prompt's layout. Preserve all project-specific content. Add missing sections with project-appropriate content (using existing docs as context).
-6. **Update tracking comment**: Add/update on line 1: `<!-- scaffold:tdd-standards v<ver> <date> -->`
-7. **Post-update summary**: Report sections added, sections restructured (with what changed), content preserved, and any cross-doc issues found.
+## Domain Knowledge
 
-**In both modes**, follow all instructions below — update mode starts from existing content rather than a blank slate.
+### testing-strategy
 
-### Update Mode Specifics
-- **Primary output**: `docs/tdd-standards.md`
-- **Preserve**: Coverage thresholds, test runner configuration, E2E sections added by Playwright/Maestro prompts, project-specific mocking strategies
-- **Related docs**: `docs/tech-stack.md`, `docs/coding-standards.md`, `docs/project-structure.md`
-- **Special rules**: Never remove E2E sections added by the Playwright or Maestro prompts. Preserve coverage threshold decisions. Keep existing reference test examples alongside any new ones.
+*Test pyramid, testing patterns, coverage strategy, and quality gates*
 
-## What the Document Must Cover
+# Testing Strategy
 
-### 1. TDD Workflow (the non-negotiable process)
-- Define the exact Red → Green → Refactor cycle as it applies to our stack
-- When to write unit tests vs integration tests vs e2e tests for a given change
-- The rule: no implementation code exists without a failing test written first
-- How to handle TDD when working with external APIs, databases, or third-party services
+Expert knowledge for test pyramid design, testing patterns, coverage strategy, and quality gates across all test levels.
 
-### 2. Test Architecture
-- Directory structure and file naming conventions (mirror source structure? co-locate? — decide based on our stack's conventions)
-- Test categorization: unit / integration / e2e — define the boundary for each
-- What belongs in each category for our specific stack (e.g., "API route handlers get integration tests, utility functions get unit tests, critical user flows get e2e tests")
-- Shared test utilities, factories, fixtures, and helpers — where they live and how to use them
+## Summary
 
-### 3. Concrete Patterns for Our Stack
-- Mocking strategy: what to mock, what NOT to mock, preferred mocking libraries
-- Database testing: test database setup/teardown, seeding, transaction rollback patterns
-- API testing: request/response testing patterns, authentication in tests
-- Frontend testing (if applicable): component testing, user interaction simulation
-- Async testing patterns specific to our stack
-- Provide a **reference test example** for each test category showing the exact pattern to follow
+### Test Pyramid
 
-### 4. AI-Specific Testing Rules
-These are critical because AI agents make predictable testing mistakes:
-- Never write tests that test the framework or library itself — only test OUR logic
-- Never write trivial tests (e.g., testing that a constant equals itself)
-- Tests must assert behavior, not implementation details — don't test that a specific internal method was called, test that the outcome is correct
-- Every test must be able to fail meaningfully — if you can't describe a scenario where the test catches a real bug, delete it
-- Test names must describe the behavior being tested: `should return 404 when session does not exist` not `test error case`
-- No test should depend on another test's state or execution order
-- When fixing a bug: write the failing test FIRST that reproduces the bug, then fix it
+```
+        /  E2E Tests  \         Few, slow, high confidence
+       / Integration    \       Moderate, medium speed
+      /   Unit Tests      \     Many, fast, focused
+     ________________________
+```
 
-### 5. Coverage & Quality Standards
-- Minimum coverage thresholds (suggest appropriate levels for our stack — 100% is usually wrong)
-- What to measure: line coverage is table stakes, branch coverage matters more
-- Areas that MUST have 100% branch coverage (e.g., authentication, payment, data validation)
-- Areas where lower coverage is acceptable (e.g., configuration, generated code)
-- How to run coverage reports with our stack's tooling
+### Test Level Definitions
 
-### 6. CI/Test Execution
-- How tests should run (parallel? sequential? by category?)
-- Expected test run time targets (fast feedback loop matters)
-- What blocks a commit vs. what runs in CI only
-- Flaky test policy: if a test fails intermittently, it's a bug — fix or delete it
+- **Unit Tests** — Single function/method/class in isolation. No I/O, deterministic, millisecond execution. Test pure business logic, state machines, edge cases, error handling.
+- **Integration Tests** — Interaction between 2+ components with real infrastructure. Seconds to execute. Test API handlers, DB queries, auth middleware, external service integrations.
+- **E2E Tests** — Complete user flows with real browser/device. Seconds to minutes. Test critical user journeys only (5-15 tests for most apps).
 
-### 7. E2E / Visual Testing
+### Basic Patterns
 
-If this project uses browser testing (Playwright) or mobile testing (Maestro), those will be configured by separate setup prompts that will add E2E-specific sections to this document.
+- **Arrange/Act/Assert (AAA)** — Set up conditions, perform action, verify result.
+- **Given/When/Then (BDD)** — Behavior-oriented variant for integration and E2E tests.
+- **Test Doubles** — Stubs (return predetermined data), Mocks (verify interactions), Spies (wrap real implementations), Fakes (simplified working implementations).
 
-Placeholder — to be completed by:
-- **Playwright Integration prompt** — for web apps (browser automation, visual verification)
-- **Maestro Setup prompt** — for Expo/mobile apps (flow testing, screenshot verification)
+### What NOT to Mock
 
-Until those prompts run, E2E testing patterns are not yet defined. Focus TDD efforts on unit and integration tests.
+- The thing you're testing
+- Value objects and simple data transformations
+- The database in integration tests
+- Too many things (if 10 mocks needed, refactor the code)
 
-## What This Document Should NOT Be
-- A TDD textbook or history lesson — assume the reader knows what TDD is
-- Generic advice that applies to any stack — everything should reference OUR specific tools and libraries
-- Aspirational — only include standards we intend to enforce from day one
+## Deep Guidance
 
-## Process
-- Use subagents to research TDD best practices for our specific stack in parallel
-- Review docs/user-stories.md to understand the types of features being built — this informs which testing patterns will be most relevant
-- Use AskUserQuestionTool for decisions like coverage thresholds, test runner preferences, or e2e scope
-- Include runnable example commands for running tests, checking coverage, and running specific test categories
-- If using Beads: create a task before starting (`bd create "docs: <document being created>" -p 0 && bd update <id> --claim`) and close when done (`bd close <id>`)
-- If this work surfaces implementation tasks (bugs, missing infrastructure), create separate Beads tasks for those — don't try to do them now
+### Unit Tests — Extended
+
+**What they test:** A single function, method, or class in isolation from all external dependencies (database, network, file system, other modules).
+
+**Characteristics:**
+- Execute in milliseconds
+- No I/O (no database, no network, no file system)
+- Deterministic (same input always produces same output)
+- Can run in any order and in parallel
+- External dependencies are replaced with test doubles
+
+**What to unit test:**
+- Pure business logic (calculations, transformations, validations)
+- State machines and state transitions
+- Edge cases and boundary conditions
+- Error handling logic
+- Data formatting and parsing
+
+**What NOT to unit test:**
+- Framework behavior (don't test that Express routes requests correctly)
+- Configuration (don't test that environment variables are read)
+- Trivial getters/setters with no logic
+- Third-party library functions
+
+**Example structure:**
+
+```typescript
+describe('calculateOrderTotal', () => {
+  it('sums line item prices', () => {
+    const lines = [
+      { quantity: 2, unitPrice: 1000 },  // $10.00 each
+      { quantity: 1, unitPrice: 2500 },  // $25.00
+    ];
+    expect(calculateOrderTotal(lines)).toBe(4500); // $45.00
+  });
+
+  it('returns zero for empty order', () => {
+    expect(calculateOrderTotal([])).toBe(0);
+  });
+
+  it('rejects negative quantities', () => {
+    const lines = [{ quantity: -1, unitPrice: 1000 }];
+    expect(() => calculateOrderTotal(lines)).toThrow('Quantity must be positive');
+  });
+});
+```
+
+### Integration Tests — Extended
+
+**What they test:** The interaction between two or more components, including real infrastructure (database, API calls between layers, message queues).
+
+**Characteristics:**
+- Execute in seconds
+- Use real infrastructure (test database, local services)
+- May require setup and teardown (database seeding, service startup)
+- Test that components integrate correctly, not that each component works in isolation
+
+**What to integration test:**
+- API endpoint handlers (request -> business logic -> database -> response)
+- Database query builders and repositories (do queries return correct data?)
+- Authentication/authorization middleware (does the auth chain work end-to-end?)
+- External service integrations (with a test/sandbox instance or contract tests)
+
+**API endpoint integration test example:**
+
+```typescript
+describe('POST /api/v1/users', () => {
+  beforeEach(async () => {
+    await db.users.deleteAll();  // Clean slate
+  });
+
+  it('creates a user and returns 201', async () => {
+    const response = await request(app)
+      .post('/api/v1/users')
+      .send({ email: 'test@example.com', password: 'SecurePass123!' })
+      .expect(201);
+
+    expect(response.body.user.email).toBe('test@example.com');
+    expect(response.body.user).not.toHaveProperty('password');  // Never return password
+
+    // Verify the user actually exists in the database
+    const dbUser = await db.users.findByEmail('test@example.com');
+    expect(dbUser).not.toBeNull();
+  });
+
+  it('returns 409 when email already exists', async () => {
+    await db.users.create({ email: 'taken@example.com', password: 'hash' });
+
+    const response = await request(app)
+      .post('/api/v1/users')
+      .send({ email: 'taken@example.com', password: 'SecurePass123!' })
+      .expect(409);
+
+    expect(response.body.error.code).toBe('ALREADY_EXISTS');
+  });
+});
+```
+
+### End-to-End (E2E) Tests — Extended
+
+**What they test:** Complete user flows from the user's perspective, using a real browser (for web apps) or real device/emulator (for mobile apps).
+
+**Characteristics:**
+- Execute in seconds to minutes
+- Use a full running application stack
+- Simulate real user behavior (clicks, typing, navigation)
+- Most expensive to maintain and slowest to run
+- Highest confidence that the system works as users expect
+
+**What to E2E test:**
+- Critical user journeys (registration, login, core business flow, payment)
+- Flows that integrate multiple features (add to cart -> checkout -> payment -> confirmation)
+- Accessibility checks on key pages
+
+**What NOT to E2E test:**
+- Every possible validation error (covered by unit/integration tests)
+- Internal API behavior (covered by integration tests)
+- Visual pixel-perfection (use visual regression testing tools separately)
+
+**Keep E2E tests focused:**
+- 5-15 E2E tests for most applications
+- Each tests a complete user journey, not a single interaction
+- If an E2E test breaks, it reveals a real user-facing problem
+
+### Test Doubles — Detailed Patterns
+
+#### Stubs
+
+Return predetermined responses. Use when you need to control what a dependency returns.
+
+```typescript
+const userRepo = { findById: jest.fn().mockResolvedValue({ id: '1', name: 'Alice' }) };
+```
+
+#### Mocks
+
+Record calls and verify interactions. Use when you need to verify that a dependency was called correctly.
+
+```typescript
+const emailService = { send: jest.fn() };
+// ... execute code ...
+expect(emailService.send).toHaveBeenCalledWith({
+  to: 'alice@example.com',
+  subject: 'Welcome!'
+});
+```
+
+#### Spies
+
+Wrap real implementations and record calls. Use when you want real behavior but also want to verify calls.
+
+#### Fakes
+
+Working implementations with simplified behavior. Use for expensive dependencies in tests (in-memory database instead of real database).
+
+#### When to Use Which
+
+- Stub external services (HTTP APIs, email, payment)
+- Mock side-effect-producing dependencies (to verify they're called)
+- Spy on internal functions (to verify call patterns without changing behavior)
+- Fake databases in unit tests (in-memory implementations of repository interfaces)
+
+### What NOT to Mock — Extended
+
+- **The thing you're testing.** If you mock the function under test, you're testing the mock, not the code.
+- **Value objects and simple data transformations.** Use real instances; they're fast and deterministic.
+- **The database in integration tests.** The point of integration tests is to test real database interactions.
+- **Too many things.** If a test requires 10 mocks, the code under test has too many dependencies. Refactor the code, not the test.
+
+### Snapshot Testing
+
+Captures the output of a component or function and compares it to a stored reference:
+
+**When to use:** Catching unintended changes to serializable output (React component trees, API response shapes, configuration objects).
+
+**When NOT to use:** For testing correctness (snapshots don't assert meaning, only shape). Don't use as a substitute for specific assertions.
+
+**Rules:**
+- Review snapshot changes carefully — don't just update blindly
+- Keep snapshots small (snapshot a component, not an entire page)
+- Use inline snapshots for small outputs
+
+### Contract Testing
+
+Verify that a service provider and its consumers agree on the API contract:
+
+- The consumer defines a contract (expected request/response pairs)
+- The provider runs the consumer's contracts as tests
+- If the provider changes break a consumer contract, tests fail before deployment
+
+Best for: microservices, separate frontend/backend teams, or any system where the API producer and consumer are developed independently.
+
+### Coverage Strategy — In Depth
+
+#### Coverage Targets by Layer
+
+Coverage targets should vary by the criticality and testability of each layer:
+
+| Layer | Coverage Target | Rationale |
+|-------|----------------|-----------|
+| Domain logic (pure business rules) | 90-100% branch | Business rules are the core value; they must be correct |
+| API endpoints | 80-90% branch | Integration tests cover happy path and major error paths |
+| UI components | 70-80% branch | Component tests cover rendering and interaction |
+| Infrastructure (adapters, config) | 50-70% line | Low logic density; over-testing adds maintenance burden |
+| Generated code | 0% | Don't test generated code; test the generator |
+
+#### Meaningful vs. Vanity Coverage
+
+**Meaningful coverage** tests behavior that could break:
+- Branch coverage (both sides of every `if` statement)
+- Boundary value testing (0, 1, N, max, max+1)
+- Error path coverage (every `catch` block has a test that triggers it)
+
+**Vanity coverage** inflates the number without adding value:
+- Testing that a constructor sets properties (tests language features, not logic)
+- Testing obvious delegation (service calls repository, returns result)
+- Achieving 100% line coverage by testing every getter/setter
+
+### Mutation Testing
+
+Mutation testing introduces small changes (mutations) to production code and checks whether tests detect them. If a mutation survives (tests still pass), the tests are weak.
+
+Common mutations:
+- Flipping `>` to `>=`
+- Changing `&&` to `||`
+- Replacing a return value with `null`
+- Removing a function call
+
+Tools: Stryker (JavaScript/TypeScript), mutmut (Python), PITest (Java).
+
+Use mutation testing periodically (not on every CI run — it's slow) to assess test suite quality.
+
+### Quality Gates — Detailed
+
+#### Pre-Commit Checks
+
+Run on every commit (should complete in <10 seconds):
+
+- **Linting:** Code style violations (ESLint, Ruff, ShellCheck)
+- **Type checking:** Static type errors (TypeScript compiler, mypy)
+- **Formatting:** Code formatting (Prettier, Black, gofmt)
+
+These are fast, catch obvious mistakes, and prevent noisy diffs in PRs.
+
+#### CI Pipeline Checks
+
+Run on every push and PR (should complete in <5 minutes):
+
+- **All pre-commit checks** (redundant but catches bypassed hooks)
+- **Unit tests** with coverage report
+- **Integration tests** with test database
+- **Build verification** (the application compiles and builds successfully)
+- **Security audit** (dependency vulnerability scan)
+
+#### Pre-Merge Requirements
+
+Before a PR can be merged:
+
+- All CI checks pass
+- Code review approved (by human or AI reviewer)
+- No merge conflicts
+- Branch is up-to-date with main (or rebased)
+
+#### Performance Benchmarks (Optional)
+
+For performance-critical applications:
+
+- Benchmark tests run in CI
+- Results compared against baseline
+- Significant regressions (>10% degradation) block merge
+- Baselines updated when intentional changes affect performance
+
+### Test Data Management
+
+#### Fixtures
+
+Static test data stored in files or constants. Best for:
+- Reference data (country lists, category hierarchies, status enums)
+- Large datasets for performance tests
+- Complex object graphs that are tedious to construct in code
+
+```typescript
+// fixtures/users.ts
+export const validUser = {
+  email: 'test@example.com',
+  displayName: 'Test User',
+  password: 'SecurePassword123!',
+};
+
+export const adminUser = {
+  ...validUser,
+  email: 'admin@example.com',
+  role: 'admin',
+};
+```
+
+#### Factories
+
+Functions that generate test data with sensible defaults and selective overrides. Best for:
+- Creating many variations of the same entity
+- Ensuring test data is always valid
+- Keeping tests focused on what varies (not boilerplate setup)
+
+```typescript
+function createUser(overrides: Partial<User> = {}): User {
+  return {
+    id: randomUUID(),
+    email: `user-${randomId()}@example.com`,
+    displayName: 'Test User',
+    status: 'active',
+    createdAt: new Date(),
+    ...overrides,
+  };
+}
+
+// Usage: only specify what matters for this test
+const suspendedUser = createUser({ status: 'suspended' });
+```
+
+#### Seeds
+
+Initial data loaded into the test database for integration tests. Rules:
+- Seed data represents realistic scenarios (not just one record per table)
+- Seed data is idempotent (safe to run twice)
+- Seed data is minimal (only what tests need; don't replicate production)
+- Seed data includes edge cases (user with no orders, order with many items)
+
+#### Test Database Management
+
+**Transaction rollback pattern:** Each test runs inside a database transaction that is rolled back after the test. Fast, clean, but doesn't test commit behavior.
+
+**Truncate-and-seed pattern:** Before each test (or test suite), truncate all tables and re-seed. Slower but tests real commit behavior.
+
+**Dedicated test database:** Each test run creates a fresh database. Slowest but most isolated.
+
+**Recommendation:** Use transaction rollback for unit-level database tests. Use truncate-and-seed for integration test suites. Use dedicated databases for CI.
+
+### Common Pitfalls
+
+**Testing implementation details.** "Verify that `_processPayment` was called with exactly these parameters." This test breaks whenever the internal implementation changes, even if the observable behavior is unchanged. Fix: test the observable outcome, not the internal mechanism.
+
+**Flaky tests.** Tests that pass sometimes and fail other times. Common causes: time-dependent logic, race conditions, shared mutable state, network dependencies, random ordering. Fix: each flaky test is a bug. Fix the root cause (mock time, eliminate shared state, isolate network calls) or delete the test. Never ignore flaky tests.
+
+**Slow test suites.** A test suite that takes 20 minutes to run discourages running tests frequently. Common causes: E2E tests doing unit-level work, no test parallelization, unnecessary database setup per test, sleeping in tests. Fix: move fine-grained logic tests to unit level. Parallelize test execution. Use transaction rollback instead of database recreation.
+
+**Testing through the UI for logic tests.** An E2E test that clicks through a form to verify that email validation works. This is a unit test masquerading as an E2E test — it's 100x slower and 10x more fragile. Fix: test validation logic with a unit test. Use E2E only for verifying the full user flow.
+
+**No test data strategy.** Tests that create data inline with inconsistent formats, duplicate setup logic, and fragile assumptions. Fix: use factories for all test data. Define fixtures for static reference data. Establish seed data for integration tests.
+
+**100% coverage as a goal.** Pursuing 100% line coverage leads to tests that test trivial code, tests that are coupled to implementation, and team resistance to writing more tests. Fix: set meaningful coverage targets per layer. Focus on branch coverage over line coverage. Use mutation testing to assess quality.
+
+**Testing the framework.** "Test that the Express router returns 404 for an undefined route." This tests Express, not your code. Fix: test your handlers, your middleware, your business logic. Assume the framework works correctly.
+
+**Skipped tests accumulate.** Tests marked as `skip` or `xit` that are never re-enabled. They represent either dead code or known bugs that nobody addresses. Fix: skipped tests are technical debt. Set a policy: fix or delete within one sprint.
+
+**No test naming convention.** Test descriptions like "test 1," "works correctly," or "handles the thing." Uninformative when tests fail. Fix: test names should describe the scenario and expected outcome: "returns 404 when user does not exist," "applies 10% discount for premium members."
+
+## See Also
+
+- [api-design](../core/api-design.md) — Contract testing patterns
+
+---
 
 ## After This Step
 
-When this step is complete, tell the user:
-
----
-**Phase 2 in progress** — `docs/tdd-standards.md` created.
-
-**Next:** Run `/scaffold:review-testing` — Review TDD standards for completeness and stack alignment. Or run `/scaffold:story-tests` — Generate test skeletons from user story acceptance criteria.
-
-**Note:** `/scaffold:project-structure` runs independently and can proceed in parallel.
-
-**Pipeline reference:** `/scaffold:prompt-pipeline`
-
----
+Continue with: `/scaffold:add-e2e-testing`, `/scaffold:implementation-plan`, `/scaffold:create-evals`, `/scaffold:review-testing`, `/scaffold:story-tests`
