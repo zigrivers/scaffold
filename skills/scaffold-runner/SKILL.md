@@ -148,7 +148,7 @@ If no prior activity is detected, suggest `single-agent-start` or `multi-agent-s
 
 ## Tool Execution
 
-Tools (version-bump, release, version, update, dashboard, prompt-pipeline, session-analyzer) are utility commands orthogonal to the pipeline.
+Tools (version-bump, release, version, update, dashboard, prompt-pipeline, session-analyzer, review-pr) are utility commands orthogonal to the pipeline.
 
 ### Differences from Pipeline Steps
 
@@ -219,6 +219,7 @@ Respond to these natural language requests:
 | "Create release" / "Release" | `scaffold run release` |
 | "What tools are available?" | `scaffold list --tools` |
 | "Show version" | `scaffold run version` |
+| "Review PR" / "Run code review" | `scaffold run review-pr` |
 
 ### Re-running Steps
 

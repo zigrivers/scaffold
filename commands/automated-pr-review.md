@@ -91,7 +91,7 @@ Add this to `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "if echo \"$CC_BASH_COMMAND\" | grep -q 'gh pr create'; then echo '\\n⚠️  MANDATORY: Run /scaffold:review-pr now.\\nAll 3 review channels must execute before proceeding:\\n  1. Codex CLI\\n  2. Gemini CLI\\n  3. Superpowers code-reviewer subagent\\nDo NOT move to the next task until review is complete.'; fi"
+            "command": "if echo \"$CC_BASH_COMMAND\" | grep -q 'gh pr create'; then echo '\\n⚠️  MANDATORY: Run all 3 code review channels before proceeding to the next task:\\n  1. Codex CLI: codex exec --skip-git-repo-check -s read-only --ephemeral \"REVIEW_PROMPT\" 2>/dev/null\\n  2. Gemini CLI: NO_BROWSER=true gemini -p \"REVIEW_PROMPT\" --output-format json --approval-mode yolo 2>/dev/null\\n  3. Superpowers: dispatch superpowers:code-reviewer subagent\\n\\nVerify auth first: codex login status | NO_BROWSER=true gemini -p \"respond with ok\" -o json\\nFix all P0/P1 findings before moving on. Do NOT skip any channel.\\nFull instructions: scaffold run review-pr'; fi"
           }
         ]
       }
@@ -104,6 +104,11 @@ Add this to `.claude/settings.json`:
 suffer from context decay — instructions from hundreds of messages ago are
 effectively invisible by the time the agent creates its third PR. The hook injects
 the reminder at exactly the right moment, every time, regardless of context length.
+
+**Why inline commands instead of just a slash command reference?** The hook must work
+regardless of how scaffold is installed (plugin vs CLI vs user commands). Including
+the actual CLI invocations ensures the agent can execute reviews even if the
+`/scaffold:review-pr` slash command isn't available in the current namespace.
 
 ### Add Review Workflow to CLAUDE.md
 

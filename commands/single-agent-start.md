@@ -141,11 +141,15 @@ For each task:
    - Follow the PR workflow from `docs/git-workflow.md` or CLAUDE.md
 
 7. **Run code reviews (MANDATORY)**
-   - Run `/scaffold:review-pr` with the PR number from step 6
-   - This runs **all three** review channels: Codex CLI, Gemini CLI, and Superpowers code-reviewer subagent
+   - Run the review-pr tool: `scaffold run review-pr` (CLI) or `/scaffold:review-pr` (plugin)
+   - This runs **all three** review channels on the PR diff:
+     1. **Codex CLI**: `codex exec --skip-git-repo-check -s read-only --ephemeral "REVIEW_PROMPT" 2>/dev/null`
+     2. **Gemini CLI**: `NO_BROWSER=true gemini -p "REVIEW_PROMPT" --output-format json --approval-mode yolo 2>/dev/null`
+     3. **Superpowers code-reviewer**: dispatch `superpowers:code-reviewer` subagent with BASE_SHA and HEAD_SHA
+   - Verify auth before each CLI (`codex login status`, `NO_BROWSER=true gemini -p "respond with ok" -o json`)
    - All three channels must execute (skip only if a tool is genuinely not installed)
    - Fix any P0/P1 findings before proceeding
-   - Do NOT move to the next task until the review summary confirms all channels ran
+   - Do NOT move to the next task until all channels have run
 
 8. **Update status**
    - If Beads: task status is managed via `bd` commands
@@ -178,7 +182,7 @@ For each task:
 1. **TDD is not optional** — Write failing tests before implementation. No exceptions.
 2. **One task at a time** — Complete the current task fully before starting the next.
 3. **Quality gates before PR** — Never create a PR with failing checks.
-4. **Code review before next task** — After creating a PR, run `/scaffold:review-pr` and fix all P0/P1 findings before moving on. All three review channels (Codex, Gemini, Superpowers) must execute.
+4. **Code review before next task** — After creating a PR, run all three review channels (Codex CLI, Gemini CLI, Superpowers code-reviewer) and fix all P0/P1 findings before moving on.
 5. **Update status immediately** — Mark tasks complete as soon as review passes.
 6. **Consult lessons.md** — Check for relevant anti-patterns before each task.
 7. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
