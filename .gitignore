@@ -4,6 +4,10 @@
 # Beads local database
 .beads/
 
+# Local runtime state
+.scaffold/
+.superpowers/
+
 # Coverage output (kcov)
 coverage/
 
