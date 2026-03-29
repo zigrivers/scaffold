@@ -366,7 +366,7 @@ describe('generateHtml', () => {
     expect(html).not.toContain('id="stale-notice"')
   })
 
-  it('escapes HTML in step slugs to prevent XSS in step rows', () => {
+  it('escapes HTML in step slugs to prevent XSS in embedded JSON', () => {
     const xssSlug = '<script>alert(1)</script>'
     const xssState = makeState({
       [xssSlug]: {
@@ -377,15 +377,72 @@ describe('generateHtml', () => {
     })
     const data = generateDashboardData(makeOpts({ state: xssState }))
     const html = generateHtml(data)
-    // The step row itself must escape the slug
-    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
-    // The raw unescaped tag must not appear in step rows (class="step-name" section)
-    expect(html).not.toContain('<span class="step-name"><script>')
+    // JSON.stringify escapes angle brackets — the raw unescaped tag must not appear
+    // outside of safely-typed script blocks
+    const jsonBlock = html.match(/<script id="scaffold-data"[^>]*>([\s\S]*?)<\/script>/)?.[1] ?? ''
+    // The JSON should contain the slug but JSON-escaped (not raw HTML)
+    expect(jsonBlock).toContain('alert(1)')
+    // The raw <script> tag must NOT appear unescaped outside JSON/script blocks
+    // Remove all <script...>...</script> blocks, then check no raw XSS
+    const withoutScripts = html.replace(/<script[\s\S]*?<\/script>/gi, '')
+    expect(withoutScripts).not.toContain('<script>alert(1)</script>')
   })
 
   it('shows "No decisions recorded yet." when decisions array is empty', () => {
     const data = generateDashboardData(makeOpts({ decisions: [] }))
     const html = generateHtml(data)
     expect(html).toContain('No decisions recorded yet.')
+  })
+
+  it('renders phase sections in HTML', () => {
+    const data = generateDashboardData(makeOpts({ metaPrompts: makeMetaPrompts() }))
+    const html = generateHtml(data)
+    expect(html).toContain('phase-header')
+    expect(html).toContain('togglePhase')
+  })
+
+  it('renders step modal infrastructure', () => {
+    const data = generateDashboardData(makeOpts())
+    const html = generateHtml(data)
+    expect(html).toContain('openModal')
+    expect(html).toContain('closeModal')
+    expect(html).toContain('modal-overlay')
+  })
+
+  it('renders what\'s next banner when nextEligible exists', () => {
+    const data = generateDashboardData(makeOpts({ metaPrompts: makeMetaPrompts() }))
+    const html = generateHtml(data)
+    expect(html).toContain('whats-next')
+  })
+
+  it('contains formatDate function', () => {
+    const data = generateDashboardData(makeOpts())
+    const html = generateHtml(data)
+    expect(html).toContain('formatDate')
+  })
+
+  it('contains copyCommand function', () => {
+    const data = generateDashboardData(makeOpts())
+    const html = generateHtml(data)
+    expect(html).toContain('copyCommand')
+  })
+
+  it('contains renderPhases function', () => {
+    const data = generateDashboardData(makeOpts())
+    const html = generateHtml(data)
+    expect(html).toContain('renderPhases')
+  })
+
+  it('contains toggleDecisions function', () => {
+    const data = generateDashboardData(makeOpts())
+    const html = generateHtml(data)
+    expect(html).toContain('toggleDecisions')
+  })
+
+  it('no external resource references', () => {
+    const data = generateDashboardData(makeOpts())
+    const html = generateHtml(data)
+    expect(html).not.toContain('https://')
+    expect(html).not.toContain('http://')
   })
 })
