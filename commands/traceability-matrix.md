@@ -33,7 +33,7 @@ coverage gaps.
 - (deep) Every test case maps to >= 1 implementation task
 - (deep) Every Must-have and Should-have item maps to >= 1 downstream artifact. Nice-to-have items may be orphaned with explicit rationale.
 - (deep) Bidirectional traceability verified: PRD → Stories → Domain → Architecture → Tasks
-- Findings categorized P0-P3 with specific file, section, and issue for each
+- (mvp) Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Finding Disposition

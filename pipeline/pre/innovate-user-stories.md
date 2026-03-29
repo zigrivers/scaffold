@@ -5,7 +5,7 @@ summary: "Identifies UX enhancement opportunities — progressive disclosure, sm
 phase: "pre"
 order: 160
 dependencies: [review-user-stories]
-outputs: [docs/user-stories-innovation.md, docs/reviews/user-stories-innovation/review-summary.md, docs/reviews/user-stories-innovation/codex-review.json, docs/reviews/user-stories-innovation/gemini-review.json]
+outputs: [docs/user-stories-innovation.md, docs/user-stories.md, docs/reviews/user-stories-innovation/review-summary.md, docs/reviews/user-stories-innovation/codex-review.json, docs/reviews/user-stories-innovation/gemini-review.json]
 conditional: "if-needed"
 knowledge-base: [user-stories, user-story-innovation, multi-model-review-dispatch]
 ---
@@ -39,7 +39,7 @@ enhancement opportunities.
 - (mvp) Each suggestion has a clear user benefit
 - (mvp) Approved enhancements are integrated into existing stories (not new stories)
 - (mvp) PRD scope boundaries are respected — no scope creep
-- User approval for each accepted innovation documented as a question-response pair with timestamp (e.g., "Q: Accept enhancement X? A: Yes — 2025-01-15T14:30Z")
+- (mvp) User approval for each accepted innovation documented as a question-response pair with timestamp (e.g., "Q: Accept enhancement X? A: Yes — 2025-01-15T14:30Z")
 - (mvp) Each innovation marked with approval status: approved, deferred, or rejected, with user decision timestamp
 - (depth 4+) Multi-model suggestions deduplicated and synthesized with unique ideas from each model highlighted
 

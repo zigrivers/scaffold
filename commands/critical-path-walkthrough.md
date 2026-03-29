@@ -28,8 +28,8 @@ spec gaps along the critical path.
 - (mvp) User specifies >= 3 Must-have epics as critical user journeys; each traced end-to-end
 - (deep) Every journey verified at each layer: PRD → Story → UX → API → Architecture → DB → Task
 - (deep) Each critical path verified against story acceptance criteria for behavioral correctness
-- Missing layers or broken handoffs documented with specific gap description
-- Findings categorized P0-P3 with specific file, section, and issue for each
+- (mvp) Missing layers or broken handoffs documented with specific gap description
+- (mvp) Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Finding Disposition
@@ -74,6 +74,19 @@ they are regenerated each run.
 # Critical Path Analysis
 
 Critical path analysis walks through the most important user journeys end-to-end across every specification artifact. For each journey, it verifies that every component, endpoint, query, screen, and task needed to make the journey work actually exists and is consistent.
+
+## Summary
+
+- **Critical paths** are user journeys representing core functionality — the features that, if broken, would make the product unusable or fail its primary value proposition.
+- **Sources for identifying journeys**: PRD success criteria, user stories, personas, architecture data flows, and revenue/value paths.
+- **Trace 5-10 journeys** per project; more than 15 suggests scope is too broad or granularity too fine.
+- **Four-step tracing process**: define the journey steps, map each step to specification artifacts (UX, API, architecture, data, tasks), check each mapping for existence/completeness/connectivity/error handling, and identify gaps.
+- **Gap types**: missing components, missing endpoints, missing queries, missing screens, missing tasks, broken connections between steps, and missing error paths.
+- **Common gap patterns**: handoff gaps at bounded-context boundaries, state transition gaps for entity lifecycle, async gaps for background processing, first-time user gaps for empty states, and permission gaps for authorization.
+- **Output**: a summary table of all journeys with gap counts and assessments, plus detailed findings with impact analysis and recommended fixes.
+- **When to run**: after all pipeline steps are complete, before implementation tasks are finalized, when PRD changes significantly, and as a final check before freezing docs.
+
+## Deep Guidance
 
 ## What a Critical Path Is
 

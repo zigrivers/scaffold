@@ -28,10 +28,10 @@ independent coverage validation.
 
 ## Quality Criteria
 - (mvp) Pass 1 (PRD coverage) executed with findings documented
-- All review passes executed with findings documented
-- Every finding categorized by severity: P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.
-- Fix plan created for P0 and P1 findings
-- Fixes applied and re-validated
+- (deep) All review passes executed with findings documented
+- (mvp) Every finding categorized by severity: P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.
+- (mvp) Fix plan created for P0 and P1 findings
+- (mvp) Fixes applied and re-validated
 - (mvp) Every story has at least one testable acceptance criterion, and every PRD feature maps to at least one story
 - (depth 4+) Every atomic PRD requirement has a REQ-xxx ID in the requirements index
 - (depth 4+) Coverage matrix maps every REQ to at least one US (100% coverage target)

@@ -22,7 +22,7 @@ not here.
 - docs/vision.md — updated with approved strategic innovations
 
 ## Quality Criteria
-- Innovations are strategic-level, not feature-level
+- (mvp) Innovations are strategic-level, not feature-level
 - (mvp) Each innovation categorized: market opportunity, positioning, AI-native, ecosystem, or contrarian
 - (mvp) Each innovation includes: what to change, why, impact (high/medium/low), cost estimate
 - (mvp) Each suggestion has an implementation cost estimate (trivial/moderate/significant)
@@ -30,8 +30,8 @@ not here.
 - (deep) Impact assessments compared to existing document content
 - (deep) Each approved innovation is integrated with the same subsection headings and detail level as existing vision sections
 - (mvp) Each innovation marked with approval status: approved, deferred, or rejected, with user decision timestamp
-- Vision scope is respected — no uncontrolled strategic drift
-- User approval is obtained before modifying the vision document
+- (mvp) Vision scope is respected — no uncontrolled strategic drift
+- (mvp) User approval is obtained before modifying the vision document
 
 ## Methodology Scaling
 - **deep**: Full innovation pass across all 5 dimensions. Competitive research

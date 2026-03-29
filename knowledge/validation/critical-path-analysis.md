@@ -8,6 +8,19 @@ topics: [validation, critical-path, user-journeys, end-to-end, gap-analysis]
 
 Critical path analysis walks through the most important user journeys end-to-end across every specification artifact. For each journey, it verifies that every component, endpoint, query, screen, and task needed to make the journey work actually exists and is consistent.
 
+## Summary
+
+- **Critical paths** are user journeys representing core functionality — the features that, if broken, would make the product unusable or fail its primary value proposition.
+- **Sources for identifying journeys**: PRD success criteria, user stories, personas, architecture data flows, and revenue/value paths.
+- **Trace 5-10 journeys** per project; more than 15 suggests scope is too broad or granularity too fine.
+- **Four-step tracing process**: define the journey steps, map each step to specification artifacts (UX, API, architecture, data, tasks), check each mapping for existence/completeness/connectivity/error handling, and identify gaps.
+- **Gap types**: missing components, missing endpoints, missing queries, missing screens, missing tasks, broken connections between steps, and missing error paths.
+- **Common gap patterns**: handoff gaps at bounded-context boundaries, state transition gaps for entity lifecycle, async gaps for background processing, first-time user gaps for empty states, and permission gaps for authorization.
+- **Output**: a summary table of all journeys with gap counts and assessments, plus detailed findings with impact analysis and recommended fixes.
+- **When to run**: after all pipeline steps are complete, before implementation tasks are finalized, when PRD changes significantly, and as a final check before freezing docs.
+
+## Deep Guidance
+
 ## What a Critical Path Is
 
 A critical path is a user journey that represents core functionality — the features that, if broken, would make the product unusable or fail its primary value proposition. These are not edge cases. They are the main flows that most users will execute most of the time.

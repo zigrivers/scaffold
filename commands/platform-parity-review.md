@@ -48,9 +48,9 @@ Skip when the project targets a single platform only.
 - (deep) Navigation patterns appropriate per platform (sidebar vs. tab bar, etc.)
 - (deep) Offline/connectivity handling addressed per platform (if applicable)
 - (deep) Web version is treated as first-class (not afterthought) if PRD specifies it
-- Every finding categorized P0-P3 (P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.)
-- Fix plan documented for all P0/P1 findings with specific document and section to update
-- (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
+- (mvp) Every finding categorized P0-P3 (P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.)
+- (mvp) Fix plan documented for all P0/P1 findings with specific document and section to update
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling
 - **deep**: Comprehensive platform audit across all documents, feature parity

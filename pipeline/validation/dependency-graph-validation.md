@@ -36,7 +36,7 @@ and completeness issues.
 - (deep) Critical path identified and total estimated duration documented
 - (deep) No task is blocked by more than 3 sequential dependencies (flag deep chains)
 - (deep) Wave assignments are consistent with dependency ordering
-- Findings categorized P0-P3 with specific file, section, and issue for each
+- (mvp) Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Finding Disposition

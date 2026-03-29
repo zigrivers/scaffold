@@ -11,7 +11,7 @@ format between agents, and success criteria.
 
 ## Inputs
 - docs/implementation-plan.md (required) — tasks to sequence
-- docs/system-architecture.md (required) — architecture context
+- docs/system-architecture.md (required at deep; optional — not available in MVP) — architecture context
 - docs/tdd-standards.md (required) — testing requirements
 - tests/acceptance/ (required if exists) — test skeletons agents implement during TDD
 - docs/story-tests-map.md (required if exists) — story-to-test mapping for progress tracking
@@ -39,7 +39,7 @@ format between agents, and success criteria.
 - (mvp) Success criteria per task (how to know it's done)
 - (deep) Handoff format between agents (what to communicate when passing work)
 - (mvp) Quality gates are defined (what must pass before a task is complete)
-- (mvp) Test skeleton discovery: playbook instructs agents to check docs/story-tests-map.md before writing new tests
+- (deep) Test skeleton discovery: playbook instructs agents to check docs/story-tests-map.md before writing new tests
 - (mvp) Dependency-failure recovery: playbook documents what to do when a task's upstream dependency is blocked
 - (deep) Quality gates include `make eval` (or equivalent) as a required check when eval tests exist
 - (deep) Agent workflow references test skeleton implementation from tests/acceptance/

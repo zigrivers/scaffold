@@ -101,3 +101,75 @@ setup() {
 
   [[ "$checked" -gt 0 ]]
 }
+
+# --- Test 3: Key QC text matches between pipeline and command pairs ---
+# Picks 5 representative steps and verifies a distinctive phrase from each
+# pipeline QC section also appears verbatim in the corresponding command file.
+# This catches build-drift where QC content silently diverges.
+
+@test "key QC phrases match between pipeline and command files" {
+  # 5 representative steps with a distinctive QC phrase from their pipeline file.
+  # Format: "step-name|distinctive phrase from QC section"
+  local -a qc_probes=(
+    "create-vision|Vision statement is a single sentence of 25 words or fewer"
+    "create-prd|Problem statement names a specific user group"
+    "tech-stack|No speculative technologies"
+    "coding-standards|Every standard references the specific tech stack"
+    "dev-env-setup|Dev server starts with a single command"
+  )
+
+  local failures=()
+  local checked=0
+
+  for probe in "${qc_probes[@]}"; do
+    local step_name="${probe%%|*}"
+    local expected_phrase="${probe##*|}"
+
+    # Find the pipeline file for this step
+    local pipeline_file=""
+    while IFS= read -r candidate; do
+      local candidate_name
+      candidate_name="$(extract_field "$candidate" "name")"
+      if [[ "$candidate_name" == "$step_name" ]]; then
+        pipeline_file="$candidate"
+        break
+      fi
+    done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+
+    if [[ -z "$pipeline_file" ]]; then
+      failures+=("${step_name}: pipeline file not found")
+      continue
+    fi
+
+    local cmd_file="${PROJECT_ROOT}/commands/${step_name}.md"
+    if [[ ! -f "$cmd_file" ]]; then
+      failures+=("${step_name}: command file not found at commands/${step_name}.md")
+      continue
+    fi
+
+    checked=$((checked + 1))
+
+    # Verify the phrase exists in the pipeline QC section
+    local pipeline_qc
+    pipeline_qc="$(awk '/^## Quality Criteria/{found=1; next} /^## /{if(found) exit} found{print}' "$pipeline_file")"
+    if ! echo "$pipeline_qc" | grep -qF "$expected_phrase"; then
+      failures+=("${step_name}: probe phrase not found in pipeline QC (test data stale?): '${expected_phrase}'")
+      continue
+    fi
+
+    # Verify the same phrase appears in the command file
+    if ! grep -qF "$expected_phrase" "$cmd_file"; then
+      failures+=("${step_name}: QC phrase missing from command file: '${expected_phrase}'")
+    fi
+  done
+
+  printf "Checked %d pipeline/command QC phrase pairs\n" "$checked"
+
+  if [[ ${#failures[@]} -gt 0 ]]; then
+    printf "QC text drift failures (%d):\n" "${#failures[@]}"
+    printf "  %s\n" "${failures[@]}"
+    return 1
+  fi
+
+  [[ "$checked" -gt 0 ]]
+}

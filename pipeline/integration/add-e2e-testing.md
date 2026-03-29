@@ -41,12 +41,12 @@ Outputs vary by detected platform:
 - (mvp) (mobile) Maestro CLI installed, sample flow executes, screenshot captured
 - (mobile) testID naming convention defined and documented
 - (mvp) E2E section in tdd-standards.md distinguishes when to use E2E vs unit tests
-- Baseline screenshots committed, current screenshots gitignored
-- CLAUDE.md contains browser/mobile testing section
-- tdd-standards.md E2E section updated with when-to-use guidance
+- (mvp) Baseline screenshots committed, current screenshots gitignored
+- (mvp) CLAUDE.md contains browser/mobile testing section
+- (mvp) tdd-standards.md E2E section updated with when-to-use guidance
 - (deep) CI integration configured for E2E test execution
 - (deep) Sub-flows defined for common user journeys
-- (deep for multi-platform) Smoke test names and intent are consistent between Playwright and Maestro
+- (deep) Smoke test names and intent are consistent between Playwright and Maestro
 
 ## Methodology Scaling
 - **deep**: Full setup for all detected platforms. All visual testing patterns,

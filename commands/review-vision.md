@@ -19,10 +19,10 @@ strategically sound, and ready for the PRD to consume.
 
 ## Quality Criteria
 - (mvp) Passes 1 and 5 executed with findings documented
-- All 5 review passes executed with findings documented
-- Every finding categorized by severity: P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.
-- Fix plan created for P0 and P1 findings
-- Fixes applied and re-validated
+- (deep) All 5 review passes executed with findings documented
+- (mvp) Every finding categorized by severity: P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.
+- (mvp) Fix plan created for P0 and P1 findings
+- (mvp) Fixes applied and re-validated
 - (mvp) Every vision section has content specific enough to derive a PRD without asking strategic clarification questions
 - (depth 4+) Multi-model review findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 

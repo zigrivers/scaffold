@@ -35,9 +35,9 @@ by the entire workflow.
 - (mvp) Dev server starts with a single command and supports live/hot reloading
 - (deep) Local database setup is scripted (if applicable)
 - (deep) .env.example documents all variables with comments
-- Key Commands table in CLAUDE.md matches actual Makefile/package.json commands
+- (mvp) Key Commands table in CLAUDE.md matches actual Makefile/package.json commands
 - (mvp) Lint and test commands exist and are runnable
-- Verification checklist passes (install, dev server, browser, live reload, tests, db)
+- (deep) Verification checklist passes (install, dev server, browser, live reload, tests, db)
 - (mvp) Setup process works for first-time clone (max 5 steps)
 - (mvp) Makefile/package.json includes at minimum: dev, test, lint targets
 

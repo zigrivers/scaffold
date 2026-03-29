@@ -39,9 +39,9 @@ independent review validation.
 - (deep) Dependency audit scope covers all dependencies
 - (deep) Threat model covers all trust boundaries
 - (deep) If docs/domain-models/ exists, data classification covers every entity in the domain model. Otherwise, data classification derived from user stories and API contracts.
-- Every finding categorized P0-P3 (P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.) with specific control, boundary, and issue
-- Fix plan documented for all P0/P1 findings; fixes applied to security-review.md and re-validated
-- Downstream readiness confirmed — no unresolved P0 or P1 findings remain before planning phase proceeds
+- (mvp) Every finding categorized P0-P3 (P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.) with specific control, boundary, and issue
+- (mvp) Fix plan documented for all P0/P1 findings; fixes applied to security-review.md and re-validated
+- (mvp) Downstream readiness confirmed — no unresolved P0 or P1 findings remain before planning phase proceeds
 - (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling

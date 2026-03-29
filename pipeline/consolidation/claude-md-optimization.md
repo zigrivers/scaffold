@@ -39,12 +39,12 @@ scannability.
 - (mvp) No verbatim repetition of content from other docs (reference instead)
 - (mvp) Consistent terminology throughout (task vs. ticket, etc.)
 - (mvp) Key Commands table matches actual Makefile/package.json commands
-- Critical patterns are prominent (TDD, never push to main, keep working,
+- (mvp) Critical patterns are prominent (TDD, never push to main, keep working,
   verify before commit, worktrees for parallel). If Beads: every commit needs task ID.
 - (deep) CLAUDE.md is <= 200 lines or critical patterns appear in the first 50 lines
 - (deep) Workflow scenarios cover error cases (test failures, merge conflicts, CI failures,
   crashed sessions, blocked tasks)
-- Tracking comment added: <!-- scaffold:claude-md-optimization v1 YYYY-MM-DD -->
+- (mvp) Tracking comment added: <!-- scaffold:claude-md-optimization v1 YYYY-MM-DD -->
 
 ## Methodology Scaling
 - **deep**: Full four-phase analysis (redundancy, consistency, gap, priority audits)

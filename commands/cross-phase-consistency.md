@@ -27,7 +27,7 @@ drift patterns.
 - (mvp) Technology references match `docs/tech-stack.md` in all documents
 - (deep) Data flow descriptions in architecture match API endpoint definitions
 - (deep) Every named entity in the domain model has exactly one name used consistently across domain-models/, api-contracts.md, database-schema.md, and ux-spec.md
-- Findings categorized P0-P3 with specific file, section, and issue for each
+- (mvp) Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Finding Disposition

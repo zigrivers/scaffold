@@ -32,7 +32,7 @@ professional UI without requiring design expertise from the user.
 - (mvp) Theme configuration files actually work (verified by running dev server)
 - (deep) Both light and dark mode token values provided (if dark mode requested)
 - (deep) Responsive breakpoints defined (mobile, tablet, desktop)
-- No arbitrary hex values or pixel values in component examples (all use tokens)
+- (mvp) No arbitrary hex values or pixel values in component examples (all use tokens)
 
 ## Methodology Scaling
 - **deep**: Full design system with all component categories, dark mode support,

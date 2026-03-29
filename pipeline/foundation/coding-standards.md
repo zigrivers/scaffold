@@ -31,14 +31,14 @@ self-review checklist.
   alongside the standards doc
 
 ## Quality Criteria
-- Every standard references the specific tech stack, not generic principles
-- Includes >= 2 runnable code examples per section showing the RIGHT way for the stack
-- Commit message format is [BD-<id>] type(scope): description
-- AI-specific coding rules section addresses common AI mistakes (dead code,
+- (mvp) Every standard references the specific tech stack, not generic principles
+- (deep) Includes >= 2 runnable code examples per section showing the RIGHT way for the stack
+- (mvp) Commit message format is [BD-<id>] type(scope): description
+- (mvp) AI-specific coding rules section addresses common AI mistakes (dead code,
   duplication, magic numbers, premature abstraction, unnecessary features)
-- Linter/formatter configs created and referenced from the document
-- Every standard has a corresponding linter rule, formatter rule, code review checklist item, or test pattern that enforces it (where applicable tools exist)
-- Every code review checklist item is a binary yes/no question
+- (mvp) Linter/formatter configs created and referenced from the document
+- (mvp) Every standard has a corresponding linter rule, formatter rule, code review checklist item, or test pattern that enforces it (where applicable tools exist)
+- (deep) Every code review checklist item is a binary yes/no question
 - (mvp) Linter/formatter config files are valid (lint command runs without config errors)
 
 ## Methodology Scaling

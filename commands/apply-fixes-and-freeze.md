@@ -19,11 +19,11 @@ issue is discovered during implementation.
 - Freeze marker added to each document (tracking comment)
 
 ## Quality Criteria
-- (mvp) All P0 and P1 validation findings addressed
+- (mvp) All P0 and P1 validation findings resolved: fixed in source document or explicitly deferred with documented rationale
 - (deep) P2 findings addressed or explicitly deferred with rationale
-- Fix log documents what changed and why
+- (mvp) Fix log documents what changed and why
 - (deep) Cross-phase-consistency validation re-run after fixes yields no new P0 or P1 findings
-- Every frozen document contains a tracking comment matching `<!-- scaffold:step-name vN YYYY-MM-DD -->`
+- (mvp) Every frozen document contains a tracking comment matching `<!-- scaffold:step-name vN YYYY-MM-DD -->`
 
 ## Methodology Scaling
 - **deep**: All findings addressed. Full fix log. Final consistency check.

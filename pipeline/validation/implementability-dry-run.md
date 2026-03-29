@@ -32,11 +32,10 @@ when simulating implementation.
 
 ## Quality Criteria
 - (mvp) Every task specifies: input file paths, expected output artifacts, testable acceptance criteria, and references to upstream documents
-- (mvp) Every task has testable acceptance criteria
 - (deep) No task references undefined concepts, components, or APIs
 - (deep) Every task's dependencies are present in the implementation plan
 - (deep) Shared code patterns identified and documented (no duplication risk across tasks)
-- Findings categorized P0-P3 with specific file, section, and issue for each
+- (mvp) Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Finding Disposition

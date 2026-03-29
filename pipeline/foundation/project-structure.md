@@ -33,17 +33,17 @@ with a Quick Reference section for file placement.
 - CLAUDE.md updated with Project Structure Quick Reference section
 
 ## Quality Criteria
-- Module organization strategy chosen and justified (feature-based, layer-based, or hybrid)
-- File placement table covers all file types (routes, services, models, types, utils, tests)
-- High-contention files identified with merge-conflict mitigation strategies
-- Shared utilities rule enforced (2+ features before promoting to shared)
-- Import conventions defined with ordering rules
-- Test file location aligns with tdd-standards.md (if it exists)
-- .gitignore covers all generated files for the tech stack
-- Structure follows the chosen framework's conventions
-- CLAUDE.md contains Project Structure Quick Reference section with file placement table
+- (mvp) Module organization strategy chosen and justified (feature-based, layer-based, or hybrid)
+- (mvp) File placement table covers all file types (routes, services, models, types, utils, tests)
+- (deep) High-contention files identified with merge-conflict mitigation strategies
+- (mvp) Shared utilities rule enforced (2+ features before promoting to shared)
+- (mvp) Import conventions defined with ordering rules
+- (mvp) Test file location aligns with tdd-standards.md (if it exists)
+- (mvp) .gitignore covers all generated files for the tech stack
+- (mvp) Structure follows the chosen framework's conventions
+- (mvp) CLAUDE.md contains Project Structure Quick Reference section with file placement table
 - (mvp) All documented directories exist on disk with .gitkeep placeholder files
-- CLAUDE.md Project Structure Quick Reference matches the directory tree in docs/project-structure.md
+- (mvp) CLAUDE.md Project Structure Quick Reference matches the directory tree in docs/project-structure.md
 
 ## Methodology Scaling
 - **deep**: Comprehensive structure with high-contention analysis, shared code

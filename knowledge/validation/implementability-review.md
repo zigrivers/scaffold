@@ -8,6 +8,20 @@ topics: [validation, implementability, ambiguity, agent-readiness, dry-run]
 
 An implementability review reads every specification as if you were an AI agent about to implement it. For each task, the question is: "Do I have everything I need to start coding right now?" Every question you would need to ask is a gap. Every ambiguity you would need to resolve is a defect. This is the most practical validation — it tests whether the specs actually work for their intended consumer.
 
+## Summary
+
+- **Core question per task**: "Do I have everything I need to start coding right now?" — every unanswered question is a gap, every ambiguity is a defect.
+- **Agent constraints to account for**: no institutional memory, no ability to ask clarifying questions, literal interpretation of specs, context window limits, and no ability to infer patterns from existing code.
+- **Five check dimensions**: task-level completeness (inputs, outputs, scope, dependencies), ambiguity detection, error case coverage, data shape precision, and pattern/convention specification.
+- **Ambiguity patterns**: vague adjectives ("fast", "secure", "appropriate"), missing specifics (pagination, notification channels, log levels), and implicit behavior (auth redirects, i18n fallbacks, cache invalidation).
+- **Error cases to verify**: input validation, business logic violations, infrastructure failures, and concurrency conflicts — each needing defined response format, retry behavior, user feedback, and logging level.
+- **Data shape precision**: types beyond primitives (email vs. free text), optional vs. nullable distinction, exhaustive enum values, and format standards (dates, money, IDs).
+- **Review method**: role-play as the implementing agent, read only what the task references, attempt pseudocode, and record every question or assumption.
+- **Scoring**: 5/5 (fully implementable) to 1/5 (not implementable); target all tasks at 4/5+ before implementation begins.
+- **Most frequently missing**: error response formats, logging conventions, edge-case validation rules, concurrency handling, and empty-state behavior.
+
+## Deep Guidance
+
 ## The Implementing Agent Perspective
 
 AI agents implementing tasks have specific constraints that make implementability review different from a human code review:

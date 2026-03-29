@@ -32,10 +32,10 @@ independent review validation.
 
 ## Quality Criteria
 - (mvp) Passes 1-2 executed with findings documented
-- All review passes executed with findings documented
-- Every finding categorized by severity: P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.
-- Fix plan created for P0 and P1 findings
-- Fixes applied and re-validated
+- (deep) All review passes executed with findings documented
+- (mvp) Every finding categorized by severity: P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.
+- (mvp) Fix plan created for P0 and P1 findings
+- (mvp) Fixes applied and re-validated
 - (mvp) Downstream readiness confirmed (User Stories can proceed)
 - (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
@@ -61,7 +61,7 @@ findings still valid.
 
 ## Update Mode Specifics
 
-- **Detect**: `docs/reviews/review-prd.md` exists with tracking comment
+- **Detect**: `docs/reviews/pre-review-prd.md` exists with tracking comment
 - **Preserve**: Prior findings still valid, resolution decisions, multi-model review artifacts
 - **Triggers**: Upstream artifact changed since last review (compare tracking comment dates)
 - **Conflict resolution**: Previously resolved findings reappearing = regression; flag and re-evaluate
