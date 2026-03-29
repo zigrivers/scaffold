@@ -67,6 +67,31 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
   work directly from user story acceptance criteria.
 - **custom:depth(1-5)**: Depth 1: ordered task list derived from PRD features only. Depth 2: ordered list with rough size estimates per task. Depth 3: add explicit dependencies and sizing (150-line budget, 3-file rule). Depth 4: full breakdown with dependency graph and parallelization plan. Depth 5: full breakdown with parallelization, wave assignments, agent allocation, and critical path analysis.
 
+## MVP-Specific Guidance (No Architecture Available)
+
+At MVP depth, the system architecture document does not exist. Task decomposition
+must work directly from user stories without explicit component definitions.
+
+**How to decompose stories into tasks without architecture:**
+
+1. **Derive implicit layers from tech stack**: Read docs/tech-stack.md. For a web
+   app: API layer (backend), UI layer (frontend), Data layer (database). Each
+   story typically decomposes into one task per affected layer.
+
+2. **Map each story to layers**: "User can register" → 3 tasks: API endpoint,
+   UI form, database table. "User can view dashboard" → 2 tasks: API data
+   endpoint, UI display component.
+
+3. **Use acceptance criteria to define task boundaries**: Each AC (Given/When/Then)
+   maps to test cases. Group test cases by layer. Each layer's test cases become
+   one task.
+
+4. **Order tasks by dependency**: Database migrations first, then API endpoints,
+   then UI components (bottom-up).
+
+5. **Split within layers when tasks exceed 150 lines**: Happy path in one task,
+   validation/error handling in another, edge cases in a third.
+
 ## Mode Detection
 Check for docs/implementation-plan.md. If it exists, operate in update mode:
 read existing task list and diff against current architecture, user stories,

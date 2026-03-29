@@ -47,8 +47,12 @@ threat modeling across all trust boundaries.
   scope. Compliance checklist (if applicable).
 - **mvp**: Key security controls. Auth approach. No secrets in code.
   Basic input validation strategy.
-- **custom:depth(1-5)**: Depth 1-2: MVP-style. Depth 3: add threat model.
-  Depth 4-5: full security review.
+- **custom:depth(1-5)**: Depth 1: key security controls and auth approach.
+  Depth 2: add secrets management strategy and basic input validation.
+  Depth 3: add threat model (basic STRIDE) and data classification.
+  Depth 4: full threat model with OWASP analysis per component and
+  compliance checklist. Depth 5: full security review with penetration
+  testing scope, dependency audit strategy, and advanced controls.
 
 ## Mode Detection
 Check for docs/security-review.md. If it exists, operate in update mode: read
