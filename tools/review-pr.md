@@ -143,7 +143,7 @@ After all channels complete, reconcile findings:
 | Multiple channels flag same issue | **High** | Fix immediately |
 | All channels approve (no findings) | **High** | Proceed to merge |
 | One channel flags P0, others approve | **High** | Fix it — P0 is critical from any source |
-| One channel flags P1, others approve | **Medium** | Review carefully; fix if specific and actionable |
+| One channel flags P1, others approve | **Medium** | Fix it — P1 findings are mandatory regardless of source count |
 | Channels contradict each other | **Low** | Present to user for adjudication |
 
 ### Step 5: Report Results
@@ -176,8 +176,8 @@ Output a review summary in this format:
 If any P0 or P1 findings exist:
 1. Fix them in the code
 2. Push the fixes: `git push`
-3. Re-run only the channels that produced findings (not all three)
-4. After 3 fix rounds, merge with remaining findings documented as follow-up issues
+3. Re-run the channels that produced findings to verify fixes
+4. After 3 fix rounds with unresolved P0/P1 findings, stop and ask the user for direction — do NOT merge automatically. Document remaining findings and let the user decide whether to continue fixing, create follow-up issues, or override.
 
 ### Step 7: Confirm Completion
 

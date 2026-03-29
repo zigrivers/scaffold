@@ -171,7 +171,7 @@ Once in-progress work is complete (or if there was none):
    - `git fetch origin --prune && git clean -fd`
    - Run the install command from CLAUDE.md Key Commands
 
-4. **Claim next task**
+5. **Claim next task**
    - Branch from remote: `git fetch origin && git checkout -b <branch-name> origin/main`
    - Pick the next task following the same process as `/scaffold:multi-agent-start`
    - Continue the TDD execution loop

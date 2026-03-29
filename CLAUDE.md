@@ -130,7 +130,7 @@ Dispatch `superpowers:code-reviewer` subagent with the base/head SHAs and PR des
 - Auth failures are NOT silent fallbacks — surface to the user with recovery commands
 - Each channel reviews independently — never share one channel's output with another
 - Fix all P0/P1 findings before proceeding to the next task
-- After 3 fix rounds, merge with remaining findings documented as follow-up issues
+- After 3 fix rounds with unresolved findings, stop and ask the user — do NOT merge automatically
 
 ## Project Structure Quick Reference
 

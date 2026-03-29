@@ -1,6 +1,6 @@
 # Scaffold
 
-A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 60 structured pipeline steps — organized into 16 phases — plus 7 utility tools, and Claude Code handles the research, planning, and implementation for you.
+A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 60 structured pipeline steps — organized into 16 phases — plus 8 utility tools, and Claude Code handles the research, planning, and implementation for you.
 
 By the end, you'll have a fully planned, standards-documented, implementation-ready project with working code.
 
@@ -696,6 +696,7 @@ These are orthogonal to the pipeline — usable at any time, not tied to pipelin
 | `scaffold run update` | Update Scaffold to the latest version. |
 | `scaffold run dashboard` | Open a visual progress dashboard in your browser. |
 | `scaffold run prompt-pipeline` | Print the full pipeline reference table. |
+| `scaffold run review-pr` | Run all 3 code review channels (Codex CLI, Gemini CLI, Superpowers) on a PR. |
 | `scaffold run session-analyzer` | Analyze Claude Code session logs for patterns and insights. |
 
 All of these are also available as slash commands (`/scaffold:release`, `/scaffold:quick-task`, etc.) when the plugin is installed.
