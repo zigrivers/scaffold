@@ -3,7 +3,7 @@ name: review-testing
 description: Review testing strategy for coverage gaps and feasibility
 phase: "quality"
 order: 910
-dependencies: [tdd]
+dependencies: [tdd, system-architecture]
 outputs: [docs/reviews/review-testing.md, docs/reviews/testing/review-summary.md, docs/reviews/testing/codex-review.json, docs/reviews/testing/gemini-review.json]
 reads: [domain-modeling, system-architecture]
 conditional: null
@@ -46,10 +46,15 @@ independent review validation.
   review dispatched to Codex and Gemini if available, with graceful fallback
   to Claude-only enhanced review.
 - **mvp**: Coverage gap check only.
-- **custom:depth(1-5)**: Depth 1-3: scale passes with depth. Depth 4: full
-  review + one external model (if CLI available). Depth 5: full review +
-  multi-model with reconciliation.
+- **custom:depth(1-5)**: Depth 1: test coverage and pyramid balance pass only. Depth 2: add test quality and naming convention passes. Depth 3: add edge case coverage and CI integration passes. Depth 4: add external model review. Depth 5: multi-model review with reconciliation.
 
 ## Mode Detection
 Re-review mode if previous review exists. If multi-model review artifacts exist
 under docs/reviews/testing/, preserve prior findings still valid.
+
+## Update Mode Specifics
+
+- **Detect**: `docs/reviews/review-testing.md` exists with tracking comment
+- **Preserve**: Prior findings still valid, resolution decisions, multi-model review artifacts
+- **Triggers**: Upstream artifact changed since last review (compare tracking comment dates)
+- **Conflict resolution**: Previously resolved findings reappearing = regression; flag and re-evaluate

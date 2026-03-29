@@ -1,7 +1,7 @@
 ---
 name: decision-completeness
 description: Verifying all architectural decisions are recorded, justified, and non-contradictory
-topics: [validation, decisions, adrs, completeness, contradictions]
+topics: [validation, decisions, adr, completeness, contradictions]
 ---
 
 # Decision Completeness

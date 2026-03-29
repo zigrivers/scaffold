@@ -48,6 +48,9 @@ $ARGUMENTS
 Use AskUserQuestionTool throughout this phase. Batch related questions together — don't ask one at a time.
 
 ### Understand the Vision
+
+If `docs/vision.md` exists: Read it completely and use it as the North Star for this PRD. Skip the discovery questions below.
+
 - What problem does this solve and for whom? Push me to be specific about the target user.
 - What does success look like? How will we know this is working?
 - What's the single most important thing this app must do well?
@@ -131,7 +134,9 @@ When this step is complete, tell the user:
 ---
 **Phase 1 complete** — `docs/plan.md` created.
 
-**Next:** Run `/scaffold:prd-gap-analysis` — Analyze the PRD for gaps, then innovate before it drives everything else.
+**Next:** Run `/scaffold:review-prd` — Review the PRD for completeness, gaps, and quality before it drives everything else.
+
+**Optional:** Run `/scaffold:prd-gap-analysis` for deeper innovation and competitive analysis.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

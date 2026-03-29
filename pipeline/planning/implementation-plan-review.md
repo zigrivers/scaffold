@@ -54,3 +54,10 @@ and produce a structured coverage matrix and review summary.
 ## Mode Detection
 Re-review mode if previous review exists. If multi-model review artifacts exist
 under docs/reviews/implementation-plan/, preserve prior findings still valid.
+
+## Update Mode Specifics
+
+- **Detect**: `docs/reviews/review-implementation-plan.md` exists with tracking comment
+- **Preserve**: Prior findings still valid, resolution decisions, multi-model review artifacts
+- **Triggers**: Upstream artifact changed since last review (compare tracking comment dates)
+- **Conflict resolution**: Previously resolved findings reappearing = regression; flag and re-evaluate

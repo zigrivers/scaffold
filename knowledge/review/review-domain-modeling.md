@@ -6,9 +6,13 @@ topics: [review, domain-modeling, ddd, bounded-contexts]
 
 # Review: Domain Modeling
 
-Domain models are the foundation of the entire pipeline. Every subsequent phase builds on them. A gap or error here compounds through ADRs, architecture, database schema, API contracts, and implementation tasks. This review uses 10 passes targeting the specific ways domain models fail.
+## Summary
+
+Domain models are the foundation of the entire pipeline. Every subsequent phase builds on them. A gap or error here compounds through ADRs, architecture, database schema, API contracts, and implementation tasks. This review uses 10 passes targeting the specific ways domain models fail: (1) PRD coverage audit, (2) bounded context integrity, (3) entity vs value object classification, (4) aggregate boundary validation, (5) domain event completeness, (6) invariant specification, (7) ubiquitous language consistency, (8) cross-domain relationship clarity, (9) downstream readiness, and (10) internal consistency.
 
 Follows the review process defined in `review-methodology.md`.
+
+## Deep Guidance
 
 ---
 

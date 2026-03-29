@@ -42,6 +42,7 @@ parallel agents, CI pipeline, branch protection, and conflict prevention rules.
 - Branch cleanup documented for both single-agent and worktree-agent variants
 - Agent crash recovery procedure documented
 - Conflict prevention rule: don't parallelize tasks touching same files
+- (mvp) CI workflow YAML is valid and references commands from Key Commands table
 
 ## Methodology Scaling
 - **deep**: Full git workflow with all sections, CI pipeline, branch protection

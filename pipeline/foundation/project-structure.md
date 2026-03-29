@@ -5,7 +5,7 @@ phase: "foundation"
 order: 250
 dependencies: [tech-stack, coding-standards]
 outputs: [docs/project-structure.md]
-reads: [create-prd, user-stories]
+reads: [create-prd, user-stories, tdd]
 conditional: null
 knowledge-base: [project-structure-patterns]
 ---
@@ -41,6 +41,8 @@ with a Quick Reference section for file placement.
 - .gitignore covers all generated files for the tech stack
 - Structure follows the chosen framework's conventions
 - CLAUDE.md contains Project Structure Quick Reference section with file placement table
+- (mvp) All documented directories exist on disk with .gitkeep placeholder files
+- CLAUDE.md Project Structure Quick Reference matches the directory tree in docs/project-structure.md
 
 ## Methodology Scaling
 - **deep**: Comprehensive structure with high-contention analysis, shared code

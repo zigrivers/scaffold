@@ -6,6 +6,7 @@ order: 860
 dependencies: [ux-spec]
 outputs: [docs/reviews/review-ux.md, docs/reviews/ux/review-summary.md, docs/reviews/ux/codex-review.json, docs/reviews/ux/gemini-review.json]
 conditional: "if-needed"
+reads: [api-contracts]
 knowledge-base: [review-methodology, review-ux-specification, multi-model-review-dispatch, review-step-template]
 ---
 
@@ -44,10 +45,15 @@ independent review validation.
 - **deep**: Full multi-pass review. Multi-model review dispatched to Codex and
   Gemini if available, with graceful fallback to Claude-only enhanced review.
 - **mvp**: Journey coverage only.
-- **custom:depth(1-5)**: Depth 1-3: scale passes with depth. Depth 4: full
-  review + one external model (if CLI available). Depth 5: full review +
-  multi-model with reconciliation.
+- **custom:depth(1-5)**: Depth 1: flow completeness and accessibility pass only. Depth 2: add responsive design and error state passes. Depth 3: add interaction patterns and platform consistency passes. Depth 4: add external model UX review. Depth 5: multi-model review with reconciliation.
 
 ## Mode Detection
 Re-review mode if previous review exists. If multi-model review artifacts exist
 under docs/reviews/ux/, preserve prior findings still valid.
+
+## Update Mode Specifics
+
+- **Detect**: `docs/reviews/review-ux.md` exists with tracking comment
+- **Preserve**: Prior findings still valid, resolution decisions, multi-model review artifacts
+- **Triggers**: Upstream artifact changed since last review (compare tracking comment dates)
+- **Conflict resolution**: Previously resolved findings reappearing = regression; flag and re-evaluate

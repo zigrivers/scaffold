@@ -37,7 +37,8 @@ self-review checklist.
   duplication, magic numbers, premature abstraction, unnecessary features)
 - Linter/formatter configs created and referenced from the document
 - Every standard has a corresponding linter rule, code review checklist item, or test pattern that enforces it
-- Code review checklist is actionable (not vague)
+- Every code review checklist item is a binary yes/no question
+- (mvp) Linter/formatter config files are valid (lint command runs without config errors)
 
 ## Methodology Scaling
 - **deep**: Comprehensive standards with examples for every section. Stack-specific

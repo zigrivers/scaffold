@@ -6,11 +6,13 @@ topics: [review, architecture, components, data-flow, modules]
 
 # Review: System Architecture
 
-The system architecture document translates domain models and ADR decisions into a concrete component structure, data flows, and module organization. It is the primary reference for all subsequent phases — database schema, API contracts, UX spec, and implementation tasks all derive from it. Errors here propagate everywhere.
+## Summary
 
-This review uses 10 passes targeting the specific ways architecture documents fail.
+The system architecture document translates domain models and ADR decisions into a concrete component structure, data flows, and module organization. It is the primary reference for all subsequent phases — database schema, API contracts, UX spec, and implementation tasks all derive from it. Errors here propagate everywhere. This review uses 10 passes targeting the specific ways architecture documents fail: (1) domain model coverage, (2) ADR constraint compliance, (3) data flow completeness, (4) module structure integrity, (5) state consistency, (6) diagram/prose consistency, (7) extension point integrity, (8) invariant verification, (9) downstream readiness, and (10) internal consistency.
 
 Follows the review process defined in `review-methodology.md`.
+
+## Deep Guidance
 
 ---
 

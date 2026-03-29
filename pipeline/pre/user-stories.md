@@ -26,12 +26,12 @@ task decomposition downstream.
   criteria scaled to the configured depth level
 
 ## Quality Criteria
-- Every PRD feature maps to at least one user story
-- Stories follow INVEST criteria (Independent, Negotiable, Valuable, Estimable, Small, Testable)
-- Acceptance criteria are testable — unambiguous pass/fail
-- No story has more than 7 acceptance criteria
-- Every PRD persona is represented in at least one story
-- Stories describe user behavior, not implementation details
+- (mvp) Every PRD feature maps to at least one user story
+- (deep) Stories follow INVEST criteria (Independent, Negotiable, Valuable, Estimable, Small, Testable)
+- (mvp) Acceptance criteria are testable — unambiguous pass/fail
+- (deep) No story has more than 7 acceptance criteria
+- (mvp) Every PRD persona is represented in at least one story
+- (mvp) Stories describe user behavior, not implementation details
 
 ## Methodology Scaling
 - **deep**: Full story template with IDs, persona journey maps, cross-story

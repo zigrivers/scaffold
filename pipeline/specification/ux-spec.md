@@ -6,6 +6,7 @@ order: 850
 dependencies: [review-architecture]
 outputs: [docs/ux-spec.md]
 conditional: "if-needed"
+reads: [api-contracts, design-system]
 knowledge-base: [ux-specification]
 ---
 

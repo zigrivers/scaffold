@@ -5,6 +5,8 @@ long-description: "Converts user stories into a dependency-ordered implementatio
 
 Review the PRD (`docs/plan.md`), user stories (`docs/user-stories.md`), and all project standards, then create an implementation plan and task graph for this project.
 
+> **Note:** This command produces full-depth output. For lighter execution at a specific methodology depth, use the pipeline engine with presets.
+
 > **Prerequisites:** Run `tdd`, `operations`, `security`, `review-architecture`, and `create-evals` first.
 
 **Beads Detection:** Check if `.beads/` directory exists. If yes, create tasks via `bd create` and manage dependencies via `bd dep add`. If no, document the task graph in `docs/implementation-plan.md` as a structured markdown task list with dependencies noted inline.

@@ -1,7 +1,7 @@
 ---
 name: review-ux-specification
 description: Failure modes and review passes specific to UI/UX specification artifacts
-topics: [review, ux, design, accessibility, responsive]
+topics: [review, ux, design, accessibility, responsive-design]
 ---
 
 # Review: UX Specification

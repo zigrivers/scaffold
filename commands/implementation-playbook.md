@@ -5,6 +5,8 @@ long-description: "Translates the implementation plan and all standards docs int
 
 Read the implementation plan, architecture, and all standards documents, then generate the implementation playbook — the operational reference AI agents follow during the build phase. This translates the task graph into an executable sequence with agent context.
 
+> **Note:** This command produces full-depth output. For lighter execution at a specific methodology depth, use the pipeline engine with presets.
+
 ## Mode Detection
 
 Before starting, check if `docs/implementation-playbook.md` already exists:

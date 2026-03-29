@@ -6,7 +6,7 @@ order: 1350
 dependencies: [implementation-plan-review, review-security]
 outputs: [docs/validation/implementability-dry-run.md, docs/validation/implementability-dry-run/review-summary.md, docs/validation/implementability-dry-run/codex-review.json, docs/validation/implementability-dry-run/gemini-review.json]
 conditional: null
-knowledge-base: [implementability-review]
+knowledge-base: [implementability-review, multi-model-review-dispatch]
 ---
 
 ## Purpose
@@ -56,9 +56,7 @@ proceeding without acknowledgment.
   dispatched to Codex and Gemini if available, with graceful fallback to
   Claude-only enhanced validation.
 - **mvp**: High-level scan for blocking issues only.
-- **custom:depth(1-5)**: Depth 1-3: scale thoroughness with depth. Depth 4:
-  full analysis + one external model (if CLI available). Depth 5: full
-  analysis + multi-model with reconciliation.
+- **custom:depth(1-5)**: Depth 1: verify each task has enough context to start. Depth 2: add tool/dependency availability check. Depth 3: full dry-run simulation of first 3 tasks with quality gate verification. Depth 4: add external model dry-run. Depth 5: multi-model dry-run with implementation plan revision recommendations.
 
 ## Mode Detection
 Not applicable — validation always runs fresh against current artifacts. If

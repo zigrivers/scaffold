@@ -38,6 +38,8 @@ independent review validation.
 - Data flow completeness verified (no orphaned components)
 - Module structure assessed for merge conflict risk, circular dependency risk, and import depth
 - Downstream readiness confirmed (specification, quality, and planning steps can proceed)
+- Every finding categorized P0-P3 with specific component, section, and issue
+- Fix plan documented for all P0/P1 findings; fixes applied to system-architecture.md and re-validated
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling
@@ -54,3 +56,10 @@ independent review validation.
 ## Mode Detection
 Re-review mode if previous review exists. If multi-model review artifacts exist
 under docs/reviews/architecture/, preserve prior findings still valid.
+
+## Update Mode Specifics
+
+- **Detect**: `docs/reviews/review-architecture.md` exists with tracking comment
+- **Preserve**: Prior findings still valid, resolution decisions, multi-model review artifacts
+- **Triggers**: Upstream artifact changed since last review (compare tracking comment dates)
+- **Conflict resolution**: Previously resolved findings reappearing = regression; flag and re-evaluate

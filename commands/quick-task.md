@@ -44,6 +44,7 @@ Before asking questions, review:
 - `docs/tdd-standards.md` — Test categories, mocking strategy, test file locations
 - `docs/project-structure.md` — Where files live, module organization
 - `tasks/lessons.md` — Previous lessons learned (extract any relevant to this task)
+- If `docs/implementation-playbook.md` exists, check its quality gates section for project-specific gates
 - Relevant source code — Read the files that will be modified
 
 ### Check for Duplicates
@@ -238,6 +239,9 @@ Present the task summary:
 - Naming follows project patterns
 - Implementation notes reference specific standards, not generic advice
 
+### Eval Gate
+- If `tests/evals/` exists, run `make eval` (or equivalent eval command from CLAUDE.md Key Commands) as a required pre-commit check
+
 ---
 
 ## Example
@@ -295,6 +299,10 @@ When this step is complete, tell the user:
 
 ---
 **Quick task created** — Task ready with acceptance criteria, test plan, and implementation notes.
+
+**After implementation:**
+- If this fix revealed a pattern or gotcha: update `tasks/lessons.md`.
+- If this fix changed a convention or pattern: consider updating `docs/implementation-playbook.md` and `docs/coding-standards.md`.
 
 **Next:** Run `/scaffold:single-agent-start` or `/scaffold:single-agent-resume` to begin implementation (or `/scaffold:multi-agent-start <agent-name>` / `/scaffold:multi-agent-resume <agent-name>` for worktree agents).
 

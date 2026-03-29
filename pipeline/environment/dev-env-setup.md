@@ -6,6 +6,7 @@ order: 310
 dependencies: [project-structure]
 outputs: [docs/dev-setup.md]
 conditional: null
+reads: [tdd]
 knowledge-base: [dev-environment]
 ---
 

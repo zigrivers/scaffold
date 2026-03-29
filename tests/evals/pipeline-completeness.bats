@@ -199,6 +199,36 @@ REQUIRED_SECTIONS=("## Purpose" "## Inputs" "## Expected Outputs" "## Quality Cr
   [[ "$checked" -gt 0 ]]
 }
 
+@test "eval_helper phase mappings cover all phases found in pipeline frontmatter" {
+  local failures=()
+
+  # Extract unique phase values from pipeline frontmatter
+  local pipeline_phases
+  pipeline_phases="$(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f -exec \
+    awk '/^---$/{fm++; next} fm==1 && /^phase:/{sub("^phase:[ ]*",""); gsub(/["'\'']/, ""); print; exit} fm>=2{exit}' {} \; | sort -u)"
+
+  while IFS= read -r phase; do
+    [[ -z "$phase" ]] && continue
+    local range
+    range="$(get_phase_order_range "$phase")"
+    if [[ -z "$range" ]]; then
+      failures+=("phase '${phase}' found in pipeline but missing from get_phase_order_range() in eval_helper.bash")
+    fi
+
+    local num
+    num="$(get_phase_number "$phase")"
+    if [[ "$num" == "-1" ]]; then
+      failures+=("phase '${phase}' found in pipeline but missing from get_phase_number() in eval_helper.bash")
+    fi
+  done <<< "$pipeline_phases"
+
+  if [[ ${#failures[@]} -gt 0 ]]; then
+    printf "Phase mapping failures:\n"
+    printf "  %s\n" "${failures[@]}"
+    return 1
+  fi
+}
+
 @test "conditional steps document their conditions in the body" {
   local failures=()
   while IFS= read -r file; do

@@ -6,7 +6,7 @@ order: 1340
 dependencies: [implementation-plan-review, review-security]
 outputs: [docs/validation/critical-path-walkthrough.md, docs/validation/critical-path-walkthrough/review-summary.md, docs/validation/critical-path-walkthrough/codex-review.json, docs/validation/critical-path-walkthrough/gemini-review.json]
 conditional: null
-knowledge-base: [critical-path-analysis]
+knowledge-base: [critical-path-analysis, multi-model-review-dispatch]
 ---
 
 ## Purpose
@@ -56,9 +56,7 @@ proceeding without acknowledgment.
   dispatched to Codex and Gemini if available, with graceful fallback to
   Claude-only enhanced validation.
 - **mvp**: High-level scan for blocking issues only.
-- **custom:depth(1-5)**: Depth 1-3: scale thoroughness with depth. Depth 4:
-  full analysis + one external model (if CLI available). Depth 5: full
-  analysis + multi-model with reconciliation.
+- **custom:depth(1-5)**: Depth 1: identify critical path and verify task ordering. Depth 2: add dependency bottleneck analysis. Depth 3: full walkthrough simulating agent execution of critical path tasks. Depth 4: add external model simulation. Depth 5: multi-model walkthrough with divergence analysis.
 
 ## Mode Detection
 Not applicable — validation always runs fresh against current artifacts. If

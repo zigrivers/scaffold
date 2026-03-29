@@ -23,7 +23,7 @@ before their first task.
 - docs/onboarding-guide.md — developer onboarding guide
 
 ## Quality Criteria
-- Covers: project purpose, architecture overview, key patterns, where to find what
+- Contains sections for: project purpose, architecture overview (with component diagram reference), top 3 coding patterns with examples, and a file/doc lookup table
 - Guide includes clone instructions, dependency install command, dev server start command, and test run command; every ADR referenced by number with one-sentence summary
 - Key architectural decisions are summarized (with pointers to ADRs)
 - Development workflow is clear (branch, code, test, PR)
@@ -31,10 +31,19 @@ before their first task.
 ## Methodology Scaling
 - **deep**: Comprehensive guide. Architecture walkthrough, key pattern explanations,
   common tasks with examples, troubleshooting section.
-- **mvp**: Quick start. Setup instructions, key files, how to run tests.
-- **custom:depth(1-5)**: Scale detail with depth.
+- **mvp**: Quick-start guide with: clone command, dependency install, dev server
+  start, test run command. Skip architecture overview, key patterns, and
+  troubleshooting sections.
+- **custom:depth(1-5)**: Depth 1-2: quick start with setup and test commands only. Depth 3: add architecture overview, key patterns, and common tasks. Depth 4: add troubleshooting section, entry points documentation, and development workflow detail. Depth 5: full guide with architecture walkthrough, decision rationale, and team-specific onboarding paths.
 
 ## Mode Detection
 Check if `docs/onboarding-guide.md` already exists.
 - If exists: UPDATE MODE — read current guide, diff against upstream docs for changes, propose targeted updates while preserving project-specific customizations and environment-specific instructions.
 - If not: FRESH MODE — generate from scratch using all pipeline artifacts.
+
+## Update Mode Specifics
+
+- **Detect**: `docs/onboarding-guide.md` exists with tracking comment
+- **Preserve**: Team-specific customizations, troubleshooting entries added from experience, getting-started verification results
+- **Triggers**: Architecture changes, new tooling, new patterns established
+- **Conflict resolution**: Merge new sections with existing customizations; never remove team-contributed troubleshooting entries

@@ -4,6 +4,10 @@ description: Get to code fast with minimal ceremony
 default_depth: 1
 
 steps:
+  # Phase 0 — Product Vision (vision)
+  create-vision: { enabled: true }
+  review-vision: { enabled: true }
+  innovate-vision: { enabled: false }
   # Phase 1 — Product Definition (pre)
   create-prd: { enabled: true }
   review-prd: { enabled: true }

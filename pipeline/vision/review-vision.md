@@ -6,7 +6,7 @@ order: 020
 dependencies: [create-vision]
 outputs: [docs/reviews/vision-review-vision.md]
 conditional: null
-knowledge-base: [review-methodology, vision-craft]
+knowledge-base: [review-methodology, vision-craft, multi-model-review-dispatch, review-step-template, review-vision]
 ---
 
 ## Purpose
@@ -28,7 +28,7 @@ strategically sound, and ready for the PRD to consume.
 - Every finding categorized by severity (P0-P3)
 - Fix plan created for P0 and P1 findings
 - Fixes applied and re-validated
-- Downstream readiness confirmed (PRD can proceed without strategic ambiguity)
+- Every vision section has content specific enough to derive a PRD without asking strategic clarification questions
 
 ## Methodology Scaling
 - **deep**: All 5 review passes. Full findings report with severity

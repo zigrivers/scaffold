@@ -7,7 +7,7 @@ dependencies: []
 outputs: [docs/tech-stack.md]
 reads: [create-prd]
 conditional: null
-knowledge-base: [tech-stack-selection]
+knowledge-base: [tech-stack-selection, multi-model-review-dispatch]
 ---
 
 ## Purpose

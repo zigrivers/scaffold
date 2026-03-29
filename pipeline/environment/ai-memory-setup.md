@@ -53,11 +53,15 @@ to prevent API hallucination. Users choose which tiers to enable.
   full Tier 1 + offer Tier 2. Depth 4-5: all tiers with comprehensive setup.
 
 ## Mode Detection
-Update mode if .claude/rules/ contains files with scaffold tracking comments
-(e.g., `<!-- scaffold:ai-memory-setup -->`). In update mode: preserve existing
-rule files and their customizations, add missing rules for new conventions,
-update rules where source docs have changed. Never delete user-customized rules.
-If MCP server already configured, verify and update rather than replace.
+Check if `.claude/rules/` directory exists first. If it exists, check for scaffold
+tracking comments (e.g., `<!-- scaffold:ai-memory-setup -->`) in rule files for
+conservativeness calibration.
+- If `.claude/rules/` exists with tracking comments: UPDATE MODE — preserve existing
+  rule files and their customizations, add missing rules for new conventions,
+  update rules where source docs have changed. Never delete user-customized rules.
+  If MCP server already configured, verify and update rather than replace.
+- If `.claude/rules/` does not exist: FRESH MODE — create rules directory and generate
+  rule files from scratch.
 
 ## Update Mode Specifics
 - **Detect prior artifact**: .claude/rules/ directory exists with rule files

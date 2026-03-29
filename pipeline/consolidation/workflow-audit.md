@@ -6,6 +6,7 @@ order: 1120
 dependencies: [claude-md-optimization]
 outputs: [CLAUDE.md, docs/git-workflow.md]
 conditional: null
+reads: [operations]
 knowledge-base: [cross-phase-consistency]
 ---
 

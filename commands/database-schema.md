@@ -5,6 +5,8 @@ long-description: "Reads domain models and architecture, then creates docs/datab
 
 Read `docs/domain-models/`, `docs/system-architecture.md`, `docs/adrs/`, `docs/plan.md`, `docs/tech-stack.md` (for database engine and ORM choice), and `docs/user-stories.md` (for query patterns and data requirements). Also read `docs/api-contracts.md` if it exists (for payload-to-schema alignment). Create `docs/database-schema.md` translating domain entities into concrete tables/collections with relationships, indexes, constraints, and a migration strategy.
 
+> **Note:** This command produces full-depth output. For lighter execution at a specific methodology depth, use the pipeline engine with presets.
+
 > **When to use this step:** Only for projects with a database. Skip if your project is purely frontend, static, or serverless without persistent storage.
 
 ## Mode Detection

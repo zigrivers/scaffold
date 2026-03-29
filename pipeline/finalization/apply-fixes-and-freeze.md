@@ -29,13 +29,21 @@ issue is discovered during implementation.
 - P2 findings addressed or explicitly deferred with rationale
 - Fix log documents what changed and why
 - Cross-phase-consistency validation re-run after fixes yields no new P0 or P1 findings
+- Every frozen document contains a tracking comment matching `<!-- scaffold:step-name vN YYYY-MM-DD -->`
 
 ## Methodology Scaling
 - **deep**: All findings addressed. Full fix log. Final consistency check.
 - **mvp**: P0 findings only. Brief fix log.
-- **custom:depth(1-5)**: Scale with depth.
+- **custom:depth(1-5)**: Depth 1-2: address P0 findings only with brief fix log. Depth 3: address P0-P1 findings with detailed fix log and deferred rationale. Depth 4: address P0-P2 with full deferred rationale and re-validation passes. Depth 5: all findings addressed, final consistency re-check, and freeze verification audit.
 
 ## Mode Detection
 Check if `docs/validation/fix-log.md` already exists.
 - If exists: UPDATE MODE — read existing fix log, identify newly introduced validation findings, apply incremental fixes, preserve previously applied fixes and their verification status.
 - If not: FRESH MODE — apply all validation findings from scratch.
+
+## Update Mode Specifics
+
+- **Detect**: `docs/validation/fix-log.md` exists with tracking comment
+- **Preserve**: Previous fix decisions, deferred rationale, freeze markers on already-frozen documents
+- **Triggers**: New validation findings since last freeze, documents modified after freeze
+- **Conflict resolution**: Re-frozen documents with new changes require updated freeze markers and fix-log entries

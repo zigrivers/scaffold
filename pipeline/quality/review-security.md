@@ -6,6 +6,7 @@ order: 960
 dependencies: [security]
 outputs: [docs/reviews/review-security.md, docs/reviews/security/review-summary.md, docs/reviews/security/codex-review.json, docs/reviews/security/gemini-review.json]
 conditional: null
+reads: [api-contracts]
 knowledge-base: [review-methodology, review-security, multi-model-review-dispatch, review-step-template]
 ---
 
@@ -46,10 +47,15 @@ independent review validation.
 - **deep**: Full multi-pass review. Multi-model review dispatched to Codex and
   Gemini if available, with graceful fallback to Claude-only enhanced review.
 - **mvp**: OWASP coverage check only.
-- **custom:depth(1-5)**: Depth 1-3: scale passes with depth. Depth 4: full
-  review + one external model (if CLI available). Depth 5: full review +
-  multi-model with reconciliation.
+- **custom:depth(1-5)**: Depth 1: OWASP top 10 and secrets management pass only. Depth 2: add auth boundary and input validation passes. Depth 3: add dependency audit and data protection passes. Depth 4: add external model security review. Depth 5: multi-model security review with reconciliation.
 
 ## Mode Detection
 Re-review mode if previous review exists. If multi-model review artifacts exist
 under docs/reviews/security/, preserve prior findings still valid.
+
+## Update Mode Specifics
+
+- **Detect**: `docs/reviews/review-security.md` exists with tracking comment
+- **Preserve**: Prior findings still valid, resolution decisions, multi-model review artifacts
+- **Triggers**: Upstream artifact changed since last review (compare tracking comment dates)
+- **Conflict resolution**: Previously resolved findings reappearing = regression; flag and re-evaluate

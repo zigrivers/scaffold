@@ -46,10 +46,15 @@ independent review validation.
   review dispatched to Codex and Gemini if available, with graceful fallback
   to Claude-only enhanced review.
 - **mvp**: Operation coverage check only.
-- **custom:depth(1-5)**: Depth 1-3: scale passes with depth. Depth 4: full
-  review + one external model (if CLI available). Depth 5: full review +
-  multi-model with reconciliation.
+- **custom:depth(1-5)**: Depth 1: endpoint coverage and response format pass only. Depth 2: add error handling and auth requirement passes. Depth 3: add idempotency, pagination, and versioning passes. Depth 4: add external model API review. Depth 5: multi-model review with reconciliation.
 
 ## Mode Detection
 Re-review mode if previous review exists. If multi-model review artifacts exist
 under docs/reviews/api/, preserve prior findings still valid.
+
+## Update Mode Specifics
+
+- **Detect**: `docs/reviews/review-api.md` exists with tracking comment
+- **Preserve**: Prior findings still valid, resolution decisions, multi-model review artifacts
+- **Triggers**: Upstream artifact changed since last review (compare tracking comment dates)
+- **Conflict resolution**: Previously resolved findings reappearing = regression; flag and re-evaluate

@@ -3,8 +3,12 @@ name: Custom
 description: Choose which steps to include and how deep to go
 default_depth: 3
 
-# All steps enabled by default at depth 3 — user overrides individual steps
+# Most steps enabled by default at depth 3 — innovation and automated-pr-review disabled by default, user overrides individual steps
 steps:
+  # Phase 0 — Product Vision (vision)
+  create-vision: { enabled: true }
+  review-vision: { enabled: true }
+  innovate-vision: { enabled: false }
   # Phase 1 — Product Definition (pre)
   create-prd: { enabled: true }
   review-prd: { enabled: true }

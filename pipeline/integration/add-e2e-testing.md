@@ -5,7 +5,7 @@ phase: "integration"
 order: 410
 dependencies: [git-workflow, tdd]
 outputs: [tests/screenshots/, maestro/]
-reads: [coding-standards]
+reads: [coding-standards, user-stories]
 conditional: "if-needed"
 knowledge-base: [testing-strategy]
 ---

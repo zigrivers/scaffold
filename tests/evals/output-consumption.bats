@@ -72,6 +72,10 @@ is_terminal_path() {
   [[ "$checked" -gt 0 ]]
 }
 
+@test "TERMINAL_OUTPUT_EXEMPT entries reference existing pipeline steps" {
+  validate_exempt_terminal_outputs
+}
+
 @test "pipeline step reads fields reference valid step names" {
   local pipeline_names
   pipeline_names="$(get_pipeline_names)"

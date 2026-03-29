@@ -5,6 +5,8 @@ long-description: "Reads the PRD and user stories, then creates docs/domain-mode
 
 Read `docs/plan.md` and `docs/user-stories.md`, then create a complete domain model for the project using Domain-Driven Design. Produce one file per bounded context in `docs/domain-models/` plus an `index.md` overview of all domains and their relationships.
 
+> **Note:** This command produces full-depth output. For lighter execution at a specific methodology depth, use the pipeline engine with presets.
+
 ## Mode Detection
 
 Before starting, check if the `docs/domain-models/` directory already exists:
@@ -149,7 +151,7 @@ When this step is complete, tell the user:
 ---
 **Phase 1 complete** — Domain models created in `docs/domain-models/`. Ubiquitous language established.
 
-**Next:** Run `/scaffold:adrs` — Document architecture decisions including technology selection.
+**Next:** Run `/scaffold:review-domain-modeling` — Review domain models for completeness, invariant coverage, and cross-context consistency. Then proceed to `/scaffold:adrs` — Document architecture decisions including technology selection.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 

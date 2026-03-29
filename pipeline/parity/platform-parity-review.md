@@ -5,9 +5,9 @@ phase: "parity"
 order: 1010
 dependencies: [review-architecture, review-database, review-api, review-ux]
 outputs: [docs/reviews/platform-parity-review.md, docs/reviews/platform-parity/review-summary.md, docs/reviews/platform-parity/codex-review.json, docs/reviews/platform-parity/gemini-review.json]
-reads: [user-stories, coding-standards, tech-stack, project-structure, tdd]
+reads: [user-stories, coding-standards, tech-stack, project-structure, tdd, design-system]
 conditional: "if-needed"
-knowledge-base: [cross-phase-consistency, multi-model-review-dispatch, review-step-template]
+knowledge-base: [cross-phase-consistency, multi-model-review-dispatch, review-step-template, review-methodology]
 ---
 
 ## Purpose
@@ -28,7 +28,7 @@ independent platform gap analysis.
 - docs/project-structure.md (optional) — platform-specific file organization
 - docs/tdd-standards.md (optional) — platform-specific testing approach
 - docs/design-system.md (optional) — responsive breakpoints and platform patterns
-- docs/implementation-plan.md (optional) — tasks covering each platform
+- docs/implementation-plan.md (optional — not available, runs before implementation-plan) — tasks covering each platform
 - CLAUDE.md (required) — platform-specific workflow notes
 
 ## Expected Outputs
@@ -47,6 +47,7 @@ independent platform gap analysis.
 - Navigation patterns appropriate per platform (sidebar vs. tab bar, etc.)
 - Offline/connectivity handling addressed per platform (if applicable)
 - Web version is treated as first-class (not afterthought) if PRD specifies it
+- Fix plan documented for all P0/P1 findings with specific document and section to update
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling

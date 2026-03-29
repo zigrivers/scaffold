@@ -28,7 +28,6 @@ COMMAND_EXEMPT=(
 TERMINAL_OUTPUT_EXEMPT=(
   "implementation-plan"
   "developer-onboarding-guide"
-  "session-handoff-brief"
   "implementation-playbook"
   "apply-fixes-and-freeze"
   "ai-memory-setup"
@@ -70,6 +69,26 @@ KNOWLEDGE_TEMPLATE_EXEMPT=(
   "review-{artifact}"
 )
 
+# --- data-flow.bats ---
+# Phase-ordering reads that are legitimate but not in transitive dependency closure.
+# Format: "reader:target" — reader step reads from target step via sequential execution.
+# These are reads where the target is in the same phase but not an explicit dependency,
+# or update-mode cross-references that optionally read from later phases.
+# Note: reads from earlier phases are automatically allowed and don't need exemption.
+PHASE_ORDERING_EXEMPT=(
+  "user-stories:innovate-prd"
+  "tdd:system-architecture"
+)
+
+is_phase_ordering_exempt() {
+  local reader="$1" target="$2"
+  local key="${reader}:${target}"
+  for exempt in "${PHASE_ORDERING_EXEMPT[@]}"; do
+    [[ "$key" == "$exempt" ]] && return 0
+  done
+  return 1
+}
+
 # --- Self-validation ---
 # Validate that exempt entries actually exist as command files.
 # Call from tests to catch stale exemptions after commands are added/removed.
@@ -82,6 +101,33 @@ validate_exempt_commands() {
   done
   if [[ ${#missing[@]} -gt 0 ]]; then
     printf "Stale COMMAND_EXEMPT entries (command files no longer exist):\n"
+    printf "  %s\n" "${missing[@]}"
+    return 1
+  fi
+}
+
+validate_exempt_phase_ordering() {
+  local missing=()
+  for entry in "${PHASE_ORDERING_EXEMPT[@]}"; do
+    local reader="${entry%%:*}"
+    local target="${entry##*:}"
+    # Verify both reader and target exist as pipeline steps
+    local reader_found=0 target_found=0
+    while IFS= read -r -d '' pfile; do
+      local name
+      name="$(basename "$pfile" .md)"
+      [[ "$name" == "$reader" ]] && reader_found=1
+      [[ "$name" == "$target" ]] && target_found=1
+    done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f -print0)
+    if [[ "$reader_found" -eq 0 ]]; then
+      missing+=("${entry}: reader '${reader}' not found in pipeline")
+    fi
+    if [[ "$target_found" -eq 0 ]]; then
+      missing+=("${entry}: target '${target}' not found in pipeline")
+    fi
+  done
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    printf "Stale PHASE_ORDERING_EXEMPT entries:\n"
     printf "  %s\n" "${missing[@]}"
     return 1
   fi

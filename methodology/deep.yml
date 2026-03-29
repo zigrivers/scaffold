@@ -4,6 +4,10 @@ description: Comprehensive documentation for complex systems — full analysis a
 default_depth: 5
 
 steps:
+  # Phase 0 — Product Vision (vision)
+  create-vision: { enabled: true }
+  review-vision: { enabled: true }
+  innovate-vision: { enabled: true, conditional: "if-needed" }
   # Phase 1 — Product Definition (pre)
   create-prd: { enabled: true }
   review-prd: { enabled: true }

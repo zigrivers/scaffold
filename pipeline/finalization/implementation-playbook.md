@@ -5,7 +5,7 @@ phase: "finalization"
 order: 1430
 dependencies: [developer-onboarding-guide]
 outputs: [docs/implementation-playbook.md]
-reads: [story-tests, create-evals, implementation-plan]
+reads: [story-tests, create-evals, implementation-plan, database-schema, api-contracts, ux-spec, design-system]
 conditional: null
 knowledge-base: [implementation-playbook]
 ---
@@ -32,7 +32,7 @@ format between agents, and success criteria.
 - docs/design-system.md (optional) — for styling task context
 - docs/security-review.md (optional) — for security control task context
 - docs/operations-runbook.md (optional) — for deployment task context
-- docs/onboarding-guide.md (required) — agents should read for project context before playbook
+- docs/onboarding-guide.md (optional — not available in MVP) — agents should read for project context before playbook
 - All other frozen artifacts
 
 ## Expected Outputs
@@ -48,16 +48,26 @@ format between agents, and success criteria.
 - Quality gates are defined (what must pass before a task is complete)
 - Quality gates include `make eval` (or equivalent) as a required check
 - Agent workflow references test skeleton implementation from tests/acceptance/
+- Handoff format includes at minimum: implementation summary, assumptions made, known limitations, gotchas, and files modified
 
 ## Methodology Scaling
 - **deep**: Full playbook. Detailed coding standards, git workflow with
   examples, per-task context briefs, inter-agent communication protocol,
   rollback procedures for failed tasks.
-- **mvp**: Task order, basic coding conventions, commit format, "run tests
-  before marking done."
-- **custom:depth(1-5)**: Scale detail with depth.
+- **mvp**: Minimal playbook with task execution order, basic coding conventions
+  reference, commit format, and quality gate commands from CLAUDE.md. Skip
+  per-task context blocks, wave assignments, and inter-agent handoff format.
+  Reference docs/coding-standards.md and docs/tdd-standards.md directly.
+- **custom:depth(1-5)**: Depth 1-2: task execution order, basic coding conventions reference, commit format, and quality gate commands. Depth 3: add per-task context requirements, wave assignments, and quality gates per wave. Depth 4: add inter-agent communication protocol, handoff format, and error recovery procedures. Depth 5: full playbook with rollback procedures, eval integration, and per-task minimum context blocks.
 
 ## Mode Detection
 Check if `docs/implementation-playbook.md` already exists.
 - If exists: UPDATE MODE — read current playbook, identify changes in implementation plan or upstream docs, update per-task context blocks and wave assignments while preserving completed task status and agent allocation history.
 - If not: FRESH MODE — generate from scratch using implementation plan and all supporting docs.
+
+## Update Mode Specifics
+
+- **Detect**: `docs/implementation-playbook.md` exists with tracking comment
+- **Preserve**: Completed task statuses, agent handoff notes, established patterns, quality gate results
+- **Triggers**: New tasks added, wave assignments changed, quality gate definitions updated
+- **Conflict resolution**: New tasks append to existing waves; never remove completed task records

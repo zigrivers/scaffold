@@ -5,6 +5,8 @@ long-description: "Reads system architecture and API contracts, then creates doc
 
 Read `docs/system-architecture.md`, `docs/api-contracts.md`, `docs/database-schema.md`, and `docs/operations-runbook.md`, then conduct a security review of the entire system design. Create `docs/security-review.md` documenting security controls, threat model, auth/authz approach, data protection, and secrets management.
 
+> **Note:** This command produces full-depth output. For lighter execution at a specific methodology depth, use the pipeline engine with presets.
+
 > **Prerequisites:** Run `review-operations` first.
 
 ## Mode Detection
@@ -214,9 +216,7 @@ When this step is complete, tell the user:
 ---
 **Quality phase in progress** — `docs/security-review.md` created with OWASP analysis, threat model, auth patterns, data protection, and secrets management.
 
-**Next:**
-- Run `/scaffold:review-security` — Review security posture for OWASP gaps and auth boundary mismatches.
-- Or skip review and proceed to `/scaffold:claude-md-optimization` — Consolidate CLAUDE.md (starts Phase 6).
+**Next:** Run `/scaffold:review-security` — Review security posture for OWASP gaps and auth boundary mismatches.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`
 
