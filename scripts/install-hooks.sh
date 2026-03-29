@@ -54,6 +54,17 @@ if [ -n "$staged_md" ]; then
     repo_dir="$script_dir/../.."
     echo "$staged_md" | xargs "$repo_dir/scripts/validate-frontmatter.sh" || exit 1
 fi
+
+# 4. Check for stale commands (pipeline/knowledge changed without scaffold build)
+staged_pipeline=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(pipeline|knowledge)/' || true)
+staged_commands=$(git diff --cached --name-only --diff-filter=ACM | grep '^commands/' || true)
+if [ -n "$staged_pipeline" ] && [ -z "$staged_commands" ]; then
+    echo "" >&2
+    echo "⚠ Stale commands: pipeline/ or knowledge/ files changed without updating commands/" >&2
+    echo "  Run 'npx scaffold build' and stage the updated commands/ before committing." >&2
+    echo "" >&2
+    exit 1
+fi
 HOOK
 
 chmod 755 "${HOOKS_DIR}/pre-commit"

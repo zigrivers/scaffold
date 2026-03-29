@@ -1,4 +1,6 @@
 import type { CommandModule } from 'yargs'
+import fs from 'node:fs'
+import path from 'node:path'
 
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
@@ -10,6 +12,52 @@ import { getPackagePipelineDir, getPackageMethodologyDir } from '../../utils/fs.
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { computeEligible } from '../../core/dependency/eligibility.js'
+
+/** Check if any pipeline/knowledge source is newer than its generated command. */
+function checkCommandStaleness(projectRoot: string): number {
+  const commandsDir = path.join(projectRoot, 'commands')
+  const sourceDirs = [
+    path.join(projectRoot, 'pipeline'),
+    path.join(projectRoot, 'knowledge'),
+  ]
+
+  if (!fs.existsSync(commandsDir)) return 0
+
+  let newestSource = 0
+  for (const dir of sourceDirs) {
+    if (!fs.existsSync(dir)) continue
+    const walk = (d: string): void => {
+      for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+        const full = path.join(d, entry.name)
+        if (entry.isDirectory()) { walk(full) }
+        else if (entry.name.endsWith('.md')) {
+          const mtime = fs.statSync(full).mtimeMs
+          if (mtime > newestSource) newestSource = mtime
+        }
+      }
+    }
+    walk(dir)
+  }
+
+  let staleCount = 0
+  let oldestCommand = Infinity
+  for (const entry of fs.readdirSync(commandsDir)) {
+    if (!entry.endsWith('.md')) continue
+    const mtime = fs.statSync(path.join(commandsDir, entry)).mtimeMs
+    if (mtime < oldestCommand) oldestCommand = mtime
+  }
+
+  if (newestSource > oldestCommand) {
+    // Count how many commands are older than the newest source
+    for (const entry of fs.readdirSync(commandsDir)) {
+      if (!entry.endsWith('.md')) continue
+      const mtime = fs.statSync(path.join(commandsDir, entry)).mtimeMs
+      if (mtime < newestSource) staleCount++
+    }
+  }
+
+  return staleCount
+}
 
 interface StatusArgs {
   phase?: number
@@ -107,7 +155,10 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     const isCompact = argv.compact === true
     const actionableStatuses = new Set(['pending', 'in_progress'])
 
-    // 6. Display or return JSON
+    // 6. Check command staleness
+    const staleCommandCount = checkCommandStaleness(projectRoot)
+
+    // 7. Display or return JSON
     if (outputMode === 'json') {
       const result: Record<string, unknown> = {
         pipeline: { methodology, total, completed, skipped, pending, inProgress },
@@ -115,6 +166,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
         phases: [],
         nextEligible: state.next_eligible,
         orphaned_entries: [],
+        staleCommands: staleCommandCount,
       }
       if (isCompact) {
         result.compact = true
@@ -155,6 +207,14 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       const liveEligible = computeEligible(graph, state.steps)
       const nextEligibleList = liveEligible.join(', ') || 'none'
       output.info(`\nNext eligible: ${nextEligibleList}`)
+
+      if (staleCommandCount > 0) {
+        output.warn(
+          `\n⚠ ${staleCommandCount} commands are stale` +
+          ' (pipeline/knowledge sources modified after last build).' +
+          ' Run `scaffold build` to update.',
+        )
+      }
     }
 
     process.exit(0)
