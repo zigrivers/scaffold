@@ -586,7 +586,7 @@ You can change methodology mid-pipeline with `scaffold init --methodology <prese
 | `scaffold skip <step> [<step2>...]` | Skip one or more steps with a reason |
 | `scaffold complete <step>` | Mark a step as completed (for steps executed outside `scaffold run`) |
 | `scaffold reset <step>` | Reset a step back to pending |
-| `scaffold status [--compact]` | Show pipeline progress (`--compact` shows only remaining work) |
+| `scaffold status [--compact]` | Show pipeline progress (`--compact` shows only remaining work). Warns if commands are stale. |
 | `scaffold next` | List next unblocked step(s) |
 | `scaffold check <step>` | Check if a conditional step applies to this project |
 | `scaffold validate` | Validate meta-prompts, config, state, and dependency graph |
@@ -850,10 +850,11 @@ skills/               # 3 Claude Code skills (pipeline reference, runner, multi-
 ### Contributing
 
 1. Meta-prompt content lives in `pipeline/` — edit the relevant `.md` file
-2. Run `scaffold build` to regenerate `commands/` from pipeline meta-prompts
+2. Run `scaffold build` to regenerate `commands/` from pipeline meta-prompts. The pre-commit hook will block commits that change `pipeline/` or `knowledge/` without also updating `commands/`.
 3. Run `make check-all` (lint + type-check + test + evals) before submitting
 4. Knowledge entries live in `knowledge/` — follow the existing frontmatter schema
 5. ADRs documenting architectural decisions are in `docs/v2/adrs/`
+6. Run `make hooks` to install git hooks (ShellCheck, frontmatter validation, stale command detection)
 
 ## License
 
