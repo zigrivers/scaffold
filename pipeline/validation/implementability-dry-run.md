@@ -30,11 +30,11 @@ when simulating implementation.
 - docs/validation/implementability-dry-run/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- Every task has sufficient input specification for an agent to start without guessing
-- Every task has testable acceptance criteria
-- No task references undefined concepts, components, or APIs
-- Every task's dependencies are present in the implementation plan
-- Shared code patterns identified and documented (no duplication risk across tasks)
+- (mvp) Every task has sufficient input specification for an agent to start without guessing
+- (mvp) Every task has testable acceptance criteria
+- (deep) No task references undefined concepts, components, or APIs
+- (deep) Every task's dependencies are present in the implementation plan
+- (deep) Shared code patterns identified and documented (no duplication risk across tasks)
 - Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
@@ -62,3 +62,9 @@ proceeding without acknowledgment.
 Not applicable — validation always runs fresh against current artifacts. If
 multi-model artifacts exist under docs/validation/implementability-dry-run/,
 they are regenerated each run.
+
+## Update Mode Specifics
+- **Detect**: `docs/validation/implementability-dry-run/` directory exists with prior multi-model artifacts
+- **Preserve**: Prior multi-model artifacts are regenerated each run (not preserved). However, if prior findings were resolved and documented, reference the resolution log to distinguish regressions from known-resolved issues.
+- **Triggers**: Any upstream artifact change triggers fresh validation
+- **Conflict resolution**: If a previously-resolved finding reappears, flag as regression rather than new finding

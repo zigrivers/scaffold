@@ -10,6 +10,18 @@ This knowledge covers feature-level innovation — discovering new capabilities,
 
 This is distinct from user story innovation (`user-story-innovation.md`), which covers UX-level enhancements to existing features. If an idea doesn't require a new PRD section or feature entry, it belongs in user story innovation, not here.
 
+## Summary
+
+- **Scope**: Feature-level innovation (new capabilities, competitive gaps, defensive improvements). UX polish on existing features belongs in user story innovation.
+- **Competitive analysis**: Research direct competitors, adjacent products, and emerging patterns. Classify findings as table-stakes (must-have), differentiator (evaluate), or copied-feature (skip).
+- **UX gap analysis**: Evaluate first-60-seconds experience, flow friction points, and missing flows that force workarounds.
+- **Missing expected features**: Search/discovery, data management (bulk import/export, undo), communication (notifications), and personalization (settings, saved views).
+- **AI-native opportunities**: Natural language interfaces, auto-categorization, predictive behavior, and content generation. Must pass the "magic vs. gimmick" test.
+- **Defensive product thinking**: Write plausible 1-star reviews to identify gaps; analyze abandonment barriers (complexity, performance, trust, value, integration).
+- **Evaluation framework**: Cost (trivial/moderate/significant) x Impact (nice-to-have/noticeable/differentiator). Must-have v1 = differentiator at any cost up to moderate, or noticeable at trivial cost.
+
+## Deep Guidance
+
 ## Scope Boundary
 
 **In scope:**

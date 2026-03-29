@@ -5,6 +5,7 @@ phase: "architecture"
 order: 720
 dependencies: [system-architecture]
 outputs: [docs/reviews/review-architecture.md, docs/reviews/architecture/review-summary.md, docs/reviews/architecture/codex-review.json, docs/reviews/architecture/gemini-review.json]
+reads: [domain-modeling]
 conditional: null
 knowledge-base: [review-methodology, review-system-architecture, multi-model-review-dispatch, review-step-template]
 ---
@@ -32,14 +33,14 @@ independent review validation.
 - docs/reviews/architecture/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- All architecture-specific review passes executed
-- Domain model coverage verified (every model maps to a component)
-- ADR constraint compliance verified
-- Data flow completeness verified (no orphaned components)
-- Module structure assessed for merge conflict risk, circular dependency risk, and import depth
-- Downstream readiness confirmed (specification, quality, and planning steps can proceed)
-- Every finding categorized P0-P3 with specific component, section, and issue
-- Fix plan documented for all P0/P1 findings; fixes applied to system-architecture.md and re-validated
+- (mvp) Domain model coverage verified (every model maps to a component)
+- (mvp) ADR constraint compliance verified
+- (deep) All architecture-specific review passes executed
+- (deep) Data flow completeness verified (no orphaned components)
+- (deep) Module structure assessed for merge conflict risk, circular dependency risk, and import depth
+- (mvp) Downstream readiness confirmed (specification, quality, and planning steps can proceed)
+- (mvp) Every finding categorized P0-P3 with specific component, section, and issue
+- (mvp) Fix plan documented for all P0/P1 findings; fixes applied to system-architecture.md and re-validated
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling

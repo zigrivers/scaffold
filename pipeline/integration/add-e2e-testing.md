@@ -34,15 +34,17 @@ Outputs vary by detected platform:
 - (both) All of the above
 
 ## Quality Criteria
-- Platform detection is explicit and logged (web, mobile, both, or skip)
-- (web) Playwright config uses framework-specific dev server command and port
-- (web) Smoke test passes (navigate, screenshot, close)
-- (mobile) Maestro CLI installed, sample flow executes, screenshot captured
+- (mvp) Platform detection is explicit and logged (web, mobile, both, or skip)
+- (mvp) (web) Playwright config uses framework-specific dev server command and port
+- (mvp) (web) Smoke test passes (navigate, screenshot, close)
+- (mvp) (mobile) Maestro CLI installed, sample flow executes, screenshot captured
 - (mobile) testID naming convention defined and documented
-- E2E section in tdd-standards.md distinguishes when to use E2E vs unit tests
+- (mvp) E2E section in tdd-standards.md distinguishes when to use E2E vs unit tests
 - Baseline screenshots committed, current screenshots gitignored
 - CLAUDE.md contains browser/mobile testing section
 - tdd-standards.md E2E section updated with when-to-use guidance
+- (deep) CI integration configured for E2E test execution
+- (deep) Sub-flows defined for common user journeys
 
 ## Methodology Scaling
 - **deep**: Full setup for all detected platforms. All visual testing patterns,

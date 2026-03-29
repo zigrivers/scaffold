@@ -29,10 +29,10 @@ drift patterns.
 - docs/validation/cross-phase-consistency/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- Entity names are consistent across domain models, database schema, and API contracts (zero mismatches)
-- Technology references match `docs/tech-stack.md` in all documents
-- Data flow descriptions in architecture match API endpoint definitions
-- Terminology is consistent (same concept never uses two different names)
+- (mvp) Entity names are consistent across domain models, database schema, and API contracts (zero mismatches)
+- (mvp) Technology references match `docs/tech-stack.md` in all documents
+- (deep) Data flow descriptions in architecture match API endpoint definitions
+- (deep) Terminology is consistent (same concept never uses two different names)
 - Findings categorized P0-P3 with specific file, section, and issue for each
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
@@ -60,3 +60,9 @@ proceeding without acknowledgment.
 Not applicable — validation always runs fresh against current artifacts. If
 multi-model artifacts exist under docs/validation/cross-phase-consistency/,
 they are regenerated each run.
+
+## Update Mode Specifics
+- **Detect**: `docs/validation/cross-phase-consistency/` directory exists with prior multi-model artifacts
+- **Preserve**: Prior multi-model artifacts are regenerated each run (not preserved). However, if prior findings were resolved and documented, reference the resolution log to distinguish regressions from known-resolved issues.
+- **Triggers**: Any upstream artifact change triggers fresh validation
+- **Conflict resolution**: If a previously-resolved finding reappears, flag as regression rather than new finding

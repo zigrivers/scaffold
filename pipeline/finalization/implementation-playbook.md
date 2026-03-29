@@ -5,7 +5,7 @@ phase: "finalization"
 order: 1430
 dependencies: [developer-onboarding-guide]
 outputs: [docs/implementation-playbook.md]
-reads: [story-tests, create-evals, implementation-plan, database-schema, api-contracts, ux-spec, design-system]
+reads: [story-tests, create-evals, implementation-plan, database-schema, api-contracts, ux-spec, design-system, system-architecture, tdd, coding-standards, security, operations]
 conditional: null
 knowledge-base: [implementation-playbook]
 ---
@@ -39,16 +39,16 @@ format between agents, and success criteria.
 - docs/implementation-playbook.md — agent implementation playbook
 
 ## Quality Criteria
-- Task execution order is clear and respects dependencies
-- Each task has context requirements (which docs to read before starting)
-- Coding standards are defined (naming, patterns, error handling)
-- Git workflow is defined (branching strategy, commit format, PR process)
-- Success criteria per task (how to know it's done)
-- Handoff format between agents (what to communicate when passing work)
-- Quality gates are defined (what must pass before a task is complete)
+- (mvp) Task execution order is clear and respects dependencies
+- (deep) Each task has context requirements (which docs to read before starting)
+- (mvp) Coding standards are defined (naming, patterns, error handling)
+- (mvp) Git workflow is defined (branching strategy, commit format, PR process)
+- (mvp) Success criteria per task (how to know it's done)
+- (deep) Handoff format between agents (what to communicate when passing work)
+- (mvp) Quality gates are defined (what must pass before a task is complete)
 - Quality gates include `make eval` (or equivalent) as a required check
-- Agent workflow references test skeleton implementation from tests/acceptance/
-- Handoff format includes at minimum: implementation summary, assumptions made, known limitations, gotchas, and files modified
+- (deep) Agent workflow references test skeleton implementation from tests/acceptance/
+- (deep) Handoff format includes at minimum: implementation summary, assumptions made, known limitations, gotchas, and files modified
 
 ## Methodology Scaling
 - **deep**: Full playbook. Detailed coding standards, git workflow with

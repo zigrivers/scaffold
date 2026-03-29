@@ -8,6 +8,18 @@ topics: [validation, dependencies, graphs, cycles, ordering, parallelization]
 
 Dependency validation extracts all dependency relationships between implementation tasks, builds a graph, checks for correctness, and verifies that the ordering matches architectural constraints. A valid dependency graph ensures that tasks can be executed in an order that never requires unbuilt dependencies.
 
+## Summary
+
+- Extract dependencies from task declarations, architecture data flows, schema foreign keys, API contract prerequisites, and implicit shared resources.
+- **Cycle detection**: Use Kahn's algorithm to find tasks that can never start; resolve by splitting tasks into "define interface" and "implement interface."
+- **Completeness check**: Every referenced task ID must exist in the task list; orphaned dependencies indicate renames, removals, or typos.
+- **Ordering validation**: Dependencies should follow architectural layer ordering (infrastructure -> schema -> domain -> service -> API -> frontend -> tests).
+- **Parallel independence**: Tasks with no dependency path between them must not share mutable files, tables, or configuration.
+- **Critical path analysis**: Identify the longest sequential chain to determine minimum project duration and focus optimization efforts.
+- **Fan-in/fan-out analysis**: High fan-in tasks are blockers (prioritize and split); high fan-out tasks start late (review whether all dependencies are necessary).
+
+## Deep Guidance
+
 ## What a Dependency Graph Represents
 
 Each node in the graph is an implementation task. Each directed edge represents a "must complete before" relationship: if task A depends on task B, then B must be completed before A can start.

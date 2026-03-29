@@ -5,6 +5,7 @@ phase: "specification"
 order: 810
 dependencies: [review-architecture]
 outputs: [docs/database-schema.md]
+reads: [domain-modeling, system-architecture, adrs]
 conditional: "if-needed"
 knowledge-base: [database-design]
 ---
@@ -28,9 +29,10 @@ from the application's query patterns.
 ## Quality Criteria
 - (mvp) Every domain entity maps to a table/collection (or justified denormalization)
 - (mvp) Relationships match domain model relationships
-- (deep) Indexes cover known query patterns from architecture data flows
-- (deep) Constraints enforce domain invariants at the database level
+- (mvp) Constraints enforce domain invariants at the database level
 - (deep) Migration strategy specifies: migration tool, forward migration approach, rollback approach, and data preservation policy
+- (deep) Every migration is reversible (rollback script or equivalent exists)
+- (mvp) Indexes cover all query patterns referenced in docs/api-contracts.md (if it exists)
 
 ## Methodology Scaling
 - **deep**: Full schema specification. CREATE TABLE statements or equivalent.

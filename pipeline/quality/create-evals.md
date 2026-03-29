@@ -71,6 +71,7 @@ Supporting:
 - (deep) docs/eval-standards.md explicitly documents what evals do NOT check
 - (deep) Full eval suite runs in under 30 seconds
 - (mvp) `make eval` (or equivalent) runs and all generated evals pass
+- (deep) Eval false-positive assessment: each eval category documents at least one scenario where valid code might incorrectly fail, with exclusion mechanism
 
 ## Methodology Scaling
 - **deep**: All 13 eval categories (conditional on doc existence). Stack-specific

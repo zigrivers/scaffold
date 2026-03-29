@@ -30,11 +30,11 @@ independent review validation.
 - docs/reviews/adrs/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- All ADR-specific review passes executed
-- Every finding categorized P0-P3 with specific ADR number, section, and issue
-- Missing decisions identified and documented
-- Contradictions resolved
-- Downstream readiness confirmed (architecture phase can proceed)
+- (mvp) All ADR-specific review passes executed
+- (mvp) Every finding categorized P0-P3 with specific ADR number, section, and issue
+- (deep) Missing decisions identified and documented
+- (mvp) Contradictions resolved
+- (mvp) Downstream readiness confirmed (architecture phase can proceed)
 - (depth 4+) Multi-model findings synthesized with consensus/disagreement analysis
 
 ## Methodology Scaling

@@ -25,12 +25,13 @@ throughout the entire pipeline.
 - docs/plan.md — Product requirements document
 
 ## Quality Criteria
-- (mvp) Problem statement is specific and testable (not vague aspirations)
+- (mvp) Problem statement names a specific user group, a specific pain point, and a falsifiable hypothesis about the solution
 - (mvp) Target users are identified with their needs
 - (mvp) Features are scoped with clear boundaries (what's in, what's out)
 - (mvp) Success criteria are measurable
+- (mvp) Each non-functional requirement has a measurable target or threshold (e.g., 'page load < 2s', 'WCAG AA')
+- (mvp) No two sections contain contradictory statements about the same concept
 - (deep) Constraints (technical, timeline, budget, team) are documented
-- (deep) Each non-functional requirement has a measurable target or threshold (e.g., 'page load < 2s', 'WCAG AA')
 
 ## Methodology Scaling
 - **deep**: Comprehensive PRD. Competitive analysis, detailed user personas,

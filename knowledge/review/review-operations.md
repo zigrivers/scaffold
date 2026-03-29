@@ -10,6 +10,18 @@ The operations runbook defines how the system is deployed, monitored, and mainta
 
 Follows the review process defined in `review-methodology.md`.
 
+## Summary
+
+- **Pass 1 — Deployment Strategy Completeness**: Full deploy lifecycle documented from merged PR to running production, including build, test, stage, deploy, verify, and rollback stages.
+- **Pass 2 — Rollback Procedures**: Every deployment type has a corresponding rollback procedure; database rollbacks addressed separately from code rollbacks.
+- **Pass 3 — Monitoring Coverage**: Infrastructure, application, and business metrics identified with dashboards defined for all critical system components.
+- **Pass 4 — Alerting Thresholds**: Alerts have justified thresholds based on baselines, severity levels map to response expectations, and alert fatigue is considered.
+- **Pass 5 — Runbook Scenarios**: Common failure scenarios have step-by-step runbook entries covering symptoms, diagnosis, resolution, verification, and escalation.
+- **Pass 6 — Dev Environment Parity**: Local development environment reasonably matches production behavior; documented deviations with implications.
+- **Pass 7 — DR/Backup Coverage**: Disaster recovery approach documented with RTO/RPO targets; backup strategy covers all persistent data stores.
+
+## Deep Guidance
+
 ---
 
 ## Pass 1: Deployment Strategy Completeness

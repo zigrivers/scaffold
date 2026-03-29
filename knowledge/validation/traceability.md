@@ -8,6 +8,18 @@ topics: [validation, traceability, requirements, coverage]
 
 Traceability validation ensures that every requirement flows from its origin in the PRD through domain modeling, architecture decisions, system design, and into implementable tasks. A complete traceability matrix is the strongest evidence that nothing has been lost or invented during the documentation pipeline.
 
+## Summary
+
+- **Traceability matrix**: A table where each row is a requirement and columns are pipeline artifacts (domain, ADR, architecture, schema, API, UX, tasks, tests). Empty cells are gaps.
+- **Build process**: Extract all PRD requirements (functional, NFR, constraints, deferred), then trace each forward through every downstream artifact.
+- **Gap detection**: Empty cells (not N/A), orphaned artifacts tracing to no requirement, thin traces, and deferred items appearing downstream.
+- **Bidirectional tracing**: Forward (requirement -> implementation) catches gaps; backward (implementation -> requirement) catches scope creep.
+- **NFR tracing**: Performance, security, and accessibility requirements cut across components and need special tracing through architecture, schema, API, testing, and UX.
+- **Common issues**: Orphan features, assumed infrastructure, tested-but-not-specified behaviors, specified-but-not-tested requirements, and split requirements across unlinked tasks.
+- Use consistent identifiers (REQ-001, ADR-003, T-012) so traces are searchable across all artifacts.
+
+## Deep Guidance
+
 ## What a Traceability Matrix Is
 
 A traceability matrix is a table where each row represents a requirement and each column represents a pipeline artifact. A complete row means the requirement is fully traced from origin to implementation. A missing cell means a gap — either the requirement was not addressed at that phase, or it was addressed but the connection is not explicit.

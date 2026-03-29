@@ -34,6 +34,7 @@ step consumes those tokens, it does not redefine them.
 - (deep) Accessibility requirements documented (WCAG level, keyboard nav, screen readers)
 - (deep) Responsive breakpoints defined with layout behavior per breakpoint
 - (mvp) Error states documented for every user action that can fail
+- (deep) All documented user flows verified at responsive breakpoints (mobile, tablet, desktop) with behavior differences noted
 
 ## Methodology Scaling
 - **deep**: Full UX specification. Detailed wireframes described in prose.

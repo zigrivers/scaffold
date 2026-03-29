@@ -27,11 +27,13 @@ enabling parallel development with confidence.
 
 ## Quality Criteria
 - (mvp) Every domain operation that crosses a component boundary has an API endpoint
-- (mvp) Every endpoint documents: success response code, error response codes, error response body schema, and at least one domain-specific error beyond 500
+- (mvp) Every endpoint documents: success response code, error response codes, error response body schema, and at least 2 domain-specific error codes per endpoint with human-readable reason phrases (e.g., 400 `invalid_email`, 409 `user_already_exists`)
 - (mvp) Authentication and authorization requirements per endpoint
 - (deep) Versioning strategy documented (if applicable)
 - (deep) Pagination, filtering, and sorting for list endpoints
 - (deep) Idempotency documented for mutating operations
+- (deep) Pagination schema documented for all list endpoints (cursor or offset, page size limits, total count)
+- (mvp) Example request and response payloads included for each endpoint
 
 ## Methodology Scaling
 - **deep**: OpenAPI-style specification. Full request/response schemas with

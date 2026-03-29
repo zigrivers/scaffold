@@ -10,6 +10,18 @@ The implementation tasks document translates the architecture into discrete, act
 
 Follows the review process defined in `review-methodology.md`.
 
+## Summary
+
+- **Pass 1 — Architecture Coverage**: Every architectural component, module, and integration point has corresponding tasks; cross-cutting concerns and infrastructure included.
+- **Pass 2 — Missing Dependencies**: Task dependencies are complete and correct; no circular dependencies; no implicit prerequisites left undeclared.
+- **Pass 3 — Task Sizing**: No task too large for a single agent session (30-60 min) or too small to be meaningful; clear scope boundaries.
+- **Pass 4 — Acceptance Criteria**: Every task has clear, testable criteria covering happy path and at least one error/edge case.
+- **Pass 5 — Critical Path Accuracy**: The identified critical path is actually the longest dependency chain; near-critical paths identified.
+- **Pass 6 — Parallelization Validity**: Tasks marked as parallel are truly independent; no shared state, files, or undeclared dependencies.
+- **Pass 7 — Agent Context**: Each task specifies which documents/sections the implementing agent should read; context is sufficient and minimal.
+
+## Deep Guidance
+
 ---
 
 ## Pass 1: Architecture Coverage

@@ -32,12 +32,12 @@ independent review validation.
 - docs/reviews/security/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- OWASP coverage verified for this project
-- Auth boundaries match API contract auth requirements
-- Secrets management covers: all environment variables, API keys, database credentials, and third-party tokens
-- Dependency audit scope covers all dependencies
-- Threat model covers all trust boundaries
-- Data classification covers every entity in the domain model
+- (mvp) OWASP coverage verified for this project
+- (deep) Auth boundaries match API contract auth requirements
+- (deep) Secrets management covers: all environment variables, API keys, database credentials, and third-party tokens
+- (deep) Dependency audit scope covers all dependencies
+- (deep) Threat model covers all trust boundaries
+- (deep) Data classification covers every entity in the domain model
 - Every finding categorized P0-P3 with specific control, boundary, and issue
 - Fix plan documented for all P0/P1 findings; fixes applied to security-review.md and re-validated
 - Downstream readiness confirmed — no unresolved P0 or P1 findings remain before planning phase proceeds

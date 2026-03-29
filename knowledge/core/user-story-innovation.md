@@ -4,6 +4,19 @@ description: Techniques for discovering UX enhancements and innovation opportuni
 topics: [innovation, ux-enhancements, user-stories, gap-analysis, differentiators]
 ---
 
+# User Story Innovation
+
+## Summary
+
+- **Scope**: UX-level improvements to existing features only (smart defaults, error handling, accessibility, progressive disclosure, AI-native enhancements). Feature-level innovation belongs in PRD innovation.
+- **High-value low-effort patterns**: Smart defaults, inline validation, keyboard shortcuts, progressive disclosure, leveraging existing data, undo/redo, and batch operations.
+- **Differentiators**: "Wow" moments, AI-native features (natural language search, auto-categorization, smart suggestions), and personalization without configuration.
+- **Defensive gaps**: Accessibility (WCAG AA minimum), mobile responsiveness, offline/degraded mode, performance under load, error recovery, and empty states.
+- **Evaluation framework**: Assess cost (trivial/moderate/significant) and impact (nice-to-have/noticeable/differentiator). Must-have for v1 = high impact + trivial or moderate cost.
+- **Integration**: Approved innovations become additional acceptance criteria, new stories, or modified story scope. All must be traceable to PRD requirements.
+
+## Deep Guidance
+
 ## Scope Boundary
 
 This knowledge covers UX-level improvements only — making existing features better, not adding new features. Feature-level innovation belongs in PRD innovation (`innovate-prd`). If an enhancement requires a new PRD section, it is out of scope for user story innovation.

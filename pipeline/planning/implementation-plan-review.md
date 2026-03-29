@@ -34,14 +34,14 @@ and produce a structured coverage matrix and review summary.
 - docs/reviews/implementation-plan/gemini-review.json — raw Gemini findings (depth 4+, if available)
 
 ## Quality Criteria
-- Architecture coverage verified (every component has tasks)
-- Dependency graph is valid DAG
-- No task is too large for a single agent session
-- Critical path is accurate
-- Parallelization assumptions are valid
-- Every acceptance criterion maps to at least one task (100% AC coverage)
-- Every task has verb-first description, >= 1 input file reference, >= 1 acceptance criterion, and defined output artifact
-- At depth 4+: independent model reviews completed and reconciled
+- (mvp) Architecture coverage verified (every component has tasks)
+- (mvp) Dependency graph is valid DAG
+- (mvp) No task is too large for a single agent session
+- (deep) Critical path is accurate
+- (deep) Parallelization assumptions are valid
+- (deep) Every acceptance criterion maps to at least one task (100% AC coverage)
+- (deep) Every task has verb-first description, >= 1 input file reference, >= 1 acceptance criterion, and defined output artifact
+- (depth 4+) Independent model reviews completed and reconciled
 
 ## Methodology Scaling
 - **deep**: Full multi-pass review with multi-model validation. AC coverage

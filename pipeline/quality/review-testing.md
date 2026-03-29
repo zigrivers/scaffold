@@ -31,11 +31,11 @@ independent review validation.
 - docs/reviews/testing/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- Coverage gaps by layer documented with severity
-- Domain invariant test cases verified
-- Each test environment assumption verified against actual environment config or flagged as unverifiable
-- Performance test coverage assessed against NFRs
-- Integration boundaries have integration tests defined
+- (mvp) Coverage gaps by layer documented with severity
+- (deep) Domain invariant test cases verified
+- (deep) Each test environment assumption verified against actual environment config or flagged as unverifiable
+- (deep) Performance test coverage assessed against NFRs
+- (deep) Integration boundaries have integration tests defined
 - Every finding categorized P0-P3 with specific test layer, gap, and issue
 - Fix plan documented for all P0/P1 findings; fixes applied to tdd-standards.md and re-validated
 - Downstream readiness confirmed — no unresolved P0 or P1 findings remain before operations step proceeds

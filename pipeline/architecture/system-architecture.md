@@ -5,7 +5,7 @@ phase: "architecture"
 order: 710
 dependencies: [review-adrs]
 outputs: [docs/system-architecture.md]
-reads: []
+reads: [create-prd, domain-modeling, adrs]
 conditional: null
 knowledge-base: [system-architecture, domain-modeling]
 ---

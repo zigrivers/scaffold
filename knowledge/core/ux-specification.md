@@ -4,6 +4,19 @@ description: UX documentation patterns — user flows, interaction states, compo
 topics: [ux, accessibility, wireframes, user-flows, responsive-design, components, interaction-states]
 ---
 
+# UX Specification
+
+## Summary
+
+- **User flow documentation**: Map each story's Given/When/Then scenarios to screen states and transitions. Document entry points, preconditions, happy path, decision points, error paths, empty states, and exit points.
+- **Component architecture**: Organize components as atoms (base), molecules (composite), organisms (feature), templates (layouts), and pages. Define prop/data flow with top-down props and events/callbacks up.
+- **Design system reference**: Consume design tokens from `docs/design-system.md` by name (e.g., `--color-error`, `--space-4`). Never hard-code values.
+- **Accessibility**: Target WCAG AA as baseline. Keyboard navigation for all interactive elements, semantic HTML, screen reader support with ARIA, 4.5:1 color contrast, and proper focus management.
+- **Responsive design**: Mobile-first breakpoints (mobile < 640px, tablet 640-1024px, desktop 1024-1280px, large > 1280px). Touch targets minimum 44x44px. Document layout behavior per breakpoint.
+- **Common pitfalls**: Designing for happy path only, accessibility as afterthought, missing loading states, breaking text on resize, and modal abuse for content that should be pages.
+
+## Deep Guidance
+
 ## User Flow Documentation
 
 ### Journey Mapping

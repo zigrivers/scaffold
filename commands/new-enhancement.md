@@ -172,6 +172,9 @@ After updating both documents:
 
 If documents have a freeze marker (`<!-- FROZEN: ... -->` or `<!-- scaffold:freeze ... -->`), this is an authorized post-freeze change. Note the amendment date and update the freeze marker (e.g., `<!-- FROZEN: original-date, amended YYYY-MM-DD for enhancement -->`).
 
+Freeze marker format: `<!-- scaffold:step-name vN YYYY-MM-DD, amended YYYY-MM-DD -->`
+When updating a frozen document, change the "amended" date to today's date. Do not remove the original version date.
+
 ---
 
 ## Phase 3: Task Creation
@@ -346,6 +349,19 @@ This is appropriate when:
 - No vague language that could be misinterpreted ("intuitive," "user-friendly," "seamless," "handles gracefully")
 - Dependencies between stories are identified (they become Beads dependencies)
 - Priority assignments make sense relative to existing features
+
+## Phase 5: Version Release
+
+After all changes are applied and verified:
+
+1. Determine release type based on change scope:
+   - **patch**: Bug fix or minor documentation update
+   - **minor**: New feature, new user story, or significant enhancement
+   - **major**: Breaking change to existing behavior or architecture
+2. Run `/scaffold:version-bump` to increment the version
+3. Create a release with changelog entry documenting the enhancement
+
+---
 
 ## After This Step
 

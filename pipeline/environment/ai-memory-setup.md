@@ -34,14 +34,14 @@ to prevent API hallucination. Users choose which tiers to enable.
 - (Tier 3) .claude/settings.json with external context MCP server
 
 ## Quality Criteria
-- .claude/rules/ files use valid YAML frontmatter with description and globs fields
-- Each rule file targets a specific concern (no catch-all files)
-- Total rule content stays under 500 lines across all files
-- CLAUDE.md references rules via pointer pattern, stays under 200 lines
-- Rules accurately reflect the conventions in source documents (no drift)
-- (Tier 2) MCP memory server responds to basic queries
-- (Tier 2) At least PreCompact hook is configured and functional
-- (Tier 3) Library doc server returns results for project dependencies
+- (mvp) .claude/rules/ files use valid YAML frontmatter with description and globs fields
+- (mvp) Each rule file targets a specific concern (no catch-all files)
+- (mvp) Total rule content stays under 500 lines across all files
+- (mvp) CLAUDE.md references rules via pointer pattern, stays under 200 lines
+- (mvp) Rules accurately reflect the conventions in source documents (no drift)
+- (deep) MCP memory server responds to basic queries
+- (deep) At least PreCompact hook is configured and functional
+- (deep) Library doc server returns results for project dependencies
 
 ## Methodology Scaling
 - **deep**: All three tiers offered. Tier 1 generates comprehensive rules from

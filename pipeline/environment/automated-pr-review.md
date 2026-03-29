@@ -38,6 +38,7 @@ entire review-fix loop locally.
 - No GitHub Actions workflows created (zero Actions minutes)
 - No ANTHROPIC_API_KEY secret required
 - Legacy GitHub Actions workflows detected and cleanup offered
+- (deep) Dual-model review enabled when both CLIs available
 
 ## Methodology Scaling
 - **deep**: Full setup with local CLI review (dual-model when both available),

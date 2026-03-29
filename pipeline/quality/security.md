@@ -30,7 +30,7 @@ threat modeling across all trust boundaries.
 - (mvp) OWASP top 10 addressed for this specific project
 - (mvp) Every API endpoint has authentication and authorization requirements specified
 - (mvp) Auth/authz boundaries defined and consistent with API contracts
-- (mvp) Input validation rules defined for each user-facing field (type, length, pattern)
+- (mvp) Input validation rules defined for each user-facing field: data type, maximum length, regex pattern (where applicable), and rejection error message
 - (deep) Data classified by sensitivity with handling requirements
 - (mvp) Secrets management strategy documented with rotation policy (no hardcoded secrets in code)
 - (deep) CORS policy explicitly configured per origin (not wildcard in production)
@@ -38,6 +38,7 @@ threat modeling across all trust boundaries.
 - (deep) Threat model covers all trust boundaries
 - (deep) Dependency audit strategy documented (automated scanning, update cadence)
 - (deep) Dependency audit integrated into CI
+- (deep) Secret rotation testing documented (how to rotate each secret type without downtime)
 
 ## Methodology Scaling
 - **deep**: Full threat model (STRIDE). OWASP analysis per component.

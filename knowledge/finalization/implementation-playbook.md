@@ -447,6 +447,19 @@ When quality gates fail during implementation:
 3. If the failure is environment-specific: check dev-setup.md for requirements
 4. If the failure is a flaky test: document the flakiness and retry once
 
+### Eval Failure Recovery
+
+When `make eval` fails during implementation:
+
+1. **Read the failing test name** — eval category names indicate what's wrong (e.g., `adherence` = coding standard violation, `consistency` = cross-document mismatch)
+2. **Check `docs/eval-standards.md`** (if it exists) for category-specific guidance
+3. **Common eval failures**:
+   - **Adherence evals**: Code doesn't match coding-standards.md patterns. Fix: read the specific standard and adjust code.
+   - **Consistency evals**: Document references are stale or contradictory. Fix: update the reference to match current state.
+   - **Structure evals**: File/directory doesn't match project-structure.md. Fix: move files to correct location.
+   - **Security evals**: Missing input validation or auth check. Fix: add the missing security control per security-review.md.
+4. **If eval seems wrong**: Check if the eval itself is outdated. Flag for upstream review rather than working around it.
+
 **Spec gap discovered during implementation:**
 1. Document the gap with specific details (what's missing, what's needed)
 2. Check if an ADR or architecture decision covers the case
@@ -458,3 +471,12 @@ When quality gates fail during implementation:
 2. Diff the output against the expected behavior
 3. If the task description was ambiguous: improve it for future agents
 4. Roll back the incorrect changes and retry with clearer context
+
+### Dependency Failure
+
+When a task's upstream dependency hasn't merged or has failed:
+
+1. **Check the dependency task status** in docs/implementation-plan.md
+2. **If in-progress**: Wait for it to merge. Do not start work that depends on uncommitted changes.
+3. **If failed/blocked**: Flag for human review. The task may need to be reworked, reordered, or its dependency removed.
+4. **If the dependency is in a different agent's worktree**: Coordinate via AGENTS.md or the task tracking system. Never duplicate work.

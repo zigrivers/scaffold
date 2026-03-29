@@ -10,6 +10,18 @@ The security review document assesses the system's security posture across authe
 
 Follows the review process defined in `review-methodology.md`.
 
+## Summary
+
+- **Pass 1 — OWASP Coverage**: Every OWASP Top 10 category addressed with project-specific analysis, not generic checklist advice.
+- **Pass 2 — Auth/AuthZ Boundary Alignment**: Security boundaries align with API contract auth requirements; no access control gaps between security review and API enforcement.
+- **Pass 3 — Secrets Management**: No secrets in code or version control; rotation strategy exists; vault/secrets manager integration specified for all secret categories.
+- **Pass 4 — Dependency Audit Coverage**: Vulnerability scanning integrated into CI covering direct and transitive dependencies; response policy for discovered vulnerabilities.
+- **Pass 5 — Threat Model Scenarios**: Structured threat model (STRIDE/PASTA) covering all trust boundaries with specific, project-relevant threat scenarios and mapped mitigations.
+- **Pass 6 — Data Classification**: Data categorized by sensitivity level with handling requirements per category; regulatory compliance addressed.
+- **Pass 7 — Input Validation**: Validation at all system boundaries (not just frontend) covering type, format, range, and business rules.
+
+## Deep Guidance
+
 ---
 
 ## Pass 1: OWASP Coverage
