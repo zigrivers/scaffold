@@ -1,10 +1,3 @@
----
-name: alignment-audit
-description: Run the Comprehensive Pipeline Alignment Audit Suite
-category: tool
-stateless: true
----
-
 # Comprehensive Pipeline Alignment Audit Suite
 
 You are performing a multi-dimensional alignment audit of the scaffold
