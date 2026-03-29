@@ -18,7 +18,14 @@ vi.mock('../../config/loader.js', () => ({
 }))
 
 vi.mock('../../core/assembly/meta-prompt-loader.js', () => ({
-  discoverMetaPrompts: vi.fn(),
+  discoverAllMetaPrompts: vi.fn(),
+}))
+
+vi.mock('../../utils/fs.js', () => ({
+  getPackagePipelineDir: vi.fn(() => '/fake/pipeline'),
+  getPackageMethodologyDir: vi.fn(() => '/fake/methodology'),
+  getPackageKnowledgeDir: vi.fn(() => '/fake/knowledge'),
+  getPackageToolsDir: vi.fn(() => '/fake/tools'),
 }))
 
 vi.mock('../../core/assembly/preset-loader.js', () => ({
@@ -64,7 +71,7 @@ vi.mock('../../core/adapters/adapter.js', () => ({
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { loadConfig } from '../../config/loader.js'
-import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
+import { discoverAllMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { detectCycles, topologicalSort } from '../../core/dependency/dependency.js'
 import { displayErrors } from '../../cli/output/error-display.js'
@@ -130,7 +137,7 @@ describe('build command', () => {
   const mockFindProjectRoot = vi.mocked(findProjectRoot)
   const mockResolveOutputMode = vi.mocked(resolveOutputMode)
   const mockLoadConfig = vi.mocked(loadConfig)
-  const mockDiscoverMetaPrompts = vi.mocked(discoverMetaPrompts)
+  const mockDiscoverMetaPrompts = vi.mocked(discoverAllMetaPrompts)
   const mockBuildGraph = vi.mocked(buildGraph)
   const mockDetectCycles = vi.mocked(detectCycles)
   const mockTopologicalSort = vi.mocked(topologicalSort)
@@ -153,7 +160,7 @@ describe('build command', () => {
       warnings: [],
     })
     mockDiscoverMetaPrompts.mockReturnValue(
-      makeMetaPromptMap(['step-a', 'step-b']) as ReturnType<typeof discoverMetaPrompts>,
+      makeMetaPromptMap(['step-a', 'step-b']) as ReturnType<typeof discoverAllMetaPrompts>,
     )
     mockBuildGraph.mockReturnValue(
       makeGraph(['step-a', 'step-b']) as ReturnType<typeof buildGraph>,
@@ -297,7 +304,7 @@ describe('build command', () => {
 
   // Test 7: Handles empty pipeline directory (0 steps)
   it('handles empty pipeline directory gracefully', async () => {
-    mockDiscoverMetaPrompts.mockReturnValue(new Map() as ReturnType<typeof discoverMetaPrompts>)
+    mockDiscoverMetaPrompts.mockReturnValue(new Map() as ReturnType<typeof discoverAllMetaPrompts>)
     mockBuildGraph.mockReturnValue(makeGraph([]) as ReturnType<typeof buildGraph>)
     mockTopologicalSort.mockReturnValue([])
 

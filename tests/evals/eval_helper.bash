@@ -92,11 +92,12 @@ get_phase_order_range() {
     planning)       echo "1200 1299" ;;
     validation)     echo "1300 1399" ;;
     finalization)   echo "1400 1499" ;;
+    build)          echo "1500 1599" ;;
     *)              echo "" ;;
   esac
 }
 
-# Get the phase number for a phase slug (1-14).
+# Get the phase number for a phase slug (0-15).
 get_phase_number() {
   local phase="$1"
   case "$phase" in
@@ -104,7 +105,7 @@ get_phase_number() {
     integration) echo 4 ;; modeling) echo 5 ;; decisions) echo 6 ;;
     architecture) echo 7 ;; specification) echo 8 ;; quality) echo 9 ;;
     parity) echo 10 ;; consolidation) echo 11 ;; planning) echo 12 ;;
-    validation) echo 13 ;; finalization) echo 14 ;; *) echo -1 ;;
+    validation) echo 13 ;; finalization) echo 14 ;; build) echo 15 ;; *) echo -1 ;;
   esac
 }
 

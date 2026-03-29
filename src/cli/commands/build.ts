@@ -4,8 +4,8 @@ import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { loadConfig } from '../../config/loader.js'
-import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
-import { getPackagePipelineDir, getPackageMethodologyDir, getPackageKnowledgeDir } from '../../utils/fs.js'
+import { discoverAllMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
+import { getPackagePipelineDir, getPackageMethodologyDir, getPackageKnowledgeDir, getPackageToolsDir } from '../../utils/fs.js'
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { detectCycles, topologicalSort } from '../../core/dependency/dependency.js'
@@ -70,8 +70,11 @@ const buildCommand: CommandModule<Record<string, unknown>, BuildArgs> = {
       return
     }
 
-    // Step 3: Discover meta-prompts
-    const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))
+    // Step 3: Discover meta-prompts from both pipeline/ and tools/ directories
+    const metaPrompts = discoverAllMetaPrompts(
+      getPackagePipelineDir(projectRoot),
+      getPackageToolsDir(projectRoot),
+    )
     const stepNames = [...metaPrompts.keys()]
 
     // Step 4: Load presets (optional — failures are non-fatal)
@@ -96,9 +99,14 @@ const buildCommand: CommandModule<Record<string, unknown>, BuildArgs> = {
       return
     }
 
-    // Step 7: Topological sort
+    // Step 7: Topological sort (pipeline steps only — tools are excluded from graph)
     const sorted = topologicalSort(graph)
-    const enabledSteps = sorted
+    // Append tools (category: 'tool') after pipeline steps — they aren't in the graph
+    const toolSteps = [...metaPrompts.values()]
+      .filter(m => m.frontmatter.category === 'tool')
+      .map(m => m.frontmatter.name)
+      .sort()
+    const enabledSteps = [...sorted, ...toolSteps]
 
     // Step 8: Handle --validate-only
     if (argv['validate-only']) {

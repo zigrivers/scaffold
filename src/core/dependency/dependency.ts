@@ -13,6 +13,7 @@ const PHASE_SORT_ORDER: Record<string, number> = {
   planning: 6,
   validation: 7,
   finalization: 8,
+  build: 9,
 }
 
 export { PHASE_SORT_ORDER }
@@ -40,7 +41,7 @@ export function topologicalSort(graph: DependencyGraph): string[] {
   queue.sort((a, b) => {
     const nodeA = nodes.get(a)!
     const nodeB = nodes.get(b)!
-    return nodeA.order - nodeB.order || a.localeCompare(b)
+    return (nodeA.order ?? 9999) - (nodeB.order ?? 9999) || a.localeCompare(b)
   })
 
   const result: string[] = []
@@ -62,7 +63,7 @@ export function topologicalSort(graph: DependencyGraph): string[] {
     newlyZero.sort((a, b) => {
       const nodeA = nodes.get(a)!
       const nodeB = nodes.get(b)!
-      return nodeA.order - nodeB.order || a.localeCompare(b)
+      return (nodeA.order ?? 9999) - (nodeB.order ?? 9999) || a.localeCompare(b)
     })
     queue.push(...newlyZero)
   }

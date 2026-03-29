@@ -16,7 +16,7 @@ Use this skill ONLY when the user asks about:
 
 ## Phases
 
-14 phases, each with a slug (used in frontmatter) and display name. Canonical source: `src/types/frontmatter.ts` `PHASES` constant.
+16 phases, each with a slug (used in frontmatter) and display name. Canonical source: `src/types/frontmatter.ts` `PHASES` constant.
 
 | # | Slug | Display Name |
 |---|------|-------------|
@@ -34,6 +34,7 @@ Use this skill ONLY when the user asks about:
 | 12 | `planning` | Planning |
 | 13 | `validation` | Validation |
 | 14 | `finalization` | Finalization |
+| 15 | `build` | Build |
 
 ## Pipeline Order
 
@@ -92,6 +93,19 @@ Use this skill ONLY when the user asks about:
 | 47 | Finalization | `/scaffold:implementation-playbook` | Operational guide for agent execution |
 | 48 | Execution | `/scaffold:single-agent-start` | Single-agent TDD execution loop |
 | 48 | Execution | `/scaffold:multi-agent-start` | Multi-agent — one per worktree |
+
+### Phase 15 — Build (stateless, on-demand)
+
+6 steps. Available once Phase 14 is complete. These steps are **stateless** — they don't track completion state and are always available for repeated use.
+
+| Order | Step | Description |
+|-------|------|-------------|
+| 1510 | single-agent-start | Start single-agent TDD execution loop |
+| 1520 | single-agent-resume | Resume single-agent work after a break |
+| 1530 | multi-agent-start | Start multi-agent execution loop in a worktree |
+| 1540 | multi-agent-resume | Resume multi-agent work after a break |
+| 1550 | quick-task | Create a focused task for a bug fix, refactor, or small improvement |
+| 1560 | new-enhancement | Add a new feature to an existing project |
 
 ## Standalone Commands
 

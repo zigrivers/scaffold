@@ -40,7 +40,7 @@ Priority classification for review findings:
 ## Architecture Concepts
 
 **Phase**
-A named stage of the pipeline. There are 14 phases (numbered 0-13), each containing one or more pipeline steps. Phases are sequential -- steps in phase N may depend on outputs from phases 0 through N-1.
+A named stage of the pipeline. There are 16 phases (numbered 0-15), each containing one or more pipeline steps. Phases are sequential -- steps in phase N may depend on outputs from phases 0 through N-1. Phase 15 (Build) contains stateless execution steps that can be run repeatedly.
 
 **Knowledge Entry**
 A markdown file in `knowledge/` containing domain expertise on a specific topic. Knowledge entries are injected into pipeline steps during command assembly based on the `knowledge-base` field in each step's frontmatter.

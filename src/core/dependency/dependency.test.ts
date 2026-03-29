@@ -23,6 +23,8 @@ function makeFm(
     conditional: null,
     knowledgeBase: [],
     reads: [],
+    stateless: false,
+    category: 'pipeline' as const,
   }
 }
 

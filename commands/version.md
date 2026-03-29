@@ -1,11 +1,16 @@
 ---
 description: "Show installed and latest scaffold version"
-long-description: "Displays the currently installed scaffold version alongside the latest available version to help you decide whether to update."
+long-description: "Show the installed scaffold version and check if a newer version is available."
 ---
 
-Show the installed scaffold version and check if a newer version is available. Follow these steps exactly:
+## Purpose
 
-## Step 1 — Detect Installed Version
+Show the installed scaffold version and check if a newer version is available.
+A read-only diagnostic — no files are modified.
+
+## Instructions
+
+### Step 1 — Detect Installed Version
 
 Determine the currently installed scaffold version using this detection cascade (stop at the first match):
 
@@ -28,7 +33,7 @@ Determine the currently installed scaffold version using this detection cascade 
 
 Store the detected version for comparison.
 
-## Step 2 — Fetch Latest Version
+### Step 2 — Fetch Latest Version
 
 Check the latest available version from GitHub:
 
@@ -40,7 +45,7 @@ From the output, extract the version number from the **first** `## [X.Y.Z]` line
 
 If the `curl` command fails (non-zero exit, empty output), note that the remote check failed and skip to Step 3.
 
-## Step 3 — Compare and Report
+### Step 3 — Compare and Report
 
 Display the results to the user:
 
@@ -61,9 +66,9 @@ If an update is available, suggest:
 
 ---
 
-## Process
+## Process Rules
 
-- This command is **read-only** — do NOT modify any files
-- Run each step in order
-- If the remote check fails, still report the installed version — don't treat it as an error
-- Keep the output concise — no need for extra explanation beyond the version report
+1. **Read-only** — do NOT modify any files.
+2. Run each step in order.
+3. If the remote check fails, still report the installed version — don't treat it as an error.
+4. Keep the output concise — no extra explanation beyond the version report.

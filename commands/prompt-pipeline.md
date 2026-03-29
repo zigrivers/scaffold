@@ -1,15 +1,20 @@
 ---
-description: "Show the full pipeline reference"
-long-description: "Displays the complete scaffold pipeline order, dependencies, and status — useful for understanding where you are and what comes next."
+description: "Display full pipeline reference"
+long-description: "Display the prompt pipeline order as a quick reference. This is a pure"
 ---
 
-Display the prompt pipeline order below. Do not read any files or run any commands — just print this reference directly.
+## Purpose
+
+Display the prompt pipeline order as a quick reference. This is a pure
+information display — no files are read or commands run.
+
+## Instructions
+
+Print the following reference directly. Do not read any files or run any commands.
 
 > **Note:** If installed via `scripts/install.sh`, use `/user:command-name` instead of `/scaffold:command-name`.
 
 ---
-
-## Prompt Pipeline — Quick Reference
 
 ### Phase 0 — Prerequisites (one-time)
 | Action | Command |
@@ -110,7 +115,7 @@ Display the prompt pipeline order below. Do not read any files or run any comman
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|
 | 38 | **Cross-Phase Consistency** | `/scaffold:cross-phase-consistency` | Naming, assumptions, interfaces |
-| 39 | **Traceability Matrix** | `/scaffold:traceability-matrix` | PRD → Stories → Architecture → Tasks |
+| 39 | **Traceability Matrix** | `/scaffold:traceability-matrix` | PRD to Stories to Architecture to Tasks |
 | 40 | **Decision Completeness** | `/scaffold:decision-completeness` | All decisions recorded and justified |
 | 41 | **Critical Path Walkthrough** | `/scaffold:critical-path-walkthrough` | End-to-end critical journey trace |
 | 42 | **Implementability Dry Run** | `/scaffold:implementability-dry-run` | Simulate agent picking up tasks |
@@ -140,3 +145,8 @@ Display the prompt pipeline order below. Do not read any files or run any comman
 | **Version Bump** | `/scaffold:version-bump` | Bump version + changelog (no tag/release) |
 | **Release** | `/scaffold:release` | Full release with tag + GitHub release |
 | **Visual Dashboard** | `/scaffold:dashboard` | HTML pipeline overview in browser |
+
+## Process Rules
+
+1. **Read-only** — this is a pure display command. Do not read any files or run any commands.
+2. Print the reference above exactly as shown.

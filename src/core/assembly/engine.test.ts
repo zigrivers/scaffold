@@ -28,6 +28,8 @@ function makeFrontmatter(overrides: Partial<MetaPromptFrontmatter> = {}): MetaPr
     conditional: null,
     knowledgeBase: [],
     reads: [],
+    stateless: false,
+    category: 'pipeline' as const,
     ...overrides,
   }
 }

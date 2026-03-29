@@ -19,6 +19,7 @@ export const PHASES = [
   { number: 12, slug: 'planning', displayName: 'Planning' },
   { number: 13, slug: 'validation', displayName: 'Validation' },
   { number: 14, slug: 'finalization', displayName: 'Finalization' },
+  { number: 15, slug: 'build', displayName: 'Build' },
 ] as const
 
 /** Valid phase slug values derived from the PHASES constant. */
@@ -39,10 +40,10 @@ export interface MetaPromptFrontmatter {
   name: string
   /** One-line purpose. Max 200 chars. */
   description: string
-  /** Pipeline phase slug. See PHASES constant for valid values. */
-  phase: string
-  /** Unique position. Phase-aligned: Phase N → N00-N99. Primary tiebreaker in topological sort. */
-  order: number
+  /** Pipeline phase slug. See PHASES constant for valid values. Null for tools. */
+  phase: string | null
+  /** Unique position. Phase-aligned: Phase N → N00-N99. Primary tiebreaker in topological sort. Null for tools. */
+  order: number | null
   /** Step slugs that must complete before this step can run. */
   dependencies: string[]
   /** Artifact paths this step produces (relative to project root). */
@@ -53,6 +54,10 @@ export interface MetaPromptFrontmatter {
   knowledgeBase: string[]  // from 'knowledge-base' YAML key
   /** Cross-cutting artifact references beyond the dependency chain. */
   reads: string[]
+  /** When true, step has no completion state tracking (on-demand, always available). */
+  stateless: boolean
+  /** Source category: 'pipeline' for sequential steps, 'tool' for utility commands. */
+  category: 'pipeline' | 'tool'
   [key: string]: unknown  // forward compatibility — unknown fields preserved
 }
 

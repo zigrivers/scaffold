@@ -549,3 +549,9 @@ When a task's upstream dependency hasn't merged or has failed:
 2. **If in-progress**: Wait for it to merge. Do not start work that depends on uncommitted changes.
 3. **If failed/blocked**: Flag for human review. The task may need to be reworked, reordered, or its dependency removed.
 4. **If the dependency is in a different agent's worktree**: Coordinate via AGENTS.md or the task tracking system. Never duplicate work.
+
+---
+
+## After This Step
+
+Continue with: `/scaffold:multi-agent-resume`, `/scaffold:multi-agent-start`, `/scaffold:new-enhancement`, `/scaffold:quick-task`, `/scaffold:single-agent-resume`, `/scaffold:single-agent-start`

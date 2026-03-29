@@ -64,8 +64,8 @@ The following JSON Schema defines the structure that parsed YAML frontmatter mus
     },
     "phase": {
       "type": "string",
-      "enum": ["pre", "foundation", "environment", "integration", "modeling", "decisions", "architecture", "specification", "quality", "parity", "consolidation", "planning", "validation", "finalization"],
-      "description": "Pipeline phase identifier. 14 phases ordered by number: (1) pre, (2) foundation, (3) environment, (4) integration, (5) modeling, (6) decisions, (7) architecture, (8) specification, (9) quality, (10) parity, (11) consolidation, (12) planning, (13) validation, (14) finalization. Canonical definitions in src/types/frontmatter.ts PHASES constant."
+      "enum": ["pre", "foundation", "environment", "integration", "modeling", "decisions", "architecture", "specification", "quality", "parity", "consolidation", "planning", "validation", "finalization", "build"],
+      "description": "Pipeline phase identifier. 16 phases ordered by number: (0) vision, (1) pre, (2) foundation, (3) environment, (4) integration, (5) modeling, (6) decisions, (7) architecture, (8) specification, (9) quality, (10) parity, (11) consolidation, (12) planning, (13) validation, (14) finalization, (15) build. Canonical definitions in src/types/frontmatter.ts PHASES constant."
     },
     "order": {
       "type": "integer",
@@ -189,10 +189,11 @@ Pipeline phase for display grouping and ordering.
 
 **Note**: The phase is a display and grouping hint. It does not enforce execution constraints — the dependency graph is the authoritative execution ordering. The `order` field (not phase) is the primary tiebreaker within the topological sort.
 
-**14 phases** (number → slug → display name):
+**16 phases** (number → slug → display name):
 
 | # | Slug | Display Name |
 |---|------|-------------|
+| 0 | `vision` | Product Vision |
 | 1 | `pre` | Product Definition |
 | 2 | `foundation` | Project Foundation |
 | 3 | `environment` | Development Environment |
@@ -207,6 +208,7 @@ Pipeline phase for display grouping and ordering.
 | 12 | `planning` | Planning |
 | 13 | `validation` | Validation |
 | 14 | `finalization` | Finalization |
+| 15 | `build` | Build |
 
 ### `order` (integer)
 

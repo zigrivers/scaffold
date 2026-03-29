@@ -60,6 +60,7 @@ const BASE: MetaPromptFrontmatter = {
   name: '', description: '', phase: 'pre', order: 0,
   dependencies: [], outputs: [], conditional: null,
   knowledgeBase: [], reads: [],
+  stateless: false, category: 'pipeline' as const,
 }
 const SAMPLE_PROMPTS: MetaPromptFrontmatter[] = [
   { ...BASE, name: 'create-prd', description: 'Create PRD', order: 110, outputs: ['docs/plan.md'] },

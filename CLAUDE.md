@@ -18,9 +18,10 @@ This is a **prompt pipeline** — a curated sequence of structured prompts used 
 This repo is a **Claude Code plugin** (installable via `/plugin marketplace add`) and also distributable as user commands.
 
 ### Source of Truth (v2 Architecture)
-- `pipeline/` — 50 meta-prompt files organized into 14 phases (source of truth for pipeline steps)
-- `knowledge/` — 45 domain expertise entries (injected into prompts during assembly)
-- `src/types/frontmatter.ts` — Canonical `PHASES` constant defining all 14 phase slugs, numbers, and display names
+- `pipeline/` — 60 meta-prompt files organized into 16 phases (source of truth for pipeline steps)
+- `tools/` — 7 tool meta-prompts (`category: tool`, `stateless: true`) orthogonal to the pipeline
+- `knowledge/` — 60 domain expertise entries in 7 categories (injected into prompts during assembly)
+- `src/types/frontmatter.ts` — Canonical `PHASES` constant defining all 16 phase slugs, numbers, and display names
 - `commands/` — Generated slash commands (built from pipeline + knowledge via `scaffold build`)
 
 ### Legacy (v1)

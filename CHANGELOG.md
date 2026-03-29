@@ -2,6 +2,31 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.37.0] — 2026-03-29
+
+### Added
+
+- **Phase 15: Build** — New pipeline phase with 6 stateless execution steps (`single-agent-start`, `single-agent-resume`, `multi-agent-start`, `multi-agent-resume`, `quick-task`, `new-enhancement`). Appears in `scaffold next` once phase 14 is complete, always available for repeated use.
+- **Tools category** — 7 utility commands (`version-bump`, `release`, `version`, `update`, `dashboard`, `prompt-pipeline`, `session-analyzer`) in new `tools/` directory. Orthogonal to the pipeline, usable at any time.
+- **`stateless` frontmatter field** — Steps that don't track completion state. Used by build phase steps and tools.
+- **`category` frontmatter field** — Distinguishes pipeline steps (`category: pipeline`) from utility tools (`category: tool`).
+- **4 execution knowledge entries** — `tdd-execution-loop`, `task-claiming-strategy`, `worktree-management`, `enhancement-workflow` in `knowledge/execution/`.
+- **3 tool knowledge entries** — `release-management`, `version-strategy`, `session-analysis` in `knowledge/tools/`.
+- **Scaffold-runner: stateless step support** — Runner handles build phase and tool execution without completion tracking; resume steps conditionally visible.
+- **Scaffold-runner: tool execution** — Tools skip eligibility checks, support argument passthrough.
+
+### Changed
+
+- **Build system** scans both `pipeline/` and `tools/` directories for meta-prompts.
+- **Dependency graph** excludes tools from topological sort.
+- **Eligibility system** shows build phase steps as "available (on-demand)" once dependencies met.
+- **13 operational commands** migrated from manually-maintained v1 files to v2 build-generated output with knowledge injection.
+- **Agent execution commands** enriched with deep TDD, task claiming, and worktree management knowledge (previously ~10 lines each).
+
+### Fixed
+
+- **V1/V2 parity gap** — 13 commands that bypassed the build system now flow through `scaffold build` with full knowledge-base injection, adapter support, and frontmatter validation.
+
 ## [2.36.0] — 2026-03-29
 
 ### Added

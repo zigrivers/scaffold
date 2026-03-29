@@ -16,6 +16,10 @@ export function buildGraph(
 
   // Initialise nodes and empty successor lists
   for (const mp of metaPrompts) {
+    // Tools (category: 'tool') are excluded from the dependency graph —
+    // they have no phase/order and don't participate in topological sort
+    if (mp.category === 'tool') continue
+
     const enabled = presetSteps.get(mp.name)?.enabled ?? true
     nodes.set(mp.name, {
       slug: mp.name,

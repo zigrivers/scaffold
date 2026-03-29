@@ -26,6 +26,8 @@ export function makeFrontmatter(
     conditional: null,
     knowledgeBase: [],
     reads: [],
+    stateless: false,
+    category: 'pipeline' as const,
     ...overrides,
   }
 }

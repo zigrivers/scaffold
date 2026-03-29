@@ -39,8 +39,15 @@ vi.mock('../../core/assembly/engine.js', () => {
 })
 
 vi.mock('../../core/assembly/meta-prompt-loader.js', () => ({
-  discoverMetaPrompts: vi.fn(),
+  discoverAllMetaPrompts: vi.fn(),
   loadMetaPrompt: vi.fn(),
+}))
+
+vi.mock('../../utils/fs.js', () => ({
+  getPackagePipelineDir: vi.fn(() => '/test/pipeline'),
+  getPackageMethodologyDir: vi.fn(() => '/test/methodology'),
+  getPackageKnowledgeDir: vi.fn(() => '/test/knowledge'),
+  getPackageToolsDir: vi.fn(() => '/test/tools'),
 }))
 
 vi.mock('../../core/assembly/knowledge-loader.js', () => ({
@@ -122,7 +129,7 @@ import { StateManager } from '../../state/state-manager.js'
 import { acquireLock, releaseLock } from '../../state/lock-manager.js'
 import { analyzeCrash } from '../../state/completion.js'
 import { AssemblyEngine } from '../../core/assembly/engine.js'
-import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
+import { discoverAllMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { buildIndexWithOverrides, loadEntries } from '../../core/assembly/knowledge-loader.js'
 import { loadInstructions } from '../../core/assembly/instruction-loader.js'
 import { resolveDepth } from '../../core/assembly/depth-resolver.js'
@@ -153,6 +160,8 @@ function makeFrontmatter(overrides: Partial<MetaPromptFrontmatter> = {}): MetaPr
     conditional: null,
     knowledgeBase: [],
     reads: [],
+    stateless: false,
+    category: 'pipeline' as const,
     ...overrides,
   }
 }
@@ -291,7 +300,7 @@ beforeEach(() => {
   vi.mocked(loadConfig).mockReturnValue({ config, errors: [], warnings: [] })
 
   const metaPrompt = makeMetaPrompt()
-  vi.mocked(discoverMetaPrompts).mockReturnValue(new Map([['create-prd', metaPrompt]]))
+  vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map([['create-prd', metaPrompt]]))
 
   const preset = makePreset()
   vi.mocked(loadAllPresets).mockReturnValue({
@@ -402,7 +411,7 @@ describe('run command handler', () => {
 
   describe('Step 2: discover pipeline', () => {
     it('exits 1 when step is not found in pipeline', async () => {
-      vi.mocked(discoverMetaPrompts).mockReturnValue(new Map())
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map())
 
       await expect(invokeHandler({ step: 'unknown-step', _: ['run'] }))
         .rejects.toThrow('process.exit called')
@@ -411,7 +420,7 @@ describe('run command handler', () => {
     })
 
     it('includes fuzzy match suggestion in error when step not found', async () => {
-      vi.mocked(discoverMetaPrompts).mockReturnValue(new Map([
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map([
         ['create-prd', makeMetaPrompt()],
       ]))
 
@@ -498,7 +507,7 @@ describe('run command handler', () => {
         frontmatter: makeFrontmatter({ name: 'create-arch', dependencies: ['create-prd'] }),
         stepName: 'create-arch',
       })
-      vi.mocked(discoverMetaPrompts).mockReturnValue(new Map([
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map([
         ['create-prd', makeMetaPrompt()],
         ['create-arch', metaPrompt],
       ]))
@@ -956,7 +965,7 @@ describe('run command handler', () => {
           outputs: ['docs/prd.md'],
         }),
       })
-      vi.mocked(discoverMetaPrompts).mockReturnValue(new Map([
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map([
         ['setup-project', setupMeta],
         ['create-prd', prdMeta],
       ]))

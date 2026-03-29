@@ -75,6 +75,8 @@ function makeMinimalMetaPrompt(name = 'test-step'): MetaPromptFile {
       conditional: null,
       knowledgeBase: [],
       reads: [],
+      stateless: false,
+      category: 'pipeline' as const,
     },
     body: '## Purpose\n\nTest body content.',
     sections: {

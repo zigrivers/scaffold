@@ -158,7 +158,7 @@ reads:
     expect(result.frontmatter.reads).toEqual(['define-scope', 'create-goals'])
   })
 
-  it('validates order field is present and in range 1-1500', () => {
+  it('validates order field is present and in range 0-1599', () => {
     const missingOrder = writeTmp(`---
 name: create-prd
 description: desc
@@ -174,7 +174,7 @@ outputs:
 name: create-prd
 description: desc
 phase: pre
-order: 1501
+order: 1600
 outputs:
   - docs/prd.md
 ---

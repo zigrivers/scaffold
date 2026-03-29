@@ -49,6 +49,8 @@ function makeMetaPromptEntry(name: string, outputs: string[]) {
       conditional: null,
       knowledgeBase: [],
       reads: [],
+      stateless: false,
+      category: 'pipeline' as const,
     },
     body: '',
     sections: {},
