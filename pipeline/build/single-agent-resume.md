@@ -1,6 +1,7 @@
 ---
 name: single-agent-resume
 description: Resume single-agent work after a break
+summary: "Recovers context from the previous session — reads lessons learned, checks git state, reconciles merged PRs — and continues the TDD loop from where you left off."
 phase: "build"
 order: 1520
 dependencies: [implementation-playbook]

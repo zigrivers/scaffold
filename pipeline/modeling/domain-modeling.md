@@ -1,6 +1,7 @@
 ---
 name: domain-modeling
 description: Deep domain modeling across all identified project domains
+summary: "Analyzes your user stories to identify the core concepts in your project (entities, their relationships, the rules that must always hold true), and establishes a shared vocabulary that all docs and code will use."
 phase: "modeling"
 order: 510
 dependencies: [review-user-stories]

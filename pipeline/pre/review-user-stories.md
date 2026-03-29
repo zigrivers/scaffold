@@ -1,6 +1,7 @@
 ---
 name: review-user-stories
 description: Multi-pass review of user stories for PRD coverage, quality, and downstream readiness
+summary: "Verifies every PRD feature maps to at least one story, checks that acceptance criteria are specific enough to test, validates story independence, and builds a requirements traceability index at higher depths."
 phase: "pre"
 order: 150
 dependencies: [user-stories]

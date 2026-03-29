@@ -1,6 +1,7 @@
 ---
 name: dev-env-setup
 description: Configure local dev environment with live reload and simple commands
+summary: "Configures your project so a single command starts everything — dev server with live reload, local database, environment variables — and documents the setup in a getting-started guide."
 phase: "environment"
 order: 310
 dependencies: [project-structure]

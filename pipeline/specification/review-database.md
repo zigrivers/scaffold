@@ -1,6 +1,7 @@
 ---
 name: review-database
 description: Review database schema for correctness and completeness
+summary: "Verifies every domain entity has a table, constraints enforce business rules at the database level, and indexes cover all query patterns from the API contracts."
 phase: "specification"
 order: 820
 dependencies: [database-schema]

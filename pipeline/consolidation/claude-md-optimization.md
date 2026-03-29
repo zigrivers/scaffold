@@ -1,6 +1,7 @@
 ---
 name: claude-md-optimization
 description: Consolidate and optimize CLAUDE.md for maximum signal density
+summary: "Removes redundancy from CLAUDE.md, fixes terminology inconsistencies, front-loads critical patterns (TDD, commit format, worktrees), and keeps it under 200 lines so agents actually read and follow it."
 phase: "consolidation"
 order: 1110
 dependencies: [git-workflow]

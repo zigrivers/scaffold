@@ -1,6 +1,7 @@
 ---
 name: system-architecture
 description: Design and document system architecture
+summary: "Designs the system blueprint — which components exist, how data flows between them, where each module lives in the directory tree, and where extension points allow custom behavior."
 phase: "architecture"
 order: 710
 dependencies: [review-adrs]

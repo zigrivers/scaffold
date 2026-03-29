@@ -1,6 +1,7 @@
 ---
 name: review-prd
 description: Multi-pass review of the PRD for completeness, clarity, and downstream readiness
+summary: "Reviews the PRD across eight passes — problem rigor, persona coverage, feature scoping, success criteria, internal consistency, constraints, non-functional requirements — and fixes blocking issues."
 phase: "pre"
 order: 120
 dependencies: [create-prd]

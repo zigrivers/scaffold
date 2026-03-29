@@ -1,6 +1,7 @@
 ---
 name: database-schema
 description: Design database schema from domain models
+summary: "Translates your domain model into database tables with constraints that enforce business rules, indexes optimized for your API query patterns, and a reversible migration strategy."
 phase: "specification"
 order: 810
 dependencies: [review-architecture]

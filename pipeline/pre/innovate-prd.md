@@ -1,6 +1,7 @@
 ---
 name: innovate-prd
 description: Discover feature-level innovation opportunities in the PRD
+summary: "Analyzes the PRD for feature-level gaps — competitive blind spots, UX enhancements, AI-native possibilities — and proposes additions for your approval."
 phase: "pre"
 order: 130
 dependencies: [review-prd]

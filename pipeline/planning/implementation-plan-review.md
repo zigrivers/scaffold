@@ -1,6 +1,7 @@
 ---
 name: implementation-plan-review
 description: Review implementation tasks for coverage, feasibility, and multi-model validation
+summary: "Verifies every feature has implementation tasks, no task is too large for one session, the dependency graph has no cycles, and every acceptance criterion maps to at least one task."
 phase: "planning"
 order: 1220
 dependencies: [implementation-plan]

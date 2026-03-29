@@ -101,11 +101,15 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
 
     if (outputMode === 'json') {
       output.result({
-        eligible: shown.map(s => ({
-          slug: s,
-          description: metaPrompts.get(s)?.frontmatter?.description ?? '',
-          command: `scaffold run ${s}`,
-        })),
+        eligible: shown.map(s => {
+          const fm = metaPrompts.get(s)?.frontmatter
+          return {
+            slug: s,
+            description: fm?.description ?? '',
+            summary: fm?.summary ?? null,
+            command: `scaffold run ${s}`,
+          }
+        }),
         blocked_steps: [],
         pipeline_complete: allDone,
       })
@@ -117,7 +121,8 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
       } else {
         output.info(`Next eligible steps (${shown.length}):`)
         for (const slug of shown) {
-          const desc = metaPrompts.get(slug)?.frontmatter?.description ?? ''
+          const fm = metaPrompts.get(slug)?.frontmatter
+          const desc = fm?.summary ?? fm?.description ?? ''
           output.info(`  scaffold run ${slug}  — ${desc}`)
         }
       }

@@ -1,6 +1,7 @@
 ---
 name: tech-stack
 description: Research and document tech stack decisions with rationale for each choice
+summary: "Researches technology options for your project — language, framework, database, hosting, auth — evaluates each against your requirements, and documents every choice with rationale and alternatives considered."
 phase: "foundation"
 order: 220
 dependencies: []

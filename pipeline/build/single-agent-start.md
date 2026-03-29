@@ -1,6 +1,7 @@
 ---
 name: single-agent-start
 description: Start single-agent TDD execution loop
+summary: "Claims the next task, writes a failing test, implements until it passes, refactors, runs quality gates, commits, and repeats — following the implementation playbook."
 phase: "build"
 order: 1510
 dependencies: [implementation-playbook]

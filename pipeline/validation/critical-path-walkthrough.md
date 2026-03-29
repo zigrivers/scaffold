@@ -1,6 +1,7 @@
 ---
 name: critical-path-walkthrough
 description: Walk critical user journeys end-to-end across all specs
+summary: "Walks the most important user journeys end-to-end across every spec layer — PRD to stories to UX to API to database to tasks — and flags any broken handoffs or missing layers."
 phase: "validation"
 order: 1340
 dependencies: [implementation-plan-review, review-security]

@@ -1,6 +1,7 @@
 ---
 name: story-tests
 description: Generate test skeletons from user story acceptance criteria
+summary: "Generates a test skeleton file for each user story — one pending test case per acceptance criterion, tagged with story and criterion IDs — giving agents a TDD starting point for every feature."
 phase: "quality"
 order: 915
 dependencies: [tdd, review-user-stories, review-architecture]

@@ -1,6 +1,7 @@
 ---
 name: new-enhancement
 description: Add a new feature to an existing project
+summary: "Walks you through adding a feature the right way — updating the PRD, creating new user stories, running an innovation pass, and generating implementation tasks that integrate with your existing plan."
 phase: "build"
 order: 1560
 dependencies: [implementation-playbook]

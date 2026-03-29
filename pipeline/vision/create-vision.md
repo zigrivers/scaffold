@@ -1,6 +1,7 @@
 ---
 name: create-vision
 description: Create a comprehensive product vision document from a project idea
+summary: "Asks about your idea — who it's for, what problem it solves, what makes it different — and produces a vision document with elevator pitch, target audience, competitive positioning, guiding principles, and success criteria."
 phase: "vision"
 order: 010
 dependencies: []

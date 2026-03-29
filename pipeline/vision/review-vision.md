@@ -1,6 +1,7 @@
 ---
 name: review-vision
 description: Multi-pass review of the product vision for clarity, coherence, and downstream readiness
+summary: "Stress-tests the vision across five dimensions — clarity, audience precision, competitive rigor, strategic coherence, and whether the PRD can be written from it without ambiguity — and fixes what it finds."
 phase: "vision"
 order: 020
 dependencies: [create-vision]

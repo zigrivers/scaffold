@@ -1,6 +1,7 @@
 ---
 name: platform-parity-review
 description: Audit all documentation for platform-specific gaps across target platforms
+summary: "Audits all documentation for platform-specific gaps — features missing on one platform, input pattern differences (touch vs. mouse), and platform-specific testing coverage."
 phase: "parity"
 order: 1010
 dependencies: [review-architecture, review-database, review-api, review-ux]

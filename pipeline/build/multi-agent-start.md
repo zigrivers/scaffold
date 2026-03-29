@@ -1,6 +1,7 @@
 ---
 name: multi-agent-start
 description: Start multi-agent execution loop in a worktree
+summary: "Sets up a named agent in an isolated git worktree so multiple agents can implement tasks simultaneously without file conflicts, each following the same TDD loop."
 phase: "build"
 order: 1530
 dependencies: [implementation-playbook]

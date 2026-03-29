@@ -1,6 +1,7 @@
 ---
 name: review-security
 description: Review security review for coverage and correctness
+summary: "Verifies OWASP coverage is complete, auth boundaries match API contracts, every secret is accounted for, and the threat model covers all trust boundaries. Highest priority for multi-model review."
 phase: "quality"
 order: 960
 dependencies: [security]

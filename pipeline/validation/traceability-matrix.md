@@ -1,6 +1,7 @@
 ---
 name: traceability-matrix
 description: Build traceability from PRD requirements through architecture to implementation tasks
+summary: "Builds a map showing that every PRD requirement traces through to user stories, architecture components, implementation tasks, and test cases — with no gaps in either direction."
 phase: "validation"
 order: 1320
 dependencies: [implementation-plan-review, review-security]

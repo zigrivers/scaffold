@@ -1,6 +1,7 @@
 ---
 name: add-e2e-testing
 description: Configure end-to-end testing (Playwright for web, Maestro for mobile) based on detected project platform
+summary: "Detects whether your project is web or mobile, then configures Playwright (web) or Maestro (mobile) with a working smoke test, baseline screenshots, and guidance on when to use E2E vs. unit tests."
 phase: "integration"
 order: 410
 dependencies: [git-workflow, tdd]

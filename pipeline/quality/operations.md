@@ -1,6 +1,7 @@
 ---
 name: operations
 description: Define deployment pipeline, deployment strategy, monitoring, alerting, and incident response
+summary: "Designs your deployment pipeline (build, test, deploy, verify, rollback), defines monitoring metrics with alert thresholds, and writes incident response procedures with rollback instructions."
 phase: "quality"
 order: 930
 dependencies: [review-testing]

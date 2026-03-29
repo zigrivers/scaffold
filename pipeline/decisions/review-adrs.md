@@ -1,6 +1,7 @@
 ---
 name: review-adrs
 description: Review ADRs for completeness, consistency, and decision quality
+summary: "Checks for contradictions between decisions, missing decisions implied by the architecture, and whether every choice has honest trade-off analysis."
 phase: "decisions"
 order: 620
 dependencies: [adrs]

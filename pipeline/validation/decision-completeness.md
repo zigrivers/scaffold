@@ -1,6 +1,7 @@
 ---
 name: decision-completeness
 description: Verify all decisions are recorded, justified, non-contradictory
+summary: "Checks that every technology choice and architectural pattern has a recorded decision with rationale, and that no two decisions contradict each other."
 phase: "validation"
 order: 1330
 dependencies: [implementation-plan-review, review-security]

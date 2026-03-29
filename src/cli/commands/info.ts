@@ -90,6 +90,7 @@ const infoCommand: CommandModule<Record<string, unknown>, InfoArgs> = {
         mode: 'step',
         slug: mp.stepName,
         description: mp.frontmatter.description,
+        summary: mp.frontmatter.summary ?? null,
         phase: mp.frontmatter.phase,
         dependsOn: mp.frontmatter.dependencies ?? [],
         produces: mp.frontmatter.outputs ?? [],
@@ -103,6 +104,9 @@ const infoCommand: CommandModule<Record<string, unknown>, InfoArgs> = {
       output.info(`Step: ${mp.stepName}`)
       output.info(`Phase: ${mp.frontmatter.phase ?? 'unspecified'}`)
       output.info(`Description: ${mp.frontmatter.description}`)
+      if (mp.frontmatter.summary) {
+        output.info(`Summary: ${mp.frontmatter.summary}`)
+      }
       output.info(`Status: ${stepState?.status ?? 'not initialized'}`)
       if (stepState?.status === 'completed') {
         output.info(`Completed at: ${stepState.at}`)

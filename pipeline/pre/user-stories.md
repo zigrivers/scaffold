@@ -1,6 +1,7 @@
 ---
 name: user-stories
 description: Translate PRD features into user stories with acceptance criteria
+summary: "Breaks every PRD feature into user stories organized by epic, each with testable acceptance criteria in Given/When/Then format."
 phase: "pre"
 order: 140
 dependencies: [review-prd]

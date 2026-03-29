@@ -1,6 +1,7 @@
 ---
 name: security
 description: Security review and documentation
+summary: "Conducts a security review of your entire system — OWASP Top 10 coverage, input validation rules for every user-facing field, data classification, secrets management, CORS policy, rate limiting, and a threat model covering all trust boundaries."
 phase: "quality"
 order: 950
 dependencies: [review-operations]

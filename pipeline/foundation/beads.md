@@ -1,6 +1,7 @@
 ---
 name: beads
 description: Initialize Beads task tracking with CLAUDE.md conventions and lessons file
+summary: "Sets up Beads task tracking with a lessons-learned file for cross-session learning, and creates the initial CLAUDE.md skeleton with core principles and workflow conventions."
 phase: "foundation"
 order: 210
 dependencies: []

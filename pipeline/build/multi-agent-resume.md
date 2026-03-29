@@ -1,6 +1,7 @@
 ---
 name: multi-agent-resume
 description: Resume multi-agent work after a break
+summary: "Verifies the worktree, syncs with main, reconciles completed tasks, and resumes the agent's TDD loop from the previous session."
 phase: "build"
 order: 1540
 dependencies: [implementation-playbook]

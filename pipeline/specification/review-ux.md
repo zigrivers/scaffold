@@ -1,6 +1,7 @@
 ---
 name: review-ux
 description: Review UX specification for completeness and usability
+summary: "Verifies every user story has a flow, accessibility requirements are met, all error states are documented, and the design system is used consistently."
 phase: "specification"
 order: 860
 dependencies: [ux-spec]

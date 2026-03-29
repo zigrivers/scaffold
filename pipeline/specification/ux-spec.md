@@ -1,6 +1,7 @@
 ---
 name: ux-spec
 description: Specify user flows, interaction states, component architecture, accessibility, and responsive behavior
+summary: "Maps out every user flow with all interaction states (loading, error, empty, populated), defines accessibility requirements (WCAG level, keyboard nav), and specifies responsive behavior at each breakpoint."
 phase: "specification"
 order: 850
 dependencies: [review-architecture]
