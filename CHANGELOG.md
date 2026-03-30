@@ -2,6 +2,16 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.44.0] — 2026-03-31
+
+### Added
+
+- **`scaffold list --section tools`** — Lists all scaffold tools in two grouped sections: Build Tools (stateless pipeline steps from `pipeline/build/`) and Utility Tools (from `tools/`). Completeness is guaranteed by filesystem scan — adding a tool file automatically includes it with no other changes required.
+  - Compact text output by default
+  - `--verbose` adds an Arguments column showing `argument-hint` values
+  - `--format json` returns `{ tools: { build: [...], utility: [...] } }` for machine-readable use
+- **`scaffold-runner` skill updated** — "What tools are available?" now calls `scaffold list --section tools --format json` and renders an enriched two-section display with "when to use" context. If the CLI returns a tool not in the skill's table, it falls back to the CLI's `description` field (graceful degradation).
+
 ## [2.43.5] — 2026-03-31
 
 ### Fixed

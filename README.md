@@ -686,7 +686,7 @@ These are stateless pipeline steps — they appear in `scaffold next` once Phase
 
 ### Utility Tools
 
-These are orthogonal to the pipeline — usable at any time, not tied to pipeline state. Defined in `tools/` with `category: tool` frontmatter:
+These are orthogonal to the pipeline — usable at any time, not tied to pipeline state. Defined in `tools/` with `category: tool` frontmatter. Run `scaffold list --section tools` for a complete listing (or `--verbose` for argument hints, `--format json` for machine-readable output):
 
 | Command | When to Use |
 |---------|-------------|
