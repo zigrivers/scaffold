@@ -103,9 +103,10 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
-    // 3. Load config and discover meta-prompts
-    const { config } = loadConfig(projectRoot, [])
+    // 3. Discover meta-prompts first, then load config with real step names
     const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))
+    const knownSteps = [...metaPrompts.keys()]
+    const { config } = loadConfig(projectRoot, knownSteps)
 
     // 4. Load methodology preset for correct eligibility computation
     const methodologyDir = getPackageMethodologyDir(projectRoot)

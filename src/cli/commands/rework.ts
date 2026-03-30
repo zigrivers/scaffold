@@ -120,8 +120,9 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
         reworkManager.advanceStep(argv.advance)
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        output.error({ code: 'REWORK_ADVANCE_FAILED', message, exitCode: 2 })
-        process.exit(2)
+        const exitCode = (err as { exitCode?: number }).exitCode ?? 2
+        output.error({ code: 'REWORK_ADVANCE_FAILED', message, exitCode })
+        process.exit(exitCode)
         return
       }
 

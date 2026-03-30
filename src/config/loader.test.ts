@@ -240,4 +240,34 @@ platforms:
     expect(config).toBeNull()
     expect(errors.some(e => e.code === 'FIELD_WRONG_TYPE')).toBe(true)
   })
+
+  it('returns error for invalid platform enum values (non-depth Zod failure)', () => {
+    const root = makeTmpDir()
+    writeConfig(root, `
+version: 2
+methodology: deep
+platforms:
+  - not-a-valid-platform
+`)
+    const { config, errors } = loadConfig(root, [])
+    expect(config).toBeNull()
+    expect(errors.some(e => e.code === 'FIELD_INVALID_VALUE')).toBe(true)
+  })
+
+  it('returns error for malformed custom block (non-depth Zod failure)', () => {
+    const root = makeTmpDir()
+    writeConfig(root, `
+version: 2
+methodology: custom
+platforms:
+  - claude-code
+custom:
+  steps:
+    my-step:
+      enabled: not-a-boolean
+`)
+    const { config, errors } = loadConfig(root, [])
+    expect(config).toBeNull()
+    expect(errors.length).toBeGreaterThan(0)
+  })
 })

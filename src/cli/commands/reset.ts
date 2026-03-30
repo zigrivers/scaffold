@@ -7,6 +7,7 @@ import { createOutputContext } from '../output/context.js'
 import { StateManager } from '../../state/state-manager.js'
 import { acquireLock, releaseLock } from '../../state/lock-manager.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
+import { buildComputeEligibleFn } from '../../utils/eligible.js'
 
 interface ResetArgs {
   step?: string
@@ -77,7 +78,7 @@ async function resetStep(
   }
 
   try {
-    const stateManager = new StateManager(projectRoot, () => [])
+    const stateManager = new StateManager(projectRoot, buildComputeEligibleFn(projectRoot))
     const state = stateManager.loadState()
 
     // Check step exists in state
@@ -201,6 +202,7 @@ async function resetPipeline(
   }
 
   // Acquire lock
+  let lockAcquired = false
   if (!argv.force) {
     const lockResult = acquireLock(projectRoot, 'reset')
     if (!lockResult.acquired) {
@@ -212,6 +214,7 @@ async function resetPipeline(
       process.exit(3)
       return
     }
+    lockAcquired = true
   }
 
   const filesDeleted: string[] = []
@@ -248,7 +251,7 @@ async function resetPipeline(
     }
     process.exit(0)
   } finally {
-    if (!argv.force) {
+    if (lockAcquired) {
       try {
         releaseLock(projectRoot)
       } catch {

@@ -81,14 +81,9 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
-    const { config, errors: configErrors } = loadConfig(projectRoot, [])
-    if (!config) {
-      displayErrors(configErrors, [], output)
-      process.exit(1)
-    }
-
     // -----------------------------------------------------------------------
-    // Step 2: Discover meta-prompts and pipeline
+    // Step 2: Discover meta-prompts and pipeline (before config so we have
+    //         real step names for Phase-6 custom.steps validation)
     // -----------------------------------------------------------------------
     const pipelineDir = getPackagePipelineDir(projectRoot)
     const toolsDir = getPackageToolsDir(projectRoot)
@@ -105,6 +100,13 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
         exitCode: 1,
         recovery: `Available steps: ${candidates.join(', ')}`,
       })
+      process.exit(1)
+    }
+
+    const knownSteps = [...metaPrompts.keys()]
+    const { config, errors: configErrors } = loadConfig(projectRoot, knownSteps)
+    if (!config) {
+      displayErrors(configErrors, [], output)
       process.exit(1)
     }
 

@@ -5,6 +5,7 @@ import { createOutputContext } from '../output/context.js'
 import { StateManager } from '../../state/state-manager.js'
 import { acquireLock, releaseLock } from '../../state/lock-manager.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
+import { buildComputeEligibleFn } from '../../utils/eligible.js'
 
 interface SkipArgs {
   step: string | string[]
@@ -67,7 +68,7 @@ const skipCommand: CommandModule<Record<string, unknown>, SkipArgs> = {
     }
 
     try {
-      const stateManager = new StateManager(projectRoot, () => [])
+      const stateManager = new StateManager(projectRoot, buildComputeEligibleFn(projectRoot))
       const state = stateManager.loadState()
       const reason = argv.reason ?? 'user-requested'
 

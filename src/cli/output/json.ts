@@ -10,6 +10,8 @@ function isScaffoldWarning(w: ScaffoldWarning | string): w is ScaffoldWarning {
 }
 
 export class JsonOutput implements OutputContext {
+  private bufferedWarnings: ScaffoldWarning[] = []
+
   success(message: string): void {
     process.stderr.write(`✓ ${message}\n`)
   }
@@ -20,6 +22,11 @@ export class JsonOutput implements OutputContext {
 
   warn(warning: ScaffoldWarning | string): void {
     const msg = isScaffoldWarning(warning) ? warning.message : warning
+    if (isScaffoldWarning(warning)) {
+      this.bufferedWarnings.push(warning)
+    } else {
+      this.bufferedWarnings.push({ code: 'WARN', message: msg })
+    }
     process.stderr.write(`⚠ ${msg}\n`)
   }
 
@@ -35,7 +42,13 @@ export class JsonOutput implements OutputContext {
   }
 
   result(data: unknown): void {
-    process.stdout.write(JSON.stringify({ success: true, data }) + '\n')
+    process.stdout.write(JSON.stringify({
+      success: true,
+      data,
+      errors: [],
+      warnings: this.bufferedWarnings,
+      exit_code: 0,
+    }) + '\n')
   }
 
   async prompt<T>(message: string, defaultValue: T): Promise<T> {

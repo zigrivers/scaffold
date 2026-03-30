@@ -229,6 +229,15 @@ describe('StateManager', () => {
       expect(state.steps['create-prd'].completed_by).toBe('agent-1')
       expect(state.steps['create-prd'].depth).toBe(4)
     })
+
+    it('throws STEP_NOT_IN_STATE for an unknown step slug', () => {
+      const tempDir = makeTempDir()
+      const manager = new StateManager(tempDir, computeEligible)
+      manager.initializeState(INIT_OPTIONS)
+
+      expect(() => manager.markCompleted('nonexistent-step', [], 'agent-1', 3))
+        .toThrow('nonexistent-step')
+    })
   })
 
   describe('markSkipped', () => {

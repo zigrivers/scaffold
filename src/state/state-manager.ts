@@ -84,6 +84,12 @@ export class StateManager {
   /** Transition step to completed; records outputs, actor, and depth. */
   markCompleted(step: string, outputs: string[], completedBy: string, depth: DepthLevel): void {
     const state = this.loadState()
+    if (!(step in state.steps)) {
+      throw Object.assign(new Error(`Cannot mark unknown step '${step}' as completed`), {
+        code: 'STEP_NOT_IN_STATE',
+        exitCode: 1,
+      })
+    }
     state.steps[step].status = 'completed'
     state.steps[step].at = new Date().toISOString()
     state.steps[step].completed_by = completedBy
