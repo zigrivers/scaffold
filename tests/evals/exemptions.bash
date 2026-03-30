@@ -7,6 +7,7 @@
 COMMAND_EXEMPT=(
   "dashboard"
   "knowledge"
+  "post-implementation-review"
   "prompt-pipeline"
   "review-pr"
   "session-analyzer"
