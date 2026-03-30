@@ -1,6 +1,7 @@
 ---
 name: post-implementation-review
 description: Run a systematic three-channel post-implementation code review across the entire codebase
+summary: "Run a systematic three-channel post-implementation code review across the entire codebase after an AI agent completes all implementation tasks."
 phase: null
 order: null
 dependencies: []
@@ -31,7 +32,7 @@ The three channels are:
 
 - `$ARGUMENTS` — `--report-only` flag (optional; omit to review + fix)
 - `docs/user-stories.md` (required) — user stories with acceptance criteria; organizing manifest for Phase 2
-- `docs/implementation-plan.md` (required) — implementation tasks for completeness reference
+- `docs/implementation-plan.md` (optional) — implementation tasks; used to cross-check that all planned deliverables were built
 - `docs/coding-standards.md` (required) — coding conventions for review context
 - `docs/architecture.md` (optional) — used for architecture alignment checks
 - `docs/adrs/` (optional) — architecture decision records for alignment checks
@@ -261,6 +262,24 @@ Provide:
 
 Do NOT provide BASE_SHA / HEAD_SHA — this is not a diff review.
 
+The subagent must return findings in this JSON shape (normalize any findings it
+surfaces to this format before returning):
+
+```json
+{
+  "findings": [
+    {
+      "severity": "P0|P1|P2|P3",
+      "category": "architecture-alignment|security|error-handling|test-coverage|complexity|dependencies",
+      "file": "relative/path/to/file.ts",
+      "line": 42,
+      "description": "Specific description of the issue",
+      "suggestion": "How to fix it"
+    }
+  ]
+}
+```
+
 Store as `SUPERPOWERS_PHASE1_FINDINGS`.
 
 ### Step 5: Run Phase 2 — Parallel User Story Review
@@ -304,7 +323,10 @@ Read the identified files. Format as:
 #### 5d: Dispatch Parallel Subagents
 
 Use `superpowers:dispatching-parallel-agents` to dispatch one subagent per
-story (or group). Each subagent receives these instructions:
+story (or group). Each subagent is dispatched with full tool access and **can
+dispatch further subagents** — this is how each story subagent runs its own
+`superpowers:code-reviewer` as Channel 3. This two-level nesting is intentional
+and supported. Each subagent receives these instructions:
 
 ```
 You are reviewing the implementation of one user story using all three review channels.
@@ -385,12 +407,14 @@ The per-story review prompt for Codex and Gemini:
 
   Return ONLY valid JSON."
 
-Return all three channels' findings:
+Normalize the Superpowers code-reviewer findings to the same JSON shape as
+Codex/Gemini (severity, acceptance_criterion, file, line, description, suggestion)
+before returning. Then return all three channels' findings:
 {
   "story": "[STORY_TITLE]",
-  "codex": { ...findings... },
-  "gemini": { ...findings... },
-  "superpowers": { ...findings... }
+  "codex": { "findings": [...] },
+  "gemini": { "findings": [...] },
+  "superpowers": { "findings": [...] }
 }
 ```
 
@@ -477,6 +501,15 @@ _Populated if any findings exceed 3 fix rounds._
 
 *Skip this step in Report Only mode.*
 
+Before making any fixes, record the current HEAD SHA:
+
+```bash
+PRE_FIX_SHA=$(git rev-parse HEAD)
+```
+
+This is used in Step 9 to identify all files modified across all fix commits,
+regardless of how many severity-tier commits are made.
+
 Process the fix queue in priority order: all P0s first, then all P1s, then all P2s.
 Within each severity tier, fix high-confidence findings (multi-source) first.
 
@@ -503,7 +536,8 @@ Commit after each severity tier:
 
 ```bash
 git add [modified source files only — not the report]
-git commit -m "fix: resolve P[N] post-implementation review findings"
+git commit -m "fix: resolve P0 post-implementation review findings"
+# Replace P0 with P1 or P2 for the respective tiers
 ```
 
 ### Step 9: Final Verification Pass
@@ -511,11 +545,15 @@ git commit -m "fix: resolve P[N] post-implementation review findings"
 After all fixes are applied, run a targeted re-check on modified files only
 using Superpowers code-reviewer (fastest channel).
 
-Identify modified files:
+Identify all files modified across all fix commits using the pre-fix SHA
+recorded at the start of Step 8:
 
 ```bash
-git diff --name-only HEAD~1..HEAD
+git diff --name-only $PRE_FIX_SHA..HEAD
 ```
+
+This captures files from every severity-tier commit (P0, P1, P2), not just
+the most recent one.
 
 Dispatch `superpowers:code-reviewer` with:
 - `WHAT_WAS_IMPLEMENTED`: "Post-implementation review fix pass"
@@ -530,7 +568,15 @@ If the subagent reports new P0 or P1 findings:
 - Re-run this verification step on the newly modified files
 
 When verification passes with no new P0/P1 findings, update
-`docs/reviews/post-implementation-review.md` by replacing the "Fix Log" placeholder:
+`docs/reviews/post-implementation-review.md` with the Fix Log:
+
+- **Review + Fix / Re-review mode:** Replace the `_Populated during fix execution._`
+  placeholder in the "Fix Log" section
+- **Update Mode:** The prior report already has a populated Fix Log; append a new
+  `## Fix Log — Update Run [YYYY-MM-DD]` section at the end of the report instead
+  of overwriting the existing one
+
+Use this table format:
 
 ```
 ## Fix Log

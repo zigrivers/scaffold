@@ -70,7 +70,7 @@ Use docs/user-stories.md as the organizing manifest. For each story:
 - **Large story (maps to more than 20 files):** The subagent splits its review
   by layer (backend files first, frontend second) within a single subagent
 
-## Phase 3: Deduplication
+## Phase 3: Finding Consolidation & Fix Execution
 
 1. Flatten all findings from all channels across both phases into one list
 2. Deduplicate: same `file` + matching issue type/description = one finding;

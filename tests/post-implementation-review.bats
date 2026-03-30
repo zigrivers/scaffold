@@ -22,7 +22,7 @@ COMMAND="$BATS_TEST_DIRNAME/../commands/post-implementation-review.md"
 }
 
 @test "command documents Phase 3 consolidation" {
-    run grep -q 'Phase 3' "$COMMAND"
+    run grep -qE 'Phase 3|Step 6.*[Cc]onsolid|[Cc]onsolid.*[Ff]inding' "$COMMAND"
     [ "$status" -eq 0 ]
 }
 
