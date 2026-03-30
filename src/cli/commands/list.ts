@@ -72,7 +72,7 @@ function scanTools(projectRoot: string | undefined): { build: ToolEntry[]; utili
 
 const listCommand: CommandModule<Record<string, unknown>, ListArgs> = {
   command: 'list',
-  describe: 'List available methodologies and platform adapters',
+  describe: 'List available methodologies, platform adapters, and tools',
   builder: (yargs) => {
     return yargs.option('section', {
       type: 'string',
@@ -152,8 +152,9 @@ const listCommand: CommandModule<Record<string, unknown>, ListArgs> = {
 
         const formatEntry = (t: ToolEntry): string => {
           const base = `  ${t.name.padEnd(nameWidth)}${t.description}`
-          if (argv.verbose && t.argumentHint) {
-            return `${base.padEnd(nameWidth + descWidth + 2)}  ${t.argumentHint}`
+          if (argv.verbose) {
+            const padded = base.padEnd(nameWidth + descWidth + 2)
+            return t.argumentHint ? `${padded}  ${t.argumentHint}` : padded.trimEnd()
           }
           return base
         }

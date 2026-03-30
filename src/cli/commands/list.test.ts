@@ -262,6 +262,7 @@ describe('list command — tools section', () => {
     expect(written).toContain('Utility Tools')
     expect(written).toContain('fake-util-tool')
     expect(written).toContain('A fake utility tool')
+    expect(written).not.toContain('<foo|bar>')
     expect(exitSpy).toHaveBeenCalled()
   })
 

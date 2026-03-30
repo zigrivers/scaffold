@@ -176,7 +176,7 @@ Tools (version-bump, release, version, update, dashboard, prompt-pipeline, sessi
 When the user asks "what tools are available?", "what can I build?", or "show me the tools":
 
 1. Run `scaffold list --section tools --format json`
-2. Parse the JSON: `data.tools.build` (6 build phase steps) and `data.tools.utility` (utility tools)
+2. Parse the JSON: `data.tools.build` (build phase steps) and `data.tools.utility` (utility tools)
 3. Render as two grouped sections:
 
 **Build Phase (Phase 15)**
