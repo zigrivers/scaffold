@@ -83,7 +83,10 @@ describe('skip command', () => {
       writtenLines.push(String(chunk))
       return true
     })
-    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      writtenLines.push(String(chunk))
+      return true
+    })
 
     // Defaults
     mockFindProjectRoot.mockReturnValue('/fake/project')

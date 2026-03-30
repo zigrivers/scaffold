@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import type { ScaffoldWarning } from '../types/index.js'
+import { atomicWriteFile } from '../utils/fs.js'
 
 export interface SectionRegistry {
   [stepSlug: string]: {
@@ -60,7 +61,7 @@ export class ClaudeMdManager {
   private writeFile(content: string): void {
     const dir = path.dirname(this.claudeMdPath)
     fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(this.claudeMdPath, content, 'utf8')
+    atomicWriteFile(this.claudeMdPath, content)
   }
 
   fillSection(slug: string, content: string): ScaffoldWarning[] {

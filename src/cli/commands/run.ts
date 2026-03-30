@@ -340,8 +340,11 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
               try {
                 const content = fs.readFileSync(fullPath, 'utf8')
                 artifacts.push({ stepName: dep, filePath: relPath, content })
-              } catch {
-                // skip unreadable artifacts
+              } catch (err) {
+                output.warn({
+                  code: 'ARTIFACT_READ_ERROR',
+                  message: `Could not read artifact '${relPath}' from step '${dep}': ${(err as Error).message}`,
+                })
               }
             }
           }
@@ -354,8 +357,11 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       if (fs.existsSync(decisionsPath)) {
         try {
           decisions = fs.readFileSync(decisionsPath, 'utf8')
-        } catch {
-          // non-fatal
+        } catch (err) {
+          output.warn({
+            code: 'DECISIONS_READ_ERROR',
+            message: `Could not read decisions log: ${(err as Error).message}`,
+          })
         }
       }
 
@@ -383,9 +389,6 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
         process.exit(5)
       }
 
-      // Write assembled prompt to stdout (raw, for AI consumption)
-      process.stdout.write(assemblyResult.prompt!.text)
-
       // -----------------------------------------------------------------------
       // Step 10: Wait for completion (interactive) or exit (auto/json)
       // -----------------------------------------------------------------------
@@ -399,6 +402,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
               status: 'stateless',
               depth,
               depth_source: provenance,
+              prompt: assemblyResult.prompt!.text,
             })
           } else {
             // Reload state for next eligible
@@ -406,16 +410,23 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
             const nextSteps = computeEligible(graph, stateForEligible.steps)
             output.result({
               step,
-              status: 'completed',
+              status: 'in_progress',
               depth,
               depth_source: provenance,
               nextEligible: nextSteps,
+              prompt: assemblyResult.prompt!.text,
             })
           }
+        } else {
+          // auto mode: write prompt to stdout for AI consumption
+          process.stdout.write(assemblyResult.prompt!.text)
         }
         if (lockAcquired) releaseLock(projectRoot)
         process.exit(0)
       }
+
+      // Write assembled prompt to stdout (raw, for AI consumption in interactive mode)
+      process.stdout.write(assemblyResult.prompt!.text)
 
       // Interactive mode: prompt user for completion
       if (isStateless) {

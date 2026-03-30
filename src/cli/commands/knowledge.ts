@@ -1,7 +1,7 @@
 import type { Argv, CommandModule } from 'yargs'
 import path from 'node:path'
 import fs from 'node:fs'
-import { execSync } from 'node:child_process'
+import { execSync, execFileSync } from 'node:child_process'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
@@ -202,7 +202,7 @@ const resetSubcommand: CommandModule<Record<string, unknown>, ResetArgs> = {
     let hasUncommittedChanges = false
     if (isGitRepo) {
       try {
-        const result = execSync(`git status --porcelain "${localPath}"`, { stdio: 'pipe', cwd: projectRoot })
+        const result = execFileSync('git', ['status', '--porcelain', localPath], { stdio: 'pipe', cwd: projectRoot })
         hasUncommittedChanges = result.toString().trim().length > 0
       } catch {
         // ignore

@@ -127,17 +127,23 @@ export function loadConfig(projectRoot: string, knownSteps: string[]): LoadResul
     })
   }
 
-  // Validate custom section depths via Zod
+  // Validate full config shape via Zod — convert all schema issues to errors
   const zodResult = ConfigSchema.safeParse(obj)
   if (!zodResult.success) {
     for (const issue of zodResult.error.issues) {
       const fieldPath = issue.path.join('.')
-      // Depth violations
       if (fieldPath.includes('depth')) {
         const depthValue = getNestedValue(obj, issue.path)
         errors.push(fieldInvalidDepth(depthValue, configPath))
+      } else {
+        errors.push({
+          code: 'FIELD_INVALID_VALUE',
+          message: `Config validation error at "${fieldPath}": ${issue.message}`,
+          exitCode: 1,
+          recovery: `Fix the "${fieldPath}" field in ${configPath}`,
+          context: { file: configPath, field: fieldPath },
+        })
       }
-      // Platforms type issues not already captured above
     }
   }
 

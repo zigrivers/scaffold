@@ -52,17 +52,17 @@ export class InteractiveOutput implements OutputContext {
 
   warn(warning: ScaffoldWarning | string): void {
     const msg = isScaffoldWarning(warning) ? warning.message : warning
-    process.stdout.write(yellow(`⚠ ${msg}`) + '\n')
+    process.stderr.write(yellow(`⚠ ${msg}`) + '\n')
   }
 
   error(error: ScaffoldError | string): void {
     if (isScaffoldError(error)) {
-      process.stdout.write(red(`✗ ${error.code}: ${error.message}`) + '\n')
+      process.stderr.write(red(`✗ ${error.code}: ${error.message}`) + '\n')
       if (error.recovery) {
-        process.stdout.write(`  Recovery: ${error.recovery}\n`)
+        process.stderr.write(`  Recovery: ${error.recovery}\n`)
       }
     } else {
-      process.stdout.write(red(`✗ ${error}`) + '\n')
+      process.stderr.write(red(`✗ ${error}`) + '\n')
     }
   }
 

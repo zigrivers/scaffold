@@ -7,7 +7,7 @@ import { loadConfig } from '../../config/loader.js'
 import { discoverAllMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import {
   getPackagePipelineDir, getPackageMethodologyDir,
-  getPackageKnowledgeDir, getPackageToolsDir,
+  getPackageKnowledgeDir, getPackageToolsDir, atomicWriteFile,
 } from '../../utils/fs.js'
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
 import { buildGraph } from '../../core/dependency/graph.js'
@@ -84,8 +84,8 @@ const buildCommand: CommandModule<Record<string, unknown>, BuildArgs> = {
     try {
       const methodologyDir = getPackageMethodologyDir(projectRoot)
       loadAllPresets(methodologyDir, stepNames)
-    } catch {
-      // No presets available — continue without them
+    } catch (err) {
+      process.stderr.write(`[scaffold] Warning: could not load methodology presets: ${(err as Error).message}\n`)
     }
 
     // Step 5: Build dependency graph
@@ -204,7 +204,7 @@ const buildCommand: CommandModule<Record<string, unknown>, BuildArgs> = {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true })
       }
-      fs.writeFileSync(fullPath, file.content, 'utf8')
+      atomicWriteFile(fullPath, file.content)
       generatedCount++
     }
 

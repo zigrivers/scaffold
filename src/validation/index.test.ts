@@ -46,7 +46,7 @@ function makeProjectRoot(opts: {
 const validConfig = `version: 2
 methodology: mvp
 platforms:
-  - web
+  - claude-code
 `
 
 const validState = JSON.stringify({

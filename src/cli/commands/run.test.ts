@@ -647,7 +647,7 @@ describe('run command handler', () => {
       expect(mockOutput.result).toHaveBeenCalledWith(
         expect.objectContaining({
           step: 'create-prd',
-          status: 'completed',
+          status: 'in_progress',
           depth: expect.any(Number),
           nextEligible: expect.any(Array),
         }),

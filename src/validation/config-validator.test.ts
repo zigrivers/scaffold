@@ -44,19 +44,19 @@ describe('validateConfig', () => {
 
   describe('valid inputs', () => {
     it('returns no errors for a valid minimal config', () => {
-      const root = makeProjectRoot('version: 2\nmethodology: mvp\nplatforms:\n  - web\n')
+      const root = makeProjectRoot('version: 2\nmethodology: mvp\nplatforms:\n  - claude-code\n')
       const result = validateConfig(root, [])
       expect(result.errors).toHaveLength(0)
     })
 
     it('returns no errors for a valid full config', () => {
-      const root = makeProjectRoot('version: 2\nmethodology: deep\nplatforms:\n  - web\n  - mobile\n')
+      const root = makeProjectRoot('version: 2\nmethodology: deep\nplatforms:\n  - claude-code\n  - codex\n')
       const result = validateConfig(root, [])
       expect(result.errors).toHaveLength(0)
     })
 
     it('returns no errors and no warnings when no unknown fields present', () => {
-      const root = makeProjectRoot('version: 2\nmethodology: mvp\nplatforms:\n  - web\n')
+      const root = makeProjectRoot('version: 2\nmethodology: mvp\nplatforms:\n  - claude-code\n')
       const result = validateConfig(root, [])
       expect(result.errors).toHaveLength(0)
       expect(result.warnings).toHaveLength(0)
@@ -124,7 +124,7 @@ describe('validateConfig', () => {
   describe('version validation', () => {
     it('auto-migrates v1 config (version: 1)', () => {
       // v1 configs get auto-migrated — result depends on migration output
-      const root = makeProjectRoot('version: 1\nmethodology: mvp\nplatforms:\n  - web\n')
+      const root = makeProjectRoot('version: 1\nmethodology: mvp\nplatforms:\n  - claude-code\n')
       const result = validateConfig(root, [])
       // Should either succeed or have specific field errors, not a version error
       const versionError = result.errors.find(e => e.code === 'FIELD_WRONG_TYPE' && e.context?.field === 'version')
@@ -132,7 +132,7 @@ describe('validateConfig', () => {
     })
 
     it('auto-migrates config with no version field', () => {
-      const root = makeProjectRoot('methodology: mvp\nplatforms:\n  - web\n')
+      const root = makeProjectRoot('methodology: mvp\nplatforms:\n  - claude-code\n')
       const result = validateConfig(root, [])
       // no version field = treated as v1, auto-migrated
       const versionError = result.errors.find(e => e.code === 'FIELD_WRONG_TYPE' && e.context?.field === 'version')
@@ -140,7 +140,7 @@ describe('validateConfig', () => {
     })
 
     it('returns FIELD_WRONG_TYPE for unsupported version (e.g. version: 3)', () => {
-      const root = makeProjectRoot('version: 3\nmethodology: mvp\nplatforms:\n  - web\n')
+      const root = makeProjectRoot('version: 3\nmethodology: mvp\nplatforms:\n  - claude-code\n')
       const result = validateConfig(root, [])
       expect(result.errors).toHaveLength(1)
       expect(result.errors[0].code).toBe('FIELD_WRONG_TYPE')
@@ -151,7 +151,7 @@ describe('validateConfig', () => {
 
   describe('required field validation', () => {
     it('returns FIELD_MISSING when methodology is missing', () => {
-      const root = makeProjectRoot('version: 2\nplatforms:\n  - web\n')
+      const root = makeProjectRoot('version: 2\nplatforms:\n  - claude-code\n')
       const result = validateConfig(root, [])
       const methodologyError = result.errors.find(
         e => e.code === 'FIELD_MISSING' && e.context?.field === 'methodology',
@@ -187,7 +187,7 @@ describe('validateConfig', () => {
 
   describe('invalid methodology', () => {
     it('returns FIELD_INVALID_METHODOLOGY for unknown methodology', () => {
-      const root = makeProjectRoot('version: 2\nmethodology: extreme\nplatforms:\n  - web\n')
+      const root = makeProjectRoot('version: 2\nmethodology: extreme\nplatforms:\n  - claude-code\n')
       const result = validateConfig(root, [])
       const methodError = result.errors.find(e => e.code === 'FIELD_INVALID_METHODOLOGY')
       expect(methodError).toBeDefined()
@@ -198,7 +198,7 @@ describe('validateConfig', () => {
 
   describe('unknown field warnings', () => {
     it('returns CONFIG_UNKNOWN_FIELD warning for unrecognized top-level keys', () => {
-      const root = makeProjectRoot('version: 2\nmethodology: mvp\nplatforms:\n  - web\nfuture_feature: true\n')
+      const root = makeProjectRoot('version: 2\nmethodology: mvp\nplatforms:\n  - claude-code\nfuture_feature: true\n')
       const result = validateConfig(root, [])
       expect(result.errors).toHaveLength(0)
       const unknownWarning = result.warnings.find(w => w.code === 'CONFIG_UNKNOWN_FIELD')
@@ -212,7 +212,7 @@ describe('validateConfig', () => {
   describe('cross-field validation', () => {
     it('returns FIELD_INVALID_VALUE for unknown step in custom.steps', () => {
       const root = makeProjectRoot(
-        'version: 2\nmethodology: custom\nplatforms:\n  - web\n'
+        'version: 2\nmethodology: custom\nplatforms:\n  - claude-code\n'
         + 'custom:\n  steps:\n    nonexistent-step:\n      enabled: true\n',
       )
       const result = validateConfig(root, ['known-step-a', 'known-step-b'])
@@ -224,7 +224,7 @@ describe('validateConfig', () => {
 
     it('no error for valid step names in custom.steps', () => {
       const root = makeProjectRoot(
-        'version: 2\nmethodology: custom\nplatforms:\n  - web\ncustom:\n  steps:\n    my-step:\n      enabled: true\n',
+        'version: 2\nmethodology: custom\nplatforms:\n  - claude-code\ncustom:\n  steps:\n    my-step:\n      enabled: true\n',
       )
       const result = validateConfig(root, ['my-step'])
       const invalidStep = result.errors.find(e => e.code === 'FIELD_INVALID_VALUE')
@@ -233,7 +233,7 @@ describe('validateConfig', () => {
 
     it('skips cross-field validation when knownSteps is empty', () => {
       const root = makeProjectRoot(
-        'version: 2\nmethodology: custom\nplatforms:\n  - web\ncustom:\n  steps:\n    anything:\n      enabled: true\n',
+        'version: 2\nmethodology: custom\nplatforms:\n  - claude-code\ncustom:\n  steps:\n    anything:\n      enabled: true\n',
       )
       const result = validateConfig(root, [])
       // With empty knownSteps, cross-field validation is skipped
@@ -252,7 +252,7 @@ describe('validateConfig', () => {
     })
 
     it('returns errors array and warnings array (never undefined)', () => {
-      const root = makeProjectRoot('version: 2\nmethodology: mvp\nplatforms:\n  - web\n')
+      const root = makeProjectRoot('version: 2\nmethodology: mvp\nplatforms:\n  - claude-code\n')
       const result = validateConfig(root, [])
       expect(Array.isArray(result.errors)).toBe(true)
       expect(Array.isArray(result.warnings)).toBe(true)

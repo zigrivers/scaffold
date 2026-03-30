@@ -24,6 +24,7 @@ vi.mock('../../config/loader.js', () => ({
 }))
 vi.mock('node:child_process', () => ({
   execSync: vi.fn(),
+  execFileSync: vi.fn(),
 }))
 vi.mock('../../core/assembly/meta-prompt-loader.js', () => ({
   discoverMetaPrompts: vi.fn(),
@@ -41,7 +42,7 @@ import { createOutputContext } from '../../cli/output/context.js'
 import { resolveOutputMode } from '../../cli/middleware/output-mode.js'
 import { loadConfig } from '../../config/loader.js'
 import { runCli } from '../../cli/index.js'
-import { execSync } from 'node:child_process'
+import { execSync, execFileSync } from 'node:child_process'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { KnowledgeUpdateAssembler } from '../../core/knowledge/knowledge-update-assembler.js'
 
@@ -209,7 +210,7 @@ describe('scaffold knowledge reset', () => {
     const output = setupDefaults()
     const localPath = '/fake/project/.scaffold/knowledge/api-design.md'
     vi.mocked(buildIndex).mockReturnValueOnce(new Map([['api-design', localPath]]))
-    vi.mocked(execSync).mockReturnValue(Buffer.from(''))  // empty = no changes
+    vi.mocked(execFileSync).mockReturnValue(Buffer.from(''))  // empty = no changes
 
     await runCli(['knowledge', 'reset', 'api-design'])
     expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(localPath)
@@ -220,10 +221,7 @@ describe('scaffold knowledge reset', () => {
     setupDefaults()
     const localPath = '/fake/project/.scaffold/knowledge/api-design.md'
     vi.mocked(buildIndex).mockReturnValueOnce(new Map([['api-design', localPath]]))
-    vi.mocked(execSync).mockImplementation((cmd: string) => {
-      if (String(cmd).includes('status')) return Buffer.from(' M .scaffold/knowledge/api-design.md')
-      return Buffer.from('')
-    })
+    vi.mocked(execFileSync).mockReturnValue(Buffer.from(' M .scaffold/knowledge/api-design.md'))
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as unknown as () => never)
 
     await runCli(['knowledge', 'reset', 'api-design'])
@@ -235,10 +233,7 @@ describe('scaffold knowledge reset', () => {
     setupDefaults()
     const localPath = '/fake/project/.scaffold/knowledge/api-design.md'
     vi.mocked(buildIndex).mockReturnValueOnce(new Map([['api-design', localPath]]))
-    vi.mocked(execSync).mockImplementation((cmd: string) => {
-      if (String(cmd).includes('status')) return Buffer.from(' M .scaffold/knowledge/api-design.md')
-      return Buffer.from('')
-    })
+    vi.mocked(execFileSync).mockReturnValue(Buffer.from(' M .scaffold/knowledge/api-design.md'))
 
     await runCli(['knowledge', 'reset', 'api-design', '--auto'])
     expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(localPath)

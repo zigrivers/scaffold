@@ -128,8 +128,8 @@ export function releaseLock(projectRoot: string): void {
     try { fs.unlinkSync(getLockPath(projectRoot)) } catch { /* ignore if already gone */ }
   } else {
     // Different PID owns this lock — do not delete
-    console.warn(
-      `[scaffold] Warning: attempted to release lock owned by PID ${lock.pid} (current PID: ${process.pid})`,
+    process.stderr.write(
+      `[scaffold] Warning: attempted to release lock owned by PID ${lock.pid} (current PID: ${process.pid})\n`,
     )
   }
 }

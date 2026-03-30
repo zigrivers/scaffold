@@ -52,10 +52,11 @@ describe('createOutputContext factory', () => {
 
 describe('InteractiveOutput', () => {
   let stdoutWrite: WriteSpy
+  let stderrWrite: WriteSpy
 
   beforeEach(() => {
     stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
-    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    stderrWrite = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
   })
 
   afterEach(() => {
@@ -80,11 +81,11 @@ describe('InteractiveOutput', () => {
     expect(written).toContain('→')
   })
 
-  it('warn() writes to stdout with warning symbol', () => {
+  it('warn() writes to stderr with warning symbol', () => {
     const out = new InteractiveOutput()
     out.warn(makeWarning())
-    expect(stdoutWrite).toHaveBeenCalled()
-    const written = String(stdoutWrite.mock.calls[0]?.[0] ?? '')
+    expect(stderrWrite).toHaveBeenCalled()
+    const written = String(stderrWrite.mock.calls[0]?.[0] ?? '')
     expect(written).toContain('Watch out')
     expect(written).toContain('⚠')
   })
@@ -92,16 +93,16 @@ describe('InteractiveOutput', () => {
   it('warn() accepts a plain string', () => {
     const out = new InteractiveOutput()
     out.warn('simple warning')
-    expect(stdoutWrite).toHaveBeenCalled()
-    const written = String(stdoutWrite.mock.calls[0]?.[0] ?? '')
+    expect(stderrWrite).toHaveBeenCalled()
+    const written = String(stderrWrite.mock.calls[0]?.[0] ?? '')
     expect(written).toContain('simple warning')
   })
 
-  it('error() writes error code + message to stdout', () => {
+  it('error() writes error code + message to stderr', () => {
     const out = new InteractiveOutput()
     out.error(makeError())
-    expect(stdoutWrite).toHaveBeenCalled()
-    const written = String(stdoutWrite.mock.calls[0]?.[0] ?? '')
+    expect(stderrWrite).toHaveBeenCalled()
+    const written = String(stderrWrite.mock.calls[0]?.[0] ?? '')
     expect(written).toContain('TEST_ERROR')
     expect(written).toContain('Something went wrong')
     expect(written).toContain('✗')
@@ -110,7 +111,7 @@ describe('InteractiveOutput', () => {
   it('error() writes recovery hint when recovery is present', () => {
     const out = new InteractiveOutput()
     out.error(makeError({ recovery: 'Try again later' }))
-    const allWritten = stdoutWrite.mock.calls.map(c => String(c[0])).join('\n')
+    const allWritten = stderrWrite.mock.calls.map(c => String(c[0])).join('\n')
     expect(allWritten).toContain('Recovery')
     expect(allWritten).toContain('Try again later')
   })
@@ -118,15 +119,15 @@ describe('InteractiveOutput', () => {
   it('error() does not write recovery line when recovery is absent', () => {
     const out = new InteractiveOutput()
     out.error(makeError())
-    const allWritten = stdoutWrite.mock.calls.map(c => String(c[0])).join('\n')
+    const allWritten = stderrWrite.mock.calls.map(c => String(c[0])).join('\n')
     expect(allWritten).not.toContain('Recovery')
   })
 
   it('error() accepts a plain string', () => {
     const out = new InteractiveOutput()
     out.error('plain error message')
-    expect(stdoutWrite).toHaveBeenCalled()
-    const written = String(stdoutWrite.mock.calls[0]?.[0] ?? '')
+    expect(stderrWrite).toHaveBeenCalled()
+    const written = String(stderrWrite.mock.calls[0]?.[0] ?? '')
     expect(written).toContain('plain error message')
   })
 

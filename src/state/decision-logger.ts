@@ -1,5 +1,5 @@
 import type { DecisionEntry } from '../types/index.js'
-import { fileExists, ensureDir } from '../utils/fs.js'
+import { fileExists, ensureDir, atomicWriteFile } from '../utils/fs.js'
 import { decisionParseError } from '../utils/errors.js'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -30,7 +30,7 @@ function readAllEntries(filePath: string): DecisionEntry[] {
       entries.push(JSON.parse(line) as DecisionEntry)
     } catch (err) {
       const warning = decisionParseError(filePath, i + 1, (err as Error).message)
-      console.warn(`[scaffold] ${warning.message}`)
+      process.stderr.write(`[scaffold] ${warning.message}\n`)
     }
   }
 
@@ -67,11 +67,14 @@ export function appendDecision(
 ): string {
   ensureDir(path.join(projectRoot, SCAFFOLD_DIR))
 
+  const filePath = decisionsPath(projectRoot)
   const id = getNextId(projectRoot)
   const fullEntry: DecisionEntry = { id, ...entry }
-  const line = JSON.stringify(fullEntry) + '\n'
+  const newLine = JSON.stringify(fullEntry) + '\n'
 
-  fs.appendFileSync(decisionsPath(projectRoot), line, 'utf8')
+  // Atomic append: read existing content, append new line, write atomically
+  const existing = fileExists(filePath) ? fs.readFileSync(filePath, 'utf8') : ''
+  atomicWriteFile(filePath, existing + newLine)
 
   return id
 }

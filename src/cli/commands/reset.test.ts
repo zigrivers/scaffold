@@ -73,7 +73,10 @@ describe('reset command', () => {
       writtenLines.push(String(chunk))
       return true
     })
-    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      writtenLines.push(String(chunk))
+      return true
+    })
 
     // Defaults
     mockFindProjectRoot.mockReturnValue(tempDir)

@@ -2,7 +2,7 @@ import type { CommandModule } from 'yargs'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { execSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
@@ -11,7 +11,7 @@ import { readDecisions } from '../../state/decision-logger.js'
 import { loadConfig } from '../../config/loader.js'
 import { generateDashboardData, generateHtml } from '../../dashboard/generator.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
-import { getPackagePipelineDir } from '../../utils/fs.js'
+import { getPackagePipelineDir, atomicWriteFile } from '../../utils/fs.js'
 import type { PipelineState } from '../../types/index.js'
 
 interface DashboardArgs {
@@ -110,7 +110,7 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
 
     // 11. Create parent directory if needed and write file
     fs.mkdirSync(path.dirname(outputPath), { recursive: true })
-    fs.writeFileSync(outputPath, html, 'utf8')
+    atomicWriteFile(outputPath, html)
 
     // 12. Open in browser (unless --no-open)
     if (!argv['no-open']) {
@@ -118,7 +118,7 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
       if (process.platform === 'darwin') opener = 'open'
       if (process.platform === 'win32') opener = 'start'
       try {
-        execSync(`${opener} "${outputPath}"`)
+        execFileSync(opener, [outputPath])
       } catch {
         // Ignore errors when opening browser
       }
