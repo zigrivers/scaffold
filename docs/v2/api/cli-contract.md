@@ -875,7 +875,7 @@ scaffold validate --format json; echo "exit: $?"
 
 ### `scaffold list [flags]`
 
-**Purpose**: Display all available methodologies and installed platform adapters. No project required.
+**Purpose**: Display all available methodologies, platform adapters, and tools. No project required.
 **Category**: utility
 **Lock behavior**: Read-only (no lock)
 **Requires project**: No
@@ -886,7 +886,8 @@ scaffold validate --format json; echo "exit: $?"
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--section <name>` | string | (all) | Show only a specific section. Valid values: `methodologies`, `platforms`. |
+| `--section <name>` | string | (all) | Show only a specific section. Valid values: `methodologies`, `platforms`, `tools`. |
+| `--verbose` | boolean | false | In the `tools` section, adds an Arguments column showing `argument-hint` values. |
 
 **Interactive behavior**:
 
@@ -909,7 +910,7 @@ Platforms
   (universal)    scaffold run outputs assembled prompt to stdout
 ```
 
-In JSON mode, `data` contains `{ methodologies: [...], platforms: [...] }`.
+In JSON mode, `data` contains `{ methodologies: [...], platforms: [...], tools: { build: [...], utility: [...] } }`.
 
 **Error conditions:** None (read-only, no project required).
 
@@ -920,6 +921,8 @@ In JSON mode, `data` contains `{ methodologies: [...], platforms: [...] }`.
 ```bash
 scaffold list
 scaffold list --section methodologies
+scaffold list --section tools
+scaffold list --section tools --verbose
 scaffold list --format json
 ```
 
