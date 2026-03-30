@@ -55,7 +55,12 @@ proceeding without acknowledgment.
   dispatched to Codex and Gemini if available, with graceful fallback to
   Claude-only enhanced validation.
 - **mvp**: High-level scan for blocking issues only.
-- **custom:depth(1-5)**: Depth 1: entity name check across PRD, user stories, and domain models. Depth 2: add tech stack reference consistency. Depth 3: full terminology audit across all documents with naming collision detection. Depth 4: add external model cross-check. Depth 5: multi-model reconciliation of consistency findings.
+- **custom:depth(1-5)**:
+  - Depth 1: entity name check across PRD, user stories, and domain models.
+  - Depth 2: add tech stack reference consistency.
+  - Depth 3: full terminology audit across all documents with naming collision detection.
+  - Depth 4: add external model cross-check.
+  - Depth 5: multi-model reconciliation of consistency findings.
 
 ## Mode Detection
 Not applicable — validation always runs fresh against current artifacts. If

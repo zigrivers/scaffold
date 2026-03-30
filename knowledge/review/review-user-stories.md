@@ -1,7 +1,7 @@
 ---
 name: review-user-stories
 description: Failure modes and review passes specific to user story artifacts
-topics: [review, user-stories, coverage, acceptance-criteria, INVEST, testability]
+topics: [user-stories, coverage, acceptance-criteria, INVEST, testability, review]
 ---
 
 # Review: User Stories

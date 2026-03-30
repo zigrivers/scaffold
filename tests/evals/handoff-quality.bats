@@ -57,8 +57,15 @@ setup() {
       continue
     }
 
-    if ! grep -qi 'implementation-playbook\|playbook' "$cmd_file"; then
-      failures+=("${cmd_slug}.md does not mention playbook")
+    # Scope to Inputs and Instructions sections — not full-file grep, which
+    # would pass on negation prose like "does NOT require a playbook".
+    local inputs_section instructions_section
+    inputs_section="$(awk '/^## Inputs/{found=1; next} /^## /{if(found) exit} found{print}' "$cmd_file")"
+    instructions_section="$(awk '/^## Instructions/{found=1; next} /^## /{if(found) exit} found{print}' "$cmd_file")"
+    local scoped_text="${inputs_section}"$'\n'"${instructions_section}"
+
+    if ! echo "$scoped_text" | grep -qi 'implementation-playbook\|playbook'; then
+      failures+=("${cmd_slug}.md Inputs/Instructions sections do not affirmatively reference playbook")
     fi
   done
 
@@ -81,8 +88,15 @@ setup() {
       continue
     }
 
-    if ! grep -qi 'onboarding' "$cmd_file"; then
-      failures+=("${cmd_slug}.md does not mention onboarding")
+    # Scope to Inputs and Instructions sections — avoids false positives from
+    # negation prose like "does NOT require onboarding" in other sections.
+    local inputs_section instructions_section
+    inputs_section="$(awk '/^## Inputs/{found=1; next} /^## /{if(found) exit} found{print}' "$cmd_file")"
+    instructions_section="$(awk '/^## Instructions/{found=1; next} /^## /{if(found) exit} found{print}' "$cmd_file")"
+    local scoped_text="${inputs_section}"$'\n'"${instructions_section}"
+
+    if ! echo "$scoped_text" | grep -qi 'onboarding'; then
+      failures+=("${cmd_slug}.md Inputs/Instructions sections do not affirmatively reference onboarding")
     fi
   done
 
@@ -102,8 +116,15 @@ setup() {
     return 1
   }
 
-  if ! grep -qi 'quality\|gate\|playbook' "$cmd_file"; then
-    echo "quick-task.md does not mention quality, gate, or playbook"
+  # Scope to Instructions and After This Step sections — the quality gate
+  # reference should appear in the process or handoff, not just anywhere in the file.
+  local instructions_section after_section
+  instructions_section="$(awk '/^## Instructions/{found=1; next} /^## /{if(found) exit} found{print}' "$cmd_file")"
+  after_section="$(awk '/^## After This Step/{found=1; next} /^## /{if(found) exit} found{print}' "$cmd_file")"
+  local scoped_text="${instructions_section}"$'\n'"${after_section}"
+
+  if ! echo "$scoped_text" | grep -qi 'quality\|gate\|playbook'; then
+    echo "quick-task.md Instructions/After-This-Step sections do not mention quality, gate, or playbook"
     return 1
   fi
 }
@@ -117,8 +138,16 @@ setup() {
     return 1
   }
 
-  if ! grep -qi 'story-tests\|test skeletons' "$cmd_file"; then
-    echo "new-enhancement.md does not mention story-tests or test skeletons"
+  # Scope to Instructions and After This Step sections — story-tests reference
+  # should appear in the process or handoff context, not just in passing elsewhere.
+  # "After This Step" is the handoff section where downstream steps are listed.
+  local instructions_section after_section
+  instructions_section="$(awk '/^## Instructions/{found=1; next} /^## /{if(found) exit} found{print}' "$cmd_file")"
+  after_section="$(awk '/^## After This Step/{found=1; next} /^## /{if(found) exit} found{print}' "$cmd_file")"
+  local scoped_text="${instructions_section}"$'\n'"${after_section}"
+
+  if ! echo "$scoped_text" | grep -qi 'story-tests\|test skeletons'; then
+    echo "new-enhancement.md Instructions/After-This-Step sections do not mention story-tests or test skeletons"
     return 1
   fi
 }

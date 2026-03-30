@@ -52,7 +52,12 @@ proceeding without acknowledgment.
   dispatched to Codex and Gemini if available, with graceful fallback to
   Claude-only enhanced validation.
 - **mvp**: High-level scan for blocking issues only.
-- **custom:depth(1-5)**: Depth 1: feature count comparison (PRD vs implementation plan). Depth 2: add component-level tracing. Depth 3: full story-level and task-level audit against original PRD scope. Depth 4: add external model scope assessment. Depth 5: multi-model scope review with risk-weighted creep analysis.
+- **custom:depth(1-5)**:
+  - Depth 1: feature count comparison (PRD vs implementation plan).
+  - Depth 2: add component-level tracing.
+  - Depth 3: full story-level and task-level audit against original PRD scope.
+  - Depth 4: add external model scope assessment.
+  - Depth 5: multi-model scope review with risk-weighted creep analysis.
 
 ## Mode Detection
 Not applicable — validation always runs fresh against current artifacts. If

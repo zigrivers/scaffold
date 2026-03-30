@@ -48,11 +48,12 @@ professional UI without requiring design expertise from the user.
   page demonstrating all patterns. 15-20 pages.
 - **mvp**: Color palette, typography, spacing scale, and button/form/card patterns.
   No dark mode. Basic theme config. 3-5 pages.
-- **custom:depth(1-5)**: Depth 1: color palette and typography scale only.
-  Depth 2: colors, typography, and button patterns. Depth 3: add forms, cards,
-  and spacing scale. Depth 4: add navigation, data display, layout system, and
-  responsive breakpoints. Depth 5: full suite with dark mode, accessibility
-  audit, and animation guidelines.
+- **custom:depth(1-5)**:
+  - Depth 1: color palette and typography scale only.
+  - Depth 2: colors, typography, and button patterns.
+  - Depth 3: add forms, cards, and spacing scale.
+  - Depth 4: add navigation, data display, layout system, and responsive breakpoints.
+  - Depth 5: full suite with dark mode, accessibility audit, and animation guidelines.
 
 ## Conditional Evaluation
 Enable when: tech-stack.md includes a frontend framework (React, Vue, Angular, Svelte,

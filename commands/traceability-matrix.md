@@ -54,7 +54,12 @@ proceeding without acknowledgment.
   dispatched to Codex and Gemini if available, with graceful fallback to
   Claude-only enhanced validation.
 - **mvp**: High-level scan for blocking issues only.
-- **custom:depth(1-5)**: Depth 1: PRD requirement to user story mapping only. Depth 2: add story to implementation task mapping. Depth 3: full bidirectional chain (PRD → story → task → test → eval). Depth 4: add external model verification of coverage gaps. Depth 5: multi-model reconciliation with gap resolution recommendations.
+- **custom:depth(1-5)**:
+  - Depth 1: PRD requirement to user story mapping only.
+  - Depth 2: add story to implementation task mapping.
+  - Depth 3: full bidirectional chain (PRD → story → task → test → eval).
+  - Depth 4: add external model verification of coverage gaps.
+  - Depth 5: multi-model reconciliation with gap resolution recommendations.
 
 ## Mode Detection
 Not applicable — validation always runs fresh against current artifacts. If

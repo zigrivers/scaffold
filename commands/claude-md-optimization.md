@@ -44,7 +44,12 @@ scannability.
   patterns verified present and prominent.
 - **mvp**: Quick pass to remove obvious duplicates and ensure workflow section is
   complete. Fix any command inconsistencies. Skip detailed audit.
-- **custom:depth(1-5)**: Depth 1: remove duplicated instructions within CLAUDE.md. Depth 2: dedup plus workflow section completeness check. Depth 3: add terminology consistency pass across all sections. Depth 4: add gap analysis (missing patterns, stale command references). Depth 5: full four-phase audit (redundancy, consistency, gap, priority).
+- **custom:depth(1-5)**:
+  - Depth 1: remove duplicated instructions within CLAUDE.md.
+  - Depth 2: dedup plus workflow section completeness check.
+  - Depth 3: add terminology consistency pass across all sections.
+  - Depth 4: add gap analysis (missing patterns, stale command references).
+  - Depth 5: full four-phase audit (redundancy, consistency, gap, priority).
 
 ## Mode Detection
 Always operates in update mode (CLAUDE.md always exists by this point). Check

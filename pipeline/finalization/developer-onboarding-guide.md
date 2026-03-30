@@ -37,7 +37,12 @@ before their first task.
 - **mvp**: Quick-start guide with: clone command, dependency install, dev server
   start, test run command. Skip architecture overview, key patterns, and
   troubleshooting sections.
-- **custom:depth(1-5)**: Depth 1: clone command and dependency install only. Depth 2: quick start with setup, dev server start, and test run commands. Depth 3: add architecture overview, key patterns, and common tasks. Depth 4: add troubleshooting section, entry points documentation, and development workflow detail. Depth 5: full guide with architecture walkthrough, decision rationale, and team-specific onboarding paths.
+- **custom:depth(1-5)**:
+  - Depth 1: clone command and dependency install only.
+  - Depth 2: quick start with setup, dev server start, and test run commands.
+  - Depth 3: add architecture overview, key patterns, and common tasks.
+  - Depth 4: add troubleshooting section, entry points documentation, and development workflow detail.
+  - Depth 5: full guide with architecture walkthrough, decision rationale, and team-specific onboarding paths.
 
 ## Mode Detection
 Check if `docs/onboarding-guide.md` already exists.

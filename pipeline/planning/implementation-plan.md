@@ -65,7 +65,12 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
   Each task has a brief description, rough size estimate, and key dependency.
   Enough to start working sequentially. Skip architecture decomposition —
   work directly from user story acceptance criteria.
-- **custom:depth(1-5)**: Depth 1: ordered task list derived from PRD features only. Depth 2: ordered list with rough size estimates per task. Depth 3: add explicit dependencies and sizing (150-line budget, 3-file rule). Depth 4: full breakdown with dependency graph and parallelization plan. Depth 5: full breakdown with parallelization, wave assignments, agent allocation, and critical path analysis.
+- **custom:depth(1-5)**:
+  - Depth 1: ordered task list derived from PRD features only.
+  - Depth 2: ordered list with rough size estimates per task.
+  - Depth 3: add explicit dependencies and sizing (150-line budget, 3-file rule).
+  - Depth 4: full breakdown with dependency graph and parallelization plan.
+  - Depth 5: full breakdown with parallelization, wave assignments, agent allocation, and critical path analysis.
 
 ## MVP-Specific Guidance (No Architecture Available)
 

@@ -57,7 +57,12 @@ proceeding without acknowledgment.
   dispatched to Codex and Gemini if available, with graceful fallback to
   Claude-only enhanced validation.
 - **mvp**: High-level scan for blocking issues only.
-- **custom:depth(1-5)**: Depth 1: cycle detection and basic ordering check. Depth 2: add transitive dependency completeness. Depth 3: full DAG validation with critical path identification and parallelization opportunities. Depth 4: add external model review. Depth 5: multi-model validation with optimization recommendations.
+- **custom:depth(1-5)**:
+  - Depth 1: cycle detection and basic ordering check.
+  - Depth 2: add transitive dependency completeness.
+  - Depth 3: full DAG validation with critical path identification and parallelization opportunities.
+  - Depth 4: add external model review.
+  - Depth 5: multi-model validation with optimization recommendations.
 
 ## Mode Detection
 Not applicable — validation always runs fresh against current artifacts. If

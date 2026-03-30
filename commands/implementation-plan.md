@@ -57,7 +57,12 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
   Each task has a brief description, rough size estimate, and key dependency.
   Enough to start working sequentially. Skip architecture decomposition —
   work directly from user story acceptance criteria.
-- **custom:depth(1-5)**: Depth 1: ordered task list derived from PRD features only. Depth 2: ordered list with rough size estimates per task. Depth 3: add explicit dependencies and sizing (150-line budget, 3-file rule). Depth 4: full breakdown with dependency graph and parallelization plan. Depth 5: full breakdown with parallelization, wave assignments, agent allocation, and critical path analysis.
+- **custom:depth(1-5)**:
+  - Depth 1: ordered task list derived from PRD features only.
+  - Depth 2: ordered list with rough size estimates per task.
+  - Depth 3: add explicit dependencies and sizing (150-line budget, 3-file rule).
+  - Depth 4: full breakdown with dependency graph and parallelization plan.
+  - Depth 5: full breakdown with parallelization, wave assignments, agent allocation, and critical path analysis.
 
 ## MVP-Specific Guidance (No Architecture Available)
 
@@ -780,6 +785,45 @@ For most scaffold pipeline projects:
 5. Avoid **layered** unless the application is genuinely simple (CRUD with minimal business logic).
 
 ## Deep Guidance
+
+## Reading ADRs to Derive Architectural Constraints
+
+The `system-architecture` pipeline step consumes ADR decision records as direct inputs. Each accepted ADR represents a binding constraint on the architecture — not a suggestion, but a committed decision that component choices must honor.
+
+### How to Extract Constraints from ADRs
+
+For each ADR, read the **Decision** and **Consequences** sections:
+
+1. **Identify the affected component scope.** An ADR about the database engine constrains the data access layer and all repository implementations. An ADR about the messaging system constrains all async communication patterns.
+2. **Extract the affirmative constraint.** "We will use PostgreSQL" → every database component must use the `pg` driver (Node.js) or `psycopg2` (Python), not a generic ORM that could target SQLite.
+3. **Extract the prohibitive constraint.** "We will not use a microservice architecture" → no service discovery, no inter-service REST calls, no per-service databases.
+4. **Note the rationale.** If an ADR says "because of GDPR data residency requirements," this rationale extends to related decisions not explicitly stated in the ADR (e.g., no third-party analytics SDKs that exfiltrate data).
+
+### Mapping ADR Outcomes to Component Decisions
+
+Document constraints inline with component definitions:
+
+```
+Component: UserRepository
+Constraint source: ADR-003 (PostgreSQL as the database)
+Implementation requirement: Must use pg driver. ORM must target PostgreSQL dialect.
+  Cannot use SQLite, MySQL, or a generic query builder that doesn't validate SQL dialect.
+
+Component: NotificationService
+Constraint source: ADR-007 (async via Redis pub/sub, not a message broker)
+Implementation requirement: Must use ioredis for pub/sub.
+  Cannot use RabbitMQ, Kafka, or in-process EventEmitter for cross-service notifications.
+```
+
+### Cross-Referencing ADR Status
+
+ADR status affects how strictly to apply constraints:
+
+- **Accepted**: Binding. The architecture must comply. Any component that would violate this decision requires a new ADR to supersede it.
+- **Proposed**: Treat as intended but not yet locked. Note the dependency — if the ADR is rejected, the architecture may need revision.
+- **Deprecated** or **Superseded**: The old constraint no longer applies; the superseding ADR's constraint applies instead. Remove any component requirements derived from the deprecated ADR.
+
+When a component's implementation would conflict with an accepted ADR, that conflict must be surfaced explicitly — either by revising the component design or by drafting a new ADR before proceeding.
 
 ## Component Design
 

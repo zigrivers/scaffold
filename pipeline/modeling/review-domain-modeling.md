@@ -46,12 +46,12 @@ independent review validation.
   review dispatched to Codex and Gemini if available, with graceful fallback
   to Claude-only enhanced review.
 - **mvp**: Quick consistency check. Focus on blocking issues only.
-- **custom:depth(1-5)**: Depth 1: single pass — blocking issues only (entity
-  coverage against PRD). Depth 2: two passes — entity coverage + ubiquitous
-  language consistency. Depth 3: four passes — entity coverage, ubiquitous
-  language, aggregate boundary validation, and cross-domain consistency.
-  Depth 4: all review passes + one external model (if CLI available).
-  Depth 5: all review passes + multi-model with reconciliation.
+- **custom:depth(1-5)**:
+  - Depth 1: single pass — blocking issues only (entity coverage against PRD).
+  - Depth 2: two passes — entity coverage + ubiquitous language consistency.
+  - Depth 3: four passes — entity coverage, ubiquitous language, aggregate boundary validation, and cross-domain consistency.
+  - Depth 4: all review passes + one external model (if CLI available).
+  - Depth 5: all review passes + multi-model with reconciliation.
 
 ## Mode Detection
 If docs/reviews/review-domain-modeling.md exists, this is a re-review. Read previous

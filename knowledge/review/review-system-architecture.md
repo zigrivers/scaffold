@@ -1,7 +1,7 @@
 ---
 name: review-system-architecture
 description: Failure modes and review passes specific to system architecture documents
-topics: [review, architecture, components, data-flow, modules]
+topics: [architecture, components, data-flow, modules, review]
 ---
 
 # Review: System Architecture

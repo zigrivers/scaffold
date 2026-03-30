@@ -55,11 +55,12 @@ complete.
 - **mvp**: Quick git/dependency check, read playbook or plan, pick next task,
   TDD loop, make check, create PR. Skip onboarding guide review and detailed
   PR annotations.
-- **custom:depth(1-5)**: Depth 1: git status check, TDD loop, make check.
-  Depth 2: add dependency check and test suite health verification before starting.
-  Depth 3: add lessons.md review and test skeleton usage. Depth 4: add
-  onboarding guide, eval gates, detailed PR descriptions. Depth 5: full
-  pre-flight suite, all quality gates, cross-reference with upstream docs.
+- **custom:depth(1-5)**:
+  - Depth 1: git status check, TDD loop, make check.
+  - Depth 2: add dependency check and test suite health verification before starting.
+  - Depth 3: add lessons.md review and test skeleton usage.
+  - Depth 4: add onboarding guide, eval gates, detailed PR descriptions.
+  - Depth 5: full pre-flight suite, all quality gates, cross-reference with upstream docs.
 
 ## Mode Detection
 This is a stateless execution command. No document is created or updated.

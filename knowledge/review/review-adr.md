@@ -1,7 +1,7 @@
 ---
 name: review-adr
 description: Failure modes and review passes specific to Architecture Decision Records
-topics: [review, adr, decisions]
+topics: [adr, decisions, review]
 ---
 
 # Review: Architecture Decision Records

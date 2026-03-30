@@ -42,13 +42,12 @@ from the application's query patterns.
   Index justification with query patterns. Normalization analysis. Migration
   plan with rollback strategy. Seed data strategy.
 - **mvp**: Entity-to-table mapping. Key relationships. Primary indexes only.
-- **custom:depth(1-5)**: Depth 1: entity-to-table mapping with primary keys
-  only. Depth 2: entity-to-table mapping with key relationships and primary
-  indexes. Depth 3: add secondary indexes, constraints enforcing domain
-  invariants, and normalization analysis. Depth 4: full specification with
-  migration plan, rollback strategy, and index justification with query
-  patterns. Depth 5: full specification with seed data strategy, performance
-  annotations, and multi-environment migration considerations.
+- **custom:depth(1-5)**:
+  - Depth 1: entity-to-table mapping with primary keys only.
+  - Depth 2: entity-to-table mapping with key relationships and primary indexes.
+  - Depth 3: add secondary indexes, constraints enforcing domain invariants, and normalization analysis.
+  - Depth 4: full specification with migration plan, rollback strategy, and index justification with query patterns.
+  - Depth 5: full specification with seed data strategy, performance annotations, and multi-environment migration considerations.
 
 ## Mode Detection
 Check for docs/database-schema.md. If it exists, operate in update mode: read

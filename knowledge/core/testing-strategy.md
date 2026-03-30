@@ -464,6 +464,99 @@ Test names should mirror the AC wording so that when a test fails, the team can 
 - AC: "Profile updates immediately after save" — Test: `'updates profile and reflects changes on next fetch'`
 - Include the story or AC ID in the describe block when practical: `describe('US-002: Edit profile', () => { ... })`
 
+### Pending Test Syntax and Skeleton-to-TDD Workflow
+
+#### Pending Test Syntax
+
+A pending test (also called a test skeleton or todo test) marks a test case that is known to be needed but not yet implemented. It fails intentionally, serving as a reminder and a contract — CI will report it, nobody can accidentally claim the work is done.
+
+**TypeScript / Jest:**
+```typescript
+// it.todo() — built-in pending marker; no callback needed
+it.todo('returns 404 when user does not exist');
+it.todo('rejects payment with expired card');
+
+// xit() / xdescribe() — skipped test with a body (useful to sketch logic first)
+xit('locks account after 5 failed login attempts', async () => {
+  // stub: arrange/act/assert goes here
+});
+```
+
+**Python / pytest:**
+```python
+import pytest
+
+@pytest.mark.skip(reason="not yet implemented — US-014 payment failure handling")
+def test_rejects_expired_card():
+    pass  # implementation stub
+
+# Or with pytest-todo plugin:
+@pytest.mark.todo
+def test_sends_confirmation_email_on_order():
+    pass
+```
+
+**Go / testing:**
+```go
+func TestRejectsExpiredCard(t *testing.T) {
+    t.Skip("not yet implemented — US-014")
+}
+```
+
+**Bats (shell):**
+```bash
+@test "rejects request without auth token" {
+  skip "not yet implemented — US-007"
+}
+```
+
+The key property of a pending test: it must be **visible in CI output** (not silently ignored) and **clearly labeled** with the story or AC it corresponds to.
+
+#### Skeleton-to-TDD Workflow
+
+The skeleton-to-TDD workflow takes user stories all the way to passing tests through four explicit stages:
+
+1. **Story → Acceptance Criteria.** Extract the Given/When/Then conditions from the user story. Each condition becomes a candidate test.
+2. **Acceptance Criteria → Pending Tests.** Write one `it.todo()` (or language equivalent) per AC. Name each test after the AC's expected outcome. Commit. CI now shows red for all pending tests — this is the intended state.
+3. **Pending Test → Failing Test.** For one pending test at a time: fill in the Arrange/Act/Assert body. Remove `.todo`. Run tests — the test must fail (because the implementation doesn't exist yet). If it passes immediately, the test is not testing anything real.
+4. **Failing Test → Passing Test.** Write the minimum implementation to make the failing test pass. No speculative code. Run tests — green. Commit.
+
+Repeat steps 3-4 for each pending test. When all pending tests for a story are passing, the story is done.
+
+**Example progression for US-014: "User sees error when paying with expired card":**
+
+```
+Stage 1: AC derived → "given expired card, POST /checkout returns 402 with error.code CARD_EXPIRED"
+Stage 2: it.todo('returns 402 CARD_EXPIRED for expired card')    ← CI: pending
+Stage 3: it('returns 402 CARD_EXPIRED for expired card', ...) { ... } ← CI: failing
+Stage 4: PaymentService.charge() → check expiry → throw CardExpiredError   ← CI: passing
+```
+
+#### story-tests-map.md Format
+
+The `story-tests-map.md` file provides a traceability matrix linking user stories to the test files and test names that verify them. It lives in the project root or `docs/` directory.
+
+**Minimal format (Markdown table):**
+
+```markdown
+# Story-to-Tests Map
+
+| Story ID | Story Title                | Test File                              | Test Name(s)                                              | Status   |
+|----------|----------------------------|----------------------------------------|-----------------------------------------------------------|----------|
+| US-001   | User registers account     | tests/auth/register.test.ts            | creates user and returns 201                              | passing  |
+| US-001   | User registers account     | tests/auth/register.test.ts            | returns 409 when email already exists                     | passing  |
+| US-002   | User logs in               | tests/auth/login.test.ts               | returns JWT on valid credentials                          | passing  |
+| US-002   | User logs in               | tests/auth/login.test.ts               | returns 401 on invalid password                           | passing  |
+| US-014   | Payment with expired card  | tests/checkout/payment.test.ts         | returns 402 CARD_EXPIRED for expired card                 | pending  |
+| US-014   | Payment with expired card  | tests/checkout/payment.test.ts         | returns 402 INSUFFICIENT_FUNDS for declined card          | pending  |
+```
+
+**Rules for maintaining the map:**
+- Every user story must have at least one row (even if all tests are pending)
+- The `Status` column reflects the current CI state: `passing`, `failing`, or `pending`
+- When a test is renamed or moved, update the map in the same commit
+- The map is machine-readable — keep it parseable (consistent column counts, no merged cells)
+
 ## See Also
 
 - [api-design](../core/api-design.md) — Contract testing patterns

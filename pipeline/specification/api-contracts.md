@@ -44,13 +44,12 @@ enabling parallel development with confidence.
   SDK generation considerations.
 - **mvp**: Endpoint list with HTTP methods and brief descriptions. Key
   request/response shapes. Auth approach.
-- **custom:depth(1-5)**: Depth 1: endpoint list with HTTP methods and brief
-  descriptions. Depth 2: endpoint list with key request/response shapes and
-  auth approach. Depth 3: add full schemas, error contracts with domain-specific
-  codes, and example payloads. Depth 4: full OpenAPI-style spec with rate
-  limiting, pagination, and idempotency documentation. Depth 5: full spec
-  with SDK generation considerations, versioning strategy, and auth flow
-  diagrams.
+- **custom:depth(1-5)**:
+  - Depth 1: endpoint list with HTTP methods and brief descriptions.
+  - Depth 2: endpoint list with key request/response shapes and auth approach.
+  - Depth 3: add full schemas, error contracts with domain-specific codes, and example payloads.
+  - Depth 4: full OpenAPI-style spec with rate limiting, pagination, and idempotency documentation.
+  - Depth 5: full spec with SDK generation considerations, versioning strategy, and auth flow diagrams.
 
 ## Mode Detection
 Check for docs/api-contracts.md. If it exists, operate in update mode: read

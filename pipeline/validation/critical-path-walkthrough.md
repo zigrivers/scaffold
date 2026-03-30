@@ -57,7 +57,12 @@ proceeding without acknowledgment.
   dispatched to Codex and Gemini if available, with graceful fallback to
   Claude-only enhanced validation.
 - **mvp**: High-level scan for blocking issues only.
-- **custom:depth(1-5)**: Depth 1: identify critical path and verify task ordering. Depth 2: add dependency bottleneck analysis. Depth 3: full walkthrough simulating agent execution of critical path tasks. Depth 4: add external model simulation. Depth 5: multi-model walkthrough with divergence analysis.
+- **custom:depth(1-5)**:
+  - Depth 1: identify critical path and verify task ordering.
+  - Depth 2: add dependency bottleneck analysis.
+  - Depth 3: full walkthrough simulating agent execution of critical path tasks.
+  - Depth 4: add external model simulation.
+  - Depth 5: multi-model walkthrough with divergence analysis.
 
 ## Mode Detection
 Not applicable — validation always runs fresh against current artifacts. If

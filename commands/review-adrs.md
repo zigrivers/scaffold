@@ -36,12 +36,12 @@ independent review validation.
   re-validated. Multi-model review dispatched to Codex and Gemini if available,
   with graceful fallback to Claude-only enhanced review.
 - **mvp**: Quick consistency check for contradictions only.
-- **custom:depth(1-5)**: Depth 1: single pass — contradiction check only.
-  Depth 2: two passes — contradiction check + missing rationale scan.
-  Depth 3: four passes — contradiction check, missing rationale, implied-but-
-  unrecorded decisions, and unresolved trade-offs. Depth 4: all passes +
-  one external model (if CLI available). Depth 5: all passes + multi-model
-  with reconciliation.
+- **custom:depth(1-5)**:
+  - Depth 1: single pass — contradiction check only.
+  - Depth 2: two passes — contradiction check + missing rationale scan.
+  - Depth 3: four passes — contradiction check, missing rationale, implied-but-unrecorded decisions, and unresolved trade-offs.
+  - Depth 4: all passes + one external model (if CLI available).
+  - Depth 5: all passes + multi-model with reconciliation.
 
 ## Mode Detection
 Re-review mode if previous review exists. Check which findings were addressed.

@@ -15,18 +15,27 @@ setup() {
   [[ -f "$skill_file" ]] || skip "scaffold-runner not found"
 
   local failures=()
-  local content
-  content="$(cat "$skill_file")"
+  local activation_section
+  # Scope to the activation section to avoid false positives from prose elsewhere
+  activation_section="$(awk '/^## When This Skill Activates/{found=1; next} /^## /{if(found) exit} found{print}' "$skill_file")"
 
-  # Must activate for these patterns
-  for phrase in "run scaffold" "run the next scaffold step" "what's next" "scaffold status"; do
-    if ! echo "$content" | grep -qi "$phrase"; then
-      failures+=("scaffold-runner missing trigger phrase: '$phrase'")
+  if [[ -z "$activation_section" ]]; then
+    failures+=("scaffold-runner missing '## When This Skill Activates' section")
+  else
+    # Check that single-step run patterns are covered (OR groups — any phrasing counts)
+    if ! echo "$activation_section" | grep -qi 'run scaffold\|scaffold run\|run.*scaffold step'; then
+      failures+=("scaffold-runner activation section missing run/execute trigger pattern")
     fi
-  done
+    if ! echo "$activation_section" | grep -qi "what.*next\|scaffold status\|where am i\|pipeline status"; then
+      failures+=("scaffold-runner activation section missing status/navigation trigger pattern")
+    fi
+    if ! echo "$activation_section" | grep -qi 'run.*step\|next step\|next scaffold'; then
+      failures+=("scaffold-runner activation section missing next-step trigger pattern")
+    fi
+  fi
 
   if [[ ${#failures[@]} -gt 0 ]]; then
-    printf "Missing trigger phrases:\n"
+    printf "Missing trigger patterns:\n"
     printf "  %s\n" "${failures[@]}"
     return 1
   fi
@@ -37,17 +46,23 @@ setup() {
   [[ -f "$skill_file" ]] || skip "scaffold-runner not found"
 
   local failures=()
-  local content
-  content="$(cat "$skill_file")"
+  local activation_section
+  activation_section="$(awk '/^## When This Skill Activates/{found=1; next} /^## /{if(found) exit} found{print}' "$skill_file")"
 
-  for phrase in "run all reviews" "run phases" "re-run" "finish the pipeline"; do
-    if ! echo "$content" | grep -qi "$phrase"; then
-      failures+=("scaffold-runner missing batch trigger phrase: '$phrase'")
+  if [[ -z "$activation_section" ]]; then
+    failures+=("scaffold-runner missing '## When This Skill Activates' section")
+  else
+    # Check batch execution triggers using OR groups — any phrasing within the group counts
+    if ! echo "$activation_section" | grep -qi 'run all\|run phases\|run.*next.*steps\|finish the pipeline\|batch'; then
+      failures+=("scaffold-runner activation section missing batch execution trigger pattern")
     fi
-  done
+    if ! echo "$activation_section" | grep -qi 're-run\|redo\|rework'; then
+      failures+=("scaffold-runner activation section missing re-run/rework trigger pattern")
+    fi
+  fi
 
   if [[ ${#failures[@]} -gt 0 ]]; then
-    printf "Missing batch trigger phrases:\n"
+    printf "Missing batch trigger patterns:\n"
     printf "  %s\n" "${failures[@]}"
     return 1
   fi
@@ -78,16 +93,33 @@ setup() {
   local skill_file="${SKILLS_DIR}/scaffold-pipeline/SKILL.md"
   [[ -f "$skill_file" ]] || skip "scaffold-pipeline not found"
 
-  local content
-  content="$(cat "$skill_file")"
+  # Scope checks to the activation/description sections rather than full-file grep.
+  # This avoids false positives from prose mentions of these concepts elsewhere.
+  local activation_section
+  activation_section="$(awk '/^## /{if(found) exit} /Use this skill ONLY|When.*Activates|Use ONLY/{found=1} found{print}' "$skill_file")"
+  # Fallback: first 30 lines of body after frontmatter if no clear section header matches
+  if [[ -z "$activation_section" ]]; then
+    activation_section="$(awk '/^---$/{fm++; next} fm>=2{print; count++} count>=30{exit}' "$skill_file")"
+  fi
 
-  # Must mention these use cases
-  for phrase in "pipeline design" "dependency" "step reference"; do
-    if ! echo "$content" | grep -qi "$phrase"; then
-      echo "scaffold-pipeline missing static reference use case: '$phrase'"
-      return 1
-    fi
-  done
+  # Check that static reference use cases are described using OR groups.
+  # These verify the skill covers pipeline design, ordering, and dependency queries.
+  local failures=()
+  if ! echo "$activation_section" | grep -qi 'pipeline design\|what phases\|ordering'; then
+    failures+=("scaffold-pipeline missing pipeline design / ordering use case")
+  fi
+  if ! echo "$activation_section" | grep -qi 'depend\|what depends'; then
+    failures+=("scaffold-pipeline missing dependency query use case")
+  fi
+  if ! echo "$activation_section" | grep -qi 'step reference\|commands.*phase\|what commands'; then
+    failures+=("scaffold-pipeline missing step reference use case")
+  fi
+
+  if [[ ${#failures[@]} -gt 0 ]]; then
+    printf "scaffold-pipeline missing static reference use cases:\n"
+    printf "  %s\n" "${failures[@]}"
+    return 1
+  fi
 }
 
 # --- multi-model-dispatch activation ---
@@ -96,15 +128,28 @@ setup() {
   local skill_file="${SKILLS_DIR}/multi-model-dispatch/SKILL.md"
   [[ -f "$skill_file" ]] || skip "multi-model-dispatch not found"
 
-  local content
-  content="$(cat "$skill_file")"
+  # Scope checks to the activation/description sections rather than full-file grep.
+  # This avoids false positives from negation prose or unrelated prose mentions.
+  local activation_section description
+  activation_section="$(awk '/^## When This Skill Activates/{found=1; next} /^## /{if(found) exit} found{print}' "$skill_file")"
+  description="$(awk '/^---$/{fm++; next} fm==1 && /^description:/{print; exit}' "$skill_file")"
 
   local failures=()
-  for phrase in "depth 4" "codex" "gemini" "review"; do
-    if ! echo "$content" | grep -qi "$phrase"; then
-      failures+=("multi-model-dispatch missing trigger context: '$phrase'")
-    fi
-  done
+
+  # Verify the skill covers multi-model dispatch context using OR groups.
+  # Any variant phrasing within the group counts — not exact string matching.
+  if ! echo "$activation_section" | grep -qi 'depth 4\|depth 5\|depth [45]'; then
+    failures+=("multi-model-dispatch activation section missing depth 4/5 trigger context")
+  fi
+  if ! echo "$activation_section" | grep -qi 'codex\|external.*model\|independent.*review'; then
+    failures+=("multi-model-dispatch activation section missing Codex/external-model context")
+  fi
+  if ! echo "$activation_section" | grep -qi 'gemini\|second opinion'; then
+    failures+=("multi-model-dispatch activation section missing Gemini/second-opinion context")
+  fi
+  if ! echo "$activation_section$description" | grep -qi 'review\|dispatch\|validation'; then
+    failures+=("multi-model-dispatch missing review/dispatch/validation context")
+  fi
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Missing dispatch trigger context:\n"

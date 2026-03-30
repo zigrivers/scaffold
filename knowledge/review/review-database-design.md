@@ -1,7 +1,7 @@
 ---
 name: review-database-design
 description: Failure modes and review passes specific to database schema design artifacts
-topics: [review, database, schema, data-modeling]
+topics: [database, schema, data-modeling, review]
 ---
 
 # Review: Database Schema

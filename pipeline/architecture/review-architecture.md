@@ -51,12 +51,12 @@ independent review validation.
   review dispatched to Codex and Gemini if available, with graceful fallback
   to Claude-only enhanced review.
 - **mvp**: Domain coverage and ADR compliance checks only.
-- **custom:depth(1-5)**: Depth 1: two passes — domain coverage and ADR
-  compliance only. Depth 2: four passes — domain coverage, ADR compliance,
-  data flow completeness, and internal consistency. Depth 3: seven passes —
-  add module structure, state consistency, and diagram integrity. Depth 4:
-  all 10 passes + one external model (if CLI available). Depth 5: all 10
-  passes + multi-model with reconciliation.
+- **custom:depth(1-5)**:
+  - Depth 1: two passes — domain coverage and ADR compliance only.
+  - Depth 2: four passes — domain coverage, ADR compliance, data flow completeness, and internal consistency.
+  - Depth 3: seven passes — add module structure, state consistency, and diagram integrity.
+  - Depth 4: all 10 passes + one external model (if CLI available).
+  - Depth 5: all 10 passes + multi-model with reconciliation.
 
 ## Mode Detection
 Re-review mode if previous review exists. If multi-model review artifacts exist
