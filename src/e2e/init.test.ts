@@ -21,6 +21,7 @@ vi.mock('../../src/project/detector.js', () => ({
     mode: 'greenfield',
     signals: [],
     methodologySuggestion: 'deep',
+      sourceFileCount: 0,
   })),
 }))
 
@@ -75,6 +76,7 @@ describe('scaffold init E2E', () => {
       mode: 'greenfield',
       signals: [],
       methodologySuggestion: 'deep',
+      sourceFileCount: 0,
     })
   })
 
@@ -194,6 +196,7 @@ describe('scaffold init E2E', () => {
       mode: 'brownfield',
       signals: [],
       methodologySuggestion: 'deep',
+      sourceFileCount: 0,
     })
     const output = createMockOutput()
     await runWizard({ projectRoot: tmpDir, methodology: 'deep', force: false, auto: true, output })

@@ -12,6 +12,7 @@ vi.mock('./detector.js', () => ({
     mode: 'greenfield',
     signals: [],
     methodologySuggestion: 'deep',
+      sourceFileCount: 0,
   })),
 }))
 
@@ -73,6 +74,7 @@ describe('runAdoption', () => {
       mode: 'greenfield',
       signals: [],
       methodologySuggestion: 'deep',
+      sourceFileCount: 0,
     })
     mockDiscoverMetaPrompts.mockReturnValue(new Map())
   })
@@ -88,6 +90,7 @@ describe('runAdoption', () => {
       mode: 'greenfield',
       signals: [],
       methodologySuggestion: 'deep',
+      sourceFileCount: 0,
     })
 
     const result = runAdoption({
