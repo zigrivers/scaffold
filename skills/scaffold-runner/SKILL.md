@@ -167,7 +167,50 @@ Tools (version-bump, release, version, update, dashboard, prompt-pipeline, sessi
 ### Accessing Tools
 
 - `scaffold run <tool-name>` — run a specific tool
-- `scaffold list --tools` — show available tools (when implemented)
+- `scaffold list --section tools` — show available tools (compact)
+- `scaffold list --section tools --verbose` — show with argument hints
+- `scaffold list --section tools --format json` — machine-readable output
+
+## Tool Listing
+
+When the user asks "what tools are available?", "what can I build?", or "show me the tools":
+
+1. Run `scaffold list --section tools --format json`
+2. Parse the JSON: `data.tools.build` (build phase steps) and `data.tools.utility` (utility tools)
+3. Render as two grouped sections:
+
+**Build Phase (Phase 15)**
+> These are stateless pipeline steps — they appear in `scaffold next` once Phase 14 is complete and can be run repeatedly.
+
+| Command | When to Use |
+|---------|-------------|
+| `scaffold run single-agent-start` | Start the autonomous TDD implementation loop — Claude picks up tasks and builds |
+| `scaffold run single-agent-resume` | Resume where you left off after closing Claude Code |
+| `scaffold run multi-agent-start` | Start parallel implementation with multiple agents in worktrees |
+| `scaffold run multi-agent-resume` | Resume parallel agent work after a break |
+| `scaffold run quick-task` | Create a focused task for a bug fix, refactor, or small improvement |
+| `scaffold run new-enhancement` | Add a new feature to an already-scaffolded project |
+
+**Utility Tools**
+> These are orthogonal to the pipeline — usable at any time, not tied to pipeline state.
+
+| Command | When to Use |
+|---------|-------------|
+| `scaffold run version-bump` | Mark a milestone with a version number without the full release ceremony |
+| `scaffold run release` | Ship a new version — changelog, Git tag, and GitHub release. Supports `--dry-run`, `current`, and `rollback` |
+| `scaffold run version` | Show the current scaffold version |
+| `scaffold run update` | Update scaffold to the latest version |
+| `scaffold run dashboard` | Open a visual progress dashboard in your browser |
+| `scaffold run prompt-pipeline` | Print the full pipeline reference table |
+| `scaffold run review-pr` | Run all 3 code review channels (Codex CLI, Gemini CLI, Superpowers) on a PR |
+| `scaffold run post-implementation-review` | Full 3-channel codebase review after an AI agent completes all tasks |
+| `scaffold run session-analyzer` | Analyze Claude Code session logs for patterns and insights |
+
+**Display rules:**
+- The tool list comes from CLI output (always complete and up-to-date)
+- The "When to Use" column comes from the table above (stable prose)
+- If the CLI returns a tool not in the table above, display it using its `description` field from the CLI output — graceful degradation
+- For verbose detail (`--verbose`), call `scaffold list --section tools --verbose --format json` and add an Arguments column using the `argumentHint` values
 
 ## Session Preferences
 
@@ -217,7 +260,7 @@ Respond to these natural language requests:
 | "New feature" / "Add enhancement" | `scaffold run new-enhancement <description>` |
 | "Bump version" / "Version bump" | `scaffold run version-bump` |
 | "Create release" / "Release" | `scaffold run release` |
-| "What tools are available?" | `scaffold list --tools` |
+| "What tools are available?" | Run `scaffold list --section tools --format json`, render as two-section grouped display — see [Tool Listing](#tool-listing) |
 | "Show version" | `scaffold run version` |
 | "Review PR" / "Run code review" | `scaffold run review-pr` |
 
