@@ -116,6 +116,10 @@ const listCommand: CommandModule<Record<string, unknown>, ListArgs> = {
       if (!section || section === 'platforms') {
         result['platforms'] = []  // T-039-T-043 will populate adapters
       }
+      if (!section || section === 'tools') {
+        const { build, utility } = scanTools(projectRoot ?? undefined)
+        result['tools'] = { build, utility }
+      }
       output.result(result)
     } else {
       if (!section || section === 'methodologies') {

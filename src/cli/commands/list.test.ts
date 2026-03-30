@@ -273,4 +273,25 @@ describe('list command — tools section', () => {
     const written = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
     expect(written).toContain('<foo|bar>')
   })
+
+  it('--section tools --format json returns structured tools data', async () => {
+    const root = makeProjectRootWithTools()
+
+    await runListHandler({ root, section: 'tools', format: 'json', auto: false, verbose: false })
+
+    const allStdout = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+    type ToolItem = { name: string; description: string; argumentHint: string | null }
+    const parsed = JSON.parse(allStdout) as {
+      success: boolean
+      data: { tools: { build: ToolItem[]; utility: ToolItem[] } }
+    }
+    expect(parsed.success).toBe(true)
+    expect(Array.isArray(parsed.data.tools.build)).toBe(true)
+    expect(Array.isArray(parsed.data.tools.utility)).toBe(true)
+    const buildNames = parsed.data.tools.build.map(t => t.name)
+    expect(buildNames).toContain('fake-build-step')
+    const utilNames = parsed.data.tools.utility.map(t => t.name)
+    expect(utilNames).toContain('fake-util-tool')
+    expect(parsed.data.tools.utility.find(t => t.name === 'fake-util-tool')?.argumentHint).toBe('<foo|bar>')
+  })
 })
