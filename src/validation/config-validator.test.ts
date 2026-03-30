@@ -224,7 +224,8 @@ describe('validateConfig', () => {
 
     it('no error for valid step names in custom.steps', () => {
       const root = makeProjectRoot(
-        'version: 2\nmethodology: custom\nplatforms:\n  - claude-code\ncustom:\n  steps:\n    my-step:\n      enabled: true\n',
+        'version: 2\nmethodology: custom\nplatforms:\n  - claude-code\n' +
+        'custom:\n  steps:\n    my-step:\n      enabled: true\n',
       )
       const result = validateConfig(root, ['my-step'])
       const invalidStep = result.errors.find(e => e.code === 'FIELD_INVALID_VALUE')
@@ -233,7 +234,8 @@ describe('validateConfig', () => {
 
     it('skips cross-field validation when knownSteps is empty', () => {
       const root = makeProjectRoot(
-        'version: 2\nmethodology: custom\nplatforms:\n  - claude-code\ncustom:\n  steps:\n    anything:\n      enabled: true\n',
+        'version: 2\nmethodology: custom\nplatforms:\n  - claude-code\n' +
+        'custom:\n  steps:\n    anything:\n      enabled: true\n',
       )
       const result = validateConfig(root, [])
       // With empty knownSteps, cross-field validation is skipped
