@@ -2,6 +2,14 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.43.5] — 2026-03-31
+
+### Fixed
+
+- **`tools/` missing from npm package** — The `tools/` directory (containing all utility tools like `post-implementation-review`, `version`, `release`, etc.) was not listed in `package.json` `files`, so globally installed scaffold had no tools directory and all `scaffold run <tool>` calls returned `STEP_NOT_FOUND`.
+- **`scaffold version` showed wrong latest version** — `version.ts` was checking the `scaffold` package on npm instead of `@zigrivers/scaffold`, returning an unrelated package's version as the "latest".
+- **URL encoding for scoped npm package names** — Registry lookups for `@zigrivers/scaffold` used the raw package name in the URL path, causing 404s. The `@` and `/` characters are now percent-encoded (`%40zigrivers%2Fscaffold`).
+
 ## [2.43.0] — 2026-03-30
 
 ### Added
