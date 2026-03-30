@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.44.1] — 2026-03-31
+
+### Fixed
+
+- **`cli-contract.md` updated for `scaffold list --section tools`** — The API contract document now reflects the new `tools` section choice, `--verbose` flag, updated JSON shape (`data.tools.build` + `data.tools.utility`), and added examples. Caught by Codex code review as a P2 discrepancy.
+
 ## [2.44.0] — 2026-03-31
 
 ### Added
