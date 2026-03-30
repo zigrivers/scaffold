@@ -281,6 +281,24 @@ describe('fetchLatestVersion', () => {
     expect(result).toBe('3.2.1')
   })
 
+  it('URL-encodes scoped package names for the registry request', async () => {
+    const mockRes = new EventEmitter()
+    const mockReq = new EventEmitter()
+    let capturedUrl = ''
+    mockHttpsGet.mockImplementation((url: string, cb: (res: EventEmitter) => void) => {
+      capturedUrl = url
+      cb(mockRes)
+      process.nextTick(() => {
+        mockRes.emit('data', Buffer.from('{"version":"2.0.0"}'))
+        mockRes.emit('end')
+      })
+      return mockReq
+    })
+
+    await fetchLatestVersion('@zigrivers/scaffold')
+    expect(capturedUrl).toBe('https://registry.npmjs.org/%40zigrivers%2Fscaffold/latest')
+  })
+
   it('resolves null on network error', async () => {
     const mockReq = new EventEmitter()
     mockHttpsGet.mockImplementation((_url: string, _cb: (res: EventEmitter) => void) => {

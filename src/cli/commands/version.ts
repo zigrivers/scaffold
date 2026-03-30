@@ -36,7 +36,7 @@ function readPackageVersion(): string {
 export async function fetchLatestVersion(name: string): Promise<string | null> {
   return new Promise((resolve) => {
     const timeout = setTimeout(() => resolve(null), 3000)
-    const url = `https://registry.npmjs.org/${name}/latest`
+    const url = `https://registry.npmjs.org/${encodeURIComponent(name)}/latest`
     const req = https.get(url, (res) => {
       let body = ''
       res.on('data', (chunk: Buffer) => { body += chunk.toString() })
