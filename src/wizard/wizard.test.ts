@@ -13,7 +13,7 @@ vi.mock('../project/detector.js', () => ({
     mode: 'greenfield',
     signals: [],
     methodologySuggestion: 'deep',
-      sourceFileCount: 0,
+    sourceFileCount: 0,
   })),
 }))
 
