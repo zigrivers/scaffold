@@ -81,8 +81,8 @@ export function detectProjectMode(projectRoot: string): DetectionResult {
 
   if (hasPackageManifest || hasSourceDir) {
     const suggestion = sourceFileCount > 10 ? 'deep' : 'mvp'
-    return { mode: 'brownfield', signals, methodologySuggestion: suggestion }
+    return { mode: 'brownfield', signals, methodologySuggestion: suggestion, sourceFileCount }
   }
 
-  return { mode: 'greenfield', signals, methodologySuggestion: 'deep' }
+  return { mode: 'greenfield', signals, methodologySuggestion: 'deep', sourceFileCount: 0 }
 }

@@ -377,6 +377,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
         metaPrompt,
         knowledgeEntries,
         instructions,
+        arguments: argv.instructions,
         depth,
         depthProvenance: provenance,
         updateMode: updateModeResult.isUpdateMode,

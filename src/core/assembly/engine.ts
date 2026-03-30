@@ -92,7 +92,12 @@ export class AssemblyEngine {
       // --- Build the 7 sections ---
       const sections: PromptSection[] = [
         { heading: 'System', content: this.buildSystemSection(step, options) },
-        { heading: 'Meta-Prompt', content: options.metaPrompt.body },
+        {
+          heading: 'Meta-Prompt',
+          content: options.arguments != null
+            ? options.metaPrompt.body.replace(/\$ARGUMENTS/g, options.arguments)
+            : options.metaPrompt.body,
+        },
         { heading: 'Knowledge Base', content: this.buildKnowledgeBaseSection(options.knowledgeEntries) },
         { heading: 'Project Context', content: this.buildProjectContextSection(artifacts, decisions, options) },
         { heading: 'Methodology', content: this.buildMethodologySection(depth, options.depthProvenance) },

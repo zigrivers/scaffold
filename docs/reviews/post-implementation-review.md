@@ -94,7 +94,43 @@
 
 ## Phase 2: Functional Findings
 
-_Phase 2 review in progress — results pending from parallel subagents._
+### Epic 1 + 4 (Init/Profile)
+
+- **P1** `src/wizard/wizard.ts:82` / `src/project/signals.ts` — `sourceFileCount` not in `DetectionResult`; `suggestMethodology()` always receives 0 for brownfield file count — the brownfield methodology-suggestion branch (US-1.7/1.8) is dead code in production.
+
+- **P1** `src/cli/commands/init.ts:44` — US-1.3 hard-exits with error+exit(1) when `.scaffold/` already exists; AC says "warns". Should be a recoverable warning, not a fatal exit.
+
+- **P2** `src/wizard/wizard.ts:119` — All discovered meta-prompt steps are initialized as `pending` regardless of preset enablement. An MVP init ends up with deep-methodology steps (`domain-modeling`, `adrs`) in pending state.
+
+- **P2** `src/core/assembly/methodology-resolver.ts:9` — `conditional-detection` provenance tier defined in the type but never produced; `conditional: 'if-needed'` YAML field is parsed but never acted upon. US-4.4 resolution chain is incomplete.
+
+- **P3** `src/wizard/wizard.ts:165` — Depth in success message comes from hardcoded question defaults, not from preset's `default_depth` field.
+
+### Epic 2 (Pipeline Engine)
+
+- **P1** `src/core/assembly/engine.ts:95` — `$ARGUMENTS` token substitution is not implemented anywhere in the assembly pipeline. No code performs `$ARGUMENTS` string replacement in the prompt body.
+
+- **P1** `src/cli/commands/run.ts:351` — `run` command reads `decisions.jsonl` but never calls `appendDecision()` after step completion. Decision logging infrastructure is read-only from the run command's perspective.
+
+- **P2** `src/state/state-manager.ts:87` — `markCompleted()` accesses `state.steps[step]` without existence guard. *(Fixed in Round 2 — STEP_NOT_IN_STATE guard added.)*
+
+- **P2** `src/core/dependency/dependency.ts:68` — Topological sort FIFO queue: newly-eligible nodes appended to back instead of merged globally sorted. Output is a valid topo sort but not the canonical order-field-sorted variant.
+
+- **P3** `src/state/decision-logger.ts:74` — `appendFileSync` not atomic. *(Fixed in Round 1.)*
+
+### Epic 3 (Navigation)
+
+- **P2** `src/cli/commands/status.ts:166` — JSON output always emits `phases: []` (hardcoded empty). US-3.4 requires grouped progress with completion counts per phase.
+
+- **P2** `src/cli/commands/skip.ts:70` — No-op eligibility `() => []`. *(Fixed in Round 2 — buildComputeEligibleFn.)*
+
+- **P2** `src/cli/commands/reset.ts:80` — Same no-op eligibility issue. *(Fixed in Round 2.)*
+
+- **P2** `src/cli/commands/next.test.ts:8` — Missing mocks for `preset-loader` and `fs` utils; tests rely on ambient filesystem state.
+
+- **P3** `src/cli/commands/status.test.ts:225` — `phases` assertion is trivially true (`[]` passes `Array.isArray`).
+
+- **P3** `src/cli/commands/skip.test.ts:366` — No integration test verifying `next_eligible` is non-empty after skip with real state.json.
 
 ---
 

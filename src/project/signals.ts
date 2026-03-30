@@ -10,4 +10,5 @@ export interface DetectionResult {
   mode: ProjectMode
   signals: ProjectSignal[]
   methodologySuggestion: 'deep' | 'mvp' | 'custom'
+  sourceFileCount: number
 }

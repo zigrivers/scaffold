@@ -82,6 +82,7 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
   const suggestion = suggestMethodology({
     idea,
     mode: detection.mode,
+    sourceFileCount: detection.sourceFileCount,
   })
 
   // Ask questions

@@ -84,6 +84,8 @@ export interface AssemblyOptions {
   /** Pre-formatted decisions string (caller is responsible for loading). */
   decisions?: string
   instructions: UserInstructions
+  /** Value to substitute for $ARGUMENTS token in meta-prompt body (e.g., from --instructions). */
+  arguments?: string
   depth: DepthLevel
   depthProvenance: DepthProvenance
   updateMode: boolean

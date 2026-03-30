@@ -12,6 +12,7 @@ import { getPackagePipelineDir, getPackageMethodologyDir } from '../../utils/fs.
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { computeEligible } from '../../core/dependency/eligibility.js'
+import { PHASES } from '../../types/frontmatter.js'
 
 /** Check if any pipeline/knowledge source is newer than its generated command. */
 function checkCommandStaleness(projectRoot: string): number {
@@ -159,12 +160,36 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     // 6. Check command staleness
     const staleCommandCount = checkCommandStaleness(projectRoot)
 
+    // Build phases array: group meta-prompts by phase with per-phase counts
+    const phasesData = PHASES.map(phaseInfo => {
+      const phaseSteps = [...metaPrompts.values()]
+        .filter(m => m.frontmatter.phase === phaseInfo.slug)
+        .map(m => {
+          const entry = steps[m.frontmatter.name]
+          return { slug: m.frontmatter.name, status: entry?.status ?? 'pending' }
+        })
+      const phaseCompleted = phaseSteps.filter(s => s.status === 'completed').length
+      const phaseSkipped = phaseSteps.filter(s => s.status === 'skipped').length
+      const phasePending = phaseSteps.filter(s => s.status === 'pending').length
+      const phaseInProgress = phaseSteps.filter(s => s.status === 'in_progress').length
+      return {
+        phase: phaseInfo.slug,
+        displayName: phaseInfo.displayName,
+        total: phaseSteps.length,
+        completed: phaseCompleted,
+        skipped: phaseSkipped,
+        pending: phasePending,
+        inProgress: phaseInProgress,
+        steps: phaseSteps,
+      }
+    }).filter(p => p.total > 0)
+
     // 7. Display or return JSON
     if (outputMode === 'json') {
       const result: Record<string, unknown> = {
         pipeline: { methodology, total, completed, skipped, pending, inProgress },
         progress: { completed, skipped, pending, inProgress, total, percentage: pct },
-        phases: [],
+        phases: phasesData,
         nextEligible: state.next_eligible,
         orphaned_entries: [],
         staleCommands: staleCommandCount,
