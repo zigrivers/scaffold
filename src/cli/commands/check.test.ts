@@ -339,10 +339,10 @@ describe('check command', () => {
   it('detects automated-pr-review as applicable when GitHub remote exists', async () => {
     const dir = makeTmpProject()
     tmpDirs.push(dir)
-    // Init a git repo with a GitHub remote
+    // Init a git repo with a GitHub remote (stdio: 'pipe' prevents git hint messages from polluting the spy)
     const { execSync } = await import('node:child_process')
-    execSync('git init', { cwd: dir })
-    execSync('git remote add origin https://github.com/test/repo.git', { cwd: dir })
+    execSync('git init', { cwd: dir, stdio: 'pipe' })
+    execSync('git remote add origin https://github.com/test/repo.git', { cwd: dir, stdio: 'pipe' })
     fs.mkdirSync(path.join(dir, '.github', 'workflows'), { recursive: true })
 
     mockFindProjectRoot.mockReturnValue(dir)
@@ -368,9 +368,9 @@ describe('check command', () => {
   it('detects automated-pr-review as not applicable without GitHub remote', async () => {
     const dir = makeTmpProject()
     tmpDirs.push(dir)
-    // Init a git repo with NO GitHub remote
+    // Init a git repo with NO GitHub remote (stdio: 'pipe' prevents git hint messages from polluting the spy)
     const { execSync } = await import('node:child_process')
-    execSync('git init', { cwd: dir })
+    execSync('git init', { cwd: dir, stdio: 'pipe' })
 
     mockFindProjectRoot.mockReturnValue(dir)
     type MP = ReturnType<typeof discoverMetaPrompts> extends Map<string, infer V> ? V : never
@@ -393,8 +393,8 @@ describe('check command', () => {
     const dir = makeTmpProject()
     tmpDirs.push(dir)
     const { execSync } = await import('node:child_process')
-    execSync('git init', { cwd: dir })
-    execSync('git remote add origin https://github.com/test/repo.git', { cwd: dir })
+    execSync('git init', { cwd: dir, stdio: 'pipe' })
+    execSync('git remote add origin https://github.com/test/repo.git', { cwd: dir, stdio: 'pipe' })
     fs.writeFileSync(path.join(dir, 'AGENTS.md'), '# Code Review Instructions')
 
     mockFindProjectRoot.mockReturnValue(dir)
