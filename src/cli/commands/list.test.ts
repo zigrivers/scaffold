@@ -52,6 +52,49 @@ function makeProjectRoot(opts: { hasMethodology?: boolean } = {}): string {
   return root
 }
 
+const fakeBuildStep = `---
+name: fake-build-step
+description: A fake stateless build step
+phase: build
+order: 1510
+dependencies: []
+outputs: []
+conditional: null
+stateless: true
+category: pipeline
+---
+
+Content.
+`
+
+const fakeUtilTool = `---
+name: fake-util-tool
+description: A fake utility tool
+phase: null
+order: null
+dependencies: []
+outputs: []
+conditional: null
+stateless: true
+category: tool
+argument-hint: "<foo|bar>"
+---
+
+Content.
+`
+
+function makeProjectRootWithTools(): string {
+  const root = makeTmpDir()
+  fs.mkdirSync(path.join(root, '.scaffold'), { recursive: true })
+  // pipeline/build/ — stateless build steps
+  fs.mkdirSync(path.join(root, 'pipeline', 'build'), { recursive: true })
+  fs.writeFileSync(path.join(root, 'pipeline', 'build', 'fake-build-step.md'), fakeBuildStep, 'utf8')
+  // tools/ — utility tools
+  fs.mkdirSync(path.join(root, 'tools'), { recursive: true })
+  fs.writeFileSync(path.join(root, 'tools', 'fake-util-tool.md'), fakeUtilTool, 'utf8')
+  return root
+}
+
 afterEach(() => {
   for (const d of tmpDirs) {
     try { fs.rmSync(d, { recursive: true, force: true }) } catch { /* ignore */ }
@@ -193,6 +236,32 @@ describe('list command — JSON mode', () => {
     const names = methodologies.map(m => m.name)
     expect(names).toContain('deep')
     expect(names).toContain('mvp')
+    expect(exitSpy).toHaveBeenCalled()
+  })
+})
+
+describe('list command — tools section', () => {
+  let stdoutWrite: MockInstance
+  let exitSpy: MockInstance
+
+  beforeEach(() => {
+    stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+  })
+
+  it('--section tools shows Build Tools and Utility Tools sections', async () => {
+    const root = makeProjectRootWithTools()
+
+    await runListHandler({ root, section: 'tools', format: undefined, auto: false, verbose: false })
+
+    const written = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+    expect(written).toContain('Build Tools')
+    expect(written).toContain('fake-build-step')
+    expect(written).toContain('A fake stateless build step')
+    expect(written).toContain('Utility Tools')
+    expect(written).toContain('fake-util-tool')
+    expect(written).toContain('A fake utility tool')
     expect(exitSpy).toHaveBeenCalled()
   })
 })

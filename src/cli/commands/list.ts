@@ -1,19 +1,73 @@
 import type { CommandModule } from 'yargs'
+import fs from 'node:fs'
+import path from 'node:path'
 
 import type { MethodologyPreset } from '../../types/index.js'
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
-import { getPackageMethodologyDir } from '../../utils/fs.js'
+import { getPackageMethodologyDir, getPackageToolsDir, getPackagePipelineDir } from '../../utils/fs.js'
 import { createOutputContext } from '../output/context.js'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
+import { parseFrontmatter } from '../../project/frontmatter.js'
 
 interface ListArgs {
-  section?: 'methodologies' | 'platforms'
+  section?: 'methodologies' | 'platforms' | 'tools'
   format?: string
   auto?: boolean
   verbose?: boolean
   root?: string
   force?: boolean
+}
+
+interface ToolEntry {
+  name: string
+  description: string
+  argumentHint: string | null
+}
+
+function scanTools(projectRoot: string | undefined): { build: ToolEntry[]; utility: ToolEntry[] } {
+  const toolsDir = getPackageToolsDir(projectRoot)
+  const pipelineDir = getPackagePipelineDir(projectRoot)
+  const buildDir = path.join(pipelineDir, 'build')
+
+  const utility: ToolEntry[] = []
+  const buildRaw: Array<ToolEntry & { order: number }> = []
+
+  // Scan tools/ for category: tool
+  try {
+    for (const file of fs.readdirSync(toolsDir).filter(f => f.endsWith('.md')).sort()) {
+      try {
+        const fm = parseFrontmatter(path.join(toolsDir, file))
+        if (fm.category !== 'tool') continue
+        utility.push({
+          name: fm.name,
+          description: fm.description,
+          argumentHint: typeof fm['argument-hint'] === 'string' ? fm['argument-hint'] : null,
+        })
+      } catch { /* skip unparseable files */ }
+    }
+  } catch { /* toolsDir not found */ }
+
+  // Scan pipeline/build/ for stateless: true, sort by order
+  try {
+    for (const file of fs.readdirSync(buildDir).filter(f => f.endsWith('.md'))) {
+      try {
+        const fm = parseFrontmatter(path.join(buildDir, file))
+        if (!fm.stateless) continue
+        buildRaw.push({
+          name: fm.name,
+          description: fm.description,
+          argumentHint: typeof fm['argument-hint'] === 'string' ? fm['argument-hint'] : null,
+          order: fm.order ?? 9999,
+        })
+      } catch { /* skip unparseable files */ }
+    }
+  } catch { /* buildDir not found */ }
+
+  buildRaw.sort((a, b) => a.order - b.order)
+  const build = buildRaw.map(({ name, description, argumentHint }) => ({ name, description, argumentHint }))
+
+  return { build, utility }
 }
 
 const listCommand: CommandModule<Record<string, unknown>, ListArgs> = {
@@ -22,7 +76,7 @@ const listCommand: CommandModule<Record<string, unknown>, ListArgs> = {
   builder: (yargs) => {
     return yargs.option('section', {
       type: 'string',
-      choices: ['methodologies', 'platforms'] as const,
+      choices: ['methodologies', 'platforms', 'tools'] as const,
       description: 'Filter to show only this section',
     })
   },
@@ -76,6 +130,45 @@ const listCommand: CommandModule<Record<string, unknown>, ListArgs> = {
       if (!section || section === 'platforms') {
         output.info('Platform Adapters:')
         output.info('  (platform adapters not yet configured)')
+      }
+      if (!section || section === 'tools') {
+        const { build, utility } = scanTools(projectRoot ?? undefined)
+        const nameWidth = Math.max(
+          ...build.map(t => t.name.length),
+          ...utility.map(t => t.name.length),
+          12,
+        ) + 2
+        const descWidth = argv.verbose
+          ? Math.max(
+            ...build.map(t => t.description.length),
+            ...utility.map(t => t.description.length),
+            20,
+          ) + 2
+          : 0
+
+        const formatEntry = (t: ToolEntry): string => {
+          const base = `  ${t.name.padEnd(nameWidth)}${t.description}`
+          if (argv.verbose && t.argumentHint) {
+            return `${base.padEnd(nameWidth + descWidth + 2)}  ${t.argumentHint}`
+          }
+          return base
+        }
+
+        output.info('Build Tools:')
+        if (build.length === 0) {
+          output.info('  (none found)')
+        }
+        for (const t of build) {
+          output.info(formatEntry(t))
+        }
+
+        output.info('Utility Tools:')
+        if (utility.length === 0) {
+          output.info('  (none found)')
+        }
+        for (const t of utility) {
+          output.info(formatEntry(t))
+        }
       }
     }
     process.exit(0)
