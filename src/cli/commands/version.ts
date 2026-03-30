@@ -73,7 +73,7 @@ const versionCommand: CommandModule<Record<string, unknown>, VersionArgs> = {
 
     // Support DI override for testing; otherwise use real implementation
     const latestVersionFn = argv._fetchLatestVersion ?? fetchLatestVersion
-    const latestVersion = await latestVersionFn('scaffold').catch(() => null)
+    const latestVersion = await latestVersionFn('@zigrivers/scaffold').catch(() => null)
     const updateAvailable = latestVersion !== null ? latestVersion !== version : null
 
     if (outputMode === 'json') {

@@ -245,6 +245,16 @@ describe('version command', () => {
     const result = builder(yargsMock)
     expect(result).toBe(yargsMock)
   })
+
+  it('checks @zigrivers/scaffold package name on npm registry', async () => {
+    const handler = versionCommand.handler as HandlerFn
+    let capturedName: string | undefined
+    const captureSpy = async (name: string) => { capturedName = name; return null }
+    await expect(
+      handler({ format: undefined, auto: undefined, _fetchLatestVersion: captureSpy }),
+    ).rejects.toThrow('process.exit(0)')
+    expect(capturedName).toBe('@zigrivers/scaffold')
+  })
 })
 
 // --- Tests for exported fetchLatestVersion function ---
