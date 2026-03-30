@@ -1,6 +1,6 @@
 # Scaffold
 
-A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 60 structured pipeline steps — organized into 16 phases — plus 8 utility tools, and Claude Code handles the research, planning, and implementation for you.
+A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 60 structured pipeline steps — organized into 16 phases — plus 9 utility tools, and Claude Code handles the research, planning, and implementation for you.
 
 By the end, you'll have a fully planned, standards-documented, implementation-ready project with working code.
 
@@ -697,6 +697,7 @@ These are orthogonal to the pipeline — usable at any time, not tied to pipelin
 | `scaffold run dashboard` | Open a visual progress dashboard in your browser. |
 | `scaffold run prompt-pipeline` | Print the full pipeline reference table. |
 | `scaffold run review-pr` | Run all 3 code review channels (Codex CLI, Gemini CLI, Superpowers) on a PR. |
+| `scaffold run post-implementation-review` | Full 3-channel codebase review after an AI agent completes all tasks — checks requirements coverage, security, architecture alignment, and more. |
 | `scaffold run session-analyzer` | Analyze Claude Code session logs for patterns and insights. |
 
 All of these are also available as slash commands (`/scaffold:release`, `/scaffold:quick-task`, etc.) when the plugin is installed.
@@ -832,10 +833,10 @@ src/
 
 ```
 pipeline/             # 60 meta-prompts organized by 16 phases (phases 0-15, including build)
-tools/                # 7 tool meta-prompts (stateless, category: tool)
-knowledge/            # 60 domain expertise entries (core, product, review, validation, finalization, execution, tools)
+tools/                # 9 tool meta-prompts (stateless, category: tool)
+knowledge/            # 61 domain expertise entries (core, product, review, validation, finalization, execution, tools)
 methodology/          # 3 YAML presets (deep, mvp, custom)
-commands/             # 80 Claude Code slash commands (60 pipeline + 13 build-phase + 7 tools)
+commands/             # 72 Claude Code slash commands (60 pipeline + 9 tools + 3 supplemental)
 skills/               # 3 Claude Code skills (pipeline reference, runner, multi-model dispatch)
 ```
 

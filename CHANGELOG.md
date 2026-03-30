@@ -2,6 +2,13 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.43.0] — 2026-03-30
+
+### Added
+
+- **`/scaffold:post-implementation-review` tool** — Systematic three-channel code review of an entire scaffold-generated codebase after an AI agent completes all implementation tasks. Unlike `review-pr` (which reviews a git diff), this tool reviews the full implemented codebase against requirements and coding standards. Two-phase approach: Phase 1 cross-cutting sweep (architecture, security, error handling, coverage, complexity, dependencies) runs across the whole codebase; Phase 2 parallel per-user-story review checks each story's acceptance criteria. Three modes: `review+fix` (default), `--report-only`, and auto-detected Update Mode (load prior report, skip re-review). All three channels run independently per phase; findings deduplicated and sorted P0→P1→P2→P3 before fix execution.
+- **`post-implementation-review-methodology` knowledge entry** — Documents the two-phase review structure, context-bundling strategy for whole-codebase CLI review, deduplication logic, file-to-story mapping approach, grouping rules for small/large projects, and Update Mode shortcut.
+
 ## [2.42.1] — 2026-03-29
 
 ### Changed
