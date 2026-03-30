@@ -264,4 +264,13 @@ describe('list command — tools section', () => {
     expect(written).toContain('A fake utility tool')
     expect(exitSpy).toHaveBeenCalled()
   })
+
+  it('--section tools --verbose shows argument-hint column', async () => {
+    const root = makeProjectRootWithTools()
+
+    await runListHandler({ root, section: 'tools', format: undefined, auto: false, verbose: true })
+
+    const written = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+    expect(written).toContain('<foo|bar>')
+  })
 })
