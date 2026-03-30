@@ -36,7 +36,7 @@ function readPackageVersion(): string {
 export async function fetchLatestVersion(name: string): Promise<string | null> {
   return new Promise((resolve) => {
     const timeout = setTimeout(() => resolve(null), 3000)
-    const url = `https://registry.npmjs.org/${name}/latest`
+    const url = `https://registry.npmjs.org/${encodeURIComponent(name)}/latest`
     const req = https.get(url, (res) => {
       let body = ''
       res.on('data', (chunk: Buffer) => { body += chunk.toString() })
@@ -73,7 +73,7 @@ const versionCommand: CommandModule<Record<string, unknown>, VersionArgs> = {
 
     // Support DI override for testing; otherwise use real implementation
     const latestVersionFn = argv._fetchLatestVersion ?? fetchLatestVersion
-    const latestVersion = await latestVersionFn('scaffold').catch(() => null)
+    const latestVersion = await latestVersionFn('@zigrivers/scaffold').catch(() => null)
     const updateAvailable = latestVersion !== null ? latestVersion !== version : null
 
     if (outputMode === 'json') {
