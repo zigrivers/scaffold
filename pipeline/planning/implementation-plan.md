@@ -1,6 +1,6 @@
 ---
 name: implementation-plan
-description: Break architecture into implementable tasks with dependencies
+description: Break deliverables into implementable tasks with dependencies, ordered by priority and dependencies
 summary: "Breaks your user stories and architecture into concrete tasks — each scoped to ~150 lines of code and 3 files max, with clear acceptance criteria, no ambiguous decisions, and explicit dependencies."
 phase: "planning"
 order: 1210
@@ -8,7 +8,7 @@ dependencies: [tdd, operations, security, review-architecture, create-evals]
 outputs: [docs/implementation-plan.md]
 reads: [create-prd, story-tests, database-schema, api-contracts, ux-spec]
 conditional: null
-knowledge-base: [task-decomposition]
+knowledge-base: [task-decomposition, system-architecture]
 ---
 
 ## Purpose
@@ -46,7 +46,6 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 - (deep) Tasks reference corresponding test skeletons from tests/acceptance/ where applicable
 - (deep) Tasks incorporate security controls from the security review where applicable
 - (deep) Tasks incorporate operational requirements (monitoring, deployment) where applicable
-- (deep) Critical path is identified
 - (deep) Parallelization opportunities are marked with wave plan
 - (mvp) Every user story maps to >= 1 task
 - (mvp) Every PRD feature maps to >= 1 user story, and every user story maps to >= 1 task (transitive traceability)
@@ -86,6 +85,8 @@ must work directly from user stories without explicit component definitions.
 3. **Use acceptance criteria to define task boundaries**: Each AC (Given/When/Then)
    maps to test cases. Group test cases by layer. Each layer's test cases become
    one task.
+
+   > **Note**: If user stories are one-liner bullets without Given/When/Then ACs (MVP depth 1–2), derive task boundaries directly from the story text instead: treat each story's success condition as defining one task scope. Infer implied acceptance criteria from the story description before decomposing into tasks.
 
 4. **Order tasks by dependency**: Database migrations first, then API endpoints,
    then UI components (bottom-up).

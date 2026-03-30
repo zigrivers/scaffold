@@ -24,7 +24,7 @@ step consumes those tokens, it does not redefine them.
 - (mvp) Every user story's acceptance criteria maps to >= 1 documented flow
 - (mvp) If design-system.md does not exist, use framework defaults for spacing, typography, and color
 - (mvp) Component hierarchy covers all UI states (loading, error, empty, populated)
-- References design tokens from docs/design-system.md (does not redefine them)
+- (mvp) References design tokens from docs/design-system.md (does not redefine them)
 - (deep) Accessibility requirements documented (WCAG level, keyboard nav, screen readers)
 - (deep) Responsive breakpoints defined with layout behavior per breakpoint
 - (mvp) Error states documented for every user action that can fail

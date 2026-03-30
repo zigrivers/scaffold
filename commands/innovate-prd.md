@@ -28,13 +28,13 @@ creative opportunities and competitive insights.
 ## Quality Criteria
 - (mvp) Enhancements are feature-level, not UX-level polish
 - (mvp) Each suggestion has a cost estimate (trivial/moderate/significant)
-- (mvp) Each suggestion has a clear user benefit and impact assessment
+- (mvp) Each suggestion specifies: the problem it solves for a specific user type, the expected behavior change, and cost estimate (trivial/moderate/significant)
 - (mvp) Each approved innovation includes: problem it solves, target users, scope boundaries, and success criteria
 - (mvp) PRD scope boundaries are respected — no uncontrolled scope creep
 - (mvp) User approval is obtained before modifying the PRD
 - (mvp) User approval for each accepted innovation documented as a question-response pair with timestamp (e.g., "Q: Accept feature X? A: Yes — 2025-01-15T14:30Z")
 - (mvp) Each innovation marked with approval status: approved, deferred, or rejected, with user decision timestamp
-- (depth 4+) Multi-model suggestions deduplicated and synthesized with unique ideas from each model highlighted
+- (depth 4+) Multi-model innovation suggestions synthesized: Consensus (all models propose similar direction), Majority (2+ models agree), or Divergent (models disagree — present all perspectives to user for selection)
 
 ## Methodology Scaling
 - **deep**: Full innovation pass across all categories (competitive research,
@@ -44,8 +44,8 @@ creative opportunities and competitive insights.
   fallback to Claude-only enhanced brainstorming.
 - **mvp**: Not applicable — this step is conditional and skipped in MVP.
 - **custom:depth(1-5)**:
-  - Depth 1: Skip (not enough context for meaningful innovation at this depth).
-  - Depth 2: Skip (not enough context for meaningful innovation at this depth).
+  - Depth 1: Skip — not enough context for meaningful innovation at this depth.
+  - Depth 2: Minimal — generate 1–2 brief innovation concepts for the most distinctive PRD feature only; no market analysis or positioning required.
   - Depth 3: Quick scan for obvious gaps and missing expected features.
   - Depth 4: Full innovation pass across all categories + one external model (if CLI available).
   - Depth 5: Full innovation pass + multi-model with deduplication and synthesis.

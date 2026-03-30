@@ -21,7 +21,7 @@ before their first task.
 - (mvp) Guide includes: clone instructions, dependency install command, dev server start command, and test run command
 - (deep) Every ADR referenced by number with one-sentence summary
 - (deep) Key architectural decisions are summarized (with pointers to ADRs)
-- (mvp) Development workflow is clear (branch, code, test, PR)
+- (mvp) Development workflow section documents: branch creation command, commit message format, test command, and PR creation command
 - (mvp) Guide explicitly states relationship to implementation-playbook: what the guide covers vs what the playbook covers
 
 ## Methodology Scaling

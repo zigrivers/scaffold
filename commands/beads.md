@@ -26,8 +26,8 @@ and autonomous behavior guidelines.
 - (mvp) tasks/lessons.md exists with Patterns, Anti-Patterns, and Common Gotchas sections
 - (mvp) CLAUDE.md contains Core Principles with all four tenets (Simplicity, No Laziness, TDD, Prove It)
 - (mvp) CLAUDE.md contains Beads command reference table
-- CLAUDE.md contains commit-message convention requiring Beads task IDs
-- Bootstrap commit uses `[BD-0]` convention
+- (mvp) CLAUDE.md contains commit-message convention requiring Beads task IDs
+- (mvp) Bootstrap commit uses `[BD-0]` convention
 - (deep) Cross-doc consistency verified against git-workflow.md and coding-standards.md
 
 ## Methodology Scaling

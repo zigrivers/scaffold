@@ -5,7 +5,7 @@ summary: "Verifies every feature has implementation tasks, no task is too large 
 phase: "planning"
 order: 1220
 dependencies: [implementation-plan]
-outputs: [docs/reviews/review-tasks.md, docs/reviews/implementation-plan/task-coverage.json, docs/reviews/implementation-plan/review-summary.md]
+outputs: [docs/reviews/review-tasks.md, docs/reviews/implementation-plan/task-coverage.json, docs/reviews/implementation-plan/review-summary.md, docs/reviews/implementation-plan/codex-review.json, docs/reviews/implementation-plan/gemini-review.json]
 conditional: null
 knowledge-base: [review-methodology, review-implementation-tasks, task-decomposition, multi-model-review-dispatch, review-step-template]
 ---

@@ -40,6 +40,11 @@ TERMINAL_PATH_PATTERNS=(
   "maestro/"
   ".beads/"
   "AGENTS.md"
+  "scripts/"
+  ".github/"
+  "playwright.config."
+  "tailwind.config."
+  "tests/screenshots/"
 )
 
 # --- command-structure.bats ---

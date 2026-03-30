@@ -31,7 +31,7 @@ development setup rather than redefining it.
 - (deep) Health check endpoints defined with expected response codes and latency bounds
 - (deep) Log aggregation strategy specifies retention period and searchable fields
 - (deep) Each alert threshold documents: the metric, threshold value, business impact if crossed, and mitigation action
-- References docs/dev-setup.md for local dev — does not redefine it
+- (mvp) References docs/dev-setup.md for local dev — does not redefine it
 - (deep) Incident response process defined
 - (deep) Recovery Time Objective (RTO) and Recovery Point Objective (RPO) documented for each critical service
 - (deep) Secret rotation procedure documented and tested

@@ -5,7 +5,7 @@ summary: "Configures automated code review — using Codex and/or Gemini CLIs fo
 phase: "environment"
 order: 340
 dependencies: [git-workflow]
-outputs: [AGENTS.md, docs/review-standards.md]
+outputs: [AGENTS.md, docs/review-standards.md, scripts/cli-pr-review.sh, scripts/await-pr-review.sh]
 reads: [tdd]
 conditional: "if-needed"
 knowledge-base: [review-methodology, automated-review-tooling]

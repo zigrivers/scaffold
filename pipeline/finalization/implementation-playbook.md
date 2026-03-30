@@ -34,6 +34,8 @@ format between agents, and success criteria.
 - docs/security-review.md (optional) — for security control task context
 - docs/operations-runbook.md (optional) — for deployment task context
 - docs/onboarding-guide.md (optional — not available in MVP) — agents should read for project context before playbook
+- docs/vision.md (optional) — strategic direction and product vision
+- docs/tech-stack.md (required) — technology choices that determine quality gate commands and build tooling
 - All other frozen artifacts
 
 ## Expected Outputs

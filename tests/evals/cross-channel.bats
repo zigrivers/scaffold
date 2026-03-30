@@ -38,6 +38,12 @@ is_consolidation() {
 
     while IFS= read -r output_path; do
       [[ -z "$output_path" ]] && continue
+      # Skip terminal/setup outputs that don't require Mode Detection coverage
+      local is_terminal=false
+      for pattern in "${TERMINAL_PATH_PATTERNS[@]}"; do
+        [[ "$output_path" == *"$pattern"* ]] && is_terminal=true && break
+      done
+      [[ "$is_terminal" == "true" ]] && continue
       # Check if the output path (or its basename) appears in Mode Detection / Update Mode Specifics
       local basename_path dir_path
       basename_path="$(basename "$output_path")"

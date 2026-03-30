@@ -5,7 +5,7 @@ summary: "Sets up your branching strategy, commit message format, PR workflow, C
 phase: "environment"
 order: 330
 dependencies: [dev-env-setup]
-outputs: [docs/git-workflow.md]
+outputs: [docs/git-workflow.md, scripts/setup-agent-worktree.sh, .github/workflows/ci.yml, .github/pull_request_template.md]
 conditional: null
 knowledge-base: [dev-environment, git-workflow-patterns]
 ---

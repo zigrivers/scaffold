@@ -5,7 +5,7 @@ summary: "Creates a visual language — color palette (WCAG-compliant), typograp
 phase: "environment"
 order: 320
 dependencies: [dev-env-setup]
-outputs: [docs/design-system.md]
+outputs: [docs/design-system.md, tailwind.config.js, docs/coding-standards.md]
 reads: [create-prd]
 conditional: "if-needed"
 knowledge-base: [design-system-tokens]
@@ -35,7 +35,7 @@ professional UI without requiring design expertise from the user.
 ## Quality Criteria
 - (mvp) All colors meet WCAG AA contrast requirements
 - (mvp) Typography scale uses a consistent modular ratio; body text >= 16px; line height >= 1.5 for body text
-- (mvp) Spacing uses a consistent system appropriate to the frontend framework (e.g., 4px base unit, Tailwind spacing scale, or Material Design grid)
+- (mvp) Spacing uses a consistent system with a defined base unit (e.g., 4px for custom systems, Tailwind spacing scale, or Material Design grid)
 - (deep) Component patterns cover buttons, forms, cards, feedback, navigation, data display
 - (mvp) Theme configuration files actually work (verified by running dev server)
 - (deep) Both light and dark mode token values provided (if dark mode requested)

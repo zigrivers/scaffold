@@ -1121,6 +1121,12 @@ A systematic approach for reviewing an entire scaffold-generated codebase after
 an AI agent has completed all implementation tasks. Differs from PR review in
 that it covers the full codebase against requirements, not just a diff.
 
+## Summary
+
+Post-implementation review is a whole-codebase quality validation that runs after all implementation tasks are complete. It uses two sequential phases — a cross-cutting systemic sweep followed by a parallel user-story review — because cross-cutting issues (security, error handling, architecture alignment) must be identified and framed before diving into feature-level requirement satisfaction. Running cross-cutting first sets the context for every downstream fix.
+
+## Deep Guidance
+
 ## Why Two Phases
 
 Cross-cutting issues — security architecture, error handling patterns, test

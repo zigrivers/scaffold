@@ -41,8 +41,8 @@ setup() {
     printf "  %s\n" "${warnings[@]}"
   fi
 
-  # Informational — warn but don't fail. The build process handles sync.
-  [[ "$checked" -gt 0 ]]
+  # Fail if any pipeline file is newer than its command by more than 60 seconds.
+  [[ "${#warnings[@]}" -eq 0 ]]
 }
 
 @test "pipeline step descriptions are substantively reflected in command descriptions" {

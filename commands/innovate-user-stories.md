@@ -34,7 +34,7 @@ enhancement opportunities.
 - (mvp) PRD scope boundaries are respected — no scope creep
 - (mvp) User approval for each accepted innovation documented as a question-response pair with timestamp (e.g., "Q: Accept enhancement X? A: Yes — 2025-01-15T14:30Z")
 - (mvp) Each innovation marked with approval status: approved, deferred, or rejected, with user decision timestamp
-- (depth 4+) Multi-model suggestions deduplicated and synthesized with unique ideas from each model highlighted
+- (depth 4+) Multi-model innovation suggestions synthesized: Consensus (all models propose similar direction), Majority (2+ models agree), or Divergent (models disagree — present all perspectives to user for selection)
 
 ## Methodology Scaling
 - **deep**: Full innovation pass across all three categories (high-value
@@ -44,8 +44,8 @@ enhancement opportunities.
   fallback to Claude-only enhanced brainstorming.
 - **mvp**: Not applicable — this step is conditional and skipped in MVP.
 - **custom:depth(1-5)**:
-  - Depth 1: Skip (not enough context for meaningful innovation at this depth).
-  - Depth 2: Skip (not enough context for meaningful innovation at this depth).
+  - Depth 1: Skip — not enough context for meaningful innovation at this depth.
+  - Depth 2: Minimal — generate 1–2 brief innovation concepts for the most distinctive user story only; no full Given/When/Then elaboration required.
   - Depth 3: Quick scan for obvious UX improvements and low-hanging enhancements.
   - Depth 4: Full innovation pass across all three categories + one external model (if CLI available).
   - Depth 5: Full innovation pass + multi-model with deduplication and synthesis.

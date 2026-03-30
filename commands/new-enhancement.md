@@ -342,7 +342,7 @@ bd ready  # Show what's available to work on now
 #### 7. Consider Follow-Up Reviews
 
 Depending on the enhancement scope, you may want to re-run these prompts:
-- **Implementation Plan Review**: If you created 5+ tasks, run it to verify sizing, dependencies, and coverage
+- **Implementation Plan Review**: If you created 3+ tasks, run it to verify sizing, dependencies, and coverage
 - **Platform Parity Review**: If the enhancement has platform-specific behavior (web vs. mobile differences), re-run to check platform coverage
 - **Workflow Audit**: Only if the enhancement changed project infrastructure or conventions (rare)
 
@@ -438,7 +438,7 @@ When this step is complete, tell the user:
 
 **Next (if applicable):**
 - If `docs/implementation-playbook.md` exists: Run `/scaffold:implementation-playbook` to update wave assignments and add per-task context blocks for new tasks. **This is required** to keep the playbook in sync with the implementation plan.
-- If you created **5+ tasks**: Run `/scaffold:implementation-plan-review` — Review task quality, coverage, and dependencies.
+- If you created **3+ tasks**: Run `/scaffold:implementation-plan-review` — Review task quality, coverage, and dependencies.
 - If the enhancement has **platform-specific behavior**: Run `/scaffold:platform-parity-review` — Check platform coverage.
 - If user stories were added or changed: Run `/scaffold:story-tests` — Regenerate test skeletons for new user stories.
 - If scope changed materially: Run `/scaffold:create-evals` — Update eval checks for new scope.

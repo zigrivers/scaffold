@@ -5,7 +5,7 @@ summary: "Detects whether your project is web or mobile, then configures Playwri
 phase: "integration"
 order: 410
 dependencies: [git-workflow, tdd]
-outputs: [tests/screenshots/, maestro/]
+outputs: [tests/screenshots/, maestro/, playwright.config.ts]
 reads: [coding-standards, user-stories]
 conditional: "if-needed"
 knowledge-base: [testing-strategy]
@@ -39,7 +39,7 @@ Outputs vary by detected platform:
 - (mvp) (web) Playwright config uses framework-specific dev server command and port
 - (mvp) (web) Smoke test passes (navigate, screenshot, close)
 - (mvp) (mobile) Maestro CLI installed, sample flow executes, screenshot captured
-- (mobile) testID naming convention defined and documented
+- (mvp) (mobile) testID naming convention defined and documented
 - (mvp) E2E section in tdd-standards.md distinguishes when to use E2E vs unit tests
 - (mvp) Baseline screenshots committed, current screenshots gitignored
 - (mvp) CLAUDE.md contains browser/mobile testing section

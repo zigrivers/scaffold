@@ -8,7 +8,7 @@ dependencies: [claude-md-optimization]
 outputs: [CLAUDE.md, docs/git-workflow.md]
 conditional: null
 reads: [operations]
-knowledge-base: [cross-phase-consistency]
+knowledge-base: [cross-phase-consistency, claude-md-patterns, git-workflow-patterns]
 ---
 
 ## Purpose
