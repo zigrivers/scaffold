@@ -58,12 +58,12 @@ This is the full-weight entry point for work that goes beyond a quick fix.
 - **mvp**: Streamlined discovery, basic impact analysis, PRD feature addition,
   minimal user stories with acceptance criteria, task list with dependencies.
   Skip innovation pass, competitive analysis, and follow-up recommendations.
-- **custom:depth(1-5)**: Depth 1: basic PRD feature addition, minimal user stories,
-  task creation. Depth 2: add impact check and dependency identification. Depth 3:
-  add detailed impact analysis, dependency management, cross-reference check. Depth 4:
-  add innovation pass, frozen artifact handling, migration considerations. Depth 5:
-  full workflow with competitive analysis, AI-native possibilities, and follow-up
-  review recommendations.
+- **custom:depth(1-5)**:
+  - Depth 1: basic PRD feature addition, minimal user stories, task creation.
+  - Depth 2: add impact check and dependency identification.
+  - Depth 3: add detailed impact analysis, dependency management, cross-reference check.
+  - Depth 4: add innovation pass, frozen artifact handling, migration considerations.
+  - Depth 5: full workflow with competitive analysis, AI-native possibilities, and follow-up review recommendations.
 
 ## Mode Detection
 This is a document-modifying execution command. It updates existing documents
@@ -353,7 +353,7 @@ bd ready  # Show what's available to work on now
 #### 7. Consider Follow-Up Reviews
 
 Depending on the enhancement scope, you may want to re-run these prompts:
-- **Implementation Plan Review**: If you created 5+ tasks, run it to verify sizing, dependencies, and coverage
+- **Implementation Plan Review**: If you created 3+ tasks, run it to verify sizing, dependencies, and coverage
 - **Platform Parity Review**: If the enhancement has platform-specific behavior (web vs. mobile differences), re-run to check platform coverage
 - **Workflow Audit**: Only if the enhancement changed project infrastructure or conventions (rare)
 
@@ -449,7 +449,7 @@ When this step is complete, tell the user:
 
 **Next (if applicable):**
 - If `docs/implementation-playbook.md` exists: Run `/scaffold:implementation-playbook` to update wave assignments and add per-task context blocks for new tasks. **This is required** to keep the playbook in sync with the implementation plan.
-- If you created **5+ tasks**: Run `/scaffold:implementation-plan-review` — Review task quality, coverage, and dependencies.
+- If you created **3+ tasks**: Run `/scaffold:implementation-plan-review` — Review task quality, coverage, and dependencies.
 - If the enhancement has **platform-specific behavior**: Run `/scaffold:platform-parity-review` — Check platform coverage.
 - If user stories were added or changed: Run `/scaffold:story-tests` — Regenerate test skeletons for new user stories.
 - If scope changed materially: Run `/scaffold:create-evals` — Update eval checks for new scope.

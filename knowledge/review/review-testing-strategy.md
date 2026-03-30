@@ -1,7 +1,7 @@
 ---
 name: review-testing-strategy
 description: Failure modes and review passes specific to testing and quality strategy artifacts
-topics: [review, testing, quality, coverage, test-pyramid]
+topics: [testing, quality, coverage, test-pyramid, review]
 ---
 
 # Review: Testing Strategy

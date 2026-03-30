@@ -39,7 +39,7 @@ development setup rather than redefining it.
 - (deep) Health check endpoints defined with expected response codes and latency bounds
 - (deep) Log aggregation strategy specifies retention period and searchable fields
 - (deep) Each alert threshold documents: the metric, threshold value, business impact if crossed, and mitigation action
-- References docs/dev-setup.md for local dev — does not redefine it
+- (mvp) References docs/dev-setup.md for local dev — does not redefine it
 - (deep) Incident response process defined
 - (deep) Recovery Time Objective (RTO) and Recovery Point Objective (RPO) documented for each critical service
 - (deep) Secret rotation procedure documented and tested
@@ -48,12 +48,12 @@ development setup rather than redefining it.
 - **deep**: Full runbook. Deployment topology diagrams. Monitoring dashboard
   specs. Alert playbooks. DR plan. Capacity planning.
 - **mvp**: Deploy command. Basic monitoring. Rollback procedure.
-- **custom:depth(1-5)**: Depth 1: deploy command and basic rollback procedure.
-  Depth 2: add basic monitoring metrics (latency, error rate, saturation).
-  Depth 3: add alert thresholds, incident response outline, health check
-  endpoints. Depth 4: full runbook with deployment topology, monitoring
-  dashboards, and DR plan. Depth 5: full runbook with capacity planning,
-  secret rotation testing, and multi-region considerations.
+- **custom:depth(1-5)**:
+  - Depth 1: deploy command and basic rollback procedure.
+  - Depth 2: add basic monitoring metrics (latency, error rate, saturation).
+  - Depth 3: add alert thresholds, incident response outline, health check endpoints.
+  - Depth 4: full runbook with deployment topology, monitoring dashboards, and DR plan.
+  - Depth 5: full runbook with capacity planning, secret rotation testing, and multi-region considerations.
 
 ## Mode Detection
 Check for docs/operations-runbook.md. If it exists, operate in update mode:

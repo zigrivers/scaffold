@@ -49,7 +49,12 @@ proceeding without acknowledgment.
   dispatched to Codex and Gemini if available, with graceful fallback to
   Claude-only enhanced validation.
 - **mvp**: High-level scan for blocking issues only.
-- **custom:depth(1-5)**: Depth 1: verify each major tech choice has an ADR. Depth 2: add alternatives-considered check. Depth 3: full ADR completeness audit (rationale, consequences, status). Depth 4: add external model review of decision quality. Depth 5: multi-model reconciliation of decision coverage.
+- **custom:depth(1-5)**:
+  - Depth 1: verify each major tech choice has an ADR.
+  - Depth 2: add alternatives-considered check.
+  - Depth 3: full ADR completeness audit (rationale, consequences, status).
+  - Depth 4: add external model review of decision quality.
+  - Depth 5: multi-model reconciliation of decision coverage.
 
 ## Mode Detection
 Not applicable — validation always runs fresh against current artifacts. If

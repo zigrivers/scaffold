@@ -43,11 +43,12 @@ work on different tasks simultaneously without stepping on each other.
   PR descriptions, between-task cleanup with dependency reinstall.
 - **mvp**: Verify worktree, pick next task, TDD loop, make check, create PR.
   Skip onboarding review and between-task reinstalls if not needed.
-- **custom:depth(1-5)**: Depth 1: verify worktree environment, TDD loop, make check.
-  Depth 2: add dependency check and Beads identity verification. Depth 3: add
-  lessons.md review and test skeleton usage. Depth 4: add onboarding guide,
-  eval gates, between-task cleanup. Depth 5: full pre-flight suite, all
-  quality gates, actor verification.
+- **custom:depth(1-5)**:
+  - Depth 1: verify worktree environment, TDD loop, make check.
+  - Depth 2: add dependency check and Beads identity verification.
+  - Depth 3: add lessons.md review and test skeleton usage.
+  - Depth 4: add onboarding guide, eval gates, between-task cleanup.
+  - Depth 5: full pre-flight suite, all quality gates, actor verification.
 
 ## Mode Detection
 This is a stateless execution command. No document is created or updated.

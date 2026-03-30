@@ -56,7 +56,12 @@ proceeding without acknowledgment.
   dispatched to Codex and Gemini if available, with graceful fallback to
   Claude-only enhanced validation.
 - **mvp**: High-level scan for blocking issues only.
-- **custom:depth(1-5)**: Depth 1: verify each task has enough context to start. Depth 2: add tool/dependency availability check. Depth 3: full dry-run simulation of first 3 tasks with quality gate verification. Depth 4: add external model dry-run. Depth 5: multi-model dry-run with implementation plan revision recommendations.
+- **custom:depth(1-5)**:
+  - Depth 1: verify each task has enough context to start.
+  - Depth 2: add tool/dependency availability check.
+  - Depth 3: full dry-run simulation of first 3 tasks with quality gate verification.
+  - Depth 4: add external model dry-run.
+  - Depth 5: multi-model dry-run with implementation plan revision recommendations.
 
 ## Mode Detection
 Not applicable — validation always runs fresh against current artifacts. If

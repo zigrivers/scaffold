@@ -1,7 +1,7 @@
 ---
 name: review-implementation-tasks
 description: Failure modes and review passes specific to implementation tasks artifacts
-topics: [review, tasks, planning, decomposition, agents]
+topics: [tasks, planning, decomposition, agents, review]
 ---
 
 # Review: Implementation Tasks

@@ -34,6 +34,8 @@ format between agents, and success criteria.
 - docs/security-review.md (optional) — for security control task context
 - docs/operations-runbook.md (optional) — for deployment task context
 - docs/onboarding-guide.md (optional — not available in MVP) — agents should read for project context before playbook
+- docs/vision.md (optional) — strategic direction and product vision
+- docs/tech-stack.md (required) — technology choices that determine quality gate commands and build tooling
 - All other frozen artifacts
 
 ## Expected Outputs
@@ -61,7 +63,12 @@ format between agents, and success criteria.
   reference, commit format, and quality gate commands from CLAUDE.md. Skip
   per-task context blocks, wave assignments, and inter-agent handoff format.
   Reference docs/coding-standards.md and docs/tdd-standards.md directly.
-- **custom:depth(1-5)**: Depth 1: task execution order and commit format only. Depth 2: add basic coding conventions reference and quality gate commands. Depth 3: add per-task context requirements, wave assignments, and quality gates per wave. Depth 4: add inter-agent communication protocol, handoff format, and error recovery procedures. Depth 5: full playbook with rollback procedures, eval integration, and per-task minimum context blocks.
+- **custom:depth(1-5)**:
+  - Depth 1: task execution order and commit format only.
+  - Depth 2: add basic coding conventions reference and quality gate commands.
+  - Depth 3: add per-task context requirements, wave assignments, and quality gates per wave.
+  - Depth 4: add inter-agent communication protocol, handoff format, and error recovery procedures.
+  - Depth 5: full playbook with rollback procedures, eval integration, and per-task minimum context blocks.
 
 ## Mode Detection
 Check if `docs/implementation-playbook.md` already exists.

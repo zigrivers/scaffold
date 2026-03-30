@@ -24,7 +24,7 @@ step consumes those tokens, it does not redefine them.
 - (mvp) Every user story's acceptance criteria maps to >= 1 documented flow
 - (mvp) If design-system.md does not exist, use framework defaults for spacing, typography, and color
 - (mvp) Component hierarchy covers all UI states (loading, error, empty, populated)
-- References design tokens from docs/design-system.md (does not redefine them)
+- (mvp) References design tokens from docs/design-system.md (does not redefine them)
 - (deep) Accessibility requirements documented (WCAG level, keyboard nav, screen readers)
 - (deep) Responsive breakpoints defined with layout behavior per breakpoint
 - (mvp) Error states documented for every user action that can fail
@@ -35,13 +35,12 @@ step consumes those tokens, it does not redefine them.
   Complete design system. Interaction state machines. Accessibility audit
   checklist. Animation and transition specs.
 - **mvp**: Key user flows. Core component list. Basic design tokens.
-- **custom:depth(1-5)**: Depth 1: key user flows with primary states (success
-  and error). Depth 2: user flows with core component list and basic state
-  documentation. Depth 3: add design system token references, interaction state
-  machines, and responsive behavior. Depth 4: full specification with
-  accessibility audit, keyboard navigation, and screen reader considerations.
-  Depth 5: full specification with animation/transition specs, comprehensive
-  WCAG compliance checklist, and detailed wireframe descriptions.
+- **custom:depth(1-5)**:
+  - Depth 1: key user flows with primary states (success and error).
+  - Depth 2: user flows with core component list and basic state documentation.
+  - Depth 3: add design system token references, interaction state machines, and responsive behavior.
+  - Depth 4: full specification with accessibility audit, keyboard navigation, and screen reader considerations.
+  - Depth 5: full specification with animation/transition specs, comprehensive WCAG compliance checklist, and detailed wireframe descriptions.
 
 ## Mode Detection
 Check for docs/ux-spec.md. If it exists, operate in update mode: read existing

@@ -62,7 +62,7 @@ Skip when the project targets a single platform only.
   Identify top 3 platform gaps. Skip detailed feature parity matrix.
 - **custom:depth(1-5)**:
   - Depth 1: User stories platform check only (1 review pass)
-  - Depth 2: User stories platform check with basic gap identification (1 review pass)
+  - Depth 2: Two-pass check — first pass validates user stories against platform constraints; second pass identifies implicit assumptions that could block native implementation (e.g., assumed web APIs not available on mobile).
   - Depth 3: Add tech-stack and coding-standards platform audit (3 review passes)
   - Depth 4: Add feature parity matrix + one external model if CLI available (3 review passes + external dispatch)
   - Depth 5: Full suite across all documents + multi-model with reconciliation (3 review passes + multi-model synthesis)

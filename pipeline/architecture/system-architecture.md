@@ -42,13 +42,12 @@ lives and how components communicate.
   point inventory, deployment topology.
 - **mvp**: High-level component overview. Key data flows. Enough structure for
   an agent to start building without ambiguity.
-- **custom:depth(1-5)**: Depth 1: high-level component overview with key data
-  flows. Depth 2: component overview with module boundaries and primary data
-  flows. Depth 3: add component diagrams, module boundaries, and state
-  management design. Depth 4: full architecture with extension point inventory,
-  deployment topology, and file-level module detail. Depth 5: full architecture
-  with cross-cutting concern analysis, failure mode documentation, and
-  scalability annotations.
+- **custom:depth(1-5)**:
+  - Depth 1: high-level component overview with key data flows.
+  - Depth 2: component overview with module boundaries and primary data flows.
+  - Depth 3: add component diagrams, module boundaries, and state management design.
+  - Depth 4: full architecture with extension point inventory, deployment topology, and file-level module detail.
+  - Depth 5: full architecture with cross-cutting concern analysis, failure mode documentation, and scalability annotations.
 
 ## Mode Detection
 If outputs already exist, operate in update mode: read existing content, diff

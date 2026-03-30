@@ -48,7 +48,7 @@ setup() {
 
 # --- Test 3: Quality Criteria depth tags present on most pipeline steps ---
 
-@test "Quality Criteria depth tags present on pipeline steps (threshold 35)" {
+@test "Quality Criteria depth tags present on pipeline steps (threshold 55)" {
   local tagged_count=0
   local total_count=0
 
@@ -65,10 +65,10 @@ setup() {
     fi
   done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
 
-  printf "Quality Criteria depth tags: %d/%d steps tagged (threshold: 35)\n" "$tagged_count" "$total_count"
+  printf "Quality Criteria depth tags: %d/%d steps tagged (threshold: 55)\n" "$tagged_count" "$total_count"
 
-  if [[ "$tagged_count" -lt 35 ]]; then
-    printf "Below threshold — fewer than 35 pipeline steps have depth-tagged Quality Criteria\n"
+  if [[ "$tagged_count" -lt 55 ]]; then
+    printf "Below threshold — fewer than 55 pipeline steps have depth-tagged Quality Criteria\n"
     return 1
   fi
 }

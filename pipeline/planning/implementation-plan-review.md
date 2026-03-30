@@ -5,7 +5,7 @@ summary: "Verifies every feature has implementation tasks, no task is too large 
 phase: "planning"
 order: 1220
 dependencies: [implementation-plan]
-outputs: [docs/reviews/review-tasks.md, docs/reviews/implementation-plan/task-coverage.json, docs/reviews/implementation-plan/review-summary.md]
+outputs: [docs/reviews/review-tasks.md, docs/reviews/implementation-plan/task-coverage.json, docs/reviews/implementation-plan/review-summary.md, docs/reviews/implementation-plan/codex-review.json, docs/reviews/implementation-plan/gemini-review.json]
 conditional: null
 knowledge-base: [review-methodology, review-implementation-tasks, task-decomposition, multi-model-review-dispatch, review-step-template]
 ---
@@ -51,7 +51,12 @@ and produce a structured coverage matrix and review summary.
 - **deep**: Full multi-pass review with multi-model validation. AC coverage
   matrix. Independent Codex/Gemini dispatches. Detailed reconciliation report.
 - **mvp**: Coverage check only. No external model dispatch.
-- **custom:depth(1-5)**: Depth 1: architecture coverage check (every component has tasks). Depth 2: coverage check plus DAG validation and agent executability rules. Depth 3: add dependency analysis, AC coverage matrix, and task sizing audit. Depth 4: add one external model review (Codex or Gemini). Depth 5: full multi-model review with reconciliation and detailed findings report.
+- **custom:depth(1-5)**:
+  - Depth 1: architecture coverage check (every component has tasks).
+  - Depth 2: coverage check plus DAG validation and agent executability rules.
+  - Depth 3: add dependency analysis, AC coverage matrix, and task sizing audit.
+  - Depth 4: add one external model review (Codex or Gemini).
+  - Depth 5: full multi-model review with reconciliation and detailed findings report.
 
 ## Mode Detection
 Re-review mode if previous review exists. If multi-model review artifacts exist

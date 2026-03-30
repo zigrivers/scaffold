@@ -5,7 +5,7 @@ summary: "Sets up your branching strategy, commit message format, PR workflow, C
 phase: "environment"
 order: 330
 dependencies: [dev-env-setup]
-outputs: [docs/git-workflow.md]
+outputs: [docs/git-workflow.md, scripts/setup-agent-worktree.sh, .github/workflows/ci.yml, .github/pull_request_template.md]
 conditional: null
 knowledge-base: [dev-environment, git-workflow-patterns]
 ---
@@ -51,12 +51,12 @@ parallel agents, CI pipeline, branch protection, and conflict prevention rules.
   cleanup, and comprehensive CLAUDE.md updates.
 - **mvp**: Branching strategy, commit format, basic PR workflow, CI config.
   Skip worktree script and crash recovery. Minimal CLAUDE.md updates.
-- **custom:depth(1-5)**: Depth 1: branching strategy, commit format, and CI
-  config. Depth 2: add basic PR workflow and PR template. Depth 3: add branch
-  protection rules and full 8-step PR workflow. Depth 4: add worktree script,
-  agent crash recovery, and conflict prevention rules. Depth 5: full suite
-  with batch branch cleanup, multi-agent coordination, and comprehensive
-  CLAUDE.md updates.
+- **custom:depth(1-5)**:
+  - Depth 1: branching strategy, commit format, and CI config.
+  - Depth 2: add basic PR workflow and PR template.
+  - Depth 3: add branch protection rules and full 8-step PR workflow.
+  - Depth 4: add worktree script, agent crash recovery, and conflict prevention rules.
+  - Depth 5: full suite with batch branch cleanup, multi-agent coordination, and comprehensive CLAUDE.md updates.
 
 ## Mode Detection
 Update mode if docs/git-workflow.md exists. In update mode: never rename CI jobs

@@ -79,6 +79,9 @@ When a per-task context block is incomplete, agents should consult this taxonomy
 | Infrastructure/CI | `docs/dev-setup.md`, `docs/git-workflow.md`, `docs/operations-runbook.md`, `docs/story-tests-map.md` | Deployment pipeline stages |
 | Bug fix | Relevant source code, `docs/tdd-standards.md`, `docs/coding-standards.md`, `docs/story-tests-map.md` | Related test files, reproduction steps, `tests/acceptance/` skeletons |
 | Security hardening | `docs/security-review.md`, `docs/api-contracts.md`, `docs/coding-standards.md`, `docs/story-tests-map.md` | OWASP checklist items from security review, `tests/acceptance/` skeletons |
+| Refactoring | `docs/coding-standards.md`, `docs/system-architecture.md` (if available), `docs/domain-models/` (if available), `docs/story-tests-map.md` | All existing tests pass; no behavior change verified |
+| Performance | `docs/system-architecture.md`, `docs/operations-runbook.md` (if available), `docs/story-tests-map.md` | Benchmark comparison before/after; make check passes |
+| E2E / Integration | `docs/tdd-standards.md`, `tests/acceptance/` (if available), `docs/api-contracts.md` (if available), `docs/story-tests-map.md` | E2E tests pass; make check passes |
 
 ## Deep Guidance
 

@@ -19,6 +19,8 @@ prompt.
 - docs/tdd-standards.md (required) — test categories, mocking strategy, test file locations
 - docs/project-structure.md (required) — where files live, module organization
 - docs/implementation-playbook.md (optional) — quality gates section for project-specific gates
+- docs/system-architecture.md (optional) — for bug fixes involving component boundaries or layer violations
+- docs/domain-models/ (optional) — for bug fixes involving domain logic or entity relationships
 - tasks/lessons.md (optional) — previous lessons learned
 - .beads/ (conditional) — Beads task tracking if configured
 - Relevant source code — files that will be modified
@@ -47,12 +49,12 @@ prompt.
 - **mvp**: Complexity gate, basic acceptance criteria (happy path + one edge
   case), test plan with category and cases, file list. Skip duplicate check
   and detailed implementation notes.
-- **custom:depth(1-5)**: Depth 1: complexity gate, basic acceptance criteria
-  (happy path only), and file list. Depth 2: add one edge case to AC, test
-  cases mapped to criteria, and test file locations. Depth 3: add duplicate
-  check, lessons.md review, regression guards. Depth 4: add mocking strategy,
-  specific coding standard references. Depth 5: full analysis with innovation
-  suggestions and cross-module impact.
+- **custom:depth(1-5)**:
+  - Depth 1: complexity gate, basic acceptance criteria (happy path only), and file list.
+  - Depth 2: add one edge case to AC, test cases mapped to criteria, and test file locations.
+  - Depth 3: add duplicate check, lessons.md review, regression guards.
+  - Depth 4: add mocking strategy, specific coding standard references.
+  - Depth 5: full analysis with innovation suggestions and cross-module impact.
 
 ## Mode Detection
 This is a task-creation execution command. Task persistence depends on context:
@@ -101,7 +103,7 @@ Before asking questions, review:
 - `docs/coding-standards.md` — Code conventions, naming, patterns
 - `docs/tdd-standards.md` — Test categories, mocking strategy, test file locations
 - `docs/project-structure.md` — Where files live, module organization
-- `tasks/lessons.md` — Previous lessons learned (extract any relevant to this task)
+- `tasks/lessons.md` (if it exists) — Previous lessons learned (extract any relevant to this task)
 - If `docs/implementation-playbook.md` exists, check its quality gates section for project-specific gates
 - Relevant source code — Read the files that will be modified
 
@@ -112,7 +114,7 @@ Before asking questions, review:
 - If proceeding, note the relationship in the new task's description
 
 #### Extract Relevant Lessons
-Review `tasks/lessons.md` for anti-patterns, gotchas, or conventions related to:
+Review `tasks/lessons.md` (if it exists) for anti-patterns, gotchas, or conventions related to:
 - The area of code being modified
 - The type of change (fix, refactor, perf, etc.)
 - Similar past mistakes to avoid
@@ -260,7 +262,7 @@ Present the task summary:
 1. **Respect the complexity gate** — If it is bigger than a quick task, redirect immediately. Do not try to squeeze a feature into the quick task format.
 2. **One task only** — Quick Task creates exactly one Beads task. If you need multiple, use the Enhancement prompt.
 3. **Check for duplicates first** — Run `bd list` before creating. Do not create tasks that already exist.
-4. **Lessons.md is required reading** — Always check `tasks/lessons.md` for relevant anti-patterns before defining the task.
+4. **Lessons.md is required reading** — Always check `tasks/lessons.md` (if it exists) for relevant anti-patterns before defining the task.
 5. **Acceptance criteria drive tests** — Every criterion must map to at least one test case. If you cannot test it, rewrite the criterion.
 6. **Conventional commit titles** — Always use `type(scope): description` format. This feeds directly into commit messages.
 

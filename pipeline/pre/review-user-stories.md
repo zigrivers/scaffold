@@ -5,7 +5,7 @@ summary: "Verifies every PRD feature maps to at least one story, checks that acc
 phase: "pre"
 order: 150
 dependencies: [user-stories]
-outputs: [docs/reviews/pre-review-user-stories.md, docs/reviews/user-stories/requirements-index.md, docs/reviews/user-stories/coverage.json, docs/reviews/user-stories/review-summary.md]
+outputs: [docs/reviews/pre-review-user-stories.md, docs/reviews/user-stories/requirements-index.md, docs/reviews/user-stories/coverage.json, docs/reviews/user-stories/review-summary.md, docs/reviews/user-stories/codex-review.json, docs/reviews/user-stories/gemini-review.json]
 conditional: null
 knowledge-base: [review-methodology, review-user-stories, multi-model-review-dispatch, review-step-template]
 ---

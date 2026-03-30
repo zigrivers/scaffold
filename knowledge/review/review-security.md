@@ -1,7 +1,7 @@
 ---
 name: review-security
 description: Failure modes and review passes specific to security review and documentation artifacts
-topics: [review, security, owasp, auth, threat-modeling]
+topics: [security, owasp, auth, threat-modeling, review]
 ---
 
 # Review: Security

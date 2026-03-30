@@ -130,15 +130,15 @@ MIN_SECTION_LINES=4
 
   printf "Quality Criteria depth tags: %d/%d steps tagged\n" "$tagged_count" "$total_count"
 
-  if [[ "$tagged_count" -lt 35 ]]; then
-    printf "FAIL: only %d steps have depth-tagged Quality Criteria (minimum 35 required)\n" "$tagged_count"
+  if [[ "$tagged_count" -lt 55 ]]; then
+    printf "FAIL: only %d steps have depth-tagged Quality Criteria (minimum 55 required)\n" "$tagged_count"
     if [[ ${#untagged[@]} -gt 0 ]]; then
       printf "Untagged steps:\n"
       printf "  %s\n" "${untagged[@]}"
     fi
   fi
 
-  [[ "$tagged_count" -ge 35 ]]
+  [[ "$tagged_count" -ge 55 ]]
 }
 
 @test "Mode Detection sections use consistent phrasing" {

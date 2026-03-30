@@ -20,7 +20,7 @@ throughout the entire pipeline.
 ## Quality Criteria
 - (mvp) Problem statement names a specific user group, a specific pain point, and a falsifiable hypothesis about the solution
 - (mvp) Target users are identified with their needs
-- (mvp) Features are scoped with clear boundaries (what's in, what's out)
+- (mvp) Each feature defines at least one explicit out-of-scope item (what it does NOT do) in addition to what it does
 - (mvp) Success criteria are measurable
 - (mvp) Each non-functional requirement has a measurable target or threshold (e.g., 'page load < 2s', 'WCAG AA')
 - (mvp) No two sections contain contradictory statements about the same concept

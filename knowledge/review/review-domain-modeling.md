@@ -1,7 +1,7 @@
 ---
 name: review-domain-modeling
 description: Failure modes and review passes specific to domain modeling artifacts
-topics: [review, domain-modeling, ddd, bounded-contexts]
+topics: [domain-modeling, ddd, bounded-contexts, review]
 ---
 
 # Review: Domain Modeling

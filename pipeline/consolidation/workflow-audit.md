@@ -8,7 +8,7 @@ dependencies: [claude-md-optimization]
 outputs: [CLAUDE.md, docs/git-workflow.md]
 conditional: null
 reads: [operations]
-knowledge-base: [cross-phase-consistency]
+knowledge-base: [cross-phase-consistency, claude-md-patterns, git-workflow-patterns]
 ---
 
 ## Purpose
@@ -54,7 +54,12 @@ inconsistent command formats. Fix all issues found.
   Every workflow step verified in every document.
 - **mvp**: Quick consistency check of commit format, branch naming, and PR
   workflow across CLAUDE.md and git-workflow.md. Fix obvious contradictions.
-- **custom:depth(1-5)**: Depth 1: CLAUDE.md workflow section completeness check only. Depth 2: CLAUDE.md workflow check plus commit format and branch naming verification. Depth 3: add cross-doc consistency (git-workflow.md, coding-standards.md alignment). Depth 4: add gap analysis (missing steps, stale references, Makefile target verification). Depth 5: full six-phase audit (inventory, completeness, consistency, gap analysis, recommendations, execution).
+- **custom:depth(1-5)**:
+  - Depth 1: CLAUDE.md workflow section completeness check only.
+  - Depth 2: CLAUDE.md workflow check plus commit format and branch naming verification.
+  - Depth 3: add cross-doc consistency (git-workflow.md, coding-standards.md alignment).
+  - Depth 4: add gap analysis (missing steps, stale references, Makefile target verification).
+  - Depth 5: full six-phase audit (inventory, completeness, consistency, gap analysis, recommendations, execution).
 
 ## Mode Detection
 Always operates in update mode (all documents exist by this point). Check for

@@ -1,7 +1,7 @@
 ---
 name: review-operations
 description: Failure modes and review passes specific to operations and deployment runbook artifacts
-topics: [review, operations, deployment, monitoring, runbooks]
+topics: [operations, deployment, monitoring, runbooks, review]
 ---
 
 # Review: Operations & Deployment

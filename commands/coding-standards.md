@@ -25,7 +25,7 @@ self-review checklist.
 ## Quality Criteria
 - (mvp) Every standard references the specific tech stack, not generic principles
 - (deep) Includes >= 2 runnable code examples per section showing the RIGHT way for the stack
-- (mvp) Commit message format is [BD-<id>] type(scope): description
+- (mvp) Commit message format documented: if project uses Beads task tracking: [BD-<id>] type(scope): description; otherwise: type(scope): description following conventional commits
 - (mvp) AI-specific coding rules section addresses common AI mistakes (dead code,
   duplication, magic numbers, premature abstraction, unnecessary features)
 - (mvp) Linter/formatter configs created and referenced from the document

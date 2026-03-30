@@ -42,12 +42,12 @@ to prevent API hallucination. Users choose which tiers to enable.
   Tier 3 configured with appropriate library doc server.
 - **mvp**: Tier 1 only (modular rules). Quick extraction of essential conventions
   into 2-3 rule files. Skip Tier 2 and 3. Minimal CLAUDE.md optimization.
-- **custom:depth(1-5)**: Depth 1: Tier 1 basics — 2 rule files for core
-  conventions. Depth 2: Tier 1 with 3-4 rule files covering code and workflow
-  conventions. Depth 3: full Tier 1 extraction from all project docs + offer
-  Tier 2 (persistent memory). Depth 4: all three tiers with MCP memory server
-  and lifecycle hooks configured. Depth 5: all tiers with comprehensive setup,
-  library doc server for all project dependencies, and CLAUDE.md optimization.
+- **custom:depth(1-5)**:
+  - Depth 1: Tier 1 basics — 2 rule files for core conventions.
+  - Depth 2: Tier 1 with 3-4 rule files covering code and workflow conventions.
+  - Depth 3: full Tier 1 extraction from all project docs + offer Tier 2 (persistent memory).
+  - Depth 4: all three tiers with MCP memory server and lifecycle hooks configured.
+  - Depth 5: all tiers with comprehensive setup, library doc server for all project dependencies, and CLAUDE.md optimization.
 
 ## Mode Detection
 Check if `.claude/rules/` directory or docs/ai-memory-setup.md exists first. If

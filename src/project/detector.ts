@@ -27,7 +27,7 @@ export function detectProjectMode(projectRoot: string): DetectionResult {
   }
 
   if (hasV1Tracking) {
-    return { mode: 'v1-migration', signals, methodologySuggestion: 'deep' }
+    return { mode: 'v1-migration', signals, methodologySuggestion: 'deep', sourceFileCount: 0 }
   }
 
   // Check for brownfield signals

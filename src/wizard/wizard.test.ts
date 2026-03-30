@@ -13,6 +13,7 @@ vi.mock('../project/detector.js', () => ({
     mode: 'greenfield',
     signals: [],
     methodologySuggestion: 'deep',
+    sourceFileCount: 0,
   })),
 }))
 
@@ -66,6 +67,7 @@ describe('runWizard', () => {
       mode: 'greenfield',
       signals: [],
       methodologySuggestion: 'deep',
+      sourceFileCount: 0,
     })
   })
 

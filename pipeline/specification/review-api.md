@@ -33,7 +33,7 @@ independent review validation.
 
 ## Quality Criteria
 - (mvp) Operation coverage against domain model verified
-- (deep) Error contracts complete and consistent
+- (deep) Error contracts complete: every endpoint documents ≥2 domain-specific error codes, human-readable reason phrases, and a consistent error response schema
 - (deep) Auth requirements specified for every endpoint
 - (deep) Versioning strategy consistent with ADRs
 - (deep) Idempotency documented for all mutating operations

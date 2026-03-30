@@ -34,12 +34,12 @@ setup() {
     printf "  %s\n" "$entry"
   done
 
-  # Soft gate: warn if >15 instances, fail if >30
-  if [[ "$vague_count" -gt 30 ]]; then
-    printf "FAIL: Too many vague quantifiers (%d > 30)\n" "$vague_count"
+  # Soft gate: warn if >5 instances, fail if >10
+  if [[ "$vague_count" -gt 10 ]]; then
+    printf "FAIL: Too many vague quantifiers (%d > 10)\n" "$vague_count"
   fi
 
-  [[ "$vague_count" -le 30 ]]
+  [[ "$vague_count" -le 10 ]]
 }
 
 @test "multi-model criteria define consensus thresholds" {

@@ -42,12 +42,12 @@ and aggregate boundaries. User actions reveal the domain model.
   relationships between bounded contexts. Separate file per domain.
 - **mvp**: Key entities and their relationships in a single file. Core business
   rules listed. Enough to inform architecture decisions.
-- **custom:depth(1-5)**: Depth 1: single-file entity list with key relationships.
-  Depth 2: single-file entity overview with attributes and core business rules.
-  Depth 3: separate files per domain with entities, events, and aggregate boundaries.
-  Depth 4: full DDD approach with context maps, detailed invariants, and domain
-  event flows. Depth 5: full DDD approach with cross-context integration contracts
-  and sequence diagrams for all cross-aggregate flows.
+- **custom:depth(1-5)**:
+  - Depth 1: single-file entity list with key relationships.
+  - Depth 2: single-file entity overview with attributes and core business rules.
+  - Depth 3: separate files per domain with entities, events, and aggregate boundaries.
+  - Depth 4: full DDD approach with context maps, detailed invariants, and domain event flows.
+  - Depth 5: full DDD approach with cross-context integration contracts and sequence diagrams for all cross-aggregate flows.
 
 ## Mode Detection
 If docs/domain-models/ exists, operate in update mode: read existing models,

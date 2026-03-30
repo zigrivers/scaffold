@@ -44,13 +44,25 @@ is_terminal_path() {
       basename_path="$(basename "$output_path")"
       local found=false
 
-      # Search all OTHER pipeline steps for references to this output
+      # Search all OTHER pipeline steps for references to this output.
+      # Scope the search to structured sections only (frontmatter reads/dependencies
+      # fields and Inputs section list items) to avoid false positives from comments
+      # or "do NOT use" warnings in prose.
       while IFS= read -r other_file; do
         local other_name
         other_name="$(extract_field "$other_file" "name")"
         [[ "$other_name" == "$name" ]] && continue
 
-        if grep -q "$output_path\|$basename_path" "$other_file"; then
+        # Check frontmatter reads: or dependencies: fields
+        if grep -E "^(reads|dependencies):" "$other_file" | grep -qF "$basename_path"; then
+          found=true
+          break
+        fi
+
+        # Check Inputs section list items (lines starting with "- ")
+        local inputs_section
+        inputs_section="$(awk '/^## Inputs/{found=1; next} /^## /{if(found) exit} found{print}' "$other_file")"
+        if echo "$inputs_section" | grep -E '^- ' | grep -qF "$basename_path"; then
           found=true
           break
         fi
