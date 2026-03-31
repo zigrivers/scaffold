@@ -105,6 +105,8 @@ const versionCommand: CommandModule<Record<string, unknown>, VersionArgs> = {
       if (latestVersion !== null) {
         if (updateAvailable) {
           output.info(`Latest: ${latestVersion} (update available)`)
+        } else if (isNewerVersion(version, latestVersion)) {
+          output.info(`Latest: ${latestVersion} (ahead of registry)`)
         } else {
           output.info(`Latest: ${latestVersion} (up to date)`)
         }

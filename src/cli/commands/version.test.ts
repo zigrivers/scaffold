@@ -193,7 +193,7 @@ describe('version command', () => {
     expect(parsed.data.update_available).toBe(false)
   })
 
-  it('interactive output does not show update available when installed version is ahead of registry', async () => {
+  it('interactive output shows "ahead of registry" when installed version is ahead of registry', async () => {
     const handler = versionCommand.handler as HandlerFn
     const fetchOlderVersion = async () => '0.0.1'
     await expect(
@@ -205,6 +205,7 @@ describe('version command', () => {
       ...stderrWrite.mock.calls.map(c => String(c[0])),
     ].join('')
     expect(allOutput).not.toContain('update available')
+    expect(allOutput).toContain('ahead of registry')
   })
 
   it('interactive output shows up-to-date message when versions match', async () => {
