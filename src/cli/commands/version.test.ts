@@ -178,6 +178,35 @@ describe('version command', () => {
     expect(allOutput).toContain('update available')
   })
 
+  it('update_available is false when installed version is ahead of npm latest', async () => {
+    const handler = versionCommand.handler as HandlerFn
+    const fetchOlderVersion = async () => '0.0.1'
+    await expect(
+      handler({ format: 'json', auto: undefined, _fetchLatestVersion: fetchOlderVersion }),
+    ).rejects.toThrow('process.exit(0)')
+
+    const allStdout = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+    const parsed = JSON.parse(allStdout) as {
+      success: boolean
+      data: { update_available: boolean | null }
+    }
+    expect(parsed.data.update_available).toBe(false)
+  })
+
+  it('interactive output does not show update available when installed version is ahead of registry', async () => {
+    const handler = versionCommand.handler as HandlerFn
+    const fetchOlderVersion = async () => '0.0.1'
+    await expect(
+      handler({ format: undefined, auto: undefined, _fetchLatestVersion: fetchOlderVersion }),
+    ).rejects.toThrow('process.exit(0)')
+
+    const allOutput = [
+      ...stdoutWrite.mock.calls.map(c => String(c[0])),
+      ...stderrWrite.mock.calls.map(c => String(c[0])),
+    ].join('')
+    expect(allOutput).not.toContain('update available')
+  })
+
   it('interactive output shows up-to-date message when versions match', async () => {
     const handler = versionCommand.handler as HandlerFn
     const fs = await import('node:fs')
