@@ -2,6 +2,13 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.44.3] — 2026-03-31
+
+### Fixed
+
+- **`scaffold version` shows "(up to date)" when installed version is ahead of npm registry** — Added a third state: when the installed version is strictly newer than what the registry reports, the CLI now shows "(ahead of registry)" instead of the misleading "(up to date)".
+- **`scaffold release` did not publish to npm** — The release tool's Phase 5 now includes an `npm publish` step after creating the GitHub release, so the npm `latest` tag is always updated as part of a release.
+
 ## [2.44.2] — 2026-03-31
 
 ### Fixed
