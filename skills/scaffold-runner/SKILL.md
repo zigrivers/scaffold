@@ -148,7 +148,7 @@ If no prior activity is detected, suggest `single-agent-start` or `multi-agent-s
 
 ## Tool Execution
 
-Tools (version-bump, release, version, update, dashboard, prompt-pipeline, session-analyzer, review-pr) are utility commands orthogonal to the pipeline.
+Tools (version-bump, release, version, update, dashboard, prompt-pipeline, session-analyzer, review-pr, post-implementation-review) are utility commands orthogonal to the pipeline.
 
 ### Differences from Pipeline Steps
 

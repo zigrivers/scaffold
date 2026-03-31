@@ -33,6 +33,21 @@ function readPackageVersion(): string {
   return 'unknown'
 }
 
+/**
+ * Returns true if semver string `a` is strictly newer than `b`.
+ * Handles "X.Y.Z" format only.
+ */
+function isNewerVersion(a: string, b: string): boolean {
+  const pa = a.split('.').map(n => parseInt(n, 10))
+  const pb = b.split('.').map(n => parseInt(n, 10))
+  for (let i = 0; i < 3; i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0)
+    if (diff > 0) return true
+    if (diff < 0) return false
+  }
+  return false
+}
+
 export async function fetchLatestVersion(name: string): Promise<string | null> {
   return new Promise((resolve) => {
     const timeout = setTimeout(() => resolve(null), 3000)
@@ -74,7 +89,7 @@ const versionCommand: CommandModule<Record<string, unknown>, VersionArgs> = {
     // Support DI override for testing; otherwise use real implementation
     const latestVersionFn = argv._fetchLatestVersion ?? fetchLatestVersion
     const latestVersion = await latestVersionFn('@zigrivers/scaffold').catch(() => null)
-    const updateAvailable = latestVersion !== null ? latestVersion !== version : null
+    const updateAvailable = latestVersion !== null ? isNewerVersion(latestVersion, version) : null
 
     if (outputMode === 'json') {
       output.result({

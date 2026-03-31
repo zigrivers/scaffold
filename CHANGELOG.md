@@ -2,6 +2,13 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.44.2] — 2026-03-31
+
+### Fixed
+
+- **`scaffold version` shows "update available" when installed version is ahead of npm registry** — Version comparison now uses semver ordering instead of string equality. When the installed version is newer than what npm's `latest` tag reports (e.g., installed 2.43.5, registry shows 2.38.1), the CLI now correctly shows "up to date" rather than "update available".
+- **`scaffold run post-implementation-review` not recognized as a tool by scaffold-runner skill** — The skill's Tool Execution section had a hardcoded tool list that was missing `post-implementation-review`. Claude would fall through to pipeline eligibility checking, conclude the step didn't exist, and offer to run the knowledge methodology manually instead of executing the tool.
+
 ## [2.44.1] — 2026-03-31
 
 ### Fixed
