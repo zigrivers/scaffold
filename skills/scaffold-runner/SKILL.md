@@ -148,7 +148,7 @@ If no prior activity is detected, suggest `single-agent-start` or `multi-agent-s
 
 ## Tool Execution
 
-Tools (version-bump, release, version, update, dashboard, prompt-pipeline, session-analyzer, review-pr, post-implementation-review) are utility commands orthogonal to the pipeline.
+Tools (version-bump, release, version, update, dashboard, prompt-pipeline, session-analyzer, review-code, review-pr, post-implementation-review) are utility commands orthogonal to the pipeline.
 
 ### Differences from Pipeline Steps
 
@@ -202,6 +202,7 @@ When the user asks "what tools are available?", "what can I build?", or "show me
 | `scaffold run update` | Update scaffold to the latest version |
 | `scaffold run dashboard` | Open a visual progress dashboard in your browser |
 | `scaffold run prompt-pipeline` | Print the full pipeline reference table |
+| `scaffold run review-code` | Run all 3 code review channels on local code before commit or push |
 | `scaffold run review-pr` | Run all 3 code review channels (Codex CLI, Gemini CLI, Superpowers) on a PR |
 | `scaffold run post-implementation-review` | Full 3-channel codebase review after an AI agent completes all tasks |
 | `scaffold run session-analyzer` | Analyze Claude Code session logs for patterns and insights |
@@ -223,6 +224,7 @@ Track these preferences within the current session to avoid re-asking:
 | Methodology | "I'm using MVP" | Informs default recommendations |
 | Batch mode | "Run the next 3 steps" | Execute sequentially, surface decisions for each |
 | Compact status | User is mid-pipeline, only cares about remaining work | Default to `scaffold status --compact` |
+| Pre-push review | "Run review-code before committing and pushing" | Remember to insert `scaffold run review-code` before `git push` in build flows |
 
 When the user sets a preference, acknowledge it and apply it to subsequent steps. Don't ask about it again unless the context changes.
 
@@ -262,6 +264,7 @@ Respond to these natural language requests:
 | "Create release" / "Release" | `scaffold run release` |
 | "What tools are available?" | Run `scaffold list --section tools --format json`, render as two-section grouped display — see [Tool Listing](#tool-listing) |
 | "Show version" | `scaffold run version` |
+| "Review local code" / "Review before push" / "Review before committing and pushing" | `scaffold run review-code` |
 | "Review PR" / "Run code review" | `scaffold run review-pr` |
 
 ### Re-running Steps

@@ -130,12 +130,19 @@ Once in-progress work is complete (or if there was none):
    - Run `make check` (or equivalent from CLAUDE.md Key Commands)
    - If `tests/evals/` exists, run `make eval` (or equivalent eval command)
 
-2. **Create PR** (if not already created for in-progress work)
+2. **Pre-push local code review (when requested or required)**
+   - If the user says to review before committing or pushing, or the project's workflow requires a local multi-model gate before `git push`, run `scaffold run review-code`
+   - This reviews the local delivery candidate without requiring a PR
+   - Surface auth failures immediately and retry after recovery
+   - If recovery is not possible, document reduced review coverage and continue with the available channels
+   - Fix any P0/P1/P2 findings before proceeding
+
+3. **Create PR** (if not already created for in-progress work)
    - Push the branch: `git push -u origin HEAD`
    - Create a pull request: `gh pr create`
    - Follow the PR workflow from `docs/git-workflow.md` or CLAUDE.md
 
-3. **Run code reviews (MANDATORY)**
+4. **Run code reviews (MANDATORY)**
    - Run the review-pr tool: `scaffold run review-pr` (CLI) or `/scaffold:review-pr` (plugin)
    - This runs **all three** review channels on the PR diff:
      1. **Codex CLI**: `codex exec --skip-git-repo-check -s read-only --ephemeral "REVIEW_PROMPT" 2>/dev/null`
@@ -146,7 +153,7 @@ Once in-progress work is complete (or if there was none):
    - Fix any P0/P1/P2 findings before proceeding
    - Do NOT move to the next task until all channels have run
 
-4. **Claim next task**
+5. **Claim next task**
    - Return to main: `git checkout main && git pull origin main`
    - Pick the next task following the same process as `/scaffold:single-agent-start`
    - Continue the TDD execution loop
@@ -185,8 +192,9 @@ Once in-progress work is complete (or if there was none):
 3. **Reconcile task status** — Merged PRs must be reflected in the task tracker.
 4. **TDD is not optional** — Continue the red-green-refactor cycle for any in-progress work.
 5. **Quality gates before PR** — Never create a PR with failing checks.
-6. **Code review before next task** — After creating a PR, run all three review channels (Codex CLI, Gemini CLI, Superpowers code-reviewer) and fix all P0/P1/P2 findings before moving on.
-7. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
+6. **Honor pre-push review when requested** — If the user or project workflow asks for pre-push multi-model review, run `scaffold run review-code` after quality gates and before `git push`.
+7. **Code review before next task** — After creating a PR, run all three review channels (Codex CLI, Gemini CLI, Superpowers code-reviewer) and fix all P0/P1/P2 findings before moving on.
+8. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
 
 ---
 

@@ -155,13 +155,20 @@ For each task:
    - If `tests/evals/` exists, run `make eval` (or equivalent eval command)
    - Fix any failures before proceeding
 
-6. **Create PR**
+6. **Pre-push local code review (when requested or required)**
+   - If the user says to review before committing or pushing, or the project's workflow requires a local multi-model gate before `git push`, run `scaffold run review-code`
+   - This reviews the local delivery candidate without requiring a PR
+   - Surface auth failures immediately and retry after recovery
+   - If recovery is not possible, document reduced review coverage and continue with the available channels
+   - Fix any P0/P1/P2 findings before proceeding
+
+7. **Create PR**
    - Push the branch: `git push -u origin HEAD`
    - Create a pull request: `gh pr create`
    - Include in the PR description: what was implemented, key decisions, files changed, agent name
    - Follow the PR workflow from `docs/git-workflow.md` or CLAUDE.md
 
-7. **Run code reviews (MANDATORY)**
+8. **Run code reviews (MANDATORY)**
    - Run the review-pr tool: `scaffold run review-pr` (CLI) or `/scaffold:review-pr` (plugin)
    - This runs **all three** review channels on the PR diff:
      1. **Codex CLI**: `codex exec --skip-git-repo-check -s read-only --ephemeral "REVIEW_PROMPT" 2>/dev/null`
@@ -172,7 +179,7 @@ For each task:
    - Fix any P0/P1/P2 findings before proceeding
    - Do NOT move to the next task until all channels have run
 
-8. **Between-task cleanup**
+9. **Between-task cleanup**
    - `git fetch origin --prune && git clean -fd`
    - Run the install command from CLAUDE.md Key Commands
    - This ensures a clean state before the next task
@@ -211,9 +218,10 @@ For each task:
 3. **Clean between tasks** — Run cleanup after each task to prevent state leakage.
 4. **TDD is not optional** — Write failing tests before implementation. No exceptions.
 5. **Quality gates before PR** — Never create a PR with failing checks.
-6. **Code review before next task** — After creating a PR, run all three review channels (Codex CLI, Gemini CLI, Superpowers code-reviewer) and fix all P0/P1/P2 findings before moving on.
-7. **Avoid task conflicts** — Check what other agents are working on before claiming.
-8. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
+6. **Honor pre-push review when requested** — If the user or project workflow asks for pre-push multi-model review, run `scaffold run review-code` after quality gates and before `git push`.
+7. **Code review before next task** — After creating a PR, run all three review channels (Codex CLI, Gemini CLI, Superpowers code-reviewer) and fix all P0/P1/P2 findings before moving on.
+8. **Avoid task conflicts** — Check what other agents are working on before claiming.
+9. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
 
 ---
 

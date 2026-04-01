@@ -292,6 +292,11 @@ Check the current branch:
    ```
    gh release create vX.Y.Z --title "vX.Y.Z" --notes "<release-notes-from-3.4>"
    ```
+5. Publish to npm:
+   ```
+   npm publish
+   ```
+   The `prepublishOnly` script runs `build` and `test` automatically. If it fails, report the error but do not roll back the git tag — tell the user to fix and re-run `npm publish` manually.
 
 #### 5.3 PR Flow (feature branch)
 
