@@ -701,6 +701,8 @@ These are orthogonal to the pipeline — usable at any time, not tied to pipelin
 | `scaffold run post-implementation-review` | Full 3-channel codebase review after an AI agent completes all tasks — checks requirements coverage, security, architecture alignment, and more. |
 | `scaffold run session-analyzer` | Analyze Claude Code session logs for patterns and insights. |
 
+Use `scaffold run review-code` before commit or push when you want a local gate on the current delivery candidate. Use `scaffold run review-pr` after a GitHub PR exists.
+
 All of these are also available as slash commands (`/scaffold:release`, `/scaffold:quick-task`, etc.) when the plugin is installed.
 
 ## Releasing Your Project

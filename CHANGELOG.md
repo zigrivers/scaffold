@@ -2,6 +2,18 @@
 
 All notable changes to Scaffold are documented here.
 
+## [2.45.0] — 2026-04-01
+
+### Added
+
+- **`scaffold run review-code`** — New local three-channel review tool for code that is ready to land but does not have a PR yet. Runs the `Codex CLI`, `Gemini CLI`, and `Superpowers` review paths against the local delivery candidate, supports `--base`, `--head`, `--staged`, and `--report-only`, and gives agents a single structured command for "review before commit/push" workflows.
+- **Pre-push review gate in build flows** — `single-agent-start`, `single-agent-resume`, `multi-agent-start`, and `multi-agent-resume` now tell agents to run `scaffold run review-code` when the user or project workflow requires a local review pass before `git push`.
+
+### Fixed
+
+- **`review-code` fallback behavior now matches the shared multi-model review standard** — Codex and Gemini auth failures now surface recovery guidance, retry after re-auth, and degrade gracefully if recovery is not possible instead of blocking the whole review.
+- **`review-code` CLI invocation guidance** — The tool now documents prompt passing via temporary files for both Codex and Gemini, avoiding brittle inline-command examples for large review prompts.
+
 ## [2.44.3] — 2026-03-31
 
 ### Fixed
