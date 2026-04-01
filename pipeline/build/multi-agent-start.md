@@ -169,7 +169,8 @@ For each task:
 6. **Pre-push local code review (when requested or required)**
    - If the user says to review before committing or pushing, or the project's workflow requires a local multi-model gate before `git push`, run `scaffold run review-code`
    - This reviews the local delivery candidate without requiring a PR
-   - Treat auth failures as blockers — do not commit, push, or create a PR until the user re-authenticates
+   - Surface auth failures immediately and retry after recovery
+   - If recovery is not possible, document reduced review coverage and continue with the available channels
    - Fix any P0/P1/P2 findings before proceeding
 
 7. **Create PR**

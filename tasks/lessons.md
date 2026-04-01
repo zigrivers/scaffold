@@ -10,7 +10,7 @@ Patterns and anti-patterns discovered during development. Review before starting
 
 <!-- Add anti-patterns as you discover them -->
 
-- Do not use Beads or `bd` commands in this repository. Beads has been removed from the project, so task tracking and workflow steps must not assume `.beads/` or `bd` are available.
+- Do not try to use Beads or `bd` commands in this repository's day-to-day workflow. Legacy `.beads/` artifacts and old docs may still exist, but current work should not assume Beads is an active dependency.
 
 ## Common Gotchas
 

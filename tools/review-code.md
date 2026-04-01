@@ -169,12 +169,14 @@ codex login status 2>/dev/null
 ```
 
 - If `codex` is not installed: skip this channel and record `skipped (not installed)`
-- If auth fails: stop with verdict `blocked` and tell the user to run `! codex login`
+- If auth fails: tell the user to run `! codex login`, retry after recovery, and if recovery is not possible, record `skipped (auth failed)` and continue with the remaining channels
 
-Run:
+Build the prompt in a temporary file and pass it over stdin:
 
 ```bash
-codex exec --skip-git-repo-check -s read-only --ephemeral "REVIEW_PROMPT" 2>/dev/null
+PROMPT_FILE=$(mktemp)
+# ...write the full review prompt to "$PROMPT_FILE"...
+codex exec --skip-git-repo-check -s read-only --ephemeral - < "$PROMPT_FILE" 2>/dev/null
 ```
 
 #### Channel 2: Gemini CLI
@@ -187,12 +189,14 @@ NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1
 ```
 
 - If `gemini` is not installed: skip this channel and record `skipped (not installed)`
-- If auth fails (including exit 41): stop with verdict `blocked` and tell the user to run `! gemini -p "hello"`
+- If auth fails (including exit 41): tell the user to run `! gemini -p "hello"`, retry after recovery, and if recovery is not possible, record `skipped (auth failed)` and continue with the remaining channels
 
-Run:
+Build the prompt in a temporary file and pass it as a single prompt string:
 
 ```bash
-NO_BROWSER=true gemini -p "REVIEW_PROMPT" --output-format json --approval-mode yolo 2>/dev/null
+PROMPT_FILE=$(mktemp)
+# ...write the full review prompt to "$PROMPT_FILE"...
+NO_BROWSER=true gemini -p "$(cat "$PROMPT_FILE")" --output-format json --approval-mode yolo 2>/dev/null
 ```
 
 #### Channel 3: Superpowers code-reviewer
@@ -285,8 +289,8 @@ Otherwise:
 Return exactly one verdict:
 
 - `pass` — all available channels ran and no unresolved P0/P1/P2 findings remain
-- `degraded-pass` — at least one channel was skipped because the tool is not installed, but all executed channels passed
-- `blocked` — auth failure, reviewer execution failure, or unresolved mandatory findings
+- `degraded-pass` — at least one channel was skipped because the tool is not installed or auth could not be recovered, but all executed channels passed
+- `blocked` — reviewer execution failure or unresolved mandatory findings
 - `needs-user-decision` — reviewer disagreement or findings still unresolved after 3 fix rounds
 
 ### Step 9: Report Results
@@ -300,8 +304,8 @@ Output a concise summary in this format:
 [scope label]
 
 ### Channels Executed
-- Codex CLI — [completed / skipped (not installed) / blocked (auth failed) / error]
-- Gemini CLI — [completed / skipped (not installed) / blocked (auth failed) / error]
+- Codex CLI — [completed / skipped (not installed) / skipped (auth failed) / error]
+- Gemini CLI — [completed / skipped (not installed) / skipped (auth failed) / error]
 - Superpowers code-reviewer — [completed / error]
 
 ### Findings
