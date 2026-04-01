@@ -44,7 +44,7 @@ Prompt assembly happens at **runtime** when `scaffold run <step>` is invoked. Th
 8. **AI generates and executes the working prompt** — the assembled prompt is passed to the AI, which generates a working prompt tailored to the project and methodology and executes it in a single turn
 9. **Update state** — mark the step as completed in `state.json`, record any architectural decisions to `decisions.jsonl`, and display next available steps to the user
 
-**What remains at "build time":** Dependency ordering (computing which steps are available based on completed prerequisites) and command wrapper generation (producing thin `commands/*.md` files for plugin delivery) can still happen at build time or on-demand — these are structural operations that do not depend on project context.
+**What remains at "build time":** Dependency ordering (computing which steps are available based on completed prerequisites) and hidden adapter artifact generation (for example `.scaffold/generated/claude-code/commands/*.md`) can still happen at build time or on-demand — these are structural operations that do not depend on project context.
 
 ## Rationale
 
@@ -93,8 +93,8 @@ Prompt assembly happens at **runtime** when `scaffold run <step>` is invoked. Th
 
 ### Neutral
 - Dependency ordering can still happen eagerly (computing available steps from state) — it does not require runtime assembly
-- Command wrapper generation (`commands/*.md` for plugin delivery) is a separate concern from prompt assembly and can happen at any time
-- The `scaffold build` command's role changes from "resolve and compose all prompts" to "generate command wrappers and validate pipeline structure"
+- Hidden adapter artifact generation is a separate concern from prompt assembly and can happen at any time
+- The `scaffold build` command's role changes from "resolve and compose all prompts" to "generate hidden adapter artifacts and validate pipeline structure"
 - ADR-010's idempotency guarantee ("same build always produces same output") is preserved at the assembly level — same inputs produce same assembled prompt — but the AI's output from that prompt is non-deterministic (bounded by quality criteria, per ADR-041)
 
 ## Reversibility

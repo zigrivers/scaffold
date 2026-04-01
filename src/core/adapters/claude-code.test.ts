@@ -37,11 +37,11 @@ describe('ClaudeCodeAdapter', () => {
     expect(result.errors).toEqual([])
   })
 
-  it('generateStepWrapper creates file at commands/<slug>.md', () => {
+  it('generateStepWrapper creates file under .scaffold/generated/claude-code/commands/<slug>.md', () => {
     adapter.initialize(makeContext())
     const output = adapter.generateStepWrapper(makeStepInput({ slug: 'define-goals' }))
     expect(output.files).toHaveLength(1)
-    expect(output.files[0].relativePath).toBe('commands/define-goals.md')
+    expect(output.files[0].relativePath).toBe('.scaffold/generated/claude-code/commands/define-goals.md')
   })
 
   it('generated file has YAML frontmatter with description', () => {

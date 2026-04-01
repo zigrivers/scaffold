@@ -27,6 +27,7 @@ vi.mock('../../src/project/detector.js', () => ({
 
 vi.mock('../../src/core/assembly/meta-prompt-loader.js', () => ({
   discoverMetaPrompts: vi.fn(() => new Map()),
+  discoverAllMetaPrompts: vi.fn(() => new Map()),
 }))
 
 // ---------------------------------------------------------------------------
@@ -37,6 +38,7 @@ import { detectProjectMode } from '../project/detector.js'
 import { runWizard } from '../wizard/wizard.js'
 import { StateManager } from '../state/state-manager.js'
 import { loadConfig } from '../config/loader.js'
+import initCommand from '../cli/commands/init.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -203,5 +205,30 @@ describe('scaffold init E2E', () => {
     const stateManager = new StateManager(tmpDir, () => [])
     const state = stateManager.loadState()
     expect(state['init-mode']).toBe('brownfield')
+  })
+
+  // Test 11: init command auto-runs build into hidden .scaffold/generated output
+  it('init command creates hidden generated output and .gitignore without root commands', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+    await initCommand.handler({
+      _: [],
+      $0: 'scaffold',
+      root: tmpDir,
+      auto: true,
+      force: false,
+      methodology: 'mvp',
+      idea: undefined,
+      format: undefined,
+      verbose: false,
+    })
+
+    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(fs.existsSync(path.join(tmpDir, '.scaffold', 'generated', 'universal', 'prompts', 'README.md'))).toBe(true)
+    expect(fs.existsSync(path.join(tmpDir, '.gitignore'))).toBe(true)
+    expect(fs.readFileSync(path.join(tmpDir, '.gitignore'), 'utf8')).toContain('.scaffold/generated/')
+    expect(fs.existsSync(path.join(tmpDir, 'commands'))).toBe(false)
   })
 })

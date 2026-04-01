@@ -52,7 +52,7 @@ ${stepList || '(No steps configured)'}
 `
 
     return {
-      files: [{ relativePath: 'prompts/README.md', content, writeMode: 'create' }],
+      files: [{ relativePath: '.scaffold/generated/universal/prompts/README.md', content, writeMode: 'create' }],
       errors: [],
     }
   }

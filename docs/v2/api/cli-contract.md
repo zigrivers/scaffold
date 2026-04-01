@@ -115,7 +115,7 @@ Build-time commands (`build`, `validate`) accumulate all errors and warnings, re
 
 ### `scaffold init [idea] [flags]`
 
-**Purpose**: Run the interactive methodology wizard (Deep/MVP/Custom), generate `.scaffold/config.yml`, then automatically invoke `scaffold build` to produce thin command wrappers for platforms.
+**Purpose**: Run the interactive methodology wizard (Deep/MVP/Custom), generate `.scaffold/config.yml`, then automatically invoke `scaffold build` to produce hidden platform adapter artifacts under `.scaffold/generated/`.
 **Category**: init
 **Lock behavior**: No lock (writes config/state atomically at the end; see domain model 14 §7.6)
 **Requires project**: No (creates the project)
@@ -164,7 +164,8 @@ All wizard questions are skipped. Selections use:
 ```
 ✓ Config written to .scaffold/config.yml
 ✓ Pipeline initialized (36 steps, all pending)
-✓ Build complete — Claude Code: 15 commands, Universal: 36 steps
+✓ .gitignore updated for Scaffold-managed files
+✓ Build complete — Claude Code and Universal artifacts written under .scaffold/generated/
 
 Next step: scaffold run <first-step>
 ```
@@ -188,7 +189,7 @@ In JSON mode, `data` contains `{ mode, methodology, config_path, platforms, proj
 - Creates `.scaffold/state.json` (all steps `pending`; v1 migration pre-completes matched steps)
 - Creates `.scaffold/decisions.jsonl` (empty for greenfield/brownfield; may be pre-populated for v1 migration)
 - Creates `.scaffold/instructions/` directory for user instruction files ([ADR-047](../adrs/ADR-047-user-instruction-three-layer-precedence.md))
-- Invokes full `scaffold build` pipeline (writes `commands/*.md`, `prompts/*.md`, `CLAUDE.md` sections, `AGENTS.md`, etc.)
+- Invokes full `scaffold build` pipeline (creates/updates the managed `.gitignore` block and writes hidden adapter artifacts under `.scaffold/generated/`)
 
 **Examples**:
 
@@ -208,7 +209,7 @@ scaffold init --force
 
 ### `scaffold build [flags]`
 
-**Purpose**: Generate thin command wrappers for platforms from the meta-prompt inventory. Each wrapper invokes `scaffold run <step>` — no prompt content resolution or mixin injection occurs at build time. Idempotent and deterministic.
+**Purpose**: Generate thin platform adapter artifacts from the meta-prompt inventory. Each artifact points back to `scaffold run <step>`; prompt content resolution does not happen at build time. Idempotent and deterministic.
 **Category**: build-time
 **Lock behavior**: Read-only (no lock)
 **Requires project**: Yes
@@ -233,9 +234,10 @@ Same as interactive — no decisions to resolve. `--auto` has no behavioral effe
 ✓ Config valid (methodology: deep)
 ✓ 36 steps in pipeline (2 optional excluded: design-system, add-maestro)
 ✓ Dependency graph: 34 nodes, 31 edges, no cycles
-✓ Claude Code: 15 commands written to commands/
-✓ Codex: AGENTS.md updated with 36 entries
-✓ Universal: scaffold run available for all 36 steps
+✓ .gitignore updated for Scaffold-managed files
+✓ Claude Code: 15 wrappers written to .scaffold/generated/claude-code/commands/
+✓ Codex: guide updated at .scaffold/generated/codex/AGENTS.md
+✓ Universal: reference updated at .scaffold/generated/universal/prompts/README.md
 Build complete in 0.3s
 ```
 
@@ -259,10 +261,14 @@ In JSON mode, `data` contains `{ methodology, steps_total, steps_excluded, platf
 | (unknown fields) | 0 (warning) | Unknown keys in config, frontmatter, or manifest ([ADR-033](../adrs/ADR-033-forward-compatibility-unknown-fields.md)) | "warning: unknown field '<field>' in <file> (possible typo, or from a newer scaffold version)" |
 
 **Side effects**:
-- Writes `commands/<step-slug>.md` for each step (Claude Code adapter; if `claude-code` in platforms) — each command is a thin wrapper that invokes `scaffold run <step>`
-- Writes/updates `CLAUDE.md` reserved section stubs (Claude Code adapter)
-- Writes `AGENTS.md` with entries pointing to `scaffold run <step>` (Codex adapter; if `codex` in platforms)
-- Does NOT modify `.scaffold/state.json`, `.scaffold/decisions.jsonl`, or `.scaffold/lock.json`
+- Creates or updates a managed `.gitignore` block for `.scaffold/generated/`, `.scaffold/lock.json`, `.scaffold/*.tmp`, and `.scaffold/**/*.tmp`
+- Warns if user-owned `.gitignore` rules such as `.scaffold/` or `.scaffold/*` would hide committed Scaffold state
+- Writes `.scaffold/generated/claude-code/commands/<step-slug>.md` for each step (Claude Code adapter; if `claude-code` in platforms)
+- Writes `.scaffold/generated/codex/AGENTS.md` (Codex adapter; if `codex` in platforms)
+- Writes `.scaffold/generated/universal/prompts/README.md` (Universal adapter; always generated)
+- Warns if legacy root-level generated output still exists (`commands/`, `prompts/`, `codex-prompts/`, or a Scaffold-generated root `AGENTS.md`)
+- Does NOT write root `commands/`, `AGENTS.md`, `prompts/`, or `codex-prompts/`
+- Does NOT modify `.scaffold/state.json` or `.scaffold/decisions.jsonl`
 
 **Examples**:
 
@@ -617,7 +623,7 @@ In JSON mode, `data` contains `{ files_deleted: string[], files_preserved: strin
 - Acquires `.scaffold/lock.json`
 - Deletes `.scaffold/state.json`
 - Deletes `.scaffold/decisions.jsonl`
-- Preserves: `.scaffold/config.yml`, `CLAUDE.md`, `AGENTS.md`, `commands/`, `prompts/`, `codex-prompts/`, all produced artifacts (e.g., `docs/`)
+- Preserves: `.scaffold/config.yml`, `.scaffold/generated/`, `CLAUDE.md`, `AGENTS.md`, and all produced artifacts (e.g., `docs/`)
 - Releases `.scaffold/lock.json`
 
 **Examples**:
@@ -905,9 +911,9 @@ Methodologies
 
 Platforms
 ─────────
-  claude-code    Generates commands/*.md that invoke scaffold run
-  codex          Generates AGENTS.md entries pointing to scaffold run
-  (universal)    scaffold run outputs assembled prompt to stdout
+  claude-code    Generates hidden wrappers in .scaffold/generated/claude-code/commands/
+  codex          Generates a hidden guide at .scaffold/generated/codex/AGENTS.md
+  (universal)    Generates hidden references in .scaffold/generated/universal/
 ```
 
 In JSON mode, `data` contains `{ methodologies: [...], platforms: [...], tools: { build: [...], utility: [...] } }`.

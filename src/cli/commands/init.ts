@@ -2,6 +2,7 @@ import type { CommandModule, Argv } from 'yargs'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { runWizard } from '../../wizard/wizard.js'
+import { runBuild } from './build.js'
 
 interface InitArgs {
   format?: string
@@ -48,8 +49,28 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       return
     }
 
+    const buildResult = await runBuild({
+      'validate-only': false,
+      force: false,
+      format: argv.format,
+      auto: argv.auto,
+      verbose: argv.verbose,
+      root: projectRoot,
+    }, {
+      output,
+      suppressFinalResult: outputMode === 'json',
+    })
+
+    if (buildResult.exitCode !== 0) {
+      process.exit(buildResult.exitCode)
+      return
+    }
+
     if (outputMode === 'json') {
-      output.result(result)
+      output.result({
+        ...result,
+        buildResult: buildResult.data ?? null,
+      })
     } else {
       output.success(`Scaffold initialized at ${result.configPath}`)
     }

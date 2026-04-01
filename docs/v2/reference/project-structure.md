@@ -101,7 +101,18 @@ scaffold/
   instructions/                 # User instructions
     global.md                   # Applied to all steps
     <step-name>.md              # Applied to specific step
+  generated/                    # Hidden adapter artifacts (gitignored)
+    claude-code/
+      commands/
+        <step-name>.md
+    codex/
+      AGENTS.md
+    universal/
+      prompts/
+        README.md
 ```
+
+`scaffold init` and `scaffold build` maintain a dedicated `.gitignore` block for `.scaffold/generated/`, `.scaffold/lock.json`, and Scaffold temp files. Root-level `commands/`, `prompts/`, `codex-prompts/`, and generated `AGENTS.md` are no longer Scaffold-owned project outputs.
 
 ## 2. Module Organization Strategy
 

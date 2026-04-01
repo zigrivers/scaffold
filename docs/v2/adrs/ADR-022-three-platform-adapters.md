@@ -10,7 +10,7 @@
 
 ## Context
 
-Scaffold v2 targets multiple AI development platforms. The v1 pipeline is tightly coupled to Claude Code — prompts reference Claude Code-specific tools, generate `commands/*.md` files with YAML frontmatter, and assume Claude Code's interaction model. V2 must support additional platforms (starting with Codex) while preserving first-class Claude Code support.
+Scaffold v2 targets multiple AI development platforms. The v1 pipeline is tightly coupled to Claude Code — prompts reference Claude Code-specific tools, generate wrapper files with YAML frontmatter, and assume Claude Code's interaction model. V2 must support additional platforms (starting with Codex) while preserving first-class Claude Code support.
 
 The design must address: which platforms to support at launch, how adapters interact with the core build pipeline, whether platform-specific outputs are isolated or interdependent, and whether there should always be a platform-agnostic fallback.
 
@@ -20,20 +20,20 @@ Domain 05 (Platform Adapter System) defines the adapter architecture as the fina
 
 Three platform adapters at launch: **Claude Code**, **Codex**, and **Universal** (plain markdown). The Universal adapter is ALWAYS generated regardless of which platforms the user selects in `config.yml`. Adapters receive assembled prompts from the assembly engine (domain 15) and produce platform-specific output files. Adapters run independently — no inter-adapter communication or shared state.
 
-Each adapter produces distinct output:
-- **Claude Code**: `commands/*.md` with YAML frontmatter (compatible with Claude Code's slash command system)
-- **Codex**: `AGENTS.md` sections with condensed summaries (~500 tokens per prompt) plus `codex-prompts/*.md` with tool-name mapping applied
-- **Universal**: `prompts/*.md` as plain markdown plus a `scaffold-pipeline.md` reference document showing the full pipeline sequence
+Each adapter produces distinct hidden output under `.scaffold/generated/`:
+- **Claude Code**: `.scaffold/generated/claude-code/commands/*.md` with YAML frontmatter
+- **Codex**: `.scaffold/generated/codex/AGENTS.md` with phase-grouped run guidance
+- **Universal**: `.scaffold/generated/universal/prompts/README.md` as the platform-agnostic reference
 
 ## Rationale
 
-**Universal always generated**: The Universal adapter serves as an escape hatch — if a user switches to a platform scaffold doesn't yet support (Gemini, Cursor, Windsurf, or a future tool), the plain markdown output works immediately. It also serves as the human-readable reference: anyone can open `prompts/*.md` and understand the pipeline without platform-specific tooling. Generating it always costs minimal additional build time (it is the simplest adapter — no tool mapping, no frontmatter, just markdown) while providing significant insurance against platform lock-in.
+**Universal always generated**: The Universal adapter serves as an escape hatch — if a user switches to a platform scaffold doesn't yet support (Gemini, Cursor, Windsurf, or a future tool), the generated reference under `.scaffold/generated/universal/` still explains how to run the pipeline through `scaffold run`. Generating it always costs minimal additional build time while providing significant insurance against platform lock-in.
 
 **Three adapters, not two**: Claude Code and Codex have sufficiently different conventions (YAML frontmatter vs. AGENTS.md, different tool names, different interaction models) that a single "generic" adapter cannot serve both well. The Universal adapter is not a substitute for platform-specific adapters — it provides baseline compatibility, not optimized output.
 
 **Independent adapters**: Each adapter receives the same input and produces output without consulting other adapters. This means adding a new adapter requires zero changes to existing adapters. It also means adapters can be tested in complete isolation — a Codex adapter test does not need a Claude Code adapter to be present.
 
-**AGENTS.md condensed summaries**: Codex's AGENTS.md serves as the top-level instruction file. Including full prompt content would make it unmanageably large. Condensed summaries (~500 tokens per prompt) provide enough context for the agent to understand the prompt's purpose, with references to the full `codex-prompts/*.md` files for detailed execution. This follows domain 05's recommendation for a two-tier Codex output structure.
+**Hidden generated output avoids repo-root churn**: Scaffold-owned generated artifacts should not compete with user-owned project files. Keeping adapter output under `.scaffold/generated/` makes ownership clear, keeps the repository root clean, and allows Scaffold to manage a focused `.gitignore` block without hiding committed state files.
 
 ## Alternatives Considered
 
@@ -64,15 +64,15 @@ Each adapter produces distinct output:
 ## Consequences
 
 ### Positive
-- Users on Claude Code get optimized output (slash commands with frontmatter). Users on Codex get optimized output (AGENTS.md + tool mapping). All users get a markdown fallback.
+- Users on Claude Code get optimized hidden wrappers. Users on Codex get a hidden generated guide. All users get a hidden markdown fallback.
 - Adding a future adapter (e.g., for Gemini) requires only implementing the adapter interface — no changes to existing adapters or the build pipeline
 - Universal output ensures scaffold is never a single-platform tool, even before a dedicated adapter exists for a new platform
 - Each adapter can be developed, tested, and maintained independently
 
 ### Negative
-- Three adapters means three sets of output files, increasing the volume of generated content in the project
-- The Codex adapter requires maintaining tool-name mapping (ADR-023) and AGENTS.md summarization logic, which is more complex than the other adapters
-- Users may be confused by multiple output directories (`commands/`, `codex-prompts/`, `prompts/`) — the `scaffold status` command must clearly explain which directory corresponds to which platform
+- Three adapters still mean multiple generated files, increasing the volume of hidden Scaffold-owned artifacts under `.scaffold/generated/`
+- The Codex adapter still requires a curated summary view in `.scaffold/generated/codex/AGENTS.md`
+- Users upgrading from older versions must migrate away from root `commands/`, `prompts/`, `codex-prompts/`, and Scaffold-generated root `AGENTS.md`
 
 ### Neutral
 - Navigation hints ("After This Step" sections) are derived from the dependency resolution output and injected by each adapter independently — the content is the same but the formatting varies by platform
@@ -83,10 +83,10 @@ Each adapter produces distinct output:
 - The Universal adapter MUST always generate output, regardless of platform selection in config.yml
 - Adapters MUST NOT communicate with each other or share intermediate state
 - All adapters MUST receive the same assembled prompt input from the assembly engine (domain 15). *Updated post-ADR-041: adapters receive assembled prompts from the assembly engine, not injection pipeline results.*
-- The Claude Code adapter MUST produce `commands/*.md` files with valid YAML frontmatter
-- The Codex adapter MUST produce `AGENTS.md` sections and `codex-prompts/*.md` files with tool-name mapping applied (ADR-023)
-- The Universal adapter MUST produce `prompts/*.md` as plain markdown plus a `scaffold-pipeline.md` reference
-- AGENTS.md prompt summaries MUST be condensed to approximately 500 tokens each, with references to full files
+- The Claude Code adapter MUST produce `.scaffold/generated/claude-code/commands/*.md` files with valid YAML frontmatter
+- The Codex adapter MUST produce `.scaffold/generated/codex/AGENTS.md`
+- The Universal adapter MUST produce `.scaffold/generated/universal/prompts/README.md`
+- Generated adapter output MUST remain Scaffold-owned and live under `.scaffold/generated/`
 - The Universal adapter MUST strip MCP-specific references entirely (remove `<!-- scaffold:mcp-only -->` wrapped content). The Codex adapter MUST wrap MCP-specific references in HTML comments so they are preserved but invisible to the agent. The Claude Code adapter preserves MCP references as-is.
 - Adding a new adapter MUST NOT require modifications to existing adapters
 

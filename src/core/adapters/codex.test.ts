@@ -60,12 +60,12 @@ describe('CodexAdapter', () => {
     expect(result.files[0].content).toContain('scaffold run step-b')
   })
 
-  // T-041 test 4: finalize() generates single AGENTS.md
-  it('finalize() generates a single AGENTS.md file', () => {
+  // T-041 test 4: finalize() generates single hidden AGENTS.md
+  it('finalize() generates a single hidden AGENTS.md file', () => {
     adapter.initialize(makeContext())
     const result = adapter.finalize(makeFinalizeInput([]))
     expect(result.files).toHaveLength(1)
-    expect(result.files[0].relativePath).toBe('AGENTS.md')
+    expect(result.files[0].relativePath).toBe('.scaffold/generated/codex/AGENTS.md')
   })
 
   // T-041 test 5: AGENTS.md groups steps by phase

@@ -164,7 +164,7 @@ Or: `/plugin marketplace update zigrivers-scaffold`
 
 ### Existing projects
 
-After upgrading the CLI, existing projects migrate automatically. Run `scaffold status` in your project directory — the state manager detects and renames old step keys, removes retired steps, normalizes artifact paths, and persists the changes atomically. No manual editing of `.scaffold/state.json` is needed.
+After upgrading the CLI, existing projects still get automatic state migrations. Run `scaffold status` in your project directory — the state manager detects and renames old step keys, removes retired steps, normalizes artifact paths, and persists the changes atomically. No manual editing of `.scaffold/state.json` is needed.
 
 **Step migrations handled automatically:**
 - `add-playwright` / `add-maestro` → `add-e2e-testing`
@@ -175,6 +175,23 @@ After upgrading the CLI, existing projects migrate automatically. Run `scaffold 
 - `testing-strategy` → `tdd`, `implementation-tasks` → `implementation-plan`, `review-tasks` → `implementation-plan-review`
 
 The PRD is always created as `docs/plan.md`. If you have a legacy `docs/prd.md` from an older version, the context gatherer resolves aliased paths so downstream steps find your PRD regardless.
+
+### Generated output layout
+
+Fresh `scaffold init` now creates committed project state under `.scaffold/` and auto-runs `scaffold build`, which writes inspectable adapter artifacts under `.scaffold/generated/`. Scaffold also manages a dedicated block in `.gitignore` so generated output, `.scaffold/lock.json`, and Scaffold temp files stay out of version control by default.
+
+The canonical execution entrypoints are still `scaffold run <step>` and the installed Scaffold plugin. Files under `.scaffold/generated/` are internal build artifacts, not root-level project files.
+
+### Migration for older projects
+
+This release is a clean breaking change for generated adapter output. To migrate an existing project:
+
+1. Upgrade Scaffold.
+2. Remove old root-level generated Scaffold output if present: `commands/`, `prompts/`, `codex-prompts/`, and root `AGENTS.md` only if it was Scaffold-generated.
+3. Run `scaffold build`.
+4. Review the Scaffold-managed block in `.gitignore`.
+5. Commit `.gitignore` plus the intended committed `.scaffold/` state files (`config.yml`, `state.json`, `decisions.jsonl`, `instructions/`).
+6. Do not commit `.scaffold/generated/` or `.scaffold/lock.json`.
 
 ## Quick Start
 
@@ -579,14 +596,14 @@ You can change methodology mid-pipeline with `scaffold init --methodology <prese
 
 | Command | What It Does |
 |---------|-------------|
-| `scaffold init` | Initialize `.scaffold/` with config, state, and decisions log |
+| `scaffold init` | Initialize `.scaffold/` state, then auto-build hidden adapter artifacts |
 | `scaffold run <step>` | Execute a pipeline step (assembles and outputs the full prompt) |
-| `scaffold build` | Generate platform adapter output (commands/, AGENTS.md, etc.) |
+| `scaffold build` | Generate hidden adapter output under `.scaffold/generated/` and update the managed `.gitignore` block |
 | `scaffold adopt` | Bootstrap state from existing artifacts (brownfield projects) |
 | `scaffold skip <step> [<step2>...]` | Skip one or more steps with a reason |
 | `scaffold complete <step>` | Mark a step as completed (for steps executed outside `scaffold run`) |
 | `scaffold reset <step>` | Reset a step back to pending |
-| `scaffold status [--compact]` | Show pipeline progress (`--compact` shows only remaining work). Warns if commands are stale. |
+| `scaffold status [--compact]` | Show pipeline progress (`--compact` shows only remaining work). Warns if generated adapter output is stale. |
 | `scaffold next` | List next unblocked step(s) |
 | `scaffold check <step>` | Check if a conditional step applies to this project |
 | `scaffold validate` | Validate meta-prompts, config, state, and dependency graph |
@@ -828,7 +845,7 @@ src/
 - **Assembly engine** (`src/core/assembly/engine.ts`) — Pure orchestrator with no I/O. Constructs 7-section prompts from meta-prompt + knowledge + context + methodology + instructions + depth guidance.
 - **State manager** (`src/state/state-manager.ts`) — Atomic writes via tmp + `fs.renameSync()`. Tracks step status, in-progress records, and next-eligible cache. Includes migration system for step renames and retired steps.
 - **Dependency graph** (`src/core/dependency/`) — Kahn's algorithm topological sort with phase-aware ordering and cycle detection.
-- **Platform adapters** (`src/core/adapters/`) — 3-step lifecycle (initialize → generateStepWrapper → finalize) producing Claude Code commands, Codex AGENTS.md, or universal markdown.
+- **Platform adapters** (`src/core/adapters/`) — 3-step lifecycle (initialize → generateStepWrapper → finalize) producing hidden adapter artifacts under `.scaffold/generated/claude-code/`, `.scaffold/generated/codex/`, and `.scaffold/generated/universal/`.
 - **Project detector** (`src/project/detector.ts`) — Scans for file system signals to classify projects as greenfield, brownfield, or v1-migration.
 - **Check command** (`src/cli/commands/check.ts`) — Applicability detection for conditional steps (platform detection, GitHub remote detection, CLI availability).
 
@@ -855,7 +872,7 @@ skills/               # 3 Claude Code skills (pipeline reference, runner, multi-
 ### Contributing
 
 1. Meta-prompt content lives in `pipeline/` — edit the relevant `.md` file
-2. Run `scaffold build` to regenerate `commands/` from pipeline meta-prompts. The pre-commit hook will block commits that change `pipeline/` or `knowledge/` without also updating `commands/`.
+2. If you changed adapter behavior, run `scaffold build` in a test project and inspect the generated artifacts under `.scaffold/generated/`.
 3. Run `make check-all` (lint + type-check + test + evals) before submitting
 4. Knowledge entries live in `knowledge/` — follow the existing frontmatter schema
 5. ADRs documenting architectural decisions are in `docs/v2/adrs/`

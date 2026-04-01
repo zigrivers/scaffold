@@ -42,12 +42,12 @@ describe('UniversalAdapter', () => {
     expect(output.files).toEqual([])
   })
 
-  // T-042 test 2: finalize() generates prompts/README.md
-  it('finalize() generates a single prompts/README.md file', () => {
+  // T-042 test 2: finalize() generates hidden prompts/README.md
+  it('finalize() generates a single hidden prompts/README.md file', () => {
     adapter.initialize(makeContext())
     const result = adapter.finalize(makeFinalizeInput([]))
     expect(result.files).toHaveLength(1)
-    expect(result.files[0].relativePath).toBe('prompts/README.md')
+    expect(result.files[0].relativePath).toBe('.scaffold/generated/universal/prompts/README.md')
   })
 
   // T-042 test 3: README contains scaffold run commands for each step

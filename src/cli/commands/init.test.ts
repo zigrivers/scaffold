@@ -35,6 +35,16 @@ vi.mock('../output/context.js', () => ({
 
 // Mock the build command to avoid circular deps / actual build execution
 vi.mock('./build.js', () => ({
+  runBuild: vi.fn().mockResolvedValue({
+    exitCode: 0,
+    data: {
+      stepsTotal: 2,
+      stepsEnabled: 2,
+      platforms: ['claude-code', 'universal'],
+      generatedFiles: 3,
+      buildTimeMs: 10,
+    },
+  }),
   default: {
     handler: vi.fn().mockResolvedValue(undefined),
   },
@@ -47,6 +57,7 @@ vi.mock('./build.js', () => ({
 import { runWizard } from '../../wizard/wizard.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
+import { runBuild } from './build.js'
 import initCommand from './init.js'
 
 // ---------------------------------------------------------------------------
@@ -104,6 +115,7 @@ describe('init command', () => {
   let tmpDir: string
   const mockRunWizard = vi.mocked(runWizard)
   const mockResolveOutputMode = vi.mocked(resolveOutputMode)
+  const mockRunBuild = vi.mocked(runBuild)
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffold-init-test-'))
@@ -113,6 +125,16 @@ describe('init command', () => {
 
     mockResolveOutputMode.mockReturnValue('auto')
     mockRunWizard.mockResolvedValue(makeSuccessResult(tmpDir))
+    mockRunBuild.mockResolvedValue({
+      exitCode: 0,
+      data: {
+        stepsTotal: 2,
+        stepsEnabled: 2,
+        platforms: ['claude-code', 'universal'],
+        generatedFiles: 3,
+        buildTimeMs: 10,
+      },
+    })
   })
 
   afterEach(() => {
@@ -120,17 +142,24 @@ describe('init command', () => {
     vi.restoreAllMocks()
   })
 
-  // Test 1: Runs wizard successfully in temp directory
-  it('runs wizard and exits 0 on success', async () => {
+  // Test 1: Runs wizard successfully in temp directory and auto-runs build
+  it('runs wizard, auto-runs build, and exits 0 on success', async () => {
     await initCommand.handler(defaultArgv({ root: tmpDir }))
     expect(mockRunWizard).toHaveBeenCalledWith(
       expect.objectContaining({ projectRoot: tmpDir }),
     )
+    expect(mockRunBuild).toHaveBeenCalledWith(
+      expect.objectContaining({
+        root: tmpDir,
+        'validate-only': false,
+      }),
+      expect.any(Object),
+    )
     expect(exitSpy).toHaveBeenCalledWith(0)
   })
 
-  // Test 2: JSON mode outputs InitResult shape
-  it('JSON mode outputs result with success shape', async () => {
+  // Test 2: JSON mode outputs single InitResult payload including buildResult
+  it('JSON mode outputs result with success shape and buildResult', async () => {
     mockResolveOutputMode.mockReturnValue('json')
     const mockOutput = {
       success: vi.fn(),
@@ -155,6 +184,9 @@ describe('init command', () => {
         projectRoot: tmpDir,
         methodology: 'deep',
         success: true,
+        buildResult: expect.objectContaining({
+          generatedFiles: 3,
+        }),
       }),
     )
     expect(exitSpy).toHaveBeenCalledWith(0)
@@ -173,6 +205,7 @@ describe('init command', () => {
     mockRunWizard.mockResolvedValue(makeFailResult(tmpDir))
     await initCommand.handler(defaultArgv({ root: tmpDir }))
     expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(mockRunBuild).not.toHaveBeenCalled()
   })
 
   // Test 5: --methodology flag is passed through to wizard
@@ -191,5 +224,13 @@ describe('init command', () => {
     expect(mockRunWizard).toHaveBeenCalledWith(
       expect.objectContaining({ projectRoot: cwd }),
     )
+  })
+
+  it('exits with build exit code when auto-build fails', async () => {
+    mockRunBuild.mockResolvedValue({ exitCode: 5 })
+
+    await initCommand.handler(defaultArgv({ root: tmpDir }))
+
+    expect(exitSpy).toHaveBeenCalledWith(5)
   })
 })

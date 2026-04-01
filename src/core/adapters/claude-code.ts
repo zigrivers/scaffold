@@ -44,7 +44,7 @@ ${bodyContent}${knowledgeSection}${afterSection}
     return {
       slug,
       platformId: this.platformId,
-      files: [{ relativePath: `commands/${slug}.md`, content, writeMode: 'create' }],
+      files: [{ relativePath: `.scaffold/generated/claude-code/commands/${slug}.md`, content, writeMode: 'create' }],
       success: true,
     }
   }

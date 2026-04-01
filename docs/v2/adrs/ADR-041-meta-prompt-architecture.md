@@ -47,7 +47,7 @@ This replaces the v2 three-layer resolution system (ADR-005), mixin injection (A
 
 ### Keep Hard-Coded Prompts (v1 Status Quo)
 
-- **Description**: Continue maintaining all prompt text directly in `prompts.md` and `commands/` files.
+- **Description**: Continue maintaining all prompt text directly in `prompts.md` and generated wrapper files.
 - **Pros**: Fully deterministic — same prompt text every time. No runtime assembly complexity. Users can read exactly what will be sent to the AI.
 - **Cons**: 29+ prompts to maintain. Domain knowledge duplicated across prompts. Adding a new methodology requires writing every prompt from scratch. Updates to domain understanding must be propagated manually. Does not scale.
 
@@ -80,7 +80,7 @@ This replaces the v2 three-layer resolution system (ADR-005), mixin injection (A
 
 ### Neutral
 - Pipeline step inventory (which steps exist and their dependencies) is unchanged from v2 — only the mechanism for producing prompts changes
-- The `commands/` directory continues to exist as thin wrappers that trigger assembly, maintaining plugin compatibility
+- Hidden generated adapter wrappers under `.scaffold/generated/` continue to provide an inspectable delivery layer without becoming root-level project files
 - Users can still inspect the assembled prompt via CLI flags for transparency
 
 ## Reversibility

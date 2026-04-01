@@ -75,7 +75,7 @@ ${sections.join('\n\n')}
 `
 
     return {
-      files: [{ relativePath: 'AGENTS.md', content, writeMode: 'create' }],
+      files: [{ relativePath: '.scaffold/generated/codex/AGENTS.md', content, writeMode: 'create' }],
       errors: [],
     }
   }

@@ -447,11 +447,11 @@ content/
 
 ## Section 4: Data Flow Diagrams
 
-Three critical data paths collectively exercise every component in the system. The **build pipeline** (4a) generates thin platform command wrappers from meta-prompt metadata. The **run flow** (4b) is the core runtime path — assembling tailored prompts, executing them via AI agents, and tracking state. The **init flow** (4c) bootstraps new projects. The coverage table (4d) verifies every component from Section 2 appears in at least one path.
+Three critical data paths collectively exercise every component in the system. The **build pipeline** (4a) generates hidden platform adapter artifacts from meta-prompt metadata. The **run flow** (4b) is the core runtime path — assembling tailored prompts, executing them via AI agents, and tracking state. The **init flow** (4c) bootstraps new projects. The coverage table (4d) verifies every component from Section 2 appears in at least one path.
 
 ### Section 4a: Build Pipeline (`scaffold build`)
 
-> **Architecture note:** The meta-prompt architecture ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)) replaced the original build-time resolution pipeline. `scaffold build` no longer resolves or assembles prompt content — that work happens at runtime via the assembly engine (`scaffold run` — see Section 4b). `scaffold build` now generates thin platform command wrappers — files that invoke `scaffold run <step>` — from meta-prompt metadata (frontmatter fields like `description`, `phase`, `depends-on`, `outputs`).
+> **Architecture note:** The meta-prompt architecture ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md)) replaced the original build-time resolution pipeline. `scaffold build` no longer resolves or assembles prompt content — that work happens at runtime via the assembly engine (`scaffold run` — see Section 4b). `scaffold build` now generates hidden platform adapter artifacts — files under `.scaffold/generated/` that invoke `scaffold run <step>` — from meta-prompt metadata (frontmatter fields like `description`, `phase`, `depends-on`, `outputs`).
 
 The deterministic transformation from `config.yml` + meta-prompt metadata to platform-specific wrapper files. This is a lightweight text transformation exercising 6 components.
 
@@ -465,9 +465,9 @@ flowchart TD
     E --> F["Topological sort:<br/>Kahn's + phase tiebreaker<br/>(Dependency Resolver)"]
     F -->|"cycle"| ERR1B["Exit 1<br/>DEP_CYCLE_DETECTED"]
     F -->|"sorted"| G["Sorted step list<br/>+ parallel sets"]
-    G --> H["Generate commands/*.md<br/>wrappers + CLAUDE.md sections<br/>(Claude Code Adapter)"]
-    G --> I["Generate AGENTS.md +<br/>codex-prompts/*.md wrappers<br/>(Codex Adapter)"]
-    G --> J["Generate prompts/*.md +<br/>prompts/README.md<br/>(Universal Adapter)"]
+    G --> H["Generate .scaffold/generated/<br/>claude-code/commands/*.md<br/>(Claude Code Adapter)"]
+    G --> I["Generate .scaffold/generated/<br/>codex/AGENTS.md<br/>(Codex Adapter)"]
+    G --> J["Generate .scaffold/generated/<br/>universal/prompts/README.md<br/>(Universal Adapter)"]
     H & I & J --> K["Print build summary<br/>(CLI Shell)"]
 ```
 
@@ -480,13 +480,13 @@ flowchart TD
 | Resolve methodology | Methodology Resolver | Methodology preset config, custom overrides | — | [ADR-043](../adrs/ADR-043-depth-scale.md) | Invalid methodology → exit 1 |
 | Filter optionals | Methodology Resolver | — (config `project` traits in memory) | — | [ADR-020](../adrs/ADR-020-skip-vs-exclude-semantics.md) | Invalid trait reference → exit 1 |
 | Kahn's sort | Dependency Resolver | — (in-memory frontmatter dependencies) | — | [ADR-009](../adrs/ADR-009-kahns-algorithm-dependency-resolution.md), [ADR-011](../adrs/ADR-011-depends-on-union-semantics.md) | `DEP_CYCLE_DETECTED` → exit 1 |
-| Claude Code output | Claude Code Adapter | — | `commands/*.md` (wrappers), CLAUDE.md sections (via CLAUDE.md Manager) | [ADR-022](../adrs/ADR-022-three-platform-adapters.md), [ADR-026](../adrs/ADR-026-claude-md-section-registry.md) | Write failure → exit 5 |
-| Codex output | Codex Adapter | — | `AGENTS.md`, `codex-prompts/*.md` (wrappers) | [ADR-022](../adrs/ADR-022-three-platform-adapters.md) | Write failure → exit 5 |
-| Universal output | Universal Adapter | `content/adapters/universal/pipeline-template.md` | `prompts/*.md`, `prompts/README.md` | [ADR-022](../adrs/ADR-022-three-platform-adapters.md) | Write failure → exit 5 | **Phase 2.** Phase 1 Universal adapter generates `prompts/README.md` only. The `scaffold-pipeline.md` reference document is deferred. |
+| Claude Code output | Claude Code Adapter | — | `.scaffold/generated/claude-code/commands/*.md` (wrappers) | [ADR-022](../adrs/ADR-022-three-platform-adapters.md) | Write failure → exit 5 |
+| Codex output | Codex Adapter | — | `.scaffold/generated/codex/AGENTS.md` | [ADR-022](../adrs/ADR-022-three-platform-adapters.md) | Write failure → exit 5 |
+| Universal output | Universal Adapter | — | `.scaffold/generated/universal/prompts/README.md` | [ADR-022](../adrs/ADR-022-three-platform-adapters.md) | Write failure → exit 5 |
 
 **Walkthrough — non-obvious behaviors:**
 
-**Build produces wrappers, not prompts.** The wrapper files generated by `scaffold build` are thin shell invocations (e.g., a `commands/create-prd.md` file with YAML frontmatter pointing to `scaffold run create-prd`). The actual prompt content is assembled at runtime by the assembly engine (Section 4b). This separation means build output can be regenerated cheaply and doesn't contain methodology-specific or depth-specific content — that's determined at run time based on current config ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md), [ADR-044](../adrs/ADR-044-runtime-prompt-generation.md)).
+**Build produces hidden wrappers, not prompts.** The files generated by `scaffold build` live under `.scaffold/generated/` and point back to `scaffold run <step>`. The actual prompt content is assembled at runtime by the assembly engine (Section 4b). This separation means build output can be regenerated cheaply and doesn't contain methodology-specific or depth-specific content — that's determined at run time based on current config ([ADR-041](../adrs/ADR-041-meta-prompt-architecture.md), [ADR-044](../adrs/ADR-044-runtime-prompt-generation.md)).
 
 **Universal adapter always runs.** Regardless of the `platforms` configuration, the Universal adapter generates output ([ADR-022](../adrs/ADR-022-three-platform-adapters.md)). This ensures every project has a platform-agnostic escape hatch — plain markdown references that work with any AI tool, current or future. The Claude Code and Codex adapters only run if their platform is listed in `config.yml`.
 
@@ -765,7 +765,7 @@ flowchart TD
 
 **V1 migration state initialization.** For v1 projects, the State Manager pre-completes prompts whose `outputs` artifacts already exist and pass verification. A v1 project that has already created `docs/plan.md`, `docs/tech-stack.md`, and `docs/coding-standards.md` will see those corresponding prompts marked `completed` in `state.json` after init. The user can then `scaffold run` to continue from where v1 left off, running only prompts whose artifacts don't yet exist.
 
-**Init-to-build handoff.** After writing config, state, and decisions files, `scaffold init` automatically invokes the full build pipeline (Section 4a). The user gets both configuration *and* platform-specific output files in a single command ([ADR-027](../adrs/ADR-027-init-wizard-smart-suggestion.md)). If the build fails (e.g., manifest references a missing file), the config and state files have already been written — the user can fix the issue and run `scaffold build` manually.
+**Init-to-build handoff.** After writing config, state, and decisions files, `scaffold init` automatically invokes the full build pipeline (Section 4a). The user gets both configuration *and* hidden adapter artifacts in a single command ([ADR-027](../adrs/ADR-027-init-wizard-smart-suggestion.md)). If the build fails (e.g., manifest references a missing file), the config and state files have already been written — the user can fix the issue and run `scaffold build` manually.
 
 ---
 
@@ -813,8 +813,8 @@ Scaffold v2 manages all state through the file system — there are no databases
 | `.scaffold/decisions.jsonl` | Key decisions — technology, architecture, process choices across sessions | Decision Logger (CLI-gated) | Run (session bootstrap context), downstream prompts | Committed | Append (single-line JSON < 4KB) | [ADR-013](../adrs/ADR-013-decision-log-jsonl-format.md) |
 | `.scaffold/lock.json` | Execution lock — prevents concurrent write operations on same machine | Lock Manager | Run, skip, init, reset (before acquiring) | Gitignored | Full rewrite (`wx` flag), delete on release | [ADR-019](../adrs/ADR-019-advisory-locking.md) |
 | `CLAUDE.md` | Agent instructions — reserved sections with scaffold-managed content | CLAUDE.md Manager (run: section fill) | Claude Code agents | Committed | Section replace (find heading → replace managed block) | [ADR-026](../adrs/ADR-026-claude-md-section-registry.md) |
-| `AGENTS.md` | Codex agent instructions | Codex Adapter | Codex agents | Committed | Full rewrite on build | [ADR-022](../adrs/ADR-022-three-platform-adapters.md) |
-| Build outputs (`commands/*.md`, `codex-prompts/*.md`, `prompts/*.md`, `prompts/README.md`) | Platform-specific wrapper files — deterministic from config + meta-prompt metadata | Platform Adapters (build) | AI agents (invoke `scaffold run`) | Committed | Full rewrite on build | [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md), [ADR-022](../adrs/ADR-022-three-platform-adapters.md) |
+| `.scaffold/generated/codex/AGENTS.md` | Hidden Codex reference guide | Codex Adapter | Humans / Codex users inspecting generated output | Gitignored | Full rewrite on build | [ADR-022](../adrs/ADR-022-three-platform-adapters.md) |
+| Build outputs (`.scaffold/generated/claude-code/commands/*.md`, `.scaffold/generated/universal/prompts/README.md`) | Hidden platform wrapper files — deterministic from config + meta-prompt metadata | Platform Adapters (build) | Humans / AI agents inspecting generated output | Gitignored | Full rewrite on build | [ADR-041](../adrs/ADR-041-meta-prompt-architecture.md), [ADR-022](../adrs/ADR-022-three-platform-adapters.md) |
 | Produced artifacts (e.g., `docs/plan.md`, `docs/tech-stack.md`) | Documents created by prompt execution — tracked via `outputs` in frontmatter | AI agents (outside scaffold) | State Manager (dual completion detection — see Section 4b for the detection algorithm), downstream prompts (via dependency ordering) | Committed | Agent-controlled (scaffold has no visibility into agent writes) | [ADR-018](../adrs/ADR-018-completion-detection-crash-recovery.md) |
 
 **Per-file lifecycle details:**
@@ -826,8 +826,8 @@ Scaffold v2 manages all state through the file system — there are no databases
 | `decisions.jsonl` | `scaffold init` (created empty) or `scaffold adopt` (pre-populated from codebase scan) | `scaffold reset` | ~50 KB (30-90 entries at ~200 bytes each; grows monotonically due to append-only design) |
 | `lock.json` | `scaffold run` / `scaffold init` / `scaffold reset` (lock acquisition) | Normal: `releaseLock()` after completion. Crash: left on disk, cleaned up by stale detection on next invocation | < 1 KB (6 fields, ~200 bytes) |
 | `CLAUDE.md` | `scaffold build` (section reservations with placeholders) | Never deleted by scaffold (user-managed file with scaffold-managed sections) | ~10 KB (2000-token budget enforced by optimization prompt) |
-| `AGENTS.md` | `scaffold build` (full rewrite) | Never explicitly deleted; overwritten on each build | ~5 KB |
-| Build outputs | `scaffold build` (all regenerated from scratch) | Never explicitly deleted; overwritten on each build | ~200 KB total (25 prompts × ~8 KB average × 3 platforms, minus shared content) |
+| `.scaffold/generated/codex/AGENTS.md` | `scaffold build` (full rewrite) | Never explicitly deleted; overwritten on each build | ~5 KB |
+| Build outputs | `scaffold build` (all regenerated from scratch) | Never explicitly deleted; overwritten on each build | ~200 KB total across `.scaffold/generated/` |
 | Produced artifacts | Agent execution during `scaffold run` | Never deleted by scaffold; `scaffold reset` does not touch produced artifacts | Varies (1-50 KB per artifact; ~25 artifacts for a full pipeline) |
 
 ---
@@ -1351,7 +1351,7 @@ graph TB
         EP[Extra Prompts<br/>config extra-prompts]
         CF[Config<br/>.scaffold/config.yml]
         ST[State Files<br/>state.json, decisions.jsonl]
-        BO[Build Outputs<br/>commands/, codex-prompts/, prompts/]
+        BO[Build Outputs<br/>.scaffold/generated/]
         AR[Produced Artifacts<br/>docs/*.md, etc.]
     end
 

@@ -213,7 +213,8 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
     "steps_total": 24,
     "steps_excluded": 2,
     "platforms": {
-      "claude-code": { "files_written": 24, "output_dir": "commands/" }
+      "claude-code": { "files_written": 24, "output_dir": ".scaffold/generated/claude-code/commands/" },
+      "universal": { "files_written": 1, "output_dir": ".scaffold/generated/universal/prompts/" }
     }
   }
 }
@@ -280,7 +281,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
 **Requires project**: Yes
 **Requires state**: No
 
-`scaffold build` generates thin command wrappers for platforms from the meta-prompt inventory. Each wrapper invokes `scaffold run <step>` — no prompt content resolution occurs at build time.
+`scaffold build` generates hidden platform adapter artifacts from the meta-prompt inventory. Each artifact points back to `scaffold run <step>` — no prompt content resolution occurs at build time.
 
 **Example `data`**:
 
@@ -293,11 +294,15 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
   "platforms": {
     "claude-code": {
       "files_written": 24,
-      "output_dir": "commands/"
+      "output_dir": ".scaffold/generated/claude-code/commands/"
     },
     "codex": {
       "files_written": 1,
-      "output_dir": "."
+      "output_dir": ".scaffold/generated/codex/"
+    },
+    "universal": {
+      "files_written": 1,
+      "output_dir": ".scaffold/generated/universal/prompts/"
     }
   },
   "dependency_graph": {
@@ -698,8 +703,7 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
   ],
   "files_preserved": [
     ".scaffold/config.yml",
-    "commands/",
-    "prompts/",
+    ".scaffold/generated/",
     "CLAUDE.md"
   ]
 }
@@ -1143,9 +1147,9 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
     }
   ],
   "platforms": [
-    { "name": "claude-code", "description": "Generates commands/*.md that invoke scaffold run" },
-    { "name": "codex", "description": "Generates AGENTS.md entries pointing to scaffold run" },
-    { "name": "universal", "description": "scaffold run outputs assembled prompt to stdout" }
+    { "name": "claude-code", "description": "Generates hidden wrappers in .scaffold/generated/claude-code/commands/" },
+    { "name": "codex", "description": "Generates a hidden guide at .scaffold/generated/codex/AGENTS.md" },
+    { "name": "universal", "description": "Generates hidden references in .scaffold/generated/universal/" }
   ]
 }
 ```
