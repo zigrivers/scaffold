@@ -9,6 +9,7 @@ COMMAND_EXEMPT=(
   "knowledge"
   "post-implementation-review"
   "prompt-pipeline"
+  "review-code"
   "review-pr"
   "session-analyzer"
   "update"
@@ -52,6 +53,7 @@ TERMINAL_PATH_PATTERNS=(
 # Terminal steps have no downstream dependents in the dependency graph.
 AFTER_STEP_EXEMPT=(
   "prompt-pipeline"
+  "review-code"
   "session-analyzer"
   "update"
   "version"
