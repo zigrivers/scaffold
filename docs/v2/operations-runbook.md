@@ -264,12 +264,13 @@ jobs:
 
 Scaffold uses two tag-triggered workflows:
 
-- **`publish.yml`** — checks out the tagged commit, runs `npm ci`, `npm run build`, `npm test`, and publishes `@zigrivers/scaffold` to npm with provenance.
+- **`publish.yml`** — checks out the tagged commit, runs `npm ci`, `npm run build`, `npm test`, and publishes `@zigrivers/scaffold` to npm with provenance. Authentication uses **npm trusted publishing** via GitHub OIDC, not a repo `NPM_TOKEN` secret.
 - **`update-homebrew.yml`** — computes the SHA256 for the tagged GitHub source tarball and updates the `zigrivers/homebrew-scaffold` tap so `brew upgrade scaffold` installs the same version.
 
 Important operational detail:
 
 - **GitHub release creation is not automated by these workflows.** Maintainers still create the GitHub release manually after the tag is pushed.
+- **Trusted publishing is a one-time package setting.** The npm package must trust the `zigrivers/scaffold` repository and the `publish.yml` workflow file. If the workflow suddenly reports npm auth failure, verify that trusted-publisher configuration before touching GitHub secrets.
 
 **Partial release failure**:
 - If `publish.yml` succeeds but `update-homebrew.yml` fails, npm users can upgrade immediately but Homebrew users cannot until the tap update is fixed.
@@ -467,7 +468,7 @@ Each scenario follows: **Symptoms** → **Diagnosis** → **Resolution** → **V
 **Scenario A: `npm publish` fails mid-stream**
 - *Symptoms*: Release workflow `publish` job fails. npm may or may not show the version.
 - *Diagnosis*: Check workflow logs for the error (auth failure, validation, network). Run `npm info @zigrivers/scaffold versions` to see if the version landed.
-- *Resolution*: If the version didn't land — fix the issue (usually `NPM_TOKEN` expired or `package.json` validation) and re-run the workflow. If the version partially landed (corrupt), unpublish and re-publish. `npm publish` is idempotent for the same content — re-running is safe if the version didn't land.
+- *Resolution*: If the version didn't land — fix the issue (usually broken npm trusted-publisher config, wrong workflow filename, missing `id-token: write`, or `package.json` validation) and re-run the workflow. If the version partially landed (corrupt), unpublish and re-publish. `npm publish` is idempotent for the same content — re-running is safe if the version didn't land.
 - *Verification*: `npm info @zigrivers/scaffold version` returns expected version.
 
 **Scenario B: Release tag pushed but workflow doesn't trigger**
@@ -507,13 +508,13 @@ The CLI makes no network requests except `scaffold update` (which checks the npm
 - npm publish requires **2FA** enabled on the publishing npm account
 - npm provenance attestation (`--provenance`) links published packages to their source commit
 
-**npm token management**:
-- The `NPM_TOKEN` GitHub secret is a granular access token scoped to publish `@zigrivers/scaffold` only
-- Token is created by the npm org owner with `Automation` type (bypasses 2FA for CI while requiring 2FA for interactive use)
-- Rotate the token at least annually or immediately if a security incident is suspected
-- Limit npm org membership to maintainers who need publish access — use the `developer` role for contributors who don't
+**npm trusted publishing**:
+- `publish.yml` uses GitHub OIDC (`id-token: write`) to request a short-lived npm publish credential at release time
+- The npm package settings must define a trusted publisher for the `zigrivers/scaffold` repository and the `.github/workflows/publish.yml` workflow
+- No long-lived `NPM_TOKEN` repository secret is required for npm publish
+- Limit npm org membership to maintainers who need publish or package-admin access — use the `developer` role for contributors who don't
 
-**npm account compromise recovery**: If the token is leaked or the account is compromised: (1) revoke all tokens immediately on npmjs.com, (2) rotate the `NPM_TOKEN` GitHub secret, (3) run `npm audit signatures` on the last published version to verify package integrity, (4) contact npm support at security@npmjs.com if unauthorized versions were published
+**npm account compromise recovery**: If the npm account or org access is compromised: (1) remove or disable the trusted publisher in npm package settings, (2) rotate the maintainer's npm credentials and 2FA recovery material, (3) run `npm audit signatures` on the last published version to verify package integrity, (4) contact npm support at security@npmjs.com if unauthorized versions were published
 
 ### 6.4 Package Hygiene
 
@@ -612,7 +613,7 @@ Scaffold has no database, no persistent user data, and no server. Recovery conce
 - **Git repository**: GitHub is the single host. Maintainers should keep local clones current. For critical redundancy, mirror to a second Git host (e.g., `git push --mirror` to a GitLab or Codeberg remote on each release).
 - **npm registry**: If the npm package is removed (policy violation, legal claim, or account issue), the package can be re-published from a local build of any tagged commit. Provenance attestation would need to be re-established.
 - **Homebrew tap**: The tap repository is a small Git repo. If lost, recreate the formula from the npm package URL and SHA. Keep a local clone.
-- **GitHub Actions secrets**: If `NPM_TOKEN` is lost, generate a new one from npmjs.com and update the GitHub secret. No other secrets exist.
+- **GitHub Actions secrets**: npm publish no longer uses a repo secret. The remaining release secret is `HOMEBREW_TAP_TOKEN` for the tap update workflow. If npm publish reports auth failure, verify the npm trusted-publisher configuration instead of creating a new `NPM_TOKEN`.
 
 ### 7.6 Documentation Drift
 
