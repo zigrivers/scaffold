@@ -7,7 +7,7 @@ Beads CLI when working on Scaffold itself.
 
 ```bash
 make check            # Run bash quality gates (lint + validate + test + eval)
-make check-all        # Run all quality gates (bash + TypeScript)
+make check-all        # Run all quality gates (bash + TypeScript); full pre-push gate
 git status -sb        # Inspect local state quickly
 git pull --rebase     # Rebase onto latest remote state
 git push              # Publish local commits
@@ -20,7 +20,7 @@ git push              # Publish local commits
 **MANDATORY WORKFLOW:**
 
 1. **File follow-up work** - Record anything still needing work in the current tracker or leave explicit handoff notes
-2. **Run quality gates** (if code changed) - Tests, linters, builds
+2. **Run quality gates** (if code changed) - Run `make check-all` as the full gate before push/hand-off
 3. **Update follow-up status** - Make sure remaining work is reflected in the current tracker or handoff
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
