@@ -4,8 +4,8 @@
 # Beads local database
 .beads/
 
-# Local runtime state
-.scaffold/
+# Scaffold — preserve state files, ignore dashboard
+.scaffold/dashboard.html
 .superpowers/
 
 # Coverage output (kcov)
@@ -30,3 +30,10 @@ tests/screenshots/current/
 tests/screenshots/diff/
 tests/screenshots/dashboard-test.html
 .playwright-mcp/
+
+# >>> scaffold managed
+.scaffold/generated/
+.scaffold/lock.json
+.scaffold/*.tmp
+.scaffold/**/*.tmp
+# <<< scaffold managed

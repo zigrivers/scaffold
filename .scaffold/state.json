@@ -1,0 +1,499 @@
+{
+  "schema-version": 1,
+  "scaffold-version": "2.0.0",
+  "init_methodology": "deep",
+  "config_methodology": "deep",
+  "init-mode": "v1-migration",
+  "created": "2026-03-28T23:23:48.083Z",
+  "in_progress": null,
+  "steps": {
+    "review-architecture": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/reviews/review-architecture.md",
+        "docs/reviews/architecture/review-summary.md",
+        "docs/reviews/architecture/codex-review.json",
+        "docs/reviews/architecture/gemini-review.json"
+      ]
+    },
+    "system-architecture": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/system-architecture.md"
+      ]
+    },
+    "claude-md-optimization": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "CLAUDE.md"
+      ]
+    },
+    "workflow-audit": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "CLAUDE.md",
+        "docs/git-workflow.md"
+      ]
+    },
+    "adrs": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/adrs/"
+      ]
+    },
+    "review-adrs": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/reviews/review-adrs.md",
+        "docs/reviews/adrs/review-summary.md",
+        "docs/reviews/adrs/codex-review.json",
+        "docs/reviews/adrs/gemini-review.json"
+      ]
+    },
+    "ai-memory-setup": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        ".claude/rules/",
+        "docs/ai-memory-setup.md"
+      ]
+    },
+    "automated-pr-review": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "AGENTS.md",
+        "docs/review-standards.md"
+      ]
+    },
+    "design-system": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/design-system.md"
+      ]
+    },
+    "dev-env-setup": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/dev-setup.md"
+      ]
+    },
+    "git-workflow": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/git-workflow.md"
+      ]
+    },
+    "apply-fixes-and-freeze": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/validation/fix-log.md"
+      ]
+    },
+    "developer-onboarding-guide": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/onboarding-guide.md"
+      ]
+    },
+    "implementation-playbook": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/implementation-playbook.md"
+      ]
+    },
+    "beads": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        ".beads/",
+        "tasks/lessons.md",
+        "CLAUDE.md"
+      ]
+    },
+    "coding-standards": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/coding-standards.md"
+      ]
+    },
+    "project-structure": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/project-structure.md"
+      ]
+    },
+    "tdd": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/tdd-standards.md"
+      ]
+    },
+    "tech-stack": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/tech-stack.md"
+      ]
+    },
+    "add-e2e-testing": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "tests/screenshots/",
+        "maestro/"
+      ]
+    },
+    "domain-modeling": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/domain-models/"
+      ]
+    },
+    "review-domain-modeling": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/reviews/review-domain-modeling.md",
+        "docs/reviews/domain-modeling/review-summary.md",
+        "docs/reviews/domain-modeling/codex-review.json",
+        "docs/reviews/domain-modeling/gemini-review.json"
+      ]
+    },
+    "platform-parity-review": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/reviews/platform-parity-review.md",
+        "docs/reviews/platform-parity/review-summary.md",
+        "docs/reviews/platform-parity/codex-review.json",
+        "docs/reviews/platform-parity/gemini-review.json"
+      ]
+    },
+    "implementation-plan-review": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/reviews/review-tasks.md",
+        "docs/reviews/implementation-plan/task-coverage.json",
+        "docs/reviews/implementation-plan/review-summary.md"
+      ]
+    },
+    "implementation-plan": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/implementation-plan.md"
+      ]
+    },
+    "create-prd": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/plan.md"
+      ]
+    },
+    "innovate-prd": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/prd-innovation.md",
+        "docs/reviews/prd-innovation/review-summary.md",
+        "docs/reviews/prd-innovation/codex-review.json",
+        "docs/reviews/prd-innovation/gemini-review.json"
+      ]
+    },
+    "innovate-user-stories": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/user-stories-innovation.md",
+        "docs/reviews/user-stories-innovation/review-summary.md",
+        "docs/reviews/user-stories-innovation/codex-review.json",
+        "docs/reviews/user-stories-innovation/gemini-review.json"
+      ]
+    },
+    "review-prd": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/reviews/pre-review-prd.md",
+        "docs/reviews/prd/review-summary.md",
+        "docs/reviews/prd/codex-review.json",
+        "docs/reviews/prd/gemini-review.json"
+      ]
+    },
+    "review-user-stories": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/reviews/pre-review-user-stories.md",
+        "docs/reviews/user-stories/requirements-index.md",
+        "docs/reviews/user-stories/coverage.json",
+        "docs/reviews/user-stories/review-summary.md"
+      ]
+    },
+    "user-stories": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/user-stories.md"
+      ]
+    },
+    "create-evals": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "tests/evals/",
+        "docs/eval-standards.md"
+      ]
+    },
+    "operations": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/operations-runbook.md"
+      ]
+    },
+    "review-operations": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/reviews/review-operations.md",
+        "docs/reviews/operations/review-summary.md",
+        "docs/reviews/operations/codex-review.json",
+        "docs/reviews/operations/gemini-review.json"
+      ]
+    },
+    "review-security": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/reviews/review-security.md",
+        "docs/reviews/security/review-summary.md",
+        "docs/reviews/security/codex-review.json",
+        "docs/reviews/security/gemini-review.json"
+      ]
+    },
+    "review-testing": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/reviews/review-testing.md",
+        "docs/reviews/testing/review-summary.md",
+        "docs/reviews/testing/codex-review.json",
+        "docs/reviews/testing/gemini-review.json"
+      ]
+    },
+    "security": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/security-review.md"
+      ]
+    },
+    "story-tests": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "tests/acceptance/",
+        "docs/story-tests-map.md"
+      ]
+    },
+    "api-contracts": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/api-contracts.md"
+      ]
+    },
+    "database-schema": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/database-schema.md"
+      ]
+    },
+    "review-api": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/reviews/review-api.md",
+        "docs/reviews/api/review-summary.md",
+        "docs/reviews/api/codex-review.json",
+        "docs/reviews/api/gemini-review.json"
+      ]
+    },
+    "review-database": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/reviews/review-database.md",
+        "docs/reviews/database/review-summary.md",
+        "docs/reviews/database/codex-review.json",
+        "docs/reviews/database/gemini-review.json"
+      ]
+    },
+    "review-ux": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/reviews/review-ux.md",
+        "docs/reviews/ux/review-summary.md",
+        "docs/reviews/ux/codex-review.json",
+        "docs/reviews/ux/gemini-review.json"
+      ]
+    },
+    "ux-spec": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/ux-spec.md"
+      ]
+    },
+    "critical-path-walkthrough": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/validation/critical-path-walkthrough.md",
+        "docs/validation/critical-path-walkthrough/review-summary.md",
+        "docs/validation/critical-path-walkthrough/codex-review.json",
+        "docs/validation/critical-path-walkthrough/gemini-review.json"
+      ]
+    },
+    "cross-phase-consistency": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/validation/cross-phase-consistency.md",
+        "docs/validation/cross-phase-consistency/review-summary.md",
+        "docs/validation/cross-phase-consistency/codex-review.json",
+        "docs/validation/cross-phase-consistency/gemini-review.json"
+      ]
+    },
+    "decision-completeness": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/validation/decision-completeness.md",
+        "docs/validation/decision-completeness/review-summary.md",
+        "docs/validation/decision-completeness/codex-review.json",
+        "docs/validation/decision-completeness/gemini-review.json"
+      ]
+    },
+    "dependency-graph-validation": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/validation/dependency-graph-validation.md",
+        "docs/validation/dependency-graph-validation/review-summary.md",
+        "docs/validation/dependency-graph-validation/codex-review.json",
+        "docs/validation/dependency-graph-validation/gemini-review.json"
+      ]
+    },
+    "implementability-dry-run": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/validation/implementability-dry-run.md",
+        "docs/validation/implementability-dry-run/review-summary.md",
+        "docs/validation/implementability-dry-run/codex-review.json",
+        "docs/validation/implementability-dry-run/gemini-review.json"
+      ]
+    },
+    "scope-creep-check": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/validation/scope-creep-check.md",
+        "docs/validation/scope-creep-check/review-summary.md",
+        "docs/validation/scope-creep-check/codex-review.json",
+        "docs/validation/scope-creep-check/gemini-review.json"
+      ]
+    },
+    "traceability-matrix": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/validation/traceability-matrix.md",
+        "docs/validation/traceability-matrix/review-summary.md",
+        "docs/validation/traceability-matrix/codex-review.json",
+        "docs/validation/traceability-matrix/gemini-review.json"
+      ]
+    },
+    "multi-agent-resume": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": []
+    },
+    "multi-agent-start": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": []
+    },
+    "new-enhancement": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": []
+    },
+    "quick-task": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": []
+    },
+    "single-agent-resume": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": []
+    },
+    "single-agent-start": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": []
+    },
+    "create-vision": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/vision.md"
+      ]
+    },
+    "innovate-vision": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/vision.md"
+      ]
+    },
+    "review-vision": {
+      "status": "pending",
+      "source": "pipeline",
+      "produces": [
+        "docs/reviews/vision-review-vision.md"
+      ]
+    }
+  },
+  "next_eligible": [
+    "create-vision",
+    "create-prd",
+    "beads",
+    "tech-stack"
+  ],
+  "extra-steps": []
+}
