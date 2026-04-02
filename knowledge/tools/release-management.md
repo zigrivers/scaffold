@@ -6,7 +6,9 @@ topics: [release, versioning, changelog, git]
 
 # Release Management
 
-Expert knowledge for release engineering including semantic versioning, conventional commit parsing, changelog generation, quality gates, and rollback procedures.
+Expert knowledge for release engineering including semantic versioning,
+conventional commit parsing, changelog generation, quality gates, release
+artifact selection, and rollback procedures.
 
 ## Summary
 
@@ -32,6 +34,14 @@ Follow the [Keep a Changelog](https://keepachangelog.com/) format. Group entries
 ### Quality Gates
 
 All quality gates must pass before a release. Stop if gates fail unless `--force` is explicitly used.
+
+### Project-Specific Release Ceremony
+
+`/scaffold:release` is intentionally project-specific. Determine the target
+project's release artifacts from its docs, manifests, CI workflows, and release
+scripts before publishing anything. Some projects only create a tag; others may
+also create hosted releases, publish to registries, deploy services, or update
+secondary channels like Homebrew.
 
 ## Deep Guidance
 
@@ -135,9 +145,12 @@ If any single commit includes a breaking change, the release is a major bump reg
 - Re-run all gates from the beginning
 - Only proceed with `--force` if explicitly instructed (and document why)
 
-### GitHub Release
+### Hosted Releases And Distribution Artifacts
 
-**Creating a release:**
+Choose release artifacts based on the target project's documented workflow.
+GitHub release creation is one common example, not the universal default.
+
+**Example: GitHub-hosted release:**
 
 ```bash
 # Create an annotated tag
@@ -149,6 +162,14 @@ git push origin v1.2.0
 # Create a GitHub release with changelog as body
 gh release create v1.2.0 --title "v1.2.0" --notes-file CHANGELOG_EXCERPT.md
 ```
+
+**Other common artifacts:**
+- npm publish: `npm publish`
+- PyPI publish: `python -m build && twine upload dist/*`
+- crates.io publish: `cargo publish`
+- deployment or registry update: follow the repo's documented release/deploy command
+
+Only run an artifact step when the repository clearly defines it.
 
 **Pre-release versions:**
 - Use `--prerelease` flag for `v0.x` versions or release candidates
@@ -172,13 +193,18 @@ When a release needs to be reverted:
 
 3. **Update version files** back to the previous version
 
-4. **Create a new patch release** with the rollback:
+4. **Undo other release artifacts only if the project documents them**:
+   - Hosted release page deletion
+   - Registry deprecation or unpublish
+   - Deployment rollback
+
+5. **Create a new patch release** with the rollback:
    ```bash
    git tag -a v1.1.1 -m "Rollback: revert v1.2.0"
    git push origin v1.1.1
    ```
 
-5. **Update the changelog** with a note explaining the rollback
+6. **Update the changelog** with a note explaining the rollback
 
 **Commit message convention for rollbacks:** prefix with `[ROLLBACK]` for easy identification in history.
 

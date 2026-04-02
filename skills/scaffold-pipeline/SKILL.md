@@ -117,7 +117,7 @@ Use this skill ONLY when the user asks about:
 | `/scaffold:new-enhancement` | Add a feature to an existing project |
 | `/scaffold:quick-task` | Create a focused task for a bug fix, refactor, or small improvement |
 | `/scaffold:version-bump` | Bump version and update changelog without tagging or releasing |
-| `/scaffold:release` | Create a versioned release with changelog and GitHub release |
+| `/scaffold:release` | Run the target project's release ceremony with changelog generation and project-specific release artifacts |
 | `/scaffold:prompt-pipeline` | Show the full pipeline reference |
 | `/scaffold:dashboard` | Open visual pipeline dashboard in browser |
 

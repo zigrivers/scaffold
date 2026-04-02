@@ -84,6 +84,22 @@ When modifying prompts:
 
 See `docs/git-workflow.md` for the full workflow.
 
+### Scaffold Release Workflow
+
+The generic `/scaffold:release` command is for downstream projects. When
+releasing Scaffold itself, use the maintainer flow in
+`docs/v2/operations-runbook.md`.
+
+Minimum checklist:
+- Update `CHANGELOG.md` and `README.md` when user-facing behavior or install,
+  upgrade, or migration guidance changed
+- Merge release-prep work to `main`
+- Tag `main` with `vX.Y.Z` and push the tag
+- Create the GitHub release
+- Verify npm publish and Homebrew update workflows succeeded
+- Verify users can update with `npm update -g @zigrivers/scaffold` and
+  `brew upgrade scaffold`
+
 ## Self-Improvement
 
 - After ANY correction from the user: update `tasks/lessons.md` with the pattern

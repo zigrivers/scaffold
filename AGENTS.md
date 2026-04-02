@@ -13,6 +13,20 @@ git pull --rebase     # Rebase onto latest remote state
 git push              # Publish local commits
 ```
 
+## Scaffold Releases
+
+When releasing Scaffold itself, follow `docs/v2/operations-runbook.md` instead
+of the generic `/scaffold:release` guidance.
+
+- Update `CHANGELOG.md` and `README.md` when user-facing behavior, install or
+  upgrade steps, migration instructions, or command semantics changed.
+- Merge the release-prep commit/PR to `main` before tagging.
+- Tag merged `main` as `vX.Y.Z` and push the tag.
+- Create the GitHub release.
+- Verify the `publish.yml` and `update-homebrew.yml` workflows succeeded so
+  users can update via `npm update -g @zigrivers/scaffold` and
+  `brew upgrade scaffold`.
+
 ## Landing the Plane (Session Completion)
 
 **When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.

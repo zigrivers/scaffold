@@ -23,7 +23,7 @@ Phases are run in order, with explicit dependency constraints between prompts. S
 - **Auto-activated pipeline skill** — provides ordering context so Claude Code knows which command to suggest next
 - **Enhancement workflow** — add features to existing projects without re-running the full pipeline
 - **Interactive pipeline dashboard** — visual status view for Scaffold runs with light/dark theme, filters, and modal task details
-- **Release management** — versioned release workflow with changelog, GitHub release, and rollback support
+- **Release management** — project-defined release workflow with changelog generation, release-artifact support, and rollback guidance
 
 ## Pipeline Phases & Commands
 
@@ -99,7 +99,7 @@ Phases are run in order, with explicit dependency constraints between prompts. S
 | `new-enhancement` | Add a new feature to an existing project |
 | `quick-task` | Bug fixes, refactors, and small improvements without full discovery |
 | `version-bump` | Bump version and update changelog without tagging or releasing |
-| `release` | Create a versioned release with changelog and GitHub release |
+| `release` | Run the target project's release ceremony with changelog generation and project-specific release artifacts |
 
 ### Standalone Commands
 
@@ -196,4 +196,4 @@ Use `./scripts/install.sh -f` to force overwrite existing files.
 | **Dashboard** | Visual pipeline dashboard for Scaffold runs; Beads-enabled downstream projects may also surface a Beads dashboard artifact |
 | **Update Mode** | All document-creating prompts auto-detect if output exists and switch between fresh/update modes — replaces dedicated migrations |
 | **Quick Task** | Lightweight workflow for bug fixes, refactors, and small improvements without full discovery |
-| **Release** | Versioned release workflow with changelog generation, GitHub release, and rollback support |
+| **Release** | Project-defined release workflow with changelog generation, project-specific release artifacts, and rollback support |

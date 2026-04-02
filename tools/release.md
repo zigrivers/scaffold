@@ -1,6 +1,6 @@
 ---
 name: release
-description: Create a versioned release with changelog and GitHub release
+description: Run the target project's release ceremony
 phase: null
 order: null
 dependencies: []
@@ -14,10 +14,12 @@ argument-hint: "<version or --dry-run or rollback>"
 
 ## Purpose
 
-Create a versioned release with changelog and GitHub release. Analyzes
-conventional commits to suggest version bumps, generates changelogs from commit
-history and Beads tasks, runs quality gates, and publishes a GitHub release.
-Supports dry-run mode and rollback.
+Run the target project's release ceremony. Analyze conventional commits to
+suggest version bumps, generate changelogs from commit history and optional
+Beads tasks, run quality gates, and execute the release artifacts that project
+defines. Depending on the project, that may include tags, hosted releases,
+package publishes, deployments, or registry updates. Supports dry-run mode and
+rollback.
 
 ## Inputs
 
@@ -27,7 +29,7 @@ $ARGUMENTS — parsed as:
 |----------|------|
 | _(empty)_ | **Standard** — auto-suggest bump, confirm, execute |
 | `major`, `minor`, or `patch` | **Explicit** — use specified bump, skip suggestion |
-| `current` | **Current** — tag and release the version already in files, no bump |
+| `current` | **Current** — use the version already in files, no additional bump |
 | `--dry-run` | **Dry Run** — all analysis, zero mutations |
 | `rollback` | **Rollback** — jump directly to the Rollback section |
 
@@ -37,8 +39,7 @@ Combine flags freely (e.g., `minor --dry-run`).
 
 - Version files updated to new version
 - `CHANGELOG.md` updated with grouped commit entries
-- Annotated git tag `vX.Y.Z`
-- GitHub release (if `gh` CLI is available)
+- Release artifacts defined by the target project (for example: git tag, hosted release, package publish, deployment)
 - Single commit with message `chore(release): vX.Y.Z`
 
 ## Instructions
@@ -51,7 +52,7 @@ Gather project context before proceeding. Check each item and record findings:
 
 1. Confirm the working tree is clean (`git status --porcelain`). If there are uncommitted changes, **stop** and tell the user: "Working tree has uncommitted changes. Commit or stash them before releasing."
 2. Record the current branch name (`git branch --show-current`).
-3. Check if `gh` CLI is available (`which gh`). If not available, warn: "GitHub CLI (`gh`) not found. Will create tag only — no GitHub release. Install with `brew install gh` for full functionality."
+3. Check whether optional release tooling is available when the project needs it (for example `gh` for GitHub-hosted releases). If a required tool is missing, record that gap and stop before the publish/deploy phase.
 4. Fetch tags: `git fetch --tags`.
 
 #### 0.2 Version File Detection
@@ -68,13 +69,21 @@ Scan the project root for version files. For each found file, record the current
 | `setup.cfg` | `[metadata].version` |
 | `version.txt` | Entire file contents (trimmed) |
 
-If **no** version files are found, note this — a tag-only release will be created.
+If **no** version files are found, note this — the release may rely on tags or other non-version-file artifacts only.
 
 #### 0.3 Project Context
 
 - Check for `.beads/` directory — enables Beads integration in release notes.
 - Check for existing `CHANGELOG.md`.
 - List existing `v*` tags: `git tag -l 'v*' --sort=-v:refname | head -5`.
+- Inspect the project's release workflow docs and automation (`README.md`, release docs, manifest scripts, CI workflows) to determine which release artifacts apply. Record whether the project expects any of:
+  - version tag
+  - hosted release page (GitHub/GitLab/etc.)
+  - package publish (npm, PyPI, crates.io, etc.)
+  - deployment or registry update
+  - a PR-based release lane instead of direct tagging from the current branch
+
+If the release process is not clear from the repository, stop and ask the user before publishing or deploying anything.
 
 #### 0.4 Mode Selection
 
@@ -84,7 +93,7 @@ Parse `$ARGUMENTS` to determine the mode:
 |----------|------|
 | _(empty)_ | **Standard** — auto-suggest bump, confirm, execute |
 | `major`, `minor`, or `patch` | **Explicit** — use specified bump, skip suggestion |
-| `current` | **Current** — tag and release the version already in files, no bump |
+| `current` | **Current** — use the version already in files, no additional bump |
 | `--dry-run` | **Dry Run** — all analysis, zero mutations |
 | `rollback` | **Rollback** — jump directly to the Rollback section |
 
@@ -250,7 +259,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 #### 3.4 Save Release Notes
 
-Store the generated changelog entry (without the file header) for use as the GitHub release body in Phase 5.
+Store the generated changelog entry (without the file header) for use as the hosted release body in Phase 5 when the target project creates one.
 
 ---
 
@@ -281,46 +290,35 @@ If Beads is configured (`.beads/` exists) and a task is active, include the task
 
 ---
 
-### Phase 5: Tag & Publish
+### Phase 5: Release Artifacts
 
 **In dry-run mode:** Show what would happen. Skip to Phase 6.
 
 #### 5.1 Determine Flow
 
-Check the current branch:
+Follow the target project's documented release lane if one exists.
 
-- **`main` or `master`**: Direct flow (tag — push — release).
-- **Any other branch**: PR flow (push — create PR — instructions).
+- If the repo docs or automation require a release PR, release branch, or merge-first flow, use that instead of making up a direct tag flow.
+- If the repo provides no release-lane guidance, use this fallback:
+  - **`main` or `master`**: direct flow
+  - **Any other branch**: PR flow
 
-#### 5.2 Direct Flow (main/master)
+#### 5.2 Direct Flow
 
-1. Create annotated tag: `git tag -a vX.Y.Z -m "Release vX.Y.Z"`
-2. Push commit and tag: `git push origin HEAD --follow-tags`
-3. If push fails (e.g., branch protection), fall back to PR flow (5.3).
-4. If `gh` is available: create GitHub release:
-   ```
-   gh release create vX.Y.Z --title "vX.Y.Z" --notes "<release-notes-from-3.4>"
-   ```
-5. Publish to npm:
-   ```
-   npm publish
-   ```
-   The `prepublishOnly` script runs `build` and `test` automatically. If it fails, report the error but do not roll back the git tag — tell the user to fix and re-run `npm publish` manually.
+1. Create the release commit in Phase 4.
+2. If the project uses version tags, create the expected tag (default: annotated `vX.Y.Z`).
+3. Push the required refs for the project workflow.
+4. Execute the project-defined release artifacts in dependency order. Common examples:
+   - Hosted release page: create it using the repo's documented tool and the saved release notes.
+   - Package publish: run the documented ecosystem publish command only when the repo clearly defines it.
+   - Deployment or registry update: run only when it is part of the project's documented release process.
+5. If push or any artifact step is blocked by branch protection, missing tooling, or missing credentials, stop and tell the user exactly what remains rather than guessing.
 
-#### 5.3 PR Flow (feature branch)
+#### 5.3 PR Flow
 
-1. Push branch: `git push -u origin HEAD`
-2. If `gh` is available: create PR:
-   ```
-   gh pr create --title "chore(release): vX.Y.Z" --body "<release-notes-from-3.4>"
-   ```
-3. Tell the user: "Release PR created. After merging to main, run these commands to create the tag and GitHub release:"
-   ```
-   git checkout main && git pull
-   git tag -a vX.Y.Z -m "Release vX.Y.Z"
-   git push origin vX.Y.Z
-   gh release create vX.Y.Z --title "vX.Y.Z" --notes-file CHANGELOG.md
-   ```
+1. Push the release branch: `git push -u origin HEAD`
+2. If the project uses PR-based releases and the relevant CLI is available, open the release PR with the changelog entry as the body.
+3. Tell the user the exact post-merge release actions derived from the project's docs and automation. Include only the artifacts that apply to this project.
 
 ---
 
@@ -333,8 +331,7 @@ Release vX.Y.Z complete!
 
   Version files updated: <list>
   Changelog: CHANGELOG.md updated
-  Tag: vX.Y.Z created
-  GitHub Release: <URL> (or "PR created: <URL>")
+  Release artifacts completed: <list>
 
   To undo this release: /scaffold:release rollback
 ```
@@ -347,8 +344,7 @@ Dry-run complete — no changes were made.
   Would bump: <current> → <new>
   Would update: <version-files>
   Would create: CHANGELOG.md entry
-  Would tag: vX.Y.Z
-  Would create: GitHub release
+  Would execute: <project-specific release artifacts>
 
 Run /scaffold:release to execute.
 ```
@@ -375,10 +371,7 @@ Tell the user: "To confirm rollback of `<tag>`, type the exact tag name (e.g., `
 
 Perform each step. If any step fails, continue with remaining steps and report all results at the end.
 
-1. **Delete GitHub release** (if `gh` is available):
-   ```
-   gh release delete <tag> --yes
-   ```
+1. **Delete hosted release** if the project created one and the appropriate CLI/API is available.
 
 2. **Delete remote tag:**
    ```
@@ -396,13 +389,15 @@ Perform each step. If any step fails, continue with remaining steps and report a
    git push origin HEAD
    ```
 
+5. **Handle project-specific publish/deploy rollback** only if the repository documents it. If that rollback is manual or ambiguous, stop and tell the user exactly what remains.
+
 #### R.4 Report Results
 
 Show what succeeded and what failed:
 
 ```
 Rollback of <tag>:
-  GitHub release: deleted (or failed: <error>)
+  Hosted release: deleted (or failed: <error> / not applicable)
   Remote tag: deleted
   Local tag: deleted
   Version bump commit: reverted
@@ -417,9 +412,9 @@ If any step failed, include manual cleanup instructions for that step.
 ## Process Rules
 
 1. **Never skip quality gates** without explicit user `--force`.
-2. **Dry-run: zero mutations** — no file writes, no git operations, no GitHub API calls.
+2. **Dry-run: zero mutations** — no file writes, no git operations, no hosted-release API calls, no publishes, and no deploys.
 3. **Beads integration is optional** — silently skip if `.beads/` doesn't exist.
-4. **Tag format is always `vX.Y.Z`** — no other formats.
+4. **Release artifacts are project-specific** — only run tag/publish/deploy steps that the target project documents.
 5. **Every confirmation must be explicit** — don't assume "yes" from silence.
 6. **Rollback requires exact tag name** — not just "yes" or "confirm".
 
@@ -428,11 +423,11 @@ If any step failed, include manual cleanup instructions for that step.
 When this step is complete, tell the user:
 
 ---
-**Release complete** — version bumped, changelog updated, tag created, GitHub release published.
+**Release complete** — version bumped, changelog updated, and the target project's release artifacts were handled.
 
 **Next (if applicable):**
 - If follow-up tasks are needed: Run `/scaffold:quick-task` — Create a focused task for post-release work.
-- If the release needs undoing: Run `/scaffold:release rollback` — Undo the most recent release.
+- If the release needs undoing: Run `/scaffold:release rollback` — Undo the most recent release and any clearly documented release artifacts.
 - For development milestone checkpoints without releasing: Run `/scaffold:version-bump` — Bump version and changelog only.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`

@@ -197,7 +197,7 @@ When the user asks "what tools are available?", "what can I build?", or "show me
 | Command | When to Use |
 |---------|-------------|
 | `scaffold run version-bump` | Mark a milestone with a version number without the full release ceremony |
-| `scaffold run release` | Ship a new version — changelog, Git tag, and GitHub release. Supports `--dry-run`, `current`, and `rollback` |
+| `scaffold run release` | Run the target project's release ceremony — changelog plus whatever release artifacts that project defines. Supports `--dry-run`, `current`, and `rollback` |
 | `scaffold run version` | Show the current scaffold version |
 | `scaffold run update` | Update scaffold to the latest version |
 | `scaffold run dashboard` | Open a visual progress dashboard in your browser |

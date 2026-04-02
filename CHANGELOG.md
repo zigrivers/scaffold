@@ -2,6 +2,14 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.0.2] — 2026-04-02
+
+### Changed
+
+- **`/scaffold:release` is now documented as a project-defined release ceremony** — `README.md`, `tools/release.md`, `commands/release.md`, the runner/pipeline skills, and reference docs now describe release artifacts as target-project-specific instead of assuming every project creates a GitHub release or publishes to npm.
+- **`/scaffold:version-bump` now clearly stops short of the formal release ceremony** — companion docs now say it updates versions and changelog without tags, push, or any project-specific release artifacts.
+- **Scaffold maintainer release docs now describe the real Scaffold release flow** — `AGENTS.md`, `CLAUDE.md`, and `docs/v2/operations-runbook.md` now distinguish generic downstream release behavior from Scaffold's own release process: review `README.md` when applicable, merge release prep to `main`, tag `vX.Y.Z`, create the GitHub release manually, and verify both npm publish and Homebrew update workflows.
+
 ## [3.0.1] — 2026-04-02
 
 ### Changed
