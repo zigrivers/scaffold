@@ -6,9 +6,9 @@ long-description: "Bump the project version and update the changelog without tag
 ## Purpose
 
 Bump the project version and update the changelog without tagging, pushing, or
-creating a GitHub release. A lightweight companion to `/scaffold:release` for
-marking development milestones — like completing a set of user stories or
-reaching a pre-release checkpoint.
+running the formal release ceremony. A lightweight companion to
+`/scaffold:release` for marking development milestones — like completing a set
+of user stories or reaching a pre-release checkpoint.
 
 ## Inputs
 
@@ -28,7 +28,7 @@ Combine flags freely (e.g., `minor --dry-run`).
 - `CHANGELOG.md` updated (or created) with grouped commit entries
 - Single commit with message `chore(version): vX.Y.Z`
 
-No tags, no push, no GitHub release.
+No tags, no push, no formal release artifacts.
 
 ## Instructions
 
@@ -238,7 +238,7 @@ Version bump complete!
   Version files updated: <list>
   Changelog: CHANGELOG.md updated
 
-  This was a version bump only — no tags, no push, no GitHub release.
+  This was a version bump only — no tags, no push, no formal release artifacts.
   When ready for a formal release: /scaffold:release current
 ```
 
@@ -259,7 +259,7 @@ Run /scaffold:version-bump to execute.
 ## Process Rules
 
 1. **No quality gates** — this is a lightweight milestone marker.
-2. **No tags, no push, no GitHub release** — use `/scaffold:release` for the full ceremony.
+2. **No tags, no push, no formal release artifacts** — use `/scaffold:release` for the full ceremony.
 3. **Dry-run: zero mutations** — no file writes, no git operations.
 4. **Beads integration is optional** — silently skip if `.beads/` doesn't exist.
 5. **Dirty working tree: warn only** — do not block.
@@ -273,7 +273,7 @@ When this step is complete, tell the user:
 **Version bump complete** — version files updated, changelog written, commit created.
 
 **Next (if applicable):**
-- When ready for a formal release: Run `/scaffold:release current` — Tag, publish, and create a GitHub release for the version already in files.
+- When ready for a formal release: Run `/scaffold:release current` — Use the version already in files and execute the target project's release ceremony.
 - If follow-up tasks are needed: Run `/scaffold:quick-task` — Create a focused task for post-bump work.
 
 **Pipeline reference:** `/scaffold:prompt-pipeline`

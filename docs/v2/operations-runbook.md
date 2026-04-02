@@ -152,7 +152,8 @@ CI runs on `ubuntu-latest`. Known divergences:
 ```
 .github/workflows/
   ci.yml              # PR checks and main branch pushes
-  release.yml          # npm publish on version tag push
+  publish.yml          # npm publish on version tag push
+  update-homebrew.yml  # Homebrew tap update on version tag push
 ```
 
 ### 3.2 CI Workflow (`ci.yml`)
@@ -257,56 +258,23 @@ jobs:
 
 **Pipeline budget**: total CI time < 3 minutes. If exceeded, investigate before adding parallelization (see testing-strategy.md §10).
 
-### 3.3 Release Workflow (`release.yml`)
+### 3.3 Tag-Push Release Workflows
 
 **Trigger**: push of a version tag (`v*`).
 
-```yaml
-name: Release
-on:
-  push:
-    tags: ['v*']
+Scaffold uses two tag-triggered workflows:
 
-concurrency:
-  group: release
-  cancel-in-progress: false   # Never cancel an in-progress publish
+- **`publish.yml`** — checks out the tagged commit, runs `npm ci`, `npm run build`, `npm test`, and publishes `@zigrivers/scaffold` to npm with provenance.
+- **`update-homebrew.yml`** — computes the SHA256 for the tagged GitHub source tarball and updates the `zigrivers/homebrew-scaffold` tap so `brew upgrade scaffold` installs the same version.
 
-jobs:
-  ci:
-    uses: ./.github/workflows/ci.yml
+Important operational detail:
 
-  publish:
-    needs: ci
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
-          registry-url: 'https://registry.npmjs.org'
-      - run: npm ci
-      - run: npm run build
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-```
+- **GitHub release creation is not automated by these workflows.** Maintainers still create the GitHub release manually after the tag is pushed.
 
-The release workflow:
-1. Runs the full CI suite first (lint, test, e2e, build, audit)
-2. Builds and publishes to npm with provenance attestation
-3. Creates a GitHub Release with auto-generated release notes
-
-**Partial release failure**: If npm publish succeeds but the GitHub Release step fails, the package is live on npm without a corresponding GitHub Release. Recovery: manually create the GitHub Release using `gh release create v<version> --generate-notes`, or re-run the failed workflow job. If the GitHub Release step fails repeatedly, the npm package is still usable — the GitHub Release is informational, not blocking.
-
-After a successful npm publish, update the Homebrew formula (see §4.7).
+**Partial release failure**:
+- If `publish.yml` succeeds but `update-homebrew.yml` fails, npm users can upgrade immediately but Homebrew users cannot until the tap update is fixed.
+- If `update-homebrew.yml` succeeds but `publish.yml` fails, the tap may point at a version that is tagged on GitHub but unavailable on npm. Treat this as a release incident and fix or roll back before announcing the release.
+- If both workflows succeed but the GitHub release has not been created yet, the package is still installable; the GitHub release is the remaining maintainer action.
 
 ### 3.4 Branch Protection
 
@@ -344,13 +312,16 @@ Scaffold follows [semver](https://semver.org):
    ### Fixed
    - State.json atomic write race on NFS mounts
    ```
-4. **Bump version**: `npm version <major|minor|patch>` — this updates `package.json`, creates a git commit, and creates a `v<version>` tag
-5. **Push tag**: `git push origin main --tags` — triggers the release workflow
-6. **Verify release**:
-   - Release workflow succeeds in GitHub Actions
-   - `npm info @scaffold-cli/scaffold version` returns the new version (npm registry propagation can take 1-5 minutes — retry after a short delay if the version doesn't appear immediately)
-   - `npx @scaffold-cli/scaffold --version` returns the new version (from a clean directory)
-7. **Update Homebrew formula** (see §4.7)
+4. **Update `README.md` when applicable**: if user-facing behavior, install or upgrade commands, migration steps, release semantics, or feature availability changed, update the README in the same release-prep change
+5. **Bump version without tagging yet**: update `package.json` and `package-lock.json` for the release version, commit the release-prep change, and merge it to `main`
+6. **Tag merged `main`**: from an up-to-date `main`, create and push `v<version>` — this triggers `publish.yml` and `update-homebrew.yml`
+7. **Create the GitHub release**: create the release manually after pushing the tag, using the changelog entry or curated release notes
+8. **Verify release**:
+   - `publish.yml` succeeds in GitHub Actions
+   - `update-homebrew.yml` succeeds in GitHub Actions
+   - `npm info @zigrivers/scaffold version` returns the new version (npm registry propagation can take 1-5 minutes — retry after a short delay if the version doesn't appear immediately)
+   - `npx @zigrivers/scaffold --version` returns the new version from a clean directory
+   - `brew update && brew upgrade scaffold && scaffold --version` returns the new version
 
 ### 4.3 Pre-Release Versions
 
@@ -361,7 +332,7 @@ npm version prerelease --preid=beta    # e.g., 1.2.0-beta.0
 git push origin main --tags
 ```
 
-Pre-release versions are published to npm but not installed by default (`npm install` gets the latest stable). Users opt in: `npm install @scaffold-cli/scaffold@beta`.
+Pre-release versions are published to npm but not installed by default (`npm install` gets the latest stable). Users opt in: `npm install @zigrivers/scaffold@beta`.
 
 ### 4.4 Package Contents
 
@@ -387,7 +358,7 @@ npm pack --dry-run
 
 # Create actual tarball and inspect
 npm pack
-tar tzf scaffold-cli-scaffold-*.tgz
+tar tzf zigrivers-scaffold-*.tgz
 
 # Verify required content is present
 tar tzf *.tgz | grep -c '^package/dist/'         # Should be > 0
@@ -406,8 +377,8 @@ After publishing, verify the zero-install experience:
 ```bash
 # From a directory with no scaffold installation
 cd $(mktemp -d)
-npx @scaffold-cli/scaffold --version     # Should print version
-npx @scaffold-cli/scaffold init --help   # Should print init help
+npx @zigrivers/scaffold --version     # Should print version
+npx @zigrivers/scaffold init --help   # Should print init help
 ```
 
 This is the first experience for new users — it must work without errors.
@@ -416,28 +387,14 @@ This is the first experience for new users — it must work without errors.
 
 npm and Homebrew must publish the same version. Version drift between channels is not acceptable (ADR-002).
 
-**Homebrew formula update** (after npm publish):
+Scaffold now handles the Homebrew tap update automatically via
+`update-homebrew.yml` on tag push. Maintainers should:
 
-```bash
-# 1. In the Homebrew tap repository (zigrivers/homebrew-scaffold):
-cd homebrew-scaffold
+1. Verify `publish.yml` succeeded for the tagged version
+2. Verify `update-homebrew.yml` succeeded for the same tag
+3. Verify `brew update && brew upgrade scaffold && scaffold --version` matches the npm version
 
-# 2. Update formula to new version and SHA
-VERS="<new-version>"
-URL="https://registry.npmjs.org/@scaffold-cli/scaffold/-/scaffold-${VERS}.tgz"
-SHA=$(curl -sL "$URL" | shasum -a 256 | cut -d' ' -f1)
-# Edit Formula/scaffold.rb: update `url` and `sha256` with the values above
-
-# 3. Test locally
-brew install --build-from-source Formula/scaffold.rb
-scaffold --version   # Must match npm version
-
-# 4. Commit and push
-git commit -am "scaffold ${VERS}"
-git push origin main
-```
-
-Verify: `brew update && brew upgrade scaffold && scaffold --version` matches the npm version. Consider automating via a GitHub Action that creates a PR to the tap after each release.
+If the Homebrew workflow fails, fix the tap update immediately or treat it as a release incident before announcing the release.
 
 ---
 
@@ -447,13 +404,13 @@ Verify: `brew update && brew upgrade scaffold && scaffold --version` matches the
 
 **Within 72 hours of publish** (and the package has fewer than 300 weekly downloads and no dependents):
 ```bash
-npm unpublish @scaffold-cli/scaffold@<bad-version>
+npm unpublish @zigrivers/scaffold@<bad-version>
 ```
 If the package exceeds 300 weekly downloads or has dependents, npm blocks unpublish even within 72 hours. In that case, use deprecation (below). Unpublish takes effect within minutes of running the command.
 
 **After 72 hours or when unpublish is blocked**:
 ```bash
-npm deprecate @scaffold-cli/scaffold@<bad-version> "Known issue: <description>. Use <good-version> instead."
+npm deprecate @zigrivers/scaffold@<bad-version> "Known issue: <description>. Use <good-version> instead."
 ```
 Deprecated versions show a warning on install but remain available. Deprecation propagates within minutes.
 
@@ -461,9 +418,9 @@ Deprecated versions show a warning on install but remain available. Deprecation 
 
 ### 5.2 Dual-Channel Rollback Sequencing
 
-**Order**: Roll back Homebrew **first**, then npm. Rationale: if the Homebrew formula sources from the npm registry, rolling back npm first could leave Homebrew pointing to a missing version.
+**Order**: Roll back Homebrew **first**, then npm/GitHub tag artifacts. Rationale: the Homebrew formula points at the tagged GitHub source tarball, so fix the tap before deleting or moving tagged release artifacts.
 
-1. Revert the Homebrew formula PR in the tap repository — users receive the previous version on their next `brew update && brew upgrade` (not instant; depends on when users update)
+1. Revert or manually fix the Homebrew formula change in `zigrivers/homebrew-scaffold` — users receive the previous version on their next `brew update && brew upgrade` (not instant; depends on when users update)
 2. Unpublish or deprecate the npm version (see §5.1)
 3. Verify both channels serve the correct version
 
@@ -482,7 +439,7 @@ If the published tarball is missing files or has wrong content:
 ```bash
 # Compare local tarball to published version
 npm pack                                          # Create local tarball
-npm pack @scaffold-cli/scaffold@<version>         # Download published tarball
+npm pack @zigrivers/scaffold@<version>         # Download published tarball
 diff <(tar tzf local.tgz | sort) <(tar tzf published.tgz | sort)
 ```
 
@@ -509,15 +466,15 @@ Each scenario follows: **Symptoms** → **Diagnosis** → **Resolution** → **V
 
 **Scenario A: `npm publish` fails mid-stream**
 - *Symptoms*: Release workflow `publish` job fails. npm may or may not show the version.
-- *Diagnosis*: Check workflow logs for the error (auth failure, validation, network). Run `npm info @scaffold-cli/scaffold versions` to see if the version landed.
+- *Diagnosis*: Check workflow logs for the error (auth failure, validation, network). Run `npm info @zigrivers/scaffold versions` to see if the version landed.
 - *Resolution*: If the version didn't land — fix the issue (usually `NPM_TOKEN` expired or `package.json` validation) and re-run the workflow. If the version partially landed (corrupt), unpublish and re-publish. `npm publish` is idempotent for the same content — re-running is safe if the version didn't land.
-- *Verification*: `npm info @scaffold-cli/scaffold version` returns expected version.
+- *Verification*: `npm info @zigrivers/scaffold version` returns expected version.
 
 **Scenario B: Release tag pushed but workflow doesn't trigger**
 - *Symptoms*: Tag visible in `git tag`, pushed to origin, but no GitHub Actions run appears.
-- *Diagnosis*: Check `.github/workflows/release.yml` syntax with `act` or the Actions UI. Check Actions quota (Settings → Billing). Verify tag matches the `v*` pattern.
+- *Diagnosis*: Check `.github/workflows/publish.yml` and `.github/workflows/update-homebrew.yml` syntax with `act` or the Actions UI. Check Actions quota (Settings → Billing). Verify tag matches the `v*` pattern.
 - *Resolution*: Fix the workflow file if there's a syntax error, then delete and re-push the tag: `git tag -d v<ver> && git push origin :refs/tags/v<ver> && git tag v<ver> && git push origin v<ver>`. If quota exceeded, wait or contact GitHub support.
-- *Verification*: Actions tab shows the release workflow running.
+- *Verification*: Actions tab shows the tag-push release workflows running.
 
 **Scenario C: CI passes but package broken on a specific platform or Node version**
 - *Symptoms*: User-reported bug that doesn't reproduce in CI. Typically macOS vs Linux or Node 18 vs 22 behavior.
@@ -525,11 +482,11 @@ Each scenario follows: **Symptoms** → **Diagnosis** → **Resolution** → **V
 - *Resolution*: Write a test that catches the platform-specific failure, fix the code, publish a patch.
 - *Verification*: Test passes on both platforms/versions. Ask the reporting user to verify with the patched version.
 
-**Scenario D: Homebrew tap CI rejects the formula update PR**
-- *Symptoms*: PR to `zigrivers/homebrew-scaffold` fails CI (audit failure, test failure, or style violation).
-- *Diagnosis*: Check the tap CI logs. Common causes: SHA mismatch (npm tarball changed after initial publish), missing dependency declaration, or `brew audit` style violations.
-- *Resolution*: Fix the formula locally, run `brew audit --strict Formula/scaffold.rb` and `brew test scaffold`, push the fix.
-- *Verification*: Tap CI passes. `brew install scaffold` from the updated tap works and `scaffold --version` matches the npm version.
+**Scenario D: `update-homebrew.yml` fails**
+- *Symptoms*: The tag push succeeds and npm publish may be live, but the Homebrew workflow fails or the tap does not update.
+- *Diagnosis*: Check the `update-homebrew.yml` logs. Common causes: bad tap credentials, SHA mismatch, or a formula/install regression in `zigrivers/homebrew-scaffold`.
+- *Resolution*: Fix the failing workflow or tap formula, rerun the workflow if possible, and verify the tap points at the correct `v<version>` source tarball.
+- *Verification*: `brew update && brew upgrade scaffold && scaffold --version` returns the expected version.
 
 ---
 
@@ -551,7 +508,7 @@ The CLI makes no network requests except `scaffold update` (which checks the npm
 - npm provenance attestation (`--provenance`) links published packages to their source commit
 
 **npm token management**:
-- The `NPM_TOKEN` GitHub secret is a granular access token scoped to publish `@scaffold-cli/scaffold` only
+- The `NPM_TOKEN` GitHub secret is a granular access token scoped to publish `@zigrivers/scaffold` only
 - Token is created by the npm org owner with `Automation` type (bypasses 2FA for CI while requiring 2FA for interactive use)
 - Rotate the token at least annually or immediately if a security incident is suspected
 - Limit npm org membership to maintainers who need publish access — use the `developer` role for contributors who don't
@@ -581,14 +538,14 @@ Scaffold is a CLI tool — there is no runtime to monitor. Release health is tra
 
 | Signal | How to check | Frequency |
 |--------|-------------|-----------|
-| npm download stats | `npm info @scaffold-cli/scaffold` or [npmjs.com](https://npmjs.com) dashboard | Weekly |
+| npm download stats | `npm info @zigrivers/scaffold` or [npmjs.com](https://npmjs.com) dashboard | Weekly |
 | Bug reports | GitHub Issues | Daily triage |
 | Feature requests | GitHub Discussions or GitHub Issues | Weekly review |
 | npm audit advisories | `npm audit` locally or Dependabot alerts | Continuous (CI) |
 | CI workflow health | GitHub Actions tab — check for failures on `main` | After each push to main |
 
 **Post-release verification** (within 48 hours of a release):
-1. Verify `npx @scaffold-cli/scaffold --version` from a clean temp directory returns the new version
+1. Verify `npx @zigrivers/scaffold --version` from a clean temp directory returns the new version
 2. Run `scaffold init --help` to confirm the CLI loads without errors
 3. Check GitHub Issues for reports tagged with the new version
 4. Monitor npm download stats — a sudden drop may indicate a broken release

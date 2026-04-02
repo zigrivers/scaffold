@@ -708,7 +708,7 @@ These are orthogonal to the pipeline — usable at any time, not tied to pipelin
 | Command | When to Use |
 |---------|-------------|
 | `scaffold run version-bump` | Mark a milestone with a version number without the full release ceremony. |
-| `scaffold run release` | Ship a new version — changelog, Git tag, and GitHub release. Supports `--dry-run`, `current`, and `rollback`. |
+| `scaffold run release` | Run your project's release ceremony — changelog plus whatever release artifacts that project defines. Supports `--dry-run`, `current`, and `rollback`. |
 | `scaffold run version` | Show the current Scaffold version. |
 | `scaffold run update` | Update Scaffold to the latest version. |
 | `scaffold run dashboard` | Open a visual progress dashboard in your browser. |
@@ -730,7 +730,7 @@ All of these are also available as slash commands (`/scaffold:release`, `/scaffo
 /scaffold:version-bump
 ```
 
-Bumps the version number and updates the changelog, but doesn't create tags, push, or publish a GitHub release. Think of it as a checkpoint.
+Bumps the version number and updates the changelog, but doesn't create tags, push, or run the formal release ceremony. Think of it as a checkpoint.
 
 ### Creating a release
 
@@ -742,7 +742,13 @@ Claude analyzes your commits since the last release, suggests whether this is a 
 1. Running your project's tests
 2. Updating the version number in your project files
 3. Generating a changelog entry
-4. Creating a Git tag, GitHub release, and npm publish
+4. Executing the release artifacts your project defines
+
+Depending on the target project, that may include a Git tag, hosted release,
+package publish, deployment, registry update, or another project-specific
+release step. `/scaffold:release` is intentionally generic; it should follow
+the target project's own documented workflow rather than assuming npm or GitHub
+for every project.
 
 Options: `--dry-run` to preview, `minor`/`major`/`patch` to specify the bump, `current` to release an already-bumped version, `rollback` to undo.
 

@@ -151,7 +151,7 @@ Print the following reference directly. Do not read any files or run any command
 | **Resume (single)** | `/scaffold:single-agent-resume` | Resuming single-agent after a break |
 | **Resume (multi)** | `/scaffold:multi-agent-resume <agent-name>` | Resuming a worktree agent after a break |
 | **Version Bump** | `/scaffold:version-bump` | Bump version + changelog (no tag/release) |
-| **Release** | `/scaffold:release` | Full release with tag + GitHub release |
+| **Release** | `/scaffold:release` | Project-defined release ceremony with changelog + relevant release artifacts |
 | **Visual Dashboard** | `/scaffold:dashboard` | HTML pipeline overview in browser |
 
 ## Process Rules
