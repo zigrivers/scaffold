@@ -96,6 +96,9 @@ Minimum checklist:
 - Merge release-prep work to `main`
 - Tag `main` with `vX.Y.Z` and push the tag
 - Create the GitHub release
+- `publish.yml` uses npm trusted publishing via GitHub OIDC; if npm publish
+  fails with auth errors, verify the trusted-publisher config in npm package
+  settings rather than looking for a repo `NPM_TOKEN` secret
 - Verify npm publish and Homebrew update workflows succeeded
 - Verify users can update with `npm update -g @zigrivers/scaffold` and
   `brew upgrade scaffold`

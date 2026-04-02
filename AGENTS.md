@@ -23,6 +23,9 @@ of the generic `/scaffold:release` guidance.
 - Merge the release-prep commit/PR to `main` before tagging.
 - Tag merged `main` as `vX.Y.Z` and push the tag.
 - Create the GitHub release.
+- `publish.yml` uses npm trusted publishing via GitHub OIDC; if npm publish
+  fails with auth errors, verify the trusted-publisher config in npm package
+  settings rather than looking for a repo `NPM_TOKEN` secret.
 - Verify the `publish.yml` and `update-homebrew.yml` workflows succeeded so
   users can update via `npm update -g @zigrivers/scaffold` and
   `brew upgrade scaffold`.

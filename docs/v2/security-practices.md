@@ -3,7 +3,7 @@
 # Scaffold v2 — Security Practices
 
 **Related documents**:
-- [operations-runbook.md](operations-runbook.md) §6 — operational security (npm tokens, CI hardening, supply chain basics)
+- [operations-runbook.md](operations-runbook.md) §6 — operational security (npm trusted publishing, CI hardening, supply chain basics)
 - [testing-strategy.md](testing-strategy.md) §10 — quality gates (pre-commit, CI, pre-merge, periodic)
 - [scaffold-v2-prd.md](scaffold-v2-prd.md) §18 — NFRs (no credential storage, no network access, file permissions)
 
@@ -26,7 +26,7 @@ Scaffold v2 is a TypeScript CLI tool distributed via npm. It assembles tailored 
 3. **Local file system access** — reads project files, writes state files within the project directory
 4. **CLI argument handling** — user-provided paths, step names, and flags parsed by yargs
 
-For operational security (npm token management, CI hardening, provenance attestation, account compromise recovery), see operations-runbook.md §6.
+For operational security (npm trusted publishing, CI hardening, provenance attestation, account compromise recovery), see operations-runbook.md §6.
 
 ---
 
@@ -38,8 +38,8 @@ For operational security (npm token management, CI hardening, provenance attesta
 
 | Threat | Likelihood | Impact | Mitigation |
 |--------|-----------|--------|------------|
-| Typosquatting — malicious package with a similar name on npm | Medium | High | Monitor npm for similar names. Document the canonical package name (`@scaffold-cli/scaffold`) in all installation docs. npm provenance attestation links packages to the source repo. |
-| Compromised npm account publishes a trojanized version | Low | Critical | 2FA required on npm account. Granular publish token scoped to this package only. Provenance attestation flags unsigned publishes. See operations-runbook.md §6.3 for recovery. |
+| Typosquatting — malicious package with a similar name on npm | Medium | High | Monitor npm for similar names. Document the canonical package name (`@zigrivers/scaffold`) in all installation docs. npm provenance attestation links packages to the source repo. |
+| Compromised npm account publishes a trojanized version | Low | Critical | 2FA required on npm account. npm trusted publishing restricts CI publishes to the configured repo/workflow. Provenance attestation flags unsigned publishes. See operations-runbook.md §6.3 for recovery. |
 | Modified Homebrew formula pointing to a malicious tarball | Low | High | Homebrew tap has its own CI. SHA256 verification against the npm registry tarball. |
 
 **Tampering**
@@ -272,7 +272,7 @@ Run `npx license-checker --summary` periodically to audit the dependency tree.
 
 ## 6. npm Distribution Security
 
-Operations-runbook.md §6.3 covers npm token management, 2FA, provenance attestation, and account compromise recovery. This section adds package-level security.
+Operations-runbook.md §6.3 covers npm trusted publishing, 2FA, provenance attestation, and account compromise recovery. This section adds package-level security.
 
 ### Package Integrity Verification
 
@@ -283,21 +283,21 @@ Users can verify a published scaffold package:
 npm audit signatures
 
 # Check provenance attestation
-npm view @scaffold-cli/scaffold --json | jq '.dist.attestations'
+npm view @zigrivers/scaffold --json | jq '.dist.attestations'
 
 # Verify tarball checksum
-npm pack @scaffold-cli/scaffold@<version>
-shasum -a 256 scaffold-cli-scaffold-<version>.tgz
+npm pack @zigrivers/scaffold@<version>
+shasum -a 256 zigrivers-scaffold-<version>.tgz
 ```
 
 Provenance attestation (enabled via `--provenance` in the release workflow) links each published version to its source commit and build environment. A package published without provenance indicates it was published manually or from an untrusted environment.
 
 ### Typosquatting Defense
 
-The canonical package name is `@scaffold-cli/scaffold`. Common misspellings and attack patterns to monitor:
+The canonical package name is `@zigrivers/scaffold`. Common misspellings and attack patterns to monitor:
 
 - `scaffold-cli` (without scope)
-- `@scaffold/cli` (different scope)
+- `@scaffold/cli` or `@scaffold-cli/scaffold` (wrong scope)
 - `scaffoldd`, `scaffol`, `scafold` (typos)
 - `scaffold-v2`, `scaffold2` (version confusion)
 
