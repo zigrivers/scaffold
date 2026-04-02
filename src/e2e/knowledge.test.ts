@@ -7,9 +7,24 @@ import { execSync } from 'node:child_process'
 const DIST = path.resolve(process.cwd(), 'dist/index.js')
 const KNOWLEDGE_SRC = path.resolve(process.cwd(), 'knowledge')
 const PIPELINE_SRC = path.resolve(process.cwd(), 'pipeline')
+let cliBuilt = false
+
+function ensureCliBuilt() {
+  if (cliBuilt && fs.existsSync(DIST)) return
+
+  if (!fs.existsSync(DIST)) {
+    execSync('npm run build', {
+      cwd: process.cwd(),
+      stdio: 'pipe',
+    })
+  }
+
+  cliBuilt = true
+}
 
 function scaffold(args: string, cwd: string): { stdout: string; stderr: string; exitCode: number } {
   try {
+    ensureCliBuilt()
     const result = execSync(`node ${DIST} ${args}`, {
       cwd,
       encoding: 'utf8',
