@@ -19,7 +19,7 @@ git push              # Publish local commits
 
 **MANDATORY WORKFLOW:**
 
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
+1. **File follow-up work** - Create GitHub issues or leave explicit handoff notes for anything that still needs work
 2. **Run quality gates** (if code changed) - Tests, linters, builds
 3. **Update follow-up status** - Make sure remaining work is reflected in issues, PR comments, or the handoff
 4. **PUSH TO REMOTE** - This is MANDATORY:
