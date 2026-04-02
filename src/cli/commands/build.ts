@@ -8,7 +8,7 @@ import { loadConfig } from '../../config/loader.js'
 import { discoverAllMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import {
   getPackagePipelineDir, getPackageMethodologyDir,
-  getPackageKnowledgeDir, getPackageToolsDir, atomicWriteFile,
+  getPackageKnowledgeDir, getPackageToolsDir, getPackageRoot, atomicWriteFile,
 } from '../../utils/fs.js'
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
 import { buildGraph } from '../../core/dependency/graph.js'
@@ -236,6 +236,22 @@ export async function runBuild(argv: BuildArgs, options: RunBuildOptions = {}): 
     }
     atomicWriteFile(fullPath, file.content)
     generatedCount++
+  }
+
+  // Step 12.5: Generate resolved skills for plugin auto-discovery
+  const skillTemplateDir = path.join(getPackageRoot(), 'content', 'skills')
+  const skillOutputDir = path.join(getPackageRoot(), 'skills')
+  if (fs.existsSync(skillTemplateDir)) {
+    const claudeVars: Record<string, string> = { INSTRUCTIONS_FILE: 'CLAUDE.md' }
+    for (const skillName of fs.readdirSync(skillTemplateDir)) {
+      const templatePath = path.join(skillTemplateDir, skillName, 'SKILL.md')
+      if (!fs.existsSync(templatePath)) continue
+      const template = fs.readFileSync(templatePath, 'utf8')
+      const resolved = template.replace(/\{\{(\w+)\}\}/g, (match: string, key: string) => claudeVars[key] ?? match)
+      const outDir = path.join(skillOutputDir, skillName)
+      fs.mkdirSync(outDir, { recursive: true })
+      fs.writeFileSync(path.join(outDir, 'SKILL.md'), resolved, 'utf8')
+    }
   }
 
   // Step 13: Report build stats
