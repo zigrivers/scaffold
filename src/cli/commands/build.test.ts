@@ -91,17 +91,41 @@ vi.mock('../../core/adapters/adapter.js', () => ({
           content: `command:${input.slug}`,
           writeMode: 'create',
         }]
-        : [],
+        : platformId === 'gemini'
+          ? [{
+            relativePath: `.gemini/commands/scaffold/${input.slug}.toml`,
+            content: `gemini:${input.slug}`,
+            writeMode: 'create',
+          }]
+          : [],
       success: true,
     })),
     finalize: vi.fn(() => ({
-      files: platformId === 'universal'
-        ? [{
-          relativePath: '.scaffold/generated/universal/prompts/README.md',
-          content: 'universal',
-          writeMode: 'create',
-        }]
-        : [],
+      files: platformId === 'gemini'
+        ? [
+          {
+            relativePath: '.agents/skills/scaffold-runner/SKILL.md',
+            content: 'runner',
+            writeMode: 'create',
+          },
+          {
+            relativePath: '.agents/skills/scaffold-pipeline/SKILL.md',
+            content: 'pipeline',
+            writeMode: 'create',
+          },
+          {
+            relativePath: 'GEMINI.md',
+            content: 'gemini',
+            writeMode: 'create',
+          },
+        ]
+        : platformId === 'universal'
+          ? [{
+            relativePath: '.scaffold/generated/universal/prompts/README.md',
+            content: 'universal',
+            writeMode: 'create',
+          }]
+          : [],
       errors: [],
     })),
   })),
@@ -432,6 +456,22 @@ describe('build command', () => {
     expect(mockAtomicWriteFile).toHaveBeenCalledWith(
       '/fake/project/.scaffold/generated/universal/prompts/README.md',
       'universal',
+    )
+  })
+
+  it('writes Gemini output when gemini is configured', async () => {
+    mockLoadConfig.mockReturnValue({
+      config: makeConfig({ platforms: ['claude-code', 'gemini'] }) as ReturnType<typeof loadConfig>['config'],
+      errors: [],
+      warnings: [],
+    })
+
+    await buildCommand.handler(defaultBuildArgv())
+
+    expect(mockCreateAdapter).toHaveBeenCalledWith('gemini')
+    expect(mockAtomicWriteFile).toHaveBeenCalledWith(
+      '/fake/project/.gemini/commands/scaffold/step-a.toml',
+      expect.any(String),
     )
   })
 

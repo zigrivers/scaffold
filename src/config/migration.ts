@@ -26,7 +26,7 @@ export function migrateV1(raw: Record<string, unknown>): ScaffoldConfig {
   const platforms = raw['platforms']
 
   const migratedMethodology = mapMethodology(String(methodology ?? ''))
-  const migratedPlatforms = (platforms as Array<'claude-code' | 'codex'> | undefined) ?? ['claude-code']
+  const migratedPlatforms = (platforms as Array<'claude-code' | 'codex' | 'gemini'> | undefined) ?? ['claude-code']
 
   return {
     ...rest,

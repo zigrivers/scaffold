@@ -97,7 +97,7 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
   const config: ScaffoldConfig = {
     version: 2,
     methodology: answers.methodology,
-    platforms: answers.platforms as Array<'claude-code' | 'codex'>,
+    platforms: answers.platforms,
     project: {
       traits: answers.traits,
     },

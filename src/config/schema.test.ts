@@ -32,6 +32,15 @@ describe('ConfigSchema', () => {
     expect(result.success).toBe(true)
   })
 
+  it('accepts a valid config with gemini platform', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2,
+      methodology: 'deep',
+      platforms: ['claude-code', 'gemini'],
+    })
+    expect(result.success).toBe(true)
+  })
+
   it('fails when methodology is missing', () => {
     const result = ConfigSchema.safeParse({
       version: 2,
