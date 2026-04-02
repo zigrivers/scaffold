@@ -171,6 +171,8 @@ describe('scaffold knowledge (E2E)', () => {
     runCommand = (cmd: string, options?: childProcess.ExecSyncOptions) => {
       if (cmd === 'npm run build') {
         buildCalls += 1
+        fs.mkdirSync(path.dirname(templatePath), { recursive: true })
+        fs.writeFileSync(templatePath, templateBackup ?? '')
         return 'built'
       }
 
@@ -188,6 +190,7 @@ describe('scaffold knowledge (E2E)', () => {
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toBe('ok')
       expect(buildCalls).toBe(1)
+      expect(fs.existsSync(templatePath)).toBe(true)
     } finally {
       runCommand = previousRunCommand
       cliBuilt = previousCliBuilt
