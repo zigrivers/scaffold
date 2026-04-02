@@ -5,15 +5,24 @@ import os from 'node:os'
 import * as childProcess from 'node:child_process'
 
 const DIST = path.resolve(process.cwd(), 'dist/index.js')
+const KNOWLEDGE_TEMPLATE_DIST = path.resolve(
+  process.cwd(),
+  'dist/core/knowledge/knowledge-update-template.md',
+)
 const KNOWLEDGE_SRC = path.resolve(process.cwd(), 'knowledge')
 const PIPELINE_SRC = path.resolve(process.cwd(), 'pipeline')
 let cliBuilt = false
-let runCommand: typeof childProcess.execSync = childProcess.execSync
+type RunCommand = (command: string, options?: childProcess.ExecSyncOptions) => string
+let runCommand: RunCommand = childProcess.execSync as unknown as RunCommand
+
+function requiredBuildArtifactsReady() {
+  return [DIST, KNOWLEDGE_TEMPLATE_DIST].every((artifactPath) => fs.existsSync(artifactPath))
+}
 
 function ensureCliBuilt() {
-  if (cliBuilt && fs.existsSync(DIST)) return
+  if (cliBuilt && requiredBuildArtifactsReady()) return
 
-  if (!fs.existsSync(DIST)) {
+  if (!requiredBuildArtifactsReady()) {
     runCommand('npm run build', {
       cwd: process.cwd(),
       encoding: 'utf8',
@@ -21,7 +30,7 @@ function ensureCliBuilt() {
     })
   }
 
-  cliBuilt = true
+  cliBuilt = requiredBuildArtifactsReady()
 }
 
 function scaffold(args: string, cwd: string): { stdout: string; stderr: string; exitCode: number } {
@@ -143,42 +152,55 @@ describe('scaffold knowledge (E2E)', () => {
     expect(exitCode).toBe(1)
   })
 
-  it('build failure keeps stdout and stderr readable as strings', () => {
-    fs.rmSync(path.dirname(DIST), { recursive: true, force: true })
+  it('rebuilds when dist/index.js exists but the knowledge template is missing', () => {
+    const distDir = path.dirname(DIST)
+    const templatePath = KNOWLEDGE_TEMPLATE_DIST
+    const hadIndex = fs.existsSync(DIST)
+    const hadTemplate = fs.existsSync(templatePath)
+    const templateBackup = hadTemplate ? fs.readFileSync(templatePath, 'utf8') : null
+
+    fs.mkdirSync(distDir, { recursive: true })
+    if (!hadIndex) {
+      fs.writeFileSync(DIST, '#!/usr/bin/env node\n')
+    }
+    fs.rmSync(templatePath, { force: true })
+
     const previousRunCommand = runCommand
+    const previousCliBuilt = cliBuilt
+    let buildCalls = 0
     runCommand = (cmd: string, options?: childProcess.ExecSyncOptions) => {
       if (cmd === 'npm run build') {
-        const error = new Error('build failed') as Error & {
-          stdout?: unknown
-          stderr?: unknown
-          status?: number
-        }
+        buildCalls += 1
+        return 'built'
+      }
 
-        if (options && 'encoding' in options && options.encoding === 'utf8') {
-          error.stdout = 'build stdout'
-          error.stderr = 'build stderr'
-        } else {
-          error.stdout = Buffer.from('build stdout')
-          error.stderr = Buffer.from('build stderr')
-        }
-
-        error.status = 1
-        throw error
+      if (cmd.startsWith(`node ${DIST}`)) {
+        return 'ok'
       }
 
       throw new Error(`unexpected command: ${cmd}`)
     }
+    cliBuilt = true
 
     try {
       const result = scaffold('knowledge list', tmpDir)
 
-      expect(result.exitCode).toBe(1)
-      expect(typeof result.stdout).toBe('string')
-      expect(typeof result.stderr).toBe('string')
-      expect(result.stdout).toContain('build stdout')
-      expect(result.stderr).toContain('build stderr')
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout).toBe('ok')
+      expect(buildCalls).toBe(1)
     } finally {
       runCommand = previousRunCommand
+      cliBuilt = previousCliBuilt
+      if (templateBackup !== null) {
+        fs.mkdirSync(path.dirname(templatePath), { recursive: true })
+        fs.writeFileSync(templatePath, templateBackup)
+      } else {
+        fs.rmSync(templatePath, { force: true })
+      }
+
+      if (!hadIndex) {
+        fs.rmSync(distDir, { recursive: true, force: true })
+      }
     }
   })
 })
