@@ -2,19 +2,21 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { execSync } from 'node:child_process'
+import * as childProcess from 'node:child_process'
 
 const DIST = path.resolve(process.cwd(), 'dist/index.js')
 const KNOWLEDGE_SRC = path.resolve(process.cwd(), 'knowledge')
 const PIPELINE_SRC = path.resolve(process.cwd(), 'pipeline')
 let cliBuilt = false
+let runCommand: typeof childProcess.execSync = childProcess.execSync
 
 function ensureCliBuilt() {
   if (cliBuilt && fs.existsSync(DIST)) return
 
   if (!fs.existsSync(DIST)) {
-    execSync('npm run build', {
+    runCommand('npm run build', {
       cwd: process.cwd(),
+      encoding: 'utf8',
       stdio: 'pipe',
     })
   }
@@ -25,7 +27,7 @@ function ensureCliBuilt() {
 function scaffold(args: string, cwd: string): { stdout: string; stderr: string; exitCode: number } {
   try {
     ensureCliBuilt()
-    const result = execSync(`node ${DIST} ${args}`, {
+    const result = runCommand(`node ${DIST} ${args}`, {
       cwd,
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -139,5 +141,44 @@ describe('scaffold knowledge (E2E)', () => {
   it('update: exits 1 for unknown target', () => {
     const { exitCode } = scaffold('knowledge update totally-unknown-target-xyz', tmpDir)
     expect(exitCode).toBe(1)
+  })
+
+  it('build failure keeps stdout and stderr readable as strings', () => {
+    fs.rmSync(path.dirname(DIST), { recursive: true, force: true })
+    const previousRunCommand = runCommand
+    runCommand = (cmd: string, options?: childProcess.ExecSyncOptions) => {
+      if (cmd === 'npm run build') {
+        const error = new Error('build failed') as Error & {
+          stdout?: unknown
+          stderr?: unknown
+          status?: number
+        }
+
+        if (options && 'encoding' in options && options.encoding === 'utf8') {
+          error.stdout = 'build stdout'
+          error.stderr = 'build stderr'
+        } else {
+          error.stdout = Buffer.from('build stdout')
+          error.stderr = Buffer.from('build stderr')
+        }
+
+        error.status = 1
+        throw error
+      }
+
+      throw new Error(`unexpected command: ${cmd}`)
+    }
+
+    try {
+      const result = scaffold('knowledge list', tmpDir)
+
+      expect(result.exitCode).toBe(1)
+      expect(typeof result.stdout).toBe('string')
+      expect(typeof result.stderr).toBe('string')
+      expect(result.stdout).toContain('build stdout')
+      expect(result.stderr).toContain('build stderr')
+    } finally {
+      runCommand = previousRunCommand
+    }
   })
 })
