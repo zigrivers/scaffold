@@ -24,7 +24,7 @@ export function ensureDir(dirPath: string): void {
 }
 
 /**
- * Resolve the package's own root directory (where pipeline/, knowledge/, methodology/ live).
+ * Resolve the package's own root directory (where content/pipeline/, content/knowledge/, etc. live).
  * Works whether scaffold is run from the repo or installed globally via npm/brew.
  */
 export function getPackageRoot(): string {
@@ -41,10 +41,10 @@ export function getPackageRoot(): string {
  */
 export function getPackagePipelineDir(projectRoot?: string): string {
   if (projectRoot) {
-    const local = path.join(projectRoot, 'pipeline')
+    const local = path.join(projectRoot, 'content', 'pipeline')
     if (fs.existsSync(local)) return local
   }
-  return path.join(getPackageRoot(), 'pipeline')
+  return path.join(getPackageRoot(), 'content', 'pipeline')
 }
 
 /**
@@ -54,10 +54,10 @@ export function getPackagePipelineDir(projectRoot?: string): string {
  */
 export function getPackageKnowledgeDir(projectRoot?: string): string {
   if (projectRoot) {
-    const local = path.join(projectRoot, 'knowledge')
+    const local = path.join(projectRoot, 'content', 'knowledge')
     if (fs.existsSync(local)) return local
   }
-  return path.join(getPackageRoot(), 'knowledge')
+  return path.join(getPackageRoot(), 'content', 'knowledge')
 }
 
 /**
@@ -67,23 +67,23 @@ export function getPackageKnowledgeDir(projectRoot?: string): string {
  */
 export function getPackageToolsDir(projectRoot?: string): string {
   if (projectRoot) {
-    const local = path.join(projectRoot, 'tools')
+    const local = path.join(projectRoot, 'content', 'tools')
     if (fs.existsSync(local)) return local
   }
-  return path.join(getPackageRoot(), 'tools')
+  return path.join(getPackageRoot(), 'content', 'tools')
 }
 
 /**
- * Resolve the bundled agent-skills directory.
- * If projectRoot is provided and contains agent-skills/, use that (dev/test mode).
- * Otherwise use the package's bundled agent-skills/.
+ * Resolve the skills template directory.
+ * If projectRoot is provided and contains content/skills/, use that (dev/test mode).
+ * Otherwise use the package's bundled content/skills/.
  */
-export function getPackageAgentSkillsDir(projectRoot?: string): string {
+export function getPackageSkillsDir(projectRoot?: string): string {
   if (projectRoot) {
-    const local = path.join(projectRoot, 'agent-skills')
+    const local = path.join(projectRoot, 'content', 'skills')
     if (fs.existsSync(local)) return local
   }
-  return path.join(getPackageRoot(), 'agent-skills')
+  return path.join(getPackageRoot(), 'content', 'skills')
 }
 
 /**
@@ -93,8 +93,8 @@ export function getPackageAgentSkillsDir(projectRoot?: string): string {
  */
 export function getPackageMethodologyDir(projectRoot?: string): string {
   if (projectRoot) {
-    const local = path.join(projectRoot, 'methodology')
+    const local = path.join(projectRoot, 'content', 'methodology')
     if (fs.existsSync(local)) return local
   }
-  return path.join(getPackageRoot(), 'methodology')
+  return path.join(getPackageRoot(), 'content', 'methodology')
 }

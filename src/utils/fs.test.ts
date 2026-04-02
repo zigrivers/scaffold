@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { describe, it, expect, afterEach } from 'vitest'
-import { atomicWriteFile, fileExists, ensureDir, getPackageAgentSkillsDir } from './fs.js'
+import { atomicWriteFile, fileExists, ensureDir, getPackageSkillsDir } from './fs.js'
 
 const tmpFiles: string[] = []
 const tmpDirs: string[] = []
@@ -95,19 +95,19 @@ describe('ensureDir', () => {
   })
 })
 
-describe('getPackageAgentSkillsDir', () => {
-  it('returns a local agent-skills directory when projectRoot provides one', () => {
+describe('getPackageSkillsDir', () => {
+  it('returns a local content/skills directory when projectRoot provides one', () => {
     const root = tmpDir()
-    const localAgentSkills = path.join(root, 'agent-skills')
-    fs.mkdirSync(localAgentSkills, { recursive: true })
+    const localSkills = path.join(root, 'content', 'skills')
+    fs.mkdirSync(localSkills, { recursive: true })
 
-    expect(getPackageAgentSkillsDir(root)).toBe(localAgentSkills)
+    expect(getPackageSkillsDir(root)).toBe(localSkills)
   })
 
-  it('falls back to the bundled agent-skills directory when no local override exists', () => {
-    const bundledDir = getPackageAgentSkillsDir()
+  it('falls back to the bundled content/skills directory when no local override exists', () => {
+    const bundledDir = getPackageSkillsDir()
 
-    expect(bundledDir).toContain(`${path.sep}agent-skills`)
+    expect(bundledDir).toContain(path.join('content', 'skills'))
     expect(fs.existsSync(bundledDir)).toBe(true)
     expect(fs.existsSync(path.join(bundledDir, 'scaffold-runner', 'SKILL.md'))).toBe(true)
   })
