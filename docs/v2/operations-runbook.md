@@ -11,7 +11,7 @@ This document covers the operational lifecycle of the Scaffold v2 TypeScript CLI
 **Related documents**:
 - [testing-strategy.md](testing-strategy.md) §10 — quality gate definitions (pre-commit, CI, pre-merge, periodic)
 - [git-workflow.md](../../docs/git-workflow.md) — branching model, PR workflow, worktree setup
-- [CLAUDE.md](../../CLAUDE.md) — Beads task tracking, commit message format, autonomous agent conventions
+- [CLAUDE.md](../../CLAUDE.md) — contributor workflow, quality gates, and autonomous agent conventions
 
 **Important context**: Scaffold v2 is a CLI tool distributed as an npm package. It has no server, no database, no runtime monitoring, and makes no network requests (except `scaffold update`). Operations concepts are adapted accordingly — "deployment" means npm publish, "monitoring" means download and issue tracking, "rollback" means npm version revert.
 
@@ -27,7 +27,6 @@ This document covers the operational lifecycle of the Scaffold v2 TypeScript CLI
 | npm | 9+ | Package management | Ships with Node.js |
 | TypeScript | 5.x | Compile-time type checking | `npm install` (devDependency) |
 | Git | 2.x+ | Version control, worktrees | Pre-installed on macOS/Linux |
-| Beads (`bd`) | Latest | Task tracking | `brew install beads` |
 
 A `.nvmrc` (or `.node-version`) file is checked into the repo root so `nvm use` and `fnm` auto-select the correct Node.js version. CI also reads this file (see §3).
 
@@ -92,15 +91,12 @@ Vitest configuration:
 
 ### 2.5 Environment Variables
 
-Scaffold v2 requires **no environment variables** for normal development or runtime operation. The CLI makes no network requests (except `scaffold update`) and stores no credentials.
+Scaffold v2 requires **no environment variables** for normal development,
+release, or runtime operation. The CLI makes no network requests (except
+`scaffold update`) and stores no credentials.
 
-The only env var relevant to development:
-
-| Variable | Required | Purpose |
-|----------|----------|---------|
-| `BD_ACTOR` | Only in parallel agent workflows | Beads attribution — identifies which agent claimed a task |
-
-No `.env` file, no `.env.example`, no secrets management. This is intentional (PRD §18: no credential storage, no API keys).
+No `.env` file, no `.env.example`, no secrets management. This is intentional
+(PRD §18: no credential storage, no API keys).
 
 ### 2.6 IDE Setup
 
@@ -338,7 +334,7 @@ Scaffold follows [semver](https://semver.org):
 
 ### 4.2 Release Checklist
 
-1. **Verify all work is complete**: `bd list` shows no in-progress tasks for this release
+1. **Verify release scope is complete**: merged PRs, open follow-up issues, and release notes all agree on what is included in this release
 2. **Run local quality gates**: `npm run check` passes (lint + type-check + test)
 3. **Update CHANGELOG.md**: follow [keep-a-changelog](https://keepachangelog.com) format
    ```markdown
@@ -381,7 +377,7 @@ What `npm pack` **includes** (configured via `files` in `package.json`):
 | `README.md` | npm landing page |
 | `LICENSE` | License file |
 
-What `npm pack` **excludes** (via `.npmignore`): `src/`, `tests/`, `docs/`, root `*.ts` configs, `.scaffold/`, `.beads/`, `.github/` — anything that is development-only or project-specific.
+What `npm pack` **excludes** (via `.npmignore`): `src/`, `tests/`, `docs/`, root `*.ts` configs, `.scaffold/`, `.github/` — anything that is development-only or project-specific.
 
 ### 4.5 Verifying the Package Before Publish
 
@@ -587,7 +583,7 @@ Scaffold is a CLI tool — there is no runtime to monitor. Release health is tra
 |--------|-------------|-----------|
 | npm download stats | `npm info @scaffold-cli/scaffold` or [npmjs.com](https://npmjs.com) dashboard | Weekly |
 | Bug reports | GitHub Issues | Daily triage |
-| Feature requests | GitHub Discussions or Beads | Weekly review |
+| Feature requests | GitHub Discussions or GitHub Issues | Weekly review |
 | npm audit advisories | `npm audit` locally or Dependabot alerts | Continuous (CI) |
 | CI workflow health | GitHub Actions tab — check for failures on `main` | After each push to main |
 
@@ -679,15 +675,13 @@ When CLI behavior changes, verify that these documents remain accurate:
 ```bash
 git clone <repo-url> && cd scaffold
 npm install && npm test              # Install + verify
-bd ready                             # Find work
-bd update <id> --claim               # Claim it
-# Implement with TDD: write test → red → green → refactor
+# Pick work from GitHub issues, PR follow-ups, or the session scope
+# Implement with TDD: write test -> red -> green -> refactor
 npm run check                        # All quality gates
-git commit -m "[BD-<id>] type(scope): description"
-bd close <id>
+git commit -m "type(scope): description"
 ```
 
-See CLAUDE.md for the full Beads workflow and commit message format.
+See CLAUDE.md for the full contributor workflow and repository-specific instructions.
 
 ### 8.2 Common Workflows
 
