@@ -1,10 +1,12 @@
 # Scaffold Overview
 
+> **Note:** This document retains v1-era overview material (for example the older 7-phase / 29-prompt framing). Current project-local agent integration includes Gemini support via `.agents/skills/`, `GEMINI.md`, and `.gemini/commands/scaffold/`. See `README.md` for the current high-level product description.
+
 ## What is Scaffold
 
-Scaffold is a prompt pipeline for scaffolding new software projects with Claude Code. It provides a curated sequence of 29 structured prompts that guide you from a raw product idea through to working software, producing documentation, standards, task graphs, and implementation along the way.
+Scaffold is a prompt pipeline for scaffolding new software projects with Claude Code, Gemini, and other supported AI tools. It provides a curated sequence of 29 structured prompts that guide you from a raw product idea through to working software, producing documentation, standards, task graphs, and implementation along the way.
 
-Scaffold is distributed as a **Claude Code plugin** (installable via `/plugin marketplace add`) and also as standalone **user commands** (copyable to `~/.claude/commands/`).
+Scaffold is distributed as a plugin (installable via `/plugin marketplace add`) and also as a standalone CLI. CLI-only projects use `scaffold skill install` to copy the shared runner skills into `.claude/skills/` and `.agents/skills/`; Gemini projects additionally use a managed root `GEMINI.md` plus `.gemini/commands/scaffold/` slash commands.
 
 ## How It Works
 
@@ -21,6 +23,7 @@ Phases are run in order, with explicit dependency constraints between prompts. S
 - **Project type awareness** — optional prompts for web apps (Playwright), mobile/Expo (Maestro), and multi-platform projects
 - **Update mode** — all document-creating prompts auto-detect fresh vs. update mode, replacing dedicated migration prompts
 - **Auto-activated pipeline skill** — provides ordering context so Claude Code knows which command to suggest next
+- **Gemini project-local integration** — managed `GEMINI.md`, shared `.agents/skills/`, and `.gemini/commands/scaffold/` commands for plain prompts and explicit slash commands
 - **Enhancement workflow** — add features to existing projects without re-running the full pipeline
 - **Interactive pipeline dashboard** — visual status view for Scaffold runs with light/dark theme, filters, and modal task details
 - **Release management** — project-defined release workflow with changelog generation, release-artifact support, and rollback guidance
@@ -145,6 +148,7 @@ The pipeline can generate the following project documents, depending on the sele
 |----------|-------------|-------------|
 | `docs/plan.md` | PRD Creation (#1) | Product requirements document |
 | `CLAUDE.md` | Beads Setup (#3) | Claude Code project instructions for Beads-enabled downstream projects |
+| `GEMINI.md` | Gemini support | Project-local instructions with a managed Scaffold import block |
 | `docs/tech-stack.md` | Tech Stack (#4) | Technology choices and rationale |
 | `docs/coding-standards.md` | Coding Standards (#5) | Code style and conventions |
 | `docs/tdd-standards.md` | TDD Standards (#6) | Testing approach and patterns |
@@ -169,17 +173,15 @@ The pipeline can generate the following project documents, depending on the sele
 
 Commands are available as `/scaffold:<command-name>` (e.g., `/scaffold:create-prd`).
 
-### As User Commands
+### As a Standalone CLI
 
 ```bash
-git clone <repo-url>
-cd scaffold
-./scripts/install.sh
+npm install -g @zigrivers/scaffold
+cd your-project
+scaffold skill install
 ```
 
-Commands are copied to `~/.claude/commands/` and available as `/user:<command-name>`.
-
-Use `./scripts/install.sh -f` to force overwrite existing files.
+This installs the shared Scaffold Runner and Pipeline skills into `.claude/skills/` and `.agents/skills/` for the current project. Gemini projects additionally use the managed `GEMINI.md` and `.gemini/commands/scaffold/` outputs from `scaffold build`.
 
 ## Key Concepts
 
@@ -188,6 +190,7 @@ Use `./scripts/install.sh -f` to force overwrite existing files.
 | **Beads** | Optional downstream task tracking tool (`@beads/bd`) used when Scaffold generates Beads-based implementation workflows |
 | **Worktrees** | Git worktrees that enable parallel Claude Code agent sessions, each working on separate tasks in isolated directories |
 | **CLAUDE.md** | Project instruction file that Claude Code reads automatically; accumulates rules from each pipeline phase |
+| **GEMINI.md** | Gemini project instruction file that loads the managed Scaffold runner block automatically |
 | **MCP** | Model Context Protocol — used for tool integrations like Playwright browser testing |
 | **PRD** | Product Requirements Document — the foundational artifact that drives all downstream decisions |
 | **TDD** | Test-Driven Development — the pipeline enforces writing tests before implementation |

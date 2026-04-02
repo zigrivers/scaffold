@@ -74,6 +74,19 @@ export function getPackageToolsDir(projectRoot?: string): string {
 }
 
 /**
+ * Resolve the bundled agent-skills directory.
+ * If projectRoot is provided and contains agent-skills/, use that (dev/test mode).
+ * Otherwise use the package's bundled agent-skills/.
+ */
+export function getPackageAgentSkillsDir(projectRoot?: string): string {
+  if (projectRoot) {
+    const local = path.join(projectRoot, 'agent-skills')
+    if (fs.existsSync(local)) return local
+  }
+  return path.join(getPackageRoot(), 'agent-skills')
+}
+
+/**
  * Resolve the methodology directory.
  * If projectRoot is provided and contains methodology/, use that (dev/test mode).
  * Otherwise use the package's bundled methodology/.

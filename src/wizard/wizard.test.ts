@@ -178,7 +178,30 @@ describe('runWizard', () => {
     expect(output.prompt).not.toHaveBeenCalled()
   })
 
-  // Test 10: Result has success: true on successful init
+  // Test 10: Interactive mode preserves Gemini in config.yml when selected
+  it('writes Gemini to config.yml when Codex is declined and Gemini is accepted in interactive mode', async () => {
+    const output = makeOutputContext()
+    vi.mocked(output.prompt).mockResolvedValueOnce('deep')
+    vi.mocked(output.confirm)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+
+    const result = await runWizard({
+      projectRoot: tmpDir,
+      auto: false,
+      force: false,
+      output,
+    })
+
+    expect(result.success).toBe(true)
+    const configPath = path.join(tmpDir, '.scaffold', 'config.yml')
+    const parsed = yaml.load(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>
+    expect(parsed['platforms']).toEqual(['claude-code', 'gemini'])
+  })
+
+  // Test 11: Result has success: true on successful init
   it('returns success: true on successful init', async () => {
     const output = makeOutputContext()
     const result = await runWizard({ projectRoot: tmpDir, auto: true, force: false, output })

@@ -1,7 +1,7 @@
 <!-- scaffold:project-structure v2 2026-03-12 -->
 # Project Structure
 
-Authoritative map of the Scaffold repository — where every file goes, why, and how directories relate to each other. All other docs (coding-standards, tech-stack, tdd-standards) reference this structure and must stay in sync with it.
+Repository-oriented map of the Scaffold codebase and generated project runtime layout. The target-project runtime section below is current; some repository examples remain historical reference material for older prompt-packaging layouts.
 
 ## 1. Directory Tree
 
@@ -57,6 +57,11 @@ scaffold/
 ├── skills/                    # Auto-activated skills
 │   └── scaffold-pipeline/
 │       └── SKILL.md
+├── agent-skills/              # Shared skill sources packaged for project-local installs
+│   ├── scaffold-pipeline/
+│   │   └── SKILL.md
+│   └── scaffold-runner/
+│       └── SKILL.md
 ├── .claude-plugin/            # Plugin manifest
 │   ├── plugin.json
 │   └── marketplace.json
@@ -110,6 +115,17 @@ scaffold/
     universal/
       prompts/
         README.md
+.agents/
+  skills/
+    scaffold-pipeline/
+      SKILL.md
+    scaffold-runner/
+      SKILL.md
+GEMINI.md                       # Managed project instructions that import the shared skills
+.gemini/
+  commands/
+    scaffold/
+      *.toml
 ```
 
 `scaffold init` and `scaffold build` maintain a dedicated `.gitignore` block for `.scaffold/generated/`, `.scaffold/lock.json`, and Scaffold temp files. Root-level `commands/`, `prompts/`, `codex-prompts/`, and generated `AGENTS.md` are no longer Scaffold-owned project outputs.
@@ -127,6 +143,7 @@ Scaffold uses a **role-based** organization. Each directory has a single clear p
 | Tests | `tests/` | bats-core `.bats` files, one per script |
 | Documentation | `docs/` | Standards docs, reviews, specs, this file |
 | Skills | `skills/` | Auto-activated skill files |
+| Shared agent skills | `agent-skills/` | Packaged skill sources copied into project-local installs |
 | Plugin manifest | `.claude-plugin/` | `plugin.json`, `marketplace.json` |
 | CI/CD & templates | `.github/` | GitHub Actions workflows, PR template |
 | Claude Code config | `.claude/` | Project and local permissions (`settings.json`) |
@@ -148,6 +165,7 @@ Scaffold uses a **role-based** organization. Each directory has a single clear p
 | Test helpers | `tests/test_helper/` | `common-setup.bash` | `tests/test_helper/common-setup.bash` |
 | CSS / theme files | `lib/` | `<name>.css` (kebab-case) | `lib/dashboard-theme.css` |
 | Skills | `skills/<skill-name>/` | `SKILL.md` | `skills/scaffold-pipeline/SKILL.md` |
+| Shared agent skills | `agent-skills/<skill-name>/` | `SKILL.md` | `agent-skills/scaffold-runner/SKILL.md` |
 | GitHub workflows | `.github/workflows/` | `<name>.yml` (kebab-case) | `.github/workflows/ci.yml` |
 | Config files | repo root | standard names | `.editorconfig`, `.shellcheckrc`, `.gitignore` |
 

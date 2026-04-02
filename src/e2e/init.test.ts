@@ -38,6 +38,8 @@ import { detectProjectMode } from '../project/detector.js'
 import { runWizard } from '../wizard/wizard.js'
 import { StateManager } from '../state/state-manager.js'
 import { loadConfig } from '../config/loader.js'
+import { runBuild } from '../cli/commands/build.js'
+import { discoverAllMetaPrompts } from '../core/assembly/meta-prompt-loader.js'
 import initCommand from '../cli/commands/init.js'
 
 // ---------------------------------------------------------------------------
@@ -63,6 +65,31 @@ function createMockOutput() {
     updateProgress: vi.fn(),
     stopProgress: vi.fn(),
   }
+}
+
+function makeMetaPromptFixture() {
+  return new Map([
+    ['create-prd', {
+      stepName: 'create-prd',
+      filePath: '/fake/pipeline/create-prd.md',
+      frontmatter: {
+        name: 'create-prd',
+        description: 'Create a PRD',
+        summary: null,
+        phase: 'planning',
+        order: 1,
+        dependencies: [],
+        outputs: ['docs/prd.md'],
+        conditional: null,
+        knowledgeBase: [],
+        reads: [],
+        stateless: false,
+        category: 'pipeline',
+      },
+      body: '## Purpose\nCreate a PRD.',
+      sections: { Purpose: 'Create a PRD.' },
+    }],
+  ])
 }
 
 // ---------------------------------------------------------------------------
@@ -230,5 +257,67 @@ describe('scaffold init E2E', () => {
     expect(fs.existsSync(path.join(tmpDir, '.gitignore'))).toBe(true)
     expect(fs.readFileSync(path.join(tmpDir, '.gitignore'), 'utf8')).toContain('.scaffold/generated/')
     expect(fs.existsSync(path.join(tmpDir, 'commands'))).toBe(false)
+  })
+
+  // Test 12: init command still writes hidden generated output from the default build path
+  it('init command creates hidden generated output in the temp project', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+    await initCommand.handler({
+      _: [],
+      $0: 'scaffold',
+      root: tmpDir,
+      auto: true,
+      force: false,
+      methodology: 'mvp',
+      idea: undefined,
+      format: undefined,
+      verbose: false,
+    })
+
+    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(fs.existsSync(path.join(tmpDir, '.scaffold', 'generated', 'universal', 'prompts', 'README.md'))).toBe(true)
+  })
+
+  // Test 13: real wizard + build path produces Gemini output with a tiny step fixture
+  it('runWizard and runBuild produce Gemini output for a configured project', async () => {
+    vi.mocked(discoverAllMetaPrompts).mockReturnValue(
+      makeMetaPromptFixture() as ReturnType<typeof discoverAllMetaPrompts>,
+    )
+
+    const output = createMockOutput()
+    output.prompt.mockResolvedValueOnce('mvp')
+    output.confirm
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+
+    const wizardResult = await runWizard({
+      projectRoot: tmpDir,
+      force: false,
+      auto: false,
+      output,
+    })
+    expect(wizardResult.success).toBe(true)
+
+    const buildResult = await runBuild({
+      'validate-only': false,
+      force: false,
+      format: undefined,
+      auto: false,
+      verbose: false,
+      root: tmpDir,
+    }, { output })
+
+    expect(buildResult.exitCode).toBe(0)
+    expect(fs.existsSync(path.join(tmpDir, '.agents', 'skills', 'scaffold-runner', 'SKILL.md'))).toBe(true)
+    expect(fs.existsSync(path.join(tmpDir, '.agents', 'skills', 'scaffold-pipeline', 'SKILL.md'))).toBe(true)
+    expect(fs.existsSync(path.join(tmpDir, 'GEMINI.md'))).toBe(true)
+    expect(fs.existsSync(path.join(tmpDir, '.gemini', 'commands', 'scaffold', 'create-prd.toml'))).toBe(true)
+    expect(fs.readFileSync(path.join(tmpDir, '.gemini', 'commands', 'scaffold', 'create-prd.toml'), 'utf8'))
+      .toContain('User request: scaffold create-prd')
   })
 })

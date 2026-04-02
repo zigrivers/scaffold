@@ -34,6 +34,11 @@ describe('migrateV1', () => {
     expect(result.platforms).toEqual(['codex'])
   })
 
+  it('preserves claude-code and gemini platforms if already present', () => {
+    const result = migrateV1({ version: 1, methodology: 'classic', platforms: ['claude-code', 'gemini'] })
+    expect(result.platforms).toEqual(['claude-code', 'gemini'])
+  })
+
   it('adds platforms claude-code if missing', () => {
     const result = migrateV1({ version: 1, methodology: 'classic' })
     expect(result.platforms).toEqual(['claude-code'])

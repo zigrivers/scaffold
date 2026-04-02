@@ -26,6 +26,5 @@ scripts/install-hooks.sh
 .scaffold/
 lib/
 commands/
-skills/
 .claude-plugin/
 Makefile

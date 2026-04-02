@@ -3,7 +3,7 @@ import type { OutputContext } from '../cli/output/context.js'
 export interface WizardAnswers {
   methodology: 'deep' | 'mvp' | 'custom'
   depth: 1 | 2 | 3 | 4 | 5
-  platforms: string[]
+  platforms: Array<'claude-code' | 'codex' | 'gemini'>
   traits: string[]
 }
 
@@ -43,10 +43,12 @@ export async function askWizardQuestions(options: {
   }
 
   // Platform selection (simplified — claude-code always included)
-  const platforms = ['claude-code']
+  const platforms: Array<'claude-code' | 'codex' | 'gemini'> = ['claude-code']
   if (!auto) {
     const addCodex = await output.confirm('Include Codex adapter?', false)
     if (addCodex) platforms.push('codex')
+    const addGemini = await output.confirm('Include Gemini adapter?', false)
+    if (addGemini) platforms.push('gemini')
   }
 
   // Traits (web/mobile/desktop)

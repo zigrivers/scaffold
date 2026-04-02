@@ -3,7 +3,7 @@ import type { MethodologyName } from './enums.js'
 export interface WizardAnswers {
   projectName: string
   methodology: MethodologyName
-  platforms: Array<'claude-code' | 'codex'>
+  platforms: Array<'claude-code' | 'codex' | 'gemini'>
   projectPlatforms?: Array<'web' | 'mobile' | 'desktop'>
 }
 

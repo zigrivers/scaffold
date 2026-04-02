@@ -1,12 +1,12 @@
 # Scaffold
 
-A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 60 structured pipeline steps — organized into 16 phases — plus 10 utility tools, and Claude Code handles the research, planning, and implementation for you.
+A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 60 structured pipeline steps — organized into 16 phases — plus 10 utility tools, and the supported AI tools handle the research, planning, and implementation for you.
 
 By the end, you'll have a fully planned, standards-documented, implementation-ready project with working code.
 
 ## What is Scaffold?
 
-Scaffold is a composable meta-prompt pipeline built for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Anthropic's command-line coding tool. If you have an idea for a software project but don't know where to start — or you want to make sure your project is set up with solid architecture, standards, and tests from day one — Scaffold guides you through every step.
+Scaffold is a composable meta-prompt pipeline built for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Gemini, and other supported AI coding tools. If you have an idea for a software project but don't know where to start — or you want to make sure your project is set up with solid architecture, standards, and tests from day one — Scaffold guides you through every step.
 
 Here's how it works:
 
@@ -19,9 +19,9 @@ Here's how it works:
 You can run steps two ways:
 
 - **CLI**: `scaffold run create-prd` — the assembly engine builds a full prompt from the meta-prompt, knowledge base entries, and project context. Best for the structured pipeline with dependency tracking.
-- **Slash commands**: `/scaffold:create-prd` in Claude Code — uses pre-rendered, self-contained prompts. Best for quick access to individual commands without the full pipeline ceremony.
+- **Slash commands**: `/scaffold:create-prd` in Claude Code or Gemini — uses pre-rendered, self-contained prompts. Best for quick access to individual commands without the full pipeline ceremony.
 
-Either way, Scaffold constructs the prompt and Claude does the work. The CLI tracks pipeline state and dependencies; slash commands are fire-and-forget.
+Either way, Scaffold constructs the prompt and the target AI tool does the work. The CLI tracks pipeline state and dependencies; slash commands are fire-and-forget.
 
 ## Key Concepts
 
@@ -118,7 +118,7 @@ Install the Scaffold plugin inside Claude Code for slash commands AND the intera
 This gives you:
 - **Slash commands** (`/scaffold:create-prd`, `/scaffold:tdd`, etc.) — quick access to any pipeline step
 - **Scaffold Runner skill** — intelligent interactive wrapper that surfaces decision points (depth level, strictness, optional sections) before execution instead of letting Claude pick defaults silently
-- **Pipeline reference skill** — shows pipeline ordering, dependencies, and completion status
+- **Pipeline reference skill** — shows pipeline ordering, dependencies, and phase structure
 - **Multi-model dispatch skill** — correct invocation patterns for Codex and Gemini CLIs
 
 **Usage** — just tell Claude Code what you want in natural language:
@@ -138,7 +138,9 @@ The plugin is optional — everything it does can also be done with `scaffold ru
 > ```bash
 > scaffold skill install
 > ```
-> This copies the Scaffold Runner, Pipeline Reference, and Multi-Model Dispatch skills to `.claude/skills/` in your project.
+> This copies the Scaffold Runner and Pipeline Reference skills to both `.claude/skills/` and `.agents/skills/` in your project.
+
+> **Gemini users**: `scaffold build` keeps a root `GEMINI.md` in sync with the shared runner instructions and generates `.gemini/commands/scaffold/*.toml` slash commands. Plain prompts like `scaffold status` work because Gemini loads `GEMINI.md`.
 
 ## Updating
 
@@ -833,12 +835,12 @@ src/
 ├── cli/middleware/    # Project root detection, output mode resolution
 ├── cli/output/       # Output strategies (interactive, json, auto)
 ├── core/assembly/    # Assembly engine — meta-prompt → full prompt
-├── core/adapters/    # Platform adapters (Claude Code, Codex, Universal)
+├── core/adapters/    # Platform adapters (Claude Code, Gemini, Codex, Universal)
 ├── core/dependency/  # DAG builder, topological sort, eligibility
 ├── core/knowledge/   # Knowledge update assembler
 ├── state/            # State manager, lock manager, decision logger
 ├── config/           # Config loading, migration, schema validation
-├── project/          # Project detector, CLAUDE.md manager, adoption
+├── project/          # Project detector, CLAUDE.md/GEMINI.md managers, adoption
 ├── wizard/           # Init wizard (interactive + --auto)
 ├── validation/       # Config, state, frontmatter validators
 ├── types/            # TypeScript types and enums
@@ -851,7 +853,7 @@ src/
 - **Assembly engine** (`src/core/assembly/engine.ts`) — Pure orchestrator with no I/O. Constructs 7-section prompts from meta-prompt + knowledge + context + methodology + instructions + depth guidance.
 - **State manager** (`src/state/state-manager.ts`) — Atomic writes via tmp + `fs.renameSync()`. Tracks step status, in-progress records, and next-eligible cache. Includes migration system for step renames and retired steps.
 - **Dependency graph** (`src/core/dependency/`) — Kahn's algorithm topological sort with phase-aware ordering and cycle detection.
-- **Platform adapters** (`src/core/adapters/`) — 3-step lifecycle (initialize → generateStepWrapper → finalize) producing hidden adapter artifacts under `.scaffold/generated/claude-code/`, `.scaffold/generated/codex/`, and `.scaffold/generated/universal/`.
+- **Platform adapters** (`src/core/adapters/`) — 3-step lifecycle (initialize → generateStepWrapper → finalize) producing `.scaffold/generated/claude-code/commands/`, `.scaffold/generated/codex/AGENTS.md`, `.scaffold/generated/universal/prompts/README.md`, and Gemini project-local files under `.agents/skills/`, `GEMINI.md`, and `.gemini/commands/scaffold/`.
 - **Project detector** (`src/project/detector.ts`) — Scans for file system signals to classify projects as greenfield, brownfield, or v1-migration.
 - **Check command** (`src/cli/commands/check.ts`) — Applicability detection for conditional steps (platform detection, GitHub remote detection, CLI availability).
 
@@ -864,6 +866,7 @@ knowledge/            # 61 domain expertise entries (core, product, review, vali
 methodology/          # 3 YAML presets (deep, mvp, custom)
 commands/             # 72 Claude Code slash commands (60 pipeline + 9 tools + 3 supplemental)
 skills/               # 3 Claude Code skills (pipeline reference, runner, multi-model dispatch)
+agent-skills/         # 2 shared agent skills packaged for Claude Code and Gemini installs
 ```
 
 ### Testing
@@ -878,7 +881,7 @@ skills/               # 3 Claude Code skills (pipeline reference, runner, multi-
 ### Contributing
 
 1. Meta-prompt content lives in `pipeline/` — edit the relevant `.md` file
-2. If you changed adapter behavior, run `scaffold build` in a test project and inspect the generated artifacts under `.scaffold/generated/`.
+2. If you changed adapter behavior, run `scaffold build` in a test project and inspect the generated artifacts under `.scaffold/generated/` plus the Gemini project-local outputs (`.agents/skills/`, `GEMINI.md`, `.gemini/commands/scaffold/`).
 3. Run `make check-all` (lint + type-check + test + evals) before submitting
 4. Knowledge entries live in `knowledge/` — follow the existing frontmatter schema
 5. ADRs documenting architectural decisions are in `docs/v2/adrs/`
