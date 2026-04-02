@@ -31,7 +31,7 @@ Use this skill ONLY when the user asks about:
 | 8 | `specification` | Specifications | Creates interface specs: database schema with constraints, API contracts with error codes, UX flows with accessibility. Each conditional. |
 | 9 | `quality` | Quality Gates | Reviews testing, generates test skeletons, creates eval checks, designs deployment pipeline, and conducts security review. |
 | 10 | `parity` | Platform Parity | Audits documentation for platform-specific gaps. Skips for single-platform projects. |
-| 11 | `consolidation` | Consolidation | Optimizes CLAUDE.md under 200 lines and audits all workflow docs for consistency. |
+| 11 | `consolidation` | Consolidation | Optimizes {{INSTRUCTIONS_FILE}} under 200 lines and audits all workflow docs for consistency. |
 | 12 | `planning` | Planning | Decomposes stories into concrete tasks scoped to ~150 lines and 3 files max, with clear acceptance criteria. |
 | 13 | `validation` | Validation | Seven cross-cutting audits: scope creep, dependency cycles, implementability, traceability, naming drift, broken handoffs, decision completeness. |
 | 14 | `finalization` | Finalization | Applies validation findings, freezes docs, creates onboarding guide, and writes the implementation playbook. |
@@ -47,7 +47,7 @@ Use this skill ONLY when the user asks about:
 | 3 | Product Definition | `/scaffold:user-stories` | Covers every PRD feature |
 | 4 | Product Definition | `/scaffold:review-user-stories` | Multi-pass story review; depth 4+ adds requirements index |
 | 4.5 | Product Definition | `/scaffold:innovate-user-stories` | **(optional)** UX-level enhancements |
-| 5 | Project Foundation | `/scaffold:beads` | **(optional)** Creates CLAUDE.md + task tracking |
+| 5 | Project Foundation | `/scaffold:beads` | **(optional)** Creates {{INSTRUCTIONS_FILE}} + task tracking |
 | 6 | Project Foundation | `/scaffold:tech-stack` | Drives all technical decisions |
 | 7 | Project Foundation | `/scaffold:coding-standards` | References tech-stack.md |
 | 8 | Project Foundation | `/scaffold:tdd` | References tech-stack.md + coding-standards.md |

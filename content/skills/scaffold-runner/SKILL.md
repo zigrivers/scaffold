@@ -1,6 +1,6 @@
 ---
 name: scaffold-runner
-description: Interactive wrapper for the scaffold CLI that surfaces decision points, manages pipeline execution, and provides a seamless scaffold workflow inside a host coding agent.
+description: Interactive wrapper for the scaffold CLI that surfaces decision points, manages pipeline execution, and provides a seamless scaffold workflow inside Claude Code.
 ---
 
 # Scaffold Runner
@@ -46,9 +46,9 @@ Save the output. This is the full 7-section prompt that includes step instructio
 Scan the assembled prompt for user-facing questions. Look for these patterns:
 
 **Explicit question markers:**
+- Lines containing `AskUserQuestionTool` or `AskUserQuestion`
 - Lines containing "ask the user" or "ask me"
-- Lines containing a structured question prompt from the host agent
-- Lines that clearly list decision options for the user
+- Lines containing "Use AskUserQuestionTool for these decisions:"
 
 **Common decision categories:**
 - **Depth/thoroughness**: "depth level", "how thorough", "exhaustive vs focused"
@@ -62,11 +62,11 @@ Scan the assembled prompt for user-facing questions. Look for these patterns:
 - Group related questions together (don't ask one at a time)
 - Provide the options mentioned in the prompt text
 - Include your recommendation based on the project context
-- If the prompt says to collect user decisions in a structured list, extract each bullet as a separate question
+- If the prompt says "use AskUserQuestionTool for these decisions:" followed by a bulleted list, extract each bullet as a separate question
 
 ### Step 4: Surface Decisions to the User
 
-Present all extracted decision points to the user using the host agent's interactive question flow. Group them into a single prompt with up to 4 questions. If there are more than 4, batch them into multiple prompts.
+Present all extracted decision points to the user using AskUserQuestion. Group them into a single call with up to 4 questions. If there are more than 4, batch them into multiple calls.
 
 For each decision:
 - Frame it as a clear choice with concrete options
@@ -95,7 +95,7 @@ Now execute the assembled prompt as your working instructions. This means:
 1. Read the assembled prompt output from Step 2
 2. Follow its instructions section by section
 3. Where the prompt says "ask the user about X", substitute the answer from Step 4
-4. Where the prompt asks for user decisions through the host's question flow, use the pre-collected answer instead
+4. Where the prompt says "use AskUserQuestionTool", use the pre-collected answer instead
 5. Perform all file operations, artifact creation, and validation the prompt describes
 
 **Critical: Execute the FULL prompt faithfully.** Don't skip sections, don't summarize, don't take shortcuts. The assembled prompt was carefully constructed with knowledge base content and project context — every section matters.
@@ -148,7 +148,7 @@ If no prior activity is detected, suggest `single-agent-start` or `multi-agent-s
 
 ## Tool Execution
 
-Tools (version-bump, release, version, update, dashboard, prompt-pipeline, session-analyzer, review-pr) are utility commands orthogonal to the pipeline.
+Tools (version-bump, release, version, update, dashboard, prompt-pipeline, session-analyzer, review-code, review-pr, post-implementation-review) are utility commands orthogonal to the pipeline.
 
 ### Differences from Pipeline Steps
 
@@ -167,7 +167,51 @@ Tools (version-bump, release, version, update, dashboard, prompt-pipeline, sessi
 ### Accessing Tools
 
 - `scaffold run <tool-name>` — run a specific tool
-- `scaffold list --tools` — show available tools (when implemented)
+- `scaffold list --section tools` — show available tools (compact)
+- `scaffold list --section tools --verbose` — show with argument hints
+- `scaffold list --section tools --format json` — machine-readable output
+
+## Tool Listing
+
+When the user asks "what tools are available?", "what can I build?", or "show me the tools":
+
+1. Run `scaffold list --section tools --format json`
+2. Parse the JSON: `data.tools.build` (build phase steps) and `data.tools.utility` (utility tools)
+3. Render as two grouped sections:
+
+**Build Phase (Phase 15)**
+> These are stateless pipeline steps — they appear in `scaffold next` once Phase 14 is complete and can be run repeatedly.
+
+| Command | When to Use |
+|---------|-------------|
+| `scaffold run single-agent-start` | Start the autonomous TDD implementation loop — Claude picks up tasks and builds |
+| `scaffold run single-agent-resume` | Resume where you left off after closing Claude Code |
+| `scaffold run multi-agent-start` | Start parallel implementation with multiple agents in worktrees |
+| `scaffold run multi-agent-resume` | Resume parallel agent work after a break |
+| `scaffold run quick-task` | Create a focused task for a bug fix, refactor, or small improvement |
+| `scaffold run new-enhancement` | Add a new feature to an already-scaffolded project |
+
+**Utility Tools**
+> These are orthogonal to the pipeline — usable at any time, not tied to pipeline state.
+
+| Command | When to Use |
+|---------|-------------|
+| `scaffold run version-bump` | Mark a milestone with a version number without the full release ceremony |
+| `scaffold run release` | Run the target project's release ceremony — changelog plus whatever release artifacts that project defines. Supports `--dry-run`, `current`, and `rollback` |
+| `scaffold run version` | Show the current scaffold version |
+| `scaffold run update` | Update scaffold to the latest version |
+| `scaffold run dashboard` | Open a visual progress dashboard in your browser |
+| `scaffold run prompt-pipeline` | Print the full pipeline reference table |
+| `scaffold run review-code` | Run all 3 code review channels on local code before commit or push |
+| `scaffold run review-pr` | Run all 3 code review channels (Codex CLI, Gemini CLI, Superpowers) on a PR |
+| `scaffold run post-implementation-review` | Full 3-channel codebase review after an AI agent completes all tasks |
+| `scaffold run session-analyzer` | Analyze Claude Code session logs for patterns and insights |
+
+**Display rules:**
+- The tool list comes from CLI output (always complete and up-to-date)
+- The "When to Use" column comes from the table above (stable prose)
+- If the CLI returns a tool not in the table above, display it using its `description` field from the CLI output — graceful degradation
+- For verbose detail (`--verbose`), call `scaffold list --section tools --verbose --format json` and add an Arguments column using the `argumentHint` values
 
 ## Session Preferences
 
@@ -180,6 +224,7 @@ Track these preferences within the current session to avoid re-asking:
 | Methodology | "I'm using MVP" | Informs default recommendations |
 | Batch mode | "Run the next 3 steps" | Execute sequentially, surface decisions for each |
 | Compact status | User is mid-pipeline, only cares about remaining work | Default to `scaffold status --compact` |
+| Pre-push review | "Run review-code before committing and pushing" | Remember to insert `scaffold run review-code` before `git push` in build flows |
 
 When the user sets a preference, acknowledge it and apply it to subsequent steps. Don't ask about it again unless the context changes.
 
@@ -217,8 +262,9 @@ Respond to these natural language requests:
 | "New feature" / "Add enhancement" | `scaffold run new-enhancement <description>` |
 | "Bump version" / "Version bump" | `scaffold run version-bump` |
 | "Create release" / "Release" | `scaffold run release` |
-| "What tools are available?" | `scaffold list --tools` |
+| "What tools are available?" | Run `scaffold list --section tools --format json`, render as two-section grouped display — see [Tool Listing](#tool-listing) |
 | "Show version" | `scaffold run version` |
+| "Review local code" / "Review before push" / "Review before committing and pushing" | `scaffold run review-code` |
 | "Review PR" / "Run code review" | `scaffold run review-pr` |
 
 ### Re-running Steps
@@ -261,18 +307,18 @@ Use the full `scaffold status` (without `--compact`) when the user asks for a co
 Some steps behave significantly differently at higher depths. When running these steps, surface the depth choice as a decision point:
 
 **`review-user-stories`** — The review step scales with depth:
-- Depth 1-3: Codex-only multi-pass review (6 review passes)
+- Depth 1-3: Claude-only multi-pass review (6 review passes)
 - Depth 4: Adds requirements index (REQ-xxx IDs) and coverage matrix (coverage.json) for formal PRD traceability
-- Depth 5: Adds multi-model dispatch to Codex/Gemini CLI for independent validation, with graceful fallback to Codex-only enhanced review if CLIs aren't available
+- Depth 5: Adds multi-model dispatch to Codex/Gemini CLI for independent validation, with graceful fallback to Claude-only enhanced review if CLIs aren't available
 
-When running `review-user-stories` at depth 5, check if `codex` or `gemini` CLI is available (`command -v codex`, `command -v gemini`). If neither is available, inform the user that the step will fall back to a Codex-only adversarial self-review — still valuable but less thorough than multi-model review.
+When running `review-user-stories` at depth 5, check if `codex` or `gemini` CLI is available (`command -v codex`, `command -v gemini`). If neither is available, inform the user that the step will fall back to a Claude-only adversarial self-review — still valuable but less thorough than multi-model review.
 
 **`ai-memory-setup`** — Three-tier AI memory configuration:
-- Tier 1 (Modular Rules): Extracts conventions from coding-standards.md, tech-stack.md, git-workflow.md into path-scoped `.Codex/rules/` files. Always recommended.
+- Tier 1 (Modular Rules): Extracts conventions from coding-standards.md, tech-stack.md, git-workflow.md into path-scoped `.claude/rules/` files. Always recommended.
 - Tier 2 (Persistent Memory): Configures MCP Knowledge Graph server (`@modelcontextprotocol/server-memory`), lifecycle hooks (PreCompact, Stop), and decision logging in `docs/decisions/`.
 - Tier 3 (External Context): Adds library documentation server (Context7/Nia/Docfork) to prevent API hallucination. Only relevant for projects with external dependencies.
 
-The step auto-detects installed MCP servers and presents tier choices as decision points. Brownfield detection: if `.Codex/rules/` exists, enters update mode preserving user customizations.
+The step auto-detects installed MCP servers and presents tier choices as decision points. Brownfield detection: if `.claude/rules/` exists, enters update mode preserving user customizations.
 
 **`add-e2e-testing`** — Unified E2E testing step that auto-detects the platform:
 - Reads `docs/tech-stack.md` and `package.json` to determine web (Playwright), mobile (Maestro), or both
@@ -299,7 +345,7 @@ All review and validation steps now support independent multi-model validation a
 - **Codex**: `codex exec --skip-git-repo-check -s read-only --ephemeral "prompt" 2>/dev/null` (NOT bare `codex`)
 - **Gemini**: `NO_BROWSER=true gemini -p "prompt" --output-format json --approval-mode yolo 2>/dev/null`
 
-**`NO_BROWSER=true` is required for all Gemini invocations** from non-interactive host-agent shells. Without it, Gemini's child process relaunch shows a consent prompt that hangs in non-TTY shells.
+**`NO_BROWSER=true` is required for all Gemini invocations** from Claude Code's Bash tool. Without it, Gemini's child process relaunch shows a consent prompt that hangs in non-TTY shells.
 
 **Auth verification is mandatory before dispatch.** CLI tokens expire mid-session. Before running any review at depth 4-5:
 1. Check Codex auth: `codex login status`
@@ -311,7 +357,7 @@ When running a review step at depth 4-5:
 1. Check CLI availability before dispatching
 2. If both available, run dual-model review for highest quality
 3. If one available, run single-model external review
-4. If neither available, fall back to Codex-only adversarial self-review
+4. If neither available, fall back to Claude-only adversarial self-review
 
 The runner should surface the depth choice as a decision point for review steps, noting that depth 4-5 enables multi-model validation if CLIs are available.
 
@@ -350,7 +396,7 @@ Map natural language requests to concrete step lists using `scaffold status` out
 | specification | Specifications | Creates interface specs for each system layer: database schema with constraints, API contracts with endpoints and error codes, UX flows with accessibility. Each conditional. | database-schema, review-database, api-contracts, review-api, ux-spec, review-ux |
 | quality | Quality Gates | Reviews testing strategy, generates test skeletons from acceptance criteria, creates eval checks, designs deployment pipeline, and conducts OWASP security review. | review-testing, story-tests, create-evals, operations, review-operations, security, review-security |
 | parity | Platform Parity | Audits documentation for platform-specific gaps across target platforms. Skips for single-platform projects. | platform-parity-review |
-| consolidation | Consolidation | Optimizes AGENTS.md under 200 lines with critical patterns front-loaded, then audits all workflow docs for consistency. | Codex-md-optimization, workflow-audit |
+| consolidation | Consolidation | Optimizes {{INSTRUCTIONS_FILE}} under 200 lines with critical patterns front-loaded, then audits all workflow docs for consistency. | claude-md-optimization, workflow-audit |
 | planning | Planning | Decomposes stories and architecture into concrete tasks scoped to ~150 lines of code and 3 files max, with clear acceptance criteria. | implementation-plan, implementation-plan-review |
 | validation | Validation | Seven cross-cutting audits catching scope creep, dependency cycles, implementability ambiguities, traceability gaps, naming drift, and broken handoffs. | cross-phase-consistency, traceability-matrix, decision-completeness, critical-path-walkthrough, implementability-dry-run, dependency-graph-validation, scope-creep-check |
 | finalization | Finalization | Applies validation findings, freezes docs, creates developer onboarding guide, and writes the implementation playbook agents follow during every coding session. | apply-fixes-and-freeze, developer-onboarding-guide, implementation-playbook |
@@ -457,7 +503,6 @@ Batch complete: 6/7 steps executed
   ✓ security — created security review
   ✗ review-security — STOPPED: Codex CLI auth expired (needs: ! codex login)
   ○ review-architecture — not reached
-```
 
 Issues requiring attention:
   1. review-security blocked on Codex auth — run `! codex login` to fix, then "continue batch"
@@ -617,5 +662,5 @@ When `scaffold rework --advance` reports all steps done (returns `all_done: true
 - **Does not modify .scaffold/config.json** — reads only (unless user explicitly asks to change methodology)
 - **Does not invent pipeline steps** — the pipeline defines what runs; this skill executes it
 - **Does not suppress questions** — every decision point gets surfaced. Silent defaults defeat the purpose.
-- **Does not cache preferences across sessions** — each host-agent session starts fresh
+- **Does not cache preferences across sessions** — each Claude Code session starts fresh
 - **Does not run steps in parallel** — batch execution is always sequential (one step at a time per ADR-021). Parallel execution is for the implementation phase via separate worktrees.
