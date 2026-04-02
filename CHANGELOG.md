@@ -2,6 +2,18 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.0.0] — 2026-04-02
+
+### Changed
+
+- **Scaffold-generated adapter output now lives under `.scaffold/generated/`** — `scaffold init` and `scaffold build` no longer write root `commands/`, `prompts/`, `codex-prompts/`, or a Scaffold-generated root `AGENTS.md`. Generated Claude Code, Codex, and Universal artifacts now live under hidden `.scaffold/generated/<platform>/...` paths.
+- **`scaffold init` now auto-runs `scaffold build`, and Scaffold manages a project `.gitignore` block** — fresh projects now get hidden generated output plus default ignore rules for `.scaffold/generated/`, `.scaffold/lock.json`, and Scaffold temp files, while keeping committed `.scaffold` state files visible.
+- **This release is intentionally breaking for older projects** — existing projects must remove legacy root generated output and rebuild. See the README migration section for the exact steps.
+
+### Fixed
+
+- **Legacy-output migration warnings no longer flag a user-owned root `AGENTS.md`** — only a Scaffold-generated root `AGENTS.md` is treated as old generated output during migration.
+
 ## [2.45.0] — 2026-04-01
 
 ### Added
