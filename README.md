@@ -742,7 +742,7 @@ Claude analyzes your commits since the last release, suggests whether this is a 
 1. Running your project's tests
 2. Updating the version number in your project files
 3. Generating a changelog entry
-4. Creating a Git tag and GitHub release
+4. Creating a Git tag, GitHub release, and npm publish
 
 Options: `--dry-run` to preview, `minor`/`major`/`patch` to specify the bump, `current` to release an already-bumped version, `rollback` to undo.
 

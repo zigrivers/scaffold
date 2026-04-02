@@ -2,6 +2,19 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.0.1] — 2026-04-02
+
+### Changed
+
+- **Scaffold maintainer docs no longer imply the Scaffold repo uses Beads internally** — `AGENTS.md`, `CLAUDE.md`, `docs/git-workflow.md`, `docs/dev-setup.md`, `docs/v2/operations-runbook.md`, and `docs/v2/security-practices.md` now describe Scaffold's own maintainer workflow without `bd`, `.beads/`, or Beads-specific tracker assumptions, while keeping Beads available for downstream generated projects.
+- **Maintainer quality-gate guidance is now consistent on `make check-all`** — repo entrypoints and supporting docs now distinguish `make check` as the bash-only gate and `make check-all` as the full pre-submit / pre-push gate, matching the current `Makefile` and CI workflow.
+- **Product docs now explicitly separate downstream Beads support from Scaffold's own workflow** — `README.md` and `docs/v2/reference/scaffold-overview.md` frame Beads as an optional downstream feature, not the task-tracking workflow used to develop Scaffold itself.
+
+### Fixed
+
+- **`scaffold release` README docs now match the actual release behavior** — the release section now states that releases publish to npm in addition to creating a tag and GitHub release.
+- **Knowledge E2E tests now bootstrap cleanly from a checkout without prebuilt `dist/` artifacts** — `src/e2e/knowledge.test.ts` now rebuilds when the CLI bundle or copied knowledge template is missing, and the regression harness passes the full lint/test gate.
+
 ## [3.0.0] — 2026-04-02
 
 ### Changed
