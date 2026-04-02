@@ -13,6 +13,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a **prompt pipeline** — a curated sequence of structured prompts used to scaffold new software projects with Claude Code. The entire pipeline lives in a single file (`prompts.md`) and is designed to be run in order, with each prompt building on artifacts produced by earlier ones.
 
+Beads is an optional workflow Scaffold can generate for downstream projects. It
+is not the task-tracking workflow used to develop the Scaffold repository
+itself.
+
 ## Structure
 
 This repo is a **Claude Code plugin** (installable via `/plugin marketplace add`) and also distributable as user commands.
