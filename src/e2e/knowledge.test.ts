@@ -168,7 +168,7 @@ describe('scaffold knowledge (E2E)', () => {
     const previousRunCommand = runCommand
     const previousCliBuilt = cliBuilt
     let buildCalls = 0
-    runCommand = (cmd: string, options?: childProcess.ExecSyncOptions) => {
+    runCommand = (cmd: string, _options?: childProcess.ExecSyncOptions) => {
       if (cmd === 'npm run build') {
         buildCalls += 1
         fs.mkdirSync(path.dirname(templatePath), { recursive: true })
