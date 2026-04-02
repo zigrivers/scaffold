@@ -6,8 +6,8 @@ Beads CLI when working on Scaffold itself.
 ## Quick Reference
 
 ```bash
-npm run check         # Run lint + type-check + tests
-npm run build         # Compile TypeScript to dist/
+make check            # Run bash quality gates (lint + validate + test + eval)
+make check-all        # Run all quality gates (bash + TypeScript)
 git status -sb        # Inspect local state quickly
 git pull --rebase     # Rebase onto latest remote state
 git push              # Publish local commits
@@ -19,9 +19,9 @@ git push              # Publish local commits
 
 **MANDATORY WORKFLOW:**
 
-1. **File follow-up work** - Create GitHub issues or leave explicit handoff notes for anything that still needs work
+1. **File follow-up work** - Record anything still needing work in the current tracker or leave explicit handoff notes
 2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update follow-up status** - Make sure remaining work is reflected in issues, PR comments, or the handoff
+3. **Update follow-up status** - Make sure remaining work is reflected in the current tracker or handoff
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
