@@ -56,7 +56,7 @@ The setup is idempotent — running `npm install` again after a `git pull` picks
 | `npm run build` | `tsc` | Compile TypeScript to `dist/` |
 | `npm run lint` | `eslint src/` | Lint source and test files |
 | `npm run type-check` | `tsc --noEmit` | Type-check without emitting |
-| `npm run check` | `npm run lint && npm run type-check && npm test` | All quality gates (local equivalent of CI) |
+| `npm run check` | `npm run lint && npm run type-check && npm test` | TypeScript quality gates (used by `make check-all`) |
 
 ### 2.4 Project Layout for Development
 
@@ -134,7 +134,7 @@ node --version   # Should print 18.x or 22.x
 If you don't have `nvm`, install it or use `fnm`. The minimum version is enforced by `package.json` `engines.node`.
 
 **Tests pass locally but fail in CI:**
-Check the Node version matrix — CI runs Node 18 and 22. A test using a Node 22 API will fail on 18. Use feature detection or polyfills for cross-version compatibility. To test both versions locally: `nvm install 18 && nvm use 18 && npm test`, then repeat for 22. For full CI parity, run `npm run check` (not just `npm test`) under each Node version. To fully reproduce CI conditions: use `npm ci` (not `npm install`), delete `dist/` before building, and run with `--no-cache` if vitest caching is suspected. For filesystem case-sensitivity issues on macOS, create a case-sensitive disk image: `hdiutil create -size 2g -fs 'Case-sensitive APFS' -volname CaseSensitive cs.dmg && open cs.dmg`.
+Check the Node version matrix — CI runs Node 18 and 22. A test using a Node 22 API will fail on 18. Use feature detection or polyfills for cross-version compatibility. To test both versions locally: `nvm install 18 && nvm use 18 && npm test`, then repeat for 22. For full CI parity, run `make check-all` (not just `npm test`) under each Node version. To fully reproduce CI conditions: use `npm ci` (not `npm install`), delete `dist/` before building, and run with `--no-cache` if vitest caching is suspected. For filesystem case-sensitivity issues on macOS, create a case-sensitive disk image: `hdiutil create -size 2g -fs 'Case-sensitive APFS' -volname CaseSensitive cs.dmg && open cs.dmg`.
 
 **Platform differences (macOS local vs Ubuntu CI):**
 CI runs on `ubuntu-latest`. Known divergences:
@@ -335,7 +335,7 @@ Scaffold follows [semver](https://semver.org):
 ### 4.2 Release Checklist
 
 1. **Verify release scope is complete**: merged PRs, open follow-up issues, and release notes all agree on what is included in this release
-2. **Run local quality gates**: `npm run check` passes (lint + type-check + test)
+2. **Run local quality gates**: `make check-all` passes (bash + TypeScript full pre-submit gate)
 3. **Update CHANGELOG.md**: follow [keep-a-changelog](https://keepachangelog.com) format
    ```markdown
    ## [1.2.0] - 2026-03-15
@@ -677,7 +677,8 @@ git clone <repo-url> && cd scaffold
 npm install && npm test              # Install + verify
 # Pick work from GitHub issues, PR follow-ups, or the session scope
 # Implement with TDD: write test -> red -> green -> refactor
-npm run check                        # All quality gates
+make check                           # Bash quality gates
+make check-all                       # Full pre-submit gate
 git commit -m "type(scope): description"
 ```
 
