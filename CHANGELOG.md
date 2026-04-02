@@ -2,6 +2,18 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.1.0] — 2026-04-03
+
+### Added
+
+- **First-class Gemini CLI runner support for Scaffold projects** — `gemini` is now a supported platform in `.scaffold/config.yml`, the init wizard can enable it directly, and `scaffold build` now generates Gemini-native project output instead of leaving Gemini users without a runner path.
+- **Gemini project-local command generation** — Scaffold now creates a managed root `GEMINI.md`, shared `.agents/skills/scaffold-runner/` and `.agents/skills/scaffold-pipeline/` installs, plus `.gemini/commands/scaffold/*.toml` wrappers so Gemini users can run flows like `scaffold status` and `scaffold create-prd` in-project.
+
+### Changed
+
+- **`scaffold skill install` now installs shared agent skills as well as Claude Code skills** — the CLI now copies the packaged runner/pipeline skills into both `.claude/skills/` and `.agents/skills/`, keeping Claude and Gemini project-local integrations aligned.
+- **Gemini support is now packaged and documented as part of the normal Scaffold install/build flow** — `agent-skills/` is now shipped in the npm package, and the README/reference docs now describe the correct Gemini invocation model, generated files, and project structure.
+
 ## [3.0.2] — 2026-04-02
 
 ### Changed
