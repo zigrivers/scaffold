@@ -36,7 +36,7 @@ make setup
 make hooks
 
 # Run all quality gates to verify setup
-make check
+make check-all
 ```
 
 ## Daily Development
@@ -49,7 +49,7 @@ git checkout -b type/short-description origin/main
 # 2. Make your changes (TDD: write tests first)
 
 # 3. Run quality gates
-make check
+make check-all
 
 # 4. Commit
 git commit -m "type(scope): description"
@@ -66,7 +66,8 @@ gh pr create
 | Run tests | `make test` |
 | Lint shell scripts | `make lint` |
 | Validate command frontmatter | `make validate` |
-| Run all quality gates | `make check` |
+| Run bash quality gates only | `make check` |
+| Run all quality gates | `make check-all` |
 | Install dev dependencies | `make setup` |
 | Install git hooks | `make hooks` |
 | Install scaffold commands | `make install` |
@@ -106,5 +107,5 @@ Quick-start for automated workflows:
 
 ```bash
 make setup          # Ensure all tools are installed
-make check          # Run all quality gates
+make check-all      # Run all quality gates
 ```

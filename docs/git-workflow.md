@@ -67,7 +67,7 @@ chore: initialize project structure
 
 1. Run quality gates:
    ```bash
-   make check
+   make check-all
    ```
 2. Push branch:
    ```bash
@@ -89,7 +89,7 @@ chore: initialize project structure
 
 ## 4. Branch Protection
 
-CI is required on PRs to main. The `check` job in `.github/workflows/ci.yml` runs `make check` (lint + validate + test).
+CI is required on PRs to main. The `check` job in `.github/workflows/ci.yml` runs `make check-all` (the full bash + TypeScript gate).
 
 ### Setup (After First CI Run)
 
@@ -145,7 +145,7 @@ These are local-only. Each developer/agent runs `make hooks` after cloning.
 
 ### CI by Design
 
-Quality gates run both locally (`make check`) and in CI. The CI workflow is the authoritative gate — local hooks are a convenience.
+Quality gates run both locally (`make check-all`) and in CI. The CI workflow is the authoritative gate — local hooks are a convenience.
 
 ## 7. Advanced: Parallel Agents (Worktrees)
 

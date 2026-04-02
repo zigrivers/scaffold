@@ -13,6 +13,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a **prompt pipeline** — a curated sequence of structured prompts used to scaffold new software projects with Claude Code. The entire pipeline lives in a single file (`prompts.md`) and is designed to be run in order, with each prompt building on artifacts produced by earlier ones.
 
+Beads is an optional workflow Scaffold can generate for downstream projects. It
+is not the task-tracking workflow used to develop the Scaffold repository
+itself.
+
 ## Structure
 
 This repo is a **Claude Code plugin** (installable via `/plugin marketplace add`) and also distributable as user commands.
@@ -53,7 +57,8 @@ When modifying prompts:
 
 | Command | Purpose |
 |---------|---------|
-| `make check` | Run all quality gates (lint + validate + test) |
+| `make check` | Run bash quality gates (lint + validate + test + eval) |
+| `make check-all` | Run all quality gates (bash + TypeScript) |
 | `make test` | Run bats test suite |
 | `make lint` | Run ShellCheck on all shell scripts |
 | `make validate` | Validate frontmatter in command files |
@@ -71,7 +76,7 @@ When modifying prompts:
 
 ### Committing and Creating PRs
 
-1. Run `make check` to verify all quality gates pass
+1. Run `make check-all` to verify all quality gates pass
 2. Push branch: `git push -u origin HEAD`
 3. Create PR: `gh pr create`
 4. Wait for CI (`check` job) to pass
@@ -93,7 +98,7 @@ See `docs/git-workflow.md` for the full workflow.
 
 ## Code Review
 
-Before pushing, review `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md. Fix any issues and re-run `make check`. Log recurring patterns to tasks/lessons.md.
+Before pushing, review `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md. Fix any issues and re-run `make check-all`. Log recurring patterns to tasks/lessons.md.
 
 ### Mandatory 3-Channel PR Review
 
@@ -157,7 +162,7 @@ See `docs/dev-setup.md` for the full setup guide.
 - **Build tool**: GNU Make (`Makefile` at repo root)
 - **Lint**: ShellCheck (`make lint`)
 - **Test**: bats-core (`make test`)
-- **All gates**: `make check` (lint + validate + test)
+- **All gates**: `make check-all` (bash + TypeScript)
 - **Git hooks**: `make hooks` installs pre-commit (ShellCheck + frontmatter) and pre-push (test suite)
 
 ## Design System

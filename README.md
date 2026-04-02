@@ -379,7 +379,7 @@ Claude researches and documents your technology choices (language, framework, da
 
 | Step | What It Does |
 |------|-------------|
-| `beads` | Sets up Beads task tracking with a lessons-learned file for cross-session learning, and creates the initial CLAUDE.md skeleton with core principles and workflow conventions. *(optional)* |
+| `beads` | Sets up optional Beads task tracking for downstream projects Scaffold generates, with a lessons-learned file for cross-session learning, and creates the initial CLAUDE.md skeleton with core principles and workflow conventions. *(This is not Scaffold's own issue-tracking workflow.)* |
 | `tech-stack` | Claude researches technology options for your project — language, framework, database, hosting, auth — evaluates each against your requirements, and documents every choice with rationale and alternatives considered. |
 | `coding-standards` | Claude creates coding standards tailored to your tech stack — naming conventions, error handling patterns, import organization, AI-specific rules — and generates working linter and formatter config files. |
 | `tdd` | Claude defines your testing approach — which types of tests to write at each layer, coverage targets, what to mock and what not to, test data patterns — so agents write the right tests from the start. |
@@ -742,7 +742,7 @@ Claude analyzes your commits since the last release, suggests whether this is a 
 1. Running your project's tests
 2. Updating the version number in your project files
 3. Generating a changelog entry
-4. Creating a Git tag and GitHub release
+4. Creating a Git tag, GitHub release, and npm publish
 
 Options: `--dry-run` to preview, `minor`/`major`/`patch` to specify the bump, `current` to release an already-bumped version, `rollback` to undo.
 

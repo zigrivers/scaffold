@@ -1,15 +1,16 @@
 # Agent Instructions
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+This repository does not use Beads for repo task tracking. Do not use the
+Beads CLI when working on Scaffold itself.
 
 ## Quick Reference
 
 ```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --status in_progress  # Claim work
-bd close <id>         # Complete work
-bd sync               # Sync with git
+make check            # Run bash quality gates (lint + validate + test + eval)
+make check-all        # Run all quality gates (bash + TypeScript); full pre-push gate
+git status -sb        # Inspect local state quickly
+git pull --rebase     # Rebase onto latest remote state
+git push              # Publish local commits
 ```
 
 ## Landing the Plane (Session Completion)
@@ -18,13 +19,12 @@ bd sync               # Sync with git
 
 **MANDATORY WORKFLOW:**
 
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
+1. **File follow-up work** - Record anything still needing work in the current tracker or leave explicit handoff notes
+2. **Run quality gates** (if code changed) - Run `make check-all` as the full gate before push/hand-off
+3. **Update follow-up status** - Make sure remaining work is reflected in the current tracker or handoff
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
-   bd sync
    git push
    git status  # MUST show "up to date with origin"
    ```
@@ -37,4 +37,3 @@ bd sync               # Sync with git
 - NEVER stop before pushing - that leaves work stranded locally
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
-
