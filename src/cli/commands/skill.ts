@@ -20,9 +20,9 @@ interface SkillDefinition {
 }
 
 interface SkillTarget {
-  sourceDir: 'skills' | 'agent-skills'
   installDir: '.claude/skills' | '.agents/skills'
   label: string
+  templateVars: Record<string, string>
 }
 
 interface SkillTargetState {
@@ -34,14 +34,14 @@ interface SkillTargetState {
 
 const SKILL_TARGETS: SkillTarget[] = [
   {
-    sourceDir: 'skills',
     installDir: '.claude/skills',
     label: 'Claude Code',
+    templateVars: { INSTRUCTIONS_FILE: 'CLAUDE.md' },
   },
   {
-    sourceDir: 'agent-skills',
     installDir: '.agents/skills',
     label: 'shared agents',
+    templateVars: { INSTRUCTIONS_FILE: 'AGENTS.md' },
   },
 ]
 
@@ -57,13 +57,17 @@ const INSTALLABLE_SKILLS: SkillDefinition[] = [
   },
 ]
 
-/** Resolve the package's skills directory using the same root as pipeline/knowledge. */
-function getPackageSkillsDir(sourceDir: SkillTarget['sourceDir']): string {
-  return path.join(getPackageRoot(), sourceDir)
+/** Resolve {{KEY}} template markers in skill content. */
+function resolveSkillTemplate(content: string, vars: Record<string, string>): string {
+  return content.replace(/\{\{(\w+)\}\}/g, (match, key) => vars[key] ?? match)
 }
 
-function getSkillSourcePath(skillName: string, target: SkillTarget): string {
-  return path.join(getPackageSkillsDir(target.sourceDir), skillName, 'SKILL.md')
+function getSkillTemplateDir(): string {
+  return path.join(getPackageRoot(), 'content', 'skills')
+}
+
+function getSkillSourcePath(skillName: string): string {
+  return path.join(getSkillTemplateDir(), skillName, 'SKILL.md')
 }
 
 function getSkillDestDir(projectRoot: string, target: SkillTarget, skillName: string): string {
@@ -75,9 +79,10 @@ function getSkillDestPath(projectRoot: string, target: SkillTarget, skillName: s
 }
 
 function buildTargetStates(projectRoot: string, skillName: string): SkillTargetState[] {
+  const sourcePath = getSkillSourcePath(skillName)
   return SKILL_TARGETS.map(target => ({
     target,
-    sourcePath: getSkillSourcePath(skillName, target),
+    sourcePath,
     destDir: getSkillDestDir(projectRoot, target, skillName),
     destPath: getSkillDestPath(projectRoot, target, skillName),
   }))
@@ -145,7 +150,9 @@ const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
           }
 
           fs.mkdirSync(state.destDir, { recursive: true })
-          fs.copyFileSync(state.sourcePath, state.destPath)
+          const template = fs.readFileSync(state.sourcePath, 'utf8')
+          const resolved = resolveSkillTemplate(template, state.target.templateVars)
+          fs.writeFileSync(state.destPath, resolved, 'utf8')
           copiedTargets++
           output.success(`${skill.name}: installed to ${state.target.installDir}/${skill.name}/SKILL.md`)
         }
