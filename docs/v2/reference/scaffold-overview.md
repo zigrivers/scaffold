@@ -22,7 +22,7 @@ Phases are run in order, with explicit dependency constraints between prompts. S
 - **Update mode** — all document-creating prompts auto-detect fresh vs. update mode, replacing dedicated migration prompts
 - **Auto-activated pipeline skill** — provides ordering context so Claude Code knows which command to suggest next
 - **Enhancement workflow** — add features to existing projects without re-running the full pipeline
-- **Interactive dashboard** — Beads task dashboard with light/dark theme, filters, and modal task details
+- **Interactive pipeline dashboard** — visual status view for Scaffold runs with light/dark theme, filters, and modal task details
 - **Release management** — versioned release workflow with changelog, GitHub release, and rollback support
 
 ## Pipeline Phases & Commands
@@ -46,7 +46,7 @@ Phases are run in order, with explicit dependency constraints between prompts. S
 
 | # | Command | Description | Optional |
 |---|---------|-------------|----------|
-| 3 | `beads` | Initialize optional Beads task tracking in this downstream project | |
+| 3 | `beads` | Initialize optional Beads task tracking in this downstream project | **(optional)** Downstream projects only |
 | 4 | `tech-stack` | Research and document tech stack decisions | |
 | 5 | `coding-standards` | Create coding standards for the tech stack | |
 | 6 | `tdd` | Create TDD standards for the tech stack | |
@@ -107,7 +107,7 @@ Phases are run in order, with explicit dependency constraints between prompts. S
 |---------|-------------|
 | `single-agent-resume` | Resume work after a break |
 | `multi-agent-resume` | Resume multi-agent work after a break |
-| `dashboard` | Open visual pipeline dashboard in browser |
+| `dashboard` | Open the visual pipeline dashboard for this Scaffold run in your browser |
 | `session-analyzer` | Analyze Claude Code session history |
 | `prompt-pipeline` | Show the full pipeline reference |
 | `update` | Check for and apply scaffold updates |
@@ -139,12 +139,12 @@ Dev Setup → Git Workflow → Claude.md Optimization → Workflow Audit
 
 ## Documentation Outputs
 
-The pipeline generates the following project documents:
+The pipeline can generate the following project documents, depending on the selected prompts and enabled features:
 
 | Document | Produced By | Description |
 |----------|-------------|-------------|
 | `docs/plan.md` | PRD Creation (#1) | Product requirements document |
-| `CLAUDE.md` | Beads Setup (#3) | Claude Code project instructions |
+| `CLAUDE.md` | Beads Setup (#3) | Claude Code project instructions for Beads-enabled downstream projects |
 | `docs/tech-stack.md` | Tech Stack (#4) | Technology choices and rationale |
 | `docs/coding-standards.md` | Coding Standards (#5) | Code style and conventions |
 | `docs/tdd-standards.md` | TDD Standards (#6) | Testing approach and patterns |
@@ -193,7 +193,7 @@ Use `./scripts/install.sh -f` to force overwrite existing files.
 | **TDD** | Test-Driven Development — the pipeline enforces writing tests before implementation |
 | **Frontmatter** | YAML metadata at the top of command files, containing name, description, and argument hints |
 | **Pipeline Skill** | Auto-activated skill that gives Claude Code awareness of pipeline ordering so it can suggest the next command |
-| **Dashboard** | Optional downstream Beads dashboard artifact that provides a visual view of task state in Beads-enabled projects |
+| **Dashboard** | Visual pipeline dashboard for Scaffold runs; Beads-enabled downstream projects may also surface a Beads dashboard artifact |
 | **Update Mode** | All document-creating prompts auto-detect if output exists and switch between fresh/update modes — replaces dedicated migrations |
 | **Quick Task** | Lightweight workflow for bug fixes, refactors, and small improvements without full discovery |
 | **Release** | Versioned release workflow with changelog generation, GitHub release, and rollback support |
