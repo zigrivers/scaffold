@@ -220,12 +220,12 @@ Operations-runbook.md §6.4-6.5 covers supply chain basics (lockfile discipline,
 |----------|---------|-------------|--------|
 | Critical | Block merge | Immediate | Fix or replace dependency before any other work |
 | High | Block merge | 24 hours | Fix in next PR. If no upstream fix exists, evaluate alternatives |
-| Medium | Warning | Within sprint | Track in a GitHub issue or release follow-up list, fix when touching the affected module |
+| Medium | Warning | Within sprint | Track in the issue tracker or release follow-up notes, fix when touching the affected module |
 | Low | None | Best effort | Fix when convenient, bundle with other dependency updates |
 
 `npm audit --audit-level=high` runs in CI (see operations-runbook.md §3.2, `security-audit` job). Critical and high vulnerabilities fail the build.
 
-**Exception process**: If a critical or high vulnerability has no upstream fix available: (1) evaluate whether the vulnerable code path is actually reachable in scaffold's usage, (2) if not reachable, add an `npm audit` override in `package.json` with a comment explaining the exception and a link to the upstream issue, (3) if reachable, replace the dependency or vendor a patched fork, (4) file a follow-up GitHub issue to remove the override when an upstream fix ships.
+**Exception process**: If a critical or high vulnerability has no upstream fix available: (1) evaluate whether the vulnerable code path is actually reachable in scaffold's usage, (2) if not reachable, add an `npm audit` override in `package.json` with a comment explaining the exception and a link to the upstream issue, (3) if reachable, replace the dependency or vendor a patched fork, (4) record a follow-up item to remove the override when an upstream fix ships.
 
 ### Dependency Selection Criteria
 
