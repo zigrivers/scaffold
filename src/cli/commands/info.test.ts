@@ -37,9 +37,9 @@ function makeProjectRoot(opts: {
   }
 
   if (opts.hasPipeline !== false && opts.pipelineFiles) {
-    fs.mkdirSync(path.join(root, 'pipeline'), { recursive: true })
+    fs.mkdirSync(path.join(root, 'content', 'pipeline'), { recursive: true })
     for (const f of opts.pipelineFiles) {
-      fs.writeFileSync(path.join(root, 'pipeline', f.name), f.content, 'utf8')
+      fs.writeFileSync(path.join(root, 'content', 'pipeline', f.name), f.content, 'utf8')
     }
   }
 

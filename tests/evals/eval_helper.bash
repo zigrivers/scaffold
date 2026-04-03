@@ -50,12 +50,12 @@ get_category() {
 
 # Collect all pipeline step names.
 get_pipeline_names() {
-  grep -rh '^name:' "${PROJECT_ROOT}/pipeline/" | sed 's/name: //' | sort
+  grep -rh '^name:' "${PROJECT_ROOT}/content/pipeline/" | sed 's/name: //' | sort
 }
 
 # Collect all knowledge entry names.
 get_knowledge_names() {
-  grep -rh '^name:' "${PROJECT_ROOT}/knowledge/" | sed 's/name: //' | sort
+  grep -rh '^name:' "${PROJECT_ROOT}/content/knowledge/" | sed 's/name: //' | sort
 }
 
 # Extract knowledge-base array entries from a pipeline step file.

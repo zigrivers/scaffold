@@ -9,8 +9,8 @@ const KNOWLEDGE_TEMPLATE_DIST = path.resolve(
   process.cwd(),
   'dist/core/knowledge/knowledge-update-template.md',
 )
-const KNOWLEDGE_SRC = path.resolve(process.cwd(), 'knowledge')
-const PIPELINE_SRC = path.resolve(process.cwd(), 'pipeline')
+const KNOWLEDGE_SRC = path.resolve(process.cwd(), 'content', 'knowledge')
+const PIPELINE_SRC = path.resolve(process.cwd(), 'content', 'pipeline')
 let cliBuilt = false
 type RunCommand = (command: string, options?: childProcess.ExecSyncOptions) => string
 let runCommand: RunCommand = childProcess.execSync as unknown as RunCommand
@@ -75,8 +75,9 @@ function setupProject(dir: string) {
     }),
   )
   // Symlink knowledge and pipeline from source (read-only)
-  fs.symlinkSync(KNOWLEDGE_SRC, path.join(dir, 'knowledge'))
-  fs.symlinkSync(PIPELINE_SRC, path.join(dir, 'pipeline'))
+  fs.mkdirSync(path.join(dir, 'content'), { recursive: true })
+  fs.symlinkSync(KNOWLEDGE_SRC, path.join(dir, 'content', 'knowledge'))
+  fs.symlinkSync(PIPELINE_SRC, path.join(dir, 'content', 'pipeline'))
 }
 
 describe('scaffold knowledge (E2E)', () => {

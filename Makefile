@@ -1,4 +1,4 @@
-.PHONY: help test lint validate check check-all eval ts-check setup hooks install uninstall extract dashboard-test
+.PHONY: help test lint validate check check-all eval ts-check setup hooks dashboard-test
 
 help: ## Show available targets
 	@grep -E '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -9,8 +9,8 @@ test: ## Run bats test suite
 lint: ## Run ShellCheck on all shell scripts
 	@find scripts lib -name '*.sh' -print0 2>/dev/null | xargs -0 shellcheck --severity=warning
 
-validate: ## Validate frontmatter in command files
-	./scripts/validate-frontmatter.sh commands/*.md
+validate: ## Validate frontmatter in pipeline and tool files
+	./scripts/validate-frontmatter.sh content/pipeline/**/*.md content/tools/*.md
 
 check: lint validate test eval ## Run bash quality gates (lint + validate + test + eval)
 
@@ -33,15 +33,6 @@ setup: ## Install dev dependencies via Homebrew
 
 hooks: ## Install pre-commit and pre-push hooks
 	./scripts/install-hooks.sh
-
-install: ## Install scaffold commands to ~/.claude/commands/
-	./scripts/install.sh
-
-uninstall: ## Remove scaffold commands from ~/.claude/commands/
-	./scripts/uninstall.sh
-
-extract: ## Extract commands from prompts.md
-	./scripts/extract-commands.sh
 
 dashboard-test: ## Generate test-ready dashboard HTML
 	@mkdir -p tests/screenshots/current tests/screenshots/diff

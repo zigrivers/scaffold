@@ -15,7 +15,7 @@ setup() {
         missing_deep+=("$(basename "$f")")
       fi
     fi
-  done < <(find "${PROJECT_ROOT}/knowledge" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/knowledge" -name '*.md' -type f)
 
   printf "Knowledge entries with Summary but no Deep Guidance: %d\n" "${#missing_deep[@]}"
   for entry in "${missing_deep[@]}"; do
@@ -37,11 +37,11 @@ setup() {
     while IFS= read -r entry; do
       [[ -z "$entry" ]] && continue
       # Check if a file with this name exists somewhere under knowledge/
-      if ! find "${PROJECT_ROOT}/knowledge" -name "${entry}.md" -print -quit 2>/dev/null | grep -q .; then
+      if ! find "${PROJECT_ROOT}/content/knowledge" -name "${entry}.md" -print -quit 2>/dev/null | grep -q .; then
         missing+=("$(basename "$f") references '$entry'")
       fi
     done <<< "$kb_refs"
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   printf "Missing knowledge entries: %d\n" "${#missing[@]}"
   for entry in "${missing[@]}"; do
@@ -66,7 +66,7 @@ setup() {
     if [[ "$count" -gt 8 ]]; then
       bloated+=("$(basename "$f"): $count entries")
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   printf "Steps with >8 knowledge entries: %d\n" "${#bloated[@]}"
   for entry in "${bloated[@]}"; do

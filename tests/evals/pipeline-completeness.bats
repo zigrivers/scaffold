@@ -17,7 +17,7 @@ REQUIRED_SECTIONS=("## Purpose" "## Inputs" "## Expected Outputs" "## Quality Cr
         failures+=("$(basename "$file"): missing field '$field'")
       fi
     done
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Pipeline frontmatter failures:\n"
@@ -36,7 +36,7 @@ REQUIRED_SECTIONS=("## Purpose" "## Inputs" "## Expected Outputs" "## Quality Cr
         failures+=("$(basename "$file"): missing section '${section}'")
       fi
     done
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Pipeline section failures:\n"
@@ -48,11 +48,11 @@ REQUIRED_SECTIONS=("## Purpose" "## Inputs" "## Expected Outputs" "## Quality Cr
 @test "pipeline step order values are unique within each phase" {
   local failures=()
   local phases
-  phases="$(grep -rh '^phase:' "${PROJECT_ROOT}/pipeline/" | sed 's/phase: //' | sed 's/"//g' | sort -u)"
+  phases="$(grep -rh '^phase:' "${PROJECT_ROOT}/content/pipeline/" | sed 's/phase: //' | sed 's/"//g' | sort -u)"
 
   while IFS= read -r phase; do
     local dupes
-    dupes="$(grep -rl "^phase:.*${phase}" "${PROJECT_ROOT}/pipeline/" | while read -r f; do
+    dupes="$(grep -rl "^phase:.*${phase}" "${PROJECT_ROOT}/content/pipeline/" | while read -r f; do
       extract_field "$f" "order"
     done | sort | uniq -d)"
 
@@ -80,7 +80,7 @@ REQUIRED_SECTIONS=("## Purpose" "## Inputs" "## Expected Outputs" "## Quality Cr
         failures+=("$(basename "$file"): dependency '$dep' not found")
       fi
     done <<< "$(get_dep_refs "$file")"
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Dangling dependency references:\n"
@@ -105,7 +105,7 @@ REQUIRED_SECTIONS=("## Purpose" "## Inputs" "## Expected Outputs" "## Quality Cr
     if [[ "$order" -lt "$min" || "$order" -gt "$max" ]]; then
       failures+=("$(basename "$file"): order $order outside phase '$phase' range ($min-$max)")
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Order/phase alignment failures:\n"
@@ -125,7 +125,7 @@ REQUIRED_SECTIONS=("## Purpose" "## Inputs" "## Expected Outputs" "## Quality Cr
       [[ -z "$dep" ]] && continue
       # Find the dependency's file
       local dep_file
-      dep_file="$(find "${PROJECT_ROOT}/pipeline" -name "${dep}.md" -type f | head -1)"
+      dep_file="$(find "${PROJECT_ROOT}/content/pipeline" -name "${dep}.md" -type f | head -1)"
       [[ -z "$dep_file" ]] && continue  # dangling dep caught by other test
 
       dep_phase="$(extract_field "$dep_file" "phase")"
@@ -135,7 +135,7 @@ REQUIRED_SECTIONS=("## Purpose" "## Inputs" "## Expected Outputs" "## Quality Cr
         failures+=("$(basename "$file") (phase $step_phase_num/$step_phase) depends on $(basename "$dep_file") (phase $dep_phase_num/$dep_phase) — forward dependency")
       fi
     done <<< "$(get_dep_refs "$file")"
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Forward dependency failures (deps should point to same or earlier phase):\n"
@@ -156,7 +156,7 @@ REQUIRED_SECTIONS=("## Purpose" "## Inputs" "## Expected Outputs" "## Quality Cr
         failures+=("$(basename "$file"): knowledge-base '$ref' not found")
       fi
     done <<< "$(get_kb_refs "$file")"
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Dangling knowledge-base references:\n"
@@ -184,7 +184,7 @@ REQUIRED_SECTIONS=("## Purpose" "## Inputs" "## Expected Outputs" "## Quality Cr
     if ! grep -q '^## Update Mode Specifics' "$file"; then
       missing+=("$(basename "$file")")
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   local present=$(( checked - ${#missing[@]} ))
   printf "Update Mode Specifics coverage: %d/%d steps with active Mode Detection\n" "$present" "$checked"
@@ -202,7 +202,7 @@ REQUIRED_SECTIONS=("## Purpose" "## Inputs" "## Expected Outputs" "## Quality Cr
 
   # Extract unique phase values from pipeline frontmatter
   local pipeline_phases
-  pipeline_phases="$(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f -exec \
+  pipeline_phases="$(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f -exec \
     awk '/^---$/{fm++; next} fm==1 && /^phase:/{sub("^phase:[ ]*",""); gsub(/["'\'']/, ""); print; exit} fm>=2{exit}' {} \; | sort -u)"
 
   while IFS= read -r phase; do
@@ -244,7 +244,7 @@ REQUIRED_SECTIONS=("## Purpose" "## Inputs" "## Expected Outputs" "## Quality Cr
     if ! echo "$body" | grep -qi "conditional\|only.*when\|skip.*if\|required.*when\|applicable.*to\|web.*app\|mobile\|expo\|multi.platform\|if.needed\|when.*present\|if.*exists\|optional\|may.*skip\|not.*all.*projects\|relevant.*project"; then
       failures+=("$(basename "$file"): conditional='${conditional}' but body lacks conditional guidance")
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Conditional steps missing condition documentation:\n"

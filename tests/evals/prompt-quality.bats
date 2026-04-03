@@ -35,7 +35,7 @@ MIN_SECTION_LINES=4
         failures+=("$(basename "$file"): section '${section}' has only ${content_lines} content lines (min ${MIN_SECTION_LINES})")
       fi
     done
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Thin section content (%d sections checked):\n" "$checked"
@@ -64,7 +64,7 @@ MIN_SECTION_LINES=4
       count="$(echo "$placeholders" | wc -l | tr -d ' ')"
       failures+=("$(basename "$file"): ${count} placeholder(s) found")
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Pipeline steps with placeholder text:\n"
@@ -96,7 +96,7 @@ MIN_SECTION_LINES=4
       # but should still have the bullet present
       failures+=("$(basename "$file"): Methodology Scaling missing '- **mvp**' bullet")
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Methodology Scaling format issues (%d checked):\n" "$checked"
@@ -126,7 +126,7 @@ MIN_SECTION_LINES=4
     else
       untagged+=("$(basename "$file")")
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   printf "Quality Criteria depth tags: %d/%d steps tagged\n" "$tagged_count" "$total_count"
 
@@ -156,7 +156,7 @@ MIN_SECTION_LINES=4
     if ! echo "$mode_section" | grep -qi "exist\|present\|found\|check\|look\|detect\|scan\|not applicable\|runs once\|always\|first time"; then
       failures+=("$(basename "$file"): Mode Detection doesn't describe how to detect mode")
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Mode Detection phrasing issues (%d checked):\n" "$checked"

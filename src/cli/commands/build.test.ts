@@ -44,10 +44,11 @@ vi.mock('../../core/assembly/meta-prompt-loader.js', () => ({
 }))
 
 vi.mock('../../utils/fs.js', () => ({
-  getPackagePipelineDir: vi.fn(() => '/fake/pipeline'),
-  getPackageMethodologyDir: vi.fn(() => '/fake/methodology'),
-  getPackageKnowledgeDir: vi.fn(() => '/fake/knowledge'),
-  getPackageToolsDir: vi.fn(() => '/fake/tools'),
+  getPackageRoot: vi.fn(() => '/fake'),
+  getPackagePipelineDir: vi.fn(() => '/fake/content/pipeline'),
+  getPackageMethodologyDir: vi.fn(() => '/fake/content/methodology'),
+  getPackageKnowledgeDir: vi.fn(() => '/fake/content/knowledge'),
+  getPackageToolsDir: vi.fn(() => '/fake/content/tools'),
   atomicWriteFile: vi.fn(),
 }))
 
@@ -167,7 +168,7 @@ function makeMetaPromptMap(names: string[]): Map<string, unknown> {
       name,
       {
         stepName: name,
-        filePath: `/fake/pipeline/${name}.md`,
+        filePath: `/fake/content/pipeline/${name}.md`,
         frontmatter: {
           name,
           phase: 'modeling',

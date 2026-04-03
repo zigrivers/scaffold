@@ -12,7 +12,7 @@ Here's how it works:
 
 1. **Initialize** — run `scaffold init` in your project directory. The init wizard detects whether you're starting fresh (greenfield) or working with an existing codebase (brownfield), and lets you pick a methodology preset (deep, mvp, or custom).
 
-2. **Run steps** — each step is a composable meta-prompt (a short intent declaration in `pipeline/`) that gets assembled at runtime into a full 7-section prompt. The assembly engine injects relevant knowledge base entries, project context from prior steps, methodology settings, and depth-appropriate instructions.
+2. **Run steps** — each step is a composable meta-prompt (a short intent declaration in `content/pipeline/`) that gets assembled at runtime into a full 7-section prompt. The assembly engine injects relevant knowledge base entries, project context from prior steps, methodology settings, and depth-appropriate instructions.
 
 3. **Follow the dependency graph** — Scaffold tracks which steps are complete, which are eligible, and which are blocked. Run `scaffold next` to see what's unblocked, or `scaffold status` for the full picture. Each step produces a specific artifact — a planning document, architecture decision, specification, or actual code.
 
@@ -25,11 +25,11 @@ Either way, Scaffold constructs the prompt and the target AI tool does the work.
 
 ## Key Concepts
 
-**Meta-prompts** — Each pipeline step is defined as a short `.md` file in `pipeline/` with YAML frontmatter (dependencies, outputs, knowledge entries) and a markdown body describing the step's intent. These are *not* the prompts Claude sees — they're assembled into full prompts at runtime.
+**Meta-prompts** — Each pipeline step is defined as a short `.md` file in `content/pipeline/` with YAML frontmatter (dependencies, outputs, knowledge entries) and a markdown body describing the step's intent. These are *not* the prompts Claude sees — they're assembled into full prompts at runtime.
 
 **Assembly engine** — At execution time, Scaffold builds a 7-section prompt from: system metadata, the meta-prompt, knowledge base entries, project context (artifacts from prior steps), methodology settings, layered instructions, and depth-specific execution guidance.
 
-**Knowledge base** — 60 domain expertise entries in `knowledge/` organized in seven categories (core, product, review, validation, finalization, execution, tools) covering testing strategy, domain modeling, API design, security best practices, eval craft, TDD execution, task claiming, worktree management, release management, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
+**Knowledge base** — 60 domain expertise entries in `content/knowledge/` organized in seven categories (core, product, review, validation, finalization, execution, tools) covering testing strategy, domain modeling, API design, security best practices, eval craft, TDD execution, task claiming, worktree management, release management, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
 
 **Methodology presets** — Three built-in presets control which steps run and how deep the analysis goes:
 - **deep** (depth 5) — all steps enabled, exhaustive analysis
@@ -705,7 +705,7 @@ These are stateless pipeline steps — they appear in `scaffold next` once Phase
 
 ### Utility Tools
 
-These are orthogonal to the pipeline — usable at any time, not tied to pipeline state. Defined in `tools/` with `category: tool` frontmatter. Run `scaffold list --section tools` for a complete listing (or `--verbose` for argument hints, `--format json` for machine-readable output):
+These are orthogonal to the pipeline — usable at any time, not tied to pipeline state. Defined in `content/tools/` with `category: tool` frontmatter. Run `scaffold list --section tools` for a complete listing (or `--verbose` for argument hints, `--format json` for machine-readable output):
 
 | Command | When to Use |
 |---------|-------------|
@@ -764,7 +764,7 @@ Options: `--dry-run` to preview, `minor`/`major`/`patch` to specify the bump, `c
 | **Frontmatter** | The YAML metadata block at the top of meta-prompt files, declaring dependencies, outputs, knowledge entries, and other configuration. |
 | **Knowledge base** | 60 domain expertise entries that get injected into prompts. Can be extended with project-local overrides. |
 | **MCP** | Model Context Protocol. A way for Claude to use external tools like a headless browser. |
-| **Meta-prompt** | A short intent declaration in `pipeline/` that gets assembled into a full prompt at runtime. |
+| **Meta-prompt** | A short intent declaration in `content/pipeline/` that gets assembled into a full prompt at runtime. |
 | **Methodology** | A preset (deep, mvp, custom) controlling which steps run and at what depth. |
 | **Multi-model review** | Independent validation from Codex/Gemini CLIs at depth 4-5, catching blind spots a single model misses. |
 | **PRD** | Product Requirements Document. The foundation for everything Scaffold builds. |
@@ -859,14 +859,21 @@ src/
 
 ### Content layout
 
+All build inputs live under `content/`:
+
 ```
-pipeline/             # 60 meta-prompts organized by 16 phases (phases 0-15, including build)
-tools/                # 9 tool meta-prompts (stateless, category: tool)
-knowledge/            # 61 domain expertise entries (core, product, review, validation, finalization, execution, tools)
-methodology/          # 3 YAML presets (deep, mvp, custom)
-commands/             # 72 Claude Code slash commands (60 pipeline + 9 tools + 3 supplemental)
-skills/               # 3 Claude Code skills (pipeline reference, runner, multi-model dispatch)
-agent-skills/         # 2 shared agent skills packaged for Claude Code and Gemini installs
+content/
+├── pipeline/         # 60 meta-prompts organized by 16 phases (phases 0-15, including build)
+├── tools/            # 10 tool meta-prompts (stateless, category: tool)
+├── knowledge/        # 61 domain expertise entries (core, product, review, validation, finalization, execution, tools)
+├── methodology/      # 3 YAML presets (deep, mvp, custom)
+└── skills/           # 3 skill templates with {{markers}} for multi-platform resolution
+```
+
+Generated output (gitignored):
+```
+skills/               # Resolved skills (built from content/skills/ templates)
+dist/                 # Compiled TypeScript output
 ```
 
 ### Testing
@@ -880,12 +887,12 @@ agent-skills/         # 2 shared agent skills packaged for Claude Code and Gemin
 
 ### Contributing
 
-1. Meta-prompt content lives in `pipeline/` — edit the relevant `.md` file
+1. Meta-prompt content lives in `content/pipeline/` — edit the relevant `.md` file
 2. If you changed adapter behavior, run `scaffold build` in a test project and inspect the generated artifacts under `.scaffold/generated/` plus the Gemini project-local outputs (`.agents/skills/`, `GEMINI.md`, `.gemini/commands/scaffold/`).
 3. Run `make check-all` (lint + type-check + test + evals) before submitting
-4. Knowledge entries live in `knowledge/` — follow the existing frontmatter schema
-5. ADRs documenting architectural decisions are in `docs/v2/adrs/`
-6. Run `make hooks` to install git hooks (ShellCheck, frontmatter validation, stale command detection)
+4. Knowledge entries live in `content/knowledge/` — follow the existing frontmatter schema
+5. ADRs documenting architectural decisions are in `docs/architecture/adrs/`
+6. Run `make hooks` to install git hooks (ShellCheck, frontmatter validation)
 
 ## License
 

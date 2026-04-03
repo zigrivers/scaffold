@@ -104,7 +104,7 @@ describe('GeminiAdapter', () => {
     adapter.initialize(context)
 
     const missingSkillDir = path.join(makeTmpDir(), 'missing-agent-skills')
-    vi.spyOn(fsUtils, 'getPackageAgentSkillsDir').mockReturnValue(missingSkillDir)
+    vi.spyOn(fsUtils, 'getPackageSkillsDir').mockReturnValue(missingSkillDir)
 
     const result = adapter.finalize({ results: [] })
 

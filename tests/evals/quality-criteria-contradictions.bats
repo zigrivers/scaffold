@@ -36,7 +36,7 @@ setup() {
       failures+=("$(basename "$file"): untagged 'all pass' criterion conflicts with (mvp)-scoped pass criteria")
       printf "  Untagged: %s\n" "$untagged_all_pass" >&2
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "QC contradiction failures (%d):\n" "${#failures[@]}"
@@ -77,7 +77,7 @@ setup() {
         failures+=("$(basename "$file"): '${deep_text}' appears both untagged and as (deep) criterion")
       fi
     done <<< "$deep_texts"
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Duplicate untagged/(deep) criterion failures (%d):\n" "${#failures[@]}"
@@ -91,7 +91,7 @@ setup() {
 # that can conflict with (mvp)-scoped criteria. Checks the QC section only.
 
 @test "new-enhancement QC has no unqualified 'thorough' language" {
-  local new_enhancement="${PROJECT_ROOT}/pipeline/build/new-enhancement.md"
+  local new_enhancement="${PROJECT_ROOT}/content/pipeline/build/new-enhancement.md"
   [[ -f "$new_enhancement" ]] || {
     echo "pipeline/build/new-enhancement.md not found"
     return 1

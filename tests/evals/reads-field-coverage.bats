@@ -33,7 +33,7 @@ setup() {
         [[ "$out" != *.md ]] && continue  # Only track .md file outputs
         printf '%s:%s\n' "$out" "$step_name"
       done <<< "$outputs_raw"
-    done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+    done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
   )"
 
   local violations=()
@@ -98,7 +98,7 @@ setup() {
         fi
       done <<< "$md_refs"
     done <<< "$inputs_section"
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   local violation_count="${#violations[@]}"
   printf "Reads field coverage: %d required artifact checks, %d violations\n" "$checked" "$violation_count"
@@ -152,7 +152,7 @@ setup() {
     if [[ "$deep_count" -eq 0 ]]; then
       violations+=("${name}: ${total_criteria} QC criteria but none tagged (deep) or (depth N+)")
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   printf "Checked %d steps with 5+ QC criteria for depth differentiation\n" "$checked"
 
@@ -193,7 +193,7 @@ setup() {
     if [[ "$criteria_count" -lt 3 ]]; then
       violations+=("${name}: only ${criteria_count} QC criteria (minimum 3 required)")
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   printf "Checked %d non-stateless steps for minimum QC criteria count\n" "$checked"
 

@@ -1,0 +1,6 @@
+version: 2
+methodology: deep
+platforms:
+  - claude-code
+project:
+  traits: []

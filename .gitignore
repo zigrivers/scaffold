@@ -1,11 +1,17 @@
 .DS_Store
 .history
 
-# Beads local database
+# Build output (rebuilt by npm run build)
+dist/
+
+# Generated skills (resolved from content/skills/ templates during scaffold build)
+skills/
+
+# Beads local database (legacy, may still exist on disk)
 .beads/
 
-# Local runtime state
-.scaffold/
+# Scaffold — preserve state files, ignore dashboard
+.scaffold/dashboard.html
 .superpowers/
 
 # Coverage output (kcov)
@@ -13,7 +19,6 @@ coverage/
 
 # Node.js / TypeScript v2
 node_modules/
-dist/
 
 # Temp files (atomic writes)
 *.tmp
@@ -30,3 +35,10 @@ tests/screenshots/current/
 tests/screenshots/diff/
 tests/screenshots/dashboard-test.html
 .playwright-mcp/
+
+# >>> scaffold managed
+.scaffold/generated/
+.scaffold/lock.json
+.scaffold/*.tmp
+.scaffold/**/*.tmp
+# <<< scaffold managed

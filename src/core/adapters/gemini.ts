@@ -11,7 +11,7 @@ import {
   type OutputFile,
 } from './adapter.js'
 import { renderManagedContent } from '../../project/gemini-md.js'
-import { getPackageAgentSkillsDir } from '../../utils/fs.js'
+import { getPackageSkillsDir } from '../../utils/fs.js'
 import type { ScaffoldError } from '../../types/index.js'
 
 const SKILL_FILES = [
@@ -52,7 +52,7 @@ export class GeminiAdapter implements PlatformAdapter {
       return { files: [], errors: [] }
     }
 
-    const skillDir = getPackageAgentSkillsDir(projectRoot)
+    const skillDir = getPackageSkillsDir(projectRoot)
     const skillFiles = readAgentSkillFiles(skillDir)
     if ('error' in skillFiles) {
       return { files: [], errors: [skillFiles.error] }
