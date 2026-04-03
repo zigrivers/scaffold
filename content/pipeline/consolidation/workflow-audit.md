@@ -5,7 +5,7 @@ summary: "Audits every document that mentions workflow (CLAUDE.md, git-workflow,
 phase: "consolidation"
 order: 1120
 dependencies: [claude-md-optimization]
-outputs: [CLAUDE.md, docs/git-workflow.md]
+outputs: [CLAUDE.md, docs/git-workflow.md, docs/coding-standards.md, tasks/lessons.md]
 conditional: null
 reads: [operations]
 knowledge-base: [cross-phase-consistency, claude-md-patterns, git-workflow-patterns]

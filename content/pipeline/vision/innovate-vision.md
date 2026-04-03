@@ -7,7 +7,7 @@ order: 030
 dependencies: [review-vision]
 outputs: [docs/vision.md]
 conditional: "if-needed"
-knowledge-base: [vision-craft, prd-innovation]
+knowledge-base: [vision-craft, vision-innovation]
 ---
 
 ## Purpose

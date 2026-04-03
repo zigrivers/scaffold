@@ -2,6 +2,19 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.2.2] — 2026-04-04
+
+### Fixed
+
+- **Pipeline frontmatter correctness** — removed redundant `system-architecture` from `review-testing` reads, added undeclared outputs to `workflow-audit`, added missing `system-architecture` to `story-tests` reads.
+- **Multi-model QC language standardized** — `tech-stack` now uses "findings synthesized" consistent with all other multi-model steps.
+- **`innovate-vision` knowledge aligned with step scope** — replaced feature-scoped `prd-innovation` with new `vision-innovation` knowledge entry covering strategic innovation (market positioning, ecosystem plays, contrarian bets).
+- **Test skeleton generation knowledge added** — new `test-skeleton-generation` knowledge entry for `story-tests` step, covering Given/When/Then to test framework translation, layer assignment heuristics, and story-tests-map format.
+
+### Added
+
+- **"After This Step" reference validation eval** — new eval verifies that pipeline step "After This Step" sections reference valid step/tool names.
+
 ## [3.2.1] — 2026-04-03
 
 ### Fixed
