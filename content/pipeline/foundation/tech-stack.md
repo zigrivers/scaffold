@@ -41,7 +41,7 @@ about ecosystem maturity, alternatives, and gotchas.
 - (mvp) Every choice is a decision, not a menu of options
 - (mvp) Quick Reference section lists every dependency with version
 - (deep) Each technology choice documents AI compatibility assessment (training data availability, convention strength); total direct dependencies counted and justified
-- (depth 4+) Multi-model recommendations synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
+- (depth 4+) Multi-model findings synthesized: Consensus (all models agree), Majority (2+ models agree), or Divergent (models disagree — present to user for decision)
 
 ## Methodology Scaling
 - **deep**: Comprehensive research with competitive analysis for each category.
