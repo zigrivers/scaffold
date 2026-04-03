@@ -1,81 +1,108 @@
-<!-- scaffold:project-structure v2 2026-03-12 -->
+<!-- scaffold:project-structure v3 2026-04-03 -->
 # Project Structure
 
-Repository-oriented map of the Scaffold codebase and generated project runtime layout. The target-project runtime section below is current; some repository examples remain historical reference material for older prompt-packaging layouts.
+Repository-oriented map of the Scaffold codebase and generated project runtime layout.
 
 ## 1. Directory Tree
 
 ```
 scaffold/
-├── commands/                  # Individual command .md files (36, generated from prompts.md)
-│   ├── add-e2e-testing.md
-│   ├── beads.md
-│   ├── ...                    # 30 more command files
-│   ├── version-bump.md
-│   ├── version.md
-│   └── workflow-audit.md
-├── scripts/                   # Bash utility scripts and JSON schemas
-│   ├── extract-commands.sh
+├── content/                   # Build inputs (source of truth for all content)
+│   ├── pipeline/              # 60 meta-prompt files organized by 16 phases
+│   │   ├── vision/
+│   │   ├── pre/
+│   │   ├── foundation/
+│   │   ├── environment/
+│   │   ├── integration/
+│   │   ├── modeling/
+│   │   ├── decisions/
+│   │   ├── architecture/
+│   │   ├── specification/
+│   │   ├── quality/
+│   │   ├── parity/
+│   │   ├── consolidation/
+│   │   ├── planning/
+│   │   ├── validation/
+│   │   ├── finalization/
+│   │   └── build/
+│   ├── tools/                 # 10 tool meta-prompts (stateless, category: tool)
+│   ├── knowledge/             # 61 domain expertise entries in 7 categories
+│   │   ├── core/
+│   │   ├── product/
+│   │   ├── review/
+│   │   ├── validation/
+│   │   ├── finalization/
+│   │   ├── execution/
+│   │   └── tools/
+│   ├── methodology/           # Preset configs (deep.yml, mvp.yml, custom-defaults.yml)
+│   └── skills/                # Skill templates with {{markers}} for multi-platform resolution
+│       ├── multi-model-dispatch/
+│       ├── scaffold-pipeline/
+│       └── scaffold-runner/
+├── src/                       # TypeScript CLI source code
+│   ├── cli/                   # CLI commands, middleware, output strategies
+│   ├── core/                  # Assembly engine, adapters, dependency graph, knowledge
+│   ├── state/                 # State manager, lock manager, decision logger
+│   ├── config/                # Config loading, migration, schema validation
+│   ├── project/               # Project detector, CLAUDE.md/GEMINI.md managers
+│   ├── wizard/                # Init wizard
+│   ├── validation/            # Config, state, frontmatter validators
+│   ├── types/                 # TypeScript types and enums
+│   ├── utils/                 # FS helpers, errors, levenshtein
+│   └── dashboard/             # HTML dashboard generator
+├── scripts/                   # Bash utility scripts
 │   ├── generate-dashboard.sh
 │   ├── implementation-plan-mmr.sh
 │   ├── implementation-plan-mmr.schema.json
 │   ├── install-hooks.sh
-│   ├── install.sh
+│   ├── prepublish.sh
 │   ├── setup-agent-worktree.sh
-│   ├── uninstall.sh
 │   ├── update.sh
 │   └── validate-frontmatter.sh
 ├── lib/                       # Shared assets
 │   └── dashboard-theme.css    # Dashboard CSS (embedded into generated HTML)
 ├── docs/                      # Project documentation and standards
+│   ├── architecture/          # Active system architecture and design docs
+│   │   ├── adrs/              # Architecture decision records
+│   │   └── ...
+│   ├── archive/               # Historical artifacts and legacy content
+│   │   ├── prompts-v1.md      # Original v1 prompt content (archived)
+│   │   ├── audits/
+│   │   ├── reviews/
+│   │   └── v2-archive/
 │   ├── coding-standards.md
-│   ├── design-system.md       # Dashboard visual design system
-│   ├── dev-setup.md           # Development environment setup
-│   ├── git-workflow.md        # Git branching and PR workflow
-│   ├── plan.md                # Product requirements document (PRD)
+│   ├── design-system.md
+│   ├── dev-setup.md
+│   ├── git-workflow.md
+│   ├── plan.md
 │   ├── project-structure.md   # This file
-│   ├── scaffold-overview.md   # High-level project overview
 │   ├── tdd-standards.md
 │   ├── tech-stack.md
-│   ├── user-stories.md
-│   ├── add-automated-pr-review.md
-│   ├── multi-model-stories-review-setup.md
-│   ├── reviews/               # Multi-model review artifacts
-│   │   └── user-stories/      # Codex/Gemini review data, coverage analysis
-│   └── superpowers/           # Superpowers integration specs
-│       └── specs/
-├── tests/                     # bats-core test files
-│   ├── generate-dashboard.bats
-│   ├── setup-agent-worktree.bats
-│   ├── validate-frontmatter.bats
-│   ├── test_helper/           # Shared test setup (placeholder)
-│   ├── fixtures/              # Test data files (placeholder)
+│   └── ...
+├── tests/                     # Test files
+│   ├── *.bats                 # bats-core shell script tests
+│   ├── test_helper/           # Shared test setup
+│   ├── fixtures/              # Test data files
 │   └── screenshots/           # Dashboard visual testing (Playwright MCP)
 │       ├── baseline/          # Committed — known-good reference screenshots
 │       ├── current/           # Gitignored — current verification run
 │       └── diff/              # Gitignored — visual comparison outputs
-├── skills/                    # Auto-activated skills
-│   └── scaffold-pipeline/
-│       └── SKILL.md
-├── agent-skills/              # Shared skill sources packaged for project-local installs
-│   ├── scaffold-pipeline/
-│   │   └── SKILL.md
-│   └── scaffold-runner/
-│       └── SKILL.md
+├── skills/                    # GENERATED — resolved skills (gitignored)
+├── dist/                      # GENERATED — compiled TypeScript output (gitignored)
 ├── .claude-plugin/            # Plugin manifest
 │   ├── plugin.json
 │   └── marketplace.json
 ├── .github/                   # GitHub CI and templates
 │   ├── workflows/
-│   │   └── ci.yml             # Runs make check on PRs
 │   └── pull_request_template.md
 ├── .claude/                   # Claude Code configuration
 │   ├── settings.json          # Project-level permissions
 │   └── settings.local.json    # Local machine overrides
 ├── tasks/                     # Session-specific task notes
 │   └── lessons.md
-├── prompts.md                 # Source of truth for all prompts
 ├── Makefile                   # Build automation (test, lint, validate, check)
+├── package.json               # npm package config
+├── tsconfig.json              # TypeScript config
 ├── CLAUDE.md                  # AI agent guidance
 ├── AGENTS.md                  # Multi-agent coordination
 ├── README.md                  # Project overview
@@ -110,7 +137,7 @@ scaffold/
 .agents/
 └── skills/
     ├── scaffold-pipeline/
-    │   └── SKILL.md           # Shared instruction source copied from packaged agent-skills/
+    │   └── SKILL.md           # Resolved from content/skills/ templates
     └── scaffold-runner/
         └── SKILL.md
 GEMINI.md                      # Managed project instructions that import the shared skills
@@ -122,7 +149,7 @@ GEMINI.md                      # Managed project instructions that import the sh
         └── status.toml
 ```
 
-`scaffold init` and `scaffold build` maintain a dedicated `.gitignore` block for `.scaffold/generated/`, `.scaffold/lock.json`, and Scaffold temp files. Root-level `commands/`, `prompts/`, `codex-prompts/`, and generated `AGENTS.md` are no longer Scaffold-owned project outputs.
+`scaffold init` and `scaffold build` maintain a dedicated `.gitignore` block for `.scaffold/generated/`, `.scaffold/lock.json`, and Scaffold temp files.
 
 ## 2. Module Organization Strategy
 
@@ -130,14 +157,19 @@ Scaffold uses a **role-based** organization. Each directory has a single clear p
 
 | Role | Directory | Contents |
 |------|-----------|----------|
-| Prompts (source of truth) | `prompts.md` | All prompt text, extracted to `commands/` |
-| Commands (distributed) | `commands/` | Individual `.md` files with YAML frontmatter (36 files) |
-| Scripts (deterministic ops) | `scripts/` | Bash utilities and JSON schemas called by prompts |
+| Pipeline meta-prompts | `content/pipeline/` | 60 `.md` files organized by 16 phases |
+| Tool meta-prompts | `content/tools/` | 10 stateless tool `.md` files |
+| Knowledge base | `content/knowledge/` | 61 domain expertise entries in 7 categories |
+| Methodology presets | `content/methodology/` | YAML preset configs (deep, mvp, custom) |
+| Skill templates | `content/skills/` | Skill sources with `{{markers}}` for multi-platform resolution |
+| TypeScript CLI | `src/` | CLI commands, assembly engine, state management |
+| Scripts (deterministic ops) | `scripts/` | Bash utilities and JSON schemas |
 | Shared assets | `lib/` | `dashboard-theme.css` (embedded into generated HTML) |
-| Tests | `tests/` | bats-core `.bats` files, one per script |
-| Documentation | `docs/` | Standards docs, reviews, specs, this file |
-| Skills | `skills/` | Auto-activated skill files |
-| Shared agent skills | `agent-skills/` | Packaged skill sources copied into project-local installs |
+| Tests | `tests/` | bats-core `.bats` files and vitest TypeScript tests |
+| Documentation | `docs/` | Standards docs, architecture, this file |
+| Architecture docs | `docs/architecture/` | Active system design docs, ADRs, runbooks |
+| Archive | `docs/archive/` | Legacy content (prompts-v1.md, old audits, reviews) |
+| Generated skills | `skills/` | Resolved from `content/skills/` templates (gitignored) |
 | Plugin manifest | `.claude-plugin/` | `plugin.json`, `marketplace.json` |
 | CI/CD & templates | `.github/` | GitHub Actions workflows, PR template |
 | Claude Code config | `.claude/` | Project and local permissions (`settings.json`) |
@@ -149,16 +181,18 @@ Scaffold uses a **role-based** organization. Each directory has a single clear p
 
 | File Type | Location | Naming Convention | Example |
 |-----------|----------|-------------------|---------|
+| Pipeline meta-prompts | `content/pipeline/<phase>/` | `<slug>.md` | `content/pipeline/pre/create-prd.md` |
+| Tool meta-prompts | `content/tools/` | `<slug>.md` | `content/tools/release.md` |
+| Knowledge entries | `content/knowledge/<category>/` | `<slug>.md` | `content/knowledge/core/testing-strategy.md` |
+| Methodology presets | `content/methodology/` | `<preset>.yml` | `content/methodology/deep.yml` |
+| Skill templates | `content/skills/<skill-name>/` | `SKILL.md` | `content/skills/scaffold-runner/SKILL.md` |
 | Bash scripts | `scripts/` | `<name>.sh` (kebab-case) | `scripts/generate-dashboard.sh` |
 | JSON schemas | `scripts/` | `<name>.schema.json` | `scripts/implementation-plan-mmr.schema.json` |
-| Command prompts | `commands/` | `<slug>.md` (generated from `prompts.md`) | `commands/tech-stack.md` |
 | Documentation | `docs/` | `<topic>.md` (kebab-case) | `docs/coding-standards.md` |
 | Test files | `tests/` | `<script-name>.bats` | `tests/generate-dashboard.bats` |
 | Test fixtures | `tests/fixtures/` | `<descriptive-name>.<ext>` | `tests/fixtures/valid-config.json` |
 | Test helpers | `tests/test_helper/` | `common-setup.bash` | `tests/test_helper/common-setup.bash` |
 | CSS / theme files | `lib/` | `<name>.css` (kebab-case) | `lib/dashboard-theme.css` |
-| Skills | `skills/<skill-name>/` | `SKILL.md` | `skills/scaffold-pipeline/SKILL.md` |
-| Shared agent skills | `agent-skills/<skill-name>/` | `SKILL.md` | `agent-skills/scaffold-runner/SKILL.md` |
 | GitHub workflows | `.github/workflows/` | `<name>.yml` (kebab-case) | `.github/workflows/ci.yml` |
 | Config files | repo root | standard names | `.editorconfig`, `.shellcheckrc`, `.gitignore` |
 
@@ -175,8 +209,8 @@ Scaffold uses a **role-based** organization. Each directory has a single clear p
 
 | File | Risk | Mitigation |
 |------|------|------------|
-| `prompts.md` | Single source of truth, ~8500 lines | Only one agent edits at a time. Extract to `commands/` after editing. |
 | `CLAUDE.md` | Project guidance | Sections are independent — agents edit specific sections only. |
+| `content/pipeline/` files | Meta-prompt definitions | Each phase is a separate directory — parallel edits are safe across phases. |
 
 ### Shared Utility Rule (future)
 
@@ -242,12 +276,13 @@ Additional `.bats` files should be added as scripts are created or modified, fol
 
 | Committed | Not Committed (in .gitignore) |
 |-----------|-------------------------------|
-| All source files (scripts, commands, docs, lib) | `coverage/` (kcov output) |
-| Config files (`.editorconfig`, `.shellcheckrc`) | `*.tmp` (atomic write temp files) |
-| `plugin.json`, `marketplace.json` | `.DS_Store` (already ignored) |
-| `tests/fixtures/` (test data) | `.DS_Store` (already ignored) |
-| `tests/screenshots/baseline/` (reference screenshots) | `.history/` (already ignored) |
-| `.github/` (CI workflows, PR template) | `*~`, `*.bak` (editor backup files) |
+| All source files (`content/`, `src/`, `scripts/`, `lib/`, `docs/`) | `dist/` (compiled TypeScript output) |
+| Config files (`.editorconfig`, `.shellcheckrc`) | `skills/` (resolved from `content/skills/` templates) |
+| `plugin.json`, `marketplace.json` | `coverage/` (kcov output) |
+| `tests/fixtures/` (test data) | `*.tmp` (atomic write temp files) |
+| `tests/screenshots/baseline/` (reference screenshots) | `.DS_Store` |
+| `.github/` (CI workflows, PR template) | `.history/` |
+| `content/skills/` (skill templates — source of truth) | `*~`, `*.bak` (editor backup files) |
 | | `tests/screenshots/current/` (verification runs) |
 | | `tests/screenshots/diff/` (comparison outputs) |
 | | `tests/screenshots/dashboard-test.html` (generated) |
@@ -260,8 +295,7 @@ Root level is reserved for project-wide config and documentation:
 
 | Category | Files |
 |----------|-------|
-| Source of truth | `prompts.md` |
-| Build automation | `Makefile` |
+| Build automation | `Makefile`, `package.json`, `tsconfig.json` |
 | Project docs | `CLAUDE.md`, `AGENTS.md`, `README.md`, `CHANGELOG.md`, `LICENSE` |
 | Tooling config | `.editorconfig`, `.shellcheckrc`, `.gitignore`, `.gitattributes` |
 

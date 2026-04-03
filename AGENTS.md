@@ -15,8 +15,8 @@ git push              # Publish local commits
 
 ## Scaffold Releases
 
-When releasing Scaffold itself, follow `docs/v2/operations-runbook.md` instead
-of the generic `/scaffold:release` guidance.
+When releasing Scaffold itself, follow `docs/architecture/operations-runbook.md`
+instead of the generic `/scaffold:release` guidance.
 
 - Update `CHANGELOG.md` and `README.md` when user-facing behavior, install or
   upgrade steps, migration instructions, or command semantics changed.
