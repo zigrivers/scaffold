@@ -11,31 +11,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **prompt pipeline** — a curated sequence of structured prompts used to scaffold new software projects with Claude Code. The entire pipeline lives in a single file (`prompts.md`) and is designed to be run in order, with each prompt building on artifacts produced by earlier ones.
-
-Beads is an optional workflow Scaffold can generate for downstream projects. It
-is not the task-tracking workflow used to develop the Scaffold repository
-itself.
+This is a **prompt pipeline** — a curated sequence of structured meta-prompts used to scaffold new software projects with Claude Code and other supported AI tools. The pipeline is defined as individual `.md` files in `content/pipeline/`, organized into 16 phases, and assembled into full prompts at runtime by the TypeScript CLI.
 
 ## Structure
 
-This repo is a **Claude Code plugin** (installable via `/plugin marketplace add`) and also distributable as user commands.
+This repo is a **Claude Code plugin** (installable via `/plugin marketplace add`) and a TypeScript CLI distributed via npm and Homebrew.
 
-### Source of Truth (v2 Architecture)
-- `pipeline/` — 60 meta-prompt files organized into 16 phases (source of truth for pipeline steps)
-- `tools/` — 7 tool meta-prompts (`category: tool`, `stateless: true`) orthogonal to the pipeline
-- `knowledge/` — 60 domain expertise entries in 7 categories (injected into prompts during assembly)
+### Source of Truth
+- `content/pipeline/` — 60 meta-prompt files organized into 16 phases (source of truth for pipeline steps)
+- `content/tools/` — 10 tool meta-prompts (`category: tool`, `stateless: true`) orthogonal to the pipeline
+- `content/knowledge/` — 61 domain expertise entries in 7 categories (injected into prompts during assembly)
+- `content/skills/` — Skill templates with `{{markers}}` for multi-platform resolution
+- `content/methodology/` — Preset configs (deep, mvp, custom)
 - `src/types/frontmatter.ts` — Canonical `PHASES` constant defining all 16 phase slugs, numbers, and display names
-- `commands/` — Generated slash commands (built from pipeline + knowledge via `scaffold build`)
 
 ### Legacy (v1)
-`prompts.md` contains the original v1 prompt content. It is **not** the source of truth for v2 — pipeline steps in `pipeline/` and commands in `commands/` are authoritative.
+The original v1 prompt content is archived at `docs/archive/prompts-v1.md`. It is **not** the source of truth — pipeline steps in `content/pipeline/` are authoritative.
 
 ### Plugin Structure
 - `.claude-plugin/plugin.json` — Plugin manifest (name: `scaffold`)
-- `commands/` — 25 individual command `.md` files with YAML frontmatter and "Next Steps" guidance, generated from `prompts.md`
-- `skills/scaffold-pipeline/SKILL.md` — Auto-activated pipeline context skill
-- `scripts/` — Install, uninstall, and extraction scripts
+- `skills/` — Generated skills (built from `content/skills/` templates; gitignored)
+- `scripts/` — Bash utility scripts
 
 ## Key Concepts
 
@@ -47,9 +43,7 @@ This repo is a **Claude Code plugin** (installable via `/plugin marketplace add`
 
 When modifying prompts:
 - Preserve the `# Name (Prompt)` heading convention — this is how prompts are identified
-- Keep the Setup Order table at the top in sync with the actual prompt sections below
-- Respect inter-prompt dependencies (documented in the dependency graph at line ~128)
-- After editing pipeline steps in `pipeline/`, rebuild commands with `scaffold build` to keep `commands/` in sync
+- Respect inter-prompt dependencies (documented in frontmatter `depends-on` fields)
 - Every document-creating prompt has a **Mode Detection** block and **Update Mode Specifics** block — when modifying prompts, preserve these blocks and keep them positioned after the opening paragraph and before the first content section
 - When adding a new document-creating prompt, include Mode Detection + Update Mode Specifics following the same pattern as existing prompts (check any existing prompt for the template)
 
@@ -61,11 +55,9 @@ When modifying prompts:
 | `make check-all` | Run all quality gates (bash + TypeScript) |
 | `make test` | Run bats test suite |
 | `make lint` | Run ShellCheck on all shell scripts |
-| `make validate` | Validate frontmatter in command files |
+| `make validate` | Validate frontmatter in pipeline and tool files |
 | `make setup` | Install dev dependencies via Homebrew |
 | `make hooks` | Install pre-commit and pre-push hooks |
-| `make install` | Install scaffold commands to ~/.claude/commands/ |
-| `make extract` | Extract commands from prompts.md |
 | `scripts/setup-agent-worktree.sh <name>` | Create worktree for parallel agent |
 | `git worktree list` | List all active worktrees |
 | `gh pr create` | Create pull request from current branch |
@@ -88,7 +80,7 @@ See `docs/git-workflow.md` for the full workflow.
 
 The generic `/scaffold:release` command is for downstream projects. When
 releasing Scaffold itself, use the maintainer flow in
-`docs/v2/operations-runbook.md`.
+`docs/architecture/operations-runbook.md`.
 
 Minimum checklist:
 - Update `CHANGELOG.md` and `README.md` when user-facing behavior or install,
@@ -162,17 +154,23 @@ See `docs/project-structure.md` for the full authoritative guide.
 
 | Directory | Purpose |
 |-----------|---------|
-| `commands/` | Individual command `.md` files (generated from `prompts.md`) |
-| `scripts/` | Bash utility scripts called by prompts |
-| `lib/` | Shared bash libraries (`common.sh`) |
+| `content/pipeline/` | Meta-prompt files organized by phase (source of truth) |
+| `content/tools/` | Stateless tool meta-prompts |
+| `content/knowledge/` | Domain expertise entries injected during assembly |
+| `content/methodology/` | Preset methodology configs (mvp, deep) |
+| `content/skills/` | Skill templates with `{{markers}}` for multi-platform resolution |
+| `src/` | TypeScript CLI source code |
+| `scripts/` | Bash utility scripts |
+| `lib/` | Shared assets (dashboard CSS) |
 | `docs/` | Project documentation and standards |
-| `tests/` | bats-core `.bats` test files |
-| `tests/test_helper/` | Shared test setup (`common-setup.bash`) |
-| `tests/fixtures/` | Test data files |
-| `skills/` | Auto-activated skills |
+| `docs/architecture/` | Active system architecture and design docs |
+| `docs/archive/` | Historical artifacts and legacy content |
+| `tests/` | bats-core and vitest test files |
+| `tasks/` | Lessons learned and session notes |
 | `.claude-plugin/` | Plugin manifest (`plugin.json`) |
+| `.scaffold/` | Runtime state (config, state, decisions) |
 
-**File placement**: Scripts → `scripts/<name>.sh` | Tests → `tests/<name>.bats` | Docs → `docs/<topic>.md` | Shared functions → `lib/common.sh` (only when used by 2+ scripts)
+**File placement**: Scripts → `scripts/<name>.sh` | Tests → `tests/<name>.bats` | Docs → `docs/<topic>.md` | Source → `src/` | Content → `content/<category>/`
 
 ## Dev Environment
 
@@ -250,4 +248,4 @@ Examples: `dashboard_desktop_default.png`, `dashboard_mobile_dark.png`
 | How do I set up my dev environment? | `docs/dev-setup.md` |
 | How should dashboard HTML/CSS look? | `docs/design-system.md` |
 | How do I visually test the dashboard? | `docs/tdd-standards.md` Section 7 |
-| What's the prompt pipeline order? | `prompts.md` (Setup Order table at top) |
+| What's the prompt pipeline order? | `content/pipeline/` directory (organized by phase) |
