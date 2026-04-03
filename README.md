@@ -19,9 +19,9 @@ Here's how it works:
 You can run steps two ways:
 
 - **CLI**: `scaffold run create-prd` — the assembly engine builds a full prompt from the meta-prompt, knowledge base entries, and project context. Best for the structured pipeline with dependency tracking.
-- **Slash commands**: `/scaffold:create-prd` in Claude Code or Gemini — uses pre-rendered, self-contained prompts. Best for quick access to individual commands without the full pipeline ceremony.
+- **Runner skill**: In Claude Code or Gemini, the scaffold-runner skill provides an interactive wrapper that surfaces decision points (depth level, strictness, optional sections) before execution instead of letting the AI pick defaults silently.
 
-Either way, Scaffold constructs the prompt and the target AI tool does the work. The CLI tracks pipeline state and dependencies; slash commands are fire-and-forget.
+Either way, Scaffold constructs the prompt and the target AI tool does the work. The CLI tracks pipeline state and dependencies; the runner skill adds interactive decision surfacing on top.
 
 ## Key Concepts
 
@@ -85,7 +85,7 @@ Lets Claude control a real browser for visual testing and screenshots.
 Scaffold has two parts that install separately:
 
 - **CLI** (`scaffold`) — the core tool. Install via npm or Homebrew. Use it from your terminal or from Claude Code with `! scaffold run <step>`.
-- **Plugin** (`/scaffold:`) — optional slash commands for Claude Code. Lets you type `/scaffold:create-prd` instead of `! scaffold run create-prd`.
+- **Plugin** — optional Claude Code plugin that auto-activates the scaffold runner and pipeline reference skills for interactive guidance.
 
 ### Step 1: Install the CLI
 
@@ -108,7 +108,7 @@ Verify: `scaffold version`
 
 ### Step 2: Add the plugin (recommended)
 
-Install the Scaffold plugin inside Claude Code for slash commands AND the interactive runner skill:
+Install the Scaffold plugin inside Claude Code for auto-activated skills:
 
 ```
 /plugin marketplace add zigrivers/scaffold
@@ -116,7 +116,6 @@ Install the Scaffold plugin inside Claude Code for slash commands AND the intera
 ```
 
 This gives you:
-- **Slash commands** (`/scaffold:create-prd`, `/scaffold:tdd`, etc.) — quick access to any pipeline step
 - **Scaffold Runner skill** — intelligent interactive wrapper that surfaces decision points (depth level, strictness, optional sections) before execution instead of letting Claude pick defaults silently
 - **Pipeline reference skill** — shows pipeline ordering, dependencies, and phase structure
 - **Multi-model dispatch skill** — correct invocation patterns for Codex and Gemini CLIs
@@ -140,7 +139,7 @@ The plugin is optional — everything it does can also be done with `scaffold ru
 > ```
 > This copies the Scaffold Runner and Pipeline Reference skills to both `.claude/skills/` and `.agents/skills/` in your project.
 
-> **Gemini users**: `scaffold build` keeps a root `GEMINI.md` in sync with the shared runner instructions and generates `.gemini/commands/scaffold/*.toml` slash commands. Plain prompts like `scaffold status` work because Gemini loads `GEMINI.md`.
+> **Gemini users**: `scaffold build` keeps a root `GEMINI.md` in sync with the shared runner instructions and generates `.gemini/commands/scaffold/*.toml` wrappers. Plain prompts like `scaffold status` work because Gemini loads `GEMINI.md`.
 
 ## Updating
 
@@ -159,10 +158,8 @@ brew upgrade scaffold
 ### Plugin
 
 ```
-/scaffold:update
+/plugin marketplace update zigrivers-scaffold
 ```
-
-Or: `/plugin marketplace update zigrivers-scaffold`
 
 ### Existing projects
 
@@ -189,7 +186,7 @@ The canonical execution entrypoints are still `scaffold run <step>` and the inst
 This release is a clean breaking change for generated adapter output. To migrate an existing project:
 
 1. Upgrade Scaffold.
-2. Remove old root-level generated Scaffold output if present: `commands/`, `prompts/`, `codex-prompts/`, and root `AGENTS.md` only if it was Scaffold-generated.
+2. Remove old root-level generated Scaffold output if present: `prompts/`, `codex-prompts/`, `commands/`, and root `AGENTS.md` only if it was Scaffold-generated. Run `scaffold status` — it warns about any legacy output.
 3. Run `scaffold build`.
 4. Review the Scaffold-managed block in `.gitignore`.
 5. Commit `.gitignore` plus the intended committed `.scaffold/` state files (`config.yml`, `state.json`, `decisions.jsonl`, `instructions/`).
@@ -722,14 +719,14 @@ These are orthogonal to the pipeline — usable at any time, not tied to pipelin
 
 Use `scaffold run review-code` before commit or push when you want a local gate on the current delivery candidate. Use `scaffold run review-pr` after a GitHub PR exists.
 
-All of these are also available as slash commands (`/scaffold:release`, `/scaffold:quick-task`, etc.) when the plugin is installed.
+Run any of these via the CLI or ask the scaffold runner skill in Claude Code or Gemini.
 
 ## Releasing Your Project
 
 ### Version bumps (development milestones)
 
 ```
-/scaffold:version-bump
+scaffold run version-bump
 ```
 
 Bumps the version number and updates the changelog, but doesn't create tags, push, or run the formal release ceremony. Think of it as a checkpoint.
@@ -737,10 +734,10 @@ Bumps the version number and updates the changelog, but doesn't create tags, pus
 ### Creating a release
 
 ```
-/scaffold:release
+scaffold run release
 ```
 
-Claude analyzes your commits since the last release, suggests whether this is a major, minor, or patch version bump, and walks you through:
+The AI analyzes your commits since the last release, suggests whether this is a major, minor, or patch version bump, and walks you through:
 1. Running your project's tests
 2. Updating the version number in your project files
 3. Generating a changelog entry
@@ -748,7 +745,7 @@ Claude analyzes your commits since the last release, suggests whether this is a 
 
 Depending on the target project, that may include a Git tag, hosted release,
 package publish, deployment, registry update, or another project-specific
-release step. `/scaffold:release` is intentionally generic; it should follow
+release step. `scaffold run release` is intentionally generic; it follows
 the target project's own documented workflow rather than assuming npm or GitHub
 for every project.
 
@@ -768,13 +765,13 @@ Options: `--dry-run` to preview, `minor`/`major`/`patch` to specify the bump, `c
 | **Methodology** | A preset (deep, mvp, custom) controlling which steps run and at what depth. |
 | **Multi-model review** | Independent validation from Codex/Gemini CLIs at depth 4-5, catching blind spots a single model misses. |
 | **PRD** | Product Requirements Document. The foundation for everything Scaffold builds. |
-| **Slash commands** | Commands in Claude Code starting with `/`. For example, `/scaffold:create-prd`. |
+| **Runner skill** | Auto-activated Claude Code/Gemini skill that surfaces decision points before executing pipeline steps. |
 | **Worktrees** | A git feature for multiple working copies. Scaffold uses these for parallel agent execution. |
 
 ## Troubleshooting / FAQ
 
 **I ran a command and nothing happened.**
-Make sure Scaffold is installed — run `scaffold version` or `/scaffold:prompt-pipeline` in Claude Code.
+Make sure Scaffold is installed — run `scaffold version` in your terminal.
 
 **Which steps can I skip?**
 Use `scaffold skip <step> --reason "..."` to skip any step. You can skip multiple steps at once: `scaffold skip design-system add-e2e-testing --reason "backend-only"`. The mvp preset only enables 7 critical steps by default. With the custom preset, you choose exactly which steps to run.

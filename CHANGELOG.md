@@ -2,6 +2,35 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.2.0] — 2026-04-03
+
+### Changed
+
+- **Project directory restructured: all build inputs now live under `content/`** — `pipeline/`, `tools/`, `knowledge/`, `methodology/` moved into `content/` to make the data flow visible: `content/` (build inputs) → `src/` (assembly engine) → `.scaffold/generated/` (adapter output).
+- **Skills consolidated to single-source templates** — `skills/` and `agent-skills/` (3 copies each) merged into `content/skills/` with `{{INSTRUCTIONS_FILE}}` template markers resolved per platform during `scaffold build` and `scaffold skill install`.
+- **Slash commands removed** — the `commands/` directory (73 pre-rendered command files) has been removed. Use `scaffold run <step>` via the CLI or the scaffold runner skill instead.
+- **`dist/` and `skills/` are now gitignored** — build output and generated skills are no longer tracked in git. They are regenerated during `npm run build` and `scaffold build` respectively.
+- **Documentation reorganized** — active architecture docs moved to `docs/architecture/`, historical artifacts archived to `docs/archive/`, `prompts.md` (v1 monolith) archived.
+
+### Removed
+
+- `commands/` directory (73 slash command files) — superseded by CLI + runner skill
+- `agent-skills/` directory — consolidated into `content/skills/`
+- `scripts/install.sh`, `scripts/uninstall.sh`, `scripts/extract-commands.sh` — dead code
+- `.beads/` — legacy task tracker no longer used
+- `prompts.md` — archived to `docs/archive/prompts-v1.md`
+
+### Migration
+
+If you are a **Scaffold contributor** (working on the Scaffold repo itself):
+- Paths have changed: `pipeline/` → `content/pipeline/`, `tools/` → `content/tools/`, etc.
+- `make install` and `make extract` targets have been removed
+- Run `make check-all` to verify your environment works with the new layout
+
+If you are a **downstream user** (using Scaffold to scaffold your own project):
+- No action needed — the CLI and `scaffold skill install` continue to work as before
+- The npm package layout changed but the public API is unchanged
+
 ## [3.1.0] — 2026-04-03
 
 ### Added
