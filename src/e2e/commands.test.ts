@@ -48,8 +48,8 @@ function makeProjectRoot(opts: {
   if (opts.pipelineFiles !== undefined && opts.pipelineFiles.length > 0) {
     for (const f of opts.pipelineFiles) {
       const dir = f.subdir
-        ? path.join(root, 'pipeline', f.subdir)
-        : path.join(root, 'pipeline')
+        ? path.join(root, 'content', 'pipeline', f.subdir)
+        : path.join(root, 'content', 'pipeline')
       fs.mkdirSync(dir, { recursive: true })
       fs.writeFileSync(path.join(dir, f.name), f.content, 'utf8')
     }
@@ -297,7 +297,7 @@ outputs:
       ],
     })
 
-    const pipelineDir = path.join(root, 'pipeline')
+    const pipelineDir = path.join(root, 'content', 'pipeline')
     const metaPrompts = discoverMetaPrompts(pipelineDir)
     expect(metaPrompts.size).toBe(2)
 
@@ -336,7 +336,7 @@ outputs:
       ],
     })
 
-    const pipelineDir = path.join(root, 'pipeline')
+    const pipelineDir = path.join(root, 'content', 'pipeline')
     const metaPrompts = discoverMetaPrompts(pipelineDir)
     const graph = buildGraph(
       [...metaPrompts.values()].map(mp => mp.frontmatter),
@@ -375,7 +375,7 @@ outputs:
       ],
     })
 
-    const pipelineDir = path.join(root, 'pipeline')
+    const pipelineDir = path.join(root, 'content', 'pipeline')
     const metaPrompts = discoverMetaPrompts(pipelineDir)
     const graph = buildGraph(
       [...metaPrompts.values()].map(mp => mp.frontmatter),
@@ -414,7 +414,7 @@ outputs:
       ],
     })
 
-    const pipelineDir = path.join(root, 'pipeline')
+    const pipelineDir = path.join(root, 'content', 'pipeline')
     const metaPrompts = discoverMetaPrompts(pipelineDir)
     const graph = buildGraph(
       [...metaPrompts.values()].map(mp => mp.frontmatter),
@@ -458,7 +458,7 @@ outputs:
       ],
     })
 
-    const pipelineDir = path.join(root, 'pipeline')
+    const pipelineDir = path.join(root, 'content', 'pipeline')
     const metaPrompts = discoverMetaPrompts(pipelineDir)
     const graph = buildGraph(
       [...metaPrompts.values()].map(mp => mp.frontmatter),
@@ -500,7 +500,7 @@ outputs:
       ],
     })
 
-    const pipelineDir = path.join(root, 'pipeline')
+    const pipelineDir = path.join(root, 'content', 'pipeline')
     const metaPrompts = discoverMetaPrompts(pipelineDir)
 
     expect(metaPrompts.size).toBe(2)
@@ -533,7 +533,7 @@ outputs:
       ],
     })
 
-    const pipelineDir = path.join(root, 'pipeline')
+    const pipelineDir = path.join(root, 'content', 'pipeline')
     const metaPrompts = discoverMetaPrompts(pipelineDir)
     const graph = buildGraph(
       [...metaPrompts.values()].map(mp => mp.frontmatter),
@@ -553,7 +553,7 @@ outputs:
   it('real scaffold pipeline directory loads without errors', () => {
     const repoRoot = path.resolve(import.meta.url.replace('file://', ''), '../../../..')
     // The real pipeline dir in the repo
-    const pipelineDir = path.join(repoRoot, 'pipeline')
+    const pipelineDir = path.join(repoRoot, 'content', 'pipeline')
 
     if (!fs.existsSync(pipelineDir)) {
       // Skip if running outside repo context

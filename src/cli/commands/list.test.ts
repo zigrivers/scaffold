@@ -43,10 +43,10 @@ function makeProjectRoot(opts: { hasMethodology?: boolean } = {}): string {
   fs.mkdirSync(path.join(root, '.scaffold'), { recursive: true })
 
   if (opts.hasMethodology !== false) {
-    fs.mkdirSync(path.join(root, 'methodology'), { recursive: true })
-    fs.writeFileSync(path.join(root, 'methodology', 'deep.yml'), deepPreset, 'utf8')
-    fs.writeFileSync(path.join(root, 'methodology', 'mvp.yml'), mvpPreset, 'utf8')
-    fs.writeFileSync(path.join(root, 'methodology', 'custom-defaults.yml'), customPreset, 'utf8')
+    fs.mkdirSync(path.join(root, 'content', 'methodology'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'content', 'methodology', 'deep.yml'), deepPreset, 'utf8')
+    fs.writeFileSync(path.join(root, 'content', 'methodology', 'mvp.yml'), mvpPreset, 'utf8')
+    fs.writeFileSync(path.join(root, 'content', 'methodology', 'custom-defaults.yml'), customPreset, 'utf8')
   }
 
   return root
@@ -87,11 +87,11 @@ function makeProjectRootWithTools(): string {
   const root = makeTmpDir()
   fs.mkdirSync(path.join(root, '.scaffold'), { recursive: true })
   // pipeline/build/ — stateless build steps
-  fs.mkdirSync(path.join(root, 'pipeline', 'build'), { recursive: true })
-  fs.writeFileSync(path.join(root, 'pipeline', 'build', 'fake-build-step.md'), fakeBuildStep, 'utf8')
+  fs.mkdirSync(path.join(root, 'content', 'pipeline', 'build'), { recursive: true })
+  fs.writeFileSync(path.join(root, 'content', 'pipeline', 'build', 'fake-build-step.md'), fakeBuildStep, 'utf8')
   // tools/ — utility tools
-  fs.mkdirSync(path.join(root, 'tools'), { recursive: true })
-  fs.writeFileSync(path.join(root, 'tools', 'fake-util-tool.md'), fakeUtilTool, 'utf8')
+  fs.mkdirSync(path.join(root, 'content', 'tools'), { recursive: true })
+  fs.writeFileSync(path.join(root, 'content', 'tools', 'fake-util-tool.md'), fakeUtilTool, 'utf8')
   return root
 }
 

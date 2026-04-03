@@ -44,10 +44,10 @@ vi.mock('../../core/assembly/meta-prompt-loader.js', () => ({
 }))
 
 vi.mock('../../utils/fs.js', () => ({
-  getPackagePipelineDir: vi.fn(() => '/test/pipeline'),
-  getPackageMethodologyDir: vi.fn(() => '/test/methodology'),
-  getPackageKnowledgeDir: vi.fn(() => '/test/knowledge'),
-  getPackageToolsDir: vi.fn(() => '/test/tools'),
+  getPackagePipelineDir: vi.fn(() => '/test/content/pipeline'),
+  getPackageMethodologyDir: vi.fn(() => '/test/content/methodology'),
+  getPackageKnowledgeDir: vi.fn(() => '/test/content/knowledge'),
+  getPackageToolsDir: vi.fn(() => '/test/content/tools'),
 }))
 
 vi.mock('../../core/assembly/knowledge-loader.js', () => ({

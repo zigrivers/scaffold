@@ -26,25 +26,16 @@ function makeTmpDir(): string {
 
 /**
  * Create a fake package root with source SKILL.md files so install can find them.
+ * In v3 architecture, both Claude Code and shared-agent targets install from
+ * the same source at content/skills/<name>/SKILL.md.
  */
 function makePackageSkillsDir(
   packageRoot: string,
-  options: { claude?: boolean; agents?: boolean } = {},
 ): void {
-  const includeClaude = options.claude ?? true
-  const includeAgents = options.agents ?? true
-
   for (const name of ['scaffold-runner', 'scaffold-pipeline']) {
-    if (includeClaude) {
-      const claudeDir = path.join(packageRoot, 'skills', name)
-      fs.mkdirSync(claudeDir, { recursive: true })
-      fs.writeFileSync(path.join(claudeDir, 'SKILL.md'), `# ${name} skill content\n`, 'utf8')
-    }
-    if (includeAgents) {
-      const agentDir = path.join(packageRoot, 'agent-skills', name)
-      fs.mkdirSync(agentDir, { recursive: true })
-      fs.writeFileSync(path.join(agentDir, 'SKILL.md'), `# ${name} agent skill content\n`, 'utf8')
-    }
+    const skillDir = path.join(packageRoot, 'content', 'skills', name)
+    fs.mkdirSync(skillDir, { recursive: true })
+    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), `# ${name} skill content\n`, 'utf8')
   }
 }
 
@@ -185,8 +176,8 @@ describe('scaffold skill', () => {
     expect(exitSpy).toHaveBeenCalledWith(0)
   })
 
-  it('install reports partial success when only one source tree exists', async () => {
-    makePackageSkillsDir(packageRoot, { agents: false })
+  it('install writes both .claude/skills and .agents/skills from single source', async () => {
+    makePackageSkillsDir(packageRoot)
 
     await skillCommand.handler({
       action: 'install',
@@ -198,10 +189,8 @@ describe('scaffold skill', () => {
 
     const output = writtenLines.join('') + stderrLines.join('')
     expect(output).toContain('scaffold-runner: installed to .claude/skills/scaffold-runner/SKILL.md')
-    expect(output).toContain('scaffold-runner [shared agents]: source not found')
-    expect(output).not.toContain('scaffold-runner: installed to .agents/skills/scaffold-runner/SKILL.md')
-    expect(output).toContain('installed with warnings')
-    expect(output).not.toContain('All skills already installed.')
+    expect(output).toContain('scaffold-runner: installed to .agents/skills/scaffold-runner/SKILL.md')
+    expect(output).toContain('2 skill(s) installed')
     expect(exitSpy).toHaveBeenCalledWith(0)
   })
 
@@ -261,7 +250,7 @@ describe('scaffold skill', () => {
     expect(output).toContain('scaffold-pipeline: installed')
     expect(output).toContain('2 skill(s) installed')
 
-    // Verify files WERE overwritten with new content
+    // Verify files WERE overwritten with new content (both targets use same source)
     const content = fs.readFileSync(
       path.join(tmpDir, '.claude', 'skills', 'scaffold-runner', 'SKILL.md'), 'utf8',
     )
@@ -269,7 +258,7 @@ describe('scaffold skill', () => {
     const agentContent = fs.readFileSync(
       path.join(tmpDir, '.agents', 'skills', 'scaffold-runner', 'SKILL.md'), 'utf8',
     )
-    expect(agentContent).toContain('scaffold-runner agent skill content')
+    expect(agentContent).toContain('scaffold-runner skill content')
     expect(exitSpy).toHaveBeenCalledWith(0)
   })
 

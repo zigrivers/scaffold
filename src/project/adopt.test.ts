@@ -95,7 +95,7 @@ describe('runAdoption', () => {
 
     const result = runAdoption({
       projectRoot: tmpDir,
-      metaPromptDir: path.join(tmpDir, 'pipeline'),
+      metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
       dryRun: false,
     })
@@ -119,7 +119,7 @@ describe('runAdoption', () => {
 
     const result = runAdoption({
       projectRoot: tmpDir,
-      metaPromptDir: path.join(tmpDir, 'pipeline'),
+      metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
       dryRun: false,
     })
@@ -147,7 +147,7 @@ describe('runAdoption', () => {
 
     const result = runAdoption({
       projectRoot: tmpDir,
-      metaPromptDir: path.join(tmpDir, 'pipeline'),
+      metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
       dryRun: false,
     })
@@ -174,7 +174,7 @@ describe('runAdoption', () => {
 
     const result = runAdoption({
       projectRoot: tmpDir,
-      metaPromptDir: path.join(tmpDir, 'pipeline'),
+      metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
       dryRun: false,
     })
@@ -200,7 +200,7 @@ describe('runAdoption', () => {
 
     const result = runAdoption({
       projectRoot: tmpDir,
-      metaPromptDir: path.join(tmpDir, 'pipeline'),
+      metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
       dryRun: false,
     })
@@ -221,7 +221,7 @@ describe('runAdoption', () => {
 
     const result = runAdoption({
       projectRoot: tmpDir,
-      metaPromptDir: path.join(tmpDir, 'pipeline'),
+      metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
       dryRun: false,
     })
@@ -237,7 +237,7 @@ describe('runAdoption', () => {
 
     const result = runAdoption({
       projectRoot: tmpDir,
-      metaPromptDir: path.join(tmpDir, 'pipeline'),
+      metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
       dryRun: true,
     })
@@ -266,7 +266,7 @@ describe('runAdoption', () => {
 
     const result = runAdoption({
       projectRoot: tmpDir,
-      metaPromptDir: path.join(tmpDir, 'pipeline'),
+      metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
       dryRun: false,
     })
