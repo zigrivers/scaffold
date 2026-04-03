@@ -1,10 +1,10 @@
 {
   "name": "scaffold",
-  "version": "2.5.0",
-  "description": "Composable meta-prompt pipeline for scaffolding new software projects with Claude Code",
+  "version": "3.1.0",
+  "description": "AI-powered software project scaffolding — CLI pipeline with auto-activated skills for Claude Code",
   "author": {
     "name": "zigrivers"
   },
   "license": "MIT",
-  "keywords": ["scaffolding", "project-setup", "pipeline", "prompts", "beads"]
+  "keywords": ["scaffolding", "project-setup", "pipeline", "ai", "scaffold"]
 }

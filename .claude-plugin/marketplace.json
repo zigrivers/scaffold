@@ -7,7 +7,7 @@
     {
       "name": "scaffold",
       "source": "./",
-      "description": "27-prompt pipeline for scaffolding new software projects with Claude Code"
+      "description": "AI-powered scaffolding pipeline with CLI and auto-activated skills"
     }
   ]
 }

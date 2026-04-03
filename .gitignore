@@ -7,6 +7,9 @@ dist/
 # Generated skills (resolved from content/skills/ templates during scaffold build)
 skills/
 
+# Beads local database (legacy, may still exist on disk)
+.beads/
+
 # Scaffold — preserve state files, ignore dashboard
 .scaffold/dashboard.html
 .superpowers/
