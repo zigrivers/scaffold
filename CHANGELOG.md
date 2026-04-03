@@ -2,6 +2,17 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.2.1] — 2026-04-03
+
+### Fixed
+
+- **MVP implementation-playbook now waits for implementation-plan** — added `implementation-plan` as a direct dependency of `implementation-playbook`, fixing MVP mode where the entire intermediate dependency chain was disabled and the playbook became eligible before the plan existed.
+- **Stale `docs/architecture.md` references fixed** — three files (post-implementation-review tool, enhancement-workflow knowledge, post-implementation-review-methodology knowledge) referenced `docs/architecture.md` instead of the correct `docs/system-architecture.md`.
+- **Review step QC criteria now match methodology scaling** — `review-domain-modeling` and `review-adrs` MVP criteria no longer say "all passes executed" when methodology says "quick check only"; `implementation-plan-review` architecture coverage criterion re-tagged as `(deep)` since architecture is unavailable at MVP.
+- **Vision phase added to pipeline reference tables** — `prompt-pipeline` tool and `scaffold-pipeline` skill Pipeline Order table now include `create-vision`, `review-vision`, and `innovate-vision` steps.
+- **`design-system` frontmatter no longer hardcodes `tailwind.config.js`** — output varies by tech stack, so the stack-specific config file was removed from the declared outputs.
+- **`implementation-playbook` reads field expanded** — added `git-workflow` and `user-stories` to improve data-flow traceability.
+
 ## [3.2.0] — 2026-04-03
 
 ### Changed
