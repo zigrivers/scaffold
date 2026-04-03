@@ -23,12 +23,8 @@
   },
   "files": [
     "dist/",
-    "pipeline/",
-    "tools/",
-    "knowledge/",
-    "methodology/",
+    "content/",
     "skills/",
-    "agent-skills/",
     "README.md",
     "LICENSE"
   ],
