@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 
-COMMAND="$BATS_TEST_DIRNAME/../commands/post-implementation-review.md"
+COMMAND="$BATS_TEST_DIRNAME/../content/tools/post-implementation-review.md"
 
 @test "generated command file exists" {
     [ -f "$COMMAND" ]

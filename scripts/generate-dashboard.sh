@@ -104,35 +104,39 @@ if [[ -f "$SKILL_FILE" ]]; then
     ' "$SKILL_FILE" | jq -R 'split("|") | {step: .[0], checkFile: .[1], trackingComment: .[2]}' | jq -s .)
 fi
 
-# Parse descriptions from FRONTMATTER in extract-commands.sh
+# Parse descriptions, long descriptions, and prompt content from content/ meta-prompts
 DESCRIPTIONS_JSON="{}"
-EXTRACT_SCRIPT="$REPO_DIR/scripts/extract-commands.sh"
-if [[ -f "$EXTRACT_SCRIPT" ]]; then
-    DESCRIPTIONS_JSON=$(grep "^    '" "$EXTRACT_SCRIPT" | sed "s/^    '//; s/'$//" | \
-        awk -F'|' '{gsub(/^[ \t]+|[ \t]+$/, "", $1); gsub(/^[ \t]+|[ \t]+$/, "", $2); if ($1 != "") printf "%s|%s\n", $1, $2}' | \
-        jq -R 'split("|") | {(.[0]): .[1]}' | jq -s 'add // {}')
-fi
-
-# Parse long descriptions from command file frontmatter
 LONG_DESCRIPTIONS_JSON="{}"
-COMMANDS_DIR="$REPO_DIR/commands"
-if [[ -d "$COMMANDS_DIR" ]]; then
-    LONG_DESCRIPTIONS_JSON=$(
-        for f in "$COMMANDS_DIR"/*.md; do
+PROMPT_CONTENT_JSON="{}"
+CONTENT_DIR="$REPO_DIR/content"
+if [[ -d "$CONTENT_DIR" ]]; then
+    _all_md_files=()
+    for f in "$CONTENT_DIR"/pipeline/*/*.md "$CONTENT_DIR"/tools/*.md; do
+        [[ -f "$f" ]] && _all_md_files+=("$f")
+    done
+
+    DESCRIPTIONS_JSON=$(
+        for f in "${_all_md_files[@]}"; do
             slug=$(basename "$f" .md)
-            ldesc=$(awk '/^---$/{n++;next} n==1 && /^long-description:/{sub(/^long-description: *"?/,"");sub(/"? *$/,"");print;exit}' "$f")
+            desc=$(awk '/^---$/{n++;next} n==1 && /^description:/{sub(/^description: *"?/,"");sub(/"? *$/,"");print;exit}' "$f")
+            if [[ -n "$desc" ]]; then
+                printf '%s|%s\n' "$slug" "$desc"
+            fi
+        done | jq -R 'split("|") | {(.[0]): .[1]}' | jq -s 'add // {}'
+    )
+
+    LONG_DESCRIPTIONS_JSON=$(
+        for f in "${_all_md_files[@]}"; do
+            slug=$(basename "$f" .md)
+            ldesc=$(awk '/^---$/{n++;next} n==1 && /^summary:/{sub(/^summary: *"?/,"");sub(/"? *$/,"");print;exit}' "$f")
             if [[ -n "$ldesc" ]]; then
                 printf '%s|%s\n' "$slug" "$ldesc"
             fi
         done | jq -R 'split("|") | {(.[0]): .[1]}' | jq -s 'add // {}'
     )
-fi
 
-# Read full prompt content from command files (strip YAML frontmatter)
-PROMPT_CONTENT_JSON="{}"
-if [[ -d "$COMMANDS_DIR" ]]; then
     PROMPT_CONTENT_JSON=$(
-        for f in "$COMMANDS_DIR"/*.md; do
+        for f in "${_all_md_files[@]}"; do
             slug=$(basename "$f" .md)
             # Strip YAML frontmatter (between first two --- lines)
             content=$(awk 'BEGIN{fm=0} /^---$/{fm++;next} fm>=2{print}' "$f")
