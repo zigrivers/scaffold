@@ -230,7 +230,7 @@ teardown() {
 
 @test "pipeline skill defers status to scaffold-runner" {
     # Verify the skill activation fix: pipeline skill points to runner for status
-    run grep 'scaffold-runner' "$BATS_TEST_DIRNAME/../skills/scaffold-pipeline/SKILL.md"
+    run grep 'scaffold-runner' "$BATS_TEST_DIRNAME/../content/skills/scaffold-pipeline/SKILL.md"
     [ "$status" -eq 0 ]
 }
 

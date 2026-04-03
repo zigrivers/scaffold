@@ -61,7 +61,7 @@ fi
 
 # ─── Section 2: Parse pipeline data ──────────────────────────────
 
-SKILL_FILE="$REPO_DIR/skills/scaffold-pipeline/SKILL.md"
+SKILL_FILE="$REPO_DIR/content/skills/scaffold-pipeline/SKILL.md"
 
 # Parse Pipeline Order table from SKILL.md into JSON
 PIPELINE_JSON="[]"
