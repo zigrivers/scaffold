@@ -1,8 +1,11 @@
 .DS_Store
 .history
 
-# Beads local database
-.beads/
+# Build output (rebuilt by npm run build)
+dist/
+
+# Generated skills (resolved from content/skills/ templates during scaffold build)
+skills/
 
 # Scaffold — preserve state files, ignore dashboard
 .scaffold/dashboard.html
@@ -13,7 +16,6 @@ coverage/
 
 # Node.js / TypeScript v2
 node_modules/
-dist/
 
 # Temp files (atomic writes)
 *.tmp
