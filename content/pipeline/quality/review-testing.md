@@ -6,7 +6,7 @@ phase: "quality"
 order: 910
 dependencies: [tdd, system-architecture]
 outputs: [docs/reviews/review-testing.md, docs/reviews/testing/review-summary.md, docs/reviews/testing/codex-review.json, docs/reviews/testing/gemini-review.json]
-reads: [domain-modeling, system-architecture]
+reads: [domain-modeling]
 conditional: null
 knowledge-base: [review-methodology, review-testing-strategy, multi-model-review-dispatch, review-step-template]
 ---
