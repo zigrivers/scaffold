@@ -44,7 +44,7 @@ Review the whole codebase for systemic concerns:
 Codex and Gemini cannot read files directly. Build a context bundle:
 
 1. Full file tree (excluding node_modules, .git, dist, build, coverage)
-2. Architecture docs (docs/architecture.md, docs/adrs/*.md if present)
+2. Architecture docs (docs/system-architecture.md, docs/adrs/*.md if present)
 3. Coding standards (docs/coding-standards.md)
 4. Up to 15 strategically selected files:
    - Entry points (main.*, index.*, app.*, server.* at root/src level)

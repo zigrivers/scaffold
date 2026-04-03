@@ -36,7 +36,8 @@ and produce a structured coverage matrix and review summary.
 - docs/reviews/implementation-plan/gemini-review.json — raw Gemini findings (depth 4+, if available)
 
 ## Quality Criteria
-- (mvp) Architecture coverage verified (every component has tasks)
+- (deep) Architecture coverage verified (every component has tasks)
+- (mvp) Every user story maps to at least one implementation task
 - (mvp) Dependency graph is valid DAG
 - (mvp) No task is too large for a single agent session
 - (deep) Critical path is accurate

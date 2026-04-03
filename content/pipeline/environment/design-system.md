@@ -5,7 +5,7 @@ summary: "Creates a visual language — color palette (WCAG-compliant), typograp
 phase: "environment"
 order: 320
 dependencies: [dev-env-setup]
-outputs: [docs/design-system.md, tailwind.config.js, docs/coding-standards.md]
+outputs: [docs/design-system.md, docs/coding-standards.md]
 reads: [create-prd]
 conditional: "if-needed"
 knowledge-base: [design-system-tokens]

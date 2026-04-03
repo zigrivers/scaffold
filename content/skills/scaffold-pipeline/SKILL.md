@@ -41,6 +41,9 @@ Use this skill ONLY when the user asks about:
 
 | # | Phase | Command | Notes |
 |---|-------|---------|-------|
+| 0.1 | Product Vision | `/scaffold:create-vision` | Interactive — requires user input |
+| 0.2 | Product Vision | `/scaffold:review-vision` | Multi-pass vision review |
+| 0.3 | Product Vision | `/scaffold:innovate-vision` | **(optional)** Strategic innovation |
 | 1 | Product Definition | `/scaffold:create-prd` | Interactive — requires user input |
 | 2 | Product Definition | `/scaffold:review-prd` | Multi-pass PRD review |
 | 2.5 | Product Definition | `/scaffold:innovate-prd` | **(optional)** Feature-level innovation |
@@ -189,9 +192,6 @@ Steps within the same track that don't depend on each other can run in parallel 
 6. **Architecture before Specification** — DB, API, UX specs derive from architecture (can parallelize)
 7. **TDD → Review Testing → Operations → Security** — quality gate chain
 8. **Both tracks converge at Implementation Plan** — depends on tdd, operations, security, AND review-architecture
-9. **All 7 Validation checks before Apply Fixes & Freeze** — freeze requires all findings
-10. **Finalization before Execution** — agents need frozen docs and playbook
-8. **TDD → Review Testing → Operations → Security** — quality gate chain
 9. **Quality Gates before Consolidation** — consolidation verifies all docs including operations/security
 10. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
 11. **Implementation Plan Review before Validation** — 7 checks run after plan review

@@ -30,6 +30,13 @@ Print the following reference directly. Do not read any files or run any command
 | Install Beads | `npm install -g @beads/bd` or `brew install beads` **(optional)** |
 | Install Playwright MCP | `claude mcp add playwright npx @playwright/mcp@latest` **(optional — web apps only)** |
 
+### Phase 0 — Product Vision (`vision`)
+| # | Prompt | Command | Notes |
+|---|--------|---------|-------|
+| 0.1 | **Product Vision** | `/scaffold:create-vision` | Interactive — requires user input |
+| 0.2 | **Review Vision** | `/scaffold:review-vision` | Multi-pass vision review |
+| 0.3 | **Innovate Vision** | `/scaffold:innovate-vision` | **(optional)** Strategic innovation |
+
 ### Phase 1 — Product Definition (`pre`)
 | # | Prompt | Command | Notes |
 |---|--------|---------|-------|

@@ -31,7 +31,7 @@ independent review validation.
 - docs/reviews/adrs/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- (mvp) All ADR-specific review passes executed
+- (mvp) Contradiction check executed with findings documented
 - (mvp) Every finding categorized P0-P3 with specific ADR number, section, and issue. Severity definitions: P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.
 - (deep) Missing decisions identified and documented
 - (mvp) Contradictions resolved

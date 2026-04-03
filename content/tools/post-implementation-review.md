@@ -34,7 +34,7 @@ The three channels are:
 - `docs/user-stories.md` (required) — user stories with acceptance criteria; organizing manifest for Phase 2
 - `docs/implementation-plan.md` (optional) — implementation tasks; used to cross-check that all planned deliverables were built
 - `docs/coding-standards.md` (required) — coding conventions for review context
-- `docs/architecture.md` (optional) — used for architecture alignment checks
+- `docs/system-architecture.md` (optional) — used for architecture alignment checks
 - `docs/adrs/` (optional) — architecture decision records for alignment checks
 - `docs/tdd-standards.md` (optional) — test coverage expectations
 - `docs/review-standards.md` (optional) — severity definitions and review criteria
@@ -120,7 +120,7 @@ find . -type f \
 
 **Read architecture docs (if present):**
 
-Read `docs/architecture.md` if it exists. Read all files in `docs/adrs/` if
+Read `docs/system-architecture.md` if it exists. Read all files in `docs/adrs/` if
 the directory exists. Combine into a single architecture context string. If
 neither exists, use an empty string and note "Architecture docs not found."
 

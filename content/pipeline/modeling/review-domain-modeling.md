@@ -30,7 +30,7 @@ independent review validation.
 - docs/reviews/domain-modeling/gemini-review.json (depth 4+, if available) — raw Gemini findings
 
 ## Quality Criteria
-- (mvp) All review passes executed with findings documented
+- (mvp) Consistency check executed with blocking issues documented
 - (mvp) Every finding categorized by severity (P0-P3). Severity definitions: P0 = Breaks downstream work. P1 = Prevents quality milestone. P2 = Known tech debt. P3 = Polish.
 - (mvp) Fix plan created for P0 and P1 findings
 - (mvp) Fixes applied and re-validated

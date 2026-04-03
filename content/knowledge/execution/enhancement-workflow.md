@@ -42,7 +42,7 @@ Read these documents in order before proposing any changes:
 1. **Product vision** (`docs/vision.md` or equivalent) — understand the project's purpose and direction
 2. **PRD** (`docs/prd.md`) — understand existing requirements and constraints
 3. **User stories** (`docs/user-stories.md`) — understand who uses the system and how
-4. **Architecture** (`docs/architecture.md` or ADRs) — understand the technical structure
+4. **Architecture** (`docs/system-architecture.md` or ADRs) — understand the technical structure
 5. **Coding standards** (`docs/coding-standards.md`) — understand conventions you must follow
 6. **TDD standards** (`docs/tdd-standards.md`) — understand testing expectations
 7. **Project structure** (`docs/project-structure.md`) — understand where code lives

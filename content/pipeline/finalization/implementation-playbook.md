@@ -4,9 +4,9 @@ description: Create the playbook that AI agents follow during implementation
 summary: "Writes the playbook agents reference during every coding session — task execution order, which docs to read before each task, the TDD loop to follow, quality gates to pass, and the handoff format between agents."
 phase: "finalization"
 order: 1430
-dependencies: [developer-onboarding-guide]
+dependencies: [developer-onboarding-guide, implementation-plan]
 outputs: [docs/implementation-playbook.md]
-reads: [story-tests, create-evals, implementation-plan, database-schema, api-contracts, ux-spec, design-system, system-architecture, tdd, coding-standards, security, operations, domain-modeling, adrs, create-prd, project-structure]
+reads: [story-tests, create-evals, implementation-plan, database-schema, api-contracts, ux-spec, design-system, system-architecture, tdd, coding-standards, security, operations, domain-modeling, adrs, create-prd, project-structure, git-workflow, user-stories]
 conditional: null
 knowledge-base: [implementation-playbook]
 ---
