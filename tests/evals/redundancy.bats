@@ -20,7 +20,7 @@ setup() {
     if [[ "$has_deep" -gt 0 && "$has_summary" -eq 0 ]]; then
       failures+=("$(basename "$file"): has Deep Guidance but no Summary")
     fi
-  done < <(find "${PROJECT_ROOT}/knowledge" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/knowledge" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Incomplete Summary/Deep Guidance structure:\n"
@@ -40,7 +40,7 @@ setup() {
     if [[ "$summary_lines" -gt 80 ]]; then
       failures+=("$(basename "$file"): Summary is ${summary_lines} lines (max 80) — may contain content that belongs in Deep Guidance")
     fi
-  done < <(find "${PROJECT_ROOT}/knowledge" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/knowledge" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Oversized Summary sections:\n"
@@ -66,7 +66,7 @@ setup() {
       local pct=$(( deep_lines * 100 / total ))
       failures+=("$(basename "$file"): Deep Guidance is ${pct}% of file (minimum 60%) — Summary may be too large")
     fi
-  done < <(find "${PROJECT_ROOT}/knowledge" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/knowledge" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Deep Guidance proportion failures:\n"

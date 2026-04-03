@@ -26,7 +26,7 @@ setup() {
     while IFS= read -r dep; do
       [[ -z "$dep" ]] && continue
       local dep_file
-      dep_file="$(find "${PROJECT_ROOT}/pipeline" -name "${dep}.md" -type f | head -1)"
+      dep_file="$(find "${PROJECT_ROOT}/content/pipeline" -name "${dep}.md" -type f | head -1)"
       [[ -z "$dep_file" ]] && continue
 
       local transitive_deps
@@ -36,7 +36,7 @@ setup() {
       while IFS= read -r trans_dep; do
         [[ -z "$trans_dep" ]] && continue
         local trans_file
-        trans_file="$(find "${PROJECT_ROOT}/pipeline" -name "${trans_dep}.md" -type f | head -1)"
+        trans_file="$(find "${PROJECT_ROOT}/content/pipeline" -name "${trans_dep}.md" -type f | head -1)"
         [[ -z "$trans_file" ]] && continue
 
         local trans_phase trans_phase_num
@@ -51,7 +51,7 @@ setup() {
         fi
       done <<< "$transitive_deps"
     done <<< "$deps"
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Transitive dependency ordering failures (%d checked):\n" "$checked"
@@ -99,7 +99,7 @@ setup() {
 
         # Get this dep's deps for next iteration
         local dep_file
-        dep_file="$(find "${PROJECT_ROOT}/pipeline" -name "${dep}.md" -type f | head -1)"
+        dep_file="$(find "${PROJECT_ROOT}/content/pipeline" -name "${dep}.md" -type f | head -1)"
         [[ -z "$dep_file" ]] && continue
 
         local sub_deps
@@ -111,7 +111,7 @@ ${sub_deps}"
       queue="$(echo "$next_queue" | grep -v '^$' || true)"
       depth=$((depth + 1))
     done
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Transitive cycle failures:\n"

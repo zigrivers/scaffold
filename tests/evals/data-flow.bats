@@ -28,7 +28,7 @@ get_transitive_deps() {
     visited="${visited}${visited:+$'\n'}${current}"
 
     local dep_file
-    dep_file="$(find "${PROJECT_ROOT}/pipeline" -name "${current}.md" -type f | head -1)"
+    dep_file="$(find "${PROJECT_ROOT}/content/pipeline" -name "${current}.md" -type f | head -1)"
     [[ -z "$dep_file" ]] && continue
 
     local deps
@@ -78,7 +78,7 @@ get_transitive_deps() {
 
       # Check implicit phase ordering: target must be in same or earlier phase
       local target_file target_phase target_phase_num
-      target_file="$(find "${PROJECT_ROOT}/pipeline" -name "${read_ref}.md" -type f | head -1)"
+      target_file="$(find "${PROJECT_ROOT}/content/pipeline" -name "${read_ref}.md" -type f | head -1)"
       if [[ -n "$target_file" ]]; then
         target_phase="$(extract_field "$target_file" "phase")"
         target_phase_num="$(get_phase_number "$target_phase")"
@@ -92,7 +92,7 @@ get_transitive_deps() {
       # If we get here, this is a real violation
       violations+=("${name}: reads '${read_ref}' not reachable (not in deps, not in earlier phase, not exempt)")
     done <<< "$reads_raw"
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   local reachable=$(( checked - ${#violations[@]} ))
   printf "Data flow coverage: %d/%d reads entries are valid\n" "$reachable" "$checked"

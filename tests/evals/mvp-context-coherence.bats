@@ -13,7 +13,7 @@ setup() {
 # exist at MVP depth. This was a root cause of the R6 P1 stuck points.
 
 @test "MVP steps do not require non-MVP artifacts" {
-  local mvp_file="${PROJECT_ROOT}/methodology/mvp.yml"
+  local mvp_file="${PROJECT_ROOT}/content/methodology/mvp.yml"
   [[ -f "$mvp_file" ]] || {
     echo "methodology/mvp.yml not found"
     return 1
@@ -47,7 +47,7 @@ setup() {
         pipeline_file="$candidate"
         break
       fi
-    done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+    done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
     [[ -z "$pipeline_file" ]] && continue
 
@@ -79,7 +79,7 @@ setup() {
 # couldn't proceed without system-architecture.md. Verify it still exists.
 
 @test "implementation-plan has MVP-Specific Guidance section" {
-  local impl_plan="${PROJECT_ROOT}/pipeline/planning/implementation-plan.md"
+  local impl_plan="${PROJECT_ROOT}/content/pipeline/planning/implementation-plan.md"
   [[ -f "$impl_plan" ]] || {
     echo "pipeline/planning/implementation-plan.md not found"
     return 1
@@ -97,7 +97,7 @@ setup() {
 # that references story-tests-map should be tagged (deep), not (mvp).
 
 @test "implementation-playbook story-tests-map QC is depth-gated not mvp-tagged" {
-  local playbook="${PROJECT_ROOT}/pipeline/finalization/implementation-playbook.md"
+  local playbook="${PROJECT_ROOT}/content/pipeline/finalization/implementation-playbook.md"
   [[ -f "$playbook" ]] || {
     echo "pipeline/finalization/implementation-playbook.md not found"
     return 1

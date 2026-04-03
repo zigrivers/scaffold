@@ -14,7 +14,7 @@ PRESET_FILES=(mvp.yml deep.yml custom-defaults.yml)
   step_names="$(get_pipeline_names)"
 
   for preset in "${PRESET_FILES[@]}"; do
-    local preset_path="${PROJECT_ROOT}/methodology/${preset}"
+    local preset_path="${PROJECT_ROOT}/content/methodology/${preset}"
     if [[ ! -f "$preset_path" ]]; then
       failures+=("preset file '${preset}' not found at ${preset_path}")
       continue
@@ -45,7 +45,7 @@ PRESET_FILES=(mvp.yml deep.yml custom-defaults.yml)
   step_names="$(get_pipeline_names)"
 
   for preset in "${PRESET_FILES[@]}"; do
-    local preset_path="${PROJECT_ROOT}/methodology/${preset}"
+    local preset_path="${PROJECT_ROOT}/content/methodology/${preset}"
     [[ ! -f "$preset_path" ]] && continue
 
     # Extract step names from preset (lines matching "  step-name: {")

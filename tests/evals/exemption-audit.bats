@@ -12,27 +12,7 @@ setup() {
 EXEMPT_THRESHOLD_PCT=25
 
 count_pipeline_steps() {
-  find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f | wc -l | tr -d ' '
-}
-
-count_commands() {
-  find "${PROJECT_ROOT}/commands" -name '*.md' -type f | wc -l | tr -d ' '
-}
-
-@test "COMMAND_EXEMPT is below 25% of total commands" {
-  local total exempt_count threshold
-  total="$(count_commands)"
-  exempt_count="${#COMMAND_EXEMPT[@]}"
-  threshold=$(( total * EXEMPT_THRESHOLD_PCT / 100 ))
-
-  printf "COMMAND_EXEMPT: %d entries (threshold: %d = %d%% of %d commands)\n" \
-    "$exempt_count" "$threshold" "$EXEMPT_THRESHOLD_PCT" "$total"
-
-  if [[ "$exempt_count" -gt "$threshold" ]]; then
-    printf "FAIL: COMMAND_EXEMPT has %d entries, exceeds %d%% threshold (%d)\n" \
-      "$exempt_count" "$EXEMPT_THRESHOLD_PCT" "$threshold"
-    return 1
-  fi
+  find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f | wc -l | tr -d ' '
 }
 
 @test "TERMINAL_OUTPUT_EXEMPT is below 25% of total pipeline steps" {
@@ -46,24 +26,6 @@ count_commands() {
 
   if [[ "$exempt_count" -gt "$threshold" ]]; then
     printf "FAIL: TERMINAL_OUTPUT_EXEMPT has %d entries, exceeds %d%% threshold (%d)\n" \
-      "$exempt_count" "$EXEMPT_THRESHOLD_PCT" "$threshold"
-    return 1
-  fi
-}
-
-@test "AFTER_STEP_EXEMPT is below 25% of total commands" {
-  local total exempt_count threshold
-  # AFTER_STEP_EXEMPT applies to commands (used in command-structure.bats),
-  # so compare against total commands, not pipeline steps.
-  total="$(count_commands)"
-  exempt_count="${#AFTER_STEP_EXEMPT[@]}"
-  threshold=$(( total * EXEMPT_THRESHOLD_PCT / 100 ))
-
-  printf "AFTER_STEP_EXEMPT: %d entries (threshold: %d = %d%% of %d commands)\n" \
-    "$exempt_count" "$threshold" "$EXEMPT_THRESHOLD_PCT" "$total"
-
-  if [[ "$exempt_count" -gt "$threshold" ]]; then
-    printf "FAIL: AFTER_STEP_EXEMPT has %d entries, exceeds %d%% threshold (%d)\n" \
       "$exempt_count" "$EXEMPT_THRESHOLD_PCT" "$threshold"
     return 1
   fi

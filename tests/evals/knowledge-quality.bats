@@ -37,7 +37,7 @@ get_min_lines() {
     [[ -z "$name" ]] && failures+=("$file: missing name")
     [[ -z "$desc" ]] && failures+=("$file: missing description")
     [[ -z "$topics" ]] && failures+=("$file: missing topics")
-  done < <(find "${PROJECT_ROOT}/knowledge" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/knowledge" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Knowledge frontmatter failures:\n"
@@ -58,7 +58,7 @@ get_min_lines() {
     if [[ "$lines" -lt "$min" ]]; then
       failures+=("$(basename "$file") (${category}): ${lines} lines < ${min} minimum")
     fi
-  done < <(find "${PROJECT_ROOT}/knowledge" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/knowledge" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Knowledge files below minimum line count:\n"
@@ -79,7 +79,7 @@ get_min_lines() {
     if [[ "$blocks" -lt 1 ]]; then
       failures+=("$(basename "$file") (${category}): 0 code blocks")
     fi
-  done < <(find "${PROJECT_ROOT}/knowledge" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/knowledge" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Knowledge files missing code blocks:\n"
@@ -105,7 +105,7 @@ is_knowledge_template() {
     local refs
     refs="$(extract_field "$file" "knowledge-base" | sed 's/\[//;s/\]//' | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$' || true)"
     [[ -n "$refs" ]] && all_refs="${all_refs}${all_refs:+$'\n'}${refs}"
-  done < <(find "${PROJECT_ROOT}/pipeline" "${PROJECT_ROOT}/tools" -name '*.md' -type f 2>/dev/null)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" "${PROJECT_ROOT}/content/tools" -name '*.md' -type f 2>/dev/null)
   all_refs="$(echo "$all_refs" | sort -u)"
 
   # Check each knowledge entry
@@ -118,7 +118,7 @@ is_knowledge_template() {
     if ! echo "$all_refs" | grep -qx "$name"; then
       orphans+=("$name")
     fi
-  done < <(find "${PROJECT_ROOT}/knowledge" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/knowledge" -name '*.md' -type f)
 
   if [[ ${#orphans[@]} -gt 0 ]]; then
     printf "Orphaned knowledge entries (not referenced by any pipeline step or tool):\n"

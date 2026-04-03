@@ -80,7 +80,7 @@ setup() {
     if [[ "$found" == "false" ]]; then
       failures+=("$(basename "$file"): Detect path '${detect_path}' not found in frontmatter outputs: [${outputs_raw//$'\n'/, }]")
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "UMS Detect path mismatches (%d):\n" "${#failures[@]}"
@@ -107,7 +107,7 @@ setup() {
       [[ -z "$op" ]] && continue
       output_owners+=("${op}:${name}")
     done <<< "$outputs_raw"
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   local failures=()
 
@@ -159,7 +159,7 @@ setup() {
     if [[ -n "$other_owner" ]]; then
       failures+=("$(basename "$file"): Detect path '${detect_path}' is an output of step '${other_owner}', not this step")
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "UMS Detect path cross-step violations (%d):\n" "${#failures[@]}"
@@ -197,7 +197,7 @@ setup() {
     if [[ -z "$outputs_raw" || "$outputs_raw" == "null" || "$outputs_raw" == "[]" ]]; then
       missing+=("$(basename "$file")")
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   printf "Steps with active Mode Detection: %d checked, %d missing outputs\n" "$checked" "${#missing[@]}"
 

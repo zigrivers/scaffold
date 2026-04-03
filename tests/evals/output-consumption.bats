@@ -66,14 +66,14 @@ is_terminal_path() {
           found=true
           break
         fi
-      done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+      done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
       if [[ "$found" == "false" ]]; then
         failures+=("${name}: output '${output_path}' not referenced by any downstream step")
       fi
       checked=$((checked + 1))
     done <<< "$outputs_raw"
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Unconsumed outputs (%d checked):\n" "$checked"
@@ -108,7 +108,7 @@ is_terminal_path() {
         failures+=("$(basename "$file"): reads '${read_ref}' is not a valid pipeline step name")
       fi
     done <<< "$reads_raw"
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Invalid reads references (%d checked):\n" "$checked"

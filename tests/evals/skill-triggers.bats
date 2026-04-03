@@ -5,7 +5,7 @@
 
 setup() {
   load eval_helper
-  SKILLS_DIR="${PROJECT_ROOT}/skills"
+  SKILLS_DIR="${PROJECT_ROOT}/content/skills"
 }
 
 # --- scaffold-runner activation ---

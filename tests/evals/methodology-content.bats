@@ -10,7 +10,7 @@ setup() {
 # --- Test 1: MVP preset disables more steps than it enables ---
 
 @test "MVP preset disables more steps than it enables" {
-  local mvp_file="${PROJECT_ROOT}/methodology/mvp.yml"
+  local mvp_file="${PROJECT_ROOT}/content/methodology/mvp.yml"
   [[ -f "$mvp_file" ]] || {
     echo "methodology/mvp.yml not found"
     return 1
@@ -30,8 +30,8 @@ setup() {
 # --- Test 2: deep preset enables more steps than MVP ---
 
 @test "deep preset enables more steps than MVP" {
-  local mvp_file="${PROJECT_ROOT}/methodology/mvp.yml"
-  local deep_file="${PROJECT_ROOT}/methodology/deep.yml"
+  local mvp_file="${PROJECT_ROOT}/content/methodology/mvp.yml"
+  local deep_file="${PROJECT_ROOT}/content/methodology/deep.yml"
   [[ -f "$mvp_file" ]] || { echo "mvp.yml not found"; return 1; }
   [[ -f "$deep_file" ]] || { echo "deep.yml not found"; return 1; }
 
@@ -63,7 +63,7 @@ setup() {
     if echo "$qc_section" | grep -q '(mvp)\|(deep)\|(depth'; then
       tagged_count=$((tagged_count + 1))
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   printf "Quality Criteria depth tags: %d/%d steps tagged (threshold: 55)\n" "$tagged_count" "$total_count"
 
@@ -76,7 +76,7 @@ setup() {
 # --- Test 4: methodology README exists and documents depth levels ---
 
 @test "methodology README exists and documents depth levels" {
-  local readme="${PROJECT_ROOT}/methodology/README.md"
+  local readme="${PROJECT_ROOT}/content/methodology/README.md"
   [[ -f "$readme" ]] || {
     echo "methodology/README.md not found"
     return 1

@@ -10,7 +10,7 @@ setup() {
 # --- Test 1: MVP-enabled step dependencies reference real pipeline steps ---
 
 @test "every MVP-enabled step's dependencies reference existing pipeline steps" {
-  local mvp_file="${PROJECT_ROOT}/methodology/mvp.yml"
+  local mvp_file="${PROJECT_ROOT}/content/methodology/mvp.yml"
   [[ -f "$mvp_file" ]] || {
     echo "methodology/mvp.yml not found"
     return 1
@@ -39,7 +39,7 @@ setup() {
     local name
     name="$(extract_field "$file" "name")"
     [[ -n "$name" ]] && all_pipeline_names+=("$name")
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   printf "MVP-enabled steps: %d, Total pipeline steps: %d\n" "${#mvp_enabled[@]}" "${#all_pipeline_names[@]}"
 
@@ -59,7 +59,7 @@ setup() {
         pipeline_file="$candidate"
         break
       fi
-    done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+    done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
     # Skip steps without pipeline files (e.g., build phase steps)
     [[ -z "$pipeline_file" ]] && continue
@@ -112,7 +112,7 @@ setup() {
 # --- Test 2: MVP step count sanity check ---
 
 @test "MVP preset enables between 10 and 30 steps" {
-  local mvp_file="${PROJECT_ROOT}/methodology/mvp.yml"
+  local mvp_file="${PROJECT_ROOT}/content/methodology/mvp.yml"
   [[ -f "$mvp_file" ]] || {
     echo "methodology/mvp.yml not found"
     return 1
@@ -137,7 +137,7 @@ setup() {
 # --- Test 3: MVP-enabled steps all resolve to existing pipeline files ---
 
 @test "every MVP-enabled step has a corresponding pipeline file" {
-  local mvp_file="${PROJECT_ROOT}/methodology/mvp.yml"
+  local mvp_file="${PROJECT_ROOT}/content/methodology/mvp.yml"
   [[ -f "$mvp_file" ]] || {
     echo "methodology/mvp.yml not found"
     return 1
@@ -149,7 +149,7 @@ setup() {
     local name
     name="$(extract_field "$file" "name")"
     [[ -n "$name" ]] && pipeline_names+=("$name")
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   # Parse MVP-enabled steps and verify each has a pipeline file
   local missing=()

@@ -2,24 +2,6 @@
 # Shared exempt lists for scaffold meta-evals.
 # Sourced by individual eval files to avoid duplicating lists.
 
-# --- channel-parity.bats ---
-# Commands that are tools or utilities (source in tools/, not pipeline/)
-COMMAND_EXEMPT=(
-  "dashboard"
-  "knowledge"
-  "post-implementation-review"
-  "prompt-pipeline"
-  "review-code"
-  "review-pr"
-  "session-analyzer"
-  "update"
-  "version"
-  "version-bump"
-  "release"
-  "prd-gap-analysis"
-  "user-stories-gaps"
-)
-
 # --- output-consumption.bats ---
 # Steps whose outputs are terminal (consumed by the user, not pipeline).
 TERMINAL_OUTPUT_EXEMPT=(
@@ -46,35 +28,6 @@ TERMINAL_PATH_PATTERNS=(
   "playwright.config."
   "tailwind.config."
   "tests/screenshots/"
-)
-
-# --- command-structure.bats ---
-# Utility commands and terminal pipeline steps that don't need After This Step.
-# Terminal steps have no downstream dependents in the dependency graph.
-AFTER_STEP_EXEMPT=(
-  "prompt-pipeline"
-  "review-code"
-  "session-analyzer"
-  "update"
-  "version"
-  "dashboard"
-  "add-e2e-testing"
-  "ai-memory-setup"
-  "automated-pr-review"
-  "beads"
-  "design-system"
-  "implementation-playbook"
-  "innovate-prd"
-  "innovate-user-stories"
-  "platform-parity-review"
-  "workflow-audit"
-)
-
-# --- cross-channel.bats ---
-# Commands that consolidate multiple pipeline steps (1:many mapping)
-CONSOLIDATION_COMMANDS=(
-  "prd-gap-analysis"
-  "user-stories-gaps"
 )
 
 # --- knowledge-quality.bats ---
@@ -104,21 +57,6 @@ is_phase_ordering_exempt() {
 }
 
 # --- Self-validation ---
-# Validate that exempt entries actually exist as command files.
-# Call from tests to catch stale exemptions after commands are added/removed.
-validate_exempt_commands() {
-  local missing=()
-  for cmd in "${COMMAND_EXEMPT[@]}"; do
-    if [[ ! -f "${PROJECT_ROOT}/commands/${cmd}.md" ]]; then
-      missing+=("$cmd")
-    fi
-  done
-  if [[ ${#missing[@]} -gt 0 ]]; then
-    printf "Stale COMMAND_EXEMPT entries (command files no longer exist):\n"
-    printf "  %s\n" "${missing[@]}"
-    return 1
-  fi
-}
 
 validate_exempt_phase_ordering() {
   local missing=()
@@ -132,7 +70,7 @@ validate_exempt_phase_ordering() {
       name="$(basename "$pfile" .md)"
       [[ "$name" == "$reader" ]] && reader_found=1
       [[ "$name" == "$target" ]] && target_found=1
-    done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f -print0)
+    done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f -print0)
     if [[ "$reader_found" -eq 0 ]]; then
       missing+=("${entry}: reader '${reader}' not found in pipeline")
     fi
@@ -159,7 +97,7 @@ validate_exempt_terminal_outputs() {
         found=1
         break
       fi
-    done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f -print0)
+    done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f -print0)
     if [[ "$found" -eq 0 ]]; then
       missing+=("$step")
     fi

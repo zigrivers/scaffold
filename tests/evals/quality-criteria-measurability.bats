@@ -27,7 +27,7 @@ setup() {
       vague_count=$((vague_count + file_vague))
       vague_files+=("$(basename "$f"): $file_vague")
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   printf "Vague quantifier instances: %d across %d files\n" "$vague_count" "${#vague_files[@]}"
   for entry in "${vague_files[@]}"; do
@@ -59,7 +59,7 @@ setup() {
         missing+=("$(basename "$f")")
       fi
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   printf "Steps with multi-model criteria missing consensus definition: %d\n" "${#missing[@]}"
   for entry in "${missing[@]}"; do

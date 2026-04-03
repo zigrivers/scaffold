@@ -32,7 +32,7 @@ setup() {
         violations+=("$(basename "$file"): QC section contains '${match}'")
       done <<< "$matches"
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#violations[@]} -gt 0 ]]; then
     printf "FAIL: Found grouped depth levels in Quality Criteria sections (%d violations):\n" "${#violations[@]}"
@@ -62,7 +62,7 @@ setup() {
         violations+=("$(basename "$file"): Methodology Scaling contains '${match}'")
       done <<< "$matches"
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   if [[ ${#violations[@]} -gt 0 ]]; then
     printf "FAIL: Found grouped depth levels in Methodology Scaling sections (%d violations):\n" "${#violations[@]}"
@@ -103,7 +103,7 @@ setup() {
     if [[ ${#missing[@]} -gt 0 ]]; then
       violations+=("$(basename "$file"): missing individual Depth entries: ${missing[*]}")
     fi
-  done < <(find "${PROJECT_ROOT}/pipeline" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/pipeline" -name '*.md' -type f)
 
   printf "Checked %d pipeline steps with custom:depth sections\n" "$checked"
 
