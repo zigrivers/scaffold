@@ -96,4 +96,35 @@ describe('loadConfig', () => {
     expect(config.channels.claude.enabled).toBe(true)
     expect(config.channels.codex.enabled).toBe(false)
   })
+
+  it('seeds builtin channels when no config files exist', () => {
+    const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
+    expect(config.channels.claude).toBeDefined()
+    expect(config.channels.claude.command).toBe('claude -p')
+    expect(config.channels.gemini).toBeDefined()
+    expect(config.channels.codex).toBeDefined()
+  })
+
+  it('allows partial channel overrides on top of builtins', () => {
+    const yaml = [
+      'version: 1',
+      'channels:',
+      '  claude:',
+      '    timeout: 600',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yaml)
+    const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
+    expect(config.channels.claude.timeout).toBe(600)
+    expect(config.channels.claude.command).toBe('claude -p')
+  })
+
+  it('throws on malformed YAML', () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), '{ invalid yaml: [}')
+    expect(() => loadConfig({ projectRoot: tmpDir, userHome: tmpDir })).toThrow('Failed to parse')
+  })
+
+  it('throws on non-object YAML root', () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), '- just\n- a\n- list\n')
+    expect(() => loadConfig({ projectRoot: tmpDir, userHome: tmpDir })).toThrow('expected an object')
+  })
 })

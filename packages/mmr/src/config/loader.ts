@@ -49,9 +49,22 @@ function deepMerge<T extends Record<string, unknown>>(base: T, overlay: Record<s
  */
 function loadYaml(filePath: string): Record<string, unknown> | undefined {
   if (!fs.existsSync(filePath)) return undefined
-  const raw = fs.readFileSync(filePath, 'utf-8')
-  const parsed = yaml.load(raw)
-  if (parsed === null || parsed === undefined || typeof parsed !== 'object') return undefined
+  let raw: string
+  try {
+    raw = fs.readFileSync(filePath, 'utf-8')
+  } catch {
+    return undefined
+  }
+  let parsed: unknown
+  try {
+    parsed = yaml.load(raw)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    throw new Error(`Failed to parse ${filePath}: ${msg}`)
+  }
+  if (parsed === null || parsed === undefined || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`Invalid config in ${filePath}: expected an object, got ${typeof parsed}`)
+  }
   return parsed as Record<string, unknown>
 }
 

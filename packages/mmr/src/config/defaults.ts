@@ -14,7 +14,7 @@ export const DEFAULT_CONFIG: MmrConfigParsed = {
     parallel: true,
     job_retention_days: 7,
   },
-  channels: {},
+  channels: {} as Record<string, ChannelConfigParsed>, // Populated below after BUILTIN_CHANNELS definition
 }
 
 /**
@@ -67,3 +67,6 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
     stderr: 'suppress',
   },
 }
+
+// Seed DEFAULT_CONFIG with builtin channels
+DEFAULT_CONFIG.channels = { ...BUILTIN_CHANNELS }
