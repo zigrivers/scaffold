@@ -33,6 +33,10 @@ vi.mock('../output/context.js', () => ({
   })),
 }))
 
+vi.mock('../../core/skills/sync.js', () => ({
+  syncSkillsIfNeeded: vi.fn(),
+}))
+
 // Mock the build command to avoid circular deps / actual build execution
 vi.mock('./build.js', () => ({
   runBuild: vi.fn().mockResolvedValue({
@@ -58,6 +62,7 @@ import { runWizard } from '../../wizard/wizard.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { runBuild } from './build.js'
+import { syncSkillsIfNeeded } from '../../core/skills/sync.js'
 import initCommand from './init.js'
 
 // ---------------------------------------------------------------------------
@@ -123,6 +128,7 @@ describe('init command', () => {
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
+    vi.mocked(syncSkillsIfNeeded).mockReset()
     mockResolveOutputMode.mockReturnValue('auto')
     mockRunWizard.mockResolvedValue(makeSuccessResult(tmpDir))
     mockRunBuild.mockResolvedValue({
@@ -155,6 +161,7 @@ describe('init command', () => {
       }),
       expect.any(Object),
     )
+    expect(syncSkillsIfNeeded).toHaveBeenCalled()
     expect(exitSpy).toHaveBeenCalledWith(0)
   })
 
