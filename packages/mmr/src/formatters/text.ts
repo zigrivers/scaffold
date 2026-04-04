@@ -1,0 +1,33 @@
+import type { ReconciledResults } from '../types.js'
+
+export function formatText(results: ReconciledResults): string {
+  const lines: string[] = []
+  const gate = results.gate_passed ? 'PASSED' : 'FAILED'
+
+  lines.push(`MMR ${gate} — ${results.job_id}`)
+  lines.push(`Threshold: ${results.fix_threshold} | Channels: ${results.metadata.channels_completed}/${results.metadata.channels_dispatched} | Elapsed: ${results.metadata.total_elapsed}`)
+  lines.push('')
+
+  if (results.reconciled_findings.length > 0) {
+    lines.push(`Findings (${results.reconciled_findings.length}):`)
+    lines.push('')
+    for (const f of results.reconciled_findings) {
+      lines.push(`  [${f.severity}] ${f.location}`)
+      lines.push(`    ${f.description}`)
+      if (f.suggestion) {
+        lines.push(`    Suggestion: ${f.suggestion}`)
+      }
+      lines.push(`    Sources: ${f.sources.join(', ')} (${f.agreement})`)
+      lines.push('')
+    }
+  } else {
+    lines.push('No findings.')
+  }
+
+  lines.push('Channels:')
+  for (const [name, ch] of Object.entries(results.per_channel)) {
+    lines.push(`  ${name}: ${ch.status} (${ch.elapsed})`)
+  }
+
+  return lines.join('\n')
+}
