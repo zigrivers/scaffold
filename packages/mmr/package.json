@@ -15,9 +15,11 @@
   },
   "files": ["dist/", "templates/", "README.md", "LICENSE"],
   "engines": { "node": ">=18" },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "bin": { "mmr": "dist/index.js" },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src/ tests/",
