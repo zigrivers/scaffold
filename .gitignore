@@ -5,7 +5,7 @@
 dist/
 
 # Generated skills (resolved from content/skills/ templates during scaffold build)
-skills/
+/skills/
 
 # Beads local database (legacy, may still exist on disk)
 .beads/

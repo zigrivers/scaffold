@@ -3,6 +3,7 @@ import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { runWizard } from '../../wizard/wizard.js'
 import { runBuild } from './build.js'
+import { syncSkillsIfNeeded } from '../../core/skills/sync.js'
 
 interface InitArgs {
   format?: string
@@ -64,6 +65,14 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
     if (buildResult.exitCode !== 0) {
       process.exit(buildResult.exitCode)
       return
+    }
+
+    // Install project-local skills — middleware can't handle this because
+    // init is ROOT_OPTIONAL and .scaffold/ doesn't exist when middleware runs
+    try {
+      syncSkillsIfNeeded(projectRoot)
+    } catch {
+      // best-effort — don't fail init if skill sync fails
     }
 
     if (outputMode === 'json') {

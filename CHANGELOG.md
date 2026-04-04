@@ -2,6 +2,18 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.3.0] — 2026-04-04
+
+### Added
+
+- **Project-local skills now auto-update on every CLI command** — when you upgrade Scaffold, the next `scaffold run`, `scaffold status`, or any other CLI command silently updates your project's `.claude/skills/` and `.agents/skills/` to match the installed version. No more manual `scaffold skill install` after upgrades.
+- **`scaffold init` now installs skills automatically** — project-local skills are ready immediately after initialization, no separate install step needed.
+
+### Changed
+
+- **Skill resolution logic extracted to shared module** — `src/core/skills/sync.ts` is the single source of truth for skill targets, template resolution, and version checking. The `scaffold skill install` command now delegates to this module.
+- **`.gitignore` fix**: `/skills/` now correctly ignores only the root-level generated skills directory, not `src/core/skills/`.
+
 ## [3.2.2] — 2026-04-04
 
 ### Fixed

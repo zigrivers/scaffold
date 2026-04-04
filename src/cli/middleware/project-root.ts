@@ -1,5 +1,6 @@
 import path from 'node:path'
 import fs from 'node:fs'
+import { syncSkillsIfNeeded } from '../../core/skills/sync.js'
 
 /**
  * Walk up from startDir looking for a directory containing .scaffold/.
@@ -37,11 +38,25 @@ export function createProjectRootMiddleware(): (argv: Record<string, unknown>) =
   return (argv: Record<string, unknown>) => {
     if (typeof argv['root'] === 'string') {
       argv['detectedRoot'] = argv['root']
+      try {
+        syncSkillsIfNeeded(argv['root'])
+      } catch {
+        // best-effort
+      }
       return
     }
 
     const found = findProjectRoot(process.cwd())
     argv['detectedRoot'] = found ?? undefined
+
+    // Auto-sync project-local skills when version changes
+    if (argv['detectedRoot']) {
+      try {
+        syncSkillsIfNeeded(argv['detectedRoot'] as string)
+      } catch {
+        // Skill sync is best-effort — never block CLI commands
+      }
+    }
 
     if (argv['detectedRoot'] === undefined) {
       const commands = argv['_'] as string[]

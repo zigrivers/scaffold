@@ -133,11 +133,7 @@ This gives you:
 
 The plugin is optional — everything it does can also be done with `scaffold run <step>` from the CLI. But you lose the interactive decision surfacing without the Scaffold Runner skill.
 
-> **CLI-only users**: If you prefer not to install the plugin, add skills with one command:
-> ```bash
-> scaffold skill install
-> ```
-> This copies the Scaffold Runner and Pipeline Reference skills to both `.claude/skills/` and `.agents/skills/` in your project.
+> **CLI-only users**: If you prefer not to install the plugin, skills are installed automatically — `scaffold init` sets them up, and any subsequent CLI command keeps them current after upgrades. No manual `scaffold skill install` needed.
 
 > **Gemini users**: `scaffold build` keeps a root `GEMINI.md` in sync with the shared runner instructions and generates `.gemini/commands/scaffold/*.toml` wrappers. Plain prompts like `scaffold status` work because Gemini loads `GEMINI.md`.
 
@@ -613,7 +609,7 @@ You can change methodology mid-pipeline with `scaffold init --methodology <prese
 | `scaffold dashboard` | Open a visual progress dashboard in your browser |
 | `scaffold decisions` | Show all logged decisions |
 | `scaffold knowledge` | Manage project-local knowledge base overrides |
-| `scaffold skill install` | Install scaffold skills into the current project |
+| `scaffold skill install` | Install scaffold skills into the current project (automatic — rarely needed manually) |
 | `scaffold skill list` | Show available skills and installation status |
 | `scaffold skill remove` | Remove scaffold skills from the current project |
 

@@ -1,8 +1,13 @@
+vi.mock('../../core/skills/sync.js', () => ({
+  syncSkillsIfNeeded: vi.fn(),
+}))
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { MockInstance } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import { findProjectRoot, createProjectRootMiddleware, ROOT_OPTIONAL_COMMANDS } from './project-root.js'
+import { syncSkillsIfNeeded } from '../../core/skills/sync.js'
 
 describe('findProjectRoot', () => {
   let tmpDir: string
@@ -48,6 +53,7 @@ describe('createProjectRootMiddleware', () => {
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(process.env['TMPDIR'] ?? '/tmp', 'scaffold-test-'))
+    vi.mocked(syncSkillsIfNeeded).mockReset()
     exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
       throw new Error('process.exit called')
     }) as never)
@@ -131,6 +137,27 @@ describe('createProjectRootMiddleware', () => {
     const allStderr = stderrSpy.mock.calls.map(c => String(c[0])).join('')
     expect(allStderr).toContain('PROJECT_NOT_INITIALIZED')
     expect(allStderr).toContain('scaffold init')
+  })
+
+  it('calls syncSkillsIfNeeded when project root is found', () => {
+    fs.mkdirSync(path.join(tmpDir, '.scaffold'))
+    vi.spyOn(process, 'cwd').mockReturnValue(tmpDir)
+
+    const middleware = createProjectRootMiddleware()
+    const argv: Record<string, unknown> = { _: ['run'] }
+    middleware(argv)
+
+    expect(syncSkillsIfNeeded).toHaveBeenCalledWith(tmpDir)
+  })
+
+  it('does not call syncSkillsIfNeeded when no project root found', () => {
+    vi.spyOn(fs, 'existsSync').mockReturnValue(false)
+
+    const middleware = createProjectRootMiddleware()
+    const argv: Record<string, unknown> = { _: ['init'] }
+
+    expect(() => middleware(argv)).not.toThrow()
+    expect(syncSkillsIfNeeded).not.toHaveBeenCalled()
   })
 })
 
