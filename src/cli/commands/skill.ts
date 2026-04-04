@@ -67,9 +67,9 @@ const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
 
       if (result.installed > 0) {
         if (result.errors.length > 0) {
-          output.warn(
-            `\n${result.installed} skill(s) installed with warnings. Start a new Claude Code or Gemini session to activate.`,
-          )
+          const msg = `\n${result.installed} skill(s) installed with warnings.`
+            + ' Start a new Claude Code or Gemini session to activate.'
+          output.warn(msg)
         } else {
           output.info(
             `\n${result.installed} skill(s) installed. Start a new Claude Code or Gemini session to activate.`,
