@@ -6,7 +6,10 @@ export function formatMarkdown(results: ReconciledResults): string {
 
   lines.push(`## Multi-Model Review — ${gate}`)
   lines.push('')
-  lines.push(`**Job:** ${results.job_id} | **Threshold:** ${results.fix_threshold} | **Elapsed:** ${results.metadata.total_elapsed}`)
+  lines.push(
+    `**Job:** ${results.job_id} | **Threshold:** ${results.fix_threshold}` +
+    ` | **Elapsed:** ${results.metadata.total_elapsed}`,
+  )
   lines.push('')
 
   if (results.reconciled_findings.length > 0) {
@@ -15,7 +18,12 @@ export function formatMarkdown(results: ReconciledResults): string {
     lines.push('| Severity | Location | Description | Suggestion | Sources | Agreement |')
     lines.push('|----------|----------|-------------|------------|---------|-----------|')
     for (const f of results.reconciled_findings) {
-      lines.push(`| ${f.severity} | ${f.location} | ${f.description} | ${f.suggestion} | ${f.sources.join(', ')} | ${f.agreement} |`)
+      const src = f.sources.join(', ')
+      const row = [
+        f.severity, f.location, f.description,
+        f.suggestion, src, f.agreement,
+      ].map((c) => ` ${c} `).join('|')
+      lines.push(`|${row}|`)
     }
     lines.push('')
   } else {

@@ -5,7 +5,11 @@ export function formatText(results: ReconciledResults): string {
   const gate = results.gate_passed ? 'PASSED' : 'FAILED'
 
   lines.push(`MMR ${gate} — ${results.job_id}`)
-  lines.push(`Threshold: ${results.fix_threshold} | Channels: ${results.metadata.channels_completed}/${results.metadata.channels_dispatched} | Elapsed: ${results.metadata.total_elapsed}`)
+  const chCount = `${results.metadata.channels_completed}/${results.metadata.channels_dispatched}`
+  lines.push(
+    `Threshold: ${results.fix_threshold} | Channels: ${chCount}` +
+    ` | Elapsed: ${results.metadata.total_elapsed}`,
+  )
   lines.push('')
 
   if (results.reconciled_findings.length > 0) {
