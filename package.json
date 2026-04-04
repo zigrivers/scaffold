@@ -3,6 +3,7 @@
   "version": "3.3.0",
   "description": "AI-powered software project scaffolding pipeline",
   "type": "module",
+  "workspaces": ["packages/*"],
   "keywords": [
     "scaffold",
     "ai",
