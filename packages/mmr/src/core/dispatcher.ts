@@ -38,7 +38,7 @@ export async function dispatchChannel(
 
   // Split multi-word commands (e.g. "claude -p" → ["claude", "-p"])
   const [cmd, ...cmdArgs] = opts.command.split(/\s+/)
-  const args = [...cmdArgs, ...opts.flags, opts.prompt]
+  const args = [...cmdArgs, ...opts.flags]
 
   // Update channel to running
   store.updateChannel(jobId, channelName, {
@@ -46,12 +46,16 @@ export async function dispatchChannel(
     started_at: new Date().toISOString(),
   })
 
-  // Spawn the process detached so parent can exit
+  // Pipe prompt via stdin to avoid E2BIG on large diffs
   const proc = spawn(cmd, args, {
     detached: true,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...process.env, ...opts.env },
   })
+
+  // Write prompt to stdin
+  proc.stdin.write(opts.prompt)
+  proc.stdin.end()
 
   // Write PID file
   const pidFile = path.join(channelsDir, `${channelName}.pid`)

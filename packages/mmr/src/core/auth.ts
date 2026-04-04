@@ -11,10 +11,11 @@ export interface AuthResult {
  * Uses `command -v` via shell.
  */
 export async function checkInstalled(command: string): Promise<boolean> {
+  // Validate command name contains only safe characters
+  if (!/^[a-zA-Z0-9._-]+$/.test(command)) return false
   return new Promise((resolve) => {
-    const child = spawn('sh', ['-c', `command -v ${command}`], {
-      stdio: 'ignore',
-    })
+    // Use 'which' with argument array to avoid shell interpolation
+    const child = spawn('which', [command], { stdio: 'ignore' })
     child.on('close', (code) => resolve(code === 0))
     child.on('error', () => resolve(false))
   })

@@ -22,8 +22,9 @@ describe('dispatchChannel', () => {
     const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['test'] })
     store.savePrompt(job.job_id, 'Review this.')
 
+    // Use 'cat' which reads stdin and writes to stdout (prompt piped via stdin)
     await dispatchChannel(store, job.job_id, 'test', {
-      command: 'echo',
+      command: 'cat',
       prompt: '{"approved": true, "findings": [], "summary": "ok"}',
       flags: [],
       env: {},
@@ -42,9 +43,10 @@ describe('dispatchChannel', () => {
     const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['slow'] })
     store.savePrompt(job.job_id, 'Review this.')
 
+    // Use 'sleep 10' as the command (10 is a flag, not stdin)
     await dispatchChannel(store, job.job_id, 'slow', {
-      command: 'sleep',
-      prompt: '10',
+      command: 'sleep 10',
+      prompt: '',
       flags: [],
       env: {},
       timeout: 1,

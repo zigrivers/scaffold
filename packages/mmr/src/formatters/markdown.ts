@@ -19,9 +19,10 @@ export function formatMarkdown(results: ReconciledResults): string {
     lines.push('|----------|----------|-------------|------------|---------|-----------|')
     for (const f of results.reconciled_findings) {
       const src = f.sources.join(', ')
+      const esc = (s: string) => s.replace(/\|/g, '\\|')
       const row = [
-        f.severity, f.location, f.description,
-        f.suggestion, src, f.agreement,
+        f.severity, f.location, esc(f.description),
+        esc(f.suggestion), src, f.agreement,
       ].map((c) => ` ${c} `).join('|')
       lines.push(`|${row}|`)
     }
