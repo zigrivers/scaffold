@@ -22,7 +22,7 @@
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint src/ tests/",
+    "lint": "eslint src/",
     "type-check": "tsc --noEmit",
     "check": "npm run lint && npm run type-check && npm test"
   },
