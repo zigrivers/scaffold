@@ -23,6 +23,34 @@ describe('MmrConfigSchema', () => {
     expect(result.success).toBe(true)
   })
 
+  it('applies channel config defaults for omitted fields', () => {
+    const config = {
+      version: 1,
+      channels: {
+        claude: {
+          command: 'claude -p',
+          auth: {
+            check: 'claude -p "ok"',
+            failure_exit_codes: [1],
+            recovery: 'Run: claude login',
+          },
+        },
+      },
+    }
+    const result = MmrConfigSchema.safeParse(config)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      const ch = result.data.channels.claude
+      expect(ch.enabled).toBe(true)
+      expect(ch.flags).toEqual([])
+      expect(ch.env).toEqual({})
+      expect(ch.prompt_wrapper).toBe('{{prompt}}')
+      expect(ch.output_parser).toBe('default')
+      expect(ch.stderr).toBe('capture')
+      expect(ch.auth.timeout).toBe(5)
+    }
+  })
+
   it('rejects config without version', () => {
     const config = { channels: {} }
     const result = MmrConfigSchema.safeParse(config)

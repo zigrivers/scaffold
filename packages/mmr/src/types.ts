@@ -79,33 +79,6 @@ export interface ReconciledResults {
   }
 }
 
-export interface ChannelConfig {
-  enabled: boolean
-  command: string
-  flags?: string[]
-  env?: Record<string, string>
-  auth: {
-    check: string
-    timeout: number
-    failure_exit_codes: number[]
-    recovery: string
-  }
-  prompt_wrapper?: string
-  output_parser?: string
-  stderr?: 'suppress' | 'capture' | 'passthrough'
-  timeout?: number
-}
-
-export interface MmrConfig {
-  version: number
-  defaults: {
-    fix_threshold: Severity
-    timeout: number
-    format: OutputFormat
-    parallel: boolean
-    job_retention_days: number
-  }
-  review_criteria?: string[]
-  templates?: Record<string, { criteria?: string[] }>
-  channels: Record<string, ChannelConfig>
-}
+// ChannelConfig and MmrConfig are derived from Zod schemas to prevent type drift.
+// Import from config/schema.ts: MmrConfigParsed, ChannelConfigParsed
+export type { MmrConfigParsed as MmrConfig, ChannelConfigParsed as ChannelConfig } from './config/schema.js'

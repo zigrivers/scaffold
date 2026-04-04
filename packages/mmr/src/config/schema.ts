@@ -44,3 +44,4 @@ export const MmrConfigSchema = z.object({
 })
 
 export type MmrConfigParsed = z.infer<typeof MmrConfigSchema>
+export type ChannelConfigParsed = z.infer<typeof ChannelConfigSchema>
