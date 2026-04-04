@@ -110,9 +110,13 @@ export const resultsCommand: CommandModule<object, ResultsArgs> = {
     // 3. Reconcile findings
     const reconciledFindings = reconcile(channelFindings)
 
-    // 4. Evaluate gate
+    // 4. Evaluate gate (fail-safe: if no channels completed, gate fails)
     const fixThreshold = job.fix_threshold as Severity
-    const gatePassed = evaluateGate(reconciledFindings, fixThreshold)
+    const completedChannels = Object.values(job.channels)
+      .filter((ch) => ch.status === 'completed').length
+    const gatePassed = completedChannels > 0
+      ? evaluateGate(reconciledFindings, fixThreshold)
+      : false
 
     // 5. Build ReconciledResults
     const totalElapsed = startTimes.length > 0 && endTimes.length > 0

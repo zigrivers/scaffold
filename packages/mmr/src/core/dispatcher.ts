@@ -103,13 +103,8 @@ export async function dispatchChannel(
     }
 
     if (code === 0 && stdout) {
-      try {
-        const parsed = JSON.parse(stdout)
-        store.saveChannelOutput(jobId, channelName, parsed)
-      } catch {
-        // Not valid JSON; save as raw log
-        store.saveChannelLog(jobId, channelName, stdout)
-      }
+      // Always save raw stdout — parser.ts handles format quirks
+      store.saveChannelOutput(jobId, channelName, stdout)
       store.updateChannel(jobId, channelName, {
         status: 'completed',
         completed_at: completedAt,
