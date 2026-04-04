@@ -63,6 +63,7 @@ export interface ChannelJobEntry {
   completed_at?: string
   elapsed?: string
   findings_count?: number
+  output_parser?: string
 }
 
 export interface ReconciledResults {

@@ -81,11 +81,9 @@ export const resultsCommand: CommandModule<object, ResultsArgs> = {
       let findings: Finding[] = []
       try {
         const output = store.loadChannelOutput(job.job_id, name)
-        raw = JSON.stringify(output)
-        const config = { output_parser: 'default' }
-        // We don't have access to the channel config parser name from job metadata,
-        // so we parse the raw JSON output directly
-        const parsed = parseChannelOutput(raw, config.output_parser)
+        raw = output
+        const parserName = entry.output_parser ?? 'default'
+        const parsed = parseChannelOutput(raw, parserName)
         findings = parsed.findings
       } catch {
         // Fall back: no parseable output

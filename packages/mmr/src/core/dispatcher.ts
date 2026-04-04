@@ -36,8 +36,9 @@ export async function dispatchChannel(
   const jobDir = store.getJobDir(jobId)
   const channelsDir = path.join(jobDir, 'channels')
 
-  // Build command args: flags first, then prompt as last arg
-  const args = [...opts.flags, opts.prompt]
+  // Split multi-word commands (e.g. "claude -p" → ["claude", "-p"])
+  const [cmd, ...cmdArgs] = opts.command.split(/\s+/)
+  const args = [...cmdArgs, ...opts.flags, opts.prompt]
 
   // Update channel to running
   store.updateChannel(jobId, channelName, {
@@ -46,7 +47,7 @@ export async function dispatchChannel(
   })
 
   // Spawn the process detached so parent can exit
-  const proc = spawn(opts.command, args, {
+  const proc = spawn(cmd, args, {
     detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, ...opts.env },

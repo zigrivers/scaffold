@@ -92,10 +92,10 @@ export class JobStore {
     fs.writeFileSync(filePath, JSON.stringify(output, null, 2))
   }
 
-  /** Load parsed channel output */
-  loadChannelOutput(jobId: string, channel: string): unknown {
+  /** Load raw channel output string */
+  loadChannelOutput(jobId: string, channel: string): string {
     const filePath = path.join(this.getJobDir(jobId), 'channels', `${channel}.json`)
-    return JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+    return fs.readFileSync(filePath, 'utf-8')
   }
 
   /** Save raw channel log output */

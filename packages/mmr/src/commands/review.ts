@@ -2,7 +2,7 @@ import type { CommandModule, ArgumentsCamelCase } from 'yargs'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { execSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import { loadConfig } from '../config/loader.js'
 import { JobStore } from '../core/job-store.js'
 import { checkInstalled, checkAuth } from '../core/auth.js'
@@ -38,23 +38,23 @@ function resolveDiff(args: ReviewArgs): string {
   }
 
   if (args.pr !== undefined) {
-    return execSync(`gh pr diff ${args.pr}`, { encoding: 'utf-8' })
+    return execFileSync('gh', ['pr', 'diff', String(args.pr)], { encoding: 'utf-8' })
   }
 
   if (args.staged) {
-    return execSync('git diff --cached', { encoding: 'utf-8' })
+    return execFileSync('git', ['diff', '--cached'], { encoding: 'utf-8' })
   }
 
   if (args.base && args.head) {
-    return execSync(`git diff ${args.base}...${args.head}`, { encoding: 'utf-8' })
+    return execFileSync('git', ['diff', `${args.base}...${args.head}`], { encoding: 'utf-8' })
   }
 
   if (args.base) {
-    return execSync(`git diff ${args.base}...HEAD`, { encoding: 'utf-8' })
+    return execFileSync('git', ['diff', `${args.base}...HEAD`], { encoding: 'utf-8' })
   }
 
   // Default: unstaged changes
-  return execSync('git diff', { encoding: 'utf-8' })
+  return execFileSync('git', ['diff'], { encoding: 'utf-8' })
 }
 
 export const reviewCommand: CommandModule<object, ReviewArgs> = {
@@ -207,10 +207,11 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     store.savePrompt(job.job_id, prompt)
     store.saveDiff(job.job_id, diff)
 
-    // 8. Dispatch channels
+    // 8. Dispatch channels (save output_parser in job metadata for results)
     const dispatches: Promise<void>[] = []
     for (const name of validChannels) {
       const chConfig = config.channels[name]
+      store.updateChannel(job.job_id, name, { output_parser: chConfig.output_parser })
       dispatches.push(
         dispatchChannel(store, job.job_id, name, {
           command: chConfig.command,

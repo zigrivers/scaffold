@@ -46,11 +46,37 @@ function extractJson(text: string): string {
  * Default parser: strips markdown fences, extracts JSON from surrounding text,
  * fixes trailing commas, then JSON.parse.
  */
+function validateParsedOutput(obj: unknown): ParsedOutput {
+  if (typeof obj !== 'object' || obj === null) {
+    throw new Error('Parsed output is not an object')
+  }
+  const record = obj as Record<string, unknown>
+  return {
+    approved: typeof record.approved === 'boolean' ? record.approved : false,
+    findings: Array.isArray(record.findings) ? record.findings.map(validateFinding) : [],
+    summary: typeof record.summary === 'string' ? record.summary : '',
+  }
+}
+
+function validateFinding(f: unknown): Finding {
+  if (typeof f !== 'object' || f === null) {
+    return { severity: 'P2', location: 'unknown', description: 'Malformed finding', suggestion: '' }
+  }
+  const record = f as Record<string, unknown>
+  return {
+    severity: (['P0', 'P1', 'P2', 'P3'].includes(record.severity as string)
+      ? record.severity : 'P2') as Finding['severity'],
+    location: typeof record.location === 'string' ? record.location : 'unknown',
+    description: typeof record.description === 'string' ? record.description : String(record.description ?? ''),
+    suggestion: typeof record.suggestion === 'string' ? record.suggestion : '',
+  }
+}
+
 function defaultParser(raw: string): ParsedOutput {
   let text = stripMarkdownFences(raw)
   text = extractJson(text)
   text = fixTrailingCommas(text)
-  return JSON.parse(text) as ParsedOutput
+  return validateParsedOutput(JSON.parse(text))
 }
 
 /**
