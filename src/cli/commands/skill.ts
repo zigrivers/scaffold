@@ -3,7 +3,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
-import { getPackageRoot } from '../../utils/fs.js'
+import {
+  type SkillTarget,
+  SKILL_TARGETS,
+  INSTALLABLE_SKILLS,
+  installAllSkills,
+} from '../../core/skills/sync.js'
 
 interface SkillArgs {
   action: string
@@ -14,78 +19,12 @@ interface SkillArgs {
   force?: boolean
 }
 
-interface SkillDefinition {
-  name: string
-  description: string
-}
-
-interface SkillTarget {
-  installDir: '.claude/skills' | '.agents/skills'
-  label: string
-  templateVars: Record<string, string>
-}
-
-interface SkillTargetState {
-  target: SkillTarget
-  sourcePath: string
-  destDir: string
-  destPath: string
-}
-
-const SKILL_TARGETS: SkillTarget[] = [
-  {
-    installDir: '.claude/skills',
-    label: 'Claude Code',
-    templateVars: { INSTRUCTIONS_FILE: 'CLAUDE.md' },
-  },
-  {
-    installDir: '.agents/skills',
-    label: 'shared agents',
-    templateVars: { INSTRUCTIONS_FILE: 'AGENTS.md' },
-  },
-]
-
-/** Available skills to install. */
-const INSTALLABLE_SKILLS: SkillDefinition[] = [
-  {
-    name: 'scaffold-runner',
-    description: 'Interactive CLI wrapper that surfaces decision points before execution',
-  },
-  {
-    name: 'scaffold-pipeline',
-    description: 'Static reference for pipeline ordering, dependencies, and phase structure',
-  },
-]
-
-/** Resolve {{KEY}} template markers in skill content. */
-function resolveSkillTemplate(content: string, vars: Record<string, string>): string {
-  return content.replace(/\{\{(\w+)\}\}/g, (match, key) => vars[key] ?? match)
-}
-
-function getSkillTemplateDir(): string {
-  return path.join(getPackageRoot(), 'content', 'skills')
-}
-
-function getSkillSourcePath(skillName: string): string {
-  return path.join(getSkillTemplateDir(), skillName, 'SKILL.md')
-}
-
 function getSkillDestDir(projectRoot: string, target: SkillTarget, skillName: string): string {
   return path.join(projectRoot, target.installDir, skillName)
 }
 
 function getSkillDestPath(projectRoot: string, target: SkillTarget, skillName: string): string {
   return path.join(getSkillDestDir(projectRoot, target, skillName), 'SKILL.md')
-}
-
-function buildTargetStates(projectRoot: string, skillName: string): SkillTargetState[] {
-  const sourcePath = getSkillSourcePath(skillName)
-  return SKILL_TARGETS.map(target => ({
-    target,
-    sourcePath,
-    destDir: getSkillDestDir(projectRoot, target, skillName),
-    destPath: getSkillDestPath(projectRoot, target, skillName),
-  }))
 }
 
 const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
@@ -112,72 +51,31 @@ const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
 
     switch (argv.action) {
     case 'install': {
-      for (const target of SKILL_TARGETS) {
-        fs.mkdirSync(path.join(projectRoot, target.installDir), { recursive: true })
-      }
-
-      let installed = 0
-      let hadSourceErrors = false
-      let hadPartialInstalls = false
+      // Clean up legacy flat-file skill format (.claude/skills/<name>.md)
       for (const skill of INSTALLABLE_SKILLS) {
-        const targetStates = buildTargetStates(projectRoot, skill.name)
-        const allTargetsInstalled = targetStates.every(state => fs.existsSync(state.destPath))
-
-        if (allTargetsInstalled && !argv.force) {
-          output.info(`${skill.name}: already installed (use --force to overwrite)`)
-          continue
-        }
-
-        let copiedTargets = 0
-        let missingSources = 0
-        for (const state of targetStates) {
-          if (fs.existsSync(state.destPath) && !argv.force) {
-            continue
-          }
-
-          if (!fs.existsSync(state.sourcePath)) {
-            output.error(`${skill.name} [${state.target.label}]: source not found at ${state.sourcePath}`)
-            hadSourceErrors = true
-            missingSources++
-            continue
-          }
-
-          if (state.target.installDir === '.claude/skills') {
-            const oldFlatPath = path.join(projectRoot, '.claude', 'skills', `${skill.name}.md`)
-            if (fs.existsSync(oldFlatPath)) {
-              fs.unlinkSync(oldFlatPath)
-            }
-          }
-
-          fs.mkdirSync(state.destDir, { recursive: true })
-          const template = fs.readFileSync(state.sourcePath, 'utf8')
-          const resolved = resolveSkillTemplate(template, state.target.templateVars)
-          fs.writeFileSync(state.destPath, resolved, 'utf8')
-          copiedTargets++
-          output.success(`${skill.name}: installed to ${state.target.installDir}/${skill.name}/SKILL.md`)
-        }
-
-        if (copiedTargets > 0) {
-          installed++
-          const finalTargetsInstalled = targetStates.every(state => fs.existsSync(state.destPath))
-          if (!finalTargetsInstalled || missingSources > 0) {
-            hadPartialInstalls = true
-            output.warn(`${skill.name}: installed ${copiedTargets} target(s)`)
-          }
+        const oldFlatPath = path.join(projectRoot, '.claude', 'skills', `${skill.name}.md`)
+        if (fs.existsSync(oldFlatPath)) {
+          fs.unlinkSync(oldFlatPath)
         }
       }
 
-      if (installed > 0) {
-        if (hadSourceErrors || hadPartialInstalls) {
+      const result = installAllSkills(projectRoot, { force: argv.force })
+
+      for (const err of result.errors) {
+        output.error(err)
+      }
+
+      if (result.installed > 0) {
+        if (result.errors.length > 0) {
           output.warn(
-            `\n${installed} skill(s) installed with warnings. Start a new Claude Code or Gemini session to activate.`,
+            `\n${result.installed} skill(s) installed with warnings. Start a new Claude Code or Gemini session to activate.`,
           )
         } else {
           output.info(
-            `\n${installed} skill(s) installed. Start a new Claude Code or Gemini session to activate.`,
+            `\n${result.installed} skill(s) installed. Start a new Claude Code or Gemini session to activate.`,
           )
         }
-      } else if (hadSourceErrors) {
+      } else if (result.errors.length > 0) {
         output.warn('\nNo skills installed due to source errors.')
       } else {
         output.info('\nAll skills already installed.')

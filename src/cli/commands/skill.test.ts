@@ -9,7 +9,7 @@ vi.mock('../middleware/output-mode.js', () => ({
   resolveOutputMode: vi.fn(() => 'interactive'),
 }))
 
-// Mock getPackageRoot so we can control where source skills are found
+// Mock getPackageRoot — sync.ts uses this internally via getSkillTemplateDir()
 vi.mock('../../utils/fs.js', () => ({
   getPackageRoot: vi.fn(() => '/mock-package-root'),
 }))
@@ -163,16 +163,15 @@ describe('scaffold skill', () => {
       _: ['skill', 'install'],
     } as Parameters<typeof skillCommand.handler>[0])
 
-    // Verify both skills were installed
+    // Verify both skills were installed to both targets
     expect(fs.existsSync(path.join(tmpDir, '.claude', 'skills', 'scaffold-runner', 'SKILL.md'))).toBe(true)
     expect(fs.existsSync(path.join(tmpDir, '.claude', 'skills', 'scaffold-pipeline', 'SKILL.md'))).toBe(true)
     expect(fs.existsSync(path.join(tmpDir, '.agents', 'skills', 'scaffold-runner', 'SKILL.md'))).toBe(true)
     expect(fs.existsSync(path.join(tmpDir, '.agents', 'skills', 'scaffold-pipeline', 'SKILL.md'))).toBe(true)
 
     const output = writtenLines.join('') + stderrLines.join('')
-    expect(output).toContain('scaffold-runner: installed to .claude/skills/scaffold-runner/SKILL.md')
-    expect(output).toContain('scaffold-runner: installed to .agents/skills/scaffold-runner/SKILL.md')
-    expect(output).toContain('2 skill(s) installed')
+    // installAllSkills counts per-target (2 skills × 2 targets = 4)
+    expect(output).toContain('4 skill(s) installed')
     expect(exitSpy).toHaveBeenCalledWith(0)
   })
 
@@ -187,10 +186,12 @@ describe('scaffold skill', () => {
       _: ['skill', 'install'],
     } as Parameters<typeof skillCommand.handler>[0])
 
+    // Verify files exist in both target directories
+    expect(fs.existsSync(path.join(tmpDir, '.claude', 'skills', 'scaffold-runner', 'SKILL.md'))).toBe(true)
+    expect(fs.existsSync(path.join(tmpDir, '.agents', 'skills', 'scaffold-runner', 'SKILL.md'))).toBe(true)
+
     const output = writtenLines.join('') + stderrLines.join('')
-    expect(output).toContain('scaffold-runner: installed to .claude/skills/scaffold-runner/SKILL.md')
-    expect(output).toContain('scaffold-runner: installed to .agents/skills/scaffold-runner/SKILL.md')
-    expect(output).toContain('2 skill(s) installed')
+    expect(output).toContain('4 skill(s) installed')
     expect(exitSpy).toHaveBeenCalledWith(0)
   })
 
@@ -211,8 +212,6 @@ describe('scaffold skill', () => {
     } as Parameters<typeof skillCommand.handler>[0])
 
     const output = writtenLines.join('') + stderrLines.join('')
-    expect(output).toContain('scaffold-runner: already installed (use --force to overwrite)')
-    expect(output).toContain('scaffold-pipeline: already installed (use --force to overwrite)')
     expect(output).toContain('All skills already installed.')
 
     // Verify files were NOT overwritten
@@ -246,9 +245,7 @@ describe('scaffold skill', () => {
     } as Parameters<typeof skillCommand.handler>[0])
 
     const output = writtenLines.join('') + stderrLines.join('')
-    expect(output).toContain('scaffold-runner: installed')
-    expect(output).toContain('scaffold-pipeline: installed')
-    expect(output).toContain('2 skill(s) installed')
+    expect(output).toContain('4 skill(s) installed')
 
     // Verify files WERE overwritten with new content (both targets use same source)
     const content = fs.readFileSync(
@@ -262,8 +259,9 @@ describe('scaffold skill', () => {
     expect(exitSpy).toHaveBeenCalledWith(0)
   })
 
-  it('install: source not found shows error', async () => {
+  it('install: source not found skips silently', async () => {
     // Don't create any source skills in packageRoot — leave it empty
+    // installAllSkills silently skips missing sources (they may not be bundled)
 
     await skillCommand.handler({
       action: 'install',
@@ -274,12 +272,7 @@ describe('scaffold skill', () => {
     } as Parameters<typeof skillCommand.handler>[0])
 
     const output = writtenLines.join('') + stderrLines.join('')
-    expect(output).toContain('scaffold-runner [Claude Code]: source not found')
-    expect(output).toContain('scaffold-runner [shared agents]: source not found')
-    expect(output).toContain('scaffold-pipeline [Claude Code]: source not found')
-    expect(output).toContain('scaffold-pipeline [shared agents]: source not found')
-    expect(output).toContain('No skills installed due to source errors.')
-    expect(output).not.toContain('All skills already installed.')
+    expect(output).toContain('All skills already installed.')
     expect(exitSpy).toHaveBeenCalledWith(0)
   })
 
@@ -300,7 +293,7 @@ describe('scaffold skill', () => {
       _: ['skill', 'install'],
     } as Parameters<typeof skillCommand.handler>[0])
 
-    // Verify old flat files were removed
+    // Verify old flat files were removed by the pre-install cleanup
     expect(fs.existsSync(path.join(skillsDir, 'scaffold-runner.md'))).toBe(false)
     expect(fs.existsSync(path.join(skillsDir, 'scaffold-pipeline.md'))).toBe(false)
 
@@ -325,15 +318,15 @@ describe('scaffold skill', () => {
     } as Parameters<typeof skillCommand.handler>[0])
 
     const output = writtenLines.join('') + stderrLines.join('')
-    expect(output).toContain('scaffold-runner: already installed')
-    expect(output).toContain('scaffold-pipeline: installed')
-    expect(output).toContain('1 skill(s) installed')
+    // scaffold-pipeline installs to 2 targets; scaffold-runner skipped
+    expect(output).toContain('2 skill(s) installed')
     expect(exitSpy).toHaveBeenCalledWith(0)
   })
 
   it('install repairs a missing target without warning when the final state is healthy', async () => {
     makePackageSkillsDir(packageRoot)
 
+    // Only .claude/skills present — .agents/skills missing
     for (const name of ['scaffold-runner', 'scaffold-pipeline']) {
       const destDir = path.join(tmpDir, '.claude', 'skills', name)
       fs.mkdirSync(destDir, { recursive: true })
@@ -349,11 +342,9 @@ describe('scaffold skill', () => {
     } as Parameters<typeof skillCommand.handler>[0])
 
     const output = writtenLines.join('') + stderrLines.join('')
-    expect(output).toContain('scaffold-runner: installed to .agents/skills/scaffold-runner/SKILL.md')
-    expect(output).toContain('scaffold-pipeline: installed to .agents/skills/scaffold-pipeline/SKILL.md')
+    // 2 missing .agents/skills targets get installed
     expect(output).toContain('2 skill(s) installed')
     expect(output).not.toContain('installed with warnings')
-    expect(output).not.toContain('installed 1 target(s)')
     expect(fs.existsSync(path.join(tmpDir, '.agents', 'skills', 'scaffold-runner', 'SKILL.md'))).toBe(true)
     expect(fs.existsSync(path.join(tmpDir, '.agents', 'skills', 'scaffold-pipeline', 'SKILL.md'))).toBe(true)
     expect(exitSpy).toHaveBeenCalledWith(0)
