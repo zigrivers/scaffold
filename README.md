@@ -76,6 +76,13 @@ Independent review from Google's model. Can run alongside or instead of Codex.
 - Requires: Google account (free tier available)
 - Verify: `gemini --version`
 
+**mmr** (multi-model review CLI)
+Automates dispatching, monitoring, and reconciling code reviews across multiple AI model CLIs. Works standalone or with Scaffold.
+- Install: `npm install -g @zigrivers/mmr`
+- Verify: `mmr --help`
+- Setup: `mmr config init` (auto-detects installed CLIs)
+- See: [mmr — Multi-Model Review CLI](#mmr--multi-model-review-cli)
+
 **Playwright MCP** (web apps only)
 Lets Claude control a real browser for visual testing and screenshots.
 - Install: `claude mcp add playwright npx @playwright/mcp@latest`
@@ -149,6 +156,12 @@ npm update -g @zigrivers/scaffold
 
 ```bash
 brew upgrade scaffold
+```
+
+### mmr
+
+```bash
+npm update -g @zigrivers/mmr
 ```
 
 ### Plugin
@@ -546,16 +559,291 @@ You don't need both — Scaffold works with whichever CLIs are available. Having
 
 ### mmr — Multi-Model Review CLI
 
-Scaffold includes `mmr`, a standalone CLI that automates multi-model code review dispatch, monitoring, and reconciliation. Instead of manually running each review channel, `mmr` handles it all:
+`mmr` is a standalone CLI that automates multi-model code review. It solves the problems teams hit when manually orchestrating reviews across Claude, Codex, and Gemini: timeouts, auth failures, inconsistent prompts, fragile output parsing, and manual reconciliation.
 
-```bash
-mmr review --pr 47 --focus "auth flow"   # Dispatch to all channels (async)
-mmr status mmr-a1b2c3                     # Poll progress
-mmr results mmr-a1b2c3                    # Reconciled findings + gate
-mmr config test                           # Pre-flight auth check
+**The core problem it solves:** Without `mmr`, an AI agent dispatching multi-model reviews has to manually construct CLI commands for each model, handle per-tool auth quirks, improvise timeout handling, parse different output formats, and reconcile findings across channels. In practice, this takes 4-6+ minutes per review and frequently fails. `mmr` reduces this to three commands.
+
+#### How mmr Works
+
+```
+mmr review --pr 47           ──→  Dispatches to all channels in background
+                                   Returns job ID immediately
+                                   Agent continues working
+
+mmr status mmr-a1b2c3        ──→  Poll progress (which channels done?)
+                                   Exit code: 0=done, 1=running, 2=failed
+
+mmr results mmr-a1b2c3       ──→  Reconcile findings across channels
+                                   Apply severity gate
+                                   Output unified findings
+                                   Exit code: 0=passed, 1=gate failed
 ```
 
-`mmr` is installed alongside Scaffold, or independently via `npm install -g @zigrivers/mmr`. Run `mmr config init` to auto-detect installed CLIs and generate a `.mmr.yaml` config. See the [mmr design spec](docs/superpowers/specs/2026-04-05-mmr-multi-model-review-design.md) for full details.
+**Key features:**
+
+- **Async job model** — reviews run in background processes. The agent fires `mmr review` and continues working. No blocking for 4-6 minutes.
+- **Per-channel auth verification** — checks authentication before every dispatch. Auth failures are never silent — `mmr` tells you exactly what expired and the command to fix it.
+- **Immutable core prompt** — every channel gets the same severity definitions (P0-P3), output format spec (JSON), and review criteria. No prompt drift between channels.
+- **Automated reconciliation** — when two channels flag the same location, that's consensus (high confidence). When only one channel flags something, it's unique (medium confidence). P0 from any single source is always high confidence.
+- **Configurable severity gate** — project default in `.mmr.yaml`, override per-review with `--fix-threshold`. Default: P2 (fix P0/P1/P2, skip P3).
+- **Multiple output formats** — JSON (default, for machines), text (terminals), markdown (PR comments).
+
+#### Installing mmr
+
+**npm** (available now):
+```bash
+npm install -g @zigrivers/mmr
+```
+
+**Homebrew** (available after next scaffold release):
+```bash
+brew tap zigrivers/scaffold
+brew install mmr
+```
+
+Verify: `mmr --help`
+
+#### Enabling mmr in an Existing Project
+
+**Step 1: Install the model CLIs you want to use**
+
+You need at least one. More models = more diverse review perspectives.
+
+```bash
+# Claude Code (you probably already have this)
+npm install -g @anthropic-ai/claude-code
+
+# Codex CLI (requires ChatGPT Plus/Pro/Team subscription)
+npm install -g @openai/codex
+
+# Gemini CLI (free tier available with Google account)
+npm install -g @google/gemini-cli
+```
+
+**Step 2: Authenticate each CLI**
+
+Each CLI needs a one-time interactive authentication:
+
+```bash
+# Claude — if not already logged in
+claude login
+
+# Codex — opens browser for OAuth
+codex login
+
+# Gemini — opens browser for OAuth
+gemini -p "hello"
+```
+
+**Step 3: Initialize mmr in your project**
+
+```bash
+cd your-project
+mmr config init
+```
+
+This auto-detects which CLIs are installed and generates `.mmr.yaml` in your project root:
+
+```
+Detected CLIs:
+  ✓ claude (claude -p)
+  ✓ gemini (gemini -p)
+  ✗ codex (not found)
+
+Generated .mmr.yaml with 2 enabled channels.
+Run `mmr config test` to verify authentication.
+```
+
+**Step 4: Verify authentication**
+
+```bash
+mmr config test
+```
+
+```
+  claude    ✓ installed    ✓ authenticated
+  gemini    ✓ installed    ✓ authenticated
+  codex     ✗ not installed (skipped)
+
+  2/3 channels ready.
+```
+
+If any channel shows an auth failure, `mmr` tells you the exact command to fix it.
+
+**Step 5: Commit the config**
+
+```bash
+git add .mmr.yaml
+git commit -m "chore: add mmr multi-model review config"
+```
+
+This ensures your team shares the same channel configuration.
+
+**Step 6 (optional): Customize review criteria**
+
+Edit `.mmr.yaml` to add project-specific review criteria that get injected into every review prompt:
+
+```yaml
+review_criteria:
+  - "Verify all database queries use parameterized statements"
+  - "Check that error messages do not leak internal state"
+  - "Ensure all API endpoints validate authentication"
+```
+
+You can also adjust per-channel timeouts, the default severity threshold, and named review templates for different review types (PR reviews, implementation plan reviews, etc.).
+
+#### Using mmr Day-to-Day
+
+**After creating a PR:**
+
+```bash
+mmr review --pr 47 --focus "auth flow, session handling"
+# → Job mmr-a1b2c3 started. 2/2 channels dispatched.
+```
+
+**Continue working, then check back:**
+
+```bash
+mmr status mmr-a1b2c3
+# → claude: completed (47s) | gemini: running (2m12s)
+
+# Later:
+mmr status mmr-a1b2c3
+# → All channels complete.
+```
+
+**Collect reconciled results:**
+
+```bash
+mmr results mmr-a1b2c3
+# → JSON output with gate_passed, reconciled_findings, per_channel details
+
+mmr results mmr-a1b2c3 --format text
+# → Human-readable terminal output
+
+mmr results mmr-a1b2c3 --format markdown
+# → Markdown table for PR comments
+```
+
+**Review staged changes before committing:**
+
+```bash
+mmr review --staged --focus "regression risk"
+```
+
+**Review a diff between branches:**
+
+```bash
+mmr review --base main --head feature/auth
+```
+
+**Override severity gate for a critical path:**
+
+```bash
+mmr review --pr 47 --fix-threshold P1    # Only fix P0 and P1
+mmr review --pr 47 --fix-threshold P0    # Only fix critical/security issues
+```
+
+#### mmr Commands Reference
+
+| Command | Purpose |
+|---------|---------|
+| `mmr review` | Dispatch a review job to all configured channels |
+| `mmr status <job-id>` | Check progress of a running job |
+| `mmr results <job-id>` | Collect, reconcile, and output findings |
+| `mmr config init` | Auto-detect CLIs and generate `.mmr.yaml` |
+| `mmr config test` | Verify all channels (installation + auth) |
+| `mmr config channels` | List configured channels |
+| `mmr jobs list` | Show recent review jobs |
+| `mmr jobs prune` | Remove old jobs (default: older than 7 days) |
+
+#### mmr Configuration (.mmr.yaml)
+
+The config file controls channel definitions, defaults, and project-specific review criteria:
+
+```yaml
+version: 1
+
+defaults:
+  fix_threshold: P2        # P0/P1/P2 block the gate, P3 is informational
+  timeout: 300             # Per-channel timeout in seconds
+  format: json             # Default output format
+  job_retention_days: 7    # Auto-prune old jobs
+
+# Project-specific criteria appended to every review prompt
+review_criteria:
+  - "Check for SQL injection in all query builders"
+  - "Verify RBAC rules match API contract"
+
+# Channel definitions (auto-generated by mmr config init)
+channels:
+  claude:
+    enabled: true
+    command: claude -p
+    auth:
+      check: "claude -p 'respond with ok' 2>/dev/null"
+      timeout: 5
+      failure_exit_codes: [1]
+      recovery: "Run: claude login"
+
+  gemini:
+    enabled: true
+    command: gemini -p
+    flags:
+      - "--approval-mode yolo"
+      - "--output-format json"
+    env:
+      NO_BROWSER: "true"
+    auth:
+      check: "NO_BROWSER=true gemini -p 'respond with ok' -o json 2>&1"
+      timeout: 5
+      failure_exit_codes: [41]
+      recovery: "Run: gemini -p 'hello' (interactive, opens browser)"
+    timeout: 360     # Gemini tends to be slower
+
+  codex:
+    enabled: true
+    command: codex exec
+    flags:
+      - "--skip-git-repo-check"
+      - "-s read-only"
+      - "--ephemeral"
+    auth:
+      check: "codex login status 2>/dev/null"
+      timeout: 5
+      failure_exit_codes: [1]
+      recovery: "Run: codex login"
+```
+
+**User-level defaults** can be set in `~/.mmr/config.yaml` for settings that apply across all projects (e.g., which channels are installed on your machine). Project config overrides user config. CLI flags override everything.
+
+**Adding a new model CLI** requires only a YAML config change — no code modifications to `mmr`. When a new model CLI ships, add its channel definition to `.mmr.yaml` and you're ready.
+
+#### Severity Levels
+
+mmr uses a standardized P0-P3 severity classification across all channels:
+
+| Level | Name | Definition | Gate Default |
+|-------|------|------------|-------------|
+| **P0** | Critical | Will cause failure, data loss, security vulnerability, or fundamental architectural flaw | Blocks |
+| **P1** | High | Will cause bugs in normal usage, inconsistency, or blocks downstream work | Blocks |
+| **P2** | Medium | Improvement opportunity — style, naming, documentation, minor optimization | Blocks |
+| **P3** | Trivial | Personal preference, trivial nits | Informational |
+
+With the default `fix_threshold: P2`, any P0, P1, or P2 finding fails the gate. Only P3-only reviews pass.
+
+#### Reconciliation Rules
+
+When multiple channels return findings, mmr applies consensus rules:
+
+| Scenario | Confidence | Action |
+|----------|-----------|--------|
+| 2+ channels flag same location, same severity | **High** | Report at agreed severity |
+| 2+ channels flag same location, different severity | **Medium** | Report at higher severity |
+| All channels approve (no findings) | **High** | Gate passed |
+| One channel flags P0, others approve | **High** | Report P0 (critical from any source) |
+| One channel flags P1/P2, others approve | **Medium** | Report with attribution |
+| Channels contradict each other | **Low** | Present both for user adjudication |
 
 ### How It Works
 
@@ -771,6 +1059,7 @@ Options: `--dry-run` to preview, `minor`/`major`/`patch` to specify the bump, `c
 | **Knowledge base** | 60 domain expertise entries that get injected into prompts. Can be extended with project-local overrides. |
 | **MCP** | Model Context Protocol. A way for Claude to use external tools like a headless browser. |
 | **Meta-prompt** | A short intent declaration in `content/pipeline/` that gets assembled into a full prompt at runtime. |
+| **mmr** | Multi-Model Review CLI (`@zigrivers/mmr`). Standalone tool for async multi-model code review dispatch, reconciliation, and severity gating. |
 | **Methodology** | A preset (deep, mvp, custom) controlling which steps run and at what depth. |
 | **Multi-model review** | Independent validation from Codex/Gemini CLIs at depth 4-5, catching blind spots a single model misses. |
 | **PRD** | Product Requirements Document. The foundation for everything Scaffold builds. |
@@ -826,6 +1115,15 @@ NO_BROWSER=true gemini -p "Review this artifact..." --output-format json --appro
 ```
 These are documented in detail in the `multi-model-dispatch` skill.
 
+**mmr review dispatches but no channels return results**
+Check auth: `mmr config test`. If channels show auth failures, re-authenticate with the recovery command shown. If channels are installed but the review hangs, check the per-channel timeout in `.mmr.yaml` — some models take 3-5 minutes for large diffs. Increase `timeout` to 360-600 seconds for large PRs.
+
+**mmr results says "gate failed" but I disagree with the findings**
+Use `mmr results <job-id> --format text` to see the full reconciled findings with source attribution and confidence scores. Single-source findings with "unique" agreement are less certain than "consensus" findings. Override the threshold for a specific review: `mmr review --pr 47 --fix-threshold P1` (only gate on P0 and P1).
+
+**How do I add a new AI model CLI to mmr?**
+Add a channel definition to `.mmr.yaml` with the command, auth check, and output parser. No code changes needed. See the [mmr Configuration](#mmr-configuration-mmryaml) section for the full schema.
+
 **I upgraded and my pipeline shows old step names**
 Run `scaffold status` — the state manager automatically migrates old step names (e.g., `add-playwright` → `add-e2e-testing`, `multi-model-review` → `automated-pr-review`) and removes retired steps.
 
@@ -873,7 +1171,22 @@ content/
 ├── tools/            # 10 tool meta-prompts (stateless, category: tool)
 ├── knowledge/        # 61 domain expertise entries (core, product, review, validation, finalization, execution, tools)
 ├── methodology/      # 3 YAML presets (deep, mvp, custom)
-└── skills/           # 3 skill templates with {{markers}} for multi-platform resolution
+└── skills/           # Skill templates with {{markers}} for multi-platform resolution (includes mmr)
+```
+
+### mmr package layout
+
+`@zigrivers/mmr` lives in `packages/mmr/` as an independent workspace package:
+
+```
+packages/mmr/
+├── src/
+│   ├── commands/     # review, status, results, config, jobs (yargs)
+│   ├── config/       # Zod schema, 4-layer config loader, builtin channel presets
+│   ├── core/         # job-store, auth, prompt assembly, parser, reconciler, dispatcher
+│   └── formatters/   # json, text, markdown output formatters
+├── templates/        # Immutable core review prompt (severity defs, output format)
+└── tests/            # 60 tests across 11 files
 ```
 
 Generated output (gitignored):

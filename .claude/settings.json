@@ -11,7 +11,6 @@
       "Bash(git push -f origin main)",
       "Bash(git push --force origin main)",
       "Bash(git reset --hard *)",
-      "Bash(git worktree remove *)",
       "Bash(bd edit *)"
     ]
   },
