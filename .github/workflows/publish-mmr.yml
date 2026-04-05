@@ -1,10 +1,9 @@
-name: Publish scaffold to npm
+name: Publish mmr to npm
 
 on:
   push:
     tags:
-      - 'v*'
-      - '!mmr-v*'
+      - 'mmr-v*'
 
 jobs:
   publish:
@@ -23,13 +22,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run build
+      - name: Build mmr
+        run: npm run build --workspace=packages/mmr
 
-      - name: Test
-        run: npm test
+      - name: Test mmr
+        run: npm test --workspace=packages/mmr
 
-      - name: Publish scaffold
-        run: npm publish --access public --provenance
+      - name: Publish mmr
+        run: npm publish --access public --provenance --workspace=packages/mmr
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,22 +1,32 @@
-name: Update Homebrew Formula
+name: Update Homebrew Formulas
 
 on:
   push:
     tags:
       - 'v*'
+      - 'mmr-v*'
 
 jobs:
   update-formula:
     runs-on: ubuntu-latest
     steps:
-      - name: Get tag version
-        id: tag
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+      - name: Determine which package was tagged
+        id: detect
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          if [[ "$TAG" == mmr-v* ]]; then
+            echo "package=mmr" >> "$GITHUB_OUTPUT"
+            echo "version=${TAG#mmr-v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "package=scaffold" >> "$GITHUB_OUTPUT"
+            echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Download source tarball and compute SHA256
         id: sha
         run: |
-          curl -sL "https://github.com/zigrivers/scaffold/archive/refs/tags/v${{ steps.tag.outputs.version }}.tar.gz" -o source.tar.gz
+          curl -sL "https://github.com/zigrivers/scaffold/archive/refs/tags/${{ steps.detect.outputs.tag }}.tar.gz" -o source.tar.gz
           echo "sha256=$(sha256sum source.tar.gz | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
       - name: Checkout homebrew tap
@@ -26,6 +36,7 @@ jobs:
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
       - name: Update scaffold formula
+        if: steps.detect.outputs.package == 'scaffold'
         run: |
           cat > Formula/scaffold.rb << FORMULA
           require "language/node"
@@ -33,7 +44,7 @@ jobs:
           class Scaffold < Formula
             desc "AI-powered software project scaffolding pipeline"
             homepage "https://github.com/zigrivers/scaffold"
-            url "https://github.com/zigrivers/scaffold/archive/refs/tags/v${{ steps.tag.outputs.version }}.tar.gz"
+            url "https://github.com/zigrivers/scaffold/archive/refs/tags/v${{ steps.detect.outputs.version }}.tar.gz"
             sha256 "${{ steps.sha.outputs.sha256 }}"
             license "MIT"
 
@@ -53,6 +64,7 @@ jobs:
           FORMULA
 
       - name: Update mmr formula
+        if: steps.detect.outputs.package == 'mmr'
         run: |
           cat > Formula/mmr.rb << FORMULA
           require "language/node"
@@ -60,9 +72,10 @@ jobs:
           class Mmr < Formula
             desc "Multi-model code review CLI — async dispatch, reconciliation, and severity gating"
             homepage "https://github.com/zigrivers/scaffold/tree/main/packages/mmr"
-            url "https://github.com/zigrivers/scaffold/archive/refs/tags/v${{ steps.tag.outputs.version }}.tar.gz"
+            url "https://github.com/zigrivers/scaffold/archive/refs/tags/mmr-v${{ steps.detect.outputs.version }}.tar.gz"
             sha256 "${{ steps.sha.outputs.sha256 }}"
             license "MIT"
+            version "${{ steps.detect.outputs.version }}"
 
             depends_on "node"
 
@@ -85,6 +98,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/scaffold.rb Formula/mmr.rb
-          git commit -m "Update scaffold to v${{ steps.tag.outputs.version }}"
+          PACKAGE="${{ steps.detect.outputs.package }}"
+          VERSION="${{ steps.detect.outputs.version }}"
+          git add Formula/
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "Update $PACKAGE to $VERSION"
           git push
