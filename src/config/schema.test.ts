@@ -200,6 +200,38 @@ describe('GameConfigSchema', () => {
     })
     expect(result.success).toBe(false)
   })
+
+  it('rejects empty targetPlatforms array', () => {
+    const result = GameConfigSchema.safeParse({
+      engine: 'unity',
+      targetPlatforms: [],
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects empty supportedLocales array', () => {
+    const result = GameConfigSchema.safeParse({
+      engine: 'unity',
+      supportedLocales: [],
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects invalid locale format', () => {
+    const result = GameConfigSchema.safeParse({
+      engine: 'unity',
+      supportedLocales: ['english'],
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts valid locale codes (xx and xx-XX)', () => {
+    const result = GameConfigSchema.safeParse({
+      engine: 'unity',
+      supportedLocales: ['en', 'en-US', 'ja', 'fr-FR'],
+    })
+    expect(result.success).toBe(true)
+  })
 })
 
 describe('ConfigSchema with projectType and gameConfig', () => {

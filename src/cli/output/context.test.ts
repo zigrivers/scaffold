@@ -392,3 +392,108 @@ describe('AutoOutput', () => {
     expect(allWritten).toContain('"key"')
   })
 })
+
+describe('InteractiveOutput — wizard primitives', () => {
+  beforeEach(() => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('select() returns default when non-TTY', async () => {
+    const out = new InteractiveOutput()
+    const result = await out.select('Pick one:', ['a', 'b', 'c'], 'b')
+    expect(result).toBe('b')
+  })
+
+  it('select() returns first option when no default and non-TTY', async () => {
+    const out = new InteractiveOutput()
+    const result = await out.select('Pick one:', ['x', 'y', 'z'])
+    expect(result).toBe('x')
+  })
+
+  it('multiSelect() returns defaults when non-TTY', async () => {
+    const out = new InteractiveOutput()
+    const result = await out.multiSelect('Pick many:', ['a', 'b', 'c'], ['a', 'c'])
+    expect(result).toEqual(['a', 'c'])
+  })
+
+  it('multiSelect() returns empty array when no defaults and non-TTY', async () => {
+    const out = new InteractiveOutput()
+    const result = await out.multiSelect('Pick many:', ['a', 'b', 'c'])
+    expect(result).toEqual([])
+  })
+
+  it('multiInput() returns default array when non-TTY', async () => {
+    const out = new InteractiveOutput()
+    const result = await out.multiInput('Enter values:', ['val1', 'val2'])
+    expect(result).toEqual(['val1', 'val2'])
+  })
+
+  it('multiInput() returns empty array when no default and non-TTY', async () => {
+    const out = new InteractiveOutput()
+    const result = await out.multiInput('Enter values:')
+    expect(result).toEqual([])
+  })
+})
+
+describe('JsonOutput — wizard primitives', () => {
+  beforeEach(() => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('select() returns default without prompting', async () => {
+    const out = new JsonOutput()
+    const result = await out.select('Pick:', ['a', 'b'], 'b')
+    expect(result).toBe('b')
+  })
+
+  it('multiSelect() returns defaults without prompting', async () => {
+    const out = new JsonOutput()
+    const result = await out.multiSelect('Pick:', ['a', 'b', 'c'], ['a', 'c'])
+    expect(result).toEqual(['a', 'c'])
+  })
+
+  it('multiInput() returns default array without prompting', async () => {
+    const out = new JsonOutput()
+    const result = await out.multiInput('Enter:', ['x', 'y'])
+    expect(result).toEqual(['x', 'y'])
+  })
+})
+
+describe('AutoOutput — wizard primitives', () => {
+  beforeEach(() => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('select() returns default without prompting', async () => {
+    const out = new AutoOutput()
+    const result = await out.select('Pick:', ['a', 'b'], 'b')
+    expect(result).toBe('b')
+  })
+
+  it('multiSelect() returns defaults without prompting', async () => {
+    const out = new AutoOutput()
+    const result = await out.multiSelect('Pick:', ['a', 'b', 'c'], ['a', 'c'])
+    expect(result).toEqual(['a', 'c'])
+  })
+
+  it('multiInput() returns default array without prompting', async () => {
+    const out = new AutoOutput()
+    const result = await out.multiInput('Enter:', ['x', 'y'])
+    expect(result).toEqual(['x', 'y'])
+  })
+})

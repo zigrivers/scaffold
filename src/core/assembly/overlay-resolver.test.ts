@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { applyOverlay } from './overlay-resolver.js'
-import type { ProjectTypeOverlay } from '../../types/index.js'
+import type { ProjectTypeOverlay, StepEnablementEntry } from '../../types/index.js'
 
 function makeOverlay(overrides: Partial<ProjectTypeOverlay> = {}): ProjectTypeOverlay {
   return {
@@ -18,7 +18,7 @@ function makeOverlay(overrides: Partial<ProjectTypeOverlay> = {}): ProjectTypeOv
 describe('applyOverlay', () => {
   describe('step overrides', () => {
     it('enables new steps and disables replaced steps', () => {
-      const steps: Record<string, { enabled: boolean; conditional?: 'if-needed' }> = {
+      const steps: Record<string, StepEnablementEntry> = {
         'design-system': { enabled: true },
         'create-prd': { enabled: true },
       }
@@ -37,7 +37,7 @@ describe('applyOverlay', () => {
     })
 
     it('merges step entries instead of replacing (preserves base conditional)', () => {
-      const steps: Record<string, { enabled: boolean; conditional?: 'if-needed' }> = {
+      const steps: Record<string, StepEnablementEntry> = {
         'step-a': { enabled: true, conditional: 'if-needed' },
       }
       const overlay = makeOverlay({
@@ -52,7 +52,7 @@ describe('applyOverlay', () => {
     })
 
     it('preserves conditional field from overlay', () => {
-      const steps: Record<string, { enabled: boolean; conditional?: 'if-needed' }> = {
+      const steps: Record<string, StepEnablementEntry> = {
         'create-prd': { enabled: true },
       }
       const overlay = makeOverlay({

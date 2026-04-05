@@ -26,8 +26,10 @@ export const GameConfigSchema = z.object({
   persistence: z.enum(['none', 'settings-only', 'profile', 'progression', 'cloud']).default('progression'),
   targetPlatforms: z.array(
     z.enum(['pc', 'web', 'ios', 'android', 'ps5', 'xbox', 'switch', 'vr', 'ar']),
-  ).default(['pc']),
-  supportedLocales: z.array(z.string()).default(['en']),
+  ).min(1).default(['pc']),
+  supportedLocales: z.array(
+    z.string().regex(/^[a-z]{2}(-[A-Z]{2})?$/, 'Must be a valid locale code (e.g. "en", "en-US", "ja", "fr-FR")'),
+  ).min(1).default(['en']),
   hasModding: z.boolean().default(false),
   npcAiComplexity: z.enum(['none', 'simple', 'complex']).default('none'),
 }).strict()
@@ -46,7 +48,7 @@ const ProjectSchema = z.object({
       }
       return true
     },
-    { message: 'gameConfig is only valid when projectType is "game"' },
+    { message: 'gameConfig is only valid when projectType is "game"', path: ['gameConfig'] },
   )
 
 export const ConfigSchema = z.object({

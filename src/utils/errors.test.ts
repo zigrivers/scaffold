@@ -27,6 +27,9 @@ import {
   presetParseError,
   presetInvalidStep,
   presetMissingStep,
+  overlayMissing,
+  overlayParseError,
+  overlayMalformedEntry,
   type ScaffoldError,
   type ScaffoldWarning,
 } from './errors.js'
@@ -57,6 +60,8 @@ describe('error factories — shape', () => {
       presetMissing('mvp', '/path/preset.yml'),
       presetParseError('/path/preset.yml', 'bad yaml'),
       presetInvalidStep('unknown-step', 'mvp'),
+      overlayMissing('game', '/path/overlay.yml'),
+      overlayParseError('/path/overlay.yml', 'bad yaml'),
     ]
 
     for (const err of errors) {
@@ -75,6 +80,7 @@ describe('error factories — shape', () => {
       frontmatterUnknownField('bar', '/path/cmd.md'),
       lockStaleCleared('host', 1234),
       presetMissingStep('step-x', 'mvp'),
+      overlayMalformedEntry('step-a', 'enabled', '/path/overlay.yml'),
     ]
 
     for (const warn of warnings) {

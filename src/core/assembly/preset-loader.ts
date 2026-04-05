@@ -1,4 +1,4 @@
-import type { MethodologyPreset, ProjectType } from '../../types/index.js'
+import type { MethodologyPreset, ProjectType, StepEnablementEntry } from '../../types/index.js'
 import type {
   ProjectTypeOverlay, KnowledgeOverride, ReadsOverride, DependencyOverride,
 } from '../../types/index.js'
@@ -6,7 +6,8 @@ import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
 import { fileExists } from '../../utils/fs.js'
 import {
   presetMissing, presetParseError, presetInvalidStep,
-  presetMissingStep, presetUnmetDependency, overlayMalformedSection,
+  presetMissingStep, presetUnmetDependency,
+  overlayMissing, overlayParseError, overlayMalformedSection, overlayMalformedEntry,
 } from '../../utils/errors.js'
 import yaml from 'js-yaml'
 import fs from 'node:fs'
@@ -89,7 +90,7 @@ export function loadPreset(
   // 5. Validate steps entries
   const stepsRaw = obj['steps'] as Record<string, unknown>
   const presetName = (obj['name'] as string).trim()
-  const steps: Record<string, { enabled: boolean; conditional?: 'if-needed' }> = {}
+  const steps: Record<string, StepEnablementEntry> = {}
 
   for (const [stepKey, stepValue] of Object.entries(stepsRaw)) {
     // Key must be kebab-case
@@ -116,7 +117,7 @@ export function loadPreset(
       continue
     }
 
-    const entry: { enabled: boolean; conditional?: 'if-needed' } = {
+    const entry: StepEnablementEntry = {
       enabled: stepObj['enabled'],
     }
 
@@ -238,13 +239,21 @@ export function validateDependencyCoherence(
 /** Parse step-overrides section from YAML object. */
 function parseStepOverrides(
   raw: Record<string, unknown>,
-): Record<string, { enabled: boolean; conditional?: 'if-needed' }> {
-  const result: Record<string, { enabled: boolean; conditional?: 'if-needed' }> = {}
+  warnings: ScaffoldWarning[],
+  filePath: string,
+): Record<string, StepEnablementEntry> {
+  const result: Record<string, StepEnablementEntry> = {}
   for (const [key, value] of Object.entries(raw)) {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) continue
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      warnings.push(overlayMalformedEntry(key, 'value', filePath))
+      continue
+    }
     const obj = value as Record<string, unknown>
-    if (typeof obj['enabled'] !== 'boolean') continue
-    const entry: { enabled: boolean; conditional?: 'if-needed' } = { enabled: obj['enabled'] }
+    if (typeof obj['enabled'] !== 'boolean') {
+      warnings.push(overlayMalformedEntry(key, 'enabled', filePath))
+      continue
+    }
+    const entry: StepEnablementEntry = { enabled: obj['enabled'] }
     if (obj['conditional'] === 'if-needed') {
       entry.conditional = 'if-needed'
     }
@@ -256,10 +265,15 @@ function parseStepOverrides(
 /** Parse knowledge-overrides section from YAML object. */
 function parseKnowledgeOverrides(
   raw: Record<string, unknown>,
+  warnings: ScaffoldWarning[],
+  filePath: string,
 ): Record<string, KnowledgeOverride> {
   const result: Record<string, KnowledgeOverride> = {}
   for (const [key, value] of Object.entries(raw)) {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) continue
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      warnings.push(overlayMalformedEntry(key, 'value', filePath))
+      continue
+    }
     const obj = value as Record<string, unknown>
     const append = Array.isArray(obj['append'])
       ? (obj['append'] as unknown[]).filter((v): v is string => typeof v === 'string')
@@ -272,10 +286,15 @@ function parseKnowledgeOverrides(
 /** Parse reads-overrides section from YAML object. */
 function parseReadsOverrides(
   raw: Record<string, unknown>,
+  warnings: ScaffoldWarning[],
+  filePath: string,
 ): Record<string, ReadsOverride> {
   const result: Record<string, ReadsOverride> = {}
   for (const [key, value] of Object.entries(raw)) {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) continue
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      warnings.push(overlayMalformedEntry(key, 'value', filePath))
+      continue
+    }
     const obj = value as Record<string, unknown>
     const replace: Record<string, string> = {}
     if (typeof obj['replace'] === 'object' && obj['replace'] !== null && !Array.isArray(obj['replace'])) {
@@ -294,10 +313,15 @@ function parseReadsOverrides(
 /** Parse dependency-overrides section from YAML object. */
 function parseDependencyOverrides(
   raw: Record<string, unknown>,
+  warnings: ScaffoldWarning[],
+  filePath: string,
 ): Record<string, DependencyOverride> {
   const result: Record<string, DependencyOverride> = {}
   for (const [key, value] of Object.entries(raw)) {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) continue
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      warnings.push(overlayMalformedEntry(key, 'value', filePath))
+      continue
+    }
     const obj = value as Record<string, unknown>
     const replace: Record<string, string> = {}
     if (typeof obj['replace'] === 'object' && obj['replace'] !== null && !Array.isArray(obj['replace'])) {
@@ -327,7 +351,7 @@ export function loadOverlay(
   // 1. Check file exists
   if (!fileExists(overlayPath)) {
     const overlayName = path.basename(overlayPath, '.yml')
-    errors.push(presetMissing(overlayName, overlayPath))
+    errors.push(overlayMissing(overlayName, overlayPath))
     return { overlay: null, errors, warnings }
   }
 
@@ -340,13 +364,13 @@ export function loadOverlay(
     parsed = yaml.load(raw)
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err)
-    errors.push(presetParseError(overlayPath, detail))
+    errors.push(overlayParseError(overlayPath, detail))
     return { overlay: null, errors, warnings }
   }
 
   // 4. Validate top-level structure
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    errors.push(presetParseError(overlayPath, 'overlay must be a YAML object'))
+    errors.push(overlayParseError(overlayPath, 'overlay must be a YAML object'))
     return { overlay: null, errors, warnings }
   }
 
@@ -354,21 +378,21 @@ export function loadOverlay(
 
   // Validate required fields
   if (typeof obj['name'] !== 'string' || obj['name'].trim() === '') {
-    errors.push(presetParseError(overlayPath, 'required field "name" must be a non-empty string'))
+    errors.push(overlayParseError(overlayPath, 'required field "name" must be a non-empty string'))
   }
 
   if (typeof obj['description'] !== 'string' || obj['description'].trim() === '') {
-    errors.push(presetParseError(overlayPath, 'required field "description" must be a non-empty string'))
+    errors.push(overlayParseError(overlayPath, 'required field "description" must be a non-empty string'))
   }
 
   if (typeof obj['project-type'] !== 'string' || obj['project-type'].trim() === '') {
-    errors.push(presetParseError(overlayPath, 'required field "project-type" must be a non-empty string'))
+    errors.push(overlayParseError(overlayPath, 'required field "project-type" must be a non-empty string'))
   } else {
     const validProjectTypes: ProjectType[] = ['web-app', 'mobile-app', 'backend', 'cli', 'library', 'game']
     const pt = obj['project-type'].trim()
     if (!validProjectTypes.includes(pt as ProjectType)) {
       const allowed = validProjectTypes.join(', ')
-      errors.push(presetParseError(
+      errors.push(overlayParseError(
         overlayPath, `"project-type" must be one of ${allowed}, got "${pt}"`,
       ))
     }
@@ -403,10 +427,10 @@ export function loadOverlay(
     name: (obj['name'] as string).trim(),
     description: (obj['description'] as string).trim(),
     projectType: (obj['project-type'] as string).trim() as ProjectTypeOverlay['projectType'],
-    stepOverrides: parseStepOverrides(stepOverridesRaw),
-    knowledgeOverrides: parseKnowledgeOverrides(knowledgeOverridesRaw),
-    readsOverrides: parseReadsOverrides(readsOverridesRaw),
-    dependencyOverrides: parseDependencyOverrides(dependencyOverridesRaw),
+    stepOverrides: parseStepOverrides(stepOverridesRaw, warnings, overlayPath),
+    knowledgeOverrides: parseKnowledgeOverrides(knowledgeOverridesRaw, warnings, overlayPath),
+    readsOverrides: parseReadsOverrides(readsOverridesRaw, warnings, overlayPath),
+    dependencyOverrides: parseDependencyOverrides(dependencyOverridesRaw, warnings, overlayPath),
   }
 
   return { overlay, errors, warnings }

@@ -83,7 +83,7 @@ describe('loadOverlay', () => {
     )
     expect(overlay).toBeNull()
     expect(errors).toHaveLength(1)
-    expect(errors[0].code).toBe('PRESET_MISSING')
+    expect(errors[0].code).toBe('OVERLAY_MISSING')
   })
 
   it('returns empty overrides for minimal overlay (no override sections)', () => {

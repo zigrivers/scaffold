@@ -359,6 +359,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       }
 
       // Gather artifacts from reads (optional cross-cutting references)
+      // Note: graph defaults missing steps to enabled:true, which may not reflect
+      // custom config overrides. This is a pre-existing graph builder limitation.
       const reads = metaPrompt.frontmatter.reads ?? []
       for (const readStep of reads) {
         // Check dependency graph for enablement (overlay-disabled steps)

@@ -1,5 +1,11 @@
 import type { MethodologyName, DepthLevel } from './enums.js'
 
+/** Step enablement entry used in presets and overlays. */
+export interface StepEnablementEntry {
+  enabled: boolean
+  conditional?: 'if-needed'
+}
+
 /** Per-step override in custom methodology config. */
 export interface CustomStepConfig {
   enabled?: boolean
@@ -55,7 +61,7 @@ export interface ProjectTypeOverlay {
   name: string
   description: string
   projectType: ProjectType
-  stepOverrides: Record<string, { enabled: boolean; conditional?: 'if-needed' }>
+  stepOverrides: Record<string, StepEnablementEntry>
   knowledgeOverrides: Record<string, KnowledgeOverride>
   readsOverrides: Record<string, ReadsOverride>
   dependencyOverrides: Record<string, DependencyOverride>
@@ -88,5 +94,5 @@ export interface MethodologyPreset {
   name: string
   description: string
   default_depth: DepthLevel
-  steps: Record<string, { enabled: boolean; conditional?: 'if-needed' }>
+  steps: Record<string, StepEnablementEntry>
 }

@@ -3,9 +3,8 @@ import type {
   KnowledgeOverride,
   ReadsOverride,
   DependencyOverride,
+  StepEnablementEntry,
 } from '../../types/index.js'
-
-type StepEntry = { enabled: boolean; conditional?: 'if-needed' }
 
 /**
  * Apply a project-type overlay to resolved pipeline state.
@@ -15,19 +14,22 @@ type StepEntry = { enabled: boolean; conditional?: 'if-needed' }
  * and returns new pipeline state without mutating inputs.
  */
 export function applyOverlay(
-  steps: Record<string, StepEntry>,
+  steps: Record<string, StepEnablementEntry>,
   knowledgeMap: Record<string, string[]>,
   readsMap: Record<string, string[]>,
   dependencyMap: Record<string, string[]>,
   overlay: ProjectTypeOverlay,
 ): {
-  steps: Record<string, StepEntry>
+  steps: Record<string, StepEnablementEntry>
   knowledge: Record<string, string[]>
   reads: Record<string, string[]>
   dependencies: Record<string, string[]>
 } {
-  // 1. Step overrides: merge fields (overlay wins on conflicts, base fields preserved)
-  const mergedSteps: Record<string, StepEntry> = { ...steps }
+  // 1. Step overrides: deep-clone all entries so callers cannot mutate originals
+  const mergedSteps: Record<string, StepEnablementEntry> = {}
+  for (const [name, entry] of Object.entries(steps)) {
+    mergedSteps[name] = { ...entry }
+  }
   for (const [name, override] of Object.entries(overlay.stepOverrides)) {
     mergedSteps[name] = { ...mergedSteps[name], ...override }
   }
