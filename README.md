@@ -544,11 +544,24 @@ npm install -g @google/gemini-cli
 
 You don't need both — Scaffold works with whichever CLIs are available. Having both gives the strongest review (three independent perspectives). See [Prerequisites](#prerequisites) for auth setup and verification commands.
 
+### mmr — Multi-Model Review CLI
+
+Scaffold includes `mmr`, a standalone CLI that automates multi-model code review dispatch, monitoring, and reconciliation. Instead of manually running each review channel, `mmr` handles it all:
+
+```bash
+mmr review --pr 47 --focus "auth flow"   # Dispatch to all channels (async)
+mmr status mmr-a1b2c3                     # Poll progress
+mmr results mmr-a1b2c3                    # Reconciled findings + gate
+mmr config test                           # Pre-flight auth check
+```
+
+`mmr` is installed alongside Scaffold, or independently via `npm install -g @zigrivers/mmr`. Run `mmr config init` to auto-detect installed CLIs and generate a `.mmr.yaml` config. See the [mmr design spec](docs/superpowers/specs/2026-04-05-mmr-multi-model-review-design.md) for full details.
+
 ### How It Works
 
 1. **Claude reviews first** — completes its own structured multi-pass review using different review lenses (coverage, consistency, quality, downstream readiness)
 2. **Independent external review** — the document being reviewed is sent to each available CLI. They don't see Claude's findings or each other's output — every review is independent.
-3. **Findings are reconciled** — Scaffold merges all findings by confidence level:
+3. **Findings are reconciled** — Scaffold (or `mmr`) merges all findings by confidence level:
 
 | Scenario | Confidence | Action |
 |----------|-----------|--------|

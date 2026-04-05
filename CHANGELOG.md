@@ -2,6 +2,22 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.4.0] — 2026-04-05
+
+### Added
+
+- **`@zigrivers/mmr` — Multi-Model Review CLI** — new workspace package (`packages/mmr/`) providing a standalone CLI for dispatching, monitoring, and reconciling multi-model code reviews. Install standalone via `npm install -g @zigrivers/mmr` or use it through Scaffold.
+  - **Async job model** — `mmr review` dispatches all channels in background, `mmr status` polls progress, `mmr results` collects and reconciles findings. No more blocking for 4-6 minutes.
+  - **Configurable channels** — `.mmr.yaml` defines review channels with per-channel auth checks, CLI flags, environment variables, and output parsers. Ship with builtin presets for Claude, Gemini, and Codex.
+  - **Per-channel auth verification** — loud failures with recovery commands, never silent skips. `mmr config test` for pre-flight checks.
+  - **Immutable core prompt** — consistent severity definitions (P0-P3) and JSON output format across all channels, with layered project criteria and per-review focus areas.
+  - **Automated reconciliation** — consensus/majority/unique classification with confidence scoring. Findings from multiple channels are merged, not duplicated.
+  - **Severity gate** — configurable per-project (`.mmr.yaml`) and per-invocation (`--fix-threshold`). Default P2 = fix P0/P1/P2, skip P3.
+  - **Multiple output formats** — JSON (default, for machines), text (terminals), markdown (PR comments).
+  - **60 tests across 11 files** in the mmr package.
+- **Scaffold skill for mmr** — `content/skills/mmr/SKILL.md` provides native integration in Claude Code and other supported environments.
+- **Makefile targets** — `mmr-build`, `mmr-test`, `mmr-check` wired into `check-all`.
+
 ## [3.3.0] — 2026-04-04
 
 ### Added
