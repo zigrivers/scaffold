@@ -4,7 +4,7 @@ import type { PipelineState } from '../../types/state.js'
 import type { StepStateEntry } from '../../types/state.js'
 import type { MetaPromptFile, MetaPromptFrontmatter } from '../../types/frontmatter.js'
 import type { ScaffoldConfig } from '../../types/config.js'
-import type { MethodologyPreset } from '../../types/config.js'
+import type { MethodologyPreset, ProjectTypeOverlay } from '../../types/config.js'
 import type { DependencyGraph } from '../../types/dependency.js'
 import type { AssemblyResult } from '../../types/assembly.js'
 
@@ -75,6 +75,14 @@ vi.mock('../../core/assembly/preset-loader.js', () => ({
   loadAllPresets: vi.fn(),
 }))
 
+vi.mock('../../core/assembly/overlay-loader.js', () => ({
+  loadOverlay: vi.fn(),
+}))
+
+vi.mock('../../core/assembly/overlay-resolver.js', () => ({
+  applyOverlay: vi.fn(),
+}))
+
 vi.mock('node:fs', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs')
   return {
@@ -136,6 +144,8 @@ import { resolveDepth } from '../../core/assembly/depth-resolver.js'
 import { detectUpdateMode } from '../../core/assembly/update-mode.js'
 import { detectMethodologyChange } from '../../core/assembly/methodology-change.js'
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
+import { loadOverlay } from '../../core/assembly/overlay-loader.js'
+import { applyOverlay } from '../../core/assembly/overlay-resolver.js'
 import { loadConfig } from '../../config/loader.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { detectCycles, topologicalSort } from '../../core/dependency/dependency.js'
@@ -313,6 +323,9 @@ beforeEach(() => {
     errors: [],
     warnings: [],
   })
+
+  // loadOverlay: default no overlay (only called when config has projectType)
+  vi.mocked(loadOverlay).mockReturnValue({ overlay: null, errors: [], warnings: [] })
 
   vi.mocked(acquireLock).mockReturnValue({ acquired: true })
 
@@ -1374,6 +1387,87 @@ describe('run command handler', () => {
       // Should NOT have exited with DEP_UNMET (exit code 2)
       // It should proceed to assembly and exit 0
       expect(exitSpy).toHaveBeenCalledWith(0)
+    })
+  })
+
+  describe('overlay application', () => {
+    it('applies overlay when config has projectType, changing step enablement', async () => {
+      // Config with projectType: 'game'
+      const config = makeConfig({
+        project: { projectType: 'game' },
+      })
+      vi.mocked(loadConfig).mockReturnValue({ config, errors: [], warnings: [] })
+
+      const gameOverlay: ProjectTypeOverlay = {
+        name: 'game',
+        description: 'Game overlay',
+        projectType: 'game',
+        stepOverrides: {
+          'create-prd': { enabled: false },
+          'game-design-document': { enabled: true },
+        },
+        knowledgeOverrides: {},
+        readsOverrides: {},
+        dependencyOverrides: {},
+      }
+      vi.mocked(loadOverlay).mockReturnValue({
+        overlay: gameOverlay,
+        errors: [],
+        warnings: [],
+      })
+
+      // applyOverlay returns merged data with create-prd disabled
+      vi.mocked(applyOverlay).mockReturnValue({
+        steps: {
+          'create-prd': { enabled: false },
+          'game-design-document': { enabled: true },
+        },
+        knowledge: { 'create-prd': [] },
+        reads: { 'create-prd': [] },
+        dependencies: { 'create-prd': [] },
+      })
+
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
+        .rejects.toThrow('process.exit called')
+
+      // Verify loadOverlay was called
+      expect(loadOverlay).toHaveBeenCalledWith(
+        expect.stringContaining('game-overlay.yml'),
+      )
+
+      // Verify applyOverlay was called with the overlay
+      expect(applyOverlay).toHaveBeenCalledWith(
+        expect.any(Object),  // preset steps
+        expect.any(Object),  // knowledgeMap
+        expect.any(Object),  // readsMap
+        expect.any(Object),  // dependencyMap
+        gameOverlay,
+      )
+
+      // Verify buildGraph received merged steps (with overlay applied)
+      expect(buildGraph).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.any(Map),
+      )
+      // The presetStepsMap passed to buildGraph should contain overlay-merged steps
+      const buildGraphCall = vi.mocked(buildGraph).mock.calls[0]
+      const stepsMap = buildGraphCall[1] as Map<string, { enabled: boolean }>
+      expect(stepsMap.get('create-prd')).toEqual({ enabled: false })
+    })
+
+    it('does not call loadOverlay when config has no projectType', async () => {
+      const config = makeConfig()  // no project.projectType
+      vi.mocked(loadConfig).mockReturnValue({ config, errors: [], warnings: [] })
+
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
+        .rejects.toThrow('process.exit called')
+
+      expect(loadOverlay).not.toHaveBeenCalled()
+      expect(applyOverlay).not.toHaveBeenCalled()
     })
   })
 })

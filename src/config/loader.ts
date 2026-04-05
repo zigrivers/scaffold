@@ -184,8 +184,9 @@ export function loadConfig(projectRoot: string, knownSteps: string[]): LoadResul
     return { config: null, errors, warnings }
   }
 
-  // Success — return config with unknown fields preserved (ADR-033)
-  const config = obj as unknown as ScaffoldConfig
+  // Success — return Zod-parsed data to apply defaults (e.g., multiplayerMode: 'none')
+  // .passthrough() on ConfigSchema preserves unknown fields per ADR-033
+  const config = (zodResult.success ? zodResult.data : obj) as unknown as ScaffoldConfig
   return { config, errors: [], warnings }
 }
 

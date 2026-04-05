@@ -16,6 +16,8 @@ import { resolveDepth } from '../../core/assembly/depth-resolver.js'
 import { detectUpdateMode } from '../../core/assembly/update-mode.js'
 import { detectMethodologyChange } from '../../core/assembly/methodology-change.js'
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
+import { loadOverlay } from '../../core/assembly/overlay-loader.js'
+import { applyOverlay } from '../../core/assembly/overlay-resolver.js'
 import { loadConfig } from '../../config/loader.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { detectCycles, topologicalSort } from '../../core/dependency/dependency.js'
@@ -127,6 +129,52 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     }
 
     // -----------------------------------------------------------------------
+    // Step 2b: Load and apply project-type overlay (if configured)
+    // -----------------------------------------------------------------------
+    // Build maps from meta-prompt frontmatter for overlay merging
+    const knowledgeMap: Record<string, string[]> = {}
+    const readsMap: Record<string, string[]> = {}
+    const dependencyMap: Record<string, string[]> = {}
+    for (const [name, mp] of metaPrompts) {
+      knowledgeMap[name] = [...(mp.frontmatter.knowledgeBase ?? [])]
+      readsMap[name] = [...(mp.frontmatter.reads ?? [])]
+      dependencyMap[name] = [...(mp.frontmatter.dependencies ?? [])]
+    }
+
+    let overlaySteps = { ...resolvedPreset.steps }
+    let overlayKnowledge = knowledgeMap
+    let overlayReads = readsMap
+    let overlayDependencies = dependencyMap
+
+    const projectType = config.project?.projectType
+    if (projectType) {
+      const overlayPath = path.join(methodologyDir, `${projectType}-overlay.yml`)
+      const { overlay, errors: overlayErrors, warnings: overlayWarnings } = loadOverlay(overlayPath)
+      for (const w of overlayWarnings) {
+        output.warn(w)
+      }
+      // Overlay errors are non-fatal — warn but continue without overlay
+      if (overlayErrors.length > 0) {
+        for (const e of overlayErrors) {
+          output.warn({ code: e.code, message: e.message })
+        }
+      }
+      if (overlay) {
+        const merged = applyOverlay(
+          overlaySteps,
+          knowledgeMap,
+          readsMap,
+          dependencyMap,
+          overlay,
+        )
+        overlaySteps = merged.steps
+        overlayKnowledge = merged.knowledge
+        overlayReads = merged.reads
+        overlayDependencies = merged.dependencies
+      }
+    }
+
+    // -----------------------------------------------------------------------
     // Step 3: Acquire lock
     // -----------------------------------------------------------------------
     const lockResult = acquireLock(projectRoot, 'run', step)
@@ -158,7 +206,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     const computeEligibleFn = (steps: Parameters<typeof computeEligible>[1]) => {
       const graph = buildGraph(
         [...metaPrompts.values()].map(m => m.frontmatter),
-        new Map(Object.entries(resolvedPreset.steps)),
+        new Map(Object.entries(overlaySteps)),
       )
       return computeEligible(graph, steps)
     }
@@ -217,7 +265,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     // -----------------------------------------------------------------------
     // Step 5: Check dependencies
     // -----------------------------------------------------------------------
-    const presetStepsMap = new Map(Object.entries(resolvedPreset.steps))
+    const presetStepsMap = new Map(Object.entries(overlaySteps))
     const graph = buildGraph(
       [...metaPrompts.values()].map(m => m.frontmatter),
       presetStepsMap,
@@ -235,7 +283,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     // Tools (category: 'tool') are not in the dependency graph — skip dep checking
     const isTool = metaPrompt.frontmatter.category === 'tool'
     const stepNode = isTool ? undefined : graph.nodes.get(step)
-    const deps = stepNode?.dependencies ?? metaPrompt.frontmatter.dependencies ?? []
+    const deps = stepNode?.dependencies ?? overlayDependencies[step] ?? metaPrompt.frontmatter.dependencies ?? []
 
     if (!isTool) {
       const unmetDeps = deps.filter(dep => {
@@ -328,7 +376,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       const kbIndex = buildIndexWithOverrides(projectRoot, getPackageKnowledgeDir(projectRoot))
       const { entries: knowledgeEntries, warnings: kbWarnings } = loadEntries(
         kbIndex,
-        metaPrompt.frontmatter.knowledgeBase ?? [],
+        overlayKnowledge[step] ?? metaPrompt.frontmatter.knowledgeBase ?? [],
       )
       for (const w of kbWarnings) {
         output.warn(w)
@@ -361,7 +409,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       // Gather artifacts from reads (optional cross-cutting references)
       // Note: graph defaults missing steps to enabled:true, which may not reflect
       // custom config overrides. This is a pre-existing graph builder limitation.
-      const reads = metaPrompt.frontmatter.reads ?? []
+      const reads = overlayReads[step] ?? metaPrompt.frontmatter.reads ?? []
       for (const readStep of reads) {
         // Check dependency graph for enablement (overlay-disabled steps)
         const readNode = graph?.nodes.get(readStep)

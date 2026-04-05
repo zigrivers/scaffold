@@ -12,9 +12,10 @@ Performance budgeting is the discipline of allocating fixed time, memory, and GP
 
 Every rendering frame must complete within a fixed time window determined by the target frame rate:
 
-- **60 fps** = 16.67 ms per frame (standard for action games, shooters, VR)
+- **60 fps** = 16.67 ms per frame (standard for action games, shooters)
 - **30 fps** = 33.33 ms per frame (acceptable for strategy, narrative, some open-world)
 - **120 fps** = 8.33 ms per frame (competitive shooters, high-refresh displays)
+- **VR targets**: 72 Hz (Quest 2 minimum) = 13.89 ms, 90 Hz (standard) = 11.11 ms, 120 Hz (high-end) = 8.33 ms — missed frames in VR cause motion sickness, making these hard requirements
 
 The frame budget is divided across the CPU and GPU. On modern hardware, CPU and GPU run in parallel — the frame time is the **longer** of the two, not their sum. However, CPU work that feeds GPU work (draw call submission, compute dispatch) creates dependencies that can serialize the pipeline.
 

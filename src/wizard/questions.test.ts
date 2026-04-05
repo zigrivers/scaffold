@@ -133,7 +133,7 @@ describe('askWizardQuestions', () => {
     expect(result.gameConfig!.onlineServices).toEqual(['matchmaking', 'accounts'])
   })
 
-  it('auto mode returns defaults without projectType or gameConfig', async () => {
+  it('auto mode creates standard project (game requires interactive wizard)', async () => {
     const output = makeOutputContext()
 
     const result = await askWizardQuestions({
