@@ -3,14 +3,9 @@ import type { CommandModule } from 'yargs'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
-import { loadConfig } from '../../config/loader.js'
 import { StateManager } from '../../state/state-manager.js'
-import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
-import { getPackagePipelineDir, getPackageMethodologyDir } from '../../utils/fs.js'
-import { loadAllPresets } from '../../core/assembly/preset-loader.js'
-import { resolveOverlayState } from '../../core/assembly/overlay-state-resolver.js'
-import { buildGraph } from '../../core/dependency/graph.js'
-import { computeEligible } from '../../core/dependency/eligibility.js'
+import { loadPipelineContext } from '../../core/pipeline/context.js'
+import { resolvePipeline } from '../../core/pipeline/resolver.js'
 
 interface NextArgs {
   count?: number
@@ -47,62 +42,24 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
-    // 2. Load config and discover meta-prompts
-    const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))
-    const knownSteps = [...metaPrompts.keys()]
-    const { config } = loadConfig(projectRoot, knownSteps)
-
-    // 3. Load methodology preset and apply project-type overlay
-    const methodologyDir = getPackageMethodologyDir(projectRoot)
-    const presets = loadAllPresets(methodologyDir, knownSteps)
-    const methodology = (config as Record<string, unknown>)?.methodology as string ?? 'deep'
-    const preset = methodology === 'mvp'
-      ? presets.mvp
-      : methodology === 'custom'
-        ? presets.custom ?? presets.deep
-        : presets.deep
-
-    // Apply project-type overlay (e.g., game overlay) if configured
-    const overlayState = config
-      ? resolveOverlayState({
-        config,
-        methodologyDir,
-        metaPrompts,
-        presetSteps: preset?.steps ?? {},
-        output,
-      })
-      : { steps: preset?.steps ?? {} }
-    const presetSteps = new Map(Object.entries(overlayState.steps))
-
-    // 4. Build graph with preset and compute eligible
-    const computeEligibleFn = (steps: Parameters<typeof computeEligible>[1]) => {
-      const graph = buildGraph(
-        [...metaPrompts.values()].map(m => m.frontmatter),
-        presetSteps,
-      )
-      return computeEligible(graph, steps)
-    }
-
-    const stateManager = new StateManager(projectRoot, computeEligibleFn)
+    // 2. Load pipeline context and resolve overlay/graph
+    const context = loadPipelineContext(projectRoot)
+    const pipeline = resolvePipeline(context, { output })
+    const stateManager = new StateManager(projectRoot, pipeline.computeEligible)
 
     // Reconcile state with current pipeline — adds any new steps that were
     // introduced after the project was initialized.
-    const pipelineSteps = [...metaPrompts.values()].map(m => ({
+    const pipelineSteps = [...context.metaPrompts.values()].map(m => ({
       slug: m.frontmatter.name,
       produces: m.frontmatter.outputs,
       // Steps not in overlay/preset map are disabled. This requires presets to enumerate
       // all known pipeline steps (which they do — see deep.yml/mvp.yml/custom-defaults.yml).
-      enabled: presetSteps.get(m.frontmatter.name)?.enabled ?? false,
+      enabled: pipeline.overlay.steps[m.frontmatter.name]?.enabled ?? false,
     }))
     stateManager.reconcileWithPipeline(pipelineSteps)
 
     const state = stateManager.loadState()
-
-    const graph = buildGraph(
-      [...metaPrompts.values()].map(m => m.frontmatter),
-      presetSteps,
-    )
-    const eligible = computeEligible(graph, state.steps)
+    const eligible = pipeline.computeEligible(state.steps)
 
     // 4. Apply --count limit
     const count = argv.count ?? eligible.length
@@ -117,7 +74,7 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     if (outputMode === 'json') {
       output.result({
         eligible: shown.map(s => {
-          const fm = metaPrompts.get(s)?.frontmatter
+          const fm = pipeline.stepMeta.get(s)
           return {
             slug: s,
             description: fm?.description ?? '',
@@ -136,7 +93,7 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
       } else {
         output.info(`Next eligible steps (${shown.length}):`)
         for (const slug of shown) {
-          const fm = metaPrompts.get(slug)?.frontmatter
+          const fm = pipeline.stepMeta.get(slug)
           const desc = fm?.summary ?? fm?.description ?? ''
           output.info(`  scaffold run ${slug}  — ${desc}`)
         }

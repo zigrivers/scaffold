@@ -5,14 +5,9 @@ import path from 'node:path'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
-import { loadConfig } from '../../config/loader.js'
 import { StateManager } from '../../state/state-manager.js'
-import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
-import { getPackagePipelineDir, getPackageMethodologyDir } from '../../utils/fs.js'
-import { loadAllPresets } from '../../core/assembly/preset-loader.js'
-import { resolveOverlayState } from '../../core/assembly/overlay-state-resolver.js'
-import { buildGraph } from '../../core/dependency/graph.js'
-import { computeEligible } from '../../core/dependency/eligibility.js'
+import { loadPipelineContext } from '../../core/pipeline/context.js'
+import { resolvePipeline } from '../../core/pipeline/resolver.js'
 import { PHASES } from '../../types/frontmatter.js'
 
 /** Check if any pipeline/knowledge source is newer than its generated command. */
@@ -105,52 +100,19 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
-    // 3. Discover meta-prompts first, then load config with real step names
-    const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))
-    const knownSteps = [...metaPrompts.keys()]
-    const { config } = loadConfig(projectRoot, knownSteps)
-
-    // 4. Load methodology preset and apply project-type overlay
-    const methodologyDir = getPackageMethodologyDir(projectRoot)
-    const presets = loadAllPresets(methodologyDir, [...metaPrompts.keys()])
-    const configMethodology =
-      (config as Record<string, unknown>)?.methodology as string ?? 'deep'
-    const preset = configMethodology === 'mvp'
-      ? presets.mvp
-      : configMethodology === 'custom'
-        ? presets.custom ?? presets.deep
-        : presets.deep
-
-    // Apply project-type overlay (e.g., game overlay) if configured
-    const overlayState = config
-      ? resolveOverlayState({
-        config,
-        methodologyDir,
-        metaPrompts,
-        presetSteps: preset?.steps ?? {},
-        output,
-      })
-      : { steps: preset?.steps ?? {} }
-    const presetSteps = new Map(Object.entries(overlayState.steps))
-
-    const computeEligibleFn = (steps: Parameters<typeof computeEligible>[1]) => {
-      const graph = buildGraph(
-        [...metaPrompts.values()].map(m => m.frontmatter),
-        presetSteps,
-      )
-      return computeEligible(graph, steps)
-    }
-
-    const stateManager = new StateManager(projectRoot, computeEligibleFn)
+    // 3. Load pipeline context and resolve overlay/graph
+    const context = loadPipelineContext(projectRoot)
+    const pipeline = resolvePipeline(context, { output })
+    const stateManager = new StateManager(projectRoot, pipeline.computeEligible)
 
     // Reconcile state with current pipeline — adds any new steps that were
     // introduced after the project was initialized (e.g., story-tests).
-    const pipelineSteps = [...metaPrompts.values()].map(m => ({
+    const pipelineSteps = [...context.metaPrompts.values()].map(m => ({
       slug: m.frontmatter.name,
       produces: m.frontmatter.outputs,
       // Steps not in overlay/preset map are disabled. This requires presets to enumerate
       // all known pipeline steps (which they do — see deep.yml/mvp.yml/custom-defaults.yml).
-      enabled: presetSteps.get(m.frontmatter.name)?.enabled ?? false,
+      enabled: pipeline.overlay.steps[m.frontmatter.name]?.enabled ?? false,
     }))
     stateManager.reconcileWithPipeline(pipelineSteps)
 
@@ -166,7 +128,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     const pct = total > 0 ? Math.round((completed + skipped) / total * 100) : 0
 
     const methodology =
-      (config as ConfigWithMethodology)?.methodology?.preset ?? state.config_methodology
+      (context.config as ConfigWithMethodology)?.methodology?.preset ?? state.config_methodology
 
     const isCompact = argv.compact === true
     const actionableStatuses = new Set(['pending', 'in_progress'])
@@ -176,7 +138,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
 
     // Build phases array: group meta-prompts by phase with per-phase counts
     const phasesData = PHASES.map(phaseInfo => {
-      const phaseSteps = [...metaPrompts.values()]
+      const phaseSteps = [...context.metaPrompts.values()]
         .filter(m => m.frontmatter.phase === phaseInfo.slug)
         .map(m => {
           const entry = steps[m.frontmatter.name]
@@ -232,19 +194,15 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
 
       for (const [slug, entry] of Object.entries(steps)) {
         if (isCompact && !actionableStatuses.has(entry.status)) continue
-        const mp = metaPrompts.get(slug)
-        const phase = mp?.frontmatter?.phase ?? '?'
+        const fm = pipeline.stepMeta.get(slug)
+        const phase = fm?.phase ?? '?'
         const icon = statusIcons[entry.status] ?? '?'
         if (argv.phase !== undefined && phase !== String(argv.phase)) continue
         output.info(`  ${icon} [${entry.status}] ${slug}`)
       }
 
       // Compute eligible live (don't rely on stale cache in state.json)
-      const graph = buildGraph(
-        [...metaPrompts.values()].map(m => m.frontmatter),
-        presetSteps,
-      )
-      const liveEligible = computeEligible(graph, state.steps)
+      const liveEligible = pipeline.computeEligible(state.steps)
       const nextEligibleList = liveEligible.join(', ') || 'none'
       output.info(`\nNext eligible: ${nextEligibleList}`)
 

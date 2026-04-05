@@ -5,22 +5,15 @@ import { StateManager } from '../../state/state-manager.js'
 import { acquireLock, releaseLock } from '../../state/lock-manager.js'
 import { analyzeCrash } from '../../state/completion.js'
 import { AssemblyEngine } from '../../core/assembly/engine.js'
-import { discoverAllMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
-import {
-  getPackagePipelineDir, getPackageMethodologyDir,
-  getPackageKnowledgeDir, getPackageToolsDir,
-} from '../../utils/fs.js'
+import { getPackageKnowledgeDir } from '../../utils/fs.js'
 import { buildIndexWithOverrides, loadEntries } from '../../core/assembly/knowledge-loader.js'
 import { loadInstructions } from '../../core/assembly/instruction-loader.js'
 import { resolveDepth } from '../../core/assembly/depth-resolver.js'
 import { detectUpdateMode } from '../../core/assembly/update-mode.js'
 import { detectMethodologyChange } from '../../core/assembly/methodology-change.js'
-import { loadAllPresets } from '../../core/assembly/preset-loader.js'
-import { resolveOverlayState } from '../../core/assembly/overlay-state-resolver.js'
-import { loadConfig } from '../../config/loader.js'
-import { buildGraph } from '../../core/dependency/graph.js'
 import { detectCycles, topologicalSort } from '../../core/dependency/dependency.js'
-import { computeEligible } from '../../core/dependency/eligibility.js'
+import { loadPipelineContext } from '../../core/pipeline/context.js'
+import { resolvePipeline } from '../../core/pipeline/resolver.js'
 import { findProjectRoot } from '../../cli/middleware/project-root.js'
 import { createOutputContext } from '../../cli/output/context.js'
 import { displayErrors } from '../../cli/output/error-display.js'
@@ -83,16 +76,19 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     const output = createOutputContext(outputMode)
 
     // -----------------------------------------------------------------------
-    // Step 2: Discover meta-prompts and pipeline (before config so we have
-    //         real step names for Phase-6 custom.steps validation)
+    // Step 2: Load pipeline context and resolve overlay/graph
     // -----------------------------------------------------------------------
-    const pipelineDir = getPackagePipelineDir(projectRoot)
-    const toolsDir = getPackageToolsDir(projectRoot)
-    const metaPrompts = discoverAllMetaPrompts(pipelineDir, toolsDir)
+    const context = loadPipelineContext(projectRoot, { includeTools: true })
+    if (!context.config) {
+      displayErrors(context.configErrors, context.configWarnings, output)
+      process.exit(1)
+      return
+    }
+    const pipeline = resolvePipeline(context, { output })
 
-    const metaPrompt = metaPrompts.get(step)
+    const metaPrompt = context.metaPrompts.get(step)
     if (!metaPrompt) {
-      const candidates = [...metaPrompts.keys()]
+      const candidates = [...context.metaPrompts.keys()]
       const suggestion = findClosestMatch(step, candidates, 3)
       const suggestionText = suggestion ? ` Did you mean '${suggestion}'?` : ''
       output.error({
@@ -103,40 +99,6 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       })
       process.exit(1)
     }
-
-    const knownSteps = [...metaPrompts.keys()]
-    const { config, errors: configErrors } = loadConfig(projectRoot, knownSteps)
-    if (!config) {
-      displayErrors(configErrors, [], output)
-      process.exit(1)
-    }
-
-    const methodologyDir = getPackageMethodologyDir(projectRoot)
-    const presets = loadAllPresets(methodologyDir, [...metaPrompts.keys()])
-
-    const preset = config.methodology === 'mvp'
-      ? presets.mvp
-      : config.methodology === 'custom'
-        ? presets.custom ?? presets.deep
-        : presets.deep
-
-    const resolvedPreset = preset ?? {
-      name: 'deep',
-      description: 'Default deep methodology',
-      default_depth: 3 as DepthLevel,
-      steps: {},
-    }
-
-    // -----------------------------------------------------------------------
-    // Step 2b: Load and apply project-type overlay (if configured)
-    // -----------------------------------------------------------------------
-    const overlayState = resolveOverlayState({
-      config,
-      methodologyDir,
-      metaPrompts,
-      presetSteps: resolvedPreset.steps,
-      output,
-    })
 
     // -----------------------------------------------------------------------
     // Step 3: Acquire lock
@@ -167,15 +129,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     // Step 4: Load and validate state
     // -----------------------------------------------------------------------
 
-    const computeEligibleFn = (steps: Parameters<typeof computeEligible>[1]) => {
-      const graph = buildGraph(
-        [...metaPrompts.values()].map(m => m.frontmatter),
-        new Map(Object.entries(overlayState.steps)),
-      )
-      return computeEligible(graph, steps)
-    }
-
-    const stateManager = new StateManager(projectRoot, computeEligibleFn)
+    const stateManager = new StateManager(projectRoot, pipeline.computeEligible)
     let state = stateManager.loadState()
 
     // Crash recovery: in_progress is non-null from a previous run
@@ -229,11 +183,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     // -----------------------------------------------------------------------
     // Step 5: Check dependencies
     // -----------------------------------------------------------------------
-    const presetStepsMap = new Map(Object.entries(overlayState.steps))
-    const graph = buildGraph(
-      [...metaPrompts.values()].map(m => m.frontmatter),
-      presetStepsMap,
-    )
+    const { graph } = pipeline
 
     const cycles = detectCycles(graph)
     if (cycles.length > 0) {
@@ -247,7 +197,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     // Tools (category: 'tool') are not in the dependency graph — skip dep checking
     const isTool = metaPrompt.frontmatter.category === 'tool'
     const stepNode = isTool ? undefined : graph.nodes.get(step)
-    const deps = overlayState.dependencies[step] ?? stepNode?.dependencies ?? metaPrompt.frontmatter.dependencies ?? []
+    const deps = pipeline.overlay.dependencies[step]
+      ?? stepNode?.dependencies ?? metaPrompt.frontmatter.dependencies ?? []
 
     if (!isTool) {
       const unmetDeps = deps.filter(dep => {
@@ -274,7 +225,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     // Step 6: Check update mode and depth downgrade
     // -----------------------------------------------------------------------
     const cliDepth = argv.depth !== undefined ? (argv.depth as DepthLevel) : undefined
-    const { depth, provenance } = resolveDepth(step, config, resolvedPreset, cliDepth)
+    const { depth, provenance } = resolveDepth(step, context.config, pipeline.preset, cliDepth)
 
     const updateModeResult = detectUpdateMode({ step, state, currentDepth: depth, projectRoot })
 
@@ -315,7 +266,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     }
 
     // Check methodology change
-    const methodologyChangeResult = detectMethodologyChange({ state, config })
+    const methodologyChangeResult = detectMethodologyChange({ state, config: context.config })
     for (const w of methodologyChangeResult.warnings) {
       output.warn(w)
     }
@@ -340,7 +291,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       const kbIndex = buildIndexWithOverrides(projectRoot, getPackageKnowledgeDir(projectRoot))
       const { entries: knowledgeEntries, warnings: kbWarnings } = loadEntries(
         kbIndex,
-        overlayState.knowledge[step] ?? metaPrompt.frontmatter.knowledgeBase ?? [],
+        pipeline.overlay.knowledge[step] ?? metaPrompt.frontmatter.knowledgeBase ?? [],
       )
       for (const w of kbWarnings) {
         output.warn(w)
@@ -373,7 +324,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       // Gather artifacts from reads (optional cross-cutting references)
       // Note: graph defaults missing steps to enabled:true, which may not reflect
       // custom config overrides. This is a pre-existing graph builder limitation.
-      const reads = overlayState.reads[step] ?? metaPrompt.frontmatter.reads ?? []
+      const reads = pipeline.overlay.reads[step] ?? metaPrompt.frontmatter.reads ?? []
       for (const readStep of reads) {
         // Check dependency graph for enablement (overlay-disabled steps)
         const readNode = graph?.nodes.get(readStep)
@@ -422,7 +373,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       // -----------------------------------------------------------------------
       const engine = new AssemblyEngine()
       const assemblyResult = engine.assemble(step, {
-        config,
+        config: context.config,
         state,
         metaPrompt,
         knowledgeEntries,
@@ -460,7 +411,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
           } else {
             // Reload state for next eligible
             const stateForEligible = stateManager.loadState()
-            const nextSteps = computeEligible(graph, stateForEligible.steps)
+            const nextSteps = pipeline.computeEligible(stateForEligible.steps)
             output.result({
               step,
               status: 'in_progress',
@@ -519,7 +470,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       // Step 12: Show next eligible steps
       // -----------------------------------------------------------------------
       const finalState = stateManager.loadState()
-      const nextSteps = computeEligible(graph, finalState.steps)
+      const nextSteps = pipeline.computeEligible(finalState.steps)
 
       if (outputMode === 'interactive') {
         if (nextSteps.length > 0) {

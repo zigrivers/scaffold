@@ -2,16 +2,12 @@ import type { CommandModule, Argv } from 'yargs'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
+import { displayErrors } from '../output/error-display.js'
 import { acquireLock, releaseLock } from '../../state/lock-manager.js'
 import { ReworkManager } from '../../state/rework-manager.js'
 import { StateManager } from '../../state/state-manager.js'
-import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
-import { getPackagePipelineDir, getPackageMethodologyDir } from '../../utils/fs.js'
-import { loadConfig } from '../../config/loader.js'
-import { loadAllPresets } from '../../core/assembly/preset-loader.js'
-import { resolveOverlayState } from '../../core/assembly/overlay-state-resolver.js'
-import { buildGraph } from '../../core/dependency/graph.js'
-import { computeEligible } from '../../core/dependency/eligibility.js'
+import { loadPipelineContext } from '../../core/pipeline/context.js'
+import { resolvePipeline } from '../../core/pipeline/resolver.js'
 import { parsePhases, parseThrough, applyExclusions, resolveStepsForPhases } from '../../core/rework/phase-selector.js'
 import type { DepthLevel } from '../../types/enums.js'
 import type { ReworkConfig } from '../../types/index.js'
@@ -272,55 +268,21 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
     }
 
     try {
-      // Load config and pipeline
-      const { config, errors: configErrors } = loadConfig(projectRoot as string, [])
-      if (!config) {
-        for (const err of configErrors) {
-          output.error(err)
-        }
+      // Load pipeline context and resolve overlay/graph
+      const context = loadPipelineContext(projectRoot as string)
+      if (!context.config) {
+        displayErrors(context.configErrors, context.configWarnings, output)
         process.exit(1)
         return
       }
-
-      const pipelineDir = getPackagePipelineDir(projectRoot as string)
-      const metaPrompts = discoverMetaPrompts(pipelineDir)
-      const metaPromptList = [...metaPrompts.values()].map(m => m.frontmatter)
-
-      const methodologyDir = getPackageMethodologyDir(projectRoot as string)
-      const presets = loadAllPresets(methodologyDir, [...metaPrompts.keys()])
-      const preset = config.methodology === 'mvp'
-        ? presets.mvp
-        : config.methodology === 'custom'
-          ? presets.custom ?? presets.deep
-          : presets.deep
-      const resolvedPreset = preset ?? {
-        name: 'deep',
-        description: 'Default deep methodology',
-        default_depth: 3 as DepthLevel,
-        steps: {},
-      }
-
-      // Apply project-type overlay (e.g., game overlay) if configured
-      const overlayState = resolveOverlayState({
-        config,
-        methodologyDir,
-        metaPrompts,
-        presetSteps: resolvedPreset.steps,
-        output,
-      })
-
-      // Build graph with overlay-aware steps
-      const presetStepsMap = new Map(Object.entries(overlayState.steps))
-      const graph = buildGraph(metaPromptList, presetStepsMap)
-
-      // Load state
-      const computeEligibleFn = (steps: Parameters<typeof computeEligible>[1]) =>
-        computeEligible(graph, steps)
-      const stateManager = new StateManager(projectRoot as string, computeEligibleFn)
+      const pipeline = resolvePipeline(context, { output })
+      const stateManager = new StateManager(projectRoot as string, pipeline.computeEligible)
       const state = stateManager.loadState()
 
+      const metaPromptList = [...context.metaPrompts.values()].map(m => m.frontmatter)
+
       // Resolve steps for selected phases
-      const reworkSteps = resolveStepsForPhases(phaseNumbers, metaPromptList, state, graph)
+      const reworkSteps = resolveStepsForPhases(phaseNumbers, metaPromptList, state, pipeline.graph)
 
       if (reworkSteps.length === 0) {
         output.error({
