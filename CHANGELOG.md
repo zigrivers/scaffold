@@ -2,6 +2,13 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.5.3] — 2026-04-06
+
+### Fixed
+
+- **Overlay dependency overrides now integrated into dependency graph** — `computeEligible()`, cycle detection, and topological sort all see overlay-resolved dependencies. Previously, `next`/`status` could show a step as eligible when `run` would block it due to an overlay-added dependency (e.g., `user-stories` depending on `review-gdd` in game projects).
+- **`run.ts` dep-check simplified** — replaced 3-level fallback chain with single source per step type (graph for pipeline steps, overlay for tools). Removed dead `topologicalSort()` call.
+
 ## [3.5.2] — 2026-04-05
 
 ### Changed
