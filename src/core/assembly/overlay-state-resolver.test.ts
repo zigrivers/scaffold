@@ -63,8 +63,14 @@ describe('resolveOverlayState', () => {
       'review-prd': { enabled: true },
     }
     const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
-      ['create-prd', { frontmatter: makeFrontmatter({ name: 'create-prd', knowledgeBase: ['kb-1'], reads: ['read-1'], dependencies: [] }) }],
-      ['review-prd', { frontmatter: makeFrontmatter({ name: 'review-prd', knowledgeBase: [], reads: [], dependencies: ['create-prd'] }) }],
+      ['create-prd', { frontmatter: makeFrontmatter({
+        name: 'create-prd', knowledgeBase: ['kb-1'],
+        reads: ['read-1'], dependencies: [],
+      }) }],
+      ['review-prd', { frontmatter: makeFrontmatter({
+        name: 'review-prd', knowledgeBase: [],
+        reads: [], dependencies: ['create-prd'],
+      }) }],
     ])
 
     const result = resolveOverlayState({
@@ -91,9 +97,18 @@ describe('resolveOverlayState', () => {
       'tdd': { enabled: true },
     }
     const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
-      ['design-system', { frontmatter: makeFrontmatter({ name: 'design-system', knowledgeBase: [], reads: [], dependencies: [] }) }],
-      ['tech-stack', { frontmatter: makeFrontmatter({ name: 'tech-stack', knowledgeBase: ['tech-stack-selection'], reads: [], dependencies: [] }) }],
-      ['tdd', { frontmatter: makeFrontmatter({ name: 'tdd', knowledgeBase: ['tdd-basics'], reads: [], dependencies: [] }) }],
+      ['design-system', { frontmatter: makeFrontmatter({
+        name: 'design-system', knowledgeBase: [],
+        reads: [], dependencies: [],
+      }) }],
+      ['tech-stack', { frontmatter: makeFrontmatter({
+        name: 'tech-stack', knowledgeBase: ['tech-stack-selection'],
+        reads: [], dependencies: [],
+      }) }],
+      ['tdd', { frontmatter: makeFrontmatter({
+        name: 'tdd', knowledgeBase: ['tdd-basics'],
+        reads: [], dependencies: [],
+      }) }],
     ])
 
     const result = resolveOverlayState({
@@ -126,12 +141,30 @@ describe('resolveOverlayState', () => {
       'platform-parity-review': { enabled: true },
     }
     const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
-      ['tech-stack', { frontmatter: makeFrontmatter({ name: 'tech-stack', knowledgeBase: ['tech-stack-selection'], reads: [], dependencies: [] }) }],
-      ['tdd', { frontmatter: makeFrontmatter({ name: 'tdd', knowledgeBase: ['tdd-basics'], reads: [], dependencies: [] }) }],
-      ['story-tests', { frontmatter: makeFrontmatter({ name: 'story-tests', knowledgeBase: [], reads: ['ux-spec', 'user-stories'], dependencies: [] }) }],
-      ['implementation-plan', { frontmatter: makeFrontmatter({ name: 'implementation-plan', knowledgeBase: [], reads: ['ux-spec'], dependencies: [] }) }],
-      ['user-stories', { frontmatter: makeFrontmatter({ name: 'user-stories', knowledgeBase: [], reads: [], dependencies: ['review-prd'] }) }],
-      ['platform-parity-review', { frontmatter: makeFrontmatter({ name: 'platform-parity-review', knowledgeBase: [], reads: [], dependencies: ['review-ux'] }) }],
+      ['tech-stack', { frontmatter: makeFrontmatter({
+        name: 'tech-stack', knowledgeBase: ['tech-stack-selection'],
+        reads: [], dependencies: [],
+      }) }],
+      ['tdd', { frontmatter: makeFrontmatter({
+        name: 'tdd', knowledgeBase: ['tdd-basics'],
+        reads: [], dependencies: [],
+      }) }],
+      ['story-tests', { frontmatter: makeFrontmatter({
+        name: 'story-tests', knowledgeBase: [],
+        reads: ['ux-spec', 'user-stories'], dependencies: [],
+      }) }],
+      ['implementation-plan', { frontmatter: makeFrontmatter({
+        name: 'implementation-plan', knowledgeBase: [],
+        reads: ['ux-spec'], dependencies: [],
+      }) }],
+      ['user-stories', { frontmatter: makeFrontmatter({
+        name: 'user-stories', knowledgeBase: [],
+        reads: [], dependencies: ['review-prd'],
+      }) }],
+      ['platform-parity-review', { frontmatter: makeFrontmatter({
+        name: 'platform-parity-review', knowledgeBase: [],
+        reads: [], dependencies: ['review-ux'],
+      }) }],
     ])
 
     const result = resolveOverlayState({
@@ -167,7 +200,10 @@ describe('resolveOverlayState', () => {
       'create-prd': { enabled: true },
     }
     const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
-      ['create-prd', { frontmatter: makeFrontmatter({ name: 'create-prd', knowledgeBase: ['kb-1'], reads: [], dependencies: [] }) }],
+      ['create-prd', { frontmatter: makeFrontmatter({
+        name: 'create-prd', knowledgeBase: ['kb-1'],
+        reads: [], dependencies: [],
+      }) }],
     ])
     const output = makeOutput()
 
@@ -192,7 +228,10 @@ describe('resolveOverlayState', () => {
       'step-a': { enabled: true },
     }
     const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
-      ['step-a', { frontmatter: makeFrontmatter({ name: 'step-a', knowledgeBase: [], reads: ['step-b'], dependencies: ['step-c'] }) }],
+      ['step-a', { frontmatter: makeFrontmatter({
+        name: 'step-a', knowledgeBase: [],
+        reads: ['step-b'], dependencies: ['step-c'],
+      }) }],
     ])
 
     const result = resolveOverlayState({
