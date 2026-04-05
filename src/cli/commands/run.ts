@@ -333,6 +333,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
 
       // Gather artifacts from completed dependency steps
       const artifacts: ArtifactEntry[] = []
+      const gatheredPaths = new Set<string>()
       for (const dep of deps) {
         const depEntry = state.steps[dep]
         if (depEntry?.status === 'completed' && depEntry.produces) {
@@ -342,12 +343,44 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
               try {
                 const content = fs.readFileSync(fullPath, 'utf8')
                 artifacts.push({ stepName: dep, filePath: relPath, content })
+                gatheredPaths.add(relPath)
               } catch (err) {
                 output.warn({
                   code: 'ARTIFACT_READ_ERROR',
                   message: `Could not read artifact '${relPath}' from step '${dep}': ${(err as Error).message}`,
                 })
               }
+            }
+          }
+        }
+      }
+
+      // Gather artifacts from reads (optional cross-cutting references)
+      const reads = metaPrompt.frontmatter.reads ?? []
+      for (const readStep of reads) {
+        // Check dependency graph for enablement (overlay-disabled steps)
+        const readNode = graph?.nodes.get(readStep)
+        if (readNode && !readNode.enabled) continue
+
+        // Check state — silently skip if not completed (reads are optional)
+        const readEntry = state.steps[readStep]
+        if (readEntry?.status !== 'completed' || !readEntry.produces) continue
+
+        for (const relPath of readEntry.produces) {
+          // Deduplicate: skip paths already gathered from deps
+          if (gatheredPaths.has(relPath)) continue
+
+          const fullPath = path.resolve(projectRoot, relPath)
+          if (fs.existsSync(fullPath)) {
+            try {
+              const content = fs.readFileSync(fullPath, 'utf8')
+              artifacts.push({ stepName: readStep, filePath: relPath, content })
+              gatheredPaths.add(relPath)
+            } catch (err) {
+              output.warn({
+                code: 'ARTIFACT_READ_ERROR',
+                message: `Could not read artifact '${relPath}' from step '${readStep}': ${(err as Error).message}`,
+              })
             }
           }
         }
