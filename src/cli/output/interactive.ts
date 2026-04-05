@@ -124,8 +124,10 @@ export class InteractiveOutput implements OutputContext {
     if (options.includes(answer)) {
       return answer
     }
-    // Fall back to default
-    return defaultValue ?? options[0] ?? ''
+    // Inform user their input was invalid, fall back to default
+    const fallback = defaultValue ?? options[0] ?? ''
+    process.stdout.write(`  Invalid input "${trimmed}", using default: ${fallback}\n`)
+    return fallback
   }
 
   async multiSelect(message: string, options: string[], defaults?: string[]): Promise<string[]> {

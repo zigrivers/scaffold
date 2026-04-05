@@ -1,5 +1,6 @@
 import type { OutputContext } from '../cli/output/context.js'
 import type { ProjectType, GameConfig } from '../types/index.js'
+import { GameConfigSchema } from '../config/schema.js'
 
 export interface WizardAnswers {
   methodology: 'deep' | 'mvp' | 'custom'
@@ -117,12 +118,13 @@ export async function askWizardQuestions(options: {
       'none',
     ) as GameConfig['economy']
 
-    // Advanced options (behind confirm gate)
-    let narrative: GameConfig['narrative'] = 'none'
-    let supportedLocales: string[] = ['en']
-    let npcAiComplexity: GameConfig['npcAiComplexity'] = 'none'
-    let hasModding = false
-    let persistence: GameConfig['persistence'] = 'progression'
+    // Advanced options — defaults derived from Zod schema to prevent drift
+    const schemaDefaults = GameConfigSchema.parse({ engine })
+    let narrative: GameConfig['narrative'] = schemaDefaults.narrative
+    let supportedLocales: string[] = schemaDefaults.supportedLocales
+    let npcAiComplexity: GameConfig['npcAiComplexity'] = schemaDefaults.npcAiComplexity
+    let hasModding = schemaDefaults.hasModding
+    let persistence: GameConfig['persistence'] = schemaDefaults.persistence
 
     const showAdvanced = await output.confirm('Configure advanced game options?', false)
     if (showAdvanced) {
