@@ -2,6 +2,24 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.5.2] — 2026-04-05
+
+### Changed
+
+- **Centralized pipeline resolution** — new `ResolvedPipeline` abstraction (`loadPipelineContext` + `resolvePipeline`) replaces duplicated resolution code across 7 CLI commands. Pipeline resolution sequence (discover → load config → select preset → resolve overlay → build graph) now lives in `src/core/pipeline/` instead of being copy-pasted in each command.
+  - 16 files changed, -106 net lines (388 added, 494 removed)
+  - Graph built 1x per command instead of 2-6x (performance improvement)
+  - Config validation now uses pipeline-only step names (tools no longer leak into validation scope)
+
+### Fixed
+
+- **Custom step enablement overrides now applied** — `config.custom.steps.{name}.enabled` was silently ignored because `resolveEnablement()` was never called by any command. The new `resolvePipeline()` applies custom enablement during preset resolution. Precedence: overlay > custom enablement > preset > disabled.
+
+### Removed
+
+- **`src/utils/eligible.ts`** — standalone factory that reimplemented the entire resolution pipeline; replaced by `resolvePipeline().computeEligible`
+- **`src/core/assembly/methodology-resolver.ts`** — dead code (`resolveEnablement()` never called in production)
+
 ## [3.5.1] — 2026-04-05
 
 ### Fixed
