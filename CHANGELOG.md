@@ -2,6 +2,25 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.5.1] — 2026-04-05
+
+### Fixed
+
+- **P0: Artifact path mismatches in 4 game pipeline steps** — `performance-budgets` referenced `docs/game-design-document.md` (correct: `docs/game-design.md`), `save-system-spec` referenced `docs/domain-model.md` (correct: `docs/domain-models/`), `art-bible` and `audio-design` referenced `docs/content-structure-design.md` (correct: `docs/content-structure/`). All four would cause agents to fail to find required input artifacts.
+- **P0: `review-game-ui` injected wrong knowledge domain** — the step's `knowledge-base` referenced `review-game-design` (GDD review passes: pillar coherence, core loop closure, mechanic ambiguity) instead of a game-UI-specific review entry. Created new `review-game-ui` knowledge entry with 7 UI-appropriate passes (HUD hierarchy, menu navigation, controller accessibility, settings coverage, FTUE, state machines, platform shell compliance).
+- **P1: Unity runtime fee described as current** — rescinded September 2024; updated `game-engine-selection` to reflect seat-based licensing.
+- **P1: ECS guidance ignored Unreal/Godot architectures** — `game-domain-patterns` presented pure ECS as universal; added engine-specific notes for Unreal's Actor-Component model and Godot's Node/Scene composition.
+- **P1: Quest 3 GPU drastically underestimated** — `game-vr-ar-design` described it as "2018 mid-range phone GPU" (actual: Snapdragon XR2 Gen 2, ~2022 flagship class).
+- **P1: Genre coverage gaps in AI, level design, and input** — `game-ai-patterns` now covers strategy AI, turn-based AI (MCTS/minimax), racing AI, and simulation AI. `game-level-content-design` now covers 2D platformer metrics, tile-based design, and non-spatial content. `game-input-systems` now covers touch/mobile, strategy, and turn-based input patterns.
+- **P1: Review step pass names misaligned with knowledge entries** — `review-netcode` passes 5-7 and `review-economy` passes 6-7 now match their corresponding knowledge entry pass names.
+- **P2: 12 additional content quality fixes** — GOAP attribution corrected (Shadow of Mordor → Tomb Raider 2013), Quixel Mixer discontinued → Quixel Bridge, Wwise licensing thresholds updated, PVRTC deprecated on iOS (ASTC-only), fixed-point math guidance added for lockstep netcode, Switch save limits clarified (32 MB default), engine-agnostic prose added around Unity-specific code examples (audio, UI, asset pipeline), per-engine DCC export axis settings, genre-specific core loop patterns (turn-based, narrative, management, puzzle), 2D performance budgets, mobile thermal targets.
+- **P2: Pipeline step quality criteria and reads improvements** — art-bible style criterion made concrete (hex/RGB ranges), content-structure-design type-specific output criterion added, netcode-spec reads now includes GDD, review steps' empty reads fields populated, SFX variation QC added to audio-design, telemetry integration QC added to playtest-plan, feature priority matrix QC added to GDD, server-authoritative transaction QC added to economy-design.
+
+### Added
+
+- **`docs/game-content-audit-prompt.md`** — reusable 11-module domain quality audit prompt for game development content. Supports iterative passes with delta tracking, finding categories (INACCURATE/INCOMPLETE/SHALLOW/MISMATCHED/OUTDATED), parallelizable as subagents, and a structured final deliverable format. Modeled on the alignment audit prompt architecture.
+- **`content/knowledge/review/review-game-ui.md`** — 7-pass game UI review knowledge entry (293 lines) with per-pass check lists, P0-P3 severity examples, and a Finding Template.
+
 ## [3.5.0] — 2026-04-05
 
 ### Added
