@@ -1,0 +1,27 @@
+name: game
+description: Game development overlay for testing
+project-type: game
+
+step-overrides:
+  game-design-document: { enabled: true }
+  review-gdd: { enabled: true }
+  design-system: { enabled: false }
+
+knowledge-overrides:
+  tech-stack:
+    append: [game-engine-selection]
+  tdd:
+    append: [game-testing-strategy]
+
+reads-overrides:
+  story-tests:
+    replace: { ux-spec: game-ui-spec }
+  implementation-plan:
+    replace: { ux-spec: game-ui-spec }
+    append: [game-design-document]
+
+dependency-overrides:
+  user-stories:
+    append: [review-gdd]
+  platform-parity-review:
+    replace: { review-ux: review-game-ui }

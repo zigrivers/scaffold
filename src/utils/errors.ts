@@ -282,3 +282,11 @@ export function presetUnmetDependency(step: string, dependency: string, preset: 
     context: { step, dependency, preset },
   }
 }
+
+export function overlayMalformedSection(section: string, file: string): ScaffoldWarning {
+  return {
+    code: 'OVERLAY_MALFORMED_SECTION',
+    message: `Overlay section "${section}" must be a YAML object — ignoring`,
+    context: { section, file },
+  }
+}
