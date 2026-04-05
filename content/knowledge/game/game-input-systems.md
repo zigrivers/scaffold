@@ -355,3 +355,25 @@ Input latency is the time from the player pressing a button to the corresponding
 - Use "late latch" techniques: update camera/aim after the final input poll, just before GPU submission
 - On PC, support NVIDIA Reflex / AMD Anti-Lag for driver-level latency reduction
 - Measure with a high-speed camera (240+ fps) pointed at the display while pressing a button connected to an LED — count frames between LED and screen change
+
+## Genre-Specific Input Patterns
+
+### Touch and Mobile Input
+
+Beyond minimum target sizes (44x44pt iOS, 48x48dp Android), mobile games need:
+
+- **Virtual joystick**: Floating (appears at touch point) preferred over fixed. Dead zone: 10-15% of joystick radius. Visual feedback: thumb indicator follows touch position.
+- **Gesture recognition**: Swipe threshold 50-100px to distinguish from taps. Multi-touch: track up to 5 simultaneous touches for action games, 2 for casual.
+- **Auto-play patterns**: Common in mobile RPGs — tap to toggle auto-battle with manual override for skills. Implement as a state machine: Manual → Auto → Manual on any input.
+- **Portrait vs landscape**: Design thumb-zone heat maps for each orientation. Critical actions within 60px of bottom corners.
+
+### Strategy and Management Input
+
+- **Box-select**: Click-drag rectangle, select all units inside. Add to selection with Shift+click. Deselect with right-click on empty space.
+- **Command queuing**: Shift+right-click appends to command queue. Display queue as waypoint markers. Max queue depth: 10-20 commands.
+- **Camera controls**: Edge scroll (mouse at screen edge), WASD pan, middle-mouse drag. Zoom: scroll wheel with min/max zoom limits. Minimap click-to-jump.
+
+### Turn-Based Input
+
+- **Select-confirm pattern**: Click to select, click again to confirm. Show preview of action result before confirmation. Undo: allow undo of last action if turn is not yet submitted.
+- **Hover-preview**: On hover, show range/area-of-effect highlight. On select, show detailed outcome prediction.

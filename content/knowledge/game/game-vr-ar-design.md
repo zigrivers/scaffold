@@ -12,7 +12,7 @@ VR and AR development is fundamentally constrained by human physiology in ways t
 
 VR has the most demanding performance requirements in real-time rendering because dropped frames directly cause motion sickness:
 
-- **Quest 3 / Quest Pro**: 72 Hz or 90 Hz (90 Hz strongly recommended). Per-eye resolution: 2064x2208. Total pixels per frame: ~9.1 million (both eyes). GPU: Mobile Adreno, roughly equivalent to a 2018 mid-range phone GPU.
+- **Quest 3 / Quest Pro**: 72 Hz or 90 Hz (90 Hz strongly recommended). Per-eye resolution: 2064x2208. Total pixels per frame: ~9.1 million (both eyes). GPU: Qualcomm Adreno 740 (Snapdragon XR2 Gen 2), roughly equivalent to a 2022 flagship phone GPU (Snapdragon 8 Gen 1 class). Significantly more capable than Quest 2's XR2 Gen 1 but still mobile-tier — expect 10-20% of a current desktop GPU's fill rate.
 - **PlayStation VR2**: 90 Hz or 120 Hz. Per-eye resolution: 2000x2040. Total pixels: ~8.2 million. GPU: PS5 AMD RDNA2 — much more capable than Quest but still must hit 90+ Hz.
 - **PC VR (Valve Index, Pimax)**: 90 Hz, 120 Hz, or 144 Hz. Per-eye resolution varies (Index: 1440x1600). GPU: Desktop RTX-class, but driving high refresh rates at high resolution is still demanding.
 - **Apple Vision Pro**: 90 Hz with dynamic foveated rendering. Per-eye resolution: ~3660x3200. GPU: M2+R1 chip with dedicated real-time sensor processing.

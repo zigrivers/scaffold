@@ -106,7 +106,7 @@ criteria:
 
   - name: "License Cost"
     weight: 2
-    unity: 3       # Free tier, then subscription; runtime fee (post-2024)
+    unity: 3       # Free tier (Unity Personal), then subscription (Plus/Pro); runtime fee rescinded September 2024, reverted to seat-based licensing
     unreal: 4      # Free until $1M revenue, then 5% royalty
     godot: 5       # MIT license, completely free forever
     custom: 5      # No license cost (but massive dev cost)
@@ -126,7 +126,7 @@ criteria:
 
 **Weaknesses:**
 - Rendering quality historically trails Unreal for AAA-grade visuals (HDRP narrows this gap)
-- Runtime fee model introduced uncertainty (Unity responded to backlash but trust was damaged)
+- Runtime fee was announced September 2023, rescinded September 2024 under new leadership with return to seat-based licensing — but the episode damaged developer trust and prompted some studios to migrate to other engines
 - Legacy code and architectural debt in some subsystems (old Input System, UI systems, networking)
 - DOTS/ECS is powerful but has had a long and unstable development path
 

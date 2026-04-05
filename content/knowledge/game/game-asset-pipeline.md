@@ -55,7 +55,7 @@ The pipeline typically involves multiple DCC tools in sequence:
 
 - **3D Modeling**: Maya (industry standard, USD support), Blender (free, growing adoption), 3ds Max (legacy, architectural viz)
 - **Sculpting**: ZBrush (high-poly sculpting, retopo), Blender (integrated sculpt mode)
-- **Texturing**: Substance 3D Painter (PBR texturing standard), Substance Designer (procedural materials), Quixel Mixer (free with Unreal)
+- **Texturing**: Substance 3D Painter (PBR texturing standard), Substance Designer (procedural materials), Quixel Bridge (Mixer was discontinued in 2024; the Megascans library and Bridge integration remain active in Unreal)
 - **VFX/Procedural**: Houdini (procedural generation, destruction, terrain), EmberGen (real-time fluid sim for VFX textures)
 - **2D Art**: Photoshop, Aseprite (pixel art), Krita (free painting)
 - **Audio**: FMOD Studio / Wwise (integration middleware), Audacity (editing), Reaper (DAW)
@@ -256,7 +256,11 @@ Each DCC tool in the pipeline needs documented export settings to ensure consist
 
 **Blender to FBX export settings:**
 - Scale: 1.0 (ensure Blender scene scale matches engine units — 1 unit = 1 meter for Unreal, 1 unit = 1 meter for Unity)
-- Forward axis: -Y Forward, Z Up (Unreal default) or varies by engine
+- Forward axis per engine:
+  - Unreal: -Y Forward, Z Up
+  - Unity: use FBX exporter 'Z Forward' setting — Unity converts to Y-Up left-handed on import
+  - Godot: -Z Forward, Y Up (right-handed)
+Verify axis settings with a test cube export before committing to a convention. A single wrong axis setting affects every asset in the pipeline.
 - Apply Modifiers: Yes
 - Mesh: Triangulate Faces enabled for guaranteed triangle counts
 - Armature: only include deform bones (exclude IK targets, helper bones)
@@ -288,7 +292,7 @@ Channel packing stores multiple grayscale maps in the RGBA channels of a single 
 **Compression formats by platform:**
 - **PC/Console**: BC7 (high quality, 8 bpp) for albedo/normal, BC5 for 2-channel normals, BC4 for grayscale masks
 - **Android**: ASTC (adaptive block sizes: 4x4 for high quality, 8x8 for lower quality/smaller size), ETC2 for broad compatibility
-- **iOS**: ASTC (preferred) or PVRTC (legacy)
+- **iOS**: ASTC (required for all Metal-capable devices, iPhone 6 and later). PVRTC is deprecated — Apple dropped dedicated PVRTC hardware decompression in recent GPU generations. Do not use PVRTC for new projects.
 - **Nintendo Switch**: ASTC is the primary format
 
 **MIP map policy:**

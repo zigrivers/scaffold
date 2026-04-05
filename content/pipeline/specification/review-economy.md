@@ -7,7 +7,7 @@ order: 869
 dependencies: [economy-design]
 outputs: [docs/reviews/specification-review-economy.md]
 conditional: "if-needed"
-reads: []
+reads: [game-design-document]
 knowledge-base: [review-game-economy, review-step-template, multi-model-review-dispatch]
 ---
 
@@ -64,7 +64,7 @@ No economy design means no economy review.
 ## Methodology Scaling
 - **deep**: All 7 review passes (Inflation Trajectory, Exploit Vectors,
   Ethical Monetization, Pay-to-Win Detection, Legal Compliance,
-  Progression-Monetization Separation, Live-Service Sustainability).
+  Earn Rate vs Engagement Projection, Sink Effectiveness Analysis).
   Multi-model review dispatched to Codex and Gemini if available, with
   graceful fallback to Claude-only enhanced review.
 - **mvp**: Three passes — Inflation Trajectory, Exploit Vectors, and Ethical

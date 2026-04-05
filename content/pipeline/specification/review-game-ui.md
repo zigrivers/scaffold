@@ -7,8 +7,8 @@ order: 864
 dependencies: [game-ui-spec]
 outputs: [docs/reviews/specification-review-game-ui.md]
 conditional: null
-reads: []
-knowledge-base: [review-game-design, game-accessibility, review-step-template, multi-model-review-dispatch]
+reads: [game-design-document, game-accessibility, input-controls-spec]
+knowledge-base: [review-game-ui, game-accessibility, review-step-template, multi-model-review-dispatch]
 ---
 
 ## Purpose
@@ -56,11 +56,11 @@ independent review validation.
   dispatched if available.
 - **mvp**: HUD coverage and controller navigation pass only.
 - **custom:depth(1-5)**:
-  - Depth 1: HUD-to-mechanic coverage and basic controller navigation pass (1 review pass)
-  - Depth 2: add settings completeness and accessibility compliance passes (2 review passes)
-  - Depth 3: add FTUE effectiveness and UI state machine passes (4 review passes)
-  - Depth 4: add external model review of UI completeness (4 review passes + external dispatch)
-  - Depth 5: multi-model review with reconciliation (4 review passes + multi-model synthesis)
+  - Depth 1: two passes — HUD-to-mechanic coverage and controller navigation reachability.
+  - Depth 2: four passes — add settings completeness and accessibility compliance.
+  - Depth 3: six passes — add FTUE effectiveness and UI state machine completeness.
+  - Depth 4: all 7 passes (add platform shell compliance) + one external model (if CLI available).
+  - Depth 5: all 7 passes + multi-model review with reconciliation.
 
 ## Mode Detection
 Re-review mode if previous review exists. If multi-model review artifacts exist

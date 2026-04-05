@@ -325,7 +325,7 @@ Each platform has unique requirements that affect save system design:
 
 **Nintendo Switch:**
 - Save data uses the Nintendo save data API
-- Strict save data size limits (varies by title approval, typically 32 MB–256 MB)
+- Strict save data size limits: Default allocation for most titles is 32 MB total (all save slots combined). Larger allocations (up to 256 MB) require explicit approval from Nintendo during title registration and must be justified. Design for 32 MB as the baseline constraint.
 - No cloud save backup for non-Nintendo Switch Online subscribers
 - Save data is bound to the console, not the user (complicates console transfer scenarios)
 - The game must implement its own backup strategy since the platform provides limited protection

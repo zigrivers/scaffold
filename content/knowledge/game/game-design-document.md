@@ -39,6 +39,15 @@ The core loop is the fundamental cycle of actions the player repeats most freque
 
 A core loop is healthy when: every action has visible feedback within 200ms, outcomes feel proportional to skill/effort, and the loop itself is satisfying even without meta-progression.
 
+### Genre-Specific Loop Patterns
+
+The Input → Rules → Outcome → Feedback model applies universally, but timing and metrics vary by genre:
+
+- **Turn-based loop**: Observe → Plan → Commit → Resolve → Evaluate. Feedback latency is irrelevant; decision quality and information clarity are the metrics. Each turn should present a meaningful choice with visible consequences.
+- **Narrative loop**: Read/Watch → Choice → Consequence → Reveal → React. Pacing metric: decision points every 5-10 minutes of content. Consequence visibility: player should understand within 1-2 scenes how their choice affected the narrative.
+- **Management loop**: Monitor → Prioritize → Allocate → Wait → Evaluate. Session metric: one complete evaluate cycle per 15-30 minutes. Feedback: dashboard showing resource trends, not just current values.
+- **Puzzle loop**: Observe state → Hypothesize → Test → Success/Adjust. 'Aha moment' density: 1-2 per puzzle. Difficulty curve: each puzzle should be solvable in 1-5 minutes at target difficulty.
+
 ### Mechanics Documentation
 
 Every mechanic in the GDD must be documented with four components: inputs (what the player controls), rules (how the system resolves actions), outputs (what changes), and feedback (how the player perceives the change). Mechanics without all four components are incomplete and will be implemented inconsistently.

@@ -313,6 +313,8 @@ Lockstep is an alternative to client-server prediction that is deterministic: al
 **Requirements:**
 - The simulation must be perfectly deterministic: same inputs must produce bit-identical outputs on all platforms
 - Floating-point determinism is extremely hard across different CPUs and compilers — many lockstep games use fixed-point math
+
+**Fixed-point math implementation:** Use a Q16.16 or Q32.32 fixed-point representation for all game state calculations in lockstep systems. Libraries: libfixmath (C), FixedMath.Net (C#). All trigonometric functions must use lookup tables or polynomial approximations — never call platform math libraries (sin, cos, sqrt) as these are not deterministic across platforms. Performance cost: fixed-point is typically 2-5x slower than hardware float but eliminates desync bugs entirely.
 - A single desync (one client computes a different result) is catastrophic — desyncs must be detected (via state hash comparison) and recovered from (resync or disconnect)
 
 **Rollback networking (GGPO):**

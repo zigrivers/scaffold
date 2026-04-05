@@ -64,6 +64,8 @@ Controller navigation requires explicit focus management — there is no cursor 
 
 Controller navigation requires a focus system that tracks which UI element is currently selected and handles directional input to move focus.
 
+**Engine-native support:** Unreal's UMG provides focus navigation through the CommonUI plugin with built-in gamepad navigation, focus flow, and input routing. Godot's Control nodes have built-in `focus_neighbor` properties for D-pad navigation. Unity requires explicit focus management through EventSystem or custom solutions. Use engine-native solutions where available, falling back to custom implementation only for complex navigation flows. The pattern below demonstrates manual focus management for reference.
+
 ```csharp
 // FocusManager.cs — Controller-first UI focus management
 // Attach to a root UI canvas; manages focus across all child elements

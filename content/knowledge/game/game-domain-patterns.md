@@ -28,6 +28,8 @@ Games are split into two architectural layers that demand different modeling app
 
 **Do NOT mix these within a layer.** ECS in the meta-game layer creates anemic data bags with scattered business logic. DDD in the simulation layer creates cache-hostile object graphs that kill frame rates. Each paradigm is correct for its layer and wrong for the other.
 
+**Engine architecture note:** The pure ECS pattern (entities as IDs, components as data bags, systems as external functions) applies directly to ECS-first frameworks: Unity DOTS, Bevy, Flecs, and custom engines. Unreal Engine uses an Actor-Component model where Actors own Components with behavior — this is closer to OOP with composition than data-oriented ECS. Do not force pure ECS onto Unreal; instead, use Unreal's native Actor-Component model for gameplay systems and apply DDD patterns to meta-game layers (GameInstance, subsystems, save state). Godot uses a Node/Scene composition model with signals — apply the simulation/meta-game separation principle using Godot's native patterns rather than importing ECS concepts.
+
 ### Game State Machines
 
 State machines are the universal pattern in game development. They appear at every scale:

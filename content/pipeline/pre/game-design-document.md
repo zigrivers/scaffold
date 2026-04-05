@@ -38,6 +38,7 @@ narrative detail are covered by separate downstream steps.
 - (deep) Progression systems define XP/level curves or equivalent with explicit formulas
 - (deep) Achievements/trophies schema is present with unlock conditions
 - (deep) Competitive analysis references specific titles and structural differentiation
+- (deep) Feature priority matrix included (must-have, should-have, nice-to-have per milestone) and top-5 risk register with likelihood, impact, and mitigation strategies
 
 ## Methodology Scaling
 - **deep**: Full GDD bible. Design pillars with exclusion rationale, multi-tier

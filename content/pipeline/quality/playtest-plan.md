@@ -7,7 +7,7 @@ order: 961
 dependencies: [game-design-document, user-stories]
 outputs: [docs/playtest-plan.md]
 conditional: null
-reads: []
+reads: [analytics-telemetry]
 knowledge-base: [game-testing-strategy, game-milestone-definitions]
 ---
 
@@ -47,6 +47,7 @@ design decisions rather than anecdotal impressions.
 - (deep) Playtest environment specification: hardware requirements, network conditions to simulate, build distribution method (Steam playtest, TestFlight, side-loading), telemetry collection during sessions
 - (deep) Playtest-to-design feedback loop: how findings are triaged (critical/major/minor), who owns resolution, turnaround time targets between playtest and design response
 - (deep) Accessibility playtest sessions: dedicated sessions with players using assistive technologies to validate accessibility features from game-accessibility spec
+- (deep) Telemetry integration specified: which analytics events are collected during playtest sessions, how automated metrics complement observer notes
 
 ## Methodology Scaling
 - **deep**: Full playtest plan covering all three tiers with detailed schedules,

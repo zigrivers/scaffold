@@ -28,7 +28,7 @@ failures, performance regressions, and visual incoherence.
 ## Inputs
 - docs/game-design.md (required) — art style direction, world setting, character roster, environment types
 - docs/performance-budgets.md (required) — polygon budgets, texture memory budgets, draw call limits per platform
-- docs/content-structure-design.md (required) — content organization, asset directory structure, naming taxonomy
+- docs/content-structure/ (required) — content organization, asset directory structure, naming taxonomy
 - docs/plan.md (required) — target platforms informing quality tiers and LOD requirements
 
 ## Expected Outputs
@@ -36,7 +36,7 @@ failures, performance regressions, and visual incoherence.
   DCC pipeline, LOD strategy, Git LFS mapping, and collision layer definitions
 
 ## Quality Criteria
-- (mvp) Art style pillars defined with visual reference descriptions (mood, color palette, silhouette language, rendering style)
+- (mvp) Art style pillars defined with concrete specifications: color palette as hex/RGB ranges, character proportion ratios, material property ranges (roughness, metallic), and reference images or "do/don't" visual descriptions per asset category
 - (mvp) Per-type asset specs documented: 3D models (poly budget, texture resolution, material slots), 2D sprites (resolution, atlas packing, animation frames), VFX (particle count, draw call budget, shader complexity), animation (bone count, clip length, blend tree structure)
 - (mvp) Naming conventions defined per asset type following content-structure-design taxonomy
 - (mvp) DCC pipeline documented: source tool → export format → engine import → validation

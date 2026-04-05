@@ -14,7 +14,7 @@ Game AI systems exist on a spectrum from simple to complex:
 
 - **Finite State Machines (FSM)**: States with explicit transitions. Simple, predictable, easy to debug. Falls apart when state count grows large. Best for simple enemies, UI, and game state management.
 - **Behavior Trees (BT)**: Hierarchical task decomposition. Moderate complexity, highly readable, industry standard for action game AI. Used in Halo, Unreal Engine's default AI, most AAA combat AI.
-- **Goal-Oriented Action Planning (GOAP)**: Agents define goals, planner finds action sequences to achieve them. More autonomous, harder to control. Used in F.E.A.R., Shadow of Mordor.
+- **Goal-Oriented Action Planning (GOAP)**: Agents define goals, planner finds action sequences to achieve them. More autonomous, harder to control. Used in F.E.A.R., Tomb Raider (2013 reboot).
 - **Utility AI**: Score every possible action and pick the highest-scoring one. Extremely flexible, non-linear priority. Used in The Sims, Infinite Axis Utility System. Harder to predict and debug.
 
 Each system has a sweet spot. Do not use GOAP for a platformer enemy that runs left and right. Do not use an FSM for an open-world companion that must react to hundreds of situations.
@@ -540,3 +540,28 @@ AI bugs are hard to reproduce because they depend on runtime state. Build debugg
 - **Freeze and inspect**: Ability to pause the game and inspect any NPC's full AI state (current BT node, GOAP plan, utility scores, perception targets)
 - **Record and replay**: Capture AI inputs (world state each frame) and replay to reproduce bugs deterministically
 - **Slow motion**: Run the game at 0.25x speed to observe AI decision-making in real time
+
+## Genre-Specific AI Patterns
+
+### Strategy Game AI
+
+Strategy AI operates on longer time horizons than action AI. Key patterns:
+
+- **Influence Maps**: 2D grid overlays tracking resource density, threat level, territory control. Update per turn or every N seconds. Used for build placement decisions, army movement, and resource prioritization.
+- **Build Order Planning**: Decision trees or scripted sequences for early-game economy. At higher difficulty, use Monte Carlo Tree Search (MCTS) to evaluate build paths 10-20 turns ahead.
+- **Opponent Modeling**: Track player tendencies (aggressive/defensive/economic) and adapt strategy. Simple approach: weighted counter-strategy table. Advanced: maintain belief state of opponent's hidden information.
+
+### Turn-Based AI
+
+- **Minimax with Alpha-Beta Pruning**: Standard for two-player zero-sum games (chess, checkers). Search depth 4-8 plies for real-time-constrained turns. Evaluation function must be fast (<1ms per position).
+- **Monte Carlo Tree Search (MCTS)**: Preferred for games with large branching factors (Go, complex card games). Run 1,000-10,000 simulations per decision within the time budget. UCB1 exploration constant: typically 1.0-1.4.
+
+### Racing AI
+
+- **Racing Line Following**: Precompute optimal racing line as spline control points. AI follows line with rubber-banding: if too far ahead, reduce throttle by 5-15%; if behind, increase by 10-20%. Expose difficulty parameter controlling how closely AI follows the optimal line.
+- **Overtaking Decision**: Distance-to-corner, speed differential, and track width determine whether to attempt pass. Use simple cost function: `overtake_score = speed_advantage * track_width / distance_to_corner`.
+
+### Simulation/Management AI
+
+- **Need-Based Scheduling**: NPCs maintain need queues (hunger, rest, social). Highest-urgency need drives behavior selection. Satisfaction decay rates define personality: fast hunger decay = always eating. Based on Sims-style utility curves.
+- **Agent Scheduling**: For city-builder NPCs: pathfind to workplace at shift start, return home at shift end. Use job queue with priority: emergency > assigned work > idle tasks. Budget 0.5-1ms per agent per tick for 100+ simultaneous agents.

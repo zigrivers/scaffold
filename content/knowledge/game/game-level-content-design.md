@@ -453,3 +453,31 @@ Every level should have a design document before construction begins.
 - **Audio direction notes**: Ambient soundscape, music transitions, key audio events
 - **Unique mechanics**: Any level-specific mechanics (vehicles, zero-gravity, underwater) with design notes
 - **Dependencies**: What player abilities are required? What story prerequisites must be met?
+
+## 2D and Non-3D Level Design
+
+### 2D Platformer Metrics
+
+The design unit for 2D platformers is the screen or screen segment, not 3D meters:
+
+- **Screen dimensions**: Design at target resolution (e.g., 1920x1080). One screen = one design unit.
+- **Tile grid**: Standard tile size 16x16, 32x32, or 64x64 pixels. Character occupies 1-2 tiles wide, 2-3 tiles tall.
+- **Jump arc**: Defined by initial velocity and gravity. Standard platformer: peak height = 3-5 tiles, horizontal distance = 4-8 tiles. Coyote time: 6-10 frames (100-167ms at 60fps).
+- **Platform spacing**: Safe gap = 60-80% of max jump distance. Challenge gap = 85-95%. Death gap = 100%+.
+- **Enemy placement**: One new mechanic or enemy per 3-5 screens. Tutorial screens introduce mechanics in isolation before combining.
+
+### Tile-Based Level Design
+
+For grid-based games (roguelikes, tactics, puzzle games):
+
+- **Room generation**: Define room templates as rectangles with connection points. Minimum room size: 5x5 tiles. Maximum: 15x15 for tactical games. Connect rooms via corridors 1-3 tiles wide.
+- **Difficulty distribution**: In procedural dungeon generation, difficulty increases with distance from start. Use weighted room selection: rooms with harder enemies have higher weight at greater distances.
+- **Puzzle stage design**: Each stage introduces one new mechanic. Progression: tutorial (1 mechanic, 1 solution), practice (1 mechanic, multiple applications), combination (2+ mechanics together), mastery (all mechanics under constraint).
+
+### Non-Spatial Content Design
+
+For games without spatial levels (card games, visual novels, management sims):
+
+- **Card game stage progression**: Introduce card types gradually. New card pool expansion every 3-5 encounters. Total card pool at launch: 100-300 for competitive, 50-100 for single-player.
+- **Visual novel branching**: Key decision points every 5-10 minutes of reading. Total playthrough length: 2-4 hours per route. Route count: 3-5 for manageable scope. Flag variable tracking: use boolean flags + integer counters, avoid floating-point relationship values.
+- **Management sim progression**: Unlock new building/unit types every 15-30 minutes of play. Each unlock should enable at least one new strategy the player couldn't execute before.

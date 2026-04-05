@@ -66,6 +66,7 @@ content (no spending decisions) do not require a full economy design.
 - (deep) Legal compliance checklist per target market: probability disclosure requirements, age-gating, spending limits, loot box classification
 - (deep) Economy simulation spreadsheet or formula reference with tunable parameters for balance testing
 - (deep) Seasonal/live-service economy plan: event currencies, battle pass reward tracks, limited-time offers, FOMO management
+- (mvp) If the economy involves online transactions: server-authoritative transaction model specified — client cannot dictate transaction outcomes
 
 ## Methodology Scaling
 - **deep**: Full economy design with multi-currency architecture, faucet/sink

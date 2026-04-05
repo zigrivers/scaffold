@@ -22,7 +22,7 @@ the system, its allocation, rationale, measurement method, and alert threshold
 so that performance regressions are caught automatically.
 
 ## Inputs
-- docs/game-design-document.md (required) — core systems, target platforms,
+- docs/game-design.md (required) — core systems, target platforms,
   visual fidelity targets, multiplayer scope
 - docs/tech-stack.md (required) — engine, renderer, target hardware, platform
   SDK constraints
