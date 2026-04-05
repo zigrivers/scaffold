@@ -29,7 +29,7 @@
 | `src/cli/commands/skip.ts` | Modify | Migrate from eligible.ts to resolvePipeline |
 | `src/cli/commands/reset.ts` | Modify | Migrate from eligible.ts to resolvePipeline |
 | `src/utils/eligible.ts` | Delete | Replaced by resolvePipeline().computeEligible |
-| `src/utils/eligible.test.ts` | Delete | Tests for deleted file |
+| `src/utils/eligible.test.ts` | Delete (if exists) | Tests for deleted file |
 | `src/core/assembly/methodology-resolver.ts` | Delete | Dead code — resolveEnablement() never called |
 | `src/core/assembly/methodology-resolver.test.ts` | Delete | Tests for deleted file |
 
@@ -47,10 +47,11 @@
 ```typescript
 // src/core/pipeline/types.ts
 import type { MetaPromptFile, MetaPromptFrontmatter } from '../../types/frontmatter.js'
-import type { ScaffoldConfig, StepEnablementEntry, MethodologyPreset } from '../../types/config.js'
-import type { StepStateEntry } from '../../types/state.js'
-import type { DependencyGraph } from '../../types/index.js'
-import type { ScaffoldError, ScaffoldWarning } from '../../utils/errors.js'
+import type {
+  ScaffoldConfig, StepEnablementEntry, MethodologyPreset,
+  DependencyGraph, ScaffoldError, ScaffoldWarning,
+  StepStateEntry,
+} from '../../types/index.js'
 import type { OverlayState } from '../assembly/overlay-state-resolver.js'
 
 export interface PipelineContext {
@@ -58,6 +59,7 @@ export interface PipelineContext {
   metaPrompts: Map<string, MetaPromptFile>
   config: ScaffoldConfig | null
   configErrors: ScaffoldError[]
+  configWarnings: ScaffoldWarning[]
   presets: {
     mvp: MethodologyPreset | null
     deep: MethodologyPreset | null
@@ -168,7 +170,7 @@ export function loadPipelineContext(
     : discoverMetaPrompts(pipelineDir)
 
   const knownSteps = [...metaPrompts.keys()]
-  const { config, errors: configErrors } = loadConfig(projectRoot, knownSteps)
+  const { config, errors: configErrors, warnings: configWarnings } = loadConfig(projectRoot, knownSteps)
   const { deep, mvp, custom } = loadAllPresets(methodologyDir, knownSteps)
 
   return {
@@ -176,6 +178,7 @@ export function loadPipelineContext(
     metaPrompts,
     config,
     configErrors,
+    configWarnings,
     presets: { deep, mvp, custom },
     methodologyDir,
   }
@@ -260,12 +263,27 @@ describe('resolvePipeline', () => {
     expect(prdNode?.enabled).toBe(false)
   })
 
-  it('handles null config gracefully (fallback to deep)', () => {
+  it('custom-enables a step absent from preset (e.g., mvp + custom enable review-prd)', () => {
+    const ctx = loadPipelineContext(process.cwd())
+    if (ctx.config) {
+      ctx.config.methodology = 'mvp'
+      ctx.config.custom = {
+        steps: { 'review-prd': { enabled: true } },
+      }
+    }
+    const pipeline = resolvePipeline(ctx)
+    const node = pipeline.graph.nodes.get('review-prd')
+    expect(node?.enabled).toBe(true)
+  })
+
+  it('handles null config gracefully (fallback to deep, frontmatter maps preserved)', () => {
     const ctx = loadPipelineContext(process.cwd())
     ctx.config = null
     const pipeline = resolvePipeline(ctx)
     expect(pipeline.preset).not.toBeNull()
     expect(pipeline.graph.nodes.size).toBeGreaterThan(50)
+    // Verify frontmatter-derived maps are not empty
+    expect(Object.keys(pipeline.overlay.knowledge).length).toBeGreaterThan(0)
   })
 })
 ```
@@ -282,10 +300,12 @@ Expected: FAIL — `resolvePipeline` does not exist
 import { resolveOverlayState } from '../assembly/overlay-state-resolver.js'
 import { buildGraph } from '../dependency/graph.js'
 import { computeEligible } from '../dependency/eligibility.js'
+import { createOutputContext } from '../../cli/output/context.js'
 import type { OutputContext } from '../../cli/output/context.js'
 import type { StepEnablementEntry } from '../../types/config.js'
 import type { StepStateEntry } from '../../types/state.js'
 import type { MetaPromptFrontmatter } from '../../types/frontmatter.js'
+import type { OverlayState } from '../assembly/overlay-state-resolver.js'
 import type { PipelineContext, ResolvedPipeline } from './types.js'
 
 export function resolvePipeline(
@@ -293,6 +313,7 @@ export function resolvePipeline(
   options?: { output?: OutputContext },
 ): ResolvedPipeline {
   const { config, presets, metaPrompts, methodologyDir } = context
+  const output = options?.output ?? createOutputContext('auto')
 
   // 1. Select preset (fallback to deep)
   const methodology = config?.methodology ?? 'deep'
@@ -307,17 +328,28 @@ export function resolvePipeline(
   const mergedSteps: Record<string, StepEnablementEntry> = { ...preset.steps }
   if (config?.custom?.steps) {
     for (const [name, customStep] of Object.entries(config.custom.steps)) {
-      if (customStep.enabled !== undefined && mergedSteps[name]) {
-        mergedSteps[name] = { ...mergedSteps[name], enabled: customStep.enabled }
+      if (customStep.enabled !== undefined) {
+        mergedSteps[name] = { ...(mergedSteps[name] ?? {}), enabled: customStep.enabled }
       }
     }
   }
 
   // 3. Resolve overlay
-  const output = options?.output
-  const overlay = config
-    ? resolveOverlayState({ config, methodologyDir, metaPrompts, presetSteps: mergedSteps, output: output! })
-    : { steps: mergedSteps, knowledge: {}, reads: {}, dependencies: {} }
+  let overlay: OverlayState
+  if (config) {
+    overlay = resolveOverlayState({ config, methodologyDir, metaPrompts, presetSteps: mergedSteps, output })
+  } else {
+    // No config — extract base maps from frontmatter (matches resolveOverlayState default behavior)
+    const knowledge: Record<string, string[]> = {}
+    const reads: Record<string, string[]> = {}
+    const dependencies: Record<string, string[]> = {}
+    for (const [name, mp] of metaPrompts) {
+      knowledge[name] = [...(mp.frontmatter.knowledgeBase ?? [])]
+      reads[name] = [...(mp.frontmatter.reads ?? [])]
+      dependencies[name] = [...(mp.frontmatter.dependencies ?? [])]
+    }
+    overlay = { steps: mergedSteps, knowledge, reads, dependencies }
+  }
 
   // 4. Build graph (once)
   const frontmatters = [...metaPrompts.values()].map((mp) => mp.frontmatter)
@@ -439,6 +471,15 @@ const pipeline = resolvePipeline(context, { output })
 const stateManager = new StateManager(projectRoot, pipeline.computeEligible)
 ```
 
+**Important:** rework.ts is a mutating command that currently exits on null config. Preserve this:
+```typescript
+if (!context.config) {
+  for (const err of context.configErrors) output.error(err.message)
+  process.exit(1)
+  return
+}
+```
+
 Note: rework.ts currently calls `loadConfig(projectRoot, [])` with empty knownSteps. `loadPipelineContext` uses `[...metaPrompts.keys()]` instead — this changes rework to validate custom steps (improvement, but behavioral change). Keep all rework-specific logic: lock management, phase selection, batch reset, session creation. Use `pipeline.graph` where rework builds its own graph.
 
 Remove unused imports.
@@ -467,6 +508,15 @@ import { resolvePipeline } from '../../core/pipeline/resolver.js'
 
 const context = loadPipelineContext(projectRoot, { includeTools: true, output })
 const pipeline = resolvePipeline(context, { output })
+```
+
+**Important:** run.ts is a mutating command that currently exits on null config. Preserve this:
+```typescript
+if (!context.config) {
+  for (const err of context.configErrors) output.error(err.message)
+  process.exit(1)
+  return
+}
 ```
 
 `run.ts` is the most complex command. Key migration points:
@@ -515,9 +565,11 @@ import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
 // ...
 const context = loadPipelineContext(projectRoot)
-const pipeline = resolvePipeline(context)
+const pipeline = resolvePipeline(context)  // output defaults to 'auto' internally
 const stateManager = new StateManager(projectRoot, pipeline.computeEligible)
 ```
+
+Note: These commands don't have an `output` variable in scope, so `resolvePipeline` uses its internal default (`createOutputContext('auto')`). This matches current `buildComputeEligibleFn` behavior which also creates its own output context.
 
 - [ ] **Step 3: Migrate skip.ts** — same pattern as Step 2
 
