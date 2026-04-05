@@ -9,6 +9,7 @@ import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { getPackagePipelineDir, getPackageMethodologyDir } from '../../utils/fs.js'
 import { loadConfig } from '../../config/loader.js'
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
+import { resolveOverlayState } from '../../core/assembly/overlay-state-resolver.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { computeEligible } from '../../core/dependency/eligibility.js'
 import { parsePhases, parseThrough, applyExclusions, resolveStepsForPhases } from '../../core/rework/phase-selector.js'
@@ -299,8 +300,17 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
         steps: {},
       }
 
-      // Build graph
-      const presetStepsMap = new Map(Object.entries(resolvedPreset.steps))
+      // Apply project-type overlay (e.g., game overlay) if configured
+      const overlayState = resolveOverlayState({
+        config,
+        methodologyDir,
+        metaPrompts,
+        presetSteps: resolvedPreset.steps,
+        output,
+      })
+
+      // Build graph with overlay-aware steps
+      const presetStepsMap = new Map(Object.entries(overlayState.steps))
       const graph = buildGraph(metaPromptList, presetStepsMap)
 
       // Load state

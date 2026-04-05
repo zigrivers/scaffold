@@ -247,7 +247,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     // Tools (category: 'tool') are not in the dependency graph — skip dep checking
     const isTool = metaPrompt.frontmatter.category === 'tool'
     const stepNode = isTool ? undefined : graph.nodes.get(step)
-    const deps = stepNode?.dependencies ?? overlayState.dependencies[step] ?? metaPrompt.frontmatter.dependencies ?? []
+    const deps = overlayState.dependencies[step] ?? stepNode?.dependencies ?? metaPrompt.frontmatter.dependencies ?? []
 
     if (!isTool) {
       const unmetDeps = deps.filter(dep => {

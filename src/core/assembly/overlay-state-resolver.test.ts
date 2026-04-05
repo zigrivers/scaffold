@@ -192,7 +192,7 @@ describe('resolveOverlayState', () => {
     expect(result.dependencies['platform-parity-review']).not.toContain('review-ux')
   })
 
-  it('handles missing overlay file gracefully (no crash, returns preset defaults)', () => {
+  it('handles missing overlay file gracefully (no crash, returns preset defaults, no warnings)', () => {
     const config = makeConfig({
       project: { projectType: 'cli' }, // no cli-overlay.yml exists in fixtures
     })
@@ -218,7 +218,39 @@ describe('resolveOverlayState', () => {
     // Should not crash, should return preset defaults
     expect(result.steps).toEqual(presetSteps)
     expect(result.knowledge['create-prd']).toEqual(['kb-1'])
-    // warn should have been called for the missing overlay
+    // No warnings should be emitted for missing overlay files (P1-2 fix)
+    expect(output.warn).not.toHaveBeenCalled()
+  })
+
+  it('handles malformed overlay YAML gracefully (warns and returns preset defaults)', () => {
+    // Use a custom methodology dir that contains the malformed overlay
+    // We name the test projectType 'malformed' so it looks for malformed-overlay.yml
+    const config = makeConfig({
+      project: { projectType: 'malformed' as never },
+    })
+    const presetSteps: Record<string, StepEnablementEntry> = {
+      'create-prd': { enabled: true },
+    }
+    const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+      ['create-prd', { frontmatter: makeFrontmatter({
+        name: 'create-prd', knowledgeBase: ['kb-1'],
+        reads: [], dependencies: [],
+      }) }],
+    ])
+    const output = makeOutput()
+
+    const result = resolveOverlayState({
+      config,
+      methodologyDir: fixtureDir,
+      metaPrompts,
+      presetSteps,
+      output,
+    })
+
+    // Should not crash, should return preset defaults
+    expect(result.steps).toEqual(presetSteps)
+    expect(result.knowledge['create-prd']).toEqual(['kb-1'])
+    // Should have warned about the parse error
     expect(output.warn).toHaveBeenCalled()
   })
 

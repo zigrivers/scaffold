@@ -1,4 +1,5 @@
 import path from 'node:path'
+import fs from 'node:fs'
 import type { ScaffoldConfig, StepEnablementEntry } from '../../types/index.js'
 import type { MetaPromptFrontmatter } from '../../types/frontmatter.js'
 import type { OutputContext } from '../../cli/output/context.js'
@@ -48,14 +49,22 @@ export function resolveOverlayState(options: {
   const projectType = config.project?.projectType
   if (projectType) {
     const overlayPath = path.join(methodologyDir, `${projectType}-overlay.yml`)
+
+    // Only attempt overlay loading when an overlay file actually exists.
+    // Most project types (backend, cli, library, etc.) don't have overlays —
+    // silently return defaults instead of emitting misleading warnings.
+    if (!fs.existsSync(overlayPath)) {
+      return { steps: { ...presetSteps }, knowledge: knowledgeMap, reads: readsMap, dependencies: dependencyMap }
+    }
+
     const { overlay, errors: overlayErrors, warnings: overlayWarnings } = loadOverlay(overlayPath)
     for (const w of overlayWarnings) {
       output.warn(w)
     }
     // Overlay errors are non-fatal — warn but continue without overlay
     if (overlayErrors.length > 0) {
-      for (const e of overlayErrors) {
-        output.warn({ code: e.code, message: e.message })
+      for (const err of overlayErrors) {
+        output.warn(`[${err.code}] ${err.message}${err.recovery ? ` — ${err.recovery}` : ''}`)
       }
     }
     if (overlay) {
