@@ -1,3 +1,4 @@
+<!-- eval-wip -->
 ---
 name: game-platform-certification
 description: Sony TRC, Microsoft XR, Nintendo Lotcheck, mobile store guidelines, Steam Deck compatibility review, and common failure points

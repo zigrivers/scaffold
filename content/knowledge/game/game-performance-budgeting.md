@@ -1,3 +1,4 @@
+<!-- eval-wip -->
 ---
 name: game-performance-budgeting
 description: Frame budget allocation, memory budgets per platform, GPU/draw call limits, loading targets, thermal constraints, and profiling tools

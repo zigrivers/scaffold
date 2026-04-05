@@ -1,3 +1,4 @@
+<!-- eval-wip -->
 ---
 name: review-game-design
 description: Failure modes and review passes specific to Game Design Documents — pillar coherence, core loop closure, mechanic clarity, and scope feasibility

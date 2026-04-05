@@ -1,3 +1,4 @@
+<!-- eval-wip -->
 ---
 name: review-netcode
 description: Failure modes and review passes specific to netcode design — latency analysis, bandwidth ceilings, cheat surfaces, and disconnect handling

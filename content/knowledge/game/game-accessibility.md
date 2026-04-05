@@ -1,3 +1,4 @@
+<!-- eval-wip -->
 ---
 name: game-accessibility
 description: Xbox Accessibility Guidelines as best-practice guidance, game-specific a11y categories, CVAA scope, and low-cost high-impact features

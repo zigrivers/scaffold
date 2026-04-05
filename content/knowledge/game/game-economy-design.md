@@ -1,3 +1,4 @@
+<!-- eval-wip -->
 ---
 name: game-economy-design
 description: Virtual currency design, faucet/sink balancing, loot table probability, monetization models, and ethical monetization patterns

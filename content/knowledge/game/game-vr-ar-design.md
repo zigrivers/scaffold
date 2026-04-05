@@ -1,3 +1,4 @@
+<!-- eval-wip -->
 ---
 name: game-vr-ar-design
 description: VR comfort and locomotion, stereo rendering budgets, spatial UI, hand tracking, gaze interaction, motion sickness, and certification

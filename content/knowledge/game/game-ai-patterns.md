@@ -1,3 +1,4 @@
+<!-- eval-wip -->
 ---
 name: game-ai-patterns
 description: Behavior trees, GOAP, utility AI, finite state machines, NavMesh pathfinding, perception systems, and companion AI

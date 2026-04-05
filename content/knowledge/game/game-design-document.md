@@ -1,3 +1,4 @@
+<!-- eval-wip -->
 ---
 name: game-design-document
 description: GDD structure, game pillars, core loop design, mechanics documentation, and progression archetypes

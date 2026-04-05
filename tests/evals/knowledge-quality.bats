@@ -111,6 +111,7 @@ is_knowledge_template() {
   # Check each knowledge entry
   while IFS= read -r file; do
     local name
+    is_wip "$file" && continue
     name="$(extract_field "$file" "name")"
     [[ -z "$name" ]] && continue
     is_knowledge_template "$name" && continue

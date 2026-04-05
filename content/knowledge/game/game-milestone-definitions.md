@@ -1,3 +1,4 @@
+<!-- eval-wip -->
 ---
 name: game-milestone-definitions
 description: Standard game development milestones from concept through live ops, gate criteria, and task-wave mapping

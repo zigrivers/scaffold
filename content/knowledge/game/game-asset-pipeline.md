@@ -1,3 +1,4 @@
+<!-- eval-wip -->
 ---
 name: game-asset-pipeline
 description: Asset naming taxonomies by engine, per-type specs (poly budgets, texture sizes, audio formats), DCC tool chains, Git LFS config, and file locking

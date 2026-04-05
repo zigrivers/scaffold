@@ -1,3 +1,4 @@
+<!-- eval-wip -->
 ---
 name: game-engine-selection
 description: Engine evaluation framework, Unity vs Unreal vs Godot comparison, middleware selection, and platform considerations

@@ -1,3 +1,4 @@
+<!-- eval-wip -->
 ---
 name: game-domain-patterns
 description: ECS vs DDD as mutually exclusive per-layer patterns, game state machines, and domain modeling for games

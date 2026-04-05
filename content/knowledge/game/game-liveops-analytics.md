@@ -1,3 +1,4 @@
+<!-- eval-wip -->
 ---
 name: game-liveops-analytics
 description: Data taxonomy, telemetry pipelines, A/B testing, content cadence, seasonal events, post-launch support, and KPI-driven decision making

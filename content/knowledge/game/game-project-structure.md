@@ -1,3 +1,4 @@
+<!-- eval-wip -->
 ---
 name: game-project-structure
 description: Engine-specific directory conventions for Unity, Unreal, and Godot with asset and code organization strategies
