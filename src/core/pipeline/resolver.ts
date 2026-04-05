@@ -4,6 +4,7 @@ import { computeEligible } from '../dependency/eligibility.js'
 import { createOutputContext } from '../../cli/output/context.js'
 import type { OutputContext } from '../../cli/output/context.js'
 import type { StepEnablementEntry } from '../../types/config.js'
+import type { DepthLevel } from '../../types/index.js'
 import type { StepStateEntry } from '../../types/state.js'
 import type { MetaPromptFrontmatter } from '../../types/frontmatter.js'
 import type { OverlayState } from '../assembly/overlay-state-resolver.js'
@@ -24,7 +25,7 @@ export function resolvePipeline(
   const resolvedPreset = preset ?? {
     name: 'deep' as const,
     description: 'Default deep methodology',
-    default_depth: 3 as any,
+    default_depth: 3 as DepthLevel,
     steps: {} as Record<string, StepEnablementEntry>,
   }
 
