@@ -2,6 +2,17 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.4.1] — 2026-04-05
+
+### Added
+
+- **Comprehensive mmr documentation in README** — step-by-step setup guide for existing projects, full commands reference, `.mmr.yaml` config schema, severity levels, reconciliation rules, troubleshooting entries, and architecture overview.
+- **mmr Homebrew formula** — `brew tap zigrivers/scaffold && brew install mmr` available starting with this release.
+
+### Fixed
+
+- **npm publish workflow** — switched from OIDC trusted publishing to `NPM_TOKEN` secret for reliable automated publishing. Added mmr workspace publish step with graceful skip when version already exists.
+
 ## [3.4.0] — 2026-04-05
 
 ### Added
