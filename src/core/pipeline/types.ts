@@ -1,7 +1,7 @@
 // src/core/pipeline/types.ts
 import type { MetaPromptFile, MetaPromptFrontmatter } from '../../types/frontmatter.js'
 import type {
-  ScaffoldConfig, StepEnablementEntry, MethodologyPreset,
+  ScaffoldConfig, MethodologyPreset,
   DependencyGraph, ScaffoldError, ScaffoldWarning,
   StepStateEntry,
 } from '../../types/index.js'

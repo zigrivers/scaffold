@@ -13,13 +13,18 @@ export function loadPipelineContext(
   const pipelineDir = getPackagePipelineDir(projectRoot)
   const methodologyDir = getPackageMethodologyDir(projectRoot)
 
+  // Always discover pipeline steps first for config/preset validation
+  const pipelineMetaPrompts = discoverMetaPrompts(pipelineDir)
+  const pipelineStepNames = [...pipelineMetaPrompts.keys()]
+
+  // Optionally extend with tools for prompt lookup (run.ts needs tools)
   const metaPrompts = options?.includeTools
     ? discoverAllMetaPrompts(pipelineDir, getPackageToolsDir(projectRoot))
-    : discoverMetaPrompts(pipelineDir)
+    : pipelineMetaPrompts
 
-  const knownSteps = [...metaPrompts.keys()]
-  const { config, errors: configErrors, warnings: configWarnings } = loadConfig(projectRoot, knownSteps)
-  const { deep, mvp, custom } = loadAllPresets(methodologyDir, knownSteps)
+  // Validate config and presets against pipeline steps only (not tools)
+  const { config, errors: configErrors, warnings: configWarnings } = loadConfig(projectRoot, pipelineStepNames)
+  const { deep, mvp, custom } = loadAllPresets(methodologyDir, pipelineStepNames)
 
   return {
     projectRoot,
