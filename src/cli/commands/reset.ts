@@ -7,7 +7,8 @@ import { createOutputContext } from '../output/context.js'
 import { StateManager } from '../../state/state-manager.js'
 import { acquireLock, releaseLock } from '../../state/lock-manager.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
-import { buildComputeEligibleFn } from '../../utils/eligible.js'
+import { loadPipelineContext } from '../../core/pipeline/context.js'
+import { resolvePipeline } from '../../core/pipeline/resolver.js'
 
 interface ResetArgs {
   step?: string
@@ -78,7 +79,9 @@ async function resetStep(
   }
 
   try {
-    const stateManager = new StateManager(projectRoot, buildComputeEligibleFn(projectRoot))
+    const context = loadPipelineContext(projectRoot)
+    const pipeline = resolvePipeline(context)
+    const stateManager = new StateManager(projectRoot, pipeline.computeEligible)
     const state = stateManager.loadState()
 
     // Check step exists in state
