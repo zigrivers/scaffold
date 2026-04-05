@@ -8,7 +8,7 @@ dependencies: [review-prd]
 outputs: [docs/game-design.md]
 conditional: null
 reads: [create-vision, create-prd]
-knowledge-base: [game-design-document, game-milestone-definitions]
+knowledge-base: [game-design-document, game-milestone-definitions, game-domain-patterns, game-engine-selection, game-project-structure]
 ---
 
 ## Purpose

@@ -92,6 +92,7 @@ setup() {
 
   [[ "$checked" -gt 0 ]]
   # Allow missing — this is a gradual adoption check
-  # Current baseline: 38 of 40 non-build, non-conditional steps lack the section
-  [[ "${#missing[@]}" -le 40 ]]
+  # Current baseline: 50 of 52 non-build, non-conditional steps lack the section
+  # (includes 12 new game-dev pipeline steps)
+  [[ "${#missing[@]}" -le 52 ]]
 }

@@ -1,4 +1,3 @@
-<!-- eval-wip -->
 ---
 name: game-testing-strategy
 description: Simulation logic testing, visual and performance regression, soak testing, balance validation, playtest protocols, and CI integration

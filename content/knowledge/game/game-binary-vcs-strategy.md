@@ -1,4 +1,3 @@
-<!-- eval-wip -->
 ---
 name: game-binary-vcs-strategy
 description: Git LFS deep dive, Perforce and PlasticSCM comparison, large repo tuning, lock protocols, CI for binary assets, VCS selection guide

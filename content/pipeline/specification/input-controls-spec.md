@@ -8,7 +8,7 @@ dependencies: [game-design-document, game-accessibility]
 outputs: [docs/input-controls-spec.md]
 conditional: null
 reads: []
-knowledge-base: [game-input-systems]
+knowledge-base: [game-input-systems, game-vr-ar-design]
 ---
 
 ## Purpose

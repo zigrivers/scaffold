@@ -1,4 +1,3 @@
-<!-- eval-wip -->
 ---
 name: game-ui-patterns
 description: HUD patterns, menu hierarchy, controller-first navigation, settings screens, split-screen adaptation, and in-game commerce flows

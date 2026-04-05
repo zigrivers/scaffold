@@ -1,4 +1,3 @@
-<!-- eval-wip -->
 ---
 name: game-audio-design
 description: Wwise vs FMOD selection, bus hierarchy, spatial audio, adaptive music systems, VO pipeline, and platform loudness targets

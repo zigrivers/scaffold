@@ -7,7 +7,7 @@ order: 872
 dependencies: [system-architecture]
 outputs: [docs/modding-spec.md]
 conditional: "if-needed"
-reads: [game-design-document, security]
+reads: [game-design-document]
 knowledge-base: [game-modding-ugc]
 ---
 

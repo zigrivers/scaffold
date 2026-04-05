@@ -1,4 +1,3 @@
-<!-- eval-wip -->
 ---
 name: game-localization
 description: String management, font atlas pipeline, text expansion, subtitle standards, VO localization, culturalization, and LQA methodology

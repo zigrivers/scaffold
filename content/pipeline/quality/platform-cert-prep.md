@@ -8,7 +8,7 @@ dependencies: [game-accessibility, performance-budgets, game-ui-spec, input-cont
 outputs: [docs/platform-cert-checklist.md]
 conditional: "if-needed"
 reads: [save-system-spec, netcode-spec, audio-design, localization-plan, online-services-spec, modding-ugc-spec]
-knowledge-base: [game-platform-certification]
+knowledge-base: [game-platform-certification, review-platform-cert, game-vr-ar-design]
 ---
 
 ## Purpose

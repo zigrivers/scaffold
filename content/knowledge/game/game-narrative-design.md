@@ -1,4 +1,3 @@
-<!-- eval-wip -->
 ---
 name: game-narrative-design
 description: Dialogue tree patterns, branching narrative frameworks, lore bible structure, environmental storytelling, and localization hooks

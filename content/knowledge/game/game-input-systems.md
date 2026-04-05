@@ -1,4 +1,3 @@
-<!-- eval-wip -->
 ---
 name: game-input-systems
 description: Input abstraction patterns, action mapping, dead zones, aim assist, haptic feedback, cross-play fairness, and accessibility

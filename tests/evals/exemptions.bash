@@ -13,6 +13,13 @@ TERMINAL_OUTPUT_EXEMPT=(
   "automated-pr-review"
   "beads"
   "create-evals"
+  # Game development steps — terminal artifacts consumed by developers, not pipeline
+  "playtest-plan"
+  "platform-cert-prep"
+  "live-ops-plan"
+  "art-bible"
+  "modding-ugc-spec"
+  "ai-behavior-design"
 )
 
 # Output path patterns that are terminal by nature

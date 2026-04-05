@@ -1,4 +1,3 @@
-<!-- eval-wip -->
 ---
 name: game-networking
 description: Client-server and P2P architectures, tick rates, client prediction, server reconciliation, lag compensation, and anti-cheat

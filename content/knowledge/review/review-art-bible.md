@@ -1,4 +1,3 @@
-<!-- eval-wip -->
 ---
 name: review-art-bible
 description: Failure modes and review passes specific to Art Bible documents — budget consistency, naming conventions, LOD coverage, and pipeline validation

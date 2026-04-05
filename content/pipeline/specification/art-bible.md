@@ -8,7 +8,7 @@ dependencies: [game-design-document, performance-budgets, content-structure-desi
 outputs: [docs/art-bible.md]
 conditional: null
 reads: []
-knowledge-base: [game-asset-pipeline, game-performance-budgeting]
+knowledge-base: [game-asset-pipeline, game-performance-budgeting, game-binary-vcs-strategy, review-art-bible]
 ---
 
 ## Purpose
