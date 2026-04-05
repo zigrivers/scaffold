@@ -114,7 +114,7 @@ describe('loadOverlay', () => {
     ].join('\n'))
 
     try {
-      const { overlay, errors, warnings } = loadOverlay(tmpFile)
+      const { overlay, errors: _errors, warnings } = loadOverlay(tmpFile)
       // Should still load (gracefully degrade) but warn
       expect(warnings.length).toBeGreaterThan(0)
       expect(warnings[0].code).toBe('OVERLAY_MALFORMED_SECTION')

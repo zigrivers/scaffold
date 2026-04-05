@@ -24,7 +24,9 @@ export const GameConfigSchema = z.object({
   economy: z.enum(['none', 'progression', 'monetized', 'both']).default('none'),
   onlineServices: z.array(z.enum(['leaderboards', 'accounts', 'matchmaking', 'live-ops'])).default([]),
   persistence: z.enum(['none', 'settings-only', 'profile', 'progression', 'cloud']).default('progression'),
-  targetPlatforms: z.array(z.enum(['pc', 'web', 'ios', 'android', 'ps5', 'xbox', 'switch', 'vr', 'ar'])).default(['pc']),
+  targetPlatforms: z.array(
+    z.enum(['pc', 'web', 'ios', 'android', 'ps5', 'xbox', 'switch', 'vr', 'ar']),
+  ).default(['pc']),
   supportedLocales: z.array(z.string()).default(['en']),
   hasModding: z.boolean().default(false),
   npcAiComplexity: z.enum(['none', 'simple', 'complex']).default('none'),

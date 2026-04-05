@@ -1,4 +1,7 @@
-import type { MethodologyPreset, ProjectTypeOverlay, KnowledgeOverride, ReadsOverride, DependencyOverride } from '../../types/index.js'
+import type { MethodologyPreset } from '../../types/index.js'
+import type {
+  ProjectTypeOverlay, KnowledgeOverride, ReadsOverride, DependencyOverride,
+} from '../../types/index.js'
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
 import { fileExists } from '../../utils/fs.js'
 import {
@@ -378,10 +381,14 @@ export function loadOverlay(
     }
   }
 
-  const stepOverridesRaw = isPlainObject(obj['step-overrides']) ? obj['step-overrides'] as Record<string, unknown> : {}
-  const knowledgeOverridesRaw = isPlainObject(obj['knowledge-overrides']) ? obj['knowledge-overrides'] as Record<string, unknown> : {}
-  const readsOverridesRaw = isPlainObject(obj['reads-overrides']) ? obj['reads-overrides'] as Record<string, unknown> : {}
-  const dependencyOverridesRaw = isPlainObject(obj['dependency-overrides']) ? obj['dependency-overrides'] as Record<string, unknown> : {}
+  const stepOverridesRaw = isPlainObject(obj['step-overrides'])
+    ? obj['step-overrides'] as Record<string, unknown> : {}
+  const knowledgeOverridesRaw = isPlainObject(obj['knowledge-overrides'])
+    ? obj['knowledge-overrides'] as Record<string, unknown> : {}
+  const readsOverridesRaw = isPlainObject(obj['reads-overrides'])
+    ? obj['reads-overrides'] as Record<string, unknown> : {}
+  const dependencyOverridesRaw = isPlainObject(obj['dependency-overrides'])
+    ? obj['dependency-overrides'] as Record<string, unknown> : {}
 
   const overlay: ProjectTypeOverlay = {
     name: (obj['name'] as string).trim(),
