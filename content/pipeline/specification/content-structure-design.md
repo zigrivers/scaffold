@@ -104,6 +104,7 @@ loop, and mechanics catalog.
 - (deep) Replayability analysis: what drives repeat engagement (procedural variety, optional objectives, difficulty modes)
 - (deep) Content pipeline documented: authoring workflow from design to engine-ready format
 - (deep) Pacing analysis with annotated intensity curves showing moment-to-moment and session-level rhythm
+- (mvp) Type-specific deliverable produced matching the identified content structure trait: level-designs.md (discrete), world-regions.md (open-world), generation-rulesets.md (procedural), escalation-bands.md (endless), or mission-templates.md (mission-based)
 
 ## Methodology Scaling
 - **deep**: Full content structure specification with all trait-specific

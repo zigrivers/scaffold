@@ -36,7 +36,7 @@ update mode.
 ## Inputs
 - docs/game-design.md (required) — mechanics, core loop, world setting, emotional tone informing audio direction
 - docs/performance-budgets.md (required) — audio memory budget, CPU budget for audio processing, streaming constraints
-- docs/content-structure-design.md (required) — audio asset directory structure, naming taxonomy
+- docs/content-structure/ (required) — audio asset directory structure, naming taxonomy
 - docs/plan.md (required) — target platforms informing loudness targets and format requirements
 - docs/narrative-bible.md (optional, forward-read) — character roster, dialogue structure, VO volume and language requirements
 
@@ -56,6 +56,7 @@ update mode.
 - (deep) Audio format matrix per platform: codec (Vorbis, Opus, ADPCM, platform-native), quality settings, streaming chunk size
 - (deep) Dynamic range management: compressor/limiter settings per bus, ducking rules (VO ducks music, gameplay SFX ducks ambient)
 - (deep) Accessibility audio: audio descriptions, mono downmix option, visual indicators for critical audio cues
+- (deep) SFX variation strategy documented: minimum variant count per sound event category, randomization rules (no-repeat, round-robin, weighted random), pitch and volume variation ranges
 
 ## Methodology Scaling
 - **deep**: Full audio design with style guide, complete SFX taxonomy with

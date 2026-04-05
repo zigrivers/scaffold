@@ -7,7 +7,7 @@ order: 715
 dependencies: [system-architecture]
 outputs: [docs/netcode-spec.md]
 conditional: "if-needed"
-reads: [tech-stack, performance-budgets]
+reads: [tech-stack, performance-budgets, game-design-document]
 knowledge-base: [game-networking]
 ---
 
