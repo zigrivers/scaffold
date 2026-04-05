@@ -80,7 +80,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     // -----------------------------------------------------------------------
     const context = loadPipelineContext(projectRoot, { includeTools: true })
     if (!context.config) {
-      for (const err of context.configErrors) output.error(err.message)
+      displayErrors(context.configErrors, context.configWarnings, output)
       process.exit(1)
       return
     }

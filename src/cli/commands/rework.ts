@@ -2,6 +2,7 @@ import type { CommandModule, Argv } from 'yargs'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
+import { displayErrors } from '../output/error-display.js'
 import { acquireLock, releaseLock } from '../../state/lock-manager.js'
 import { ReworkManager } from '../../state/rework-manager.js'
 import { StateManager } from '../../state/state-manager.js'
@@ -270,7 +271,7 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
       // Load pipeline context and resolve overlay/graph
       const context = loadPipelineContext(projectRoot as string)
       if (!context.config) {
-        for (const err of context.configErrors) output.error(err.message)
+        displayErrors(context.configErrors, context.configWarnings, output)
         process.exit(1)
         return
       }
