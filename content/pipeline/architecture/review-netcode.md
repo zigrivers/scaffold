@@ -7,7 +7,7 @@ order: 716
 dependencies: [netcode-spec]
 outputs: [docs/reviews/architecture-review-netcode.md]
 conditional: "if-needed"
-reads: []
+reads: [performance-budgets, system-architecture, game-design-document]
 knowledge-base: [review-netcode, review-step-template, multi-model-review-dispatch]
 ---
 
@@ -54,8 +54,8 @@ Skip when: netcode-spec is skipped (i.e., `multiplayerMode` is `none` or
 
 ## Methodology Scaling
 - **deep**: All 7 review passes (Latency Tolerance, Bandwidth Compliance,
-  Cheat Surface Audit, Determinism Verification, Connection Edge Cases,
-  Serialization Size Audit, Architecture Cross-Reference). Multi-model
+  Cheat Surface Audit, Determinism Verification, Disconnect/Reconnect Handling,
+  Matchmaking Fairness Assessment, Bandwidth Spike Resilience). Multi-model
   review dispatched to Codex and Gemini if available, with graceful fallback
   to Claude-only enhanced review.
 - **mvp**: Three passes — Latency Tolerance, Bandwidth Compliance, and Cheat
