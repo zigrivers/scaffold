@@ -48,7 +48,7 @@ acquisition for mutating commands, before display for read-only commands).
 interface PipelineContext {
   projectRoot: string
   metaPrompts: Map<string, MetaPromptFile>
-  config: ScaffoldConfig
+  config: ScaffoldConfig | null
   configErrors: ScaffoldError[]
   presets: {
     mvp: MethodologyPreset | null
@@ -78,6 +78,8 @@ at the appropriate time (after lock acquisition for mutating commands) and
 call `pipeline.computeEligible(state.steps)` to get eligibility. No
 pre-computed `eligible` array — it would be stale after state reconciliation
 or lock-protected mutations.
+
+`stepMeta` extracts frontmatter from `metaPrompts`, omitting the raw markdown content. Commands that need step descriptions (like `next.ts` displaying step summaries) use this map.
 
 `overlay` contains `steps`, `knowledge`, `reads`, and `dependencies` maps. Commands that need overlay data (primarily `run.ts` for knowledge injection, reads assembly, and dependency overrides) access it directly. Commands that don't need it ignore it.
 
@@ -115,9 +117,17 @@ export function resolvePipeline(
 
 Resolution sequence:
 
-1. **Select preset** from `context.config.methodology` (mvp / custom / deep, fallback to deep)
-2. **Apply custom enablement overrides** — for each entry in `config.custom?.steps`, if `enabled` is defined, override the selected preset step's `enabled` field. Only enablement is merged here; depth remains the responsibility of `resolveDepth()`. Precedence: custom enablement > preset default > disabled. This fixes the current bug where custom step enablement is silently ignored.
-3. **Resolve overlay** — call existing `resolveOverlayState()` with merged steps. Precedence becomes: overlay > custom enablement > preset > disabled.
+1. **Select preset** from `context.config.methodology` (mvp / custom / deep, fallback to deep). If `context.config` is null (config loading failed), default to `deep` preset, skip custom overrides (step 2), and skip overlay resolution (step 3) — matching current `status.ts`/`next.ts` graceful degradation behavior.
+2. **Apply custom enablement overrides** — for each entry in `config.custom?.steps`, if `enabled` is defined, override the selected preset step's `enabled` field while preserving the preset's `conditional` value. The merge produces `mergedSteps: Record<string, StepEnablementEntry>`:
+   ```typescript
+   for (const [name, customStep] of Object.entries(config.custom?.steps ?? {})) {
+     if (customStep.enabled !== undefined) {
+       mergedSteps[name] = { ...presetSteps[name], enabled: customStep.enabled }
+     }
+   }
+   ```
+   Only enablement is merged; `CustomStepConfig.depth` is handled separately by `resolveDepth()`. Precedence: custom enablement > preset default > disabled. This fixes the current bug where custom step enablement is silently ignored.
+3. **Resolve overlay** — pass `mergedSteps` as `presetSteps` to existing `resolveOverlayState()`. Precedence becomes: overlay > custom enablement > preset > disabled.
 4. **Build graph** — convert `overlay.steps` to a `Map<string, { enabled: boolean }>` via `new Map(Object.entries(overlay.steps))`, then call `buildGraph()` once with overlay-aware enablement. **Note:** Overlay dependency overrides (`overlay.dependencies`) are not fed into graph construction — `buildGraph()` uses frontmatter dependencies. Only `run.ts` consults overlay dependency overrides at runtime (for dep-check and artifact gathering). This is an existing limitation; extending `buildGraph()` to accept resolved dependencies is out of scope for this refactor but could be a follow-up.
 5. **Build stepMeta** — extract frontmatter map from meta-prompts.
 6. **Build computeEligible closure** — captures graph, returns `(steps) => computeEligible(graph, steps)`.
