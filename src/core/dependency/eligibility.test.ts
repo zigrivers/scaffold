@@ -1,3 +1,7 @@
+// NOTE: These tests cover core eligibility logic including overlay-disabled deps.
+// Full integration testing of eligibility with overlay-resolved state (e.g., game
+// overlay changing which steps are enabled/disabled) is covered by E2E tests.
+
 import { describe, it, expect } from 'vitest'
 import type { MetaPromptFrontmatter, StepStateEntry } from '../../types/index.js'
 import { buildGraph } from './graph.js'

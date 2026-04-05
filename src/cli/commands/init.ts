@@ -13,6 +13,7 @@ interface InitArgs {
   force?: boolean
   idea?: string
   methodology?: string
+  'project-type'?: string
 }
 
 const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
@@ -24,6 +25,11 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       .option('force', { type: 'boolean', default: false, describe: 'Back up and reinitialize if .scaffold/ exists' })
       .option('auto', { type: 'boolean', default: false, describe: 'Non-interactive mode' })
       .option('methodology', { type: 'string', describe: 'Preset methodology (deep/mvp/custom)' })
+      .option('project-type', {
+        type: 'string',
+        describe: 'Project type (web-app/mobile-app/backend/cli/library/game)',
+        choices: ['web-app', 'mobile-app', 'backend', 'cli', 'library', 'game'],
+      })
       .option('idea', { type: 'string', describe: 'One-line project idea for methodology suggestion' })
       .option('format', { type: 'string', describe: 'Output format (json/auto/interactive)' })
       .option('verbose', { type: 'boolean', default: false, describe: 'Verbose output' }) as Argv<InitArgs>
@@ -38,6 +44,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       auto: argv.auto ?? false,
       force: argv.force ?? false,
       methodology: argv.methodology,
+      projectType: argv['project-type'],
       idea: argv.idea,
       output,
     })

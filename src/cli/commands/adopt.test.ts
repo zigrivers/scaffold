@@ -278,7 +278,38 @@ describe('adopt command', () => {
     expect(exitSpy).toHaveBeenCalledWith(0)
   })
 
-  // Test 6: Marks matched steps as completed in state
+  // Test 6: Writes detected game config to config.yml (even when config doesn't exist)
+  it('writes projectType and gameConfig to config.yml when game detected', async () => {
+    // Create .scaffold/ dir in tmpDir but no config.yml
+    const scaffoldDir = path.join(tmpDir, '.scaffold')
+    fs.mkdirSync(scaffoldDir, { recursive: true })
+    // No state.json either — triggers initializeState path
+    mockFindProjectRoot.mockReturnValue(tmpDir)
+
+    mockRunAdoption.mockReturnValue({
+      mode: 'brownfield',
+      artifactsFound: 1,
+      detectedArtifacts: [],
+      stepsCompleted: [],
+      stepsRemaining: [],
+      methodology: 'deep',
+      errors: [],
+      warnings: [],
+      projectType: 'game',
+      gameConfig: { engine: 'unity' },
+    })
+
+    await adoptCommand.handler(defaultArgv({ 'dry-run': false }))
+
+    const configPath = path.join(scaffoldDir, 'config.yml')
+    expect(fs.existsSync(configPath)).toBe(true)
+    const configContent = fs.readFileSync(configPath, 'utf8')
+    expect(configContent).toContain('projectType: game')
+    expect(configContent).toContain('engine: unity')
+    expect(exitSpy).toHaveBeenCalledWith(0)
+  })
+
+  // Test 7: Marks matched steps as completed in state
   it('marks stepsCompleted in state when state.json exists', async () => {
     // Create .scaffold/state.json in tmpDir so fs.existsSync returns true
     const scaffoldDir = path.join(tmpDir, '.scaffold')

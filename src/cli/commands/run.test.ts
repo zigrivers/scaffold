@@ -1398,6 +1398,12 @@ describe('run command handler', () => {
       })
       vi.mocked(loadConfig).mockReturnValue({ config, errors: [], warnings: [] })
 
+      // fs.existsSync must return true for the overlay file so the resolver proceeds
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        if (String(p).includes('game-overlay.yml')) return true
+        return false
+      })
+
       const gameOverlay: ProjectTypeOverlay = {
         name: 'game',
         description: 'Game overlay',

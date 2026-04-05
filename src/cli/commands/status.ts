@@ -10,6 +10,7 @@ import { StateManager } from '../../state/state-manager.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { getPackagePipelineDir, getPackageMethodologyDir } from '../../utils/fs.js'
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
+import { resolveOverlayState } from '../../core/assembly/overlay-state-resolver.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { computeEligible } from '../../core/dependency/eligibility.js'
 import { PHASES } from '../../types/frontmatter.js'
@@ -109,7 +110,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     const knownSteps = [...metaPrompts.keys()]
     const { config } = loadConfig(projectRoot, knownSteps)
 
-    // 4. Load methodology preset for correct eligibility computation
+    // 4. Load methodology preset and apply project-type overlay
     const methodologyDir = getPackageMethodologyDir(projectRoot)
     const presets = loadAllPresets(methodologyDir, [...metaPrompts.keys()])
     const configMethodology =
@@ -119,7 +120,18 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       : configMethodology === 'custom'
         ? presets.custom ?? presets.deep
         : presets.deep
-    const presetSteps = new Map(Object.entries(preset?.steps ?? {}))
+
+    // Apply project-type overlay (e.g., game overlay) if configured
+    const overlayState = config
+      ? resolveOverlayState({
+        config,
+        methodologyDir,
+        metaPrompts,
+        presetSteps: preset?.steps ?? {},
+        output,
+      })
+      : { steps: preset?.steps ?? {} }
+    const presetSteps = new Map(Object.entries(overlayState.steps))
 
     const computeEligibleFn = (steps: Parameters<typeof computeEligible>[1]) => {
       const graph = buildGraph(
@@ -136,7 +148,9 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     const pipelineSteps = [...metaPrompts.values()].map(m => ({
       slug: m.frontmatter.name,
       produces: m.frontmatter.outputs,
-      enabled: presetSteps.get(m.frontmatter.name)?.enabled ?? true,
+      // Steps not in overlay/preset map are disabled. This requires presets to enumerate
+      // all known pipeline steps (which they do — see deep.yml/mvp.yml/custom-defaults.yml).
+      enabled: presetSteps.get(m.frontmatter.name)?.enabled ?? false,
     }))
     stateManager.reconcileWithPipeline(pipelineSteps)
 

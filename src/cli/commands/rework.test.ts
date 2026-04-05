@@ -84,6 +84,12 @@ function makeReworkSession(overrides: Record<string, unknown> = {}): Record<stri
 // Tests
 // ---------------------------------------------------------------------------
 
+// NOTE: Overlay-aware rework behavior (e.g., game overlay affecting which steps
+// are included in a rework session) is not tested here in isolation. Integration
+// coverage is provided by the game pipeline E2E tests. A focused unit test for
+// overlay-aware step selection in rework would require mocking the full preset +
+// overlay loading chain, which is better covered at the integration level.
+
 describe('rework command', () => {
   let exitSpy: MockInstance
   let writtenLines: string[]

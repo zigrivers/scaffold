@@ -229,7 +229,15 @@ describe('init command', () => {
     )
   })
 
-  // Test 6: Creates .scaffold/ in correct location (uses process.cwd() when root not given)
+  // Test 6: --project-type flag is passed through to wizard
+  it('passes project-type flag to wizard', async () => {
+    await initCommand.handler(defaultArgv({ root: tmpDir, 'project-type': 'game' } as Partial<InitArgv>))
+    expect(mockRunWizard).toHaveBeenCalledWith(
+      expect.objectContaining({ projectType: 'game' }),
+    )
+  })
+
+  // Test 7: Creates .scaffold/ in correct location (uses process.cwd() when root not given)
   it('uses process.cwd() as projectRoot when root not provided', async () => {
     const cwd = process.cwd()
     mockRunWizard.mockResolvedValue(makeSuccessResult(cwd))

@@ -2,6 +2,21 @@
 
 All notable changes to Scaffold are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **Game development pipeline support** — new `game` project type with 24 pipeline steps, 29 knowledge entries, and a project-type overlay system.
+  - `scaffold init --project-type game` for non-interactive game project setup
+  - Progressive-disclosure wizard for game configuration (engine, multiplayer, platforms, economy, narrative, etc.)
+  - Game Design Document (GDD), performance budgets, art bible, audio design, netcode spec, game accessibility, economy design, and 17 more documentation steps
+  - `scaffold adopt` detects Unity (.meta), Unreal (.uproject), and Godot (project.godot) projects
+  - Project-type overlay architecture extensible to future project types
+- **Overlay system** — `game-overlay.yml` layers step enablement, knowledge injection, reads remapping, and dependency adjustments on any methodology preset (mvp/deep/custom).
+- **Wizard UI primitives** — `select()`, `multiSelect()`, `multiInput()` methods on OutputContext for richer init wizard interactions.
+- **Reads assembly** — `reads` frontmatter field now wired into prompt assembly context (non-blocking artifact gathering).
+- **Centralized overlay resolution** — all commands (run, status, next, rework, complete, skip, reset) are overlay-aware for game projects.
+
 ## [3.4.1] — 2026-04-05
 
 ### Added

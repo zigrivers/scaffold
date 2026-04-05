@@ -1,6 +1,7 @@
 import type { CommandModule, Argv } from 'yargs'
 import fs from 'node:fs'
 import path from 'node:path'
+import yaml from 'js-yaml'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
@@ -99,6 +100,28 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
         }
       }
 
+      // Write detected game config into config.yml
+      if (!dryRun && adoptResult.projectType) {
+        const configPath = path.join(projectRoot, '.scaffold', 'config.yml')
+        let raw: Record<string, unknown> = {}
+        if (fs.existsSync(configPath)) {
+          try {
+            const content = fs.readFileSync(configPath, 'utf8')
+            const parsed = yaml.load(content)
+            if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+              raw = parsed as Record<string, unknown>
+            }
+          } catch { /* start fresh if parse fails */ }
+        }
+        const project = (raw['project'] ?? {}) as Record<string, unknown>
+        project['projectType'] = adoptResult.projectType
+        if (adoptResult.gameConfig) {
+          project['gameConfig'] = adoptResult.gameConfig
+        }
+        raw['project'] = project
+        fs.writeFileSync(configPath, yaml.dump(raw), 'utf8')
+      }
+
       const resultData = {
         mode: adoptResult.mode,
         artifacts_found: adoptResult.artifactsFound,
@@ -106,6 +129,8 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
         steps_remaining: adoptResult.stepsRemaining,
         methodology: adoptResult.methodology,
         dry_run: dryRun,
+        ...(adoptResult.projectType && { project_type: adoptResult.projectType }),
+        ...(adoptResult.gameConfig && { game_config: adoptResult.gameConfig }),
       }
 
       if (outputMode === 'json') {

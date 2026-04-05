@@ -8,6 +8,7 @@ import { StateManager } from '../../state/state-manager.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { getPackagePipelineDir, getPackageMethodologyDir } from '../../utils/fs.js'
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
+import { resolveOverlayState } from '../../core/assembly/overlay-state-resolver.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { computeEligible } from '../../core/dependency/eligibility.js'
 
@@ -47,19 +48,31 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     const output = createOutputContext(outputMode)
 
     // 2. Load config and discover meta-prompts
-    const { config } = loadConfig(projectRoot, [])
     const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))
+    const knownSteps = [...metaPrompts.keys()]
+    const { config } = loadConfig(projectRoot, knownSteps)
 
-    // 3. Load methodology preset (same as run.ts) for correct eligibility
+    // 3. Load methodology preset and apply project-type overlay
     const methodologyDir = getPackageMethodologyDir(projectRoot)
-    const presets = loadAllPresets(methodologyDir, [...metaPrompts.keys()])
+    const presets = loadAllPresets(methodologyDir, knownSteps)
     const methodology = (config as Record<string, unknown>)?.methodology as string ?? 'deep'
     const preset = methodology === 'mvp'
       ? presets.mvp
       : methodology === 'custom'
         ? presets.custom ?? presets.deep
         : presets.deep
-    const presetSteps = new Map(Object.entries(preset?.steps ?? {}))
+
+    // Apply project-type overlay (e.g., game overlay) if configured
+    const overlayState = config
+      ? resolveOverlayState({
+        config,
+        methodologyDir,
+        metaPrompts,
+        presetSteps: preset?.steps ?? {},
+        output,
+      })
+      : { steps: preset?.steps ?? {} }
+    const presetSteps = new Map(Object.entries(overlayState.steps))
 
     // 4. Build graph with preset and compute eligible
     const computeEligibleFn = (steps: Parameters<typeof computeEligible>[1]) => {
@@ -77,7 +90,9 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     const pipelineSteps = [...metaPrompts.values()].map(m => ({
       slug: m.frontmatter.name,
       produces: m.frontmatter.outputs,
-      enabled: presetSteps.get(m.frontmatter.name)?.enabled ?? true,
+      // Steps not in overlay/preset map are disabled. This requires presets to enumerate
+      // all known pipeline steps (which they do — see deep.yml/mvp.yml/custom-defaults.yml).
+      enabled: presetSteps.get(m.frontmatter.name)?.enabled ?? false,
     }))
     stateManager.reconcileWithPipeline(pipelineSteps)
 

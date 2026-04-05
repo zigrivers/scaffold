@@ -1,0 +1,91 @@
+import path from 'node:path'
+import fs from 'node:fs'
+import type { ScaffoldConfig, StepEnablementEntry } from '../../types/index.js'
+import type { MetaPromptFrontmatter } from '../../types/frontmatter.js'
+import type { OutputContext } from '../../cli/output/context.js'
+import { loadOverlay } from './overlay-loader.js'
+import { applyOverlay } from './overlay-resolver.js'
+
+export interface OverlayState {
+  steps: Record<string, StepEnablementEntry>
+  knowledge: Record<string, string[]>
+  reads: Record<string, string[]>
+  dependencies: Record<string, string[]>
+}
+
+/**
+ * Resolve overlay state by building maps from meta-prompt frontmatter,
+ * then optionally loading and applying a project-type overlay.
+ *
+ * Centralizes the logic previously inline in run.ts (Step 2b) so that
+ * status, next, rework, and other commands can share the same resolution.
+ */
+export function resolveOverlayState(options: {
+  config: ScaffoldConfig
+  methodologyDir: string
+  metaPrompts: Map<string, { frontmatter: MetaPromptFrontmatter }>
+  presetSteps: Record<string, StepEnablementEntry>
+  output: OutputContext
+}): OverlayState {
+  const { config, methodologyDir, metaPrompts, presetSteps, output } = options
+
+  // Build maps from meta-prompt frontmatter
+  const knowledgeMap: Record<string, string[]> = {}
+  const readsMap: Record<string, string[]> = {}
+  const dependencyMap: Record<string, string[]> = {}
+  for (const [name, mp] of metaPrompts) {
+    knowledgeMap[name] = [...(mp.frontmatter.knowledgeBase ?? [])]
+    readsMap[name] = [...(mp.frontmatter.reads ?? [])]
+    dependencyMap[name] = [...(mp.frontmatter.dependencies ?? [])]
+  }
+
+  // Start with preset defaults
+  let overlaySteps = { ...presetSteps }
+  let overlayKnowledge = knowledgeMap
+  let overlayReads = readsMap
+  let overlayDependencies = dependencyMap
+
+  // Load and apply project-type overlay if configured
+  const projectType = config.project?.projectType
+  if (projectType) {
+    const overlayPath = path.join(methodologyDir, `${projectType}-overlay.yml`)
+
+    // Only attempt overlay loading when an overlay file actually exists.
+    // Most project types (backend, cli, library, etc.) don't have overlays —
+    // silently return defaults instead of emitting misleading warnings.
+    if (!fs.existsSync(overlayPath)) {
+      return { steps: { ...presetSteps }, knowledge: knowledgeMap, reads: readsMap, dependencies: dependencyMap }
+    }
+
+    const { overlay, errors: overlayErrors, warnings: overlayWarnings } = loadOverlay(overlayPath)
+    for (const w of overlayWarnings) {
+      output.warn(w)
+    }
+    // Overlay errors are non-fatal — warn but continue without overlay
+    if (overlayErrors.length > 0) {
+      for (const err of overlayErrors) {
+        output.warn(`[${err.code}] ${err.message}${err.recovery ? ` — ${err.recovery}` : ''}`)
+      }
+    }
+    if (overlay) {
+      const merged = applyOverlay(
+        overlaySteps,
+        knowledgeMap,
+        readsMap,
+        dependencyMap,
+        overlay,
+      )
+      overlaySteps = merged.steps
+      overlayKnowledge = merged.knowledge
+      overlayReads = merged.reads
+      overlayDependencies = merged.dependencies
+    }
+  }
+
+  return {
+    steps: overlaySteps,
+    knowledge: overlayKnowledge,
+    reads: overlayReads,
+    dependencies: overlayDependencies,
+  }
+}

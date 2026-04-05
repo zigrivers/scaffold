@@ -148,4 +148,87 @@ describe('askWizardQuestions', () => {
     expect(output.select).not.toHaveBeenCalled()
     expect(output.confirm).not.toHaveBeenCalled()
   })
+
+  it('--project-type game --auto produces valid gameConfig with Zod defaults', async () => {
+    const output = makeOutputContext()
+
+    const result = await askWizardQuestions({
+      output,
+      suggestion: 'deep',
+      methodology: 'deep',
+      auto: true,
+      projectType: 'game',
+    })
+
+    expect(result.projectType).toBe('game')
+    expect(result.gameConfig).toBeDefined()
+    // Zod defaults from GameConfigSchema.parse({ engine: 'custom' })
+    expect(result.gameConfig!.engine).toBe('custom')
+    expect(result.gameConfig!.multiplayerMode).toBe('none')
+    expect(result.gameConfig!.narrative).toBe('none')
+    expect(result.gameConfig!.contentStructure).toBe('discrete')
+    expect(result.gameConfig!.economy).toBe('none')
+    expect(result.gameConfig!.persistence).toBe('progression')
+    // No interactive prompts should have been called
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.confirm).not.toHaveBeenCalled()
+  })
+
+  it('--project-type web-app skips game questions entirely', async () => {
+    const output = makeOutputContext()
+    vi.mocked(output.confirm)
+      .mockResolvedValueOnce(false)   // Codex
+      .mockResolvedValueOnce(false)   // Gemini
+      .mockResolvedValueOnce(false)   // web
+      .mockResolvedValueOnce(false)   // mobile
+
+    const result = await askWizardQuestions({
+      output,
+      suggestion: 'deep',
+      methodology: 'deep',
+      auto: false,
+      projectType: 'web-app',
+    })
+
+    expect(result.projectType).toBe('web-app')
+    expect(result.gameConfig).toBeUndefined()
+    // select should NOT have been called — projectType was pre-set
+    expect(output.select).not.toHaveBeenCalled()
+  })
+
+  it('--project-type game (interactive) skips projectType select but still asks game questions', async () => {
+    const output = makeOutputContext()
+    vi.mocked(output.confirm)
+      .mockResolvedValueOnce(false)   // Codex
+      .mockResolvedValueOnce(false)   // Gemini
+      .mockResolvedValueOnce(false)   // web
+      .mockResolvedValueOnce(false)   // mobile
+      .mockResolvedValueOnce(false)   // advanced options
+    vi.mocked(output.select)
+      .mockResolvedValueOnce('unity')    // engine
+      .mockResolvedValueOnce('local')    // multiplayer
+      .mockResolvedValueOnce('open-world') // contentStructure
+      .mockResolvedValueOnce('progression') // economy
+    vi.mocked(output.multiSelect)
+      .mockResolvedValueOnce(['pc', 'ps5'])  // targetPlatforms
+
+    const result = await askWizardQuestions({
+      output,
+      suggestion: 'deep',
+      methodology: 'deep',
+      auto: false,
+      projectType: 'game',
+    })
+
+    expect(result.projectType).toBe('game')
+    expect(result.gameConfig).toBeDefined()
+    expect(result.gameConfig!.engine).toBe('unity')
+    expect(result.gameConfig!.multiplayerMode).toBe('local')
+    expect(result.gameConfig!.targetPlatforms).toEqual(['pc', 'ps5'])
+    // select was called for game sub-questions but NOT for projectType itself
+    // engine, multiplayer, contentStructure, economy = 4 calls
+    expect(output.select).toHaveBeenCalledTimes(4)
+    // First select call should be engine, not projectType
+    expect(output.select).toHaveBeenNthCalledWith(1, 'Game engine:', ['unity', 'unreal', 'godot', 'custom'])
+  })
 })
