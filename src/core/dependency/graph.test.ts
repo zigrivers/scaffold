@@ -382,6 +382,18 @@ describe('buildGraph with dependencyMap', () => {
     expect(graph.edges.has('nonexistent')).toBe(false)
   })
 
+  it('excludes tool entries from nodes and edges even with dependencyMap', () => {
+    const fms = [
+      makeFm('step-a', 'pre', 1, []),
+      { ...makeFm('my-tool', 'pre', 2, ['step-a']), category: 'tool' as const },
+    ]
+    const preset = new Map([['step-a', { enabled: true }]])
+    const depMap = { 'step-a': [], 'my-tool': ['step-a'] }
+    const graph = buildGraph(fms, preset, depMap)
+    expect(graph.nodes.has('my-tool')).toBe(false)
+    expect(graph.edges.get('step-a')).not.toContain('my-tool')
+  })
+
   it('without dependencyMap, behavior is unchanged (backward compat)', () => {
     const fms = [
       makeFm('a', 'pre', 1, ['b']),
