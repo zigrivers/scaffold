@@ -356,6 +356,23 @@ scaffold dashboard           # open a visual progress dashboard in your browser
 - **The pipeline is a guide, not a cage.** Skip steps that don't apply (`scaffold skip <step> --reason "..."`). Run them out of order if you know what you're doing. Scaffold tracks dependencies so it'll tell you if you're missing a prerequisite.
 - **Depth controls thoroughness.** Each step runs at a depth from 1 (focused, fast) to 5 (exhaustive). The mvp preset defaults to depth 1; deep defaults to 5. You can override per step or per session: `"Use depth 3 for everything"`.
 
+### Game Development
+
+Scaffold supports game development projects with specialized pipeline steps for game design documents, performance budgets, art bibles, audio design, netcode, and more.
+
+```bash
+# Initialize a game project interactively
+scaffold init
+
+# Or non-interactively with defaults
+scaffold init --project-type game --auto
+
+# Adopt an existing game project (auto-detects Unity/Unreal/Godot)
+scaffold adopt
+```
+
+The game pipeline adds 24 documentation steps covering game design, technical specs, art/audio, player experience, and platform certification. All standard pipeline features (status, next, rework, multi-model review) work with game projects.
+
 ## The Pipeline
 
 ### Phase 0 — Product Vision (vision)
