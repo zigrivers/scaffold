@@ -54,7 +54,7 @@ export interface DependencyOverride {
 export interface ProjectTypeOverlay {
   name: string
   description: string
-  projectType: string
+  projectType: ProjectType
   stepOverrides: Record<string, { enabled: boolean; conditional?: 'if-needed' }>
   knowledgeOverrides: Record<string, KnowledgeOverride>
   readsOverrides: Record<string, ReadsOverride>

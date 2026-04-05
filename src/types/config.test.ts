@@ -1,6 +1,6 @@
 // src/types/config.test.ts
 import { describe, it, expect } from 'vitest'
-import type { ProjectConfig, GameConfig, ProjectType } from './config.js'
+import type { ProjectConfig, GameConfig } from './config.js'
 
 describe('GameConfig type', () => {
   it('accepts a valid game config', () => {
