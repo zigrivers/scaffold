@@ -60,7 +60,7 @@ export function resolvePipeline(
   const presetStepsMap = new Map(
     Object.entries(overlay.steps).map(([k, v]) => [k, { enabled: v.enabled }]),
   )
-  const graph = buildGraph(frontmatters, presetStepsMap)
+  const graph = buildGraph(frontmatters, presetStepsMap, overlay.dependencies)
 
   // 5. Build stepMeta
   const stepMeta = new Map<string, MetaPromptFrontmatter>()

@@ -311,3 +311,97 @@ describe('buildGraph', () => {
     }
   })
 })
+
+// ---------------------------------------------------------------------------
+// buildGraph with dependencyMap — overlay dependency overrides
+// ---------------------------------------------------------------------------
+
+describe('buildGraph with dependencyMap', () => {
+  it('uses dependencyMap deps instead of frontmatter deps when provided', () => {
+    const fms = [
+      makeFm('a', 'pre', 1, ['original-dep']),
+      makeFm('b', 'foundation', 2, []),
+    ]
+    const preset = new Map([
+      ['a', { enabled: true }],
+      ['b', { enabled: true }],
+    ])
+    const depMap = { a: ['b'], b: [] }
+    const graph = buildGraph(fms, preset, depMap)
+    expect(graph.nodes.get('a')?.dependencies).toEqual(['b'])
+    expect(graph.edges.get('b')).toContain('a')
+    expect(graph.edges.has('original-dep')).toBe(false)
+  })
+
+  it('falls back to frontmatter deps when dependencyMap entry is missing', () => {
+    const fms = [
+      makeFm('a', 'pre', 1, ['b']),
+      makeFm('b', 'foundation', 2, []),
+    ]
+    const preset = new Map([['a', { enabled: true }], ['b', { enabled: true }]])
+    const depMap = { b: [] }
+    const graph = buildGraph(fms, preset, depMap)
+    expect(graph.nodes.get('a')?.dependencies).toEqual(['b'])
+    expect(graph.edges.get('b')).toContain('a')
+  })
+
+  it('handles replace semantics (old dep gone, new dep present)', () => {
+    const fms = [
+      makeFm('a', 'pre', 1, ['old-dep']),
+      makeFm('old-dep', 'pre', 2, []),
+      makeFm('new-dep', 'pre', 3, []),
+    ]
+    const preset = new Map([['a', { enabled: true }], ['old-dep', { enabled: true }], ['new-dep', { enabled: true }]])
+    const depMap = { a: ['new-dep'], 'old-dep': [], 'new-dep': [] }
+    const graph = buildGraph(fms, preset, depMap)
+    expect(graph.nodes.get('a')?.dependencies).toEqual(['new-dep'])
+    expect(graph.edges.get('new-dep')).toContain('a')
+    expect(graph.edges.get('old-dep')).not.toContain('a')
+  })
+
+  it('handles append semantics (new dep alongside originals)', () => {
+    const fms = [
+      makeFm('a', 'pre', 1, ['b']),
+      makeFm('b', 'foundation', 2, []),
+      makeFm('c', 'foundation', 3, []),
+    ]
+    const preset = new Map([['a', { enabled: true }], ['b', { enabled: true }], ['c', { enabled: true }]])
+    const depMap = { a: ['b', 'c'], b: [], c: [] }
+    const graph = buildGraph(fms, preset, depMap)
+    expect(graph.nodes.get('a')?.dependencies).toEqual(['b', 'c'])
+    expect(graph.edges.get('b')).toContain('a')
+    expect(graph.edges.get('c')).toContain('a')
+  })
+
+  it('unknown dep from dependencyMap is stored on node (caught by detectCycles)', () => {
+    const fms = [makeFm('a', 'pre', 1, [])]
+    const preset = new Map([['a', { enabled: true }]])
+    const depMap = { a: ['nonexistent'] }
+    const graph = buildGraph(fms, preset, depMap)
+    expect(graph.nodes.get('a')?.dependencies).toEqual(['nonexistent'])
+    expect(graph.edges.has('nonexistent')).toBe(false)
+  })
+
+  it('excludes tool entries from nodes and edges even with dependencyMap', () => {
+    const fms = [
+      makeFm('step-a', 'pre', 1, []),
+      { ...makeFm('my-tool', 'pre', 2, ['step-a']), category: 'tool' as const },
+    ]
+    const preset = new Map([['step-a', { enabled: true }]])
+    const depMap = { 'step-a': [], 'my-tool': ['step-a'] }
+    const graph = buildGraph(fms, preset, depMap)
+    expect(graph.nodes.has('my-tool')).toBe(false)
+    expect(graph.edges.get('step-a')).not.toContain('my-tool')
+  })
+
+  it('without dependencyMap, behavior is unchanged (backward compat)', () => {
+    const fms = [
+      makeFm('a', 'pre', 1, ['b']),
+      makeFm('b', 'foundation', 2, []),
+    ]
+    const preset = new Map([['a', { enabled: true }], ['b', { enabled: true }]])
+    const graph = buildGraph(fms, preset)
+    expect(graph.nodes.get('a')?.dependencies).toEqual(['b'])
+    expect(graph.edges.get('b')).toContain('a')
+  })
+})

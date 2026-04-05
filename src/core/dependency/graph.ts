@@ -10,6 +10,7 @@ import type { MetaPromptFrontmatter } from '../../types/index.js'
 export function buildGraph(
   metaPrompts: MetaPromptFrontmatter[],
   presetSteps: Map<string, { enabled: boolean }>,
+  dependencyMap?: Record<string, string[]>,
 ): DependencyGraph {
   const nodes = new Map<string, DependencyNode>()
   const edges = new Map<string, string[]>()
@@ -20,23 +21,24 @@ export function buildGraph(
     // they have no phase/order and don't participate in topological sort
     if (mp.category === 'tool') continue
 
+    const deps = dependencyMap?.[mp.name] ?? mp.dependencies
     const enabled = presetSteps.get(mp.name)?.enabled ?? true
     nodes.set(mp.name, {
       slug: mp.name,
       phase: mp.phase,
       order: mp.order,
-      dependencies: mp.dependencies,
+      dependencies: deps,
       enabled,
     })
     edges.set(mp.name, [])
   }
 
-  // Build edges: for each step, for each dep, push this step onto dep's successor list
-  for (const mp of metaPrompts) {
-    for (const dep of mp.dependencies) {
+  // Build edges: for each node, for each dep, push this step onto dep's successor list
+  for (const [name, node] of nodes) {
+    for (const dep of node.dependencies) {
       const successors = edges.get(dep)
       if (successors) {
-        successors.push(mp.name)
+        successors.push(name)
       }
       // Unknown deps are caught by detectCycles → DEP_TARGET_MISSING
     }

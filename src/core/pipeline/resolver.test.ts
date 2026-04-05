@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { resolvePipeline } from './resolver.js'
 import { loadPipelineContext } from './context.js'
+import type { StepStateEntry } from '../../types/state.js'
 
 describe('resolvePipeline', () => {
   it('returns a DependencyGraph with nodes', () => {
@@ -61,6 +62,43 @@ describe('resolvePipeline', () => {
     const pipeline = resolvePipeline(ctx)
     const node = pipeline.graph.nodes.get('review-prd')
     expect(node?.enabled).toBe(true)
+  })
+
+  it('graph nodes have overlay-appended deps (user-stories depends on review-gdd for game)', () => {
+    const ctx = loadPipelineContext(process.cwd())
+    if (ctx.config) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod defaults fill fields at runtime
+      ctx.config.project = { projectType: 'game', gameConfig: { engine: 'custom' } } as any
+    }
+    const pipeline = resolvePipeline(ctx)
+    const node = pipeline.graph.nodes.get('user-stories')
+    expect(node?.dependencies).toContain('review-gdd')
+  })
+
+  it('graph nodes have overlay-replaced deps (platform-parity-review uses review-game-ui for game)', () => {
+    const ctx = loadPipelineContext(process.cwd())
+    if (ctx.config) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod defaults fill fields at runtime
+      ctx.config.project = { projectType: 'game', gameConfig: { engine: 'custom' } } as any
+    }
+    const pipeline = resolvePipeline(ctx)
+    const node = pipeline.graph.nodes.get('platform-parity-review')
+    expect(node?.dependencies).toContain('review-game-ui')
+    expect(node?.dependencies).not.toContain('review-ux')
+  })
+
+  it('computeEligible blocks user-stories when review-gdd is not completed (game project)', () => {
+    const ctx = loadPipelineContext(process.cwd())
+    if (ctx.config) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod defaults fill fields at runtime
+      ctx.config.project = { projectType: 'game', gameConfig: { engine: 'custom' } } as any
+    }
+    const pipeline = resolvePipeline(ctx)
+    const state: Record<string, StepStateEntry> = {
+      'review-prd': { status: 'completed', source: 'pipeline' },
+    }
+    const eligible = pipeline.computeEligible(state)
+    expect(eligible).not.toContain('user-stories')
   })
 
   it('handles null config gracefully (fallback to deep, frontmatter maps preserved)', () => {
