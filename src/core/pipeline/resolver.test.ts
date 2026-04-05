@@ -1,0 +1,74 @@
+import { describe, it, expect } from 'vitest'
+import { resolvePipeline } from './resolver.js'
+import { loadPipelineContext } from './context.js'
+
+describe('resolvePipeline', () => {
+  it('returns a DependencyGraph with nodes', () => {
+    const ctx = loadPipelineContext(process.cwd())
+    const pipeline = resolvePipeline(ctx)
+    expect(pipeline.graph.nodes.size).toBeGreaterThan(50)
+  })
+
+  it('returns a preset matching the config methodology', () => {
+    const ctx = loadPipelineContext(process.cwd())
+    const pipeline = resolvePipeline(ctx)
+    expect(pipeline.preset).not.toBeNull()
+    expect(pipeline.preset.name).toBeDefined()
+  })
+
+  it('returns overlay with steps record', () => {
+    const ctx = loadPipelineContext(process.cwd())
+    const pipeline = resolvePipeline(ctx)
+    expect(typeof pipeline.overlay.steps).toBe('object')
+    expect(Object.keys(pipeline.overlay.steps).length).toBeGreaterThan(50)
+  })
+
+  it('returns stepMeta map keyed by step name', () => {
+    const ctx = loadPipelineContext(process.cwd())
+    const pipeline = resolvePipeline(ctx)
+    expect(pipeline.stepMeta.has('create-prd')).toBe(true)
+    expect(pipeline.stepMeta.get('create-prd')?.phase).toBe('pre')
+  })
+
+  it('returns computeEligible that accepts steps and returns string[]', () => {
+    const ctx = loadPipelineContext(process.cwd())
+    const pipeline = resolvePipeline(ctx)
+    const eligible = pipeline.computeEligible({})
+    expect(Array.isArray(eligible)).toBe(true)
+    expect(eligible.length).toBeGreaterThan(0)
+  })
+
+  it('applies custom enablement overrides when config has custom steps', () => {
+    const ctx = loadPipelineContext(process.cwd())
+    if (ctx.config) {
+      ctx.config.custom = {
+        steps: { 'create-prd': { enabled: false } },
+      }
+    }
+    const pipeline = resolvePipeline(ctx)
+    const prdNode = pipeline.graph.nodes.get('create-prd')
+    expect(prdNode?.enabled).toBe(false)
+  })
+
+  it('custom-enables a step absent from preset (e.g., mvp + custom enable review-prd)', () => {
+    const ctx = loadPipelineContext(process.cwd())
+    if (ctx.config) {
+      ctx.config.methodology = 'mvp'
+      ctx.config.custom = {
+        steps: { 'review-prd': { enabled: true } },
+      }
+    }
+    const pipeline = resolvePipeline(ctx)
+    const node = pipeline.graph.nodes.get('review-prd')
+    expect(node?.enabled).toBe(true)
+  })
+
+  it('handles null config gracefully (fallback to deep, frontmatter maps preserved)', () => {
+    const ctx = loadPipelineContext(process.cwd())
+    ctx.config = null
+    const pipeline = resolvePipeline(ctx)
+    expect(pipeline.preset).not.toBeNull()
+    expect(pipeline.graph.nodes.size).toBeGreaterThan(50)
+    expect(Object.keys(pipeline.overlay.knowledge).length).toBeGreaterThan(0)
+  })
+})
