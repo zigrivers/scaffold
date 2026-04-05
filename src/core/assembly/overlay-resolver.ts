@@ -26,10 +26,10 @@ export function applyOverlay(
   reads: Record<string, string[]>
   dependencies: Record<string, string[]>
 } {
-  // 1. Step overrides: overlay wins on conflicts
-  const mergedSteps: Record<string, StepEntry> = {
-    ...steps,
-    ...overlay.stepOverrides,
+  // 1. Step overrides: merge fields (overlay wins on conflicts, base fields preserved)
+  const mergedSteps: Record<string, StepEntry> = { ...steps }
+  for (const [name, override] of Object.entries(overlay.stepOverrides)) {
+    mergedSteps[name] = { ...mergedSteps[name], ...override }
   }
 
   // 2. Knowledge overrides: append + deduplicate

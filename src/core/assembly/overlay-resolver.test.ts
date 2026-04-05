@@ -36,6 +36,21 @@ describe('applyOverlay', () => {
       expect(result.steps['create-prd']).toEqual({ enabled: true })
     })
 
+    it('merges step entries instead of replacing (preserves base conditional)', () => {
+      const steps: Record<string, { enabled: boolean; conditional?: 'if-needed' }> = {
+        'step-a': { enabled: true, conditional: 'if-needed' },
+      }
+      const overlay = makeOverlay({
+        stepOverrides: {
+          'step-a': { enabled: false },
+        },
+      })
+
+      const result = applyOverlay(steps, {}, {}, {}, overlay)
+
+      expect(result.steps['step-a']).toEqual({ enabled: false, conditional: 'if-needed' })
+    })
+
     it('preserves conditional field from overlay', () => {
       const steps: Record<string, { enabled: boolean; conditional?: 'if-needed' }> = {
         'create-prd': { enabled: true },

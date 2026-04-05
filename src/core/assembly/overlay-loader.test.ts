@@ -93,7 +93,7 @@ describe('loadOverlay', () => {
     expect(errors).toHaveLength(0)
     expect(overlay).not.toBeNull()
     expect(overlay!.name).toBe('minimal')
-    expect(overlay!.projectType).toBe('test')
+    expect(overlay!.projectType).toBe('game')
     expect(overlay!.stepOverrides).toEqual({})
     expect(overlay!.knowledgeOverrides).toEqual({})
     expect(overlay!.readsOverrides).toEqual({})
@@ -107,7 +107,7 @@ describe('loadOverlay', () => {
     fs.writeFileSync(tmpFile, [
       'name: malformed',
       'description: Malformed overlay for testing',
-      'project-type: test',
+      'project-type: game',
       'knowledge-overrides:',
       '  - item1',
       '  - item2',

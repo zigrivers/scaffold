@@ -30,7 +30,7 @@ export const GameConfigSchema = z.object({
   supportedLocales: z.array(z.string()).default(['en']),
   hasModding: z.boolean().default(false),
   npcAiComplexity: z.enum(['none', 'simple', 'complex']).default('none'),
-})
+}).strict()
 
 const ProjectSchema = z.object({
   name: z.string().min(1).optional(),

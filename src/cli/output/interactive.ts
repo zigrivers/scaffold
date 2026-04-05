@@ -98,7 +98,7 @@ export class InteractiveOutput implements OutputContext {
   }
 
   async select(message: string, options: string[], defaultValue?: string): Promise<string> {
-    if (!isTTY() || isNoColor()) {
+    if (!isTTY()) {
       return defaultValue ?? options[0] ?? ''
     }
     // Display numbered options
@@ -112,10 +112,13 @@ export class InteractiveOutput implements OutputContext {
       message: 'Enter number or text:',
       default: defaultValue,
     })
-    // Accept number input
-    const num = parseInt(answer, 10)
-    if (!isNaN(num) && num >= 1 && num <= options.length) {
-      return options[num - 1] ?? defaultValue ?? options[0] ?? ''
+    // Accept number input (strict: entire string must be a valid integer)
+    const trimmed = answer.trim()
+    if (/^\d+$/.test(trimmed)) {
+      const num = Number(trimmed)
+      if (num >= 1 && num <= options.length) {
+        return options[num - 1] ?? defaultValue ?? options[0] ?? ''
+      }
     }
     // Accept exact text match
     if (options.includes(answer)) {
@@ -126,7 +129,7 @@ export class InteractiveOutput implements OutputContext {
   }
 
   async multiSelect(message: string, options: string[], defaults?: string[]): Promise<string[]> {
-    if (!isTTY() || isNoColor()) {
+    if (!isTTY()) {
       return defaults ?? []
     }
     // Display options with defaults marked
@@ -143,11 +146,13 @@ export class InteractiveOutput implements OutputContext {
     const parts = answer.split(',').map(s => s.trim()).filter(Boolean)
     const selected: string[] = []
     for (const part of parts) {
-      const num = parseInt(part, 10)
-      if (!isNaN(num) && num >= 1 && num <= options.length) {
-        const opt = options[num - 1]
-        if (opt !== undefined && !selected.includes(opt)) {
-          selected.push(opt)
+      if (/^\d+$/.test(part)) {
+        const num = Number(part)
+        if (num >= 1 && num <= options.length) {
+          const opt = options[num - 1]
+          if (opt !== undefined && !selected.includes(opt)) {
+            selected.push(opt)
+          }
         }
       } else if (options.includes(part) && !selected.includes(part)) {
         selected.push(part)
@@ -157,7 +162,7 @@ export class InteractiveOutput implements OutputContext {
   }
 
   async multiInput(message: string, defaultValue?: string[]): Promise<string[]> {
-    if (!isTTY() || isNoColor()) {
+    if (!isTTY()) {
       return defaultValue ?? []
     }
     const { input } = await import('@inquirer/prompts')

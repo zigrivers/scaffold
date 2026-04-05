@@ -1,4 +1,4 @@
-import type { MethodologyPreset } from '../../types/index.js'
+import type { MethodologyPreset, ProjectType } from '../../types/index.js'
 import type {
   ProjectTypeOverlay, KnowledgeOverride, ReadsOverride, DependencyOverride,
 } from '../../types/index.js'
@@ -363,6 +363,15 @@ export function loadOverlay(
 
   if (typeof obj['project-type'] !== 'string' || obj['project-type'].trim() === '') {
     errors.push(presetParseError(overlayPath, 'required field "project-type" must be a non-empty string'))
+  } else {
+    const validProjectTypes: ProjectType[] = ['web-app', 'mobile-app', 'backend', 'cli', 'library', 'game']
+    const pt = obj['project-type'].trim()
+    if (!validProjectTypes.includes(pt as ProjectType)) {
+      const allowed = validProjectTypes.join(', ')
+      errors.push(presetParseError(
+        overlayPath, `"project-type" must be one of ${allowed}, got "${pt}"`,
+      ))
+    }
   }
 
   if (errors.length > 0) {
