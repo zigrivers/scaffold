@@ -291,4 +291,29 @@ describe('runWizard', () => {
     expect(project['projectType']).toBeUndefined()
     expect(project['gameConfig']).toBeUndefined()
   })
+
+  // Test 15: --project-type game --auto writes gameConfig with Zod defaults
+  it('writes gameConfig to config.yml with --project-type game --auto', async () => {
+    const output = makeOutputContext()
+    const result = await runWizard({
+      projectRoot: tmpDir,
+      auto: true,
+      force: false,
+      projectType: 'game',
+      output,
+    })
+    expect(result.success).toBe(true)
+    const configPath = path.join(tmpDir, '.scaffold', 'config.yml')
+    const parsed = yaml.load(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>
+    const project = parsed['project'] as Record<string, unknown>
+    expect(project['projectType']).toBe('game')
+    expect(project['gameConfig']).toBeDefined()
+    const gc = project['gameConfig'] as Record<string, unknown>
+    expect(gc['engine']).toBe('custom')
+    expect(gc['multiplayerMode']).toBe('none')
+    expect(gc['persistence']).toBe('progression')
+    // No interactive prompts
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.confirm).not.toHaveBeenCalled()
+  })
 })

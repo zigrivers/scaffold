@@ -19,6 +19,7 @@ export async function askWizardQuestions(options: {
   output: OutputContext
   suggestion: 'deep' | 'mvp'
   methodology?: string  // pre-set via --methodology flag
+  projectType?: string  // pre-set via --project-type flag
   auto: boolean
 }): Promise<WizardAnswers> {
   const { output, suggestion, auto } = options
@@ -64,9 +65,11 @@ export async function askWizardQuestions(options: {
     if (isMobile) traits.push('mobile')
   }
 
-  // Project type question
+  // Project type question (skip if --project-type was provided)
   let projectType: ProjectType | undefined
-  if (!auto) {
+  if (options.projectType) {
+    projectType = options.projectType as ProjectType
+  } else if (!auto) {
     const selected = await output.select(
       'What type of project is this?',
       ['web-app', 'mobile-app', 'backend', 'cli', 'library', 'game'],
@@ -77,7 +80,11 @@ export async function askWizardQuestions(options: {
 
   // Game config questions (only when projectType === 'game')
   let gameConfig: GameConfig | undefined
-  if (projectType === 'game' && !auto) {
+  if (projectType === 'game' && auto) {
+    // --project-type game --auto: use Zod defaults
+    const defaults = GameConfigSchema.parse({ engine: 'custom' })
+    gameConfig = defaults
+  } else if (projectType === 'game' && !auto) {
     // Core questions — always asked for games
     const engine = await output.select(
       'Game engine:',

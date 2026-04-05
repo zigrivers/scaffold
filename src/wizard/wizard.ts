@@ -17,6 +17,7 @@ export interface WizardOptions {
   projectRoot: string
   idea?: string
   methodology?: string   // --methodology flag pre-sets this
+  projectType?: string   // --project-type flag pre-sets this
   force: boolean
   auto: boolean
   output: OutputContext
@@ -31,7 +32,10 @@ export interface WizardResult {
 }
 
 export async function runWizard(options: WizardOptions): Promise<WizardResult> {
-  const { projectRoot, idea, methodology: presetMethodology, force, auto, output } = options
+  const {
+    projectRoot, idea, methodology: presetMethodology,
+    projectType: presetProjectType, force, auto, output,
+  } = options
   const scaffoldDir = path.join(projectRoot, '.scaffold')
 
   // Check for existing .scaffold/
@@ -90,6 +94,7 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
     output,
     suggestion,
     methodology: presetMethodology,
+    projectType: presetProjectType,
     auto,
   })
 
