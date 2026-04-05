@@ -16,7 +16,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
@@ -28,5 +28,18 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Publish
+      - name: Publish scaffold
         run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Build mmr
+        run: npm run build --workspace=packages/mmr
+
+      - name: Test mmr
+        run: npm test --workspace=packages/mmr
+
+      - name: Publish mmr
+        run: npm publish --access public --provenance --workspace=packages/mmr
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
