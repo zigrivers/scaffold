@@ -49,14 +49,25 @@ vi.mock('../../core/assembly/preset-loader.js', () => ({
   })),
 }))
 
+vi.mock('../../core/assembly/overlay-state-resolver.js', () => ({
+  resolveOverlayState: vi.fn(({ presetSteps }: { presetSteps: Record<string, unknown> }) => ({
+    steps: presetSteps,
+    knowledge: {},
+    reads: {},
+    dependencies: {},
+  })),
+}))
+
 // ---------------------------------------------------------------------------
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
 
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
+import { loadConfig } from '../../config/loader.js'
 import { StateManager } from '../../state/state-manager.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
+import { resolveOverlayState } from '../../core/assembly/overlay-state-resolver.js'
 import statusCommand from './status.js'
 
 // ---------------------------------------------------------------------------
@@ -326,6 +337,63 @@ describe('status command', () => {
     expect(slugs).toContain('story-tests')
     expect(slugs).toContain('step-a')
     expect(slugs).toContain('step-b')
+  })
+
+  it('uses overlay steps when config has projectType: game', async () => {
+    const mockLoadConfig = vi.mocked(loadConfig)
+    const mockOverlay = vi.mocked(resolveOverlayState)
+
+    // Config with projectType: 'game'
+    mockLoadConfig.mockReturnValue({
+      config: {
+        version: 2,
+        methodology: 'deep',
+        platforms: ['claude-code'],
+        project: { projectType: 'game' },
+      } as ReturnType<typeof loadConfig>['config'],
+      errors: [],
+      warnings: [],
+    })
+
+    // Overlay returns game-design-document as enabled
+    mockOverlay.mockReturnValue({
+      steps: {
+        'game-design-document': { enabled: true },
+        'requirements': { enabled: true },
+      },
+      knowledge: {},
+      reads: {},
+      dependencies: {},
+    })
+
+    const metaPrompts = new Map([
+      ['game-design-document', makeFrontmatter('game-design-document', 'design', 1)],
+      ['requirements', makeFrontmatter('requirements', 'design', 2)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
+
+    const steps = {
+      'game-design-document': { status: 'pending', source: 'pipeline', produces: [] },
+      'requirements': { status: 'completed', source: 'pipeline', produces: [] },
+    }
+    mockStateWith(MockStateManager, steps, { next_eligible: ['game-design-document'] })
+
+    await statusCommand.handler(defaultArgv())
+
+    // Verify overlay was called with the config
+    expect(mockOverlay).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          project: expect.objectContaining({ projectType: 'game' }),
+        }),
+      }),
+    )
+
+    const allOutput = writtenLines.join('')
+    expect(allOutput).toContain('game-design-document')
+    expect(exitSpy).toHaveBeenCalledWith(0)
   })
 
   describe('--compact flag', () => {
