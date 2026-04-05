@@ -239,6 +239,9 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
 
     if (!isTool) {
       const unmetDeps = deps.filter(dep => {
+        // Overlay-disabled deps are treated as satisfied (matches eligibility.ts)
+        const depNode = graph?.nodes.get(dep)
+        if (depNode && !depNode.enabled) return false
         const depStatus = state.steps[dep]?.status
         return depStatus !== 'completed' && depStatus !== 'skipped'
       })
