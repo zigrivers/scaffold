@@ -100,6 +100,8 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
     platforms: answers.platforms,
     project: {
       traits: answers.traits,
+      ...(answers.projectType && { projectType: answers.projectType }),
+      ...(answers.gameConfig && { gameConfig: answers.gameConfig }),
     },
   }
 

@@ -1,4 +1,4 @@
-import type { MethodologyPreset } from '../../types/index.js'
+import type { MethodologyPreset, StepEnablementEntry } from '../../types/index.js'
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
 import { fileExists } from '../../utils/fs.js'
 import {
@@ -8,6 +8,9 @@ import {
 import yaml from 'js-yaml'
 import fs from 'node:fs'
 import path from 'node:path'
+
+// Re-export loadOverlay from its own module for backward compatibility
+export { loadOverlay } from './overlay-loader.js'
 
 /** Validate that a value is a valid DepthLevel (integer 1–5). */
 function isDepthLevel(value: unknown): value is 1 | 2 | 3 | 4 | 5 {
@@ -86,7 +89,7 @@ export function loadPreset(
   // 5. Validate steps entries
   const stepsRaw = obj['steps'] as Record<string, unknown>
   const presetName = (obj['name'] as string).trim()
-  const steps: Record<string, { enabled: boolean; conditional?: 'if-needed' }> = {}
+  const steps: Record<string, StepEnablementEntry> = {}
 
   for (const [stepKey, stepValue] of Object.entries(stepsRaw)) {
     // Key must be kebab-case
@@ -113,7 +116,7 @@ export function loadPreset(
       continue
     }
 
-    const entry: { enabled: boolean; conditional?: 'if-needed' } = {
+    const entry: StepEnablementEntry = {
       enabled: stepObj['enabled'],
     }
 
@@ -229,3 +232,4 @@ export function validateDependencyCoherence(
 
   return warnings
 }
+

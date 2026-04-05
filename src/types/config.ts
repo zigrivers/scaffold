@@ -1,5 +1,11 @@
 import type { MethodologyName, DepthLevel } from './enums.js'
 
+/** Step enablement entry used in presets and overlays. */
+export interface StepEnablementEntry {
+  enabled: boolean
+  conditional?: 'if-needed'
+}
+
 /** Per-step override in custom methodology config. */
 export interface CustomStepConfig {
   enabled?: boolean
@@ -12,10 +18,61 @@ export interface CustomConfig {
   steps?: Record<string, CustomStepConfig>
 }
 
+/** Valid project types. */
+export type ProjectType = 'web-app' | 'mobile-app' | 'backend' | 'cli' | 'library' | 'game'
+
+/** Game engine options. */
+export type GameEngine = 'unity' | 'unreal' | 'godot' | 'custom'
+
+/** Game-specific configuration. Only valid when projectType === 'game'. */
+export interface GameConfig {
+  engine: GameEngine
+  multiplayerMode: 'none' | 'local' | 'online' | 'hybrid'
+  narrative: 'none' | 'light' | 'heavy'
+  contentStructure: 'discrete' | 'open-world' | 'procedural' | 'endless' | 'mission-based'
+  economy: 'none' | 'progression' | 'monetized' | 'both'
+  onlineServices: Array<'leaderboards' | 'accounts' | 'matchmaking' | 'live-ops'>
+  persistence: 'none' | 'settings-only' | 'profile' | 'progression' | 'cloud'
+  targetPlatforms: Array<'pc' | 'web' | 'ios' | 'android' | 'ps5' | 'xbox' | 'switch' | 'vr' | 'ar'>
+  supportedLocales: string[]
+  hasModding: boolean
+  npcAiComplexity: 'none' | 'simple' | 'complex'
+}
+
+/** Override entry for knowledge injection. */
+export interface KnowledgeOverride {
+  append: string[]
+}
+
+/** Override entry for reads remapping. */
+export interface ReadsOverride {
+  replace?: Record<string, string>
+  append?: string[]
+}
+
+/** Override entry for dependency remapping. */
+export interface DependencyOverride {
+  replace?: Record<string, string>
+  append?: string[]
+}
+
+/** Project-type overlay definition (e.g., game-overlay.yml). */
+export interface ProjectTypeOverlay {
+  name: string
+  description: string
+  projectType: ProjectType
+  stepOverrides: Record<string, StepEnablementEntry>
+  knowledgeOverrides: Record<string, KnowledgeOverride>
+  readsOverrides: Record<string, ReadsOverride>
+  dependencyOverrides: Record<string, DependencyOverride>
+}
+
 /** Project characteristics from config.yml. */
 export interface ProjectConfig {
   name?: string
   platforms?: Array<'web' | 'mobile' | 'desktop'>
+  projectType?: ProjectType
+  gameConfig?: GameConfig
   [key: string]: unknown  // forward compatibility
 }
 
@@ -37,5 +94,5 @@ export interface MethodologyPreset {
   name: string
   description: string
   default_depth: DepthLevel
-  steps: Record<string, { enabled: boolean; conditional?: 'if-needed' }>
+  steps: Record<string, StepEnablementEntry>
 }

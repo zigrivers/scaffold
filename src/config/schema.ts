@@ -12,10 +12,44 @@ const CustomSchema = z.object({
   steps: z.record(z.string(), CustomStepSchema).optional(),
 }).strict()
 
+export const ProjectTypeSchema = z.enum([
+  'web-app', 'mobile-app', 'backend', 'cli', 'library', 'game',
+])
+
+export const GameConfigSchema = z.object({
+  engine: z.enum(['unity', 'unreal', 'godot', 'custom']),
+  multiplayerMode: z.enum(['none', 'local', 'online', 'hybrid']).default('none'),
+  narrative: z.enum(['none', 'light', 'heavy']).default('none'),
+  contentStructure: z.enum(['discrete', 'open-world', 'procedural', 'endless', 'mission-based']).default('discrete'),
+  economy: z.enum(['none', 'progression', 'monetized', 'both']).default('none'),
+  onlineServices: z.array(z.enum(['leaderboards', 'accounts', 'matchmaking', 'live-ops'])).default([]),
+  persistence: z.enum(['none', 'settings-only', 'profile', 'progression', 'cloud']).default('progression'),
+  targetPlatforms: z.array(
+    z.enum(['pc', 'web', 'ios', 'android', 'ps5', 'xbox', 'switch', 'vr', 'ar']),
+  ).min(1).default(['pc']),
+  supportedLocales: z.array(
+    z.string().regex(/^[a-z]{2}(-[A-Z]{2})?$/, 'Must be a valid locale code (e.g. "en", "en-US", "ja", "fr-FR")'),
+  ).min(1).default(['en']),
+  hasModding: z.boolean().default(false),
+  npcAiComplexity: z.enum(['none', 'simple', 'complex']).default('none'),
+}).strict()
+
 const ProjectSchema = z.object({
   name: z.string().min(1).optional(),
   platforms: z.array(z.enum(['web', 'mobile', 'desktop'])).optional(),
+  projectType: ProjectTypeSchema.optional(),
+  gameConfig: GameConfigSchema.optional(),
 }).passthrough()  // allow unknown fields per ADR-033
+  .refine(
+    (data) => {
+      // gameConfig is only valid when projectType === 'game'
+      if (data.gameConfig !== undefined && data.projectType !== 'game') {
+        return false
+      }
+      return true
+    },
+    { message: 'gameConfig is only valid when projectType is "game"', path: ['gameConfig'] },
+  )
 
 export const ConfigSchema = z.object({
   version: z.literal(2),

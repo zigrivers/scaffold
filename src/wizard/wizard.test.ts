@@ -45,6 +45,9 @@ function makeOutputContext() {
     result: vi.fn(),
     prompt: vi.fn().mockResolvedValue(''),
     confirm: vi.fn().mockResolvedValue(false),
+    select: vi.fn().mockResolvedValue(''),
+    multiSelect: vi.fn().mockResolvedValue([]),
+    multiInput: vi.fn().mockResolvedValue([]),
     startSpinner: vi.fn(),
     stopSpinner: vi.fn(),
     startProgress: vi.fn(),
@@ -183,10 +186,11 @@ describe('runWizard', () => {
     const output = makeOutputContext()
     vi.mocked(output.prompt).mockResolvedValueOnce('deep')
     vi.mocked(output.confirm)
-      .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)   // Codex
+      .mockResolvedValueOnce(true)    // Gemini
+      .mockResolvedValueOnce(false)   // web
+      .mockResolvedValueOnce(false)   // mobile
+    vi.mocked(output.select).mockResolvedValueOnce('web-app')  // projectType
 
     const result = await runWizard({
       projectRoot: tmpDir,
@@ -209,5 +213,82 @@ describe('runWizard', () => {
     expect(result.errors).toHaveLength(0)
     expect(result.projectRoot).toBe(tmpDir)
     expect(result.configPath).toBe(path.join(tmpDir, '.scaffold', 'config.yml'))
+  })
+
+  // Test 12: Game config written to config.yml when projectType is 'game'
+  it('writes gameConfig to config.yml when projectType is game', async () => {
+    const output = makeOutputContext()
+    vi.mocked(output.prompt).mockResolvedValueOnce('deep')
+    vi.mocked(output.confirm)
+      .mockResolvedValueOnce(false)   // Codex
+      .mockResolvedValueOnce(false)   // Gemini
+      .mockResolvedValueOnce(false)   // web
+      .mockResolvedValueOnce(false)   // mobile
+      .mockResolvedValueOnce(false)   // advanced options
+    vi.mocked(output.select)
+      .mockResolvedValueOnce('game')     // projectType
+      .mockResolvedValueOnce('godot')    // engine
+      .mockResolvedValueOnce('none')     // multiplayer
+      .mockResolvedValueOnce('discrete') // contentStructure
+      .mockResolvedValueOnce('none')     // economy
+    vi.mocked(output.multiSelect)
+      .mockResolvedValueOnce(['pc'])     // targetPlatforms
+
+    const result = await runWizard({
+      projectRoot: tmpDir,
+      auto: false,
+      force: false,
+      output,
+    })
+
+    expect(result.success).toBe(true)
+    const configPath = path.join(tmpDir, '.scaffold', 'config.yml')
+    const parsed = yaml.load(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>
+    const project = parsed['project'] as Record<string, unknown>
+    expect(project['projectType']).toBe('game')
+    expect(project['gameConfig']).toBeDefined()
+    const gc = project['gameConfig'] as Record<string, unknown>
+    expect(gc['engine']).toBe('godot')
+    expect(gc['multiplayerMode']).toBe('none')
+    expect(gc['targetPlatforms']).toEqual(['pc'])
+  })
+
+  // Test 13: No gameConfig in config.yml when projectType is not 'game'
+  it('does not write gameConfig to config.yml when projectType is not game', async () => {
+    const output = makeOutputContext()
+    vi.mocked(output.prompt).mockResolvedValueOnce('deep')
+    vi.mocked(output.confirm)
+      .mockResolvedValueOnce(false)   // Codex
+      .mockResolvedValueOnce(false)   // Gemini
+      .mockResolvedValueOnce(false)   // web
+      .mockResolvedValueOnce(false)   // mobile
+    vi.mocked(output.select)
+      .mockResolvedValueOnce('backend')  // projectType
+
+    const result = await runWizard({
+      projectRoot: tmpDir,
+      auto: false,
+      force: false,
+      output,
+    })
+
+    expect(result.success).toBe(true)
+    const configPath = path.join(tmpDir, '.scaffold', 'config.yml')
+    const parsed = yaml.load(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>
+    const project = parsed['project'] as Record<string, unknown>
+    expect(project['projectType']).toBe('backend')
+    expect(project['gameConfig']).toBeUndefined()
+  })
+
+  // Test 14: Auto mode does not write projectType or gameConfig
+  it('does not write projectType or gameConfig in auto mode', async () => {
+    const output = makeOutputContext()
+    const result = await runWizard({ projectRoot: tmpDir, auto: true, force: false, output })
+    expect(result.success).toBe(true)
+    const configPath = path.join(tmpDir, '.scaffold', 'config.yml')
+    const parsed = yaml.load(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>
+    const project = parsed['project'] as Record<string, unknown>
+    expect(project['projectType']).toBeUndefined()
+    expect(project['gameConfig']).toBeUndefined()
   })
 })

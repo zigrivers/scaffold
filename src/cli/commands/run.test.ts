@@ -4,7 +4,7 @@ import type { PipelineState } from '../../types/state.js'
 import type { StepStateEntry } from '../../types/state.js'
 import type { MetaPromptFile, MetaPromptFrontmatter } from '../../types/frontmatter.js'
 import type { ScaffoldConfig } from '../../types/config.js'
-import type { MethodologyPreset } from '../../types/config.js'
+import type { MethodologyPreset, ProjectTypeOverlay } from '../../types/config.js'
 import type { DependencyGraph } from '../../types/dependency.js'
 import type { AssemblyResult } from '../../types/assembly.js'
 
@@ -75,6 +75,14 @@ vi.mock('../../core/assembly/preset-loader.js', () => ({
   loadAllPresets: vi.fn(),
 }))
 
+vi.mock('../../core/assembly/overlay-loader.js', () => ({
+  loadOverlay: vi.fn(),
+}))
+
+vi.mock('../../core/assembly/overlay-resolver.js', () => ({
+  applyOverlay: vi.fn(),
+}))
+
 vi.mock('node:fs', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs')
   return {
@@ -136,6 +144,8 @@ import { resolveDepth } from '../../core/assembly/depth-resolver.js'
 import { detectUpdateMode } from '../../core/assembly/update-mode.js'
 import { detectMethodologyChange } from '../../core/assembly/methodology-change.js'
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
+import { loadOverlay } from '../../core/assembly/overlay-loader.js'
+import { applyOverlay } from '../../core/assembly/overlay-resolver.js'
 import { loadConfig } from '../../config/loader.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { detectCycles, topologicalSort } from '../../core/dependency/dependency.js'
@@ -237,6 +247,9 @@ function makeOutputContext() {
     result: vi.fn(),
     prompt: vi.fn(),
     confirm: vi.fn(),
+    select: vi.fn(),
+    multiSelect: vi.fn(),
+    multiInput: vi.fn(),
     startSpinner: vi.fn(),
     stopSpinner: vi.fn(),
     startProgress: vi.fn(),
@@ -310,6 +323,9 @@ beforeEach(() => {
     errors: [],
     warnings: [],
   })
+
+  // loadOverlay: default no overlay (only called when config has projectType)
+  vi.mocked(loadOverlay).mockReturnValue({ overlay: null, errors: [], warnings: [] })
 
   vi.mocked(acquireLock).mockReturnValue({ acquired: true })
 
@@ -1031,6 +1047,427 @@ describe('run command handler', () => {
         }),
       )
       expect(exitSpy).toHaveBeenCalledWith(0)
+    })
+  })
+
+  describe('reads artifact gathering', () => {
+    it('gathers artifacts from completed read targets', async () => {
+      // Set up pipeline: create-prd reads from setup-project (not a dependency)
+      const setupMeta = makeMetaPrompt({
+        stepName: 'setup-project',
+        frontmatter: makeFrontmatter({
+          name: 'setup-project',
+          phase: 'prerequisites',
+          order: 0,
+          dependencies: [],
+          outputs: ['docs/setup.md'],
+        }),
+      })
+      const prdMeta = makeMetaPrompt({
+        stepName: 'create-prd',
+        frontmatter: makeFrontmatter({
+          name: 'create-prd',
+          dependencies: [],
+          reads: ['setup-project'],
+          outputs: ['docs/prd.md'],
+        }),
+      })
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map([
+        ['setup-project', setupMeta],
+        ['create-prd', prdMeta],
+      ]))
+
+      const state = makeState({
+        'setup-project': {
+          status: 'completed',
+          source: 'pipeline',
+          produces: ['docs/setup.md'],
+          depth: 3,
+          completed_by: 'scaffold-run',
+        },
+        'create-prd': { status: 'pending', source: 'pipeline', produces: ['docs/prd.md'] },
+      })
+      vi.mocked(StateManager.prototype.loadState).mockReturnValue(state)
+
+      const graph: DependencyGraph = {
+        nodes: new Map([
+          ['setup-project', {
+            slug: 'setup-project', phase: 'prerequisites',
+            order: 0, dependencies: [], enabled: true,
+          }],
+          ['create-prd', {
+            slug: 'create-prd', phase: 'modeling',
+            order: 1, dependencies: [], enabled: true,
+          }],
+        ]),
+        edges: new Map([['setup-project', []], ['create-prd', []]]),
+      }
+      vi.mocked(buildGraph).mockReturnValue(graph)
+
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        if (String(p).includes('docs/setup.md')) return true
+        return false
+      })
+      vi.mocked(fs.readFileSync).mockImplementation((p: fs.PathOrFileDescriptor, _opts?: unknown) => {
+        if (String(p).includes('docs/setup.md')) return '# Setup\nContent.'
+        throw new Error(`ENOENT: no such file: ${String(p)}`)
+      })
+
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
+        .rejects.toThrow('process.exit called')
+
+      expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+        'create-prd',
+        expect.objectContaining({
+          artifacts: expect.arrayContaining([
+            expect.objectContaining({
+              stepName: 'setup-project',
+              filePath: 'docs/setup.md',
+              content: '# Setup\nContent.',
+            }),
+          ]),
+        }),
+      )
+    })
+
+    it('silently skips reads from pending (not completed) steps', async () => {
+      const setupMeta = makeMetaPrompt({
+        stepName: 'setup-project',
+        frontmatter: makeFrontmatter({
+          name: 'setup-project',
+          phase: 'prerequisites',
+          order: 0,
+          dependencies: [],
+          outputs: ['docs/setup.md'],
+        }),
+      })
+      const prdMeta = makeMetaPrompt({
+        stepName: 'create-prd',
+        frontmatter: makeFrontmatter({
+          name: 'create-prd',
+          dependencies: [],
+          reads: ['setup-project'],
+          outputs: ['docs/prd.md'],
+        }),
+      })
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map([
+        ['setup-project', setupMeta],
+        ['create-prd', prdMeta],
+      ]))
+
+      // setup-project is pending (not completed)
+      const state = makeState({
+        'setup-project': { status: 'pending', source: 'pipeline', produces: ['docs/setup.md'] },
+        'create-prd': { status: 'pending', source: 'pipeline', produces: ['docs/prd.md'] },
+      })
+      vi.mocked(StateManager.prototype.loadState).mockReturnValue(state)
+
+      const graph: DependencyGraph = {
+        nodes: new Map([
+          ['setup-project', {
+            slug: 'setup-project', phase: 'prerequisites',
+            order: 0, dependencies: [], enabled: true,
+          }],
+          ['create-prd', {
+            slug: 'create-prd', phase: 'modeling',
+            order: 1, dependencies: [], enabled: true,
+          }],
+        ]),
+        edges: new Map([['setup-project', []], ['create-prd', []]]),
+      }
+      vi.mocked(buildGraph).mockReturnValue(graph)
+
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
+        .rejects.toThrow('process.exit called')
+
+      // Should have empty artifacts (reads target not completed)
+      expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+        'create-prd',
+        expect.objectContaining({
+          artifacts: [],
+        }),
+      )
+    })
+
+    it('silently skips disabled read targets', async () => {
+      const setupMeta = makeMetaPrompt({
+        stepName: 'setup-project',
+        frontmatter: makeFrontmatter({
+          name: 'setup-project',
+          phase: 'prerequisites',
+          order: 0,
+          dependencies: [],
+          outputs: ['docs/setup.md'],
+        }),
+      })
+      const prdMeta = makeMetaPrompt({
+        stepName: 'create-prd',
+        frontmatter: makeFrontmatter({
+          name: 'create-prd',
+          dependencies: [],
+          reads: ['setup-project'],
+          outputs: ['docs/prd.md'],
+        }),
+      })
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map([
+        ['setup-project', setupMeta],
+        ['create-prd', prdMeta],
+      ]))
+
+      const state = makeState({
+        'setup-project': {
+          status: 'completed', source: 'pipeline',
+          produces: ['docs/setup.md'], depth: 3, completed_by: 'scaffold-run',
+        },
+        'create-prd': { status: 'pending', source: 'pipeline', produces: ['docs/prd.md'] },
+      })
+      vi.mocked(StateManager.prototype.loadState).mockReturnValue(state)
+
+      // setup-project is disabled in graph (overlay disabled)
+      const graph: DependencyGraph = {
+        nodes: new Map([
+          ['setup-project', {
+            slug: 'setup-project', phase: 'prerequisites',
+            order: 0, dependencies: [], enabled: false,
+          }],
+          ['create-prd', { slug: 'create-prd', phase: 'modeling', order: 1, dependencies: [], enabled: true }],
+        ]),
+        edges: new Map([['setup-project', []], ['create-prd', []]]),
+      }
+      vi.mocked(buildGraph).mockReturnValue(graph)
+
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
+        .rejects.toThrow('process.exit called')
+
+      // Disabled read target should be skipped — no artifacts gathered
+      expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+        'create-prd',
+        expect.objectContaining({
+          artifacts: [],
+        }),
+      )
+    })
+
+    it('deduplicates reads artifacts against dependency artifacts', async () => {
+      // setup-project is both a dependency and a read target
+      const setupMeta = makeMetaPrompt({
+        stepName: 'setup-project',
+        frontmatter: makeFrontmatter({
+          name: 'setup-project',
+          phase: 'prerequisites',
+          order: 0,
+          dependencies: [],
+          outputs: ['docs/setup.md'],
+        }),
+      })
+      const prdMeta = makeMetaPrompt({
+        stepName: 'create-prd',
+        frontmatter: makeFrontmatter({
+          name: 'create-prd',
+          dependencies: ['setup-project'],
+          reads: ['setup-project'],  // also in reads
+          outputs: ['docs/prd.md'],
+        }),
+      })
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map([
+        ['setup-project', setupMeta],
+        ['create-prd', prdMeta],
+      ]))
+
+      const state = makeState({
+        'setup-project': {
+          status: 'completed',
+          source: 'pipeline',
+          produces: ['docs/setup.md'],
+          depth: 3,
+          completed_by: 'scaffold-run',
+        },
+        'create-prd': { status: 'pending', source: 'pipeline', produces: ['docs/prd.md'] },
+      })
+      vi.mocked(StateManager.prototype.loadState).mockReturnValue(state)
+
+      const graph: DependencyGraph = {
+        nodes: new Map([
+          ['setup-project', {
+            slug: 'setup-project', phase: 'prerequisites',
+            order: 0, dependencies: [], enabled: true,
+          }],
+          ['create-prd', {
+            slug: 'create-prd', phase: 'modeling',
+            order: 1, dependencies: ['setup-project'], enabled: true,
+          }],
+        ]),
+        edges: new Map([
+          ['setup-project', ['create-prd']],
+          ['create-prd', []],
+        ]),
+      }
+      vi.mocked(buildGraph).mockReturnValue(graph)
+
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        if (String(p).includes('docs/setup.md')) return true
+        return false
+      })
+      vi.mocked(fs.readFileSync).mockImplementation((p: fs.PathOrFileDescriptor, _opts?: unknown) => {
+        if (String(p).includes('docs/setup.md')) return '# Setup\nContent.'
+        throw new Error(`ENOENT: no such file: ${String(p)}`)
+      })
+
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
+        .rejects.toThrow('process.exit called')
+
+      // Should only have one artifact (deduplicated)
+      const assembleCall = vi.mocked(AssemblyEngine.prototype.assemble).mock.calls[0]
+      const artifacts = (assembleCall?.[1] as { artifacts: unknown[] })?.artifacts ?? []
+      expect(artifacts).toHaveLength(1)
+    })
+  })
+
+  describe('disabled dependency bypass', () => {
+    it('does not return DEP_UNMET when dependency is disabled in graph', async () => {
+      // create-arch depends on create-prd, but create-prd is disabled
+      const prdMeta = makeMetaPrompt({
+        stepName: 'create-prd',
+        frontmatter: makeFrontmatter({
+          name: 'create-prd',
+          dependencies: [],
+          outputs: ['docs/prd.md'],
+        }),
+      })
+      const archMeta = makeMetaPrompt({
+        stepName: 'create-arch',
+        frontmatter: makeFrontmatter({
+          name: 'create-arch',
+          phase: 'architecture',
+          order: 2,
+          dependencies: ['create-prd'],
+          outputs: ['docs/arch.md'],
+        }),
+      })
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map([
+        ['create-prd', prdMeta],
+        ['create-arch', archMeta],
+      ]))
+
+      const state = makeState({
+        'create-prd': { status: 'pending', source: 'pipeline', produces: [] },
+        'create-arch': { status: 'pending', source: 'pipeline', produces: [] },
+      })
+      vi.mocked(StateManager.prototype.loadState).mockReturnValue(state)
+
+      // create-prd is disabled in graph (overlay disabled it)
+      const graph: DependencyGraph = {
+        nodes: new Map([
+          ['create-prd', {
+            slug: 'create-prd', phase: 'modeling',
+            order: 1, dependencies: [], enabled: false,
+          }],
+          ['create-arch', {
+            slug: 'create-arch', phase: 'architecture',
+            order: 2, dependencies: ['create-prd'], enabled: true,
+          }],
+        ]),
+        edges: new Map([['create-prd', ['create-arch']], ['create-arch', []]]),
+      }
+      vi.mocked(buildGraph).mockReturnValue(graph)
+
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await expect(invokeHandler({ step: 'create-arch', _: ['run'], auto: true }))
+        .rejects.toThrow('process.exit called')
+
+      // Should NOT have exited with DEP_UNMET (exit code 2)
+      // It should proceed to assembly and exit 0
+      expect(exitSpy).toHaveBeenCalledWith(0)
+    })
+  })
+
+  describe('overlay application', () => {
+    it('applies overlay when config has projectType, changing step enablement', async () => {
+      // Config with projectType: 'game'
+      const config = makeConfig({
+        project: { projectType: 'game' },
+      })
+      vi.mocked(loadConfig).mockReturnValue({ config, errors: [], warnings: [] })
+
+      const gameOverlay: ProjectTypeOverlay = {
+        name: 'game',
+        description: 'Game overlay',
+        projectType: 'game',
+        stepOverrides: {
+          'create-prd': { enabled: false },
+          'game-design-document': { enabled: true },
+        },
+        knowledgeOverrides: {},
+        readsOverrides: {},
+        dependencyOverrides: {},
+      }
+      vi.mocked(loadOverlay).mockReturnValue({
+        overlay: gameOverlay,
+        errors: [],
+        warnings: [],
+      })
+
+      // applyOverlay returns merged data with create-prd disabled
+      vi.mocked(applyOverlay).mockReturnValue({
+        steps: {
+          'create-prd': { enabled: false },
+          'game-design-document': { enabled: true },
+        },
+        knowledge: { 'create-prd': [] },
+        reads: { 'create-prd': [] },
+        dependencies: { 'create-prd': [] },
+      })
+
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
+        .rejects.toThrow('process.exit called')
+
+      // Verify loadOverlay was called
+      expect(loadOverlay).toHaveBeenCalledWith(
+        expect.stringContaining('game-overlay.yml'),
+      )
+
+      // Verify applyOverlay was called with the overlay
+      expect(applyOverlay).toHaveBeenCalledWith(
+        expect.any(Object),  // preset steps
+        expect.any(Object),  // knowledgeMap
+        expect.any(Object),  // readsMap
+        expect.any(Object),  // dependencyMap
+        gameOverlay,
+      )
+
+      // Verify buildGraph received merged steps (with overlay applied)
+      expect(buildGraph).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.any(Map),
+      )
+      // The presetStepsMap passed to buildGraph should contain overlay-merged steps
+      const buildGraphCall = vi.mocked(buildGraph).mock.calls[0]
+      const stepsMap = buildGraphCall[1] as Map<string, { enabled: boolean }>
+      expect(stepsMap.get('create-prd')).toEqual({ enabled: false })
+    })
+
+    it('does not call loadOverlay when config has no projectType', async () => {
+      const config = makeConfig()  // no project.projectType
+      vi.mocked(loadConfig).mockReturnValue({ config, errors: [], warnings: [] })
+
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
+        .rejects.toThrow('process.exit called')
+
+      expect(loadOverlay).not.toHaveBeenCalled()
+      expect(applyOverlay).not.toHaveBeenCalled()
     })
   })
 })

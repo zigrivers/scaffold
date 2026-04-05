@@ -1,0 +1,145 @@
+# methodology/game-overlay.yml
+name: game
+description: >
+  Game development overlay — adds game-specific steps, injects game knowledge
+  into existing steps, and remaps artifact references for game projects.
+project-type: game
+
+# ---------------------------------------------------------------------------
+# step-overrides
+# ---------------------------------------------------------------------------
+# Enable all 24 game-specific steps (12 always-on, 12 conditional).
+# Disable 3 web-centric steps that game projects replace.
+step-overrides:
+  # --- Always-enabled game steps (12) ---
+  game-design-document: { enabled: true }
+  review-gdd: { enabled: true }
+  performance-budgets: { enabled: true }
+  game-accessibility: { enabled: true }
+  input-controls-spec: { enabled: true }
+  game-ui-spec: { enabled: true }
+  review-game-ui: { enabled: true }
+  content-structure-design: { enabled: true }
+  art-bible: { enabled: true }
+  audio-design: { enabled: true }
+  playtest-plan: { enabled: true }
+  analytics-telemetry: { enabled: true }
+
+  # --- Conditional game steps (12) ---
+  narrative-bible: { enabled: true, conditional: "if-needed" }
+  netcode-spec: { enabled: true, conditional: "if-needed" }
+  review-netcode: { enabled: true, conditional: "if-needed" }
+  ai-behavior-design: { enabled: true, conditional: "if-needed" }
+  economy-design: { enabled: true, conditional: "if-needed" }
+  review-economy: { enabled: true, conditional: "if-needed" }
+  save-system-spec: { enabled: true, conditional: "if-needed" }
+  localization-plan: { enabled: true, conditional: "if-needed" }
+  online-services-spec: { enabled: true, conditional: "if-needed" }
+  modding-ugc-spec: { enabled: true, conditional: "if-needed" }
+  live-ops-plan: { enabled: true, conditional: "if-needed" }
+  platform-cert-prep: { enabled: true, conditional: "if-needed" }
+
+  # --- Disabled (replaced by game equivalents) ---
+  design-system: { enabled: false }
+  ux-spec: { enabled: false }
+  review-ux: { enabled: false }
+
+# ---------------------------------------------------------------------------
+# knowledge-overrides
+# ---------------------------------------------------------------------------
+# Map game knowledge entries into existing pipeline steps so that game domain
+# expertise is injected during prompt assembly.
+knowledge-overrides:
+  create-prd:
+    append: [game-design-document]
+  user-stories:
+    append: [game-design-document, game-accessibility]
+  tech-stack:
+    append: [game-engine-selection, game-performance-budgeting]
+  coding-standards:
+    append: [game-engine-selection]
+  tdd:
+    append: [game-testing-strategy]
+  project-structure:
+    append: [game-project-structure]
+  git-workflow:
+    append: [game-asset-pipeline, game-project-structure]
+  dev-env-setup:
+    append: [game-project-structure]
+  add-e2e-testing:
+    append: [game-testing-strategy]
+  domain-modeling:
+    append: [game-domain-patterns, game-save-systems]
+  adrs:
+    append: [game-engine-selection]
+  system-architecture:
+    append: [game-domain-patterns, game-engine-selection]
+  review-architecture:
+    append: [game-performance-budgeting]
+  security:
+    append: [game-networking]
+  review-security:
+    append: [game-networking]
+  operations:
+    append: [game-liveops-analytics]
+  review-operations:
+    append: [game-liveops-analytics]
+  database-schema:
+    append: [game-save-systems, game-networking]
+  api-contracts:
+    append: [game-networking]
+  review-database:
+    append: [game-save-systems]
+  review-api:
+    append: [game-networking]
+  platform-parity-review:
+    append: [game-platform-certification, game-networking]
+  implementation-plan:
+    append: [game-milestone-definitions, game-design-document]
+  implementation-playbook:
+    append: [game-milestone-definitions]
+  game-design-document:
+    append: [game-milestone-definitions]
+  playtest-plan:
+    append: [game-milestone-definitions]
+  story-tests:
+    append: [game-testing-strategy]
+  review-testing:
+    append: [game-testing-strategy, game-performance-budgeting]
+  create-evals:
+    append: [game-testing-strategy]
+  cross-phase-consistency:
+    append: [game-design-document]
+  critical-path-walkthrough:
+    append: [game-design-document]
+
+# ---------------------------------------------------------------------------
+# reads-overrides
+# ---------------------------------------------------------------------------
+# Remap artifact references so game steps read game-specific docs instead of
+# web-centric ones (e.g. ux-spec -> game-ui-spec).
+reads-overrides:
+  story-tests:
+    replace: { ux-spec: game-ui-spec }
+  create-evals:
+    replace: { ux-spec: game-ui-spec }
+  implementation-plan:
+    replace: { ux-spec: game-ui-spec }
+  implementation-playbook:
+    replace: { ux-spec: game-ui-spec, design-system: game-ui-spec }
+  new-enhancement:
+    replace: { ux-spec: game-ui-spec }
+  platform-parity-review:
+    replace: { design-system: game-ui-spec }
+  cross-phase-consistency:
+    replace: { ux-spec: game-ui-spec }
+
+# ---------------------------------------------------------------------------
+# dependency-overrides
+# ---------------------------------------------------------------------------
+# Adjust dependency graph so game review gates are wired correctly.
+dependency-overrides:
+  user-stories:
+    append: [review-gdd]
+  platform-parity-review:
+    replace: { review-ux: review-game-ui }

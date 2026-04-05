@@ -80,3 +80,28 @@ steps:
   multi-agent-resume: { enabled: true }
   quick-task: { enabled: true }
   new-enhancement: { enabled: true }
+  # Game development steps (enabled via game overlay)
+  game-design-document: { enabled: false }
+  review-gdd: { enabled: false }
+  performance-budgets: { enabled: false }
+  narrative-bible: { enabled: false }
+  netcode-spec: { enabled: false }
+  review-netcode: { enabled: false }
+  ai-behavior-design: { enabled: false }
+  game-accessibility: { enabled: false }
+  input-controls-spec: { enabled: false }
+  game-ui-spec: { enabled: false }
+  review-game-ui: { enabled: false }
+  content-structure-design: { enabled: false }
+  art-bible: { enabled: false }
+  audio-design: { enabled: false }
+  economy-design: { enabled: false }
+  review-economy: { enabled: false }
+  online-services-spec: { enabled: false }
+  modding-ugc-spec: { enabled: false }
+  save-system-spec: { enabled: false }
+  localization-plan: { enabled: false }
+  playtest-plan: { enabled: false }
+  analytics-telemetry: { enabled: false }
+  live-ops-plan: { enabled: false }
+  platform-cert-prep: { enabled: false }

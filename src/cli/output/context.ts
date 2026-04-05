@@ -18,6 +18,15 @@ export interface OutputContext {
   prompt<T>(message: string, defaultValue: T): Promise<T>
   confirm(message: string, defaultValue?: boolean): Promise<boolean>
 
+  /** Single-choice selection from a list of options. */
+  select(message: string, options: string[], defaultValue?: string): Promise<string>
+
+  /** Multi-choice selection from a list of options. Returns selected items. */
+  multiSelect(message: string, options: string[], defaults?: string[]): Promise<string[]>
+
+  /** Comma-separated text input returning an array of trimmed strings. */
+  multiInput(message: string, defaultValue?: string[]): Promise<string[]>
+
   // Progress indicators
   startSpinner(message: string): void
   stopSpinner(success?: boolean): void

@@ -97,6 +97,84 @@ export class InteractiveOutput implements OutputContext {
     return confirm({ message, default: defaultValue })
   }
 
+  async select(message: string, options: string[], defaultValue?: string): Promise<string> {
+    if (!isTTY()) {
+      return defaultValue ?? options[0] ?? ''
+    }
+    // Display numbered options
+    process.stdout.write(`${message}\n`)
+    for (let i = 0; i < options.length; i++) {
+      const marker = options[i] === defaultValue ? ' (default)' : ''
+      process.stdout.write(`  ${i + 1}. ${options[i]}${marker}\n`)
+    }
+    const { input } = await import('@inquirer/prompts')
+    const answer = await input({
+      message: 'Enter number or text:',
+      default: defaultValue,
+    })
+    // Accept number input (strict: entire string must be a valid integer)
+    const trimmed = answer.trim()
+    if (/^\d+$/.test(trimmed)) {
+      const num = Number(trimmed)
+      if (num >= 1 && num <= options.length) {
+        return options[num - 1] ?? defaultValue ?? options[0] ?? ''
+      }
+    }
+    // Accept exact text match
+    if (options.includes(answer)) {
+      return answer
+    }
+    // Inform user their input was invalid, fall back to default
+    const fallback = defaultValue ?? options[0] ?? ''
+    process.stdout.write(`  Invalid input "${trimmed}", using default: ${fallback}\n`)
+    return fallback
+  }
+
+  async multiSelect(message: string, options: string[], defaults?: string[]): Promise<string[]> {
+    if (!isTTY()) {
+      return defaults ?? []
+    }
+    // Display options with defaults marked
+    process.stdout.write(`${message}\n`)
+    for (let i = 0; i < options.length; i++) {
+      const isDefault = defaults?.includes(options[i] ?? '') ? ' *' : ''
+      process.stdout.write(`  ${i + 1}. ${options[i]}${isDefault}\n`)
+    }
+    const { input } = await import('@inquirer/prompts')
+    const answer = await input({
+      message: 'Enter numbers or text (comma-separated):',
+      default: defaults?.join(', '),
+    })
+    const parts = answer.split(',').map(s => s.trim()).filter(Boolean)
+    const selected: string[] = []
+    for (const part of parts) {
+      if (/^\d+$/.test(part)) {
+        const num = Number(part)
+        if (num >= 1 && num <= options.length) {
+          const opt = options[num - 1]
+          if (opt !== undefined && !selected.includes(opt)) {
+            selected.push(opt)
+          }
+        }
+      } else if (options.includes(part) && !selected.includes(part)) {
+        selected.push(part)
+      }
+    }
+    return selected.length > 0 ? selected : (defaults ?? [])
+  }
+
+  async multiInput(message: string, defaultValue?: string[]): Promise<string[]> {
+    if (!isTTY()) {
+      return defaultValue ?? []
+    }
+    const { input } = await import('@inquirer/prompts')
+    const answer = await input({
+      message,
+      default: defaultValue?.join(', '),
+    })
+    return answer.split(',').map(s => s.trim()).filter(Boolean)
+  }
+
   startSpinner(message: string): void {
     if (!isTTY() || isNoColor()) return
     this.spinnerFrame = 0

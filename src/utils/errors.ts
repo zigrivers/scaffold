@@ -282,3 +282,38 @@ export function presetUnmetDependency(step: string, dependency: string, preset: 
     context: { step, dependency, preset },
   }
 }
+
+export function overlayMissing(name: string, path: string): ScaffoldError {
+  return {
+    code: 'OVERLAY_MISSING',
+    message: `Project-type overlay "${name}" not found at ${path}`,
+    exitCode: 1,
+    recovery: 'Reinstall scaffold to restore built-in overlays',
+    context: { name, file: path },
+  }
+}
+
+export function overlayParseError(path: string, detail: string): ScaffoldError {
+  return {
+    code: 'OVERLAY_PARSE_ERROR',
+    message: `Failed to parse project-type overlay: ${detail}`,
+    exitCode: 1,
+    context: { file: path, detail },
+  }
+}
+
+export function overlayMalformedEntry(step: string, field: string, file: string): ScaffoldWarning {
+  return {
+    code: 'OVERLAY_MALFORMED_ENTRY',
+    message: `Overlay entry "${step}" has invalid "${field}" — ignoring entry`,
+    context: { step, field, file },
+  }
+}
+
+export function overlayMalformedSection(section: string, file: string): ScaffoldWarning {
+  return {
+    code: 'OVERLAY_MALFORMED_SECTION',
+    message: `Overlay section "${section}" must be a YAML object — ignoring`,
+    context: { section, file },
+  }
+}
