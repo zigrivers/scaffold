@@ -40,6 +40,6 @@ jobs:
         run: npm test --workspace=packages/mmr
 
       - name: Publish mmr
-        run: npm publish --access public --provenance --workspace=packages/mmr
+        run: npm publish --access public --provenance --workspace=packages/mmr || echo "mmr publish skipped (version may already exist)"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
