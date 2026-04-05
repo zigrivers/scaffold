@@ -247,7 +247,68 @@ describe('runAdoption', () => {
     expect(result.mode).toBe('greenfield')
   })
 
-  // Test 8: artifactsFound count matches detected artifacts
+  // Test 8: Detects Unity project (Assets/ with .meta files)
+  it('detects Unity project when Assets/ contains .meta files', () => {
+    const assetsDir = path.join(tmpDir, 'Assets')
+    fs.mkdirSync(assetsDir, { recursive: true })
+    fs.writeFileSync(path.join(assetsDir, 'foo.meta'), '')
+
+    const result = runAdoption({
+      projectRoot: tmpDir,
+      metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
+      methodology: 'deep',
+      dryRun: false,
+    })
+
+    expect(result.projectType).toBe('game')
+    expect(result.gameConfig).toEqual({ engine: 'unity' })
+  })
+
+  // Test 9: Detects Unreal project (.uproject file)
+  it('detects Unreal project when .uproject file exists', () => {
+    fs.writeFileSync(path.join(tmpDir, 'MyGame.uproject'), '{}')
+
+    const result = runAdoption({
+      projectRoot: tmpDir,
+      metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
+      methodology: 'deep',
+      dryRun: false,
+    })
+
+    expect(result.projectType).toBe('game')
+    expect(result.gameConfig).toEqual({ engine: 'unreal' })
+  })
+
+  // Test 10: Detects Godot project (project.godot file)
+  it('detects Godot project when project.godot exists', () => {
+    fs.writeFileSync(path.join(tmpDir, 'project.godot'), '[gd_scene]')
+
+    const result = runAdoption({
+      projectRoot: tmpDir,
+      metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
+      methodology: 'deep',
+      dryRun: false,
+    })
+
+    expect(result.projectType).toBe('game')
+    expect(result.gameConfig).toEqual({ engine: 'godot' })
+  })
+
+  // Test 11: Non-game project returns no projectType
+  it('returns no projectType for non-game project', () => {
+    // tmpDir is empty — no game engine files
+    const result = runAdoption({
+      projectRoot: tmpDir,
+      metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
+      methodology: 'deep',
+      dryRun: false,
+    })
+
+    expect(result.projectType).toBeUndefined()
+    expect(result.gameConfig).toBeUndefined()
+  })
+
+  // Test 12: artifactsFound count matches detected artifacts
   it('artifactsFound count matches detected artifacts array length', () => {
     const paths = ['docs/prd.md', 'docs/user-stories.md']
     for (const p of paths) {

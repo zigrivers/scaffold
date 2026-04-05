@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { ScaffoldError, ScaffoldWarning } from '../types/index.js'
+import type { ScaffoldError, ScaffoldWarning, ProjectType, GameConfig } from '../types/index.js'
 import { detectProjectMode } from './detector.js'
 import { discoverMetaPrompts } from '../core/assembly/meta-prompt-loader.js'
 
@@ -21,6 +21,8 @@ export interface AdoptionResult {
   methodology: string
   errors: ScaffoldError[]
   warnings: ScaffoldWarning[]
+  projectType?: ProjectType
+  gameConfig?: Partial<GameConfig>
 }
 
 /**
@@ -68,7 +70,29 @@ export function runAdoption(options: {
     }
   }
 
-  return {
+  // 4. Game engine detection
+  let detectedEngine: string | undefined
+  if (fs.existsSync(path.join(projectRoot, 'Assets'))) {
+    try {
+      const assets = fs.readdirSync(path.join(projectRoot, 'Assets'))
+      if (assets.some(f => f.endsWith('.meta'))) {
+        detectedEngine = 'unity'
+      }
+    } catch { /* ignore read errors */ }
+  }
+  if (!detectedEngine) {
+    try {
+      const files = fs.readdirSync(projectRoot)
+      if (files.some(f => f.endsWith('.uproject'))) {
+        detectedEngine = 'unreal'
+      }
+    } catch { /* ignore */ }
+  }
+  if (!detectedEngine && fs.existsSync(path.join(projectRoot, 'project.godot'))) {
+    detectedEngine = 'godot'
+  }
+
+  const result: AdoptionResult = {
     mode: detection.mode,
     artifactsFound: detectedArtifacts.length,
     detectedArtifacts,
@@ -78,4 +102,11 @@ export function runAdoption(options: {
     errors: [],
     warnings: [],
   }
+
+  if (detectedEngine) {
+    result.projectType = 'game'
+    result.gameConfig = { engine: detectedEngine as GameConfig['engine'] }
+  }
+
+  return result
 }
