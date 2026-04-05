@@ -52,6 +52,15 @@ Memory budgets must be subdivided by subsystem: textures (typically 40–60% of 
 - **Shader complexity**: Measure in GPU ms per material; flag any material exceeding 0.5 ms in isolation
 - **Post-processing**: Budget 2–4 ms total for all post-process effects combined
 
+### 2D and Non-3D Performance Budgets
+
+2D games have different bottlenecks than 3D:
+
+- **Sprite batch count**: Target 50-200 draw calls. Each atlas page = 1 batch. Minimize atlas count by grouping co-rendered sprites.
+- **Fill rate**: Overdraw from layered sprites is the primary 2D GPU cost. Target < 4x overdraw. Transparent sprites are expensive — use opaque where possible.
+- **Particle count (2D VFX)**: Budget 200-500 active particles for mobile, 1,000-2,000 for PC.
+- **UI-heavy games** (visual novels, card games): UI element count < 500 visible, text rendering budget < 2ms, animation/tween count < 100 simultaneous.
+
 ### Loading Time Targets
 
 - **Initial boot to menu**: Under 10 seconds on console (platform certification requirement areas)
@@ -67,6 +76,8 @@ Mobile devices throttle CPU and GPU when they overheat. A game that runs at 60 f
 - Measure thermal state after 30 minutes of continuous play
 - Budget power draw to allow 2–3 hours of gameplay per charge
 - Reduce target frame rate to 30 fps on mobile unless the game genre demands 60 fps
+
+**Concrete mobile thermal targets:** Typical thermal throttle onset at 40-42°C skin temperature (varies by device). Sustainable GPU utilization: 50-60% of peak — not 100%. Power draw targets: 3W sustained for phone games (~3hr on 4000mAh battery), 5W for tablet. Monitor with Android `dumpsys thermalservice` or iOS `ProcessInfo.ThermalState`. At `.serious` thermal state, reduce render resolution by 25% and particle count by 50%.
 
 ## Deep Guidance
 

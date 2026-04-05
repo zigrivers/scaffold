@@ -14,7 +14,7 @@ Game AI systems exist on a spectrum from simple to complex:
 
 - **Finite State Machines (FSM)**: States with explicit transitions. Simple, predictable, easy to debug. Falls apart when state count grows large. Best for simple enemies, UI, and game state management.
 - **Behavior Trees (BT)**: Hierarchical task decomposition. Moderate complexity, highly readable, industry standard for action game AI. Used in Halo, Unreal Engine's default AI, most AAA combat AI.
-- **Goal-Oriented Action Planning (GOAP)**: Agents define goals, planner finds action sequences to achieve them. More autonomous, harder to control. Used in F.E.A.R., Shadow of Mordor.
+- **Goal-Oriented Action Planning (GOAP)**: Agents define goals, planner finds action sequences to achieve them. More autonomous, harder to control. Used in F.E.A.R., Tomb Raider (2013 reboot).
 - **Utility AI**: Score every possible action and pick the highest-scoring one. Extremely flexible, non-linear priority. Used in The Sims, Infinite Axis Utility System. Harder to predict and debug.
 
 Each system has a sweet spot. Do not use GOAP for a platformer enemy that runs left and right. Do not use an FSM for an open-world companion that must react to hundreds of situations.

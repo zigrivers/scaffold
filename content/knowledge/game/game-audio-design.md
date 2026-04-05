@@ -22,7 +22,7 @@ Both Wwise and FMOD are professional audio middleware that replace the engine's 
 
 **Wwise:**
 - Steeper learning curve; full productivity takes weeks of training
-- More complex licensing (free under $150K budget with limited sound count; tiered pricing above)
+- More complex licensing (free for non-commercial use and projects under revenue thresholds set by Audiokinetic; commercial pricing based on project budget tier — verify current thresholds at audiokinetic.com as these shift periodically)
 - Industry standard for AAA — most senior audio programmers have Wwise experience
 - Superior spatial audio with Wwise Spatial Audio including room/portal modeling
 - More powerful interactive music system (Music Segments, Stingers, Transitions)
@@ -107,6 +107,8 @@ Adaptive music responds to gameplay state in real-time, creating a dynamic sound
 - Budget 10–30 stingers per game; overuse makes them less impactful
 
 **Implementation pattern:**
+
+The following example uses Unity + FMOD, but the pattern is engine-agnostic: create a persistent music event, drive parameters (intensity, danger) from gameplay state, and smooth parameter transitions. In Unreal, use FMOD or Wwise UE plugin with Blueprint-exposed parameters. In Godot, use AudioStreamPlayer with custom properties driven by game state, or integrate FMOD via GDNative. The core pattern — a persistent music controller receiving gameplay state updates — is identical across engines.
 
 ```csharp
 // Adaptive music controller — vertical layering with FMOD parameters
