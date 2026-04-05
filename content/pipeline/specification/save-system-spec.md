@@ -54,7 +54,7 @@ authoritative state (no client save) do not need a save system specification.
 
 ## Inputs
 - docs/system-architecture.md (required) — data flow, storage layer, serialization strategy, platform abstraction
-- docs/domain-model.md (required) — entity definitions, relationships, and state that must be persisted
+- docs/domain-models/ (required) — entity definitions, relationships, and state that must be persisted
 - docs/plan.md (required) — target platforms informing cloud save APIs and storage quotas
 - docs/economy-design.md (optional, forward-read) — currency balances, inventory, transaction history requiring tamper-resistant persistence
 - docs/narrative-bible.md (optional, forward-read) — narrative state, branching flags, relationship values, quest progress requiring persistence
