@@ -35,6 +35,18 @@ export class AutoOutput implements OutputContext {
     return defaultValue
   }
 
+  async select(_msg: string, options: string[], defaultValue?: string): Promise<string> {
+    return defaultValue ?? options[0] ?? ''
+  }
+
+  async multiSelect(_msg: string, _options: string[], defaults?: string[]): Promise<string[]> {
+    return defaults ?? []
+  }
+
+  async multiInput(_msg: string, defaultValue?: string[]): Promise<string[]> {
+    return defaultValue ?? []
+  }
+
   startSpinner(message: string): void {
     this.interactive.startSpinner(message)
   }

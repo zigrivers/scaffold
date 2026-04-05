@@ -55,8 +55,16 @@ function makeOutputMock() {
     error: vi.fn(),
     info: vi.fn(),
     result: vi.fn(),
+    prompt: vi.fn(),
+    confirm: vi.fn(),
+    select: vi.fn(),
+    multiSelect: vi.fn(),
+    multiInput: vi.fn(),
     startSpinner: vi.fn(),
     stopSpinner: vi.fn(),
+    startProgress: vi.fn(),
+    updateProgress: vi.fn(),
+    stopProgress: vi.fn(),
   }
 }
 
