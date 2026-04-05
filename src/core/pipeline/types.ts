@@ -1,0 +1,30 @@
+// src/core/pipeline/types.ts
+import type { MetaPromptFile, MetaPromptFrontmatter } from '../../types/frontmatter.js'
+import type {
+  ScaffoldConfig, StepEnablementEntry, MethodologyPreset,
+  DependencyGraph, ScaffoldError, ScaffoldWarning,
+  StepStateEntry,
+} from '../../types/index.js'
+import type { OverlayState } from '../assembly/overlay-state-resolver.js'
+
+export interface PipelineContext {
+  projectRoot: string
+  metaPrompts: Map<string, MetaPromptFile>
+  config: ScaffoldConfig | null
+  configErrors: ScaffoldError[]
+  configWarnings: ScaffoldWarning[]
+  presets: {
+    mvp: MethodologyPreset | null
+    deep: MethodologyPreset | null
+    custom: MethodologyPreset | null
+  }
+  methodologyDir: string
+}
+
+export interface ResolvedPipeline {
+  graph: DependencyGraph
+  preset: MethodologyPreset
+  overlay: OverlayState
+  stepMeta: Map<string, MetaPromptFrontmatter>
+  computeEligible: (steps: Record<string, StepStateEntry>) => string[]
+}
