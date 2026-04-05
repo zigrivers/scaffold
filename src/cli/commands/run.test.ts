@@ -39,6 +39,7 @@ vi.mock('../../core/assembly/engine.js', () => {
 })
 
 vi.mock('../../core/assembly/meta-prompt-loader.js', () => ({
+  discoverMetaPrompts: vi.fn(),
   discoverAllMetaPrompts: vi.fn(),
   loadMetaPrompt: vi.fn(),
 }))
@@ -81,6 +82,15 @@ vi.mock('../../core/assembly/overlay-loader.js', () => ({
 
 vi.mock('../../core/assembly/overlay-resolver.js', () => ({
   applyOverlay: vi.fn(),
+}))
+
+vi.mock('../../core/assembly/overlay-state-resolver.js', () => ({
+  resolveOverlayState: vi.fn(({ presetSteps }: { presetSteps: Record<string, unknown> }) => ({
+    steps: presetSteps,
+    knowledge: {},
+    reads: {},
+    dependencies: {},
+  })),
 }))
 
 vi.mock('node:fs', async () => {
@@ -137,7 +147,7 @@ import { StateManager } from '../../state/state-manager.js'
 import { acquireLock, releaseLock } from '../../state/lock-manager.js'
 import { analyzeCrash } from '../../state/completion.js'
 import { AssemblyEngine } from '../../core/assembly/engine.js'
-import { discoverAllMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
+import { discoverMetaPrompts, discoverAllMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { buildIndexWithOverrides, loadEntries } from '../../core/assembly/knowledge-loader.js'
 import { loadInstructions } from '../../core/assembly/instruction-loader.js'
 import { resolveDepth } from '../../core/assembly/depth-resolver.js'
@@ -146,6 +156,7 @@ import { detectMethodologyChange } from '../../core/assembly/methodology-change.
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
 import { loadOverlay } from '../../core/assembly/overlay-loader.js'
 import { applyOverlay } from '../../core/assembly/overlay-resolver.js'
+import { resolveOverlayState } from '../../core/assembly/overlay-state-resolver.js'
 import { loadConfig } from '../../config/loader.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { detectCycles, topologicalSort } from '../../core/dependency/dependency.js'
@@ -313,7 +324,9 @@ beforeEach(() => {
   vi.mocked(loadConfig).mockReturnValue({ config, errors: [], warnings: [] })
 
   const metaPrompt = makeMetaPrompt()
-  vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map([['create-prd', metaPrompt]]))
+  const defaultMetaPromptMap = new Map([['create-prd', metaPrompt]])
+  vi.mocked(discoverMetaPrompts).mockReturnValue(defaultMetaPromptMap)
+  vi.mocked(discoverAllMetaPrompts).mockReturnValue(defaultMetaPromptMap)
 
   const preset = makePreset()
   vi.mocked(loadAllPresets).mockReturnValue({
@@ -427,6 +440,7 @@ describe('run command handler', () => {
 
   describe('Step 2: discover pipeline', () => {
     it('exits 1 when step is not found in pipeline', async () => {
+      vi.mocked(discoverMetaPrompts).mockReturnValue(new Map())
       vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map())
 
       await expect(invokeHandler({ step: 'unknown-step', _: ['run'] }))
@@ -436,9 +450,9 @@ describe('run command handler', () => {
     })
 
     it('includes fuzzy match suggestion in error when step not found', async () => {
-      vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map([
-        ['create-prd', makeMetaPrompt()],
-      ]))
+      const map = new Map([['create-prd', makeMetaPrompt()]])
+      vi.mocked(discoverMetaPrompts).mockReturnValue(map)
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(map)
 
       await expect(invokeHandler({ step: 'create-pr', _: ['run'] }))
         .rejects.toThrow('process.exit called')
@@ -523,10 +537,12 @@ describe('run command handler', () => {
         frontmatter: makeFrontmatter({ name: 'create-arch', dependencies: ['create-prd'] }),
         stepName: 'create-arch',
       })
-      vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map([
+      const depMap = new Map([
         ['create-prd', makeMetaPrompt()],
         ['create-arch', metaPrompt],
-      ]))
+      ])
+      vi.mocked(discoverMetaPrompts).mockReturnValue(depMap)
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(depMap)
 
       const state = makeState({
         'create-prd': { status: 'pending', source: 'pipeline', produces: [] },
@@ -981,10 +997,12 @@ describe('run command handler', () => {
           outputs: ['docs/prd.md'],
         }),
       })
-      vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map([
+      const artMap = new Map([
         ['setup-project', setupMeta],
         ['create-prd', prdMeta],
-      ]))
+      ])
+      vi.mocked(discoverMetaPrompts).mockReturnValue(artMap)
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(artMap)
 
       // setup-project is completed with produces
       const state = makeState({
@@ -1072,10 +1090,12 @@ describe('run command handler', () => {
           outputs: ['docs/prd.md'],
         }),
       })
-      vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map([
+      const readsMap1 = new Map([
         ['setup-project', setupMeta],
         ['create-prd', prdMeta],
-      ]))
+      ])
+      vi.mocked(discoverMetaPrompts).mockReturnValue(readsMap1)
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(readsMap1)
 
       const state = makeState({
         'setup-project': {
@@ -1152,10 +1172,12 @@ describe('run command handler', () => {
           outputs: ['docs/prd.md'],
         }),
       })
-      vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map([
+      const readsMap2 = new Map([
         ['setup-project', setupMeta],
         ['create-prd', prdMeta],
-      ]))
+      ])
+      vi.mocked(discoverMetaPrompts).mockReturnValue(readsMap2)
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(readsMap2)
 
       // setup-project is pending (not completed)
       const state = makeState({
@@ -1213,10 +1235,12 @@ describe('run command handler', () => {
           outputs: ['docs/prd.md'],
         }),
       })
-      vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map([
+      const readsMap3 = new Map([
         ['setup-project', setupMeta],
         ['create-prd', prdMeta],
-      ]))
+      ])
+      vi.mocked(discoverMetaPrompts).mockReturnValue(readsMap3)
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(readsMap3)
 
       const state = makeState({
         'setup-project': {
@@ -1275,10 +1299,12 @@ describe('run command handler', () => {
           outputs: ['docs/prd.md'],
         }),
       })
-      vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map([
+      const dedupMap = new Map([
         ['setup-project', setupMeta],
         ['create-prd', prdMeta],
-      ]))
+      ])
+      vi.mocked(discoverMetaPrompts).mockReturnValue(dedupMap)
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(dedupMap)
 
       const state = makeState({
         'setup-project': {
@@ -1352,10 +1378,12 @@ describe('run command handler', () => {
           outputs: ['docs/arch.md'],
         }),
       })
-      vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map([
+      const bypassMap = new Map([
         ['create-prd', prdMeta],
         ['create-arch', archMeta],
-      ]))
+      ])
+      vi.mocked(discoverMetaPrompts).mockReturnValue(bypassMap)
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(bypassMap)
 
       const state = makeState({
         'create-prd': { status: 'pending', source: 'pipeline', produces: [] },
@@ -1391,42 +1419,17 @@ describe('run command handler', () => {
   })
 
   describe('overlay application', () => {
-    it('applies overlay when config has projectType, changing step enablement', async () => {
+    it('applies overlay when resolveOverlayState returns disabled steps', async () => {
       // Config with projectType: 'game'
       const config = makeConfig({
         project: { projectType: 'game' },
       })
       vi.mocked(loadConfig).mockReturnValue({ config, errors: [], warnings: [] })
 
-      // fs.existsSync must return true for the overlay file so the resolver proceeds
-      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
-        if (String(p).includes('game-overlay.yml')) return true
-        return false
-      })
-
-      const gameOverlay: ProjectTypeOverlay = {
-        name: 'game',
-        description: 'Game overlay',
-        projectType: 'game',
-        stepOverrides: {
-          'create-prd': { enabled: false },
-          'game-design-document': { enabled: true },
-        },
-        knowledgeOverrides: {},
-        readsOverrides: {},
-        dependencyOverrides: {},
-      }
-      vi.mocked(loadOverlay).mockReturnValue({
-        overlay: gameOverlay,
-        errors: [],
-        warnings: [],
-      })
-
-      // applyOverlay returns merged data with create-prd disabled
-      vi.mocked(applyOverlay).mockReturnValue({
+      // Mock resolveOverlayState to return overlay-merged data with create-prd disabled
+      vi.mocked(resolveOverlayState).mockReturnValue({
         steps: {
           'create-prd': { enabled: false },
-          'game-design-document': { enabled: true },
         },
         knowledge: { 'create-prd': [] },
         reads: { 'create-prd': [] },
@@ -1438,19 +1441,8 @@ describe('run command handler', () => {
       await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
         .rejects.toThrow('process.exit called')
 
-      // Verify loadOverlay was called
-      expect(loadOverlay).toHaveBeenCalledWith(
-        expect.stringContaining('game-overlay.yml'),
-      )
-
-      // Verify applyOverlay was called with the overlay
-      expect(applyOverlay).toHaveBeenCalledWith(
-        expect.any(Object),  // preset steps
-        expect.any(Object),  // knowledgeMap
-        expect.any(Object),  // readsMap
-        expect.any(Object),  // dependencyMap
-        gameOverlay,
-      )
+      // Verify resolveOverlayState was called (overlay resolution delegated to resolver)
+      expect(resolveOverlayState).toHaveBeenCalled()
 
       // Verify buildGraph received merged steps (with overlay applied)
       expect(buildGraph).toHaveBeenCalledWith(
@@ -1463,7 +1455,7 @@ describe('run command handler', () => {
       expect(stepsMap.get('create-prd')).toEqual({ enabled: false })
     })
 
-    it('does not call loadOverlay when config has no projectType', async () => {
+    it('passes preset steps through when config has no projectType', async () => {
       const config = makeConfig()  // no project.projectType
       vi.mocked(loadConfig).mockReturnValue({ config, errors: [], warnings: [] })
 
@@ -1472,8 +1464,9 @@ describe('run command handler', () => {
       await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
         .rejects.toThrow('process.exit called')
 
-      expect(loadOverlay).not.toHaveBeenCalled()
-      expect(applyOverlay).not.toHaveBeenCalled()
+      // resolveOverlayState is still called (by the resolver) but with no projectType
+      // it returns the preset steps unchanged
+      expect(resolveOverlayState).toHaveBeenCalled()
     })
   })
 })
