@@ -320,12 +320,16 @@ export function resolvePipeline(
   const preset =
     (methodology === 'mvp' ? presets.mvp : methodology === 'custom' ? presets.custom : presets.deep) ??
     presets.deep
-  if (!preset) {
-    throw new Error('No methodology preset available (deep preset is missing)')
+  // Fallback when no preset found (matches current rework.ts behavior)
+  const resolvedPreset = preset ?? {
+    name: 'deep' as const,
+    description: 'Default deep methodology',
+    default_depth: 3 as any,
+    steps: {} as Record<string, StepEnablementEntry>,
   }
 
   // 2. Apply custom enablement overrides
-  const mergedSteps: Record<string, StepEnablementEntry> = { ...preset.steps }
+  const mergedSteps: Record<string, StepEnablementEntry> = { ...resolvedPreset.steps }
   if (config?.custom?.steps) {
     for (const [name, customStep] of Object.entries(config.custom.steps)) {
       if (customStep.enabled !== undefined) {
@@ -368,7 +372,7 @@ export function resolvePipeline(
   const computeEligibleFn = (steps: Record<string, StepStateEntry>): string[] =>
     computeEligible(graph, steps)
 
-  return { graph, preset, overlay, stepMeta, computeEligible: computeEligibleFn }
+  return { graph, preset: resolvedPreset, overlay, stepMeta, computeEligible: computeEligibleFn }
 }
 ```
 
@@ -407,7 +411,13 @@ const pipeline = resolvePipeline(context, { output })
 const stateManager = new StateManager(projectRoot, pipeline.computeEligible)
 ```
 
-Keep all command-specific logic unchanged: state reconciliation, progress stats, phase grouping, output formatting. Use `pipeline.stepMeta` where status.ts currently accesses `metaPrompts.get(name)?.frontmatter`. Use `context.metaPrompts` where it needs the full MetaPromptFile.
+Keep all command-specific logic unchanged: state reconciliation, progress stats, phase grouping, output formatting.
+
+**Key migration points for status.ts:**
+- Use `pipeline.stepMeta` where status.ts accesses `metaPrompts.get(name)?.frontmatter`
+- Use `context.metaPrompts` where it needs the full `MetaPromptFile`
+- Replace `presetSteps.get(name)?.enabled` in `pipelineSteps` construction (~line 150) with `pipeline.overlay.steps[name]?.enabled ?? false`
+- Replace the second graph build at lines ~243-248 (`buildGraph(...)` + `computeEligible(graph, state.steps)`) with `pipeline.computeEligible(state.steps)`
 
 Remove unused imports: `discoverMetaPrompts`, `loadAllPresets`, `resolveOverlayState`, `buildGraph`, `computeEligible`, `loadConfig`, `getPackagePipelineDir`, `getPackageMethodologyDir`.
 
