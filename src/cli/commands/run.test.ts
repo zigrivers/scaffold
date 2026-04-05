@@ -1447,6 +1447,7 @@ describe('run command handler', () => {
       expect(buildGraph).toHaveBeenCalledWith(
         expect.any(Array),
         expect.any(Map),
+        expect.any(Object),
       )
       // The presetStepsMap passed to buildGraph should contain overlay-merged steps
       const buildGraphCall = vi.mocked(buildGraph).mock.calls[0]

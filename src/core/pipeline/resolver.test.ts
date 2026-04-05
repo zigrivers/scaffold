@@ -63,6 +63,40 @@ describe('resolvePipeline', () => {
     expect(node?.enabled).toBe(true)
   })
 
+  it('graph nodes have overlay-appended deps (user-stories depends on review-gdd for game)', () => {
+    const ctx = loadPipelineContext(process.cwd())
+    if (ctx.config) {
+      ctx.config.project = { projectType: 'game', gameConfig: { engine: 'custom' } }
+    }
+    const pipeline = resolvePipeline(ctx)
+    const node = pipeline.graph.nodes.get('user-stories')
+    expect(node?.dependencies).toContain('review-gdd')
+  })
+
+  it('graph nodes have overlay-replaced deps (platform-parity-review uses review-game-ui for game)', () => {
+    const ctx = loadPipelineContext(process.cwd())
+    if (ctx.config) {
+      ctx.config.project = { projectType: 'game', gameConfig: { engine: 'custom' } }
+    }
+    const pipeline = resolvePipeline(ctx)
+    const node = pipeline.graph.nodes.get('platform-parity-review')
+    expect(node?.dependencies).toContain('review-game-ui')
+    expect(node?.dependencies).not.toContain('review-ux')
+  })
+
+  it('computeEligible blocks user-stories when review-gdd is not completed (game project)', () => {
+    const ctx = loadPipelineContext(process.cwd())
+    if (ctx.config) {
+      ctx.config.project = { projectType: 'game', gameConfig: { engine: 'custom' } }
+    }
+    const pipeline = resolvePipeline(ctx)
+    const state: Record<string, any> = {
+      'review-prd': { status: 'completed', source: 'pipeline' },
+    }
+    const eligible = pipeline.computeEligible(state)
+    expect(eligible).not.toContain('user-stories')
+  })
+
   it('handles null config gracefully (fallback to deep, frontmatter maps preserved)', () => {
     const ctx = loadPipelineContext(process.cwd())
     ctx.config = null
