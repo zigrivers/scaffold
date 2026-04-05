@@ -115,7 +115,6 @@ vi.mock('../../core/dependency/graph.js', () => ({
 
 vi.mock('../../core/dependency/dependency.js', () => ({
   detectCycles: vi.fn(),
-  topologicalSort: vi.fn(),
 }))
 
 vi.mock('../../core/dependency/eligibility.js', () => ({
@@ -158,7 +157,7 @@ import { loadOverlay } from '../../core/assembly/overlay-loader.js'
 import { resolveOverlayState } from '../../core/assembly/overlay-state-resolver.js'
 import { loadConfig } from '../../config/loader.js'
 import { buildGraph } from '../../core/dependency/graph.js'
-import { detectCycles, topologicalSort } from '../../core/dependency/dependency.js'
+import { detectCycles } from '../../core/dependency/dependency.js'
 import { computeEligible } from '../../core/dependency/eligibility.js'
 import { findProjectRoot } from '../../cli/middleware/project-root.js'
 import { createOutputContext } from '../../cli/output/context.js'
@@ -357,7 +356,6 @@ beforeEach(() => {
   const graph = makeGraph()
   vi.mocked(buildGraph).mockReturnValue(graph)
   vi.mocked(detectCycles).mockReturnValue([])
-  vi.mocked(topologicalSort).mockReturnValue(['create-prd'])
   vi.mocked(computeEligible).mockReturnValue([])
 
   vi.mocked(resolveDepth).mockReturnValue({ depth: 3, provenance: 'preset-default' })

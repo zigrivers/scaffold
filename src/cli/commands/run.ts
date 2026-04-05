@@ -11,7 +11,7 @@ import { loadInstructions } from '../../core/assembly/instruction-loader.js'
 import { resolveDepth } from '../../core/assembly/depth-resolver.js'
 import { detectUpdateMode } from '../../core/assembly/update-mode.js'
 import { detectMethodologyChange } from '../../core/assembly/methodology-change.js'
-import { detectCycles, topologicalSort } from '../../core/dependency/dependency.js'
+import { detectCycles } from '../../core/dependency/dependency.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
 import { findProjectRoot } from '../../cli/middleware/project-root.js'
@@ -192,13 +192,12 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       process.exit(1)
     }
 
-    topologicalSort(graph)
-
     // Tools (category: 'tool') are not in the dependency graph — skip dep checking
     const isTool = metaPrompt.frontmatter.category === 'tool'
     const stepNode = isTool ? undefined : graph.nodes.get(step)
-    const deps = pipeline.overlay.dependencies[step]
-      ?? stepNode?.dependencies ?? metaPrompt.frontmatter.dependencies ?? []
+    const deps = isTool
+      ? (pipeline.overlay.dependencies[step] ?? [])
+      : (stepNode?.dependencies ?? [])
 
     if (!isTool) {
       const unmetDeps = deps.filter(dep => {
