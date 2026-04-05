@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { resolvePipeline } from './resolver.js'
 import { loadPipelineContext } from './context.js'
+import type { StepStateEntry } from '../../types/state.js'
 
 describe('resolvePipeline', () => {
   it('returns a DependencyGraph with nodes', () => {
@@ -66,7 +67,8 @@ describe('resolvePipeline', () => {
   it('graph nodes have overlay-appended deps (user-stories depends on review-gdd for game)', () => {
     const ctx = loadPipelineContext(process.cwd())
     if (ctx.config) {
-      ctx.config.project = { projectType: 'game', gameConfig: { engine: 'custom' } }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod defaults fill fields at runtime
+      ctx.config.project = { projectType: 'game', gameConfig: { engine: 'custom' } } as any
     }
     const pipeline = resolvePipeline(ctx)
     const node = pipeline.graph.nodes.get('user-stories')
@@ -76,7 +78,8 @@ describe('resolvePipeline', () => {
   it('graph nodes have overlay-replaced deps (platform-parity-review uses review-game-ui for game)', () => {
     const ctx = loadPipelineContext(process.cwd())
     if (ctx.config) {
-      ctx.config.project = { projectType: 'game', gameConfig: { engine: 'custom' } }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod defaults fill fields at runtime
+      ctx.config.project = { projectType: 'game', gameConfig: { engine: 'custom' } } as any
     }
     const pipeline = resolvePipeline(ctx)
     const node = pipeline.graph.nodes.get('platform-parity-review')
@@ -87,10 +90,11 @@ describe('resolvePipeline', () => {
   it('computeEligible blocks user-stories when review-gdd is not completed (game project)', () => {
     const ctx = loadPipelineContext(process.cwd())
     if (ctx.config) {
-      ctx.config.project = { projectType: 'game', gameConfig: { engine: 'custom' } }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod defaults fill fields at runtime
+      ctx.config.project = { projectType: 'game', gameConfig: { engine: 'custom' } } as any
     }
     const pipeline = resolvePipeline(ctx)
-    const state: Record<string, any> = {
+    const state: Record<string, StepStateEntry> = {
       'review-prd': { status: 'completed', source: 'pipeline' },
     }
     const eligible = pipeline.computeEligible(state)
