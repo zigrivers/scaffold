@@ -1,0 +1,42 @@
+import type { ReconciledResults } from '../types.js'
+
+export function formatMarkdown(results: ReconciledResults): string {
+  const lines: string[] = []
+  const gate = results.gate_passed ? 'PASSED' : 'FAILED'
+
+  lines.push(`## Multi-Model Review — ${gate}`)
+  lines.push('')
+  lines.push(
+    `**Job:** ${results.job_id} | **Threshold:** ${results.fix_threshold}` +
+    ` | **Elapsed:** ${results.metadata.total_elapsed}`,
+  )
+  lines.push('')
+
+  if (results.reconciled_findings.length > 0) {
+    lines.push('### Findings')
+    lines.push('')
+    lines.push('| Severity | Location | Description | Suggestion | Sources | Agreement |')
+    lines.push('|----------|----------|-------------|------------|---------|-----------|')
+    for (const f of results.reconciled_findings) {
+      const src = f.sources.join(', ')
+      const esc = (s: string) => s.replace(/\|/g, '\\|')
+      const row = [
+        f.severity, f.location, esc(f.description),
+        esc(f.suggestion), src, f.agreement,
+      ].map((c) => ` ${c} `).join('|')
+      lines.push(`|${row}|`)
+    }
+    lines.push('')
+  } else {
+    lines.push('No findings.')
+    lines.push('')
+  }
+
+  lines.push('### Channels')
+  lines.push('')
+  for (const [name, ch] of Object.entries(results.per_channel)) {
+    lines.push(`- **${name}:** ${ch.status} (${ch.elapsed})`)
+  }
+
+  return lines.join('\n')
+}
