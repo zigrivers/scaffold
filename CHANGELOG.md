@@ -2,20 +2,33 @@
 
 All notable changes to Scaffold are documented here.
 
-## [Unreleased]
+## [3.5.0] — 2026-04-05
 
 ### Added
 
-- **Game development pipeline support** — new `game` project type with 24 pipeline steps, 29 knowledge entries, and a project-type overlay system.
-  - `scaffold init --project-type game` for non-interactive game project setup
-  - Progressive-disclosure wizard for game configuration (engine, multiplayer, platforms, economy, narrative, etc.)
-  - Game Design Document (GDD), performance budgets, art bible, audio design, netcode spec, game accessibility, economy design, and 17 more documentation steps
-  - `scaffold adopt` detects Unity (.meta), Unreal (.uproject), and Godot (project.godot) projects
-  - Project-type overlay architecture extensible to future project types
-- **Overlay system** — `game-overlay.yml` layers step enablement, knowledge injection, reads remapping, and dependency adjustments on any methodology preset (mvp/deep/custom).
-- **Wizard UI primitives** — `select()`, `multiSelect()`, `multiInput()` methods on OutputContext for richer init wizard interactions.
-- **Reads assembly** — `reads` frontmatter field now wired into prompt assembly context (non-blocking artifact gathering).
-- **Centralized overlay resolution** — all commands (run, status, next, rework, complete, skip, reset) are overlay-aware for game projects.
+- **Game development pipeline support** — new `game` project type with 24 pipeline steps, 29 knowledge entries, and a project-type overlay system. Scaffold can now produce comprehensive game documentation from GDD through platform certification.
+  - **24 game-specific pipeline steps** across 5 phases: Game Design Document (GDD) with pillars and core loop, performance budgets (frame/memory/GPU), art bible with asset pipeline, audio design with adaptive music, game UI spec (replaces web design system), content structure design (levels/open-world/procedural), netcode spec, game accessibility (XAG-aligned), economy design, playtest plan, analytics/telemetry, platform certification prep, and 12 more
+  - **29 game knowledge entries** providing domain expertise on game engines, networking, audio middleware, save systems, input patterns, VR/AR, localization, modding/UGC, live operations, platform certification, and more — injected into both new and existing pipeline steps
+  - **Progressive-disclosure init wizard** — game configuration asks about engine (Unity/Unreal/Godot/custom), multiplayer mode, target platforms, online services, content structure, economy, narrative depth, locales, NPC AI, modding, and persistence
+  - **`--project-type` CLI flag** — `scaffold init --project-type game --auto` for non-interactive game project setup in CI/scripts
+  - **`scaffold adopt` game engine detection** — automatically detects Unity (.meta files), Unreal (.uproject), and Godot (project.godot) projects and configures the game overlay
+  - **Enum-based game traits** — `multiplayerMode`, `narrative`, `contentStructure`, `economy`, `onlineServices`, `persistence`, `targetPlatforms`, `supportedLocales`, `npcAiComplexity`, `hasModding` control which conditional steps activate
+- **Project-type overlay system** — new architecture enabling project-type-specific pipeline customization without modifying methodology presets.
+  - `game-overlay.yml` layers step enablement, knowledge injection, reads remapping, and dependency adjustments on any methodology (mvp/deep/custom)
+  - Extensible to future project types (data pipelines, embedded, etc.) by adding new overlay files
+  - `overlay-state-resolver.ts` provides centralized resolution shared by all commands
+  - `overlay-loader.ts` parses overlay YAML with graceful error handling
+  - `overlay-resolver.ts` applies overlays via replace-then-append-then-dedup algorithm
+- **Wizard UI primitives** — `select()`, `multiSelect()`, `multiInput()` methods on `OutputContext` for richer wizard interactions beyond yes/no prompts.
+- **Reads assembly** — the `reads` frontmatter field is now wired into prompt assembly context. Steps can declare cross-cutting artifact references that are loaded non-blockingly (missing reads produce warnings, not errors).
+- **Centralized overlay resolution** — all pipeline commands (`run`, `status`, `next`, `rework`, `complete`, `skip`, `reset`) are overlay-aware for game projects. Step enablement, knowledge injection, reads remapping, and dependency overrides apply consistently across every command.
+- **`GameConfig` type and Zod validation** — full TypeScript type system for game configuration with runtime validation, cross-field rules (`gameConfig` only valid when `projectType === 'game'`), and sensible defaults for all fields.
+
+### Changed
+
+- **Config loader returns Zod-parsed data** — `loadConfig()` now returns `zodResult.data` instead of the raw YAML object, ensuring Zod defaults (including `GameConfig` field defaults) are applied at runtime.
+- **Disabled dependencies treated as satisfied in run command** — aligns `run.ts` with `eligibility.ts` behavior, preventing `DEP_UNMET` errors when overlays disable steps.
+- **Methodology presets updated** — all three presets (deep, mvp, custom-defaults) now include the 24 game steps as `enabled: false`, preventing `PRESET_MISSING_STEP` warnings. The game overlay enables them when active.
 
 ## [3.4.1] — 2026-04-05
 

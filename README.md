@@ -358,20 +358,94 @@ scaffold dashboard           # open a visual progress dashboard in your browser
 
 ### Game Development
 
-Scaffold supports game development projects with specialized pipeline steps for game design documents, performance budgets, art bibles, audio design, netcode, and more.
+Scaffold fully supports game development projects. When you select `game` as your project type, a **project-type overlay** activates 24 game-specific pipeline steps and injects game domain expertise into existing steps — all while keeping the standard pipeline workflow (status, next, rework, multi-model review) fully functional.
+
+#### Getting Started
 
 ```bash
-# Initialize a game project interactively
+# Interactive — the wizard asks about your engine, multiplayer, platforms, etc.
 scaffold init
 
-# Or non-interactively with defaults
+# Non-interactive with defaults (engine: custom, single-player, PC)
 scaffold init --project-type game --auto
+
+# Non-interactive with specific methodology
+scaffold init --project-type game --methodology deep --auto
 
 # Adopt an existing game project (auto-detects Unity/Unreal/Godot)
 scaffold adopt
 ```
 
-The game pipeline adds 24 documentation steps covering game design, technical specs, art/audio, player experience, and platform certification. All standard pipeline features (status, next, rework, multi-model review) work with game projects.
+#### How It Works
+
+Game support uses a **project-type overlay** architecture. You choose your methodology normally (`mvp`, `deep`, or `custom`), then `projectType: game` layers on top:
+
+- **Enables 24 game steps** — GDD, performance budgets, art bible, audio design, etc.
+- **Disables 3 web-centric steps** — `design-system`, `ux-spec`, `review-ux` (replaced by `game-ui-spec`)
+- **Injects 29 game knowledge entries** into existing steps (e.g., game engine evaluation into `tech-stack`, game testing patterns into `tdd`)
+- **Remaps artifact references** so downstream steps read game-specific docs instead of web ones
+
+A game jam project uses `mvp` + game overlay (fewer steps, lower depth). An AAA project uses `deep` + game overlay (all steps, max depth).
+
+#### Game Configuration
+
+During `scaffold init`, the wizard asks game-specific questions with progressive disclosure:
+
+| Category | Questions |
+|----------|-----------|
+| **Core** (always asked) | Game engine (Unity/Unreal/Godot/custom), multiplayer mode (none/local/online/hybrid), target platforms (PC/console/mobile/VR/AR) |
+| **Conditional** | Online services (if multiplayer), content structure (levels/open-world/procedural/endless), economy type (none/progression/monetized) |
+| **Advanced** (opt-in) | Narrative depth, supported locales, NPC AI complexity, mod support, persistence model |
+
+These answers control which conditional steps activate. A single-player puzzle game gets a different pipeline than a multiplayer live-service RPG.
+
+#### Game Pipeline Steps
+
+**Always enabled** (12 steps):
+
+| Step | Phase | What It Produces |
+|------|-------|-----------------|
+| `game-design-document` | Pre | Game pillars, core loop, mechanics catalog, progression systems |
+| `review-gdd` | Pre | Multi-pass review of GDD for pillar coherence, scope feasibility |
+| `performance-budgets` | Foundation | Frame budgets, memory budgets, GPU limits, loading targets per platform |
+| `game-accessibility` | Specification | XAG-aligned accessibility plan (visual, motor, cognitive, auditory) |
+| `input-controls-spec` | Specification | Input bindings, rebinding, haptics, dead zones, cross-play fairness |
+| `game-ui-spec` | Specification | HUD, menus, controller navigation, settings, FTUE/tutorial, UI states |
+| `review-game-ui` | Specification | Multi-pass review of game UI for completeness and accessibility |
+| `content-structure-design` | Specification | Level layouts, world regions, procedural rulesets, or mission templates |
+| `art-bible` | Specification | Art style, asset specs, naming conventions, DCC pipeline, LOD strategy |
+| `audio-design` | Specification | Audio direction, adaptive music, spatial audio, middleware config, VO |
+| `playtest-plan` | Quality | Playtest types, schedule, feedback templates, balance testing |
+| `analytics-telemetry` | Quality | Event taxonomy, crash telemetry, data pipeline, privacy compliance |
+
+**Conditional** (12 steps — activated by your game configuration):
+
+| Step | Activates When | What It Produces |
+|------|---------------|-----------------|
+| `narrative-bible` | Narrative is light/heavy | World lore, characters, dialogue systems, branching narrative |
+| `netcode-spec` | Multiplayer is online/hybrid | Network topology, tick rate, prediction, lag compensation, anti-cheat |
+| `review-netcode` | Netcode spec enabled | Latency tolerance, bandwidth, cheat resistance review |
+| `ai-behavior-design` | NPC AI is simple/complex | Behavior trees, pathfinding, perception, difficulty scaling |
+| `economy-design` | Economy is not none | Currencies, loot tables, monetization, legal compliance |
+| `review-economy` | Economy design enabled | Inflation analysis, exploit detection, ethical monetization review |
+| `online-services-spec` | Online services selected | Identity, leaderboards, matchmaking, moderation, cloud save |
+| `modding-ugc-spec` | Mod support enabled | Mod API, sandboxing, distribution, content moderation |
+| `save-system-spec` | Persistence is not none | Save format, cloud sync, corruption recovery, migration |
+| `localization-plan` | Multiple locales | String management, fonts (CJK/RTL), VO localization, LQA |
+| `live-ops-plan` | Live-ops selected | Content cadence, events, hotfix deployment, maintenance |
+| `platform-cert-prep` | Console/mobile/VR targets | Sony TRC, Xbox XR, Nintendo Lotcheck, store compliance checklists |
+
+#### Engine Detection
+
+`scaffold adopt` automatically detects game engines in existing projects:
+
+| Engine | Detection Signal |
+|--------|-----------------|
+| Unity | `Assets/*.meta` files |
+| Unreal | `*.uproject` file |
+| Godot | `project.godot` file |
+
+When detected, `scaffold adopt` sets `projectType: game` and `gameConfig.engine` in your config, enabling the full game overlay.
 
 ## The Pipeline
 
