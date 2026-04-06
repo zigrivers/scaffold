@@ -1,5 +1,5 @@
 import type { OutputContext } from '../cli/output/context.js'
-import type { ProjectType, GameConfig } from '../types/index.js'
+import type { ProjectType, GameConfig, WebAppConfig, BackendConfig, CliConfig } from '../types/index.js'
 import { GameConfigSchema, ProjectTypeSchema } from '../config/schema.js'
 
 export interface WizardAnswers {
@@ -9,6 +9,9 @@ export interface WizardAnswers {
   traits: string[]
   projectType?: ProjectType
   gameConfig?: GameConfig
+  webAppConfig?: WebAppConfig
+  backendConfig?: BackendConfig
+  cliConfig?: CliConfig
 }
 
 /**
