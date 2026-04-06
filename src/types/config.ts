@@ -84,6 +84,9 @@ export interface ProjectConfig {
   platforms?: Array<'web' | 'mobile' | 'desktop'>
   projectType?: ProjectType
   gameConfig?: GameConfig
+  webAppConfig?: WebAppConfig
+  backendConfig?: BackendConfig
+  cliConfig?: CliConfig
   [key: string]: unknown  // forward compatibility
 }
 

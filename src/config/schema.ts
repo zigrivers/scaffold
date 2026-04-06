@@ -60,17 +60,39 @@ const ProjectSchema = z.object({
   platforms: z.array(z.enum(['web', 'mobile', 'desktop'])).optional(),
   projectType: ProjectTypeSchema.optional(),
   gameConfig: GameConfigSchema.optional(),
+  webAppConfig: WebAppConfigSchema.optional(),
+  backendConfig: BackendConfigSchema.optional(),
+  cliConfig: CliConfigSchema.optional(),
 }).passthrough()  // allow unknown fields per ADR-033
-  .refine(
-    (data) => {
-      // gameConfig is only valid when projectType === 'game'
-      if (data.gameConfig !== undefined && data.projectType !== 'game') {
-        return false
+  .superRefine((data, ctx) => {
+    if (data.gameConfig !== undefined && data.projectType !== 'game') {
+      ctx.addIssue({ path: ['gameConfig'], code: 'custom',
+        message: 'gameConfig is only valid when projectType is "game"' })
+    }
+    if (data.webAppConfig !== undefined && data.projectType !== 'web-app') {
+      ctx.addIssue({ path: ['webAppConfig'], code: 'custom',
+        message: 'webAppConfig requires projectType: web-app' })
+    }
+    if (data.backendConfig !== undefined && data.projectType !== 'backend') {
+      ctx.addIssue({ path: ['backendConfig'], code: 'custom',
+        message: 'backendConfig requires projectType: backend' })
+    }
+    if (data.cliConfig !== undefined && data.projectType !== 'cli') {
+      ctx.addIssue({ path: ['cliConfig'], code: 'custom',
+        message: 'cliConfig requires projectType: cli' })
+    }
+    if (data.webAppConfig) {
+      const { renderingStrategy, deployTarget, authFlow } = data.webAppConfig
+      if (['ssr', 'hybrid'].includes(renderingStrategy) && deployTarget === 'static') {
+        ctx.addIssue({ path: ['webAppConfig', 'deployTarget'], code: 'custom',
+          message: 'SSR/hybrid rendering requires compute, not static hosting' })
       }
-      return true
-    },
-    { message: 'gameConfig is only valid when projectType is "game"', path: ['gameConfig'] },
-  )
+      if (authFlow === 'session' && deployTarget === 'static') {
+        ctx.addIssue({ path: ['webAppConfig', 'authFlow'], code: 'custom',
+          message: 'Session auth requires server state, incompatible with static hosting' })
+      }
+    }
+  })
 
 export const ConfigSchema = z.object({
   version: z.literal(2),
