@@ -185,28 +185,35 @@ export async function askWizardQuestions(options: {
     const hasAdvancedFlag = options.narrative !== undefined || options.locales !== undefined ||
       options.npcAi !== undefined || options.modding !== undefined || options.persistence !== undefined
 
-    if (!hasAdvancedFlag && !auto) {
-      const showAdvanced = await output.confirm('Configure advanced game options?', false)
-      if (showAdvanced) {
+    // Show advanced questions if: any advanced flag is set (force open), or user confirms
+    const showAdvanced = hasAdvancedFlag || (!auto && await output.confirm('Configure advanced game options?', false))
+
+    if (showAdvanced && !auto) {
+      // Ask each unflagged advanced question interactively
+      if (options.narrative === undefined) {
         narrative = await output.select(
           'Narrative depth:',
           ['none', 'light', 'heavy'],
           'none',
         ) as GameConfig['narrative']
-
+      }
+      if (options.locales === undefined) {
         supportedLocales = await output.multiInput(
           'Supported locales (comma-separated):',
           ['en'],
         )
-
+      }
+      if (options.npcAi === undefined) {
         npcAiComplexity = await output.select(
           'NPC AI complexity:',
           ['none', 'simple', 'complex'],
           'none',
         ) as GameConfig['npcAiComplexity']
-
+      }
+      if (options.modding === undefined) {
         hasModding = await output.confirm('Mod support?', false)
-
+      }
+      if (options.persistence === undefined) {
         persistence = await output.select(
           'Persistence level:',
           ['none', 'settings-only', 'profile', 'progression', 'cloud'],

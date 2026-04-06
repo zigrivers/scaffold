@@ -35,7 +35,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
   describe: 'Initialize scaffold for this project',
   builder: (yargs: Argv<Record<string, unknown>>) => {
     const coerceCSV = (val: string | string[]) =>
-      [...new Set((Array.isArray(val) ? val : [val]).flatMap((v: string) => v.split(',').map((s: string) => s.trim())))]
+      [...new Set((Array.isArray(val) ? val : [val]).flatMap((v: string) => v.split(',').map((s: string) => s.trim()).filter(Boolean)))]
 
     return yargs
       // General options
