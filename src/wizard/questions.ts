@@ -176,15 +176,21 @@ export async function askWizardQuestions(options: {
           ['relational', 'document', 'key-value'], ['relational']) as BackendConfig['dataStore']
         : ['relational'] as BackendConfig['dataStore']
 
-    const authMechanism = apiStyle === 'none'
-      ? 'none' as BackendConfig['authMechanism']
-      : options.backendAuth
+    let authMechanism: BackendConfig['authMechanism']
+    if (apiStyle === 'none') {
+      if (options.backendAuth && options.backendAuth !== 'none') {
+        output.warn('--backend-auth ignored because --backend-api-style is none (no API to authenticate)')
+      }
+      authMechanism = 'none'
+    } else {
+      authMechanism = options.backendAuth
         ? options.backendAuth as BackendConfig['authMechanism']
         : !auto
           ? await output.select('How does the API verify requests?',
             ['none', 'jwt', 'session', 'oauth', 'apikey'],
             'none') as BackendConfig['authMechanism']
           : 'none'
+    }
 
     const asyncMessaging = options.backendMessaging
       ? options.backendMessaging as BackendConfig['asyncMessaging']

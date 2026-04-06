@@ -480,11 +480,10 @@ scaffold init --project-type game --methodology deep --auto \
 Scaffold supports **project-type overlays** — domain-specific knowledge and pipeline customizations that activate based on your project type. When you set a project type during `scaffold init`, the corresponding overlay layers on top of your chosen methodology (mvp, deep, or custom):
 
 - **Injects domain knowledge** into existing pipeline steps (e.g., SSR caching strategies into `tech-stack`, API pagination patterns into `coding-standards`)
-- **Adjusts step enablement** — disables steps that don't apply and enables type-specific alternatives
-- **Remaps artifact references** so downstream steps read the right documents
-- **Adds dependency overrides** to ensure correct step ordering
 
-Overlays are composable with methodology presets. An MVP web-app gets fewer steps at lower depth; a deep backend project gets exhaustive analysis of every architectural decision. The overlay only adds domain expertise — it doesn't change how many steps run or how thorough they are.
+The game overlay additionally adjusts step enablement, remaps artifact references, and adds dependency overrides (because game development has fundamentally different artifacts). The web-app, backend, and CLI overlays are **knowledge-only** — they inject domain expertise into existing steps without changing which steps run or how they depend on each other.
+
+Overlays are composable with methodology presets. An MVP web-app gets fewer steps at lower depth; a deep backend project gets exhaustive analysis of every architectural decision.
 
 | Project Type | Overlay | Knowledge Entries | Config Options |
 |-------------|---------|-------------------|----------------|
