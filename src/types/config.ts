@@ -3,6 +3,7 @@ import type { z } from 'zod'
 import {
   ProjectTypeSchema, WebAppConfigSchema, BackendConfigSchema,
   CliConfigSchema, LibraryConfigSchema, MobileAppConfigSchema,
+  DataPipelineConfigSchema, MlConfigSchema, BrowserExtensionConfigSchema,
 } from '../config/schema.js'
 
 /** Step enablement entry used in presets and overlays. */
@@ -40,6 +41,15 @@ export type LibraryConfig = z.infer<typeof LibraryConfigSchema>
 
 /** Mobile app configuration — derived from Zod schema (single source of truth). */
 export type MobileAppConfig = z.infer<typeof MobileAppConfigSchema>
+
+/** Data pipeline configuration — derived from Zod schema (single source of truth). */
+export type DataPipelineConfig = z.infer<typeof DataPipelineConfigSchema>
+
+/** ML project configuration — derived from Zod schema (single source of truth). */
+export type MlConfig = z.infer<typeof MlConfigSchema>
+
+/** Browser extension configuration — derived from Zod schema (single source of truth). */
+export type BrowserExtensionConfig = z.infer<typeof BrowserExtensionConfigSchema>
 
 /** Game engine options. */
 export type GameEngine = 'unity' | 'unreal' | 'godot' | 'custom'
@@ -98,6 +108,9 @@ export interface ProjectConfig {
   cliConfig?: CliConfig
   libraryConfig?: LibraryConfig
   mobileAppConfig?: MobileAppConfig
+  dataPipelineConfig?: DataPipelineConfig
+  mlConfig?: MlConfig
+  browserExtensionConfig?: BrowserExtensionConfig
   [key: string]: unknown  // forward compatibility
 }
 

@@ -5,14 +5,18 @@ import {
   ConfigSchema, GameConfigSchema, ProjectTypeSchema,
   WebAppConfigSchema, BackendConfigSchema, CliConfigSchema,
   LibraryConfigSchema, MobileAppConfigSchema,
+  DataPipelineConfigSchema, MlConfigSchema, BrowserExtensionConfigSchema,
 } from './schema.js'
 
 describe('ProjectTypeSchema', () => {
   it('includes all project types', () => {
     expect(ProjectTypeSchema.options).toEqual(
-      expect.arrayContaining(['web-app', 'mobile-app', 'backend', 'cli', 'library', 'game']),
+      expect.arrayContaining([
+        'web-app', 'mobile-app', 'backend', 'cli', 'library', 'game',
+        'data-pipeline', 'ml', 'browser-extension',
+      ]),
     )
-    expect(ProjectTypeSchema.options).toHaveLength(6)
+    expect(ProjectTypeSchema.options).toHaveLength(9)
   })
 })
 
@@ -690,6 +694,184 @@ describe('ProjectSchema cross-field validation — library and mobile-app', () =
       project: {
         projectType: 'library',
         libraryConfig: { visibility: 'internal', documentationLevel: 'none' },
+      },
+    })
+    expect(result.success).toBe(true)
+  })
+})
+
+describe('DataPipelineConfigSchema', () => {
+  it('requires processingModel', () => {
+    const result = DataPipelineConfigSchema.safeParse({})
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts valid config with defaults', () => {
+    const result = DataPipelineConfigSchema.parse({ processingModel: 'batch' })
+    expect(result).toEqual({
+      processingModel: 'batch',
+      orchestration: 'none',
+      dataQualityStrategy: 'validation',
+      schemaManagement: 'none',
+      hasDataCatalog: false,
+    })
+  })
+
+  it('rejects unknown fields (.strict())', () => {
+    const result = DataPipelineConfigSchema.safeParse({
+      processingModel: 'streaming',
+      unknownField: 'value',
+    })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('MlConfigSchema', () => {
+  it('requires projectPhase', () => {
+    const result = MlConfigSchema.safeParse({})
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts valid config with defaults', () => {
+    const result = MlConfigSchema.parse({ projectPhase: 'training' })
+    expect(result).toEqual({
+      projectPhase: 'training',
+      modelType: 'deep-learning',
+      servingPattern: 'none',
+      hasExperimentTracking: true,
+    })
+  })
+
+  it('rejects unknown fields (.strict())', () => {
+    const result = MlConfigSchema.safeParse({
+      projectPhase: 'both',
+      unknownField: 'value',
+    })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('BrowserExtensionConfigSchema', () => {
+  it('accepts config with all defaults (no required fields)', () => {
+    const result = BrowserExtensionConfigSchema.parse({})
+    expect(result).toEqual({
+      manifestVersion: '3',
+      uiSurfaces: ['popup'],
+      hasContentScript: false,
+      hasBackgroundWorker: true,
+    })
+  })
+
+  it('rejects unknown fields (.strict())', () => {
+    const result = BrowserExtensionConfigSchema.safeParse({
+      unknownField: 'value',
+    })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('ProjectSchema cross-field validation — new project types', () => {
+  it('rejects dataPipelineConfig with non-data-pipeline projectType', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'backend',
+        dataPipelineConfig: { processingModel: 'batch' },
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects mlConfig with non-ml projectType', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'backend',
+        mlConfig: { projectPhase: 'training' },
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects browserExtensionConfig with non-browser-extension projectType', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'web-app',
+        browserExtensionConfig: {},
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects ML inference with servingPattern none', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'ml',
+        mlConfig: { projectPhase: 'inference', servingPattern: 'none' },
+      },
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const msgs = result.error.issues.map(i => i.message)
+      expect(msgs).toContain('Inference projects must specify a serving pattern')
+    }
+  })
+
+  it('rejects ML training with servingPattern set', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'ml',
+        mlConfig: { projectPhase: 'training', servingPattern: 'realtime' },
+      },
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const msgs = result.error.issues.map(i => i.message)
+      expect(msgs).toContain('Training-only projects should not have a serving pattern')
+    }
+  })
+
+  it('rejects browser extension with no capabilities', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'browser-extension',
+        browserExtensionConfig: {
+          uiSurfaces: [],
+          hasContentScript: false,
+          hasBackgroundWorker: false,
+        },
+      },
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const msgs = result.error.issues.map(i => i.message)
+      expect(msgs).toContain(
+        'Extension must have at least one UI surface, content script, or background worker',
+      )
+    }
+  })
+
+  it('accepts ML both phase with realtime serving', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'ml',
+        mlConfig: { projectPhase: 'both', servingPattern: 'realtime' },
+      },
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts browser extension with defaults', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'browser-extension',
+        browserExtensionConfig: {},
       },
     })
     expect(result.success).toBe(true)
