@@ -157,6 +157,75 @@ export async function askWizardQuestions(options: {
     webAppConfig = { renderingStrategy, deployTarget, realtime, authFlow }
   }
 
+  // Backend configuration
+  let backendConfig: BackendConfig | undefined
+  if (projectType === 'backend') {
+    if (auto && !options.backendApiStyle) {
+      throw new Error('--backend-api-style is required in auto mode for backend projects')
+    }
+
+    const apiStyle = options.backendApiStyle
+      ? options.backendApiStyle as BackendConfig['apiStyle']
+      : await output.select('API style?',
+        ['rest', 'graphql', 'grpc', 'trpc', 'none']) as BackendConfig['apiStyle']
+
+    const dataStore = options.backendDataStore
+      ? options.backendDataStore as BackendConfig['dataStore']
+      : !auto
+        ? await output.multiSelect('Data store(s)?',
+          ['relational', 'document', 'key-value'], ['relational']) as BackendConfig['dataStore']
+        : ['relational'] as BackendConfig['dataStore']
+
+    const authMechanism = options.backendAuth
+      ? options.backendAuth as BackendConfig['authMechanism']
+      : !auto
+        ? await output.select('How does the API verify requests?',
+          ['none', 'jwt', 'session', 'oauth', 'apikey'], 'none') as BackendConfig['authMechanism']
+        : 'none'
+
+    const asyncMessaging = options.backendMessaging
+      ? options.backendMessaging as BackendConfig['asyncMessaging']
+      : !auto
+        ? await output.select('Async messaging?',
+          ['none', 'queue', 'event-driven'], 'none') as BackendConfig['asyncMessaging']
+        : 'none'
+
+    const deployTarget = options.backendDeployTarget
+      ? options.backendDeployTarget as BackendConfig['deployTarget']
+      : !auto
+        ? await output.select('Deploy target?',
+          ['serverless', 'container', 'long-running'], 'container') as BackendConfig['deployTarget']
+        : 'container'
+
+    backendConfig = { apiStyle, dataStore, authMechanism, asyncMessaging, deployTarget }
+  }
+
+  // CLI configuration
+  let cliConfig: CliConfig | undefined
+  if (projectType === 'cli') {
+    if (auto && !options.cliInteractivity) {
+      throw new Error('--cli-interactivity is required in auto mode for cli projects')
+    }
+
+    const interactivity = options.cliInteractivity
+      ? options.cliInteractivity as CliConfig['interactivity']
+      : await output.select('Interactivity model?',
+        ['args-only', 'interactive', 'hybrid']) as CliConfig['interactivity']
+
+    const distributionChannels = options.cliDistribution
+      ? options.cliDistribution as CliConfig['distributionChannels']
+      : !auto
+        ? await output.multiSelect('Distribution channels?',
+          ['package-manager', 'system-package-manager', 'standalone-binary', 'container'],
+          ['package-manager']) as CliConfig['distributionChannels']
+        : ['package-manager'] as CliConfig['distributionChannels']
+
+    const hasStructuredOutput = options.cliStructuredOutput
+      ?? (!auto ? await output.confirm('Support structured output (--json)?', false) : false)
+
+    cliConfig = { interactivity, distributionChannels, hasStructuredOutput }
+  }
+
   // Game config questions (only when projectType === 'game')
   let gameConfig: GameConfig | undefined
   if (projectType === 'game') {
@@ -289,5 +358,5 @@ export async function askWizardQuestions(options: {
     }
   }
 
-  return { methodology, depth, platforms, traits, projectType, webAppConfig, gameConfig }
+  return { methodology, depth, platforms, traits, projectType, webAppConfig, backendConfig, cliConfig, gameConfig }
 }

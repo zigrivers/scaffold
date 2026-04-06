@@ -61,8 +61,9 @@ describe('askWizardQuestions', () => {
 
     expect(result.projectType).toBe('backend')
     expect(result.gameConfig).toBeUndefined()
-    // select called once (projectType only), never for engine/multiplayer/etc.
-    expect(output.select).toHaveBeenCalledTimes(1)
+    // select called for: projectType + apiStyle + authMechanism + asyncMessaging + deployTarget
+    // never for engine/multiplayer/etc. (game questions not triggered)
+    expect(output.select).toHaveBeenCalledTimes(5)
   })
 
   it('game projectType triggers engine question and returns gameConfig', async () => {
