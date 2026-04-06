@@ -1,7 +1,10 @@
 // src/config/schema.test.ts
 
 import { describe, it, expect } from 'vitest'
-import { ConfigSchema, GameConfigSchema, ProjectTypeSchema, WebAppConfigSchema, BackendConfigSchema, CliConfigSchema } from './schema.js'
+import {
+  ConfigSchema, GameConfigSchema, ProjectTypeSchema,
+  WebAppConfigSchema, BackendConfigSchema, CliConfigSchema,
+} from './schema.js'
 
 describe('ProjectTypeSchema', () => {
   it('includes all project types', () => {

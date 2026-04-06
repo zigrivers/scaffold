@@ -6,6 +6,27 @@ import { runBuild } from './build.js'
 import { syncSkillsIfNeeded } from '../../core/skills/sync.js'
 import { ProjectTypeSchema } from '../../config/schema.js'
 
+const GAME_FLAGS = [
+  'engine', 'multiplayer', 'target-platforms', 'online-services',
+  'content-structure', 'economy', 'narrative', 'locales',
+  'npc-ai', 'modding', 'persistence',
+] as const
+
+const WEB_FLAGS = [
+  'web-rendering', 'web-deploy-target',
+  'web-realtime', 'web-auth-flow',
+] as const
+
+const BACKEND_FLAGS = [
+  'backend-api-style', 'backend-data-store', 'backend-auth',
+  'backend-messaging', 'backend-deploy-target',
+] as const
+
+const CLI_TYPE_FLAGS = [
+  'cli-interactivity', 'cli-distribution',
+  'cli-structured-output',
+] as const
+
 interface InitArgs {
   format?: string
   auto?: boolean
@@ -222,9 +243,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         }
 
         // Game flags auto-set --project-type game; error if explicitly non-game
-        const gameFlags = ['engine', 'multiplayer', 'target-platforms', 'online-services',
-          'content-structure', 'economy', 'narrative', 'locales', 'npc-ai', 'modding', 'persistence'] as const
-        const hasGameFlag = gameFlags.some((f) => argv[f] !== undefined)
+        const hasGameFlag = GAME_FLAGS.some((f) => argv[f] !== undefined)
         if (hasGameFlag) {
           if (argv['project-type'] !== undefined && argv['project-type'] !== 'game') {
             throw new Error('Game flags (--engine, --multiplayer, etc.) require --project-type game')
@@ -286,13 +305,13 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         }
 
         // New project type flag detection
-        const webFlags = ['web-rendering', 'web-deploy-target', 'web-realtime', 'web-auth-flow'] as const
-        const hasWebFlag = webFlags.some((f) => argv[f] !== undefined)
-        const backendFlags = ['backend-api-style', 'backend-data-store', 'backend-auth',
-          'backend-messaging', 'backend-deploy-target'] as const
-        const hasBackendFlag = backendFlags.some((f) => argv[f] !== undefined)
-        const cliTypeFlags = ['cli-interactivity', 'cli-distribution', 'cli-structured-output'] as const
-        const hasCliFlag = cliTypeFlags.some((f) => argv[f] !== undefined)
+        const hasWebFlag = WEB_FLAGS.some((f) => argv[f] !== undefined)
+        const hasBackendFlag = BACKEND_FLAGS.some(
+          (f) => argv[f] !== undefined,
+        )
+        const hasCliFlag = CLI_TYPE_FLAGS.some(
+          (f) => argv[f] !== undefined,
+        )
 
         // Reject mixed-family flags
         const typeCount = [hasGameFlag, hasWebFlag, hasBackendFlag, hasCliFlag].filter(Boolean).length
@@ -317,14 +336,37 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
           const invalid = (argv['backend-data-store'] as string[]).filter(
             (v: string) => !validDataStores.includes(v),
           )
-          if (invalid.length) throw new Error(`Invalid --backend-data-store value(s): ${invalid.join(', ')}`)
+          if (invalid.length) {
+            throw new Error(
+              `Invalid --backend-data-store value(s): ${invalid.join(', ')}`,
+            )
+          }
         }
-        const validDistChannels = ['package-manager', 'system-package-manager', 'standalone-binary', 'container']
+        if (
+          argv['backend-data-store'] &&
+          (argv['backend-data-store'] as string[]).length === 0
+        ) {
+          throw new Error('--backend-data-store requires at least one value')
+        }
+        const validDistChannels = [
+          'package-manager', 'system-package-manager',
+          'standalone-binary', 'container',
+        ]
         if (argv['cli-distribution']) {
           const invalid = (argv['cli-distribution'] as string[]).filter(
             (v: string) => !validDistChannels.includes(v),
           )
-          if (invalid.length) throw new Error(`Invalid --cli-distribution value(s): ${invalid.join(', ')}`)
+          if (invalid.length) {
+            throw new Error(
+              `Invalid --cli-distribution value(s): ${invalid.join(', ')}`,
+            )
+          }
+        }
+        if (
+          argv['cli-distribution'] &&
+          (argv['cli-distribution'] as string[]).length === 0
+        ) {
+          throw new Error('--cli-distribution requires at least one value')
         }
 
         // WebApp cross-field validation
@@ -356,22 +398,26 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
     const output = createOutputContext(outputMode)
 
     // Auto-detect project type from flags
-    const gameFlags = ['engine', 'multiplayer', 'target-platforms', 'online-services',
-      'content-structure', 'economy', 'narrative', 'locales', 'npc-ai', 'modding', 'persistence'] as const
-    const hasGameFlag = gameFlags.some((f) => argv[f] !== undefined)
-    const hasWebFlag = ['web-rendering', 'web-deploy-target', 'web-realtime', 'web-auth-flow']
-      .some((f) => argv[f] !== undefined)
-    const hasBackendFlag = ['backend-api-style', 'backend-data-store', 'backend-auth',
-      'backend-messaging', 'backend-deploy-target']
-      .some((f) => argv[f] !== undefined)
-    const hasCliTypeFlag = ['cli-interactivity', 'cli-distribution', 'cli-structured-output']
-      .some((f) => argv[f] !== undefined)
+    const hasGameFlag = GAME_FLAGS.some((f) => argv[f] !== undefined)
+    const hasWebFlag = WEB_FLAGS.some(
+      (f) => argv[f] !== undefined,
+    )
+    const hasBackendFlag = BACKEND_FLAGS.some(
+      (f) => argv[f] !== undefined,
+    )
+    const hasCliTypeFlag = CLI_TYPE_FLAGS.some(
+      (f) => argv[f] !== undefined,
+    )
 
-    const detectedType = hasGameFlag ? 'game'
-      : hasWebFlag ? 'web-app'
-      : hasBackendFlag ? 'backend'
-      : hasCliTypeFlag ? 'cli'
-      : undefined
+    const detectedType = hasGameFlag
+      ? 'game'
+      : hasWebFlag
+        ? 'web-app'
+        : hasBackendFlag
+          ? 'backend'
+          : hasCliTypeFlag
+            ? 'cli'
+            : undefined
     const projectType = argv['project-type'] ?? detectedType
 
     const result = await runWizard({

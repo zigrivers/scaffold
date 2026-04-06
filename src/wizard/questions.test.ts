@@ -493,7 +493,7 @@ describe('web-app wizard questions', () => {
     const output = makeOutputContext()
 
     const answers = await askWizardQuestions({
-      output, suggestion: 'deep', auto: false,
+      output, suggestion: 'deep', methodology: 'deep', auto: false,
       projectType: 'web-app',
       webRendering: 'ssr',
       webDeployTarget: 'container',
@@ -544,7 +544,7 @@ describe('backend wizard questions', () => {
     const output = makeOutputContext()
 
     const answers = await askWizardQuestions({
-      output, suggestion: 'deep', auto: false,
+      output, suggestion: 'deep', methodology: 'deep', auto: false,
       projectType: 'backend',
       backendApiStyle: 'graphql',
       backendDataStore: ['relational', 'key-value'],
@@ -580,7 +580,7 @@ describe('cli wizard questions', () => {
     const output = makeOutputContext()
 
     const answers = await askWizardQuestions({
-      output, suggestion: 'deep', auto: false,
+      output, suggestion: 'deep', methodology: 'deep', auto: false,
       projectType: 'cli',
       cliInteractivity: 'hybrid',
       cliDistribution: ['package-manager', 'standalone-binary'],

@@ -176,12 +176,15 @@ export async function askWizardQuestions(options: {
           ['relational', 'document', 'key-value'], ['relational']) as BackendConfig['dataStore']
         : ['relational'] as BackendConfig['dataStore']
 
-    const authMechanism = options.backendAuth
-      ? options.backendAuth as BackendConfig['authMechanism']
-      : !auto
-        ? await output.select('How does the API verify requests?',
-          ['none', 'jwt', 'session', 'oauth', 'apikey'], 'none') as BackendConfig['authMechanism']
-        : 'none'
+    const authMechanism = apiStyle === 'none'
+      ? 'none' as BackendConfig['authMechanism']
+      : options.backendAuth
+        ? options.backendAuth as BackendConfig['authMechanism']
+        : !auto
+          ? await output.select('How does the API verify requests?',
+            ['none', 'jwt', 'session', 'oauth', 'apikey'],
+            'none') as BackendConfig['authMechanism']
+          : 'none'
 
     const asyncMessaging = options.backendMessaging
       ? options.backendMessaging as BackendConfig['asyncMessaging']

@@ -33,7 +33,9 @@ export const BackendConfigSchema = z.object({
 
 export const CliConfigSchema = z.object({
   interactivity: z.enum(['args-only', 'interactive', 'hybrid']),
-  distributionChannels: z.array(z.enum(['package-manager', 'system-package-manager', 'standalone-binary', 'container'])).min(1).default(['package-manager']),
+  distributionChannels: z.array(
+    z.enum(['package-manager', 'system-package-manager', 'standalone-binary', 'container']),
+  ).min(1).default(['package-manager']),
   hasStructuredOutput: z.boolean().default(false),
 }).strict()
 

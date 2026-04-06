@@ -3,7 +3,7 @@ import type { MockInstance } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import yargs from 'yargs'
+import yargs, { type Argv } from 'yargs'
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -269,7 +269,8 @@ async function parseInitArgs(args: string[]): Promise<Record<string, unknown>> {
   const instance = yargs(args)
     .exitProcess(false)
     .fail(false)
-  const built = initCommand.builder(instance as Parameters<typeof initCommand.builder>[0])
+  const builderFn = initCommand.builder as (y: Argv) => Argv
+  const built = builderFn(instance)
   return built.parseAsync() as Promise<Record<string, unknown>>
 }
 
