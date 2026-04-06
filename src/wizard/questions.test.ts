@@ -430,7 +430,7 @@ describe('askWizardQuestions', () => {
     // confirm should NOT have been called for the advanced gate
     // Total confirms: Codex, Gemini, web, mobile, modding = 5
     expect(output.confirm).toHaveBeenCalledTimes(5)
-    // The advanced gate confirm should never fire — check that no confirm was called with 'Configure advanced game options?'
+    // Advanced gate confirm should never fire — verify no call with that text
     for (const call of output.confirm.mock.calls) {
       expect(call[0]).not.toBe('Configure advanced game options?')
     }
