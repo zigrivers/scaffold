@@ -56,7 +56,7 @@ knowledge-overrides:
 
   # Reviews (mirror authoring steps)
   review-architecture:
-    append: [mobile-app-architecture, mobile-app-offline-patterns]
+    append: [mobile-app-architecture, mobile-app-offline-patterns, mobile-app-push-notifications]
   review-ux:
     append: [mobile-app-architecture]
   review-security:
