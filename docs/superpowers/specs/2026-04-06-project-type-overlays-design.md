@@ -24,7 +24,7 @@ The overlay infrastructure is already generic: `resolveOverlayState()` loads any
 
 6. **Add config interfaces + Zod schemas** — `WebAppConfig`, `BackendConfig`, `CliConfig` (Release 1), `LibraryConfig`, `MobileAppConfig` (Release 2), `DataPipelineConfig`, `MlConfig`, `BrowserExtensionConfig` (Release 3). Use `z.discriminatedUnion`-style gating via `.superRefine()`. Derive TS types from Zod schemas via `z.infer<>` to prevent drift.
 
-7. **Extend config persistence flow** — `WizardAnswers`, `runWizard()`, and config serialization in `wizard.ts` carry new typed configs through to `config.yml`. Consolidate duplicate `WizardAnswers` interfaces (pre-existing issue in `questions.ts:5` and `types/wizard.ts:3`) before adding new fields.
+7. **Extend config persistence flow** — `WizardAnswers`, `runWizard()`, and config serialization in `wizard.ts` carry new typed configs through to `config.yml`. Consolidate duplicate `WizardAnswers` interfaces: delete the stale version at `types/wizard.ts:3` (different fields, nothing imports it) and keep the canonical version at `questions.ts:5`, extending it with `webAppConfig?`, `backendConfig?`, `cliConfig?`.
 
 8. **Namespace CLI flags by type** — `--web-*`, `--backend-*`, `--cli-*` prefixes. Add `--game-*` aliases for existing bare game flags (`--engine` becomes alias for `--game-engine`) for consistency. Bare game flags preserved as hidden aliases for backwards compatibility.
 
@@ -228,7 +228,7 @@ Each config has one required "anchor" field with no default (matching `GameConfi
 | BackendConfig | `apiStyle` | `dataStore: ['relational']`, `authMechanism: 'none'`, `asyncMessaging: 'none'`, `deployTarget: 'container'` |
 | CliConfig | `interactivity` | `distributionChannels: ['package-manager']`, `hasStructuredOutput: false` |
 
-Under `--auto`, omitting the required anchor field produces a Zod validation error at config parse time.
+Under `--auto`, omitting the required anchor field produces an early explicit error in the wizard (e.g., `--web-rendering is required in auto mode for web-app projects`), preventing a broken config from being written to disk.
 
 `BackendConfig.apiStyle: 'none'` is intentional — it covers worker, cron, and event-consumer backends that have no API surface.
 
@@ -251,10 +251,12 @@ export interface ProjectConfig {
 
 Add explicit fields to `ProjectSchema` (`.passthrough()` does NOT validate unknown fields):
 
+Note: `ProjectSchema` is a non-exported `const` in the current codebase. It remains non-exported. The existing `.refine()` on lines 43-52 of `schema.ts` is deleted entirely and replaced by the `.superRefine()` below.
+
 ```typescript
-export const ProjectSchema = z.object({
-  name: z.string().optional(),
-  platforms: z.array(PlatformSchema).optional(),
+const ProjectSchema = z.object({
+  name: z.string().min(1).optional(),
+  platforms: z.array(z.enum(['web', 'mobile', 'desktop'])).optional(),
   projectType: ProjectTypeSchema.optional(),
   gameConfig: GameConfigSchema.optional(),
   webAppConfig: WebAppConfigSchema.optional(),
@@ -265,7 +267,7 @@ export const ProjectSchema = z.object({
 
 ### Cross-Field Validation
 
-Replace the existing single `.refine()` with a consolidated `.superRefine()`:
+Replace the existing `.refine()` (lines 43-52 of `schema.ts`) with a consolidated `.superRefine()` chained after `.passthrough()`:
 
 ```typescript
 .superRefine((data, ctx) => {
@@ -405,12 +407,15 @@ Matches v3.6.0 game flow:
 
 ### Question Flow
 
+Required anchor fields throw early under `--auto` if no flag was provided, rather than deferring to Zod (which would produce a confusing error after config serialization):
+
 ```typescript
 if (projectType === 'web-app') {
+  if (auto && !options.webRendering)
+    throw new Error('--web-rendering is required in auto mode for web-app projects')
+
   const renderingStrategy = options.webRendering
-    ?? (auto ? undefined : await output.select('Rendering strategy?',
-       ['spa', 'ssr', 'ssg', 'hybrid']))
-  // renderingStrategy is required — if auto + no flag, Zod will error
+    ?? await output.select('Rendering strategy?', ['spa', 'ssr', 'ssg', 'hybrid'])
 
   const deployTarget = options.webDeployTarget
     ?? (auto ? 'serverless' : await output.select('Deploy target?',
@@ -428,12 +433,14 @@ if (projectType === 'web-app') {
 }
 
 if (projectType === 'backend') {
+  if (auto && !options.backendApiStyle)
+    throw new Error('--backend-api-style is required in auto mode for backend projects')
+
   const apiStyle = options.backendApiStyle
-    ?? (auto ? undefined : await output.select('API style?',
-       ['rest', 'graphql', 'grpc', 'trpc', 'none']))
+    ?? await output.select('API style?', ['rest', 'graphql', 'grpc', 'trpc', 'none'])
 
   const dataStore = options.backendDataStore
-    ?? (auto ? ['relational'] : await output.multiselect('Data store(s)?',
+    ?? (auto ? ['relational'] : await output.multiSelect('Data store(s)?',
        ['relational', 'document', 'key-value']))
 
   const authMechanism = options.backendAuth
@@ -452,12 +459,14 @@ if (projectType === 'backend') {
 }
 
 if (projectType === 'cli') {
+  if (auto && !options.cliInteractivity)
+    throw new Error('--cli-interactivity is required in auto mode for cli projects')
+
   const interactivity = options.cliInteractivity
-    ?? (auto ? undefined : await output.select('Interactivity model?',
-       ['args-only', 'interactive', 'hybrid']))
+    ?? await output.select('Interactivity model?', ['args-only', 'interactive', 'hybrid'])
 
   const distributionChannels = options.cliDistribution
-    ?? (auto ? ['package-manager'] : await output.multiselect('Distribution channels?',
+    ?? (auto ? ['package-manager'] : await output.multiSelect('Distribution channels?',
        ['package-manager', 'system-package-manager', 'standalone-binary', 'container']))
 
   const hasStructuredOutput = options.cliStructuredOutput
@@ -480,6 +489,21 @@ Each new config type needs tests parallel to existing game config coverage:
 - **CLI flag tests**: Flag parsing, auto-detection, mixed-family rejection, CSV coercion
 - **Wizard tests**: Flag-skip for each field, `--auto` behavior, interactive prompts
 - **Integration tests**: Full `init` → `config.yml` → overlay resolution → knowledge injection flow
+
+## Config Serialization in wizard.ts
+
+The existing serialization at `wizard.ts:132-141` uses a spread pattern. Add the new configs:
+
+```typescript
+project: {
+  platforms: answers.traits as Array<'web' | 'mobile' | 'desktop'>,
+  ...(answers.projectType && { projectType: answers.projectType }),
+  ...(answers.gameConfig && { gameConfig: answers.gameConfig }),
+  ...(answers.webAppConfig && { webAppConfig: answers.webAppConfig }),
+  ...(answers.backendConfig && { backendConfig: answers.backendConfig }),
+  ...(answers.cliConfig && { cliConfig: answers.cliConfig }),
+},
+```
 
 ## Config Serialization Example
 
