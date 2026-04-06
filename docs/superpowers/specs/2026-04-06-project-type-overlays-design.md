@@ -230,7 +230,18 @@ Each config has one required "anchor" field with no default (matching `GameConfi
 
 Under `--auto`, omitting the required anchor field produces an early explicit error in the wizard (e.g., `--web-rendering is required in auto mode for web-app projects`), preventing a broken config from being written to disk.
 
+**Note:** This is a deliberate divergence from the game pattern, where `--auto` defaults `engine` to `'custom'` (see `questions.ts:112`). For new types, the anchor field has no reasonable universal default, so `--auto` requires it explicitly. This is a stricter but clearer contract.
+
 `BackendConfig.apiStyle: 'none'` is intentional — it covers worker, cron, and event-consumer backends that have no API surface.
+
+### Config Block Optionality
+
+`webAppConfig`, `backendConfig`, and `cliConfig` are **optional** on `ProjectConfig` — setting `projectType: web-app` without a `webAppConfig` block is valid. This supports:
+- Manual configs where the user only sets `projectType` to get overlay knowledge injection
+- Older configs migrated from before this feature existed
+- Future `scaffold adopt` flows that detect project type but not config details
+
+When the config block is absent, the overlay still loads (keyed on `projectType`), knowledge is still injected, and meta-prompt Conditional Evaluation sections treat missing config fields as their Zod defaults. The wizard always creates the config block, so this case only applies to hand-edited or adopted configs.
 
 ### ProjectConfig Extension
 
@@ -311,7 +322,7 @@ Both appear in the wizard with distinct phrasing:
 
 ### Flag Naming
 
-All new flags use type prefixes to avoid collision. Existing bare game flags get `--game-*` aliases for consistency:
+All new flags use type prefixes to avoid collision. Existing bare game flags get `--game-*` aliases for consistency. Yargs aliases share a single `argv` key, so `--engine unity` and `--game-engine unity` both write to `argv.gameEngine`. If both forms are passed with conflicting values, yargs uses the last one — no special handling needed.
 
 ```
 # Existing game flags (bare names preserved as hidden aliases):
@@ -344,7 +355,7 @@ All new flags use type prefixes to avoid collision. Existing bare game flags get
 Each flag gets:
 - `type: 'string'` (or `'boolean'` for `--cli-structured-output`)
 - `choices` for single-select enums
-- `coerce: coerceCSV` for array fields (reuse existing helper)
+- `coerce: coerceCSV` for array fields (reuse existing local helper in `init.ts:37`)
 - `.group()` per type: `'Game Configuration:'`, `'Web-App Configuration:'`, `'Backend Configuration:'`, `'CLI Configuration:'`
 
 ### Auto-Detection
@@ -385,6 +396,18 @@ if (typeCount > 1)
     throw new Error('--backend-* flags require --project-type backend')
   if (hasCliFlag && argv.projectType && argv.projectType !== 'cli')
     throw new Error('--cli-* flags require --project-type cli')
+
+  // CSV array enum validation (coerceCSV splits but does not validate values)
+  const validDataStores = ['relational', 'document', 'key-value']
+  if (argv.backendDataStore) {
+    const invalid = argv.backendDataStore.filter((v: string) => !validDataStores.includes(v))
+    if (invalid.length) throw new Error(`Invalid --backend-data-store: ${invalid.join(', ')}`)
+  }
+  const validDistChannels = ['package-manager', 'system-package-manager', 'standalone-binary', 'container']
+  if (argv.cliDistribution) {
+    const invalid = argv.cliDistribution.filter((v: string) => !validDistChannels.includes(v))
+    if (invalid.length) throw new Error(`Invalid --cli-distribution: ${invalid.join(', ')}`)
+  }
 
   // WebApp cross-field
   if (['ssr', 'hybrid'].includes(argv.webRendering) && argv.webDeployTarget === 'static')
@@ -441,7 +464,7 @@ if (projectType === 'backend') {
 
   const dataStore = options.backendDataStore
     ?? (auto ? ['relational'] : await output.multiSelect('Data store(s)?',
-       ['relational', 'document', 'key-value']))
+       ['relational', 'document', 'key-value'], ['relational']))
 
   const authMechanism = options.backendAuth
     ?? (auto ? 'none' : await output.select('API auth mechanism?',
@@ -467,7 +490,8 @@ if (projectType === 'cli') {
 
   const distributionChannels = options.cliDistribution
     ?? (auto ? ['package-manager'] : await output.multiSelect('Distribution channels?',
-       ['package-manager', 'system-package-manager', 'standalone-binary', 'container']))
+       ['package-manager', 'system-package-manager', 'standalone-binary', 'container'],
+       ['package-manager']))
 
   const hasStructuredOutput = options.cliStructuredOutput
     ?? (auto ? false : await output.confirm('Support structured output (--json)?', false))
@@ -513,6 +537,7 @@ version: 2
 methodology: deep
 platforms: [claude-code]
 project:
+  platforms: [web]
   projectType: web-app
   webAppConfig:
     renderingStrategy: ssr
@@ -527,6 +552,7 @@ version: 2
 methodology: deep
 platforms: [claude-code]
 project:
+  platforms: [web]
   projectType: backend
   backendConfig:
     apiStyle: graphql
@@ -542,6 +568,7 @@ version: 2
 methodology: mvp
 platforms: [claude-code]
 project:
+  platforms: [desktop]
   projectType: cli
   cliConfig:
     interactivity: hybrid
