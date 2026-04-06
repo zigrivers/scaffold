@@ -545,4 +545,173 @@ describe('init command — .check() validation', () => {
       'mobile-offline': 'cache',
     })
   })
+
+  // -------------------------------------------------------------------------
+  // Data-pipeline auto-detection
+  // -------------------------------------------------------------------------
+
+  it('accepts --pipeline-processing batch without explicit --project-type', async () => {
+    await expect(parseInitArgs(['--pipeline-processing', 'batch'])).resolves.toMatchObject({
+      'pipeline-processing': 'batch',
+    })
+  })
+
+  it('handler auto-detects data-pipeline from --pipeline-processing flag', async () => {
+    const argv = defaultArgv({
+      root: os.tmpdir(),
+      'pipeline-processing': 'batch',
+    } as Partial<InitArgv>)
+    await initCommand.handler(argv)
+    expect(runWizard).toHaveBeenCalledWith(
+      expect.objectContaining({ projectType: 'data-pipeline' }),
+    )
+  })
+
+  // -------------------------------------------------------------------------
+  // ML auto-detection
+  // -------------------------------------------------------------------------
+
+  it('accepts --ml-phase training without explicit --project-type', async () => {
+    await expect(parseInitArgs(['--ml-phase', 'training'])).resolves.toMatchObject({
+      'ml-phase': 'training',
+    })
+  })
+
+  it('handler auto-detects ml from --ml-phase flag', async () => {
+    const argv = defaultArgv({
+      root: os.tmpdir(),
+      'ml-phase': 'training',
+    } as Partial<InitArgv>)
+    await initCommand.handler(argv)
+    expect(runWizard).toHaveBeenCalledWith(
+      expect.objectContaining({ projectType: 'ml' }),
+    )
+  })
+
+  // -------------------------------------------------------------------------
+  // Browser-extension auto-detection
+  // -------------------------------------------------------------------------
+
+  it('accepts --ext-manifest 3 without explicit --project-type', async () => {
+    await expect(parseInitArgs(['--ext-manifest', '3'])).resolves.toMatchObject({
+      'ext-manifest': '3',
+    })
+  })
+
+  it('handler auto-detects browser-extension from --ext-manifest flag', async () => {
+    const argv = defaultArgv({
+      root: os.tmpdir(),
+      'ext-manifest': '3',
+    } as Partial<InitArgv>)
+    await initCommand.handler(argv)
+    expect(runWizard).toHaveBeenCalledWith(
+      expect.objectContaining({ projectType: 'browser-extension' }),
+    )
+  })
+
+  // -------------------------------------------------------------------------
+  // Mixed-family rejection: data-pipeline / ml / browser-extension
+  // -------------------------------------------------------------------------
+
+  it('rejects mixing --pipeline-processing with --ml-phase', async () => {
+    await expect(
+      parseInitArgs(['--pipeline-processing', 'batch', '--ml-phase', 'training']),
+    ).rejects.toThrow(/mix/)
+  })
+
+  it('rejects mixing --ext-manifest with --web-rendering', async () => {
+    await expect(
+      parseInitArgs(['--ext-manifest', '3', '--web-rendering', 'ssr']),
+    ).rejects.toThrow(/mix/)
+  })
+
+  // -------------------------------------------------------------------------
+  // Project type conflict: data-pipeline / ml / browser-extension
+  // -------------------------------------------------------------------------
+
+  it('rejects --project-type backend with --pipeline-processing batch', async () => {
+    await expect(
+      parseInitArgs(['--project-type', 'backend', '--pipeline-processing', 'batch']),
+    ).rejects.toThrow(/pipeline-\* flags require/)
+  })
+
+  it('rejects --project-type backend with --ml-phase training', async () => {
+    await expect(
+      parseInitArgs(['--project-type', 'backend', '--ml-phase', 'training']),
+    ).rejects.toThrow(/ml-\* flags require/)
+  })
+
+  it('rejects --project-type backend with --ext-manifest 3', async () => {
+    await expect(
+      parseInitArgs(['--project-type', 'backend', '--ext-manifest', '3']),
+    ).rejects.toThrow(/ext-\* flags require/)
+  })
+
+  // -------------------------------------------------------------------------
+  // CSV validation: --ext-ui-surfaces
+  // -------------------------------------------------------------------------
+
+  it('rejects invalid --ext-ui-surfaces value', async () => {
+    await expect(
+      parseInitArgs(['--ext-ui-surfaces', 'invalid-surface']),
+    ).rejects.toThrow(/Invalid --ext-ui-surfaces/)
+  })
+
+  it('accepts valid --ext-ui-surfaces CSV values', async () => {
+    await expect(
+      parseInitArgs(['--ext-ui-surfaces', 'popup,options']),
+    ).resolves.toMatchObject({
+      'ext-ui-surfaces': ['popup', 'options'],
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // Acceptance: valid flag combos pass
+  // -------------------------------------------------------------------------
+
+  it('accepts --pipeline-processing with other data-pipeline flags', async () => {
+    await expect(
+      parseInitArgs([
+        '--pipeline-processing', 'streaming',
+        '--pipeline-orchestration', 'event-driven',
+        '--pipeline-quality', 'observability',
+        '--pipeline-schema', 'schema-registry',
+      ]),
+    ).resolves.toMatchObject({
+      'pipeline-processing': 'streaming',
+      'pipeline-orchestration': 'event-driven',
+      'pipeline-quality': 'observability',
+      'pipeline-schema': 'schema-registry',
+    })
+  })
+
+  it('accepts --ml-phase with other ml flags', async () => {
+    await expect(
+      parseInitArgs([
+        '--ml-phase', 'both',
+        '--ml-model-type', 'llm',
+        '--ml-serving', 'realtime',
+      ]),
+    ).resolves.toMatchObject({
+      'ml-phase': 'both',
+      'ml-model-type': 'llm',
+      'ml-serving': 'realtime',
+    })
+  })
+
+  it('accepts --ext-manifest with other browser-extension flags', async () => {
+    await expect(
+      parseInitArgs([
+        '--ext-manifest', '3',
+        '--ext-ui-surfaces', 'popup,sidepanel',
+        '--ext-content-script',
+        '--ext-background-worker',
+      ]),
+    ).resolves.toMatchObject({
+      'ext-manifest': '3',
+      'ext-ui-surfaces': ['popup', 'sidepanel'],
+      'ext-content-script': true,
+      'ext-background-worker': true,
+    })
+  })
 })
