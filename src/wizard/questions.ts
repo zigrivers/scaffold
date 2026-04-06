@@ -38,6 +38,21 @@ export async function askWizardQuestions(options: {
   npcAi?: string
   modding?: boolean
   persistence?: string
+  // Web-app flags
+  webRendering?: string
+  webDeployTarget?: string
+  webRealtime?: string
+  webAuthFlow?: string
+  // Backend flags
+  backendApiStyle?: string
+  backendDataStore?: string[]
+  backendAuth?: string
+  backendMessaging?: string
+  backendDeployTarget?: string
+  // CLI flags
+  cliInteractivity?: string
+  cliDistribution?: string[]
+  cliStructuredOutput?: boolean
 }): Promise<WizardAnswers> {
   const { output, suggestion, auto } = options
 
