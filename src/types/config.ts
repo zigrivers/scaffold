@@ -1,6 +1,6 @@
 import type { MethodologyName, DepthLevel } from './enums.js'
 import type { z } from 'zod'
-import { ProjectTypeSchema } from '../config/schema.js'
+import { ProjectTypeSchema, WebAppConfigSchema, BackendConfigSchema, CliConfigSchema } from '../config/schema.js'
 
 /** Step enablement entry used in presets and overlays. */
 export interface StepEnablementEntry {
@@ -22,6 +22,15 @@ export interface CustomConfig {
 
 /** Valid project types — derived from Zod schema (single source of truth). */
 export type ProjectType = z.infer<typeof ProjectTypeSchema>
+
+/** Web app configuration — derived from Zod schema (single source of truth). */
+export type WebAppConfig = z.infer<typeof WebAppConfigSchema>
+
+/** Backend configuration — derived from Zod schema (single source of truth). */
+export type BackendConfig = z.infer<typeof BackendConfigSchema>
+
+/** CLI tool configuration — derived from Zod schema (single source of truth). */
+export type CliConfig = z.infer<typeof CliConfigSchema>
 
 /** Game engine options. */
 export type GameEngine = 'unity' | 'unreal' | 'godot' | 'custom'

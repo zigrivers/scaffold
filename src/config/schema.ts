@@ -16,6 +16,27 @@ export const ProjectTypeSchema = z.enum([
   'web-app', 'mobile-app', 'backend', 'cli', 'library', 'game',
 ])
 
+export const WebAppConfigSchema = z.object({
+  renderingStrategy: z.enum(['spa', 'ssr', 'ssg', 'hybrid']),
+  deployTarget: z.enum(['static', 'serverless', 'container', 'edge', 'long-running']).default('serverless'),
+  realtime: z.enum(['none', 'websocket', 'sse']).default('none'),
+  authFlow: z.enum(['none', 'session', 'oauth', 'passkey']).default('none'),
+}).strict()
+
+export const BackendConfigSchema = z.object({
+  apiStyle: z.enum(['rest', 'graphql', 'grpc', 'trpc', 'none']),
+  dataStore: z.array(z.enum(['relational', 'document', 'key-value'])).min(1).default(['relational']),
+  authMechanism: z.enum(['none', 'jwt', 'session', 'oauth', 'apikey']).default('none'),
+  asyncMessaging: z.enum(['none', 'queue', 'event-driven']).default('none'),
+  deployTarget: z.enum(['serverless', 'container', 'long-running']).default('container'),
+}).strict()
+
+export const CliConfigSchema = z.object({
+  interactivity: z.enum(['args-only', 'interactive', 'hybrid']),
+  distributionChannels: z.array(z.enum(['package-manager', 'system-package-manager', 'standalone-binary', 'container'])).min(1).default(['package-manager']),
+  hasStructuredOutput: z.boolean().default(false),
+}).strict()
+
 export const GameConfigSchema = z.object({
   engine: z.enum(['unity', 'unreal', 'godot', 'custom']),
   multiplayerMode: z.enum(['none', 'local', 'online', 'hybrid']).default('none'),
