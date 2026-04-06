@@ -444,4 +444,102 @@ describe('init command — .check() validation', () => {
       parseInitArgs(['--game-engine', 'unity', '--web-rendering', 'ssr']),
     ).rejects.toThrow(/mix/)
   })
+
+  // -------------------------------------------------------------------------
+  // Library auto-detection
+  // -------------------------------------------------------------------------
+
+  it('accepts --lib-visibility public without explicit --project-type', async () => {
+    await expect(parseInitArgs(['--lib-visibility', 'public'])).resolves.toMatchObject({
+      'lib-visibility': 'public',
+    })
+  })
+
+  it('handler auto-detects library from --lib-visibility flag', async () => {
+    const argv = defaultArgv({
+      root: os.tmpdir(),
+      'lib-visibility': 'public',
+    } as Partial<InitArgv>)
+    await initCommand.handler(argv)
+    expect(runWizard).toHaveBeenCalledWith(
+      expect.objectContaining({ projectType: 'library' }),
+    )
+  })
+
+  // -------------------------------------------------------------------------
+  // Mobile-app auto-detection
+  // -------------------------------------------------------------------------
+
+  it('accepts --mobile-platform ios without explicit --project-type', async () => {
+    await expect(parseInitArgs(['--mobile-platform', 'ios'])).resolves.toMatchObject({
+      'mobile-platform': 'ios',
+    })
+  })
+
+  it('handler auto-detects mobile-app from --mobile-platform flag', async () => {
+    const argv = defaultArgv({
+      root: os.tmpdir(),
+      'mobile-platform': 'ios',
+    } as Partial<InitArgv>)
+    await initCommand.handler(argv)
+    expect(runWizard).toHaveBeenCalledWith(
+      expect.objectContaining({ projectType: 'mobile-app' }),
+    )
+  })
+
+  // -------------------------------------------------------------------------
+  // Mixed-family rejection: library / mobile
+  // -------------------------------------------------------------------------
+
+  it('rejects mixing --lib-visibility with --mobile-platform', async () => {
+    await expect(
+      parseInitArgs(['--lib-visibility', 'public', '--mobile-platform', 'ios']),
+    ).rejects.toThrow(/mix/)
+  })
+
+  it('rejects mixing --lib-visibility with --web-rendering', async () => {
+    await expect(
+      parseInitArgs(['--lib-visibility', 'public', '--web-rendering', 'ssr']),
+    ).rejects.toThrow(/mix/)
+  })
+
+  // -------------------------------------------------------------------------
+  // Project type conflict: library / mobile
+  // -------------------------------------------------------------------------
+
+  it('rejects --project-type backend with --lib-visibility public', async () => {
+    await expect(
+      parseInitArgs(['--project-type', 'backend', '--lib-visibility', 'public']),
+    ).rejects.toThrow(/lib-\* flags require/)
+  })
+
+  it('rejects --project-type web-app with --mobile-platform ios', async () => {
+    await expect(
+      parseInitArgs(['--project-type', 'web-app', '--mobile-platform', 'ios']),
+    ).rejects.toThrow(/mobile-\* flags require/)
+  })
+
+  // -------------------------------------------------------------------------
+  // Acceptance tests (valid combos — no cross-field constraints for lib/mobile)
+  // -------------------------------------------------------------------------
+
+  it('accepts --lib-visibility with other library flags', async () => {
+    await expect(
+      parseInitArgs(['--lib-visibility', 'internal', '--lib-runtime-target', 'node', '--lib-bundle-format', 'esm']),
+    ).resolves.toMatchObject({
+      'lib-visibility': 'internal',
+      'lib-runtime-target': 'node',
+      'lib-bundle-format': 'esm',
+    })
+  })
+
+  it('accepts --mobile-platform with other mobile flags', async () => {
+    await expect(
+      parseInitArgs(['--mobile-platform', 'cross-platform', '--mobile-distribution', 'public', '--mobile-offline', 'cache']),
+    ).resolves.toMatchObject({
+      'mobile-platform': 'cross-platform',
+      'mobile-distribution': 'public',
+      'mobile-offline': 'cache',
+    })
+  })
 })
