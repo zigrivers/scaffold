@@ -309,6 +309,7 @@ describe('game pipeline E2E', () => {
       methodology: 'deep',
       force: false,
       auto: true,
+      webRendering: 'spa',
       output,
     })
 

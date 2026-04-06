@@ -123,6 +123,40 @@ export async function askWizardQuestions(options: {
     projectType = selected as ProjectType
   }
 
+  // Web-App configuration
+  let webAppConfig: WebAppConfig | undefined
+  if (projectType === 'web-app') {
+    if (auto && !options.webRendering) {
+      throw new Error('--web-rendering is required in auto mode for web-app projects')
+    }
+
+    const renderingStrategy = options.webRendering
+      ? options.webRendering as WebAppConfig['renderingStrategy']
+      : await output.select('Rendering strategy?', ['spa', 'ssr', 'ssg', 'hybrid']) as WebAppConfig['renderingStrategy']
+
+    const deployTarget = options.webDeployTarget
+      ? options.webDeployTarget as WebAppConfig['deployTarget']
+      : !auto
+        ? await output.select('Deploy target?',
+          ['static', 'serverless', 'container', 'edge', 'long-running'], 'serverless') as WebAppConfig['deployTarget']
+        : 'serverless'
+
+    const realtime = options.webRealtime
+      ? options.webRealtime as WebAppConfig['realtime']
+      : !auto
+        ? await output.select('Real-time needs?', ['none', 'websocket', 'sse'], 'none') as WebAppConfig['realtime']
+        : 'none'
+
+    const authFlow = options.webAuthFlow
+      ? options.webAuthFlow as WebAppConfig['authFlow']
+      : !auto
+        ? await output.select('How do users authenticate?',
+          ['none', 'session', 'oauth', 'passkey'], 'none') as WebAppConfig['authFlow']
+        : 'none'
+
+    webAppConfig = { renderingStrategy, deployTarget, realtime, authFlow }
+  }
+
   // Game config questions (only when projectType === 'game')
   let gameConfig: GameConfig | undefined
   if (projectType === 'game') {
@@ -255,5 +289,5 @@ export async function askWizardQuestions(options: {
     }
   }
 
-  return { methodology, depth, platforms, traits, projectType, gameConfig }
+  return { methodology, depth, platforms, traits, projectType, webAppConfig, gameConfig }
 }

@@ -181,6 +181,11 @@ describe('askWizardQuestions', () => {
       .mockResolvedValueOnce(false)   // Gemini
       .mockResolvedValueOnce(false)   // web
       .mockResolvedValueOnce(false)   // mobile
+    vi.mocked(output.select)
+      .mockResolvedValueOnce('spa')          // renderingStrategy
+      .mockResolvedValueOnce('serverless')   // deployTarget
+      .mockResolvedValueOnce('none')         // realtime
+      .mockResolvedValueOnce('none')         // authFlow
 
     const result = await askWizardQuestions({
       output,
@@ -192,8 +197,9 @@ describe('askWizardQuestions', () => {
 
     expect(result.projectType).toBe('web-app')
     expect(result.gameConfig).toBeUndefined()
-    // select should NOT have been called — projectType was pre-set
-    expect(output.select).not.toHaveBeenCalled()
+    // web-app select questions were asked, game questions were NOT
+    expect(result.webAppConfig).toBeDefined()
+    expect(result.webAppConfig!.renderingStrategy).toBe('spa')
   })
 
   it('--project-type game (interactive) skips projectType select but still asks game questions', async () => {
