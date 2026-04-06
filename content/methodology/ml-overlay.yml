@@ -1,0 +1,70 @@
+# methodology/ml-overlay.yml
+name: ml
+description: >
+  Machine learning overlay — injects ML domain knowledge into existing
+  pipeline steps for model training, serving, experiment tracking, evaluation,
+  observability, and MLOps patterns.
+project-type: ml
+
+# ---------------------------------------------------------------------------
+# knowledge-overrides
+# ---------------------------------------------------------------------------
+# Map ML knowledge entries into existing pipeline steps so that machine
+# learning domain expertise is injected during prompt assembly.
+# Skips UX/design steps and database steps.
+knowledge-overrides:
+  # Foundational
+  create-prd:
+    append: [ml-requirements]
+  user-stories:
+    append: [ml-requirements]
+  coding-standards:
+    append: [ml-conventions]
+  project-structure:
+    append: [ml-project-structure]
+  dev-env-setup:
+    append: [ml-dev-environment]
+  git-workflow:
+    append: [ml-conventions]
+
+  # Architecture & Design
+  # training-patterns + serving-patterns → system-architecture
+  system-architecture:
+    append: [ml-architecture, ml-training-patterns, ml-serving-patterns]
+  tech-stack:
+    append: [ml-architecture]
+  adrs:
+    append: [ml-architecture]
+  domain-modeling:
+    append: [ml-architecture]
+  security:
+    append: [ml-security]
+  # experiment-tracking → operations; observability → operations
+  operations:
+    append: [ml-experiment-tracking, ml-observability]
+
+  # Testing
+  # model-evaluation → create-evals
+  tdd:
+    append: [ml-testing]
+  add-e2e-testing:
+    append: [ml-testing]
+  create-evals:
+    append: [ml-testing, ml-model-evaluation]
+  story-tests:
+    append: [ml-testing]
+
+  # Reviews (mirror authoring steps)
+  review-architecture:
+    append: [ml-architecture, ml-training-patterns, ml-serving-patterns]
+  review-security:
+    append: [ml-security]
+  # observability → review-operations
+  review-operations:
+    append: [ml-experiment-tracking, ml-observability]
+  review-testing:
+    append: [ml-testing, ml-model-evaluation]
+
+  # Planning
+  implementation-plan:
+    append: [ml-architecture]
