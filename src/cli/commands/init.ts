@@ -34,8 +34,11 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
   command: 'init',
   describe: 'Initialize scaffold for this project',
   builder: (yargs: Argv<Record<string, unknown>>) => {
-    const coerceCSV = (val: string | string[]) =>
-      [...new Set((Array.isArray(val) ? val : [val]).flatMap((v: string) => v.split(',').map((s: string) => s.trim()).filter(Boolean)))]
+    const coerceCSV = (val: string | string[]) => {
+      const items = (Array.isArray(val) ? val : [val])
+        .flatMap((v: string) => v.split(',').map((s: string) => s.trim()).filter(Boolean))
+      return [...new Set(items)]
+    }
 
     return yargs
       // General options
