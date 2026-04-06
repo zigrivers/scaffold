@@ -485,3 +485,124 @@ describe('askWizardQuestions', () => {
     expect(output.prompt).not.toHaveBeenCalled()
   })
 })
+
+// --- Task 12: Web-app, backend, CLI flag-skip tests ---
+
+describe('web-app wizard questions', () => {
+  it('uses flag values when provided (skips prompts)', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: false,
+      projectType: 'web-app',
+      webRendering: 'ssr',
+      webDeployTarget: 'container',
+      webRealtime: 'websocket',
+      webAuthFlow: 'oauth',
+    })
+    expect(answers.webAppConfig).toEqual({
+      renderingStrategy: 'ssr',
+      deployTarget: 'container',
+      realtime: 'websocket',
+      authFlow: 'oauth',
+    })
+    // All 4 web-app questions were provided via flags — no select calls for web-app questions
+    // (platform confirms still fire: Codex, Gemini, web, mobile)
+    expect(output.select).not.toHaveBeenCalled()
+  })
+
+  it('throws in auto mode without required --web-rendering', async () => {
+    const output = makeOutputContext()
+
+    await expect(askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'web-app',
+    })).rejects.toThrow('--web-rendering is required')
+  })
+
+  it('uses defaults in auto mode when anchor flag is provided', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'web-app',
+      webRendering: 'spa',
+    })
+    expect(answers.webAppConfig).toEqual({
+      renderingStrategy: 'spa',
+      deployTarget: 'serverless',
+      realtime: 'none',
+      authFlow: 'none',
+    })
+  })
+})
+
+describe('backend wizard questions', () => {
+  it('uses flag values when provided', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: false,
+      projectType: 'backend',
+      backendApiStyle: 'graphql',
+      backendDataStore: ['relational', 'key-value'],
+      backendAuth: 'jwt',
+      backendMessaging: 'queue',
+      backendDeployTarget: 'serverless',
+    })
+    expect(answers.backendConfig).toEqual({
+      apiStyle: 'graphql',
+      dataStore: ['relational', 'key-value'],
+      authMechanism: 'jwt',
+      asyncMessaging: 'queue',
+      deployTarget: 'serverless',
+    })
+    // All backend questions were provided via flags — no select/multiSelect calls
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.multiSelect).not.toHaveBeenCalled()
+  })
+
+  it('throws in auto mode without required --backend-api-style', async () => {
+    const output = makeOutputContext()
+
+    await expect(askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'backend',
+    })).rejects.toThrow('--backend-api-style is required')
+  })
+})
+
+describe('cli wizard questions', () => {
+  it('uses flag values when provided', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: false,
+      projectType: 'cli',
+      cliInteractivity: 'hybrid',
+      cliDistribution: ['package-manager', 'standalone-binary'],
+      cliStructuredOutput: true,
+    })
+    expect(answers.cliConfig).toEqual({
+      interactivity: 'hybrid',
+      distributionChannels: ['package-manager', 'standalone-binary'],
+      hasStructuredOutput: true,
+    })
+    // All CLI questions were provided via flags — no select/multiSelect/confirm calls for CLI questions
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.multiSelect).not.toHaveBeenCalled()
+  })
+
+  it('throws in auto mode without required --cli-interactivity', async () => {
+    const output = makeOutputContext()
+
+    await expect(askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'cli',
+    })).rejects.toThrow('--cli-interactivity is required')
+  })
+})
