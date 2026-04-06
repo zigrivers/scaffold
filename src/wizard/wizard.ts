@@ -21,6 +21,20 @@ export interface WizardOptions {
   force: boolean
   auto: boolean
   output: OutputContext
+  depth?: number
+  adapters?: string[]
+  traits?: string[]
+  engine?: string
+  multiplayer?: string
+  targetPlatforms?: string[]
+  onlineServices?: string[]
+  contentStructure?: string
+  economy?: string
+  narrative?: string
+  locales?: string[]
+  npcAi?: string
+  modding?: boolean
+  persistence?: string
 }
 
 export interface WizardResult {
@@ -35,6 +49,9 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
   const {
     projectRoot, idea, methodology: presetMethodology,
     projectType: presetProjectType, force, auto, output,
+    depth, adapters, traits, engine, multiplayer, targetPlatforms,
+    onlineServices, contentStructure, economy, narrative,
+    locales, npcAi, modding, persistence,
   } = options
   const scaffoldDir = path.join(projectRoot, '.scaffold')
 
@@ -96,6 +113,20 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
     methodology: presetMethodology,
     projectType: presetProjectType,
     auto,
+    depth,
+    adapters,
+    traits,
+    engine,
+    multiplayer,
+    targetPlatforms,
+    onlineServices,
+    contentStructure,
+    economy,
+    narrative,
+    locales,
+    npcAi,
+    modding,
+    persistence,
   })
 
   // Build config — methodology is a top-level string per the real ScaffoldConfig schema
@@ -104,7 +135,7 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
     methodology: answers.methodology,
     platforms: answers.platforms,
     project: {
-      traits: answers.traits,
+      platforms: answers.traits as Array<'web' | 'mobile' | 'desktop'>,
       ...(answers.projectType && { projectType: answers.projectType }),
       ...(answers.gameConfig && { gameConfig: answers.gameConfig }),
     },
