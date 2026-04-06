@@ -7,6 +7,7 @@ import { loadOverlay } from './overlay-loader.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const fixtureDir = path.resolve(__dirname, '../../../tests/fixtures/methodology')
+const methodologyDir = path.resolve(__dirname, '../../../content/methodology')
 
 describe('loadOverlay', () => {
   it('loads game-overlay.yml with correct name and projectType', () => {
@@ -124,5 +125,41 @@ describe('loadOverlay', () => {
     } finally {
       fs.rmSync(tmpDir, { recursive: true })
     }
+  })
+})
+
+describe('web-app overlay', () => {
+  it('loads web-app-overlay.yml successfully', () => {
+    const overlayPath = path.join(methodologyDir, 'web-app-overlay.yml')
+    const { overlay, errors } = loadOverlay(overlayPath)
+    expect(errors).toHaveLength(0)
+    expect(overlay).not.toBeNull()
+    expect(overlay!.projectType).toBe('web-app')
+    expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(20)
+    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+  })
+})
+
+describe('backend overlay', () => {
+  it('loads backend-overlay.yml successfully', () => {
+    const overlayPath = path.join(methodologyDir, 'backend-overlay.yml')
+    const { overlay, errors } = loadOverlay(overlayPath)
+    expect(errors).toHaveLength(0)
+    expect(overlay).not.toBeNull()
+    expect(overlay!.projectType).toBe('backend')
+    expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(15)
+    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+  })
+})
+
+describe('cli overlay', () => {
+  it('loads cli-overlay.yml successfully', () => {
+    const overlayPath = path.join(methodologyDir, 'cli-overlay.yml')
+    const { overlay, errors } = loadOverlay(overlayPath)
+    expect(errors).toHaveLength(0)
+    expect(overlay).not.toBeNull()
+    expect(overlay!.projectType).toBe('cli')
+    expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(15)
+    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
   })
 })

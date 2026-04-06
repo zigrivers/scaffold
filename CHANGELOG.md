@@ -2,6 +2,29 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.7.0] — 2026-04-06
+
+### Added
+
+- **Project-type overlays for web-app, backend, and CLI** — three new overlay files (`web-app-overlay.yml`, `backend-overlay.yml`, `cli-overlay.yml`) inject domain-specific knowledge into existing pipeline steps based on project type. Each overlay adjusts step enablement, knowledge injection, and artifact references without modifying methodology presets.
+- **12 new CLI flags for `scaffold init`** — non-interactive configuration for the three new project types:
+  - **Web-app flags** (auto-set `--project-type web-app`): `--web-rendering` (spa/ssr/ssg/hybrid), `--web-deploy-target` (static/serverless/container/edge/long-running), `--web-realtime` (none/websocket/sse), `--web-auth-flow` (none/session/oauth/passkey)
+  - **Backend flags** (auto-set `--project-type backend`): `--backend-api-style` (rest/graphql/grpc/trpc/none), `--backend-data-store` (relational/document/key-value, comma-sep), `--backend-auth` (none/jwt/session/oauth/apikey), `--backend-messaging` (none/queue/event-driven), `--backend-deploy-target` (serverless/container/long-running)
+  - **CLI flags** (auto-set `--project-type cli`): `--cli-interactivity` (args-only/interactive/hybrid), `--cli-distribution` (package-manager/system-package-manager/standalone-binary/container, comma-sep), `--cli-structured-output` (boolean)
+  - Cross-family validation: cannot mix `--web-*`, `--backend-*`, `--cli-*`, and game flags
+  - Cross-field validation: SSR/hybrid rendering rejects static deploy target; session auth rejects static deploy target
+  - Help text grouped into Web-App / Backend / CLI / Game Configuration sections
+- **`--game-*` flag aliases** — game config flags now have `--game-engine`, `--game-multiplayer`, `--game-target-platforms`, etc. aliases for consistency with other project type flag prefixes. Bare flags like `--engine` still work.
+- **41 domain knowledge entries** — 17 web-app entries (rendering strategies, state management, auth, SSR, deploy targets, real-time, PWA, caching, testing, security, accessibility), 14 backend entries (API design, data stores, auth, messaging, observability, deploy, caching, rate limiting, error handling, migrations, testing, security), 10 CLI entries (argument parsing, config management, output formatting, distribution, testing, error handling, plugin architecture, shell integration)
+- **Web-app, backend, and CLI wizard questions** — progressive-disclosure wizard for each new project type, with `--auto` mode requiring only the primary config flag (`--web-rendering`, `--backend-api-style`, `--cli-interactivity`)
+
+### Changed
+
+- **`ProjectType` derived from Zod schema** — `ProjectTypeSchema` is now the single source of truth; the `ProjectType` union type is derived via `z.infer`. Adding a new project type only requires updating the Zod enum.
+- **`WizardAnswers` consolidated** — removed stale duplicate interface; the canonical definition now includes `webAppConfig`, `backendConfig`, and `cliConfig` fields alongside existing `gameConfig`.
+- **`ProjectSchema` uses `.superRefine()` for cross-field validation** — project-type-specific config objects (`webAppConfig`, `backendConfig`, `cliConfig`) are validated against their project type, matching the existing `gameConfig` pattern.
+- **Flag families are mutually exclusive** — `scaffold init` rejects mixing flags from different project types at the CLI validation layer.
+
 ## [3.6.0] — 2026-04-06
 
 ### Added

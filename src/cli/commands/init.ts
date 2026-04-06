@@ -4,6 +4,28 @@ import { createOutputContext } from '../output/context.js'
 import { runWizard } from '../../wizard/wizard.js'
 import { runBuild } from './build.js'
 import { syncSkillsIfNeeded } from '../../core/skills/sync.js'
+import { ProjectTypeSchema } from '../../config/schema.js'
+
+const GAME_FLAGS = [
+  'engine', 'multiplayer', 'target-platforms', 'online-services',
+  'content-structure', 'economy', 'narrative', 'locales',
+  'npc-ai', 'modding', 'persistence',
+] as const
+
+const WEB_FLAGS = [
+  'web-rendering', 'web-deploy-target',
+  'web-realtime', 'web-auth-flow',
+] as const
+
+const BACKEND_FLAGS = [
+  'backend-api-style', 'backend-data-store', 'backend-auth',
+  'backend-messaging', 'backend-deploy-target',
+] as const
+
+const CLI_TYPE_FLAGS = [
+  'cli-interactivity', 'cli-distribution',
+  'cli-structured-output',
+] as const
 
 interface InitArgs {
   format?: string
@@ -28,6 +50,21 @@ interface InitArgs {
   'npc-ai'?: string
   modding?: boolean
   persistence?: string
+  // Web-app flags
+  'web-rendering'?: string
+  'web-deploy-target'?: string
+  'web-realtime'?: string
+  'web-auth-flow'?: string
+  // Backend flags
+  'backend-api-style'?: string
+  'backend-data-store'?: string[]
+  'backend-auth'?: string
+  'backend-messaging'?: string
+  'backend-deploy-target'?: string
+  // CLI flags
+  'cli-interactivity'?: string
+  'cli-distribution'?: string[]
+  'cli-structured-output'?: boolean
 }
 
 const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
@@ -73,66 +110,141 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       })
       .option('project-type', {
         type: 'string',
-        describe: 'Project type (web-app/mobile-app/backend/cli/library/game)',
-        choices: ['web-app', 'mobile-app', 'backend', 'cli', 'library', 'game'] as const,
+        describe: `Project type (${ProjectTypeSchema.options.join('/')})`,
+        choices: ProjectTypeSchema.options as unknown as string[],
+      })
+      // Web-App Configuration
+      .option('web-rendering', {
+        type: 'string',
+        describe: 'Rendering strategy',
+        choices: ['spa', 'ssr', 'ssg', 'hybrid'] as const,
+      })
+      .option('web-deploy-target', {
+        type: 'string',
+        describe: 'Deploy target',
+        choices: ['static', 'serverless', 'container', 'edge', 'long-running'] as const,
+      })
+      .option('web-realtime', {
+        type: 'string',
+        describe: 'Real-time strategy',
+        choices: ['none', 'websocket', 'sse'] as const,
+      })
+      .option('web-auth-flow', {
+        type: 'string',
+        describe: 'Authentication flow',
+        choices: ['none', 'session', 'oauth', 'passkey'] as const,
+      })
+      // Backend Configuration
+      .option('backend-api-style', {
+        type: 'string',
+        describe: 'API style',
+        choices: ['rest', 'graphql', 'grpc', 'trpc', 'none'] as const,
+      })
+      .option('backend-data-store', {
+        type: 'string',
+        array: true,
+        describe: 'Data store(s) (relational,document,key-value)',
+        coerce: coerceCSV,
+      })
+      .option('backend-auth', {
+        type: 'string',
+        describe: 'API auth mechanism',
+        choices: ['none', 'jwt', 'session', 'oauth', 'apikey'] as const,
+      })
+      .option('backend-messaging', {
+        type: 'string',
+        describe: 'Async messaging',
+        choices: ['none', 'queue', 'event-driven'] as const,
+      })
+      .option('backend-deploy-target', {
+        type: 'string',
+        describe: 'Deploy target',
+        choices: ['serverless', 'container', 'long-running'] as const,
+      })
+      // CLI Configuration
+      .option('cli-interactivity', {
+        type: 'string',
+        describe: 'Interactivity model',
+        choices: ['args-only', 'interactive', 'hybrid'] as const,
+      })
+      .option('cli-distribution', {
+        type: 'string',
+        array: true,
+        describe: 'Distribution channels (package-manager,system-package-manager,standalone-binary,container)',
+        coerce: coerceCSV,
+      })
+      .option('cli-structured-output', {
+        type: 'boolean',
+        describe: 'Support structured output (--json)',
       })
       // Game configuration options
       .option('engine', {
         type: 'string',
         describe: 'Game engine',
         choices: ['unity', 'unreal', 'godot', 'custom'] as const,
+        alias: 'game-engine',
       })
       .option('multiplayer', {
         type: 'string',
         describe: 'Multiplayer mode',
         choices: ['none', 'local', 'online', 'hybrid'] as const,
+        alias: 'game-multiplayer',
       })
       .option('target-platforms', {
         type: 'string',
         array: true,
         describe: 'Target platforms (pc,web,ios,android,ps5,xbox,switch,vr,ar)',
         coerce: coerceCSV,
+        alias: 'game-target-platforms',
       })
       .option('online-services', {
         type: 'string',
         array: true,
         describe: 'Online services (leaderboards,accounts,matchmaking,live-ops)',
         coerce: coerceCSV,
+        alias: 'game-online-services',
       })
       .option('content-structure', {
         type: 'string',
         describe: 'Content structure',
         choices: ['discrete', 'open-world', 'procedural', 'endless', 'mission-based'] as const,
+        alias: 'game-content-structure',
       })
       .option('economy', {
         type: 'string',
         describe: 'Economy model',
         choices: ['none', 'progression', 'monetized', 'both'] as const,
+        alias: 'game-economy',
       })
       .option('narrative', {
         type: 'string',
         describe: 'Narrative depth',
         choices: ['none', 'light', 'heavy'] as const,
+        alias: 'game-narrative',
       })
       .option('locales', {
         type: 'string',
         array: true,
         describe: 'Supported locales (e.g. en,ja,fr-FR)',
         coerce: coerceCSV,
+        alias: 'game-locales',
       })
       .option('npc-ai', {
         type: 'string',
         describe: 'NPC AI complexity',
         choices: ['none', 'simple', 'complex'] as const,
+        alias: 'game-npc-ai',
       })
       .option('modding', {
         type: 'boolean',
         describe: 'Enable mod support',
+        alias: 'game-modding',
       })
       .option('persistence', {
         type: 'string',
         describe: 'Persistence level',
         choices: ['none', 'settings-only', 'profile', 'progression', 'cloud'] as const,
+        alias: 'game-persistence',
       })
       // Validation
       .check((argv) => {
@@ -142,9 +254,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         }
 
         // Game flags auto-set --project-type game; error if explicitly non-game
-        const gameFlags = ['engine', 'multiplayer', 'target-platforms', 'online-services',
-          'content-structure', 'economy', 'narrative', 'locales', 'npc-ai', 'modding', 'persistence'] as const
-        const hasGameFlag = gameFlags.some((f) => argv[f] !== undefined)
+        const hasGameFlag = GAME_FLAGS.some((f) => argv[f] !== undefined)
         if (hasGameFlag) {
           if (argv['project-type'] !== undefined && argv['project-type'] !== 'game') {
             throw new Error('Game flags (--engine, --multiplayer, etc.) require --project-type game')
@@ -205,14 +315,91 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
           }
         }
 
+        // New project type flag detection
+        const hasWebFlag = WEB_FLAGS.some((f) => argv[f] !== undefined)
+        const hasBackendFlag = BACKEND_FLAGS.some(
+          (f) => argv[f] !== undefined,
+        )
+        const hasCliFlag = CLI_TYPE_FLAGS.some(
+          (f) => argv[f] !== undefined,
+        )
+
+        // Reject mixed-family flags
+        const typeCount = [hasGameFlag, hasWebFlag, hasBackendFlag, hasCliFlag].filter(Boolean).length
+        if (typeCount > 1) {
+          throw new Error('Cannot mix flags from multiple project types (--web-*, --backend-*, --cli-*, game flags)')
+        }
+
+        // Web flags require web-app project type
+        if (hasWebFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'web-app') {
+          throw new Error('--web-* flags require --project-type web-app')
+        }
+        if (hasBackendFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'backend') {
+          throw new Error('--backend-* flags require --project-type backend')
+        }
+        if (hasCliFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'cli') {
+          throw new Error('--cli-* flags require --project-type cli')
+        }
+
+        // CSV enum validation for array flags
+        const validDataStores = ['relational', 'document', 'key-value']
+        if (argv['backend-data-store']) {
+          const invalid = (argv['backend-data-store'] as string[]).filter(
+            (v: string) => !validDataStores.includes(v),
+          )
+          if (invalid.length) {
+            throw new Error(
+              `Invalid --backend-data-store value(s): ${invalid.join(', ')}`,
+            )
+          }
+        }
+        if (
+          argv['backend-data-store'] &&
+          (argv['backend-data-store'] as string[]).length === 0
+        ) {
+          throw new Error('--backend-data-store requires at least one value')
+        }
+        const validDistChannels = [
+          'package-manager', 'system-package-manager',
+          'standalone-binary', 'container',
+        ]
+        if (argv['cli-distribution']) {
+          const invalid = (argv['cli-distribution'] as string[]).filter(
+            (v: string) => !validDistChannels.includes(v),
+          )
+          if (invalid.length) {
+            throw new Error(
+              `Invalid --cli-distribution value(s): ${invalid.join(', ')}`,
+            )
+          }
+        }
+        if (
+          argv['cli-distribution'] &&
+          (argv['cli-distribution'] as string[]).length === 0
+        ) {
+          throw new Error('--cli-distribution requires at least one value')
+        }
+
+        // WebApp cross-field validation
+        if (['ssr', 'hybrid'].includes(argv['web-rendering'] as string) && argv['web-deploy-target'] === 'static') {
+          throw new Error('SSR/hybrid rendering requires compute, not static hosting')
+        }
+        if (argv['web-auth-flow'] === 'session' && argv['web-deploy-target'] === 'static') {
+          throw new Error('Session auth requires server state, incompatible with static hosting')
+        }
+
         return true
       })
       // Help grouping
       .group(['methodology', 'depth', 'adapters', 'traits', 'project-type'], 'Configuration:')
+      .group(['web-rendering', 'web-deploy-target', 'web-realtime', 'web-auth-flow'], 'Web-App Configuration:')
+      .group(['backend-api-style', 'backend-data-store', 'backend-auth',
+        'backend-messaging', 'backend-deploy-target'], 'Backend Configuration:')
+      .group(['cli-interactivity', 'cli-distribution', 'cli-structured-output'], 'CLI Configuration:')
       .group([
-        'engine', 'multiplayer', 'target-platforms', 'online-services',
-        'content-structure', 'economy', 'narrative', 'locales',
-        'npc-ai', 'modding', 'persistence',
+        'game-engine', 'game-multiplayer', 'game-target-platforms', 'game-online-services',
+        'game-content-structure', 'game-economy', 'game-narrative', 'game-locales',
+        'game-npc-ai', 'game-modding', 'game-persistence',
       ], 'Game Configuration:')
       .group(['root', 'force', 'auto', 'idea', 'format', 'verbose'], 'General:') as Argv<InitArgs>
   },
@@ -221,11 +408,28 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
-    // Game flags auto-set --project-type game
-    const gameFlags = ['engine', 'multiplayer', 'target-platforms', 'online-services',
-      'content-structure', 'economy', 'narrative', 'locales', 'npc-ai', 'modding', 'persistence'] as const
-    const hasGameFlag = gameFlags.some((f) => argv[f] !== undefined)
-    const projectType = argv['project-type'] ?? (hasGameFlag ? 'game' : undefined)
+    // Auto-detect project type from flags
+    const hasGameFlag = GAME_FLAGS.some((f) => argv[f] !== undefined)
+    const hasWebFlag = WEB_FLAGS.some(
+      (f) => argv[f] !== undefined,
+    )
+    const hasBackendFlag = BACKEND_FLAGS.some(
+      (f) => argv[f] !== undefined,
+    )
+    const hasCliTypeFlag = CLI_TYPE_FLAGS.some(
+      (f) => argv[f] !== undefined,
+    )
+
+    const detectedType = hasGameFlag
+      ? 'game'
+      : hasWebFlag
+        ? 'web-app'
+        : hasBackendFlag
+          ? 'backend'
+          : hasCliTypeFlag
+            ? 'cli'
+            : undefined
+    const projectType = argv['project-type'] ?? detectedType
 
     const result = await runWizard({
       projectRoot,
@@ -249,6 +453,18 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       npcAi: argv['npc-ai'],
       modding: argv.modding,
       persistence: argv.persistence,
+      webRendering: argv['web-rendering'],
+      webDeployTarget: argv['web-deploy-target'],
+      webRealtime: argv['web-realtime'],
+      webAuthFlow: argv['web-auth-flow'],
+      backendApiStyle: argv['backend-api-style'],
+      backendDataStore: argv['backend-data-store'],
+      backendAuth: argv['backend-auth'],
+      backendMessaging: argv['backend-messaging'],
+      backendDeployTarget: argv['backend-deploy-target'],
+      cliInteractivity: argv['cli-interactivity'],
+      cliDistribution: argv['cli-distribution'],
+      cliStructuredOutput: argv['cli-structured-output'],
     })
 
     if (!result.success) {

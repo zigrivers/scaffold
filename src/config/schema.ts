@@ -16,6 +16,29 @@ export const ProjectTypeSchema = z.enum([
   'web-app', 'mobile-app', 'backend', 'cli', 'library', 'game',
 ])
 
+export const WebAppConfigSchema = z.object({
+  renderingStrategy: z.enum(['spa', 'ssr', 'ssg', 'hybrid']),
+  deployTarget: z.enum(['static', 'serverless', 'container', 'edge', 'long-running']).default('serverless'),
+  realtime: z.enum(['none', 'websocket', 'sse']).default('none'),
+  authFlow: z.enum(['none', 'session', 'oauth', 'passkey']).default('none'),
+}).strict()
+
+export const BackendConfigSchema = z.object({
+  apiStyle: z.enum(['rest', 'graphql', 'grpc', 'trpc', 'none']),
+  dataStore: z.array(z.enum(['relational', 'document', 'key-value'])).min(1).default(['relational']),
+  authMechanism: z.enum(['none', 'jwt', 'session', 'oauth', 'apikey']).default('none'),
+  asyncMessaging: z.enum(['none', 'queue', 'event-driven']).default('none'),
+  deployTarget: z.enum(['serverless', 'container', 'long-running']).default('container'),
+}).strict()
+
+export const CliConfigSchema = z.object({
+  interactivity: z.enum(['args-only', 'interactive', 'hybrid']),
+  distributionChannels: z.array(
+    z.enum(['package-manager', 'system-package-manager', 'standalone-binary', 'container']),
+  ).min(1).default(['package-manager']),
+  hasStructuredOutput: z.boolean().default(false),
+}).strict()
+
 export const GameConfigSchema = z.object({
   engine: z.enum(['unity', 'unreal', 'godot', 'custom']),
   multiplayerMode: z.enum(['none', 'local', 'online', 'hybrid']).default('none'),
@@ -39,17 +62,39 @@ const ProjectSchema = z.object({
   platforms: z.array(z.enum(['web', 'mobile', 'desktop'])).optional(),
   projectType: ProjectTypeSchema.optional(),
   gameConfig: GameConfigSchema.optional(),
+  webAppConfig: WebAppConfigSchema.optional(),
+  backendConfig: BackendConfigSchema.optional(),
+  cliConfig: CliConfigSchema.optional(),
 }).passthrough()  // allow unknown fields per ADR-033
-  .refine(
-    (data) => {
-      // gameConfig is only valid when projectType === 'game'
-      if (data.gameConfig !== undefined && data.projectType !== 'game') {
-        return false
+  .superRefine((data, ctx) => {
+    if (data.gameConfig !== undefined && data.projectType !== 'game') {
+      ctx.addIssue({ path: ['gameConfig'], code: 'custom',
+        message: 'gameConfig is only valid when projectType is "game"' })
+    }
+    if (data.webAppConfig !== undefined && data.projectType !== 'web-app') {
+      ctx.addIssue({ path: ['webAppConfig'], code: 'custom',
+        message: 'webAppConfig requires projectType: web-app' })
+    }
+    if (data.backendConfig !== undefined && data.projectType !== 'backend') {
+      ctx.addIssue({ path: ['backendConfig'], code: 'custom',
+        message: 'backendConfig requires projectType: backend' })
+    }
+    if (data.cliConfig !== undefined && data.projectType !== 'cli') {
+      ctx.addIssue({ path: ['cliConfig'], code: 'custom',
+        message: 'cliConfig requires projectType: cli' })
+    }
+    if (data.webAppConfig) {
+      const { renderingStrategy, deployTarget, authFlow } = data.webAppConfig
+      if (['ssr', 'hybrid'].includes(renderingStrategy) && deployTarget === 'static') {
+        ctx.addIssue({ path: ['webAppConfig', 'deployTarget'], code: 'custom',
+          message: 'SSR/hybrid rendering requires compute, not static hosting' })
       }
-      return true
-    },
-    { message: 'gameConfig is only valid when projectType is "game"', path: ['gameConfig'] },
-  )
+      if (authFlow === 'session' && deployTarget === 'static') {
+        ctx.addIssue({ path: ['webAppConfig', 'authFlow'], code: 'custom',
+          message: 'Session auth requires server state, incompatible with static hosting' })
+      }
+    }
+  })
 
 export const ConfigSchema = z.object({
   version: z.literal(2),

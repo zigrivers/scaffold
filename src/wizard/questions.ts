@@ -1,6 +1,6 @@
 import type { OutputContext } from '../cli/output/context.js'
-import type { ProjectType, GameConfig } from '../types/index.js'
-import { GameConfigSchema } from '../config/schema.js'
+import type { ProjectType, GameConfig, WebAppConfig, BackendConfig, CliConfig } from '../types/index.js'
+import { GameConfigSchema, ProjectTypeSchema } from '../config/schema.js'
 
 export interface WizardAnswers {
   methodology: 'deep' | 'mvp' | 'custom'
@@ -9,6 +9,9 @@ export interface WizardAnswers {
   traits: string[]
   projectType?: ProjectType
   gameConfig?: GameConfig
+  webAppConfig?: WebAppConfig
+  backendConfig?: BackendConfig
+  cliConfig?: CliConfig
 }
 
 /**
@@ -35,6 +38,21 @@ export async function askWizardQuestions(options: {
   npcAi?: string
   modding?: boolean
   persistence?: string
+  // Web-app flags
+  webRendering?: string
+  webDeployTarget?: string
+  webRealtime?: string
+  webAuthFlow?: string
+  // Backend flags
+  backendApiStyle?: string
+  backendDataStore?: string[]
+  backendAuth?: string
+  backendMessaging?: string
+  backendDeployTarget?: string
+  // CLI flags
+  cliInteractivity?: string
+  cliDistribution?: string[]
+  cliStructuredOutput?: boolean
 }): Promise<WizardAnswers> {
   const { output, suggestion, auto } = options
 
@@ -99,10 +117,122 @@ export async function askWizardQuestions(options: {
   } else if (!auto) {
     const selected = await output.select(
       'What type of project is this?',
-      ['web-app', 'mobile-app', 'backend', 'cli', 'library', 'game'],
+      [...ProjectTypeSchema.options],
       'web-app',
     )
     projectType = selected as ProjectType
+  }
+
+  // Web-App configuration
+  let webAppConfig: WebAppConfig | undefined
+  if (projectType === 'web-app') {
+    if (auto && !options.webRendering) {
+      throw new Error('--web-rendering is required in auto mode for web-app projects')
+    }
+
+    const renderingStrategy = options.webRendering
+      ? options.webRendering as WebAppConfig['renderingStrategy']
+      : await output.select('Rendering strategy?', ['spa', 'ssr', 'ssg', 'hybrid']) as WebAppConfig['renderingStrategy']
+
+    const deployTarget = options.webDeployTarget
+      ? options.webDeployTarget as WebAppConfig['deployTarget']
+      : !auto
+        ? await output.select('Deploy target?',
+          ['static', 'serverless', 'container', 'edge', 'long-running'], 'serverless') as WebAppConfig['deployTarget']
+        : 'serverless'
+
+    const realtime = options.webRealtime
+      ? options.webRealtime as WebAppConfig['realtime']
+      : !auto
+        ? await output.select('Real-time needs?', ['none', 'websocket', 'sse'], 'none') as WebAppConfig['realtime']
+        : 'none'
+
+    const authFlow = options.webAuthFlow
+      ? options.webAuthFlow as WebAppConfig['authFlow']
+      : !auto
+        ? await output.select('How do users authenticate?',
+          ['none', 'session', 'oauth', 'passkey'], 'none') as WebAppConfig['authFlow']
+        : 'none'
+
+    webAppConfig = { renderingStrategy, deployTarget, realtime, authFlow }
+  }
+
+  // Backend configuration
+  let backendConfig: BackendConfig | undefined
+  if (projectType === 'backend') {
+    if (auto && !options.backendApiStyle) {
+      throw new Error('--backend-api-style is required in auto mode for backend projects')
+    }
+
+    const apiStyle = options.backendApiStyle
+      ? options.backendApiStyle as BackendConfig['apiStyle']
+      : await output.select('API style?',
+        ['rest', 'graphql', 'grpc', 'trpc', 'none']) as BackendConfig['apiStyle']
+
+    const dataStore = options.backendDataStore
+      ? options.backendDataStore as BackendConfig['dataStore']
+      : !auto
+        ? await output.multiSelect('Data store(s)?',
+          ['relational', 'document', 'key-value'], ['relational']) as BackendConfig['dataStore']
+        : ['relational'] as BackendConfig['dataStore']
+
+    let authMechanism: BackendConfig['authMechanism']
+    if (apiStyle === 'none') {
+      if (options.backendAuth && options.backendAuth !== 'none') {
+        output.warn('--backend-auth ignored because --backend-api-style is none (no API to authenticate)')
+      }
+      authMechanism = 'none'
+    } else {
+      authMechanism = options.backendAuth
+        ? options.backendAuth as BackendConfig['authMechanism']
+        : !auto
+          ? await output.select('How does the API verify requests?',
+            ['none', 'jwt', 'session', 'oauth', 'apikey'],
+            'none') as BackendConfig['authMechanism']
+          : 'none'
+    }
+
+    const asyncMessaging = options.backendMessaging
+      ? options.backendMessaging as BackendConfig['asyncMessaging']
+      : !auto
+        ? await output.select('Async messaging?',
+          ['none', 'queue', 'event-driven'], 'none') as BackendConfig['asyncMessaging']
+        : 'none'
+
+    const deployTarget = options.backendDeployTarget
+      ? options.backendDeployTarget as BackendConfig['deployTarget']
+      : !auto
+        ? await output.select('Deploy target?',
+          ['serverless', 'container', 'long-running'], 'container') as BackendConfig['deployTarget']
+        : 'container'
+
+    backendConfig = { apiStyle, dataStore, authMechanism, asyncMessaging, deployTarget }
+  }
+
+  // CLI configuration
+  let cliConfig: CliConfig | undefined
+  if (projectType === 'cli') {
+    if (auto && !options.cliInteractivity) {
+      throw new Error('--cli-interactivity is required in auto mode for cli projects')
+    }
+
+    const interactivity = options.cliInteractivity
+      ? options.cliInteractivity as CliConfig['interactivity']
+      : await output.select('Interactivity model?',
+        ['args-only', 'interactive', 'hybrid']) as CliConfig['interactivity']
+
+    const distributionChannels = options.cliDistribution
+      ? options.cliDistribution as CliConfig['distributionChannels']
+      : !auto
+        ? await output.multiSelect('Distribution channels?',
+          ['package-manager', 'system-package-manager', 'standalone-binary', 'container'],
+          ['package-manager']) as CliConfig['distributionChannels']
+        : ['package-manager'] as CliConfig['distributionChannels']
+
+    const hasStructuredOutput = options.cliStructuredOutput
+      ?? (!auto ? await output.confirm('Support structured output (--json)?', false) : false)
+
+    cliConfig = { interactivity, distributionChannels, hasStructuredOutput }
   }
 
   // Game config questions (only when projectType === 'game')
@@ -237,5 +367,5 @@ export async function askWizardQuestions(options: {
     }
   }
 
-  return { methodology, depth, platforms, traits, projectType, gameConfig }
+  return { methodology, depth, platforms, traits, projectType, webAppConfig, backendConfig, cliConfig, gameConfig }
 }

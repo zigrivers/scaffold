@@ -29,7 +29,7 @@ Either way, Scaffold constructs the prompt and the target AI tool does the work.
 
 **Assembly engine** — At execution time, Scaffold builds a 7-section prompt from: system metadata, the meta-prompt, knowledge base entries, project context (artifacts from prior steps), methodology settings, layered instructions, and depth-specific execution guidance.
 
-**Knowledge base** — 60 domain expertise entries in `content/knowledge/` organized in seven categories (core, product, review, validation, finalization, execution, tools) covering testing strategy, domain modeling, API design, security best practices, eval craft, TDD execution, task claiming, worktree management, release management, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
+**Knowledge base** — 134 domain expertise entries in `content/knowledge/` organized in eleven categories (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli) covering testing strategy, domain modeling, API design, security best practices, eval craft, TDD execution, task claiming, worktree management, release management, rendering strategies, data stores, CLI patterns, game engines, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
 
 **Methodology presets** — Three built-in presets control which steps run and how deep the analysis goes:
 - **deep** (depth 5) — all steps enabled, exhaustive analysis
@@ -371,6 +371,33 @@ Every `scaffold init` wizard question can be answered via CLI flags, making scaf
 | `--project-type` | string | web-app, mobile-app, backend, cli, library, game |
 | `--auto` | boolean | Non-interactive mode (uses Zod defaults for unset flags) |
 
+#### Web-App Config Flags (require `--project-type web-app` or auto-set it)
+
+| Flag | Type | Values |
+|------|------|--------|
+| `--web-rendering` | string | spa, ssr, ssg, hybrid |
+| `--web-deploy-target` | string | static, serverless, container, edge, long-running |
+| `--web-realtime` | string | none, websocket, sse |
+| `--web-auth-flow` | string | none, session, oauth, passkey |
+
+#### Backend Config Flags (require `--project-type backend` or auto-set it)
+
+| Flag | Type | Values |
+|------|------|--------|
+| `--backend-api-style` | string | rest, graphql, grpc, trpc, none |
+| `--backend-data-store` | comma-sep | relational, document, key-value |
+| `--backend-auth` | string | none, jwt, session, oauth, apikey |
+| `--backend-messaging` | string | none, queue, event-driven |
+| `--backend-deploy-target` | string | serverless, container, long-running |
+
+#### CLI Config Flags (require `--project-type cli` or auto-set it)
+
+| Flag | Type | Values |
+|------|------|--------|
+| `--cli-interactivity` | string | args-only, interactive, hybrid |
+| `--cli-distribution` | comma-sep | package-manager, system-package-manager, standalone-binary, container |
+| `--cli-structured-output` | boolean | `--cli-structured-output` / `--no-cli-structured-output` |
+
 #### Game Config Flags (require `--project-type game` or auto-set it)
 
 | Flag | Type | Values |
@@ -387,16 +414,47 @@ Every `scaffold init` wizard question can be answered via CLI flags, making scaf
 | `--modding` | boolean | `--modding` / `--no-modding` |
 | `--persistence` | string | none, settings-only, profile, progression, cloud |
 
+> **Flag aliases**: Game flags have `--game-*` aliases for consistency with other project types (e.g., `--game-engine` is equivalent to `--engine`). Bare flags like `--engine` still work.
+
 #### How Flags Interact
 
 - **Flag > auto > interactive**: Flags always take highest precedence. `--auto --engine unreal` uses defaults for everything except engine.
 - **Partial flags + interactive**: Provide some flags and the wizard asks only the remaining questions. `scaffold init --project-type game --engine unreal` prompts interactively for multiplayer, platforms, etc.
-- **Game flags auto-set project type**: `--engine unity` automatically sets `--project-type game`. Error if conflicting non-game type.
-- **Validation**: `--depth` requires `--methodology custom`. `--online-services` requires `--multiplayer online` or `hybrid`.
+- **Type-specific flags auto-set project type**: `--engine unity` automatically sets `--project-type game`, `--web-rendering ssr` sets `--project-type web-app`, `--backend-api-style rest` sets `--project-type backend`, `--cli-interactivity hybrid` sets `--project-type cli`. Error if conflicting type.
+- **Cannot mix flag families**: `--web-rendering ssr --backend-api-style rest` is an error. Each flag family is exclusive.
+- **Validation**: `--depth` requires `--methodology custom`. `--online-services` requires `--multiplayer online` or `hybrid`. SSR/hybrid rendering is incompatible with static deploy target. Session auth requires server state (not static).
 
 #### CI Examples
 
 ```bash
+# Web-app project (SSR with serverless deploy)
+scaffold init --auto --methodology deep --project-type web-app \
+  --web-rendering ssr --web-deploy-target serverless
+
+# Web-app with real-time features and OAuth
+scaffold init --auto --methodology deep --project-type web-app \
+  --web-rendering ssr --web-deploy-target container \
+  --web-realtime websocket --web-auth-flow oauth
+
+# Backend project (GraphQL with relational + key-value stores)
+scaffold init --auto --methodology deep --project-type backend \
+  --backend-api-style graphql --backend-data-store relational,key-value
+
+# Backend with event-driven messaging and JWT auth
+scaffold init --auto --methodology deep --project-type backend \
+  --backend-api-style rest --backend-data-store relational \
+  --backend-auth jwt --backend-messaging event-driven \
+  --backend-deploy-target container
+
+# CLI project (interactive with multiple distribution channels)
+scaffold init --auto --methodology mvp --project-type cli \
+  --cli-interactivity hybrid --cli-distribution package-manager,standalone-binary
+
+# CLI with structured JSON output
+scaffold init --auto --methodology deep --project-type cli \
+  --cli-interactivity args-only --cli-distribution package-manager \
+  --cli-structured-output
+
 # Multiplayer mobile game with Unity
 scaffold init --project-type game --methodology deep --auto \
   --engine unity --multiplayer online --target-platforms ios,android \
@@ -404,10 +462,6 @@ scaffold init --project-type game --methodology deep --auto \
 
 # Simple puzzle game
 scaffold init --project-type game --auto --engine godot
-
-# Web app with multiple AI adapters
-scaffold init --project-type web-app --methodology mvp --auto \
-  --adapters claude-code,gemini --traits web,mobile
 
 # Custom methodology at depth 3
 scaffold init --methodology custom --depth 3 --auto
@@ -420,6 +474,23 @@ scaffold init --project-type game --methodology deep --auto \
   --npc-ai complex --modding --persistence cloud \
   --content-structure open-world
 ```
+
+### Project-Type Overlays
+
+Scaffold supports **project-type overlays** — domain-specific knowledge and pipeline customizations that activate based on your project type. When you set a project type during `scaffold init`, the corresponding overlay layers on top of your chosen methodology (mvp, deep, or custom):
+
+- **Injects domain knowledge** into existing pipeline steps (e.g., SSR caching strategies into `tech-stack`, API pagination patterns into `coding-standards`)
+
+The game overlay additionally adjusts step enablement, remaps artifact references, and adds dependency overrides (because game development has fundamentally different artifacts). The web-app, backend, and CLI overlays are **knowledge-only** — they inject domain expertise into existing steps without changing which steps run or how they depend on each other.
+
+Overlays are composable with methodology presets. An MVP web-app gets fewer steps at lower depth; a deep backend project gets exhaustive analysis of every architectural decision.
+
+| Project Type | Overlay | Knowledge Entries | Config Options |
+|-------------|---------|-------------------|----------------|
+| `web-app` | `web-app-overlay.yml` | 17 entries (rendering, state management, auth, SSR, deploy targets, real-time, PWA, testing) | Rendering strategy, deploy target, real-time, auth flow |
+| `backend` | `backend-overlay.yml` | 14 entries (API design, data stores, auth, messaging, observability, deploy, caching, rate limiting) | API style, data store(s), auth, messaging, deploy target |
+| `cli` | `cli-overlay.yml` | 10 entries (argument parsing, config management, output formatting, distribution, testing, error handling) | Interactivity model, distribution channels, structured output |
+| `game` | `game-overlay.yml` | 24 entries (engines, networking, audio, VR/AR, economy, save systems, certification) | Engine, multiplayer, platforms, economy, narrative, and 6 more |
 
 ### Game Development
 
@@ -1113,15 +1184,19 @@ scaffold dashboard
 
 ## Knowledge System
 
-Scaffold ships with 60 domain expertise entries organized in seven categories:
+Scaffold ships with 134 domain expertise entries organized in eleven categories:
 
-- **core/** (25 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, design system tokens, user story innovation, AI memory management, coding conventions, tech stack selection, project structure patterns, task tracking, CLAUDE.md patterns, multi-model review dispatch, review step template, dev environment, git workflow patterns, automated review tooling
-- **product/** (3 entries) — PRD craft, PRD innovation, gap analysis
-- **review/** (13 entries) — review methodology (shared), plus domain-specific review passes for PRD, user stories, domain modeling, ADRs, architecture, API design, database design, UX specification, testing, security, operations, implementation tasks
+- **core/** (26 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, design system tokens, user story innovation, AI memory management, coding conventions, tech stack selection, project structure patterns, task tracking, CLAUDE.md patterns, multi-model review dispatch, review step template, dev environment, git workflow patterns, automated review tooling, vision craft
+- **product/** (5 entries) — PRD craft, PRD innovation, gap analysis, vision craft, vision innovation
+- **review/** (20 entries) — review methodology (shared), plus domain-specific review passes for PRD, user stories, domain modeling, ADRs, architecture, API design, database design, UX specification, testing, security, operations, implementation tasks, game design, game economy, game UI, netcode, and more
 - **validation/** (7 entries) — critical path analysis, cross-phase consistency, scope management, traceability, implementability, decision completeness, dependency validation
 - **finalization/** (3 entries) — implementation playbook, developer onboarding, apply-fixes-and-freeze
 - **execution/** (4 entries) — TDD execution loop, task claiming strategy, worktree management, enhancement workflow
-- **tools/** (3 entries) — release management, version strategy, session analysis
+- **tools/** (4 entries) — release management, version strategy, session analysis, and more
+- **game/** (24 entries) — game engines, networking/netcode, audio middleware, save systems, input patterns, VR/AR, localization, modding/UGC, live operations, platform certification, economy design, AI/behavior, level design, performance, accessibility
+- **web-app/** (17 entries) — rendering strategies (SSR/SSG/SPA), state management, authentication, deploy targets, real-time patterns, PWA, performance, security, testing, session patterns, UX patterns, caching, API integration, accessibility
+- **backend/** (14 entries) — API design patterns, data store selection, authentication mechanisms, messaging/event systems, observability, deploy strategies, caching, rate limiting, error handling, database migrations, testing, security
+- **cli/** (10 entries) — argument parsing, config management, output formatting, distribution channels, testing patterns, error handling, plugin architecture, shell integration, structured output, interactive prompts
 
 Each pipeline step declares which knowledge entries it needs in its frontmatter. The assembly engine injects them automatically. Knowledge files with a `## Deep Guidance` section are optimized for the CLI — only the deep guidance content is loaded into the assembled prompt, skipping the summary to avoid redundancy with the prompt text.
 

@@ -1,0 +1,69 @@
+# methodology/cli-overlay.yml
+name: cli
+description: >
+  CLI tool overlay — injects CLI domain knowledge into existing pipeline
+  steps for command parsing, distribution, interactive prompts, output
+  formatting, and shell integration patterns.
+project-type: cli
+
+# ---------------------------------------------------------------------------
+# knowledge-overrides
+# ---------------------------------------------------------------------------
+# Map CLI knowledge entries into existing pipeline steps so that CLI tool
+# domain expertise is injected during prompt assembly.
+knowledge-overrides:
+  # Foundational
+  create-prd:
+    append: [cli-requirements]
+  user-stories:
+    append: [cli-requirements]
+  coding-standards:
+    append: [cli-conventions]
+  project-structure:
+    append: [cli-project-structure]
+  dev-env-setup:
+    append: [cli-dev-environment, cli-shell-integration]
+  git-workflow:
+    append: [cli-distribution-patterns]
+
+  # Architecture & Design
+  system-architecture:
+    append: [cli-architecture, cli-interactivity-patterns]
+  tech-stack:
+    append: [cli-architecture, cli-distribution-patterns]
+  adrs:
+    append: [cli-architecture]
+  domain-modeling:
+    append: [cli-architecture]
+  api-contracts:
+    append: [cli-output-patterns]
+  security:
+    append: [cli-conventions]
+  operations:
+    append: [cli-distribution-patterns, cli-shell-integration]
+
+  # Testing
+  tdd:
+    append: [cli-testing]
+  add-e2e-testing:
+    append: [cli-testing]
+  create-evals:
+    append: [cli-testing]
+  story-tests:
+    append: [cli-testing]
+
+  # Reviews (mirror authoring steps)
+  review-architecture:
+    append: [cli-architecture, cli-interactivity-patterns]
+  review-api:
+    append: [cli-output-patterns]
+  review-security:
+    append: [cli-conventions]
+  review-operations:
+    append: [cli-distribution-patterns, cli-shell-integration]
+  review-testing:
+    append: [cli-testing]
+
+  # Planning
+  implementation-plan:
+    append: [cli-architecture]

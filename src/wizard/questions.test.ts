@@ -61,8 +61,9 @@ describe('askWizardQuestions', () => {
 
     expect(result.projectType).toBe('backend')
     expect(result.gameConfig).toBeUndefined()
-    // select called once (projectType only), never for engine/multiplayer/etc.
-    expect(output.select).toHaveBeenCalledTimes(1)
+    // select called for: projectType + apiStyle + authMechanism + asyncMessaging + deployTarget
+    // never for engine/multiplayer/etc. (game questions not triggered)
+    expect(output.select).toHaveBeenCalledTimes(5)
   })
 
   it('game projectType triggers engine question and returns gameConfig', async () => {
@@ -181,6 +182,11 @@ describe('askWizardQuestions', () => {
       .mockResolvedValueOnce(false)   // Gemini
       .mockResolvedValueOnce(false)   // web
       .mockResolvedValueOnce(false)   // mobile
+    vi.mocked(output.select)
+      .mockResolvedValueOnce('spa')          // renderingStrategy
+      .mockResolvedValueOnce('serverless')   // deployTarget
+      .mockResolvedValueOnce('none')         // realtime
+      .mockResolvedValueOnce('none')         // authFlow
 
     const result = await askWizardQuestions({
       output,
@@ -192,8 +198,9 @@ describe('askWizardQuestions', () => {
 
     expect(result.projectType).toBe('web-app')
     expect(result.gameConfig).toBeUndefined()
-    // select should NOT have been called — projectType was pre-set
-    expect(output.select).not.toHaveBeenCalled()
+    // web-app select questions were asked, game questions were NOT
+    expect(result.webAppConfig).toBeDefined()
+    expect(result.webAppConfig!.renderingStrategy).toBe('spa')
   })
 
   it('--project-type game (interactive) skips projectType select but still asks game questions', async () => {
@@ -476,5 +483,126 @@ describe('askWizardQuestions', () => {
     expect(output.confirm).not.toHaveBeenCalled()
     expect(output.multiSelect).not.toHaveBeenCalled()
     expect(output.prompt).not.toHaveBeenCalled()
+  })
+})
+
+// --- Task 12: Web-app, backend, CLI flag-skip tests ---
+
+describe('web-app wizard questions', () => {
+  it('uses flag values when provided (skips prompts)', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', methodology: 'deep', auto: false,
+      projectType: 'web-app',
+      webRendering: 'ssr',
+      webDeployTarget: 'container',
+      webRealtime: 'websocket',
+      webAuthFlow: 'oauth',
+    })
+    expect(answers.webAppConfig).toEqual({
+      renderingStrategy: 'ssr',
+      deployTarget: 'container',
+      realtime: 'websocket',
+      authFlow: 'oauth',
+    })
+    // All 4 web-app questions were provided via flags — no select calls for web-app questions
+    // (platform confirms still fire: Codex, Gemini, web, mobile)
+    expect(output.select).not.toHaveBeenCalled()
+  })
+
+  it('throws in auto mode without required --web-rendering', async () => {
+    const output = makeOutputContext()
+
+    await expect(askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'web-app',
+    })).rejects.toThrow('--web-rendering is required')
+  })
+
+  it('uses defaults in auto mode when anchor flag is provided', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'web-app',
+      webRendering: 'spa',
+    })
+    expect(answers.webAppConfig).toEqual({
+      renderingStrategy: 'spa',
+      deployTarget: 'serverless',
+      realtime: 'none',
+      authFlow: 'none',
+    })
+  })
+})
+
+describe('backend wizard questions', () => {
+  it('uses flag values when provided', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', methodology: 'deep', auto: false,
+      projectType: 'backend',
+      backendApiStyle: 'graphql',
+      backendDataStore: ['relational', 'key-value'],
+      backendAuth: 'jwt',
+      backendMessaging: 'queue',
+      backendDeployTarget: 'serverless',
+    })
+    expect(answers.backendConfig).toEqual({
+      apiStyle: 'graphql',
+      dataStore: ['relational', 'key-value'],
+      authMechanism: 'jwt',
+      asyncMessaging: 'queue',
+      deployTarget: 'serverless',
+    })
+    // All backend questions were provided via flags — no select/multiSelect calls
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.multiSelect).not.toHaveBeenCalled()
+  })
+
+  it('throws in auto mode without required --backend-api-style', async () => {
+    const output = makeOutputContext()
+
+    await expect(askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'backend',
+    })).rejects.toThrow('--backend-api-style is required')
+  })
+})
+
+describe('cli wizard questions', () => {
+  it('uses flag values when provided', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', methodology: 'deep', auto: false,
+      projectType: 'cli',
+      cliInteractivity: 'hybrid',
+      cliDistribution: ['package-manager', 'standalone-binary'],
+      cliStructuredOutput: true,
+    })
+    expect(answers.cliConfig).toEqual({
+      interactivity: 'hybrid',
+      distributionChannels: ['package-manager', 'standalone-binary'],
+      hasStructuredOutput: true,
+    })
+    // All CLI questions were provided via flags — no select/multiSelect/confirm calls for CLI questions
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.multiSelect).not.toHaveBeenCalled()
+  })
+
+  it('throws in auto mode without required --cli-interactivity', async () => {
+    const output = makeOutputContext()
+
+    await expect(askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'cli',
+    })).rejects.toThrow('--cli-interactivity is required')
   })
 })

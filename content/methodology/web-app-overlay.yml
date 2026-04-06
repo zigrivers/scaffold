@@ -1,0 +1,79 @@
+# methodology/web-app-overlay.yml
+name: web-app
+description: >
+  Web application overlay — injects web-app domain knowledge into existing
+  pipeline steps for SSR/SPA architecture, deployment, authentication, and
+  real-time patterns.
+project-type: web-app
+
+# ---------------------------------------------------------------------------
+# knowledge-overrides
+# ---------------------------------------------------------------------------
+# Map web-app knowledge entries into existing pipeline steps so that web-app
+# domain expertise is injected during prompt assembly.
+knowledge-overrides:
+  # Foundational
+  create-prd:
+    append: [web-app-requirements]
+  user-stories:
+    append: [web-app-requirements]
+  coding-standards:
+    append: [web-app-conventions]
+  project-structure:
+    append: [web-app-project-structure]
+  dev-env-setup:
+    append: [web-app-dev-environment]
+  git-workflow:
+    append: [web-app-deployment-workflow]
+
+  # Architecture & Design
+  system-architecture:
+    append: [web-app-architecture, web-app-deployment]
+  tech-stack:
+    append: [web-app-rendering-strategies, web-app-deployment, web-app-auth-patterns]
+  adrs:
+    append: [web-app-architecture]
+  ux-spec:
+    append: [web-app-ux-patterns]
+  design-system:
+    append: [web-app-design-system]
+  domain-modeling:
+    append: [web-app-session-patterns]
+  database-schema:
+    append: [web-app-data-patterns]
+  api-contracts:
+    append: [web-app-api-patterns]
+  security:
+    append: [web-app-auth-patterns, web-app-security]
+  operations:
+    append: [web-app-deployment, web-app-observability]
+
+  # Testing
+  tdd:
+    append: [web-app-testing]
+  add-e2e-testing:
+    append: [web-app-testing]
+  create-evals:
+    append: [web-app-testing]
+  story-tests:
+    append: [web-app-testing]
+
+  # Reviews (mirror authoring steps)
+  review-architecture:
+    append: [web-app-architecture, web-app-deployment]
+  review-ux:
+    append: [web-app-ux-patterns]
+  review-api:
+    append: [web-app-api-patterns]
+  review-database:
+    append: [web-app-data-patterns]
+  review-security:
+    append: [web-app-auth-patterns, web-app-security]
+  review-operations:
+    append: [web-app-deployment, web-app-observability]
+  review-testing:
+    append: [web-app-testing]
+
+  # Planning
+  implementation-plan:
+    append: [web-app-architecture]

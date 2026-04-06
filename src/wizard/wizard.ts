@@ -35,6 +35,21 @@ export interface WizardOptions {
   npcAi?: string
   modding?: boolean
   persistence?: string
+  // Web-app flags
+  webRendering?: string
+  webDeployTarget?: string
+  webRealtime?: string
+  webAuthFlow?: string
+  // Backend flags
+  backendApiStyle?: string
+  backendDataStore?: string[]
+  backendAuth?: string
+  backendMessaging?: string
+  backendDeployTarget?: string
+  // CLI flags
+  cliInteractivity?: string
+  cliDistribution?: string[]
+  cliStructuredOutput?: boolean
 }
 
 export interface WizardResult {
@@ -52,6 +67,9 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
     depth, adapters, traits, engine, multiplayer, targetPlatforms,
     onlineServices, contentStructure, economy, narrative,
     locales, npcAi, modding, persistence,
+    webRendering, webDeployTarget, webRealtime, webAuthFlow,
+    backendApiStyle, backendDataStore, backendAuth, backendMessaging, backendDeployTarget,
+    cliInteractivity, cliDistribution, cliStructuredOutput,
   } = options
   const scaffoldDir = path.join(projectRoot, '.scaffold')
 
@@ -127,6 +145,18 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
     npcAi,
     modding,
     persistence,
+    webRendering,
+    webDeployTarget,
+    webRealtime,
+    webAuthFlow,
+    backendApiStyle,
+    backendDataStore,
+    backendAuth,
+    backendMessaging,
+    backendDeployTarget,
+    cliInteractivity,
+    cliDistribution,
+    cliStructuredOutput,
   })
 
   // Build config — methodology is a top-level string per the real ScaffoldConfig schema
@@ -138,6 +168,9 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
       platforms: answers.traits as Array<'web' | 'mobile' | 'desktop'>,
       ...(answers.projectType && { projectType: answers.projectType }),
       ...(answers.gameConfig && { gameConfig: answers.gameConfig }),
+      ...(answers.webAppConfig && { webAppConfig: answers.webAppConfig }),
+      ...(answers.backendConfig && { backendConfig: answers.backendConfig }),
+      ...(answers.cliConfig && { cliConfig: answers.cliConfig }),
     },
   }
 
