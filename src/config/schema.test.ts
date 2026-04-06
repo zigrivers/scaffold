@@ -1,7 +1,7 @@
 // src/config/schema.test.ts
 
 import { describe, it, expect } from 'vitest'
-import { ConfigSchema, GameConfigSchema, ProjectTypeSchema } from './schema.js'
+import { ConfigSchema, GameConfigSchema, ProjectTypeSchema, WebAppConfigSchema, BackendConfigSchema, CliConfigSchema } from './schema.js'
 
 describe('ProjectTypeSchema', () => {
   it('includes all project types', () => {
@@ -357,5 +357,161 @@ describe('ConfigSchema with projectType and gameConfig', () => {
       },
     })
     expect(result.success).toBe(true)
+  })
+})
+
+describe('WebAppConfigSchema', () => {
+  it('requires renderingStrategy', () => {
+    const result = WebAppConfigSchema.safeParse({})
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts valid config with defaults', () => {
+    const result = WebAppConfigSchema.parse({ renderingStrategy: 'ssr' })
+    expect(result).toEqual({
+      renderingStrategy: 'ssr',
+      deployTarget: 'serverless',
+      realtime: 'none',
+      authFlow: 'none',
+    })
+  })
+
+  it('rejects unknown fields (.strict())', () => {
+    const result = WebAppConfigSchema.safeParse({
+      renderingStrategy: 'spa',
+      unknownField: 'value',
+    })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('BackendConfigSchema', () => {
+  it('requires apiStyle', () => {
+    const result = BackendConfigSchema.safeParse({})
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts valid config with defaults', () => {
+    const result = BackendConfigSchema.parse({ apiStyle: 'rest' })
+    expect(result).toEqual({
+      apiStyle: 'rest',
+      dataStore: ['relational'],
+      authMechanism: 'none',
+      asyncMessaging: 'none',
+      deployTarget: 'container',
+    })
+  })
+
+  it('enforces dataStore min(1)', () => {
+    const result = BackendConfigSchema.safeParse({
+      apiStyle: 'rest',
+      dataStore: [],
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts apiStyle none for workers', () => {
+    const result = BackendConfigSchema.parse({ apiStyle: 'none' })
+    expect(result.apiStyle).toBe('none')
+  })
+})
+
+describe('CliConfigSchema', () => {
+  it('requires interactivity', () => {
+    const result = CliConfigSchema.safeParse({})
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts valid config with defaults', () => {
+    const result = CliConfigSchema.parse({ interactivity: 'hybrid' })
+    expect(result).toEqual({
+      interactivity: 'hybrid',
+      distributionChannels: ['package-manager'],
+      hasStructuredOutput: false,
+    })
+  })
+
+  it('enforces distributionChannels min(1)', () => {
+    const result = CliConfigSchema.safeParse({
+      interactivity: 'args-only',
+      distributionChannels: [],
+    })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('ProjectSchema cross-field validation', () => {
+  it('rejects webAppConfig with non-web-app projectType', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'backend',
+        webAppConfig: { renderingStrategy: 'spa' },
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts webAppConfig with web-app projectType', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'web-app',
+        webAppConfig: { renderingStrategy: 'spa' },
+      },
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects SSR + static deploy', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'web-app',
+        webAppConfig: { renderingStrategy: 'ssr', deployTarget: 'static' },
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects session auth + static deploy', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'web-app',
+        webAppConfig: { renderingStrategy: 'spa', deployTarget: 'static', authFlow: 'session' },
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('allows projectType web-app without webAppConfig', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: { projectType: 'web-app' },
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects backendConfig with non-backend projectType', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'web-app',
+        backendConfig: { apiStyle: 'rest' },
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects cliConfig with non-cli projectType', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'game',
+        cliConfig: { interactivity: 'hybrid' },
+      },
+    })
+    expect(result.success).toBe(false)
   })
 })
