@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest'
 import {
   ConfigSchema, GameConfigSchema, ProjectTypeSchema,
   WebAppConfigSchema, BackendConfigSchema, CliConfigSchema,
+  LibraryConfigSchema, MobileAppConfigSchema,
 } from './schema.js'
 
 describe('ProjectTypeSchema', () => {
@@ -527,5 +528,130 @@ describe('ProjectSchema cross-field validation', () => {
       },
     })
     expect(result.success).toBe(false)
+  })
+})
+
+describe('LibraryConfigSchema', () => {
+  it('requires visibility', () => {
+    const result = LibraryConfigSchema.safeParse({})
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts valid config with defaults', () => {
+    const result = LibraryConfigSchema.parse({ visibility: 'public' })
+    expect(result).toEqual({
+      visibility: 'public',
+      runtimeTarget: 'isomorphic',
+      bundleFormat: 'dual',
+      hasTypeDefinitions: true,
+      documentationLevel: 'readme',
+    })
+  })
+
+  it('accepts internal visibility', () => {
+    const result = LibraryConfigSchema.parse({ visibility: 'internal' })
+    expect(result.visibility).toBe('internal')
+  })
+
+  it('rejects unknown fields (.strict())', () => {
+    const result = LibraryConfigSchema.safeParse({
+      visibility: 'public',
+      unknownField: 'value',
+    })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('MobileAppConfigSchema', () => {
+  it('requires platform', () => {
+    const result = MobileAppConfigSchema.safeParse({})
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts valid config with defaults', () => {
+    const result = MobileAppConfigSchema.parse({ platform: 'cross-platform' })
+    expect(result).toEqual({
+      platform: 'cross-platform',
+      distributionModel: 'public',
+      offlineSupport: 'none',
+      hasPushNotifications: false,
+    })
+  })
+
+  it('accepts all platform values', () => {
+    for (const platform of ['ios', 'android', 'cross-platform'] as const) {
+      const result = MobileAppConfigSchema.parse({ platform })
+      expect(result.platform).toBe(platform)
+    }
+  })
+
+  it('rejects unknown fields (.strict())', () => {
+    const result = MobileAppConfigSchema.safeParse({
+      platform: 'ios',
+      unknownField: 'value',
+    })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('ProjectSchema cross-field validation — library and mobile-app', () => {
+  it('rejects libraryConfig with non-library projectType', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'backend',
+        libraryConfig: { visibility: 'public' },
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts libraryConfig with library projectType', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'library',
+        libraryConfig: { visibility: 'public' },
+      },
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects mobileAppConfig with non-mobile-app projectType', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'web-app',
+        mobileAppConfig: { platform: 'ios' },
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts mobileAppConfig with mobile-app projectType', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'mobile-app',
+        mobileAppConfig: { platform: 'android' },
+      },
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('allows library projectType without libraryConfig', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: { projectType: 'library' },
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('allows mobile-app projectType without mobileAppConfig', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: { projectType: 'mobile-app' },
+    })
+    expect(result.success).toBe(true)
   })
 })
