@@ -64,7 +64,7 @@ knowledge-overrides:
   review-security:
     append: [backend-auth-patterns, backend-security]
   review-operations:
-    append: [backend-deployment, backend-observability]
+    append: [backend-deployment, backend-observability, backend-async-patterns, backend-worker-patterns]
   review-testing:
     append: [backend-testing]
 
