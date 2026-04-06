@@ -4,7 +4,11 @@ description: API integration tests, contract testing, database testing patterns,
 topics: [backend, testing, integration-tests, contract-testing, database-testing, mocking, load-testing]
 ---
 
-## API Integration Tests
+Backend testing strategy determines how much confidence you have before every deploy — a well-layered test suite catches regressions at the fastest possible feedback loop while still exercising the real data layer and honoring API contracts with consumers.
+
+## Summary
+
+### API Integration Tests
 
 Integration tests verify the full request-response cycle through the application stack, including middleware, routing, validation, business logic, and the database. Unlike unit tests, they catch wiring problems that unit tests miss.
 
@@ -24,7 +28,7 @@ it('POST /orders returns 201 with created order', async () => {
 
 Run integration tests against a real database (see Database Testing below), not mocks. The value of integration tests comes from exercising the real data layer.
 
-## Contract Testing
+### Contract Testing
 
 Contract tests verify that a service honors the API contract its consumers depend on, without requiring consumers and providers to be deployed together.
 
@@ -34,7 +38,7 @@ Contract tests verify that a service honors the API contract its consumers depen
 
 **Use contract testing when:** You own both sides of an API boundary, or you maintain a public API with known consumers. Skip it for internal services where integration tests cover the boundary adequately.
 
-## Database Testing
+### Database Testing
 
 **Use transactions for isolation:** Wrap each test in a database transaction and roll it back after the test. No cleanup code needed; each test starts from a known state.
 
@@ -49,7 +53,9 @@ afterEach(async () => { await db.transaction.rollback(); });
 
 **Seed data:** Limit seed data to what is required by the test. Broad seed data creates invisible dependencies between tests — a test that only creates one record but relies on seeded data is fragile and hard to understand.
 
-## Mocking External Services
+## Deep Guidance
+
+### Mocking External Services
 
 **MSW (Mock Service Worker):** Intercepts HTTP requests at the network layer using a service worker (browser) or Node.js interceptor. Unlike mocking `fetch` or axios, MSW mocks at the protocol level — the same mock works for any HTTP client. Define handlers that return realistic responses; test error cases by returning 5xx responses or network errors.
 
@@ -61,7 +67,7 @@ afterEach(async () => { await db.transaction.rollback(); });
 - Keep mock responses realistic — use actual API response shapes, not minimal stubs.
 - Test the unhappy path: timeout, 429, 500, malformed response.
 
-## Load Testing
+### Load Testing
 
 **k6:** JavaScript-based load testing tool with a clean API. Define scenarios with virtual users and ramp profiles. Check assertions (thresholds) on p95 latency and error rate inline with the test script. Outputs structured results; integrates with Grafana for visualization.
 

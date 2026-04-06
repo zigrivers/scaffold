@@ -4,7 +4,11 @@ description: Structured logging, distributed tracing, RED method metrics, SLO-ba
 topics: [backend, observability, logging, tracing, metrics, alerting, opentelemetry, slo]
 ---
 
-## Structured Logging
+Observability is the ability to answer arbitrary questions about a system's behavior using its outputs alone — without deploying new code. Investing in structured logging, distributed tracing, and SLO-based alerting before the first incident makes the difference between a 5-minute diagnosis and a 5-hour outage.
+
+## Summary
+
+### Structured Logging
 
 Log in JSON to make logs machine-parseable and searchable in aggregation systems (Datadog, Splunk, CloudWatch Logs Insights, Grafana Loki).
 
@@ -25,7 +29,7 @@ Log in JSON to make logs machine-parseable and searchable in aggregation systems
 
 **Correlation IDs:** Generate a UUID per request at the entry point (API gateway or first middleware). Propagate it through all downstream service calls via the `X-Request-ID` or `traceparent` header. Include it in every log line. This makes it possible to trace a single user request across all services and log streams.
 
-## Distributed Tracing
+### Distributed Tracing
 
 Use OpenTelemetry (OTel) — the vendor-neutral standard for distributed tracing, metrics, and logs. Instrument once, export to any backend (Jaeger, Zipkin, Datadog APM, Honeycomb, AWS X-Ray).
 
@@ -37,7 +41,7 @@ Use OpenTelemetry (OTel) — the vendor-neutral standard for distributed tracing
 
 **Sampling:** In high-throughput services, trace every request at 100% to observe development/staging. In production, use head-based sampling (5–10%) to control costs while preserving statistically representative data. Always sample 100% of errored traces regardless of the sampling rate.
 
-## Metrics — RED Method
+### Metrics — RED Method
 
 The RED method (Rate, Errors, Duration) provides a minimal but complete view of service health:
 
@@ -47,7 +51,9 @@ The RED method (Rate, Errors, Duration) provides a minimal but complete view of 
 
 Instrument these three metrics for every service endpoint. For background workers, instrument job throughput (rate), job failures (errors), and job duration.
 
-## SLO-Based Alerting
+## Deep Guidance
+
+### SLO-Based Alerting
 
 Define SLOs (Service Level Objectives) before writing alert rules. An SLO is a measurable target: "99.9% of requests complete successfully" or "p99 latency < 500ms over a 28-day window."
 
@@ -57,7 +63,7 @@ Define SLOs (Service Level Objectives) before writing alert rules. An SLO is a m
 
 Avoid threshold alerts on raw metrics — they generate too many false positives. SLO-based alerting reduces alert fatigue and ensures alerts correspond to actual user impact.
 
-## Dashboards
+### Dashboards
 
 Build dashboards around the RED metrics plus infrastructure health. Every service dashboard should show: request rate, error rate, p50/p95/p99 latency, error budget remaining, database query latency, and downstream service call rates.
 

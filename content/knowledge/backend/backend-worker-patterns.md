@@ -4,7 +4,11 @@ description: Background job frameworks, cron scheduling, event consumers, dead l
 topics: [backend, workers, bullmq, celery, temporal, cron, background-jobs, dlq]
 ---
 
-## Background Job Frameworks
+Background workers offload time-consuming and deferred work from the request path, but they introduce their own failure modes — jobs that silently vanish, duplicate executions, and unclean shutdowns during deploys all require deliberate design to prevent.
+
+## Summary
+
+### Background Job Frameworks
 
 **BullMQ (Node.js):** Redis-backed job queue with strong TypeScript support, priority queues, delayed jobs, repeatable jobs, flow producers (job hierarchies), and a rich event API. Workers are long-running processes that pull jobs from queues. Multiple workers for the same queue compete for jobs (work queue pattern). Suitable for most Node.js use cases from simple email sending to complex multi-step workflows.
 
@@ -12,7 +16,7 @@ topics: [backend, workers, bullmq, celery, temporal, cron, background-jobs, dlq]
 
 **Temporal:** Workflow-as-code platform for long-running, durable workflows. Workflows are ordinary functions that survive crashes and restarts because Temporal replays the event history. Use Temporal when: workflows span hours or days, involve human approvals, require complex compensation logic, or must survive process restarts mid-execution. Steeper learning curve but eliminates entire classes of distributed systems bugs.
 
-## Cron Scheduling
+### Cron Scheduling
 
 Define cron schedules in one place — application code or infrastructure (Kubernetes CronJob, AWS EventBridge Scheduler), not both. Infrastructure-level crons are more reliable (no process needs to be running continuously to trigger them) but harder to test. Application-level crons (BullMQ repeatable jobs, Celery beat) are easier to test and version alongside the code.
 
@@ -20,7 +24,7 @@ Define cron schedules in one place — application code or infrastructure (Kuber
 
 **Missed jobs:** Decide whether a missed job (process was down during the scheduled time) should run on restart. For time-sensitive jobs (send a daily digest), skip the missed run. For idempotent catch-up jobs (sync data), run the missed job. Make this behavior explicit in code.
 
-## Event Consumers
+### Event Consumers
 
 Event consumers are workers that read from a message queue or event stream (Kafka, SQS, RabbitMQ, Redis Streams) and process each message.
 
@@ -30,7 +34,9 @@ Event consumers are workers that read from a message queue or event stream (Kafk
 
 **Concurrency:** Run multiple concurrent consumers for throughput. Set concurrency based on downstream resource limits (database connection pool, external API rate limit) rather than CPU count. In BullMQ, set `concurrency` per worker instance. In Celery, set `--concurrency` per worker process.
 
-## Dead Letter Queue Handling
+## Deep Guidance
+
+### Dead Letter Queue Handling
 
 A DLQ captures messages that failed after the maximum retry attempts. Treat the DLQ as a first-class operational concern:
 
@@ -41,7 +47,7 @@ A DLQ captures messages that failed after the maximum retry attempts. Treat the 
 
 Never replay from the DLQ blindly — diagnose the failure first. A bug that caused the original failures will cause the replayed messages to fail again.
 
-## Worker Health Monitoring
+### Worker Health Monitoring
 
 Workers are long-running processes. Monitor their health with:
 
@@ -49,7 +55,7 @@ Workers are long-running processes. Monitor their health with:
 - **Queue depth metrics:** Export queue pending count, in-progress count, and DLQ count as metrics. Alert on queue depth growth that indicates workers are falling behind.
 - **Job duration metrics:** Track and alert on unexpectedly long-running jobs (potential deadlocks or infinite loops).
 
-## Graceful Shutdown for Workers
+### Graceful Shutdown for Workers
 
 Workers must handle `SIGTERM` cleanly to avoid corrupting in-progress jobs during deployments:
 

@@ -4,7 +4,11 @@ description: Containerization best practices, serverless patterns, health check 
 topics: [backend, deployment, docker, serverless, health-checks, graceful-shutdown, blue-green, canary]
 ---
 
-## Containerization
+Deployment reliability is a multiplier on every other engineering investment — a well-written service that deploys poorly will cause more incidents than a mediocre service that deploys safely and rolls back cleanly.
+
+## Summary
+
+### Containerization
 
 **Multi-stage Dockerfile:** Use separate build and runtime stages. The build stage installs all dependencies and compiles. The runtime stage copies only the compiled output and production dependencies — no compiler toolchain, no dev dependencies, no source maps in production. This reduces image size by 60–80% and eliminates build-time tools as attack surface.
 
@@ -29,7 +33,7 @@ CMD ["node", "dist/main.js"]
 
 **Non-root user:** Always run the container process as a non-root user (`USER node` or `USER nobody`). Combine with read-only filesystems (`--read-only`) and a writable tmpfs for temp files. Set resource limits (CPU, memory) to prevent noisy-neighbor problems in shared clusters.
 
-## Serverless Patterns
+### Serverless Patterns
 
 **Cold start mitigation:** Cold starts add 200ms–2s of latency on the first request. Minimize cold starts by: keeping the function bundle small (tree-shake, avoid heavy dependencies), using provisioned concurrency for latency-sensitive paths, initializing database connections in the module scope (not inside the handler), and using connection proxies (RDS Proxy, PgBouncer) that maintain connection pools outside the function lifecycle.
 
@@ -37,7 +41,7 @@ CMD ["node", "dist/main.js"]
 
 **Stateless design:** Serverless functions must be stateless. Store all session state, cache, and shared state in external services (Redis, DynamoDB). Write output to S3 or a database, never to the local filesystem.
 
-## Health Check Endpoints
+### Health Check Endpoints
 
 Every service must expose two health endpoints:
 
@@ -47,7 +51,7 @@ Every service must expose two health endpoints:
 
 Include response body with version, uptime, and dependency statuses for operational visibility.
 
-## Graceful Shutdown
+### Graceful Shutdown
 
 Handle `SIGTERM` (sent by Kubernetes, Docker, and process managers before killing the process):
 
@@ -59,7 +63,9 @@ Handle `SIGTERM` (sent by Kubernetes, Docker, and process managers before killin
 
 Set a shutdown timeout (10–30 seconds). If draining takes longer, force exit. In Kubernetes, set `terminationGracePeriodSeconds` to match. Without graceful shutdown, deployments cause dropped requests and incomplete transactions.
 
-## Blue-Green and Canary Deploys
+## Deep Guidance
+
+### Blue-Green and Canary Deploys
 
 **Blue-green:** Maintain two identical production environments (blue and green). Deploy the new version to the inactive environment, run smoke tests, then cut over traffic in one atomic switch. Instant rollback: switch traffic back. Cost: double the infrastructure during deployment.
 

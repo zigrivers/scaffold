@@ -4,7 +4,11 @@ description: JWT lifecycle, OAuth2 authorization code flow, API key management, 
 topics: [backend, auth, jwt, oauth2, api-keys, mtls, security]
 ---
 
-## JWT Lifecycle
+Authentication and authorization are the first line of defense for any backend service — mistakes here compromise the entire system, making it essential to use proven patterns like JWTs with rotation, OAuth2 with PKCE, and workload identity from the start.
+
+## Summary
+
+### JWT Lifecycle
 
 Issue JWTs with short expiry (15–60 minutes) signed with RS256 or ES256. Include only the minimum claims needed: `sub`, `iat`, `exp`, `iss`, `aud`, and application-specific role or scope claims. Never put sensitive data in the payload — it is base64-encoded, not encrypted.
 
@@ -14,7 +18,7 @@ Issue JWTs with short expiry (15–60 minutes) signed with RS256 or ES256. Inclu
 
 **Key rotation:** Support multiple active signing keys identified by `kid` header. Add the new key to the JWKS endpoint, start signing with it, keep the old key for validation until all tokens signed with it have expired, then remove it.
 
-## OAuth2 Authorization Code Flow
+### OAuth2 Authorization Code Flow
 
 Use the authorization code flow (with PKCE) for any user-facing OAuth2 integration — never implicit or client credentials on the frontend.
 
@@ -24,7 +28,7 @@ Use the authorization code flow (with PKCE) for any user-facing OAuth2 integrati
 4. Store the provider's access token server-side (never expose it to the browser). Use it to fetch the user's profile and map to a local user record.
 5. Issue your own session or JWT — do not use the provider's token as your application's auth token.
 
-## API Key Management
+### API Key Management
 
 **Generation:** Use cryptographically random 32-byte values encoded as hex or base58. Prefix keys with a service identifier (`sk_live_`, `pk_test_`) for easy identification in logs and leaked-credential scanners.
 
@@ -34,7 +38,9 @@ Use the authorization code flow (with PKCE) for any user-facing OAuth2 integrati
 
 **Rotation:** Provide a rotation endpoint that issues a new key and returns both old and new simultaneously. Set a grace period (e.g., 24 hours) during which both keys are valid, then revoke the old key. Send email/webhook notifications before expiry.
 
-## Service-to-Service Authentication
+## Deep Guidance
+
+### Service-to-Service Authentication
 
 **mTLS:** Both client and server present TLS certificates. The server verifies the client certificate against a trusted CA. Use a private CA (cert-manager on Kubernetes, AWS Private CA) to issue short-lived service certificates. Rotate certificates automatically before expiry. mTLS is the strongest service-to-service option and integrates with service meshes (Istio, Linkerd).
 
