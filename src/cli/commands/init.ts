@@ -182,58 +182,69 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         type: 'string',
         describe: 'Game engine',
         choices: ['unity', 'unreal', 'godot', 'custom'] as const,
+        alias: 'game-engine',
       })
       .option('multiplayer', {
         type: 'string',
         describe: 'Multiplayer mode',
         choices: ['none', 'local', 'online', 'hybrid'] as const,
+        alias: 'game-multiplayer',
       })
       .option('target-platforms', {
         type: 'string',
         array: true,
         describe: 'Target platforms (pc,web,ios,android,ps5,xbox,switch,vr,ar)',
         coerce: coerceCSV,
+        alias: 'game-target-platforms',
       })
       .option('online-services', {
         type: 'string',
         array: true,
         describe: 'Online services (leaderboards,accounts,matchmaking,live-ops)',
         coerce: coerceCSV,
+        alias: 'game-online-services',
       })
       .option('content-structure', {
         type: 'string',
         describe: 'Content structure',
         choices: ['discrete', 'open-world', 'procedural', 'endless', 'mission-based'] as const,
+        alias: 'game-content-structure',
       })
       .option('economy', {
         type: 'string',
         describe: 'Economy model',
         choices: ['none', 'progression', 'monetized', 'both'] as const,
+        alias: 'game-economy',
       })
       .option('narrative', {
         type: 'string',
         describe: 'Narrative depth',
         choices: ['none', 'light', 'heavy'] as const,
+        alias: 'game-narrative',
       })
       .option('locales', {
         type: 'string',
         array: true,
         describe: 'Supported locales (e.g. en,ja,fr-FR)',
         coerce: coerceCSV,
+        alias: 'game-locales',
       })
       .option('npc-ai', {
         type: 'string',
         describe: 'NPC AI complexity',
         choices: ['none', 'simple', 'complex'] as const,
+        alias: 'game-npc-ai',
       })
       .option('modding', {
         type: 'boolean',
         describe: 'Enable mod support',
+        alias: 'game-modding',
       })
       .option('persistence', {
         type: 'string',
         describe: 'Persistence level',
         choices: ['none', 'settings-only', 'profile', 'progression', 'cloud'] as const,
+        alias: 'game-persistence',
       })
       // Validation
       .check((argv) => {
@@ -386,9 +397,9 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         'backend-messaging', 'backend-deploy-target'], 'Backend Configuration:')
       .group(['cli-interactivity', 'cli-distribution', 'cli-structured-output'], 'CLI Configuration:')
       .group([
-        'engine', 'multiplayer', 'target-platforms', 'online-services',
-        'content-structure', 'economy', 'narrative', 'locales',
-        'npc-ai', 'modding', 'persistence',
+        'game-engine', 'game-multiplayer', 'game-target-platforms', 'game-online-services',
+        'game-content-structure', 'game-economy', 'game-narrative', 'game-locales',
+        'game-npc-ai', 'game-modding', 'game-persistence',
       ], 'Game Configuration:')
       .group(['root', 'force', 'auto', 'idea', 'format', 'verbose'], 'General:') as Argv<InitArgs>
   },
