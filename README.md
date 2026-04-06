@@ -356,6 +356,71 @@ scaffold dashboard           # open a visual progress dashboard in your browser
 - **The pipeline is a guide, not a cage.** Skip steps that don't apply (`scaffold skip <step> --reason "..."`). Run them out of order if you know what you're doing. Scaffold tracks dependencies so it'll tell you if you're missing a prerequisite.
 - **Depth controls thoroughness.** Each step runs at a depth from 1 (focused, fast) to 5 (exhaustive). The mvp preset defaults to depth 1; deep defaults to 5. You can override per step or per session: `"Use depth 3 for everything"`.
 
+### Non-Interactive / CI Usage
+
+Every `scaffold init` wizard question can be answered via CLI flags, making scaffold fully scriptable for CI pipelines, automation, and reproducible project setup.
+
+#### General Flags
+
+| Flag | Type | Description |
+|------|------|-------------|
+| `--methodology` | deep/mvp/custom | Methodology preset |
+| `--depth` | 1-5 | Custom methodology depth (requires `--methodology custom`) |
+| `--adapters` | comma-sep | AI adapters: claude-code, codex, gemini |
+| `--traits` | comma-sep | Project traits: web, mobile |
+| `--project-type` | string | web-app, mobile-app, backend, cli, library, game |
+| `--auto` | boolean | Non-interactive mode (uses Zod defaults for unset flags) |
+
+#### Game Config Flags (require `--project-type game` or auto-set it)
+
+| Flag | Type | Values |
+|------|------|--------|
+| `--engine` | string | unity, unreal, godot, custom |
+| `--multiplayer` | string | none, local, online, hybrid |
+| `--target-platforms` | comma-sep | pc, web, ios, android, ps5, xbox, switch, vr, ar |
+| `--online-services` | comma-sep | leaderboards, accounts, matchmaking, live-ops |
+| `--content-structure` | string | discrete, open-world, procedural, endless, mission-based |
+| `--economy` | string | none, progression, monetized, both |
+| `--narrative` | string | none, light, heavy |
+| `--locales` | comma-sep | Locale codes: en, ja, fr-FR |
+| `--npc-ai` | string | none, simple, complex |
+| `--modding` | boolean | `--modding` / `--no-modding` |
+| `--persistence` | string | none, settings-only, profile, progression, cloud |
+
+#### How Flags Interact
+
+- **Flag > auto > interactive**: Flags always take highest precedence. `--auto --engine unreal` uses defaults for everything except engine.
+- **Partial flags + interactive**: Provide some flags and the wizard asks only the remaining questions. `scaffold init --project-type game --engine unreal` prompts interactively for multiplayer, platforms, etc.
+- **Game flags auto-set project type**: `--engine unity` automatically sets `--project-type game`. Error if conflicting non-game type.
+- **Validation**: `--depth` requires `--methodology custom`. `--online-services` requires `--multiplayer online` or `hybrid`.
+
+#### CI Examples
+
+```bash
+# Multiplayer mobile game with Unity
+scaffold init --project-type game --methodology deep --auto \
+  --engine unity --multiplayer online --target-platforms ios,android \
+  --economy monetized --online-services matchmaking,leaderboards
+
+# Simple puzzle game
+scaffold init --project-type game --auto --engine godot
+
+# Web app with multiple AI adapters
+scaffold init --project-type web-app --methodology mvp --auto \
+  --adapters claude-code,gemini --traits web,mobile
+
+# Custom methodology at depth 3
+scaffold init --methodology custom --depth 3 --auto
+
+# AAA console game with full configuration
+scaffold init --project-type game --methodology deep --auto \
+  --engine unreal --multiplayer online --target-platforms ps5,xbox,pc \
+  --economy both --online-services matchmaking,leaderboards,accounts,live-ops \
+  --narrative heavy --locales en,ja,ko,zh-CN,fr,de,es \
+  --npc-ai complex --modding --persistence cloud \
+  --content-structure open-world
+```
+
 ### Game Development
 
 Scaffold fully supports game development projects. When you select `game` as your project type, a **project-type overlay** activates 24 game-specific pipeline steps and injects game domain expertise into existing steps — all while keeping the standard pipeline workflow (status, next, rework, multi-model review) fully functional.
@@ -369,8 +434,10 @@ scaffold init
 # Non-interactive with defaults (engine: custom, single-player, PC)
 scaffold init --project-type game --auto
 
-# Non-interactive with specific methodology
-scaffold init --project-type game --methodology deep --auto
+# Non-interactive with specific configuration
+scaffold init --project-type game --methodology deep --auto \
+  --engine unity --multiplayer online --target-platforms ios,android \
+  --economy monetized --online-services matchmaking,leaderboards
 
 # Adopt an existing game project (auto-detects Unity/Unreal/Godot)
 scaffold adopt

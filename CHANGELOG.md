@@ -2,6 +2,26 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.6.0] — 2026-04-06
+
+### Added
+
+- **14 new CLI flags for `scaffold init`** — every wizard question can now be answered via CLI flags, enabling fully non-interactive CI/scripting workflows.
+  - **General flags**: `--depth` (custom methodology depth 1-5), `--adapters` (AI platforms: claude-code, codex, gemini), `--traits` (project traits: web, mobile)
+  - **Game config flags** (auto-set `--project-type game`): `--engine`, `--multiplayer`, `--target-platforms`, `--online-services`, `--content-structure`, `--economy`, `--narrative`, `--locales`, `--npc-ai`, `--modding` / `--no-modding`, `--persistence`
+  - Comma-separated array values with auto-deduplication
+  - CLI-layer validation: game flags require game project type, `--depth` requires `--methodology custom`, `--online-services` requires multiplayer online/hybrid, locale regex validation
+  - Help text grouped into General / Configuration / Game Configuration sections
+  - Flag-question skip: flags take highest precedence, then `--auto` defaults, then interactive wizard
+
+### Fixed
+
+- **`--traits` config mapping** — `scaffold init` wizard previously wrote traits to an untyped `project.traits` field (using `ProjectConfig`'s index signature). Now correctly writes to the typed `project.platforms` field matching the `ProjectConfig` interface.
+
+### Changed
+
+- **`--methodology` now validates choices** — rejects invalid values at the CLI layer (previously accepted any string and failed during config parsing).
+
 ## [3.5.3] — 2026-04-06
 
 ### Fixed
