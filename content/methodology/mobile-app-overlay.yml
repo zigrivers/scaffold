@@ -1,0 +1,71 @@
+# methodology/mobile-app-overlay.yml
+name: mobile-app
+description: >
+  Mobile app overlay — injects mobile domain knowledge into existing pipeline
+  steps for deployment, offline patterns, push notifications, distribution,
+  and platform-specific architecture.
+project-type: mobile-app
+
+# ---------------------------------------------------------------------------
+# knowledge-overrides
+# ---------------------------------------------------------------------------
+# Map mobile-app knowledge entries into existing pipeline steps so that mobile
+# domain expertise is injected during prompt assembly.
+knowledge-overrides:
+  # Foundational
+  create-prd:
+    append: [mobile-app-requirements]
+  user-stories:
+    append: [mobile-app-requirements]
+  coding-standards:
+    append: [mobile-app-conventions]
+  project-structure:
+    append: [mobile-app-project-structure]
+  dev-env-setup:
+    append: [mobile-app-dev-environment]
+  git-workflow:
+    append: [mobile-app-deployment]
+
+  # Architecture & Design
+  system-architecture:
+    append: [mobile-app-architecture, mobile-app-offline-patterns, mobile-app-push-notifications]
+  tech-stack:
+    append: [mobile-app-architecture, mobile-app-deployment]
+  adrs:
+    append: [mobile-app-architecture]
+  ux-spec:
+    append: [mobile-app-architecture]
+  design-system:
+    append: [mobile-app-conventions]
+  domain-modeling:
+    append: [mobile-app-offline-patterns]
+  security:
+    append: [mobile-app-security]
+  operations:
+    append: [mobile-app-deployment, mobile-app-distribution, mobile-app-observability]
+
+  # Testing
+  tdd:
+    append: [mobile-app-testing]
+  add-e2e-testing:
+    append: [mobile-app-testing]
+  create-evals:
+    append: [mobile-app-testing]
+  story-tests:
+    append: [mobile-app-testing]
+
+  # Reviews (mirror authoring steps)
+  review-architecture:
+    append: [mobile-app-architecture, mobile-app-offline-patterns]
+  review-ux:
+    append: [mobile-app-architecture]
+  review-security:
+    append: [mobile-app-security]
+  review-operations:
+    append: [mobile-app-deployment, mobile-app-distribution, mobile-app-observability]
+  review-testing:
+    append: [mobile-app-testing]
+
+  # Planning
+  implementation-plan:
+    append: [mobile-app-architecture]

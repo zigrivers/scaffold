@@ -163,3 +163,27 @@ describe('cli overlay', () => {
     expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
   })
 })
+
+describe('library overlay', () => {
+  it('loads library-overlay.yml successfully', () => {
+    const overlayPath = path.join(methodologyDir, 'library-overlay.yml')
+    const { overlay, errors } = loadOverlay(overlayPath)
+    expect(errors).toHaveLength(0)
+    expect(overlay).not.toBeNull()
+    expect(overlay!.projectType).toBe('library')
+    expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(15)
+    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+  })
+})
+
+describe('mobile-app overlay', () => {
+  it('loads mobile-app-overlay.yml successfully', () => {
+    const overlayPath = path.join(methodologyDir, 'mobile-app-overlay.yml')
+    const { overlay, errors } = loadOverlay(overlayPath)
+    expect(errors).toHaveLength(0)
+    expect(overlay).not.toBeNull()
+    expect(overlay!.projectType).toBe('mobile-app')
+    expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(15)
+    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+  })
+})
