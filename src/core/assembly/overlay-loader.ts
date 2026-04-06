@@ -1,8 +1,9 @@
-import type { ProjectType, StepEnablementEntry } from '../../types/index.js'
+import type { StepEnablementEntry } from '../../types/index.js'
 import type {
   ProjectTypeOverlay, KnowledgeOverride, ReadsOverride, DependencyOverride,
 } from '../../types/index.js'
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
+import { ProjectTypeSchema } from '../../config/schema.js'
 import { fileExists } from '../../utils/fs.js'
 import {
   overlayMissing, overlayParseError, overlayMalformedSection, overlayMalformedEntry,
@@ -183,9 +184,9 @@ export function loadOverlay(
   if (typeof obj['project-type'] !== 'string' || obj['project-type'].trim() === '') {
     errors.push(overlayParseError(overlayPath, 'required field "project-type" must be a non-empty string'))
   } else {
-    const validProjectTypes: ProjectType[] = ['web-app', 'mobile-app', 'backend', 'cli', 'library', 'game']
+    const validProjectTypes = ProjectTypeSchema.options
     const pt = obj['project-type'].trim()
-    if (!validProjectTypes.includes(pt as ProjectType)) {
+    if (!validProjectTypes.includes(pt as typeof validProjectTypes[number])) {
       const allowed = validProjectTypes.join(', ')
       errors.push(overlayParseError(
         overlayPath, `"project-type" must be one of ${allowed}, got "${pt}"`,

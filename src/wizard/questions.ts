@@ -1,6 +1,6 @@
 import type { OutputContext } from '../cli/output/context.js'
 import type { ProjectType, GameConfig } from '../types/index.js'
-import { GameConfigSchema } from '../config/schema.js'
+import { GameConfigSchema, ProjectTypeSchema } from '../config/schema.js'
 
 export interface WizardAnswers {
   methodology: 'deep' | 'mvp' | 'custom'
@@ -99,7 +99,7 @@ export async function askWizardQuestions(options: {
   } else if (!auto) {
     const selected = await output.select(
       'What type of project is this?',
-      ['web-app', 'mobile-app', 'backend', 'cli', 'library', 'game'],
+      [...ProjectTypeSchema.options],
       'web-app',
     )
     projectType = selected as ProjectType

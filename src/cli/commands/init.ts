@@ -4,6 +4,7 @@ import { createOutputContext } from '../output/context.js'
 import { runWizard } from '../../wizard/wizard.js'
 import { runBuild } from './build.js'
 import { syncSkillsIfNeeded } from '../../core/skills/sync.js'
+import { ProjectTypeSchema } from '../../config/schema.js'
 
 interface InitArgs {
   format?: string
@@ -73,8 +74,8 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       })
       .option('project-type', {
         type: 'string',
-        describe: 'Project type (web-app/mobile-app/backend/cli/library/game)',
-        choices: ['web-app', 'mobile-app', 'backend', 'cli', 'library', 'game'] as const,
+        describe: `Project type (${ProjectTypeSchema.options.join('/')})`,
+        choices: ProjectTypeSchema.options as unknown as string[],
       })
       // Game configuration options
       .option('engine', {

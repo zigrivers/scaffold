@@ -1,7 +1,16 @@
 // src/config/schema.test.ts
 
 import { describe, it, expect } from 'vitest'
-import { ConfigSchema, GameConfigSchema } from './schema.js'
+import { ConfigSchema, GameConfigSchema, ProjectTypeSchema } from './schema.js'
+
+describe('ProjectTypeSchema', () => {
+  it('includes all project types', () => {
+    expect(ProjectTypeSchema.options).toEqual(
+      expect.arrayContaining(['web-app', 'mobile-app', 'backend', 'cli', 'library', 'game']),
+    )
+    expect(ProjectTypeSchema.options).toHaveLength(6)
+  })
+})
 
 describe('ConfigSchema', () => {
   it('accepts a valid minimal config', () => {
