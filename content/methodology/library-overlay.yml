@@ -1,0 +1,67 @@
+# methodology/library-overlay.yml
+name: library
+description: >
+  Library overlay — injects library domain knowledge into existing pipeline
+  steps for API design, bundling, type definitions, documentation, and
+  versioning patterns.
+project-type: library
+
+# ---------------------------------------------------------------------------
+# knowledge-overrides
+# ---------------------------------------------------------------------------
+# Map library knowledge entries into existing pipeline steps so that library
+# domain expertise is injected during prompt assembly.
+knowledge-overrides:
+  # Foundational
+  create-prd:
+    append: [library-requirements]
+  user-stories:
+    append: [library-requirements]
+  coding-standards:
+    append: [library-conventions, library-documentation]
+  project-structure:
+    append: [library-project-structure]
+  dev-env-setup:
+    append: [library-dev-environment]
+  git-workflow:
+    append: [library-versioning]
+
+  # Architecture & Design
+  system-architecture:
+    append: [library-architecture]
+  tech-stack:
+    append: [library-architecture, library-bundling, library-type-definitions]
+  adrs:
+    append: [library-architecture]
+  api-contracts:
+    append: [library-api-design]
+  security:
+    append: [library-security]
+  operations:
+    append: [library-versioning, library-documentation]
+
+  # Testing
+  tdd:
+    append: [library-testing]
+  add-e2e-testing:
+    append: [library-testing]
+  create-evals:
+    append: [library-testing]
+  story-tests:
+    append: [library-testing]
+
+  # Reviews (mirror authoring steps)
+  review-architecture:
+    append: [library-architecture]
+  review-api:
+    append: [library-api-design]
+  review-security:
+    append: [library-security]
+  review-operations:
+    append: [library-versioning, library-documentation]
+  review-testing:
+    append: [library-testing]
+
+  # Planning
+  implementation-plan:
+    append: [library-architecture]

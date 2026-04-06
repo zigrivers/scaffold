@@ -2,7 +2,8 @@
  * E2E integration tests for project-type overlay flow:
  *   init → config.yml → overlay resolution → knowledge injection
  *
- * Tests the full pipeline for web-app, backend, and cli project types:
+ * Tests the full pipeline for web-app, backend, cli, library, and mobile-app
+ * project types:
  * 1. Init creates config with project-type-specific config block
  * 2. Config validates through ConfigSchema
  * 3. Overlay loads and resolves against real pipeline meta-prompts
@@ -94,7 +95,7 @@ async function discoverRealMetaPrompts(): Promise<Map<string, MetaPromptFile>> {
  * Resolve an overlay with a given project type and methodology against the real pipeline.
  */
 async function resolveProjectOverlay(
-  projectType: 'web-app' | 'backend' | 'cli',
+  projectType: 'web-app' | 'backend' | 'cli' | 'library' | 'mobile-app',
   methodology: 'deep' | 'mvp' = 'deep',
 ): Promise<{ overlayState: OverlayState; realMetaPrompts: Map<string, MetaPromptFile> }> {
   const methodologyDir = getPackageMethodologyDir()
@@ -579,33 +580,364 @@ describe('cli overlay integration', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Tests — Library
+// ---------------------------------------------------------------------------
+
+describe('library overlay integration', () => {
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = makeTempDir()
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+    vi.restoreAllMocks()
+  })
+
+  // Test 1: Config with library + libraryConfig validates through ConfigSchema
+  it('library config with libraryConfig validates through ConfigSchema', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2,
+      methodology: 'deep',
+      platforms: ['claude-code'],
+      project: {
+        projectType: 'library',
+        libraryConfig: { visibility: 'public' },
+      },
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      const project = result.data.project as Record<string, unknown>
+      expect(project['projectType']).toBe('library')
+      const lc = project['libraryConfig'] as Record<string, unknown>
+      expect(lc['visibility']).toBe('public')
+      expect(lc['runtimeTarget']).toBe('isomorphic')   // default
+      expect(lc['bundleFormat']).toBe('dual')           // default
+      expect(lc['hasTypeDefinitions']).toBe(true)       // default
+      expect(lc['documentationLevel']).toBe('readme')   // default
+    }
+  })
+
+  // Test 2: Init with projectType library creates config with libraryConfig
+  it('init with projectType library creates config.yml with libraryConfig defaults', async () => {
+    const output = createMockOutput()
+    const result = await runWizard({
+      projectRoot: tmpDir,
+      projectType: 'library',
+      libVisibility: 'public',
+      methodology: 'deep',
+      force: false,
+      auto: true,
+      output,
+    })
+
+    expect(result.success).toBe(true)
+
+    const { config } = loadConfig(tmpDir, [])
+    expect(config).not.toBeNull()
+    expect(config!.project?.projectType).toBe('library')
+    expect(config!.project?.libraryConfig).toBeDefined()
+    expect(config!.project?.libraryConfig?.visibility).toBe('public')
+  })
+
+  // Test 3: config.yml round-trips through YAML correctly
+  it('config.yml round-trips projectType and libraryConfig through YAML', async () => {
+    const output = createMockOutput()
+    await runWizard({
+      projectRoot: tmpDir,
+      projectType: 'library',
+      libVisibility: 'internal',
+      methodology: 'deep',
+      force: false,
+      auto: true,
+      output,
+    })
+
+    const configPath = path.join(tmpDir, '.scaffold', 'config.yml')
+    const raw = yaml.load(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>
+    const project = raw['project'] as Record<string, unknown>
+    expect(project['projectType']).toBe('library')
+    expect(project['libraryConfig']).toBeDefined()
+    const lc = project['libraryConfig'] as Record<string, unknown>
+    expect(lc['visibility']).toBe('internal')
+  })
+
+  // Test 4: Overlay loads successfully from content/methodology
+  it('library overlay loads without errors', () => {
+    const methodologyDir = getPackageMethodologyDir()
+    const overlayPath = path.join(methodologyDir, 'library-overlay.yml')
+    const { overlay, errors } = loadOverlay(overlayPath)
+    expect(errors).toHaveLength(0)
+    expect(overlay).not.toBeNull()
+    expect(overlay!.projectType).toBe('library')
+    expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(0)
+  })
+
+  // Test 5: Overlay injects library knowledge into architecture step
+  it('overlay injects library-architecture into system-architecture step', async () => {
+    const { overlayState } = await resolveProjectOverlay('library')
+
+    expect(overlayState.knowledge['system-architecture']).toBeDefined()
+    expect(overlayState.knowledge['system-architecture']).toContain('library-architecture')
+  })
+
+  // Test 6: Overlay injects knowledge into tech-stack step
+  it('overlay injects library knowledge into tech-stack step', async () => {
+    const { overlayState } = await resolveProjectOverlay('library')
+
+    expect(overlayState.knowledge['tech-stack']).toBeDefined()
+    expect(overlayState.knowledge['tech-stack']).toContain('library-architecture')
+    expect(overlayState.knowledge['tech-stack']).toContain('library-bundling')
+    expect(overlayState.knowledge['tech-stack']).toContain('library-type-definitions')
+  })
+
+  // Test 7: Overlay injects knowledge into testing steps
+  it('overlay injects library-testing into TDD and e2e steps', async () => {
+    const { overlayState } = await resolveProjectOverlay('library')
+
+    expect(overlayState.knowledge['tdd']).toBeDefined()
+    expect(overlayState.knowledge['tdd']).toContain('library-testing')
+
+    expect(overlayState.knowledge['add-e2e-testing']).toBeDefined()
+    expect(overlayState.knowledge['add-e2e-testing']).toContain('library-testing')
+  })
+
+  // Test 8: Overlay injects knowledge into foundational steps
+  it('overlay injects library knowledge into foundational steps', async () => {
+    const { overlayState } = await resolveProjectOverlay('library')
+
+    expect(overlayState.knowledge['create-prd']).toContain('library-requirements')
+    expect(overlayState.knowledge['coding-standards']).toContain('library-conventions')
+    expect(overlayState.knowledge['project-structure']).toContain('library-project-structure')
+  })
+
+  // Test 9: Overlay injects knowledge into api-contracts and operations steps
+  it('overlay injects library knowledge into api-contracts and operations steps', async () => {
+    const { overlayState } = await resolveProjectOverlay('library')
+
+    expect(overlayState.knowledge['api-contracts']).toBeDefined()
+    expect(overlayState.knowledge['api-contracts']).toContain('library-api-design')
+
+    expect(overlayState.knowledge['operations']).toBeDefined()
+    expect(overlayState.knowledge['operations']).toContain('library-versioning')
+    expect(overlayState.knowledge['operations']).toContain('library-documentation')
+  })
+
+  // Test 10: MVP methodology with library overlay works
+  it('MVP methodology with library overlay injects knowledge', async () => {
+    const { overlayState } = await resolveProjectOverlay('library', 'mvp')
+
+    expect(overlayState.knowledge['system-architecture']).toContain('library-architecture')
+    expect(overlayState.knowledge['tech-stack']).toContain('library-bundling')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Tests — Mobile-app
+// ---------------------------------------------------------------------------
+
+describe('mobile-app overlay integration', () => {
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = makeTempDir()
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+    vi.restoreAllMocks()
+  })
+
+  // Test 1: Config with mobile-app + mobileAppConfig validates through ConfigSchema
+  it('mobile-app config with mobileAppConfig validates through ConfigSchema', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2,
+      methodology: 'deep',
+      platforms: ['claude-code'],
+      project: {
+        projectType: 'mobile-app',
+        mobileAppConfig: { platform: 'cross-platform' },
+      },
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      const project = result.data.project as Record<string, unknown>
+      expect(project['projectType']).toBe('mobile-app')
+      const mc = project['mobileAppConfig'] as Record<string, unknown>
+      expect(mc['platform']).toBe('cross-platform')
+      expect(mc['distributionModel']).toBe('public')   // default
+      expect(mc['offlineSupport']).toBe('none')        // default
+      expect(mc['hasPushNotifications']).toBe(false)   // default
+    }
+  })
+
+  // Test 2: Init with projectType mobile-app creates config with mobileAppConfig
+  it('init with projectType mobile-app creates config.yml with mobileAppConfig defaults', async () => {
+    const output = createMockOutput()
+    const result = await runWizard({
+      projectRoot: tmpDir,
+      projectType: 'mobile-app',
+      mobilePlatform: 'cross-platform',
+      methodology: 'deep',
+      force: false,
+      auto: true,
+      output,
+    })
+
+    expect(result.success).toBe(true)
+
+    const { config } = loadConfig(tmpDir, [])
+    expect(config).not.toBeNull()
+    expect(config!.project?.projectType).toBe('mobile-app')
+    expect(config!.project?.mobileAppConfig).toBeDefined()
+    expect(config!.project?.mobileAppConfig?.platform).toBe('cross-platform')
+  })
+
+  // Test 3: config.yml round-trips through YAML correctly
+  it('config.yml round-trips projectType and mobileAppConfig through YAML', async () => {
+    const output = createMockOutput()
+    await runWizard({
+      projectRoot: tmpDir,
+      projectType: 'mobile-app',
+      mobilePlatform: 'ios',
+      methodology: 'deep',
+      force: false,
+      auto: true,
+      output,
+    })
+
+    const configPath = path.join(tmpDir, '.scaffold', 'config.yml')
+    const raw = yaml.load(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>
+    const project = raw['project'] as Record<string, unknown>
+    expect(project['projectType']).toBe('mobile-app')
+    expect(project['mobileAppConfig']).toBeDefined()
+    const mc = project['mobileAppConfig'] as Record<string, unknown>
+    expect(mc['platform']).toBe('ios')
+  })
+
+  // Test 4: Overlay loads successfully from content/methodology
+  it('mobile-app overlay loads without errors', () => {
+    const methodologyDir = getPackageMethodologyDir()
+    const overlayPath = path.join(methodologyDir, 'mobile-app-overlay.yml')
+    const { overlay, errors } = loadOverlay(overlayPath)
+    expect(errors).toHaveLength(0)
+    expect(overlay).not.toBeNull()
+    expect(overlay!.projectType).toBe('mobile-app')
+    expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(0)
+  })
+
+  // Test 5: Overlay injects mobile-app knowledge into architecture step
+  it('overlay injects mobile-app-architecture into system-architecture step', async () => {
+    const { overlayState } = await resolveProjectOverlay('mobile-app')
+
+    expect(overlayState.knowledge['system-architecture']).toBeDefined()
+    expect(overlayState.knowledge['system-architecture']).toContain('mobile-app-architecture')
+    expect(overlayState.knowledge['system-architecture']).toContain('mobile-app-offline-patterns')
+    expect(overlayState.knowledge['system-architecture']).toContain('mobile-app-push-notifications')
+  })
+
+  // Test 6: Overlay injects knowledge into tech-stack step
+  it('overlay injects mobile-app knowledge into tech-stack step', async () => {
+    const { overlayState } = await resolveProjectOverlay('mobile-app')
+
+    expect(overlayState.knowledge['tech-stack']).toBeDefined()
+    expect(overlayState.knowledge['tech-stack']).toContain('mobile-app-architecture')
+    expect(overlayState.knowledge['tech-stack']).toContain('mobile-app-deployment')
+  })
+
+  // Test 7: Overlay injects knowledge into testing steps
+  it('overlay injects mobile-app-testing into TDD and e2e steps', async () => {
+    const { overlayState } = await resolveProjectOverlay('mobile-app')
+
+    expect(overlayState.knowledge['tdd']).toBeDefined()
+    expect(overlayState.knowledge['tdd']).toContain('mobile-app-testing')
+
+    expect(overlayState.knowledge['add-e2e-testing']).toBeDefined()
+    expect(overlayState.knowledge['add-e2e-testing']).toContain('mobile-app-testing')
+  })
+
+  // Test 8: Overlay injects knowledge into foundational steps
+  it('overlay injects mobile-app knowledge into foundational steps', async () => {
+    const { overlayState } = await resolveProjectOverlay('mobile-app')
+
+    expect(overlayState.knowledge['create-prd']).toContain('mobile-app-requirements')
+    expect(overlayState.knowledge['coding-standards']).toContain('mobile-app-conventions')
+    expect(overlayState.knowledge['project-structure']).toContain('mobile-app-project-structure')
+  })
+
+  // Test 9: Overlay injects knowledge into ux-spec and operations steps
+  it('overlay injects mobile-app knowledge into ux-spec and operations steps', async () => {
+    const { overlayState } = await resolveProjectOverlay('mobile-app')
+
+    expect(overlayState.knowledge['ux-spec']).toBeDefined()
+    expect(overlayState.knowledge['ux-spec']).toContain('mobile-app-architecture')
+
+    expect(overlayState.knowledge['operations']).toBeDefined()
+    expect(overlayState.knowledge['operations']).toContain('mobile-app-deployment')
+    expect(overlayState.knowledge['operations']).toContain('mobile-app-distribution')
+    expect(overlayState.knowledge['operations']).toContain('mobile-app-observability')
+  })
+
+  // Test 10: MVP methodology with mobile-app overlay works
+  it('MVP methodology with mobile-app overlay injects knowledge', async () => {
+    const { overlayState } = await resolveProjectOverlay('mobile-app', 'mvp')
+
+    expect(overlayState.knowledge['system-architecture']).toContain('mobile-app-architecture')
+    expect(overlayState.knowledge['tech-stack']).toContain('mobile-app-deployment')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Cross-type validation tests
 // ---------------------------------------------------------------------------
 
 describe('project-type overlay cross-validation', () => {
   it('each overlay type injects distinct knowledge entries (no accidental overlap)', async () => {
-    const [webResult, backendResult, cliResult] = await Promise.all([
+    const [webResult, backendResult, cliResult, libraryResult, mobileResult] = await Promise.all([
       resolveProjectOverlay('web-app'),
       resolveProjectOverlay('backend'),
       resolveProjectOverlay('cli'),
+      resolveProjectOverlay('library'),
+      resolveProjectOverlay('mobile-app'),
     ])
 
     // system-architecture should have type-specific entries for each
     const webArch = webResult.overlayState.knowledge['system-architecture'] ?? []
     const backendArch = backendResult.overlayState.knowledge['system-architecture'] ?? []
     const cliArch = cliResult.overlayState.knowledge['system-architecture'] ?? []
+    const libraryArch = libraryResult.overlayState.knowledge['system-architecture'] ?? []
+    const mobileArch = mobileResult.overlayState.knowledge['system-architecture'] ?? []
 
     expect(webArch).toContain('web-app-architecture')
     expect(webArch).not.toContain('backend-architecture')
     expect(webArch).not.toContain('cli-architecture')
+    expect(webArch).not.toContain('library-architecture')
+    expect(webArch).not.toContain('mobile-app-architecture')
 
     expect(backendArch).toContain('backend-architecture')
     expect(backendArch).not.toContain('web-app-architecture')
     expect(backendArch).not.toContain('cli-architecture')
+    expect(backendArch).not.toContain('library-architecture')
+    expect(backendArch).not.toContain('mobile-app-architecture')
 
     expect(cliArch).toContain('cli-architecture')
     expect(cliArch).not.toContain('web-app-architecture')
     expect(cliArch).not.toContain('backend-architecture')
+    expect(cliArch).not.toContain('library-architecture')
+    expect(cliArch).not.toContain('mobile-app-architecture')
+
+    expect(libraryArch).toContain('library-architecture')
+    expect(libraryArch).not.toContain('web-app-architecture')
+    expect(libraryArch).not.toContain('backend-architecture')
+    expect(libraryArch).not.toContain('cli-architecture')
+    expect(libraryArch).not.toContain('mobile-app-architecture')
+
+    expect(mobileArch).toContain('mobile-app-architecture')
+    expect(mobileArch).not.toContain('web-app-architecture')
+    expect(mobileArch).not.toContain('backend-architecture')
+    expect(mobileArch).not.toContain('cli-architecture')
+    expect(mobileArch).not.toContain('library-architecture')
   })
 
   it('config schema rejects cross-typed config blocks', () => {
@@ -631,6 +963,30 @@ describe('project-type overlay cross-validation', () => {
     expect(ConfigSchema.safeParse({
       version: 2, methodology: 'deep', platforms: ['claude-code'],
       project: { projectType: 'game', cliConfig: { interactivity: 'hybrid' } },
+    }).success).toBe(false)
+
+    // libraryConfig on web-app
+    expect(ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: { projectType: 'web-app', libraryConfig: { visibility: 'public' } },
+    }).success).toBe(false)
+
+    // mobileAppConfig on backend
+    expect(ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: { projectType: 'backend', mobileAppConfig: { platform: 'ios' } },
+    }).success).toBe(false)
+
+    // libraryConfig on mobile-app
+    expect(ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: { projectType: 'mobile-app', libraryConfig: { visibility: 'internal' } },
+    }).success).toBe(false)
+
+    // mobileAppConfig on library
+    expect(ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: { projectType: 'library', mobileAppConfig: { platform: 'android' } },
     }).success).toBe(false)
   })
 })

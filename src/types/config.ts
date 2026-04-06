@@ -1,6 +1,9 @@
 import type { MethodologyName, DepthLevel } from './enums.js'
 import type { z } from 'zod'
-import { ProjectTypeSchema, WebAppConfigSchema, BackendConfigSchema, CliConfigSchema } from '../config/schema.js'
+import {
+  ProjectTypeSchema, WebAppConfigSchema, BackendConfigSchema,
+  CliConfigSchema, LibraryConfigSchema, MobileAppConfigSchema,
+} from '../config/schema.js'
 
 /** Step enablement entry used in presets and overlays. */
 export interface StepEnablementEntry {
@@ -31,6 +34,12 @@ export type BackendConfig = z.infer<typeof BackendConfigSchema>
 
 /** CLI tool configuration — derived from Zod schema (single source of truth). */
 export type CliConfig = z.infer<typeof CliConfigSchema>
+
+/** Library configuration — derived from Zod schema (single source of truth). */
+export type LibraryConfig = z.infer<typeof LibraryConfigSchema>
+
+/** Mobile app configuration — derived from Zod schema (single source of truth). */
+export type MobileAppConfig = z.infer<typeof MobileAppConfigSchema>
 
 /** Game engine options. */
 export type GameEngine = 'unity' | 'unreal' | 'godot' | 'custom'
@@ -87,6 +96,8 @@ export interface ProjectConfig {
   webAppConfig?: WebAppConfig
   backendConfig?: BackendConfig
   cliConfig?: CliConfig
+  libraryConfig?: LibraryConfig
+  mobileAppConfig?: MobileAppConfig
   [key: string]: unknown  // forward compatibility
 }
 

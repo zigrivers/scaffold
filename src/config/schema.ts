@@ -39,6 +39,21 @@ export const CliConfigSchema = z.object({
   hasStructuredOutput: z.boolean().default(false),
 }).strict()
 
+export const LibraryConfigSchema = z.object({
+  visibility: z.enum(['public', 'internal']),
+  runtimeTarget: z.enum(['node', 'browser', 'isomorphic', 'edge']).default('isomorphic'),
+  bundleFormat: z.enum(['esm', 'cjs', 'dual', 'unbundled']).default('dual'),
+  hasTypeDefinitions: z.boolean().default(true),
+  documentationLevel: z.enum(['none', 'readme', 'api-docs', 'full-site']).default('readme'),
+}).strict()
+
+export const MobileAppConfigSchema = z.object({
+  platform: z.enum(['ios', 'android', 'cross-platform']),
+  distributionModel: z.enum(['public', 'private', 'mixed']).default('public'),
+  offlineSupport: z.enum(['none', 'cache', 'offline-first']).default('none'),
+  hasPushNotifications: z.boolean().default(false),
+}).strict()
+
 export const GameConfigSchema = z.object({
   engine: z.enum(['unity', 'unreal', 'godot', 'custom']),
   multiplayerMode: z.enum(['none', 'local', 'online', 'hybrid']).default('none'),
@@ -65,6 +80,8 @@ const ProjectSchema = z.object({
   webAppConfig: WebAppConfigSchema.optional(),
   backendConfig: BackendConfigSchema.optional(),
   cliConfig: CliConfigSchema.optional(),
+  libraryConfig: LibraryConfigSchema.optional(),
+  mobileAppConfig: MobileAppConfigSchema.optional(),
 }).passthrough()  // allow unknown fields per ADR-033
   .superRefine((data, ctx) => {
     if (data.gameConfig !== undefined && data.projectType !== 'game') {
@@ -82,6 +99,25 @@ const ProjectSchema = z.object({
     if (data.cliConfig !== undefined && data.projectType !== 'cli') {
       ctx.addIssue({ path: ['cliConfig'], code: 'custom',
         message: 'cliConfig requires projectType: cli' })
+    }
+    if (data.libraryConfig !== undefined && data.projectType !== 'library') {
+      ctx.addIssue({ path: ['libraryConfig'], code: 'custom',
+        message: 'libraryConfig requires projectType: library' })
+    }
+    if (data.mobileAppConfig !== undefined && data.projectType !== 'mobile-app') {
+      ctx.addIssue({ path: ['mobileAppConfig'], code: 'custom',
+        message: 'mobileAppConfig requires projectType: mobile-app' })
+    }
+    if (data.libraryConfig) {
+      const { visibility, documentationLevel } = data.libraryConfig
+      if (visibility === 'public' && documentationLevel === 'none') {
+        ctx.addIssue({
+          path: ['libraryConfig', 'documentationLevel'],
+          code: 'custom',
+          message: 'Public libraries should have documentation'
+            + ' (documentationLevel: none with visibility: public)',
+        })
+      }
     }
     if (data.webAppConfig) {
       const { renderingStrategy, deployTarget, authFlow } = data.webAppConfig

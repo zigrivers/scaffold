@@ -29,7 +29,7 @@ Either way, Scaffold constructs the prompt and the target AI tool does the work.
 
 **Assembly engine** — At execution time, Scaffold builds a 7-section prompt from: system metadata, the meta-prompt, knowledge base entries, project context (artifacts from prior steps), methodology settings, layered instructions, and depth-specific execution guidance.
 
-**Knowledge base** — 134 domain expertise entries in `content/knowledge/` organized in eleven categories (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli) covering testing strategy, domain modeling, API design, security best practices, eval craft, TDD execution, task claiming, worktree management, release management, rendering strategies, data stores, CLI patterns, game engines, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
+**Knowledge base** — 158 domain expertise entries in `content/knowledge/` organized in thirteen categories (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app) covering testing strategy, domain modeling, API design, security best practices, eval craft, TDD execution, task claiming, worktree management, release management, rendering strategies, data stores, CLI patterns, game engines, library bundling, mobile deployment, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
 
 **Methodology presets** — Three built-in presets control which steps run and how deep the analysis goes:
 - **deep** (depth 5) — all steps enabled, exhaustive analysis
@@ -398,6 +398,25 @@ Every `scaffold init` wizard question can be answered via CLI flags, making scaf
 | `--cli-distribution` | comma-sep | package-manager, system-package-manager, standalone-binary, container |
 | `--cli-structured-output` | boolean | `--cli-structured-output` / `--no-cli-structured-output` |
 
+#### Library Config Flags (require `--project-type library` or auto-set it)
+
+| Flag | Type | Values |
+|------|------|--------|
+| `--lib-visibility` | string | public, internal |
+| `--lib-runtime-target` | string | node, browser, isomorphic, edge |
+| `--lib-bundle-format` | string | esm, cjs, dual, unbundled |
+| `--lib-type-definitions` | boolean | `--lib-type-definitions` / `--no-lib-type-definitions` |
+| `--lib-doc-level` | string | none, readme, api-docs, full-site |
+
+#### Mobile-App Config Flags (require `--project-type mobile-app` or auto-set it)
+
+| Flag | Type | Values |
+|------|------|--------|
+| `--mobile-platform` | string | ios, android, cross-platform |
+| `--mobile-distribution` | string | public, private, mixed |
+| `--mobile-offline` | string | none, cache, offline-first |
+| `--mobile-push-notifications` | boolean | `--mobile-push-notifications` / `--no-mobile-push-notifications` |
+
 #### Game Config Flags (require `--project-type game` or auto-set it)
 
 | Flag | Type | Values |
@@ -420,7 +439,7 @@ Every `scaffold init` wizard question can be answered via CLI flags, making scaf
 
 - **Flag > auto > interactive**: Flags always take highest precedence. `--auto --engine unreal` uses defaults for everything except engine.
 - **Partial flags + interactive**: Provide some flags and the wizard asks only the remaining questions. `scaffold init --project-type game --engine unreal` prompts interactively for multiplayer, platforms, etc.
-- **Type-specific flags auto-set project type**: `--engine unity` automatically sets `--project-type game`, `--web-rendering ssr` sets `--project-type web-app`, `--backend-api-style rest` sets `--project-type backend`, `--cli-interactivity hybrid` sets `--project-type cli`. Error if conflicting type.
+- **Type-specific flags auto-set project type**: `--engine unity` automatically sets `--project-type game`, `--web-rendering ssr` sets `--project-type web-app`, `--backend-api-style rest` sets `--project-type backend`, `--cli-interactivity hybrid` sets `--project-type cli`, `--lib-visibility public` sets `--project-type library`, `--mobile-platform ios` sets `--project-type mobile-app`. Error if conflicting type.
 - **Cannot mix flag families**: `--web-rendering ssr --backend-api-style rest` is an error. Each flag family is exclusive.
 - **Validation**: `--depth` requires `--methodology custom`. `--online-services` requires `--multiplayer online` or `hybrid`. SSR/hybrid rendering is incompatible with static deploy target. Session auth requires server state (not static).
 
@@ -455,6 +474,25 @@ scaffold init --auto --methodology deep --project-type cli \
   --cli-interactivity args-only --cli-distribution package-manager \
   --cli-structured-output
 
+# Public library with full API docs and ESM bundle
+scaffold init --auto --methodology deep --project-type library \
+  --lib-visibility public --lib-runtime-target isomorphic \
+  --lib-bundle-format esm --lib-doc-level api-docs
+
+# Internal library (Node-only, no docs)
+scaffold init --auto --methodology mvp --project-type library \
+  --lib-visibility internal --lib-runtime-target node \
+  --lib-bundle-format cjs --lib-doc-level none
+
+# Cross-platform mobile app with offline support
+scaffold init --auto --methodology deep --project-type mobile-app \
+  --mobile-platform cross-platform --mobile-offline offline-first \
+  --mobile-push-notifications
+
+# iOS app with private distribution
+scaffold init --auto --methodology mvp --project-type mobile-app \
+  --mobile-platform ios --mobile-distribution private
+
 # Multiplayer mobile game with Unity
 scaffold init --project-type game --methodology deep --auto \
   --engine unity --multiplayer online --target-platforms ios,android \
@@ -481,7 +519,7 @@ Scaffold supports **project-type overlays** — domain-specific knowledge and pi
 
 - **Injects domain knowledge** into existing pipeline steps (e.g., SSR caching strategies into `tech-stack`, API pagination patterns into `coding-standards`)
 
-The game overlay additionally adjusts step enablement, remaps artifact references, and adds dependency overrides (because game development has fundamentally different artifacts). The web-app, backend, and CLI overlays are **knowledge-only** — they inject domain expertise into existing steps without changing which steps run or how they depend on each other.
+The game overlay additionally adjusts step enablement, remaps artifact references, and adds dependency overrides (because game development has fundamentally different artifacts). The web-app, backend, CLI, library, and mobile-app overlays are **knowledge-only** — they inject domain expertise into existing steps without changing which steps run or how they depend on each other.
 
 Overlays are composable with methodology presets. An MVP web-app gets fewer steps at lower depth; a deep backend project gets exhaustive analysis of every architectural decision.
 
@@ -490,6 +528,8 @@ Overlays are composable with methodology presets. An MVP web-app gets fewer step
 | `web-app` | `web-app-overlay.yml` | 17 entries (rendering, state management, auth, SSR, deploy targets, real-time, PWA, testing) | Rendering strategy, deploy target, real-time, auth flow |
 | `backend` | `backend-overlay.yml` | 14 entries (API design, data stores, auth, messaging, observability, deploy, caching, rate limiting) | API style, data store(s), auth, messaging, deploy target |
 | `cli` | `cli-overlay.yml` | 10 entries (argument parsing, config management, output formatting, distribution, testing, error handling) | Interactivity model, distribution channels, structured output |
+| `library` | `library-overlay.yml` | 12 entries (API design, bundling, type definitions, versioning, documentation, testing, security) | Visibility, runtime target, bundle format, type definitions, documentation level |
+| `mobile-app` | `mobile-app-overlay.yml` | 12 entries (architecture, offline patterns, push notifications, deployment, distribution, testing, security) | Platform, distribution model, offline support, push notifications |
 | `game` | `game-overlay.yml` | 24 entries (engines, networking, audio, VR/AR, economy, save systems, certification) | Engine, multiplayer, platforms, economy, narrative, and 6 more |
 
 ### Game Development

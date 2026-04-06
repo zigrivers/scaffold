@@ -291,11 +291,17 @@ describe('askWizardQuestions', () => {
   it('--traits flag skips web/mobile confirm questions', async () => {
     const output = makeOutputContext()
     // No traits confirms needed — but platform confirms still fire
+    // Plus library wizard asks "Ship type definitions?"
     vi.mocked(output.confirm)
       .mockResolvedValueOnce(false)   // Codex
       .mockResolvedValueOnce(false)   // Gemini
+      .mockResolvedValueOnce(true)    // Ship type definitions? (library)
     vi.mocked(output.select)
       .mockResolvedValueOnce('library')  // projectType
+      .mockResolvedValueOnce('public')   // Library visibility
+      .mockResolvedValueOnce('isomorphic') // Runtime target
+      .mockResolvedValueOnce('dual')     // Bundle format
+      .mockResolvedValueOnce('readme')   // Documentation level
 
     const result = await askWizardQuestions({
       output,
@@ -306,8 +312,8 @@ describe('askWizardQuestions', () => {
     })
 
     expect(result.traits).toEqual(['web', 'mobile'])
-    // confirm called only twice (Codex + Gemini), not four times
-    expect(output.confirm).toHaveBeenCalledTimes(2)
+    // confirm called 3 times: Codex + Gemini + Ship type definitions (library)
+    expect(output.confirm).toHaveBeenCalledTimes(3)
   })
 
   it('--depth with --auto overrides auto default for custom methodology', async () => {
@@ -604,5 +610,94 @@ describe('cli wizard questions', () => {
       methodology: 'deep',
       projectType: 'cli',
     })).rejects.toThrow('--cli-interactivity is required')
+  })
+})
+
+describe('library wizard questions', () => {
+  it('uses flag values when all 5 flags provided (skips prompts)', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', methodology: 'deep', auto: false,
+      projectType: 'library',
+      libVisibility: 'public',
+      libRuntimeTarget: 'isomorphic',
+      libBundleFormat: 'dual',
+      libTypeDefinitions: true,
+      libDocLevel: 'api-docs',
+    })
+    expect(answers.libraryConfig).toEqual({
+      visibility: 'public',
+      runtimeTarget: 'isomorphic',
+      bundleFormat: 'dual',
+      hasTypeDefinitions: true,
+      documentationLevel: 'api-docs',
+    })
+    // All library questions were provided via flags — no select/confirm calls for library questions
+    // Platform confirms still fire: Codex, Gemini, web, mobile
+    expect(output.select).not.toHaveBeenCalled()
+  })
+
+  it('throws in auto mode without required --lib-visibility', async () => {
+    const output = makeOutputContext()
+
+    await expect(askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'library',
+    })).rejects.toThrow('--lib-visibility is required')
+  })
+
+  it('uses defaults in auto mode when --lib-visibility is provided', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'library',
+      libVisibility: 'internal',
+    })
+    expect(answers.libraryConfig).toEqual({
+      visibility: 'internal',
+      runtimeTarget: 'isomorphic',
+      bundleFormat: 'dual',
+      hasTypeDefinitions: true,
+      documentationLevel: 'readme',
+    })
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.confirm).not.toHaveBeenCalled()
+  })
+})
+
+describe('mobile-app wizard questions', () => {
+  it('uses flag values when all 4 flags provided (skips prompts)', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', methodology: 'deep', auto: false,
+      projectType: 'mobile-app',
+      mobilePlatform: 'ios',
+      mobileDistribution: 'public',
+      mobileOffline: 'cache',
+      mobilePushNotifications: true,
+    })
+    expect(answers.mobileAppConfig).toEqual({
+      platform: 'ios',
+      distributionModel: 'public',
+      offlineSupport: 'cache',
+      hasPushNotifications: true,
+    })
+    // All mobile questions were provided via flags — no select/confirm calls for mobile questions
+    expect(output.select).not.toHaveBeenCalled()
+  })
+
+  it('throws in auto mode without required --mobile-platform', async () => {
+    const output = makeOutputContext()
+
+    await expect(askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'mobile-app',
+    })).rejects.toThrow('--mobile-platform is required')
   })
 })
