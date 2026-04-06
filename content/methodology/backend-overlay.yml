@@ -1,0 +1,73 @@
+# methodology/backend-overlay.yml
+name: backend
+description: >
+  Backend service overlay — injects backend domain knowledge into existing
+  pipeline steps for API design, data modeling, authentication, async
+  processing, and deployment patterns.
+project-type: backend
+
+# ---------------------------------------------------------------------------
+# knowledge-overrides
+# ---------------------------------------------------------------------------
+# Map backend knowledge entries into existing pipeline steps so that backend
+# domain expertise is injected during prompt assembly.
+knowledge-overrides:
+  # Foundational
+  create-prd:
+    append: [backend-requirements]
+  user-stories:
+    append: [backend-requirements]
+  coding-standards:
+    append: [backend-conventions]
+  project-structure:
+    append: [backend-project-structure]
+  dev-env-setup:
+    append: [backend-dev-environment]
+  git-workflow:
+    append: [backend-deployment]
+
+  # Architecture & Design
+  system-architecture:
+    append: [backend-architecture, backend-async-patterns, backend-worker-patterns]
+  tech-stack:
+    append: [backend-architecture, backend-api-design, backend-auth-patterns]
+  adrs:
+    append: [backend-architecture]
+  domain-modeling:
+    append: [backend-data-modeling]
+  database-schema:
+    append: [backend-data-modeling]
+  api-contracts:
+    append: [backend-api-design]
+  security:
+    append: [backend-auth-patterns, backend-security]
+  operations:
+    append: [backend-deployment, backend-observability, backend-async-patterns, backend-worker-patterns]
+
+  # Testing
+  tdd:
+    append: [backend-testing]
+  add-e2e-testing:
+    append: [backend-testing]
+  create-evals:
+    append: [backend-testing]
+  story-tests:
+    append: [backend-testing]
+
+  # Reviews (mirror authoring steps)
+  review-architecture:
+    append: [backend-architecture, backend-async-patterns, backend-worker-patterns]
+  review-api:
+    append: [backend-api-design]
+  review-database:
+    append: [backend-data-modeling]
+  review-security:
+    append: [backend-auth-patterns, backend-security]
+  review-operations:
+    append: [backend-deployment, backend-observability]
+  review-testing:
+    append: [backend-testing]
+
+  # Planning
+  implementation-plan:
+    append: [backend-architecture]
