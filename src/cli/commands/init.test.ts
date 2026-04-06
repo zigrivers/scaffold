@@ -433,4 +433,15 @@ describe('init command — .check() validation', () => {
       parseInitArgs(['--web-auth-flow', 'session', '--web-deploy-target', 'static']),
     ).rejects.toThrow(/Session auth/)
   })
+
+  it('accepts --game-engine alias for --engine', async () => {
+    const args = await parseInitArgs(['--game-engine', 'unity'])
+    expect(args.engine).toBe('unity')
+  })
+
+  it('rejects --game-engine with --web-rendering (mixed families)', async () => {
+    await expect(
+      parseInitArgs(['--game-engine', 'unity', '--web-rendering', 'ssr']),
+    ).rejects.toThrow(/mix/)
+  })
 })

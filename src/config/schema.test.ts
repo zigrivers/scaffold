@@ -477,6 +477,17 @@ describe('ProjectSchema cross-field validation', () => {
     expect(result.success).toBe(false)
   })
 
+  it('rejects hybrid + static deploy', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'web-app',
+        webAppConfig: { renderingStrategy: 'hybrid', deployTarget: 'static' },
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+
   it('rejects session auth + static deploy', () => {
     const result = ConfigSchema.safeParse({
       version: 2, methodology: 'deep', platforms: ['claude-code'],

@@ -490,7 +490,7 @@ Overlays are composable with methodology presets. An MVP web-app gets fewer step
 | `web-app` | `web-app-overlay.yml` | 17 entries (rendering, state management, auth, SSR, deploy targets, real-time, PWA, testing) | Rendering strategy, deploy target, real-time, auth flow |
 | `backend` | `backend-overlay.yml` | 14 entries (API design, data stores, auth, messaging, observability, deploy, caching, rate limiting) | API style, data store(s), auth, messaging, deploy target |
 | `cli` | `cli-overlay.yml` | 10 entries (argument parsing, config management, output formatting, distribution, testing, error handling) | Interactivity model, distribution channels, structured output |
-| `game` | `game-overlay.yml` | 29 entries (engines, networking, audio, VR/AR, economy, save systems, certification) | Engine, multiplayer, platforms, economy, narrative, and 6 more |
+| `game` | `game-overlay.yml` | 24 entries (engines, networking, audio, VR/AR, economy, save systems, certification) | Engine, multiplayer, platforms, economy, narrative, and 6 more |
 
 ### Game Development
 
