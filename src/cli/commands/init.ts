@@ -285,10 +285,64 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
           }
         }
 
+        // New project type flag detection
+        const webFlags = ['web-rendering', 'web-deploy-target', 'web-realtime', 'web-auth-flow'] as const
+        const hasWebFlag = webFlags.some((f) => argv[f] !== undefined)
+        const backendFlags = ['backend-api-style', 'backend-data-store', 'backend-auth',
+          'backend-messaging', 'backend-deploy-target'] as const
+        const hasBackendFlag = backendFlags.some((f) => argv[f] !== undefined)
+        const cliTypeFlags = ['cli-interactivity', 'cli-distribution', 'cli-structured-output'] as const
+        const hasCliFlag = cliTypeFlags.some((f) => argv[f] !== undefined)
+
+        // Reject mixed-family flags
+        const typeCount = [hasGameFlag, hasWebFlag, hasBackendFlag, hasCliFlag].filter(Boolean).length
+        if (typeCount > 1) {
+          throw new Error('Cannot mix flags from multiple project types (--web-*, --backend-*, --cli-*, game flags)')
+        }
+
+        // Web flags require web-app project type
+        if (hasWebFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'web-app') {
+          throw new Error('--web-* flags require --project-type web-app')
+        }
+        if (hasBackendFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'backend') {
+          throw new Error('--backend-* flags require --project-type backend')
+        }
+        if (hasCliFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'cli') {
+          throw new Error('--cli-* flags require --project-type cli')
+        }
+
+        // CSV enum validation for array flags
+        const validDataStores = ['relational', 'document', 'key-value']
+        if (argv['backend-data-store']) {
+          const invalid = (argv['backend-data-store'] as string[]).filter(
+            (v: string) => !validDataStores.includes(v),
+          )
+          if (invalid.length) throw new Error(`Invalid --backend-data-store value(s): ${invalid.join(', ')}`)
+        }
+        const validDistChannels = ['package-manager', 'system-package-manager', 'standalone-binary', 'container']
+        if (argv['cli-distribution']) {
+          const invalid = (argv['cli-distribution'] as string[]).filter(
+            (v: string) => !validDistChannels.includes(v),
+          )
+          if (invalid.length) throw new Error(`Invalid --cli-distribution value(s): ${invalid.join(', ')}`)
+        }
+
+        // WebApp cross-field validation
+        if (['ssr', 'hybrid'].includes(argv['web-rendering'] as string) && argv['web-deploy-target'] === 'static') {
+          throw new Error('SSR/hybrid rendering requires compute, not static hosting')
+        }
+        if (argv['web-auth-flow'] === 'session' && argv['web-deploy-target'] === 'static') {
+          throw new Error('Session auth requires server state, incompatible with static hosting')
+        }
+
         return true
       })
       // Help grouping
       .group(['methodology', 'depth', 'adapters', 'traits', 'project-type'], 'Configuration:')
+      .group(['web-rendering', 'web-deploy-target', 'web-realtime', 'web-auth-flow'], 'Web-App Configuration:')
+      .group(['backend-api-style', 'backend-data-store', 'backend-auth',
+        'backend-messaging', 'backend-deploy-target'], 'Backend Configuration:')
+      .group(['cli-interactivity', 'cli-distribution', 'cli-structured-output'], 'CLI Configuration:')
       .group([
         'engine', 'multiplayer', 'target-platforms', 'online-services',
         'content-structure', 'economy', 'narrative', 'locales',
@@ -301,11 +355,24 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
-    // Game flags auto-set --project-type game
+    // Auto-detect project type from flags
     const gameFlags = ['engine', 'multiplayer', 'target-platforms', 'online-services',
       'content-structure', 'economy', 'narrative', 'locales', 'npc-ai', 'modding', 'persistence'] as const
     const hasGameFlag = gameFlags.some((f) => argv[f] !== undefined)
-    const projectType = argv['project-type'] ?? (hasGameFlag ? 'game' : undefined)
+    const hasWebFlag = ['web-rendering', 'web-deploy-target', 'web-realtime', 'web-auth-flow']
+      .some((f) => argv[f] !== undefined)
+    const hasBackendFlag = ['backend-api-style', 'backend-data-store', 'backend-auth',
+      'backend-messaging', 'backend-deploy-target']
+      .some((f) => argv[f] !== undefined)
+    const hasCliTypeFlag = ['cli-interactivity', 'cli-distribution', 'cli-structured-output']
+      .some((f) => argv[f] !== undefined)
+
+    const detectedType = hasGameFlag ? 'game'
+      : hasWebFlag ? 'web-app'
+      : hasBackendFlag ? 'backend'
+      : hasCliTypeFlag ? 'cli'
+      : undefined
+    const projectType = argv['project-type'] ?? detectedType
 
     const result = await runWizard({
       projectRoot,
@@ -329,6 +396,18 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       npcAi: argv['npc-ai'],
       modding: argv.modding,
       persistence: argv.persistence,
+      webRendering: argv['web-rendering'],
+      webDeployTarget: argv['web-deploy-target'],
+      webRealtime: argv['web-realtime'],
+      webAuthFlow: argv['web-auth-flow'],
+      backendApiStyle: argv['backend-api-style'],
+      backendDataStore: argv['backend-data-store'],
+      backendAuth: argv['backend-auth'],
+      backendMessaging: argv['backend-messaging'],
+      backendDeployTarget: argv['backend-deploy-target'],
+      cliInteractivity: argv['cli-interactivity'],
+      cliDistribution: argv['cli-distribution'],
+      cliStructuredOutput: argv['cli-structured-output'],
     })
 
     if (!result.success) {
