@@ -535,7 +535,10 @@ describe('init command — .check() validation', () => {
 
   it('accepts --mobile-platform with other mobile flags', async () => {
     await expect(
-      parseInitArgs(['--mobile-platform', 'cross-platform', '--mobile-distribution', 'public', '--mobile-offline', 'cache']),
+      parseInitArgs([
+        '--mobile-platform', 'cross-platform',
+        '--mobile-distribution', 'public', '--mobile-offline', 'cache',
+      ]),
     ).resolves.toMatchObject({
       'mobile-platform': 'cross-platform',
       'mobile-distribution': 'public',

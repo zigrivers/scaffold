@@ -2,6 +2,17 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.8.0] — 2026-04-06
+
+### Added
+
+- **Library and mobile-app project-type overlays** — two new overlay files (`library-overlay.yml`, `mobile-app-overlay.yml`) inject domain-specific knowledge into existing pipeline steps based on project type. Library overlay covers API design, bundling, type definitions, versioning, documentation, and testing. Mobile-app overlay covers architecture, offline patterns, push notifications, deployment, distribution, and platform-specific testing.
+- **9 new CLI flags for `scaffold init`** — non-interactive configuration for the two new project types:
+  - **Library flags** (auto-set `--project-type library`): `--lib-visibility` (public/internal), `--lib-runtime-target` (node/browser/isomorphic/edge), `--lib-bundle-format` (esm/cjs/dual/unbundled), `--lib-type-definitions` (boolean), `--lib-doc-level` (none/readme/api-docs/full-site)
+  - **Mobile-app flags** (auto-set `--project-type mobile-app`): `--mobile-platform` (ios/android/cross-platform), `--mobile-distribution` (public/private/mixed), `--mobile-offline` (none/cache/offline-first), `--mobile-push-notifications` (boolean)
+- **24 domain knowledge entries** — 12 library entries (architecture, API design, bundling, type definitions, versioning, documentation, testing, conventions, project structure, dev environment, requirements, security) and 12 mobile-app entries (architecture, offline patterns, push notifications, deployment, distribution, testing, conventions, project structure, dev environment, requirements, security, observability)
+- **Public library + no docs cross-field validation** — `ConfigSchema` now rejects `visibility: public` with `documentationLevel: none` in `libraryConfig`, preventing contradictory configurations where a public library ships without documentation.
+
 ## [3.7.0] — 2026-04-06
 
 ### Added

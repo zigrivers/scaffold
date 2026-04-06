@@ -1,5 +1,8 @@
 import type { OutputContext } from '../cli/output/context.js'
-import type { ProjectType, GameConfig, WebAppConfig, BackendConfig, CliConfig } from '../types/index.js'
+import type {
+  ProjectType, GameConfig, WebAppConfig, BackendConfig,
+  CliConfig, LibraryConfig, MobileAppConfig,
+} from '../types/index.js'
 import { GameConfigSchema, ProjectTypeSchema } from '../config/schema.js'
 
 export interface WizardAnswers {
@@ -12,6 +15,8 @@ export interface WizardAnswers {
   webAppConfig?: WebAppConfig
   backendConfig?: BackendConfig
   cliConfig?: CliConfig
+  libraryConfig?: LibraryConfig
+  mobileAppConfig?: MobileAppConfig
 }
 
 /**
@@ -53,6 +58,17 @@ export async function askWizardQuestions(options: {
   cliInteractivity?: string
   cliDistribution?: string[]
   cliStructuredOutput?: boolean
+  // Library flags
+  libVisibility?: string
+  libRuntimeTarget?: string
+  libBundleFormat?: string
+  libTypeDefinitions?: boolean
+  libDocLevel?: string
+  // Mobile-app flags
+  mobilePlatform?: string
+  mobileDistribution?: string
+  mobileOffline?: string
+  mobilePushNotifications?: boolean
 }): Promise<WizardAnswers> {
   const { output, suggestion, auto } = options
 
@@ -235,6 +251,78 @@ export async function askWizardQuestions(options: {
     cliConfig = { interactivity, distributionChannels, hasStructuredOutput }
   }
 
+  // Library configuration
+  let libraryConfig: LibraryConfig | undefined
+  if (projectType === 'library') {
+    if (auto && !options.libVisibility) {
+      throw new Error('--lib-visibility is required in auto mode for library projects')
+    }
+    const visibility = options.libVisibility
+      ? options.libVisibility as LibraryConfig['visibility']
+      : await output.select('Library visibility?', ['public', 'internal']) as LibraryConfig['visibility']
+
+    const runtimeTarget = options.libRuntimeTarget
+      ? options.libRuntimeTarget as LibraryConfig['runtimeTarget']
+      : !auto
+        ? await output.select('Runtime target?',
+          ['node', 'browser', 'isomorphic', 'edge'],
+          'isomorphic') as LibraryConfig['runtimeTarget']
+        : 'isomorphic'
+
+    const bundleFormat = options.libBundleFormat
+      ? options.libBundleFormat as LibraryConfig['bundleFormat']
+      : !auto
+        ? await output.select('Bundle format?',
+          ['esm', 'cjs', 'dual', 'unbundled'],
+          'dual') as LibraryConfig['bundleFormat']
+        : 'dual'
+
+    const hasTypeDefinitions = options.libTypeDefinitions
+      ?? (!auto ? await output.confirm('Ship type definitions?', true) : true)
+
+    const documentationLevel = options.libDocLevel
+      ? options.libDocLevel as LibraryConfig['documentationLevel']
+      : !auto
+        ? await output.select('Documentation level?',
+          ['none', 'readme', 'api-docs', 'full-site'],
+          'readme') as LibraryConfig['documentationLevel']
+        : 'readme'
+
+    libraryConfig = { visibility, runtimeTarget, bundleFormat, hasTypeDefinitions, documentationLevel }
+  }
+
+  // Mobile-app configuration
+  let mobileAppConfig: MobileAppConfig | undefined
+  if (projectType === 'mobile-app') {
+    if (auto && !options.mobilePlatform) {
+      throw new Error('--mobile-platform is required in auto mode for mobile-app projects')
+    }
+    const platform = options.mobilePlatform
+      ? options.mobilePlatform as MobileAppConfig['platform']
+      : await output.select('Target platform?', ['ios', 'android', 'cross-platform']) as MobileAppConfig['platform']
+
+    const distributionModel = options.mobileDistribution
+      ? options.mobileDistribution as MobileAppConfig['distributionModel']
+      : !auto
+        ? await output.select('Distribution model?',
+          ['public', 'private', 'mixed'],
+          'public') as MobileAppConfig['distributionModel']
+        : 'public'
+
+    const offlineSupport = options.mobileOffline
+      ? options.mobileOffline as MobileAppConfig['offlineSupport']
+      : !auto
+        ? await output.select('Offline support?',
+          ['none', 'cache', 'offline-first'],
+          'none') as MobileAppConfig['offlineSupport']
+        : 'none'
+
+    const hasPushNotifications = options.mobilePushNotifications
+      ?? (!auto ? await output.confirm('Push notification support?', false) : false)
+
+    mobileAppConfig = { platform, distributionModel, offlineSupport, hasPushNotifications }
+  }
+
   // Game config questions (only when projectType === 'game')
   let gameConfig: GameConfig | undefined
   if (projectType === 'game') {
@@ -367,5 +455,9 @@ export async function askWizardQuestions(options: {
     }
   }
 
-  return { methodology, depth, platforms, traits, projectType, webAppConfig, backendConfig, cliConfig, gameConfig }
+  return {
+    methodology, depth, platforms, traits, projectType,
+    webAppConfig, backendConfig, cliConfig,
+    libraryConfig, mobileAppConfig, gameConfig,
+  }
 }

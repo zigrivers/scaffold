@@ -654,4 +654,44 @@ describe('ProjectSchema cross-field validation — library and mobile-app', () =
     })
     expect(result.success).toBe(true)
   })
+
+  it('rejects public library with documentationLevel none', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'library',
+        libraryConfig: { visibility: 'public', documentationLevel: 'none' },
+      },
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const msgs = result.error.issues.map(i => i.message)
+      expect(msgs).toContain(
+        'Public libraries should have documentation'
+        + ' (documentationLevel: none with visibility: public)',
+      )
+    }
+  })
+
+  it('allows public library with documentation', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'library',
+        libraryConfig: { visibility: 'public', documentationLevel: 'api-docs' },
+      },
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('allows internal library with no documentation', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'library',
+        libraryConfig: { visibility: 'internal', documentationLevel: 'none' },
+      },
+    })
+    expect(result.success).toBe(true)
+  })
 })

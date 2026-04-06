@@ -27,6 +27,13 @@ const CLI_TYPE_FLAGS = [
   'cli-structured-output',
 ] as const
 
+const LIB_FLAGS = [
+  'lib-visibility', 'lib-runtime-target', 'lib-bundle-format',
+  'lib-type-definitions', 'lib-doc-level',
+] as const
+
+const MOBILE_FLAGS = ['mobile-platform', 'mobile-distribution', 'mobile-offline', 'mobile-push-notifications'] as const
+
 interface InitArgs {
   format?: string
   auto?: boolean
@@ -65,6 +72,17 @@ interface InitArgs {
   'cli-interactivity'?: string
   'cli-distribution'?: string[]
   'cli-structured-output'?: boolean
+  // Library flags
+  'lib-visibility'?: string
+  'lib-runtime-target'?: string
+  'lib-bundle-format'?: string
+  'lib-type-definitions'?: boolean
+  'lib-doc-level'?: string
+  // Mobile-app flags
+  'mobile-platform'?: string
+  'mobile-distribution'?: string
+  'mobile-offline'?: string
+  'mobile-push-notifications'?: boolean
 }
 
 const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
@@ -176,6 +194,51 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       .option('cli-structured-output', {
         type: 'boolean',
         describe: 'Support structured output (--json)',
+      })
+      // Library Configuration
+      .option('lib-visibility', {
+        type: 'string',
+        describe: 'Library visibility',
+        choices: ['public', 'internal'] as const,
+      })
+      .option('lib-runtime-target', {
+        type: 'string',
+        describe: 'Runtime target',
+        choices: ['node', 'browser', 'isomorphic', 'edge'] as const,
+      })
+      .option('lib-bundle-format', {
+        type: 'string',
+        describe: 'Bundle format',
+        choices: ['esm', 'cjs', 'dual', 'unbundled'] as const,
+      })
+      .option('lib-type-definitions', {
+        type: 'boolean',
+        describe: 'Ship type definitions',
+      })
+      .option('lib-doc-level', {
+        type: 'string',
+        describe: 'Documentation level',
+        choices: ['none', 'readme', 'api-docs', 'full-site'] as const,
+      })
+      // Mobile-App Configuration
+      .option('mobile-platform', {
+        type: 'string',
+        describe: 'Target platform',
+        choices: ['ios', 'android', 'cross-platform'] as const,
+      })
+      .option('mobile-distribution', {
+        type: 'string',
+        describe: 'Distribution model',
+        choices: ['public', 'private', 'mixed'] as const,
+      })
+      .option('mobile-offline', {
+        type: 'string',
+        describe: 'Offline support',
+        choices: ['none', 'cache', 'offline-first'] as const,
+      })
+      .option('mobile-push-notifications', {
+        type: 'boolean',
+        describe: 'Push notification support',
       })
       // Game configuration options
       .option('engine', {
@@ -323,11 +386,19 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         const hasCliFlag = CLI_TYPE_FLAGS.some(
           (f) => argv[f] !== undefined,
         )
+        const hasLibFlag = LIB_FLAGS.some((f) => argv[f] !== undefined)
+        const hasMobileFlag = MOBILE_FLAGS.some((f) => argv[f] !== undefined)
 
         // Reject mixed-family flags
-        const typeCount = [hasGameFlag, hasWebFlag, hasBackendFlag, hasCliFlag].filter(Boolean).length
+        const typeCount = [
+          hasGameFlag, hasWebFlag, hasBackendFlag,
+          hasCliFlag, hasLibFlag, hasMobileFlag,
+        ].filter(Boolean).length
         if (typeCount > 1) {
-          throw new Error('Cannot mix flags from multiple project types (--web-*, --backend-*, --cli-*, game flags)')
+          throw new Error(
+            'Cannot mix flags from multiple project types'
+            + ' (--web-*, --backend-*, --cli-*, --lib-*, --mobile-*, game flags)',
+          )
         }
 
         // Web flags require web-app project type
@@ -339,6 +410,12 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         }
         if (hasCliFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'cli') {
           throw new Error('--cli-* flags require --project-type cli')
+        }
+        if (hasLibFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'library') {
+          throw new Error('--lib-* flags require --project-type library')
+        }
+        if (hasMobileFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'mobile-app') {
+          throw new Error('--mobile-* flags require --project-type mobile-app')
         }
 
         // CSV enum validation for array flags
@@ -396,6 +473,8 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       .group(['backend-api-style', 'backend-data-store', 'backend-auth',
         'backend-messaging', 'backend-deploy-target'], 'Backend Configuration:')
       .group(['cli-interactivity', 'cli-distribution', 'cli-structured-output'], 'CLI Configuration:')
+      .group([...LIB_FLAGS], 'Library Configuration:')
+      .group([...MOBILE_FLAGS], 'Mobile-App Configuration:')
       .group([
         'game-engine', 'game-multiplayer', 'game-target-platforms', 'game-online-services',
         'game-content-structure', 'game-economy', 'game-narrative', 'game-locales',
@@ -419,6 +498,8 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
     const hasCliTypeFlag = CLI_TYPE_FLAGS.some(
       (f) => argv[f] !== undefined,
     )
+    const hasLibFlag = LIB_FLAGS.some((f) => argv[f] !== undefined)
+    const hasMobileFlag = MOBILE_FLAGS.some((f) => argv[f] !== undefined)
 
     const detectedType = hasGameFlag
       ? 'game'
@@ -428,7 +509,11 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
           ? 'backend'
           : hasCliTypeFlag
             ? 'cli'
-            : undefined
+            : hasLibFlag
+              ? 'library'
+              : hasMobileFlag
+                ? 'mobile-app'
+                : undefined
     const projectType = argv['project-type'] ?? detectedType
 
     const result = await runWizard({
@@ -465,6 +550,15 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       cliInteractivity: argv['cli-interactivity'],
       cliDistribution: argv['cli-distribution'],
       cliStructuredOutput: argv['cli-structured-output'],
+      libVisibility: argv['lib-visibility'],
+      libRuntimeTarget: argv['lib-runtime-target'],
+      libBundleFormat: argv['lib-bundle-format'],
+      libTypeDefinitions: argv['lib-type-definitions'],
+      libDocLevel: argv['lib-doc-level'],
+      mobilePlatform: argv['mobile-platform'],
+      mobileDistribution: argv['mobile-distribution'],
+      mobileOffline: argv['mobile-offline'],
+      mobilePushNotifications: argv['mobile-push-notifications'],
     })
 
     if (!result.success) {

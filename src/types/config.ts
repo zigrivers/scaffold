@@ -1,6 +1,9 @@
 import type { MethodologyName, DepthLevel } from './enums.js'
 import type { z } from 'zod'
-import { ProjectTypeSchema, WebAppConfigSchema, BackendConfigSchema, CliConfigSchema, LibraryConfigSchema, MobileAppConfigSchema } from '../config/schema.js'
+import {
+  ProjectTypeSchema, WebAppConfigSchema, BackendConfigSchema,
+  CliConfigSchema, LibraryConfigSchema, MobileAppConfigSchema,
+} from '../config/schema.js'
 
 /** Step enablement entry used in presets and overlays. */
 export interface StepEnablementEntry {

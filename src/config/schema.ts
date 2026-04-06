@@ -108,6 +108,17 @@ const ProjectSchema = z.object({
       ctx.addIssue({ path: ['mobileAppConfig'], code: 'custom',
         message: 'mobileAppConfig requires projectType: mobile-app' })
     }
+    if (data.libraryConfig) {
+      const { visibility, documentationLevel } = data.libraryConfig
+      if (visibility === 'public' && documentationLevel === 'none') {
+        ctx.addIssue({
+          path: ['libraryConfig', 'documentationLevel'],
+          code: 'custom',
+          message: 'Public libraries should have documentation'
+            + ' (documentationLevel: none with visibility: public)',
+        })
+      }
+    }
     if (data.webAppConfig) {
       const { renderingStrategy, deployTarget, authFlow } = data.webAppConfig
       if (['ssr', 'hybrid'].includes(renderingStrategy) && deployTarget === 'static') {

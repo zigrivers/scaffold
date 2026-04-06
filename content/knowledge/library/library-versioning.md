@@ -66,7 +66,7 @@ npx changeset publish
 In CI, automate this with the Changesets GitHub Action:
 ```yaml
 # .github/workflows/release.yml
-name: Release
+# name: Release — CI publishes on push to main
 on:
   push:
     branches: [main]
@@ -190,8 +190,7 @@ Full release workflow with provenance and attestation:
 
 ```yaml
 # .github/workflows/release.yml
-name: Release
-
+# name: Release — CI publishes on tag push
 on:
   push:
     tags:

@@ -50,6 +50,17 @@ export interface WizardOptions {
   cliInteractivity?: string
   cliDistribution?: string[]
   cliStructuredOutput?: boolean
+  // Library flags
+  libVisibility?: string
+  libRuntimeTarget?: string
+  libBundleFormat?: string
+  libTypeDefinitions?: boolean
+  libDocLevel?: string
+  // Mobile-app flags
+  mobilePlatform?: string
+  mobileDistribution?: string
+  mobileOffline?: string
+  mobilePushNotifications?: boolean
 }
 
 export interface WizardResult {
@@ -70,6 +81,8 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
     webRendering, webDeployTarget, webRealtime, webAuthFlow,
     backendApiStyle, backendDataStore, backendAuth, backendMessaging, backendDeployTarget,
     cliInteractivity, cliDistribution, cliStructuredOutput,
+    libVisibility, libRuntimeTarget, libBundleFormat, libTypeDefinitions, libDocLevel,
+    mobilePlatform, mobileDistribution, mobileOffline, mobilePushNotifications,
   } = options
   const scaffoldDir = path.join(projectRoot, '.scaffold')
 
@@ -157,6 +170,15 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
     cliInteractivity,
     cliDistribution,
     cliStructuredOutput,
+    libVisibility,
+    libRuntimeTarget,
+    libBundleFormat,
+    libTypeDefinitions,
+    libDocLevel,
+    mobilePlatform,
+    mobileDistribution,
+    mobileOffline,
+    mobilePushNotifications,
   })
 
   // Build config — methodology is a top-level string per the real ScaffoldConfig schema
@@ -171,6 +193,8 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
       ...(answers.webAppConfig && { webAppConfig: answers.webAppConfig }),
       ...(answers.backendConfig && { backendConfig: answers.backendConfig }),
       ...(answers.cliConfig && { cliConfig: answers.cliConfig }),
+      ...(answers.libraryConfig && { libraryConfig: answers.libraryConfig }),
+      ...(answers.mobileAppConfig && { mobileAppConfig: answers.mobileAppConfig }),
     },
   }
 
