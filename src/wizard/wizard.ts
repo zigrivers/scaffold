@@ -61,6 +61,22 @@ export interface WizardOptions {
   mobileDistribution?: string
   mobileOffline?: string
   mobilePushNotifications?: boolean
+  // Data-pipeline flags
+  pipelineProcessing?: string
+  pipelineOrchestration?: string
+  pipelineQuality?: string
+  pipelineSchema?: string
+  pipelineCatalog?: boolean
+  // ML flags
+  mlPhase?: string
+  mlModelType?: string
+  mlServing?: string
+  mlExperimentTracking?: boolean
+  // Browser-extension flags
+  extManifest?: string
+  extUiSurfaces?: string[]
+  extContentScript?: boolean
+  extBackgroundWorker?: boolean
 }
 
 export interface WizardResult {
@@ -83,6 +99,9 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
     cliInteractivity, cliDistribution, cliStructuredOutput,
     libVisibility, libRuntimeTarget, libBundleFormat, libTypeDefinitions, libDocLevel,
     mobilePlatform, mobileDistribution, mobileOffline, mobilePushNotifications,
+    pipelineProcessing, pipelineOrchestration, pipelineQuality, pipelineSchema, pipelineCatalog,
+    mlPhase, mlModelType, mlServing, mlExperimentTracking,
+    extManifest, extUiSurfaces, extContentScript, extBackgroundWorker,
   } = options
   const scaffoldDir = path.join(projectRoot, '.scaffold')
 
@@ -179,6 +198,19 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
     mobileDistribution,
     mobileOffline,
     mobilePushNotifications,
+    pipelineProcessing,
+    pipelineOrchestration,
+    pipelineQuality,
+    pipelineSchema,
+    pipelineCatalog,
+    mlPhase,
+    mlModelType,
+    mlServing,
+    mlExperimentTracking,
+    extManifest,
+    extUiSurfaces,
+    extContentScript,
+    extBackgroundWorker,
   })
 
   // Build config — methodology is a top-level string per the real ScaffoldConfig schema
@@ -195,6 +227,9 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
       ...(answers.cliConfig && { cliConfig: answers.cliConfig }),
       ...(answers.libraryConfig && { libraryConfig: answers.libraryConfig }),
       ...(answers.mobileAppConfig && { mobileAppConfig: answers.mobileAppConfig }),
+      ...(answers.dataPipelineConfig && { dataPipelineConfig: answers.dataPipelineConfig }),
+      ...(answers.mlConfig && { mlConfig: answers.mlConfig }),
+      ...(answers.browserExtensionConfig && { browserExtensionConfig: answers.browserExtensionConfig }),
     },
   }
 

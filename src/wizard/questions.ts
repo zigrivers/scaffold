@@ -2,6 +2,7 @@ import type { OutputContext } from '../cli/output/context.js'
 import type {
   ProjectType, GameConfig, WebAppConfig, BackendConfig,
   CliConfig, LibraryConfig, MobileAppConfig,
+  DataPipelineConfig, MlConfig, BrowserExtensionConfig,
 } from '../types/index.js'
 import { GameConfigSchema, ProjectTypeSchema } from '../config/schema.js'
 
@@ -17,6 +18,9 @@ export interface WizardAnswers {
   cliConfig?: CliConfig
   libraryConfig?: LibraryConfig
   mobileAppConfig?: MobileAppConfig
+  dataPipelineConfig?: DataPipelineConfig
+  mlConfig?: MlConfig
+  browserExtensionConfig?: BrowserExtensionConfig
 }
 
 /**
@@ -69,6 +73,22 @@ export async function askWizardQuestions(options: {
   mobileDistribution?: string
   mobileOffline?: string
   mobilePushNotifications?: boolean
+  // Data-pipeline flags
+  pipelineProcessing?: string
+  pipelineOrchestration?: string
+  pipelineQuality?: string
+  pipelineSchema?: string
+  pipelineCatalog?: boolean
+  // ML flags
+  mlPhase?: string
+  mlModelType?: string
+  mlServing?: string
+  mlExperimentTracking?: boolean
+  // Browser-extension flags
+  extManifest?: string
+  extUiSurfaces?: string[]
+  extContentScript?: boolean
+  extBackgroundWorker?: boolean
 }): Promise<WizardAnswers> {
   const { output, suggestion, auto } = options
 
@@ -323,6 +343,104 @@ export async function askWizardQuestions(options: {
     mobileAppConfig = { platform, distributionModel, offlineSupport, hasPushNotifications }
   }
 
+  // Data pipeline configuration
+  let dataPipelineConfig: DataPipelineConfig | undefined
+  if (projectType === 'data-pipeline') {
+    if (auto && !options.pipelineProcessing) {
+      throw new Error('--pipeline-processing is required in auto mode for data-pipeline projects')
+    }
+
+    const processingModel = options.pipelineProcessing
+      ? options.pipelineProcessing as DataPipelineConfig['processingModel']
+      : await output.select(
+        'Processing model?',
+        ['batch', 'streaming', 'hybrid'],
+      ) as DataPipelineConfig['processingModel']
+
+    const orchestration = options.pipelineOrchestration
+      ? options.pipelineOrchestration as DataPipelineConfig['orchestration']
+      : !auto
+        ? await output.select('Orchestration pattern?',
+          ['none', 'dag-based', 'event-driven', 'scheduled'], 'none') as DataPipelineConfig['orchestration']
+        : 'none'
+
+    const dataQualityStrategy = options.pipelineQuality
+      ? options.pipelineQuality as DataPipelineConfig['dataQualityStrategy']
+      : !auto
+        ? await output.select('Data quality strategy?',
+          ['none', 'validation', 'testing', 'observability'], 'validation') as DataPipelineConfig['dataQualityStrategy']
+        : 'validation'
+
+    const schemaManagement = options.pipelineSchema
+      ? options.pipelineSchema as DataPipelineConfig['schemaManagement']
+      : !auto
+        ? await output.select('Schema management?',
+          ['none', 'schema-registry', 'contracts'], 'none') as DataPipelineConfig['schemaManagement']
+        : 'none'
+
+    const hasDataCatalog = options.pipelineCatalog
+      ?? (!auto ? await output.confirm('Data catalog support?', false) : false)
+
+    dataPipelineConfig = { processingModel, orchestration, dataQualityStrategy, schemaManagement, hasDataCatalog }
+  }
+
+  // ML configuration
+  let mlConfig: MlConfig | undefined
+  if (projectType === 'ml') {
+    if (auto && !options.mlPhase) {
+      throw new Error('--ml-phase is required in auto mode for ml projects')
+    }
+
+    const projectPhase = options.mlPhase
+      ? options.mlPhase as MlConfig['projectPhase']
+      : await output.select('Project phase?', ['training', 'inference', 'both']) as MlConfig['projectPhase']
+
+    const modelType = options.mlModelType
+      ? options.mlModelType as MlConfig['modelType']
+      : !auto
+        ? await output.select('Model type?',
+          ['classical', 'deep-learning', 'llm'], 'deep-learning') as MlConfig['modelType']
+        : 'deep-learning'
+
+    const servingPattern = options.mlServing
+      ? options.mlServing as MlConfig['servingPattern']
+      : !auto
+        ? await output.select('Serving pattern?',
+          ['none', 'batch', 'realtime', 'edge'], 'none') as MlConfig['servingPattern']
+        : 'none'
+
+    const hasExperimentTracking = options.mlExperimentTracking
+      ?? (!auto ? await output.confirm('Experiment tracking?', true) : true)
+
+    mlConfig = { projectPhase, modelType, servingPattern, hasExperimentTracking }
+  }
+
+  // Browser extension configuration
+  let browserExtensionConfig: BrowserExtensionConfig | undefined
+  if (projectType === 'browser-extension') {
+    const manifestVersion = options.extManifest
+      ? options.extManifest as BrowserExtensionConfig['manifestVersion']
+      : !auto
+        ? await output.select('Manifest version?', ['2', '3'], '3') as BrowserExtensionConfig['manifestVersion']
+        : '3'
+
+    const uiSurfaces = options.extUiSurfaces
+      ? options.extUiSurfaces as BrowserExtensionConfig['uiSurfaces']
+      : !auto
+        ? await output.multiSelect('UI surfaces?',
+          ['popup', 'options', 'newtab', 'devtools', 'sidepanel'],
+          ['popup']) as BrowserExtensionConfig['uiSurfaces']
+        : ['popup'] as BrowserExtensionConfig['uiSurfaces']
+
+    const hasContentScript = options.extContentScript
+      ?? (!auto ? await output.confirm('Content script support?', false) : false)
+
+    const hasBackgroundWorker = options.extBackgroundWorker
+      ?? (!auto ? await output.confirm('Background worker support?', true) : true)
+
+    browserExtensionConfig = { manifestVersion, uiSurfaces, hasContentScript, hasBackgroundWorker }
+  }
+
   // Game config questions (only when projectType === 'game')
   let gameConfig: GameConfig | undefined
   if (projectType === 'game') {
@@ -458,6 +576,7 @@ export async function askWizardQuestions(options: {
   return {
     methodology, depth, platforms, traits, projectType,
     webAppConfig, backendConfig, cliConfig,
-    libraryConfig, mobileAppConfig, gameConfig,
+    libraryConfig, mobileAppConfig, dataPipelineConfig,
+    mlConfig, browserExtensionConfig, gameConfig,
   }
 }
