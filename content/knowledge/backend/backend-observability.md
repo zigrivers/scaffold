@@ -8,6 +8,10 @@ Observability is the ability to answer arbitrary questions about a system's beha
 
 ## Summary
 
+Observability requires three pillars: structured JSON logging with correlation IDs, distributed tracing via OpenTelemetry, and RED method metrics (Rate, Errors, Duration) for every service endpoint. SLO-based alerting replaces noisy threshold alerts. Build operational dashboards around these signals before the first incident, not after.
+
+## Deep Guidance
+
 ### Structured Logging
 
 Log in JSON to make logs machine-parseable and searchable in aggregation systems (Datadog, Splunk, CloudWatch Logs Insights, Grafana Loki).
@@ -51,8 +55,6 @@ The RED method (Rate, Errors, Duration) provides a minimal but complete view of 
 
 Instrument these three metrics for every service endpoint. For background workers, instrument job throughput (rate), job failures (errors), and job duration.
 
-## Deep Guidance
-
 ### SLO-Based Alerting
 
 Define SLOs (Service Level Objectives) before writing alert rules. An SLO is a measurable target: "99.9% of requests complete successfully" or "p99 latency < 500ms over a 28-day window."
@@ -68,3 +70,33 @@ Avoid threshold alerts on raw metrics — they generate too many false positives
 Build dashboards around the RED metrics plus infrastructure health. Every service dashboard should show: request rate, error rate, p50/p95/p99 latency, error budget remaining, database query latency, and downstream service call rates.
 
 Add runbook links to every alert. An alert without a runbook wastes incident response time.
+
+### Log Aggregation Pipeline
+
+Production logging requires a pipeline from application to searchable dashboard:
+
+1. **Application** emits structured JSON logs to stdout (never to files in containerized environments)
+2. **Log shipper** (Fluentd, Fluent Bit, Vector, or the platform's native agent) collects logs from stdout
+3. **Log store** (Elasticsearch, Grafana Loki, CloudWatch Logs, Datadog) indexes and stores logs
+4. **Dashboard** (Kibana, Grafana, CloudWatch Insights) provides search, filtering, and alerting
+
+Keep log retention proportional to the debugging window: 14–30 days for verbose logs, 90 days for error logs, 1 year for audit logs. Storage costs scale linearly with retention — budget accordingly.
+
+### Infrastructure Metrics
+
+Beyond application metrics, monitor the infrastructure layer:
+
+- **Container metrics**: CPU usage, memory usage, restart count, OOM kill events
+- **Database metrics**: Active connections, query latency p95, replication lag, disk usage
+- **Queue metrics**: Queue depth, consumer lag, DLQ depth, message age
+- **Network metrics**: Request rate at the load balancer, 5xx rate, connection errors
+
+Set alerts on infrastructure metrics that precede application failures: database connection pool saturation, disk usage above 80%, and replication lag above 10 seconds. Catching these early prevents user-facing incidents.
+
+### Incident Response Observability
+
+During an incident, observability tools must answer three questions in under 5 minutes:
+
+1. **What changed?** — Deployment timeline overlaid on error rate graphs. Correlate the incident start time with the most recent deployment.
+2. **What is affected?** — Service dependency map showing which services are degraded. Error rate by endpoint to identify the blast radius.
+3. **What is the root cause?** — Distributed trace for a failing request showing where time is spent and where errors originate. Log search by `requestId` for the specific failure context.

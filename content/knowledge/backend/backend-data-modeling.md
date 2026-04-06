@@ -8,6 +8,12 @@ Data modeling decisions have the highest reversal cost of any backend choice. A 
 
 ## Summary
 
+Data modeling decisions have the highest reversal cost of any backend choice. Choose relational databases for transactional integrity and complex queries, document stores for hierarchical data read as a unit. Use versioned migrations for all schema changes with non-destructive patterns for zero-downtime deploys. Every production backend requires connection pooling; pool exhaustion under load is a complete outage.
+
+Multi-tenancy, eventual consistency, and ORM vs query builder selection are load-bearing choices that must be made with explicit tradeoff acknowledgment before the first schema ships.
+
+## Deep Guidance
+
 ### Relational vs Document Modeling
 
 Choose based on your access patterns and data structure, not familiarity:
@@ -67,8 +73,30 @@ Distributed systems and event-driven architectures introduce eventual consistenc
 - **Idempotency**: All event consumers and queue workers must be idempotent — processing the same message twice produces the same outcome as processing it once. Use an idempotency key stored in the database to detect duplicates.
 - **Sagas for distributed transactions**: When a business operation spans multiple services with no shared transaction, use the Saga pattern — a sequence of local transactions with compensating transactions for rollback. Choreography (event-driven) or orchestration (central coordinator) variants.
 
-## Deep Guidance
-
 ### Index Strategy
 
 An unindexed query on a large table is a latency spike and a database lock. Index columns that appear in `WHERE`, `ORDER BY`, `GROUP BY`, and `JOIN ON` clauses. Over-indexing is also a problem — indexes slow writes. Review the query plan (`EXPLAIN ANALYZE`) for every significant query before shipping. Index maintenance is a recurring task, not a one-time setup.
+
+### Soft Deletes vs Hard Deletes
+
+- **Soft deletes**: Add a `deleted_at` timestamp column. Rows are never physically removed; queries filter with `WHERE deleted_at IS NULL`. Benefits: audit trail, easy recovery, referential integrity preserved. Cost: every query must include the filter (use a database view or ORM default scope to enforce this), storage grows indefinitely.
+- **Hard deletes**: Rows are physically removed with `DELETE`. Benefits: simpler queries, smaller tables, no filter overhead. Cost: data is gone, referential integrity may break if foreign keys exist.
+- **Archive pattern**: Move deleted rows to a separate `_archive` table in the same transaction. Active table stays clean; historical data is preserved. Best of both worlds at the cost of archive table maintenance.
+
+Default to soft deletes for business entities (users, orders, products). Use hard deletes for ephemeral data (sessions, temp tokens, analytics events past retention).
+
+### Data Retention and Purging
+
+Define retention policies explicitly for each table:
+
+- **Regulatory**: Financial records may require 7-year retention. Medical records vary by jurisdiction. Document the legal basis for each retention period.
+- **Operational**: Log tables, event tables, and session tables should have automated purging. Use database partitioning by date and drop old partitions — this is orders of magnitude faster than `DELETE WHERE created_at < ?`.
+- **Implementation**: Schedule a recurring job (cron, pg_cron, Kubernetes CronJob) that purges expired data. Alert if the job fails silently — unpurged data grows disk usage and degrades query performance over months.
+
+### Query Optimization Fundamentals
+
+Before optimizing, measure. Use `EXPLAIN ANALYZE` (PostgreSQL) or `EXPLAIN FORMAT=JSON` (MySQL) to understand the query plan:
+
+- **Sequential scans on large tables**: Add an index on the filtered column. A sequential scan on a million-row table that should be an index scan is the most common performance bug.
+- **Index-only scans**: When the query only needs columns in the index, the database reads the index without touching the table. Use covering indexes (`CREATE INDEX ... INCLUDE (col)`) for frequently queried column combinations.
+- **Join order**: The query planner usually picks the right join order, but with 5+ joins, it may choose poorly. Use `EXPLAIN` to verify. If the planner is wrong, consider rewriting as CTEs or materializing intermediate results.

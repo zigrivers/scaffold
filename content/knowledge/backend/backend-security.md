@@ -8,6 +8,12 @@ Security vulnerabilities in backend services are disproportionately expensive to
 
 ## Summary
 
+Backend security starts with input validation at every trust boundary using schema libraries, parameterized queries for all database access, and rate limiting at multiple layers (IP, user, endpoint). The OWASP API Security Top 10 identifies the highest-impact API risks including broken object-level authorization, authentication weaknesses, and unrestricted resource consumption.
+
+Secrets management, dependency auditing, and pre-commit secret scanning are operational requirements, not optional hardening steps.
+
+## Deep Guidance
+
 ### Input Validation
 
 Validate all input at every trust boundary using a schema library — Zod (TypeScript), Joi (Node.js), Pydantic (Python), or similar. Never trust data from clients, webhooks, or upstream services without validation.
@@ -60,8 +66,6 @@ The OWASP API Security project identifies the most critical API-specific risks. 
 - **API5 — Broken Function Level Authorization:** Admin and internal endpoints must require role checks, not just authentication.
 - **API8 — Security Misconfiguration:** Disable debug endpoints in production, apply security headers, restrict CORS to known origins.
 
-## Deep Guidance
-
 ### Secrets Management
 
 Never hardcode secrets in source code. Store secrets in environment variables for simple deployments, and a vault system (AWS Secrets Manager, HashiCorp Vault, GCP Secret Manager) for production.
@@ -78,3 +82,23 @@ Never hardcode secrets in source code. Store secrets in environment variables fo
 Run `npm audit --audit-level=high` (or equivalent) on every CI build. Block merges on critical and high vulnerabilities. Keep a policy: critical fixes same day, high within 24 hours, medium within a sprint.
 
 Use lockfiles (`package-lock.json`, `poetry.lock`) and `npm ci` (not `npm install`) to verify checksums. Pin indirect dependencies that have a history of supply-chain incidents. Subscribe to GitHub security advisories for critical dependencies. Periodically run `npm outdated` and schedule dedicated update sprints rather than letting packages fall behind by major versions.
+
+### Security Headers
+
+Set security headers on all HTTP responses. Configure these at the reverse proxy or middleware level so they apply to every endpoint:
+
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains` — enforce HTTPS
+- `X-Content-Type-Options: nosniff` — prevent MIME-type sniffing
+- `X-Frame-Options: DENY` — prevent clickjacking
+- `Content-Security-Policy` — restrict which resources can be loaded, preventing XSS
+- `Referrer-Policy: strict-origin-when-cross-origin` — control referrer information leakage
+
+Use `helmet` (Node.js/Express) or equivalent middleware to set these headers with sensible defaults. Validate headers with `securityheaders.com` after deployment.
+
+### CORS Configuration
+
+Cross-Origin Resource Sharing must be configured explicitly on backend APIs consumed by browser clients:
+
+- **Origin allowlist**: List specific allowed origins (`https://app.example.com`). Never use `*` in production with credentials. A wildcard origin with `Access-Control-Allow-Credentials: true` is a security vulnerability.
+- **Preflight caching**: Set `Access-Control-Max-Age` to cache preflight OPTIONS responses (3600 seconds is a reasonable default). This reduces the number of preflight requests for repeated API calls.
+- **Expose only needed headers**: Use `Access-Control-Expose-Headers` to explicitly list response headers the browser may access. Do not expose all headers — limit to those the frontend needs (pagination cursors, rate limit headers).

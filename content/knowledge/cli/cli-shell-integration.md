@@ -8,6 +8,10 @@ Shell integration is the difference between a CLI that feels native and one that
 
 ## Summary
 
+Shell integration — completion scripts, man pages, dotfile modifications, and PATH management — determines whether power users adopt the tool or abandon it. Generate completion scripts from the CLI definition for bash, zsh, and fish. Provide an `install-completions` subcommand. When modifying shell startup files, use clearly marked comment blocks and always provide an uninstall command.
+
+## Deep Guidance
+
 ### Shell Completion Generation
 
 Provide completion scripts for bash, zsh, and fish. Generate them from the CLI definition rather than hand-writing them — they will stay in sync as commands and flags evolve:
@@ -105,8 +109,6 @@ my-cli alias generate >> ~/.zshrc
 ```
 
 Aliases should be documented and user-editable. Never require aliases for core functionality — they are convenience, not architecture.
-
-## Deep Guidance
 
 ### Shell Detection
 

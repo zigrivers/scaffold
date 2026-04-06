@@ -106,6 +106,13 @@ is_knowledge_template() {
     refs="$(extract_field "$file" "knowledge-base" | sed 's/\[//;s/\]//' | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$' || true)"
     [[ -n "$refs" ]] && all_refs="${all_refs}${all_refs:+$'\n'}${refs}"
   done < <(find "${PROJECT_ROOT}/content/pipeline" "${PROJECT_ROOT}/content/tools" -name '*.md' -type f 2>/dev/null)
+
+  # Also collect knowledge references from overlay YAML files (knowledge-overrides)
+  while IFS= read -r overlay; do
+    local overlay_refs
+    overlay_refs="$(grep -oE '\[.*\]' "$overlay" | tr ',' '\n' | sed 's/[][ ]//g' | grep -v '^$' || true)"
+    [[ -n "$overlay_refs" ]] && all_refs="${all_refs}${all_refs:+$'\n'}${overlay_refs}"
+  done < <(find "${PROJECT_ROOT}/content/methodology" -name '*-overlay.yml' -type f 2>/dev/null)
   all_refs="$(echo "$all_refs" | sort -u)"
 
   # Check each knowledge entry

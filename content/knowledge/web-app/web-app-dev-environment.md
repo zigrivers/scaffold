@@ -8,6 +8,10 @@ A fast, reliable local development environment is a force multiplier for the ent
 
 ## Summary
 
+A fast web app dev environment targets sub-second feedback loops with HMR and zero-friction onboarding. Use Vite for new projects (or the framework's built-in server for Next.js). Configure an API proxy to avoid CORS issues. Validate environment variables at startup with a schema. Run local dependencies in Docker Compose.
+
+## Deep Guidance
+
 ### Dev Server Choice: Vite vs webpack
 
 For new projects in 2024 and beyond, use **Vite** unless you have a specific reason not to:
@@ -101,8 +105,6 @@ volumes:
 ```
 
 Document the setup in the README: `docker compose up -d` starts all services. Never require developers to install PostgreSQL, Redis, or other services directly on their machines.
-
-## Deep Guidance
 
 ### Getting to Zero-Friction Setup
 

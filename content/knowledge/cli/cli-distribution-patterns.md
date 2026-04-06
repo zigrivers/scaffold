@@ -8,6 +8,10 @@ Distribution is where many CLI projects fail: the tool works perfectly in develo
 
 ## Summary
 
+A well-distributed CLI reaches users through multiple channels: package registries (npm, cargo, pip), Homebrew formulae, standalone binaries, and GitHub Releases with SHA256 checksums. Automate publishing via CI with trusted publishing (OIDC) rather than storing long-lived tokens. Notify users of updates asynchronously without blocking command execution.
+
+## Deep Guidance
+
 ### Package Registry Publishing
 
 **npm (Node.js)**
@@ -89,8 +93,6 @@ gh release create v1.0.0 \
 ```
 
 Users verify: `sha256sum -c checksums.txt`. Homebrew formulae require a SHA256 of the source tarball. Provide a `checksums.txt` in a consistent, parseable format.
-
-## Deep Guidance
 
 ### Auto-Update Strategy
 

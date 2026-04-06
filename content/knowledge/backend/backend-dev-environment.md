@@ -8,6 +8,10 @@ A backend development environment that requires manual setup steps is a producti
 
 ## Summary
 
+A backend dev environment should go from fresh checkout to running API in under five minutes. Docker Compose pins infrastructure dependencies (databases, caches, queues) to exact production-matching versions. Migrations are the source of truth for schema evolution; seed scripts provide a baseline dataset. Validate all environment variables at startup with a schema.
+
+## Deep Guidance
+
 ### Docker Compose for Infrastructure
 
 Use Docker Compose to run all stateful infrastructure dependencies locally:
@@ -59,10 +63,40 @@ For services that require HTTPS locally (OAuth redirects, secure cookies, mixed-
 - **mkcert**: Generates locally trusted TLS certificates signed by a local CA. `mkcert localhost 127.0.0.1` produces a certificate that browsers trust without warnings.
 - **Caddy reverse proxy**: Configure Caddy as a local reverse proxy with automatic HTTPS to avoid configuring TLS in the app itself.
 
-## Deep Guidance
-
 ### One-Command Setup
 
 The `make setup` or `./scripts/dev-setup.sh` target should: install required tool versions (via asdf or mise), pull Docker images, copy `.env.example` to `.env`, start Compose services, run migrations, and run seed scripts. A developer who has never seen the project should be running a working API in under five minutes.
 
 Document any manual steps that cannot be automated (hardware keys, corporate VPN certificates) in a `docs/dev-setup.md`. Every manual step is a future support ticket.
+
+### Database GUI Tools
+
+Provide a web-based database admin tool in the Compose stack for development:
+
+- **pgAdmin** or **Adminer**: Low-overhead database browsing. Adminer supports PostgreSQL, MySQL, SQLite, and MongoDB in a single container.
+- **TablePlus / DBeaver**: Recommend as desktop alternatives in the dev setup docs. Include connection strings for copy-paste.
+
+A developer who cannot see the data cannot debug the application. Make database access a one-click experience in the dev environment.
+
+### Test Data Generation
+
+Beyond simple seeds, provide tools for generating realistic test data at scale:
+
+- **Faker libraries**: `@faker-js/faker` (Node), `Faker` (Python), `gofakeit` (Go) generate realistic names, addresses, emails, and domain-specific values.
+- **Factory patterns**: Build factory functions that produce valid domain objects with sensible defaults and explicit overrides. `createOrder({ status: 'cancelled' })` should handle all required fields automatically.
+- **Volume seeding**: For performance testing locally, generate 10,000–100,000 rows. This catches query performance issues that are invisible at 100 rows. Include a `make seed-large` target for this scenario.
+
+### Hot Reloading Backend Services
+
+For Node.js services, use `tsx --watch` or `nodemon` for automatic restarts on file change:
+
+```json
+{
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "dev:debug": "tsx watch --inspect src/server.ts"
+  }
+}
+```
+
+For Go: `air` provides automatic rebuild and restart. For Python: `uvicorn --reload` handles FastAPI and Starlette. For Rust: `cargo watch -x run`. The goal is sub-second feedback loops for backend changes matching what frontend developers expect from HMR.

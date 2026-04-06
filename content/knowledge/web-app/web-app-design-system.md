@@ -8,6 +8,10 @@ A design system is the contract between design and engineering. Without one, com
 
 ## Summary
 
+A design system encodes design decisions as tokens at three tiers: primitive (raw values), semantic (intent-based aliases), and component-scoped overrides. Support dark/light mode via CSS custom properties with both `prefers-color-scheme` and explicit `data-theme` toggle. Commit to a consistent breakpoint scale and CSS methodology. Use headless component libraries for accessible behavior with full visual control.
+
+## Deep Guidance
+
 ### Token Architecture
 
 Design tokens are the atoms of a design system. They encode decisions — not values — at three tiers:
@@ -79,8 +83,6 @@ Commit to a consistent breakpoint scale and never deviate:
 ```
 
 Use `min-width` queries exclusively (mobile-first). Avoid magic numbers in media queries — always reference the token scale.
-
-## Deep Guidance
 
 ### Component Library Patterns
 

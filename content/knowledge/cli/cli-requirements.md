@@ -8,6 +8,10 @@ CLI tools occupy a unique design space: they are used by humans typing commands,
 
 ## Summary
 
+CLI tools serve humans, shell scripts, and pipelines simultaneously. Follow POSIX flag conventions, use standard exit codes (0 success, 1 error, 2 usage), handle signals cleanly (SIGINT, SIGTERM, SIGPIPE), and implement progressive disclosure in help output. Define the tool's single responsibility before writing code.
+
+## Deep Guidance
+
 ### Do One Thing Well
 
 Unix philosophy is not aspirational — it is a load-bearing constraint. A CLI that tries to be a GUI, an interactive REPL, and a batch processor will be worse than a dedicated tool at each. Define the single responsibility before writing a line of code: what is the one transformation or action this tool performs?
@@ -62,8 +66,6 @@ Help output should scale with user familiarity:
 
 Never dump 200 lines of option documentation in response to a bad argument. The user who mistyped a flag wants a correction, not a manual.
 
-## Deep Guidance
-
 ### Input Validation Order
 
 Validate in this order to give the most useful errors earliest:
@@ -75,3 +77,25 @@ Validate in this order to give the most useful errors earliest:
 5. External resource validation (can we reach the API? is the DB up?)
 
 Exit 2 for steps 1–3 (usage errors). Exit 1 for steps 4–5 (runtime errors).
+
+### Stdin / Stdout Pipeline Contract
+
+A tool that participates in pipelines must honor these contracts:
+
+- **Accept stdin**: If the tool reads input, accept it from stdin when no file argument is provided. `my-cli process < input.txt` and `cat input.txt | my-cli process` must both work.
+- **Write to stdout**: All output data goes to stdout. All status, progress, and error messages go to stderr. Violating this breaks every pipe chain the tool participates in.
+- **Exit on broken pipe**: When the downstream process closes its stdin (e.g., `my-cli list | head -5`), the tool receives SIGPIPE. Handle it cleanly — do not print a "broken pipe" error.
+- **No color in pipes**: When stdout is not a TTY, disable ANSI color codes automatically. Colored output in a pipe corrupts the downstream process's input.
+- **No interactive prompts in pipes**: When stdin is not a TTY, never prompt for user input. Either use defaults or fail with a clear error requesting the `--yes` flag.
+
+### Error Message Quality
+
+Error messages are the primary user support channel for CLI tools. Every error should answer three questions:
+
+1. **What happened?** — "Could not connect to the API at https://api.example.com"
+2. **Why did it happen?** — "Connection timed out after 10 seconds"
+3. **What should the user do?** — "Check your network connection, or set --timeout to increase the timeout"
+
+Never print a raw stack trace to the user. Stack traces go to debug output or log files. The user-facing message should be actionable. For unknown errors, provide a way to capture debug output: "Run with --verbose and file an issue at https://github.com/..."
+
+Suggest corrections for common mistakes: `Unknown command 'biuld'. Did you mean 'build'?` Use Levenshtein distance or a fuzzy matching library to find close matches among known commands and flags.

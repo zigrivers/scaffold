@@ -8,6 +8,10 @@ Backend requirements are the contract the service makes with its consumers — o
 
 ## Summary
 
+Backend requirements establish the contract the service makes with its consumers. Write the API contract (OpenAPI, GraphQL schema, protobuf) before implementation. Set explicit SLA targets for latency (p99), availability, throughput, and error budgets before sprint one. Define backwards compatibility commitments and API versioning strategy upfront.
+
+## Deep Guidance
+
 ### API-First Design
 
 Write the API contract — OpenAPI spec, GraphQL schema, or protobuf definition — before writing implementation code. This forces explicit thinking about the consumer's perspective and produces a concrete artifact reviewable by all stakeholders before a single endpoint exists.
@@ -50,8 +54,6 @@ Choose one strategy per API surface and document it:
 - **Query parameter**: `?version=2`. Easiest to add but pollutes every request.
 - **No versioning (schema evolution)**: Only viable with strict non-breaking-change discipline and GraphQL or Protobuf with field deprecation support.
 
-## Deep Guidance
-
 ### Encoding SLAs as Tests
 
 SLA commitments only have teeth if they are automatically verified:
@@ -59,3 +61,43 @@ SLA commitments only have teeth if they are automatically verified:
 - Add p99 latency assertions to load tests using k6, Gatling, or Locust. Fail the pipeline if p99 exceeds the budget under synthetic load.
 - Instrument production with percentile metrics (not just averages) via Prometheus or Datadog. Average latency hides tail-latency problems that affect the top 1% of users — which at scale is thousands of people.
 - Implement synthetic monitoring: fire real API calls from external locations every 60 seconds and alert on latency or error rate breaches.
+
+### Capacity Planning Requirements
+
+Document capacity expectations before implementation to avoid architectural surprises:
+
+- **Concurrent users**: Define peak concurrent users for the first year and projected growth. A service designed for 100 concurrent users needs fundamentally different connection pooling, caching, and infrastructure than one designed for 100,000.
+- **Data retention**: Define how long each data type is stored. Unbounded retention eventually degrades query performance and storage costs. Set explicit TTLs for logs, events, sessions, and temporary data.
+- **Burst traffic**: Identify expected traffic spikes (marketing campaigns, seasonal events, time-zone-aligned usage). Design rate limiting and auto-scaling to handle 5-10x sustained traffic without degradation.
+- **Geographic distribution**: Define where users are located. A single-region deployment with users on the opposite side of the world will never meet a 200ms p99 latency target regardless of optimization.
+
+### Rate Limiting Requirements
+
+Define rate limits as requirements, not afterthoughts:
+
+- **Public API tiers**: Free tier (100 req/min), standard (1,000 req/min), enterprise (custom). Document limits in API documentation and enforce via API key scoping.
+- **Internal service limits**: Even internal services need rate limits to prevent cascading failures. A misbehaving upstream service should not be able to overwhelm a downstream service.
+- **Auth endpoint limits**: Login, registration, and password reset endpoints need aggressive rate limiting (5-10 attempts per minute per IP) to prevent credential stuffing and brute-force attacks.
+
+### Documentation Requirements
+
+Backend requirements must include documentation standards:
+
+- **OpenAPI / AsyncAPI spec**: Every endpoint documented in a machine-readable spec. Generate client SDKs from the spec. Block PRs that change behavior without updating the spec.
+- **Runbooks**: Every service has a runbook documenting: how to restart it, how to roll back, how to check health, what the common failure modes are, and who owns it.
+- **Architecture Decision Records**: Document every significant technical decision (database choice, caching strategy, auth approach) with context, alternatives considered, and rationale.
+
+### Compliance and Regulatory Requirements
+
+Identify applicable regulations before designing the system:
+
+- **Data residency**: Some jurisdictions require data to be stored within geographic boundaries (GDPR for EU data, data sovereignty laws). This affects database region selection and CDN configuration.
+- **PII handling**: Define which fields are personally identifiable information. PII requires encryption at rest, access logging, right-to-deletion support, and data minimization (collect only what is needed).
+- **Audit logging**: Financial services, healthcare, and government applications require immutable audit logs of all data access and modifications. Design the audit log schema as a first-class requirement, not a bolt-on.
+- **Accessibility**: Backend APIs serving web frontends must support the data structures needed for accessible UIs — alternative text for images, structured content for screen readers, and proper error message formatting.
+
+Identify compliance requirements during project inception, not after launch. Retrofitting data residency or audit logging into an existing system is an order of magnitude more expensive than designing for it from the start. Engage legal and compliance stakeholders during the requirements phase to surface these constraints early.
+
+### Observability Requirements
+
+Define observability requirements alongside functional requirements. Every service should have: structured logging with correlation IDs, RED metrics (Rate, Errors, Duration) for all endpoints, SLO targets documented and enforced via alerting, and distributed tracing via OpenTelemetry. These are not nice-to-haves — they are the tools that make production debugging possible.

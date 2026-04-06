@@ -8,6 +8,10 @@ Defining web app requirements before writing a line of code prevents the most ex
 
 ## Summary
 
+Web app requirements establish rendering strategy (SSR for SEO, SPA for authenticated apps, hybrid for content-heavy sites), Core Web Vitals budgets (LCP < 2.5s, INP < 200ms, CLS < 0.1), responsive breakpoints from a shared token set, browser support matrix encoded via Browserslist, PWA scope decisions, and SEO requirements. Lock these down before sprint one.
+
+## Deep Guidance
+
 ### SSR vs SPA Decision Criteria
 
 Rendering strategy is the first architectural decision. The wrong choice costs weeks of retrofit:
@@ -65,8 +69,6 @@ For public-facing apps:
 - Implement `<title>`, `<meta description>`, Open Graph, and structured data (JSON-LD) on every route.
 - Generate a sitemap at deploy time; submit to Google Search Console.
 - Ensure canonical URLs, `robots.txt`, and proper handling of 404/301/302 responses.
-
-## Deep Guidance
 
 ### Performance Budget Enforcement
 

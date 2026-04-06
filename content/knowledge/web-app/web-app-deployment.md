@@ -8,6 +8,10 @@ Deployment platform selection determines your app's operational cost, performanc
 
 ## Summary
 
+Web app deployment platforms range from static CDN hosting (cheapest, fastest TTFB) through serverless (pay-per-invocation, cold start concerns), containers (persistent connections, custom runtimes), edge functions (global low-latency transformations), to long-running servers (WebSockets, background jobs). Choose based on rendering strategy, traffic patterns, and operational expertise.
+
+## Deep Guidance
+
 ### Static Hosting (CDN)
 
 For SSG applications with no server-side rendering at request time:
@@ -78,8 +82,6 @@ For apps that need WebSockets, background jobs, or full control over the request
 
 - **Best platforms**: AWS EC2 + ALB, Fly.io, Railway, DigitalOcean Droplets, Hetzner (cost-efficient)
 - **When to choose**: Real-time features (WebSockets, SSE), background workers, long-running database transactions, legacy apps that cannot be adapted to serverless constraints
-
-## Deep Guidance
 
 ### Blue-Green Deployments
 

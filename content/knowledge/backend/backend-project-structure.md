@@ -8,6 +8,12 @@ A well-organized backend project is readable to a new engineer in minutes. The d
 
 ## Summary
 
+A backend project structure should communicate its architecture at a glance: routes own HTTP registration, handlers translate HTTP to service calls, services contain business logic, and repositories abstract data access. Config is loaded and validated at startup. Dependencies are composed explicitly via constructor injection at a single composition root.
+
+For small services, group by layer. For large codebases (10+ engineers or 20+ domain concepts), reorganize by feature/domain with layer sub-directories and enforce import boundaries between feature modules.
+
+## Deep Guidance
+
 ### Canonical Directory Layout
 
 ```
@@ -55,8 +61,6 @@ Avoid module-level singletons for dependencies with side effects (database conne
 - **Composition root**: Wire all dependencies together in `app.ts` or a dedicated `container.ts`. This is the only place that instantiates concrete implementations.
 - **DI frameworks**: InversifyJS, tsyringe, or NestJS's built-in IoC container add decorator-based injection. Use only if the manual wiring becomes unmanageable — DI frameworks add complexity and build overhead.
 
-## Deep Guidance
-
 ### Feature-Based Structure (Large Codebases)
 
 When a codebase grows beyond ~10 engineers or ~20 domain concepts, flat layer directories become unwieldy. Reorganize by feature/domain with layer sub-directories:
@@ -84,3 +88,13 @@ This makes the blast radius of a domain change obvious and allows teams to own v
 ### When to Create a New Layer
 
 The urge to add layers (`managers/`, `helpers/`, `transformers/`) should be resisted unless the new concept is meaningfully distinct and will appear in more than one place. Every layer is a conceptual tax on new engineers. Prefer a clear violation of the existing convention to an ad hoc proliferation of vaguely named directories.
+
+### Test File Organization
+
+Choose one test file placement pattern and enforce it project-wide:
+
+- **Co-located**: `order-service.ts` and `order-service.test.ts` in the same directory. Easier to find the test for a given file. Preferred for unit tests.
+- **Mirror directory**: `src/services/order-service.ts` and `tests/services/order-service.test.ts`. Keeps the `src/` directory clean. Preferred when test files significantly outnumber source files.
+- **Integration tests**: Always in a dedicated `tests/integration/` or `tests/e2e/` directory. These test cross-layer behavior and do not belong next to any single source file.
+
+Whichever pattern you choose, enforce it in the ESLint configuration so new files follow the convention automatically.

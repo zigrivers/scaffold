@@ -8,6 +8,12 @@ Backend testing strategy determines how much confidence you have before every de
 
 ## Summary
 
+Backend testing strategy layers three concerns: API integration tests that verify the full request-response cycle against a real database, contract tests that ensure API boundary compatibility across services, and database tests using transaction rollback for isolation. Mock only external boundaries you do not own; use real instances for internal services and databases.
+
+Load testing with explicit p99 latency thresholds must run before launching any high-traffic endpoint.
+
+## Deep Guidance
+
 ### API Integration Tests
 
 Integration tests verify the full request-response cycle through the application stack, including middleware, routing, validation, business logic, and the database. Unlike unit tests, they catch wiring problems that unit tests miss.
@@ -53,8 +59,6 @@ afterEach(async () => { await db.transaction.rollback(); });
 
 **Seed data:** Limit seed data to what is required by the test. Broad seed data creates invisible dependencies between tests — a test that only creates one record but relies on seeded data is fragile and hard to understand.
 
-## Deep Guidance
-
 ### Mocking External Services
 
 **MSW (Mock Service Worker):** Intercepts HTTP requests at the network layer using a service worker (browser) or Node.js interceptor. Unlike mocking `fetch` or axios, MSW mocks at the protocol level — the same mock works for any HTTP client. Define handlers that return realistic responses; test error cases by returning 5xx responses or network errors.
@@ -74,3 +78,24 @@ afterEach(async () => { await db.transaction.rollback(); });
 **Artillery:** YAML/JSON configuration-driven load testing with a plugin ecosystem. Better for teams that prefer declarative configuration over scripting. Supports WebSocket and gRPC in addition to HTTP.
 
 **When to run:** Load test before launching any endpoint that will receive significant concurrent traffic, before scaling down infrastructure, and after performance-sensitive refactors. Run load tests in a staging environment with production-representative data volume. Define pass/fail thresholds (p99 < 500ms, error rate < 0.1%) and fail CI when thresholds are breached.
+
+### Test Data Management
+
+Production-like test data is essential for meaningful integration and load tests:
+
+- **Factory functions over fixtures**: Factories programmatically generate test records with sensible defaults and explicit overrides. They compose — `createOrderWithItems(3)` creates an order, 3 items, and the necessary customer record. Fixture files are static and rot.
+- **Database seeding for integration tests**: Use a dedicated seed script that creates the minimum dataset for the test suite. Run it once before the suite, not before each test.
+- **Data anonymization**: For staging environments that need production-like volume, use anonymized production data. Tools like `postgresql_anonymizer` or custom scripts replace PII (names, emails, addresses) with realistic fakes while preserving data distribution and relationships.
+
+### Flaky Test Prevention
+
+Flaky tests undermine test suite credibility. Common causes and fixes:
+
+- **Time-dependent tests**: Mock `Date.now()` or use a clock injection. Never assert on real-time values.
+- **Order-dependent tests**: Each test must set up its own state and clean up after itself. Use transaction rollback or database truncation between tests.
+- **Network-dependent tests**: Mock all external HTTP calls in unit/integration tests. Reserve real network calls for E2E tests on a schedule.
+- **Race conditions**: Use `waitFor` patterns instead of fixed `setTimeout` delays. In database tests, ensure writes are committed before reads.
+
+Quarantine known flaky tests in a separate CI job that does not block merges. Fix quarantined tests within one sprint — a test that stays quarantined indefinitely should be deleted.
+
+Track flaky test frequency with test analytics tools (Datadog CI Visibility, BuildPulse, or a simple CSV log). A test that fails intermittently 5% of the time will block CI multiple times per week on an active team.

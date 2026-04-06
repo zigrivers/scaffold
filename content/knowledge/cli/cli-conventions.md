@@ -8,6 +8,10 @@ CLI conventions exist because shell users build mental models across dozens of t
 
 ## Summary
 
+CLI conventions exist because shell users build mental models across dozens of tools. Use established flag vocabulary (`--verbose`, `--quiet`, `--dry-run`, `--force`, `--output`). Structure subcommands as `<tool> <noun> <verb>`. Print help to stdout with USAGE, FLAGS, and EXAMPLES sections. Follow the `NO_COLOR` standard and detect TTY to disable interactive features in pipes.
+
+## Deep Guidance
+
 ### Flag Naming
 
 Flag names communicate intent. Use the established vocabulary:
@@ -99,8 +103,6 @@ Color output must be defeatable. Follow the `NO_COLOR` standard (no-color.org):
 - `--color` / `FORCE_COLOR` can re-enable color for non-TTY output when explicitly requested (useful for CI that does support color)
 
 This order of precedence: `--no-color` flag > `NO_COLOR` env > TTY detection > default (color on TTY).
-
-## Deep Guidance
 
 ### Configuration Precedence Convention
 

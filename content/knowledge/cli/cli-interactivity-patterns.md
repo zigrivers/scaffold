@@ -8,6 +8,10 @@ Interactive CLI features — prompts, spinners, progress bars, colored output �
 
 ## Summary
 
+Interactive CLI features — prompts, spinners, progress bars, colored output — must be gated on TTY detection and degrade gracefully in pipes, redirected output, and CI environments. Always provide `--yes` / `--no-interactive` flags. Spinners and progress output go to stderr; data goes to stdout. Follow the `NO_COLOR` standard for color defeat.
+
+## Deep Guidance
+
 ### TTY Detection
 
 Every interactive feature must be gated on TTY detection:
@@ -87,8 +91,6 @@ Color conventions:
 - **Red**: Error, failure
 - **Cyan/Blue**: Informational, prompts
 - **Dim/Gray**: Secondary information, timestamps
-
-## Deep Guidance
 
 ### Graceful Degradation Checklist
 

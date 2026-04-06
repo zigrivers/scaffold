@@ -8,6 +8,10 @@ A well-structured web app project is navigable by any developer without a tour. 
 
 ## Summary
 
+Web app project structure separates `app/` (routes and layouts), `features/` (domain-owned modules), `components/` (shared UI), `hooks/` (shared hooks), and `lib/` (framework-agnostic utilities). Routes mirror URL structure with thin page files. Feature modules own their components, hooks, and types; shared modules have zero imports from feature modules.
+
+## Deep Guidance
+
 ### Standard Directory Layout
 
 For a Next.js or similar SSR framework, the canonical structure is:
@@ -87,8 +91,6 @@ Config files belong at the repo root, not inside `src/`. Standard placement:
 - `.env.example` — documented environment variables (committed); `.env.local` — actual values (gitignored)
 - `tailwind.config.ts` — if using Tailwind
 - `vitest.config.ts` / `jest.config.ts` — test runner config
-
-## Deep Guidance
 
 ### Feature Module Template
 

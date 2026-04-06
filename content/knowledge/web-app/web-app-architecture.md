@@ -8,6 +8,10 @@ Web application architecture is the set of decisions that are expensive to rever
 
 ## Summary
 
+Web app architecture decisions — rendering strategy (CSR, SSG, SSR, ISR, hybrid), CDN edge patterns, hydration strategy, and the BFF pattern — are expensive to reverse. Match each strategy to the use case rather than trends. Most real-world apps benefit from a hybrid approach mixing strategies per route. Document every significant architectural choice as an Architecture Decision Record.
+
+## Deep Guidance
+
 ### Rendering Strategy Tradeoffs
 
 Every rendering strategy has a cost and a benefit profile. Match the strategy to the use case:
@@ -68,8 +72,6 @@ The BFF pattern places a purpose-built server layer between the frontend and bac
 - **Implementation**: Next.js API routes or Remix loader functions are natural BFF layers. For separate backend services: a Node.js/Express/Fastify service that the frontend treats as its own API.
 
 Do not build a BFF that becomes an unowned monolith. The BFF is owned by the frontend team and changes with the frontend's needs.
-
-## Deep Guidance
 
 ### Architecture Decision Record Template
 

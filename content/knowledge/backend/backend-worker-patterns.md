@@ -8,6 +8,12 @@ Background workers offload time-consuming and deferred work from the request pat
 
 ## Summary
 
+Background workers offload time-consuming work from the request path. Choose BullMQ (Node.js), Celery (Python), or Temporal (durable workflows) based on the complexity of job orchestration. Define cron schedules in one place with overlap prevention. Design all event consumers to be idempotent since most message systems guarantee at-least-once delivery.
+
+DLQ monitoring, worker health heartbeats, and graceful SIGTERM handling are operational requirements for any production worker system.
+
+## Deep Guidance
+
 ### Background Job Frameworks
 
 **BullMQ (Node.js):** Redis-backed job queue with strong TypeScript support, priority queues, delayed jobs, repeatable jobs, flow producers (job hierarchies), and a rich event API. Workers are long-running processes that pull jobs from queues. Multiple workers for the same queue compete for jobs (work queue pattern). Suitable for most Node.js use cases from simple email sending to complex multi-step workflows.
@@ -33,8 +39,6 @@ Event consumers are workers that read from a message queue or event stream (Kafk
 **Acknowledgment:** Acknowledge messages only after successfully processing them. Never auto-ack before processing. If processing fails, either nack (return to queue for retry) or move to a DLQ after the maximum retries are exhausted.
 
 **Concurrency:** Run multiple concurrent consumers for throughput. Set concurrency based on downstream resource limits (database connection pool, external API rate limit) rather than CPU count. In BullMQ, set `concurrency` per worker instance. In Celery, set `--concurrency` per worker process.
-
-## Deep Guidance
 
 ### Dead Letter Queue Handling
 
@@ -66,3 +70,31 @@ Workers must handle `SIGTERM` cleanly to avoid corrupting in-progress jobs durin
 5. Exit with code 0.
 
 Configure Kubernetes `terminationGracePeriodSeconds` to match the shutdown timeout. Without graceful shutdown, rolling deployments drop in-flight jobs.
+
+### Job Prioritization
+
+When a queue processes both urgent and non-urgent work, prioritization prevents starvation:
+
+- **Priority queues**: BullMQ supports priority levels per job. Higher-priority jobs are dequeued first. Use sparingly — too many priority levels create implicit ordering complexity.
+- **Separate queues**: Dedicate separate queues for different urgency levels (critical, standard, background). Assign more workers to the critical queue. This provides stronger isolation — a flood of background jobs cannot starve critical ones.
+- **Fair scheduling**: For multi-tenant systems, ensure one tenant's burst of jobs does not starve other tenants. Use per-tenant rate limiting or round-robin dequeuing across tenant-specific sub-queues.
+
+### Worker Deployment Patterns
+
+Workers have different deployment considerations than HTTP services:
+
+- **Separate deployment**: Deploy workers as separate processes or containers from the API. This allows independent scaling — add more workers when queues are deep without scaling the API.
+- **Resource sizing**: Workers often need more memory than API servers (processing large files, holding state for long workflows). Size worker containers independently based on the job profile.
+- **Rolling deploys**: During a deployment, old and new worker versions run simultaneously. Ensure job schemas are backwards-compatible — a job enqueued by the old version must be processable by the new version, and vice versa.
+- **Singleton workers**: For jobs that must run on exactly one instance (leader election, exclusive cron), use a distributed lock (Redis `SET NX EX`) or a framework that supports this natively (Temporal).
+
+### Job Observability
+
+Workers are invisible unless explicitly instrumented. Essential metrics for every worker system:
+
+- **Job throughput**: Jobs completed per second, broken down by queue and job type. Track trends to detect throughput degradation before it becomes a queue depth problem.
+- **Job duration**: p50, p95, and p99 execution time per job type. Alert on p99 exceeding the expected duration — long-running jobs may indicate a dependency issue or a bug.
+- **Failure rate**: Percentage of jobs that fail after all retries. Track separately from the retry rate (jobs that failed once but succeeded on retry). A rising failure rate after a deployment signals a bug.
+- **Queue age**: Time the oldest unprocessed message has been waiting. This is the most direct measure of consumer lag. Alert if queue age exceeds the SLO (e.g., "all jobs processed within 5 minutes").
+
+Emit structured logs at job start, completion, and failure with the job ID, queue name, duration, and any relevant business identifiers. This enables tracing a specific job through the entire processing lifecycle.

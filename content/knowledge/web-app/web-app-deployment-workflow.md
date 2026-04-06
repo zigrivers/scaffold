@@ -8,6 +8,10 @@ A mature deployment workflow transforms deployment from a risky, manual event in
 
 ## Summary
 
+A mature deployment workflow makes every merge to main automatically deliverable with fast rollback. Every PR gets a preview deploy. CI/CD runs lint, typecheck, test, and build in fail-fast order. Test rollback procedures quarterly. For high-traffic apps, use canary deployments with explicit rollback criteria.
+
+## Deep Guidance
+
 ### Preview Deploys Per PR
 
 Every pull request should get its own preview deployment — a fully functional URL that reviewers and QA can use to verify behavior before merging. This is the single highest-ROI practice in modern web deployment:
@@ -64,8 +68,6 @@ For high-traffic production apps, deploy changes to a small percentage of traffi
 - Gradually increase the percentage or roll back if metrics degrade
 
 Canary deployments require infrastructure support: feature flag services (LaunchDarkly, Unleash), traffic splitting at the load balancer (AWS ALB weighted routing, Cloudflare Workers), or platform-level support (Vercel edge middleware). Do not implement canaries manually — use the platform's built-in mechanism.
-
-## Deep Guidance
 
 ### CI/CD Pipeline Template (GitHub Actions)
 

@@ -8,6 +8,10 @@ UX patterns are the difference between an app that users trust and one they aban
 
 ## Summary
 
+UX patterns cover responsive mobile-first design, loading states (skeletons, progressive loading, optimistic updates), error boundaries at meaningful granularity, offline patterns for PWAs, and accessibility compliance. Implement these consistently across the entire app. Loading states for sub-100ms operations make the app feel slower; omit them.
+
+## Deep Guidance
+
 ### Responsive Design: Mobile-First
 
 Design and implement for mobile first, then add complexity for larger screens. This discipline prevents the "desktop first, mobile afterthought" failure mode:
@@ -35,7 +39,7 @@ Design and implement for mobile first, then add complexity for larger screens. T
 }
 ```
 
-Touch targets must be at least 44 × 44 px (Apple HIG) or 48 × 48 px (Material Design). Smaller tap targets on mobile cause accidental taps and user frustration. This is both a UX and accessibility requirement.
+Touch targets must be at least 44 x 44 px (Apple HIG) or 48 x 48 px (Material Design). Smaller tap targets on mobile cause accidental taps and user frustration. This is both a UX and accessibility requirement.
 
 Viewport-relative units (`vw`, `vh`, `svh`, `dvh`) handle mobile browser chrome (address bars, bottom navigation) correctly. Use `dvh` for full-height layouts on mobile — `100vh` overflows when the browser chrome is visible.
 
@@ -44,7 +48,7 @@ Viewport-relative units (`vw`, `vh`, `svh`, `dvh`) handle mobile browser chrome 
 Never show a blank screen or unresponsive UI during data fetching. Use the appropriate loading pattern for the context:
 
 - **Skeleton screens**: Render a content-shaped placeholder that mirrors the final layout. Reduces perceived load time and prevents layout shift when content arrives. Preferred over spinners for content that has a predictable layout.
-- **Progressive loading**: Render low-quality or partial content immediately, replace with full content as it loads. Image blur-up (blur-hash placeholder → full image) is a common example.
+- **Progressive loading**: Render low-quality or partial content immediately, replace with full content as it loads. Image blur-up (blur-hash placeholder to full image) is a common example.
 - **Inline spinners**: For user-triggered actions (button submit, form save) where a skeleton does not make sense. Keep spinners small and contextual — a full-page spinner on a button press is jarring.
 - **Optimistic updates**: Show the result immediately, apply it to the server in the background (see below). Best perceived performance.
 
@@ -117,8 +121,6 @@ const mutation = useMutation({
 ```
 
 Use optimistic updates for: toggling checkboxes, likes/favorites, reordering, simple field edits. Do not use for: payments, irreversible actions, or anything where showing a false success state is harmful.
-
-## Deep Guidance
 
 ### Accessibility Implementation
 

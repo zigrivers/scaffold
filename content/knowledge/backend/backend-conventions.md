@@ -8,6 +8,12 @@ Consistent conventions in a backend codebase reduce cognitive load, make code re
 
 ## Summary
 
+Backend conventions cover naming, error handling, logging, and file organization. Services are named after domain concepts (noun form), handlers after HTTP resources, and repositories after data entities. Structured errors use machine-readable codes; structured logs emit JSON with correlation IDs. Group by layer in small services, by feature/domain in large codebases.
+
+Conventions enforced only by humans drift immediately. Automate with ESLint, TypeScript strict mode, commit hooks, and schema validation in integration tests.
+
+## Deep Guidance
+
 ### Service and Handler Naming
 
 Names should reveal intent and be consistent across the codebase:
@@ -45,8 +51,6 @@ Enforce a predictable directory layout:
 - Test files co-located with source files (`order-service.test.ts` next to `order-service.ts`) or in a parallel `__tests__/` directory — choose one pattern and enforce it.
 - Configuration files at the root of `src/`, not scattered across subdirectories.
 
-## Deep Guidance
-
 ### Enforcing Conventions with Tooling
 
 Conventions enforced by humans alone drift. Use automated tools:
@@ -55,3 +59,47 @@ Conventions enforced by humans alone drift. Use automated tools:
 - **TypeScript strict mode**: Catches the class of errors that naming conventions alone cannot prevent — `strictNullChecks`, `noImplicitAny`, `noUncheckedIndexedAccess`.
 - **Commit hooks**: Run linting on staged files via `lint-staged` + `husky`. Prevents convention drift from reaching the repository.
 - **OpenAPI response schema validation**: Validate that error responses match the standard shape in integration tests. Catches endpoints that return non-standard errors before they reach production.
+
+### Naming Conventions by Language
+
+Each language ecosystem has established naming conventions. Follow them without exception:
+
+**TypeScript/Node.js:**
+- Files: `kebab-case.ts` (`order-service.ts`, `payment-handler.ts`)
+- Classes: `PascalCase` (`OrderService`, `PaymentHandler`)
+- Functions/methods: `camelCase` (`createOrder`, `findUserById`)
+- Constants: `UPPER_SNAKE_CASE` (`MAX_RETRIES`, `DEFAULT_TIMEOUT_MS`)
+- Interfaces/Types: `PascalCase` with no prefix (`OrderData`, not `IOrderData`)
+
+**Python:**
+- Files: `snake_case.py` (`order_service.py`)
+- Classes: `PascalCase` (`OrderService`)
+- Functions/methods: `snake_case` (`create_order`, `find_user_by_id`)
+- Constants: `UPPER_SNAKE_CASE` (`MAX_RETRIES`)
+
+**Go:**
+- Files: `snake_case.go` (`order_service.go`)
+- Exported: `PascalCase` (`CreateOrder`)
+- Unexported: `camelCase` (`validateInput`)
+- Packages: lowercase, single word (`orders`, not `orderService`)
+
+### Request/Response Envelope Standards
+
+Standardize the shape of all API responses:
+
+```json
+{
+  "data": { "id": "ord_123", "status": "created" },
+  "meta": { "requestId": "req_abc", "timestamp": "2024-01-15T10:30:00Z" }
+}
+```
+
+For error responses:
+```json
+{
+  "error": { "code": "NOT_FOUND", "message": "Order not found", "details": [] },
+  "meta": { "requestId": "req_abc", "timestamp": "2024-01-15T10:30:00Z" }
+}
+```
+
+Never mix success and error shapes. A response has either `data` or `error`, never both. This makes client-side type discrimination trivial. Include `meta` on every response for debugging and correlation.

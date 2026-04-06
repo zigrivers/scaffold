@@ -8,6 +8,12 @@ API design is a long-lived contract. Every structural decision — URL shape, er
 
 ## Summary
 
+REST, GraphQL, gRPC, and tRPC each solve different problems. REST (Level 2 Richardson Maturity) is the default for most public APIs — use HTTP verbs correctly, plural nouns for collections, and nested paths for containment. GraphQL suits complex, multi-entity queries with schema-first design. gRPC is the standard for high-performance internal service-to-service calls. tRPC provides end-to-end type safety for TypeScript monorepos.
+
+API versioning, pagination, and filtering are long-lived contracts. URL path versioning is preferred for public APIs. Cursor-based pagination is the correct choice for any list that may grow large. All filter parameters must be validated against a schema before reaching the data layer.
+
+## Deep Guidance
+
 ### REST Maturity Levels (Richardson Model)
 
 The Richardson Maturity Model is a pragmatic rubric, not a goal to maximize:
@@ -69,8 +75,29 @@ tRPC provides end-to-end type safety for TypeScript monorepos without a schema d
 - Validate all filter parameters against a schema before passing to the data layer. Never interpolate raw query parameters into SQL — use parameterized queries unconditionally.
 - Limit the surface area of filterable/sortable fields to those backed by indexes. Undocumented table scans at scale are a reliability incident.
 
-## Deep Guidance
+### Error Response Standards
+
+Standardize error responses across all API styles:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid request parameters",
+    "details": [
+      { "field": "email", "issue": "must be a valid email address" }
+    ],
+    "requestId": "req_abc123"
+  }
+}
+```
+
+Include a machine-readable `code` field that consumers can switch on without string-matching human-readable messages. Include the `requestId` in every error response to enable correlation with server-side logs.
 
 ### API Design Review Checklist
 
 Before shipping any new endpoint: Does the URL follow the naming convention? Are all error responses structured with an error code? Is the success response envelope consistent with existing endpoints? Is pagination implemented for list endpoints? Are inputs validated with a schema? Is the endpoint documented in OpenAPI / GraphQL schema / proto? Are breaking changes versioned?
+
+### Rate Limiting Headers
+
+Every API should communicate rate limit state to callers via response headers. Include `X-RateLimit-Limit` (maximum requests per window), `X-RateLimit-Remaining` (requests left in current window), and `X-RateLimit-Reset` (UTC epoch seconds when the window resets). When the limit is exceeded, return `429 Too Many Requests` with a `Retry-After` header specifying seconds until the caller may retry. This enables well-behaved clients to self-throttle without guessing.

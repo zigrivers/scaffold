@@ -8,6 +8,10 @@ CLI development has a tighter feedback loop requirement than library development
 
 ## Summary
 
+CLI development requires a tight feedback loop: install locally via `npm link` (Node), `cargo install --path .` (Rust), or `pip install -e .` (Python), run the actual binary, and verify behavior. Support debug output via environment variables and `--verbose` flags, with debug output always on stderr to protect pipe chains.
+
+## Deep Guidance
+
 ### Installing for Local Development
 
 **Node.js (npm link)**
@@ -104,8 +108,6 @@ When building interactive prompts or REPL-like features, test incrementally:
 - Mock `process.stdin` and `process.stdout` in unit tests to verify prompt sequences
 - Use `script` (Unix) or `Expect` to record and replay terminal interactions in integration tests
 - Test TTY vs non-TTY behavior explicitly — many prompt libraries silently skip prompts in non-TTY mode
-
-## Deep Guidance
 
 ### Environment Isolation
 

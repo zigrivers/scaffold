@@ -8,6 +8,12 @@ Backend architecture is the set of structural decisions that determine how the s
 
 ## Summary
 
+The single most common backend architecture mistake is choosing microservices before the problem demands them. Start with a monolith when the team is under 10-15 engineers or domain boundaries are unclear. Choose microservices only when parts of the system have genuinely different scaling requirements or teams need independent release cadences. The "modular monolith" is the underrated middle path.
+
+The foundational organizational pattern is layered architecture: controllers own HTTP, services own business logic, repositories own data access. Advanced patterns like CQRS, event sourcing, and hexagonal architecture solve specific problems and should not be adopted speculatively.
+
+## Deep Guidance
+
 ### Monolith vs Microservices Decision Framework
 
 The choice is not philosophical — it is economic. Evaluate on these axes:
@@ -61,8 +67,6 @@ Hexagonal architecture (Ports and Adapters) places the domain model at the cente
 
 The benefit: the domain is testable in isolation from all infrastructure. The cost: more interfaces and indirection. Apply when the domain is complex and long-lived; overkill for simple CRUD services.
 
-## Deep Guidance
-
 ### Service Mesh Considerations
 
 Service meshes (Istio, Linkerd, Consul Connect) add a sidecar proxy to each service pod, providing mTLS, traffic management, circuit breaking, and observability without application code changes. Consider only when:
@@ -72,3 +76,25 @@ Service meshes (Istio, Linkerd, Consul Connect) add a sidecar proxy to each serv
 - You need traffic splitting for canary deployments at the infrastructure level
 
 A service mesh adds significant operational overhead. Validate the need against simpler alternatives (application-level circuit breakers with Resilience4j / Polly / opossum, API gateway traffic management) before committing.
+
+### Modular Monolith Implementation
+
+A modular monolith combines the deployment simplicity of a monolith with the code isolation of microservices:
+
+- **Module boundaries**: Each module has its own directory with a public API (exported functions/types) and private internals. Modules communicate through well-defined interfaces, not direct imports of internal implementation.
+- **Enforce boundaries**: Use ESLint import rules, TypeScript project references, or build-time checks to prevent cross-module imports that bypass the public API. The rule: Module A may import from Module B's public API but never from its internal implementation files.
+- **Database isolation**: Each module owns its tables and never queries another module's tables directly. Cross-module data access goes through the module's service interface. This discipline makes future extraction to microservices possible without rewriting the data layer.
+- **Shared kernel**: A small shared layer provides cross-cutting concerns (auth, logging, error types) used by all modules. Keep the shared kernel minimal — every shared type is a coupling point.
+
+The modular monolith is the underrated default architecture for teams of 5–15 engineers. It avoids the operational overhead of microservices while providing the code isolation that prevents monolith rot.
+
+### API Gateway Pattern
+
+An API gateway sits in front of backend services and provides a unified entry point:
+
+- **Routing**: Route requests to the appropriate service based on URL path or header
+- **Cross-cutting concerns**: Authentication, rate limiting, request logging, and CORS handled once at the gateway rather than duplicated in each service
+- **Response aggregation**: Combine responses from multiple services into a single response for the client (BFF-like behavior)
+- **Tools**: Kong, AWS API Gateway, Traefik, Envoy, or a custom Express/Fastify proxy
+
+Use an API gateway when you have 3+ services that share auth and rate limiting requirements. Do not use one for a single service — the added hop is pure overhead.

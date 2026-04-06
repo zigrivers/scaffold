@@ -8,6 +8,10 @@ CLI testing requires a different mindset than library testing. The contract bein
 
 ## Summary
 
+CLI testing requires spawning the actual binary and asserting on stdout, stderr, and exit code. Snapshot test help text to catch accidental regressions. Isolate filesystem tests with temporary directories and mock `$HOME`/`XDG_CONFIG_HOME`. Test across OS/runtime matrices in CI including Windows.
+
+## Deep Guidance
+
 ### Integration Testing by Spawning the Process
 
 The most valuable CLI test spawns the actual binary and asserts on stdout, stderr, and exit code:
@@ -120,8 +124,6 @@ strategy:
 ```
 
 Windows-specific concerns: path separators (`\` vs `/`), line endings (`\r\n` vs `\n`), `%APPDATA%` vs `$HOME/.config`, and `PATHEXT` for binary extension handling. Test on Windows even if you do not primarily develop on it.
-
-## Deep Guidance
 
 ### Test Pyramid for CLIs
 

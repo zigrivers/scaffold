@@ -8,6 +8,10 @@ Conventions are the difference between a codebase where any engineer can find an
 
 ## Summary
 
+Web app conventions establish consistent patterns for component naming (PascalCase, domain-specific), file colocation (feature-based over type-based), state management (local, server, global, URL tiers), custom hook conventions, and CSS methodology selection. Choose one approach per area and enforce it via linting.
+
+## Deep Guidance
+
 ### Component Naming
 
 - **PascalCase for components**: `UserProfile`, `NavigationMenu`, `CheckoutSummary`. This is universal across React, Vue (single-file components), and Svelte.
@@ -68,8 +72,6 @@ Choose one methodology and enforce it. Mixing methodologies creates chaos:
 - **CSS Modules**: Best for teams that prefer semantic class names and encapsulation without a utility framework. No runtime, good TypeScript support via `typed-css-modules`.
 - **CSS-in-JS (styled-components, Emotion)**: Best for highly dynamic styles or design systems with programmatic theming. Downsides: runtime cost, hydration complexity with SSR.
 - **Vanilla CSS with custom properties**: Best for simple apps or teams who want zero abstraction. Use a consistent BEM-like naming convention.
-
-## Deep Guidance
 
 ### Enforcing Conventions with Tooling
 

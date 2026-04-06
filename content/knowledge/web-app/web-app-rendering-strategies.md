@@ -8,6 +8,10 @@ Rendering strategy is the foundational technical decision in a web app — it de
 
 ## Summary
 
+Rendering strategy determines server infrastructure, SEO characteristics, and performance profile. SSR provides SEO and fast LCP but adds server cost and TTFB. SSG gives sub-100ms TTFB from CDN but data is stale until rebuild. ISR extends SSG with per-route revalidation. Streaming SSR and React Server Components reduce bundle size and improve perceived performance by streaming content progressively. Most real-world apps need a hybrid approach.
+
+## Deep Guidance
+
 ### SSR: Benefits and Real Costs
 
 Server-Side Rendering generates HTML on the server for each request. The benefits are real but often overstated:
@@ -84,8 +88,6 @@ RSC is a model where components run exclusively on the server and send a seriali
 - **Benefit**: A product page with 40 KB of component code can ship 5 KB to the browser if most components are server-only.
 
 The mental model shift: the client-server boundary is now drawn at the component level, not the page level. This is the most significant change in React architecture since hooks.
-
-## Deep Guidance
 
 ### Choosing a Strategy: Decision Framework
 

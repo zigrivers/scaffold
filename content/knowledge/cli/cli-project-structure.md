@@ -8,6 +8,10 @@ A well-structured CLI project makes it easy to add subcommands, locate business 
 
 ## Summary
 
+A CLI project structure separates concerns into `bin/` (entry point), `src/commands/` (one file per subcommand), `src/utils/` (shared business logic), and `tests/`. Command handlers are thin dispatchers; business logic belongs in utilities. Config files are discovered in precedence order from CLI flags through project-local files to XDG Base Directory user config.
+
+## Deep Guidance
+
 ### Canonical Directory Layout
 
 ```
@@ -94,8 +98,6 @@ Plugin discovery scans `~/.config/mycli/plugins/` at startup. Each plugin direct
 - `version`: Semver
 - `main`: Entry point relative to plugin directory
 - `commands`: Array of subcommand names the plugin registers
-
-## Deep Guidance
 
 ### Monorepo CLI Structure
 

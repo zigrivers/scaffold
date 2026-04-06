@@ -8,6 +8,10 @@ CLI architecture is simpler than web architecture but has its own failure modes:
 
 ## Summary
 
+CLI architecture centers on the command router (mapping argv to handlers via established frameworks like yargs, clap, click, or cobra), middleware chains for cross-cutting concerns, deterministic config resolution order, and lazy loading to keep startup under 100ms. Plugin systems extend the CLI without modifying its source but require scoped capabilities and trust verification.
+
+## Deep Guidance
+
 ### Command Router Patterns
 
 The command router is the core of a CLI: it maps `argv` tokens to handler functions.
@@ -67,8 +71,6 @@ Startup time is a first-class metric for CLIs. Every millisecond of startup late
 
 Target: `my-cli --help` should complete in under 100ms on any machine. Measure startup time with `time my-cli --help` and set it as a CI regression gate.
 
-## Deep Guidance
-
 ### Error Handling Architecture
 
 Define a typed error hierarchy at the architecture level:
@@ -79,3 +81,21 @@ Define a typed error hierarchy at the architecture level:
 - `NetworkError` (exit 1): External call failed — show endpoint, status code, retry hint
 
 Catch all errors at the top-level router, format based on type, and emit structured JSON when `--json` is active. Never let uncaught exceptions reach the user as stack traces in production.
+
+### Telemetry and Analytics
+
+If the CLI collects usage telemetry (command frequency, error rates, feature adoption):
+
+- **Opt-in by default**: Never collect telemetry without explicit user consent. Prompt on first run and respect the answer. Provide `my-cli telemetry disable` to opt out at any time.
+- **Transparency**: Document exactly what is collected and where it is sent. Provide `my-cli telemetry status` to show current settings.
+- **Privacy**: Never collect file paths, file contents, environment variable values, or personally identifiable information. Collect only: command name, exit code, duration, OS/version, and tool version.
+- **Non-blocking**: Telemetry must never slow down the tool. Send data asynchronously in a background process after command completion. If the telemetry endpoint is down, silently discard the data.
+
+### Startup Performance Architecture
+
+CLI startup time is felt on every invocation. Architectural decisions that affect startup:
+
+- **Lazy command loading**: Only load the code for the invoked command. A `deploy` command should not load the `build` command's bundler dependency.
+- **Cache config resolution**: If config file discovery involves walking the directory tree, cache the resolved path for the current session.
+- **Avoid top-level I/O**: Do not read files, make network calls, or check for updates during module initialization. Defer all I/O to the command handler or a background process.
+- **Benchmark in CI**: Add `time my-cli --version` as a CI step and fail if it exceeds 100ms. Startup regressions creep in gradually — CI gates catch them early.

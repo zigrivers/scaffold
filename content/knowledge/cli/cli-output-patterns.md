@@ -8,6 +8,10 @@ CLI output is a two-audience problem: humans reading in a terminal, and machines
 
 ## Summary
 
+CLI output serves two audiences: humans in terminals and machines in pipelines. stdout carries data; stderr carries status, progress, warnings, and errors. Provide `--json` for machine consumption, `--format` for multiple output modes, and `--quiet` to suppress non-error output. Use consistent snake_case field names in JSON output across all subcommands.
+
+## Deep Guidance
+
 ### stdout vs stderr Convention
 
 This distinction is non-negotiable for tools expected to participate in pipelines:
@@ -86,8 +90,6 @@ my-cli build --quiet && echo "Build OK"  # Only "Build OK" appears on success
 Quiet mode is essential for cron jobs, shell scripts that run in the background, and CI steps where unrelated output creates noise.
 
 Quiet + --json interaction: `--json` takes precedence. A user who explicitly requests JSON output expects it even with `--quiet`.
-
-## Deep Guidance
 
 ### Output Format Decision Matrix
 
