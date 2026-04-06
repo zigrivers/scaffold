@@ -29,6 +29,21 @@ interface InitArgs {
   'npc-ai'?: string
   modding?: boolean
   persistence?: string
+  // Web-app flags
+  'web-rendering'?: string
+  'web-deploy-target'?: string
+  'web-realtime'?: string
+  'web-auth-flow'?: string
+  // Backend flags
+  'backend-api-style'?: string
+  'backend-data-store'?: string[]
+  'backend-auth'?: string
+  'backend-messaging'?: string
+  'backend-deploy-target'?: string
+  // CLI flags
+  'cli-interactivity'?: string
+  'cli-distribution'?: string[]
+  'cli-structured-output'?: boolean
 }
 
 const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
@@ -76,6 +91,70 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         type: 'string',
         describe: `Project type (${ProjectTypeSchema.options.join('/')})`,
         choices: ProjectTypeSchema.options as unknown as string[],
+      })
+      // Web-App Configuration
+      .option('web-rendering', {
+        type: 'string',
+        describe: 'Rendering strategy',
+        choices: ['spa', 'ssr', 'ssg', 'hybrid'] as const,
+      })
+      .option('web-deploy-target', {
+        type: 'string',
+        describe: 'Deploy target',
+        choices: ['static', 'serverless', 'container', 'edge', 'long-running'] as const,
+      })
+      .option('web-realtime', {
+        type: 'string',
+        describe: 'Real-time strategy',
+        choices: ['none', 'websocket', 'sse'] as const,
+      })
+      .option('web-auth-flow', {
+        type: 'string',
+        describe: 'Authentication flow',
+        choices: ['none', 'session', 'oauth', 'passkey'] as const,
+      })
+      // Backend Configuration
+      .option('backend-api-style', {
+        type: 'string',
+        describe: 'API style',
+        choices: ['rest', 'graphql', 'grpc', 'trpc', 'none'] as const,
+      })
+      .option('backend-data-store', {
+        type: 'string',
+        array: true,
+        describe: 'Data store(s) (relational,document,key-value)',
+        coerce: coerceCSV,
+      })
+      .option('backend-auth', {
+        type: 'string',
+        describe: 'API auth mechanism',
+        choices: ['none', 'jwt', 'session', 'oauth', 'apikey'] as const,
+      })
+      .option('backend-messaging', {
+        type: 'string',
+        describe: 'Async messaging',
+        choices: ['none', 'queue', 'event-driven'] as const,
+      })
+      .option('backend-deploy-target', {
+        type: 'string',
+        describe: 'Deploy target',
+        choices: ['serverless', 'container', 'long-running'] as const,
+      })
+      // CLI Configuration
+      .option('cli-interactivity', {
+        type: 'string',
+        describe: 'Interactivity model',
+        choices: ['args-only', 'interactive', 'hybrid'] as const,
+      })
+      .option('cli-distribution', {
+        type: 'string',
+        array: true,
+        describe: 'Distribution channels (package-manager,system-package-manager,standalone-binary,container)',
+        coerce: coerceCSV,
+      })
+      .option('cli-structured-output', {
+        type: 'boolean',
+        describe: 'Support structured output (--json)',
       })
       // Game configuration options
       .option('engine', {
