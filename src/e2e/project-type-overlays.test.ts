@@ -165,7 +165,7 @@ describe('web-app overlay integration', () => {
     const result = await runWizard({
       projectRoot: tmpDir,
       projectType: 'web-app',
-      webRendering: 'ssr',
+      webAppFlags: { webRendering: 'ssr' },
       methodology: 'deep',
       force: false,
       auto: true,
@@ -188,7 +188,7 @@ describe('web-app overlay integration', () => {
     await runWizard({
       projectRoot: tmpDir,
       projectType: 'web-app',
-      webRendering: 'spa',
+      webAppFlags: { webRendering: 'spa' },
       methodology: 'deep',
       force: false,
       auto: true,
@@ -324,7 +324,7 @@ describe('backend overlay integration', () => {
     const result = await runWizard({
       projectRoot: tmpDir,
       projectType: 'backend',
-      backendApiStyle: 'rest',
+      backendFlags: { backendApiStyle: 'rest' },
       methodology: 'deep',
       force: false,
       auto: true,
@@ -346,7 +346,7 @@ describe('backend overlay integration', () => {
     await runWizard({
       projectRoot: tmpDir,
       projectType: 'backend',
-      backendApiStyle: 'graphql',
+      backendFlags: { backendApiStyle: 'graphql' },
       methodology: 'deep',
       force: false,
       auto: true,
@@ -475,7 +475,7 @@ describe('cli overlay integration', () => {
     const result = await runWizard({
       projectRoot: tmpDir,
       projectType: 'cli',
-      cliInteractivity: 'hybrid',
+      cliFlags: { cliInteractivity: 'hybrid' },
       methodology: 'deep',
       force: false,
       auto: true,
@@ -497,7 +497,7 @@ describe('cli overlay integration', () => {
     await runWizard({
       projectRoot: tmpDir,
       projectType: 'cli',
-      cliInteractivity: 'args-only',
+      cliFlags: { cliInteractivity: 'args-only' },
       methodology: 'deep',
       force: false,
       auto: true,
@@ -626,7 +626,7 @@ describe('library overlay integration', () => {
     const result = await runWizard({
       projectRoot: tmpDir,
       projectType: 'library',
-      libVisibility: 'public',
+      libraryFlags: { libVisibility: 'public' },
       methodology: 'deep',
       force: false,
       auto: true,
@@ -648,7 +648,7 @@ describe('library overlay integration', () => {
     await runWizard({
       projectRoot: tmpDir,
       projectType: 'library',
-      libVisibility: 'internal',
+      libraryFlags: { libVisibility: 'internal' },
       methodology: 'deep',
       force: false,
       auto: true,
@@ -779,7 +779,7 @@ describe('mobile-app overlay integration', () => {
     const result = await runWizard({
       projectRoot: tmpDir,
       projectType: 'mobile-app',
-      mobilePlatform: 'cross-platform',
+      mobileAppFlags: { mobilePlatform: 'cross-platform' },
       methodology: 'deep',
       force: false,
       auto: true,
@@ -801,7 +801,7 @@ describe('mobile-app overlay integration', () => {
     await runWizard({
       projectRoot: tmpDir,
       projectType: 'mobile-app',
-      mobilePlatform: 'ios',
+      mobileAppFlags: { mobilePlatform: 'ios' },
       methodology: 'deep',
       force: false,
       auto: true,
@@ -935,7 +935,7 @@ describe('data-pipeline overlay integration', () => {
     const result = await runWizard({
       projectRoot: tmpDir,
       projectType: 'data-pipeline',
-      pipelineProcessing: 'batch',
+      dataPipelineFlags: { pipelineProcessing: 'batch' },
       methodology: 'deep',
       force: false,
       auto: true,
@@ -957,7 +957,7 @@ describe('data-pipeline overlay integration', () => {
     await runWizard({
       projectRoot: tmpDir,
       projectType: 'data-pipeline',
-      pipelineProcessing: 'streaming',
+      dataPipelineFlags: { pipelineProcessing: 'streaming' },
       methodology: 'deep',
       force: false,
       auto: true,
@@ -1095,7 +1095,7 @@ describe('ml overlay integration', () => {
     const result = await runWizard({
       projectRoot: tmpDir,
       projectType: 'ml',
-      mlPhase: 'training',
+      mlFlags: { mlPhase: 'training' },
       methodology: 'deep',
       force: false,
       auto: true,
@@ -1117,8 +1117,7 @@ describe('ml overlay integration', () => {
     await runWizard({
       projectRoot: tmpDir,
       projectType: 'ml',
-      mlPhase: 'inference',
-      mlServing: 'realtime',
+      mlFlags: { mlPhase: 'inference', mlServing: 'realtime' },
       methodology: 'deep',
       force: false,
       auto: true,
@@ -1277,9 +1276,11 @@ describe('browser-extension overlay integration', () => {
     await runWizard({
       projectRoot: tmpDir,
       projectType: 'browser-extension',
-      extManifest: '3',
-      extUiSurfaces: ['popup', 'sidepanel'],
-      extContentScript: true,
+      browserExtensionFlags: {
+        extManifest: '3',
+        extUiSurfaces: ['popup', 'sidepanel'],
+        extContentScript: true,
+      },
       methodology: 'deep',
       force: false,
       auto: true,

@@ -358,7 +358,7 @@ describe('askWizardQuestions', () => {
       methodology: 'deep',
       auto: false,
       projectType: 'game',
-      engine: 'unreal',
+      gameFlags: { engine: 'unreal' },
     })
 
     expect(result.gameConfig!.engine).toBe('unreal')
@@ -377,7 +377,7 @@ describe('askWizardQuestions', () => {
       methodology: 'deep',
       auto: true,
       projectType: 'game',
-      multiplayer: 'online',
+      gameFlags: { multiplayer: 'online' },
     })
 
     expect(result.gameConfig!.multiplayerMode).toBe('online')
@@ -395,7 +395,7 @@ describe('askWizardQuestions', () => {
       methodology: 'deep',
       auto: true,
       projectType: 'game',
-      targetPlatforms: ['pc', 'ps5', 'xbox'],
+      gameFlags: { targetPlatforms: ['pc', 'ps5', 'xbox'] },
     })
 
     expect(result.gameConfig!.targetPlatforms).toEqual(['pc', 'ps5', 'xbox'])
@@ -430,7 +430,7 @@ describe('askWizardQuestions', () => {
       methodology: 'deep',
       auto: false,
       projectType: 'game',
-      narrative: 'heavy',
+      gameFlags: { narrative: 'heavy' },
     })
 
     // The flagged value should be used directly
@@ -458,17 +458,19 @@ describe('askWizardQuestions', () => {
       methodology: 'deep',
       auto: true,
       projectType: 'game',
-      engine: 'unity',
-      multiplayer: 'hybrid',
-      targetPlatforms: ['pc', 'ps5'],
-      onlineServices: ['matchmaking', 'leaderboards'],
-      contentStructure: 'open-world',
-      economy: 'monetized',
-      narrative: 'heavy',
-      locales: ['en', 'ja', 'de'],
-      npcAi: 'complex',
-      modding: true,
-      persistence: 'cloud',
+      gameFlags: {
+        engine: 'unity',
+        multiplayer: 'hybrid',
+        targetPlatforms: ['pc', 'ps5'],
+        onlineServices: ['matchmaking', 'leaderboards'],
+        contentStructure: 'open-world',
+        economy: 'monetized',
+        narrative: 'heavy',
+        locales: ['en', 'ja', 'de'],
+        npcAi: 'complex',
+        modding: true,
+        persistence: 'cloud',
+      },
     })
 
     // Every flag should override the Zod/auto defaults
@@ -501,10 +503,12 @@ describe('web-app wizard questions', () => {
     const answers = await askWizardQuestions({
       output, suggestion: 'deep', methodology: 'deep', auto: false,
       projectType: 'web-app',
-      webRendering: 'ssr',
-      webDeployTarget: 'container',
-      webRealtime: 'websocket',
-      webAuthFlow: 'oauth',
+      webAppFlags: {
+        webRendering: 'ssr',
+        webDeployTarget: 'container',
+        webRealtime: 'websocket',
+        webAuthFlow: 'oauth',
+      },
     })
     expect(answers.webAppConfig).toEqual({
       renderingStrategy: 'ssr',
@@ -534,7 +538,7 @@ describe('web-app wizard questions', () => {
       output, suggestion: 'deep', auto: true,
       methodology: 'deep',
       projectType: 'web-app',
-      webRendering: 'spa',
+      webAppFlags: { webRendering: 'spa' },
     })
     expect(answers.webAppConfig).toEqual({
       renderingStrategy: 'spa',
@@ -552,11 +556,13 @@ describe('backend wizard questions', () => {
     const answers = await askWizardQuestions({
       output, suggestion: 'deep', methodology: 'deep', auto: false,
       projectType: 'backend',
-      backendApiStyle: 'graphql',
-      backendDataStore: ['relational', 'key-value'],
-      backendAuth: 'jwt',
-      backendMessaging: 'queue',
-      backendDeployTarget: 'serverless',
+      backendFlags: {
+        backendApiStyle: 'graphql',
+        backendDataStore: ['relational', 'key-value'],
+        backendAuth: 'jwt',
+        backendMessaging: 'queue',
+        backendDeployTarget: 'serverless',
+      },
     })
     expect(answers.backendConfig).toEqual({
       apiStyle: 'graphql',
@@ -588,9 +594,11 @@ describe('cli wizard questions', () => {
     const answers = await askWizardQuestions({
       output, suggestion: 'deep', methodology: 'deep', auto: false,
       projectType: 'cli',
-      cliInteractivity: 'hybrid',
-      cliDistribution: ['package-manager', 'standalone-binary'],
-      cliStructuredOutput: true,
+      cliFlags: {
+        cliInteractivity: 'hybrid',
+        cliDistribution: ['package-manager', 'standalone-binary'],
+        cliStructuredOutput: true,
+      },
     })
     expect(answers.cliConfig).toEqual({
       interactivity: 'hybrid',
@@ -620,11 +628,13 @@ describe('library wizard questions', () => {
     const answers = await askWizardQuestions({
       output, suggestion: 'deep', methodology: 'deep', auto: false,
       projectType: 'library',
-      libVisibility: 'public',
-      libRuntimeTarget: 'isomorphic',
-      libBundleFormat: 'dual',
-      libTypeDefinitions: true,
-      libDocLevel: 'api-docs',
+      libraryFlags: {
+        libVisibility: 'public',
+        libRuntimeTarget: 'isomorphic',
+        libBundleFormat: 'dual',
+        libTypeDefinitions: true,
+        libDocLevel: 'api-docs',
+      },
     })
     expect(answers.libraryConfig).toEqual({
       visibility: 'public',
@@ -655,7 +665,7 @@ describe('library wizard questions', () => {
       output, suggestion: 'deep', auto: true,
       methodology: 'deep',
       projectType: 'library',
-      libVisibility: 'internal',
+      libraryFlags: { libVisibility: 'internal' },
     })
     expect(answers.libraryConfig).toEqual({
       visibility: 'internal',
@@ -676,10 +686,12 @@ describe('mobile-app wizard questions', () => {
     const answers = await askWizardQuestions({
       output, suggestion: 'deep', methodology: 'deep', auto: false,
       projectType: 'mobile-app',
-      mobilePlatform: 'ios',
-      mobileDistribution: 'public',
-      mobileOffline: 'cache',
-      mobilePushNotifications: true,
+      mobileAppFlags: {
+        mobilePlatform: 'ios',
+        mobileDistribution: 'public',
+        mobileOffline: 'cache',
+        mobilePushNotifications: true,
+      },
     })
     expect(answers.mobileAppConfig).toEqual({
       platform: 'ios',
@@ -709,11 +721,13 @@ describe('data-pipeline wizard questions', () => {
     const answers = await askWizardQuestions({
       output, suggestion: 'deep', methodology: 'deep', auto: false,
       projectType: 'data-pipeline',
-      pipelineProcessing: 'streaming',
-      pipelineOrchestration: 'event-driven',
-      pipelineQuality: 'observability',
-      pipelineSchema: 'schema-registry',
-      pipelineCatalog: true,
+      dataPipelineFlags: {
+        pipelineProcessing: 'streaming',
+        pipelineOrchestration: 'event-driven',
+        pipelineQuality: 'observability',
+        pipelineSchema: 'schema-registry',
+        pipelineCatalog: true,
+      },
     })
     expect(answers.dataPipelineConfig).toEqual({
       processingModel: 'streaming',
@@ -744,7 +758,7 @@ describe('data-pipeline wizard questions', () => {
       output, suggestion: 'deep', auto: true,
       methodology: 'deep',
       projectType: 'data-pipeline',
-      pipelineProcessing: 'batch',
+      dataPipelineFlags: { pipelineProcessing: 'batch' },
     })
     expect(answers.dataPipelineConfig).toEqual({
       processingModel: 'batch',
@@ -765,10 +779,12 @@ describe('ml wizard questions', () => {
     const answers = await askWizardQuestions({
       output, suggestion: 'deep', methodology: 'deep', auto: false,
       projectType: 'ml',
-      mlPhase: 'training',
-      mlModelType: 'llm',
-      mlServing: 'realtime',
-      mlExperimentTracking: false,
+      mlFlags: {
+        mlPhase: 'training',
+        mlModelType: 'llm',
+        mlServing: 'realtime',
+        mlExperimentTracking: false,
+      },
     })
     expect(answers.mlConfig).toEqual({
       projectPhase: 'training',
@@ -798,7 +814,7 @@ describe('ml wizard questions', () => {
       output, suggestion: 'deep', auto: true,
       methodology: 'deep',
       projectType: 'ml',
-      mlPhase: 'training',
+      mlFlags: { mlPhase: 'training' },
     })
     expect(answers.mlConfig).toEqual({
       projectPhase: 'training',
@@ -816,7 +832,7 @@ describe('ml wizard questions', () => {
       output, suggestion: 'deep', auto: true,
       methodology: 'deep',
       projectType: 'ml',
-      mlPhase: 'inference',
+      mlFlags: { mlPhase: 'inference' },
     })
     expect(answers.mlConfig).toEqual({
       projectPhase: 'inference',
@@ -834,7 +850,7 @@ describe('ml wizard questions', () => {
       output, suggestion: 'deep', auto: true,
       methodology: 'deep',
       projectType: 'ml',
-      mlPhase: 'both',
+      mlFlags: { mlPhase: 'both' },
     })
     expect(answers.mlConfig).toEqual({
       projectPhase: 'both',
@@ -854,10 +870,12 @@ describe('browser-extension wizard questions', () => {
     const answers = await askWizardQuestions({
       output, suggestion: 'deep', methodology: 'deep', auto: false,
       projectType: 'browser-extension',
-      extManifest: '3',
-      extUiSurfaces: ['popup', 'sidepanel'],
-      extContentScript: true,
-      extBackgroundWorker: false,
+      browserExtensionFlags: {
+        extManifest: '3',
+        extUiSurfaces: ['popup', 'sidepanel'],
+        extContentScript: true,
+        extBackgroundWorker: false,
+      },
     })
     expect(answers.browserExtensionConfig).toEqual({
       manifestVersion: '3',

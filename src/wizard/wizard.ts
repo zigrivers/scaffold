@@ -13,6 +13,30 @@ import yaml from 'js-yaml'
 import fs from 'node:fs'
 import path from 'node:path'
 
+export type {
+  GameFlags,
+  WebAppFlags,
+  BackendFlags,
+  CliFlags,
+  LibraryFlags,
+  MobileAppFlags,
+  DataPipelineFlags,
+  MlFlags,
+  BrowserExtensionFlags,
+} from './flags.js'
+
+import type {
+  GameFlags,
+  WebAppFlags,
+  BackendFlags,
+  CliFlags,
+  LibraryFlags,
+  MobileAppFlags,
+  DataPipelineFlags,
+  MlFlags,
+  BrowserExtensionFlags,
+} from './flags.js'
+
 export interface WizardOptions {
   projectRoot: string
   idea?: string
@@ -24,59 +48,17 @@ export interface WizardOptions {
   depth?: number
   adapters?: string[]
   traits?: string[]
-  engine?: string
-  multiplayer?: string
-  targetPlatforms?: string[]
-  onlineServices?: string[]
-  contentStructure?: string
-  economy?: string
-  narrative?: string
-  locales?: string[]
-  npcAi?: string
-  modding?: boolean
-  persistence?: string
-  // Web-app flags
-  webRendering?: string
-  webDeployTarget?: string
-  webRealtime?: string
-  webAuthFlow?: string
-  // Backend flags
-  backendApiStyle?: string
-  backendDataStore?: string[]
-  backendAuth?: string
-  backendMessaging?: string
-  backendDeployTarget?: string
-  // CLI flags
-  cliInteractivity?: string
-  cliDistribution?: string[]
-  cliStructuredOutput?: boolean
-  // Library flags
-  libVisibility?: string
-  libRuntimeTarget?: string
-  libBundleFormat?: string
-  libTypeDefinitions?: boolean
-  libDocLevel?: string
-  // Mobile-app flags
-  mobilePlatform?: string
-  mobileDistribution?: string
-  mobileOffline?: string
-  mobilePushNotifications?: boolean
-  // Data-pipeline flags
-  pipelineProcessing?: string
-  pipelineOrchestration?: string
-  pipelineQuality?: string
-  pipelineSchema?: string
-  pipelineCatalog?: boolean
-  // ML flags
-  mlPhase?: string
-  mlModelType?: string
-  mlServing?: string
-  mlExperimentTracking?: boolean
-  // Browser-extension flags
-  extManifest?: string
-  extUiSurfaces?: string[]
-  extContentScript?: boolean
-  extBackgroundWorker?: boolean
+
+  // Type-specific flag groups
+  gameFlags?: GameFlags
+  webAppFlags?: WebAppFlags
+  backendFlags?: BackendFlags
+  cliFlags?: CliFlags
+  libraryFlags?: LibraryFlags
+  mobileAppFlags?: MobileAppFlags
+  dataPipelineFlags?: DataPipelineFlags
+  mlFlags?: MlFlags
+  browserExtensionFlags?: BrowserExtensionFlags
 }
 
 export interface WizardResult {
@@ -91,17 +73,9 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
   const {
     projectRoot, idea, methodology: presetMethodology,
     projectType: presetProjectType, force, auto, output,
-    depth, adapters, traits, engine, multiplayer, targetPlatforms,
-    onlineServices, contentStructure, economy, narrative,
-    locales, npcAi, modding, persistence,
-    webRendering, webDeployTarget, webRealtime, webAuthFlow,
-    backendApiStyle, backendDataStore, backendAuth, backendMessaging, backendDeployTarget,
-    cliInteractivity, cliDistribution, cliStructuredOutput,
-    libVisibility, libRuntimeTarget, libBundleFormat, libTypeDefinitions, libDocLevel,
-    mobilePlatform, mobileDistribution, mobileOffline, mobilePushNotifications,
-    pipelineProcessing, pipelineOrchestration, pipelineQuality, pipelineSchema, pipelineCatalog,
-    mlPhase, mlModelType, mlServing, mlExperimentTracking,
-    extManifest, extUiSurfaces, extContentScript, extBackgroundWorker,
+    depth, adapters, traits,
+    gameFlags, webAppFlags, backendFlags, cliFlags, libraryFlags,
+    mobileAppFlags, dataPipelineFlags, mlFlags, browserExtensionFlags,
   } = options
   const scaffoldDir = path.join(projectRoot, '.scaffold')
 
@@ -166,51 +140,15 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
     depth,
     adapters,
     traits,
-    engine,
-    multiplayer,
-    targetPlatforms,
-    onlineServices,
-    contentStructure,
-    economy,
-    narrative,
-    locales,
-    npcAi,
-    modding,
-    persistence,
-    webRendering,
-    webDeployTarget,
-    webRealtime,
-    webAuthFlow,
-    backendApiStyle,
-    backendDataStore,
-    backendAuth,
-    backendMessaging,
-    backendDeployTarget,
-    cliInteractivity,
-    cliDistribution,
-    cliStructuredOutput,
-    libVisibility,
-    libRuntimeTarget,
-    libBundleFormat,
-    libTypeDefinitions,
-    libDocLevel,
-    mobilePlatform,
-    mobileDistribution,
-    mobileOffline,
-    mobilePushNotifications,
-    pipelineProcessing,
-    pipelineOrchestration,
-    pipelineQuality,
-    pipelineSchema,
-    pipelineCatalog,
-    mlPhase,
-    mlModelType,
-    mlServing,
-    mlExperimentTracking,
-    extManifest,
-    extUiSurfaces,
-    extContentScript,
-    extBackgroundWorker,
+    gameFlags,
+    webAppFlags,
+    backendFlags,
+    cliFlags,
+    libraryFlags,
+    mobileAppFlags,
+    dataPipelineFlags,
+    mlFlags,
+    browserExtensionFlags,
   })
 
   // Build config — methodology is a top-level string per the real ScaffoldConfig schema
