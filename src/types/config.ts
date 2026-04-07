@@ -4,6 +4,7 @@ import {
   ProjectTypeSchema, WebAppConfigSchema, BackendConfigSchema,
   CliConfigSchema, LibraryConfigSchema, MobileAppConfigSchema,
   DataPipelineConfigSchema, MlConfigSchema, BrowserExtensionConfigSchema,
+  GameConfigSchema,
 } from '../config/schema.js'
 
 /** Step enablement entry used in presets and overlays. */
@@ -51,23 +52,11 @@ export type MlConfig = z.infer<typeof MlConfigSchema>
 /** Browser extension configuration — derived from Zod schema (single source of truth). */
 export type BrowserExtensionConfig = z.infer<typeof BrowserExtensionConfigSchema>
 
-/** Game engine options. */
-export type GameEngine = 'unity' | 'unreal' | 'godot' | 'custom'
+/** Game-specific configuration — derived from Zod schema (single source of truth). Only valid when projectType === 'game'. */
+export type GameConfig = z.infer<typeof GameConfigSchema>
 
-/** Game-specific configuration. Only valid when projectType === 'game'. */
-export interface GameConfig {
-  engine: GameEngine
-  multiplayerMode: 'none' | 'local' | 'online' | 'hybrid'
-  narrative: 'none' | 'light' | 'heavy'
-  contentStructure: 'discrete' | 'open-world' | 'procedural' | 'endless' | 'mission-based'
-  economy: 'none' | 'progression' | 'monetized' | 'both'
-  onlineServices: Array<'leaderboards' | 'accounts' | 'matchmaking' | 'live-ops'>
-  persistence: 'none' | 'settings-only' | 'profile' | 'progression' | 'cloud'
-  targetPlatforms: Array<'pc' | 'web' | 'ios' | 'android' | 'ps5' | 'xbox' | 'switch' | 'vr' | 'ar'>
-  supportedLocales: string[]
-  hasModding: boolean
-  npcAiComplexity: 'none' | 'simple' | 'complex'
-}
+/** Game engine options — derived from GameConfig (single source of truth). */
+export type GameEngine = GameConfig['engine']
 
 /** Override entry for knowledge injection. */
 export interface KnowledgeOverride {
