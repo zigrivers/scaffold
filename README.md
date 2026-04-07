@@ -1284,7 +1284,7 @@ scaffold dashboard
 
 ## Knowledge System
 
-Scaffold ships with 134 domain expertise entries organized in eleven categories:
+Scaffold ships with 194 domain expertise entries organized in sixteen categories:
 
 - **core/** (26 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, design system tokens, user story innovation, AI memory management, coding conventions, tech stack selection, project structure patterns, task tracking, CLAUDE.md patterns, multi-model review dispatch, review step template, dev environment, git workflow patterns, automated review tooling, vision craft
 - **product/** (5 entries) — PRD craft, PRD innovation, gap analysis, vision craft, vision innovation
@@ -1297,6 +1297,11 @@ Scaffold ships with 134 domain expertise entries organized in eleven categories:
 - **web-app/** (17 entries) — rendering strategies (SSR/SSG/SPA), state management, authentication, deploy targets, real-time patterns, PWA, performance, security, testing, session patterns, UX patterns, caching, API integration, accessibility
 - **backend/** (14 entries) — API design patterns, data store selection, authentication mechanisms, messaging/event systems, observability, deploy strategies, caching, rate limiting, error handling, database migrations, testing, security
 - **cli/** (10 entries) — argument parsing, config management, output formatting, distribution channels, testing patterns, error handling, plugin architecture, shell integration, structured output, interactive prompts
+- **library/** (12 entries) — visibility (public/internal), bundle formats (ESM/CJS/dual), type definitions, documentation levels, semver discipline, supply chain security, runtime targets
+- **mobile-app/** (12 entries) — platform-specific patterns (iOS/Android/cross-platform), distribution models (app store/enterprise), offline support, push notifications, mobile testing
+- **data-pipeline/** (12 entries) — batch/streaming/hybrid patterns, orchestration (DAG/event-driven/scheduled), data quality, schema management, lineage, pipeline testing
+- **ml/** (12 entries) — training and inference patterns, model types (classical/deep-learning/llm), serving patterns, experiment tracking, model evaluation, MLOps observability
+- **browser-extension/** (12 entries) — Manifest V3, content scripts, service workers, cross-browser compatibility, extension security, store submission
 
 Each pipeline step declares which knowledge entries it needs in its frontmatter. The assembly engine injects them automatically. Knowledge files with a `## Deep Guidance` section are optimized for the CLI — only the deep guidance content is loaded into the assembled prompt, skipping the summary to avoid redundancy with the prompt text.
 
@@ -1502,7 +1507,7 @@ All build inputs live under `content/`:
 content/
 ├── pipeline/         # 60 meta-prompts organized by 16 phases (phases 0-15, including build)
 ├── tools/            # 10 tool meta-prompts (stateless, category: tool)
-├── knowledge/        # 61 domain expertise entries (core, product, review, validation, finalization, execution, tools)
+├── knowledge/        # 194 domain expertise entries (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension)
 ├── methodology/      # 3 YAML presets (deep, mvp, custom)
 └── skills/           # Skill templates with {{markers}} for multi-platform resolution (includes mmr)
 ```
