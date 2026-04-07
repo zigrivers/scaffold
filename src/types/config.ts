@@ -52,7 +52,10 @@ export type MlConfig = z.infer<typeof MlConfigSchema>
 /** Browser extension configuration — derived from Zod schema (single source of truth). */
 export type BrowserExtensionConfig = z.infer<typeof BrowserExtensionConfigSchema>
 
-/** Game-specific configuration — derived from Zod schema (single source of truth). Only valid when projectType === 'game'. */
+/**
+ * Game-specific configuration — derived from Zod schema (single source of truth).
+ * Only valid when projectType === 'game'.
+ */
 export type GameConfig = z.infer<typeof GameConfigSchema>
 
 /** Game engine options — derived from GameConfig (single source of truth). */

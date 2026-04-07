@@ -13,17 +13,7 @@ import yaml from 'js-yaml'
 import fs from 'node:fs'
 import path from 'node:path'
 
-export interface WizardOptions {
-  projectRoot: string
-  idea?: string
-  methodology?: string   // --methodology flag pre-sets this
-  projectType?: string   // --project-type flag pre-sets this
-  force: boolean
-  auto: boolean
-  output: OutputContext
-  depth?: number
-  adapters?: string[]
-  traits?: string[]
+export interface GameFlags {
   engine?: string
   multiplayer?: string
   targetPlatforms?: string[]
@@ -35,48 +25,88 @@ export interface WizardOptions {
   npcAi?: string
   modding?: boolean
   persistence?: string
-  // Web-app flags
+}
+
+export interface WebAppFlags {
   webRendering?: string
   webDeployTarget?: string
   webRealtime?: string
   webAuthFlow?: string
-  // Backend flags
+}
+
+export interface BackendFlags {
   backendApiStyle?: string
   backendDataStore?: string[]
   backendAuth?: string
   backendMessaging?: string
   backendDeployTarget?: string
-  // CLI flags
+}
+
+export interface CliFlags {
   cliInteractivity?: string
   cliDistribution?: string[]
   cliStructuredOutput?: boolean
-  // Library flags
+}
+
+export interface LibraryFlags {
   libVisibility?: string
   libRuntimeTarget?: string
   libBundleFormat?: string
   libTypeDefinitions?: boolean
   libDocLevel?: string
-  // Mobile-app flags
+}
+
+export interface MobileAppFlags {
   mobilePlatform?: string
   mobileDistribution?: string
   mobileOffline?: string
   mobilePushNotifications?: boolean
-  // Data-pipeline flags
+}
+
+export interface DataPipelineFlags {
   pipelineProcessing?: string
   pipelineOrchestration?: string
   pipelineQuality?: string
   pipelineSchema?: string
   pipelineCatalog?: boolean
-  // ML flags
+}
+
+export interface MlFlags {
   mlPhase?: string
   mlModelType?: string
   mlServing?: string
   mlExperimentTracking?: boolean
-  // Browser-extension flags
+}
+
+export interface BrowserExtensionFlags {
   extManifest?: string
   extUiSurfaces?: string[]
   extContentScript?: boolean
   extBackgroundWorker?: boolean
+}
+
+export interface WizardOptions {
+  projectRoot: string
+  idea?: string
+  methodology?: string   // --methodology flag pre-sets this
+  projectType?: string   // --project-type flag pre-sets this
+  force: boolean
+  auto: boolean
+  output: OutputContext
+  depth?: number
+  adapters?: string[]
+  traits?: string[]
+
+  // Type-specific flag groups
+  gameFlags?: GameFlags
+  webAppFlags?: WebAppFlags
+  backendFlags?: BackendFlags
+  cliFlags?: CliFlags
+  libraryFlags?: LibraryFlags
+  mobileAppFlags?: MobileAppFlags
+  dataPipelineFlags?: DataPipelineFlags
+  mlFlags?: MlFlags
+  browserExtensionFlags?: BrowserExtensionFlags
 }
 
 export interface WizardResult {
@@ -91,17 +121,9 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
   const {
     projectRoot, idea, methodology: presetMethodology,
     projectType: presetProjectType, force, auto, output,
-    depth, adapters, traits, engine, multiplayer, targetPlatforms,
-    onlineServices, contentStructure, economy, narrative,
-    locales, npcAi, modding, persistence,
-    webRendering, webDeployTarget, webRealtime, webAuthFlow,
-    backendApiStyle, backendDataStore, backendAuth, backendMessaging, backendDeployTarget,
-    cliInteractivity, cliDistribution, cliStructuredOutput,
-    libVisibility, libRuntimeTarget, libBundleFormat, libTypeDefinitions, libDocLevel,
-    mobilePlatform, mobileDistribution, mobileOffline, mobilePushNotifications,
-    pipelineProcessing, pipelineOrchestration, pipelineQuality, pipelineSchema, pipelineCatalog,
-    mlPhase, mlModelType, mlServing, mlExperimentTracking,
-    extManifest, extUiSurfaces, extContentScript, extBackgroundWorker,
+    depth, adapters, traits,
+    gameFlags, webAppFlags, backendFlags, cliFlags, libraryFlags,
+    mobileAppFlags, dataPipelineFlags, mlFlags, browserExtensionFlags,
   } = options
   const scaffoldDir = path.join(projectRoot, '.scaffold')
 
@@ -166,51 +188,15 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
     depth,
     adapters,
     traits,
-    engine,
-    multiplayer,
-    targetPlatforms,
-    onlineServices,
-    contentStructure,
-    economy,
-    narrative,
-    locales,
-    npcAi,
-    modding,
-    persistence,
-    webRendering,
-    webDeployTarget,
-    webRealtime,
-    webAuthFlow,
-    backendApiStyle,
-    backendDataStore,
-    backendAuth,
-    backendMessaging,
-    backendDeployTarget,
-    cliInteractivity,
-    cliDistribution,
-    cliStructuredOutput,
-    libVisibility,
-    libRuntimeTarget,
-    libBundleFormat,
-    libTypeDefinitions,
-    libDocLevel,
-    mobilePlatform,
-    mobileDistribution,
-    mobileOffline,
-    mobilePushNotifications,
-    pipelineProcessing,
-    pipelineOrchestration,
-    pipelineQuality,
-    pipelineSchema,
-    pipelineCatalog,
-    mlPhase,
-    mlModelType,
-    mlServing,
-    mlExperimentTracking,
-    extManifest,
-    extUiSurfaces,
-    extContentScript,
-    extBackgroundWorker,
+    gameFlags,
+    webAppFlags,
+    backendFlags,
+    cliFlags,
+    libraryFlags,
+    mobileAppFlags,
+    dataPipelineFlags,
+    mlFlags,
+    browserExtensionFlags,
   })
 
   // Build config — methodology is a top-level string per the real ScaffoldConfig schema
