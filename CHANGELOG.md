@@ -2,6 +2,14 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.9.2] — 2026-04-07
+
+### Changed (internal)
+
+- **`coerceCSV` extracted** from `src/cli/commands/init.ts` to `src/cli/utils/coerce.ts` as a reusable helper, with 8 unit tests covering CSV parsing edge cases.
+- **`GameConfig` type derived from Zod** via `z.infer<typeof GameConfigSchema>`, matching the pattern used by all 8 newer config types. Eliminates drift risk between the manual interface and the Zod schema. `GameEngine` is now derived as `GameConfig['engine']`.
+- **`WizardOptions` flag fields grouped by project type** — the 40+ flat type-specific fields are now organized into 9 per-type interfaces (`GameFlags`, `WebAppFlags`, `BackendFlags`, `CliFlags`, `LibraryFlags`, `MobileAppFlags`, `DataPipelineFlags`, `MlFlags`, `BrowserExtensionFlags`) extracted to `src/wizard/flags.ts`. Adding a new project type is now a focused change instead of editing 4+ disconnected places. No behavior changes — CLI flag names and field names within groups are unchanged.
+
 ## [3.9.1] — 2026-04-07
 
 ### Fixed
