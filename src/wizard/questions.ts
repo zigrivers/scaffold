@@ -402,12 +402,16 @@ export async function askWizardQuestions(options: {
           ['classical', 'deep-learning', 'llm'], 'deep-learning') as MlConfig['modelType']
         : 'deep-learning'
 
+    // Default serving pattern depends on project phase to satisfy schema constraints:
+    // training-only requires 'none', inference/both require non-'none'
+    const autoServingDefault: MlConfig['servingPattern'] =
+      projectPhase === 'training' ? 'none' : 'realtime'
     const servingPattern = options.mlServing
       ? options.mlServing as MlConfig['servingPattern']
       : !auto
         ? await output.select('Serving pattern?',
-          ['none', 'batch', 'realtime', 'edge'], 'none') as MlConfig['servingPattern']
-        : 'none'
+          ['none', 'batch', 'realtime', 'edge'], autoServingDefault) as MlConfig['servingPattern']
+        : autoServingDefault
 
     const hasExperimentTracking = options.mlExperimentTracking
       ?? (!auto ? await output.confirm('Experiment tracking?', true) : true)

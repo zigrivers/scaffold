@@ -791,7 +791,25 @@ describe('ml wizard questions', () => {
     })).rejects.toThrow('--ml-phase is required')
   })
 
-  it('uses defaults in auto mode when --ml-phase is provided', async () => {
+  it('uses defaults in auto mode when --ml-phase is training', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'ml',
+      mlPhase: 'training',
+    })
+    expect(answers.mlConfig).toEqual({
+      projectPhase: 'training',
+      modelType: 'deep-learning',
+      servingPattern: 'none',
+      hasExperimentTracking: true,
+    })
+    expect(output.select).not.toHaveBeenCalled()
+  })
+
+  it('defaults servingPattern to realtime in auto mode when --ml-phase is inference', async () => {
     const output = makeOutputContext()
 
     const answers = await askWizardQuestions({
@@ -803,7 +821,25 @@ describe('ml wizard questions', () => {
     expect(answers.mlConfig).toEqual({
       projectPhase: 'inference',
       modelType: 'deep-learning',
-      servingPattern: 'none',
+      servingPattern: 'realtime',
+      hasExperimentTracking: true,
+    })
+    expect(output.select).not.toHaveBeenCalled()
+  })
+
+  it('defaults servingPattern to realtime in auto mode when --ml-phase is both', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'ml',
+      mlPhase: 'both',
+    })
+    expect(answers.mlConfig).toEqual({
+      projectPhase: 'both',
+      modelType: 'deep-learning',
+      servingPattern: 'realtime',
       hasExperimentTracking: true,
     })
     expect(output.select).not.toHaveBeenCalled()
