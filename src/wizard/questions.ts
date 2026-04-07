@@ -7,7 +7,7 @@ import type {
 import type {
   GameFlags, WebAppFlags, BackendFlags, CliFlags, LibraryFlags,
   MobileAppFlags, DataPipelineFlags, MlFlags, BrowserExtensionFlags,
-} from './wizard.js'
+} from './flags.js'
 import { GameConfigSchema, ProjectTypeSchema } from '../config/schema.js'
 
 export interface WizardAnswers {

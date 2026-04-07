@@ -330,10 +330,17 @@ describe('init command — .check() validation', () => {
     const argv = defaultArgv({
       root: os.tmpdir(),
       'web-rendering': 'ssr',
+      'web-deploy-target': 'serverless',
     } as Partial<InitArgv>)
     await initCommand.handler(argv)
     expect(runWizard).toHaveBeenCalledWith(
-      expect.objectContaining({ projectType: 'web-app' }),
+      expect.objectContaining({
+        projectType: 'web-app',
+        webAppFlags: expect.objectContaining({
+          webRendering: 'ssr',
+          webDeployTarget: 'serverless',
+        }),
+      }),
     )
   })
 
@@ -341,10 +348,17 @@ describe('init command — .check() validation', () => {
     const argv = defaultArgv({
       root: os.tmpdir(),
       'backend-api-style': 'rest',
+      'backend-data-store': ['relational'],
     } as Partial<InitArgv>)
     await initCommand.handler(argv)
     expect(runWizard).toHaveBeenCalledWith(
-      expect.objectContaining({ projectType: 'backend' }),
+      expect.objectContaining({
+        projectType: 'backend',
+        backendFlags: expect.objectContaining({
+          backendApiStyle: 'rest',
+          backendDataStore: ['relational'],
+        }),
+      }),
     )
   })
 
@@ -352,10 +366,125 @@ describe('init command — .check() validation', () => {
     const argv = defaultArgv({
       root: os.tmpdir(),
       'cli-interactivity': 'hybrid',
+      'cli-structured-output': true,
     } as Partial<InitArgv>)
     await initCommand.handler(argv)
     expect(runWizard).toHaveBeenCalledWith(
-      expect.objectContaining({ projectType: 'cli' }),
+      expect.objectContaining({
+        projectType: 'cli',
+        cliFlags: expect.objectContaining({
+          cliInteractivity: 'hybrid',
+          cliStructuredOutput: true,
+        }),
+      }),
+    )
+  })
+
+  it('handler builds gameFlags from --game-* flags', async () => {
+    const argv = defaultArgv({
+      root: os.tmpdir(),
+      engine: 'unity',
+      multiplayer: 'online',
+    } as Partial<InitArgv>)
+    await initCommand.handler(argv)
+    expect(runWizard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectType: 'game',
+        gameFlags: expect.objectContaining({
+          engine: 'unity',
+          multiplayer: 'online',
+        }),
+      }),
+    )
+  })
+
+  it('handler builds libraryFlags from --lib-* flags', async () => {
+    const argv = defaultArgv({
+      root: os.tmpdir(),
+      'lib-visibility': 'public',
+      'lib-bundle-format': 'dual',
+    } as Partial<InitArgv>)
+    await initCommand.handler(argv)
+    expect(runWizard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectType: 'library',
+        libraryFlags: expect.objectContaining({
+          libVisibility: 'public',
+          libBundleFormat: 'dual',
+        }),
+      }),
+    )
+  })
+
+  it('handler builds mobileAppFlags from --mobile-* flags', async () => {
+    const argv = defaultArgv({
+      root: os.tmpdir(),
+      'mobile-platform': 'ios',
+      'mobile-distribution': 'public',
+    } as Partial<InitArgv>)
+    await initCommand.handler(argv)
+    expect(runWizard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectType: 'mobile-app',
+        mobileAppFlags: expect.objectContaining({
+          mobilePlatform: 'ios',
+          mobileDistribution: 'public',
+        }),
+      }),
+    )
+  })
+
+  it('handler builds dataPipelineFlags from --pipeline-* flags', async () => {
+    const argv = defaultArgv({
+      root: os.tmpdir(),
+      'pipeline-processing': 'streaming',
+      'pipeline-orchestration': 'event-driven',
+    } as Partial<InitArgv>)
+    await initCommand.handler(argv)
+    expect(runWizard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectType: 'data-pipeline',
+        dataPipelineFlags: expect.objectContaining({
+          pipelineProcessing: 'streaming',
+          pipelineOrchestration: 'event-driven',
+        }),
+      }),
+    )
+  })
+
+  it('handler builds mlFlags from --ml-* flags', async () => {
+    const argv = defaultArgv({
+      root: os.tmpdir(),
+      'ml-phase': 'training',
+      'ml-model-type': 'llm',
+    } as Partial<InitArgv>)
+    await initCommand.handler(argv)
+    expect(runWizard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectType: 'ml',
+        mlFlags: expect.objectContaining({
+          mlPhase: 'training',
+          mlModelType: 'llm',
+        }),
+      }),
+    )
+  })
+
+  it('handler builds browserExtensionFlags from --ext-* flags', async () => {
+    const argv = defaultArgv({
+      root: os.tmpdir(),
+      'ext-manifest': '3',
+      'ext-content-script': true,
+    } as Partial<InitArgv>)
+    await initCommand.handler(argv)
+    expect(runWizard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectType: 'browser-extension',
+        browserExtensionFlags: expect.objectContaining({
+          extManifest: '3',
+          extContentScript: true,
+        }),
+      }),
     )
   })
 

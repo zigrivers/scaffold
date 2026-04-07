@@ -13,77 +13,29 @@ import yaml from 'js-yaml'
 import fs from 'node:fs'
 import path from 'node:path'
 
-export interface GameFlags {
-  engine?: string
-  multiplayer?: string
-  targetPlatforms?: string[]
-  onlineServices?: string[]
-  contentStructure?: string
-  economy?: string
-  narrative?: string
-  locales?: string[]
-  npcAi?: string
-  modding?: boolean
-  persistence?: string
-}
+export type {
+  GameFlags,
+  WebAppFlags,
+  BackendFlags,
+  CliFlags,
+  LibraryFlags,
+  MobileAppFlags,
+  DataPipelineFlags,
+  MlFlags,
+  BrowserExtensionFlags,
+} from './flags.js'
 
-export interface WebAppFlags {
-  webRendering?: string
-  webDeployTarget?: string
-  webRealtime?: string
-  webAuthFlow?: string
-}
-
-export interface BackendFlags {
-  backendApiStyle?: string
-  backendDataStore?: string[]
-  backendAuth?: string
-  backendMessaging?: string
-  backendDeployTarget?: string
-}
-
-export interface CliFlags {
-  cliInteractivity?: string
-  cliDistribution?: string[]
-  cliStructuredOutput?: boolean
-}
-
-export interface LibraryFlags {
-  libVisibility?: string
-  libRuntimeTarget?: string
-  libBundleFormat?: string
-  libTypeDefinitions?: boolean
-  libDocLevel?: string
-}
-
-export interface MobileAppFlags {
-  mobilePlatform?: string
-  mobileDistribution?: string
-  mobileOffline?: string
-  mobilePushNotifications?: boolean
-}
-
-export interface DataPipelineFlags {
-  pipelineProcessing?: string
-  pipelineOrchestration?: string
-  pipelineQuality?: string
-  pipelineSchema?: string
-  pipelineCatalog?: boolean
-}
-
-export interface MlFlags {
-  mlPhase?: string
-  mlModelType?: string
-  mlServing?: string
-  mlExperimentTracking?: boolean
-}
-
-export interface BrowserExtensionFlags {
-  extManifest?: string
-  extUiSurfaces?: string[]
-  extContentScript?: boolean
-  extBackgroundWorker?: boolean
-}
+import type {
+  GameFlags,
+  WebAppFlags,
+  BackendFlags,
+  CliFlags,
+  LibraryFlags,
+  MobileAppFlags,
+  DataPipelineFlags,
+  MlFlags,
+  BrowserExtensionFlags,
+} from './flags.js'
 
 export interface WizardOptions {
   projectRoot: string
