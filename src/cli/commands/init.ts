@@ -34,6 +34,13 @@ const LIB_FLAGS = [
 
 const MOBILE_FLAGS = ['mobile-platform', 'mobile-distribution', 'mobile-offline', 'mobile-push-notifications'] as const
 
+const PIPELINE_FLAGS = [
+  'pipeline-processing', 'pipeline-orchestration',
+  'pipeline-quality', 'pipeline-schema', 'pipeline-catalog',
+] as const
+const ML_FLAGS = ['ml-phase', 'ml-model-type', 'ml-serving', 'ml-experiment-tracking'] as const
+const EXT_FLAGS = ['ext-manifest', 'ext-ui-surfaces', 'ext-content-script', 'ext-background-worker'] as const
+
 interface InitArgs {
   format?: string
   auto?: boolean
@@ -83,6 +90,22 @@ interface InitArgs {
   'mobile-distribution'?: string
   'mobile-offline'?: string
   'mobile-push-notifications'?: boolean
+  // Data-pipeline flags
+  'pipeline-processing'?: string
+  'pipeline-orchestration'?: string
+  'pipeline-quality'?: string
+  'pipeline-schema'?: string
+  'pipeline-catalog'?: boolean
+  // ML flags
+  'ml-phase'?: string
+  'ml-model-type'?: string
+  'ml-serving'?: string
+  'ml-experiment-tracking'?: boolean
+  // Browser-extension flags
+  'ext-manifest'?: string
+  'ext-ui-surfaces'?: string[]
+  'ext-content-script'?: boolean
+  'ext-background-worker'?: boolean
 }
 
 const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
@@ -95,7 +118,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       return [...new Set(items)]
     }
 
-    return yargs
+    return (yargs
       // General options
       .option('root', { type: 'string', describe: 'Project root directory' })
       .option('force', { type: 'boolean', default: false, describe: 'Back up and reinitialize if .scaffold/ exists' })
@@ -239,6 +262,71 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       .option('mobile-push-notifications', {
         type: 'boolean',
         describe: 'Push notification support',
+      }) as unknown as Argv<InitArgs>)
+      // Data Pipeline Configuration
+      .option('pipeline-processing', {
+        type: 'string',
+        describe: 'Processing model',
+        choices: ['batch', 'streaming', 'hybrid'] as const,
+      })
+      .option('pipeline-orchestration', {
+        type: 'string',
+        describe: 'Orchestration pattern',
+        choices: ['none', 'dag-based', 'event-driven', 'scheduled'] as const,
+      })
+      .option('pipeline-quality', {
+        type: 'string',
+        describe: 'Data quality strategy',
+        choices: ['none', 'validation', 'testing', 'observability'] as const,
+      })
+      .option('pipeline-schema', {
+        type: 'string',
+        describe: 'Schema management',
+        choices: ['none', 'schema-registry', 'contracts'] as const,
+      })
+      .option('pipeline-catalog', {
+        type: 'boolean',
+        describe: 'Data catalog support',
+      })
+      // ML Configuration
+      .option('ml-phase', {
+        type: 'string',
+        describe: 'Project phase',
+        choices: ['training', 'inference', 'both'] as const,
+      })
+      .option('ml-model-type', {
+        type: 'string',
+        describe: 'Model type',
+        choices: ['classical', 'deep-learning', 'llm'] as const,
+      })
+      .option('ml-serving', {
+        type: 'string',
+        describe: 'Serving pattern',
+        choices: ['none', 'batch', 'realtime', 'edge'] as const,
+      })
+      .option('ml-experiment-tracking', {
+        type: 'boolean',
+        describe: 'Experiment tracking',
+      })
+      // Browser Extension Configuration
+      .option('ext-manifest', {
+        type: 'string',
+        describe: 'Manifest version',
+        choices: ['2', '3'] as const,
+      })
+      .option('ext-ui-surfaces', {
+        type: 'string',
+        array: true,
+        describe: 'UI surfaces (popup,options,newtab,devtools,sidepanel)',
+        coerce: coerceCSV,
+      })
+      .option('ext-content-script', {
+        type: 'boolean',
+        describe: 'Content script support',
+      })
+      .option('ext-background-worker', {
+        type: 'boolean',
+        describe: 'Background worker support',
       })
       // Game configuration options
       .option('engine', {
@@ -388,16 +476,20 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         )
         const hasLibFlag = LIB_FLAGS.some((f) => argv[f] !== undefined)
         const hasMobileFlag = MOBILE_FLAGS.some((f) => argv[f] !== undefined)
+        const hasPipelineFlag = PIPELINE_FLAGS.some((f) => argv[f] !== undefined)
+        const hasMlFlag = ML_FLAGS.some((f) => argv[f] !== undefined)
+        const hasExtFlag = EXT_FLAGS.some((f) => argv[f] !== undefined)
 
         // Reject mixed-family flags
         const typeCount = [
           hasGameFlag, hasWebFlag, hasBackendFlag,
           hasCliFlag, hasLibFlag, hasMobileFlag,
+          hasPipelineFlag, hasMlFlag, hasExtFlag,
         ].filter(Boolean).length
         if (typeCount > 1) {
           throw new Error(
             'Cannot mix flags from multiple project types'
-            + ' (--web-*, --backend-*, --cli-*, --lib-*, --mobile-*, game flags)',
+            + ' (--web-*, --backend-*, --cli-*, --lib-*, --mobile-*, --pipeline-*, --ml-*, --ext-*, game flags)',
           )
         }
 
@@ -416,6 +508,15 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         }
         if (hasMobileFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'mobile-app') {
           throw new Error('--mobile-* flags require --project-type mobile-app')
+        }
+        if (hasPipelineFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'data-pipeline') {
+          throw new Error('--pipeline-* flags require --project-type data-pipeline')
+        }
+        if (hasMlFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'ml') {
+          throw new Error('--ml-* flags require --project-type ml')
+        }
+        if (hasExtFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'browser-extension') {
+          throw new Error('--ext-* flags require --project-type browser-extension')
         }
 
         // CSV enum validation for array flags
@@ -456,6 +557,23 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         ) {
           throw new Error('--cli-distribution requires at least one value')
         }
+        const validUiSurfaces = ['popup', 'options', 'newtab', 'devtools', 'sidepanel']
+        if (argv['ext-ui-surfaces']) {
+          const invalid = (argv['ext-ui-surfaces'] as string[]).filter(
+            (v: string) => !validUiSurfaces.includes(v),
+          )
+          if (invalid.length) {
+            throw new Error(
+              `Invalid --ext-ui-surfaces value(s): ${invalid.join(', ')}`,
+            )
+          }
+        }
+        if (
+          argv['ext-ui-surfaces'] &&
+          (argv['ext-ui-surfaces'] as string[]).length === 0
+        ) {
+          throw new Error('--ext-ui-surfaces requires at least one value')
+        }
 
         // WebApp cross-field validation
         if (['ssr', 'hybrid'].includes(argv['web-rendering'] as string) && argv['web-deploy-target'] === 'static') {
@@ -475,6 +593,9 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       .group(['cli-interactivity', 'cli-distribution', 'cli-structured-output'], 'CLI Configuration:')
       .group([...LIB_FLAGS], 'Library Configuration:')
       .group([...MOBILE_FLAGS], 'Mobile-App Configuration:')
+      .group([...PIPELINE_FLAGS], 'Data Pipeline Configuration:')
+      .group([...ML_FLAGS], 'ML Configuration:')
+      .group([...EXT_FLAGS], 'Browser Extension Configuration:')
       .group([
         'game-engine', 'game-multiplayer', 'game-target-platforms', 'game-online-services',
         'game-content-structure', 'game-economy', 'game-narrative', 'game-locales',
@@ -500,6 +621,9 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
     )
     const hasLibFlag = LIB_FLAGS.some((f) => argv[f] !== undefined)
     const hasMobileFlag = MOBILE_FLAGS.some((f) => argv[f] !== undefined)
+    const hasPipelineFlag = PIPELINE_FLAGS.some((f) => argv[f] !== undefined)
+    const hasMlFlag = ML_FLAGS.some((f) => argv[f] !== undefined)
+    const hasExtFlag = EXT_FLAGS.some((f) => argv[f] !== undefined)
 
     const detectedType = hasGameFlag
       ? 'game'
@@ -513,7 +637,13 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
               ? 'library'
               : hasMobileFlag
                 ? 'mobile-app'
-                : undefined
+                : hasPipelineFlag
+                  ? 'data-pipeline'
+                  : hasMlFlag
+                    ? 'ml'
+                    : hasExtFlag
+                      ? 'browser-extension'
+                      : undefined
     const projectType = argv['project-type'] ?? detectedType
 
     const result = await runWizard({
@@ -559,6 +689,19 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       mobileDistribution: argv['mobile-distribution'],
       mobileOffline: argv['mobile-offline'],
       mobilePushNotifications: argv['mobile-push-notifications'],
+      pipelineProcessing: argv['pipeline-processing'],
+      pipelineOrchestration: argv['pipeline-orchestration'],
+      pipelineQuality: argv['pipeline-quality'],
+      pipelineSchema: argv['pipeline-schema'],
+      pipelineCatalog: argv['pipeline-catalog'],
+      mlPhase: argv['ml-phase'],
+      mlModelType: argv['ml-model-type'],
+      mlServing: argv['ml-serving'],
+      mlExperimentTracking: argv['ml-experiment-tracking'],
+      extManifest: argv['ext-manifest'],
+      extUiSurfaces: argv['ext-ui-surfaces'],
+      extContentScript: argv['ext-content-script'],
+      extBackgroundWorker: argv['ext-background-worker'],
     })
 
     if (!result.success) {

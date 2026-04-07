@@ -14,6 +14,7 @@ const CustomSchema = z.object({
 
 export const ProjectTypeSchema = z.enum([
   'web-app', 'mobile-app', 'backend', 'cli', 'library', 'game',
+  'data-pipeline', 'ml', 'browser-extension',
 ])
 
 export const WebAppConfigSchema = z.object({
@@ -54,6 +55,28 @@ export const MobileAppConfigSchema = z.object({
   hasPushNotifications: z.boolean().default(false),
 }).strict()
 
+export const DataPipelineConfigSchema = z.object({
+  processingModel: z.enum(['batch', 'streaming', 'hybrid']),
+  orchestration: z.enum(['none', 'dag-based', 'event-driven', 'scheduled']).default('none'),
+  dataQualityStrategy: z.enum(['none', 'validation', 'testing', 'observability']).default('validation'),
+  schemaManagement: z.enum(['none', 'schema-registry', 'contracts']).default('none'),
+  hasDataCatalog: z.boolean().default(false),
+}).strict()
+
+export const MlConfigSchema = z.object({
+  projectPhase: z.enum(['training', 'inference', 'both']),
+  modelType: z.enum(['classical', 'deep-learning', 'llm']).default('deep-learning'),
+  servingPattern: z.enum(['none', 'batch', 'realtime', 'edge']).default('none'),
+  hasExperimentTracking: z.boolean().default(true),
+}).strict()
+
+export const BrowserExtensionConfigSchema = z.object({
+  manifestVersion: z.enum(['2', '3']).default('3'),
+  uiSurfaces: z.array(z.enum(['popup', 'options', 'newtab', 'devtools', 'sidepanel'])).default(['popup']),
+  hasContentScript: z.boolean().default(false),
+  hasBackgroundWorker: z.boolean().default(true),
+}).strict()
+
 export const GameConfigSchema = z.object({
   engine: z.enum(['unity', 'unreal', 'godot', 'custom']),
   multiplayerMode: z.enum(['none', 'local', 'online', 'hybrid']).default('none'),
@@ -82,6 +105,9 @@ const ProjectSchema = z.object({
   cliConfig: CliConfigSchema.optional(),
   libraryConfig: LibraryConfigSchema.optional(),
   mobileAppConfig: MobileAppConfigSchema.optional(),
+  dataPipelineConfig: DataPipelineConfigSchema.optional(),
+  mlConfig: MlConfigSchema.optional(),
+  browserExtensionConfig: BrowserExtensionConfigSchema.optional(),
 }).passthrough()  // allow unknown fields per ADR-033
   .superRefine((data, ctx) => {
     if (data.gameConfig !== undefined && data.projectType !== 'game') {
@@ -108,6 +134,18 @@ const ProjectSchema = z.object({
       ctx.addIssue({ path: ['mobileAppConfig'], code: 'custom',
         message: 'mobileAppConfig requires projectType: mobile-app' })
     }
+    if (data.dataPipelineConfig !== undefined && data.projectType !== 'data-pipeline') {
+      ctx.addIssue({ path: ['dataPipelineConfig'], code: 'custom',
+        message: 'dataPipelineConfig requires projectType: data-pipeline' })
+    }
+    if (data.mlConfig !== undefined && data.projectType !== 'ml') {
+      ctx.addIssue({ path: ['mlConfig'], code: 'custom',
+        message: 'mlConfig requires projectType: ml' })
+    }
+    if (data.browserExtensionConfig !== undefined && data.projectType !== 'browser-extension') {
+      ctx.addIssue({ path: ['browserExtensionConfig'], code: 'custom',
+        message: 'browserExtensionConfig requires projectType: browser-extension' })
+    }
     if (data.libraryConfig) {
       const { visibility, documentationLevel } = data.libraryConfig
       if (visibility === 'public' && documentationLevel === 'none') {
@@ -128,6 +166,24 @@ const ProjectSchema = z.object({
       if (authFlow === 'session' && deployTarget === 'static') {
         ctx.addIssue({ path: ['webAppConfig', 'authFlow'], code: 'custom',
           message: 'Session auth requires server state, incompatible with static hosting' })
+      }
+    }
+    if (data.mlConfig) {
+      const { projectPhase, servingPattern } = data.mlConfig
+      if (projectPhase === 'inference' && servingPattern === 'none') {
+        ctx.addIssue({ path: ['mlConfig', 'servingPattern'], code: 'custom',
+          message: 'Inference projects must specify a serving pattern' })
+      }
+      if (projectPhase === 'training' && servingPattern !== 'none') {
+        ctx.addIssue({ path: ['mlConfig', 'servingPattern'], code: 'custom',
+          message: 'Training-only projects should not have a serving pattern' })
+      }
+    }
+    if (data.browserExtensionConfig) {
+      const { uiSurfaces, hasContentScript, hasBackgroundWorker } = data.browserExtensionConfig
+      if ((!uiSurfaces || uiSurfaces.length === 0) && !hasContentScript && !hasBackgroundWorker) {
+        ctx.addIssue({ path: ['browserExtensionConfig'], code: 'custom',
+          message: 'Extension must have at least one UI surface, content script, or background worker' })
       }
     }
   })

@@ -1,0 +1,82 @@
+# methodology/browser-extension-overlay.yml
+name: browser-extension
+description: >
+  Browser extension overlay — injects extension domain knowledge into existing
+  pipeline steps for manifest configuration, content scripts, service workers,
+  cross-browser compatibility, store submission, and security patterns.
+project-type: browser-extension
+
+# ---------------------------------------------------------------------------
+# knowledge-overrides
+# ---------------------------------------------------------------------------
+# Map browser-extension knowledge entries into existing pipeline steps so that
+# browser extension domain expertise is injected during prompt assembly.
+# Includes UX/design steps (extensions have UI).
+# Maps: manifest → tech-stack + coding-standards; content-scripts → security;
+#       service-workers → system-architecture; cross-browser → tdd + add-e2e-testing;
+#       store-submission → operations.
+knowledge-overrides:
+  # Foundational
+  create-prd:
+    append: [browser-extension-requirements]
+  user-stories:
+    append: [browser-extension-requirements]
+  # manifest → coding-standards
+  coding-standards:
+    append: [browser-extension-conventions, browser-extension-manifest]
+  project-structure:
+    append: [browser-extension-project-structure]
+  dev-env-setup:
+    append: [browser-extension-dev-environment]
+  git-workflow:
+    append: [browser-extension-conventions]
+
+  # Architecture & Design
+  # service-workers → system-architecture
+  system-architecture:
+    append: [browser-extension-architecture, browser-extension-service-workers]
+  # manifest → tech-stack
+  tech-stack:
+    append: [browser-extension-architecture, browser-extension-manifest]
+  adrs:
+    append: [browser-extension-architecture]
+  domain-modeling:
+    append: [browser-extension-architecture]
+  # UX/design steps (extensions have UI)
+  ux-spec:
+    append: [browser-extension-architecture]
+  design-system:
+    append: [browser-extension-conventions]
+  # content-scripts → security
+  security:
+    append: [browser-extension-security, browser-extension-content-scripts]
+  # store-submission → operations
+  operations:
+    append: [browser-extension-store-submission]
+
+  # Testing
+  # cross-browser → tdd + add-e2e-testing
+  tdd:
+    append: [browser-extension-testing, browser-extension-cross-browser]
+  add-e2e-testing:
+    append: [browser-extension-testing, browser-extension-cross-browser]
+  create-evals:
+    append: [browser-extension-testing]
+  story-tests:
+    append: [browser-extension-testing]
+
+  # Reviews (mirror authoring steps)
+  review-architecture:
+    append: [browser-extension-architecture, browser-extension-service-workers]
+  review-ux:
+    append: [browser-extension-architecture]
+  review-security:
+    append: [browser-extension-security, browser-extension-content-scripts]
+  review-operations:
+    append: [browser-extension-store-submission]
+  review-testing:
+    append: [browser-extension-testing, browser-extension-cross-browser]
+
+  # Planning
+  implementation-plan:
+    append: [browser-extension-architecture]

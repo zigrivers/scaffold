@@ -1,0 +1,70 @@
+# methodology/data-pipeline-overlay.yml
+name: data-pipeline
+description: >
+  Data pipeline overlay — injects data pipeline domain knowledge into existing
+  pipeline steps for batch processing, streaming, orchestration, schema
+  management, data quality, and observability patterns.
+project-type: data-pipeline
+
+# ---------------------------------------------------------------------------
+# knowledge-overrides
+# ---------------------------------------------------------------------------
+# Map data-pipeline knowledge entries into existing pipeline steps so that
+# data pipeline domain expertise is injected during prompt assembly.
+# Skips UX/design steps and database steps (pipelines use different patterns).
+knowledge-overrides:
+  # Foundational
+  create-prd:
+    append: [data-pipeline-requirements]
+  user-stories:
+    append: [data-pipeline-requirements]
+  coding-standards:
+    append: [data-pipeline-conventions]
+  project-structure:
+    append: [data-pipeline-project-structure]
+  dev-env-setup:
+    append: [data-pipeline-dev-environment]
+  git-workflow:
+    append: [data-pipeline-conventions]
+
+  # Architecture & Design
+  # batch-patterns + streaming-patterns → system-architecture
+  system-architecture:
+    append: [data-pipeline-architecture, data-pipeline-batch-patterns, data-pipeline-streaming-patterns]
+  tech-stack:
+    append: [data-pipeline-architecture]
+  adrs:
+    append: [data-pipeline-architecture]
+  # schema-management → domain-modeling
+  domain-modeling:
+    append: [data-pipeline-schema-management]
+  security:
+    append: [data-pipeline-security]
+  # orchestration → operations
+  operations:
+    append: [data-pipeline-orchestration]
+
+  # Testing
+  # quality → tdd + create-evals
+  tdd:
+    append: [data-pipeline-testing, data-pipeline-quality]
+  add-e2e-testing:
+    append: [data-pipeline-testing]
+  create-evals:
+    append: [data-pipeline-testing, data-pipeline-quality]
+  story-tests:
+    append: [data-pipeline-testing]
+
+  # Reviews (mirror authoring steps)
+  review-architecture:
+    append: [data-pipeline-architecture, data-pipeline-batch-patterns, data-pipeline-streaming-patterns]
+  review-security:
+    append: [data-pipeline-security]
+  review-operations:
+    append: [data-pipeline-orchestration]
+  review-testing:
+    append: [data-pipeline-testing, data-pipeline-quality]
+
+  # Planning
+  implementation-plan:
+    append: [data-pipeline-architecture]

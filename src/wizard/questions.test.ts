@@ -701,3 +701,154 @@ describe('mobile-app wizard questions', () => {
     })).rejects.toThrow('--mobile-platform is required')
   })
 })
+
+describe('data-pipeline wizard questions', () => {
+  it('uses flag values when all flags provided (skips prompts)', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', methodology: 'deep', auto: false,
+      projectType: 'data-pipeline',
+      pipelineProcessing: 'streaming',
+      pipelineOrchestration: 'event-driven',
+      pipelineQuality: 'observability',
+      pipelineSchema: 'schema-registry',
+      pipelineCatalog: true,
+    })
+    expect(answers.dataPipelineConfig).toEqual({
+      processingModel: 'streaming',
+      orchestration: 'event-driven',
+      dataQualityStrategy: 'observability',
+      schemaManagement: 'schema-registry',
+      hasDataCatalog: true,
+    })
+    // All data-pipeline questions were provided via flags — no select calls for data-pipeline questions
+    // Platform confirms still fire: Codex, Gemini, web, mobile
+    expect(output.select).not.toHaveBeenCalled()
+  })
+
+  it('throws in auto mode without required --pipeline-processing', async () => {
+    const output = makeOutputContext()
+
+    await expect(askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'data-pipeline',
+    })).rejects.toThrow('--pipeline-processing is required')
+  })
+
+  it('uses defaults in auto mode when --pipeline-processing is provided', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'data-pipeline',
+      pipelineProcessing: 'batch',
+    })
+    expect(answers.dataPipelineConfig).toEqual({
+      processingModel: 'batch',
+      orchestration: 'none',
+      dataQualityStrategy: 'validation',
+      schemaManagement: 'none',
+      hasDataCatalog: false,
+    })
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.confirm).not.toHaveBeenCalled()
+  })
+})
+
+describe('ml wizard questions', () => {
+  it('uses flag values when all flags provided (skips prompts)', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', methodology: 'deep', auto: false,
+      projectType: 'ml',
+      mlPhase: 'training',
+      mlModelType: 'llm',
+      mlServing: 'realtime',
+      mlExperimentTracking: false,
+    })
+    expect(answers.mlConfig).toEqual({
+      projectPhase: 'training',
+      modelType: 'llm',
+      servingPattern: 'realtime',
+      hasExperimentTracking: false,
+    })
+    // All ml questions were provided via flags — no select calls for ml questions
+    // Platform confirms still fire: Codex, Gemini, web, mobile
+    expect(output.select).not.toHaveBeenCalled()
+  })
+
+  it('throws in auto mode without required --ml-phase', async () => {
+    const output = makeOutputContext()
+
+    await expect(askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'ml',
+    })).rejects.toThrow('--ml-phase is required')
+  })
+
+  it('uses defaults in auto mode when --ml-phase is provided', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'ml',
+      mlPhase: 'inference',
+    })
+    expect(answers.mlConfig).toEqual({
+      projectPhase: 'inference',
+      modelType: 'deep-learning',
+      servingPattern: 'none',
+      hasExperimentTracking: true,
+    })
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.confirm).not.toHaveBeenCalled()
+  })
+})
+
+describe('browser-extension wizard questions', () => {
+  it('uses flag values when all flags provided (skips prompts)', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', methodology: 'deep', auto: false,
+      projectType: 'browser-extension',
+      extManifest: '3',
+      extUiSurfaces: ['popup', 'sidepanel'],
+      extContentScript: true,
+      extBackgroundWorker: false,
+    })
+    expect(answers.browserExtensionConfig).toEqual({
+      manifestVersion: '3',
+      uiSurfaces: ['popup', 'sidepanel'],
+      hasContentScript: true,
+      hasBackgroundWorker: false,
+    })
+    // All extension questions were provided via flags — no select calls for extension questions
+    // Platform confirms still fire: Codex, Gemini, web, mobile
+    expect(output.select).not.toHaveBeenCalled()
+  })
+
+  it('uses defaults in auto mode without any flags (browser-extension has no required flag)', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'browser-extension',
+    })
+    expect(answers.browserExtensionConfig).toEqual({
+      manifestVersion: '3',
+      uiSurfaces: ['popup'],
+      hasContentScript: false,
+      hasBackgroundWorker: true,
+    })
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.confirm).not.toHaveBeenCalled()
+  })
+})

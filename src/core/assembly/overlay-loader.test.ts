@@ -187,3 +187,39 @@ describe('mobile-app overlay', () => {
     expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
   })
 })
+
+describe('data-pipeline overlay', () => {
+  it('loads data-pipeline-overlay.yml successfully', () => {
+    const overlayPath = path.join(methodologyDir, 'data-pipeline-overlay.yml')
+    const { overlay, errors } = loadOverlay(overlayPath)
+    expect(errors).toHaveLength(0)
+    expect(overlay).not.toBeNull()
+    expect(overlay!.projectType).toBe('data-pipeline')
+    expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(15)
+    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+  })
+})
+
+describe('ml overlay', () => {
+  it('loads ml-overlay.yml successfully', () => {
+    const overlayPath = path.join(methodologyDir, 'ml-overlay.yml')
+    const { overlay, errors } = loadOverlay(overlayPath)
+    expect(errors).toHaveLength(0)
+    expect(overlay).not.toBeNull()
+    expect(overlay!.projectType).toBe('ml')
+    expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(15)
+    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+  })
+})
+
+describe('browser-extension overlay', () => {
+  it('loads browser-extension-overlay.yml successfully', () => {
+    const overlayPath = path.join(methodologyDir, 'browser-extension-overlay.yml')
+    const { overlay, errors } = loadOverlay(overlayPath)
+    expect(errors).toHaveLength(0)
+    expect(overlay).not.toBeNull()
+    expect(overlay!.projectType).toBe('browser-extension')
+    expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(15)
+    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+  })
+})

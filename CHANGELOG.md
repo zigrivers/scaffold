@@ -2,6 +2,23 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.9.0] — 2026-04-07
+
+### Added
+
+- **Data-pipeline, ML, and browser-extension project-type overlays** — three new overlay files (`data-pipeline-overlay.yml`, `ml-overlay.yml`, `browser-extension-overlay.yml`) inject domain-specific knowledge into existing pipeline steps based on project type. Data-pipeline overlay covers batch and streaming patterns, orchestration, schema management, data quality, and observability. ML overlay covers training and serving patterns, experiment tracking, model evaluation, MLOps observability, and security. Browser-extension overlay covers manifest configuration, content scripts, service workers, cross-browser compatibility, store submission, and security.
+- **3 new `ProjectType` enum values** — `data-pipeline`, `ml`, and `browser-extension` are now valid project types in `ProjectTypeSchema`. Each type has a strict `*Config` Zod schema with cross-field validation derived as a TypeScript type.
+- **13 new CLI flags for `scaffold init`** — non-interactive configuration for the three new project types:
+  - **Data-pipeline flags** (auto-set `--project-type data-pipeline`): `--pipeline-processing` (batch/streaming/hybrid), `--pipeline-orchestration` (none/dag-based/event-driven/scheduled), `--pipeline-quality` (none/validation/testing/observability), `--pipeline-schema` (none/schema-registry/contracts), `--pipeline-catalog` (boolean)
+  - **ML flags** (auto-set `--project-type ml`): `--ml-phase` (training/inference/both), `--ml-model-type` (classical/deep-learning/llm), `--ml-serving` (none/batch/realtime/edge), `--ml-experiment-tracking` (boolean)
+  - **Browser-extension flags** (auto-set `--project-type browser-extension`): `--ext-manifest` (2/3), `--ext-ui-surfaces` (popup/options/newtab/devtools/sidepanel, comma-sep), `--ext-content-script` (boolean), `--ext-background-worker` (boolean)
+  - Cross-family validation: cannot mix `--pipeline-*`, `--ml-*`, `--ext-*` flags with each other or with existing `--web-*`, `--backend-*`, `--cli-*`, `--lib-*`, `--mobile-*`, or game flag families.
+  - Help text grouped into Data Pipeline / ML / Browser Extension Configuration sections.
+- **36 domain knowledge entries** — 12 data-pipeline entries (architecture, batch patterns, streaming patterns, orchestration, schema management, quality, testing, conventions, project structure, dev environment, requirements, security), 12 ML entries (architecture, training patterns, serving patterns, experiment tracking, model evaluation, observability, testing, conventions, project structure, dev environment, requirements, security), 12 browser-extension entries (architecture, manifest, service workers, content scripts, cross-browser, store submission, testing, conventions, project structure, dev environment, requirements, security). Knowledge base now totals **194 entries in 16 categories**.
+- **ML inference/serving cross-field validation** — `ConfigSchema` now rejects `mlConfig` when `projectPhase: inference` is paired with `servingPattern: none` (an inference project must specify how it serves predictions), and rejects `projectPhase: training` paired with any non-`none` serving pattern (training-only projects should not declare a serving pattern).
+- **Browser-extension empty-capability validation** — `ConfigSchema` now rejects `browserExtensionConfig` when an extension declares zero UI surfaces, no content script, and no background worker — every extension must have at least one runtime capability.
+- **Data-pipeline, ML, and browser-extension wizard questions** — progressive-disclosure wizard for each new project type. `--auto` mode requires `--pipeline-processing` (data-pipeline) and `--ml-phase` (ml); browser-extension has no required flag in `--auto` mode (all fields have safe defaults).
+
 ## [3.8.0] — 2026-04-06
 
 ### Added
