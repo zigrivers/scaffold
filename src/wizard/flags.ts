@@ -6,78 +6,89 @@
  * interface + one new question block) rather than threading 4-5 fields
  * through WizardOptions, runWizard, askWizardQuestions, and tests.
  *
+ * Field types are derived from the Zod-derived config types so the valid
+ * values are tracked in a single source of truth (the schema). The broad
+ * `string`/`string[]` yargs values are narrowed to these literal unions at
+ * the single CLI boundary in `src/cli/commands/init.ts`, which is safe
+ * because yargs' `choices:` validates enum values at runtime.
+ *
  * Field names within each group match the camelCase form of the CLI flag
  * names (e.g., `--web-rendering` → `webRendering`).
  */
 
+import type {
+  GameConfig, WebAppConfig, BackendConfig, CliConfig, LibraryConfig,
+  MobileAppConfig, DataPipelineConfig, MlConfig, BrowserExtensionConfig,
+} from '../types/index.js'
+
 export interface GameFlags {
-  engine?: string
-  multiplayer?: string
-  targetPlatforms?: string[]
-  onlineServices?: string[]
-  contentStructure?: string
-  economy?: string
-  narrative?: string
-  locales?: string[]
-  npcAi?: string
-  modding?: boolean
-  persistence?: string
+  engine?: GameConfig['engine']
+  multiplayer?: GameConfig['multiplayerMode']
+  targetPlatforms?: GameConfig['targetPlatforms']
+  onlineServices?: GameConfig['onlineServices']
+  contentStructure?: GameConfig['contentStructure']
+  economy?: GameConfig['economy']
+  narrative?: GameConfig['narrative']
+  locales?: GameConfig['supportedLocales']
+  npcAi?: GameConfig['npcAiComplexity']
+  modding?: GameConfig['hasModding']
+  persistence?: GameConfig['persistence']
 }
 
 export interface WebAppFlags {
-  webRendering?: string
-  webDeployTarget?: string
-  webRealtime?: string
-  webAuthFlow?: string
+  webRendering?: WebAppConfig['renderingStrategy']
+  webDeployTarget?: WebAppConfig['deployTarget']
+  webRealtime?: WebAppConfig['realtime']
+  webAuthFlow?: WebAppConfig['authFlow']
 }
 
 export interface BackendFlags {
-  backendApiStyle?: string
-  backendDataStore?: string[]
-  backendAuth?: string
-  backendMessaging?: string
-  backendDeployTarget?: string
+  backendApiStyle?: BackendConfig['apiStyle']
+  backendDataStore?: BackendConfig['dataStore']
+  backendAuth?: BackendConfig['authMechanism']
+  backendMessaging?: BackendConfig['asyncMessaging']
+  backendDeployTarget?: BackendConfig['deployTarget']
 }
 
 export interface CliFlags {
-  cliInteractivity?: string
-  cliDistribution?: string[]
-  cliStructuredOutput?: boolean
+  cliInteractivity?: CliConfig['interactivity']
+  cliDistribution?: CliConfig['distributionChannels']
+  cliStructuredOutput?: CliConfig['hasStructuredOutput']
 }
 
 export interface LibraryFlags {
-  libVisibility?: string
-  libRuntimeTarget?: string
-  libBundleFormat?: string
-  libTypeDefinitions?: boolean
-  libDocLevel?: string
+  libVisibility?: LibraryConfig['visibility']
+  libRuntimeTarget?: LibraryConfig['runtimeTarget']
+  libBundleFormat?: LibraryConfig['bundleFormat']
+  libTypeDefinitions?: LibraryConfig['hasTypeDefinitions']
+  libDocLevel?: LibraryConfig['documentationLevel']
 }
 
 export interface MobileAppFlags {
-  mobilePlatform?: string
-  mobileDistribution?: string
-  mobileOffline?: string
-  mobilePushNotifications?: boolean
+  mobilePlatform?: MobileAppConfig['platform']
+  mobileDistribution?: MobileAppConfig['distributionModel']
+  mobileOffline?: MobileAppConfig['offlineSupport']
+  mobilePushNotifications?: MobileAppConfig['hasPushNotifications']
 }
 
 export interface DataPipelineFlags {
-  pipelineProcessing?: string
-  pipelineOrchestration?: string
-  pipelineQuality?: string
-  pipelineSchema?: string
-  pipelineCatalog?: boolean
+  pipelineProcessing?: DataPipelineConfig['processingModel']
+  pipelineOrchestration?: DataPipelineConfig['orchestration']
+  pipelineQuality?: DataPipelineConfig['dataQualityStrategy']
+  pipelineSchema?: DataPipelineConfig['schemaManagement']
+  pipelineCatalog?: DataPipelineConfig['hasDataCatalog']
 }
 
 export interface MlFlags {
-  mlPhase?: string
-  mlModelType?: string
-  mlServing?: string
-  mlExperimentTracking?: boolean
+  mlPhase?: MlConfig['projectPhase']
+  mlModelType?: MlConfig['modelType']
+  mlServing?: MlConfig['servingPattern']
+  mlExperimentTracking?: MlConfig['hasExperimentTracking']
 }
 
 export interface BrowserExtensionFlags {
-  extManifest?: string
-  extUiSurfaces?: string[]
-  extContentScript?: boolean
-  extBackgroundWorker?: boolean
+  extManifest?: BrowserExtensionConfig['manifestVersion']
+  extUiSurfaces?: BrowserExtensionConfig['uiSurfaces']
+  extContentScript?: BrowserExtensionConfig['hasContentScript']
+  extBackgroundWorker?: BrowserExtensionConfig['hasBackgroundWorker']
 }

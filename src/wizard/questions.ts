@@ -127,29 +127,27 @@ export async function askWizardQuestions(options: {
       throw new Error('--web-rendering is required in auto mode for web-app projects')
     }
 
-    const renderingStrategy = options.webAppFlags?.webRendering
-      ? options.webAppFlags.webRendering as WebAppConfig['renderingStrategy']
-      : await output.select('Rendering strategy?', ['spa', 'ssr', 'ssg', 'hybrid']) as WebAppConfig['renderingStrategy']
+    const renderingStrategy: WebAppConfig['renderingStrategy'] = options.webAppFlags?.webRendering
+      ?? await output.select(
+        'Rendering strategy?', ['spa', 'ssr', 'ssg', 'hybrid'],
+      ) as WebAppConfig['renderingStrategy']
 
-    const deployTarget = options.webAppFlags?.webDeployTarget
-      ? options.webAppFlags.webDeployTarget as WebAppConfig['deployTarget']
-      : !auto
+    const deployTarget: WebAppConfig['deployTarget'] = options.webAppFlags?.webDeployTarget
+      ?? (!auto
         ? await output.select('Deploy target?',
           ['static', 'serverless', 'container', 'edge', 'long-running'], 'serverless') as WebAppConfig['deployTarget']
-        : 'serverless'
+        : 'serverless')
 
-    const realtime = options.webAppFlags?.webRealtime
-      ? options.webAppFlags.webRealtime as WebAppConfig['realtime']
-      : !auto
+    const realtime: WebAppConfig['realtime'] = options.webAppFlags?.webRealtime
+      ?? (!auto
         ? await output.select('Real-time needs?', ['none', 'websocket', 'sse'], 'none') as WebAppConfig['realtime']
-        : 'none'
+        : 'none')
 
-    const authFlow = options.webAppFlags?.webAuthFlow
-      ? options.webAppFlags.webAuthFlow as WebAppConfig['authFlow']
-      : !auto
+    const authFlow: WebAppConfig['authFlow'] = options.webAppFlags?.webAuthFlow
+      ?? (!auto
         ? await output.select('How do users authenticate?',
           ['none', 'session', 'oauth', 'passkey'], 'none') as WebAppConfig['authFlow']
-        : 'none'
+        : 'none')
 
     webAppConfig = { renderingStrategy, deployTarget, realtime, authFlow }
   }
@@ -161,17 +159,15 @@ export async function askWizardQuestions(options: {
       throw new Error('--backend-api-style is required in auto mode for backend projects')
     }
 
-    const apiStyle = options.backendFlags?.backendApiStyle
-      ? options.backendFlags.backendApiStyle as BackendConfig['apiStyle']
-      : await output.select('API style?',
+    const apiStyle: BackendConfig['apiStyle'] = options.backendFlags?.backendApiStyle
+      ?? await output.select('API style?',
         ['rest', 'graphql', 'grpc', 'trpc', 'none']) as BackendConfig['apiStyle']
 
-    const dataStore = options.backendFlags?.backendDataStore
-      ? options.backendFlags.backendDataStore as BackendConfig['dataStore']
-      : !auto
+    const dataStore: BackendConfig['dataStore'] = options.backendFlags?.backendDataStore
+      ?? (!auto
         ? await output.multiSelect('Data store(s)?',
           ['relational', 'document', 'key-value'], ['relational']) as BackendConfig['dataStore']
-        : ['relational'] as BackendConfig['dataStore']
+        : ['relational'])
 
     let authMechanism: BackendConfig['authMechanism']
     if (apiStyle === 'none') {
@@ -181,27 +177,24 @@ export async function askWizardQuestions(options: {
       authMechanism = 'none'
     } else {
       authMechanism = options.backendFlags?.backendAuth
-        ? options.backendFlags.backendAuth as BackendConfig['authMechanism']
-        : !auto
+        ?? (!auto
           ? await output.select('How does the API verify requests?',
             ['none', 'jwt', 'session', 'oauth', 'apikey'],
             'none') as BackendConfig['authMechanism']
-          : 'none'
+          : 'none')
     }
 
-    const asyncMessaging = options.backendFlags?.backendMessaging
-      ? options.backendFlags.backendMessaging as BackendConfig['asyncMessaging']
-      : !auto
+    const asyncMessaging: BackendConfig['asyncMessaging'] = options.backendFlags?.backendMessaging
+      ?? (!auto
         ? await output.select('Async messaging?',
           ['none', 'queue', 'event-driven'], 'none') as BackendConfig['asyncMessaging']
-        : 'none'
+        : 'none')
 
-    const deployTarget = options.backendFlags?.backendDeployTarget
-      ? options.backendFlags.backendDeployTarget as BackendConfig['deployTarget']
-      : !auto
+    const deployTarget: BackendConfig['deployTarget'] = options.backendFlags?.backendDeployTarget
+      ?? (!auto
         ? await output.select('Deploy target?',
           ['serverless', 'container', 'long-running'], 'container') as BackendConfig['deployTarget']
-        : 'container'
+        : 'container')
 
     backendConfig = { apiStyle, dataStore, authMechanism, asyncMessaging, deployTarget }
   }
@@ -213,18 +206,16 @@ export async function askWizardQuestions(options: {
       throw new Error('--cli-interactivity is required in auto mode for cli projects')
     }
 
-    const interactivity = options.cliFlags?.cliInteractivity
-      ? options.cliFlags.cliInteractivity as CliConfig['interactivity']
-      : await output.select('Interactivity model?',
+    const interactivity: CliConfig['interactivity'] = options.cliFlags?.cliInteractivity
+      ?? await output.select('Interactivity model?',
         ['args-only', 'interactive', 'hybrid']) as CliConfig['interactivity']
 
-    const distributionChannels = options.cliFlags?.cliDistribution
-      ? options.cliFlags.cliDistribution as CliConfig['distributionChannels']
-      : !auto
+    const distributionChannels: CliConfig['distributionChannels'] = options.cliFlags?.cliDistribution
+      ?? (!auto
         ? await output.multiSelect('Distribution channels?',
           ['package-manager', 'system-package-manager', 'standalone-binary', 'container'],
           ['package-manager']) as CliConfig['distributionChannels']
-        : ['package-manager'] as CliConfig['distributionChannels']
+        : ['package-manager'])
 
     const hasStructuredOutput = options.cliFlags?.cliStructuredOutput
       ?? (!auto ? await output.confirm('Support structured output (--json)?', false) : false)
@@ -238,36 +229,32 @@ export async function askWizardQuestions(options: {
     if (auto && !options.libraryFlags?.libVisibility) {
       throw new Error('--lib-visibility is required in auto mode for library projects')
     }
-    const visibility = options.libraryFlags?.libVisibility
-      ? options.libraryFlags.libVisibility as LibraryConfig['visibility']
-      : await output.select('Library visibility?', ['public', 'internal']) as LibraryConfig['visibility']
+    const visibility: LibraryConfig['visibility'] = options.libraryFlags?.libVisibility
+      ?? await output.select('Library visibility?', ['public', 'internal']) as LibraryConfig['visibility']
 
-    const runtimeTarget = options.libraryFlags?.libRuntimeTarget
-      ? options.libraryFlags.libRuntimeTarget as LibraryConfig['runtimeTarget']
-      : !auto
+    const runtimeTarget: LibraryConfig['runtimeTarget'] = options.libraryFlags?.libRuntimeTarget
+      ?? (!auto
         ? await output.select('Runtime target?',
           ['node', 'browser', 'isomorphic', 'edge'],
           'isomorphic') as LibraryConfig['runtimeTarget']
-        : 'isomorphic'
+        : 'isomorphic')
 
-    const bundleFormat = options.libraryFlags?.libBundleFormat
-      ? options.libraryFlags.libBundleFormat as LibraryConfig['bundleFormat']
-      : !auto
+    const bundleFormat: LibraryConfig['bundleFormat'] = options.libraryFlags?.libBundleFormat
+      ?? (!auto
         ? await output.select('Bundle format?',
           ['esm', 'cjs', 'dual', 'unbundled'],
           'dual') as LibraryConfig['bundleFormat']
-        : 'dual'
+        : 'dual')
 
     const hasTypeDefinitions = options.libraryFlags?.libTypeDefinitions
       ?? (!auto ? await output.confirm('Ship type definitions?', true) : true)
 
-    const documentationLevel = options.libraryFlags?.libDocLevel
-      ? options.libraryFlags.libDocLevel as LibraryConfig['documentationLevel']
-      : !auto
+    const documentationLevel: LibraryConfig['documentationLevel'] = options.libraryFlags?.libDocLevel
+      ?? (!auto
         ? await output.select('Documentation level?',
           ['none', 'readme', 'api-docs', 'full-site'],
           'readme') as LibraryConfig['documentationLevel']
-        : 'readme'
+        : 'readme')
 
     libraryConfig = { visibility, runtimeTarget, bundleFormat, hasTypeDefinitions, documentationLevel }
   }
@@ -278,25 +265,22 @@ export async function askWizardQuestions(options: {
     if (auto && !options.mobileAppFlags?.mobilePlatform) {
       throw new Error('--mobile-platform is required in auto mode for mobile-app projects')
     }
-    const platform = options.mobileAppFlags?.mobilePlatform
-      ? options.mobileAppFlags.mobilePlatform as MobileAppConfig['platform']
-      : await output.select('Target platform?', ['ios', 'android', 'cross-platform']) as MobileAppConfig['platform']
+    const platform: MobileAppConfig['platform'] = options.mobileAppFlags?.mobilePlatform
+      ?? await output.select('Target platform?', ['ios', 'android', 'cross-platform']) as MobileAppConfig['platform']
 
-    const distributionModel = options.mobileAppFlags?.mobileDistribution
-      ? options.mobileAppFlags.mobileDistribution as MobileAppConfig['distributionModel']
-      : !auto
+    const distributionModel: MobileAppConfig['distributionModel'] = options.mobileAppFlags?.mobileDistribution
+      ?? (!auto
         ? await output.select('Distribution model?',
           ['public', 'private', 'mixed'],
           'public') as MobileAppConfig['distributionModel']
-        : 'public'
+        : 'public')
 
-    const offlineSupport = options.mobileAppFlags?.mobileOffline
-      ? options.mobileAppFlags.mobileOffline as MobileAppConfig['offlineSupport']
-      : !auto
+    const offlineSupport: MobileAppConfig['offlineSupport'] = options.mobileAppFlags?.mobileOffline
+      ?? (!auto
         ? await output.select('Offline support?',
           ['none', 'cache', 'offline-first'],
           'none') as MobileAppConfig['offlineSupport']
-        : 'none'
+        : 'none')
 
     const hasPushNotifications = options.mobileAppFlags?.mobilePushNotifications
       ?? (!auto ? await output.confirm('Push notification support?', false) : false)
@@ -311,33 +295,29 @@ export async function askWizardQuestions(options: {
       throw new Error('--pipeline-processing is required in auto mode for data-pipeline projects')
     }
 
-    const processingModel = options.dataPipelineFlags?.pipelineProcessing
-      ? options.dataPipelineFlags.pipelineProcessing as DataPipelineConfig['processingModel']
-      : await output.select(
+    const processingModel: DataPipelineConfig['processingModel'] = options.dataPipelineFlags?.pipelineProcessing
+      ?? await output.select(
         'Processing model?',
         ['batch', 'streaming', 'hybrid'],
       ) as DataPipelineConfig['processingModel']
 
-    const orchestration = options.dataPipelineFlags?.pipelineOrchestration
-      ? options.dataPipelineFlags.pipelineOrchestration as DataPipelineConfig['orchestration']
-      : !auto
+    const orchestration: DataPipelineConfig['orchestration'] = options.dataPipelineFlags?.pipelineOrchestration
+      ?? (!auto
         ? await output.select('Orchestration pattern?',
           ['none', 'dag-based', 'event-driven', 'scheduled'], 'none') as DataPipelineConfig['orchestration']
-        : 'none'
+        : 'none')
 
-    const dataQualityStrategy = options.dataPipelineFlags?.pipelineQuality
-      ? options.dataPipelineFlags.pipelineQuality as DataPipelineConfig['dataQualityStrategy']
-      : !auto
+    const dataQualityStrategy: DataPipelineConfig['dataQualityStrategy'] = options.dataPipelineFlags?.pipelineQuality
+      ?? (!auto
         ? await output.select('Data quality strategy?',
           ['none', 'validation', 'testing', 'observability'], 'validation') as DataPipelineConfig['dataQualityStrategy']
-        : 'validation'
+        : 'validation')
 
-    const schemaManagement = options.dataPipelineFlags?.pipelineSchema
-      ? options.dataPipelineFlags.pipelineSchema as DataPipelineConfig['schemaManagement']
-      : !auto
+    const schemaManagement: DataPipelineConfig['schemaManagement'] = options.dataPipelineFlags?.pipelineSchema
+      ?? (!auto
         ? await output.select('Schema management?',
           ['none', 'schema-registry', 'contracts'], 'none') as DataPipelineConfig['schemaManagement']
-        : 'none'
+        : 'none')
 
     const hasDataCatalog = options.dataPipelineFlags?.pipelineCatalog
       ?? (!auto ? await output.confirm('Data catalog support?', false) : false)
@@ -352,27 +332,24 @@ export async function askWizardQuestions(options: {
       throw new Error('--ml-phase is required in auto mode for ml projects')
     }
 
-    const projectPhase = options.mlFlags?.mlPhase
-      ? options.mlFlags.mlPhase as MlConfig['projectPhase']
-      : await output.select('Project phase?', ['training', 'inference', 'both']) as MlConfig['projectPhase']
+    const projectPhase: MlConfig['projectPhase'] = options.mlFlags?.mlPhase
+      ?? await output.select('Project phase?', ['training', 'inference', 'both']) as MlConfig['projectPhase']
 
-    const modelType = options.mlFlags?.mlModelType
-      ? options.mlFlags.mlModelType as MlConfig['modelType']
-      : !auto
+    const modelType: MlConfig['modelType'] = options.mlFlags?.mlModelType
+      ?? (!auto
         ? await output.select('Model type?',
           ['classical', 'deep-learning', 'llm'], 'deep-learning') as MlConfig['modelType']
-        : 'deep-learning'
+        : 'deep-learning')
 
     // Default serving pattern depends on project phase to satisfy schema constraints:
     // training-only requires 'none', inference/both require non-'none'
     const autoServingDefault: MlConfig['servingPattern'] =
       projectPhase === 'training' ? 'none' : 'realtime'
-    const servingPattern = options.mlFlags?.mlServing
-      ? options.mlFlags.mlServing as MlConfig['servingPattern']
-      : !auto
+    const servingPattern: MlConfig['servingPattern'] = options.mlFlags?.mlServing
+      ?? (!auto
         ? await output.select('Serving pattern?',
           ['none', 'batch', 'realtime', 'edge'], autoServingDefault) as MlConfig['servingPattern']
-        : autoServingDefault
+        : autoServingDefault)
 
     const hasExperimentTracking = options.mlFlags?.mlExperimentTracking
       ?? (!auto ? await output.confirm('Experiment tracking?', true) : true)
@@ -383,19 +360,17 @@ export async function askWizardQuestions(options: {
   // Browser extension configuration
   let browserExtensionConfig: BrowserExtensionConfig | undefined
   if (projectType === 'browser-extension') {
-    const manifestVersion = options.browserExtensionFlags?.extManifest
-      ? options.browserExtensionFlags.extManifest as BrowserExtensionConfig['manifestVersion']
-      : !auto
+    const manifestVersion: BrowserExtensionConfig['manifestVersion'] = options.browserExtensionFlags?.extManifest
+      ?? (!auto
         ? await output.select('Manifest version?', ['2', '3'], '3') as BrowserExtensionConfig['manifestVersion']
-        : '3'
+        : '3')
 
-    const uiSurfaces = options.browserExtensionFlags?.extUiSurfaces
-      ? options.browserExtensionFlags.extUiSurfaces as BrowserExtensionConfig['uiSurfaces']
-      : !auto
+    const uiSurfaces: BrowserExtensionConfig['uiSurfaces'] = options.browserExtensionFlags?.extUiSurfaces
+      ?? (!auto
         ? await output.multiSelect('UI surfaces?',
           ['popup', 'options', 'newtab', 'devtools', 'sidepanel'],
           ['popup']) as BrowserExtensionConfig['uiSurfaces']
-        : ['popup'] as BrowserExtensionConfig['uiSurfaces']
+        : ['popup'])
 
     const hasContentScript = options.browserExtensionFlags?.extContentScript
       ?? (!auto ? await output.confirm('Content script support?', false) : false)
@@ -412,36 +387,33 @@ export async function askWizardQuestions(options: {
     const gf = options.gameFlags
     // Core questions — use flag if provided, else ask (or default in auto mode)
     const engine: GameConfig['engine'] = gf?.engine
-      ? gf.engine as GameConfig['engine']
-      : !auto
+      ?? (!auto
         ? await output.select('Game engine:', ['unity', 'unreal', 'godot', 'custom']) as GameConfig['engine']
-        : 'custom'
+        : 'custom')
 
     // Derive Zod defaults from engine (used for auto mode and advanced defaults)
     const schemaDefaults = GameConfigSchema.parse({ engine })
 
     const multiplayerMode: GameConfig['multiplayerMode'] = gf?.multiplayer
-      ? gf.multiplayer as GameConfig['multiplayerMode']
-      : !auto
+      ?? (!auto
         ? await output.select(
           'Multiplayer mode:', ['none', 'local', 'online', 'hybrid'], 'none',
         ) as GameConfig['multiplayerMode']
-        : schemaDefaults.multiplayerMode
+        : schemaDefaults.multiplayerMode)
 
     const targetPlatforms: GameConfig['targetPlatforms'] = gf?.targetPlatforms
-      ? gf.targetPlatforms as GameConfig['targetPlatforms']
-      : !auto
+      ?? (!auto
         ? await output.multiSelect(
           'Target platforms:',
           ['pc', 'web', 'ios', 'android', 'ps5', 'xbox', 'switch', 'vr', 'ar'],
           ['pc'],
         ) as GameConfig['targetPlatforms']
-        : schemaDefaults.targetPlatforms
+        : schemaDefaults.targetPlatforms)
 
     // Conditional follow-ups
     let onlineServices: GameConfig['onlineServices']
     if (gf?.onlineServices) {
-      onlineServices = gf.onlineServices as GameConfig['onlineServices']
+      onlineServices = gf.onlineServices
     } else if ((multiplayerMode === 'online' || multiplayerMode === 'hybrid') && !auto) {
       onlineServices = await output.multiSelect(
         'Online services:',
@@ -453,35 +425,27 @@ export async function askWizardQuestions(options: {
     }
 
     const contentStructure: GameConfig['contentStructure'] = gf?.contentStructure
-      ? gf.contentStructure as GameConfig['contentStructure']
-      : !auto
+      ?? (!auto
         ? await output.select(
           'Content structure:',
           ['discrete', 'open-world', 'procedural', 'endless', 'mission-based'],
           'discrete',
         ) as GameConfig['contentStructure']
-        : schemaDefaults.contentStructure
+        : schemaDefaults.contentStructure)
 
     const economy: GameConfig['economy'] = gf?.economy
-      ? gf.economy as GameConfig['economy']
-      : !auto
+      ?? (!auto
         ? await output.select(
           'Economy model:', ['none', 'progression', 'monetized', 'both'], 'none',
         ) as GameConfig['economy']
-        : schemaDefaults.economy
+        : schemaDefaults.economy)
 
     // Advanced options — defaults derived from Zod schema to prevent drift
-    let narrative: GameConfig['narrative'] = gf?.narrative
-      ? gf.narrative as GameConfig['narrative']
-      : schemaDefaults.narrative
+    let narrative: GameConfig['narrative'] = gf?.narrative ?? schemaDefaults.narrative
     let supportedLocales: string[] = gf?.locales ?? schemaDefaults.supportedLocales
-    let npcAiComplexity: GameConfig['npcAiComplexity'] = gf?.npcAi
-      ? gf.npcAi as GameConfig['npcAiComplexity']
-      : schemaDefaults.npcAiComplexity
+    let npcAiComplexity: GameConfig['npcAiComplexity'] = gf?.npcAi ?? schemaDefaults.npcAiComplexity
     let hasModding = gf?.modding ?? schemaDefaults.hasModding
-    let persistence: GameConfig['persistence'] = gf?.persistence
-      ? gf.persistence as GameConfig['persistence']
-      : schemaDefaults.persistence
+    let persistence: GameConfig['persistence'] = gf?.persistence ?? schemaDefaults.persistence
 
     // If any advanced flag was provided via CLI, skip the gate question
     const hasAdvancedFlag = gf?.narrative !== undefined || gf?.locales !== undefined ||
