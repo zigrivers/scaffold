@@ -5,6 +5,7 @@ import { runWizard } from '../../wizard/wizard.js'
 import { runBuild } from './build.js'
 import { syncSkillsIfNeeded } from '../../core/skills/sync.js'
 import { ProjectTypeSchema } from '../../config/schema.js'
+import { coerceCSV } from '../utils/coerce.js'
 
 const GAME_FLAGS = [
   'engine', 'multiplayer', 'target-platforms', 'online-services',
@@ -112,12 +113,6 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
   command: 'init',
   describe: 'Initialize scaffold for this project',
   builder: (yargs: Argv<Record<string, unknown>>) => {
-    const coerceCSV = (val: string | string[]) => {
-      const items = (Array.isArray(val) ? val : [val])
-        .flatMap((v: string) => v.split(',').map((s: string) => s.trim()).filter(Boolean))
-      return [...new Set(items)]
-    }
-
     return (yargs
       // General options
       .option('root', { type: 'string', describe: 'Project root directory' })
