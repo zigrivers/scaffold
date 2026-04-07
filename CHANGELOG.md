@@ -2,6 +2,12 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.9.1] — 2026-04-07
+
+### Fixed
+
+- **ML auto-init for inference projects**: `scaffold init --auto --project-type ml --ml-phase inference` (and `--ml-phase both`) now succeeds. Previously the wizard hard-coded `servingPattern: 'none'` under `--auto`, which the schema rejects when `projectPhase` is `inference` or `both`. The wizard now defaults `servingPattern` to `'realtime'` when phase is inference/both, matching the schema's cross-field validation.
+
 ## [3.9.0] — 2026-04-07
 
 ### Added
