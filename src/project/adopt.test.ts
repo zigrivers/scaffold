@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import os from 'node:os'
 import path from 'node:path'
 import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -334,5 +338,28 @@ describe('runAdoption', () => {
 
     expect(result.artifactsFound).toBe(result.detectedArtifacts.length)
     expect(result.artifactsFound).toBe(2)
+  })
+
+  // Test 13: Unity wins precedence when multi-engine signatures coexist
+  it('Unity wins precedence when multi-engine signatures coexist', () => {
+    // Regression test for Unity > Unreal > Godot precedence.
+    // Fixture has Assets/*.meta + .uproject + project.godot simultaneously.
+    // Pins existing inline logic in src/project/adopt.ts before Task 5
+    // relocates detection to src/project/adopt/detectors/game.ts.
+    const fixturePath = path.join(
+      __dirname,
+      '../../tests/fixtures/adopt/detectors/game/multi-engine',
+    )
+
+    const result = runAdoption({
+      projectRoot: fixturePath,
+      metaPromptDir: path.join(fixturePath, 'content', 'pipeline'),
+      methodology: 'deep',
+      dryRun: true,
+    })
+
+    expect(result.projectType).toBe('game')
+    expect(result.gameConfig).toEqual({ engine: 'unity' })
+    // Unity must win because Assets/*.meta is detected first in adopt.ts:74-82
   })
 })
