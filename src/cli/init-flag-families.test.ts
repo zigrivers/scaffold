@@ -262,6 +262,20 @@ describe('buildFlagOverrides', () => {
       partial: { manifestVersion: '3', uiSurfaces: ['popup'], hasContentScript: true },
     })
   })
+
+  it('omits fields for flags not passed', () => {
+    // Only --engine passed, no --multiplayer, --locales, etc.
+    const result = buildFlagOverrides({ engine: 'unity' } as Record<string, unknown>)
+    expect(result).toEqual({
+      type: 'game',
+      partial: { engine: 'unity' },
+    })
+    // Explicit absence assertions — guards against drive-by refactors that
+    // accidentally write `undefined` into the partial.
+    expect(result!.partial).not.toHaveProperty('multiplayerMode')
+    expect(result!.partial).not.toHaveProperty('supportedLocales')
+    expect(result!.partial).not.toHaveProperty('hasModding')
+  })
 })
 
 // ---------------------------------------------------------------------------

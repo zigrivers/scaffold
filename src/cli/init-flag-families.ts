@@ -95,6 +95,48 @@ export type PartialConfigOverrides =
   | undefined
 
 // ---------------------------------------------------------------------------
+// Private family detection helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Detect which project-type flag family an argv belongs to.
+ *
+ * Checks flag families in the canonical precedence order (game → web-app →
+ * backend → cli → library → mobile-app → data-pipeline → ml →
+ * browser-extension) and returns the first match, or `undefined` when no
+ * type-specific flags are present.
+ *
+ * This helper intentionally returns only the first precedence match — it is
+ * NOT suitable for mixed-family detection. `applyFlagFamilyValidation`
+ * computes its own booleans because it needs to know about ALL families
+ * present in argv to reject mixed-family usage.
+ */
+function detectFamily(
+  argv: Record<string, unknown>,
+):
+  | 'game'
+  | 'web-app'
+  | 'backend'
+  | 'cli'
+  | 'library'
+  | 'mobile-app'
+  | 'data-pipeline'
+  | 'ml'
+  | 'browser-extension'
+  | undefined {
+  if (GAME_FLAGS.some((f) => argv[f] !== undefined)) return 'game'
+  if (WEB_FLAGS.some((f) => argv[f] !== undefined)) return 'web-app'
+  if (BACKEND_FLAGS.some((f) => argv[f] !== undefined)) return 'backend'
+  if (CLI_TYPE_FLAGS.some((f) => argv[f] !== undefined)) return 'cli'
+  if (LIB_FLAGS.some((f) => argv[f] !== undefined)) return 'library'
+  if (MOBILE_FLAGS.some((f) => argv[f] !== undefined)) return 'mobile-app'
+  if (PIPELINE_FLAGS.some((f) => argv[f] !== undefined)) return 'data-pipeline'
+  if (ML_FLAGS.some((f) => argv[f] !== undefined)) return 'ml'
+  if (EXT_FLAGS.some((f) => argv[f] !== undefined)) return 'browser-extension'
+  return undefined
+}
+
+// ---------------------------------------------------------------------------
 // Validation (verbatim from init.ts .check() closure, minus init-only checks)
 // ---------------------------------------------------------------------------
 
@@ -289,17 +331,9 @@ export function applyFlagFamilyValidation(argv: Record<string, unknown>): true |
  * guarantee at most one family is present in argv.
  */
 export function buildFlagOverrides(argv: Record<string, unknown>): PartialConfigOverrides {
-  const hasGameFlag = GAME_FLAGS.some((f) => argv[f] !== undefined)
-  const hasWebFlag = WEB_FLAGS.some((f) => argv[f] !== undefined)
-  const hasBackendFlag = BACKEND_FLAGS.some((f) => argv[f] !== undefined)
-  const hasCliFlag = CLI_TYPE_FLAGS.some((f) => argv[f] !== undefined)
-  const hasLibFlag = LIB_FLAGS.some((f) => argv[f] !== undefined)
-  const hasMobileFlag = MOBILE_FLAGS.some((f) => argv[f] !== undefined)
-  const hasPipelineFlag = PIPELINE_FLAGS.some((f) => argv[f] !== undefined)
-  const hasMlFlag = ML_FLAGS.some((f) => argv[f] !== undefined)
-  const hasExtFlag = EXT_FLAGS.some((f) => argv[f] !== undefined)
-
-  if (hasGameFlag) {
+  const family = detectFamily(argv)
+  switch (family) {
+  case 'game': {
     const partial: Partial<GameConfig> = {}
     if (argv.engine !== undefined) {
       partial.engine = argv.engine as GameConfig['engine']
@@ -336,8 +370,7 @@ export function buildFlagOverrides(argv: Record<string, unknown>): PartialConfig
     }
     return { type: 'game', partial }
   }
-
-  if (hasWebFlag) {
+  case 'web-app': {
     const partial: Partial<WebAppConfig> = {}
     if (argv['web-rendering'] !== undefined) {
       partial.renderingStrategy = argv['web-rendering'] as WebAppConfig['renderingStrategy']
@@ -353,8 +386,7 @@ export function buildFlagOverrides(argv: Record<string, unknown>): PartialConfig
     }
     return { type: 'web-app', partial }
   }
-
-  if (hasBackendFlag) {
+  case 'backend': {
     const partial: Partial<BackendConfig> = {}
     if (argv['backend-api-style'] !== undefined) {
       partial.apiStyle = argv['backend-api-style'] as BackendConfig['apiStyle']
@@ -373,8 +405,7 @@ export function buildFlagOverrides(argv: Record<string, unknown>): PartialConfig
     }
     return { type: 'backend', partial }
   }
-
-  if (hasCliFlag) {
+  case 'cli': {
     const partial: Partial<CliConfig> = {}
     if (argv['cli-interactivity'] !== undefined) {
       partial.interactivity = argv['cli-interactivity'] as CliConfig['interactivity']
@@ -387,8 +418,7 @@ export function buildFlagOverrides(argv: Record<string, unknown>): PartialConfig
     }
     return { type: 'cli', partial }
   }
-
-  if (hasLibFlag) {
+  case 'library': {
     const partial: Partial<LibraryConfig> = {}
     if (argv['lib-visibility'] !== undefined) {
       partial.visibility = argv['lib-visibility'] as LibraryConfig['visibility']
@@ -407,8 +437,7 @@ export function buildFlagOverrides(argv: Record<string, unknown>): PartialConfig
     }
     return { type: 'library', partial }
   }
-
-  if (hasMobileFlag) {
+  case 'mobile-app': {
     const partial: Partial<MobileAppConfig> = {}
     if (argv['mobile-platform'] !== undefined) {
       partial.platform = argv['mobile-platform'] as MobileAppConfig['platform']
@@ -424,8 +453,7 @@ export function buildFlagOverrides(argv: Record<string, unknown>): PartialConfig
     }
     return { type: 'mobile-app', partial }
   }
-
-  if (hasPipelineFlag) {
+  case 'data-pipeline': {
     const partial: Partial<DataPipelineConfig> = {}
     if (argv['pipeline-processing'] !== undefined) {
       partial.processingModel = argv['pipeline-processing'] as DataPipelineConfig['processingModel']
@@ -444,8 +472,7 @@ export function buildFlagOverrides(argv: Record<string, unknown>): PartialConfig
     }
     return { type: 'data-pipeline', partial }
   }
-
-  if (hasMlFlag) {
+  case 'ml': {
     const partial: Partial<MlConfig> = {}
     if (argv['ml-phase'] !== undefined) {
       partial.projectPhase = argv['ml-phase'] as MlConfig['projectPhase']
@@ -461,8 +488,7 @@ export function buildFlagOverrides(argv: Record<string, unknown>): PartialConfig
     }
     return { type: 'ml', partial }
   }
-
-  if (hasExtFlag) {
+  case 'browser-extension': {
     const partial: Partial<BrowserExtensionConfig> = {}
     if (argv['ext-manifest'] !== undefined) {
       partial.manifestVersion = argv['ext-manifest'] as BrowserExtensionConfig['manifestVersion']
@@ -478,6 +504,7 @@ export function buildFlagOverrides(argv: Record<string, unknown>): PartialConfig
     }
     return { type: 'browser-extension', partial }
   }
-
-  return undefined
+  default:
+    return undefined
+  }
 }
