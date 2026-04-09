@@ -45,7 +45,7 @@ vi.mock('../../state/lock-manager.js', () => ({
 }))
 
 vi.mock('../../project/adopt.js', () => ({
-  runAdoption: vi.fn(() => Promise.resolve({
+  runAdoption: vi.fn().mockResolvedValue({
     mode: 'greenfield',
     artifactsFound: 0,
     detectedArtifacts: [],
@@ -54,7 +54,7 @@ vi.mock('../../project/adopt.js', () => ({
     methodology: 'deep',
     errors: [],
     warnings: [],
-  })),
+  }),
 }))
 
 vi.mock('../../core/assembly/meta-prompt-loader.js', () => ({
