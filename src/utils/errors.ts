@@ -330,14 +330,11 @@ export function asScaffoldError(
   fallbackExit: number,
 ): ScaffoldError {
   // Case 1: Already a fully-formed ScaffoldError
-  if (
-    err !== null &&
-    typeof err === 'object' &&
-    'code' in err && typeof (err as Record<string, unknown>).code === 'string' &&
-    'message' in err && typeof (err as Record<string, unknown>).message === 'string' &&
-    'exitCode' in err && typeof (err as Record<string, unknown>).exitCode === 'number'
-  ) {
-    return err as ScaffoldError
+  if (err !== null && typeof err === 'object') {
+    const o = err as Record<string, unknown>
+    if (typeof o.code === 'string' && typeof o.message === 'string' && typeof o.exitCode === 'number') {
+      return err as ScaffoldError
+    }
   }
 
   // Case 2: Error instance
@@ -346,7 +343,9 @@ export function asScaffoldError(
       code: fallbackCode,
       message: err.message || 'Unknown error',
       exitCode: fallbackExit,
-      context: err.stack ? { stack: err.stack.slice(0, 500), name: err.name } : undefined,
+      context: err.stack
+        ? ({ stack: err.stack.slice(0, 500), name: err.name } satisfies Record<string, string | number | undefined>)
+        : undefined,
     }
   }
 

@@ -148,6 +148,10 @@ describe('asScaffoldError', () => {
     expect(result.code).toBe('FALLBACK')
     expect(result.message).toBe('boom')
     expect(result.exitCode).toBe(1)
+    // Context shape: name and truncated stack (guards against type tightening)
+    expect(result.context?.name).toBe('Error')
+    expect(typeof result.context?.stack).toBe('string')
+    expect((result.context!.stack as string).length).toBeLessThanOrEqual(500)
   })
 
   it('wraps an Error instance without a message', () => {
