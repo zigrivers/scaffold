@@ -21,6 +21,7 @@ export enum ExitCode {
   StateCorruption = 3,
   UserCancellation = 4,
   BuildError = 5,
+  Ambiguous = 6,       // operator action required (detection ambiguity, type conflict)
 }
 
 /** Output mode for CLI. */

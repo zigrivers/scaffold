@@ -190,9 +190,9 @@ const ProjectSchema = z.object({
 
 export const ConfigSchema = z.object({
   version: z.literal(2),
-  methodology: z.enum(['deep', 'mvp', 'custom']),
+  methodology: z.enum(['deep', 'mvp', 'custom']).default('deep'),
   custom: CustomSchema.optional(),
-  platforms: z.array(z.enum(['claude-code', 'codex', 'gemini'])).min(1),
+  platforms: z.array(z.enum(['claude-code', 'codex', 'gemini'])).min(1).default(['claude-code']),
   project: ProjectSchema.optional(),
 }).passthrough()  // allow unknown fields at top level per ADR-033
 

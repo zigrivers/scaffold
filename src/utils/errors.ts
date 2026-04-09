@@ -317,3 +317,49 @@ export function overlayMalformedSection(section: string, file: string): Scaffold
     context: { section, file },
   }
 }
+
+/**
+ * Converts any thrown value into a well-formed ScaffoldError.
+ * - Already-shaped ScaffoldError objects are returned unchanged (strict duck-type check).
+ * - Error instances have their message extracted; stack included in context.
+ * - String/null/undefined/other throws are wrapped with the fallback code.
+ */
+export function asScaffoldError(
+  err: unknown,
+  fallbackCode: string,
+  fallbackExit: number,
+): ScaffoldError {
+  // Case 1: Already a fully-formed ScaffoldError
+  if (
+    err !== null &&
+    typeof err === 'object' &&
+    'code' in err && typeof (err as Record<string, unknown>).code === 'string' &&
+    'message' in err && typeof (err as Record<string, unknown>).message === 'string' &&
+    'exitCode' in err && typeof (err as Record<string, unknown>).exitCode === 'number'
+  ) {
+    return err as ScaffoldError
+  }
+
+  // Case 2: Error instance
+  if (err instanceof Error) {
+    return {
+      code: fallbackCode,
+      message: err.message || 'Unknown error',
+      exitCode: fallbackExit,
+      context: err.stack ? { stack: err.stack.slice(0, 500), name: err.name } : undefined,
+    }
+  }
+
+  // Case 3: non-Error throws
+  return {
+    code: fallbackCode,
+    message: typeof err === 'string'
+      ? err
+      : err === null
+        ? 'null error thrown'
+        : err === undefined
+          ? 'undefined error thrown'
+          : `Non-Error thrown: ${String(err)}`,
+    exitCode: fallbackExit,
+  }
+}
