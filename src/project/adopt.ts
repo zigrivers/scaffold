@@ -29,12 +29,12 @@ export interface AdoptionResult {
  * Scan projectRoot for existing artifacts, match to pipeline steps,
  * and pre-populate state.json.
  */
-export function runAdoption(options: {
+export async function runAdoption(options: {
   projectRoot: string
   metaPromptDir: string
   methodology: string
   dryRun: boolean
-}): AdoptionResult {
+}): Promise<AdoptionResult> {
   const { projectRoot, metaPromptDir, methodology } = options
 
   // 1. Detect project mode
