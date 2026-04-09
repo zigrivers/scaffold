@@ -109,6 +109,80 @@ function extractPyName(spec: string): string {
   return normalizePep503(s.trim())
 }
 
+// Module-private dep matchers — shared by real and fake contexts
+
+const NPM_ALL_SCOPES: readonly NpmDepScope[] = ['deps', 'dev', 'peer', 'optional']
+
+function npmBucket(pkg: PackageJson, s: NpmDepScope): Readonly<Record<string, string>> | undefined {
+  return s === 'deps' ? pkg.dependencies
+    : s === 'dev' ? pkg.devDependencies
+      : s === 'peer' ? pkg.peerDependencies
+        : pkg.optionalDependencies
+}
+
+function resolveNpmScopes(scope: DepScope): readonly NpmDepScope[] {
+  if (scope === 'all') return NPM_ALL_SCOPES
+  if (scope === 'deps' || scope === 'dev' || scope === 'peer' || scope === 'optional') return [scope]
+  return NPM_ALL_SCOPES   // defensive fallback — matches old real-context behavior
+}
+
+function matchNpmDep(pkg: PackageJson | undefined, name: string, scope: DepScope): boolean {
+  if (!pkg) return false
+  for (const s of resolveNpmScopes(scope)) {
+    const bucket = npmBucket(pkg, s)
+    if (bucket && name in bucket) return true
+  }
+  return false
+}
+
+function matchPyDep(py: PyprojectToml | undefined, name: string): boolean {
+  if (!py) return false
+  const normalized = normalizePep503(name)
+  const pep621 = py.project?.dependencies ?? []
+  for (const spec of pep621) {
+    if (extractPyName(spec) === normalized) return true
+  }
+  const poetryDeps = py.tool?.poetry?.dependencies
+  if (poetryDeps) {
+    for (const key of Object.keys(poetryDeps)) {
+      if (key === 'python') continue
+      if (normalizePep503(key) === normalized) return true
+    }
+  }
+  const poetryDev = py.tool?.poetry?.['dev-dependencies']
+  if (poetryDev) {
+    for (const key of Object.keys(poetryDev)) {
+      if (normalizePep503(key) === normalized) return true
+    }
+  }
+  const groups = py.tool?.poetry?.group ?? {}
+  for (const group of Object.values(groups)) {
+    if (group.dependencies) {
+      for (const key of Object.keys(group.dependencies)) {
+        if (normalizePep503(key) === normalized) return true
+      }
+    }
+  }
+  return false
+}
+
+function matchCargoDep(cargo: CargoToml | undefined, name: string): boolean {
+  if (!cargo) return false
+  if (cargo.dependencies && name in cargo.dependencies) return true
+  if (cargo['dev-dependencies'] && name in cargo['dev-dependencies']) return true
+  return false
+}
+
+function matchGoDep(go: GoMod | undefined, name: string): boolean {
+  if (!go) return false
+  for (const req of go.requires ?? []) {
+    if (req.indirect) continue
+    if (req.path === name) return true
+    if (req.path.startsWith(`${name}/`)) return true
+  }
+  return false
+}
+
 // go.mod parser (handles multi-line require blocks + // indirect)
 function parseGoMod(content: string): GoMod {
   const result: { module?: string; goVersion?: string; requires: GoModRequire[] } = { requires: [] }
@@ -264,8 +338,11 @@ export function createSignalContext(projectRoot: string): SignalContext {
       if (stat.size > maxBytes) {
         const fd = fs.openSync(full, 'r')
         const buf = Buffer.alloc(maxBytes)
-        fs.readSync(fd, buf, 0, maxBytes, 0)
-        fs.closeSync(fd)
+        try {
+          fs.readSync(fd, buf, 0, maxBytes, 0)
+        } finally {
+          fs.closeSync(fd)
+        }
         warnings.push({
           code: 'ADOPT_FILE_TRUNCATED',
           message: `File truncated to ${maxBytes} bytes`,
@@ -501,88 +578,15 @@ export function createSignalContext(projectRoot: string): SignalContext {
     }
   }
 
-  function depInNpm(name: string, scope: DepScope): boolean {
-    const pkg = packageJson()
-    if (!pkg) return false
-    const scopes: NpmDepScope[] = scope === 'all'
-      ? ['deps', 'dev', 'peer', 'optional']
-      : scope === 'deps' || scope === 'dev' || scope === 'peer' || scope === 'optional'
-        ? [scope]
-        : ['deps', 'dev', 'peer', 'optional']
-    for (const s of scopes) {
-      const bucket = s === 'deps' ? pkg.dependencies
-        : s === 'dev' ? pkg.devDependencies
-          : s === 'peer' ? pkg.peerDependencies
-            : pkg.optionalDependencies
-      if (bucket && name in bucket) return true
-    }
-    return false
-  }
-
-  function depInPy(name: string): boolean {
-    const py = pyprojectToml()
-    if (!py) return false
-    const normalized = normalizePep503(name)
-    // PEP 621 project.dependencies
-    const pep621 = py.project?.dependencies ?? []
-    for (const spec of pep621) {
-      if (extractPyName(spec) === normalized) return true
-    }
-    // Poetry [tool.poetry.dependencies]
-    const poetryDeps = py.tool?.poetry?.dependencies
-    if (poetryDeps) {
-      for (const key of Object.keys(poetryDeps)) {
-        if (key === 'python') continue
-        if (normalizePep503(key) === normalized) return true
-      }
-    }
-    // Poetry dev deps
-    const poetryDev = py.tool?.poetry?.['dev-dependencies']
-    if (poetryDev) {
-      for (const key of Object.keys(poetryDev)) {
-        if (normalizePep503(key) === normalized) return true
-      }
-    }
-    // Poetry group deps
-    const groups = py.tool?.poetry?.group ?? {}
-    for (const group of Object.values(groups)) {
-      if (group.dependencies) {
-        for (const key of Object.keys(group.dependencies)) {
-          if (normalizePep503(key) === normalized) return true
-        }
-      }
-    }
-    return false
-  }
-
-  function depInCargo(name: string): boolean {
-    const cargo = cargoToml()
-    if (!cargo) return false
-    if (cargo.dependencies && name in cargo.dependencies) return true
-    if (cargo['dev-dependencies'] && name in cargo['dev-dependencies']) return true
-    return false
-  }
-
-  function depInGo(name: string): boolean {
-    const go = goMod()
-    if (!go) return false
-    for (const req of go.requires ?? []) {
-      if (req.indirect) continue        // filter indirect by default
-      if (req.path === name) return true
-      if (req.path.startsWith(`${name}/`)) return true
-    }
-    return false
-  }
-
   function hasDep(name: string, where?: ManifestKind | readonly ManifestKind[], scope: DepScope = 'all'): boolean {
     const kinds: ManifestKind[] = where
       ? Array.isArray(where) ? [...where] : [where as ManifestKind]
       : ['npm', 'py', 'cargo', 'go']
     for (const kind of kinds) {
-      if (kind === 'npm' && depInNpm(name, scope)) return true
-      if (kind === 'py' && depInPy(name)) return true
-      if (kind === 'cargo' && depInCargo(name)) return true
-      if (kind === 'go' && depInGo(name)) return true
+      if (kind === 'npm' && matchNpmDep(packageJson(), name, scope)) return true
+      if (kind === 'py' && matchPyDep(pyprojectToml(), name)) return true
+      if (kind === 'cargo' && matchCargoDep(cargoToml(), name)) return true
+      if (kind === 'go' && matchGoDep(goMod(), name)) return true
     }
     return false
   }
@@ -652,43 +656,17 @@ export function createFakeSignalContext(input: FakeContextInput = {}): SignalCon
   const cargo = manifestVal<CargoToml>(input.cargoToml, 'cargo')
   const go = manifestVal<GoMod>(input.goMod, 'go')
 
-  // Delegate to real createSignalContext's dep logic where possible
-  // (keep behavior identical between fake and real contexts)
+  // Reuses the same module-private matchers as the real context,
+  // so fake and real behaviors stay in lockstep.
   function hasDep(name: string, where?: ManifestKind | readonly ManifestKind[], scope: DepScope = 'all'): boolean {
     const kinds: ManifestKind[] = where
       ? Array.isArray(where) ? [...where] : [where as ManifestKind]
       : ['npm', 'py', 'cargo', 'go']
     for (const kind of kinds) {
-      if (kind === 'npm' && pkg.val) {
-        const scopes: NpmDepScope[] = scope === 'all' ? ['deps', 'dev', 'peer', 'optional'] : [scope as NpmDepScope]
-        for (const s of scopes) {
-          const bucket = s === 'deps' ? pkg.val.dependencies
-            : s === 'dev' ? pkg.val.devDependencies
-              : s === 'peer' ? pkg.val.peerDependencies
-                : pkg.val.optionalDependencies
-          if (bucket && name in bucket) return true
-        }
-      }
-      // Use the SAME normalization as the real context (no shortcuts)
-      if (kind === 'py' && py.val) {
-        const normalized = name.toLowerCase().replace(/[-_.]+/g, '-')
-        const pep621 = py.val.project?.dependencies ?? []
-        for (const spec of pep621) {
-          // Strip env markers, URL fragments, extras, version specs
-          let s = spec.split(';')[0].split('@')[0]
-          s = s.replace(/[=<>!~].*$/, '').replace(/\[.*?\]/, '').trim()
-          if (s.toLowerCase().replace(/[-_.]+/g, '-') === normalized) return true
-        }
-        const poetryDeps = py.val.tool?.poetry?.dependencies
-        if (poetryDeps) {
-          for (const key of Object.keys(poetryDeps)) {
-            if (key === 'python') continue
-            if (key.toLowerCase().replace(/[-_.]+/g, '-') === normalized) return true
-          }
-        }
-      }
-      if (kind === 'cargo' && cargo.val?.dependencies && name in cargo.val.dependencies) return true
-      if (kind === 'go' && go.val?.requires?.some(r => !r.indirect && r.path === name)) return true
+      if (kind === 'npm' && matchNpmDep(pkg.val, name, scope)) return true
+      if (kind === 'py' && matchPyDep(py.val, name)) return true
+      if (kind === 'cargo' && matchCargoDep(cargo.val, name)) return true
+      if (kind === 'go' && matchGoDep(go.val, name)) return true
     }
     return false
   }

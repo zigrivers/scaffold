@@ -10,12 +10,21 @@ export function stripJsTsComments(content: string): string {
   const lines = result.split('\n')
   const stripped = lines.map(line => {
     let inSingle = false, inDouble = false, inTemplate = false
+    let prevWasBackslash = false
     for (let i = 0; i < line.length; i++) {
       const ch = line[i]
       if (!inSingle && !inDouble && !inTemplate && ch === '/' && line[i + 1] === '/') {
         return line.slice(0, i)
       }
-      if (i > 0 && line[i - 1] === '\\') continue
+      if (prevWasBackslash) {
+        // This char is escaped — ignore it for toggle logic
+        prevWasBackslash = false
+        continue
+      }
+      if (ch === '\\') {
+        prevWasBackslash = true
+        continue
+      }
       if (!inDouble && !inTemplate && ch === '\'') inSingle = !inSingle
       else if (!inSingle && !inTemplate && ch === '"') inDouble = !inDouble
       else if (!inSingle && !inDouble && ch === '`') inTemplate = !inTemplate

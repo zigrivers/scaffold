@@ -21,6 +21,17 @@ describe('stripJsTsComments', () => {
   it('blanks template literal contents', () => {
     expect(stripJsTsComments('const x = `output: "export"`')).toBe('const x = ``')
   })
+
+  it('handles escaped backslashes before quote correctly', () => {
+    // The string literal is: const path = "C:\\"  // comment
+    // That's a string containing a single backslash, followed by // comment.
+    // Before the fix, the \\ before " would confuse the escape tracker and
+    // leave the comment stripper in a bad state.
+    const input = 'const path = "C:\\\\" // comment'
+    const output = stripJsTsComments(input)
+    // The // comment should be stripped (it's outside the string)
+    expect(output).toBe('const path = "C:\\\\" ')
+  })
 })
 
 describe('matchesConfigExport', () => {

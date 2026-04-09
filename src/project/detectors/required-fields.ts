@@ -9,8 +9,7 @@ export function getRequiredFieldsWithoutDefaults<T extends z.ZodRawShape>(
   const required: string[] = []
   for (const key of Object.keys(shape)) {
     const field = shape[key] as z.ZodTypeAny
-    if (field._def.typeName === 'ZodOptional') continue
-    if (field._def.typeName === 'ZodDefault') continue
+    if (field.isOptional()) continue
     required.push(key)
   }
   return required
