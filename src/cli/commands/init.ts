@@ -6,45 +6,15 @@ import { runBuild } from './build.js'
 import { syncSkillsIfNeeded } from '../../core/skills/sync.js'
 import { ProjectTypeSchema } from '../../config/schema.js'
 import { coerceCSV } from '../utils/coerce.js'
+import {
+  GAME_FLAGS, WEB_FLAGS, BACKEND_FLAGS, CLI_TYPE_FLAGS,
+  LIB_FLAGS, MOBILE_FLAGS, PIPELINE_FLAGS, ML_FLAGS, EXT_FLAGS,
+  applyFlagFamilyValidation,
+} from '../init-flag-families.js'
 import type {
   GameFlags, WebAppFlags, BackendFlags, CliFlags, LibraryFlags,
   MobileAppFlags, DataPipelineFlags, MlFlags, BrowserExtensionFlags,
 } from '../../wizard/flags.js'
-
-const GAME_FLAGS = [
-  'engine', 'multiplayer', 'target-platforms', 'online-services',
-  'content-structure', 'economy', 'narrative', 'locales',
-  'npc-ai', 'modding', 'persistence',
-] as const
-
-const WEB_FLAGS = [
-  'web-rendering', 'web-deploy-target',
-  'web-realtime', 'web-auth-flow',
-] as const
-
-const BACKEND_FLAGS = [
-  'backend-api-style', 'backend-data-store', 'backend-auth',
-  'backend-messaging', 'backend-deploy-target',
-] as const
-
-const CLI_TYPE_FLAGS = [
-  'cli-interactivity', 'cli-distribution',
-  'cli-structured-output',
-] as const
-
-const LIB_FLAGS = [
-  'lib-visibility', 'lib-runtime-target', 'lib-bundle-format',
-  'lib-type-definitions', 'lib-doc-level',
-] as const
-
-const MOBILE_FLAGS = ['mobile-platform', 'mobile-distribution', 'mobile-offline', 'mobile-push-notifications'] as const
-
-const PIPELINE_FLAGS = [
-  'pipeline-processing', 'pipeline-orchestration',
-  'pipeline-quality', 'pipeline-schema', 'pipeline-catalog',
-] as const
-const ML_FLAGS = ['ml-phase', 'ml-model-type', 'ml-serving', 'ml-experiment-tracking'] as const
-const EXT_FLAGS = ['ext-manifest', 'ext-ui-surfaces', 'ext-content-script', 'ext-background-worker'] as const
 
 interface InitArgs {
   format?: string
@@ -398,27 +368,12 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       })
       // Validation
       .check((argv) => {
-        // --depth requires --methodology custom
+        // --depth requires --methodology custom (init-only)
         if (argv.depth !== undefined && argv.methodology !== 'custom') {
           throw new Error('--depth requires --methodology custom')
         }
 
-        // Game flags auto-set --project-type game; error if explicitly non-game
-        const hasGameFlag = GAME_FLAGS.some((f) => argv[f] !== undefined)
-        if (hasGameFlag) {
-          if (argv['project-type'] !== undefined && argv['project-type'] !== 'game') {
-            throw new Error('Game flags (--engine, --multiplayer, etc.) require --project-type game')
-          }
-        }
-
-        // --online-services requires --multiplayer online|hybrid
-        if (argv['online-services'] !== undefined) {
-          if (argv.multiplayer !== 'online' && argv.multiplayer !== 'hybrid') {
-            throw new Error('--online-services requires --multiplayer online or --multiplayer hybrid')
-          }
-        }
-
-        // Validate array enum values
+        // Validate array enum values (init-only)
         const validAdapters = ['claude-code', 'codex', 'gemini']
         if (argv.adapters) {
           for (const a of argv.adapters as string[]) {
@@ -437,152 +392,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
           }
         }
 
-        const validPlatforms = ['pc', 'web', 'ios', 'android', 'ps5', 'xbox', 'switch', 'vr', 'ar']
-        if (argv['target-platforms']) {
-          for (const p of argv['target-platforms'] as string[]) {
-            if (!validPlatforms.includes(p)) {
-              throw new Error(`Invalid target platform "${p}". Valid: ${validPlatforms.join(', ')}`)
-            }
-          }
-        }
-
-        const validServices = ['leaderboards', 'accounts', 'matchmaking', 'live-ops']
-        if (argv['online-services']) {
-          for (const s of argv['online-services'] as string[]) {
-            if (!validServices.includes(s)) {
-              throw new Error(`Invalid online service "${s}". Valid: ${validServices.join(', ')}`)
-            }
-          }
-        }
-
-        // Validate locale format
-        const localeRegex = /^[a-z]{2}(-[A-Z]{2})?$/
-        if (argv.locales) {
-          for (const l of argv.locales as string[]) {
-            if (!localeRegex.test(l)) {
-              throw new Error(`Invalid locale "${l}". Must match pattern: en, en-US, ja, fr-FR`)
-            }
-          }
-        }
-
-        // New project type flag detection
-        const hasWebFlag = WEB_FLAGS.some((f) => argv[f] !== undefined)
-        const hasBackendFlag = BACKEND_FLAGS.some(
-          (f) => argv[f] !== undefined,
-        )
-        const hasCliFlag = CLI_TYPE_FLAGS.some(
-          (f) => argv[f] !== undefined,
-        )
-        const hasLibFlag = LIB_FLAGS.some((f) => argv[f] !== undefined)
-        const hasMobileFlag = MOBILE_FLAGS.some((f) => argv[f] !== undefined)
-        const hasPipelineFlag = PIPELINE_FLAGS.some((f) => argv[f] !== undefined)
-        const hasMlFlag = ML_FLAGS.some((f) => argv[f] !== undefined)
-        const hasExtFlag = EXT_FLAGS.some((f) => argv[f] !== undefined)
-
-        // Reject mixed-family flags
-        const typeCount = [
-          hasGameFlag, hasWebFlag, hasBackendFlag,
-          hasCliFlag, hasLibFlag, hasMobileFlag,
-          hasPipelineFlag, hasMlFlag, hasExtFlag,
-        ].filter(Boolean).length
-        if (typeCount > 1) {
-          throw new Error(
-            'Cannot mix flags from multiple project types'
-            + ' (--web-*, --backend-*, --cli-*, --lib-*, --mobile-*, --pipeline-*, --ml-*, --ext-*, game flags)',
-          )
-        }
-
-        // Web flags require web-app project type
-        if (hasWebFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'web-app') {
-          throw new Error('--web-* flags require --project-type web-app')
-        }
-        if (hasBackendFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'backend') {
-          throw new Error('--backend-* flags require --project-type backend')
-        }
-        if (hasCliFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'cli') {
-          throw new Error('--cli-* flags require --project-type cli')
-        }
-        if (hasLibFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'library') {
-          throw new Error('--lib-* flags require --project-type library')
-        }
-        if (hasMobileFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'mobile-app') {
-          throw new Error('--mobile-* flags require --project-type mobile-app')
-        }
-        if (hasPipelineFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'data-pipeline') {
-          throw new Error('--pipeline-* flags require --project-type data-pipeline')
-        }
-        if (hasMlFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'ml') {
-          throw new Error('--ml-* flags require --project-type ml')
-        }
-        if (hasExtFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'browser-extension') {
-          throw new Error('--ext-* flags require --project-type browser-extension')
-        }
-
-        // CSV enum validation for array flags
-        const validDataStores = ['relational', 'document', 'key-value']
-        if (argv['backend-data-store']) {
-          const invalid = (argv['backend-data-store'] as string[]).filter(
-            (v: string) => !validDataStores.includes(v),
-          )
-          if (invalid.length) {
-            throw new Error(
-              `Invalid --backend-data-store value(s): ${invalid.join(', ')}`,
-            )
-          }
-        }
-        if (
-          argv['backend-data-store'] &&
-          (argv['backend-data-store'] as string[]).length === 0
-        ) {
-          throw new Error('--backend-data-store requires at least one value')
-        }
-        const validDistChannels = [
-          'package-manager', 'system-package-manager',
-          'standalone-binary', 'container',
-        ]
-        if (argv['cli-distribution']) {
-          const invalid = (argv['cli-distribution'] as string[]).filter(
-            (v: string) => !validDistChannels.includes(v),
-          )
-          if (invalid.length) {
-            throw new Error(
-              `Invalid --cli-distribution value(s): ${invalid.join(', ')}`,
-            )
-          }
-        }
-        if (
-          argv['cli-distribution'] &&
-          (argv['cli-distribution'] as string[]).length === 0
-        ) {
-          throw new Error('--cli-distribution requires at least one value')
-        }
-        const validUiSurfaces = ['popup', 'options', 'newtab', 'devtools', 'sidepanel']
-        if (argv['ext-ui-surfaces']) {
-          const invalid = (argv['ext-ui-surfaces'] as string[]).filter(
-            (v: string) => !validUiSurfaces.includes(v),
-          )
-          if (invalid.length) {
-            throw new Error(
-              `Invalid --ext-ui-surfaces value(s): ${invalid.join(', ')}`,
-            )
-          }
-        }
-        if (
-          argv['ext-ui-surfaces'] &&
-          (argv['ext-ui-surfaces'] as string[]).length === 0
-        ) {
-          throw new Error('--ext-ui-surfaces requires at least one value')
-        }
-
-        // WebApp cross-field validation
-        if (['ssr', 'hybrid'].includes(argv['web-rendering'] as string) && argv['web-deploy-target'] === 'static') {
-          throw new Error('SSR/hybrid rendering requires compute, not static hosting')
-        }
-        if (argv['web-auth-flow'] === 'session' && argv['web-deploy-target'] === 'static') {
-          throw new Error('Session auth requires server state, incompatible with static hosting')
-        }
-
-        return true
+        return applyFlagFamilyValidation(argv as Record<string, unknown>)
       })
       // Help grouping
       .group(['methodology', 'depth', 'adapters', 'traits', 'project-type'], 'Configuration:')
