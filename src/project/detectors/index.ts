@@ -2,26 +2,23 @@
 import type { SignalContext } from './context.js'
 import type { Detector, DetectionMatch } from './types.js'
 import { detectGame } from './game.js'
-import { detectWebApp } from './web-app.js'
-import { detectBackend } from './backend.js'
-import { detectCli } from './cli.js'
-import { detectLibrary } from './library.js'
+import { detectBrowserExtension } from './browser-extension.js'
 import { detectMobileApp } from './mobile-app.js'
 import { detectDataPipeline } from './data-pipeline.js'
+import { detectWebApp } from './web-app.js'
+import { detectBackend } from './backend.js'
 import { detectMl } from './ml.js'
+import { detectCli } from './cli.js'
+import { detectLibrary } from './library.js'
 
-// Ordering is a performance optimization only. Correctness does NOT depend on order —
-// all matches are collected and disambiguated per Section 3 Case A-G. Reordering is
-// behavior-preserving. Current order: specific-signature detectors first (cheap
-// distinctive failures), dep-heavy detectors middle, catch-all library last.
+// Order is a PERFORMANCE optimization only. Correctness does NOT depend on order
+// — all matches are collected and disambiguated per Section 3 Case A-G.
 export const ALL_DETECTORS: readonly Detector[] = [
-  detectGame,
-  detectMobileApp,
-  detectDataPipeline,
-  detectWebApp,
-  detectBackend,
-  detectMl,
-  detectCli,
+  // Tier 1: distinctive root-file detectors (cheap distinctive failures)
+  detectGame, detectBrowserExtension, detectMobileApp, detectDataPipeline,
+  // Tier 2: dep-heavy detectors
+  detectWebApp, detectBackend, detectMl, detectCli,
+  // Tier 3: catch-all
   detectLibrary,
 ]
 
