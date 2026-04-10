@@ -2,6 +2,7 @@
 import type { SignalContext } from './context.js'
 import type { Detector, DetectionMatch } from './types.js'
 import { detectGame } from './game.js'
+import { detectWebApp } from './web-app.js'
 
 // Ordering is a performance optimization only. Correctness does NOT depend on order —
 // all matches are collected and disambiguated per Section 3 Case A-G. Reordering is
@@ -9,6 +10,7 @@ import { detectGame } from './game.js'
 // distinctive failures), dep-heavy detectors middle, catch-all library last.
 export const ALL_DETECTORS: readonly Detector[] = [
   detectGame,
+  detectWebApp,
 ]
 
 export function runDetectors(

@@ -1,0 +1,1 @@
+{"name":"demo","dependencies":{"@sveltejs/kit":"2","@sveltejs/adapter-vercel":"5","next-auth":"4"}}
