@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { ScaffoldError, ScaffoldWarning, ProjectType, GameConfig } from '../types/index.js'
+import type { ScaffoldError, ScaffoldWarning, ProjectType, GameConfig, DetectedConfig } from '../types/index.js'
+import type { Confidence, DetectionEvidence } from './detectors/types.js'
 import { detectProjectMode } from './detector.js'
 import { discoverMetaPrompts } from '../core/assembly/meta-prompt-loader.js'
 import { createSignalContext } from './detectors/context.js'
@@ -24,7 +25,11 @@ export interface AdoptionResult {
   errors: ScaffoldError[]
   warnings: ScaffoldWarning[]
   projectType?: ProjectType
+  /** @deprecated Use detectedConfig instead. Removed in v4.0. */
   gameConfig?: Partial<GameConfig>
+  detectedConfig?: DetectedConfig
+  detectionEvidence?: readonly DetectionEvidence[]
+  detectionConfidence?: Confidence
 }
 
 /**
@@ -93,7 +98,10 @@ export async function runAdoption(options: {
 
   if (gameMatch) {
     result.projectType = 'game'
-    result.gameConfig = gameMatch.partialConfig
+    result.gameConfig = gameMatch.partialConfig           // deprecated alias (v4.0 removal)
+    result.detectedConfig = { type: 'game', config: gameMatch.partialConfig }
+    result.detectionEvidence = gameMatch.evidence
+    result.detectionConfidence = gameMatch.confidence
   }
 
   return result

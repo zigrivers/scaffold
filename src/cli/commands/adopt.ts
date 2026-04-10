@@ -131,6 +131,9 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
         dry_run: dryRun,
         ...(adoptResult.projectType && { project_type: adoptResult.projectType }),
         ...(adoptResult.gameConfig && { game_config: adoptResult.gameConfig }),
+        ...(adoptResult.detectedConfig && { detected_config: adoptResult.detectedConfig }),
+        ...(adoptResult.detectionConfidence && { detection_confidence: adoptResult.detectionConfidence }),
+        ...(adoptResult.detectionEvidence && { detection_evidence: adoptResult.detectionEvidence }),
       }
 
       if (outputMode === 'json') {

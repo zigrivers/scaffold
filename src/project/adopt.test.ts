@@ -266,6 +266,9 @@ describe('runAdoption', () => {
 
     expect(result.projectType).toBe('game')
     expect(result.gameConfig).toEqual({ engine: 'unity' })
+    expect(result.detectedConfig).toEqual({ type: 'game', config: { engine: 'unity' } })
+    expect(Array.isArray(result.detectionEvidence)).toBe(true)
+    expect(result.detectionConfidence).toBe('high')
   })
 
   // Test 9: Detects Unreal project (.uproject file)
@@ -281,6 +284,9 @@ describe('runAdoption', () => {
 
     expect(result.projectType).toBe('game')
     expect(result.gameConfig).toEqual({ engine: 'unreal' })
+    expect(result.detectedConfig).toEqual({ type: 'game', config: { engine: 'unreal' } })
+    expect(Array.isArray(result.detectionEvidence)).toBe(true)
+    expect(result.detectionConfidence).toBe('high')
   })
 
   // Test 10: Detects Godot project (project.godot file)
@@ -296,6 +302,9 @@ describe('runAdoption', () => {
 
     expect(result.projectType).toBe('game')
     expect(result.gameConfig).toEqual({ engine: 'godot' })
+    expect(result.detectedConfig).toEqual({ type: 'game', config: { engine: 'godot' } })
+    expect(Array.isArray(result.detectionEvidence)).toBe(true)
+    expect(result.detectionConfidence).toBe('high')
   })
 
   // Test 11: Non-game project returns no projectType
@@ -310,6 +319,9 @@ describe('runAdoption', () => {
 
     expect(result.projectType).toBeUndefined()
     expect(result.gameConfig).toBeUndefined()
+    expect(result.detectedConfig).toBeUndefined()
+    expect(result.detectionEvidence).toBeUndefined()
+    expect(result.detectionConfidence).toBeUndefined()
   })
 
   // Test 12: artifactsFound count matches detected artifacts
@@ -360,6 +372,9 @@ describe('runAdoption', () => {
 
     expect(result.projectType).toBe('game')
     expect(result.gameConfig).toEqual({ engine: 'unity' })
+    expect(result.detectedConfig).toEqual({ type: 'game', config: { engine: 'unity' } })
+    expect(Array.isArray(result.detectionEvidence)).toBe(true)
+    expect(result.detectionConfidence).toBe('high')
     // Unity must win because Assets/*.meta is detected first in adopt.ts:74-82
   })
 })

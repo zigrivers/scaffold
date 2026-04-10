@@ -61,6 +61,22 @@ export type GameConfig = z.infer<typeof GameConfigSchema>
 /** Game engine options — derived from GameConfig (single source of truth). */
 export type GameEngine = GameConfig['engine']
 
+/**
+ * Discriminated union for detected project configuration (v3.10+).
+ * Replaces the single `gameConfig` field with a polymorphic shape
+ * so any project type's config can flow through the same channel.
+ */
+export type DetectedConfig =
+  | { type: 'web-app'; config: Partial<WebAppConfig> }
+  | { type: 'backend'; config: Partial<BackendConfig> }
+  | { type: 'cli'; config: Partial<CliConfig> }
+  | { type: 'library'; config: Partial<LibraryConfig> }
+  | { type: 'mobile-app'; config: Partial<MobileAppConfig> }
+  | { type: 'data-pipeline'; config: Partial<DataPipelineConfig> }
+  | { type: 'ml'; config: Partial<MlConfig> }
+  | { type: 'browser-extension'; config: Partial<BrowserExtensionConfig> }
+  | { type: 'game'; config: Partial<GameConfig> }
+
 /** Override entry for knowledge injection. */
 export interface KnowledgeOverride {
   append: string[]
