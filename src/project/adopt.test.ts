@@ -262,11 +262,14 @@ describe('runAdoption', () => {
       metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
       dryRun: false,
+      auto: true,
     })
 
     expect(result.projectType).toBe('game')
-    expect(result.gameConfig).toEqual({ engine: 'unity' })
-    expect(result.detectedConfig).toEqual({ type: 'game', config: { engine: 'unity' } })
+    // gameConfig now includes Zod defaults from GameConfigSchema.parse()
+    expect(result.gameConfig).toEqual(expect.objectContaining({ engine: 'unity' }))
+    expect(result.detectedConfig?.type).toBe('game')
+    expect(result.detectedConfig?.config).toEqual(expect.objectContaining({ engine: 'unity' }))
     expect(Array.isArray(result.detectionEvidence)).toBe(true)
     expect(result.detectionConfidence).toBe('high')
   })
@@ -280,11 +283,13 @@ describe('runAdoption', () => {
       metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
       dryRun: false,
+      auto: true,
     })
 
     expect(result.projectType).toBe('game')
-    expect(result.gameConfig).toEqual({ engine: 'unreal' })
-    expect(result.detectedConfig).toEqual({ type: 'game', config: { engine: 'unreal' } })
+    expect(result.gameConfig).toEqual(expect.objectContaining({ engine: 'unreal' }))
+    expect(result.detectedConfig?.type).toBe('game')
+    expect(result.detectedConfig?.config).toEqual(expect.objectContaining({ engine: 'unreal' }))
     expect(Array.isArray(result.detectionEvidence)).toBe(true)
     expect(result.detectionConfidence).toBe('high')
   })
@@ -298,11 +303,13 @@ describe('runAdoption', () => {
       metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
       dryRun: false,
+      auto: true,
     })
 
     expect(result.projectType).toBe('game')
-    expect(result.gameConfig).toEqual({ engine: 'godot' })
-    expect(result.detectedConfig).toEqual({ type: 'game', config: { engine: 'godot' } })
+    expect(result.gameConfig).toEqual(expect.objectContaining({ engine: 'godot' }))
+    expect(result.detectedConfig?.type).toBe('game')
+    expect(result.detectedConfig?.config).toEqual(expect.objectContaining({ engine: 'godot' }))
     expect(Array.isArray(result.detectionEvidence)).toBe(true)
     expect(result.detectionConfidence).toBe('high')
   })
@@ -368,11 +375,14 @@ describe('runAdoption', () => {
       metaPromptDir: path.join(fixturePath, 'content', 'pipeline'),
       methodology: 'deep',
       dryRun: true,
+      auto: true,
     })
 
     expect(result.projectType).toBe('game')
-    expect(result.gameConfig).toEqual({ engine: 'unity' })
-    expect(result.detectedConfig).toEqual({ type: 'game', config: { engine: 'unity' } })
+    // gameConfig now includes Zod defaults from GameConfigSchema.parse()
+    expect(result.gameConfig).toEqual(expect.objectContaining({ engine: 'unity' }))
+    expect(result.detectedConfig?.type).toBe('game')
+    expect(result.detectedConfig?.config).toEqual(expect.objectContaining({ engine: 'unity' }))
     expect(Array.isArray(result.detectionEvidence)).toBe(true)
     expect(result.detectionConfidence).toBe('high')
     // Unity must win because Assets/*.meta is detected first in adopt.ts:74-82

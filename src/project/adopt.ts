@@ -1,11 +1,57 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { parseDocument, isMap, isScalar, type Document } from 'yaml'
+import { z } from 'zod'
 import type { ScaffoldError, ScaffoldWarning, ProjectType, GameConfig, DetectedConfig } from '../types/index.js'
 import type { Confidence, DetectionEvidence } from './detectors/types.js'
+import type { DetectionMatch } from './detectors/types.js'
+import { assertNever } from './detectors/types.js'
 import { detectProjectMode } from './detector.js'
 import { discoverMetaPrompts } from '../core/assembly/meta-prompt-loader.js'
 import { createSignalContext } from './detectors/context.js'
 import { runDetectors } from './detectors/index.js'
+import { resolveDetection } from './detectors/resolve-detection.js'
+import {
+  WebAppConfigSchema, BackendConfigSchema, CliConfigSchema, LibraryConfigSchema,
+  MobileAppConfigSchema, DataPipelineConfigSchema, MlConfigSchema,
+  BrowserExtensionConfigSchema, GameConfigSchema,
+} from '../config/schema.js'
+import { ExitCode } from '../types/enums.js'
+import { configParseError, configNotObject } from '../utils/errors.js'
+import type { PartialConfigOverrides } from '../cli/init-flag-families.js'
+
+// CRITICAL: project-type → typed-config-key mapping. Do NOT derive via string transforms
+// — `'web-app'.replace('-','')` produces 'webapp', not 'webApp'.
+const TYPE_KEY: Record<ProjectType, string> = {
+  'web-app':           'webAppConfig',
+  'mobile-app':        'mobileAppConfig',
+  'backend':           'backendConfig',
+  'cli':               'cliConfig',
+  'library':           'libraryConfig',
+  'game':              'gameConfig',
+  'data-pipeline':     'dataPipelineConfig',
+  'ml':                'mlConfig',
+  'browser-extension': 'browserExtensionConfig',
+}
+
+// Exported for use by CLI handler's writeOrUpdateConfig
+export { TYPE_KEY }
+
+// Map project type to its Zod schema for parse/validation
+function schemaForType(type: ProjectType): z.ZodType {
+  switch (type) {
+  case 'web-app':           return WebAppConfigSchema
+  case 'backend':           return BackendConfigSchema
+  case 'cli':               return CliConfigSchema
+  case 'library':           return LibraryConfigSchema
+  case 'mobile-app':        return MobileAppConfigSchema
+  case 'data-pipeline':     return DataPipelineConfigSchema
+  case 'ml':                return MlConfigSchema
+  case 'browser-extension': return BrowserExtensionConfigSchema
+  case 'game':              return GameConfigSchema
+  default: return assertNever(type as never)
+  }
+}
 
 export type AdaptationStrategy = 'update-mode' | 'skip-recommended' | 'context-only' | 'full-run'
 
@@ -41,8 +87,17 @@ export async function runAdoption(options: {
   metaPromptDir: string
   methodology: string
   dryRun: boolean
+  auto?: boolean
+  force?: boolean
+  verbose?: boolean
+  explicitProjectType?: ProjectType
+  flagOverrides?: PartialConfigOverrides
 }): Promise<AdoptionResult> {
   const { projectRoot, metaPromptDir, methodology } = options
+  const auto = options.auto ?? false
+  const force = options.force ?? false
+  const explicitProjectType = options.explicitProjectType
+  const flagOverrides = options.flagOverrides
 
   // 1. Detect project mode
   const detection = detectProjectMode(projectRoot)
@@ -77,14 +132,6 @@ export async function runAdoption(options: {
     }
   }
 
-  // 4. Project-type detection via SignalContext-backed detectors.
-  //    Currently registers detectGame (Unity > Unreal > Godot > Bevy > Love2D > JS).
-  //    Task 10/11 expand the result shape; Task 5 is behavior-preserving and only
-  //    sets result.gameConfig when a game match exists.
-  const ctx = createSignalContext(projectRoot)
-  const matches = runDetectors(ctx)
-  const gameMatch = matches.find((m) => m.projectType === 'game')
-
   const result: AdoptionResult = {
     mode: detection.mode,
     artifactsFound: detectedArtifacts.length,
@@ -93,18 +140,179 @@ export async function runAdoption(options: {
     stepsRemaining,
     methodology,
     errors: [],
-    warnings: [...ctx.warnings],
+    warnings: [],
   }
 
-  if (gameMatch) {
-    result.projectType = 'game'
-    result.gameConfig = gameMatch.partialConfig           // deprecated alias (v4.0 removal)
-    result.detectedConfig = { type: 'game', config: gameMatch.partialConfig }
-    result.detectionEvidence = gameMatch.evidence
-    result.detectionConfidence = gameMatch.confidence
+  // 4. Project-type detection via SignalContext-backed detectors + resolveDetection pipeline.
+
+  // Build SignalContext + run detectors
+  const ctx = createSignalContext(projectRoot)
+  const detectorMatches = runDetectors(ctx)
+
+  // Re-adoption: read existing config.yml (if any) BEFORE Case A-G resolves
+  const configPath = path.join(projectRoot, '.scaffold', 'config.yml')
+  let existingDoc: Document | undefined
+  let existingProjectType: ProjectType | undefined
+  let existingTypedConfigRaw: Record<string, unknown> | undefined
+
+  if (fs.existsSync(configPath)) {
+    const text = fs.readFileSync(configPath, 'utf8')
+    existingDoc = parseDocument(text)
+    if (existingDoc.errors.length > 0) {
+      result.errors.push(configParseError(configPath, existingDoc.errors[0].message))
+      return result
+    }
+    const projectNode = existingDoc.get('project', true)
+    // A null Scalar (YAML `project:` with no value) is fine — treated as empty project
+    if (projectNode !== undefined && !isMap(projectNode) && !isScalar(projectNode)) {
+      result.errors.push(configNotObject(configPath))
+      return result
+    }
+    const projectJs = existingDoc.toJS()?.project as Record<string, unknown> | undefined
+    existingProjectType = projectJs?.projectType as ProjectType | undefined
+    if (existingProjectType) {
+      existingTypedConfigRaw = projectJs?.[TYPE_KEY[existingProjectType]] as Record<string, unknown> | undefined
+    }
+  }
+
+  // Re-adoption gating
+  if (existingProjectType && !force && !explicitProjectType) {
+    // SKIP detection — just re-run artifact scan (existing behavior)
+    result.warnings.push({
+      code: 'ADOPT_DETECTION_INCONCLUSIVE',
+      message: `Project already adopted as '${existingProjectType}'. `
+        + 'Pass --force to re-detect, or --project-type to switch.',
+    })
+    result.projectType = existingProjectType
+    // Carry through context warnings
+    result.warnings.push(...ctx.warnings)
+    return result
+  }
+
+  // Project-type conflict check
+  if (existingProjectType && explicitProjectType
+      && explicitProjectType !== existingProjectType
+      && !force) {
+    result.errors.push({
+      code: 'ADOPT_TYPE_CONFLICT',
+      message: `Existing projectType is '${existingProjectType}' but `
+        + `--project-type=${explicitProjectType} was passed. `
+        + 'Re-run with --force to overwrite.',
+      exitCode: ExitCode.Ambiguous,
+    })
+    return result
+  }
+
+  const decision = await resolveDetection({
+    matches: detectorMatches,
+    explicitProjectType,
+    opts: {
+      interactive: !auto,
+      acceptLowConfidence: force,
+    },
+  })
+
+  result.warnings.push(...ctx.warnings, ...decision.warnings)
+
+  if (decision.error) {
+    result.errors.push(decision.error)
+    return result
+  }
+
+  if (decision.chosen) {
+    // Type-changed warning if re-adoption picked a different type
+    if (existingProjectType && existingProjectType !== decision.chosen.projectType) {
+      result.warnings.push({
+        code: 'ADOPT_TYPE_CHANGED',
+        message: `Re-adoption changed projectType from '${existingProjectType}' to '${decision.chosen.projectType}'`,
+        context: { from: existingProjectType, to: decision.chosen.projectType },
+      })
+    }
+
+    try {
+      const finalized = finalizeConfigFromMatch(
+        decision.chosen,
+        flagOverrides,
+        // Only pass existing raw if same type (avoids merging across types)
+        existingProjectType === decision.chosen.projectType ? existingTypedConfigRaw : undefined,
+      )
+
+      // Emit field-conflict warnings from the merge
+      if (finalized.conflicts.length > 0) {
+        result.warnings.push(...emitFieldConflictWarnings(
+          finalized.conflicts,
+          TYPE_KEY[decision.chosen.projectType],
+        ))
+      }
+
+      result.projectType = decision.chosen.projectType
+      result.detectedConfig = {
+        type: decision.chosen.projectType,
+        config: finalized.config,
+      } as DetectedConfig
+      result.detectionEvidence = decision.chosen.evidence
+      result.detectionConfidence = decision.chosen.confidence
+
+      // Dual-emit gameConfig (deprecation alias, removed v4.0)
+      if (decision.chosen.projectType === 'game') {
+        result.gameConfig = finalized.config as Partial<GameConfig>
+        result.warnings.push({
+          code: 'ADOPT_GAME_CONFIG_DEPRECATED',
+          message: 'The \'gameConfig\' field is deprecated. '
+            + 'Use \'detectedConfig\' (when type === \'game\'). Removed in v4.0.',
+        })
+      }
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        const missing = err.errors.map(e => e.path.join('.')).join(', ')
+        result.errors.push({
+          code: 'ADOPT_MISSING_REQUIRED_FIELDS',
+          message: `Schema validation failed for ${decision.chosen.projectType}: `
+            + `missing or invalid fields [${missing}]. `
+            + 'Run \'scaffold init --help\' to see the available flags.',
+          exitCode: ExitCode.ValidationError,
+          context: { type: decision.chosen.projectType, missing },
+        })
+        return result
+      }
+      throw err
+    }
   }
 
   return result
+}
+
+// ---------------------------------------------------------------------------
+// finalizeConfigFromMatch — merge pipeline: existing → detected → flags → Zod
+// ---------------------------------------------------------------------------
+
+interface FinalizedResult {
+  readonly config: unknown    // narrowed by caller via projectType
+  readonly conflicts: readonly FieldConflict[]
+}
+
+function finalizeConfigFromMatch(
+  match: DetectionMatch,
+  flagOverrides: PartialConfigOverrides | undefined,
+  existingTypedConfigRaw: Record<string, unknown> | undefined,
+): FinalizedResult {
+  // Step 1: pre-parse merge — existing wins over detected
+  const { merged, conflicts } = mergeRawConfig(
+    match.partialConfig as Record<string, unknown>,
+    existingTypedConfigRaw,
+  )
+
+  // Step 2: apply flag overrides — flags replace whatever survived step 1
+  const overridePartial = flagOverrides?.type === match.projectType
+    ? (flagOverrides.partial as Record<string, unknown>)
+    : undefined
+  const flagged = applyFlagOverrides(merged, overridePartial)
+
+  // Step 3: Zod.parse — applies defaults to fields still unset
+  const schema = schemaForType(match.projectType)
+  const config = schema.parse(flagged)
+
+  return { config, conflicts }
 }
 
 export interface FieldConflict {
