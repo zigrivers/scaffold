@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { MockInstance } from 'vitest'
+import type { DetectedConfig } from '../../types/config.js'
 import os from 'node:os'
 import path from 'node:path'
 import fs from 'node:fs'
@@ -308,7 +309,7 @@ describe('adopt command', () => {
       warnings: [],
       projectType: 'game',
       gameConfig: { engine: 'unity' },
-      detectedConfig: { type: 'game', config: { engine: 'unity' } },
+      detectedConfig: { type: 'game', config: { engine: 'unity' } } as DetectedConfig,
     })
 
     await adoptCommand.handler(defaultArgv({ 'dry-run': false }))
