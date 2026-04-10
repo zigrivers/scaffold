@@ -8,6 +8,7 @@ import { detectCli } from './cli.js'
 import { detectLibrary } from './library.js'
 import { detectMobileApp } from './mobile-app.js'
 import { detectDataPipeline } from './data-pipeline.js'
+import { detectMl } from './ml.js'
 
 // Ordering is a performance optimization only. Correctness does NOT depend on order —
 // all matches are collected and disambiguated per Section 3 Case A-G. Reordering is
@@ -19,6 +20,7 @@ export const ALL_DETECTORS: readonly Detector[] = [
   detectDataPipeline,
   detectWebApp,
   detectBackend,
+  detectMl,
   detectCli,
   detectLibrary,
 ]
