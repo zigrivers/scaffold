@@ -1,0 +1,3 @@
+[project]
+name = "infer"
+dependencies = ["torch", "fastapi", "uvicorn"]

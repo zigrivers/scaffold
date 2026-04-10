@@ -1,0 +1,4 @@
+[tool.poetry]
+name = "mylib"
+[tool.poetry.dependencies]
+python = "^3.10"

@@ -3,6 +3,8 @@ import path from 'node:path'
 import type { ScaffoldError, ScaffoldWarning, ProjectType, GameConfig } from '../types/index.js'
 import { detectProjectMode } from './detector.js'
 import { discoverMetaPrompts } from '../core/assembly/meta-prompt-loader.js'
+import { createSignalContext } from './detectors/context.js'
+import { runDetectors } from './detectors/index.js'
 
 export type AdaptationStrategy = 'update-mode' | 'skip-recommended' | 'context-only' | 'full-run'
 
@@ -70,27 +72,13 @@ export async function runAdoption(options: {
     }
   }
 
-  // 4. Game engine detection
-  let detectedEngine: string | undefined
-  if (fs.existsSync(path.join(projectRoot, 'Assets'))) {
-    try {
-      const assets = fs.readdirSync(path.join(projectRoot, 'Assets'))
-      if (assets.some(f => f.endsWith('.meta'))) {
-        detectedEngine = 'unity'
-      }
-    } catch { /* ignore read errors */ }
-  }
-  if (!detectedEngine) {
-    try {
-      const files = fs.readdirSync(projectRoot)
-      if (files.some(f => f.endsWith('.uproject'))) {
-        detectedEngine = 'unreal'
-      }
-    } catch { /* ignore */ }
-  }
-  if (!detectedEngine && fs.existsSync(path.join(projectRoot, 'project.godot'))) {
-    detectedEngine = 'godot'
-  }
+  // 4. Project-type detection via SignalContext-backed detectors.
+  //    Currently registers detectGame (Unity > Unreal > Godot > Bevy > Love2D > JS).
+  //    Task 10/11 expand the result shape; Task 5 is behavior-preserving and only
+  //    sets result.gameConfig when a game match exists.
+  const ctx = createSignalContext(projectRoot)
+  const matches = runDetectors(ctx)
+  const gameMatch = matches.find((m) => m.projectType === 'game')
 
   const result: AdoptionResult = {
     mode: detection.mode,
@@ -100,12 +88,12 @@ export async function runAdoption(options: {
     stepsRemaining,
     methodology,
     errors: [],
-    warnings: [],
+    warnings: [...ctx.warnings],
   }
 
-  if (detectedEngine) {
+  if (gameMatch) {
     result.projectType = 'game'
-    result.gameConfig = { engine: detectedEngine as GameConfig['engine'] }
+    result.gameConfig = gameMatch.partialConfig
   }
 
   return result
