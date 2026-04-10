@@ -23,16 +23,21 @@ export function detectLibrary(ctx: SignalContext): LibraryMatch | null {
   const isPurePyLib = py && (py.project?.name || py.tool?.poetry) && !py.project?.scripts
     && !ctx.hasAnyDep(PYTHON_APP_DEPS, 'py')
 
+  // Go library — has go.mod, no cmd/ dir, no main.go at root
+  const goMod = ctx.goMod()
+  const isPureGoLib = goMod?.module && !ctx.dirExists('cmd') && !ctx.hasFile('main.go')
+
   // Medium-tier: dual-purpose (library exports + CLI bin) — detectCli also fires high,
   // disambiguate() lets the user pick
   const isDualNpm = pkg && (pkg.main || pkg.module || pkg.exports) && pkg.bin
   const isDualRust = cargo?.lib && cargo.bin && cargo.bin.length > 0
 
-  if (!isPureNpmLib && !isPureRustLib && !isPurePyLib && !isDualNpm && !isDualRust) return null
+  if (!isPureNpmLib && !isPureRustLib && !isPurePyLib && !isPureGoLib && !isDualNpm && !isDualRust) return null
 
   if (isPureNpmLib) ev.push(evidence('npm-main-or-module', 'package.json'))
   if (isPureRustLib) ev.push(evidence('cargo-lib', 'Cargo.toml'))
   if (isPurePyLib) ev.push(evidence('python-package', 'pyproject.toml'))
+  if (isPureGoLib) ev.push(evidence('go-module', 'go.mod'))
   if (isDualNpm) ev.push(evidence('npm-main-plus-bin', 'package.json', 'dual-purpose library + CLI'))
   if (isDualRust) ev.push(evidence('cargo-lib-plus-bin', 'Cargo.toml', 'dual-purpose crate'))
 

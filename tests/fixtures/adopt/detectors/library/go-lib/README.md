@@ -1,0 +1,2 @@
+# mylib
+A Go library.

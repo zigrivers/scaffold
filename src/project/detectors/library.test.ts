@@ -79,4 +79,29 @@ describe('detectLibrary', () => {
     // Intentional: the package exports both a library AND a CLI.
     // detectCli will also fire high; disambiguate prompts the user.
   })
+
+  it('detects Go library from go.mod without cmd/ or main.go', () => {
+    const ctx = createSignalContext(path.join(FIXTURES, 'go-lib'))
+    const m = detectLibrary(ctx)
+    expect(m?.projectType).toBe('library')
+    expect(m?.confidence).toBe('high')
+    expect(m?.partialConfig.visibility).toBe('public')
+    expect(m?.partialConfig.documentationLevel).toBe('readme')
+  })
+
+  it('Go module with cmd/ dir is NOT a library', () => {
+    const ctx = createFakeSignalContext({
+      goMod: { module: 'example.com/svc', requires: [] },
+      dirs: ['cmd'],
+    })
+    expect(detectLibrary(ctx)).toBeNull()
+  })
+
+  it('Go module with main.go at root is NOT a library', () => {
+    const ctx = createFakeSignalContext({
+      goMod: { module: 'example.com/tool', requires: [] },
+      files: { 'main.go': 'package main' },
+    })
+    expect(detectLibrary(ctx)).toBeNull()
+  })
 })

@@ -67,15 +67,15 @@ export type GameEngine = GameConfig['engine']
  * so any project type's config can flow through the same channel.
  */
 export type DetectedConfig =
-  | { type: 'web-app'; config: Partial<WebAppConfig> }
-  | { type: 'backend'; config: Partial<BackendConfig> }
-  | { type: 'cli'; config: Partial<CliConfig> }
-  | { type: 'library'; config: Partial<LibraryConfig> }
-  | { type: 'mobile-app'; config: Partial<MobileAppConfig> }
-  | { type: 'data-pipeline'; config: Partial<DataPipelineConfig> }
-  | { type: 'ml'; config: Partial<MlConfig> }
-  | { type: 'browser-extension'; config: Partial<BrowserExtensionConfig> }
-  | { type: 'game'; config: Partial<GameConfig> }
+  | { type: 'web-app'; config: WebAppConfig }
+  | { type: 'backend'; config: BackendConfig }
+  | { type: 'cli'; config: CliConfig }
+  | { type: 'library'; config: LibraryConfig }
+  | { type: 'mobile-app'; config: MobileAppConfig }
+  | { type: 'data-pipeline'; config: DataPipelineConfig }
+  | { type: 'ml'; config: MlConfig }
+  | { type: 'browser-extension'; config: BrowserExtensionConfig }
+  | { type: 'game'; config: GameConfig }
 
 /** Override entry for knowledge injection. */
 export interface KnowledgeOverride {

@@ -44,7 +44,7 @@ function atomicWriteFileSync(target: string, content: string): void {
   fs.renameSync(tmpPath, target)
 }
 
-function writeOrUpdateConfig(
+export function writeOrUpdateConfig(
   projectRoot: string,
   result: AdoptionResult,
 ): void {
@@ -432,7 +432,7 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
     if (!projectRoot) {
       const output = createOutputContext('auto')
       output.error({ code: 'PROJECT_NOT_INITIALIZED', message: 'No .scaffold/ directory found', exitCode: 1 })
-      process.exit(1)
+      process.exitCode = 1
       return
     }
 
@@ -443,7 +443,7 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
     const lockResult = acquireLock(projectRoot, 'adopt')
     if (!lockResult.acquired) {
       if (lockResult.error) output.error(lockResult.error)
-      process.exit(3)
+      process.exitCode = 3
       return
     }
 
@@ -538,7 +538,8 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
         )
       }
 
-      process.exit(0)
+      process.exitCode = 0
+      return
     } finally {
       releaseLock(projectRoot)
     }
