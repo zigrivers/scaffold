@@ -424,10 +424,10 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
   },
   "detection_confidence": "high",
   "detection_evidence": [
-    "next-config (next.config.mjs)",
-    "app-router-dir (app/page.tsx)",
-    "public-dir (public/)",
-    "react-dep"
+    { "signal": "next-config", "file": "next.config.mjs" },
+    { "signal": "app-router-dir", "file": "app/page.tsx" },
+    { "signal": "public-dir", "file": "public/" },
+    { "signal": "react-dep" }
   ],
   "artifacts_found": 5,
   "detected_artifacts": [
@@ -497,8 +497,16 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
     },
     "detection_evidence": {
       "type": "array",
-      "items": { "type": "string" },
-      "description": "Evidence keys that triggered the detection (e.g., 'next-config', 'react-dep')."
+      "items": {
+        "type": "object",
+        "properties": {
+          "signal": { "type": "string", "description": "Evidence signal key (e.g., 'next-config', 'react-dep')." },
+          "file": { "type": "string", "description": "File path that triggered the signal (optional)." },
+          "note": { "type": "string", "description": "Human-readable note (optional)." }
+        },
+        "required": ["signal"]
+      },
+      "description": "Structured evidence objects that triggered the detection."
     },
     "artifacts_found": {
       "type": "integer",

@@ -503,7 +503,9 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
         try {
           writeOrUpdateState(projectRoot, adoptResult, methodology, metaPromptDir)
         } catch (err) {
-          // State write failure is recoverable — emit warning and continue
+          // State write failure is recoverable — state.json is derived data (re-created
+          // from config + artifacts on the next `scaffold` command). Config is the source
+          // of truth and was already successfully written above.
           output.warn({
             code: 'ADOPT_STATE_WRITE_FAILED',
             message: `state.json write failed (recoverable on next run): ${(err as Error).message}`,
@@ -515,6 +517,7 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
         schema_version: 2,
         mode: adoptResult.mode,
         artifacts_found: adoptResult.artifactsFound,
+        detected_artifacts: adoptResult.detectedArtifacts,
         steps_completed: adoptResult.stepsCompleted,
         steps_remaining: adoptResult.stepsRemaining,
         methodology: adoptResult.methodology,
