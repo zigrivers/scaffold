@@ -58,7 +58,7 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
       const metaPromptDir = getPackagePipelineDir(projectRoot)
       const methodology = 'deep'
 
-      const adoptResult = runAdoption({ projectRoot, metaPromptDir, methodology, dryRun })
+      const adoptResult = await runAdoption({ projectRoot, metaPromptDir, methodology, dryRun })
 
       if (!dryRun) {
         const stateFile = path.join(projectRoot, '.scaffold', 'state.json')

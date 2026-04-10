@@ -45,7 +45,7 @@ vi.mock('../../state/lock-manager.js', () => ({
 }))
 
 vi.mock('../../project/adopt.js', () => ({
-  runAdoption: vi.fn(() => ({
+  runAdoption: vi.fn().mockResolvedValue({
     mode: 'greenfield',
     artifactsFound: 0,
     detectedArtifacts: [],
@@ -54,7 +54,7 @@ vi.mock('../../project/adopt.js', () => ({
     methodology: 'deep',
     errors: [],
     warnings: [],
-  })),
+  }),
 }))
 
 vi.mock('../../core/assembly/meta-prompt-loader.js', () => ({
@@ -123,7 +123,7 @@ describe('adopt command', () => {
     mockFindProjectRoot.mockReturnValue('/fake/project')
     mockResolveOutputMode.mockReturnValue('interactive')
     mockAcquireLock.mockReturnValue({ acquired: true })
-    mockRunAdoption.mockReturnValue({
+    mockRunAdoption.mockResolvedValue({
       mode: 'greenfield',
       artifactsFound: 0,
       detectedArtifacts: [],
@@ -219,7 +219,7 @@ describe('adopt command', () => {
   // Test 4: JSON output has mode, artifacts_found, steps_completed, steps_remaining fields
   it('JSON output has required fields', async () => {
     mockResolveOutputMode.mockReturnValue('json')
-    mockRunAdoption.mockReturnValue({
+    mockRunAdoption.mockResolvedValue({
       mode: 'brownfield',
       artifactsFound: 2,
       detectedArtifacts: [],
@@ -286,7 +286,7 @@ describe('adopt command', () => {
     // No state.json either — triggers initializeState path
     mockFindProjectRoot.mockReturnValue(tmpDir)
 
-    mockRunAdoption.mockReturnValue({
+    mockRunAdoption.mockResolvedValue({
       mode: 'brownfield',
       artifactsFound: 1,
       detectedArtifacts: [],
@@ -343,7 +343,7 @@ describe('adopt command', () => {
       initializeState: vi.fn(),
     }) as unknown as InstanceType<typeof StateManager>)
 
-    mockRunAdoption.mockReturnValue({
+    mockRunAdoption.mockResolvedValue({
       mode: 'greenfield',
       artifactsFound: 1,
       detectedArtifacts: [],

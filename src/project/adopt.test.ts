@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import os from 'node:os'
 import path from 'node:path'
 import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -85,7 +89,7 @@ describe('runAdoption', () => {
   })
 
   // Test 1: Returns 'greenfield' mode for empty directory
-  it('returns greenfield mode for empty directory', () => {
+  it('returns greenfield mode for empty directory', async () => {
     mockDetectProjectMode.mockReturnValue({
       mode: 'greenfield',
       signals: [],
@@ -93,7 +97,7 @@ describe('runAdoption', () => {
       sourceFileCount: 0,
     })
 
-    const result = runAdoption({
+    const result = await runAdoption({
       projectRoot: tmpDir,
       metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
@@ -104,7 +108,7 @@ describe('runAdoption', () => {
   })
 
   // Test 2: Detects artifact when produces path exists on disk
-  it('detects artifact when output path exists on disk', () => {
+  it('detects artifact when output path exists on disk', async () => {
     const artifactPath = 'docs/prd.md'
     const fullPath = path.join(tmpDir, artifactPath)
     fs.mkdirSync(path.dirname(fullPath), { recursive: true })
@@ -117,7 +121,7 @@ describe('runAdoption', () => {
       metaPrompts as ReturnType<typeof discoverMetaPrompts>,
     )
 
-    const result = runAdoption({
+    const result = await runAdoption({
       projectRoot: tmpDir,
       metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
@@ -130,7 +134,7 @@ describe('runAdoption', () => {
   })
 
   // Test 3: Strategy is 'skip-recommended' when all outputs found
-  it('uses skip-recommended strategy when all outputs found', () => {
+  it('uses skip-recommended strategy when all outputs found', async () => {
     const paths = ['docs/prd.md', 'docs/user-stories.md']
     for (const p of paths) {
       const full = path.join(tmpDir, p)
@@ -145,7 +149,7 @@ describe('runAdoption', () => {
       metaPrompts as ReturnType<typeof discoverMetaPrompts>,
     )
 
-    const result = runAdoption({
+    const result = await runAdoption({
       projectRoot: tmpDir,
       metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
@@ -158,7 +162,7 @@ describe('runAdoption', () => {
   })
 
   // Test 4: Strategy is 'context-only' when only some outputs found
-  it('uses context-only strategy when only some outputs found', () => {
+  it('uses context-only strategy when only some outputs found', async () => {
     const existingPath = 'docs/prd.md'
     const missingPath = 'docs/user-stories.md'
     const full = path.join(tmpDir, existingPath)
@@ -172,7 +176,7 @@ describe('runAdoption', () => {
       metaPrompts as ReturnType<typeof discoverMetaPrompts>,
     )
 
-    const result = runAdoption({
+    const result = await runAdoption({
       projectRoot: tmpDir,
       metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
@@ -184,7 +188,7 @@ describe('runAdoption', () => {
   })
 
   // Test 5: stepsCompleted includes matched steps
-  it('stepsCompleted includes matched steps', () => {
+  it('stepsCompleted includes matched steps', async () => {
     const artifactPath = 'docs/prd.md'
     const full = path.join(tmpDir, artifactPath)
     fs.mkdirSync(path.dirname(full), { recursive: true })
@@ -198,7 +202,7 @@ describe('runAdoption', () => {
       metaPrompts as ReturnType<typeof discoverMetaPrompts>,
     )
 
-    const result = runAdoption({
+    const result = await runAdoption({
       projectRoot: tmpDir,
       metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
@@ -210,7 +214,7 @@ describe('runAdoption', () => {
   })
 
   // Test 6: stepsRemaining includes unmatched steps
-  it('stepsRemaining includes unmatched steps', () => {
+  it('stepsRemaining includes unmatched steps', async () => {
     const metaPrompts = new Map([
       ['product-requirements', makeMetaPromptEntry('product-requirements', ['docs/prd.md'])],
       ['user-stories', makeMetaPromptEntry('user-stories', ['docs/user-stories.md'])],
@@ -219,7 +223,7 @@ describe('runAdoption', () => {
       metaPrompts as ReturnType<typeof discoverMetaPrompts>,
     )
 
-    const result = runAdoption({
+    const result = await runAdoption({
       projectRoot: tmpDir,
       metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
@@ -231,11 +235,11 @@ describe('runAdoption', () => {
   })
 
   // Test 7: dryRun mode doesn't write state.json
-  it('dryRun mode does not write state.json', () => {
+  it('dryRun mode does not write state.json', async () => {
     const scaffoldDir = path.join(tmpDir, '.scaffold')
     fs.mkdirSync(scaffoldDir, { recursive: true })
 
-    const result = runAdoption({
+    const result = await runAdoption({
       projectRoot: tmpDir,
       metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
@@ -248,12 +252,12 @@ describe('runAdoption', () => {
   })
 
   // Test 8: Detects Unity project (Assets/ with .meta files)
-  it('detects Unity project when Assets/ contains .meta files', () => {
+  it('detects Unity project when Assets/ contains .meta files', async () => {
     const assetsDir = path.join(tmpDir, 'Assets')
     fs.mkdirSync(assetsDir, { recursive: true })
     fs.writeFileSync(path.join(assetsDir, 'foo.meta'), '')
 
-    const result = runAdoption({
+    const result = await runAdoption({
       projectRoot: tmpDir,
       metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
@@ -265,10 +269,10 @@ describe('runAdoption', () => {
   })
 
   // Test 9: Detects Unreal project (.uproject file)
-  it('detects Unreal project when .uproject file exists', () => {
+  it('detects Unreal project when .uproject file exists', async () => {
     fs.writeFileSync(path.join(tmpDir, 'MyGame.uproject'), '{}')
 
-    const result = runAdoption({
+    const result = await runAdoption({
       projectRoot: tmpDir,
       metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
@@ -280,10 +284,10 @@ describe('runAdoption', () => {
   })
 
   // Test 10: Detects Godot project (project.godot file)
-  it('detects Godot project when project.godot exists', () => {
+  it('detects Godot project when project.godot exists', async () => {
     fs.writeFileSync(path.join(tmpDir, 'project.godot'), '[gd_scene]')
 
-    const result = runAdoption({
+    const result = await runAdoption({
       projectRoot: tmpDir,
       metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
@@ -295,9 +299,9 @@ describe('runAdoption', () => {
   })
 
   // Test 11: Non-game project returns no projectType
-  it('returns no projectType for non-game project', () => {
+  it('returns no projectType for non-game project', async () => {
     // tmpDir is empty — no game engine files
-    const result = runAdoption({
+    const result = await runAdoption({
       projectRoot: tmpDir,
       metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
@@ -309,7 +313,7 @@ describe('runAdoption', () => {
   })
 
   // Test 12: artifactsFound count matches detected artifacts
-  it('artifactsFound count matches detected artifacts array length', () => {
+  it('artifactsFound count matches detected artifacts array length', async () => {
     const paths = ['docs/prd.md', 'docs/user-stories.md']
     for (const p of paths) {
       const full = path.join(tmpDir, p)
@@ -325,7 +329,7 @@ describe('runAdoption', () => {
       metaPrompts as ReturnType<typeof discoverMetaPrompts>,
     )
 
-    const result = runAdoption({
+    const result = await runAdoption({
       projectRoot: tmpDir,
       metaPromptDir: path.join(tmpDir, 'content', 'pipeline'),
       methodology: 'deep',
@@ -334,5 +338,28 @@ describe('runAdoption', () => {
 
     expect(result.artifactsFound).toBe(result.detectedArtifacts.length)
     expect(result.artifactsFound).toBe(2)
+  })
+
+  // Test 13: Unity wins precedence when multi-engine signatures coexist
+  it('Unity wins precedence when multi-engine signatures coexist', async () => {
+    // Regression test for Unity > Unreal > Godot precedence.
+    // Fixture has Assets/*.meta + .uproject + project.godot simultaneously.
+    // Pins existing inline logic in src/project/adopt.ts before Task 5
+    // relocates detection to src/project/adopt/detectors/game.ts.
+    const fixturePath = path.join(
+      __dirname,
+      '../../tests/fixtures/adopt/detectors/game/multi-engine',
+    )
+
+    const result = await runAdoption({
+      projectRoot: fixturePath,
+      metaPromptDir: path.join(fixturePath, 'content', 'pipeline'),
+      methodology: 'deep',
+      dryRun: true,
+    })
+
+    expect(result.projectType).toBe('game')
+    expect(result.gameConfig).toEqual({ engine: 'unity' })
+    // Unity must win because Assets/*.meta is detected first in adopt.ts:74-82
   })
 })

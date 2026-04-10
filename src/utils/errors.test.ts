@@ -30,6 +30,7 @@ import {
   overlayMissing,
   overlayParseError,
   overlayMalformedEntry,
+  asScaffoldError,
   type ScaffoldError,
   type ScaffoldWarning,
 } from './errors.js'
@@ -132,5 +133,53 @@ describe('psmAlreadyInProgress', () => {
     const err = psmAlreadyInProgress('step-b', 'step-a')
     expect(err.code).toBe('PSM_ALREADY_IN_PROGRESS')
     expect(err.exitCode).toBe(3)
+  })
+})
+
+describe('asScaffoldError', () => {
+  it('returns an existing ScaffoldError as-is', () => {
+    const err: ScaffoldError = { code: 'FOO', message: 'bar', exitCode: 1 }
+    expect(asScaffoldError(err, 'FALLBACK', 1)).toBe(err)
+  })
+
+  it('wraps an Error instance', () => {
+    const err = new Error('boom')
+    const result = asScaffoldError(err, 'FALLBACK', 1)
+    expect(result.code).toBe('FALLBACK')
+    expect(result.message).toBe('boom')
+    expect(result.exitCode).toBe(1)
+    // Context shape: name and truncated stack (guards against type tightening)
+    expect(result.context?.name).toBe('Error')
+    expect(typeof result.context?.stack).toBe('string')
+    expect((result.context!.stack as string).length).toBeLessThanOrEqual(500)
+  })
+
+  it('wraps an Error instance without a message', () => {
+    const err = new Error('')
+    const result = asScaffoldError(err, 'FALLBACK', 2)
+    expect(result.message).toBe('Unknown error')
+  })
+
+  it('wraps a string throw', () => {
+    const result = asScaffoldError('oh no', 'FALLBACK', 1)
+    expect(result.code).toBe('FALLBACK')
+    expect(result.message).toBe('oh no')
+  })
+
+  it('wraps null', () => {
+    const result = asScaffoldError(null, 'FALLBACK', 1)
+    expect(result.message).toContain('null')
+  })
+
+  it('wraps undefined', () => {
+    const result = asScaffoldError(undefined, 'FALLBACK', 1)
+    expect(result.message).toContain('undefined')
+  })
+
+  it('rejects partial ScaffoldError duck type (missing exitCode)', () => {
+    const partial = { code: 'FOO', message: 'bar' }
+    const result = asScaffoldError(partial, 'FALLBACK', 3)
+    expect(result.code).toBe('FALLBACK')    // NOT 'FOO' — strict shape check
+    expect(result.exitCode).toBe(3)
   })
 })

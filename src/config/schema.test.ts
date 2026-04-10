@@ -58,20 +58,26 @@ describe('ConfigSchema', () => {
     expect(result.success).toBe(true)
   })
 
-  it('fails when methodology is missing', () => {
+  it('uses default methodology when methodology is missing', () => {
     const result = ConfigSchema.safeParse({
       version: 2,
       platforms: ['claude-code'],
     })
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.methodology).toBe('deep')
+    }
   })
 
-  it('fails when platforms is missing', () => {
+  it('uses default platforms when platforms is missing', () => {
     const result = ConfigSchema.safeParse({
       version: 2,
       methodology: 'deep',
     })
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.platforms).toEqual(['claude-code'])
+    }
   })
 
   it('fails when platforms is empty', () => {
