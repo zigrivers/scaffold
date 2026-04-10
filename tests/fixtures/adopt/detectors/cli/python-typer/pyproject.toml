@@ -1,0 +1,5 @@
+[project]
+name = "mycli"
+dependencies = ["typer"]
+[project.scripts]
+mycli = "mycli:main"
