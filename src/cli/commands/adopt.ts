@@ -64,7 +64,7 @@ project:
       throw configParseError(configPath, doc.errors[0].message)
     }
     const projectNode = doc.get('project', true)
-    if (projectNode !== undefined && !isMap(projectNode)) {
+    if (projectNode !== undefined && !isMap(projectNode) && !isScalar(projectNode)) {
       throw configNotObject(configPath)
     }
   }
@@ -522,8 +522,8 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
         ...(adoptResult.projectType && { project_type: adoptResult.projectType }),
         ...(adoptResult.gameConfig && { game_config: adoptResult.gameConfig }),
         ...(adoptResult.detectedConfig && { detected_config: adoptResult.detectedConfig }),
-        ...(adoptResult.detectionConfidence && { detection_confidence: adoptResult.detectionConfidence }),
-        ...(adoptResult.detectionEvidence && { detection_evidence: adoptResult.detectionEvidence }),
+        ...(adoptResult.detectionConfidence !== undefined && { detection_confidence: adoptResult.detectionConfidence }),
+        ...(adoptResult.detectionEvidence !== undefined && { detection_evidence: adoptResult.detectionEvidence }),
       }
 
       if (outputMode === 'json') {
