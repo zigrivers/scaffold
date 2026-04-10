@@ -44,7 +44,7 @@ function atomicWriteFileSync(target: string, content: string): void {
   fs.renameSync(tmpPath, target)
 }
 
-function writeOrUpdateConfig(
+export function writeOrUpdateConfig(
   projectRoot: string,
   result: AdoptionResult,
 ): void {
