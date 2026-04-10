@@ -34,10 +34,20 @@ export async function resolveDetection(
 
   // Case G: user passed --project-type → short-circuits Cases A-F
   if (input.explicitProjectType) {
-    return {
-      chosen: synthesizeEmptyMatch(input.explicitProjectType),
-      warnings,
+    const found = input.matches.find(m => m.projectType === input.explicitProjectType)
+    if (found) {
+      // Promote the detected match — user's explicit choice overrides disambiguation
+      return {
+        chosen: {
+          ...found,
+          confidence: 'high',
+          evidence: [...found.evidence, { signal: 'user-specified', note: '--project-type flag' }],
+        },
+        warnings,
+      }
     }
+    // Type not detected — synthesize empty match (flags/existing may fill in the rest)
+    return { chosen: synthesizeEmptyMatch(input.explicitProjectType), warnings }
   }
 
   const high = input.matches.filter(m => m.confidence === 'high')

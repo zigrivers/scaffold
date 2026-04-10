@@ -102,6 +102,24 @@ describe('resolveDetection Cases A-G', () => {
     expect(disambiguate).not.toHaveBeenCalled()
   })
 
+  it('Case G: explicitProjectType promotes detected match instead of synthesizing empty', async () => {
+    const webMatch = match('web-app', 'medium')
+    // Manually add partialConfig for realism
+    const richMatch = { ...webMatch, partialConfig: { renderingStrategy: 'ssr' } } as DetectionMatch
+    const result = await resolveDetection({
+      matches: [richMatch, match('backend', 'high')],
+      explicitProjectType: 'web-app',
+      opts: { interactive: true, acceptLowConfidence: false },
+    })
+    expect(result.chosen?.projectType).toBe('web-app')
+    expect(result.chosen?.confidence).toBe('high')   // promoted
+    expect((result.chosen?.partialConfig as any)?.renderingStrategy).toBe('ssr')  // preserved
+    expect(result.chosen?.evidence).toContainEqual(
+      expect.objectContaining({ signal: 'user-specified' }),
+    )
+    expect(disambiguate).not.toHaveBeenCalled()
+  })
+
   it('Case C user-cancelled → ADOPT_USER_CANCELLED error with exit code 4', async () => {
     vi.mocked(disambiguate).mockResolvedValueOnce({ chosen: null, skipReason: 'user-cancelled' })
     const result = await resolveDetection({

@@ -79,6 +79,13 @@ project:
   if (result.projectType && result.detectedConfig) {
     doc.setIn(['project', 'projectType'], result.projectType)
     doc.setIn(['project', TYPE_KEY[result.projectType]], result.detectedConfig.config)
+
+    // Remove stale config blocks from previous project types
+    for (const [type, key] of Object.entries(TYPE_KEY)) {
+      if (type !== result.projectType && doc.hasIn(['project', key])) {
+        doc.deleteIn(['project', key])
+      }
+    }
   }
 
   // Ensure .scaffold directory exists
