@@ -66,7 +66,7 @@ describe('adopt JSON output shape', () => {
     return dir
   }
 
-  it('greenfield produces mode: greenfield with no detected config', async () => {
+  it('empty project with no detection signals produces no detected config', async () => {
     const dir = tracked(makeTmpProject({}))
     const result = await runAdoption({
       projectRoot: dir,
