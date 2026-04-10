@@ -7,7 +7,10 @@ cd "$(git rev-parse --show-toplevel)"
 
 # Find all files containing gameConfig (tracked files only)
 files=$(git grep -l 'gameConfig' -- 'src/**' 'content/**' 'docs/**' 'README.md' 'CHANGELOG.md' 2>/dev/null || true)
-file_count=$(echo "$files" | grep -c . || echo 0)
+# Count non-empty lines; awk 'NF' filters blanks without the grep exit-code
+# noise that `grep -c . || echo 0` introduced (which produced a stray "0\n0"
+# on empty input and tripped the numeric comparison below).
+file_count=$(printf '%s\n' "$files" | awk 'NF' | wc -l | tr -d ' ')
 
 # Expected: 26 files total. Mismatch requires updating Appendix B of the spec.
 EXPECTED_TOTAL=26

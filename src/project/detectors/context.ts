@@ -102,8 +102,9 @@ function extractPyName(spec: string): string {
   let s = spec.split(';')[0]
   // Strip URL fragment
   s = s.split('@')[0]
-  // Strip version specs
-  s = s.replace(/[=<>!~].*$/, '')
+  // Strip version specs — include `(` for PEP 508 parenthesis form,
+  // e.g. `Django (>=2.0)` which should normalize to `django`.
+  s = s.replace(/[(=<>!~].*$/, '')
   // Strip extras
   s = s.replace(/\[.*?\]/, '')
   return normalizePep503(s.trim())
@@ -210,7 +211,7 @@ function parseGoMod(content: string): GoMod {
     }
     if (inRequireBlock || line.startsWith('require ')) {
       const body = line.startsWith('require ') ? line.slice(8) : line
-      const indirect = rawLine.includes('// indirect')
+      const indirect = /\/\/\s*indirect\b/.test(rawLine)
       const parts = body.trim().split(/\s+/)
       if (parts.length >= 2) {
         result.requires.push({ path: parts[0], version: parts[1], indirect })
@@ -271,11 +272,16 @@ export function createSignalContext(projectRoot: string): SignalContext {
       fileCache.set(relPath, exists)
       return exists
     } catch (err) {
-      warnings.push({
-        code: 'ADOPT_FS_INACCESSIBLE',
-        message: `Cannot stat file: ${(err as Error).message}`,
-        context: { path: relPath },
-      })
+      // ENOENT/ENOTDIR are normal "not present" probe results — silent.
+      // Only emit a warning on real access failures (EACCES, EIO, etc.).
+      const code = (err as NodeJS.ErrnoException).code
+      if (code !== 'ENOENT' && code !== 'ENOTDIR') {
+        warnings.push({
+          code: 'ADOPT_FS_INACCESSIBLE',
+          message: `Cannot stat file: ${(err as Error).message}`,
+          context: { path: relPath },
+        })
+      }
       fileCache.set(relPath, false)
       return false
     }
@@ -290,11 +296,15 @@ export function createSignalContext(projectRoot: string): SignalContext {
       dirCache.set(relPath, exists)
       return exists
     } catch (err) {
-      warnings.push({
-        code: 'ADOPT_FS_INACCESSIBLE',
-        message: `Cannot stat directory: ${(err as Error).message}`,
-        context: { path: relPath },
-      })
+      // ENOENT/ENOTDIR are normal "not present" probe results — silent.
+      const code = (err as NodeJS.ErrnoException).code
+      if (code !== 'ENOENT' && code !== 'ENOTDIR') {
+        warnings.push({
+          code: 'ADOPT_FS_INACCESSIBLE',
+          message: `Cannot stat directory: ${(err as Error).message}`,
+          context: { path: relPath },
+        })
+      }
       dirCache.set(relPath, false)
       return false
     }
@@ -314,12 +324,16 @@ export function createSignalContext(projectRoot: string): SignalContext {
       listDirCache.set(relPath, names)
       return names
     } catch (err) {
-      // Missing dir or read error → empty result + single warning
-      warnings.push({
-        code: 'ADOPT_FS_INACCESSIBLE',
-        message: `Cannot list directory: ${(err as Error).message}`,
-        context: { path: relPath },
-      })
+      // ENOENT/ENOTDIR are expected for detectors probing optional paths
+      // like app/, ios/, android/ — silent. Only warn on real access failures.
+      const code = (err as NodeJS.ErrnoException).code
+      if (code !== 'ENOENT' && code !== 'ENOTDIR') {
+        warnings.push({
+          code: 'ADOPT_FS_INACCESSIBLE',
+          message: `Cannot list directory: ${(err as Error).message}`,
+          context: { path: relPath },
+        })
+      }
       const empty: readonly string[] = []
       listDirCache.set(relPath, empty)
       return empty
@@ -327,6 +341,9 @@ export function createSignalContext(projectRoot: string): SignalContext {
   }
 
   function readFileText(relPath: string, maxBytes: number = 262144): string | undefined {
+    // Cache stores FULL content (or undefined for missing/unreadable). Truncated
+    // reads are never cached — otherwise a later call with a larger maxBytes
+    // would receive the stale truncated value.
     if (textCache.has(relPath)) return textCache.get(relPath)
     try {
       const full = path.join(projectRoot, relPath)
@@ -338,8 +355,9 @@ export function createSignalContext(projectRoot: string): SignalContext {
       if (stat.size > maxBytes) {
         const fd = fs.openSync(full, 'r')
         const buf = Buffer.alloc(maxBytes)
+        let bytesRead = 0
         try {
-          fs.readSync(fd, buf, 0, maxBytes, 0)
+          bytesRead = fs.readSync(fd, buf, 0, maxBytes, 0)
         } finally {
           fs.closeSync(fd)
         }
@@ -348,9 +366,10 @@ export function createSignalContext(projectRoot: string): SignalContext {
           message: `File truncated to ${maxBytes} bytes`,
           context: { path: relPath, size: stat.size },
         })
-        const truncated = buf.toString('utf8')
-        textCache.set(relPath, truncated)
-        return truncated
+        // Trim to bytesRead so a short read doesn't leave trailing null bytes.
+        // Do NOT cache — we only have a partial read and a future caller may
+        // request a larger slice.
+        return buf.toString('utf8', 0, bytesRead)
       }
       const content = fs.readFileSync(full, 'utf8')
       textCache.set(relPath, content)
@@ -367,6 +386,13 @@ export function createSignalContext(projectRoot: string): SignalContext {
   }
 
   function manifestStatus(kind: ManifestKind): ManifestStatus {
+    // Lazily trigger parse so the status reflects reality regardless of call order.
+    // Without this, a detector that calls manifestStatus() as a pre-check before
+    // calling the parser accessor would see 'missing' even when the file exists.
+    if (kind === 'npm' && !('packageJson' in parseCache)) packageJson()
+    else if (kind === 'py' && !('pyprojectToml' in parseCache)) pyprojectToml()
+    else if (kind === 'cargo' && !('cargoToml' in parseCache)) cargoToml()
+    else if (kind === 'go' && !('goMod' in parseCache)) goMod()
     return status[kind]
   }
 
@@ -563,6 +589,20 @@ export function createSignalContext(projectRoot: string): SignalContext {
     }
     try {
       const parsed = parseGoMod(text)
+      // Minimal structural validation: a valid go.mod must declare a module.
+      // Without this check, completely malformed input like "<<garbage>>" would
+      // silently produce an empty GoMod object — every other manifest accessor
+      // marks malformed input as 'unparseable'.
+      if (!parsed.module) {
+        warnings.push({
+          code: 'ADOPT_MANIFEST_UNPARSEABLE',
+          message: 'go.mod parse failed: missing module directive',
+          context: { path: 'go.mod' },
+        })
+        status.go = 'unparseable'
+        parseCache.goMod = undefined
+        return undefined
+      }
       status.go = 'parsed'
       parseCache.goMod = parsed
       return parsed
@@ -685,7 +725,11 @@ export function createFakeSignalContext(input: FakeContextInput = {}): SignalCon
   return {
     projectRoot: input.projectRoot ?? '/fake',
     get warnings() { return warnings },
-    hasFile: (p: string) => p in filesMap || rootEntriesCache.includes(p),
+    // Only consult filesMap — entries in rootEntries may be directories,
+    // and the real context's hasFile() returns false for directory paths.
+    // Tests that need "file exists at root" behavior should add the path
+    // to `files`, not just `rootEntries`.
+    hasFile: (p: string) => p in filesMap,
     dirExists: (p: string) => dirsSet.has(p),
     rootEntries: () => rootEntriesCache,
     listDir: (p: string) => dirListings[p] ?? [],

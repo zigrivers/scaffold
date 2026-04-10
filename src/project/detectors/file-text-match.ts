@@ -7,9 +7,15 @@ export function stripJsTsComments(content: string): string {
   const result = content.replace(/\/\*[\s\S]*?\*\//g, '')
 
   // Step 2: strip single-line // comments (respecting strings)
+  // inTemplate MUST persist across line boundaries — template literals can
+  // span multiple lines in JS/TS. inSingle/inDouble reset per line because
+  // raw string literals can't span newlines, and prevWasBackslash also
+  // resets because a backslash doesn't escape a newline for line-comment
+  // purposes. See file-text-match.test.ts for regression coverage.
   const lines = result.split('\n')
+  let inTemplate = false
   const stripped = lines.map(line => {
-    let inSingle = false, inDouble = false, inTemplate = false
+    let inSingle = false, inDouble = false
     let prevWasBackslash = false
     for (let i = 0; i < line.length; i++) {
       const ch = line[i]
