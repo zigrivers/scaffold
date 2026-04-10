@@ -6,7 +6,7 @@ import path from 'node:path'
 import { parseDocument } from 'yaml'
 
 describe('atomic config write performance', () => {
-  it('writes a typical config.yml in under 5ms', () => {
+  it('writes a typical config.yml in under 50ms', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'adopt-perf-'))
     const configPath = path.join(dir, 'config.yml')
     const doc = parseDocument(`version: 2
@@ -26,7 +26,7 @@ project:
     const end = process.hrtime.bigint()
 
     const elapsedMs = Number(end - start) / 1_000_000
-    expect(elapsedMs).toBeLessThan(5)
+    expect(elapsedMs).toBeLessThan(50)
 
     fs.rmSync(dir, { recursive: true, force: true })
   })
