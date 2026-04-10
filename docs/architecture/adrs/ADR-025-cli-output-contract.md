@@ -119,3 +119,31 @@ Three interrelated decisions define the CLI output contract:
 - [ADR-014](ADR-014-config-schema-versioning.md) — Config validation produces errors/warnings that feed into the output contract; fuzzy matching originates from config validation
 - [ADR-019](ADR-019-advisory-locking.md) — Locking interacts with --force and --auto flags; lock contention is exit code 3
 - Domain 09 ([09-cli-architecture.md](../domain-models/09-cli-architecture.md)) — Full CLI architecture including OutputContext Strategy pattern, command lifecycle, and flag definitions
+
+---
+
+## Amendment 1 — Exit Code 6 (added v3.10.0)
+
+**Status:** Accepted
+**Date:** 2026-04-08
+
+Adds `ExitCode.Ambiguous = 6` to the exit code enumeration for "operator action
+required" outcomes that are neither errors nor user cancellations.
+
+Used by `scaffold adopt` when:
+- Detection finds multiple equally-plausible project types and `--auto` is set
+  (`ADOPT_AMBIGUOUS` error)
+- `--project-type X` conflicts with an existing `projectType` in `config.yml`
+  and `--force` is not set (`ADOPT_TYPE_CONFLICT` error)
+
+Distinct from exit code 1 (general error) and exit code 3 (lock/state conflict)
+so CI scripts can branch:
+
+```sh
+case $? in
+  0) echo "success" ;;
+  1) echo "error" ;;
+  3) echo "lock conflict" ;;
+  6) echo "needs operator decision" ;;
+esac
+```
