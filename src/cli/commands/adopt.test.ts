@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { MockInstance } from 'vitest'
 import type { DetectedConfig } from '../../types/config.js'
 import os from 'node:os'
 import path from 'node:path'
@@ -111,7 +110,6 @@ function makeTempDir(): string {
 // ---------------------------------------------------------------------------
 
 describe('adopt command', () => {
-  let exitSpy: MockInstance
   let writtenLines: string[]
   let tmpDir: string
 
@@ -122,9 +120,9 @@ describe('adopt command', () => {
   const mockRunAdoption = vi.mocked(runAdoption)
 
   beforeEach(() => {
+    process.exitCode = undefined
     tmpDir = makeTempDir()
     writtenLines = []
-    exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
     vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
       writtenLines.push(String(chunk))
       return true
@@ -178,7 +176,7 @@ describe('adopt command', () => {
 
     await adoptCommand.handler(defaultArgv())
 
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
   })
 
   // Test 2: Exits 3 when lock not acquired
@@ -194,7 +192,7 @@ describe('adopt command', () => {
 
     await adoptCommand.handler(defaultArgv())
 
-    expect(exitSpy).toHaveBeenCalledWith(3)
+    expect(process.exitCode).toBe(3)
   })
 
   // Test 3: Dry-run succeeds without modifying files
@@ -225,7 +223,7 @@ describe('adopt command', () => {
 
     expect(mockInitializeState).not.toHaveBeenCalled()
     expect(mockSaveState).not.toHaveBeenCalled()
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
   })
 
   // Test 4: JSON output has mode, artifacts_found, steps_completed, steps_remaining fields
@@ -253,7 +251,7 @@ describe('adopt command', () => {
     expect(parsed).toHaveProperty('steps_remaining')
     expect(Array.isArray(parsed.steps_completed)).toBe(true)
     expect(Array.isArray(parsed.steps_remaining)).toBe(true)
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
   })
 
   // Test 5: Writes state.json when not dry-run — state gets initialized when state.json doesn't exist
@@ -287,7 +285,7 @@ describe('adopt command', () => {
 
     // state.json doesn't exist so initializeState should be called
     expect(mockInitializeState).toHaveBeenCalled()
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
   })
 
   // Test 6: Writes detected game config to config.yml (even when config doesn't exist)
@@ -319,7 +317,7 @@ describe('adopt command', () => {
     const configContent = fs.readFileSync(configPath, 'utf8')
     expect(configContent).toContain('projectType: game')
     expect(configContent).toContain('engine: unity')
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
   })
 
   // Test 7: Marks matched steps as completed in state
@@ -375,7 +373,7 @@ describe('adopt command', () => {
     const stepA = savedState.steps['step-a']
     expect(stepA.status).toBe('completed')
     expect(stepA.completed_by).toBe('scaffold-adopt')
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
 
     void releaseLock
   })
