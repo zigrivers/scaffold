@@ -5,6 +5,7 @@ import { detectGame } from './game.js'
 import { detectWebApp } from './web-app.js'
 import { detectBackend } from './backend.js'
 import { detectCli } from './cli.js'
+import { detectLibrary } from './library.js'
 
 // Ordering is a performance optimization only. Correctness does NOT depend on order —
 // all matches are collected and disambiguated per Section 3 Case A-G. Reordering is
@@ -15,6 +16,7 @@ export const ALL_DETECTORS: readonly Detector[] = [
   detectWebApp,
   detectBackend,
   detectCli,
+  detectLibrary,
 ]
 
 export function runDetectors(
