@@ -59,6 +59,16 @@ describe('detectLibrary', () => {
     expect(ctx.warnings.some(w => w.code === 'ADOPT_PUBLIC_LIBRARY_NO_README')).toBe(true)
   })
 
+  it('Python with FastAPI dep → NOT library (backend project)', () => {
+    const ctx = createFakeSignalContext({
+      pyprojectToml: {
+        project: { name: 'api', dependencies: ['fastapi', 'uvicorn'] },
+        'build-system': { requires: ['setuptools'] },
+      },
+    })
+    expect(detectLibrary(ctx)).toBeNull()
+  })
+
   it('package with main AND bin → medium tier (dual-purpose library + CLI per Section 5.4)', () => {
     const ctx = createFakeSignalContext({
       packageJson: { name: 'demo', main: 'index.js', bin: { demo: 'cli.js' } },

@@ -115,7 +115,11 @@ export function detectBackend(ctx: SignalContext): BackendMatch | null {
   }
   if (!matched) return null
 
-  const ev: DetectionEvidence[] = [evidence(`${matched.fw.dep}-dep`)]
+  const manifestFile = matched.fw.kind === 'npm' ? 'package.json'
+    : matched.fw.kind === 'py' ? 'pyproject.toml'
+      : matched.fw.kind === 'cargo' ? 'Cargo.toml'
+        : 'go.mod'
+  const ev: DetectionEvidence[] = [evidence(`${matched.fw.dep}-dep`, manifestFile)]
 
   // Tier
   let confidence: 'high' | 'medium' | 'low'

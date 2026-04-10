@@ -20,7 +20,12 @@ export function detectCli(ctx: SignalContext): CliMatch | null {
   if (hasPyScripts) ev.push(evidence('pyproject-scripts', 'pyproject.toml'))
 
   const goCmdDirs = ctx.dirExists('cmd')
-  if (goCmdDirs && ctx.goMod()) ev.push(evidence('go-cmd-dir', 'cmd/'))
+  const hasGoCliFramework = ctx.hasAnyDep(
+    ['github.com/spf13/cobra', 'github.com/urfave/cli'], 'go',
+  )
+  // Go CLI requires cmd/ + go.mod + a CLI framework dep — cmd/ alone matches backend services
+  const hasGoCli = goCmdDirs && !!ctx.goMod() && hasGoCliFramework
+  if (hasGoCli) ev.push(evidence('go-cmd-dir', 'cmd/'))
 
   // CLI framework deps (medium tier when no bin)
   const hasCliFramework =
@@ -28,9 +33,9 @@ export function detectCli(ctx: SignalContext): CliMatch | null {
     || ctx.hasDep('clap', 'cargo')
     || ctx.hasDep('structopt', 'cargo')
     || ctx.hasAnyDep(['typer', 'click'], 'py')
-    || ctx.hasAnyDep(['github.com/spf13/cobra', 'github.com/urfave/cli'], 'go')
+    || hasGoCliFramework
 
-  const hasHighSignal = hasNodeBin || hasCargoBin || hasPyScripts || (goCmdDirs && ctx.goMod())
+  const hasHighSignal = hasNodeBin || hasCargoBin || hasPyScripts || hasGoCli
   if (!hasHighSignal && !hasCliFramework) return null
 
   const confidence: 'high' | 'medium' = hasHighSignal ? 'high' : 'medium'

@@ -12,7 +12,16 @@ export function detectLibrary(ctx: SignalContext): LibraryMatch | null {
   // High-tier: exports a library AND doesn't also export a CLI
   const isPureNpmLib = pkg && (pkg.main || pkg.module || pkg.exports) && !pkg.bin
   const isPureRustLib = cargo?.lib && (!cargo.bin || cargo.bin.length === 0)
+  // Python library: has project name or poetry config, no CLI scripts, AND no
+  // backend/pipeline/ML/CLI framework deps (which indicate an application, not a library)
+  const PYTHON_APP_DEPS = [
+    'fastapi', 'django', 'flask', 'uvicorn',     // backend
+    'airflow', 'prefect', 'dagster', 'luigi',     // data-pipeline
+    'torch', 'tensorflow', 'scikit-learn', 'jax', // ML
+    'typer', 'click',                              // CLI
+  ]
   const isPurePyLib = py && (py.project?.name || py.tool?.poetry) && !py.project?.scripts
+    && !ctx.hasAnyDep(PYTHON_APP_DEPS, 'py')
 
   // Medium-tier: dual-purpose (library exports + CLI bin) — detectCli also fires high,
   // disambiguate() lets the user pick

@@ -62,7 +62,7 @@ describe('detectBrowserExtension', () => {
     expect(detectBrowserExtension(ctx)).toBeNull()
   })
 
-  it('Malformed manifest.json → returns null and emits warning', () => {
+  it('Malformed manifest.json → returns null (unparseable JSON)', () => {
     const ctx = createFakeSignalContext({
       rootEntries: ['manifest.json'],
       files: { 'manifest.json': '{ invalid json' },

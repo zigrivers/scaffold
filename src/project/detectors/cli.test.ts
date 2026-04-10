@@ -59,6 +59,16 @@ describe('detectCli', () => {
     expect(detectCli(ctx)).toBeNull()
   })
 
+  it('Go cmd/ without CLI framework → null (avoids backend false positive)', () => {
+    const ctx = createFakeSignalContext({
+      dirs: ['cmd'],
+      goMod: { module: 'example.com/svc', requires: [
+        { path: 'github.com/gin-gonic/gin', version: 'v1.9.0', indirect: false },
+      ] },
+    })
+    expect(detectCli(ctx)).toBeNull()
+  })
+
   it('hasStructuredOutput true when ink dep present', () => {
     const ctx = createFakeSignalContext({
       packageJson: { name: 'tui', bin: { tui: 'cli.js' }, dependencies: { ink: '5' } },
