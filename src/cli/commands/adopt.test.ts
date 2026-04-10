@@ -55,6 +55,17 @@ vi.mock('../../project/adopt.js', () => ({
     errors: [],
     warnings: [],
   }),
+  TYPE_KEY: {
+    'web-app':           'webAppConfig',
+    'mobile-app':        'mobileAppConfig',
+    'backend':           'backendConfig',
+    'cli':               'cliConfig',
+    'library':           'libraryConfig',
+    'game':              'gameConfig',
+    'data-pipeline':     'dataPipelineConfig',
+    'ml':                'mlConfig',
+    'browser-extension': 'browserExtensionConfig',
+  },
 }))
 
 vi.mock('../../core/assembly/meta-prompt-loader.js', () => ({
@@ -297,6 +308,7 @@ describe('adopt command', () => {
       warnings: [],
       projectType: 'game',
       gameConfig: { engine: 'unity' },
+      detectedConfig: { type: 'game', config: { engine: 'unity' } },
     })
 
     await adoptCommand.handler(defaultArgv({ 'dry-run': false }))

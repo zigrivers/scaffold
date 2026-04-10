@@ -673,17 +673,48 @@ These answers control which conditional steps activate. A single-player puzzle g
 | `live-ops-plan` | Live-ops selected | Content cadence, events, hotfix deployment, maintenance |
 | `platform-cert-prep` | Console/mobile/VR targets | Sony TRC, Xbox XR, Nintendo Lotcheck, store compliance checklists |
 
-#### Engine Detection
+#### Multi-type Detection
 
-`scaffold adopt` automatically detects game engines in existing projects:
+`scaffold adopt` detects 9 project types from manifest files and directory layouts:
 
-| Engine | Detection Signal |
-|--------|-----------------|
-| Unity | `Assets/*.meta` files |
-| Unreal | `*.uproject` file |
-| Godot | `project.godot` file |
+| Type | Key Signals |
+|------|-------------|
+| `web-app` | `next.config.*`, `nuxt.config.*`, `app/` router dirs, SPA frameworks |
+| `backend` | `routes/` or `controllers/`, ORM schemas, server deps |
+| `cli` | `bin` field in manifest, `commander`/`yargs`/`clap` deps |
+| `library` | `main`/`types` fields, peer dependencies, no `bin` |
+| `mobile-app` | `app.json` (Expo), `ios/`/`android/` dirs, React Native deps |
+| `game` | `Assets/*.meta` (Unity), `*.uproject` (Unreal), `project.godot` (Godot) |
+| `data-pipeline` | `dags/` dir, Airflow/Prefect/Dagster deps, Spark configs |
+| `ml` | `training/`/`models/` dirs, PyTorch/TensorFlow deps, MLflow configs |
+| `browser-extension` | `manifest.json` with `manifest_version` field |
 
-When detected, `scaffold adopt` sets `projectType: game` and `gameConfig.engine` in your config, enabling the full game overlay.
+Each detector returns a confidence tier (high/medium/low) with evidence trails. Override detection with `--project-type <type>`.
+
+#### Multi-type Disambiguation
+
+When `scaffold adopt` finds signals matching multiple project types, you'll
+see a radio prompt:
+
+```
+? Which best describes this project? (Use arrow keys)
+> web-app    [high]    next-config (next.config.mjs), app-router-dir (app/page.tsx), public-dir (public/), react-dep
+  backend    [high]    routes-dir (app/api), prisma-schema (prisma/schema.prisma), pg-dep
+  library    [medium]  pkg-main-field (package.json), pkg-types-field (package.json), peer-deps (react)
+  None of these — continue without a project type
+```
+
+The default selection is the highest-confidence match with the most evidence. Press Enter to accept, or use arrow keys to pick a different option.
+
+For non-interactive use (CI, scripts), pass `--project-type <type>` explicitly:
+
+```bash
+scaffold adopt --auto --project-type web-app
+```
+
+If you run `scaffold adopt --auto` and detection is ambiguous, the command
+exits with code 6 (`ExitCode.Ambiguous`) and lists the candidate types in the
+error message.
 
 ## The Pipeline
 

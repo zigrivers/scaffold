@@ -84,7 +84,7 @@ Failure envelope:
 | `data` | object \| null | Yes | Command-specific payload. `null` when `success` is `false` and the command could not produce partial data. Defined per command in Section 2. |
 | `errors` | array | Yes | Structured error objects. Empty array on success. See Section 3. |
 | `warnings` | array | Yes | Structured warning objects. Same shape as error objects. May be non-empty even on success. See Section 3. |
-| `exit_code` | integer | Yes | The process exit code. One of `0`, `1`, `2`, `3`, `4`, `5`. See exit code table below. |
+| `exit_code` | integer | Yes | The process exit code. One of `0`, `1`, `2`, `3`, `4`, `5`, `6`. See exit code table below. |
 | `verbose` | array \| null | Yes | Verbose diagnostics when `--verbose` is passed. `null` when `--verbose` is not set. Each entry is an object with `level`, `component`, `message`, and optional `data`. Contents are informational and non-stable across versions. |
 | `scaffold_version` | string | Yes | The scaffold CLI version that produced this output. |
 
@@ -98,6 +98,7 @@ Failure envelope:
 | `3` | State / lock error | `state.json` unreadable or corrupt; `lock.json` held by another alive process |
 | `4` | User cancellation | User pressed Ctrl+C or declined an interactive confirmation |
 | `5` | Build/assembly error | Platform adapter failure, assembly engine error |
+| `6` | Ambiguous (v3.10+) | `scaffold adopt` detection found multiple equally-plausible project types under `--auto` ([ADR-025 Amendment 1](../adrs/ADR-025-cli-output-contract.md#amendment-1--exit-code-6-added-v3100)) |
 
 ### 1.3 JSON Schema for the envelope
 
@@ -399,17 +400,35 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
 
 ### 2.3 scaffold adopt
 
-**Signature**: `scaffold adopt`
+**Signature**: `scaffold adopt [--project-type <type>] [--auto] [--force] [--dry-run] [--<type>-* flags]`
 **Requires project**: No (creates the `.scaffold/` directory)
 **Requires state**: No
+**Schema version**: 2 (v3.10+)
 
-`scaffold adopt` scans an existing codebase, maps discovered artifacts to scaffold steps via their `produces` fields, writes `.scaffold/config.yml` and `state.json` with pre-completed entries for matched steps, and runs `scaffold build`. See [domain 07](../domain-models/07-brownfield-adopt.md) for the scanning algorithm.
+`scaffold adopt` scans an existing codebase, detects the project type from manifest files and directory layouts, maps discovered artifacts to scaffold steps via their `produces` fields, writes `.scaffold/config.yml` and `state.json` with pre-completed entries for matched steps, and runs `scaffold build`. See [domain 07](../domain-models/07-brownfield-adopt.md) for the scanning algorithm and [ADR-056](../adrs/ADR-056-multi-type-detection-architecture.md) for the multi-type detection architecture.
 
-**Example `data`**:
+**Example `data`** (v3.10+):
 
 ```json
 {
+  "schema_version": 2,
   "mode": "brownfield",
+  "detected_config": {
+    "type": "web-app",
+    "config": {
+      "rendering": "ssr",
+      "deployTarget": "container",
+      "realtimeStrategy": "none",
+      "authFlow": "oauth"
+    }
+  },
+  "detection_confidence": "high",
+  "detection_evidence": [
+    { "signal": "next-config", "file": "next.config.mjs" },
+    { "signal": "app-router-dir", "file": "app/page.tsx" },
+    { "signal": "public-dir", "file": "public/" },
+    { "signal": "react-dep" }
+  ],
   "artifacts_found": 5,
   "detected_artifacts": [
     { "file": "docs/plan.md", "mapped_to_step": "create-prd" },
@@ -422,9 +441,18 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
   "steps_remaining": 19,
   "methodology": "deep",
   "config_path": ".scaffold/config.yml",
-  "build_result": { ... }
+  "build_result": { "..." : "..." },
+  "project_type": "web-app",
+  "game_config": null
 }
 ```
+
+**Deprecated fields** (emitted in v3.10 for backward compatibility, removed in v4.0):
+
+| Deprecated field | Replacement | Notes |
+|-----------------|-------------|-------|
+| `project_type` (top-level) | `detected_config.type` | String field moved inside discriminated union |
+| `game_config` | `detected_config.config` (when `type === 'game'`) | Only non-null for game projects |
 
 **JSON Schema**:
 
@@ -433,13 +461,52 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
   "$id": "https://scaffold-cli.dev/schemas/data/adopt.json",
   "title": "AdoptData",
   "type": "object",
-  "required": ["mode", "artifacts_found", "detected_artifacts", "steps_completed", "steps_remaining"],
+  "required": ["schema_version", "mode", "artifacts_found", "detected_artifacts", "steps_completed", "steps_remaining"],
   "additionalProperties": true,
   "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 2,
+      "description": "Schema version. v3.9.x emitted version 1 (implicit); v3.10+ emits version 2."
+    },
     "mode": {
       "type": "string",
       "enum": ["brownfield", "v1-migration"],
       "description": "Detected project mode. adopt always results in brownfield or v1-migration — never greenfield."
+    },
+    "detected_config": {
+      "type": "object",
+      "required": ["type", "config"],
+      "description": "Discriminated union: type field selects the config shape. Null when no project type detected.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["web-app", "backend", "cli", "library", "mobile-app", "game", "data-pipeline", "ml", "browser-extension"],
+          "description": "The detected (or overridden) project type."
+        },
+        "config": {
+          "type": "object",
+          "description": "Type-specific config fields. Shape varies by type — see per-type schemas below."
+        }
+      }
+    },
+    "detection_confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"],
+      "description": "Confidence tier of the winning detection match."
+    },
+    "detection_evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "signal": { "type": "string", "description": "Evidence signal key (e.g., 'next-config', 'react-dep')." },
+          "file": { "type": "string", "description": "File path that triggered the signal (optional)." },
+          "note": { "type": "string", "description": "Human-readable note (optional)." }
+        },
+        "required": ["signal"]
+      },
+      "description": "Structured evidence objects that triggered the detection."
     },
     "artifacts_found": {
       "type": "integer",
@@ -494,6 +561,16 @@ Commands are grouped by their category ([domain 09](../domain-models/09-cli-arch
     "build_result": {
       "$ref": "build.json",
       "description": "Results from the automatic scaffold build after adopt completes."
+    },
+    "project_type": {
+      "type": "string",
+      "deprecated": true,
+      "description": "DEPRECATED (v3.10): Use detected_config.type instead. Removed in v4.0."
+    },
+    "game_config": {
+      "type": "object",
+      "deprecated": true,
+      "description": "DEPRECATED (v3.10): Use detected_config.config when type === 'game'. Removed in v4.0."
     }
   }
 }

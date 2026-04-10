@@ -13,7 +13,7 @@ files=$(git grep -l 'gameConfig' -- 'src/**' 'content/**' 'docs/**' 'README.md' 
 file_count=$(printf '%s\n' "$files" | awk 'NF' | wc -l | tr -d ' ')
 
 # Expected: 26 files total. Mismatch requires updating Appendix B of the spec.
-EXPECTED_TOTAL=26
+EXPECTED_TOTAL=30
 
 echo "Files containing 'gameConfig': $file_count (expected: $EXPECTED_TOTAL)"
 echo ""
@@ -22,8 +22,8 @@ echo ""
 # uncategorized check at the bottom of this script.
 PROD_RE='^src/(types/config|project/adopt|wizard/(wizard|questions)|cli/commands/(adopt|init))\.ts$'
 TEST_RE='\.test\.ts$'
-SCHEMA_RE='^src/config/schema'
-HIST_DOCS_RE='^docs/(superpowers|game-content)'
+SCHEMA_RE='^src/(config/schema|project/__frozen-schemas__/)'
+HIST_DOCS_RE='^docs/(superpowers|game-content|architecture/adrs)'
 USER_DOCS_RE='^(README|CHANGELOG)\.md$'
 
 # Categorize

@@ -2,6 +2,88 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.10.0] — 2026-04-10
+
+### Added
+- **Multi-type detection in `scaffold adopt`** — extends adoption beyond game projects
+  to detect 8 new project types: web-app, mobile-app, backend, cli, library,
+  data-pipeline, ml, browser-extension. Each type has its own detector with
+  file/manifest-based signals and confidence tiers (high/medium/low). Game detection
+  rewritten to use the same SignalContext API (behavior preserved, regression test
+  added before relocation).
+- **Interactive disambiguation** — when multiple project types match, scaffold adopt
+  presents a single radio prompt showing all matches with their evidence. Under
+  `--auto`, ambiguity exits with `ExitCode.Ambiguous = 6`.
+- **`scaffold adopt` accepts all 32 init flags from R1-R3** — `--project-type`,
+  `--web-rendering`, `--backend-api-style`, `--mobile-platform`, etc. Flags override
+  detected values. Flag-family validation infrastructure extracted to a shared
+  `src/cli/init-flag-families.ts` module.
+- **`AdoptionResult.detectedConfig`** — discriminated union holding the finalized
+  typed config (post-Zod-parse) for any of 9 project types.
+- **`detectionEvidence` and `detectionConfidence`** fields on `AdoptionResult` for
+  transparency into what triggered each detection.
+- **Atomic config + state writes** — tmp + rename pattern eliminates partial-write
+  corruption on POSIX and Windows.
+- **Comment-preserving config edits** — adopt now uses the `yaml` package's
+  `parseDocument` AST API to mutate `config.yml` in place, preserving user comments,
+  blank lines, key order, and CRLF/LF line endings.
+- **Re-adoption support** — running `scaffold adopt` on an already-adopted project:
+  without `--force`, detection is skipped; with `--force`, detection re-runs and
+  fills in missing typed-config fields without overwriting user-set values.
+- **`--dry-run`** runs full detection + merge pipeline in memory and emits proposed
+  changes without writing.
+- **New `ExitCode.Ambiguous = 6`** for "operator action required" outcomes.
+
+### Changed
+- **`runAdoption` is now async** — necessary because the disambiguation prompt is
+  async. All callers updated to await.
+- Detection runs through a new `SignalContext` abstraction at
+  `src/project/detectors/`. Game detection moved out of inline `adopt.ts` code.
+- `scaffold adopt --force` now lets low-confidence matches participate in
+  disambiguation (in addition to overriding existing `projectType`).
+- New dependencies: `yaml ^2.8.3` (AST-based YAML mutation for adopt writes),
+  `smol-toml ^1.6.1` (TOML parsing for pyproject.toml and Cargo.toml signals).
+- `ConfigSchema` `methodology` and `platforms` fields now have explicit Zod defaults
+  so a bootstrap config with only `version: 2` and `project: {}` is loadable.
+
+### Deprecated
+- **`AdoptionResult.gameConfig`** field — use `detectedConfig` (when
+  `type === 'game'`) instead. Removed in v4.0.0.
+- **JSON output `game_config` field** — use `detected_config.config` instead.
+  Removed in v4.0.0.
+- **JSON output top-level `project_type` field** — use `detected_config.type`
+  instead. Removed in v4.0.0.
+
+A one-time stderr notice fires on every game adoption to alert consumers.
+
+### Fixed
+- **Existing inline game detection** had no precedence regression test for the
+  Unity > Unreal > Godot ordering. v3.10 adds the test before relocating the logic.
+- `js-yaml.dump` calls in adopt's config-write path destroyed user comments and
+  line endings. Replaced with `yaml.parseDocument` AST mutation.
+- `scaffold adopt` no longer crashes on filesystem permission errors (`EACCES`,
+  `ELOOP`, `ENOTDIR`) — gracefully degrades with warnings.
+- `scaffold adopt` no longer hangs in non-TTY environments without `--auto` (CI
+  runners, piped stdin) — disambiguation detects non-TTY and treats as `--auto`.
+- Cross-platform: detection works on case-insensitive filesystems (macOS APFS,
+  Windows NTFS) by using readdir-based exact-case matching.
+
+### Migration
+
+**Upgrading from v3.9.x to v3.10.0:** No code changes required. Existing
+`config.yml` files written by v3.9.x continue to work. New `scaffold adopt` runs
+on previously-adopted projects skip detection (info message); pass `--force` to
+re-detect.
+
+**Deprecated fields (removed in v4.0):** `AdoptionResult.gameConfig`, JSON
+`game_config`, JSON top-level `project_type`. Use `detectedConfig` /
+`detected_config` instead. Both old and new fields are emitted in v3.10.
+
+**Project types not detected in v3.10** (deferred to v3.11+): Rails, Laravel,
+Spring Boot, ASP.NET Core, Quarkus, Symfony, Sinatra (Ruby/PHP/JVM/.NET backends);
+Maven/Gradle/.NET libraries; Vike, Qwik, Solid, Preact (web frameworks); Bun.serve,
+Deno.serve, Cloudflare Workers (runtimes). Pass `--project-type <type>` manually.
+
 ## [3.9.2] — 2026-04-07
 
 ### Changed (internal)
