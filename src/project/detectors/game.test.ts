@@ -60,6 +60,37 @@ describe('detectGame', () => {
     })
   })
 
+  it('detects Love2D from conf.lua + main.lua', () => {
+    const ctx = createFakeSignalContext({
+      rootEntries: ['conf.lua', 'main.lua'],
+      files: { 'conf.lua': 'function love.conf(t) end', 'main.lua': 'function love.draw() end' },
+    })
+    const match = detectGame(ctx)
+    expect(match?.partialConfig.engine).toBe('custom')
+    expect(match?.evidence[0].signal).toBe('love2d-conf')
+  })
+
+  it('detects JS game from phaser npm dep', () => {
+    const ctx = createFakeSignalContext({
+      rootEntries: ['package.json'],
+      files: { 'package.json': '{"name":"x"}' },
+      packageJson: { name: 'x', dependencies: { phaser: '3.80' } },
+    })
+    const match = detectGame(ctx)
+    expect(match?.partialConfig.engine).toBe('custom')
+    expect(match?.evidence[0].signal).toBe('js-game-dep')
+  })
+
+  it('requires index.html alongside three for JS game detection', () => {
+    // three alone is not enough — could be a visualization project
+    const ctx = createFakeSignalContext({
+      rootEntries: ['package.json'],
+      files: { 'package.json': '{"name":"x"}' },
+      packageJson: { name: 'x', dependencies: { three: '0.160' } },
+    })
+    expect(detectGame(ctx)).toBeNull()
+  })
+
   it('returns null for empty directory', () => {
     const ctx = createFakeSignalContext({ rootEntries: [] })
     expect(detectGame(ctx)).toBeNull()

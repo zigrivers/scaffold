@@ -93,7 +93,7 @@ export async function runAdoption(options: {
 
   if (gameMatch) {
     result.projectType = 'game'
-    result.gameConfig = gameMatch.partialConfig as Partial<GameConfig>
+    result.gameConfig = gameMatch.partialConfig
   }
 
   return result
