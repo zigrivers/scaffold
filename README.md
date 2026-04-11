@@ -1,6 +1,6 @@
 # Scaffold
 
-A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 60 structured pipeline steps — organized into 16 phases — plus 10 utility tools, and the supported AI tools handle the research, planning, and implementation for you.
+A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 60 structured pipeline steps — organized into 16 phases — plus 11 utility tools, and the supported AI tools handle the research, planning, and implementation for you.
 
 By the end, you'll have a fully planned, standards-documented, implementation-ready project with working code.
 
@@ -1381,9 +1381,10 @@ These are orthogonal to the pipeline — usable at any time, not tied to pipelin
 | `scaffold run review-code` | Run all 3 code review channels on local code before commit or push. |
 | `scaffold run review-pr` | Run all 3 code review channels (Codex CLI, Gemini CLI, Superpowers) on a PR. |
 | `scaffold run post-implementation-review` | Full 3-channel codebase review after an AI agent completes all tasks — checks requirements coverage, security, architecture alignment, and more. |
+| `scaffold run spark` | Explore and expand a raw project idea through Socratic questioning, competitive research, and innovation expansion. Produces a `docs/spark-brief.md` that feeds into `create-vision`. At depth 4+, dispatches to external models for independent research and adversarial red-teaming. |
 | `scaffold run session-analyzer` | Analyze Claude Code session logs for patterns and insights. |
 
-Use `scaffold run review-code` before commit or push when you want a local gate on the current delivery candidate. Use `scaffold run review-pr` after a GitHub PR exists.
+Use `scaffold run spark` before `create-vision` when you have a vague idea that needs sharpening. Use `scaffold run review-code` before commit or push when you want a local gate on the current delivery candidate. Use `scaffold run review-pr` after a GitHub PR exists.
 
 Run any of these via the CLI or ask the scaffold runner skill in Claude Code or Gemini.
 
