@@ -221,7 +221,7 @@ The brief's depth metadata is informational — it tells you how thoroughly
 the idea was explored, not how thorough this vision step should be.
 
 Defer the brief's "Technology Opportunities" section to downstream phases
-(PRD, architecture) — the vision document is about purpose and positioning,
+(tech-stack, architecture) — the vision document is about purpose and positioning,
 not technical implementation.
 
 **If `docs/spark-brief.md` does NOT exist**: Proceed normally with Phase 1
