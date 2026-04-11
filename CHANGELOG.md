@@ -2,6 +2,53 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.11.0] — 2026-04-11
+
+### Added
+- **`scaffold run spark` — idea exploration and expansion tool** — a new stateless
+  tool that takes a vague project idea ("a game about cats," "an app for tracking
+  recipes") and turns it into a well-formed idea brief (`docs/spark-brief.md`)
+  through Socratic questioning and active research. Spark is two things in one:
+  an interviewer that asks hard questions AND a research companion that explores
+  the problem space and brings back insights you haven't considered.
+  - **6-phase conversational framework**: Seed (capture the idea) → Research
+    (competitive landscape) → Expand (innovation and adjacent opportunities) →
+    Challenge (stress-test assumptions and sharpen scope) → Synthesize (write the
+    brief) → Red-Team (adversarial review at depth 4+).
+  - **Depth-scaled behavior**: Depth 1 is knowledge-only (quick sanity check),
+    depth 2-3 adds web research, depth 4 dispatches to one external model for
+    independent competitive analysis, depth 5 does multi-model research with
+    reconciliation plus adversarial red-teaming.
+  - **Rerun support**: If `docs/spark-brief.md` already exists, spark offers
+    update mode (deepen/revise existing brief) or fresh mode (start over).
+  - **Feeds into create-vision**: The spark brief is automatically detected by
+    `create-vision` as optional upstream context. Vision enters "accelerated
+    mode" — using the brief as a baseline and asking targeted follow-up questions
+    to deepen and validate hypotheses, rather than re-exploring from scratch.
+  - **Game-aware**: When the game overlay is active (`projectType: game`), spark
+    automatically gains game-specific ideation lenses — core loop identification,
+    player fantasy, retention mechanics, session design, and monetization models.
+- **3 new knowledge entries**:
+  - `ideation-craft` — Socratic questioning techniques, competitive research
+    methodology, lightweight expansion patterns, brief synthesis with confidence
+    tagging, worked examples, and anti-patterns.
+  - `multi-model-research-dispatch` — dispatch patterns for sending research
+    and adversarial challenge to external AI models (Codex, Gemini) with
+    reconciliation rules, single-model fallback (VC/competitor PM/skeptical
+    user perspectives), timeout handling, and quality gates.
+  - `game-ideation` — game-specific ideation techniques including core loop
+    evaluation worksheet, player fantasy alignment tests, retention mechanics,
+    session design by platform, monetization model guidance, scoping by project
+    scale, and common game ideation anti-patterns.
+- **`tech-stack` now consumes spark brief** — the Technology Opportunities
+  section from the spark brief is available as supplementary input when
+  researching technology options, with a freshness guard that ignores stale
+  briefs.
+
+### Changed
+- Updated tool count references (10 → 11 tools, 61 → 64 knowledge entries)
+  across CLAUDE.md, project-structure.md, and prompt-pipeline.md.
+
 ## [3.10.0] — 2026-04-10
 
 ### Added
