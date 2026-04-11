@@ -842,17 +842,7 @@ spark brief and use it as a starting point, accelerating the discovery process.
 Run: `make validate`
 Expected: PASS
 
-- [ ] **Step 3: Run scaffold build**
-
-Run: `npm run build`
-Expected: Build succeeds — spark tool is discovered by the assembly engine.
-
-- [ ] **Step 4: Verify tool is discoverable**
-
-Run: `scaffold list --tools`
-Expected: `spark` appears in the tool listing.
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 git add content/tools/spark.md
@@ -868,10 +858,11 @@ git commit -m "feat(spark): add methodology scaling, brief template, and closing
 
 - [ ] **Step 1: Read the current create-vision.md**
 
-Read the file completely. Find the exact locations of these headings (line numbers are approximate — verify by reading the file):
-- The `## Inputs` section
-- The `### Mode Detection` block
-- The `## Phase 1: Strategic Discovery` heading
+Read the file completely. Find the exact locations of these sections (heading levels may vary — search by name, not by heading level):
+- The `Inputs` section
+- The `Mode Detection` block
+- The `Update Mode Specifics` block
+- The `Phase 1: Strategic Discovery` heading
 
 - [ ] **Step 2: Update the Inputs section**
 
@@ -925,16 +916,17 @@ not technical implementation.
 
 - [ ] **Step 4: Add Spark Brief Context at the beginning of Phase 1**
 
-Insert the following block at the beginning of `## Phase 1: Strategic Discovery`, before the discovery questions. This is a back-reference to the full detection block above — it ensures FRESH MODE (which says "skip to Phase 1") naturally reaches the spark brief context:
+Insert the following block at the beginning of `Phase 1: Strategic Discovery`, before the discovery questions. This supplements (not duplicates) the full detection block above — FRESH MODE says "skip to Phase 1" so this block ensures spark-brief context is applied even when Mode Detection was skipped:
 
 ```markdown
-## Phase 1: Strategic Discovery
-
 ### Spark Brief Context
-If a spark brief was detected in the Spark Brief Detection section above,
-use it as your baseline for this phase. Do not skip phases — use the brief's
+
+**If `docs/spark-brief.md` was read during Spark Brief Detection above**, use
+it as your baseline for this phase. Do not skip phases — use the brief's
 answers as a starting point and ask targeted follow-up questions to deepen
 and validate the brief's hypotheses to create-vision's required depth.
+
+**If no spark brief exists**, proceed normally with the discovery questions below.
 ```
 
 - [ ] **Step 5: Validate**
@@ -983,6 +975,8 @@ git commit -m "feat(spark): add spark-brief Technology Opportunities to tech-sta
 ---
 
 ### Task 8: Validation and integration testing
+
+**Note:** This is a main-agent/integrator task, NOT a subagent task. It requires cross-file context from all prior tasks.
 
 **Files:**
 - No new files — verification of all previous tasks
@@ -1072,9 +1066,9 @@ rm docs/spark-brief.md
 
 - [ ] **Step 7: Commit any fixes**
 
-If any validation steps required fixes, commit them:
+If any validation steps required fixes, commit only the specific files that were fixed:
 
 ```bash
-git add -A
+git add <specific-files-that-were-fixed>
 git commit -m "fix(spark): address validation findings"
 ```
