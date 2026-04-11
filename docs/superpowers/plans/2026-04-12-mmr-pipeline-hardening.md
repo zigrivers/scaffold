@@ -124,13 +124,15 @@ Search the entire file for any auth recovery commands that lack the `!` prefix. 
 
 - [ ] **Step 5: Remove severity definitions**
 
-Find any severity definition blocks (P0/P1/P2/P3 definitions). These may be in the Summary or in the prompt template. Replace the inline definitions with:
+Find severity definition blocks (P0/P1/P2/P3 definitions) in the entry's **own instructional prose** — the Summary section and any Deep Guidance sections that define severities for the reader. Replace those with:
 
 ```markdown
 See `review-methodology` for severity definitions (P0-P3). This entry uses those severities but does not define them.
 ```
 
-**IMPORTANT:** Do NOT remove severity definitions from inside prompt templates (the `## Output Format` prompt example). Those must stay inline because external models cannot resolve cross-references. Only remove severity definitions from the entry's own instructional prose.
+**IMPORTANT — two different contexts to distinguish:**
+- **Instructional prose** (Summary, Deep Guidance explanations): REMOVE severity definitions, replace with cross-reference above.
+- **Prompt templates** (the `## Output Format` example sent to external models): KEEP severity definitions inline. External models receive only the assembled prompt — they cannot resolve cross-references to knowledge entries. Do NOT touch these.
 
 - [ ] **Step 6: Adapt quality gates for degraded mode**
 
@@ -431,7 +433,7 @@ make validate
 
 Expected: PASS. Note: SKILL.md may not be covered by frontmatter validation.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Run scaffold build**
 
 ```bash
 scaffold build
@@ -598,13 +600,19 @@ After each channel's auth failure handling block, add compensating-pass queuing.
 After "If auth fails: tell the user to run `! codex login`..." add:
 
 ```markdown
-If auth cannot be recovered, or if Codex is not installed, queue a compensating Claude self-review pass focused on implementation correctness, security, and API contracts. Label findings as `[compensating: Codex-equivalent]`. This pass runs after all channel dispatch attempts complete.
+If auth cannot be recovered, or if Codex is not installed, queue a compensating Claude self-review pass focused on implementation correctness, security, and API contracts. Label findings as `[compensating: Codex-equivalent]`. If auth check times out (~5s), retry once; if still failing, record `auth timeout` and queue compensating pass. This pass runs after all channel dispatch attempts complete.
 ```
 
 For Gemini, after the auth failure handling, add:
 
 ```markdown
-If auth cannot be recovered, or if Gemini is not installed, queue a compensating Claude self-review pass focused on architectural patterns, design reasoning, and broad context. Label findings as `[compensating: Gemini-equivalent]`. This pass runs after all channel dispatch attempts complete.
+If auth cannot be recovered, or if Gemini is not installed, queue a compensating Claude self-review pass focused on architectural patterns, design reasoning, and broad context. Label findings as `[compensating: Gemini-equivalent]`. If auth check times out (~5s), retry once; if still failing, record `auth timeout` and queue compensating pass. This pass runs after all channel dispatch attempts complete.
+```
+
+After the dispatch command for each external channel, add a runtime failure branch:
+
+```markdown
+If the CLI exits with a non-zero code, produces malformed/unparseable output, or is killed by the tool runner timeout, record status `failed` and queue a compensating pass for that channel.
 ```
 
 After the Superpowers section, add:
@@ -631,13 +639,23 @@ When compensating passes ran for any channel, the maximum achievable verdict is 
 
 - [ ] **Step 6: Update Step 9 report with canonical statuses**
 
-Replace the channel status options in the report template:
+Replace the channel status options in the report template. Each channel now reports **both** root cause and coverage:
 
 ```markdown
 ### Channels Executed
-- Codex CLI — [completed / not installed / auth failed / auth timeout / failed / compensating (Codex-equivalent)]
-- Gemini CLI — [completed / not installed / auth failed / auth timeout / failed / compensating (Gemini-equivalent)]
-- Superpowers code-reviewer — [completed / error]
+- Codex CLI — root cause: [completed / not installed / auth failed / auth timeout / failed], coverage: [full / compensating (Codex-equivalent)]
+- Gemini CLI — root cause: [completed / not installed / auth failed / auth timeout / failed], coverage: [full / compensating (Gemini-equivalent)]
+- Superpowers code-reviewer — [completed / failed]
+```
+
+Note: Superpowers uses `failed` (not `error`) to match canonical vocabulary. Superpowers has no compensating pass — it is always-available Claude.
+
+- [ ] **Step 6a: Add fix-cycle channel rule**
+
+In review-code.md's fix cycle step (Step 7, around line 283), add:
+
+```markdown
+**Fix cycle channel rule:** Re-run only channels that originally completed or ran as compensating passes. Never retry a channel marked `not installed`, `auth failed`, or `auth timeout` during fix rounds — its availability does not change within a session.
 ```
 
 - [ ] **Step 7: Add Process Rules**
@@ -737,9 +755,9 @@ Replace the prose verdict in the report template. The Channels Executed section 
 
 ```markdown
 ### Channels Executed
-- [ ] Codex CLI — [completed / not installed / auth failed / auth timeout / failed / compensating (Codex-equivalent)]
-- [ ] Gemini CLI — [completed / not installed / auth failed / auth timeout / failed / compensating (Gemini-equivalent)]
-- [ ] Superpowers code-reviewer — [completed / error]
+- [ ] Codex CLI — root cause: [completed / not installed / auth failed / auth timeout / failed], coverage: [full / compensating (Codex-equivalent)]
+- [ ] Gemini CLI — root cause: [completed / not installed / auth failed / auth timeout / failed], coverage: [full / compensating (Gemini-equivalent)]
+- [ ] Superpowers code-reviewer — [completed / failed]
 ```
 
 Replace the Verdict line:
@@ -817,7 +835,7 @@ Update the completion output to include the formal verdict:
 
 ```markdown
 ```
-Code review complete. Verdict: [pass/degraded-pass]. All 3 channels executed. PR #[number] is ready for merge.
+Code review complete. Verdict: [pass/degraded-pass]. Channels: [N] executed, [N] compensating. PR #[number] is ready for merge.
 ```
 ```
 
@@ -863,9 +881,19 @@ Before "#### Channel 1: Codex CLI" in Step 4, add:
 **Foreground only:** Always run Codex and Gemini CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`. Background execution produces empty output.
 ```
 
-- [ ] **Step 3: Add compensating-pass logic to Phase 1 channels**
+- [ ] **Step 3: Add installation checks and compensating-pass logic to Phase 1 channels**
 
-For Codex, after the auth failure handling, add:
+For each external channel (Codex, Gemini), add a `command -v` installation check BEFORE the auth check (matching the pattern from Task 7):
+
+```markdown
+**Installation check:**
+```bash
+command -v codex >/dev/null 2>&1
+```
+- If `codex` is not installed: queue a compensating pass, record status `not installed`. Skip to next channel.
+```
+
+Then after the existing auth check and its failure handling, add for Codex:
 
 ```markdown
 If auth cannot be recovered, or if Codex is not installed, queue a compensating Claude self-review pass focused on implementation correctness, security, and API contracts. Label findings as `[compensating: Codex-equivalent]`. If auth check times out (~5s), retry once; if still failing, record `auth timeout` and queue compensating pass.
@@ -896,6 +924,23 @@ Phase 2 compensating passes adapt the focus to story context:
 ```
 
 Also add the foreground-only note to the subagent channel dispatch instructions.
+
+Update the Phase 2 subagent return shape to include per-channel status metadata so the parent can compute Phase 2 coverage counts:
+
+```markdown
+Each Phase 2 subagent must return channel status alongside findings:
+{
+  "story": "[STORY_TITLE]",
+  "channel_status": {
+    "codex": { "root_cause": "completed|not_installed|auth_failed|...", "coverage": "full|compensating" },
+    "gemini": { "root_cause": "...", "coverage": "..." },
+    "superpowers": { "root_cause": "completed", "coverage": "full" }
+  },
+  "codex": { "findings": [...] },
+  "gemini": { "findings": [...] },
+  "superpowers": { "findings": [...] }
+}
+```
 
 - [ ] **Step 5: Update Step 7 report format**
 
@@ -1025,6 +1070,22 @@ Find the `mmr status` exit codes (line ~100: "Exit codes: 0 = all complete, 1 = 
 **Exit code precedence:** Gate codes (0/2/3) take precedence over channel-failure (4) when a reconciled result exists. Exit 4 = no result possible. `needs-user-decision` verdict maps to exit 2 with a `verdict: "needs-user-decision"` field in JSON output.
 ```
 
+- [ ] **Step 5a: Update mmr status JSON example**
+
+Find the `mmr status` JSON example (around line 88). Update channel objects to include `root_cause` and `coverage_status`:
+
+```json
+{
+  "job_id": "mmr-a1b2c3",
+  "status": "running",
+  "channels": {
+    "claude": { "status": "completed", "root_cause": null, "coverage_status": "full", "elapsed": "47s", "findings_count": 2 },
+    "gemini": { "status": "running", "elapsed": "2m12s" },
+    "codex": { "status": "completed", "root_cause": null, "coverage_status": "full", "elapsed": "1m03s", "findings_count": 0 }
+  }
+}
+```
+
 - [ ] **Step 6: Update Auth Verification Layer**
 
 Find the auth lifecycle text "Auth is verified every time before dispatch — never cached or assumed" (around line 131). Replace with:
@@ -1038,7 +1099,7 @@ Auth results are cached internally for up to `auth_cache_ttl` seconds (default: 
 In the Critical Distinction table, add a row:
 
 ```markdown
-| Auth check timeout | Retry once, then treat as `auth_failed` | Check network |
+| Auth check timeout | Retry once, then record `auth_timeout` (distinct from `auth_failed`) | Check network |
 ```
 
 Fix recovery commands in the channel config examples: use raw commands without `!` prefix. Add note:
@@ -1351,20 +1412,24 @@ If any files still hardcode old dispatch patterns, fix them to reference `scaffo
 
 - [ ] **Step 6: Manual smoke check**
 
-Verify the assembled review prompts work correctly:
+Verify the assembled review prompts contain the new content. After `scaffold build`, check the build artifacts:
 
 ```bash
-# Verify review-pr tool assembles without errors
-scaffold run review-pr --help 2>&1 || echo "review-pr assembly check"
+# Check assembled review-pr prompt contains new vocabulary
+grep -l "foreground\|compensating\|degraded-pass" .scaffold/assembled/review-pr.md 2>/dev/null || echo "review-pr: check assembled output manually"
 
-# Verify review-code tool assembles without errors
-scaffold run review-code --help 2>&1 || echo "review-code assembly check"
+# Check assembled review-code prompt
+grep -l "foreground\|compensating\|degraded-pass" .scaffold/assembled/review-code.md 2>/dev/null || echo "review-code: check assembled output manually"
+
+# Check assembled post-implementation-review prompt
+grep -l "foreground\|compensating\|coverage" .scaffold/assembled/post-implementation-review.md 2>/dev/null || echo "post-impl: check assembled output manually"
 ```
 
-If `scaffold run` is available, spot-check that the assembled prompt contains:
-- The foreground-only constraint
-- The compensating-pass instructions
-- The canonical status vocabulary
+If assembled files are not available at those paths, read the source tool files directly and verify they contain:
+- The foreground-only constraint text
+- The compensating-pass instructions with `[compensating: X-equivalent]` labeling
+- The canonical status vocabulary (root cause + coverage dimensions)
+- The verdict definitions (review-code, review-pr) or coverage indicators (post-impl)
 
 - [ ] **Step 7: Commit any fixups**
 
