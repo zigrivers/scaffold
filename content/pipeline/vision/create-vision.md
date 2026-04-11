@@ -19,6 +19,7 @@ throughout the entire pipeline.
 
 ## Inputs
 - Project idea (provided by user verbally or in a brief)
+- docs/spark-brief.md (optional) — upstream context from spark ideation session
 - Existing project files (if brownfield — any README, docs, or code)
 - Market context or competitive research (if available)
 
@@ -103,10 +104,51 @@ Before starting, check if `docs/vision.md` already exists:
 - **Related docs**: `docs/plan.md`
 - **Special rules**: Never change guiding principles without user approval. Preserve any strategic decisions that were explicitly made by the user.
 
+### Spark Brief Detection
+
+**If `docs/spark-brief.md` exists**: Read it completely. Check its tracking
+comment date and idea-slug against the `docs/vision.md` tracking comment
+date (if vision exists) and the current `$ARGUMENTS`. If the brief predates
+the current vision, ignore it and note: "Spark brief found but predates
+current vision — ignoring." If the brief's idea-slug appears unrelated to
+the current `$ARGUMENTS`, ask the user before using it.
+
+Otherwise, this is upstream context from a spark ideation session — the user
+has already explored the problem space, researched competitors, expanded the
+idea, and challenged assumptions.
+
+**Accelerated mode**: Use the brief's answers as a baseline and ask targeted
+follow-up questions to expand them to create-vision's required depth. Do not
+skip phases — deepen and validate the brief's hypotheses rather than
+re-exploring from scratch.
+
+If the brief was red-teamed (Session Metadata), treat its competitive
+landscape and risk sections as pre-validated hypotheses — focus discovery on
+gaps or updates rather than re-exploring those areas.
+
+create-vision uses its own configured depth regardless of the brief's depth.
+The brief's depth metadata is informational — it tells you how thoroughly
+the idea was explored, not how thorough this vision step should be.
+
+Defer the brief's "Technology Opportunities" section to downstream phases
+(tech-stack, architecture) — the vision document is about purpose and positioning,
+not technical implementation.
+
+**If `docs/spark-brief.md` does NOT exist**: Proceed normally.
+
 ## Here's my idea:
 $ARGUMENTS
 
 ## Phase 1: Strategic Discovery
+
+### Spark Brief Context
+
+**If `docs/spark-brief.md` was read during Spark Brief Detection above**, use
+it as your baseline for this phase. Do not skip phases — use the brief's
+answers as a starting point and ask targeted follow-up questions to deepen
+and validate the brief's hypotheses to create-vision's required depth.
+
+**If no spark brief exists**, proceed normally with the discovery questions below.
 
 Use AskUserQuestionTool throughout this phase. Batch related questions together — don't ask one at a time.
 
