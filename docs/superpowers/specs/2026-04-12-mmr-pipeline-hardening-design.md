@@ -174,10 +174,11 @@ reconciliation, and verdict logic.
   not installed (`command -v` fails), auth fails and the user cannot recover,
   or it fails during execution (non-zero exit, malformed output, timeout).
   Run a compensating Claude
-  self-review pass for each missing channel, focused on that channel's
-  strength area and labeled `[compensating: Codex-equivalent]` or
-  `[compensating: Gemini-equivalent]`. Compensating findings are single-source
-  confidence.
+  self-review pass for each missing **external** channel (Codex or Gemini),
+  focused on that channel's strength area and labeled
+  `[compensating: Codex-equivalent]` or `[compensating: Gemini-equivalent]`.
+  Compensating findings are single-source confidence. (Superpowers is a
+  Claude subagent and is always available — no compensating pass needed.)
 - **Auth failures are NOT silent** — surface to the user with recovery commands:
   - Codex: `! codex login`
   - Gemini: `! gemini -p "hello"`
@@ -274,7 +275,7 @@ During implementation, verify whether any other files reference the old review-p
 ### Shared dispatch pattern
 
 ```
-For each channel (Codex, Gemini, Superpowers):
+For each external channel (Codex, Gemini):
   1. Check installation: command -v <tool> >/dev/null 2>&1
      -> not found: status = not_installed, queue compensating pass
   2. Check auth: <auth command> with 5s mental timeout
@@ -284,7 +285,14 @@ For each channel (Codex, Gemini, Superpowers):
   3. Dispatch review (foreground only)
      -> completed: use results
      -> CLI killed by tool runner: status = failed, queue compensating pass
-  4. After all channels: run queued compensating passes (foreground)
+
+For Superpowers (always-available Claude subagent):
+  1. Dispatch superpowers:code-reviewer subagent
+     -> No install/auth check needed — always available
+     -> If plugin not installed: warn user, skip (no compensating pass)
+
+After all channels:
+  4. Run queued compensating passes (foreground)
   5. Reconcile all findings (real + compensating)
   6. Apply verdict logic (PR tools) or coverage indicator (report tools)
 ```
@@ -332,8 +340,8 @@ Uses **coverage indicator** (not 4 verdicts) — it's report-oriented, not merge
    | Indicator | Condition |
    |-----------|-----------|
    | `full-coverage` | All channels completed in all phases, no compensating |
-   | `degraded-coverage` | Compensating passes used, but all phases ran |
-   | `partial-coverage` | Phase skipped or channel produced no results with no compensation |
+   | `degraded-coverage` | Compensating passes used OR channels have `partial` coverage (partial_timeout), but all phases ran |
+   | `partial-coverage` | Phase skipped entirely, or channel produced no results with no compensation |
 
 5. Updated report: coverage indicator + Phase 1/Phase 2 channel breakdown.
 6. Fallback + Process Rules updated.
@@ -367,9 +375,11 @@ Updates to `docs/superpowers/specs/2026-04-05-mmr-multi-model-review-design.md`.
    | 4 | Channel failure (no reconciled result possible) | `mmr status`, `mmr results` |
    | 5 | CLI error | all |
 
+   **`mmr review --sync` exit semantics:** `--sync` blocks until all channels complete (or timeout), runs reconciliation, and returns the same exit codes as `mmr results`. It is the recommended single-command entry point for AI agents and CI/CD.
+
    **CI/CD note:** Use `mmr review --sync` for gate decisions, never `mmr status` directly. Exit 3 is a warning, not failure.
 
-   **Exit code precedence:** Gate codes (0/2/3) take precedence over channel-failure (4) when a reconciled result exists. Exit 4 = no result possible.
+   **Exit code precedence:** Gate codes (0/2/3) take precedence over channel-failure (4) when a reconciled result exists. Exit 4 = no result possible. `needs-user-decision` verdict maps to exit 2 (`gate_failed`) with a `verdict: "needs-user-decision"` field in the JSON output to distinguish from a standard gate failure.
 
 3. **`mmr status` canonical statuses:** root_cause + coverage per channel.
 
@@ -385,12 +395,14 @@ Updates to `docs/superpowers/specs/2026-04-05-mmr-multi-model-review-design.md`.
 
 2. **Add `auth_timeout` row** to critical distinction table.
 
-3. **Recovery commands:** Raw in config, platform wrappers add `!` prefix:
+3. **Recovery commands:** Raw commands in config. Platform wrappers add the `!` prefix dynamically for Claude Code contexts (the `!` prefix runs the command interactively in the user's terminal):
    ```yaml
    codex:
      auth:
        recovery: "codex login"
-       recovery_claude_code: "! codex login"
+   gemini:
+     auth:
+       recovery: "gemini -p 'hello'"
    ```
 
 4. **Foreground note:** `--sync` recommended for all AI agent contexts.
@@ -403,15 +415,20 @@ Layer 1 severity definitions are intentionally inline. Note: "External models re
 
 1. **Updated lifecycle:**
    ```
-   Per-channel:
+   Per-channel (preflight):
+     PREFLIGHT -> NOT_INSTALLED -> COMPENSATING -> COMP_COMPLETED / COMP_FAILED
+     PREFLIGHT -> AUTH_FAILED   -> COMPENSATING -> COMP_COMPLETED / COMP_FAILED
+     PREFLIGHT -> AUTH_TIMEOUT  -> COMPENSATING -> COMP_COMPLETED / COMP_FAILED
+     PREFLIGHT -> READY -> DISPATCHED
+
+   Per-channel (dispatch):
      DISPATCHED -> RUNNING -> COMPLETED
                     |
                     +-> TIMEOUT -> PARTIAL_TIMEOUT (if partial output)
-                    +-> FAILED
-                    +-> AUTH_FAILED -> COMPENSATING -> COMP_COMPLETED / COMP_FAILED
+                    +-> FAILED -> COMPENSATING -> COMP_COMPLETED / COMP_FAILED
 
    Per-job (terminal):
-     GATE_PASSED / GATE_FAILED / GATE_DEGRADED
+     GATE_PASSED / GATE_FAILED / GATE_DEGRADED / GATE_NEEDS_USER
    ```
 
 2. **`.meta.json` schema:**
@@ -460,10 +477,12 @@ Layer 1 severity definitions are intentionally inline. Note: "External models re
 
 3. **Gate logic:**
    ```
-   gate_passed  = no finding <= fix_threshold
-   gate_degraded = gate_passed AND any channel coverage_status = "compensating"
-   gate_failed  = any finding <= fix_threshold unresolved
+   gate_passed      = no finding <= fix_threshold AND all channels coverage_status = "full"
+   gate_degraded    = no finding <= fix_threshold AND any channel coverage_status in ("partial", "compensating", "none")
+   gate_failed      = any finding <= fix_threshold unresolved
+   gate_needs_user  = contradictions or unresolvable findings requiring human judgment
    ```
+   **Quality gate failures** (e.g., missing raw output, unmet minimum finding count) map to `gate_failed` — they indicate the review itself is incomplete, which blocks proceeding.
 
 ### Configuration
 
