@@ -8,8 +8,15 @@ Game ideation applies game-specific lenses — core loop, player fantasy, retent
 
 ## Summary
 
-### When This Applies
-This knowledge is injected by the game overlay when the spark tool detects a game idea. It supplements the general ideation-craft entry with game-specific lenses.
+### Game Ideation Lenses
+Five lenses to apply during idea exploration: **Core loop** (what the player does every 30 seconds), **Player fantasy** (the emotional experience, not mechanics), **Retention** (what brings players back), **Session design** (how long and how satisfying), **Monetization** (how the game sustains itself).
+
+### Quick Tests
+- **Core loop**: Can you describe it in one sentence without "and"?
+- **Player fantasy**: Does every major mechanic reinforce it?
+- **Retention**: What happens if the player leaves for a week?
+
+## Deep Guidance
 
 ### Core Loop Identification
 - **What is the core loop?** The repeating cycle of actions the player performs most often. In a shooter: aim → shoot → loot → repeat. In a puzzle game: observe → plan → execute → evaluate → repeat.
@@ -37,8 +44,6 @@ This knowledge is injected by the game overlay when the spark tool detects a gam
 - **Subscription**: Recurring payment for ongoing content. Best for live-service games.
 - **Ask the user**: "How does your player feel about spending money in your game? What would they pay for? What would feel unfair?"
 
-## Deep Guidance
-
 ### Applying Game Lenses During Spark Phases
 
 **Phase 1 (Seed)**: Ask about the core loop and player fantasy early. These are the foundation — if they're unclear, everything else is built on sand.
@@ -64,3 +69,32 @@ When writing the spark brief for a game idea, adapt sections:
 - **Landscape** → Frame competitors by core loop and fantasy, not just features
 - **Expansion Ideas** → Tag which ideas affect the core loop vs. metagame vs. content
 - **Risks** → Include core loop fatigue, monetization/fantasy tension, and scope risks
+
+### Scoping by Project Scale
+
+| Scale | Core loop | Content depth | Monetization | Session design |
+|-------|-----------|---------------|-------------|----------------|
+| Game jam (48-72h) | One mechanic, tight loop | Minimal — procedural or template | None (free) | 5-15 min total |
+| Indie (solo/small team) | 1-2 mechanics, polished | Handcrafted, limited scope | Premium or F2P with cosmetics | 15-60 min sessions |
+| AA/studio | Multiple interlocking systems | Extensive content pipeline | Any model, balanced | Platform-appropriate |
+
+### Common Game Ideation Anti-Patterns
+
+- **The Kitchen Sink**: Trying to combine too many mechanics before any one is fun. Focus the core loop first.
+- **Fantasy Mismatch**: The monetization model undermines the player fantasy. (Pay-to-win in a skill-based competitive game.)
+- **Platform Blindness**: Designing a 90-minute session game for mobile, or a 3-minute session for PC/console.
+- **Retention Treadmill**: Relying on FOMO and daily login rewards instead of intrinsic motivation. Players resent obligation.
+- **Scope Denial**: "We'll just add multiplayer later." Multiplayer is an architecture decision, not a feature toggle.
+- **Clone Trap**: "Like [popular game] but with [small twist]." The twist must be fundamental enough to justify switching costs.
+
+### Core Loop Evaluation Worksheet
+
+When evaluating a proposed core loop, walk through these questions:
+
+1. **Primary loop**: What does the player do every 30 seconds? Is it inherently satisfying?
+2. **Secondary loop**: What does the player do every 5 minutes? Does it give meaning to the primary loop?
+3. **Tertiary loop**: What does the player do every session? Does it create a sense of progress?
+4. **Friction test**: Remove one mechanic from the loop. Does the game still work? If yes, that mechanic may be unnecessary.
+5. **Fantasy alignment**: Does every step in the loop reinforce the player fantasy? If a step breaks immersion, redesign it.
+6. **Depth test**: Can a skilled player execute the loop differently than a novice? If not, the loop may lack depth.
+7. **Social test**: Would watching someone else do this loop be entertaining? If not, the loop may lack spectacle or surprise.

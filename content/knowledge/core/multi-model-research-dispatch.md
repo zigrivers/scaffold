@@ -152,3 +152,57 @@ Run each perspective as a separate reasoning pass. Synthesize the three viewpoin
 | Challenge dispatch | Either Codex or Gemini | Adversarial analysis is model-agnostic |
 | Depth 4 (1 model) | Prefer Gemini (Google search built-in) | Strongest for competitive research |
 | Depth 5 (multi) | Both Codex AND Gemini | Diverse perspectives from different architectures |
+
+### Reconciliation Process (Depth 5)
+
+When two or more models return research findings, reconcile them:
+
+1. **Extract findings**: Parse each model's response into discrete findings (one competitor, one market signal, one risk = one finding).
+2. **Match findings**: Compare findings across models. Two findings match if they reference the same entity (competitor, trend, risk) even if the wording differs.
+3. **Classify each finding**:
+   - **Consensus**: 2+ models independently identified the same finding. High confidence.
+   - **Divergent**: Models disagree about the same entity (e.g., one says competitor X is strong, another says X is weak). Present both perspectives with reasoning.
+   - **Unique**: Only one model surfaced this finding. Not necessarily wrong — may be the most valuable insight. Present it without discounting.
+4. **Synthesize for the user**: Present findings grouped by classification. Lead with consensus (highest confidence), then unique (potential insights), then divergent (needs user judgment).
+5. **Never suppress minority views**: A lone model flagging a risk that others missed may be the most important finding in the entire research pass.
+
+### Quality Gates
+
+Before presenting research findings to the user, verify:
+
+- At least 2 competitors or alternatives identified (even at depth 4 with single model)
+- Each competitor has both a strength and a weakness documented
+- The "do nothing" option is addressed (how users cope without any tool)
+- Market timing signals are present (why now?)
+- If multi-model: reconciliation labels (consensus/divergent/unique) are applied
+
+### Common Anti-Patterns
+
+| Anti-pattern | Problem | Fix |
+|-------------|---------|-----|
+| Dismissing competitors | "They're not really competition" — every alternative is competition | Acknowledge strengths honestly |
+| Echo chamber | Both models agree because both drew from the same training data | Look for unique findings, not just consensus |
+| Recency bias | Focusing only on recent launches, ignoring established players | Include both established and emerging competitors |
+| Feature-list comparison | Comparing feature lists instead of positioning | Compare on audience, value prop, and differentiation |
+| Silent fallback | External model fails, no mention in output | Always note which models were used and any failures |
+| Over-synthesis | Merging distinct findings into one summary, losing nuance | Preserve individual findings before synthesizing |
+
+### Output Format
+
+When presenting research findings to the user, structure them as:
+
+**Competitive Landscape:**
+- [Competitor 1]: Strengths — [specifics]. Weaknesses — [specifics]. Why users choose them — [specifics].
+- [Competitor 2]: ...
+- "Do nothing" option: How users cope today — [specifics]. Why it's insufficient — [specifics].
+
+**Market Signals:**
+- [Signal 1]: [What happened, when, why it matters for this idea]
+- [Signal 2]: ...
+
+**Expansion Opportunities** (from adjacent market research):
+- [Opportunity 1]: [What it is, why it's relevant, how it connects]
+
+**Red-Team Challenges** (from adversarial review):
+- [Challenge 1]: [Weakness identified, why it matters, recommended action]
+  - Disposition: [accept/dismiss/defer — tracked after user response]
