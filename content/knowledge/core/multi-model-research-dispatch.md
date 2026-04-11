@@ -6,7 +6,7 @@ topics: [multi-model, research, competitive-analysis, red-team, codex, gemini, d
 
 # Multi-Model Research Dispatch
 
-At higher methodology depths (4+), idea exploration benefits from independent research and adversarial challenge by external AI models. This entry provides the dispatch patterns, reconciliation rules, and fallback strategies for research and red-team workflows in the spark tool.
+At higher methodology depths (4+), idea exploration and adversarial challenge benefit from independent research by external AI models. This entry provides dispatch patterns, reconciliation rules, and fallback strategies for research and red-team workflows.
 
 ## Summary
 

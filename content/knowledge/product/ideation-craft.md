@@ -6,7 +6,7 @@ topics: [ideation, questioning, research, competitive-analysis, brief-synthesis,
 
 # Ideation Craft
 
-Ideation craft covers the questioning, research, and synthesis techniques used during early-stage idea exploration. It guides the spark tool's conversational flow from a raw idea through competitive research to a structured idea brief.
+Ideation craft covers the questioning, research, and synthesis techniques used during early-stage idea exploration. It guides a conversational flow from a raw idea through competitive research to a structured idea brief.
 
 ## Summary
 
