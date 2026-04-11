@@ -145,3 +145,107 @@ step does comprehensive strategic expansion later.
 **Exit condition:** Present each expansion idea to the user. Each gets an
 explicit disposition: **accept** (include in brief), **defer** (note as open
 question), or **reject** (drop).
+
+### Phase 4: Challenge
+
+Converge. Challenge every assumption surfaced in Phases 1-3, including
+accepted expansion ideas.
+
+**What to challenge:**
+- **Feasibility**: Can this actually be built with the stated resources/timeline?
+- **Scope**: Is this too broad? "If you could only ship ONE feature, what is it?"
+- **Technical reality**: Are there hard technical constraints being glossed over?
+- **Positioning**: "Three competitors already do this. What's your genuine
+  differentiator?"
+- **Accepted expansions**: Phase 3 accepts are baseline intent. Phase 4 may
+  scope down or reject accepted ideas if they critically fail feasibility or
+  technical reality checks. Don't re-litigate the value of ideas the user
+  accepted — but DO challenge whether they're buildable and whether the overall
+  positioning holds against the competitive landscape.
+
+**Exit condition:** Each challenged assumption is confirmed or revised by the
+user. Core scope is explicitly locked — the user knows what's in and what's out.
+
+### Phase 5: Synthesize
+
+Write `docs/spark-brief.md`. Create the `docs/` directory if it doesn't exist.
+
+The brief is intentionally shallow — directional hypotheses, not validated
+conclusions. Target 2-4 sentences or concise bullet points per section.
+Sections may state "None identified" if inapplicable.
+
+**At depth 1-3:** Present the brief to the user for final approval. Write the
+file to disk after approval. This is the terminal phase — spark is complete.
+
+**At depth 4+:** Generate the draft brief in conversation (not yet written to
+disk). Present to the user for awareness: "Here's what I have before we
+stress-test it." Then proceed to Phase 6.
+
+Use the template in the Spark Brief Template section below.
+
+### Phase 6: Red-Team (depth 4+ only)
+
+Send the draft spark brief to available external models as adversarial
+reviewers.
+
+**Depth 4:** Dispatch to 1 external model.
+**Depth 5:** Dispatch to both Codex AND Gemini with reconciliation.
+
+**Red-team prompt for external models:**
+
+```
+You are an adversarial reviewer stress-testing a product idea brief.
+Your job is to find weaknesses, challenge assumptions, and surface missed
+opportunities.
+
+SPARK BRIEF:
+[Full content of the draft spark-brief.md]
+
+CHALLENGE INSTRUCTIONS:
+1. For each section, identify the weakest assumption and explain why it might
+   be wrong.
+2. What competitors or market dynamics does the brief underestimate?
+3. What technical feasibility risks are glossed over?
+4. What user segments or use cases are missing?
+5. If you could only flag ONE critical risk, what would it be?
+
+Be constructive but ruthless. Respond in structured markdown.
+```
+
+**Execution:**
+
+```bash
+# Codex
+codex exec --skip-git-repo-check -s read-only --ephemeral "RED_TEAM_PROMPT" 2>&1
+
+# Gemini
+NO_BROWSER=true gemini -p "RED_TEAM_PROMPT" --output-format json --approval-mode yolo 2>/dev/null
+```
+
+**If no external models available:** Fall back to primary model with distinct
+"red team" system prompt. Use the three-perspective approach from
+multi-model-research-dispatch knowledge (VC, competitor PM, skeptical user).
+
+**Processing challenges:**
+- Present each challenge to the user one at a time.
+- For each: **accept** (update the brief), **dismiss** (explain why), or
+  **defer** (note as open question).
+- Update the brief based on accepted challenges.
+
+**Exit condition:** User reviews all red-team findings and gives final approval.
+Write the updated brief to disk.
+
+### Adaptive Behavior
+
+Assess these heuristics continuously, beginning in Phase 1. Use the idea's
+characteristics to calibrate behavior across all phases:
+
+- **Well-formed idea** → Phase 1 is brief. Move to research quickly.
+- **Crowded space** → Phases 3 and 4 intensify. More expansion ideas to
+  differentiate, more competitive positioning challenges.
+- **Novel idea (no competitors)** → Phase 2 shifts to adjacent-space and
+  analogous-system research. Phase 4 focuses on market-existence risk.
+
+Phase transitions use natural conversational pivots, not mechanical
+announcements. ("Now that I understand the core idea, let me research what
+else is out there...")
