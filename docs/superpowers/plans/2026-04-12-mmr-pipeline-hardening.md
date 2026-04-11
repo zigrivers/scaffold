@@ -12,12 +12,44 @@
 
 ---
 
+### Task 0: Verify prerequisites
+
+**Context:** The spec requires `review-methodology` to exist with severity definitions BEFORE Tasks 1-2 remove them from other entries.
+
+- [ ] **Step 1: Verify review-methodology**
+
+```bash
+grep -l "P0.*P1\|P0.*blocks\|P0.*critical" content/knowledge/review/review-methodology.md
+```
+
+Expected: match found — severity definitions (P0-P3) are present. If NOT found, add severity definitions to `content/knowledge/review/review-methodology.md` before proceeding.
+
+- [ ] **Step 2: Audit for stale review-pr references**
+
+```bash
+grep -rn "codex exec\|codex login status\|gemini -p.*REVIEW" content/skills/ content/pipeline/ --include="*.md" | grep -v "multi-model\|review-code\|review-pr\|post-implementation"
+```
+
+Note any files that hardcode the old 3-channel dispatch pattern. If found, add them to the Task 7/8 scope for updates.
+
+---
+
 ### Task 1: Update `multi-model-review-dispatch` knowledge entry
 
 **Files:**
 - Modify: `content/knowledge/core/multi-model-review-dispatch.md`
 
 **Context:** This entry owns all dispatch mechanics. Six changes per the spec: foreground constraint, two-step CLI check, `!` prefix, remove severity defs, remove gcloud fallback, adapt quality gates for degraded mode.
+
+**Shared dispatch pattern for reference** (all tool tasks should produce this flow):
+```
+For each external channel (Codex, Gemini):
+  1. command -v <tool> → not found: not_installed, queue compensating
+  2. auth check → failed: auth_failed, queue compensating; timeout: retry once → auth_timeout
+  3. dispatch foreground → completed / failed (queue compensating)
+For Superpowers: dispatch subagent (always available, no compensating)
+After all: run compensating passes → reconcile → verdict/indicator
+```
 
 - [ ] **Step 1: Read the current file**
 
@@ -269,7 +301,7 @@ Expected: PASS.
 
 ```bash
 git add content/knowledge/core/automated-review-tooling.md
-git commit -m "fix: restructure automated-review-tooling with verdicts, compensating passes, scope delineation"
+git commit -m "fix: restructure automated-review-tooling with verdicts, compensating passes, degraded-mode"
 ```
 
 ---
@@ -402,6 +434,14 @@ Expected: PASS. Note: SKILL.md may not be covered by frontmatter validation.
 - [ ] **Step 7: Commit**
 
 ```bash
+scaffold build
+```
+
+Expected: PASS. Knowledge entries are assembled at build time — verify no assembly errors after Tasks 1-4.
+
+- [ ] **Step 8: Commit**
+
+```bash
 git add content/skills/multi-model-dispatch/SKILL.md
 git commit -m "fix: update multi-model-dispatch skill with foreground, reconciliation cross-ref"
 ```
@@ -522,6 +562,18 @@ git commit -m "fix: streamline CLAUDE.md review section with foreground, verdict
 
 **Context:** Already the most aligned tool. Add foreground constraint, compensating passes, canonical statuses, verdict cap for degraded mode. Six changes.
 
+**Status mapping reference** (current → canonical):
+| Current | Canonical | Display |
+|---------|-----------|---------|
+| `completed` | `completed` | "completed" |
+| `skipped (not installed)` | `not_installed` | "not installed" |
+| `skipped (auth failed)` | `auth_failed` | "auth failed" |
+| `error` | `failed` | "failed" |
+| *(new)* | `auth_timeout` | "auth timeout" |
+| *(new)* | `compensating` | "compensating (X-equivalent)" |
+
+**Pre-MMR note:** `partial_timeout` is deferred to MMR CLI. Pre-MMR tools record a killed CLI as `failed`.
+
 - [ ] **Step 1: Read the current file**
 
 Read `content/tools/review-code.md` in full. Note:
@@ -549,7 +601,11 @@ After "If auth fails: tell the user to run `! codex login`..." add:
 If auth cannot be recovered, or if Codex is not installed, queue a compensating Claude self-review pass focused on implementation correctness, security, and API contracts. Label findings as `[compensating: Codex-equivalent]`. This pass runs after all channel dispatch attempts complete.
 ```
 
-For Gemini, add similar text focused on architectural patterns, design reasoning, and broad context, labeled `[compensating: Gemini-equivalent]`.
+For Gemini, after the auth failure handling, add:
+
+```markdown
+If auth cannot be recovered, or if Gemini is not installed, queue a compensating Claude self-review pass focused on architectural patterns, design reasoning, and broad context. Label findings as `[compensating: Gemini-equivalent]`. This pass runs after all channel dispatch attempts complete.
+```
 
 After the Superpowers section, add:
 
@@ -656,9 +712,10 @@ Then the existing auth check follows. After the auth failure handling, add:
 
 ```markdown
 If auth cannot be recovered, queue a compensating pass (same focus as above). Record status `auth failed`.
+If auth check times out (~5s), retry once. If still failing, record status `auth timeout` and queue compensating pass.
 ```
 
-Add the same pattern for Gemini (with architectural patterns, design reasoning, broad context as focus).
+For Gemini, add the same two-step pattern with installation check, auth check (including timeout/retry), and compensating-pass queuing focused on architectural patterns, design reasoning, and broad context. Label findings `[compensating: Gemini-equivalent]`.
 
 After all three channel sections, add:
 
@@ -731,6 +788,7 @@ Replace the entire Fallback Behavior table with:
 | Channel not installed | Queue compensating pass, report status `not installed` |
 | Auth expired, user recovers | Retry dispatch |
 | Auth expired, user declines | Queue compensating pass, report status `auth failed` |
+| Auth check timeout (after retry) | Queue compensating pass, report status `auth timeout` |
 | Channel fails during execution | Queue compensating pass, report status `failed` |
 | Both external channels unavailable | Two compensating passes, max verdict: `degraded-pass`, note "All findings single-model" |
 | Superpowers unavailable | Run available CLIs, warn user (Superpowers is always-available Claude — no compensating pass) |
@@ -807,7 +865,17 @@ Before "#### Channel 1: Codex CLI" in Step 4, add:
 
 - [ ] **Step 3: Add compensating-pass logic to Phase 1 channels**
 
-After each external channel's auth failure handling, add compensating-pass queuing (same pattern as Task 6 Step 3, adapted for post-implementation context).
+For Codex, after the auth failure handling, add:
+
+```markdown
+If auth cannot be recovered, or if Codex is not installed, queue a compensating Claude self-review pass focused on implementation correctness, security, and API contracts. Label findings as `[compensating: Codex-equivalent]`. If auth check times out (~5s), retry once; if still failing, record `auth timeout` and queue compensating pass.
+```
+
+For Gemini, after the auth failure handling, add:
+
+```markdown
+If auth cannot be recovered, or if Gemini is not installed, queue a compensating Claude self-review pass focused on architectural patterns, design reasoning, and broad context. Label findings as `[compensating: Gemini-equivalent]`. If auth check times out (~5s), retry once; if still failing, record `auth timeout` and queue compensating pass.
+```
 
 After all Phase 1 channels, add:
 
@@ -846,14 +914,39 @@ Coverage indicator mapping:
 
 - [ ] **Step 6: Replace Fallback Behavior table**
 
-Replace with canonical vocabulary version (same pattern as Task 7 Step 7).
+Replace the entire Fallback Behavior table with:
+
+```markdown
+## Fallback Behavior
+
+| Situation | Action |
+|-----------|--------|
+| Channel not installed | Queue compensating pass, report status `not installed` |
+| Auth expired, user recovers | Retry dispatch |
+| Auth expired, user declines | Queue compensating pass, report status `auth failed` |
+| Auth check timeout (after retry) | Queue compensating pass, report status `auth timeout` |
+| Channel fails during execution | Queue compensating pass, report status `failed` |
+| Both external channels unavailable | Two compensating passes, max coverage: `degraded-coverage`, note "All findings single-model" |
+| Superpowers unavailable | Run available CLIs, warn user (Superpowers is always-available Claude — no compensating pass) |
+| `docs/user-stories.md` missing | Skip Phase 2; run Phase 1 only; coverage: `partial-coverage` |
+```
 
 - [ ] **Step 7: Add/update Process Rules**
 
-Add foreground-only rule and cross-reference comment (same pattern as Task 6 Step 7, adapted for this tool):
+Add or update the Process Rules section with these rules:
 
 ```markdown
-8. **Dispatch pattern** follows `multi-model-review-dispatch` knowledge entry. When modifying channel dispatch in this file, verify consistency with `review-code.md` and `review-pr.md`.
+## Process Rules
+
+1. **Foreground only** — Always run Codex and Gemini CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`.
+2. **All three channels are mandatory** — skip only when a tool is genuinely not installed, never by choice.
+3. **Auth failures are not silent** — always surface to the user with the exact recovery command.
+4. **Independence** — never share one channel's output with another.
+5. **Verify every fix** — run tests (or re-read the file) immediately after each fix before moving on.
+6. **3-round limit** — never attempt to fix the same finding more than 3 times. Surface unresolved findings to the user.
+7. **Document everything** — the report must show which channels ran, which were skipped, and why.
+8. **No auto-merge** — this tool modifies local files only. It never pushes, merges, or creates PRs.
+9. **Dispatch pattern** follows `multi-model-review-dispatch` knowledge entry. When modifying channel dispatch in this file, verify consistency with `review-code.md` and `review-pr.md`.
 ```
 
 - [ ] **Step 8: Run validation**
@@ -873,20 +966,20 @@ git commit -m "fix: update post-implementation-review with foreground, compensat
 
 ---
 
-### Task 9: Update MMR CLI spec (Section 4)
+### Task 9a: Update MMR CLI spec — Problem, Solution, CLI, Auth (Section 4, part 1)
 
 **Files:**
 - Modify: `docs/superpowers/specs/2026-04-05-mmr-multi-model-review-design.md`
 
-**Context:** Errata across all sections per the design spec Section 4. This can land independently from Sections 1-3.
+**Context:** Errata for the front sections of the MMR CLI spec. Read only the first ~175 lines (through Auth Verification). This task can land independently from Sections 1-3. All replacement content is inline below.
 
-- [ ] **Step 1: Read the current MMR spec**
+- [ ] **Step 1: Read the spec through Auth Verification**
 
-Read `docs/superpowers/specs/2026-04-05-mmr-multi-model-review-design.md` in full.
+Read `docs/superpowers/specs/2026-04-05-mmr-multi-model-review-design.md` lines 1-175.
 
 - [ ] **Step 2: Add background execution bullet to Problem section**
 
-After the existing problem bullets, add:
+After the existing problem bullets (around line 17), add:
 
 ```markdown
 - Background execution (`run_in_background`) produces empty output from both Codex and Gemini CLIs, forcing foreground-only dispatch that blocks the agent
@@ -894,87 +987,304 @@ After the existing problem bullets, add:
 
 - [ ] **Step 3: Add compensating passes to Solution section**
 
-After the existing solution features list, add:
+After the existing solution features list (around line 29), add:
 
 ```markdown
 - **Compensating passes** — when a channel is unavailable, mmr optionally runs a one-shot compensating Claude self-review pass focused on the missing channel's strength area, with explicit labeling and single-source confidence
 ```
 
-- [ ] **Step 4: Update CLI Interface**
+- [ ] **Step 4: Add --compensate flag to CLI Interface**
 
-Add `--compensate`/`--no-compensate` to `mmr review` options.
-
-Replace the per-command exit code sections with the global exit code table from the design spec.
-
-Add `--sync` exit semantics note.
-
-- [ ] **Step 5: Update Auth Verification Layer**
-
-Remove "Auth is verified every time before dispatch — never cached or assumed." Replace with auth cache description (5min TTL, bust on failure, machine-local).
-
-Add `auth_timeout` row to critical distinction table.
-
-Fix recovery commands: use raw commands in config (no `!` prefix), note that platform wrappers add `!` dynamically.
-
-Add foreground note with `--sync` recommendation.
-
-- [ ] **Step 6: Add Core Prompt Engine note**
-
-After the Layer 1 description, add:
+In the `mmr review` options list (around line 80), add:
 
 ```markdown
-Layer 1 severity definitions are intentionally duplicated from `review-methodology`. External models receive only the assembled prompt — they cannot resolve cross-references to knowledge entries.
+  --compensate              # Run compensating Claude passes for unavailable channels (default: from config)
+  --no-compensate           # Skip compensating passes
 ```
 
-- [ ] **Step 7: Update Job Manager**
+- [ ] **Step 5: Replace per-command exit codes with global table**
 
-Replace the lifecycle diagram with the updated version including preflight states and GATE_NEEDS_USER.
+Find the `mmr status` exit codes (line ~100: "Exit codes: 0 = all complete, 1 = still running, 2 = at least one failed") and the `mmr results` exit code (line ~104). Replace both with a single global table placed after the `mmr results` description:
 
-Add `.meta.json` schema definition per channel.
+```markdown
+### Global Exit Codes
 
-- [ ] **Step 8: Update Reconciliation Engine**
+| Exit Code | Meaning | Commands |
+|-----------|---------|----------|
+| 0 | Success (dispatched / all complete / gate passed) | all |
+| 1 | In progress (still running) | `mmr status` only |
+| 2 | Gate failed (findings above threshold) | `mmr results`, `mmr review --sync` |
+| 3 | Gate degraded (passed with compensating channels) | `mmr results`, `mmr review --sync` |
+| 4 | Channel failure (no reconciled result possible) | `mmr status`, `mmr results` |
+| 5 | CLI error (bad arguments, config error) | all |
 
-Add compensation eligibility table.
+**`mmr review --sync` exit semantics:** `--sync` blocks until all channels complete (or timeout), runs reconciliation, and returns the same exit codes as `mmr results`. It is the recommended single-command entry point for AI agents and CI/CD.
 
-Replace the consensus rules table with the unified 8-row version.
+**CI/CD note:** Use `mmr review --sync` for gate decisions, never `mmr status` directly. Exit 3 is a warning, not failure.
 
-Add confidence cap rule, severity-never-capped note.
+**Exit code precedence:** Gate codes (0/2/3) take precedence over channel-failure (4) when a reconciled result exists. Exit 4 = no result possible. `needs-user-decision` verdict maps to exit 2 with a `verdict: "needs-user-decision"` field in JSON output.
+```
 
-Replace gate logic with the 4-state version including gate_degraded and gate_needs_user.
+- [ ] **Step 6: Update Auth Verification Layer**
 
-Add quality gate failure mapping.
+Find the auth lifecycle text "Auth is verified every time before dispatch — never cached or assumed" (around line 131). Replace with:
 
-- [ ] **Step 9: Update Configuration**
+```markdown
+Auth results are cached internally for up to `auth_cache_ttl` seconds (default: 300). The cache is machine-local (`~/.mmr/auth-cache.json`), never written to project config, and busts immediately on any auth failure. This balances the original "verify every time" principle against the practical cost of repeated slow auth probes in session-scoped workflows.
 
-Add `compensate`, `auth_cache_ttl`, and `compensate_focus` to the defaults example.
+> **Rationale:** Auth tokens expire mid-session without warning. Pre-flight checks are non-negotiable, but repeated 5-second probes across N story reviews in post-implementation-review waste minutes. The TTL-based cache was chosen over a `--skip-auth-check` flag to prevent cargo-culting in CI scripts.
+```
 
-Fix `!` prefix in recovery commands.
+In the Critical Distinction table, add a row:
 
-- [ ] **Step 10: Update Platform Wrappers**
+```markdown
+| Auth check timeout | Retry once, then treat as `auth_failed` | Check network |
+```
 
-Add `--sync` as recommended mode for AI agents.
+Fix recovery commands in the channel config examples: use raw commands without `!` prefix. Add note:
 
-- [ ] **Step 11: Add output surfaces note**
+```markdown
+Recovery commands are stored as raw commands in `.mmr.yaml`. Platform wrappers (Claude Code skill, AGENTS.md) add the `!` prefix dynamically for interactive contexts.
+```
 
-Add a section listing all output surfaces needing canonical vocabulary update.
+Add after the auth section:
 
-- [ ] **Step 12: Update Package Structure**
+```markdown
+> **Foreground note:** AI agents calling `mmr` must run it in the foreground. Background execution produces empty output. `--sync` is the recommended mode for agent workflows.
+```
 
-Add `core/compensator.ts` to the package tree.
-
-- [ ] **Step 13: Update Success Criteria**
-
-Add criteria 8-10.
-
-- [ ] **Step 14: Add Rationale notes**
-
-Fold the 5 lessons-learned observations into their respective spec sections as Rationale notes.
-
-- [ ] **Step 15: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add docs/superpowers/specs/2026-04-05-mmr-multi-model-review-design.md
-git commit -m "docs: update MMR CLI spec with compensating passes, auth cache, exit codes, lifecycle
+git commit -m "docs: update MMR CLI spec — problem, solution, CLI interface, auth verification"
+```
+
+---
+
+### Task 9b: Update MMR CLI spec — Job Manager, Reconciliation, Core Prompt (Section 4, part 2)
+
+**Files:**
+- Modify: `docs/superpowers/specs/2026-04-05-mmr-multi-model-review-design.md`
+
+**Context:** The densest errata — lifecycle diagram, reconciliation tables, gate logic. Read lines 175-310 of the spec. All replacement content inline.
+
+- [ ] **Step 1: Read the spec's middle sections**
+
+Read `docs/superpowers/specs/2026-04-05-mmr-multi-model-review-design.md` lines 175-310.
+
+- [ ] **Step 2: Add Core Prompt Engine note**
+
+After the Layer 1 description (around line 184), add:
+
+```markdown
+> **Rationale:** Layer 1 severity definitions are intentionally duplicated from `review-methodology`. External models receive only the assembled prompt — they cannot resolve cross-references to knowledge entries.
+```
+
+- [ ] **Step 3: Replace the Job Manager lifecycle diagram**
+
+Find the existing lifecycle diagram (around line 232). Replace with:
+
+```markdown
+### Job Lifecycle
+
+```
+Per-channel (preflight):
+  PREFLIGHT -> NOT_INSTALLED -> COMPENSATING -> COMP_COMPLETED / COMP_FAILED
+  PREFLIGHT -> AUTH_FAILED   -> COMPENSATING -> COMP_COMPLETED / COMP_FAILED
+  PREFLIGHT -> AUTH_TIMEOUT  -> COMPENSATING -> COMP_COMPLETED / COMP_FAILED
+  PREFLIGHT -> READY -> DISPATCHED
+
+Per-channel (dispatch):
+  DISPATCHED -> RUNNING -> COMPLETED
+                 |
+                 +-> TIMEOUT -> PARTIAL_TIMEOUT (if partial output)
+                 +-> FAILED -> COMPENSATING -> COMP_COMPLETED / COMP_FAILED
+
+Per-job (terminal):
+  GATE_PASSED / GATE_FAILED / GATE_DEGRADED / GATE_NEEDS_USER
+```
+```
+
+- [ ] **Step 4: Add .meta.json schema**
+
+After the job state directory listing (around line 255), add:
+
+```markdown
+#### Channel Metadata (`.meta.json`)
+
+Each channel directory may contain a `.meta.json` file tracking root cause and coverage:
+
+```json
+{
+  "root_cause": "auth_failed",
+  "coverage_status": "compensating",
+  "compensated_by": "claude",
+  "original_channel": "gemini",
+  "compensate_focus": ["architectural patterns", "design reasoning"],
+  "compensate_elapsed": "15s"
+}
+```
+
+Valid `root_cause` values: `null | auth_failed | auth_timeout | timeout | partial_timeout | failed | not_installed`
+Valid `coverage_status` values: `full | partial | compensating | none`
+```
+
+- [ ] **Step 5: Add compensation eligibility table**
+
+Before the existing consensus rules (around line 263), add:
+
+```markdown
+### Compensation Eligibility
+
+| Root Cause | Eligible? | Rationale |
+|-----------|-----------|-----------|
+| `not_installed` | Yes | Tool absent |
+| `auth_failed` | Yes | Compensate immediately; discard if auth recovers |
+| `auth_timeout` (after retry) | Yes | Transient |
+| `timeout` (no output) | Yes | No data |
+| `partial_timeout` | No | Use partial results |
+| `failed` | Yes | No output |
+```
+
+- [ ] **Step 6: Replace the consensus rules table**
+
+Replace the existing 6-row consensus table with:
+
+```markdown
+### Consensus Rules
+
+| Scenario | Confidence | Action |
+|----------|-----------|--------|
+| 2+ real channels, same location + severity | **High** | Report at agreed severity |
+| 2+ real channels, same location, different severity | **Medium** | Report at higher severity |
+| Real + compensating agree | **Medium** | Report, note compensating source |
+| All real channels approve | **High** | Gate passed |
+| One real P0, others approve | **High** | Report P0 |
+| One real P1/P2, others approve | **Medium** | Report with attribution |
+| Compensating-only finding | **Low** | Report, flag single-source |
+| Real channels contradict | **Low** | User adjudication |
+
+**Confidence cap rule:** Compensating evidence caps confidence at Medium only when it is necessary to reach the agreement threshold. Existing multi-real-channel consensus is not downgraded.
+
+**Severity is never capped.** A compensating P0 is still reported as P0 with Low confidence. Fix threshold gates on severity, not confidence.
+```
+
+- [ ] **Step 7: Replace gate logic**
+
+Find the existing gate logic (around line 307). Replace with:
+
+```markdown
+### Gate Logic
+
+```
+gate_passed      = no finding <= fix_threshold AND all channels coverage_status = "full"
+gate_degraded    = no finding <= fix_threshold AND any channel coverage_status in ("partial", "compensating", "none")
+gate_failed      = any finding <= fix_threshold unresolved
+gate_needs_user  = contradictions or unresolvable findings requiring human judgment
+```
+
+**Quality gate failures** (e.g., missing raw output, unmet minimum finding count) map to `gate_failed`.
+
+> **Rationale:** Partial results beat no results. A review with 2/3 channels at degraded confidence is better than blocking on the third. The degraded gate model captures this — reduced confidence, not a hard failure.
+```
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add docs/superpowers/specs/2026-04-05-mmr-multi-model-review-design.md
+git commit -m "docs: update MMR CLI spec — job manager, reconciliation, core prompt engine"
+```
+
+---
+
+### Task 9c: Update MMR CLI spec — Config, Wrappers, Package, Success Criteria (Section 4, part 3)
+
+**Files:**
+- Modify: `docs/superpowers/specs/2026-04-05-mmr-multi-model-review-design.md`
+
+**Context:** Smaller additive changes to the back half of the spec. Read lines 310-507.
+
+- [ ] **Step 1: Read the spec's back sections**
+
+Read `docs/superpowers/specs/2026-04-05-mmr-multi-model-review-design.md` lines 310-507.
+
+- [ ] **Step 2: Update Configuration section**
+
+In the `.mmr.yaml` defaults example (around line 320), add:
+
+```yaml
+  compensate: true
+  auth_cache_ttl: 300
+  compensate_focus:
+    codex:
+      aspects: ["implementation correctness", "security", "API contracts"]
+    gemini:
+      aspects: ["architectural patterns", "design reasoning", "broad context"]
+```
+
+`compensate_focus.aspects` is additive with `--focus`.
+
+Fix recovery commands in channel config: use raw commands without `!` prefix. The existing examples show `recovery: "Run: codex login"` — change to `recovery: "codex login"` and add note that platform wrappers add `!` prefix dynamically.
+
+- [ ] **Step 3: Update Platform Wrappers**
+
+In the Claude Code section (around line 398), add:
+
+```markdown
+**Recommended mode:** Claude Code agents should always use `mmr review --sync` to avoid background execution issues. `--sync` blocks until results are ready, returning reconciled findings directly.
+```
+
+Add same recommendation to Codex/Gemini wrapper sections.
+
+- [ ] **Step 4: Add output surfaces note**
+
+After the Platform Wrappers section, add:
+
+```markdown
+### Output Surface Consistency
+
+All externally visible surfaces must use the canonical `root_cause` / `coverage_status` vocabulary:
+- `mmr status` JSON output
+- `mmr results` JSON output (all formats: json, text, markdown, sarif)
+- `mmr jobs list` output
+- `mmr review --replay` input validation
+- Error messages referencing channel states
+```
+
+- [ ] **Step 5: Update Package Structure**
+
+In the package tree (around line 460), add under `core/`:
+
+```
+      compensator.ts     # Compensating pass dispatch and labeling
+```
+
+- [ ] **Step 6: Update Success Criteria**
+
+After the existing criteria (around line 500), add:
+
+```markdown
+8. Compensating passes run automatically for unavailable channels when `--compensate` is enabled
+9. Compensating findings are clearly labeled and never inflate confidence scores
+10. `--sync` mode works reliably for AI agent workflows (no empty output, no polling needed)
+```
+
+- [ ] **Step 7: Add Rationale notes throughout**
+
+Fold these observations into the spec sections they relate to (add as `> **Rationale:**` blockquotes):
+
+1. **Background execution** → Auth Verification section (already added in Task 9a Step 6)
+2. **Auth friction** → Auth Verification section: "Auth tokens expire mid-session. The loud-failure contract ensures agents never silently skip a channel that could be recovered in 30 seconds."
+3. **Compensating value** → Reconciliation section (already added in Task 9b Step 7)
+4. **Vocabulary drift** → Core Prompt Engine section: "Having severity definitions in 4+ places caused drift within weeks. Layer 1 immutability is the architectural fix."
+5. **Partial results** → Reconciliation section (already added in Task 9b Step 7)
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add docs/superpowers/specs/2026-04-05-mmr-multi-model-review-design.md
+git commit -m "docs: update MMR CLI spec — config, wrappers, package, success criteria, rationale
 
 BREAKING CHANGE: exit code semantics changed for mmr status and mmr results"
 ```
@@ -1023,20 +1333,45 @@ grep -rn "codex login\|gemini -p" content/knowledge/ content/tools/ CLAUDE.md | 
 # Expected: only matches inside prompt templates (external model prompts that don't use ! prefix)
 ```
 
-- [ ] **Step 4: Verify the review-methodology prerequisite**
+- [ ] **Step 4: Verify review-methodology prerequisite is intact**
 
 ```bash
-grep -l "P0.*P1.*P2.*P3\|P0.*blocks\|P0.*critical" content/knowledge/review/review-methodology.md
+grep -c "P0\|P1\|P2\|P3" content/knowledge/review/review-methodology.md
 ```
 
-Expected: match found — severity definitions are present.
+Expected: multiple matches — severity definitions are present. (Task 0 verified this before work began; this confirms nothing was accidentally removed.)
 
-- [ ] **Step 5: Commit any fixups**
+- [ ] **Step 5: Audit for stale review-pr references**
+
+```bash
+grep -rn "codex exec\|codex login status\|gemini -p.*REVIEW\|3-Channel\|three.*channel.*review" content/skills/ content/pipeline/ --include="*.md" | grep -v "multi-model\|review-code\|review-pr\|post-implementation"
+```
+
+If any files still hardcode old dispatch patterns, fix them to reference `scaffold run review-pr` or remove the stale instructions.
+
+- [ ] **Step 6: Manual smoke check**
+
+Verify the assembled review prompts work correctly:
+
+```bash
+# Verify review-pr tool assembles without errors
+scaffold run review-pr --help 2>&1 || echo "review-pr assembly check"
+
+# Verify review-code tool assembles without errors
+scaffold run review-code --help 2>&1 || echo "review-code assembly check"
+```
+
+If `scaffold run` is available, spot-check that the assembled prompt contains:
+- The foreground-only constraint
+- The compensating-pass instructions
+- The canonical status vocabulary
+
+- [ ] **Step 7: Commit any fixups**
 
 If any consistency issues were found, fix them and commit:
 
 ```bash
-git add -A
+git add content/ CLAUDE.md .claude/settings.json docs/
 git commit -m "fix: address cross-file consistency issues from integration check"
 ```
 
