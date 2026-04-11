@@ -267,7 +267,7 @@ else is out there...")
 When writing `docs/spark-brief.md`, use this exact structure:
 
 ```markdown
-<!-- scaffold:spark-brief v1 YYYY-MM-DD idea-slug -->
+<!-- scaffold:spark-brief v1 YYYY-MM-DD deep -->
 
 # Spark Brief: [Idea Name]
 
@@ -308,10 +308,12 @@ from Phase 4 and Phase 6 if red-teamed]
 - **Date**: [YYYY-MM-DD]
 ```
 
-**Tracking comment format:** `<!-- scaffold:spark-brief v[N] YYYY-MM-DD idea-slug -->` where:
+**Tracking comment format:** `<!-- scaffold:spark-brief v[N] YYYY-MM-DD [methodology] -->` where:
 - `v[N]` increments on each update (v1, v2, v3...)
 - `YYYY-MM-DD` is the session date
-- `idea-slug` is a kebab-case slug derived from the idea name (e.g., `recipe-app-ai-meal-planning`)
+- `[methodology]` is the active methodology preset (e.g., `deep`, `mvp`, `custom`)
+
+**Idea identity:** The idea name is captured in the `# Spark Brief: [Idea Name]` heading, not in the tracking comment. For identity matching, create-vision compares the heading's idea name against `$ARGUMENTS`.
 
 ## How to Work With Me
 - I'm your co-founder for the next few minutes. I'll challenge you AND do homework on your behalf.

@@ -47,8 +47,8 @@ which gemini >/dev/null 2>&1 && NO_BROWSER=true gemini -p "respond with ok" -o j
 ```
 
 If auth fails, tell the user which tool failed and how to fix it:
-- Codex: "Codex auth expired — run `codex login` to re-authenticate"
-- Gemini: "Gemini auth expired — run `gemini -p 'hello'` to re-authenticate"
+- Codex: "Codex auth expired — run `! codex login` to re-authenticate"
+- Gemini: "Gemini auth expired — run `! gemini -p \"hello\"` to re-authenticate"
 
 Auth failures are NOT silent fallbacks — surface them explicitly.
 

@@ -136,7 +136,7 @@ The AI assesses these heuristics continuously, beginning in Phase 1, using the i
 ### `docs/spark-brief.md` format
 
 ```markdown
-<!-- scaffold:spark-brief v1 YYYY-MM-DD idea-slug -->
+<!-- scaffold:spark-brief v1 YYYY-MM-DD methodology -->
 
 # Spark Brief: [Idea Name]
 
@@ -175,7 +175,7 @@ and why they need it]
 
 ### Key decisions
 
-- Tracking comment on line 1 follows the same convention as `create-vision` uses for `docs/vision.md`. Includes an idea-slug for identity matching.
+- Tracking comment on line 1 follows the same convention as `create-vision` uses for `docs/vision.md`. Includes an methodology for identity matching.
 - Header banner makes the artifact's intent explicit — directional, not authoritative.
 - Session Metadata lets create-vision know provenance. "Red-teamed" has behavioral impact (see below). "Depth" and "Models consulted" are informational only.
 - Each section maps to a conversational phase.
@@ -197,10 +197,10 @@ and why they need it]
 ### Spark Brief Detection
 
 **If `docs/spark-brief.md` exists**: Read it completely. Check its tracking
-comment date and idea-slug against the `docs/vision.md` tracking comment
+comment date and methodology against the `docs/vision.md` tracking comment
 date (if vision exists) and the current `$ARGUMENTS`. If the brief predates
 the current vision, ignore it and note: "Spark brief found but predates
-current vision — ignoring." If the brief's idea-slug appears unrelated to
+current vision — ignoring." If the brief's methodology appears unrelated to
 the current `$ARGUMENTS`, ask the user before using it.
 
 Otherwise, this is upstream context from a spark ideation session — the user

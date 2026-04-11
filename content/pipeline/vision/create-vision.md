@@ -107,11 +107,12 @@ Before starting, check if `docs/vision.md` already exists:
 ### Spark Brief Detection
 
 **If `docs/spark-brief.md` exists**: Read it completely. Check its tracking
-comment date and idea-slug against the `docs/vision.md` tracking comment
-date (if vision exists) and the current `$ARGUMENTS`. If the brief predates
-the current vision, ignore it and note: "Spark brief found but predates
-current vision — ignoring." If the brief's idea-slug appears unrelated to
-the current `$ARGUMENTS`, ask the user before using it.
+comment date against the `docs/vision.md` tracking comment date (if vision
+exists). If the brief predates the current vision, ignore it and note:
+"Spark brief found but predates current vision — ignoring." Check the
+brief's heading (`# Spark Brief: [Idea Name]`) against the current
+`$ARGUMENTS` — if the idea name appears unrelated, ask the user before
+using it.
 
 Otherwise, this is upstream context from a spark ideation session — the user
 has already explored the problem space, researched competitors, expanded the
