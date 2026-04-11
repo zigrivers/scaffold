@@ -112,6 +112,8 @@ knowledge-overrides:
     append: [game-design-document]
   critical-path-walkthrough:
     append: [game-design-document]
+  spark:
+    append: [game-ideation]
 
 # ---------------------------------------------------------------------------
 # reads-overrides
