@@ -24,6 +24,7 @@ about ecosystem maturity, alternatives, and gotchas.
 ## Inputs
 - docs/plan.md (required) — PRD features, integrations, and technical requirements
 - User preferences (gathered via questions) — language, framework, deployment target, constraints
+- docs/spark-brief.md (optional) — Technology Opportunities section from spark ideation session. If present and not stale (compare tracking comment date against docs/vision.md and docs/plan.md — if the brief predates both, ignore it), use the Technology Opportunities section as supplementary research context when evaluating technology options.
 
 ## Expected Outputs
 - docs/tech-stack.md — complete technology reference with architecture overview,

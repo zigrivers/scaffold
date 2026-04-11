@@ -159,6 +159,7 @@ Print the following reference directly. Do not read any files or run any command
 | **Resume (multi)** | `/scaffold:multi-agent-resume <agent-name>` | Resuming a worktree agent after a break |
 | **Version Bump** | `/scaffold:version-bump` | Bump version + changelog (no tag/release) |
 | **Release** | `/scaffold:release` | Project-defined release ceremony with changelog + relevant release artifacts |
+| **Spark** | `/scaffold:spark` | Explore and expand a raw project idea |
 | **Visual Dashboard** | `/scaffold:dashboard` | HTML pipeline overview in browser |
 
 ## Process Rules
