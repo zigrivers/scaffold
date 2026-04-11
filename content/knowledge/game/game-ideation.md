@@ -4,12 +4,12 @@ description: Game-specific ideation techniques for spark — core loop, player f
 topics: [game-dev, ideation, core-loop, player-fantasy, retention, monetization, session-design]
 ---
 
-# Game Ideation
+Game ideation applies game-specific lenses — core loop, player fantasy, retention mechanics, session design, and monetization — to the spark tool's ideation flow. It supplements the general ideation-craft entry when a user is exploring a game idea.
 
 ## Summary
 
 ### When This Applies
-This knowledge is injected by the game overlay when a user is exploring a game idea via the spark tool. It supplements the general ideation-craft entry with game-specific lenses.
+This knowledge is injected by the game overlay when the spark tool detects a game idea. It supplements the general ideation-craft entry with game-specific lenses.
 
 ### Core Loop Identification
 - **What is the core loop?** The repeating cycle of actions the player performs most often. In a shooter: aim → shoot → loot → repeat. In a puzzle game: observe → plan → execute → evaluate → repeat.
