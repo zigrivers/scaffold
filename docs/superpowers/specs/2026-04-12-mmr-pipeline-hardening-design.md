@@ -74,7 +74,7 @@ A bottom-up fix across four workstreams:
 
 4. **Remove severity definitions** — replace with: "See `review-methodology` for severity definitions (P0-P3). This entry uses those severities but does not define them."
 
-5. **Remove the `gcloud` fallback** — line 58's `which gcloud && gcloud ai models list` is stale. Replace with direct `gemini` check only.
+5. **Remove the `gcloud` fallback** — the CLI Availability Check section's `which gcloud && gcloud ai models list` is stale. Replace with direct `gemini` check only.
 
 6. **Adapt quality gates for degraded mode:**
    - "Minimum finding count" gate: compensating passes count toward the total but are not treated as separate external channels for consensus purposes.
@@ -86,7 +86,7 @@ A bottom-up fix across four workstreams:
 
 1. **Thin the Summary** — remove duplicated severity definitions and reconciliation rules. Add cross-reference: "See `review-methodology` for severity definitions (P0-P3)." Add cross-reference: "See `multi-model-review-dispatch` for reconciliation rules." **Keep action thresholds** — "P0/P1/P2 findings must be fixed before proceeding" is an action policy owned here.
 
-2. **Replace the reconciliation table in Deep Guidance** (lines 133-149) with: "After all channels complete, reconcile findings using the rules in `multi-model-review-dispatch`. The orchestration entry triggers reconciliation; the dispatch entry defines how to perform it."
+2. **Replace the "Review Finding Reconciliation" subsection in Deep Guidance** with: "After all channels complete, reconcile findings using the rules in `multi-model-review-dispatch`. The orchestration entry triggers reconciliation; the dispatch entry defines how to perform it."
 
 3. **Add degraded-mode behavior** (new section):
 
@@ -112,6 +112,7 @@ A bottom-up fix across four workstreams:
    - Missing Gemini -> focus on architectural patterns, design reasoning, broad context.
    - Missing both -> two compensating passes.
    - Single-source confidence regardless. Normal mandatory-fix thresholds (P0/P1/P2 still require fixing).
+   - **Superpowers channel:** No compensating pass needed — Superpowers is a Claude subagent and is always available. If the Superpowers plugin is not installed, run available external CLIs and warn the user that review coverage is reduced.
 
 4. **Add foreground-only constraint** — same language as `multi-model-review-dispatch`. Intentional duplication: knowledge entries are injected independently by the assembly engine — an agent may receive one without the other.
 
@@ -122,7 +123,7 @@ A bottom-up fix across four workstreams:
 ### Changes to `multi-model-research-dispatch`
 
 1. **Add foreground-only constraint.**
-2. **Standardize `which` -> `command -v`** at 3 locations: line 21 (prose), lines 41/45 (code blocks).
+2. **Standardize `which` -> `command -v`** at all occurrences: Summary prose references and Deep Guidance code blocks.
 3. **Apply same two-step error handling** as review dispatch.
 4. **Verify `!` prefix** — already correct.
 
@@ -130,12 +131,12 @@ A bottom-up fix across four workstreams:
 
 1. **Add foreground-only constraint.**
 2. **Verify `command -v` and `!` prefix** — already correct.
-3. **Replace reconciliation table** (lines 213-225) with cross-reference to `multi-model-review-dispatch`.
-4. **Severity definitions in prompt templates** (lines 147-150) **MUST remain inline** — external models cannot resolve cross-references. Only meta-level prose outside templates should cross-reference.
+3. **Replace the "Dual-Model Reconciliation" table** with cross-reference to `multi-model-review-dispatch`.
+4. **Severity definitions in prompt templates** (the "Context Bundling" template) **MUST remain inline** — external models cannot resolve cross-references. Only meta-level prose outside templates should cross-reference.
 
 ### Implementation ordering
 
-Section 1 is not safe to deploy without Section 3. Once knowledge entries define formal verdicts and degraded-mode behavior, the tool files must match. Deploy together.
+Sections 1, 2, and 3 are not safe to deploy independently. Once knowledge entries define formal verdicts and degraded-mode behavior, the CLAUDE.md section and tool files must match. Deploy all three atomically (same PR).
 
 ### Consumer tools deferred to Section 3
 
@@ -147,7 +148,7 @@ All three tool files (`review-code.md`, `review-pr.md`, `post-implementation-rev
 
 ### New "Mandatory 3-Channel PR Review" section
 
-Replace CLAUDE.md lines 114-149 with:
+Replace the "Mandatory 3-Channel PR Review" section in CLAUDE.md (currently lines 114-149) with:
 
 ```markdown
 ### Mandatory 3-Channel PR Review
@@ -242,7 +243,7 @@ During implementation, verify whether any other files reference the old review-p
    - Post-dispatch: `completed`, `partial_timeout`, `failed`
    - Compensating: `compensating (Codex-equivalent)`, `compensating (Gemini-equivalent)`
 
-   **Pre-MMR note:** `partial_timeout` is deferred to the MMR CLI implementation. Pre-MMR tools record a killed CLI as `failed`.
+   **Pre-MMR note:** `partial_timeout` is deferred to the MMR CLI implementation. Pre-MMR tools record a killed CLI as `failed`. Similarly, Section 4's `timeout` (dispatch timeout with no output) maps to `failed` in pre-MMR tools and is therefore eligible for compensation under that status.
 
    **Status mapping:**
 
@@ -263,7 +264,7 @@ During implementation, verify whether any other files reference the old review-p
    - Single-source confidence
    - Missing Codex -> implementation correctness, security, API contracts
    - Missing Gemini -> architectural patterns, design reasoning, broad context
-   - Missing both -> two passes, max `degraded-pass`/`degraded-coverage`, "All findings single-model"
+   - Missing both -> two passes, max verdict `degraded-pass` (merge-gating tools) or max coverage indicator `degraded-coverage` (report tools), "All findings single-model"
 
 4. **Installation check** — `command -v` before auth, as distinct step.
 
@@ -529,6 +530,12 @@ Folded into spec sections as Rationale notes (no standalone appendix):
 ### Deployment order
 
 Sections 1, 2, and 3 must be deployed atomically (same PR). Section 4 is an additive spec update that can land independently.
+
+### Implementation prerequisites
+
+- **Verify `review-methodology` knowledge entry:** Sections 1 references `review-methodology` as the authoritative source for severity definitions (P0-P3). Confirm `content/knowledge/review/review-methodology.md` exists and contains these definitions before removing them from other entries. If it does not, add the definitions there first.
+
+- **Section 4 exit code breaking change:** The new global exit code table changes the semantics of existing `mmr status` and `mmr results` exit codes. Any consumers of the existing exit codes (implementation plan Task 11 code, CI scripts) must be updated. Flag this as a breaking change in the MMR spec update commit.
 
 ### Testing approach
 
