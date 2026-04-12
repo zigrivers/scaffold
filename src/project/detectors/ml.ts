@@ -1,12 +1,7 @@
 import type { SignalContext } from './context.js'
 import type { MlMatch, DetectionEvidence } from './types.js'
 import { evidence } from './types.js'
-
-const ML_FRAMEWORK_DEPS = [
-  'torch', 'pytorch-lightning', 'tensorflow', 'keras', 'jax',
-  'scikit-learn', 'xgboost', 'lightgbm', 'catboost',
-  'transformers', 'sentence-transformers',
-]
+import { ML_FRAMEWORK_DEPS, EXPERIMENT_TRACKING_DEPS } from './shared-signals.js'
 
 export function detectMl(ctx: SignalContext): MlMatch | null {
   const ev: DetectionEvidence[] = []
@@ -35,7 +30,7 @@ export function detectMl(ctx: SignalContext): MlMatch | null {
   const hasTrainPy = ctx.hasFile('train.py') || ctx.hasFile('training.py') || ctx.hasFile('scripts/train.py')
   const hasServePy = ctx.hasFile('serve.py') || ctx.hasFile('predict.py')
     || ctx.hasFile('serving/main.py') || ctx.hasFile('inference/main.py')
-  const hasTrackingDep = ctx.hasAnyDep(['mlflow', 'wandb', 'neptune-client', 'clearml', 'dvc'], 'py')
+  const hasTrackingDep = ctx.hasAnyDep([...EXPERIMENT_TRACKING_DEPS], 'py')
 
   const hasStructure = hasModelsDir || hasNotebooks || hasTrainPy || hasServePy || hasTrackingDep
 
