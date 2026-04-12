@@ -15,12 +15,14 @@ const TRADING_IMPORTS = /from backtrader|import backtrader|from zipline|import z
 type ExperimentDriver = ResearchMatch['partialConfig']['experimentDriver']
 type Domain = NonNullable<ResearchMatch['partialConfig']['domain']>
 
+const WANDB_SWEEP_KEYS = ['method:', 'metric:', 'parameters:'] as const
+
 export function detectResearch(ctx: SignalContext): ResearchMatch | null {
   const ev: DetectionEvidence[] = []
 
-  // Negative gate: if ML framework deps are present, this is an ML project, not research
+  // ML dep check — used as a negative gate ONLY for the medium-tier optimization branch.
+  // A repo with autoresearch markers + ML deps (e.g. PyTorch) is still research.
   const hasMlDep = ctx.hasAnyDep([...ML_FRAMEWORK_DEPS], 'py')
-  if (hasMlDep) return null
 
   // Dep checks
   const hasTradingDep = ctx.hasAnyDep([...TRADING_DEPS], 'py')
@@ -75,12 +77,30 @@ export function detectResearch(ctx: SignalContext): ResearchMatch | null {
     }
   }
 
-  // --- MEDIUM: optimization + experiments (no ML) ---
-  if (!confidence && hasOptDep && (hasExperimentsDir || hasResultsDir)) {
+  // --- MEDIUM: optimization + experiments (no ML — negative gate applies here only) ---
+  if (!confidence && hasOptDep && (hasExperimentsDir || hasResultsDir) && !hasMlDep) {
     confidence = 'medium'
     driver = 'config-driven'
     ev.push(evidence('optimization-deps'))
     ev.push(evidence('experiment-structure', hasExperimentsDir ? 'experiments/' : 'results/'))
+  }
+
+  // --- MEDIUM: sweep config + experiment structure (non-W&B) ---
+  if (!confidence && (hasExperimentsDir || hasResultsDir)) {
+    const sweepFile = ctx.hasFile('sweep.yaml') ? 'sweep.yaml'
+      : ctx.hasFile('sweep_config.yaml') ? 'sweep_config.yaml'
+        : undefined
+    if (sweepFile) {
+      const content = ctx.readFileText(sweepFile, 4096) ?? ''
+      const isWandb = WANDB_SWEEP_KEYS.every(k => content.includes(k))
+      if (!isWandb) {
+        confidence = 'medium'
+        driver = 'config-driven'
+        interactionMode = 'autonomous'
+        ev.push(evidence('sweep-config', sweepFile, 'non-W&B sweep config'))
+        ev.push(evidence('experiment-structure', hasExperimentsDir ? 'experiments/' : 'results/'))
+      }
+    }
   }
 
   // --- MEDIUM: trading deps alone (no web, no backtest already matched) ---
@@ -101,11 +121,12 @@ export function detectResearch(ctx: SignalContext): ResearchMatch | null {
   }
 
   // --- MEDIUM: LLM SDK + eval structure (no train.py) ---
-  if (!confidence && hasLlmDep && hasEvalsDir && !hasTrainPy) {
+  const hasEvalStructure = hasEvalsDir || ctx.hasFile('results.jsonl')
+  if (!confidence && hasLlmDep && hasEvalStructure && !hasTrainPy) {
     confidence = 'medium'
     driver = 'api-driven'
     ev.push(evidence('llm-sdk-deps'))
-    ev.push(evidence('evals-dir', 'evals/'))
+    ev.push(evidence('eval-structure', hasEvalsDir ? 'evals/' : 'results.jsonl'))
   }
 
   // --- Academic upgrade: medium signals + academic markers → high ---
