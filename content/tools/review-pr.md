@@ -171,7 +171,7 @@ After all channels complete, reconcile findings:
 | One channel flags P0, others approve | **High** | Fix it — P0 is critical from any source |
 | One channel flags P1, others approve | **Medium** | Fix it — P1 findings are mandatory regardless of source count |
 | Channels contradict each other | **Low** | Present to user for adjudication |
-| Compensating-pass P0/P1/P2 finding | Single-source confidence — fix per normal thresholds, label as compensating |
+| Compensating-pass P0/P1/P2 finding | **Single-source** | Fix per normal thresholds, label as compensating |
 
 ### Step 5: Report Results
 
