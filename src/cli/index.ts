@@ -1,6 +1,7 @@
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 
+import { shutdown } from './shutdown.js'
 import initCommand from './commands/init.js'
 import runCommand from './commands/run.js'
 import buildCommand from './commands/build.js'
@@ -23,6 +24,7 @@ import completeCommand from './commands/complete.js'
 import reworkCommand from './commands/rework.js'
 
 export async function runCli(argv: string[]): Promise<void> {
+  shutdown.install()
   await yargs(argv)
     .scriptName('scaffold')
     .usage('$0 <command> [options]')
