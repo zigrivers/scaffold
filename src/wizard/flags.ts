@@ -19,6 +19,7 @@
 import type {
   GameConfig, WebAppConfig, BackendConfig, CliConfig, LibraryConfig,
   MobileAppConfig, DataPipelineConfig, MlConfig, BrowserExtensionConfig,
+  ResearchConfig,
 } from '../types/index.js'
 
 export interface GameFlags {
@@ -91,4 +92,11 @@ export interface BrowserExtensionFlags {
   extUiSurfaces?: BrowserExtensionConfig['uiSurfaces']
   extContentScript?: BrowserExtensionConfig['hasContentScript']
   extBackgroundWorker?: BrowserExtensionConfig['hasBackgroundWorker']
+}
+
+export interface ResearchFlags {
+  researchDriver?: ResearchConfig['experimentDriver']
+  researchInteraction?: ResearchConfig['interactionMode']
+  researchDomain?: ResearchConfig['domain']
+  researchTracking?: ResearchConfig['hasExperimentTracking']
 }
