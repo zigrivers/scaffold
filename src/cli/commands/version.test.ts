@@ -2,6 +2,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { MockInstance } from 'vitest'
 import { EventEmitter } from 'node:events'
 
+// Mock shutdown to provide a no-op AbortSignal
+vi.mock('../shutdown.js', () => ({
+  shutdown: { signal: new AbortController().signal },
+}))
+
 // Mock https for testing the real fetchLatestVersion
 const mockHttpsGet = vi.fn()
 vi.mock('node:https', () => ({
@@ -298,7 +303,7 @@ describe('fetchLatestVersion', () => {
   it('resolves with version from npm registry on success', async () => {
     const mockRes = new EventEmitter()
     const mockReq = new EventEmitter()
-    mockHttpsGet.mockImplementation((_url: string, cb: (res: EventEmitter) => void) => {
+    mockHttpsGet.mockImplementation((_url: string, _opts: unknown, cb: (res: EventEmitter) => void) => {
       cb(mockRes)
       process.nextTick(() => {
         mockRes.emit('data', Buffer.from('{"version":"3.2.1"}'))
@@ -315,7 +320,7 @@ describe('fetchLatestVersion', () => {
     const mockRes = new EventEmitter()
     const mockReq = new EventEmitter()
     let capturedUrl = ''
-    mockHttpsGet.mockImplementation((url: string, cb: (res: EventEmitter) => void) => {
+    mockHttpsGet.mockImplementation((url: string, _opts: unknown, cb: (res: EventEmitter) => void) => {
       capturedUrl = url
       cb(mockRes)
       process.nextTick(() => {
@@ -331,7 +336,7 @@ describe('fetchLatestVersion', () => {
 
   it('resolves null on network error', async () => {
     const mockReq = new EventEmitter()
-    mockHttpsGet.mockImplementation((_url: string, _cb: (res: EventEmitter) => void) => {
+    mockHttpsGet.mockImplementation((_url: string, _opts: unknown, _cb: (res: EventEmitter) => void) => {
       process.nextTick(() => {
         mockReq.emit('error', new Error('ECONNREFUSED'))
       })
@@ -345,7 +350,7 @@ describe('fetchLatestVersion', () => {
   it('resolves null on invalid JSON response', async () => {
     const mockRes = new EventEmitter()
     const mockReq = new EventEmitter()
-    mockHttpsGet.mockImplementation((_url: string, cb: (res: EventEmitter) => void) => {
+    mockHttpsGet.mockImplementation((_url: string, _opts: unknown, cb: (res: EventEmitter) => void) => {
       cb(mockRes)
       process.nextTick(() => {
         mockRes.emit('data', Buffer.from('not json'))
@@ -361,7 +366,7 @@ describe('fetchLatestVersion', () => {
   it('resolves null when response lacks version field', async () => {
     const mockRes = new EventEmitter()
     const mockReq = new EventEmitter()
-    mockHttpsGet.mockImplementation((_url: string, cb: (res: EventEmitter) => void) => {
+    mockHttpsGet.mockImplementation((_url: string, _opts: unknown, cb: (res: EventEmitter) => void) => {
       cb(mockRes)
       process.nextTick(() => {
         mockRes.emit('data', Buffer.from('{"name":"scaffold"}'))

@@ -5,6 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
+import { shutdown } from '../shutdown.js'
 
 interface VersionArgs {
   format?: string
@@ -51,8 +52,9 @@ function isNewerVersion(a: string, b: string): boolean {
 export async function fetchLatestVersion(name: string): Promise<string | null> {
   return new Promise((resolve) => {
     const timeout = setTimeout(() => resolve(null), 3000)
+    timeout.unref()
     const url = `https://registry.npmjs.org/${encodeURIComponent(name)}/latest`
-    const req = https.get(url, (res) => {
+    const req = https.get(url, { signal: shutdown.signal }, (res) => {
       let body = ''
       res.on('data', (chunk: Buffer) => { body += chunk.toString() })
       res.on('end', () => {

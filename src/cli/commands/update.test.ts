@@ -10,6 +10,11 @@ vi.mock('../middleware/output-mode.js', () => ({
   resolveOutputMode: vi.fn(() => 'interactive'),
 }))
 
+// Mock shutdown to provide a no-op AbortSignal
+vi.mock('../shutdown.js', () => ({
+  shutdown: { signal: new AbortController().signal },
+}))
+
 // Mock https for testing the real fetchLatestVersion code path
 const mockHttpsGet = vi.fn()
 vi.mock('node:https', () => ({
@@ -372,7 +377,7 @@ describe('update command', () => {
       // Simulate a successful HTTPS response
       const mockRes = new EventEmitter()
       const mockReq = new EventEmitter()
-      mockHttpsGet.mockImplementation((_url: string, cb: (res: EventEmitter) => void) => {
+      mockHttpsGet.mockImplementation((_url: string, _opts: unknown, cb: (res: EventEmitter) => void) => {
         cb(mockRes)
         // Emit data and end asynchronously
         process.nextTick(() => {
@@ -400,7 +405,7 @@ describe('update command', () => {
       mockResolveOutputMode.mockReturnValue('json')
 
       const mockReq = new EventEmitter()
-      mockHttpsGet.mockImplementation((_url: string, _cb: (res: EventEmitter) => void) => {
+      mockHttpsGet.mockImplementation((_url: string, _opts: unknown, _cb: (res: EventEmitter) => void) => {
         // Trigger error on next tick
         process.nextTick(() => {
           mockReq.emit('error', new Error('ECONNREFUSED'))
@@ -426,7 +431,7 @@ describe('update command', () => {
 
       const mockRes = new EventEmitter()
       const mockReq = new EventEmitter()
-      mockHttpsGet.mockImplementation((_url: string, cb: (res: EventEmitter) => void) => {
+      mockHttpsGet.mockImplementation((_url: string, _opts: unknown, cb: (res: EventEmitter) => void) => {
         cb(mockRes)
         process.nextTick(() => {
           mockRes.emit('data', Buffer.from('not valid json'))
@@ -453,7 +458,7 @@ describe('update command', () => {
 
       const mockRes = new EventEmitter()
       const mockReq = new EventEmitter()
-      mockHttpsGet.mockImplementation((_url: string, cb: (res: EventEmitter) => void) => {
+      mockHttpsGet.mockImplementation((_url: string, _opts: unknown, cb: (res: EventEmitter) => void) => {
         cb(mockRes)
         process.nextTick(() => {
           mockRes.emit('data', Buffer.from('{"name":"scaffold"}'))
