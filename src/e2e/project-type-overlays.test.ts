@@ -50,6 +50,7 @@ import { loadOverlay } from '../core/assembly/overlay-loader.js'
 import { getPackagePipelineDir, getPackageMethodologyDir } from '../utils/fs.js'
 import type { MetaPromptFile } from '../types/index.js'
 import type { OverlayState } from '../core/assembly/overlay-state-resolver.js'
+import type { ResearchConfig } from '../types/config.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1560,8 +1561,14 @@ describe('research overlay integration', () => {
    * is not in its union and requires researchConfig.
    */
   async function resolveResearchOverlay(
-    researchConfig: { experimentDriver: string; domain?: string },
+    partial: { experimentDriver: ResearchConfig['experimentDriver']; domain?: ResearchConfig['domain'] },
   ): Promise<OverlayState> {
+    const researchConfig: ResearchConfig = {
+      experimentDriver: partial.experimentDriver,
+      interactionMode: 'checkpoint-gated',
+      hasExperimentTracking: true,
+      domain: partial.domain ?? 'none',
+    }
     const methodologyDir = getPackageMethodologyDir()
     const realMetaPrompts = await discoverRealMetaPrompts()
     const knownSteps = [...realMetaPrompts.keys()]

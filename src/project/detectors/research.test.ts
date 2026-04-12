@@ -181,7 +181,8 @@ describe('detectResearch', () => {
     const ctx = createFakeSignalContext({
       dirs: ['results'],
       files: {
-        'sweep.yaml': 'method: bayes\nmetric:\n  name: val_loss\n  goal: minimize\nparameters:\n  lr:\n    min: 0.001\n',
+        'sweep.yaml': 'method: bayes\nmetric:\n  name: val_loss\n'
+          + '  goal: minimize\nparameters:\n  lr:\n    min: 0.001\n',
       },
     })
     const m = detectResearch(ctx)

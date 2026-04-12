@@ -256,7 +256,8 @@ export function loadSubOverlay(
   if (hasStep || hasReads || hasDeps) {
     warnings.push({
       code: 'SUB_OVERLAY_NON_KNOWLEDGE',
-      message: `Sub-overlay ${overlayPath} contains non-knowledge sections (step/reads/dependency overrides). These are stripped for domain sub-overlays.`,
+      message: `Sub-overlay ${overlayPath} contains non-knowledge sections`
+        + ' (step/reads/dependency overrides). These are stripped for domain sub-overlays.',
       context: { file: overlayPath },
     })
     overlay.stepOverrides = {}

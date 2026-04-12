@@ -483,7 +483,8 @@ export async function askWizardQuestions(options: {
     const experimentDriver: ResearchConfig['experimentDriver'] = options.researchFlags?.researchDriver
       ?? await output.select(
         'Experiment driver?',
-        optionsFromCopy(copy.experimentDriver.options, ['code-driven', 'config-driven', 'api-driven', 'notebook-driven']),
+        optionsFromCopy(copy.experimentDriver.options,
+          ['code-driven', 'config-driven', 'api-driven', 'notebook-driven']),
         undefined,
         copy.experimentDriver,
       ) as ResearchConfig['experimentDriver']
