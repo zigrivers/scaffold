@@ -224,4 +224,38 @@ describe('ShutdownManager', () => {
       setTimeoutSpy.mockRestore()
     })
   })
+
+  describe('withPrompt()', () => {
+    beforeEach(() => {
+      mgr.install()
+    })
+
+    it('returns the value from the wrapped function', async () => {
+      const result = await mgr.withPrompt(async () => 'hello')
+      expect(result).toBe('hello')
+    })
+
+    it('re-throws non-ExitPromptError errors', async () => {
+      await expect(
+        mgr.withPrompt(async () => { throw new Error('oops') }),
+      ).rejects.toThrow('oops')
+    })
+
+    it('catches ExitPromptError by name and calls shutdown', async () => {
+      const shutdownSpy = vi.spyOn(mgr, 'shutdown').mockResolvedValue(undefined as never)
+      const err = new Error('User force closed the prompt with SIGINT')
+      err.name = 'ExitPromptError'
+
+      await mgr.withPrompt(async () => { throw err })
+
+      expect(shutdownSpy).toHaveBeenCalledWith(ExitCode.UserCancellation)
+    })
+
+    it('does not catch errors where only message mentions ExitPromptError', async () => {
+      const err = new Error('ExitPromptError happened')
+      await expect(
+        mgr.withPrompt(async () => { throw err }),
+      ).rejects.toThrow('ExitPromptError happened')
+    })
+  })
 })

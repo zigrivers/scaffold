@@ -165,7 +165,16 @@ export class ShutdownManager {
     clearTimeout(timeout)
     this.proc.exit(exitCode)
   }
-  async withPrompt<T>(fn: () => Promise<T>): Promise<T> { return fn() }
+  async withPrompt<T>(fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn()
+    } catch (e) {
+      if (e instanceof Error && e.name === 'ExitPromptError') {
+        return this.shutdown(ExitCode.UserCancellation)
+      }
+      throw e
+    }
+  }
   async withResource<T>(
     _name: string, _cleanup: CleanupFn, fn: () => T | Promise<T>,
   ): Promise<T> { return fn() }
