@@ -28,8 +28,8 @@ export function detectResearch(ctx: SignalContext): ResearchMatch | null {
   const hasTradingDep = ctx.hasAnyDep([...TRADING_DEPS], 'py')
   const hasOptDep = ctx.hasAnyDep([...OPTIMIZATION_DEPS], 'py')
   const hasSimDep = ctx.hasAnyDep([...SIMULATION_DEPS], 'py')
-  const hasLlmDep = ctx.hasAnyDep([...LLM_SDK_DEPS])
-  const hasWebDep = ctx.hasAnyDep([...WEB_FRAMEWORK_DEPS])
+  const hasLlmDep = ctx.hasAnyDep([...LLM_SDK_DEPS], 'py')
+  const hasWebDep = ctx.hasAnyDep([...WEB_FRAMEWORK_DEPS], 'py')
   const hasTrackingDep = ctx.hasAnyDep([...EXPERIMENT_TRACKING_DEPS], 'py')
   const hasTrainPy = ctx.hasFile('train.py') || ctx.hasFile('training.py') || ctx.hasFile('scripts/train.py')
 

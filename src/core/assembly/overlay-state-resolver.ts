@@ -90,7 +90,8 @@ export function resolveOverlayState(options: {
       if (typeConfig && typeof typeConfig.domain === 'string' && typeConfig.domain !== 'none') {
         const subOverlayPath = path.join(methodologyDir, `${projectType}-${typeConfig.domain}.yml`)
         if (fs.existsSync(subOverlayPath)) {
-          const { overlay: subOverlay, warnings: subWarnings } = loadSubOverlay(subOverlayPath)
+          const { overlay: subOverlay, errors: subErrors, warnings: subWarnings } = loadSubOverlay(subOverlayPath)
+          for (const err of subErrors) output.warn(`[${err.code}] ${err.message}`)
           for (const w of subWarnings) output.warn(w)
           if (subOverlay) {
             // Apply knowledge-overrides only, starting from ALREADY-MERGED overlayKnowledge

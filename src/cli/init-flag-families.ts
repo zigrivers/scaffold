@@ -226,7 +226,7 @@ export function applyFlagFamilyValidation(argv: Record<string, unknown>): true |
   if (typeCount > 1) {
     throw new Error(
       'Cannot mix flags from multiple project types'
-      + ' (--web-*, --backend-*, --cli-*, --lib-*, --mobile-*, --pipeline-*, --ml-*, --ext-*, game flags)',
+      + ' (--web-*, --backend-*, --cli-*, --lib-*, --mobile-*, --pipeline-*, --ml-*, --research-*, --ext-*, game flags)',
     )
   }
 
