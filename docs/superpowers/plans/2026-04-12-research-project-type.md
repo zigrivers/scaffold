@@ -174,6 +174,8 @@ if (data.researchConfig) {
 
 In `src/types/config.ts`:
 
+First, add `ResearchConfigSchema` to the import from `'../config/schema.js'` (line 4-8).
+
 Add the type derivation (near the other type derivations around line 50):
 ```typescript
 export type ResearchConfig = z.infer<typeof ResearchConfigSchema>
@@ -191,7 +193,7 @@ researchConfig?: ResearchConfig
 
 - [ ] **Step 5: Update adopt.ts**
 
-In `src/project/adopt.ts`:
+In `src/project/adopt.ts`, first add `ResearchConfigSchema` to the import from `'../config/schema.js'`.
 
 Add to `TYPE_KEY` record:
 ```typescript
@@ -207,6 +209,8 @@ case 'research':          return ResearchConfigSchema
 
 Run: `npx vitest run src/config/schema.test.ts --reporter=verbose 2>&1 | tail -20`
 Expected: ALL PASS
+
+Note: Adding `'research'` to `ProjectTypeSchema` broadens the `ProjectType` type, which may cause temporary TypeScript errors in `ProjectCopyMap` and `coreCopy.projectType.options` until Task 9 adds the copy entries. If `tsc --noEmit` fails after this task, that's expected — those files are fixed in Task 9. Only run schema tests here, not full `tsc`.
 
 - [ ] **Step 7: Commit**
 
@@ -363,21 +367,22 @@ git commit -m "feat(research): add ResearchMatch type and detector stub"
 
 - [ ] **Step 1: Write high-confidence detection tests**
 
-Create `src/project/detectors/research.test.ts`:
+Create `src/project/detectors/research.test.ts`. Use `createFakeSignalContext` (NOT `fakeContext` — that doesn't exist). Python deps go via `pyprojectToml`, file contents go via `files` record (path → content string). See `ml.test.ts` for the exact pattern:
 
 ```typescript
 import { describe, it, expect } from 'vitest'
+import { createFakeSignalContext } from './context.js'
 import { detectResearch } from './research.js'
-import { fakeContext } from './context.js'
 
 describe('detectResearch', () => {
   describe('high confidence', () => {
     it('detects autoresearch pattern: program.md + results.tsv with markers', () => {
-      const ctx = fakeContext({
-        files: ['program.md', 'results.tsv', 'train.py'],
-        fileContents: {
+      const ctx = createFakeSignalContext({
+        files: {
           'program.md': '# Research Protocol\nLoop: iterate through experiments and evaluate results\n',
+          'results.tsv': 'commit\tval_bpb\n',
         },
+        rootEntries: ['program.md', 'results.tsv', 'train.py'],
       })
       const match = detectResearch(ctx)
       expect(match).not.toBeNull()
@@ -387,12 +392,12 @@ describe('detectResearch', () => {
     })
 
     it('detects backtest + trading deps with import verification', () => {
-      const ctx = fakeContext({
-        files: ['backtest.py'],
-        fileContents: {
+      const ctx = createFakeSignalContext({
+        files: {
           'backtest.py': 'from backtrader import cerebro\nimport pandas as pd\n',
         },
-        pyDeps: ['backtrader', 'pandas'],
+        rootEntries: ['backtest.py'],
+        pyprojectToml: { project: { name: 'bt', dependencies: ['backtrader', 'pandas'] } },
       })
       const match = detectResearch(ctx)
       expect(match).not.toBeNull()
@@ -404,9 +409,9 @@ describe('detectResearch', () => {
 
   describe('medium confidence', () => {
     it('detects optimization deps + experiments dir (no ML deps)', () => {
-      const ctx = fakeContext({
+      const ctx = createFakeSignalContext({
         dirs: ['experiments'],
-        pyDeps: ['optuna'],
+        pyprojectToml: { project: { name: 'opt', dependencies: ['optuna'] } },
       })
       const match = detectResearch(ctx)
       expect(match).not.toBeNull()
@@ -415,9 +420,9 @@ describe('detectResearch', () => {
     })
 
     it('does NOT detect optimization deps when ML framework deps present', () => {
-      const ctx = fakeContext({
+      const ctx = createFakeSignalContext({
         dirs: ['experiments'],
-        pyDeps: ['optuna', 'torch'],
+        pyprojectToml: { project: { name: 'ml', dependencies: ['optuna', 'torch'] } },
       })
       const match = detectResearch(ctx)
       // Should return null — ML detector should claim this repo
@@ -425,9 +430,9 @@ describe('detectResearch', () => {
     })
 
     it('detects simulation deps + experiment structure', () => {
-      const ctx = fakeContext({
+      const ctx = createFakeSignalContext({
         dirs: ['experiments'],
-        pyDeps: ['simpy'],
+        pyprojectToml: { project: { name: 'sim', dependencies: ['simpy'] } },
       })
       const match = detectResearch(ctx)
       expect(match).not.toBeNull()
@@ -438,8 +443,9 @@ describe('detectResearch', () => {
 
   describe('low confidence', () => {
     it('detects experiments dir alone', () => {
-      const ctx = fakeContext({
-        files: ['experiment.py'],
+      const ctx = createFakeSignalContext({
+        files: { 'experiment.py': '# experiment script' },
+        rootEntries: ['experiment.py'],
       })
       const match = detectResearch(ctx)
       expect(match).not.toBeNull()
@@ -449,7 +455,7 @@ describe('detectResearch', () => {
   })
 
   it('returns null for empty repo', () => {
-    const ctx = fakeContext({})
+    const ctx = createFakeSignalContext({})
     expect(detectResearch(ctx)).toBeNull()
   })
 })
@@ -624,23 +630,32 @@ git commit -m "feat(research): implement research project detector with tiered s
 
 - [ ] **Step 1: Write failing test for sub-overlay loading**
 
-Add to `src/core/assembly/overlay-loader.test.ts`:
+Add to `src/core/assembly/overlay-loader.test.ts`. Note: there is no `writeTempOverlay` helper — use `fs.writeFileSync` with a temp directory (the existing test file uses `fs` and `os.tmpdir()` directly). Also note: `ScaffoldWarning` uses `context` not `file`.
 
 ```typescript
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { loadSubOverlay } from './overlay-loader.js'
+
 describe('loadSubOverlay', () => {
+  function writeTempYaml(content: string): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffold-test-'))
+    const filePath = path.join(dir, 'test-overlay.yml')
+    fs.writeFileSync(filePath, content)
+    return filePath
+  }
+
   it('loads knowledge-overrides from a sub-overlay file', () => {
-    // Create a temp sub-overlay YAML with knowledge-overrides only
-    const yaml = `
+    const tmpPath = writeTempYaml(`
 name: research-quant-finance
 description: Quant finance sub-overlay
 project-type: research
-domain: quant-finance
 
 knowledge-overrides:
   system-architecture:
     append: [research-quant-backtesting]
-`
-    const tmpPath = writeTempOverlay(yaml)
+`)
     const { overlay, warnings } = loadSubOverlay(tmpPath)
     expect(overlay).not.toBeNull()
     expect(overlay!.knowledgeOverrides).toHaveProperty('system-architecture')
@@ -648,11 +663,10 @@ knowledge-overrides:
   })
 
   it('warns and strips non-knowledge sections from sub-overlay', () => {
-    const yaml = `
+    const tmpPath = writeTempYaml(`
 name: test-sub
 description: Test sub-overlay
 project-type: research
-domain: quant-finance
 
 knowledge-overrides:
   tdd:
@@ -660,8 +674,7 @@ knowledge-overrides:
 step-overrides:
   some-step:
     enabled: true
-`
-    const tmpPath = writeTempOverlay(yaml)
+`)
     const { overlay, warnings } = loadSubOverlay(tmpPath)
     expect(overlay).not.toBeNull()
     expect(overlay!.knowledgeOverrides).toHaveProperty('tdd')
@@ -700,7 +713,7 @@ export function loadSubOverlay(
     warnings.push({
       code: 'sub-overlay-non-knowledge',
       message: `Sub-overlay ${overlayPath} contains non-knowledge sections (step/reads/dependency overrides). These are stripped for domain sub-overlays.`,
-      file: overlayPath,
+      context: overlayPath,
     })
     overlay.stepOverrides = {}
     overlay.readsOverrides = {}
@@ -752,9 +765,9 @@ describe('domain sub-overlay resolution', () => {
       output: testOutput,
     })
     // Core knowledge should be present
-    expect(state.overlayKnowledge['system-architecture']).toContain('research-architecture')
+    expect(state.knowledge['system-architecture']).toContain('research-architecture')
     // Domain knowledge should be appended AFTER core
-    expect(state.overlayKnowledge['system-architecture']).toContain('research-quant-backtesting')
+    expect(state.knowledge['system-architecture']).toContain('research-quant-backtesting')
   })
 
   it('skips domain sub-overlay when domain is none', () => {
@@ -772,8 +785,8 @@ describe('domain sub-overlay resolution', () => {
       output: testOutput,
     })
     // Core knowledge present, no domain knowledge
-    expect(state.overlayKnowledge['system-architecture']).toContain('research-architecture')
-    expect(state.overlayKnowledge['system-architecture']).not.toContain('research-quant-backtesting')
+    expect(state.knowledge['system-architecture']).toContain('research-architecture')
+    expect(state.knowledge['system-architecture']).not.toContain('research-quant-backtesting')
   })
 })
 ```
@@ -785,23 +798,35 @@ Expected: FAIL
 
 - [ ] **Step 3: Implement generic domain sub-overlay loading**
 
-In `src/core/assembly/overlay-state-resolver.ts`, after the core overlay application block, add:
+In `src/core/assembly/overlay-state-resolver.ts`, after the core overlay application block (around line 87 where the return object is built), add domain sub-overlay loading.
+
+**Important API notes** (verified against actual codebase):
+- `OverlayState` has `knowledge` property (not `overlayKnowledge`). Internal variable is `overlayKnowledge` but return is `knowledge`.
+- Warnings go through `output.warn()`, not a local array.
+- Use the existing `TYPE_KEY` from `adopt.ts` to map `projectType` → config key (don't use template literal — it fails for hyphenated types like `web-app`).
 
 ```typescript
-// Generic domain sub-overlay: if typeConfig has a domain !== 'none', load sub-overlay
-const typeConfigKey = `${projectType}Config` as const
-const typeConfig = config.project?.[typeConfigKey] as Record<string, unknown> | undefined
-if (typeConfig && typeof typeConfig.domain === 'string' && typeConfig.domain !== 'none') {
-  const subOverlayPath = path.join(methodologyDir, `${projectType}-${typeConfig.domain}.yml`)
-  if (fs.existsSync(subOverlayPath)) {
-    const { overlay: subOverlay, warnings: subWarnings } = loadSubOverlay(subOverlayPath)
-    warnings.push(...subWarnings)
-    if (subOverlay) {
-      // Apply knowledge-overrides only, starting from ALREADY-MERGED state
-      for (const [step, overrides] of Object.entries(subOverlay.knowledgeOverrides ?? {})) {
-        if (step in overlayKnowledge) {
-          const toAppend = overrides.append ?? []
-          overlayKnowledge[step] = [...overlayKnowledge[step], ...toAppend]
+// Generic domain sub-overlay: if typeConfig has a 'domain' field !== 'none', load sub-overlay
+// Import TYPE_KEY mapping or replicate it — don't use template literals for hyphenated types
+const TYPE_CONFIG_KEY: Partial<Record<string, string>> = {
+  'research': 'researchConfig',
+  // Future types with domain support can be added here
+}
+const typeConfigKey = TYPE_CONFIG_KEY[projectType]
+if (typeConfigKey) {
+  const typeConfig = config.project?.[typeConfigKey] as Record<string, unknown> | undefined
+  if (typeConfig && typeof typeConfig.domain === 'string' && typeConfig.domain !== 'none') {
+    const subOverlayPath = path.join(methodologyDir, `${projectType}-${typeConfig.domain}.yml`)
+    if (fs.existsSync(subOverlayPath)) {
+      const { overlay: subOverlay, warnings: subWarnings } = loadSubOverlay(subOverlayPath)
+      for (const w of subWarnings) output.warn(w.message)
+      if (subOverlay) {
+        // Apply knowledge-overrides only, starting from ALREADY-MERGED overlayKnowledge
+        for (const [step, overrides] of Object.entries(subOverlay.knowledgeOverrides ?? {})) {
+          if (step in overlayKnowledge) {
+            const toAppend = overrides.append ?? []
+            overlayKnowledge[step] = [...overlayKnowledge[step], ...toAppend]
+          }
         }
       }
     }
@@ -809,7 +834,7 @@ if (typeConfig && typeof typeConfig.domain === 'string' && typeConfig.domain !==
 }
 ```
 
-Import `loadSubOverlay` at the top of the file.
+Import `loadSubOverlay` from `./overlay-loader.js` at the top of the file.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -878,66 +903,109 @@ git commit -m "feat(research): add core overlay and 11 knowledge files"
 
 ---
 
-### Task 8: Domain Sub-Overlays + Domain Knowledge Files
+### Task 8a: Quant-Finance Domain Sub-Overlay + Knowledge Files
 
 **Files:**
 - Create: `content/methodology/research-quant-finance.yml`
-- Create: `content/methodology/research-ml-research.yml`
-- Create: `content/methodology/research-simulation.yml`
 - Create: `content/knowledge/research/research-quant-*.md` (6 files)
-- Create: `content/knowledge/research/research-ml-*.md` (4 files)
-- Create: `content/knowledge/research/research-sim-*.md` (4 files)
 
-- [ ] **Step 1: Create the 3 domain sub-overlay YAMLs**
+- [ ] **Step 1: Create the quant-finance sub-overlay YAML**
 
-Create each file with the exact content from the spec (Section 3, Domain Sub-Overlays). Each includes `name`, `description`, `project-type`, `domain`, and `knowledge-overrides`.
+Create `content/methodology/research-quant-finance.yml` with the exact content from the spec (Section 3). Must include `name`, `description`, `project-type`, `domain`, and `knowledge-overrides`.
 
 - [ ] **Step 2: Create the 6 quant-finance knowledge files**
 
-In `content/knowledge/research/`:
-1. `research-quant-requirements.md`
-2. `research-quant-backtesting.md`
-3. `research-quant-metrics.md`
-4. `research-quant-market-data.md`
-5. `research-quant-strategy-patterns.md`
-6. `research-quant-risk.md`
+In `content/knowledge/research/`, create each file with frontmatter + Summary + Deep Guidance sections. Use `content/knowledge/ml/ml-architecture.md` as reference for depth (~200-300 lines each):
 
-Each follows the standard knowledge file structure with frontmatter, Summary, and Deep Guidance sections. Content should cover the topics listed in the spec's knowledge inventory.
+1. `research-quant-requirements.md` — Trading system research requirements patterns
+2. `research-quant-backtesting.md` — Walk-forward analysis, look-ahead bias, survivorship bias, transaction cost modeling, slippage
+3. `research-quant-metrics.md` — Sharpe, Sortino, Calmar, max drawdown, profit factor, win rate, expectancy, risk-adjusted returns
+4. `research-quant-market-data.md` — OHLCV data sources, tick data, corporate actions (splits/dividends), data quality for financial time series
+5. `research-quant-strategy-patterns.md` — Entry/exit rules, position sizing models, stop-loss/take-profit, multi-asset allocation
+6. `research-quant-risk.md` — Regime detection, tail risk, Kelly criterion, correlation breakdown, position limits
 
-- [ ] **Step 3: Create the 4 ML-research knowledge files**
-
-1. `research-ml-architecture-search.md`
-2. `research-ml-training-patterns.md`
-3. `research-ml-evaluation.md`
-4. `research-ml-experiment-tracking.md`
-
-Adapt content from existing `content/knowledge/ml/` files where relevant, reframed for research context.
-
-- [ ] **Step 4: Create the 4 simulation knowledge files**
-
-1. `research-sim-engine-patterns.md`
-2. `research-sim-parameter-spaces.md`
-3. `research-sim-validation.md`
-4. `research-sim-compute-management.md`
-
-- [ ] **Step 5: Validate all overlays**
+- [ ] **Step 3: Validate**
 
 Run: `make validate 2>&1 | tail -20`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add content/methodology/research-quant-finance.yml \
-  content/methodology/research-ml-research.yml \
-  content/methodology/research-simulation.yml \
-  content/knowledge/research/
-git commit -m "feat(research): add 3 domain sub-overlays and 14 domain knowledge files"
+  content/knowledge/research/research-quant-*.md
+git commit -m "feat(research): add quant-finance domain sub-overlay and 6 knowledge files"
 ```
 
 ---
 
-### Task 9: Wizard Copy System
+### Task 8b: ML-Research Domain Sub-Overlay + Knowledge Files
+
+**Files:**
+- Create: `content/methodology/research-ml-research.yml`
+- Create: `content/knowledge/research/research-ml-*.md` (4 files)
+
+- [ ] **Step 1: Create the ML-research sub-overlay YAML**
+
+Create `content/methodology/research-ml-research.yml` with the exact content from the spec (Section 3).
+
+- [ ] **Step 2: Create the 4 ML-research knowledge files**
+
+Adapt content from existing `content/knowledge/ml/` files, reframed for research context (not production ML). Read `content/knowledge/ml/ml-experiment-tracking.md` and `content/knowledge/ml/ml-model-evaluation.md` first for reference:
+
+1. `research-ml-architecture-search.md` — NAS patterns, architecture mutation strategies, search space definition
+2. `research-ml-training-patterns.md` — Training loop patterns adapted for autonomous research iteration (not production training)
+3. `research-ml-evaluation.md` — Model evaluation in research context, ablation studies, statistical significance
+4. `research-ml-experiment-tracking.md` — MLflow/W&B for research (lighter than production ML, focused on comparison and reproducibility)
+
+- [ ] **Step 3: Validate**
+
+Run: `make validate 2>&1 | tail -20`
+Expected: PASS
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add content/methodology/research-ml-research.yml \
+  content/knowledge/research/research-ml-*.md
+git commit -m "feat(research): add ML-research domain sub-overlay and 4 knowledge files"
+```
+
+---
+
+### Task 8c: Simulation Domain Sub-Overlay + Knowledge Files
+
+**Files:**
+- Create: `content/methodology/research-simulation.yml`
+- Create: `content/knowledge/research/research-sim-*.md` (4 files)
+
+- [ ] **Step 1: Create the simulation sub-overlay YAML**
+
+Create `content/methodology/research-simulation.yml` with the exact content from the spec (Section 3).
+
+- [ ] **Step 2: Create the 4 simulation knowledge files**
+
+1. `research-sim-engine-patterns.md` — Physics/materials simulation engine integration patterns (OpenFOAM, FEniCS, SimPy), solver configuration, mesh management
+2. `research-sim-parameter-spaces.md` — Parameter space definition, dimensionality analysis, interaction effects, Latin hypercube sampling, Sobol sequences
+3. `research-sim-validation.md` — Simulation validation against known analytical solutions, convergence testing, mesh independence studies
+4. `research-sim-compute-management.md` — Compute budgets, parallelization strategies, HPC job scheduling, resource monitoring
+
+- [ ] **Step 3: Validate**
+
+Run: `make validate 2>&1 | tail -20`
+Expected: PASS
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add content/methodology/research-simulation.yml \
+  content/knowledge/research/research-sim-*.md
+git commit -m "feat(research): add simulation domain sub-overlay and 4 knowledge files"
+```
+
+---
+
+### Task 9: Wizard Copy System (do this before `tsc --noEmit` — fixes type drift from Task 1)
 
 **Files:**
 - Modify: `src/wizard/copy/types.ts`
@@ -1107,13 +1175,16 @@ Pass `researchFlags: options.researchFlags` to `askWizardQuestions`.
 
 Add to `src/wizard/questions.test.ts`:
 
+Note: `askWizardQuestions` requires a `suggestion: 'deep' | 'mvp'` parameter. All existing tests use `suggestion: 'deep'`. The function also requires an `OutputContext` — use the same `testOutput` / `createTestOutput()` helper from the existing test file.
+
 ```typescript
 describe('research wizard questions', () => {
   it('requires --research-driver in auto mode', async () => {
     await expect(askWizardQuestions({
       projectType: 'research',
+      suggestion: 'deep',
       auto: true,
-      output: testOutput,
+      output: createTestOutput(),
       researchFlags: {},
     })).rejects.toThrow('--research-driver is required')
   })
@@ -1121,8 +1192,9 @@ describe('research wizard questions', () => {
   it('produces valid research config with all flags', async () => {
     const answers = await askWizardQuestions({
       projectType: 'research',
+      suggestion: 'deep',
       auto: true,
-      output: testOutput,
+      output: createTestOutput(),
       researchFlags: {
         researchDriver: 'code-driven',
         researchInteraction: 'autonomous',
@@ -1175,7 +1247,17 @@ export const RESEARCH_FLAGS = [
 
 - [ ] **Step 2: Update detectFamily**
 
-Add to the `detectFamily` function:
+`detectFamily` has an explicit return type union — add `| 'research'` to it:
+```typescript
+// Update return type to include 'research':
+function detectFamily(argv: Record<string, unknown>):
+  | 'game' | 'web-app' | 'backend' | 'cli' | 'library'
+  | 'mobile-app' | 'data-pipeline' | 'ml' | 'browser-extension'
+  | 'research'  // ADD THIS
+  | undefined
+```
+
+Add detection logic inside the function body:
 ```typescript
 if (RESEARCH_FLAGS.some((f) => argv[f] !== undefined)) return 'research'
 ```
@@ -1243,12 +1325,10 @@ Add the same Yargs flag definitions and group to `src/cli/commands/adopt.ts`.
 
 Add to `src/cli/init-flag-families.test.ts`:
 
+Note: `detectFamily` is **not exported** — it's a private function. Tests should use `applyFlagFamilyValidation` and `buildFlagOverrides` which are exported. `buildFlagOverrides` takes ONE argument (`argv`), not two — it calls `detectFamily` internally.
+
 ```typescript
 describe('research flags', () => {
-  it('detects research family from --research-driver', () => {
-    expect(detectFamily({ 'research-driver': 'code-driven' })).toBe('research')
-  })
-
   it('rejects research flags with wrong project type', () => {
     expect(() => applyFlagFamilyValidation({
       'project-type': 'ml',
@@ -1257,14 +1337,18 @@ describe('research flags', () => {
   })
 
   it('rejects notebook-driven + autonomous', () => {
+    // MUST include project-type: 'research' so it passes the type check
+    // and reaches the cross-field validation
     expect(() => applyFlagFamilyValidation({
+      'project-type': 'research',
       'research-driver': 'notebook-driven',
       'research-interaction': 'autonomous',
     })).toThrow('cannot be fully autonomous')
   })
 
   it('builds research flag overrides', () => {
-    const result = buildFlagOverrides('research', {
+    // buildFlagOverrides takes ONE arg (argv), not (family, argv)
+    const result = buildFlagOverrides({
       'research-driver': 'api-driven',
       'research-domain': 'quant-finance',
     })
@@ -1298,7 +1382,7 @@ git commit -m "feat(research): add CLI flags for init and adopt commands"
 
 - [ ] **Step 1: Write e2e overlay test**
 
-Add to `src/e2e/project-type-overlays.test.ts`:
+Add to `src/e2e/project-type-overlays.test.ts`. Use the existing test setup from that file — it has `getPackageMethodologyDir()`, `discoverMetaPrompts()`, `loadAllPresets()`, and test output helpers already defined. Match the existing test patterns in that file for variable names:
 
 ```typescript
 describe('research overlay', () => {
@@ -1316,9 +1400,9 @@ describe('research overlay', () => {
       presetSteps: realPresetSteps,
       output: testOutput,
     })
-    expect(state.overlayKnowledge['system-architecture']).toContain('research-architecture')
-    expect(state.overlayKnowledge['tdd']).toContain('research-testing')
-    expect(state.overlayKnowledge['operations']).toContain('research-experiment-tracking')
+    expect(state.knowledge['system-architecture']).toContain('research-architecture')
+    expect(state.knowledge['tdd']).toContain('research-testing')
+    expect(state.knowledge['operations']).toContain('research-experiment-tracking')
   })
 
   it('applies quant-finance domain knowledge on top of core', () => {
@@ -1336,10 +1420,10 @@ describe('research overlay', () => {
       output: testOutput,
     })
     // Core + domain knowledge both present
-    expect(state.overlayKnowledge['system-architecture']).toContain('research-architecture')
-    expect(state.overlayKnowledge['system-architecture']).toContain('research-quant-backtesting')
+    expect(state.knowledge['system-architecture']).toContain('research-architecture')
+    expect(state.knowledge['system-architecture']).toContain('research-quant-backtesting')
     // Domain knowledge appears AFTER core
-    const sysArch = state.overlayKnowledge['system-architecture']
+    const sysArch = state.knowledge['system-architecture']
     const coreIdx = sysArch.indexOf('research-architecture')
     const domainIdx = sysArch.indexOf('research-quant-backtesting')
     expect(domainIdx).toBeGreaterThan(coreIdx)
@@ -1359,8 +1443,8 @@ describe('research overlay', () => {
       presetSteps: realPresetSteps,
       output: testOutput,
     })
-    expect(state.overlayKnowledge['system-architecture']).toContain('research-architecture')
-    expect(state.overlayKnowledge['system-architecture']).not.toContain('research-quant-backtesting')
+    expect(state.knowledge['system-architecture']).toContain('research-architecture')
+    expect(state.knowledge['system-architecture']).not.toContain('research-quant-backtesting')
   })
 })
 ```
