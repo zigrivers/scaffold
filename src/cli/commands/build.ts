@@ -20,6 +20,7 @@ import type { AdapterStepInput, AdapterStepOutput, OutputFile } from '../../core
 import { ensureScaffoldGitignore, findLegacyGeneratedOutputs } from '../../project/gitignore.js'
 import fs from 'node:fs'
 import type { CommandResult } from '../../types/index.js'
+import { shutdown } from '../shutdown.js'
 
 export interface BuildArgs {
   'validate-only': boolean
@@ -58,6 +59,9 @@ const buildCommand: CommandModule<Record<string, unknown>, BuildArgs> = {
 }
 
 export async function runBuild(argv: BuildArgs, options: RunBuildOptions = {}): Promise<CommandResult> {
+  return shutdown.withContext(
+    'Cancelled. Partial output may exist. Run `scaffold build` to regenerate.',
+    async () => {
   const startTime = Date.now()
 
   // Step 1: Resolve project root
@@ -229,6 +233,7 @@ export async function runBuild(argv: BuildArgs, options: RunBuildOptions = {}): 
   // Step 12: Write output files
   let generatedCount = 0
   for (const file of allOutputFiles) {
+    if (shutdown.isShuttingDown) break
     const fullPath = path.join(projectRoot, file.relativePath)
     const dir = path.dirname(fullPath)
     if (!fs.existsSync(dir)) {
@@ -244,6 +249,7 @@ export async function runBuild(argv: BuildArgs, options: RunBuildOptions = {}): 
   if (fs.existsSync(skillTemplateDir)) {
     const claudeVars: Record<string, string> = { INSTRUCTIONS_FILE: 'CLAUDE.md' }
     for (const skillName of fs.readdirSync(skillTemplateDir)) {
+      if (shutdown.isShuttingDown) break
       const templatePath = path.join(skillTemplateDir, skillName, 'SKILL.md')
       if (!fs.existsSync(templatePath)) continue
       const template = fs.readFileSync(templatePath, 'utf8')
@@ -273,6 +279,7 @@ export async function runBuild(argv: BuildArgs, options: RunBuildOptions = {}): 
   }
 
   return { exitCode: 0, data: buildResult }
+  }) // end withContext
 }
 
 export default buildCommand
