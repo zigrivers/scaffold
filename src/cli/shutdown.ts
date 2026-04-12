@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { setMaxListeners } from 'node:events'
 // fs and ExitCode used by methods implemented in subsequent tasks
-import fs from 'node:fs' // eslint-disable-line @typescript-eslint/no-unused-vars
+import * as fs from 'node:fs' // eslint-disable-line @typescript-eslint/no-unused-vars
 
 import { ExitCode } from '../types/enums.js'
 
@@ -77,7 +77,25 @@ export class ShutdownManager {
   }
 
   private sigtermHandler = (): void => {
-    // Implemented in Task 3
+    this.triggeredBySigterm = true
+    if (this.sigintState === 'idle') {
+      this.sigintState = 'cleaning'
+      this.shutdown(ExitCode.UserCancellation)
+    }
+  }
+
+  private get currentContext(): string {
+    const ctx = this.contextStorage.getStore() ?? this.fallbackContext
+    return typeof ctx === 'function' ? ctx() : ctx
+  }
+
+  private getTimeoutMs(): number {
+    const env = this.proc.env?.SCAFFOLD_SHUTDOWN_TIMEOUT_MS
+    if (env) {
+      const n = Number(env)
+      if (!Number.isNaN(n) && n > 0) return Math.max(500, Math.min(n, 10000))
+    }
+    return this.triggeredBySigterm ? 5000 : 2000
   }
 
   install(): void {
@@ -105,13 +123,48 @@ export class ShutdownManager {
   }
 
   // Placeholder methods — implemented in subsequent tasks
-  register(_name: string, _cleanup: CleanupFn, _opts?: { priority?: 'critical' }): Deregister {
-    return () => {}
+  register(name: string, cleanup: CleanupFn, opts?: { priority?: 'critical' }): Deregister {
+    if (this.shuttingDown) {
+      try { Promise.resolve(cleanup()).catch(() => {}) } catch { /* sync throw */ }
+      return () => {}
+    }
+    this.registry.set(name, { cleanup, priority: opts?.priority })
+    return () => { this.registry.delete(name) }
   }
 
   registerLockOwnership(_path: string): void {}
   releaseLockOwnership(): void {}
-  async shutdown(_exitCode?: number): Promise<never> { return new Promise<never>(() => {}) }
+  async shutdown(exitCode: number = ExitCode.UserCancellation): Promise<never> {
+    if (this.shuttingDown) {
+      return new Promise<never>(() => {})
+    }
+    this.shuttingDown = true
+
+    this.controller.abort()
+
+    const msg = this.currentContext
+    this.proc.stderr.write(`\n${msg}\n`)
+
+    const timeoutMs = this.getTimeoutMs()
+    const timeout = setTimeout(() => this.proc.exit(exitCode), timeoutMs)
+
+    const entries = Array.from(this.registry.entries())
+    const critical = entries
+      .filter(([, v]) => v.priority === 'critical').reverse()
+    for (const [, d] of critical) {
+      try { await Promise.resolve(d.cleanup()) } catch { /* continue */ }
+    }
+
+    const normal = entries
+      .filter(([, v]) => v.priority !== 'critical').reverse()
+    await Promise.allSettled(normal.map(([, d]) => {
+      try { return Promise.resolve(d.cleanup()) }
+      catch { return Promise.resolve() }
+    }))
+
+    clearTimeout(timeout)
+    this.proc.exit(exitCode)
+  }
   async withPrompt<T>(fn: () => Promise<T>): Promise<T> { return fn() }
   async withResource<T>(
     _name: string, _cleanup: CleanupFn, fn: () => T | Promise<T>,
