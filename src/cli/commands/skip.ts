@@ -3,7 +3,8 @@ import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { StateManager } from '../../state/state-manager.js'
-import { acquireLock, releaseLock } from '../../state/lock-manager.js'
+import { acquireLock, getLockPath, releaseLock } from '../../state/lock-manager.js'
+import { shutdown } from '../shutdown.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
@@ -68,7 +69,9 @@ const skipCommand: CommandModule<Record<string, unknown>, SkipArgs> = {
       return
     }
 
-    try {
+    shutdown.registerLockOwnership(getLockPath(projectRoot))
+
+    await shutdown.withResource('lock', () => { releaseLock(projectRoot); shutdown.releaseLockOwnership() }, async () => {
       const context = loadPipelineContext(projectRoot)
       const pipeline = resolvePipeline(context)
       const stateManager = new StateManager(projectRoot, pipeline.computeEligible)
@@ -146,12 +149,8 @@ const skipCommand: CommandModule<Record<string, unknown>, SkipArgs> = {
         output.info(`Newly eligible: ${newlyEligible.join(', ')}`)
       }
 
-      process.exit(hasErrors ? 2 : 0)
-    } finally {
-      if (lockResult.acquired) {
-        releaseLock(projectRoot)
-      }
-    }
+      process.exitCode = hasErrors ? 2 : 0
+    })
   },
 }
 
@@ -176,7 +175,7 @@ async function skipSingle(
       exitCode: 2,
       recovery: 'Run `scaffold list` to see available steps',
     })
-    process.exit(2)
+    process.exitCode = 2
     return
   }
 
@@ -184,7 +183,7 @@ async function skipSingle(
 
   if (stepEntry.status === 'skipped') {
     output.info(`Step '${stepSlug}' is already skipped`)
-    process.exit(0)
+    process.exitCode = 0
     return
   }
 
@@ -197,16 +196,16 @@ async function skipSingle(
           exitCode: 3,
           recovery: 'Use --force to re-mark as skipped',
         })
-        process.exit(3)
+        process.exitCode = 3
         return
       }
     } else {
-      const proceed = await output.confirm(
+      const proceed = await shutdown.withPrompt(() => output.confirm(
         `Step '${stepSlug}' is already completed. Re-mark as skipped?`,
         false,
-      )
+      ))
       if (!proceed) {
-        process.exit(0)
+        process.exitCode = 0
         return
       }
     }
@@ -236,7 +235,7 @@ async function skipSingle(
       output.info(`Newly eligible: ${newlyEligible.join(', ')}`)
     }
   }
-  process.exit(0)
+  process.exitCode = 0
 }
 
 export default skipCommand

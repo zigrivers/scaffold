@@ -23,6 +23,16 @@ vi.mock('../../state/state-manager.js', () => ({
 vi.mock('../../state/lock-manager.js', () => ({
   acquireLock: vi.fn(() => ({ acquired: true })),
   releaseLock: vi.fn(),
+  getLockPath: vi.fn(() => '/mock/.scaffold/lock.json'),
+}))
+
+vi.mock('../shutdown.js', () => ({
+  shutdown: {
+    withResource: vi.fn((_name: string, _cleanup: unknown, fn: () => unknown) => fn()),
+    withPrompt: vi.fn((fn: () => unknown) => fn()),
+    registerLockOwnership: vi.fn(),
+    releaseLockOwnership: vi.fn(),
+  },
 }))
 
 vi.mock('../../utils/levenshtein.js', () => ({
@@ -36,7 +46,7 @@ vi.mock('../../utils/levenshtein.js', () => ({
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { StateManager } from '../../state/state-manager.js'
-import { acquireLock, releaseLock } from '../../state/lock-manager.js'
+import { acquireLock, getLockPath, releaseLock } from '../../state/lock-manager.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
 import skipCommand from './skip.js'
 
@@ -109,6 +119,7 @@ describe('skip command', () => {
   })
 
   afterEach(() => {
+    process.exitCode = undefined
     vi.restoreAllMocks()
   })
 
@@ -157,7 +168,7 @@ describe('skip command', () => {
     await skipCommand.handler(argv as Parameters<typeof skipCommand.handler>[0])
 
     expect(mockMarkSkipped).toHaveBeenCalledWith('some-step', 'not needed', 'scaffold-skip')
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
   })
 
   // Test 3: Step not found exits 2 with DEP_TARGET_MISSING
@@ -183,7 +194,7 @@ describe('skip command', () => {
     }
     await skipCommand.handler(argv as Parameters<typeof skipCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(2)
+    expect(process.exitCode).toBe(2)
     const allOutput = writtenLines.join('')
     expect(allOutput).toContain('DEP_TARGET_MISSING')
   })
@@ -213,7 +224,7 @@ describe('skip command', () => {
     }
     await skipCommand.handler(argv as Parameters<typeof skipCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(2)
+    expect(process.exitCode).toBe(2)
     const allOutput = writtenLines.join('')
     expect(allOutput).toContain('existing-step')
   })
@@ -245,7 +256,7 @@ describe('skip command', () => {
     }
     await skipCommand.handler(argv as Parameters<typeof skipCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(3)
+    expect(process.exitCode).toBe(3)
     const stderrOutput = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('')
     expect(stderrOutput).toContain('PSM_INVALID_TRANSITION')
   })
@@ -302,7 +313,7 @@ describe('skip command', () => {
 
     expect(mockConfirm).toHaveBeenCalled()
     expect(mockMarkSkipped).toHaveBeenCalledWith('completed-step', 'user-requested', 'scaffold-skip')
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
 
     vi.mocked(contextModule.createOutputContext).mockRestore()
   })
@@ -332,7 +343,7 @@ describe('skip command', () => {
     }
     await skipCommand.handler(argv as Parameters<typeof skipCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
     const allOutput = writtenLines.join('')
     expect(allOutput).toContain('already skipped')
   })
@@ -366,7 +377,7 @@ describe('skip command', () => {
     const allOutput = writtenLines.join('')
     expect(allOutput).toContain('in progress')
     expect(mockMarkSkipped).toHaveBeenCalled()
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
   })
 
   // Test 9: JSON output has step, reason, skippedAt, newly_eligible fields
@@ -405,12 +416,13 @@ describe('skip command', () => {
     expect(data).toHaveProperty('skippedAt')
     expect(data).toHaveProperty('newly_eligible')
     expect(Array.isArray(data.newly_eligible)).toBe(true)
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
 
     // Silence unused variable warnings
     void stdoutSpy
     void mockAcquireLock
     void releaseLock
+    void getLockPath
   })
 
   // -------------------------------------------------------------------------
@@ -447,7 +459,7 @@ describe('skip command', () => {
       expect(mockMarkSkipped).toHaveBeenCalledTimes(2)
       expect(mockMarkSkipped).toHaveBeenCalledWith('step-a', 'no frontend', 'scaffold-skip')
       expect(mockMarkSkipped).toHaveBeenCalledWith('step-b', 'no frontend', 'scaffold-skip')
-      expect(exitSpy).toHaveBeenCalledWith(0)
+      expect(process.exitCode).toBe(0)
     })
 
     it('continues skipping remaining steps when one is not found', async () => {
@@ -478,7 +490,7 @@ describe('skip command', () => {
       // Should still skip the valid step
       expect(mockMarkSkipped).toHaveBeenCalledWith('good-step', 'user-requested', 'scaffold-skip')
       // Should exit with partial failure code
-      expect(exitSpy).toHaveBeenCalledWith(2)
+      expect(process.exitCode).toBe(2)
     })
 
     it('batch skip JSON output includes results array', async () => {
