@@ -225,6 +225,50 @@ describe('ShutdownManager', () => {
     })
   })
 
+  describe('withResource()', () => {
+    beforeEach(() => {
+      mgr.install()
+    })
+
+    it('returns the value from the wrapped function', async () => {
+      const result = await mgr.withResource('test', () => {}, async () => 42)
+      expect(result).toBe(42)
+    })
+
+    it('runs cleanup on normal completion', async () => {
+      const cleanup = vi.fn()
+      await mgr.withResource('test', cleanup, async () => 'done')
+      expect(cleanup).toHaveBeenCalledOnce()
+    })
+
+    it('runs cleanup on error', async () => {
+      const cleanup = vi.fn()
+      await expect(
+        mgr.withResource('test', cleanup, async () => { throw new Error('fail') }),
+      ).rejects.toThrow('fail')
+      expect(cleanup).toHaveBeenCalledOnce()
+    })
+
+    it('only runs cleanup once if shutdown also fires (idempotency)', async () => {
+      const cleanup = vi.fn()
+
+      const promise = mgr.withResource('test', cleanup, async () => {
+        // Simulate shutdown calling the registered cleanup
+        const entry = (mgr as any).registry.get('test')
+        if (entry) entry.cleanup()
+        return 'done'
+      })
+
+      await promise
+      expect(cleanup).toHaveBeenCalledOnce()
+    })
+
+    it('deregisters from registry after completion', async () => {
+      await mgr.withResource('test', () => {}, async () => 'done')
+      expect((mgr as any).registry.has('test')).toBe(false)
+    })
+  })
+
   describe('withPrompt()', () => {
     beforeEach(() => {
       mgr.install()

@@ -176,8 +176,22 @@ export class ShutdownManager {
     }
   }
   async withResource<T>(
-    _name: string, _cleanup: CleanupFn, fn: () => T | Promise<T>,
-  ): Promise<T> { return fn() }
+    name: string, cleanup: CleanupFn, fn: () => T | Promise<T>,
+  ): Promise<T> {
+    let cleaned = false
+    const guardedCleanup = async (): Promise<void> => {
+      if (cleaned) return
+      cleaned = true
+      await cleanup()
+    }
+    const deregister = this.register(name, guardedCleanup)
+    try {
+      return await fn()
+    } finally {
+      deregister()
+      try { await guardedCleanup() } catch { /* best effort */ }
+    }
+  }
   async withContext<T>(
     _message: string | (() => string), fn: () => T | Promise<T>,
   ): Promise<T> { return Promise.resolve(fn()) }
