@@ -237,7 +237,11 @@ describe('askWizardQuestions', () => {
     // engine, multiplayer, contentStructure, economy = 4 calls
     expect(output.select).toHaveBeenCalledTimes(4)
     // First select call should be engine, not projectType
-    expect(output.select).toHaveBeenNthCalledWith(1, 'Game engine:', ['unity', 'unreal', 'godot', 'custom'])
+    expect(output.select).toHaveBeenNthCalledWith(1, 'Game engine:',
+      expect.arrayContaining([expect.objectContaining({ value: 'unity' })]),
+      undefined,
+      expect.any(Object),
+    )
   })
 
   // --- Task 5: General flag-skip tests ---
@@ -366,7 +370,11 @@ describe('askWizardQuestions', () => {
     // select called 3 times (multiplayer, contentStructure, economy) — engine was skipped
     expect(output.select).toHaveBeenCalledTimes(3)
     // First select call should be multiplayer, NOT engine
-    expect(output.select).toHaveBeenNthCalledWith(1, 'Multiplayer mode:', ['none', 'local', 'online', 'hybrid'], 'none')
+    expect(output.select).toHaveBeenNthCalledWith(1, 'Multiplayer mode:',
+      expect.arrayContaining([expect.objectContaining({ value: 'none' })]),
+      'none',
+      expect.any(Object),
+    )
   })
 
   it('--multiplayer flag is used', async () => {
