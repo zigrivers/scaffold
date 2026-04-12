@@ -48,7 +48,7 @@ export const ResearchConfigSchema = z.object({
 
 ### Design Principles Applied
 
-- **"Changes pipeline structure" bar**: `experimentDriver` and `interactionMode` change how architecture, testing, and operations steps are structured. `hasExperimentTracking` gates whether tracking infrastructure is scaffolded. `domain` drives sub-overlay selection (persistence and validation require a typed field — `.passthrough()` is insufficient because wizard/adopt writers only serialize typed fields).
+- **"Changes pipeline structure" bar**: `experimentDriver` and `interactionMode` change how architecture, testing, and operations steps are structured. `hasExperimentTracking` gates whether tracking infrastructure is scaffolded in the generated project (the overlay always injects tracking *knowledge* so the architecture step understands the concept, but the field tells that step whether to actually scaffold MLflow/results-database infrastructure). `domain` drives sub-overlay selection (persistence and validation require a typed field — `.passthrough()` is insufficient because wizard/adopt writers only serialize typed fields).
 - **Field count**: 4 fields matches the codebase norm (ML: 4, WebApp: 4, Backend: 5, CLI: 3).
 - **`domain` uses `'none'` not `.optional()`**: Every other absent concept in the codebase uses a `'none'` enum value (`offlineSupport`, `asyncMessaging`, `servingPattern`, etc.). Implementation caveat: always check `domain !== 'none'`, never `if (domain)` — the string `'none'` is truthy.
 
@@ -112,9 +112,9 @@ Both `ml.ts` and `research.ts` import from this module. Existing `ML_FRAMEWORK_D
 
 Confidence-based, not ordering-based. Detector order in `ALL_DETECTORS` is performance-only (per `index.ts` comment).
 
-- Research high + ml medium/low: `resolveDetection` Case B auto-commits research
-- Both high: Case E prompts user (or `--project-type` flag in non-TTY)
-- `PROJECT_TYPE_PREFERENCE` in `disambiguate.ts`: add `'research'` after `'ml'`
+- Research high + ml medium/low: `resolveDetection` Case B auto-commits research (single high match)
+- Both high: Case C prompts user (multiple high matches) or `--project-type` flag in non-TTY
+- `PROJECT_TYPE_PREFERENCE` in `disambiguate.ts`: add `'research'` after `'ml'`, producing: `'web-app', 'backend', 'cli', 'library', 'mobile-app', 'data-pipeline', 'ml', 'research', 'browser-extension', 'game'`
 
 ### Detection Tiers
 
@@ -123,7 +123,7 @@ Confidence-based, not ordering-based. Detector order in `ALL_DETECTORS` is perfo
 | Signal | Verification | Partial Config |
 |---|---|---|
 | `program.md` + `results.tsv` | `program.md` content contains experiment-loop markers (first 500 bytes checked for "loop", "iterate", "experiment", "run", "evaluate") | `experimentDriver: 'code-driven'`, `interactionMode: 'autonomous'` |
-| `backtest.py`/`strategy.py` + trading deps | Import verification inside file (`from backtrader`, `from zipline`, etc.) | `experimentDriver: 'code-driven'` |
+| `backtest.py`/`strategy.py` + trading deps | Import verification inside file (`from backtrader`, `from zipline`, etc.) | `experimentDriver: 'code-driven'`, `domain: 'quant-finance'` |
 | Medium-tier signal + academic artifacts (`.tex`, `.bib`, `paper/`) | Academic artifacts as upgrade evidence | Inherits from medium match |
 
 **Medium confidence** (framework dep + structure, with negative gates):
@@ -132,8 +132,8 @@ Confidence-based, not ordering-based. Detector order in `ALL_DETECTORS` is perfo
 |---|---|---|
 | Optimization deps (optuna, hyperopt, pymoo, nevergrad) + `results/`/`experiments/` dir | `!hasAnyDep(ML_FRAMEWORK_DEPS)` | `experimentDriver: 'config-driven'` |
 | Non-W&B `sweep.yaml`/`sweep_config.yaml` + results dir | Content check: reject if W&B top-level keys (`method:` + `metric:` + `parameters:`) | `experimentDriver: 'config-driven'`, `interactionMode: 'autonomous'` |
-| Trading deps (backtrader, zipline, vectorbt, ccxt) + no web/API framework | No Express/FastAPI/Django deps | `experimentDriver: 'code-driven'` |
-| Simulation deps (openfoam, fenics, simpy, pyomo, deap) + experiment structure | - | `experimentDriver: 'code-driven'` |
+| Trading deps (backtrader, zipline, vectorbt, ccxt) + no web/API framework | No Express/FastAPI/Django deps | `experimentDriver: 'code-driven'`, `domain: 'quant-finance'` |
+| Simulation deps (openfoam, fenics, simpy, pyomo, deap) + experiment structure | - | `experimentDriver: 'code-driven'`, `domain: 'simulation'` |
 | LLM SDK deps (openai, anthropic, langchain) + eval structure (`evals/`, `results.jsonl`) | No `train.py` | `experimentDriver: 'api-driven'` |
 
 **Low confidence** (weak signals):
@@ -190,6 +190,11 @@ For ANY project type:
 21 steps mapped (matching ml and data-pipeline coverage):
 
 ```yaml
+name: research
+description: >
+  Research overlay — injects research domain knowledge into existing
+  pipeline steps for experiment loop architecture, tracking, evaluation,
+  overfitting prevention, and domain-specific patterns.
 project-type: research
 
 knowledge-overrides:
@@ -252,6 +257,10 @@ knowledge-overrides:
 
 **`research-quant-finance.yml`**:
 ```yaml
+name: research-quant-finance
+description: >
+  Quant-finance domain sub-overlay — adds trading strategy, backtesting,
+  risk analysis, and market data knowledge to research projects.
 project-type: research
 domain: quant-finance
 
@@ -280,6 +289,10 @@ knowledge-overrides:
 
 **`research-ml-research.yml`**:
 ```yaml
+name: research-ml-research
+description: >
+  ML-research domain sub-overlay — adds architecture search, training
+  patterns, and evaluation knowledge for ML research projects.
 project-type: research
 domain: ml-research
 
@@ -302,6 +315,10 @@ knowledge-overrides:
 
 **`research-simulation.yml`**:
 ```yaml
+name: research-simulation
+description: >
+  Simulation domain sub-overlay — adds physics/materials simulation engine,
+  parameter space, and compute management knowledge.
 project-type: research
 domain: simulation
 
@@ -377,11 +394,12 @@ Each file follows the existing knowledge file structure: frontmatter (name, desc
 
 ### Copy
 
+The copy object follows the `QuestionCopy` type in `src/wizard/copy/types.ts` (which has `short`, `long`, and `options` fields — no `prompt` field). Prompt strings live directly in `src/wizard/questions.ts`.
+
 ```typescript
 // src/wizard/copy/research.ts
 export const researchCopy = {
   experimentDriver: {
-    prompt: 'Experiment driver?',
     options: {
       'code-driven':     { label: 'Code-driven',     short: 'Modifies source files, executes them, reads output.' },
       'config-driven':   { label: 'Config-driven',   short: 'Generates config files consumed by a fixed runner.' },
@@ -390,7 +408,6 @@ export const researchCopy = {
     },
   },
   interactionMode: {
-    prompt: 'Interaction mode?',
     options: {
       'autonomous':       { label: 'Autonomous',       short: 'Runs indefinitely until interrupted.' },
       'checkpoint-gated': { label: 'Checkpoint-gated', short: 'Pauses for human review at intervals.' },
@@ -398,7 +415,6 @@ export const researchCopy = {
     },
   },
   domain: {
-    prompt: 'Research domain?',
     options: {
       'none':           { label: 'None',           short: 'No domain-specific knowledge.' },
       'quant-finance':  { label: 'Quant finance',  short: 'Trading strategies, backtesting, risk analysis.' },
@@ -406,11 +422,15 @@ export const researchCopy = {
       'simulation':     { label: 'Simulation',     short: 'Physics, materials, engineering parameter optimization.' },
     },
   },
-  hasExperimentTracking: {
-    prompt: 'Experiment tracking?',
-  },
+  hasExperimentTracking: {},
 } satisfies ResearchCopy
 ```
+
+Prompt strings in `src/wizard/questions.ts` (inside the research question block):
+- `'Experiment driver?'`
+- `'Interaction mode?'`
+- `'Research domain?'`
+- `'Experiment tracking?'`
 
 Project-type selection copy in `src/wizard/copy/core.ts`:
 ```typescript
@@ -429,7 +449,7 @@ Project-type selection copy in `src/wizard/copy/core.ts`:
 
 ### Auto-Mode & Non-Interactive Behavior
 
-- `--research-driver` is required in any non-interactive context (auto mode, non-TTY, JSON output). Missing = error: `'--research-driver is required in auto mode for research projects'`
+- `--research-driver` is required in `--auto` mode. Missing = error: `'--research-driver is required in auto mode for research projects'`. Note: `init` currently does not convert JSON output mode to effective auto mode (unlike `adopt`), so JSON output without `--auto` will silently pick the first option for required fields. This is a pre-existing `init` behavior, not specific to research.
 - All other fields use defaults if flags are omitted
 - Flag-level validation in `applyFlagFamilyValidation` rejects `notebook-driven + autonomous`
 - Schema-level validation in `superRefine` also rejects `notebook-driven + autonomous` (catches invalid YAML configs)
@@ -465,7 +485,7 @@ All files that need modification or creation, using the ML type as template:
 |---|---|
 | `src/config/schema.ts` | Add `'research'` to `ProjectTypeSchema`, add `ResearchConfigSchema`, add `researchConfig?` to `ProjectSchema`, add cross-field rules to `superRefine()` |
 | `src/types/config.ts` | Add `ResearchConfig` type, add to `DetectedConfig` union, add to `ProjectConfig` |
-| `src/project/adopt.ts` | Add `'research'` to `TYPE_KEY` mapping |
+| `src/project/adopt.ts` | Add `'research'` to `TYPE_KEY` mapping AND add `case 'research': return ResearchConfigSchema` to `schemaForType()` exhaustive switch |
 
 ### Detector
 
@@ -473,7 +493,8 @@ All files that need modification or creation, using the ML type as template:
 |---|---|
 | `src/project/detectors/shared-signals.ts` | New file: shared constants |
 | `src/project/detectors/research.ts` | New detector |
-| `src/project/detectors/ml.ts` | Import `ML_FRAMEWORK_DEPS` from shared-signals |
+| `src/project/detectors/ml.ts` | Import `ML_FRAMEWORK_DEPS` and `EXPERIMENT_TRACKING_DEPS` from shared-signals (refactor both inline constants) |
+| `src/project/detectors/resolve-detection.ts` | Verify `synthesizeEmptyMatch` works with new `ResearchMatch` in `DetectionMatch` union |
 | `src/project/detectors/types.ts` | Add `ResearchMatch` to `DetectionMatch` union |
 | `src/project/detectors/index.ts` | Add `detectResearch` to `ALL_DETECTORS` |
 | `src/project/detectors/disambiguate.ts` | Add `'research'` to `PROJECT_TYPE_PREFERENCE` after `'ml'` |
@@ -500,16 +521,25 @@ All files that need modification or creation, using the ML type as template:
 | `src/wizard/copy/research.ts` | New copy file |
 | `src/wizard/copy/index.ts` | Import and register research copy |
 | `src/wizard/copy/core.ts` | Add `'research'` to project-type selection copy |
-| `src/cli/init-flag-families.ts` | Add `RESEARCH_FLAGS`, update `detectFamily`, `applyFlagFamilyValidation`, `buildFlagOverrides` |
+| `src/cli/init-flag-families.ts` | Add `RESEARCH_FLAGS`, update `detectFamily`, `applyFlagFamilyValidation`, `buildFlagOverrides`, add `{ type: 'research'; partial: Partial<ResearchConfig> }` to `PartialConfigOverrides` union |
 | `src/cli/commands/init.ts` | Add `--research-*` flag definitions |
+| `src/cli/commands/adopt.ts` | Add `--research-*` Yargs flag definitions and `.group([...RESEARCH_FLAGS], 'Research Configuration:')` (adopt re-defines flags separately from init) |
+| `src/wizard/wizard.ts` | Add `researchFlags` to `WizardOptions`, pass to `askWizardQuestions`, map `answers.researchConfig` to final config payload |
 
 ### Tests
 
 | File | Change |
 |---|---|
-| `src/config/schema.test.ts` | Schema validation tests (valid configs, cross-field rejection) |
+| `src/config/schema.test.ts` | Schema validation tests (valid configs, cross-field rejection for notebook+autonomous) |
 | `src/project/detectors/research.test.ts` | New detector tests (all tiers, ML overlap, false positive/negative) |
 | `src/e2e/project-type-overlays.test.ts` | Core + domain overlay sequencing, additive ordering, sub-overlay warning, missing domain fallback |
+| `src/wizard/questions.test.ts` | Research wizard question flow, smart filtering, auto-mode required field |
+| `src/cli/init-flag-families.test.ts` | Research flag family detection, validation, cross-field rejection |
+| `src/cli/commands/adopt.test.ts` | Adopt with research type, flag handling |
+| `src/cli/commands/adopt.serialization.test.ts` | Research config serialization roundtrip |
+| `src/core/assembly/overlay-loader.test.ts` | Sub-overlay loading, non-knowledge section warning |
+| `src/core/assembly/overlay-state-resolver.test.ts` | Generic domain sub-overlay resolution |
+| `tests/fixtures/adopt/detectors/research/` | New detector test fixtures |
 
 ## 6. Review History
 
