@@ -11,6 +11,10 @@ function isTTY(): boolean {
   return process.stdout.isTTY === true
 }
 
+function canPrompt(): boolean {
+  return process.stdin.isTTY === true && process.stdout.isTTY === true
+}
+
 function green(s: string): string {
   return isNoColor() || !isTTY() ? s : `\x1b[32m${s}\x1b[0m`
 }
@@ -71,8 +75,8 @@ export class InteractiveOutput implements OutputContext {
   }
 
   async prompt<T>(message: string, defaultValue: T): Promise<T> {
-    // Non-TTY or NO_COLOR: return default immediately
-    if (!isTTY() || isNoColor()) {
+    // Non-interactive: return default immediately
+    if (!canPrompt()) {
       return defaultValue
     }
     // In TTY mode, use @inquirer/prompts
@@ -89,8 +93,8 @@ export class InteractiveOutput implements OutputContext {
   }
 
   async confirm(message: string, defaultValue = false): Promise<boolean> {
-    // Non-TTY or NO_COLOR: return default immediately
-    if (!isTTY() || isNoColor()) {
+    // Non-interactive: return default immediately
+    if (!canPrompt()) {
       return defaultValue
     }
     const { confirm } = await import('@inquirer/prompts')
@@ -98,7 +102,7 @@ export class InteractiveOutput implements OutputContext {
   }
 
   async select(message: string, options: string[], defaultValue?: string): Promise<string> {
-    if (!isTTY()) {
+    if (!canPrompt()) {
       return defaultValue ?? options[0] ?? ''
     }
     // Display numbered options
@@ -120,9 +124,9 @@ export class InteractiveOutput implements OutputContext {
         return options[num - 1] ?? defaultValue ?? options[0] ?? ''
       }
     }
-    // Accept exact text match
-    if (options.includes(answer)) {
-      return answer
+    // Accept exact text match (trimmed)
+    if (options.includes(trimmed)) {
+      return trimmed
     }
     // Inform user their input was invalid, fall back to default
     const fallback = defaultValue ?? options[0] ?? ''
@@ -131,7 +135,7 @@ export class InteractiveOutput implements OutputContext {
   }
 
   async multiSelect(message: string, options: string[], defaults?: string[]): Promise<string[]> {
-    if (!isTTY()) {
+    if (!canPrompt()) {
       return defaults ?? []
     }
     // Display options with defaults marked
@@ -164,7 +168,7 @@ export class InteractiveOutput implements OutputContext {
   }
 
   async multiInput(message: string, defaultValue?: string[]): Promise<string[]> {
-    if (!isTTY()) {
+    if (!canPrompt()) {
       return defaultValue ?? []
     }
     const { input } = await import('@inquirer/prompts')
