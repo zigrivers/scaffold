@@ -268,11 +268,15 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
       return
     }
 
-    shutdown.registerLockOwnership(getLockPath(projectRoot as string))
+    if (lockResult.acquired) {
+      shutdown.registerLockOwnership(getLockPath(projectRoot as string))
+    }
 
     await shutdown.withResource('lock', () => {
-      releaseLock(projectRoot as string)
-      shutdown.releaseLockOwnership()
+      if (lockResult.acquired) {
+        releaseLock(projectRoot as string)
+        shutdown.releaseLockOwnership()
+      }
     }, async () => {
       // Load pipeline context and resolve overlay/graph
       const context = loadPipelineContext(projectRoot as string)

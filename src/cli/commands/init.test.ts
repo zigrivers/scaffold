@@ -174,6 +174,7 @@ describe('init command', () => {
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
     vi.restoreAllMocks()
+    process.exitCode = undefined
   })
 
   // Test 1: Runs wizard successfully in temp directory and auto-runs build
@@ -190,7 +191,7 @@ describe('init command', () => {
       expect.any(Object),
     )
     expect(syncSkillsIfNeeded).toHaveBeenCalled()
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode ?? 0).toBe(0)
   })
 
   // Test 2: JSON mode outputs single InitResult payload including buildResult
@@ -228,7 +229,7 @@ describe('init command', () => {
         }),
       }),
     )
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode ?? 0).toBe(0)
   })
 
   // Test 3: --force backs up existing .scaffold/
@@ -243,7 +244,7 @@ describe('init command', () => {
   it('exits 1 when wizard returns INIT_SCAFFOLD_EXISTS error', async () => {
     mockRunWizard.mockResolvedValue(makeFailResult(tmpDir))
     await initCommand.handler(defaultArgv({ root: tmpDir }))
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
     expect(mockRunBuild).not.toHaveBeenCalled()
   })
 
@@ -291,7 +292,7 @@ describe('init command', () => {
 
     await initCommand.handler(defaultArgv({ root: tmpDir }))
 
-    expect(exitSpy).toHaveBeenCalledWith(5)
+    expect(process.exitCode).toBe(5)
   })
 })
 

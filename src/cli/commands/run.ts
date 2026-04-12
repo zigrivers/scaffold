@@ -303,214 +303,213 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
             }
           },
           async () => {
-            await shutdown.withResource('in-progress', () => {
-              stateManager.clearInProgress()
-            }, async () => {
-              if (!isStateless) {
-                stateManager.setInProgress(step, 'scaffold-run')
-              }
+            // Note: Do NOT wrap in withResource('in-progress') — clearing in_progress
+            // on Ctrl+C would break crash recovery. The existing analyzeCrash() logic
+            // handles interrupted steps correctly on the next run.
+            if (!isStateless) {
+              stateManager.setInProgress(step, 'scaffold-run')
+            }
 
-              // Reload state after setInProgress
-              state = stateManager.loadState()
+            // Reload state after setInProgress
+            state = stateManager.loadState()
 
-              // -----------------------------------------------------------------------
-              // Step 8: Load assembly components
-              // -----------------------------------------------------------------------
-              const { instructions } = loadInstructions(projectRoot, step, argv.instructions)
+            // -----------------------------------------------------------------------
+            // Step 8: Load assembly components
+            // -----------------------------------------------------------------------
+            const { instructions } = loadInstructions(projectRoot, step, argv.instructions)
 
-              const kbIndex = buildIndexWithOverrides(projectRoot, getPackageKnowledgeDir(projectRoot))
-              const { entries: knowledgeEntries, warnings: kbWarnings } = loadEntries(
-                kbIndex,
-                pipeline.overlay.knowledge[step] ?? metaPrompt.frontmatter.knowledgeBase ?? [],
-              )
-              for (const w of kbWarnings) {
-                output.warn(w)
-              }
+            const kbIndex = buildIndexWithOverrides(projectRoot, getPackageKnowledgeDir(projectRoot))
+            const { entries: knowledgeEntries, warnings: kbWarnings } = loadEntries(
+              kbIndex,
+              pipeline.overlay.knowledge[step] ?? metaPrompt.frontmatter.knowledgeBase ?? [],
+            )
+            for (const w of kbWarnings) {
+              output.warn(w)
+            }
 
-              // Gather artifacts from completed dependency steps
-              const artifacts: ArtifactEntry[] = []
-              const gatheredPaths = new Set<string>()
-              for (const dep of deps) {
-                const depEntry = state.steps[dep]
-                if (depEntry?.status === 'completed' && depEntry.produces) {
-                  for (const relPath of depEntry.produces) {
-                    const fullPath = path.resolve(projectRoot, relPath)
-                    if (fs.existsSync(fullPath)) {
-                      try {
-                        const content = fs.readFileSync(fullPath, 'utf8')
-                        artifacts.push({ stepName: dep, filePath: relPath, content })
-                        gatheredPaths.add(relPath)
-                      } catch (err) {
-                        output.warn({
-                          code: 'ARTIFACT_READ_ERROR',
-                          message: `Could not read artifact '${relPath}' from step '${dep}': ${(err as Error).message}`,
-                        })
-                      }
-                    }
-                  }
-                }
-              }
-
-              // Gather artifacts from reads (optional cross-cutting references)
-              // Note: graph defaults missing steps to enabled:true, which may not reflect
-              // custom config overrides. This is a pre-existing graph builder limitation.
-              const reads = pipeline.overlay.reads[step] ?? metaPrompt.frontmatter.reads ?? []
-              for (const readStep of reads) {
-                // Check dependency graph for enablement (overlay-disabled steps)
-                const readNode = graph?.nodes.get(readStep)
-                if (readNode && !readNode.enabled) continue
-
-                // Check state — silently skip if not completed (reads are optional)
-                const readEntry = state.steps[readStep]
-                if (readEntry?.status !== 'completed' || !readEntry.produces) continue
-
-                for (const relPath of readEntry.produces) {
-                  // Deduplicate: skip paths already gathered from deps
-                  if (gatheredPaths.has(relPath)) continue
-
+            // Gather artifacts from completed dependency steps
+            const artifacts: ArtifactEntry[] = []
+            const gatheredPaths = new Set<string>()
+            for (const dep of deps) {
+              const depEntry = state.steps[dep]
+              if (depEntry?.status === 'completed' && depEntry.produces) {
+                for (const relPath of depEntry.produces) {
                   const fullPath = path.resolve(projectRoot, relPath)
                   if (fs.existsSync(fullPath)) {
                     try {
                       const content = fs.readFileSync(fullPath, 'utf8')
-                      artifacts.push({ stepName: readStep, filePath: relPath, content })
+                      artifacts.push({ stepName: dep, filePath: relPath, content })
                       gatheredPaths.add(relPath)
                     } catch (err) {
                       output.warn({
                         code: 'ARTIFACT_READ_ERROR',
-                        message: `Could not read artifact '${relPath}' from step` +
-                          ` '${readStep}': ${(err as Error).message}`,
+                        message: `Could not read artifact '${relPath}' from step '${dep}': ${(err as Error).message}`,
                       })
                     }
                   }
                 }
               }
+            }
 
-              // Read decisions log
-              const decisionsPath = path.join(projectRoot, '.scaffold', 'decisions.jsonl')
-              let decisions = ''
-              if (fs.existsSync(decisionsPath)) {
-                try {
-                  decisions = fs.readFileSync(decisionsPath, 'utf8')
-                } catch (err) {
-                  output.warn({
-                    code: 'DECISIONS_READ_ERROR',
-                    message: `Could not read decisions log: ${(err as Error).message}`,
-                  })
-                }
-              }
+            // Gather artifacts from reads (optional cross-cutting references)
+            // Note: graph defaults missing steps to enabled:true, which may not reflect
+            // custom config overrides. This is a pre-existing graph builder limitation.
+            const reads = pipeline.overlay.reads[step] ?? metaPrompt.frontmatter.reads ?? []
+            for (const readStep of reads) {
+              // Check dependency graph for enablement (overlay-disabled steps)
+              const readNode = graph?.nodes.get(readStep)
+              if (readNode && !readNode.enabled) continue
 
-              // -----------------------------------------------------------------------
-              // Step 9: Assemble prompt
-              // -----------------------------------------------------------------------
-              const engine = new AssemblyEngine()
-              const assemblyResult = engine.assemble(step, {
-                config,
-                state,
-                metaPrompt,
-                knowledgeEntries,
-                instructions,
-                arguments: argv.instructions,
-                depth,
-                depthProvenance: provenance,
-                updateMode: updateModeResult.isUpdateMode,
-                existingArtifact: updateModeResult.existingArtifact,
-                artifacts,
-                decisions,
-              })
+              // Check state — silently skip if not completed (reads are optional)
+              const readEntry = state.steps[readStep]
+              if (readEntry?.status !== 'completed' || !readEntry.produces) continue
 
-              if (!assemblyResult.success) {
-                displayErrors(assemblyResult.errors, assemblyResult.warnings, output)
-                process.exitCode = 5
-                return
-              }
+              for (const relPath of readEntry.produces) {
+                // Deduplicate: skip paths already gathered from deps
+                if (gatheredPaths.has(relPath)) continue
 
-              // -----------------------------------------------------------------------
-              // Step 10: Wait for completion (interactive) or exit (auto/json)
-              // -----------------------------------------------------------------------
-              if (outputMode === 'auto' || outputMode === 'json') {
-                // In auto/json mode: output the structured result and exit 0
-                // For stateful steps, step stays in_progress for crash recovery awareness
-                if (outputMode === 'json') {
-                  if (isStateless) {
-                    output.result({
-                      step,
-                      status: 'stateless',
-                      depth,
-                      depth_source: provenance,
-                      prompt: assemblyResult.prompt!.text,
-                    })
-                  } else {
-                    // Reload state for next eligible
-                    const stateForEligible = stateManager.loadState()
-                    const nextSteps = pipeline.computeEligible(stateForEligible.steps)
-                    output.result({
-                      step,
-                      status: 'in_progress',
-                      depth,
-                      depth_source: provenance,
-                      nextEligible: nextSteps,
-                      prompt: assemblyResult.prompt!.text,
+                const fullPath = path.resolve(projectRoot, relPath)
+                if (fs.existsSync(fullPath)) {
+                  try {
+                    const content = fs.readFileSync(fullPath, 'utf8')
+                    artifacts.push({ stepName: readStep, filePath: relPath, content })
+                    gatheredPaths.add(relPath)
+                  } catch (err) {
+                    output.warn({
+                      code: 'ARTIFACT_READ_ERROR',
+                      message: `Could not read artifact '${relPath}' from step` +
+                          ` '${readStep}': ${(err as Error).message}`,
                     })
                   }
-                } else {
-                  // auto mode: write prompt to stdout for AI consumption
-                  process.stdout.write(assemblyResult.prompt!.text)
-                }
-                return
-              }
-
-              // Write assembled prompt to stdout (raw, for AI consumption in interactive mode)
-              process.stdout.write(assemblyResult.prompt!.text)
-
-              // Interactive mode: prompt user for completion
-              if (isStateless) {
-                // Stateless steps don't track completion — just exit
-                if (outputMode === 'interactive') {
-                  output.info(`Stateless step '${step}' executed. Available for re-use anytime.`)
-                }
-                return
-              }
-
-              const isComplete = await shutdown.withPrompt(() =>
-                output.confirm(`Step '${step}' complete?`, true),
-              )
-              if (!isComplete) {
-                const shouldSkip = await shutdown.withPrompt(() =>
-                  output.confirm('Mark as skipped instead?', false),
-                )
-                if (shouldSkip) {
-                  stateManager.markSkipped(step, 'user-cancelled', 'scaffold-run')
-                } else {
-                  stateManager.clearInProgress()
-                }
-                process.exitCode = 4
-                return
-              }
-
-              // -----------------------------------------------------------------------
-              // Step 11: Mark completed
-              // -----------------------------------------------------------------------
-              stateManager.markCompleted(
-                step,
-                metaPrompt.frontmatter.outputs ?? [],
-                'scaffold-run',
-                depth,
-              )
-
-              // -----------------------------------------------------------------------
-              // Step 12: Show next eligible steps
-              // -----------------------------------------------------------------------
-              const finalState = stateManager.loadState()
-              const nextSteps = pipeline.computeEligible(finalState.steps)
-
-              if (outputMode === 'interactive') {
-                if (nextSteps.length > 0) {
-                  output.info(`Next eligible: ${nextSteps.join(', ')}`)
-                } else {
-                  output.info('No more eligible steps.')
                 }
               }
+            }
+
+            // Read decisions log
+            const decisionsPath = path.join(projectRoot, '.scaffold', 'decisions.jsonl')
+            let decisions = ''
+            if (fs.existsSync(decisionsPath)) {
+              try {
+                decisions = fs.readFileSync(decisionsPath, 'utf8')
+              } catch (err) {
+                output.warn({
+                  code: 'DECISIONS_READ_ERROR',
+                  message: `Could not read decisions log: ${(err as Error).message}`,
+                })
+              }
+            }
+
+            // -----------------------------------------------------------------------
+            // Step 9: Assemble prompt
+            // -----------------------------------------------------------------------
+            const engine = new AssemblyEngine()
+            const assemblyResult = engine.assemble(step, {
+              config,
+              state,
+              metaPrompt,
+              knowledgeEntries,
+              instructions,
+              arguments: argv.instructions,
+              depth,
+              depthProvenance: provenance,
+              updateMode: updateModeResult.isUpdateMode,
+              existingArtifact: updateModeResult.existingArtifact,
+              artifacts,
+              decisions,
             })
+
+            if (!assemblyResult.success) {
+              displayErrors(assemblyResult.errors, assemblyResult.warnings, output)
+              process.exitCode = 5
+              return
+            }
+
+            // -----------------------------------------------------------------------
+            // Step 10: Wait for completion (interactive) or exit (auto/json)
+            // -----------------------------------------------------------------------
+            if (outputMode === 'auto' || outputMode === 'json') {
+              // In auto/json mode: output the structured result and exit 0
+              // For stateful steps, step stays in_progress for crash recovery awareness
+              if (outputMode === 'json') {
+                if (isStateless) {
+                  output.result({
+                    step,
+                    status: 'stateless',
+                    depth,
+                    depth_source: provenance,
+                    prompt: assemblyResult.prompt!.text,
+                  })
+                } else {
+                  // Reload state for next eligible
+                  const stateForEligible = stateManager.loadState()
+                  const nextSteps = pipeline.computeEligible(stateForEligible.steps)
+                  output.result({
+                    step,
+                    status: 'in_progress',
+                    depth,
+                    depth_source: provenance,
+                    nextEligible: nextSteps,
+                    prompt: assemblyResult.prompt!.text,
+                  })
+                }
+              } else {
+                // auto mode: write prompt to stdout for AI consumption
+                process.stdout.write(assemblyResult.prompt!.text)
+              }
+              return
+            }
+
+            // Write assembled prompt to stdout (raw, for AI consumption in interactive mode)
+            process.stdout.write(assemblyResult.prompt!.text)
+
+            // Interactive mode: prompt user for completion
+            if (isStateless) {
+              // Stateless steps don't track completion — just exit
+              if (outputMode === 'interactive') {
+                output.info(`Stateless step '${step}' executed. Available for re-use anytime.`)
+              }
+              return
+            }
+
+            const isComplete = await shutdown.withPrompt(() =>
+              output.confirm(`Step '${step}' complete?`, true),
+            )
+            if (!isComplete) {
+              const shouldSkip = await shutdown.withPrompt(() =>
+                output.confirm('Mark as skipped instead?', false),
+              )
+              if (shouldSkip) {
+                stateManager.markSkipped(step, 'user-cancelled', 'scaffold-run')
+              } else {
+                stateManager.clearInProgress()
+              }
+              process.exitCode = 4
+              return
+            }
+
+            // -----------------------------------------------------------------------
+            // Step 11: Mark completed
+            // -----------------------------------------------------------------------
+            stateManager.markCompleted(
+              step,
+              metaPrompt.frontmatter.outputs ?? [],
+              'scaffold-run',
+              depth,
+            )
+
+            // -----------------------------------------------------------------------
+            // Step 12: Show next eligible steps
+            // -----------------------------------------------------------------------
+            const finalState = stateManager.loadState()
+            const nextSteps = pipeline.computeEligible(finalState.steps)
+
+            if (outputMode === 'interactive') {
+              if (nextSteps.length > 0) {
+                output.info(`Next eligible: ${nextSteps.join(', ')}`)
+              } else {
+                output.info('No more eligible steps.')
+              }
+            }
           },
         )
       } catch (err) {

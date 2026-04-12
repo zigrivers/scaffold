@@ -269,6 +269,11 @@ export async function runBuild(argv: BuildArgs, options: RunBuildOptions = {}): 
         buildTimeMs: Date.now() - startTime,
       }
 
+      // If shutdown interrupted the build, return early without success message
+      if (shutdown.isShuttingDown) {
+        return { exitCode: 1, data: buildResult }
+      }
+
       if (outputMode === 'json') {
         if (!options.suppressFinalResult) {
           output.result(buildResult)

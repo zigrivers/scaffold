@@ -541,7 +541,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         for (const err of result.errors) {
           output.error(err)
         }
-        process.exit(1)
+        process.exitCode = 1
         return
       }
 
@@ -561,7 +561,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
           })
 
           if (buildResult.exitCode !== 0) {
-            process.exit(buildResult.exitCode)
+            process.exitCode = buildResult.exitCode
             return
           }
 
@@ -582,7 +582,6 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
             output.success(`Scaffold initialized at ${result.configPath}`)
           }
 
-          process.exit(0)
         },
       )
     })
