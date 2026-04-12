@@ -13,15 +13,17 @@
 
 **Branch:** Already on `mmr/cli-fixes` branch.
 
+**Known issue (out of scope):** `saveChannelOutput` calls `JSON.stringify` on string values, double-serializing raw stdout. This is a pre-existing bug tracked as part of Batch 8 (P2-25). Tests in this batch work around it by checking substring presence.
+
 ---
 
 ## File Map
 
 | File | Action | Responsibility |
 |------|--------|----------------|
-| `packages/mmr/src/core/job-store.ts` | Modify | Derive channel state on `loadJob` read; eliminate race |
+| `packages/mmr/src/core/job-store.ts` | Modify | Centralized channel path validation, per-channel status files, derive-on-read, listJobs fix |
 | `packages/mmr/src/core/dispatcher.ts` | Modify | stdin error handler, settled flag, return Promise on completion |
-| `packages/mmr/src/commands/review.ts` | Modify | Fix sequential dispatch |
+| `packages/mmr/src/commands/review.ts` | Modify | Fix sequential dispatch, update result output to reflect actual status |
 | `packages/mmr/src/core/parser.ts` | Modify | String-aware brace extraction, Gemini validation |
 | `packages/mmr/src/config/defaults.ts` | Modify | Fix parser names |
 | `packages/mmr/tests/core/job-store.test.ts` | Modify | Add channel-state-on-read tests |
@@ -79,26 +81,45 @@ Expected: First test may pass (serial execution), but the race exists. Second te
 
 In `packages/mmr/src/core/job-store.ts`, make these changes:
 
-**a)** Add a channel name validation helper at the top of the class (after `constructor`):
+**a)** Add a channel-safe path helper at the top of the class (after `constructor`). This centralizes channel name validation for ALL channel file operations (status, output, log, PID):
 
 ```typescript
-/** Validate channel name is safe for use in file paths */
-private validateChannelName(channel: string): void {
+/** Validate channel name and return safe path within channels dir */
+private channelFilePath(jobId: string, channel: string, filename: string): string {
   if (!/^[a-zA-Z0-9._-]+$/.test(channel)) {
     throw new Error(`Unsafe channel name: ${channel}`)
   }
+  return path.join(this.getJobDir(jobId), 'channels', filename)
 }
 ```
 
-**b)** Replace the `updateChannel` method (lines 107-113):
+**b)** Update `saveChannelOutput`, `loadChannelOutput`, `saveChannelLog` to use the helper:
 
 ```typescript
-/** Write a per-channel status file atomically — no read-modify-write on job.json */
+saveChannelOutput(jobId: string, channel: string, output: unknown): void {
+  const filePath = this.channelFilePath(jobId, channel, `${channel}.json`)
+  fs.writeFileSync(filePath, JSON.stringify(output, null, 2))
+}
+
+loadChannelOutput(jobId: string, channel: string): string {
+  const filePath = this.channelFilePath(jobId, channel, `${channel}.json`)
+  return fs.readFileSync(filePath, 'utf-8')
+}
+
+saveChannelLog(jobId: string, channel: string, log: string): void {
+  const filePath = this.channelFilePath(jobId, channel, `${channel}.log`)
+  fs.writeFileSync(filePath, log)
+}
+```
+
+**c)** Replace the `updateChannel` method (lines 107-113):
+
+```typescript
+/** Write a per-channel status file — no read-modify-write on job.json */
 updateChannel(jobId: string, channel: string, update: Partial<ChannelJobEntry>): void {
-  this.validateChannelName(channel)
   const channelsDir = path.join(this.getJobDir(jobId), 'channels')
   fs.mkdirSync(channelsDir, { recursive: true })
-  const channelStatusPath = path.join(channelsDir, `${channel}.status.json`)
+  const channelStatusPath = this.channelFilePath(jobId, channel, `${channel}.status.json`)
 
   // Read existing channel status if file exists, merge update
   let existing: Partial<ChannelJobEntry> = {}
@@ -106,18 +127,24 @@ updateChannel(jobId: string, channel: string, update: Partial<ChannelJobEntry>):
     const raw = fs.readFileSync(channelStatusPath, 'utf-8')
     existing = JSON.parse(raw)
   } catch (err: unknown) {
-    // ENOENT is expected (first update). Any other error is a problem.
-    if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
-      throw err
+    // ENOENT is expected (first update). SyntaxError or other errors should surface.
+    if (err instanceof Error) {
+      const code = (err as NodeJS.ErrnoException).code
+      if (code !== 'ENOENT' && code !== undefined) throw err
+      if (code === undefined && err.name !== 'SyntaxError') throw err
+      // For SyntaxError (corrupted file) or ENOENT: start fresh
     }
   }
 
   const merged = { ...existing, ...update }
-  fs.writeFileSync(channelStatusPath, JSON.stringify(merged, null, 2))
+  // Write to temp file then rename for atomicity
+  const tmpPath = channelStatusPath + '.tmp'
+  fs.writeFileSync(tmpPath, JSON.stringify(merged, null, 2))
+  fs.renameSync(tmpPath, channelStatusPath)
 }
 ```
 
-**c)** Modify `loadJob` to derive channel state from status files (replace lines 62-67):
+**d)** Modify `loadJob` to derive channel state from status files (replace lines 62-67):
 
 ```typescript
 /** Read job metadata and derive channel state from per-channel status files */
@@ -144,6 +171,21 @@ loadJob(jobId: string): JobMetadata {
 }
 ```
 
+**e)** Update `listJobs` to use `loadJob` instead of reading `job.json` directly (lines 124-144). Replace the inner loop body:
+
+```typescript
+for (const entry of entries) {
+  if (!entry.isDirectory() || !entry.name.startsWith('mmr-')) continue
+  const jobJsonPath = path.join(this.jobsDir, entry.name, 'job.json')
+  if (!fs.existsSync(jobJsonPath)) continue
+  try {
+    jobs.push(this.loadJob(entry.name))
+  } catch {
+    // Skip malformed job directories
+  }
+}
+```
+
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `cd packages/mmr && npx vitest run tests/core/job-store.test.ts`
@@ -162,9 +204,10 @@ git commit -m "fix(mmr): eliminate concurrent job.json write race with derive-on
 
 P0-4: updateChannel() had a read-modify-write race when parallel channels
 completed simultaneously. Now writes per-channel .status.json files
-atomically and derives aggregate state in loadJob() by reading those
-files on every load. No mutable aggregate file in the critical path.
-Also adds channel name validation to prevent path traversal."
+via atomic temp+rename and derives aggregate state in loadJob() by
+reading those files on every load. Also centralizes channel name
+validation to prevent path traversal across all channel file ops,
+and updates listJobs to use loadJob for consistent derived state."
 ```
 
 ---
@@ -249,7 +292,7 @@ Make these targeted edits to `packages/mmr/src/core/dispatcher.ts`:
 
 ```typescript
   // Handle stdin pipe errors (child may close stdin early)
-  proc.stdin.on('error', () => {
+  proc.stdin?.on('error', () => {
     // Swallow EPIPE — the close handler will deal with the process exit
   })
 ```
@@ -557,21 +600,41 @@ In `packages/mmr/src/commands/review.ts`, replace lines 211-233 (the dispatch se
     }
 ```
 
-- [ ] **Step 2: Run type check and full tests**
+- [ ] **Step 2: Update dispatch result output to reflect actual status**
+
+After the dispatch section, update the result output (lines 236-245) to read actual job status:
+
+```typescript
+    // 9. Output dispatch result
+    const completedJob = store.loadJob(job.job_id)
+    const result = {
+      job_id: job.job_id,
+      status: completedJob.status,
+      channels: Object.fromEntries(
+        Object.entries(completedJob.channels).map(([name, ch]) => [name, ch.status]),
+      ),
+      valid_channels: validChannels,
+    }
+
+    console.log(JSON.stringify(result, null, 2))
+```
+
+- [ ] **Step 3: Run type check and full tests**
 
 Run: `cd packages/mmr && npx tsc --noEmit && npx vitest run`
 Expected: All pass
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add packages/mmr/src/commands/review.ts
-git commit -m "fix(mmr): fix sequential dispatch — channels were starting concurrently
+git commit -m "fix(mmr): fix sequential dispatch and reflect actual completion status
 
 P1-9: dispatchChannel() was called eagerly when building the dispatches
 array, so all processes started immediately regardless of parallel flag.
 Now only calls dispatchChannel inside the loop when parallel is false.
-Works correctly because dispatchChannel now returns a completion Promise."
+Also updates dispatch result output to reflect actual job/channel status
+instead of hard-coding 'dispatched'."
 ```
 
 ---
@@ -795,9 +858,15 @@ don't exist — they silently fell back to 'default'. Make intent explicit."
 - Modify: `packages/mmr/package.json` (version bump to 0.2.0)
 - Create: `packages/mmr/CHANGELOG.md` (add v0.2.0 entry)
 
-- [ ] **Step 1: Bump version**
+- [ ] **Step 1: Bump version and sync lockfile**
 
-In `packages/mmr/package.json`, update the `version` field to `"0.2.0"`.
+In `packages/mmr/package.json`, update the `version` field to `"0.2.0"`. Then sync the lockfile:
+
+```bash
+cd packages/mmr && npm install --package-lock-only 2>/dev/null || true
+```
+
+(If there's no root lockfile or workspace, this is a no-op — that's fine.)
 
 - [ ] **Step 2: Create CHANGELOG.md**
 
