@@ -4,6 +4,12 @@ import { InteractiveOutput } from './interactive.js'
 import { JsonOutput } from './json.js'
 import { AutoOutput } from './auto.js'
 
+export type SelectOption = string | {
+  value: string
+  label?: string
+  short?: string
+}
+
 export interface OutputContext {
   // Status messages
   success(message: string): void
@@ -14,18 +20,21 @@ export interface OutputContext {
   // Structured output (for commands that return data)
   result(data: unknown): void
 
+  // Capability queries
+  supportsInteractivePrompts(): boolean
+
   // User prompts
-  prompt<T>(message: string, defaultValue: T): Promise<T>
-  confirm(message: string, defaultValue?: boolean): Promise<boolean>
+  prompt<T>(message: string, defaultValue: T, help?: { short?: string }): Promise<T>
+  confirm(message: string, defaultValue?: boolean, help?: { short?: string }): Promise<boolean>
 
   /** Single-choice selection from a list of options. */
-  select(message: string, options: string[], defaultValue?: string): Promise<string>
+  select(message: string, options: SelectOption[], defaultValue?: string, help?: { short?: string; long?: string }): Promise<string>
 
   /** Multi-choice selection from a list of options. Returns selected items. */
-  multiSelect(message: string, options: string[], defaults?: string[]): Promise<string[]>
+  multiSelect(message: string, options: SelectOption[], defaults?: string[], help?: { short?: string; long?: string }): Promise<string[]>
 
   /** Comma-separated text input returning an array of trimmed strings. */
-  multiInput(message: string, defaultValue?: string[]): Promise<string[]>
+  multiInput(message: string, defaultValue?: string[], help?: { short?: string }): Promise<string[]>
 
   // Progress indicators
   startSpinner(message: string): void

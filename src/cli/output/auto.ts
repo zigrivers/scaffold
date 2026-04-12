@@ -1,5 +1,5 @@
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
-import type { OutputContext } from './context.js'
+import type { OutputContext, SelectOption } from './context.js'
 import { InteractiveOutput } from './interactive.js'
 
 export class AutoOutput implements OutputContext {
@@ -25,25 +25,30 @@ export class AutoOutput implements OutputContext {
     this.interactive.result(data)
   }
 
-  async prompt<T>(message: string, defaultValue: T): Promise<T> {
+  supportsInteractivePrompts(): boolean {
+    return false
+  }
+
+  async prompt<T>(message: string, defaultValue: T, _help?: { short?: string }): Promise<T> {
     process.stderr.write(`(auto) Using default for: ${message}\n`)
     return defaultValue
   }
 
-  async confirm(message: string, defaultValue = false): Promise<boolean> {
+  async confirm(message: string, defaultValue = false, _help?: { short?: string }): Promise<boolean> {
     process.stderr.write(`(auto) Confirming: ${message}\n`)
     return defaultValue
   }
 
-  async select(_msg: string, options: string[], defaultValue?: string): Promise<string> {
-    return defaultValue ?? options[0] ?? ''
+  async select(_msg: string, options: SelectOption[], defaultValue?: string, _help?: { short?: string; long?: string }): Promise<string> {
+    const first = typeof options[0] === 'string' ? options[0] : options[0]?.value
+    return defaultValue ?? first ?? ''
   }
 
-  async multiSelect(_msg: string, _options: string[], defaults?: string[]): Promise<string[]> {
+  async multiSelect(_msg: string, _options: SelectOption[], defaults?: string[], _help?: { short?: string; long?: string }): Promise<string[]> {
     return defaults ?? []
   }
 
-  async multiInput(_msg: string, defaultValue?: string[]): Promise<string[]> {
+  async multiInput(_msg: string, defaultValue?: string[], _help?: { short?: string }): Promise<string[]> {
     return defaultValue ?? []
   }
 

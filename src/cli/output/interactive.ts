@@ -1,5 +1,5 @@
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
-import type { OutputContext } from './context.js'
+import type { OutputContext, SelectOption } from './context.js'
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
@@ -74,7 +74,11 @@ export class InteractiveOutput implements OutputContext {
     process.stdout.write(JSON.stringify(data, null, 2) + '\n')
   }
 
-  async prompt<T>(message: string, defaultValue: T): Promise<T> {
+  supportsInteractivePrompts(): boolean {
+    return canPrompt()
+  }
+
+  async prompt<T>(message: string, defaultValue: T, _help?: { short?: string }): Promise<T> {
     // Non-interactive: return default immediately
     if (!canPrompt()) {
       return defaultValue
@@ -92,7 +96,7 @@ export class InteractiveOutput implements OutputContext {
     return answer as T
   }
 
-  async confirm(message: string, defaultValue = false): Promise<boolean> {
+  async confirm(message: string, defaultValue = false, _help?: { short?: string }): Promise<boolean> {
     // Non-interactive: return default immediately
     if (!canPrompt()) {
       return defaultValue
@@ -101,15 +105,16 @@ export class InteractiveOutput implements OutputContext {
     return confirm({ message, default: defaultValue })
   }
 
-  async select(message: string, options: string[], defaultValue?: string): Promise<string> {
+  async select(message: string, options: SelectOption[], defaultValue?: string, _help?: { short?: string; long?: string }): Promise<string> {
+    const normalized = options.map(o => typeof o === 'string' ? { value: o } : o)
     if (!canPrompt()) {
-      return defaultValue ?? options[0] ?? ''
+      return defaultValue ?? normalized[0]?.value ?? ''
     }
     // Display numbered options once
     process.stdout.write(`${message}\n`)
-    for (let i = 0; i < options.length; i++) {
-      const marker = options[i] === defaultValue ? ' (default)' : ''
-      process.stdout.write(`  ${i + 1}. ${options[i]}${marker}\n`)
+    for (let i = 0; i < normalized.length; i++) {
+      const marker = normalized[i]!.value === defaultValue ? ' (default)' : ''
+      process.stdout.write(`  ${i + 1}. ${normalized[i]!.value}${marker}\n`)
     }
     const { input } = await import('@inquirer/prompts')
     // Loop until valid input
@@ -122,28 +127,29 @@ export class InteractiveOutput implements OutputContext {
       const trimmed = answer.trim()
       if (/^\d+$/.test(trimmed)) {
         const num = Number(trimmed)
-        if (num >= 1 && num <= options.length) {
-          return options[num - 1] ?? defaultValue ?? options[0] ?? ''
+        if (num >= 1 && num <= normalized.length) {
+          return normalized[num - 1]?.value ?? defaultValue ?? normalized[0]?.value ?? ''
         }
       }
       // Accept exact text match (trimmed)
-      if (options.includes(trimmed)) {
+      if (normalized.some(n => n.value === trimmed)) {
         return trimmed
       }
       // Invalid input — print error and re-prompt (do not re-print options)
-      process.stdout.write(`  Invalid input "${trimmed}". Please enter a number (1-${options.length}) or one of: ${options.join(', ')}\n`)
+      process.stdout.write(`  Invalid input "${trimmed}". Please enter a number (1-${normalized.length}) or one of: ${normalized.map(n => n.value).join(', ')}\n`)
     }
   }
 
-  async multiSelect(message: string, options: string[], defaults?: string[]): Promise<string[]> {
+  async multiSelect(message: string, options: SelectOption[], defaults?: string[], _help?: { short?: string; long?: string }): Promise<string[]> {
+    const normalized = options.map(o => typeof o === 'string' ? { value: o } : o)
     if (!canPrompt()) {
       return defaults ?? []
     }
     // Display options with defaults marked once
     process.stdout.write(`${message}\n`)
-    for (let i = 0; i < options.length; i++) {
-      const isDefault = defaults?.includes(options[i] ?? '') ? ' *' : ''
-      process.stdout.write(`  ${i + 1}. ${options[i]}${isDefault}\n`)
+    for (let i = 0; i < normalized.length; i++) {
+      const isDefault = defaults?.includes(normalized[i]!.value) ? ' *' : ''
+      process.stdout.write(`  ${i + 1}. ${normalized[i]!.value}${isDefault}\n`)
     }
     const { input } = await import('@inquirer/prompts')
     // Loop until valid input
@@ -161,13 +167,13 @@ export class InteractiveOutput implements OutputContext {
       for (const part of parts) {
         if (/^\d+$/.test(part)) {
           const num = Number(part)
-          if (num >= 1 && num <= options.length) {
-            const opt = options[num - 1]
+          if (num >= 1 && num <= normalized.length) {
+            const opt = normalized[num - 1]?.value
             if (opt !== undefined && !selected.includes(opt)) {
               selected.push(opt)
             }
           }
-        } else if (options.includes(part) && !selected.includes(part)) {
+        } else if (normalized.some(n => n.value === part) && !selected.includes(part)) {
           selected.push(part)
         }
       }
@@ -175,11 +181,11 @@ export class InteractiveOutput implements OutputContext {
         return selected
       }
       // Non-empty input but no valid selections — print error and re-prompt
-      process.stdout.write(`  Invalid input. Please enter numbers (1-${options.length}) or values from: ${options.join(', ')}\n`)
+      process.stdout.write(`  Invalid input. Please enter numbers (1-${normalized.length}) or values from: ${normalized.map(n => n.value).join(', ')}\n`)
     }
   }
 
-  async multiInput(message: string, defaultValue?: string[]): Promise<string[]> {
+  async multiInput(message: string, defaultValue?: string[], _help?: { short?: string }): Promise<string[]> {
     if (!canPrompt()) {
       return defaultValue ?? []
     }
