@@ -1,0 +1,23 @@
+# methodology/research-ml-research.yml
+name: research-ml-research
+description: >
+  ML-research domain sub-overlay — adds architecture search, training
+  patterns, and evaluation knowledge for ML research projects.
+project-type: research
+domain: ml-research
+
+knowledge-overrides:
+  system-architecture:
+    append: [research-ml-architecture-search, research-ml-training-patterns]
+  operations:
+    append: [research-ml-experiment-tracking]
+  tdd:
+    append: [research-ml-evaluation]
+  create-evals:
+    append: [research-ml-evaluation]
+  review-architecture:
+    append: [research-ml-architecture-search]
+  review-testing:
+    append: [research-ml-evaluation]
+  implementation-plan:
+    append: [research-ml-architecture-search]
