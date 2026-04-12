@@ -19,6 +19,16 @@ vi.mock('../middleware/output-mode.js', () => ({
 vi.mock('../../state/lock-manager.js', () => ({
   acquireLock: vi.fn(() => ({ acquired: true })),
   releaseLock: vi.fn(),
+  getLockPath: vi.fn((root: string) => `${root}/.scaffold/.lock`),
+}))
+
+vi.mock('../shutdown.js', () => ({
+  shutdown: {
+    withResource: vi.fn((_name: string, _cleanup: () => void, fn: () => Promise<unknown>) => fn()),
+    withPrompt: vi.fn((fn: () => Promise<unknown>) => fn()),
+    registerLockOwnership: vi.fn(),
+    releaseLockOwnership: vi.fn(),
+  },
 }))
 
 // createOutputContext is optionally mocked per-test for interactive confirm tests
@@ -87,6 +97,7 @@ describe('reset command', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    process.exitCode = undefined
     // Cleanup temp directory
     try { fs.rmSync(tempDir, { recursive: true, force: true }) } catch { /* ignore */ }
   })
@@ -125,7 +136,7 @@ describe('reset command', () => {
     await resetCommand.handler(argv as Parameters<typeof resetCommand.handler>[0])
 
     expect(fs.existsSync(statePath)).toBe(false)
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
   })
 
   // Test 3: Deletes decisions.jsonl when it exists
@@ -145,7 +156,7 @@ describe('reset command', () => {
     await resetCommand.handler(argv as Parameters<typeof resetCommand.handler>[0])
 
     expect(fs.existsSync(decisionsPath)).toBe(false)
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
   })
 
   // Test 4: Preserves config.yml
@@ -168,7 +179,7 @@ describe('reset command', () => {
 
     expect(fs.existsSync(statePath)).toBe(false)
     expect(fs.existsSync(configPath)).toBe(true)
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
   })
 
   // Test 5: Auto mode without --confirm-reset exits 1 (RESET_CONFIRM_REQUIRED)
@@ -209,7 +220,7 @@ describe('reset command', () => {
     }
     await resetCommand.handler(argv as Parameters<typeof resetCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
     expect(fs.existsSync(statePath)).toBe(false)
   })
 
@@ -243,11 +254,19 @@ describe('reset command', () => {
     expect(Array.isArray(data.files_preserved)).toBe(true)
     expect(data.files_deleted).toContain('.scaffold/state.json')
     expect(data.files_preserved).toContain('.scaffold/config.yml')
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
   })
 
-  // Test 8: Releases lock after reset completes
+  // Test 8: Releases lock after reset completes (via withResource cleanup)
   it('releases lock after reset completes', async () => {
+    // Use a withResource mock that calls cleanup after fn
+    const { shutdown: shutdownMock } = await import('../shutdown.js')
+    vi.mocked(shutdownMock.withResource).mockImplementationOnce(
+      async (_name: string, cleanup: () => void, fn: () => Promise<unknown>) => {
+        try { return await fn() } finally { cleanup() }
+      },
+    )
+
     const argv = {
       confirmReset: true,
       'confirm-reset': true,
@@ -307,7 +326,7 @@ describe('reset command', () => {
       fs.readFileSync(path.join(tempDir, '.scaffold', 'state.json'), 'utf8'),
     )
     expect(state.steps['create-prd'].status).toBe('pending')
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
   })
 
   it('resets a skipped step to pending', async () => {
@@ -325,7 +344,7 @@ describe('reset command', () => {
       fs.readFileSync(path.join(tempDir, '.scaffold', 'state.json'), 'utf8'),
     )
     expect(state.steps['design-system'].status).toBe('pending')
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
   })
 
   it('reports already pending step without error', async () => {
@@ -338,7 +357,7 @@ describe('reset command', () => {
       _: ['reset', 'tdd'],
     } as Parameters<typeof resetCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
     expect(writtenLines.join('')).toContain('already pending')
   })
 
@@ -353,7 +372,7 @@ describe('reset command', () => {
       _: ['reset', 'creat-prd'],
     } as Parameters<typeof resetCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(2)
+    expect(process.exitCode).toBe(2)
     expect(writtenLines.join('')).toContain('Did you mean')
   })
 
@@ -370,7 +389,7 @@ describe('reset command', () => {
       _: ['reset', 'zzzzzzzzzzzzz'],
     } as Parameters<typeof resetCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(2)
+    expect(process.exitCode).toBe(2)
     const allOutput = writtenLines.join('')
     expect(allOutput).toContain('not found')
     expect(allOutput).not.toContain('Did you mean')
@@ -422,7 +441,7 @@ describe('reset command', () => {
       _: ['reset', 'create-prd'],
     } as Parameters<typeof resetCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
     const allOutput = writtenLines.join('')
     expect(allOutput).toContain('appears to be in progress')
 
@@ -444,7 +463,7 @@ describe('reset command', () => {
       _: ['reset', 'create-prd'],
     } as Parameters<typeof resetCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(3)
+    expect(process.exitCode).toBe(3)
     const allOutput = writtenLines.join('')
     expect(allOutput).toContain('PSM_INVALID_TRANSITION')
     expect(allOutput).toContain('Use --force')
@@ -462,7 +481,7 @@ describe('reset command', () => {
       _: ['reset', 'create-prd'],
     } as Parameters<typeof resetCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
     const state = JSON.parse(
       fs.readFileSync(path.join(tempDir, '.scaffold', 'state.json'), 'utf8'),
     )
@@ -481,7 +500,7 @@ describe('reset command', () => {
       _: ['reset', 'create-prd'],
     } as Parameters<typeof resetCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
     // State should NOT have changed
     const state = JSON.parse(
       fs.readFileSync(path.join(tempDir, '.scaffold', 'state.json'), 'utf8'),
@@ -517,7 +536,7 @@ describe('reset command', () => {
       _: ['reset', 'create-prd'],
     } as Parameters<typeof resetCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
     const savedState = JSON.parse(
       fs.readFileSync(path.join(tempDir, '.scaffold', 'state.json'), 'utf8'),
     )
@@ -538,7 +557,7 @@ describe('reset command', () => {
       _: ['reset', 'create-prd'],
     } as Parameters<typeof resetCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
     const allOutput = writtenLines.join('')
     const parsed = JSON.parse(allOutput)
     const data = parsed.data ?? parsed
@@ -562,7 +581,7 @@ describe('reset command', () => {
       _: ['reset'],
     } as Parameters<typeof resetCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
     expect(fs.existsSync(statePath)).toBe(false)
   })
 
@@ -644,7 +663,7 @@ describe('reset command', () => {
       _: ['reset'],
     } as Parameters<typeof resetCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
     expect(fs.existsSync(statePath)).toBe(false)
     // acquireLock should NOT have been called for pipeline reset path
     // (it gets called with 'reset' as operation name, no step)
@@ -699,7 +718,7 @@ describe('reset command', () => {
       _: ['reset', 'create-prd'],
     } as Parameters<typeof resetCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
     expect(writtenLines.join('')).toContain('already pending')
   })
 })
