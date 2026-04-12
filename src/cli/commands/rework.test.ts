@@ -18,7 +18,16 @@ vi.mock('../middleware/output-mode.js', () => ({
 
 vi.mock('../../state/lock-manager.js', () => ({
   acquireLock: vi.fn(() => ({ acquired: true })),
+  getLockPath: vi.fn(() => '/mock/.scaffold/lock.json'),
   releaseLock: vi.fn(),
+}))
+
+vi.mock('../shutdown.js', () => ({
+  shutdown: {
+    registerLockOwnership: vi.fn(),
+    releaseLockOwnership: vi.fn(),
+    withResource: vi.fn(async (_name: string, _cleanup: () => void, fn: () => Promise<unknown>) => fn()),
+  },
 }))
 
 vi.mock('../output/context.js', async (importOriginal) => {
@@ -116,6 +125,7 @@ describe('rework command', () => {
   })
 
   afterEach(() => {
+    process.exitCode = undefined
     vi.restoreAllMocks()
     try { fs.rmSync(tempDir, { recursive: true, force: true }) } catch { /* ignore */ }
   })
@@ -275,7 +285,7 @@ describe('rework command', () => {
       const session = JSON.parse(fs.readFileSync(reworkPath, 'utf8'))
       expect(session.config.phases).toEqual([1])
       expect(session.steps.length).toBeGreaterThan(0)
-      expect(exitSpy).toHaveBeenCalledWith(0)
+      expect(process.exitCode).toBe(0)
     })
 
     it('errors when session exists in auto mode without --force', async () => {
@@ -325,7 +335,7 @@ describe('rework command', () => {
         // All phase-1 steps should be pending
         expect(state.steps[stepName].status).toBe('pending')
       }
-      expect(exitSpy).toHaveBeenCalledWith(0)
+      expect(process.exitCode).toBe(0)
     })
 
     it('records --fix --fresh --depth in config', async () => {
@@ -353,7 +363,7 @@ describe('rework command', () => {
       expect(session.config.depth).toBe(4)
       expect(session.config.fix).toBe(true)
       expect(session.config.fresh).toBe(true)
-      expect(exitSpy).toHaveBeenCalledWith(0)
+      expect(process.exitCode).toBe(0)
     })
   })
 })

@@ -3,7 +3,7 @@ import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { displayErrors } from '../output/error-display.js'
-import { acquireLock, releaseLock } from '../../state/lock-manager.js'
+import { acquireLock, getLockPath, releaseLock } from '../../state/lock-manager.js'
 import { ReworkManager } from '../../state/rework-manager.js'
 import { StateManager } from '../../state/state-manager.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
@@ -12,6 +12,7 @@ import { parsePhases, parseThrough, applyExclusions, resolveStepsForPhases } fro
 import type { DepthLevel } from '../../types/enums.js'
 import type { ReworkConfig } from '../../types/index.js'
 import { PHASES } from '../../types/frontmatter.js'
+import { shutdown } from '../shutdown.js'
 
 interface ReworkArgs {
   phases?: string
@@ -263,16 +264,21 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
         message: 'Another scaffold process is running. Use --force to override.',
         exitCode: 3,
       })
-      process.exit(3)
+      process.exitCode = 3
       return
     }
 
-    try {
+    shutdown.registerLockOwnership(getLockPath(projectRoot as string))
+
+    await shutdown.withResource('lock', () => {
+      releaseLock(projectRoot as string)
+      shutdown.releaseLockOwnership()
+    }, async () => {
       // Load pipeline context and resolve overlay/graph
       const context = loadPipelineContext(projectRoot as string)
       if (!context.config) {
         displayErrors(context.configErrors, context.configWarnings, output)
-        process.exit(1)
+        process.exitCode = 1
         return
       }
       const pipeline = resolvePipeline(context, { output })
@@ -291,7 +297,7 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
           exitCode: 1,
           recovery: 'Check that the selected phases have steps that are not skipped',
         })
-        process.exit(1)
+        process.exitCode = 1
         return
       }
 
@@ -338,12 +344,8 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
           `Rework plan created: ${reworkSteps.length} steps across ${phaseDisplay}${depthDisplay}`,
         )
       }
-      process.exit(0)
-    } finally {
-      if (lockResult.acquired) {
-        releaseLock(projectRoot as string)
-      }
-    }
+      process.exitCode = 0
+    })
   },
 }
 
