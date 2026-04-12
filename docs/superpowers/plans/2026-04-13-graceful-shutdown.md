@@ -107,8 +107,8 @@ describe('ShutdownManager', () => {
 
     it('clears shutting down state', async () => {
       mgr.install()
-      // Force shuttingDown to true via internal state
-      // We'll test this more thoroughly later
+      ;(mgr as any).shuttingDown = true
+      expect(mgr.isShuttingDown).toBe(true)
       mgr.reset()
       expect(mgr.isShuttingDown).toBe(false)
     })
@@ -1325,7 +1325,7 @@ git commit -m "feat(shutdown): adopt.ts — withResource for lock cleanup"
 
 **Files:**
 - Modify: `src/cli/commands/skip.ts`
-- Modify: `src/cli/commands/skip.test.ts` (if exists)
+- Modify: `src/cli/commands/skip.test.ts`
 
 **Context for subagent:** Same imports and patterns as Task 12. `skip.ts` has a `skipSingle` helper function that acquires a lock and has one `output.confirm()` call. Only convert `process.exit()` calls that are INSIDE the lock-protected scope. Leave `process.exit()` calls that happen before lock acquisition unchanged.
 
@@ -1356,9 +1356,15 @@ const confirmed = await shutdown.withPrompt(() => output.confirm(...))
 
 - [ ] **Step 4: Update test file**
 
-If `skip.test.ts` exists and mocks `process.exit` or `lock-manager`, update:
+In `skip.test.ts`:
 - Add `getLockPath` to the lock-manager mock
 - For exit assertions inside the lock scope, change `expect(exitSpy).toHaveBeenCalledWith(N)` to `expect(process.exitCode).toBe(N)`
+- Add `process.exitCode = undefined` cleanup in `afterEach` to prevent state leakage between tests:
+```typescript
+afterEach(() => {
+  process.exitCode = undefined
+})
+```
 
 - [ ] **Step 5: Run tests**
 
@@ -1378,7 +1384,7 @@ git commit -m "feat(shutdown): skip.ts — withResource + withPrompt"
 
 **Files:**
 - Modify: `src/cli/commands/complete.ts`
-- Modify: `src/cli/commands/complete.test.ts` (if exists)
+- Modify: `src/cli/commands/complete.test.ts`
 
 **Context for subagent:** Same pattern as Task 13 but simpler — no prompts, just lock.
 
@@ -1392,7 +1398,10 @@ Same pattern as Task 13. Convert `process.exit(N)` inside lock scope to `process
 
 - [ ] **Step 3: Update test file**
 
-Same pattern: add `getLockPath` to mock, update exit assertions.
+In `complete.test.ts`:
+- Add `getLockPath` to the lock-manager mock
+- Update exit assertions inside lock scope
+- Add `process.exitCode = undefined` cleanup in `afterEach`
 
 - [ ] **Step 4: Run tests and commit**
 
@@ -1410,7 +1419,7 @@ git commit -m "feat(shutdown): complete.ts — withResource for lock cleanup"
 
 **Files:**
 - Modify: `src/cli/commands/rework.ts`
-- Modify: `src/cli/commands/rework.test.ts` (if exists)
+- Modify: `src/cli/commands/rework.test.ts`
 
 **Context for subagent:** Same pattern. Key difference: `rework.ts` has multiple branches (`--advance`, `--resume`, `--clear`, new rework). Only the new-rework-creation branch acquires a lock. The `--advance` and `--resume` branches do NOT acquire locks — do not wrap those branches.
 
@@ -1426,7 +1435,10 @@ Convert `process.exit(N)` calls INSIDE the withResource block to `process.exitCo
 
 - [ ] **Step 3: Update test file**
 
-Same pattern.
+In `rework.test.ts`:
+- Add `getLockPath` to the lock-manager mock
+- Update exit assertions inside lock scope
+- Add `process.exitCode = undefined` cleanup in `afterEach`
 
 - [ ] **Step 4: Run tests and commit**
 
@@ -1444,7 +1456,7 @@ git commit -m "feat(shutdown): rework.ts — withResource for lock cleanup"
 
 **Files:**
 - Modify: `src/cli/commands/reset.ts`
-- Modify: `src/cli/commands/reset.test.ts` (if exists)
+- Modify: `src/cli/commands/reset.test.ts`
 
 **Context for subagent:** `reset.ts` has TWO sub-commands with different lock/prompt ordering:
 - `resetStep()`: acquires lock FIRST, then prompts → `withResource` wraps outer, `withPrompt` wraps inner
@@ -1485,9 +1497,14 @@ await shutdown.withResource('lock', () => {
 })
 ```
 
+**Note:** Both sub-commands may have `--force` bypass paths that skip the lock entirely. If `--force` skips lock acquisition, do NOT wrap the force-bypass path in `withResource`. Only wrap the branch that actually calls `acquireLock`.
+
 - [ ] **Step 4: Update test file**
 
-Add `getLockPath` to the lock-manager mock. Update exit assertions inside lock scope from `expect(exitSpy).toHaveBeenCalledWith(N)` to `expect(process.exitCode).toBe(N)`.
+In `reset.test.ts`:
+- Add `getLockPath` to the lock-manager mock
+- Update exit assertions inside lock scope from `expect(exitSpy).toHaveBeenCalledWith(N)` to `expect(process.exitCode).toBe(N)`
+- Add `process.exitCode = undefined` cleanup in `afterEach`
 
 - [ ] **Step 5: Run tests and commit**
 
@@ -1511,18 +1528,16 @@ git commit -m "feat(shutdown): reset.ts — withResource + withPrompt (two sub-c
 
 This task converts `process.exit(N)` to `process.exitCode = N; return` so that `withResource`'s `finally` blocks will execute in Task 18.
 
-**Important:** Only convert `process.exit()` calls that are in the handler function body or in code that will be inside a `withResource` block. Leave any early validation exits that happen before the handler's main logic.
+- [ ] **Step 1: Convert ALL process.exit() calls in run.ts**
 
-- [ ] **Step 1: Convert process.exit() calls in run.ts**
-
-Read `src/cli/commands/run.ts`. For each `process.exit(N)`, replace with:
+Read `src/cli/commands/run.ts`. Convert ALL 15 `process.exit(N)` calls to:
 
 ```typescript
 process.exitCode = N
 return
 ```
 
-All 15 `process.exit()` calls are in the top-level handler function, so `return` returns from the handler. No nested function propagation is needed — the handler's `process.exit()` calls are all at the handler scope level.
+All 15 calls are in the top-level handler function (not nested functions), so `return` returns from the handler. Convert every single one — early validation exits and lock-scope exits alike. This is necessary because `withResource` in Task 18 will wrap the handler body, and ALL exits must use `return` for `finally` blocks to execute.
 
 - [ ] **Step 2: Update run.test.ts**
 
@@ -1615,17 +1630,36 @@ const confirmed = await shutdown.withPrompt(() => output.confirm(...))
 
 This fixes the pre-existing bug where Ctrl+C during a `run` confirmation shows `RUN_UNEXPECTED_ERROR`.
 
-- [ ] **Step 4: Add withContext**
+- [ ] **Step 4: Add withResource for in_progress cleanup**
 
-Wrap the step-execution section:
+Where `stateManager.setInProgress(step, 'run')` is called, wrap the step-execution section in a nested `withResource` that clears in_progress state on shutdown:
+
+```typescript
+await shutdown.withResource('in-progress', () => {
+  stateManager.clearInProgress()
+}, async () => {
+  stateManager.setInProgress(step, 'run')
+  // ... existing step execution logic ...
+})
+```
+
+This ensures that if Ctrl+C fires during step execution, the `in_progress` state is cleared — preventing false crash-recovery prompts on the next `scaffold run`.
+
+- [ ] **Step 5: Add withContext**
+
+Wrap the step-execution section in a context message. Use try/catch in the thunk to handle edge cases where state.json may be mid-write:
 
 ```typescript
 await shutdown.withContext(
   () => {
-    const state = stateManager.loadState()
-    return state.in_progress !== null
-      ? 'Cancelled. Step progress cleared.'
-      : 'Cancelled.'
+    try {
+      const state = stateManager.loadState()
+      return state.in_progress !== null
+        ? 'Cancelled. Step progress cleared.'
+        : 'Cancelled.'
+    } catch {
+      return 'Cancelled.'
+    }
   },
   async () => {
     // ... step execution logic ...
@@ -1633,7 +1667,7 @@ await shutdown.withContext(
 )
 ```
 
-- [ ] **Step 5: Update test mock**
+- [ ] **Step 6: Update test mock**
 
 In `run.test.ts`, add `getLockPath` to the lock-manager mock:
 
@@ -1641,17 +1675,17 @@ In `run.test.ts`, add `getLockPath` to the lock-manager mock:
 getLockPath: vi.fn(() => '/mock/.scaffold/lock.json'),
 ```
 
-- [ ] **Step 6: Run tests**
+- [ ] **Step 7: Run tests**
 
 Run: `npx vitest run src/cli/commands/run.test.ts`
 Expected: PASS
 
-- [ ] **Step 7: Run full quality gate**
+- [ ] **Step 8: Run full quality gate**
 
 Run: `make check-all`
 Expected: PASS
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add src/cli/commands/run.ts src/cli/commands/run.test.ts
