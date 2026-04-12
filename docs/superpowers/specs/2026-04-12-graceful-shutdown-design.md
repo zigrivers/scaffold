@@ -20,7 +20,7 @@ The scaffold CLI has zero signal handling. When a user presses Ctrl+C during an 
 - No `setPromptActive` — removed entirely (readline handles separation)
 - No `lastSignal` tracking for `.unref()` decisions — timeout always ref'd (a simple `triggeredBySigterm` boolean distinguishes timeout duration only)
 - No debounce — three-stage state machine replaces it
-- No `process.exit()` refactoring of existing 50+ call sites — safety net covers them; gradual migration over time
+- No **broad** `process.exit()` refactoring across all 50+ call sites — safety net covers commands not yet migrated. However, commands wrapped in `withResource` (run, skip, reset, etc.) **must** convert their internal `process.exit()` calls to `process.exitCode = N; return;` so `finally` blocks execute. This is a per-command requirement, not a codebase-wide refactor.
 
 ---
 
@@ -53,7 +53,7 @@ interface ShutdownProcess {
   removeListener(event: string, listener: (...args: unknown[]) => void): void;
   exit(code?: number): never;
   env: Record<string, string | undefined>;
-  stdout: { writable?: boolean; write(s: string): boolean };
+  stdout: { writable?: boolean; isTTY?: boolean; write(s: string): boolean };
   stderr: { writable?: boolean; write(s: string): boolean };
 }
 
@@ -68,6 +68,7 @@ Uses scaffold's own `ExitCode` enum from `src/types/enums.ts`, NOT POSIX convent
 
 - User cancellation (Ctrl+C, SIGINT, SIGTERM): `ExitCode.UserCancellation` (value 4)
 - This aligns with ADR-025 (CLI output contract) and maintains consistency for automation consumers
+- **Migration note:** `init.ts` currently exits with code 130 (POSIX convention). This changes to 4. Update `init.test.ts` assertions accordingly. Any external automation checking for exit code 130 will need updating — this is an intentional breaking change for correctness.
 
 ### Signal Handling (Dual-Path)
 
@@ -95,7 +96,7 @@ SIGTERM:
   -> single-stage, always: run cleanup -> exit(ExitCode.UserCancellation)
 ```
 
-**ExitPromptError detection:** Always use `err.name === 'ExitPromptError'` (name-based), never `instanceof`. `ExitPromptError` is not exported from `@inquirer/prompts` — only from `@inquirer/core`. Name-based detection is stable across package versions and duplicates. This matches existing codebase conventions (`init.ts:538`, `disambiguate.ts:110`).
+**ExitPromptError detection:** Always use `err.name === 'ExitPromptError'` (name-based), never `instanceof`. `ExitPromptError` is not exported from `@inquirer/prompts` — only from `@inquirer/core`. Name-based detection is stable across package versions and duplicates. This matches existing codebase conventions in `init.ts` and `disambiguate.ts`.
 
 ### Three-Stage Ctrl+C (TTY only, SIGINT only)
 
@@ -134,6 +135,20 @@ private sigintHandler = () => {
 ```
 
 Only the `idle -> cleaning` transition calls `shutdown()`. The `cleaning -> armed -> force-quit` path is handled entirely by the SIGINT handler, independent of the `shutdown()` idempotency guard.
+
+The SIGTERM handler is simpler — always single-stage:
+
+```typescript
+private triggeredBySigterm = false;
+
+private sigtermHandler = () => {
+  this.triggeredBySigterm = true;
+  if (this.sigintState === 'idle') {
+    this.sigintState = 'cleaning'; // prevent SIGINT from also triggering shutdown
+    this.shutdown(ExitCode.UserCancellation);
+  }
+};
+```
 
 ### Cleanup Execution
 
@@ -313,6 +328,10 @@ releaseLockOwnership(): void {
 
 Commands call `registerLockOwnership` after `acquireLock` and `releaseLockOwnership` after `releaseLock`.
 
+**Lock path access:** `getLockPath()` in `lock-manager.ts` is currently unexported. As part of this work, export it so commands can pass the path to `registerLockOwnership()`. Alternatively, `registerLockOwnership` can accept `projectRoot` and derive the path internally using the same `path.join(projectRoot, '.scaffold', 'lock.json')` logic.
+
+**Lock command names:** The `LockableCommand` type in `src/types/lock.ts` accepts `'run' | 'skip' | 'init' | 'reset' | 'adopt' | 'complete' | 'rework'` — always the short form, never prefixed with `scaffold-`.
+
 ### Exit Safety Net
 
 ```typescript
@@ -346,7 +365,7 @@ install(): void {
 }
 ```
 
-Must be called in `runCli()` at CLI startup, NOT at import time. This ensures ShutdownManager's SIGINT handler registers after `signal-exit`'s handler (installed when @inquirer modules load), allowing `signal-exit` to correctly detect other handlers and defer.
+Must be called in `runCli()` at CLI startup, NOT at import time. Note: `@inquirer/prompts` is loaded lazily via dynamic `import()` in `interactive.ts`, so `signal-exit`'s handler is installed later (at first prompt usage), not at startup. This means ShutdownManager's SIGINT handler will be registered first. This is fine — when `signal-exit` registers later and sees ShutdownManager's existing listener, it correctly defers. The key constraint is that `install()` must run exactly once, early in `runCli()`, before any command handler executes.
 
 ### Test Isolation
 
@@ -354,6 +373,7 @@ Must be called in `runCli()` at CLI startup, NOT at import time. This ensures Sh
 reset(): void {
   this.shuttingDown = false;
   this.sigintState = 'idle';
+  this.triggeredBySigterm = false;
   this.exitHandlerRan = false;
   this.lockOwned = false;
   this.lockPath = null;
@@ -362,6 +382,8 @@ reset(): void {
   setMaxListeners(0, this.controller.signal);
   this.proc.removeListener('SIGINT', this.sigintHandler);
   this.proc.removeListener('SIGTERM', this.sigtermHandler);
+  // Note: exit handler uses exitHandlerRan guard, so resetting the flag
+  // is sufficient — no need to remove/re-add the exit listener.
 }
 ```
 
@@ -398,83 +420,114 @@ stopSpinner(success = true): void {
 
 ### scaffold init
 
+The init handler delegates to `runWizard()` (which handles backup rename, questions, `.scaffold/` creation, config/state writing) and then `runBuild()`. Integration wraps these at the correct abstraction level — not decomposing their internals:
+
 ```typescript
-// In init handler:
+// Pseudocode — shows integration points, not exact function signatures.
+// In init handler (init.ts):
 await shutdown.withContext('Cancelled. No changes were made.', async () => {
-  // --force backup: wrap rename through file-write
+  // --force backup: wrap runWizard so backup is restored on cancel.
+  // runWizard() internally does: backup rename -> questions -> .scaffold/ creation -> config write.
+  // The withResource cleanup checks if .scaffold/ was fully created; if not, restores backup.
   if (force && fs.existsSync(scaffoldDir)) {
-    const backupPath = computeBackupPath();
+    const backupPath = /* computed inline, same logic as wizard.ts line 116-118 */;
     await shutdown.withResource('init-backup', () => {
-      // Restore backup if new .scaffold/ wasn't fully written
       if (!fs.existsSync(scaffoldDir) && fs.existsSync(backupPath)) {
         fs.renameSync(backupPath, scaffoldDir);
       }
     }, async () => {
-      fs.renameSync(scaffoldDir, backupPath);
+      const wizardResult = await runWizard(/* ... */);
+      if (!wizardResult.success) return;
 
-      // Wizard prompts
-      const answers = await shutdown.withPrompt(() => askWizardQuestions(output));
-
-      // Build phase
+      // Build phase — runBuild is idempotent, so partial output is safe
       await shutdown.withContext(
         'Cancelled. Partial output may exist. Run `scaffold build` to regenerate.',
         async () => {
-          // Write .scaffold/ config
-          writeConfig(answers);
-          // Build loop with cooperative shutdown
-          for (const file of outputFiles) {
-            if (shutdown.isShuttingDown) break;
-            atomicWriteFile(file.path, file.content);
-          }
+          const buildResult = await runBuild(/* ... */);
+          // ...
         }
       );
     });
+  } else {
+    // Non-force path: no backup to restore
+    const wizardResult = await runWizard(/* ... */);
+    if (!wizardResult.success) return;
+
+    await shutdown.withContext(
+      'Cancelled. Partial output may exist. Run `scaffold build` to regenerate.',
+      async () => {
+        const buildResult = await runBuild(/* ... */);
+        // ...
+      }
+    );
   }
 });
 ```
 
+**Note on `runWizard` internals:** `runWizard()` calls `askWizardQuestions()` which uses `output.prompt()`, `output.confirm()`, and `output.select()` — all of which dynamically import `@inquirer/prompts`. These prompt calls must be individually wrapped in `shutdown.withPrompt()` inside `questions.ts`, or `runWizard` itself must catch `ExitPromptError` and propagate it. The cleanest approach is wrapping `runWizard()` in `withPrompt` at the init handler level and letting ExitPromptError propagate up naturally from the prompt calls.
+
+**Note on locks:** `init` does not currently acquire an advisory lock (unlike `run`, `skip`, etc.). This is intentional — init creates `.scaffold/` from scratch and concurrent inits are protected by the filesystem (the directory either exists or doesn't).
+
 ### scaffold run
 
+`run.ts` currently has 5 `output.confirm()` calls (lines 162, 234, 251, 445, 447), 15 `process.exit()` calls, and 11 scattered `releaseLock()` calls. The primary goal of `withResource` is consolidating these scattered cleanup paths.
+
+**Pre-existing bug:** `run.ts` has no `ExitPromptError` handling. Ctrl+C during any prompt shows `RUN_UNEXPECTED_ERROR`. This is fixed by wrapping prompts in `withPrompt`.
+
 ```typescript
-// In run handler:
+// Pseudocode — shows integration points, not exact function signatures.
+// In run handler (run.ts):
+const lockResult = acquireLock(projectRoot, 'run', step);
+if (!lockResult.acquired) { /* handle error/warning */ return; }
+shutdown.registerLockOwnership(getLockPath(projectRoot));
+
 await shutdown.withResource('lock', () => {
   releaseLock(projectRoot);
   shutdown.releaseLockOwnership();
 }, async () => {
-  acquireLock(projectRoot, 'scaffold-run');
-  shutdown.registerLockOwnership(lockPath);
-
-  // ... dependency checks ...
+  // ... dependency checks (multiple early returns, no process.exit()) ...
 
   await shutdown.withContext(
-    () => stateManager.isInProgress()
+    () => stateManager.loadState().in_progress !== null
       ? 'Cancelled. Step progress cleared.'
       : 'Cancelled.',
     async () => {
       await shutdown.withResource('in-progress', () => {
         stateManager.clearInProgress();
       }, async () => {
-        stateManager.setInProgress(step, 'scaffold-run');
+        stateManager.setInProgress(step, 'run');
 
-        // Confirmation prompt
+        // All 5 confirmation prompts wrapped in withPrompt:
         const isComplete = await shutdown.withPrompt(() =>
           output.confirm('Mark step as complete?')
         );
+        // ... other prompts similarly wrapped ...
       });
     }
   );
 });
 ```
 
+**Migration note:** The 15 `process.exit()` calls inside `run.ts` must be converted to `process.exitCode = N; return;` so `withResource`'s `finally` blocks execute. This is a required refactoring for `run.ts` specifically — the "no broad process.exit() refactoring" non-goal applies to commands NOT wrapped in `withResource`. Commands that adopt `withResource` must migrate their internal exit calls.
+
 ### scaffold build
 
+`build.ts` writes files in a loop using `atomicWriteFile` (each write is atomic — no partial files). The `isShuttingDown` check between iterations allows graceful exit:
+
 ```typescript
+// Pseudocode — shows integration points.
+// In runBuild() or the build command handler:
 await shutdown.withContext(
   'Cancelled. Partial output may exist. Run `scaffold build` to regenerate.',
   async () => {
     for (const file of allOutputFiles) {
       if (shutdown.isShuttingDown) break;
       atomicWriteFile(file.path, file.content);
+    }
+    // Also check in skill template loop (uses raw writeFileSync):
+    for (const skill of skillFiles) {
+      if (shutdown.isShuttingDown) break;
+      fs.writeFileSync(skill.path, skill.content);
     }
   }
 );
@@ -484,49 +537,56 @@ await shutdown.withContext(
 
 `disambiguate.ts` already catches `ExitPromptError` as valid input (`skipReason: 'user-cancelled'`). Do NOT wrap in `withPrompt()`. Keep existing pattern.
 
-Lock cleanup uses `withResource`:
+Lock cleanup uses `withResource`. Note: `adopt.ts` already uses `process.exitCode` instead of `process.exit()`, making it a good candidate for `withResource`:
 
 ```typescript
+const lockResult = acquireLock(projectRoot, 'adopt');
+if (!lockResult.acquired) { /* handle */ return; }
+shutdown.registerLockOwnership(getLockPath(projectRoot));
+
 await shutdown.withResource('lock', () => {
   releaseLock(projectRoot);
   shutdown.releaseLockOwnership();
 }, async () => {
-  acquireLock(projectRoot, 'scaffold-adopt');
-  shutdown.registerLockOwnership(lockPath);
   // ... adoption logic ...
 });
 ```
 
 ### scaffold skip / reset / rework / complete
 
-All four commands acquire locks and some have interactive prompts:
+All four commands acquire locks. Some have interactive prompts:
 
 ```typescript
-// skip.ts — lock + confirmation prompt
+// Pseudocode — shows integration pattern, not exact signatures.
+
+// skip.ts — lock + one confirmation prompt (skipSingle has output.confirm)
+acquireLock(projectRoot, 'skip', step);
+shutdown.registerLockOwnership(getLockPath(projectRoot));
 await shutdown.withResource('lock', lockCleanup, async () => {
-  acquireLock(...); shutdown.registerLockOwnership(lockPath);
-  const confirmed = await shutdown.withPrompt(() => output.confirm('Skip this step?'));
+  const confirmed = await shutdown.withPrompt(() => output.confirm(...));
   // ...
 });
 
-// reset.ts — lock + two confirmation prompts
-await shutdown.withResource('lock', lockCleanup, async () => {
-  acquireLock(...); shutdown.registerLockOwnership(lockPath);
-  const confirmed = await shutdown.withPrompt(() => output.confirm('Reset step?'));
-  // ...
-});
+// reset.ts — two sub-commands with different lock ordering:
+//   resetStep: acquires lock FIRST, then confirms
+//   resetPipeline: confirms FIRST, then acquires lock (lock comes AFTER prompt)
+// For resetPipeline, withPrompt wraps the confirmation OUTSIDE withResource:
+const confirmed = await shutdown.withPrompt(() => output.confirm('Reset entire pipeline?'));
+if (!confirmed) return;
+acquireLock(projectRoot, 'reset');
+shutdown.registerLockOwnership(getLockPath(projectRoot));
+await shutdown.withResource('lock', lockCleanup, async () => { /* ... */ });
 
-// rework.ts — lock only (no prompts)
-await shutdown.withResource('lock', lockCleanup, async () => {
-  acquireLock(...); shutdown.registerLockOwnership(lockPath);
-  // ...
-});
+// rework.ts — lock for new rework creation only (no prompts)
+// Note: --advance and --resume branches do NOT acquire locks
+acquireLock(projectRoot, 'rework');
+shutdown.registerLockOwnership(getLockPath(projectRoot));
+await shutdown.withResource('lock', lockCleanup, async () => { /* ... */ });
 
 // complete.ts — lock only (no prompts)
-await shutdown.withResource('lock', lockCleanup, async () => {
-  acquireLock(...); shutdown.registerLockOwnership(lockPath);
-  // ...
-});
+acquireLock(projectRoot, 'complete', step);
+shutdown.registerLockOwnership(getLockPath(projectRoot));
+await shutdown.withResource('lock', lockCleanup, async () => { /* ... */ });
 ```
 
 ### HTTP timers (version.ts, update.ts)
@@ -550,17 +610,19 @@ timeout.unref(); // don't block exit
 
 ```typescript
 // Fake process for DI
-const createFakeProcess = (): ShutdownProcess => {
+// Note: emit() is not on ShutdownProcess — it's added for test convenience
+// to simulate signal delivery. Cast with `as any` or extend the type.
+const createFakeProcess = () => {
   const emitter = new EventEmitter();
   return {
     on: emitter.on.bind(emitter),
     removeListener: emitter.removeListener.bind(emitter),
     exit: vi.fn() as any,
     env: {},
-    stdout: { writable: true, write: vi.fn(), isTTY: true },
+    stdout: { writable: true, isTTY: true, write: vi.fn() },
     stderr: { writable: true, write: vi.fn() },
-    emit: emitter.emit.bind(emitter), // for triggering signals in tests
-  };
+    emit: emitter.emit.bind(emitter), // test-only: trigger SIGINT/SIGTERM
+  } as ShutdownProcess & { emit: typeof emitter.emit };
 };
 
 // Test cases:
@@ -595,4 +657,6 @@ This design went through 4 rounds of multi-model review:
 3. **Round 3** (3x Claude agents: final correctness, API completeness, Node.js internals): Found 2 P0s, 11 P1s, 10 P2s. Key fixes: withResource cleaned flag, all timeouts ref'd, name-based ExitPromptError detection, thunk-based withContext.
 4. **Round 4** (Codex + Gemini + Claude code-reviewer): Found 2 P0s, 6 P1s, 4 P2s. Key fixes: lock ownership guard, scaffold exit codes (not POSIX), AsyncLocalStorage for context, independent SIGINT state machine, AbortSignal listener limit, test reset(), late registration behavior, complete command inventory.
 
-Total unique findings addressed: 72+ across all rounds.
+5. **Round 5** (Codex + Gemini + Claude code-reviewer, spec file review): Found 3 P0s, 6 P1s, 6 P2s. Key fixes: ShutdownProcess interface missing isTTY, exit code 130→4 migration note, lock API mismatch (getLockPath unexported, wrong command names), init/run flow corrected to match actual architecture, SIGTERM handler implementation added, install() ordering rationale corrected for lazy imports, reset.ts lock-after-prompt ordering, process.exit() constraint clarified per-command.
+
+Total unique findings addressed: 85+ across all rounds.
