@@ -195,7 +195,7 @@ Read `content/knowledge/core/automated-review-tooling.md` in full. Note:
 
 - [ ] **Step 2: Thin the Summary**
 
-Replace the severity definitions block in the Summary with:
+Replace the entire Summary section. Remove: severity definitions, the "Architecture: Local CLI Review" subsection (references `scripts/cli-pr-review.sh`, `scripts/await-pr-review.sh`), the "Dual-Model Review Pattern" subsection, and the "Integration with PR Workflow" subsection. Replace with:
 
 ```markdown
 ### Review Severity and Reconciliation
@@ -454,7 +454,7 @@ Also update "### Step 3: Handle Auth Failures" to match — replace "Fall back t
 
 Check the "## Context Bundling" section's prompt template. The severity definitions inside the template (P0/P1/P2/P3 definitions within the prompt text) **MUST remain inline**. External models receive only the assembled prompt — they cannot resolve cross-references to knowledge entries. Confirm these are NOT removed. If they are intact, no change needed.
 
-- [ ] **Step 6: Run validation**
+- [ ] **Step 7: Run validation**
 
 ```bash
 make validate
@@ -462,7 +462,7 @@ make validate
 
 Expected: PASS. Note: SKILL.md may not be covered by frontmatter validation.
 
-- [ ] **Step 7: Run scaffold build**
+- [ ] **Step 8: Run scaffold build**
 
 ```bash
 scaffold build
@@ -470,11 +470,11 @@ scaffold build
 
 Expected: PASS. Knowledge entries are assembled at build time — verify no assembly errors after Tasks 1-4.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add content/skills/multi-model-dispatch/SKILL.md
-git commit -m "fix: update multi-model-dispatch skill with foreground, reconciliation cross-ref"
+git commit -m "fix: update multi-model-dispatch skill with foreground, reconciliation cross-ref, compensating fallback"
 ```
 
 ---
@@ -696,7 +696,7 @@ In review-code.md's fix cycle step (Step 7, around line 283), add:
 
 - [ ] **Step 8: Add Process Rules**
 
-If a Process Rules section exists, add to it. If not, add before "## After This Step":
+If a Process Rules section exists, add to it. If not, add a new `## Process Rules` section at the end of the file, before any trailing `---` separator or `## After This Step` heading (if present). If neither exists, append to the end of the file:
 
 ```markdown
 ## Process Rules
@@ -809,12 +809,12 @@ Replace the Verdict line:
 [pass / degraded-pass / blocked / needs-user-decision]
 ```
 
-- [ ] **Step 5: Add Final Verdict step**
+- [ ] **Step 5: Add Final Verdict step and renumber**
 
-After Step 5 (Report Results) and before Step 6 (Fix), add a new step:
+After the current Step 5 (Report Results) and before the current Step 6 (Fix), insert a new step. Then renumber: current Step 6 (Fix) becomes Step 7, current Step 7 (Confirm) becomes Step 8. The inserted step:
 
 ```markdown
-### Step 6: Final Verdict
+### Step 5a: Final Verdict
 
 Return exactly one verdict:
 
@@ -830,7 +830,7 @@ When compensating passes ran, maximum achievable verdict is `degraded-pass`. Whe
 
 - [ ] **Step 6: Update fix cycle**
 
-In the fix step (Step 6), add:
+In the fix step (now Step 7 after renumbering), add:
 
 ```markdown
 **Fix cycle channel rule:** Re-run only channels that originally completed or ran as compensating passes. Never retry a channel marked `not installed`, `auth failed`, or `auth timeout` during fix rounds — its availability does not change within a session.
@@ -871,7 +871,7 @@ Replace or add the Process Rules section:
 8. **Dispatch pattern** follows `multi-model-review-dispatch` knowledge entry. When modifying channel dispatch in this file, verify consistency with `review-code.md` and `post-implementation-review.md`.
 ```
 
-- [ ] **Step 9: Update Step 7 confirm completion**
+- [ ] **Step 9: Update confirm completion (now Step 8 after renumbering)**
 
 Update the completion output to include the formal verdict:
 
@@ -881,7 +881,22 @@ Code review complete. Verdict: [pass/degraded-pass]. Channels: [N] executed, [N]
 ```
 ```
 
-- [ ] **Step 10: Run validation**
+- [ ] **Step 10: Update "After This Step" section**
+
+Update the trailing `## After This Step` section to use the new verdict vocabulary:
+
+```markdown
+**Code review complete** — Verdict: [pass/degraded-pass]. All channels executed for PR #[number].
+
+**Results:**
+- Channels run: [list which of the 3 ran, noting any compensating]
+- Findings fixed: [count]
+- Remaining: [none / list]
+
+**Next:** Return to the task execution loop.
+```
+
+- [ ] **Step 11: Run validation**
 
 ```bash
 make validate
@@ -889,7 +904,7 @@ make validate
 
 Expected: PASS.
 
-- [ ] **Step 11: Commit**
+- [ ] **Step 12: Commit**
 
 ```bash
 git add content/tools/review-pr.md
@@ -1036,7 +1051,25 @@ Add or update the Process Rules section with these rules:
 9. **Dispatch pattern** follows `multi-model-review-dispatch` knowledge entry. When modifying channel dispatch in this file, verify consistency with `review-code.md` and `review-pr.md`.
 ```
 
-- [ ] **Step 8: Run validation**
+- [ ] **Step 8: Update Step 10 completion and "After This Step"**
+
+Update Step 10's completion summary to include the coverage indicator:
+
+```markdown
+Post-implementation review complete.
+
+Coverage: [full-coverage / degraded-coverage / partial-coverage]
+Channels (Phase 1): Codex [status] | Gemini [status] | Superpowers [completed]
+Channels (Phase 2): [N] stories reviewed, [N] with full channels, [N] with compensating passes
+Findings: P0: [N] | P1: [N] | P2: [N] | P3: [N]
+Fixed: [N] | Remaining: [N]
+
+Report: docs/reviews/post-implementation-review.md
+```
+
+Update the `## After This Step` section similarly to include coverage indicator and Phase 2 breakdown.
+
+- [ ] **Step 9: Run validation**
 
 ```bash
 make validate
@@ -1044,7 +1077,7 @@ make validate
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
 git add content/tools/post-implementation-review.md
@@ -1162,7 +1195,9 @@ Add after the auth section:
 
 ```bash
 git add docs/superpowers/specs/2026-04-05-mmr-multi-model-review-design.md
-git commit -m "docs: update MMR CLI spec — problem, solution, CLI interface, auth verification"
+git commit -m "docs: update MMR CLI spec — problem, solution, CLI interface, auth verification
+
+BREAKING CHANGE: exit code semantics changed for mmr status and mmr results"
 ```
 
 ---
@@ -1379,19 +1414,17 @@ After the existing criteria (around line 500), add:
 
 Fold these observations into the spec sections they relate to (add as `> **Rationale:**` blockquotes):
 
-1. **Background execution** → Auth Verification section (already added in Task 9a Step 6)
-2. **Auth friction** → Auth Verification section: "Auth tokens expire mid-session. The loud-failure contract ensures agents never silently skip a channel that could be recovered in 30 seconds."
-3. **Compensating value** → Reconciliation section (already added in Task 9b Step 7)
-4. **Vocabulary drift** → Core Prompt Engine section: "Having severity definitions in 4+ places caused drift within weeks. Layer 1 immutability is the architectural fix."
-5. **Partial results** → Reconciliation section (already added in Task 9b Step 7)
+1. **Background execution** → Auth Verification section: already added as Rationale blockquote in Task 9a Step 7. Verify it's present; if not, add: "Background execution produces empty output. The `--sync` flag and foreground-only execution are mandatory for AI agent contexts."
+2. **Auth friction** → Auth Verification section (same location as #1): "Auth tokens expire mid-session. The loud-failure contract ensures agents never silently skip a channel that could be recovered in 30 seconds."
+3. **Compensating value** → Reconciliation section: already added as Rationale blockquote in Task 9b Step 7 (gate logic). Verify it's present.
+4. **Vocabulary drift** → Core Prompt Engine section: already noted in Task 9b Step 2. Add if missing: "Having severity definitions in 4+ places caused drift within weeks. Layer 1 immutability is the architectural fix."
+5. **Partial results** → Reconciliation section: covered by the gate logic Rationale in Task 9b Step 7. Verify it's present.
 
 - [ ] **Step 8: Commit**
 
 ```bash
 git add docs/superpowers/specs/2026-04-05-mmr-multi-model-review-design.md
-git commit -m "docs: update MMR CLI spec — config, wrappers, package, success criteria, rationale
-
-BREAKING CHANGE: exit code semantics changed for mmr status and mmr results"
+git commit -m "docs: update MMR CLI spec — config, wrappers, package, success criteria, rationale"
 ```
 
 ---
