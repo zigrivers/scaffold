@@ -27,6 +27,10 @@ function yellow(s: string): string {
   return isNoColor() || !isTTY() ? s : `\x1b[33m${s}\x1b[0m`
 }
 
+function dim(s: string): string {
+  return isNoColor() || !isTTY() ? s : `\x1b[2m${s}\x1b[0m`
+}
+
 // cyan is available for future use
 // function cyan(s: string): string {
 //   return isNoColor() || !isTTY() ? s : `\x1b[36m${s}\x1b[0m`
@@ -78,10 +82,13 @@ export class InteractiveOutput implements OutputContext {
     return canPrompt()
   }
 
-  async prompt<T>(message: string, defaultValue: T, _help?: { short?: string }): Promise<T> {
+  async prompt<T>(message: string, defaultValue: T, help?: { short?: string }): Promise<T> {
     // Non-interactive: return default immediately
     if (!canPrompt()) {
       return defaultValue
+    }
+    if (help?.short) {
+      process.stdout.write(dim(`  ${help.short}`) + '\n')
     }
     // In TTY mode, use @inquirer/prompts
     const { input } = await import('@inquirer/prompts')
@@ -96,26 +103,42 @@ export class InteractiveOutput implements OutputContext {
     return answer as T
   }
 
-  async confirm(message: string, defaultValue = false, _help?: { short?: string }): Promise<boolean> {
+  async confirm(message: string, defaultValue = false, help?: { short?: string }): Promise<boolean> {
     // Non-interactive: return default immediately
     if (!canPrompt()) {
       return defaultValue
+    }
+    if (help?.short) {
+      process.stdout.write(dim(`  ${help.short}`) + '\n')
     }
     const { confirm } = await import('@inquirer/prompts')
     return confirm({ message, default: defaultValue })
   }
 
-  async select(message: string, options: SelectOption[], defaultValue?: string, _help?: { short?: string; long?: string }): Promise<string> {
+  async select(message: string, options: SelectOption[], defaultValue?: string, help?: { short?: string; long?: string }): Promise<string> {
     const normalized = options.map(o => typeof o === 'string' ? { value: o } : o)
     if (!canPrompt()) {
       return defaultValue ?? normalized[0]?.value ?? ''
     }
-    // Display numbered options once
-    process.stdout.write(`${message}\n`)
-    for (let i = 0; i < normalized.length; i++) {
-      const marker = normalized[i]!.value === defaultValue ? ' (default)' : ''
-      process.stdout.write(`  ${i + 1}. ${normalized[i]!.value}${marker}\n`)
+
+    const renderFrame = (): void => {
+      if (help?.short) {
+        process.stdout.write(dim(`  ${help.short}`) + '\n')
+      }
+      const suffix = help?.long ? ' (? for help)' : ''
+      process.stdout.write(`${message}${suffix}\n`)
+      for (let i = 0; i < normalized.length; i++) {
+        const opt = normalized[i]!
+        const displayName = opt.label ?? opt.value
+        const marker = opt.value === defaultValue ? ' (default)' : ''
+        process.stdout.write(`  ${i + 1}. ${displayName}${marker}\n`)
+        if (opt.short) {
+          process.stdout.write(`     ${dim(opt.short)}\n`)
+        }
+      }
     }
+
+    renderFrame()
     const { input } = await import('@inquirer/prompts')
     // Loop until valid input
     for (;;) {
@@ -123,8 +146,18 @@ export class InteractiveOutput implements OutputContext {
         message: 'Enter number or text:',
         default: defaultValue,
       })
-      // Accept number input (strict: entire string must be a valid integer)
       const trimmed = answer.trim()
+      // Handle ? help request
+      if (trimmed === '?') {
+        if (help?.long) {
+          process.stdout.write(dim(help.long) + '\n')
+          renderFrame()
+        } else {
+          process.stdout.write(`  No additional help available — pick one of: ${normalized.map(n => n.value).join(', ')}\n`)
+        }
+        continue
+      }
+      // Accept number input (strict: entire string must be a valid integer)
       if (/^\d+$/.test(trimmed)) {
         const num = Number(trimmed)
         if (num >= 1 && num <= normalized.length) {
@@ -140,17 +173,30 @@ export class InteractiveOutput implements OutputContext {
     }
   }
 
-  async multiSelect(message: string, options: SelectOption[], defaults?: string[], _help?: { short?: string; long?: string }): Promise<string[]> {
+  async multiSelect(message: string, options: SelectOption[], defaults?: string[], help?: { short?: string; long?: string }): Promise<string[]> {
     const normalized = options.map(o => typeof o === 'string' ? { value: o } : o)
     if (!canPrompt()) {
       return defaults ?? []
     }
-    // Display options with defaults marked once
-    process.stdout.write(`${message}\n`)
-    for (let i = 0; i < normalized.length; i++) {
-      const isDefault = defaults?.includes(normalized[i]!.value) ? ' *' : ''
-      process.stdout.write(`  ${i + 1}. ${normalized[i]!.value}${isDefault}\n`)
+
+    const renderFrame = (): void => {
+      if (help?.short) {
+        process.stdout.write(dim(`  ${help.short}`) + '\n')
+      }
+      const suffix = help?.long ? ' (? for help)' : ''
+      process.stdout.write(`${message}${suffix}\n`)
+      for (let i = 0; i < normalized.length; i++) {
+        const opt = normalized[i]!
+        const displayName = opt.label ?? opt.value
+        const isDefault = defaults?.includes(opt.value) ? ' *' : ''
+        process.stdout.write(`  ${i + 1}. ${displayName}${isDefault}\n`)
+        if (opt.short) {
+          process.stdout.write(`     ${dim(opt.short)}\n`)
+        }
+      }
     }
+
+    renderFrame()
     const { input } = await import('@inquirer/prompts')
     // Loop until valid input
     for (;;) {
@@ -158,6 +204,17 @@ export class InteractiveOutput implements OutputContext {
         message: 'Enter numbers or text (comma-separated):',
         default: defaults?.join(', '),
       })
+      const trimmed = answer.trim()
+      // Handle ? help request (only when entire input is ?)
+      if (trimmed === '?') {
+        if (help?.long) {
+          process.stdout.write(dim(help.long) + '\n')
+          renderFrame()
+        } else {
+          process.stdout.write(`  No additional help available — pick from: ${normalized.map(n => n.value).join(', ')}\n`)
+        }
+        continue
+      }
       const parts = answer.split(',').map(s => s.trim()).filter(Boolean)
       // Empty input (user pressed Enter) — return defaults
       if (parts.length === 0) {
@@ -185,9 +242,12 @@ export class InteractiveOutput implements OutputContext {
     }
   }
 
-  async multiInput(message: string, defaultValue?: string[], _help?: { short?: string }): Promise<string[]> {
+  async multiInput(message: string, defaultValue?: string[], help?: { short?: string }): Promise<string[]> {
     if (!canPrompt()) {
       return defaultValue ?? []
+    }
+    if (help?.short) {
+      process.stdout.write(dim(`  ${help.short}`) + '\n')
     }
     const { input } = await import('@inquirer/prompts')
     const answer = await input({
