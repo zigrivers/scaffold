@@ -1,0 +1,65 @@
+# methodology/research-overlay.yml
+name: research
+description: >
+  Research overlay — injects research domain knowledge into existing
+  pipeline steps for experiment loop architecture, tracking, evaluation,
+  overfitting prevention, and domain-specific patterns.
+project-type: research
+
+# ---------------------------------------------------------------------------
+# knowledge-overrides
+# ---------------------------------------------------------------------------
+# Map research knowledge entries into existing pipeline steps so that
+# experiment loop domain expertise is injected during prompt assembly.
+knowledge-overrides:
+  # Foundational (6 steps)
+  create-prd:
+    append: [research-requirements]
+  user-stories:
+    append: [research-requirements]
+  coding-standards:
+    append: [research-conventions]
+  project-structure:
+    append: [research-project-structure]
+  dev-env-setup:
+    append: [research-dev-environment]
+  git-workflow:
+    append: [research-conventions]
+
+  # Architecture & Design (6 steps)
+  system-architecture:
+    append: [research-architecture, research-experiment-loop]
+  tech-stack:
+    append: [research-architecture]
+  adrs:
+    append: [research-architecture]
+  domain-modeling:
+    append: [research-experiment-loop]
+  security:
+    append: [research-security]
+  operations:
+    append: [research-experiment-tracking, research-observability]
+
+  # Testing (4 steps)
+  tdd:
+    append: [research-testing, research-overfitting-prevention]
+  add-e2e-testing:
+    append: [research-testing]
+  create-evals:
+    append: [research-testing, research-overfitting-prevention]
+  story-tests:
+    append: [research-testing]
+
+  # Reviews (4 steps)
+  review-architecture:
+    append: [research-architecture, research-experiment-loop]
+  review-security:
+    append: [research-security]
+  review-operations:
+    append: [research-experiment-tracking, research-observability]
+  review-testing:
+    append: [research-testing, research-overfitting-prevention]
+
+  # Planning (1 step)
+  implementation-plan:
+    append: [research-architecture]
