@@ -1,7 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { setMaxListeners } from 'node:events'
-// fs and ExitCode used by methods implemented in subsequent tasks
-import * as fs from 'node:fs' // eslint-disable-line @typescript-eslint/no-unused-vars
+import * as fs from 'node:fs'
 
 import { ExitCode } from '../types/enums.js'
 
@@ -105,7 +104,16 @@ export class ShutdownManager {
   }
 
   private installExitHandler(): void {
-    // Implemented in Task 6
+    this.proc.on('exit', (() => {
+      if (this.exitHandlerRan) return
+      this.exitHandlerRan = true
+      if (this.lockOwned && this.lockPath) {
+        try { fs.unlinkSync(this.lockPath) } catch { /* ok */ }
+      }
+      if (this.proc.stderr?.writable) {
+        try { this.proc.stderr.write('\x1b[?25h\n') } catch { /* ok */ }
+      }
+    }) as (...args: unknown[]) => void)
   }
 
   reset(): void {
@@ -132,8 +140,14 @@ export class ShutdownManager {
     return () => { this.registry.delete(name) }
   }
 
-  registerLockOwnership(_path: string): void {}
-  releaseLockOwnership(): void {}
+  registerLockOwnership(lockFilePath: string): void {
+    this.lockPath = lockFilePath
+    this.lockOwned = true
+  }
+  releaseLockOwnership(): void {
+    this.lockOwned = false
+    this.lockPath = null
+  }
   async shutdown(exitCode: number = ExitCode.UserCancellation): Promise<never> {
     if (this.shuttingDown) {
       return new Promise<never>(() => {})
@@ -193,8 +207,10 @@ export class ShutdownManager {
     }
   }
   async withContext<T>(
-    _message: string | (() => string), fn: () => T | Promise<T>,
-  ): Promise<T> { return Promise.resolve(fn()) }
+    message: string | (() => string), fn: () => T | Promise<T>,
+  ): Promise<T> {
+    return this.contextStorage.run(message, () => Promise.resolve(fn()))
+  }
 }
 
 export const shutdown = new ShutdownManager()

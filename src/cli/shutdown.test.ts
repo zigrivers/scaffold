@@ -269,6 +269,87 @@ describe('ShutdownManager', () => {
     })
   })
 
+  describe('withContext()', () => {
+    beforeEach(() => {
+      mgr.install()
+    })
+
+    it('returns the value from the wrapped function', async () => {
+      const result = await mgr.withContext('msg', async () => 'value')
+      expect(result).toBe('value')
+    })
+
+    it('uses context message during shutdown', async () => {
+      await mgr.withContext('Custom cancel message.', async () => {
+        mgr.shutdown()
+        await vi.waitFor(() => expect(proc.exit).toHaveBeenCalled())
+      })
+      expect(proc.stderr.write).toHaveBeenCalledWith('\nCustom cancel message.\n')
+    })
+
+    it('supports thunk messages evaluated at shutdown time', async () => {
+      let phase = 'wizard'
+      await mgr.withContext(() => `Cancelled during ${phase}.`, async () => {
+        phase = 'build'
+        mgr.shutdown()
+        await vi.waitFor(() => expect(proc.exit).toHaveBeenCalled())
+      })
+      expect(proc.stderr.write).toHaveBeenCalledWith('\nCancelled during build.\n')
+    })
+
+    it('concurrent async scopes maintain independent contexts', async () => {
+      const contexts: string[] = []
+      await Promise.all([
+        mgr.withContext('scope-A', async () => {
+          await new Promise(r => setTimeout(r, 10))
+          contexts.push((mgr as any).currentContext)
+        }),
+        mgr.withContext('scope-B', async () => {
+          await new Promise(r => setTimeout(r, 5))
+          contexts.push((mgr as any).currentContext)
+        }),
+      ])
+      expect(contexts).toContain('scope-A')
+      expect(contexts).toContain('scope-B')
+    })
+
+    it('inner context overrides outer context', async () => {
+      await mgr.withContext('outer', async () => {
+        await mgr.withContext('inner', async () => {
+          mgr.shutdown()
+          await vi.waitFor(() => expect(proc.exit).toHaveBeenCalled())
+        })
+      })
+      expect(proc.stderr.write).toHaveBeenCalledWith('\ninner\n')
+    })
+  })
+
+  describe('lock ownership', () => {
+    it('registers and releases lock ownership', () => {
+      mgr.registerLockOwnership('/path/to/lock.json')
+      expect((mgr as any).lockOwned).toBe(true)
+      expect((mgr as any).lockPath).toBe('/path/to/lock.json')
+
+      mgr.releaseLockOwnership()
+      expect((mgr as any).lockOwned).toBe(false)
+      expect((mgr as any).lockPath).toBeNull()
+    })
+  })
+
+  describe('exit safety net', () => {
+    it('runs exit handler only once (reentrancy guard)', () => {
+      mgr.install()
+      proc.emit('exit', 0)
+      proc.emit('exit', 0)
+
+      const stderrCalls = (proc.stderr.write as ReturnType<typeof vi.fn>).mock.calls
+      const cursorRestores = stderrCalls.filter(
+        ([arg]: [string]) => arg.includes('\x1b[?25h'),
+      )
+      expect(cursorRestores.length).toBe(1)
+    })
+  })
+
   describe('withPrompt()', () => {
     beforeEach(() => {
       mgr.install()
