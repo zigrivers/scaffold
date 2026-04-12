@@ -31,11 +31,6 @@ export const coreCopy: CoreCopy = {
   methodology: {
     short: 'Controls how thorough the scaffolding process is.',
     long: 'Deep produces comprehensive docs; MVP skips optional steps; Custom lets you toggle each step.',
-    options: {
-      deep:   { label: 'Deep',   short: 'Every step enabled — full architecture, docs, and tests.' },
-      mvp:    { label: 'MVP',    short: 'Minimum viable pipeline — ship fast, fill in later.' },
-      custom: { label: 'Custom', short: 'Hand-pick which steps run and at what depth.' },
-    },
   },
   depth: {
     short: 'Sets the default detail level (1 = minimal, 5 = comprehensive) for all steps.',

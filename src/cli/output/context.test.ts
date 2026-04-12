@@ -798,6 +798,31 @@ describe('InteractiveOutput — re-prompt on invalid input (A3)', () => {
     }
   })
 
+  it('multiSelect() warns about partial invalid entries and returns valid ones', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      inputMock.mockResolvedValueOnce('1, banana, 2')
+
+      const out = new InteractiveOutput()
+      const result = await out.multiSelect('Pick:', ['a', 'b', 'c'])
+      expect(result).toEqual(['a', 'b'])
+      // Should NOT re-prompt — only called once
+      expect(inputMock).toHaveBeenCalledTimes(1)
+      // Warning about unrecognized entries
+      const allWritten = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+      expect(allWritten).toContain('Ignored unrecognized: banana')
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+
   it('multiSelect() returns defaults on empty input (pressing Enter)', async () => {
     const originalStdinIsTTY = process.stdin.isTTY
     const originalStdoutIsTTY = process.stdout.isTTY

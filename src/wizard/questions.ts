@@ -126,7 +126,7 @@ export async function askWizardQuestions(options: {
     const ptCopy = coreCopy.projectType
     const selected = await output.select(
       'What type of project is this?',
-      optionsFromCopy(ptCopy.options!, [...ProjectTypeSchema.options]),
+      optionsFromCopy(ptCopy.options, [...ProjectTypeSchema.options]),
       'web-app',
       ptCopy,
     )
@@ -146,7 +146,7 @@ export async function askWizardQuestions(options: {
     const renderingStrategy: WebAppConfig['renderingStrategy'] = options.webAppFlags?.webRendering
       ?? await output.select(
         'Rendering strategy?',
-        optionsFromCopy(copy.renderingStrategy.options!, ['spa', 'ssr', 'ssg', 'hybrid']),
+        optionsFromCopy(copy.renderingStrategy.options, ['spa', 'ssr', 'ssg', 'hybrid']),
         undefined,
         copy.renderingStrategy,
       ) as WebAppConfig['renderingStrategy']
@@ -154,7 +154,7 @@ export async function askWizardQuestions(options: {
     const deployTarget: WebAppConfig['deployTarget'] = options.webAppFlags?.webDeployTarget
       ?? (!auto
         ? await output.select('Deploy target?',
-          optionsFromCopy(copy.deployTarget.options!, ['static', 'serverless', 'container', 'edge', 'long-running']),
+          optionsFromCopy(copy.deployTarget.options, ['static', 'serverless', 'container', 'edge', 'long-running']),
           'serverless',
           copy.deployTarget,
         ) as WebAppConfig['deployTarget']
@@ -163,7 +163,7 @@ export async function askWizardQuestions(options: {
     const realtime: WebAppConfig['realtime'] = options.webAppFlags?.webRealtime
       ?? (!auto
         ? await output.select('Real-time needs?',
-          optionsFromCopy(copy.realtime.options!, ['none', 'websocket', 'sse']),
+          optionsFromCopy(copy.realtime.options, ['none', 'websocket', 'sse']),
           'none',
           copy.realtime,
         ) as WebAppConfig['realtime']
@@ -172,7 +172,7 @@ export async function askWizardQuestions(options: {
     const authFlow: WebAppConfig['authFlow'] = options.webAppFlags?.webAuthFlow
       ?? (!auto
         ? await output.select('How do users authenticate?',
-          optionsFromCopy(copy.authFlow.options!, ['none', 'session', 'oauth', 'passkey']),
+          optionsFromCopy(copy.authFlow.options, ['none', 'session', 'oauth', 'passkey']),
           'none',
           copy.authFlow,
         ) as WebAppConfig['authFlow']
@@ -193,7 +193,7 @@ export async function askWizardQuestions(options: {
 
     const apiStyle: BackendConfig['apiStyle'] = options.backendFlags?.backendApiStyle
       ?? await output.select('API style?',
-        optionsFromCopy(copy.apiStyle.options!, ['rest', 'graphql', 'grpc', 'trpc', 'none']),
+        optionsFromCopy(copy.apiStyle.options, ['rest', 'graphql', 'grpc', 'trpc', 'none']),
         undefined,
         copy.apiStyle,
       ) as BackendConfig['apiStyle']
@@ -201,7 +201,7 @@ export async function askWizardQuestions(options: {
     const dataStore: BackendConfig['dataStore'] = options.backendFlags?.backendDataStore
       ?? (!auto
         ? await output.multiSelect('Data store(s)?',
-          optionsFromCopy(copy.dataStore.options!, ['relational', 'document', 'key-value']),
+          optionsFromCopy(copy.dataStore.options, ['relational', 'document', 'key-value']),
           ['relational'],
           copy.dataStore,
         ) as BackendConfig['dataStore']
@@ -217,7 +217,7 @@ export async function askWizardQuestions(options: {
       authMechanism = options.backendFlags?.backendAuth
         ?? (!auto
           ? await output.select('How does the API verify requests?',
-            optionsFromCopy(copy.authMechanism.options!, ['none', 'jwt', 'session', 'oauth', 'apikey']),
+            optionsFromCopy(copy.authMechanism.options, ['none', 'jwt', 'session', 'oauth', 'apikey']),
             'none',
             copy.authMechanism,
           ) as BackendConfig['authMechanism']
@@ -227,7 +227,7 @@ export async function askWizardQuestions(options: {
     const asyncMessaging: BackendConfig['asyncMessaging'] = options.backendFlags?.backendMessaging
       ?? (!auto
         ? await output.select('Async messaging?',
-          optionsFromCopy(copy.asyncMessaging.options!, ['none', 'queue', 'event-driven']),
+          optionsFromCopy(copy.asyncMessaging.options, ['none', 'queue', 'event-driven']),
           'none',
           copy.asyncMessaging,
         ) as BackendConfig['asyncMessaging']
@@ -236,7 +236,7 @@ export async function askWizardQuestions(options: {
     const deployTarget: BackendConfig['deployTarget'] = options.backendFlags?.backendDeployTarget
       ?? (!auto
         ? await output.select('Deploy target?',
-          optionsFromCopy(copy.deployTarget.options!, ['serverless', 'container', 'long-running']),
+          optionsFromCopy(copy.deployTarget.options, ['serverless', 'container', 'long-running']),
           'container',
           copy.deployTarget,
         ) as BackendConfig['deployTarget']
@@ -257,7 +257,7 @@ export async function askWizardQuestions(options: {
 
     const interactivity: CliConfig['interactivity'] = options.cliFlags?.cliInteractivity
       ?? await output.select('Interactivity model?',
-        optionsFromCopy(copy.interactivity.options!, ['args-only', 'interactive', 'hybrid']),
+        optionsFromCopy(copy.interactivity.options, ['args-only', 'interactive', 'hybrid']),
         undefined,
         copy.interactivity,
       ) as CliConfig['interactivity']
@@ -265,7 +265,7 @@ export async function askWizardQuestions(options: {
     const distributionChannels: CliConfig['distributionChannels'] = options.cliFlags?.cliDistribution
       ?? (!auto
         ? await output.multiSelect('Distribution channels?',
-          optionsFromCopy(copy.distributionChannels.options!, [
+          optionsFromCopy(copy.distributionChannels.options, [
             'package-manager', 'system-package-manager', 'standalone-binary', 'container',
           ]),
           ['package-manager'],
@@ -290,7 +290,7 @@ export async function askWizardQuestions(options: {
     }
     const visibility: LibraryConfig['visibility'] = options.libraryFlags?.libVisibility
       ?? await output.select('Library visibility?',
-        optionsFromCopy(copy.visibility.options!, ['public', 'internal']),
+        optionsFromCopy(copy.visibility.options, ['public', 'internal']),
         undefined,
         copy.visibility,
       ) as LibraryConfig['visibility']
@@ -298,7 +298,7 @@ export async function askWizardQuestions(options: {
     const runtimeTarget: LibraryConfig['runtimeTarget'] = options.libraryFlags?.libRuntimeTarget
       ?? (!auto
         ? await output.select('Runtime target?',
-          optionsFromCopy(copy.runtimeTarget.options!, ['node', 'browser', 'isomorphic', 'edge']),
+          optionsFromCopy(copy.runtimeTarget.options, ['node', 'browser', 'isomorphic', 'edge']),
           'isomorphic',
           copy.runtimeTarget,
         ) as LibraryConfig['runtimeTarget']
@@ -307,7 +307,7 @@ export async function askWizardQuestions(options: {
     const bundleFormat: LibraryConfig['bundleFormat'] = options.libraryFlags?.libBundleFormat
       ?? (!auto
         ? await output.select('Bundle format?',
-          optionsFromCopy(copy.bundleFormat.options!, ['esm', 'cjs', 'dual', 'unbundled']),
+          optionsFromCopy(copy.bundleFormat.options, ['esm', 'cjs', 'dual', 'unbundled']),
           'dual',
           copy.bundleFormat,
         ) as LibraryConfig['bundleFormat']
@@ -319,7 +319,7 @@ export async function askWizardQuestions(options: {
     const documentationLevel: LibraryConfig['documentationLevel'] = options.libraryFlags?.libDocLevel
       ?? (!auto
         ? await output.select('Documentation level?',
-          optionsFromCopy(copy.documentationLevel.options!, ['none', 'readme', 'api-docs', 'full-site']),
+          optionsFromCopy(copy.documentationLevel.options, ['none', 'readme', 'api-docs', 'full-site']),
           'readme',
           copy.documentationLevel,
         ) as LibraryConfig['documentationLevel']
@@ -340,7 +340,7 @@ export async function askWizardQuestions(options: {
     const platform: MobileAppConfig['platform'] = options.mobileAppFlags?.mobilePlatform
       ?? await output.select(
         'Target platform?',
-        optionsFromCopy(copy.platform.options!, ['ios', 'android', 'cross-platform']),
+        optionsFromCopy(copy.platform.options, ['ios', 'android', 'cross-platform']),
         undefined,
         copy.platform,
       ) as MobileAppConfig['platform']
@@ -348,7 +348,7 @@ export async function askWizardQuestions(options: {
     const distributionModel: MobileAppConfig['distributionModel'] = options.mobileAppFlags?.mobileDistribution
       ?? (!auto
         ? await output.select('Distribution model?',
-          optionsFromCopy(copy.distributionModel.options!, ['public', 'private', 'mixed']),
+          optionsFromCopy(copy.distributionModel.options, ['public', 'private', 'mixed']),
           'public',
           copy.distributionModel,
         ) as MobileAppConfig['distributionModel']
@@ -357,7 +357,7 @@ export async function askWizardQuestions(options: {
     const offlineSupport: MobileAppConfig['offlineSupport'] = options.mobileAppFlags?.mobileOffline
       ?? (!auto
         ? await output.select('Offline support?',
-          optionsFromCopy(copy.offlineSupport.options!, ['none', 'cache', 'offline-first']),
+          optionsFromCopy(copy.offlineSupport.options, ['none', 'cache', 'offline-first']),
           'none',
           copy.offlineSupport,
         ) as MobileAppConfig['offlineSupport']
@@ -382,7 +382,7 @@ export async function askWizardQuestions(options: {
     const processingModel: DataPipelineConfig['processingModel'] = options.dataPipelineFlags?.pipelineProcessing
       ?? await output.select(
         'Processing model?',
-        optionsFromCopy(copy.processingModel.options!, ['batch', 'streaming', 'hybrid']),
+        optionsFromCopy(copy.processingModel.options, ['batch', 'streaming', 'hybrid']),
         undefined,
         copy.processingModel,
       ) as DataPipelineConfig['processingModel']
@@ -390,7 +390,7 @@ export async function askWizardQuestions(options: {
     const orchestration: DataPipelineConfig['orchestration'] = options.dataPipelineFlags?.pipelineOrchestration
       ?? (!auto
         ? await output.select('Orchestration pattern?',
-          optionsFromCopy(copy.orchestration.options!, ['none', 'dag-based', 'event-driven', 'scheduled']),
+          optionsFromCopy(copy.orchestration.options, ['none', 'dag-based', 'event-driven', 'scheduled']),
           'none',
           copy.orchestration,
         ) as DataPipelineConfig['orchestration']
@@ -399,7 +399,7 @@ export async function askWizardQuestions(options: {
     const dataQualityStrategy: DataPipelineConfig['dataQualityStrategy'] = options.dataPipelineFlags?.pipelineQuality
       ?? (!auto
         ? await output.select('Data quality strategy?',
-          optionsFromCopy(copy.dataQualityStrategy.options!, ['none', 'validation', 'testing', 'observability']),
+          optionsFromCopy(copy.dataQualityStrategy.options, ['none', 'validation', 'testing', 'observability']),
           'validation',
           copy.dataQualityStrategy,
         ) as DataPipelineConfig['dataQualityStrategy']
@@ -408,7 +408,7 @@ export async function askWizardQuestions(options: {
     const schemaManagement: DataPipelineConfig['schemaManagement'] = options.dataPipelineFlags?.pipelineSchema
       ?? (!auto
         ? await output.select('Schema management?',
-          optionsFromCopy(copy.schemaManagement.options!, ['none', 'schema-registry', 'contracts']),
+          optionsFromCopy(copy.schemaManagement.options, ['none', 'schema-registry', 'contracts']),
           'none',
           copy.schemaManagement,
         ) as DataPipelineConfig['schemaManagement']
@@ -433,7 +433,7 @@ export async function askWizardQuestions(options: {
     const projectPhase: MlConfig['projectPhase'] = options.mlFlags?.mlPhase
       ?? await output.select(
         'Project phase?',
-        optionsFromCopy(copy.projectPhase.options!, ['training', 'inference', 'both']),
+        optionsFromCopy(copy.projectPhase.options, ['training', 'inference', 'both']),
         undefined,
         copy.projectPhase,
       ) as MlConfig['projectPhase']
@@ -441,7 +441,7 @@ export async function askWizardQuestions(options: {
     const modelType: MlConfig['modelType'] = options.mlFlags?.mlModelType
       ?? (!auto
         ? await output.select('Model type?',
-          optionsFromCopy(copy.modelType.options!, ['classical', 'deep-learning', 'llm']),
+          optionsFromCopy(copy.modelType.options, ['classical', 'deep-learning', 'llm']),
           'deep-learning',
           copy.modelType,
         ) as MlConfig['modelType']
@@ -454,7 +454,7 @@ export async function askWizardQuestions(options: {
     const servingPattern: MlConfig['servingPattern'] = options.mlFlags?.mlServing
       ?? (!auto
         ? await output.select('Serving pattern?',
-          optionsFromCopy(copy.servingPattern.options!, ['none', 'batch', 'realtime', 'edge']),
+          optionsFromCopy(copy.servingPattern.options, ['none', 'batch', 'realtime', 'edge']),
           autoServingDefault,
           copy.servingPattern,
         ) as MlConfig['servingPattern']
@@ -475,7 +475,7 @@ export async function askWizardQuestions(options: {
     const manifestVersion: BrowserExtensionConfig['manifestVersion'] = options.browserExtensionFlags?.extManifest
       ?? (!auto
         ? await output.select('Manifest version?',
-          optionsFromCopy(copy.manifestVersion.options!, ['2', '3']),
+          optionsFromCopy(copy.manifestVersion.options, ['2', '3']),
           '3',
           copy.manifestVersion,
         ) as BrowserExtensionConfig['manifestVersion']
@@ -484,7 +484,7 @@ export async function askWizardQuestions(options: {
     const uiSurfaces: BrowserExtensionConfig['uiSurfaces'] = options.browserExtensionFlags?.extUiSurfaces
       ?? (!auto
         ? await output.multiSelect('UI surfaces?',
-          optionsFromCopy(copy.uiSurfaces.options!, ['popup', 'options', 'newtab', 'devtools', 'sidepanel']),
+          optionsFromCopy(copy.uiSurfaces.options, ['popup', 'options', 'newtab', 'devtools', 'sidepanel']),
           ['popup'],
           copy.uiSurfaces,
         ) as BrowserExtensionConfig['uiSurfaces']
@@ -511,7 +511,7 @@ export async function askWizardQuestions(options: {
       ?? (!auto
         ? await output.select(
           'Game engine:',
-          optionsFromCopy(copy.engine.options!, ['unity', 'unreal', 'godot', 'custom']),
+          optionsFromCopy(copy.engine.options, ['unity', 'unreal', 'godot', 'custom']),
           undefined,
           copy.engine,
         ) as GameConfig['engine']
@@ -524,7 +524,7 @@ export async function askWizardQuestions(options: {
       ?? (!auto
         ? await output.select(
           'Multiplayer mode:',
-          optionsFromCopy(copy.multiplayerMode.options!, ['none', 'local', 'online', 'hybrid']),
+          optionsFromCopy(copy.multiplayerMode.options, ['none', 'local', 'online', 'hybrid']),
           'none',
           copy.multiplayerMode,
         ) as GameConfig['multiplayerMode']
@@ -534,7 +534,7 @@ export async function askWizardQuestions(options: {
       ?? (!auto
         ? await output.multiSelect(
           'Target platforms:',
-          optionsFromCopy(copy.targetPlatforms.options!, [
+          optionsFromCopy(copy.targetPlatforms.options, [
             'pc', 'web', 'ios', 'android', 'ps5', 'xbox', 'switch', 'vr', 'ar',
           ]),
           ['pc'],
@@ -549,7 +549,7 @@ export async function askWizardQuestions(options: {
     } else if ((multiplayerMode === 'online' || multiplayerMode === 'hybrid') && !auto) {
       onlineServices = await output.multiSelect(
         'Online services:',
-        optionsFromCopy(copy.onlineServices.options!, ['leaderboards', 'accounts', 'matchmaking', 'live-ops']),
+        optionsFromCopy(copy.onlineServices.options, ['leaderboards', 'accounts', 'matchmaking', 'live-ops']),
         [],
         copy.onlineServices,
       ) as GameConfig['onlineServices']
@@ -561,7 +561,7 @@ export async function askWizardQuestions(options: {
       ?? (!auto
         ? await output.select(
           'Content structure:',
-          optionsFromCopy(copy.contentStructure.options!, [
+          optionsFromCopy(copy.contentStructure.options, [
             'discrete', 'open-world', 'procedural', 'endless', 'mission-based',
           ]),
           'discrete',
@@ -573,7 +573,7 @@ export async function askWizardQuestions(options: {
       ?? (!auto
         ? await output.select(
           'Economy model:',
-          optionsFromCopy(copy.economy.options!, ['none', 'progression', 'monetized', 'both']),
+          optionsFromCopy(copy.economy.options, ['none', 'progression', 'monetized', 'both']),
           'none',
           copy.economy,
         ) as GameConfig['economy']
@@ -600,7 +600,7 @@ export async function askWizardQuestions(options: {
       if (gf?.narrative === undefined) {
         narrative = await output.select(
           'Narrative depth:',
-          optionsFromCopy(copy.narrative.options!, ['none', 'light', 'heavy']),
+          optionsFromCopy(copy.narrative.options, ['none', 'light', 'heavy']),
           'none',
           copy.narrative,
         ) as GameConfig['narrative']
@@ -615,7 +615,7 @@ export async function askWizardQuestions(options: {
       if (gf?.npcAi === undefined) {
         npcAiComplexity = await output.select(
           'NPC AI complexity:',
-          optionsFromCopy(copy.npcAiComplexity.options!, ['none', 'simple', 'complex']),
+          optionsFromCopy(copy.npcAiComplexity.options, ['none', 'simple', 'complex']),
           'none',
           copy.npcAiComplexity,
         ) as GameConfig['npcAiComplexity']
@@ -626,7 +626,7 @@ export async function askWizardQuestions(options: {
       if (gf?.persistence === undefined) {
         persistence = await output.select(
           'Persistence level:',
-          optionsFromCopy(copy.persistence.options!, ['none', 'settings-only', 'profile', 'progression', 'cloud']),
+          optionsFromCopy(copy.persistence.options, ['none', 'settings-only', 'profile', 'progression', 'cloud']),
           'progression',
           copy.persistence,
         ) as GameConfig['persistence']

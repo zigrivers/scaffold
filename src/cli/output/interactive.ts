@@ -265,6 +265,19 @@ export class InteractiveOutput implements OutputContext {
         }
       }
       if (selected.length > 0) {
+        // Warn about any unrecognized entries
+        const inputParts = answer.split(',').map(s => s.trim()).filter(Boolean)
+        const unrecognized = inputParts.filter(part => {
+          if (/^\d+$/.test(part)) {
+            const num = Number(part)
+            return num < 1 || num > normalized.length
+          }
+          return !normalized.some(n => n.value === part) &&
+                 !normalized.some(n => n.label?.toLowerCase() === part.toLowerCase())
+        })
+        if (unrecognized.length > 0) {
+          process.stdout.write(`  Ignored unrecognized: ${unrecognized.join(', ')}\n`)
+        }
         return selected
       }
       // Non-empty input but no valid selections — print error and re-prompt

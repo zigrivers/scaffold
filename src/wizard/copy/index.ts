@@ -29,9 +29,14 @@ export function getCopyForType<T extends ProjectType>(type: T): ProjectCopyMap[T
 }
 
 export function optionsFromCopy<T extends string>(
-  copy: Record<T, OptionCopy>,
+  copy: Record<T, OptionCopy> | undefined,
   values: readonly T[],
 ): SelectOption[] {
+  if (!copy) {
+    throw new Error(
+      'optionsFromCopy called with undefined copy — check that the copy file defines options for this field',
+    )
+  }
   return values.map(v => ({ value: v, label: copy[v].label, short: copy[v].short }))
 }
 
