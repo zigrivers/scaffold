@@ -3,10 +3,11 @@ import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { StateManager } from '../../state/state-manager.js'
-import { acquireLock, releaseLock } from '../../state/lock-manager.js'
+import { acquireLock, getLockPath, releaseLock } from '../../state/lock-manager.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
+import { shutdown } from '../shutdown.js'
 
 interface CompleteArgs {
   step: string
@@ -46,11 +47,16 @@ const completeCommand: CommandModule<Record<string, unknown>, CompleteArgs> = {
       } else {
         output.warn('Lock is held by another process')
       }
-      process.exit(3)
+      process.exitCode = 3
       return
     }
 
-    try {
+    shutdown.registerLockOwnership(getLockPath(projectRoot))
+
+    await shutdown.withResource('lock', () => {
+      releaseLock(projectRoot)
+      shutdown.releaseLockOwnership()
+    }, async () => {
       const context = loadPipelineContext(projectRoot)
       const pipeline = resolvePipeline(context)
       const stateManager = new StateManager(projectRoot, pipeline.computeEligible)
@@ -68,7 +74,7 @@ const completeCommand: CommandModule<Record<string, unknown>, CompleteArgs> = {
           exitCode: 2,
           recovery: 'Run `scaffold list` to see available steps',
         })
-        process.exit(2)
+        process.exitCode = 2
         return
       }
 
@@ -81,7 +87,7 @@ const completeCommand: CommandModule<Record<string, unknown>, CompleteArgs> = {
         } else {
           output.info(`Step '${argv.step}' is already completed`)
         }
-        process.exit(0)
+        process.exitCode = 0
         return
       }
 
@@ -113,12 +119,8 @@ const completeCommand: CommandModule<Record<string, unknown>, CompleteArgs> = {
         output.success(`Step '${argv.step}' marked as completed (was ${previousStatus})`)
         output.info('Run `scaffold next` to see eligible steps')
       }
-      process.exit(0)
-    } finally {
-      if (lockResult.acquired) {
-        releaseLock(projectRoot)
-      }
-    }
+      process.exitCode = 0
+    })
   },
 }
 
