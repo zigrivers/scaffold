@@ -3,7 +3,7 @@ import { setMaxListeners } from 'node:events'
 // fs and ExitCode used by methods implemented in subsequent tasks
 import fs from 'node:fs' // eslint-disable-line @typescript-eslint/no-unused-vars
 
-import { ExitCode } from '../types/enums.js' // eslint-disable-line @typescript-eslint/no-unused-vars
+import { ExitCode } from '../types/enums.js'
 
 export interface ShutdownProcess {
   on(event: string, listener: (...args: unknown[]) => void): void
@@ -50,7 +50,30 @@ export class ShutdownManager {
   }
 
   private sigintHandler = (): void => {
-    // Implemented in Task 2
+    if (!this.proc.stdout.isTTY) {
+      if (this.sigintState === 'idle') {
+        this.sigintState = 'cleaning'
+        this.shutdown(ExitCode.UserCancellation)
+      } else {
+        this.proc.exit(ExitCode.UserCancellation)
+      }
+      return
+    }
+
+    switch (this.sigintState) {
+      case 'idle':
+        this.sigintState = 'cleaning'
+        this.shutdown(ExitCode.UserCancellation)
+        break
+      case 'cleaning':
+        this.proc.stderr.write('\nPress Ctrl+C again to force quit.\n')
+        this.sigintState = 'armed'
+        break
+      case 'armed':
+        this.proc.stderr.write('\nForce quit.\n')
+        this.proc.exit(ExitCode.UserCancellation)
+        break
+    }
   }
 
   private sigtermHandler = (): void => {

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { EventEmitter } from 'node:events'
 import { ShutdownManager } from './shutdown.js'
 import type { ShutdownProcess } from './shutdown.js'
+import { ExitCode } from '../types/enums.js'
 
 class FakeProcess extends EventEmitter {
   exit = vi.fn() as unknown as ShutdownProcess['exit']
@@ -59,6 +60,58 @@ describe('ShutdownManager', () => {
       expect(mgr.isShuttingDown).toBe(true)
       mgr.reset()
       expect(mgr.isShuttingDown).toBe(false)
+    })
+  })
+
+  describe('SIGINT handler (TTY)', () => {
+    beforeEach(() => {
+      proc.stdout.isTTY = true
+      mgr.install()
+    })
+
+    it('first SIGINT calls shutdown (idle -> cleaning)', () => {
+      const shutdownSpy = vi.spyOn(mgr, 'shutdown').mockResolvedValue(undefined as never)
+      proc.emit('SIGINT')
+      expect(shutdownSpy).toHaveBeenCalledWith(ExitCode.UserCancellation)
+    })
+
+    it('second SIGINT prints warning (cleaning -> armed)', () => {
+      vi.spyOn(mgr, 'shutdown').mockResolvedValue(undefined as never)
+      proc.emit('SIGINT')
+      proc.emit('SIGINT')
+      expect(proc.stderr.write).toHaveBeenCalledWith('\nPress Ctrl+C again to force quit.\n')
+    })
+
+    it('third SIGINT force-quits (armed -> exit)', () => {
+      vi.spyOn(mgr, 'shutdown').mockResolvedValue(undefined as never)
+      proc.emit('SIGINT')
+      proc.emit('SIGINT')
+      proc.emit('SIGINT')
+      expect(proc.stderr.write).toHaveBeenCalledWith('\nForce quit.\n')
+      expect(proc.exit).toHaveBeenCalledWith(ExitCode.UserCancellation)
+    })
+  })
+
+  describe('SIGINT handler (non-TTY)', () => {
+    beforeEach(() => {
+      proc.stdout.isTTY = false
+      mgr.install()
+    })
+
+    it('first SIGINT calls shutdown immediately', () => {
+      const shutdownSpy = vi.spyOn(mgr, 'shutdown').mockResolvedValue(undefined as never)
+      proc.emit('SIGINT')
+      expect(shutdownSpy).toHaveBeenCalledWith(ExitCode.UserCancellation)
+    })
+
+    it('second SIGINT force-exits without warning', () => {
+      vi.spyOn(mgr, 'shutdown').mockResolvedValue(undefined as never)
+      proc.emit('SIGINT')
+      proc.emit('SIGINT')
+      expect(proc.exit).toHaveBeenCalledWith(ExitCode.UserCancellation)
+      expect(proc.stderr.write).not.toHaveBeenCalledWith(
+        expect.stringContaining('Press Ctrl+C'),
+      )
     })
   })
 })
