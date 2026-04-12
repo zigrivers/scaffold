@@ -468,11 +468,12 @@
       "produces": []
     },
     "create-vision": {
-      "status": "pending",
+      "status": "in_progress",
       "source": "pipeline",
       "produces": [
         "docs/vision.md"
-      ]
+      ],
+      "at": "2026-04-12T21:12:21.005Z"
     },
     "innovate-vision": {
       "status": "pending",
@@ -490,7 +491,6 @@
     }
   },
   "next_eligible": [
-    "create-vision",
     "create-prd",
     "beads",
     "tech-stack"

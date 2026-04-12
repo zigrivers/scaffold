@@ -18,7 +18,16 @@ vi.mock('../middleware/output-mode.js', () => ({
 
 vi.mock('../../state/lock-manager.js', () => ({
   acquireLock: vi.fn(() => ({ acquired: true })),
+  getLockPath: vi.fn(() => '/mock/.scaffold/lock.json'),
   releaseLock: vi.fn(),
+}))
+
+vi.mock('../shutdown.js', () => ({
+  shutdown: {
+    registerLockOwnership: vi.fn(),
+    releaseLockOwnership: vi.fn(),
+    withResource: vi.fn(async (_name: string, _cleanup: () => void, fn: () => Promise<unknown>) => fn()),
+  },
 }))
 
 // ---------------------------------------------------------------------------
@@ -62,6 +71,7 @@ describe('complete command', () => {
   })
 
   afterEach(() => {
+    process.exitCode = undefined
     vi.restoreAllMocks()
     fs.rmSync(tempDir, { recursive: true, force: true })
   })
@@ -100,7 +110,7 @@ describe('complete command', () => {
   it('exits 2 when step not found in state', async () => {
     writeState({ 'some-other-step': { status: 'pending', source: 'pipeline' } })
     await completeCommand.handler(defaultArgv({ step: 'nonexistent' }))
-    expect(exitSpy).toHaveBeenCalledWith(2)
+    expect(process.exitCode).toBe(2)
   })
 
   it('marks in_progress step as completed', async () => {
@@ -109,7 +119,7 @@ describe('complete command', () => {
 
     const state = JSON.parse(fs.readFileSync(path.join(tempDir, '.scaffold', 'state.json'), 'utf8'))
     expect(state.steps['review-testing'].status).toBe('completed')
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
   })
 
   it('marks pending step as completed', async () => {
@@ -118,7 +128,7 @@ describe('complete command', () => {
 
     const state = JSON.parse(fs.readFileSync(path.join(tempDir, '.scaffold', 'state.json'), 'utf8'))
     expect(state.steps['review-testing'].status).toBe('completed')
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
   })
 
   it('reports already completed step without error', async () => {
@@ -127,7 +137,7 @@ describe('complete command', () => {
 
     const allOutput = writtenLines.join('')
     expect(allOutput).toContain('already completed')
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
   })
 
   it('clears in_progress record when completing that step', async () => {
@@ -167,6 +177,6 @@ describe('complete command', () => {
 
     const allOutput = writtenLines.join('')
     expect(allOutput).toContain('review-testing')
-    expect(exitSpy).toHaveBeenCalledWith(2)
+    expect(process.exitCode).toBe(2)
   })
 })

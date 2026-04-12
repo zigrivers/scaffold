@@ -116,6 +116,7 @@ describe('scaffold init E2E', () => {
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
     vi.restoreAllMocks()
+    process.exitCode = undefined
   })
 
   // Test 1: Creates .scaffold/ directory structure
@@ -240,7 +241,7 @@ describe('scaffold init E2E', () => {
 
   // Test 11: init command auto-runs build into hidden .scaffold/generated output
   it('init command creates hidden generated output and .gitignore without root commands', async () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+    vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
@@ -256,7 +257,7 @@ describe('scaffold init E2E', () => {
       verbose: false,
     })
 
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode ?? 0).toBe(0)
     expect(fs.existsSync(path.join(tmpDir, '.scaffold', 'generated', 'universal', 'prompts', 'README.md'))).toBe(true)
     expect(fs.existsSync(path.join(tmpDir, '.gitignore'))).toBe(true)
     expect(fs.readFileSync(path.join(tmpDir, '.gitignore'), 'utf8')).toContain('.scaffold/generated/')
@@ -265,7 +266,7 @@ describe('scaffold init E2E', () => {
 
   // Test 12: init command still writes hidden generated output from the default build path
   it('init command creates hidden generated output in the temp project', async () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+    vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
@@ -281,7 +282,7 @@ describe('scaffold init E2E', () => {
       verbose: false,
     })
 
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode ?? 0).toBe(0)
     expect(fs.existsSync(path.join(tmpDir, '.scaffold', 'generated', 'universal', 'prompts', 'README.md'))).toBe(true)
   })
 

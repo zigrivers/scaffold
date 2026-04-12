@@ -4,6 +4,7 @@ import { createOutputContext } from '../output/context.js'
 import { runWizard } from '../../wizard/wizard.js'
 import { runBuild } from './build.js'
 import { syncSkillsIfNeeded } from '../../core/skills/sync.js'
+import { shutdown } from '../shutdown.js'
 import { ProjectTypeSchema } from '../../config/schema.js'
 import { coerceCSV } from '../utils/coerce.js'
 import {
@@ -486,8 +487,9 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
     const projectType = argv['project-type'] ?? detectedType
 
     let result: Awaited<ReturnType<typeof runWizard>>
-    try {
-      result = await runWizard({
+
+    await shutdown.withContext('Cancelled. No changes were made.', async () => {
+      result = await shutdown.withPrompt(async () => runWizard({
         projectRoot,
         auto: argv.auto ?? false,
         force: argv.force ?? false,
@@ -569,59 +571,56 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
           researchDomain: argv['research-domain'] as ResearchFlags['researchDomain'],
           researchTracking: argv['research-tracking'],
         } : undefined,
-      })
-    } catch (err) {
-      if (err instanceof Error && err.name === 'ExitPromptError') {
-        output.info('Cancelled.')
-        process.exit(130)
+      }))
+
+      if (!result.success) {
+        for (const err of result.errors) {
+          output.error(err)
+        }
+        process.exitCode = 1
         return
       }
-      throw err
-    }
 
-    if (!result.success) {
-      for (const err of result.errors) {
-        output.error(err)
-      }
-      process.exit(1)
-      return
-    }
+      await shutdown.withContext(
+        'Cancelled. Partial output may exist. Run `scaffold build` to regenerate.',
+        async () => {
+          const buildResult = await runBuild({
+            'validate-only': false,
+            force: false,
+            format: argv.format,
+            auto: argv.auto,
+            verbose: argv.verbose,
+            root: projectRoot,
+          }, {
+            output,
+            suppressFinalResult: outputMode === 'json',
+          })
 
-    const buildResult = await runBuild({
-      'validate-only': false,
-      force: false,
-      format: argv.format,
-      auto: argv.auto,
-      verbose: argv.verbose,
-      root: projectRoot,
-    }, {
-      output,
-      suppressFinalResult: outputMode === 'json',
+          if (buildResult.exitCode !== 0) {
+            process.exitCode = buildResult.exitCode
+            return
+          }
+
+          // Install project-local skills — middleware can't handle this because
+          // init is ROOT_OPTIONAL and .scaffold/ doesn't exist when middleware runs
+          try {
+            syncSkillsIfNeeded(projectRoot)
+          } catch {
+            // best-effort — don't fail init if skill sync fails
+          }
+
+          if (outputMode === 'json') {
+            output.result({
+              ...result,
+              buildResult: buildResult.data ?? null,
+            })
+          } else {
+            output.success(`Scaffold initialized at ${result.configPath}`)
+          }
+
+        },
+      )
     })
-
-    if (buildResult.exitCode !== 0) {
-      process.exit(buildResult.exitCode)
-      return
-    }
-
-    // Install project-local skills — middleware can't handle this because
-    // init is ROOT_OPTIONAL and .scaffold/ doesn't exist when middleware runs
-    try {
-      syncSkillsIfNeeded(projectRoot)
-    } catch {
-      // best-effort — don't fail init if skill sync fails
-    }
-
-    if (outputMode === 'json') {
-      output.result({
-        ...result,
-        buildResult: buildResult.data ?? null,
-      })
-    } else {
-      output.success(`Scaffold initialized at ${result.configPath}`)
-    }
-
-    process.exit(0)
   },
 }
 

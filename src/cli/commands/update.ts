@@ -4,6 +4,7 @@ import https from 'node:https'
 import fs from 'node:fs'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
+import { shutdown } from '../shutdown.js'
 
 interface UpdateArgs {
   'check-only': boolean
@@ -61,8 +62,10 @@ function detectInstallChannel(): { channel: string; upgradeCommand: string } {
 function fetchLatestVersion(packageName: string): Promise<string | null> {
   return new Promise((resolve) => {
     const timeout = setTimeout(() => resolve(null), 3000)
+    timeout.unref()
     const req = https.get(
       `https://registry.npmjs.org/${encodeURIComponent(packageName)}/latest`,
+      { signal: shutdown.signal },
       (res) => {
         let data = ''
         res.on('data', (chunk: Buffer) => {

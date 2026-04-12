@@ -40,7 +40,7 @@ Either way, Scaffold constructs the prompt and the target AI tool does the work.
 
 **Multi-model validation** — At depth 4-5, all 19 review and validation steps can dispatch independent reviews to Codex and/or Gemini CLIs. Two independent models catch more blind spots than one. When both CLIs are available, findings are reconciled by confidence level (both agree = high confidence, single model P0 = still actionable). When a channel is unavailable, a compensating Claude self-review pass runs in its place (labeled `[compensating: Codex-equivalent]` or `[compensating: Gemini-equivalent]`, single-source confidence). CLI commands must always run in the foreground — background execution produces empty output. See the [Multi-Model Review](#multi-model-review) section.
 
-**State management** — Pipeline progress is tracked in `.scaffold/state.json` with atomic file writes and crash recovery. An advisory lock prevents concurrent runs. Decisions are logged to an append-only `decisions.jsonl`.
+**State management** — Pipeline progress is tracked in `.scaffold/state.json` with atomic file writes and crash recovery. An advisory lock prevents concurrent runs. Decisions are logged to an append-only `decisions.jsonl`. Pressing Ctrl+C during any command exits cleanly with an informative message — no stack traces, no orphaned locks, no corrupted state.
 
 **Dependency graph** — Steps declare their prerequisites in frontmatter. Scaffold builds a DAG, runs topological sort (Kahn's algorithm), detects cycles, and computes which steps are eligible at any point.
 

@@ -9,7 +9,7 @@ import path from 'node:path'
 import os from 'node:os'
 import { execSync } from 'node:child_process'
 
-function getLockPath(projectRoot: string): string {
+export function getLockPath(projectRoot: string): string {
   return path.join(projectRoot, '.scaffold', 'lock.json')
 }
 

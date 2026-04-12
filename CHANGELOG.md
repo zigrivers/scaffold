@@ -2,7 +2,7 @@
 
 All notable changes to Scaffold are documented here.
 
-## [3.14.0] — 2026-04-12
+## [3.15.0] — 2026-04-12
 
 ### Added
 - **Research project type** — scaffold's 10th project type, covering
@@ -37,6 +37,50 @@ All notable changes to Scaffold are documented here.
 - **Shared detector signal library** — `ML_FRAMEWORK_DEPS` and
   `EXPERIMENT_TRACKING_DEPS` extracted to `shared-signals.ts` for reuse
   across ML and research detectors.
+
+## [3.14.0] — 2026-04-13
+
+### Added
+- **Graceful shutdown** — Ctrl+C now exits cleanly with informative messages
+  instead of dumping stack traces. A centralized `ShutdownManager` handles
+  signal cleanup across all CLI commands.
+  - **Three-stage Ctrl+C** in TTY mode: first press runs cleanup and exits,
+    second press warns "Press Ctrl+C again to force quit", third force-quits.
+    Non-TTY (CI) gets immediate clean exit on first signal.
+  - **`withPrompt()`** catches `@inquirer/prompts` `ExitPromptError` by name
+    and triggers graceful shutdown — no more stack traces during interactive
+    prompts.
+  - **`withResource()`** provides idempotent cleanup guards for advisory locks
+    and in-progress state. Cleanup runs exactly once whether triggered by
+    shutdown or normal code path completion.
+  - **`withContext()`** uses `AsyncLocalStorage` for phase-aware exit messages
+    (e.g., "Cancelled. No changes were made." during wizard vs. "Partial output
+    may exist." during build).
+  - **Lock ownership guard** in `process.on('exit')` safety net prevents
+    deleting another process's lock file (per ADR-019).
+  - **`AbortSignal`** integration for HTTP request cancellation in `scaffold
+    version` and `scaffold update`.
+  - **Spinner auto-registration** — the spinner cleans up automatically on
+    shutdown without command-level wiring.
+  - **All 8 lock-holding commands integrated**: init, run, build, adopt, skip,
+    complete, rework, reset.
+
+### Changed
+- **Exit code for user cancellation** changed from 130 (POSIX) to 4
+  (`ExitCode.UserCancellation`) per ADR-025. This is a **breaking change** for
+  automation that checks for exit code 130.
+- `scaffold run` internally uses `process.exitCode` instead of `process.exit()`
+  for all exit paths, enabling `withResource` cleanup to run.
+- HTTP version-check timers in `version.ts` and `update.ts` now use `.unref()`
+  so they don't block process exit during shutdown.
+
+### Fixed
+- **`scaffold run` Ctrl+C during confirmation prompts** no longer shows
+  `RUN_UNEXPECTED_ERROR` — prompts are now wrapped in `withPrompt()`.
+- **`scaffold build` Ctrl+C** no longer reports "Build complete" with partial
+  output — exits with code 1 and skips success message.
+- **Lock cleanup with `--force`** no longer claims ownership of locks that
+  weren't acquired, preventing accidental deletion of another process's lock.
 
 ## [3.13.0] — 2026-04-12
 

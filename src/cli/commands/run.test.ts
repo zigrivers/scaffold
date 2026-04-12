@@ -26,6 +26,7 @@ vi.mock('../../state/lock-manager.js', () => ({
   acquireLock: vi.fn(),
   releaseLock: vi.fn(),
   checkLock: vi.fn(),
+  getLockPath: vi.fn(() => '/mock/.scaffold/lock.json'),
 }))
 
 vi.mock('../../state/completion.js', () => ({
@@ -138,12 +139,23 @@ vi.mock('../../cli/middleware/output-mode.js', () => ({
   resolveOutputMode: vi.fn(),
 }))
 
+vi.mock('../shutdown.js', () => ({
+  shutdown: {
+    withResource: vi.fn((_name: string, _cleanup: unknown, fn: () => unknown) => fn()),
+    withPrompt: vi.fn((fn: () => unknown) => fn()),
+    withContext: vi.fn((_msg: unknown, fn: () => unknown) => fn()),
+    registerLockOwnership: vi.fn(),
+    releaseLockOwnership: vi.fn(),
+  },
+}))
+
 // ---------------------------------------------------------------------------
 // Import mocked modules
 // ---------------------------------------------------------------------------
 
 import { StateManager } from '../../state/state-manager.js'
 import { acquireLock, releaseLock } from '../../state/lock-manager.js'
+import { shutdown } from '../shutdown.js'
 import { analyzeCrash } from '../../state/completion.js'
 import { AssemblyEngine } from '../../core/assembly/engine.js'
 import { discoverMetaPrompts, discoverAllMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
@@ -299,15 +311,15 @@ function makeSuccessAssemblyResult(): AssemblyResult {
 
 const PROJECT_ROOT = '/test/project'
 
-let exitSpy: MockInstance
+let _exitSpy: MockInstance
 let stdoutSpy: MockInstance
 let mockOutput: ReturnType<typeof makeOutputContext>
 
 beforeEach(() => {
   vi.clearAllMocks()
 
-  exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
-    throw new Error('process.exit called')
+  _exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
+    // no-op — run.ts no longer calls process.exit(); it sets process.exitCode
   }) as never)
 
   stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
@@ -386,6 +398,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  process.exitCode = undefined
   vi.restoreAllMocks()
 })
 
@@ -416,10 +429,9 @@ describe('run command handler', () => {
     it('exits 1 when project root is not found', async () => {
       vi.mocked(findProjectRoot).mockReturnValue(null)
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], root: undefined }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'], root: undefined })
 
-      expect(exitSpy).toHaveBeenCalledWith(1)
+      expect(process.exitCode).toBe(1)
     })
 
     it('exits 1 when config cannot be loaded', async () => {
@@ -429,10 +441,9 @@ describe('run command handler', () => {
         warnings: [],
       })
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'] })
 
-      expect(exitSpy).toHaveBeenCalledWith(1)
+      expect(process.exitCode).toBe(1)
     })
   })
 
@@ -441,10 +452,9 @@ describe('run command handler', () => {
       vi.mocked(discoverMetaPrompts).mockReturnValue(new Map())
       vi.mocked(discoverAllMetaPrompts).mockReturnValue(new Map())
 
-      await expect(invokeHandler({ step: 'unknown-step', _: ['run'] }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'unknown-step', _: ['run'] })
 
-      expect(exitSpy).toHaveBeenCalledWith(1)
+      expect(process.exitCode).toBe(1)
     })
 
     it('includes fuzzy match suggestion in error when step not found', async () => {
@@ -452,11 +462,10 @@ describe('run command handler', () => {
       vi.mocked(discoverMetaPrompts).mockReturnValue(map)
       vi.mocked(discoverAllMetaPrompts).mockReturnValue(map)
 
-      await expect(invokeHandler({ step: 'create-pr', _: ['run'] }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-pr', _: ['run'] })
 
       // Should have called output.error or displayErrors
-      expect(exitSpy).toHaveBeenCalledWith(1)
+      expect(process.exitCode).toBe(1)
     })
   })
 
@@ -467,10 +476,9 @@ describe('run command handler', () => {
         error: { code: 'LOCK_HELD', message: 'Lock held', exitCode: 3 },
       })
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], force: false }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'], force: false })
 
-      expect(exitSpy).toHaveBeenCalledWith(3)
+      expect(process.exitCode).toBe(3)
     })
 
     it('proceeds when lock is not acquired but --force is set', async () => {
@@ -479,12 +487,11 @@ describe('run command handler', () => {
         error: { code: 'LOCK_HELD', message: 'Lock held', exitCode: 3 },
       })
 
-      // Should NOT exit 3, should complete (exits 0 in auto mode)
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], force: true, auto: true }))
-        .rejects.toThrow('process.exit called')
+      // Should NOT exit 3, should complete (returns normally in auto mode)
+      await invokeHandler({ step: 'create-prd', _: ['run'], force: true, auto: true })
 
-      // In auto mode, exits 0 after prompt output
-      expect(exitSpy).toHaveBeenCalledWith(0)
+      // In auto mode, returns normally (exitCode undefined = 0)
+      expect(process.exitCode).toBeUndefined()
     })
   })
 
@@ -501,9 +508,8 @@ describe('run command handler', () => {
         missingArtifacts: [],
       })
 
-      // Should clear in_progress and proceed; in auto mode exits 0
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
-        .rejects.toThrow('process.exit called')
+      // Should clear in_progress and proceed; in auto mode returns normally
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
 
       expect(StateManager.prototype.clearInProgress).toHaveBeenCalled()
     })
@@ -522,10 +528,9 @@ describe('run command handler', () => {
 
       vi.mocked(resolveOutputMode).mockReturnValue('auto')
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
 
-      expect(exitSpy).toHaveBeenCalledWith(4)
+      expect(process.exitCode).toBe(4)
     })
   })
 
@@ -562,10 +567,9 @@ describe('run command handler', () => {
       }
       vi.mocked(buildGraph).mockReturnValue(graph)
 
-      await expect(invokeHandler({ step: 'create-arch', _: ['run'] }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-arch', _: ['run'] })
 
-      expect(exitSpy).toHaveBeenCalledWith(2)
+      expect(process.exitCode).toBe(2)
     })
 
     it('exits 1 when dependency cycles are detected', async () => {
@@ -573,10 +577,9 @@ describe('run command handler', () => {
         { code: 'DEP_CYCLE_DETECTED', message: 'Cycle detected', exitCode: 1 },
       ])
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'] })
 
-      expect(exitSpy).toHaveBeenCalledWith(1)
+      expect(process.exitCode).toBe(1)
     })
   })
 
@@ -584,12 +587,11 @@ describe('run command handler', () => {
     it('outputs assembled prompt text to stdout on success (auto mode)', async () => {
       vi.mocked(resolveOutputMode).mockReturnValue('auto')
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
 
       // Prompt text should be written to stdout
       expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('assembled prompt text'))
-      expect(exitSpy).toHaveBeenCalledWith(0)
+      expect(process.exitCode).toBeUndefined()
     })
 
     it('exits 5 when assembly engine fails', async () => {
@@ -599,21 +601,19 @@ describe('run command handler', () => {
         warnings: [],
       })
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'] })
 
-      expect(exitSpy).toHaveBeenCalledWith(5)
+      expect(process.exitCode).toBe(5)
     })
   })
 
   describe('Step 10: completion (auto mode)', () => {
-    it('auto mode exits 0 immediately after prompt output', async () => {
+    it('auto mode returns normally after prompt output', async () => {
       vi.mocked(resolveOutputMode).mockReturnValue('auto')
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
 
-      expect(exitSpy).toHaveBeenCalledWith(0)
+      expect(process.exitCode).toBeUndefined()
     })
   })
 
@@ -622,8 +622,7 @@ describe('run command handler', () => {
       vi.mocked(resolveOutputMode).mockReturnValue('interactive')
       mockOutput.confirm = vi.fn().mockResolvedValue(true)
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'] })
 
       expect(StateManager.prototype.markCompleted).toHaveBeenCalledWith(
         'create-prd',
@@ -631,7 +630,7 @@ describe('run command handler', () => {
         'scaffold-run',
         expect.any(Number),
       )
-      expect(exitSpy).toHaveBeenCalledWith(0)
+      expect(process.exitCode).toBeUndefined()
     })
 
     it('exits 4 when user declines completion in interactive mode', async () => {
@@ -641,10 +640,9 @@ describe('run command handler', () => {
         .mockResolvedValueOnce(false)  // "Step complete?" -> No
         .mockResolvedValueOnce(false)  // "Mark as skipped?" -> No
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'] })
 
-      expect(exitSpy).toHaveBeenCalledWith(4)
+      expect(process.exitCode).toBe(4)
     })
   })
 
@@ -652,8 +650,7 @@ describe('run command handler', () => {
     it('passes --depth CLI flag to resolveDepth', async () => {
       vi.mocked(resolveDepth).mockReturnValue({ depth: 3, provenance: 'cli-flag' })
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], depth: 3, auto: true }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'], depth: 3, auto: true })
 
       expect(resolveDepth).toHaveBeenCalledWith(
         'create-prd',
@@ -669,9 +666,8 @@ describe('run command handler', () => {
       vi.mocked(resolveOutputMode).mockReturnValue('json')
       vi.mocked(computeEligible).mockReturnValue(['next-step'])
 
-      // In JSON mode, like auto mode, exits 0 after prompt output
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], format: 'json' }))
-        .rejects.toThrow('process.exit called')
+      // In JSON mode, like auto mode, returns normally after prompt output
+      await invokeHandler({ step: 'create-prd', _: ['run'], format: 'json' })
 
       // In json mode output.result is called with structured data
       expect(mockOutput.result).toHaveBeenCalledWith(
@@ -687,8 +683,7 @@ describe('run command handler', () => {
 
   describe('--instructions flag', () => {
     it('passes inline instructions to loadInstructions', async () => {
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], instructions: 'Be thorough', auto: true }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'], instructions: 'Be thorough', auto: true })
 
       expect(loadInstructions).toHaveBeenCalledWith(
         expect.any(String),
@@ -712,23 +707,25 @@ describe('run command handler', () => {
         warnings: [],
       })
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], force: true, auto: true }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'], force: true, auto: true })
 
-      // Should exit 0 (success, not 4 cancellation)
-      expect(exitSpy).toHaveBeenCalledWith(0)
+      // Should return normally (success, not 4 cancellation)
+      expect(process.exitCode).toBeUndefined()
     })
   })
 
   describe('lock release', () => {
-    it('releases lock after successful run', async () => {
+    it('delegates lock cleanup to shutdown.withResource', async () => {
       vi.mocked(resolveOutputMode).mockReturnValue('interactive')
       mockOutput.confirm = vi.fn().mockResolvedValue(true)
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'] })
 
-      expect(releaseLock).toHaveBeenCalledWith(PROJECT_ROOT)
+      expect(shutdown.withResource).toHaveBeenCalledWith(
+        'lock',
+        expect.any(Function),
+        expect.any(Function),
+      )
     })
   })
 
@@ -755,8 +752,7 @@ describe('run command handler', () => {
         .mockResolvedValueOnce(true)   // crash recovery: mark as completed
         .mockResolvedValueOnce(true)   // step complete
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'] })
 
       expect(StateManager.prototype.markCompleted).toHaveBeenCalledWith(
         'create-prd',
@@ -775,8 +771,7 @@ describe('run command handler', () => {
         .mockResolvedValueOnce(false)  // crash recovery: do not mark completed
         .mockResolvedValueOnce(true)   // step complete
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'] })
 
       // Should have called clearInProgress but NOT markCompleted with crash-recovery source
       const markCompletedCalls = vi.mocked(StateManager.prototype.markCompleted).mock.calls
@@ -809,11 +804,14 @@ describe('run command handler', () => {
       // User declines re-run confirmation
       mockOutput.confirm = vi.fn().mockResolvedValueOnce(false)
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'] })
 
-      expect(exitSpy).toHaveBeenCalledWith(4)
-      expect(releaseLock).toHaveBeenCalledWith(PROJECT_ROOT)
+      expect(process.exitCode).toBe(4)
+      expect(shutdown.withResource).toHaveBeenCalledWith(
+        'lock',
+        expect.any(Function),
+        expect.any(Function),
+      )
     })
 
     it('proceeds when user confirms depth downgrade', async () => {
@@ -826,10 +824,9 @@ describe('run command handler', () => {
         .mockResolvedValueOnce(true)   // depth downgrade confirmation
         .mockResolvedValueOnce(true)   // step complete
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'] })
 
-      expect(exitSpy).toHaveBeenCalledWith(0)
+      expect(process.exitCode).toBeUndefined()
       expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('assembled prompt text'))
     })
 
@@ -841,11 +838,14 @@ describe('run command handler', () => {
         .mockResolvedValueOnce(true)   // update mode confirmation
         .mockResolvedValueOnce(false)  // depth downgrade → decline
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'] })
 
-      expect(exitSpy).toHaveBeenCalledWith(4)
-      expect(releaseLock).toHaveBeenCalledWith(PROJECT_ROOT)
+      expect(process.exitCode).toBe(4)
+      expect(shutdown.withResource).toHaveBeenCalledWith(
+        'lock',
+        expect.any(Function),
+        expect.any(Function),
+      )
     })
 
     it('outputs warnings and proceeds in auto mode with depth downgrade', async () => {
@@ -862,13 +862,12 @@ describe('run command handler', () => {
       })
       vi.mocked(resolveOutputMode).mockReturnValue('auto')
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
 
       expect(mockOutput.warn).toHaveBeenCalledWith(
         expect.objectContaining({ code: 'ASM_DEPTH_DOWNGRADE' }),
       )
-      expect(exitSpy).toHaveBeenCalledWith(0)
+      expect(process.exitCode).toBeUndefined()
     })
   })
 
@@ -879,8 +878,7 @@ describe('run command handler', () => {
         warning: { code: 'LOCK_STALE_CLEARED', message: 'Stale lock cleared' },
       })
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
 
       expect(mockOutput.warn).toHaveBeenCalledWith(
         expect.objectContaining({ code: 'LOCK_STALE_CLEARED', message: 'Stale lock cleared' }),
@@ -895,15 +893,14 @@ describe('run command handler', () => {
         .mockResolvedValueOnce(false)  // Step complete? → no
         .mockResolvedValueOnce(true)   // Mark as skipped? → yes
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'] })
 
       expect(StateManager.prototype.markSkipped).toHaveBeenCalledWith(
         'create-prd',
         'user-cancelled',
         'scaffold-run',
       )
-      expect(exitSpy).toHaveBeenCalledWith(4)
+      expect(process.exitCode).toBe(4)
     })
   })
 
@@ -913,8 +910,7 @@ describe('run command handler', () => {
       vi.mocked(computeEligible).mockReturnValue(['create-arch', 'create-api'])
       mockOutput.confirm = vi.fn().mockResolvedValue(true)
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'] })
 
       expect(mockOutput.info).toHaveBeenCalledWith(
         expect.stringContaining('Next eligible: create-arch, create-api'),
@@ -926,23 +922,25 @@ describe('run command handler', () => {
       vi.mocked(computeEligible).mockReturnValue([])
       mockOutput.confirm = vi.fn().mockResolvedValue(true)
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'] }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'] })
 
       expect(mockOutput.info).toHaveBeenCalledWith('No more eligible steps.')
     })
   })
 
   describe('unexpected error handling', () => {
-    it('releases lock and exits 1 when assembly engine throws unexpected error', async () => {
+    it('delegates lock cleanup to withResource and exits 1 when assembly engine throws unexpected error', async () => {
       vi.mocked(AssemblyEngine.prototype.assemble).mockImplementation(() => {
         throw new Error('unexpected engine failure')
       })
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
 
-      expect(releaseLock).toHaveBeenCalledWith(PROJECT_ROOT)
+      expect(shutdown.withResource).toHaveBeenCalledWith(
+        'lock',
+        expect.any(Function),
+        expect.any(Function),
+      )
       expect(mockOutput.error).toHaveBeenCalledWith(
         expect.objectContaining({
           code: 'RUN_UNEXPECTED_ERROR',
@@ -950,7 +948,7 @@ describe('run command handler', () => {
           exitCode: 1,
         }),
       )
-      expect(exitSpy).toHaveBeenCalledWith(1)
+      expect(process.exitCode).toBe(1)
     })
   })
 
@@ -965,8 +963,7 @@ describe('run command handler', () => {
         ],
       })
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
 
       expect(mockOutput.warn).toHaveBeenCalledWith(
         expect.objectContaining({ code: 'METHODOLOGY_CHANGED' }),
@@ -1046,8 +1043,7 @@ describe('run command handler', () => {
 
       vi.mocked(resolveOutputMode).mockReturnValue('auto')
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
 
       // Verify the assembly engine received artifacts
       expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
@@ -1062,7 +1058,7 @@ describe('run command handler', () => {
           ]),
         }),
       )
-      expect(exitSpy).toHaveBeenCalledWith(0)
+      expect(process.exitCode).toBeUndefined()
     })
   })
 
@@ -1133,8 +1129,7 @@ describe('run command handler', () => {
 
       vi.mocked(resolveOutputMode).mockReturnValue('auto')
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
 
       expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
         'create-prd',
@@ -1201,8 +1196,7 @@ describe('run command handler', () => {
 
       vi.mocked(resolveOutputMode).mockReturnValue('auto')
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
 
       // Should have empty artifacts (reads target not completed)
       expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
@@ -1264,8 +1258,7 @@ describe('run command handler', () => {
 
       vi.mocked(resolveOutputMode).mockReturnValue('auto')
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
 
       // Disabled read target should be skipped — no artifacts gathered
       expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
@@ -1345,8 +1338,7 @@ describe('run command handler', () => {
 
       vi.mocked(resolveOutputMode).mockReturnValue('auto')
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
 
       // Should only have one artifact (deduplicated)
       const assembleCall = vi.mocked(AssemblyEngine.prototype.assemble).mock.calls[0]
@@ -1407,12 +1399,11 @@ describe('run command handler', () => {
 
       vi.mocked(resolveOutputMode).mockReturnValue('auto')
 
-      await expect(invokeHandler({ step: 'create-arch', _: ['run'], auto: true }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-arch', _: ['run'], auto: true })
 
-      // Should NOT have exited with DEP_UNMET (exit code 2)
-      // It should proceed to assembly and exit 0
-      expect(exitSpy).toHaveBeenCalledWith(0)
+      // Should NOT have set exitCode to 2 (DEP_UNMET)
+      // It should proceed to assembly and return normally
+      expect(process.exitCode).toBeUndefined()
     })
   })
 
@@ -1436,8 +1427,7 @@ describe('run command handler', () => {
 
       vi.mocked(resolveOutputMode).mockReturnValue('auto')
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
 
       // Verify resolveOverlayState was called (overlay resolution delegated to resolver)
       expect(resolveOverlayState).toHaveBeenCalled()
@@ -1460,8 +1450,7 @@ describe('run command handler', () => {
 
       vi.mocked(resolveOutputMode).mockReturnValue('auto')
 
-      await expect(invokeHandler({ step: 'create-prd', _: ['run'], auto: true }))
-        .rejects.toThrow('process.exit called')
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
 
       // resolveOverlayState is still called (by the resolver) but with no projectType
       // it returns the preset steps unchanged
