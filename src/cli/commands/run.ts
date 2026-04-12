@@ -69,7 +69,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
         '✗ error [PROJECT_NOT_INITIALIZED]: No .scaffold/ directory found\n' +
         '  Fix: Run `scaffold init` to initialize a project\n',
       )
-      process.exit(1)
+      process.exitCode = 1
+      return
     }
 
     const outputMode = resolveOutputMode(argv)
@@ -81,7 +82,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     const context = loadPipelineContext(projectRoot, { includeTools: true })
     if (!context.config) {
       displayErrors(context.configErrors, context.configWarnings, output)
-      process.exit(1)
+      process.exitCode = 1
       return
     }
     const pipeline = resolvePipeline(context, { output })
@@ -97,7 +98,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
         exitCode: 1,
         recovery: `Available steps: ${candidates.join(', ')}`,
       })
-      process.exit(1)
+      process.exitCode = 1
+      return
     }
 
     // -----------------------------------------------------------------------
@@ -115,7 +117,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
           })
         }
         output.warn({ code: 'LOCK_HELD', message: 'Another scaffold process is running. Use --force to override.' })
-        process.exit(3)
+        process.exitCode = 3
+        return
       }
       // --force: proceed without lock
       lockAcquired = false
@@ -156,7 +159,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
               'Please manually verify and use --force to continue.',
           })
           if (lockAcquired) releaseLock(projectRoot)
-          process.exit(4)
+          process.exitCode = 4
+          return
         } else {
           // Interactive: prompt user
           const shouldComplete = await output.confirm(
@@ -189,7 +193,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     if (cycles.length > 0) {
       displayErrors(cycles, [], output)
       if (lockAcquired) releaseLock(projectRoot)
-      process.exit(1)
+      process.exitCode = 1
+      return
     }
 
     // Tools (category: 'tool') are not in the dependency graph — skip dep checking
@@ -216,7 +221,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
           recovery: `Complete these steps first: ${unmetDeps.join(', ')}`,
         })
         if (lockAcquired) releaseLock(projectRoot)
-        process.exit(2)
+        process.exitCode = 2
+        return
       }
     }
 
@@ -237,7 +243,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
           )
           if (!proceed) {
             if (lockAcquired) releaseLock(projectRoot)
-            process.exit(4)
+            process.exitCode = 4
+            return
           }
         } else {
           output.info(`Re-running step '${step}' in update mode (auto)`)
@@ -254,7 +261,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
           )
           if (!proceedWithDowngrade) {
             if (lockAcquired) releaseLock(projectRoot)
-            process.exit(4)
+            process.exitCode = 4
+            return
           }
         } else {
           for (const w of updateModeResult.warnings) {
@@ -389,7 +397,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       if (!assemblyResult.success) {
         displayErrors(assemblyResult.errors, assemblyResult.warnings, output)
         if (lockAcquired) releaseLock(projectRoot)
-        process.exit(5)
+        process.exitCode = 5
+        return
       }
 
       // -----------------------------------------------------------------------
@@ -425,7 +434,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
           process.stdout.write(assemblyResult.prompt!.text)
         }
         if (lockAcquired) releaseLock(projectRoot)
-        process.exit(0)
+        return
       }
 
       // Write assembled prompt to stdout (raw, for AI consumption in interactive mode)
@@ -438,7 +447,6 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
         if (outputMode === 'interactive') {
           output.info(`Stateless step '${step}' executed. Available for re-use anytime.`)
         }
-        process.exit(0)
         return
       }
 
@@ -451,7 +459,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
           stateManager.clearInProgress()
         }
         if (lockAcquired) releaseLock(projectRoot)
-        process.exit(4)
+        process.exitCode = 4
+        return
       }
 
       // -----------------------------------------------------------------------
@@ -479,12 +488,13 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
         }
       }
 
-      process.exit(0)
+      return
     } catch (err) {
       if (lockAcquired) releaseLock(projectRoot)
       const message = err instanceof Error ? err.message : String(err)
       output.error({ code: 'RUN_UNEXPECTED_ERROR', message, exitCode: 1 })
-      process.exit(1)
+      process.exitCode = 1
+      return
     }
   },
 }
