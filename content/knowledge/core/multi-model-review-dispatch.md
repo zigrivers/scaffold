@@ -44,6 +44,8 @@ The review never blocks on external model availability.
 
 ## Deep Guidance
 
+See `review-methodology` for severity definitions (P0-P3). This entry uses those severities but does not define them.
+
 ### Dispatch Mechanics
 
 ### Foreground-Only Execution
