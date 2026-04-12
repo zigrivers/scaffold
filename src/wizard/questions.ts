@@ -265,7 +265,9 @@ export async function askWizardQuestions(options: {
     const distributionChannels: CliConfig['distributionChannels'] = options.cliFlags?.cliDistribution
       ?? (!auto
         ? await output.multiSelect('Distribution channels?',
-          optionsFromCopy(copy.distributionChannels.options!, ['package-manager', 'system-package-manager', 'standalone-binary', 'container']),
+          optionsFromCopy(copy.distributionChannels.options!, [
+            'package-manager', 'system-package-manager', 'standalone-binary', 'container',
+          ]),
           ['package-manager'],
           copy.distributionChannels,
         ) as CliConfig['distributionChannels']
@@ -532,7 +534,9 @@ export async function askWizardQuestions(options: {
       ?? (!auto
         ? await output.multiSelect(
           'Target platforms:',
-          optionsFromCopy(copy.targetPlatforms.options!, ['pc', 'web', 'ios', 'android', 'ps5', 'xbox', 'switch', 'vr', 'ar']),
+          optionsFromCopy(copy.targetPlatforms.options!, [
+            'pc', 'web', 'ios', 'android', 'ps5', 'xbox', 'switch', 'vr', 'ar',
+          ]),
           ['pc'],
           copy.targetPlatforms,
         ) as GameConfig['targetPlatforms']
@@ -557,7 +561,9 @@ export async function askWizardQuestions(options: {
       ?? (!auto
         ? await output.select(
           'Content structure:',
-          optionsFromCopy(copy.contentStructure.options!, ['discrete', 'open-world', 'procedural', 'endless', 'mission-based']),
+          optionsFromCopy(copy.contentStructure.options!, [
+            'discrete', 'open-world', 'procedural', 'endless', 'mission-based',
+          ]),
           'discrete',
           copy.contentStructure,
         ) as GameConfig['contentStructure']
@@ -585,7 +591,9 @@ export async function askWizardQuestions(options: {
       gf?.npcAi !== undefined || gf?.modding !== undefined || gf?.persistence !== undefined
 
     // Show advanced questions if: any advanced flag is set (force open), or user confirms
-    const showAdvanced = hasAdvancedFlag || (!auto && await output.confirm('Configure advanced game options?', false, coreCopy.advancedGameGate))
+    const showAdvanced = hasAdvancedFlag || (!auto && await output.confirm(
+      'Configure advanced game options?', false, coreCopy.advancedGameGate,
+    ))
 
     if (showAdvanced && !auto) {
       // Ask each unflagged advanced question interactively

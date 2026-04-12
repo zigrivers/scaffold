@@ -12,16 +12,27 @@ export const mlCopy: MlCopy = {
   },
   modelType: {
     short: 'The category of model being used.',
-    long: 'Classical ML uses traditional algorithms; deep learning uses neural networks; LLM covers large language models and foundation models.',
+    long: 'Classical ML uses traditional algorithms; deep learning uses neural networks; '
+      + 'LLM covers large language models and foundation models.',
     options: {
-      classical:       { label: 'Classical ML',    short: 'Traditional algorithms like random forests, SVMs, or gradient boosting.' },
-      'deep-learning': { label: 'Deep learning',   short: 'Neural networks (CNNs, transformers, etc.) trained on large datasets.' },
-      llm:             { label: 'LLM',             short: 'Large language models — fine-tuning or prompt-engineering foundation models.' },
+      classical: {
+        label: 'Classical ML',
+        short: 'Traditional algorithms like random forests, SVMs, or gradient boosting.',
+      },
+      'deep-learning': {
+        label: 'Deep learning',
+        short: 'Neural networks (CNNs, transformers, etc.) trained on large datasets.',
+      },
+      llm: {
+        label: 'LLM',
+        short: 'Large language models — fine-tuning or prompt-engineering foundation models.',
+      },
     },
   },
   servingPattern: {
     short: 'How the model delivers predictions.',
-    long: 'Batch scores datasets offline; realtime responds to individual requests; edge runs on-device for lowest latency.',
+    long: 'Batch scores datasets offline; realtime responds to individual requests; '
+      + 'edge runs on-device for lowest latency.',
     options: {
       none:     { label: 'None',     short: 'No serving — training and evaluation only.' },
       batch:    { label: 'Batch',    short: 'Scores large datasets on a schedule (e.g. nightly predictions).' },

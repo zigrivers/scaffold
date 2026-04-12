@@ -3,7 +3,8 @@ import type { WebAppCopy } from './types.js'
 export const webAppCopy: WebAppCopy = {
   renderingStrategy: {
     short: 'How the HTML is produced and delivered to the browser.',
-    long: 'SPA renders everything client-side; SSR renders on each request; SSG pre-builds at deploy time; Hybrid mixes strategies per route.',
+    long: 'SPA renders everything client-side; SSR renders on each request; '
+      + 'SSG pre-builds at deploy time; Hybrid mixes strategies per route.',
     options: {
       spa:    { label: 'SPA',    short: 'Single-page app — all rendering happens in the browser.' },
       ssr:    { label: 'SSR',    short: 'Server-side rendered on every request for dynamic content.' },
@@ -16,7 +17,10 @@ export const webAppCopy: WebAppCopy = {
     long: 'Determines infrastructure assumptions like compute availability, cold starts, and scaling model.',
     options: {
       static:       { label: 'Static hosting',  short: 'CDN-served files with no server compute.' },
-      serverless:   { label: 'Serverless',       short: 'Functions that spin up per request (e.g. AWS Lambda, Vercel).' },
+      serverless: {
+        label: 'Serverless',
+        short: 'Functions that spin up per request (e.g. AWS Lambda, Vercel).',
+      },
       container:    { label: 'Container',        short: 'Docker container running in a managed cluster.' },
       edge:         { label: 'Edge',             short: 'Code runs at CDN edge locations for low latency.' },
       'long-running': { label: 'Long-running',   short: 'Traditional always-on server process.' },

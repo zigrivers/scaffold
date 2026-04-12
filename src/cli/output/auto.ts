@@ -39,12 +39,22 @@ export class AutoOutput implements OutputContext {
     return defaultValue
   }
 
-  async select(_msg: string, options: SelectOption[], defaultValue?: string, _help?: { short?: string; long?: string }): Promise<string> {
+  async select(
+    _msg: string,
+    options: SelectOption[],
+    defaultValue?: string,
+    _help?: { short?: string; long?: string },
+  ): Promise<string> {
     const first = typeof options[0] === 'string' ? options[0] : options[0]?.value
     return defaultValue ?? first ?? ''
   }
 
-  async multiSelect(_msg: string, _options: SelectOption[], defaults?: string[], _help?: { short?: string; long?: string }): Promise<string[]> {
+  async multiSelect(
+    _msg: string,
+    _options: SelectOption[],
+    defaults?: string[],
+    _help?: { short?: string; long?: string },
+  ): Promise<string[]> {
     return defaults ?? []
   }
 

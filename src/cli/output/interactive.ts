@@ -115,7 +115,12 @@ export class InteractiveOutput implements OutputContext {
     return confirm({ message, default: defaultValue })
   }
 
-  async select(message: string, options: SelectOption[], defaultValue?: string, help?: { short?: string; long?: string }): Promise<string> {
+  async select(
+    message: string,
+    options: SelectOption[],
+    defaultValue?: string,
+    help?: { short?: string; long?: string },
+  ): Promise<string> {
     const normalized = options.map(o => typeof o === 'string' ? { value: o } : o)
     if (!canPrompt()) {
       return defaultValue ?? normalized[0]?.value ?? ''
@@ -153,7 +158,8 @@ export class InteractiveOutput implements OutputContext {
           process.stdout.write(dim(help.long) + '\n')
           renderFrame()
         } else {
-          process.stdout.write(`  No additional help available — pick one of: ${normalized.map(n => n.value).join(', ')}\n`)
+          const vals = normalized.map(n => n.value).join(', ')
+          process.stdout.write(`  No additional help available — pick one of: ${vals}\n`)
         }
         continue
       }
@@ -168,12 +174,27 @@ export class InteractiveOutput implements OutputContext {
       if (normalized.some(n => n.value === trimmed)) {
         return trimmed
       }
+      // Accept label text match (case-insensitive)
+      const labelMatch = normalized.find(
+        n => n.label && n.label.toLowerCase() === trimmed.toLowerCase(),
+      )
+      if (labelMatch) {
+        return labelMatch.value
+      }
       // Invalid input — print error and re-prompt (do not re-print options)
-      process.stdout.write(`  Invalid input "${trimmed}". Please enter a number (1-${normalized.length}) or one of: ${normalized.map(n => n.value).join(', ')}\n`)
+      const opts = normalized.map(n => n.value).join(', ')
+      process.stdout.write(
+        `  Invalid input "${trimmed}". Enter a number (1-${normalized.length}) or one of: ${opts}\n`,
+      )
     }
   }
 
-  async multiSelect(message: string, options: SelectOption[], defaults?: string[], help?: { short?: string; long?: string }): Promise<string[]> {
+  async multiSelect(
+    message: string,
+    options: SelectOption[],
+    defaults?: string[],
+    help?: { short?: string; long?: string },
+  ): Promise<string[]> {
     const normalized = options.map(o => typeof o === 'string' ? { value: o } : o)
     if (!canPrompt()) {
       return defaults ?? []
@@ -211,7 +232,8 @@ export class InteractiveOutput implements OutputContext {
           process.stdout.write(dim(help.long) + '\n')
           renderFrame()
         } else {
-          process.stdout.write(`  No additional help available — pick from: ${normalized.map(n => n.value).join(', ')}\n`)
+          const vals = normalized.map(n => n.value).join(', ')
+          process.stdout.write(`  No additional help available — pick from: ${vals}\n`)
         }
         continue
       }
@@ -232,13 +254,24 @@ export class InteractiveOutput implements OutputContext {
           }
         } else if (normalized.some(n => n.value === part) && !selected.includes(part)) {
           selected.push(part)
+        } else {
+          // Accept label text match (case-insensitive)
+          const labelMatch = normalized.find(
+            n => n.label && n.label.toLowerCase() === part.toLowerCase(),
+          )
+          if (labelMatch && !selected.includes(labelMatch.value)) {
+            selected.push(labelMatch.value)
+          }
         }
       }
       if (selected.length > 0) {
         return selected
       }
       // Non-empty input but no valid selections — print error and re-prompt
-      process.stdout.write(`  Invalid input. Please enter numbers (1-${normalized.length}) or values from: ${normalized.map(n => n.value).join(', ')}\n`)
+      const opts = normalized.map(n => n.value).join(', ')
+      process.stdout.write(
+        `  Invalid input. Enter numbers (1-${normalized.length}) or values from: ${opts}\n`,
+      )
     }
   }
 

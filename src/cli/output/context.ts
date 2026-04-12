@@ -28,10 +28,20 @@ export interface OutputContext {
   confirm(message: string, defaultValue?: boolean, help?: { short?: string }): Promise<boolean>
 
   /** Single-choice selection from a list of options. */
-  select(message: string, options: SelectOption[], defaultValue?: string, help?: { short?: string; long?: string }): Promise<string>
+  select(
+    message: string,
+    options: SelectOption[],
+    defaultValue?: string,
+    help?: { short?: string; long?: string },
+  ): Promise<string>
 
   /** Multi-choice selection from a list of options. Returns selected items. */
-  multiSelect(message: string, options: SelectOption[], defaults?: string[], help?: { short?: string; long?: string }): Promise<string[]>
+  multiSelect(
+    message: string,
+    options: SelectOption[],
+    defaults?: string[],
+    help?: { short?: string; long?: string },
+  ): Promise<string[]>
 
   /** Comma-separated text input returning an array of trimmed strings. */
   multiInput(message: string, defaultValue?: string[], help?: { short?: string }): Promise<string[]>

@@ -9,10 +9,22 @@ export const coreCopy: CoreCopy = {
       'backend':           { label: 'Backend service',    short: 'API or service with no built-in UI.' },
       'cli':               { label: 'CLI tool',           short: 'Command-line program run from a terminal.' },
       'library':           { label: 'Library / package',  short: 'Reusable code published for other projects.' },
-      'mobile-app':        { label: 'Mobile app',         short: 'Native or cross-platform app for phones and tablets.' },
-      'data-pipeline':     { label: 'Data pipeline',      short: 'ETL or streaming system that moves and transforms data.' },
-      'ml':                { label: 'ML project',         short: 'Machine-learning training, inference, or both.' },
-      'browser-extension': { label: 'Browser extension',  short: 'Add-on that runs inside Chrome, Firefox, or similar.' },
+      'mobile-app': {
+        label: 'Mobile app',
+        short: 'Native or cross-platform app for phones and tablets.',
+      },
+      'data-pipeline': {
+        label: 'Data pipeline',
+        short: 'ETL or streaming system that moves and transforms data.',
+      },
+      'ml': {
+        label: 'ML project',
+        short: 'Machine-learning training, inference, or both.',
+      },
+      'browser-extension': {
+        label: 'Browser extension',
+        short: 'Add-on that runs inside Chrome, Firefox, or similar.',
+      },
       'game':              { label: 'Game',               short: 'Interactive entertainment with a game loop.' },
     },
   },

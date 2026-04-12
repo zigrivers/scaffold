@@ -3,7 +3,8 @@ import type { GameCopy } from './types.js'
 export const gameCopy: GameCopy = {
   engine: {
     short: 'The game engine or framework powering the project.',
-    long: 'Each engine has different strengths — Unity for broad platform support, Unreal for high-fidelity 3D, Godot for open-source flexibility.',
+    long: 'Each engine has different strengths — Unity for broad platform support, '
+      + 'Unreal for high-fidelity 3D, Godot for open-source flexibility.',
     options: {
       unity:  { label: 'Unity',  short: 'Cross-platform engine with C# scripting — strong 2D and 3D support.' },
       unreal: { label: 'Unreal', short: 'High-fidelity 3D engine with C++ and Blueprints visual scripting.' },
@@ -23,7 +24,8 @@ export const gameCopy: GameCopy = {
   },
   narrative: {
     short: 'How much story and dialogue the game includes.',
-    long: 'Light means flavor text and brief cutscenes; heavy means branching dialogue, quest logs, and narrative systems.',
+    long: 'Light means flavor text and brief cutscenes; '
+      + 'heavy means branching dialogue, quest logs, and narrative systems.',
     options: {
       none:  { label: 'None',  short: 'No story — gameplay-driven experience.' },
       light: { label: 'Light', short: 'Flavor text, brief cutscenes, or contextual lore.' },
@@ -35,8 +37,14 @@ export const gameCopy: GameCopy = {
     options: {
       discrete:        { label: 'Discrete levels', short: 'Self-contained stages or levels loaded one at a time.' },
       'open-world':    { label: 'Open world',      short: 'Large continuous world the player explores freely.' },
-      procedural:      { label: 'Procedural',      short: 'Content generated algorithmically at runtime.' },
-      endless:         { label: 'Endless',          short: 'Infinite or repeating gameplay with increasing difficulty.' },
+      procedural: {
+        label: 'Procedural',
+        short: 'Content generated algorithmically at runtime.',
+      },
+      endless: {
+        label: 'Endless',
+        short: 'Infinite or repeating gameplay with increasing difficulty.',
+      },
       'mission-based': { label: 'Mission-based',   short: 'Structured objectives within a larger game world.' },
     },
   },
@@ -57,12 +65,16 @@ export const gameCopy: GameCopy = {
       leaderboards: { label: 'Leaderboards',  short: 'Global or friends-list score rankings.' },
       accounts:     { label: 'Accounts',       short: 'Player identity, profiles, and authentication.' },
       matchmaking:  { label: 'Matchmaking',    short: 'Automated pairing of players for online sessions.' },
-      'live-ops':   { label: 'Live Ops',       short: 'Seasonal events, daily challenges, and remote content updates.' },
+      'live-ops': {
+        label: 'Live Ops',
+        short: 'Seasonal events, daily challenges, and remote content updates.',
+      },
     },
   },
   persistence: {
     short: 'What player data is saved between sessions.',
-    long: 'Settings-only saves preferences; profile adds player identity; progression tracks unlocks and progress; cloud syncs across devices.',
+    long: 'Settings-only saves preferences; profile adds player identity; '
+      + 'progression tracks unlocks and progress; cloud syncs across devices.',
     options: {
       none:            { label: 'None',          short: 'Nothing persists — each session starts fresh.' },
       'settings-only': { label: 'Settings only', short: 'Only user preferences (volume, controls) are saved.' },

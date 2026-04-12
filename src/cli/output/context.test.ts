@@ -397,10 +397,10 @@ describe('AutoOutput', () => {
 vi.mock('@inquirer/prompts', () => ({ input: vi.fn(), confirm: vi.fn() }))
 
 describe('InteractiveOutput — bug fixes', () => {
-  let stdoutWrite: WriteSpy
+  let _stdoutWrite: WriteSpy
 
   beforeEach(() => {
-    stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    _stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
   })
 
@@ -1011,6 +1011,112 @@ describe('InteractiveOutput — rich rendering + ? help', () => {
     } finally {
       Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
       Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+})
+
+describe('InteractiveOutput — label text matching', () => {
+  beforeEach(() => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('select accepts label text input (case-insensitive)', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: true, configurable: true,
+      })
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: true, configurable: true,
+      })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      inputMock.mockResolvedValueOnce('Backend Service')
+
+      const out = new InteractiveOutput()
+      const result = await out.select('Pick:', [
+        { value: 'backend', label: 'Backend service' },
+        { value: 'frontend', label: 'Frontend app' },
+      ], 'frontend')
+      expect(result).toBe('backend')
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: originalStdoutIsTTY, configurable: true,
+      })
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalStdinIsTTY, configurable: true,
+      })
+    }
+  })
+
+  it('select prefers exact value match over label match', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: true, configurable: true,
+      })
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: true, configurable: true,
+      })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      inputMock.mockResolvedValueOnce('spa')
+
+      const out = new InteractiveOutput()
+      const result = await out.select('Pick:', [
+        { value: 'spa', label: 'SPA App' },
+        { value: 'ssr', label: 'SSR App' },
+      ], 'ssr')
+      // Should match as exact value, not fall through to label
+      expect(result).toBe('spa')
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: originalStdoutIsTTY, configurable: true,
+      })
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalStdinIsTTY, configurable: true,
+      })
+    }
+  })
+
+  it('multiSelect accepts label text input (case-insensitive)', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: true, configurable: true,
+      })
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: true, configurable: true,
+      })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      inputMock.mockResolvedValueOnce('Backend Service, Frontend app')
+
+      const out = new InteractiveOutput()
+      const result = await out.multiSelect('Pick:', [
+        { value: 'backend', label: 'Backend service' },
+        { value: 'frontend', label: 'Frontend app' },
+        { value: 'cli', label: 'CLI tool' },
+      ])
+      expect(result).toEqual(['backend', 'frontend'])
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: originalStdoutIsTTY, configurable: true,
+      })
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalStdinIsTTY, configurable: true,
+      })
     }
   })
 })

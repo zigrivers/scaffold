@@ -7,16 +7,28 @@ export const mobileAppCopy: MobileAppCopy = {
     options: {
       ios:              { label: 'iOS only',        short: 'Native iOS app using Swift/SwiftUI.' },
       android:          { label: 'Android only',    short: 'Native Android app using Kotlin/Jetpack Compose.' },
-      'cross-platform': { label: 'Cross-platform',  short: 'Shared codebase for iOS and Android (React Native, Flutter, etc.).' },
+      'cross-platform': {
+        label: 'Cross-platform',
+        short: 'Shared codebase for iOS and Android (React Native, Flutter, etc.).',
+      },
     },
   },
   distributionModel: {
     short: 'How the app reaches its users.',
     long: 'Public apps go through app stores; private apps use enterprise distribution or MDM.',
     options: {
-      public:  { label: 'Public (App Store / Google Play)', short: 'Listed on public app stores for anyone to download.' },
-      private: { label: 'Private / Enterprise',             short: 'Distributed internally via MDM or enterprise signing.' },
-      mixed:   { label: 'Mixed',                            short: 'Both public store listing and private enterprise builds.' },
+      public: {
+        label: 'Public (App Store / Google Play)',
+        short: 'Listed on public app stores for anyone to download.',
+      },
+      private: {
+        label: 'Private / Enterprise',
+        short: 'Distributed internally via MDM or enterprise signing.',
+      },
+      mixed: {
+        label: 'Mixed',
+        short: 'Both public store listing and private enterprise builds.',
+      },
     },
   },
   offlineSupport: {

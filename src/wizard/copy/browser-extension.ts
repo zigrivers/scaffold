@@ -3,10 +3,17 @@ import type { BrowserExtensionCopy } from './types.js'
 export const browserExtensionCopy: BrowserExtensionCopy = {
   manifestVersion: {
     short: 'Which Chrome extension manifest version to target.',
-    long: 'Manifest V3 is required for new Chrome Web Store submissions. V2 is legacy and only relevant for existing extensions.',
+    long: 'Manifest V3 is required for new Chrome Web Store submissions. '
+      + 'V2 is legacy and only relevant for existing extensions.',
     options: {
-      '2': { label: 'Manifest V2', short: 'Legacy format — still supported in some browsers but deprecated in Chrome.' },
-      '3': { label: 'Manifest V3', short: 'Current standard — required for new Chrome Web Store listings.' },
+      '2': {
+        label: 'Manifest V2',
+        short: 'Legacy format — still supported in some browsers but deprecated in Chrome.',
+      },
+      '3': {
+        label: 'Manifest V3',
+        short: 'Current standard — required for new Chrome Web Store listings.',
+      },
     },
   },
   uiSurfaces: {

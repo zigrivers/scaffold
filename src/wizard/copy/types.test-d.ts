@@ -19,7 +19,7 @@ describe('QuestionCopy type-level tests', () => {
     const _: LibraryCopy['hasTypeDefinitions'] = {
       short: 'x',
       // @ts-expect-error -- options on boolean-typed fields should be forbidden
-      options: { 'true': { label: 'Yes' } }
+      options: { 'true': { label: 'Yes' } },
     }
     void _
   })
@@ -28,7 +28,7 @@ describe('QuestionCopy type-level tests', () => {
     const _: GameCopy['supportedLocales'] = {
       short: 'x',
       // @ts-expect-error -- options on free-text string[] fields should be forbidden
-      options: { 'en': { label: 'English' } }
+      options: { 'en': { label: 'English' } },
     }
     void _
   })
