@@ -132,7 +132,7 @@ Search the entire file for any auth recovery commands that lack the `!` prefix. 
 
 - [ ] **Step 5: Remove severity definitions**
 
-Find severity definition blocks (P0/P1/P2/P3 definitions) in the entry's **own instructional prose** — the Summary section and any Deep Guidance sections that define severities for the reader. Replace those with:
+Check if the entry's **own instructional prose** (Summary section or Deep Guidance explanatory text) contains standalone severity definitions (e.g., "P0: critical, P1: important..."). If found, replace with the cross-reference below. If the entry only *uses* severity labels without defining them (e.g., "resolve severity disagreements," "P0 → use P0"), no removal needed — just add the cross-reference note near the first usage:
 
 ```markdown
 See `review-methodology` for severity definitions (P0-P3). This entry uses those severities but does not define them.
@@ -429,7 +429,28 @@ When multiple models produce findings, reconcile them using the rules defined in
 For the full consensus rules, confidence scoring, and disagreement resolution process, see `multi-model-review-dispatch`.
 ```
 
-- [ ] **Step 5: Verify inline severity definitions in prompt templates are preserved**
+- [ ] **Step 5: Update fallback and auth guidance for compensating-pass model**
+
+Find the "## Fallback Behavior" section. Update it to reference compensating passes instead of single-model/Claude-only fallback:
+
+```markdown
+## Fallback Behavior
+
+| Situation | Fallback |
+|-----------|----------|
+| Neither CLI available | Queue two compensating Claude passes (one per missing channel's strength area). Label findings. Max verdict: `degraded-pass`. |
+| Codex only | Single-model review with Codex + compensating Claude pass for Gemini |
+| Gemini only | Single-model review with Gemini + compensating Claude pass for Codex |
+| **CLI auth expired** | **Surface to user with `!` recovery command — do NOT silently fall back** |
+| One CLI fails mid-review | Use partial results if available, else queue compensating pass. Note failure in summary. |
+| Both CLIs fail | Two compensating passes, max verdict: `degraded-pass`. Warn user. |
+
+Auth failures are NOT silent fallbacks.
+```
+
+Also update "### Step 3: Handle Auth Failures" to match — replace "Fall back to structured Claude-only self-review" with "queue a compensating Claude pass focused on the failed channel's strength area."
+
+- [ ] **Step 6: Verify inline severity definitions in prompt templates are preserved**
 
 Check the "## Context Bundling" section's prompt template. The severity definitions inside the template (P0/P1/P2/P3 definitions within the prompt text) **MUST remain inline**. External models receive only the assembled prompt — they cannot resolve cross-references to knowledge entries. Confirm these are NOT removed. If they are intact, no change needed.
 
@@ -620,7 +641,7 @@ If auth cannot be recovered, or if Gemini is not installed, queue a compensating
 After the dispatch command for each external channel, add a runtime failure branch:
 
 ```markdown
-If the CLI exits with a non-zero code, produces malformed/unparseable output, or is killed by the tool runner timeout, record status `failed` and queue a compensating pass for that channel.
+If the CLI exits with a non-zero code, produces malformed/unparseable output, or is killed by the tool runner timeout, record root-cause `failed` and queue a compensating pass for that channel.
 ```
 
 After the Superpowers section, add:
@@ -745,10 +766,16 @@ Then the existing auth check follows. After the auth failure handling, add:
 
 ```markdown
 If auth cannot be recovered, queue a compensating pass (same focus as above). Record root-cause `auth_failed`.
-If auth check times out (~5s), retry once. If still failing, record status `auth timeout` and queue compensating pass.
+If auth check times out (~5s), retry once. If still failing, record root-cause `auth_timeout` and queue compensating pass.
 ```
 
 For Gemini, add the same two-step pattern with installation check, auth check (including timeout/retry), and compensating-pass queuing focused on architectural patterns, design reasoning, and broad context. Label findings `[compensating: Gemini-equivalent]`.
+
+After the dispatch command for each external channel, add a runtime failure branch:
+
+```markdown
+If the CLI exits with a non-zero code, produces malformed/unparseable output, or is killed by the tool runner timeout, record root-cause `failed` and queue a compensating pass for that channel.
+```
 
 After all three channel sections, add:
 
@@ -787,7 +814,7 @@ Replace the Verdict line:
 After Step 5 (Report Results) and before Step 6 (Fix), add a new step:
 
 ```markdown
-### Step 5a: Final Verdict
+### Step 6: Final Verdict
 
 Return exactly one verdict:
 
@@ -905,7 +932,7 @@ For each external channel (Codex, Gemini), add a `command -v` installation check
 ```bash
 command -v codex >/dev/null 2>&1
 ```
-- If `codex` is not installed: queue a compensating pass, record status `not installed`. Skip to next channel.
+- If `codex` is not installed: queue a compensating pass, record root-cause `not_installed`. Skip to next channel.
 ```
 
 Then after the existing auth check and its failure handling, add for Codex:
@@ -928,7 +955,7 @@ After all Phase 1 channels, add:
 
 - [ ] **Step 4: Update Phase 2 subagent instructions**
 
-In Step 5d, update the subagent dispatch instructions to include:
+In Step 5d, **replace** the existing per-channel auth check instructions inside the subagent template (the sections that tell each subagent to run `codex login status` and `NO_BROWSER=true gemini -p "respond with ok"` independently). Replace with:
 
 ```markdown
 **Session-scoped channel availability:** Phase 1 has already probed channel installation and auth. Pass the Phase 1 channel availability results to each Phase 2 subagent. Subagents do NOT re-probe — if Codex was `auth failed` in Phase 1, every Phase 2 subagent treats Codex as unavailable and runs a compensating pass immediately.
@@ -947,9 +974,9 @@ Each Phase 2 subagent must return channel status alongside findings:
 {
   "story": "[STORY_TITLE]",
   "channel_status": {
-    "codex": { "root_cause": "completed|not_installed|auth_failed|...", "coverage_status": "full|compensating" },
-    "gemini": { "root_cause": "...", "coverage_status": "..." },
-    "superpowers": { "root_cause": "completed", "coverage_status": "full" }
+    "codex": { "root_cause": null, "coverage_status": "full|compensating" },
+    "gemini": { "root_cause": "auth_failed|not_installed|null", "coverage_status": "full|compensating" },
+    "superpowers": { "root_cause": null, "coverage_status": "full" }
   },
   "codex": { "findings": [...] },
   "gemini": { "findings": [...] },
@@ -1064,7 +1091,9 @@ In the `mmr review` options list (around line 80), add:
 
 - [ ] **Step 5: Replace per-command exit codes with global table**
 
-Find the `mmr status` exit codes (line ~100: "Exit codes: 0 = all complete, 1 = still running, 2 = at least one failed") and the `mmr results` exit code (line ~104). Replace both with a single global table placed after the `mmr results` description:
+First, find the `mmr review` exit code sentence (around line 84): "Returns a job ID immediately (unless `--sync`). Exit code 0 = dispatched successfully." Replace with: "Returns a job ID immediately (unless `--sync`). See Global Exit Codes below for exit code semantics."
+
+Then find the `mmr status` exit codes (line ~100: "Exit codes: 0 = all complete, 1 = still running, 2 = at least one failed") and the `mmr results` exit code (line ~104). Replace both with a single global table placed after the `mmr results` description:
 
 ```markdown
 ### Global Exit Codes
@@ -1437,7 +1466,7 @@ grep -c "foreground\|compensating\|degraded-pass\|not_installed\|auth_failed" co
 grep -c "foreground\|compensating\|degraded-pass\|not_installed\|auth_failed" content/tools/review-code.md
 
 # Check post-implementation-review contains new vocabulary
-grep -c "foreground\|compensating\|coverage-indicator\|not_installed\|auth_failed" content/tools/post-implementation-review.md
+grep -c "foreground\|compensating\|full-coverage\|degraded-coverage\|not_installed" content/tools/post-implementation-review.md
 ```
 
 Expected: multiple matches per file. If any file returns 0 or very few matches, inspect it manually. Verify each contains:
