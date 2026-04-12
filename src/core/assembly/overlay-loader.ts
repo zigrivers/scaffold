@@ -231,3 +231,38 @@ export function loadOverlay(
 
   return { overlay, errors, warnings }
 }
+
+/**
+ * Load a domain sub-overlay YAML file with knowledge-only constraint.
+ * Sub-overlays may only contain knowledge-overrides; any step, reads, or
+ * dependency override sections are stripped with a warning.
+ * @param overlayPath - Absolute path to sub-overlay file
+ * @returns { overlay, errors, warnings }
+ */
+export function loadSubOverlay(
+  overlayPath: string,
+): { overlay: ProjectTypeOverlay | null; errors: ScaffoldError[]; warnings: ScaffoldWarning[] } {
+  const result = loadOverlay(overlayPath)
+  if (!result.overlay) return result
+
+  const warnings = [...result.warnings]
+  const overlay = { ...result.overlay }
+
+  // Enforce knowledge-only constraint for domain sub-overlays
+  const hasStep = Object.keys(overlay.stepOverrides ?? {}).length > 0
+  const hasReads = Object.keys(overlay.readsOverrides ?? {}).length > 0
+  const hasDeps = Object.keys(overlay.dependencyOverrides ?? {}).length > 0
+
+  if (hasStep || hasReads || hasDeps) {
+    warnings.push({
+      code: 'SUB_OVERLAY_NON_KNOWLEDGE',
+      message: `Sub-overlay ${overlayPath} contains non-knowledge sections (step/reads/dependency overrides). These are stripped for domain sub-overlays.`,
+      context: { file: overlayPath },
+    })
+    overlay.stepOverrides = {}
+    overlay.readsOverrides = {}
+    overlay.dependencyOverrides = {}
+  }
+
+  return { overlay, errors: result.errors, warnings }
+}

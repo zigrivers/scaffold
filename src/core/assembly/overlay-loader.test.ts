@@ -3,7 +3,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import os from 'node:os'
 import { fileURLToPath } from 'node:url'
-import { loadOverlay } from './overlay-loader.js'
+import { loadOverlay, loadSubOverlay } from './overlay-loader.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const fixtureDir = path.resolve(__dirname, '../../../tests/fixtures/methodology')
@@ -221,5 +221,72 @@ describe('browser-extension overlay', () => {
     expect(overlay!.projectType).toBe('browser-extension')
     expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(15)
     expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+  })
+})
+
+describe('loadSubOverlay', () => {
+  it('loads knowledge-overrides from a valid sub-overlay with no warnings', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sub-overlay-test-'))
+    const tmpFile = path.join(tmpDir, 'knowledge-only.yml')
+    fs.writeFileSync(tmpFile, [
+      'name: knowledge-only',
+      'description: Sub-overlay with knowledge only',
+      'project-type: research',
+      'knowledge-overrides:',
+      '  tech-stack:',
+      '    append:',
+      '      - quant-finance-stack',
+      '      - data-analysis-tools',
+    ].join('\n'))
+
+    try {
+      const { overlay, errors, warnings } = loadSubOverlay(tmpFile)
+      expect(errors).toHaveLength(0)
+      expect(warnings).toHaveLength(0)
+      expect(overlay).not.toBeNull()
+      expect(overlay!.knowledgeOverrides['tech-stack']).toEqual({
+        append: ['quant-finance-stack', 'data-analysis-tools'],
+      })
+      expect(overlay!.stepOverrides).toEqual({})
+      expect(overlay!.readsOverrides).toEqual({})
+      expect(overlay!.dependencyOverrides).toEqual({})
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true })
+    }
+  })
+
+  it('warns and strips non-knowledge sections from sub-overlay', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sub-overlay-test-'))
+    const tmpFile = path.join(tmpDir, 'mixed-sections.yml')
+    fs.writeFileSync(tmpFile, [
+      'name: mixed-sections',
+      'description: Sub-overlay with step overrides that should be stripped',
+      'project-type: research',
+      'step-overrides:',
+      '  game-design-document:',
+      '    enabled: true',
+      'knowledge-overrides:',
+      '  tech-stack:',
+      '    append:',
+      '      - quant-finance-stack',
+    ].join('\n'))
+
+    try {
+      const { overlay, errors, warnings } = loadSubOverlay(tmpFile)
+      expect(errors).toHaveLength(0)
+      expect(overlay).not.toBeNull()
+      // Step overrides should be stripped
+      expect(overlay!.stepOverrides).toEqual({})
+      // Knowledge overrides should be preserved
+      expect(overlay!.knowledgeOverrides['tech-stack']).toEqual({
+        append: ['quant-finance-stack'],
+      })
+      // Warning should be emitted
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0].code).toBe('SUB_OVERLAY_NON_KNOWLEDGE')
+      expect(warnings[0].message).toContain('non-knowledge')
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true })
+    }
   })
 })
