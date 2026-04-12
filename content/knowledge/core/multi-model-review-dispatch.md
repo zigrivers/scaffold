@@ -46,19 +46,49 @@ The review never blocks on external model availability.
 
 ### Dispatch Mechanics
 
+### Foreground-Only Execution
+
+When an AI agent dispatches CLI reviews via a tool runner (Claude Code Bash tool, Codex exec, etc.), always run commands in the foreground. Background execution (`run_in_background`, `&`, `nohup`) produces empty or truncated output from Codex and Gemini CLIs. Multiple foreground calls can still run in parallel if the tool runner supports parallel tool invocations.
+
 #### CLI Availability Check
 
-Before dispatching, verify the model CLI is installed and authenticated:
+Before dispatching, verify the model CLI is installed and authenticated using a two-step process that produces distinct statuses for the orchestration layer:
+
+**Step 1 — Installation check:**
 
 ```bash
-# Codex check
-which codex && codex --version 2>/dev/null
+# Codex: not found -> status: "not_installed"
+command -v codex >/dev/null 2>&1
 
-# Gemini check (via Google Cloud CLI or dedicated tool)
-which gemini 2>/dev/null || (which gcloud && gcloud ai models list 2>/dev/null)
+# Gemini: not found -> status: "not_installed"
+command -v gemini >/dev/null 2>&1
 ```
 
-If the CLI is not found, skip dispatch immediately. Do not prompt the user to install it — this is a review enhancement, not a requirement.
+If the CLI is not found, report status `not_installed` to the orchestration layer. Do not prompt the user to install it.
+
+**Step 2 — Auth verification (only if installed):**
+
+```bash
+# Codex: fail -> status: "auth_failed"
+codex login status 2>/dev/null
+
+# Gemini: exit 41 -> status: "auth_failed"
+NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1
+```
+
+If auth fails, report status `auth_failed` and surface recovery to the user:
+- Codex: "Codex auth expired — run `! codex login` to re-authenticate"
+- Gemini: "Gemini auth expired — run `! gemini -p \"hello\"` to re-authenticate"
+
+If auth check times out (~5 seconds), retry once. If still failing, report `auth_timeout`.
+If auth succeeds, report `ready` and proceed to dispatch.
+
+**Post-dispatch terminal states:**
+- `completed` — channel produced results, use normally
+- `partial_timeout` — partial output before timeout; use what was received, note incompleteness. Does NOT trigger compensating pass.
+- `failed` — crashed or unparseable output; triggers compensating pass.
+
+Verdict impact: `partial_timeout` and `failed` channels mean the review is degraded. Maximum verdict is `degraded-pass` when any channel has a non-`completed` terminal state.
 
 #### Prompt Formatting
 
@@ -240,6 +270,15 @@ Minimum standards for a multi-model review to be considered complete:
 | Raw output preserved | JSON files exist for all models that were dispatched | Audit trail |
 
 If the primary Claude review produces zero findings and external models are unavailable, the review should explicitly note this as unusual and recommend a targeted re-review at a later stage.
+
+#### Degraded-Mode Gate Adaptation
+
+When channels are skipped and compensating passes are used:
+
+- **Minimum finding count** gate: compensating passes count toward the total but are not treated as separate external channels for consensus purposes.
+- **Cross-model disagreement documentation** gate: applies whenever 2+ distinct model perspectives participate (Claude + one external counts). N/A only when Claude is the sole perspective (no external models and no compensating passes that introduce genuinely different framing).
+- **Coverage threshold** gate: compensating passes satisfy the "every pass has at least one finding or explicit no-issues note" requirement.
+- The reconciled output must record which channels were real, which were compensating, and which were skipped, so the orchestration layer can apply appropriate verdict logic.
 
 ### Common Anti-Patterns
 
