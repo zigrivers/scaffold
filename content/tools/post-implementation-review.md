@@ -208,17 +208,27 @@ Severity:
 Return ONLY valid JSON. No markdown, no explanation outside the JSON object.
 ```
 
+**Foreground only:** Always run Codex and Gemini CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`. Background execution produces empty output.
+
 #### Channel 1: Codex CLI
 
-**Auth check first** (tokens expire — always re-verify):
+**Installation check first:**
+
+```bash
+command -v codex >/dev/null 2>&1 || echo "Codex not installed"
+```
+
+If not installed: queue a compensating pass (implementation correctness, security, API contracts, labeled `[compensating: Codex-equivalent]`). Skip to Channel 2.
+
+**Auth check** (tokens expire — always re-verify):
 
 ```bash
 codex login status 2>/dev/null && echo "codex authenticated" || echo "codex NOT authenticated"
 ```
 
-If not authenticated: tell the user "Codex auth expired. Run: `! codex login`".
-Do NOT silently skip. Retry after user re-authenticates.
-If Codex is not installed: skip this channel and note it in the report.
+If not authenticated: tell the user "Codex auth expired. Run: `! codex login`". Do NOT silently skip. Wait for re-auth and retry once. If auth cannot be recovered (auth_timeout or user declines): queue a compensating pass (implementation correctness, security, API contracts, labeled `[compensating: Codex-equivalent]`).
+
+If Codex fails during execution (non-zero exit, malformed output, timeout): queue a compensating pass with the same focus and label.
 
 **Run the review:**
 
@@ -230,15 +240,23 @@ Store the JSON output as `CODEX_PHASE1_FINDINGS`.
 
 #### Channel 2: Gemini CLI
 
-**Auth check first:**
+**Installation check first:**
+
+```bash
+command -v gemini >/dev/null 2>&1 || echo "Gemini not installed"
+```
+
+If not installed: queue a compensating pass (architectural patterns, design reasoning, broad context, labeled `[compensating: Gemini-equivalent]`). Skip to Channel 3.
+
+**Auth check:**
 
 ```bash
 NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1
 ```
 
-If exit code is 41: tell the user "Gemini auth expired. Run: `! gemini -p \"hello\"`".
-Do NOT silently skip.
-If Gemini is not installed: skip this channel and note it in the report.
+If exit code is 41: tell the user "Gemini auth expired. Run: `! gemini -p \"hello\"`". Do NOT silently skip. Wait for re-auth and retry once. If auth cannot be recovered (auth_timeout or user declines): queue a compensating pass (architectural patterns, design reasoning, broad context, labeled `[compensating: Gemini-equivalent]`).
+
+If Gemini fails during execution (non-zero exit, malformed output, timeout): queue a compensating pass with the same focus and label.
 
 **Run the review (independent — do NOT include Codex output in this prompt):**
 
@@ -247,6 +265,8 @@ NO_BROWSER=true gemini -p "[PHASE 1 REVIEW PROMPT]" --output-format json --appro
 ```
 
 Store as `GEMINI_PHASE1_FINDINGS`.
+
+**After all Phase 1 channels:** Run any queued compensating passes. Record which channels were real, compensating, or skipped. This availability map is used for Phase 2.
 
 #### Channel 3: Superpowers Code-Reviewer
 
@@ -349,13 +369,21 @@ Acceptance Criteria:
 Run all three review channels. Each runs independently — do NOT share one channel's
 output with another.
 
+**Foreground only:** Always run Codex and Gemini CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`. Background execution produces empty output.
+
+**Session-scoped channel availability:** Phase 1 has already probed channel installation and auth. Pass the Phase 1 channel availability results to each Phase 2 subagent. Subagents do NOT re-probe — if Codex was `auth failed` in Phase 1, every Phase 2 subagent treats Codex as unavailable and runs a compensating pass immediately.
+
+Phase 2 compensating passes adapt the focus to story context:
+- Missing Codex → focus compensating pass on implementation correctness and edge cases for this story's acceptance criteria.
+- Missing Gemini → focus compensating pass on design coherence and architectural alignment for this story.
+
 Channel 1 — Codex CLI:
-  Auth: codex login status 2>/dev/null
   Run: codex exec --skip-git-repo-check -s read-only --ephemeral "[PER-STORY PROMPT]" 2>/dev/null
+  (Only if Codex was available in Phase 1. Otherwise run compensating pass immediately.)
 
 Channel 2 — Gemini CLI (independent):
-  Auth: NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1 (exit 41 = auth failure)
   Run: NO_BROWSER=true gemini -p "[PER-STORY PROMPT]" --output-format json --approval-mode yolo 2>/dev/null
+  (Only if Gemini was available in Phase 1. Otherwise run compensating pass immediately.)
 
 Channel 3 — Superpowers code-reviewer:
   Dispatch superpowers:code-reviewer with:
@@ -409,9 +437,14 @@ The per-story review prompt for Codex and Gemini:
 
 Normalize the Superpowers code-reviewer findings to the same JSON shape as
 Codex/Gemini (severity, acceptance_criterion, file, line, description, suggestion)
-before returning. Then return all three channels' findings:
+before returning. Then return all three channels' findings plus channel status:
 {
   "story": "[STORY_TITLE]",
+  "channel_status": {
+    "codex": { "root_cause": "null|not_installed|auth_failed|auth_timeout|failed", "coverage_status": "full|compensating" },
+    "gemini": { "root_cause": "null|not_installed|auth_failed|auth_timeout|failed", "coverage_status": "full|compensating" },
+    "superpowers": { "root_cause": null, "coverage_status": "full" }
+  },
   "codex": { "findings": [...] },
   "gemini": { "findings": [...] },
   "superpowers": { "findings": [...] }
@@ -448,7 +481,9 @@ Create `docs/reviews/` if it does not exist. Write the following to
 
 - **Date:** [YYYY-MM-DD]
 - **Mode:** [Review + Fix | Report Only | Update Mode | Re-review]
-- **Channels:** Codex [completed | skipped — reason] | Gemini [completed | skipped — reason] | Superpowers [completed]
+- **Coverage:** [full-coverage / degraded-coverage / partial-coverage]
+- **Channels (Phase 1):** Codex [completed | compensating | skipped — reason] | Gemini [completed | compensating | skipped — reason] | Superpowers [completed]
+- **Channels (Phase 2):** [N] stories reviewed, [N] with full channels, [N] with compensating passes
 - **Findings:** P0: [N] | P1: [N] | P2: [N] | P3: [N]
 - **Fixed:** [N findings fixed | N/A — report-only]
 
@@ -602,7 +637,9 @@ Output the completion summary:
 ```
 Post-implementation review complete.
 
-Channels: Codex [status] | Gemini [status] | Superpowers [completed]
+Coverage: [full-coverage / degraded-coverage / partial-coverage]
+Channels (Phase 1): Codex [completed|compensating|skipped — reason] | Gemini [completed|compensating|skipped — reason] | Superpowers [completed]
+Channels (Phase 2): [N] stories reviewed, [N] with full channels, [N] with compensating passes
 Findings: P0: [N] | P1: [N] | P2: [N] | P3: [N]
 Fixed: [N] | Remaining: [N]
 
@@ -616,23 +653,29 @@ the user they require manual attention before the project is ready to release.
 
 | Situation | Action |
 |-----------|--------|
-| Codex not installed | Skip Codex in all phases; document as "not installed" in report |
-| Gemini not installed | Skip Gemini in all phases; document as "not installed" in report |
-| Codex auth expired | Tell user: "Codex auth expired. Run: `! codex login`". Do NOT silently skip. Retry after re-auth. |
-| Gemini auth expired (exit 41) | Tell user: "Gemini auth expired. Run: `! gemini -p \"hello\"`". Do NOT silently skip. |
-| Neither CLI installed | Run Superpowers code-reviewer only; warn user that review coverage is reduced |
+| Codex not installed (`command -v` fails) | Queue compensating pass (implementation correctness, security, API contracts, labeled `[compensating: Codex-equivalent]`); document as "not_installed" in report |
+| Gemini not installed (`command -v` fails) | Queue compensating pass (architectural patterns, design reasoning, broad context, labeled `[compensating: Gemini-equivalent]`); document as "not_installed" in report |
+| Codex auth expired — user recovers | Re-run auth check; proceed with full Codex channel |
+| Codex auth expired — user declines or auth_timeout | Queue compensating pass (implementation correctness, security, API contracts, labeled `[compensating: Codex-equivalent]`); document as "auth_failed" or "auth_timeout" in report |
+| Gemini auth expired (exit 41) — user recovers | Re-run auth check; proceed with full Gemini channel |
+| Gemini auth expired — user declines or auth_timeout | Queue compensating pass (architectural patterns, design reasoning, broad context, labeled `[compensating: Gemini-equivalent]`); document as "auth_failed" or "auth_timeout" in report |
+| Channel fails during execution (non-zero exit, malformed output, timeout) | Queue compensating pass for that channel with same focus and label; document root cause in report |
+| Both external CLIs unavailable (any combination of not_installed / auth failure) | Run all compensating passes plus Superpowers code-reviewer; report coverage as "degraded-coverage"; warn user that review coverage is reduced |
+| Superpowers unavailable | Document as "unavailable" in report; proceed with remaining channels; Superpowers is a Claude subagent and should always be available |
 | `docs/user-stories.md` missing | Skip Phase 2; run Phase 1 only; warn user that functional review is incomplete |
 | `docs/coding-standards.md` missing | Proceed without it; note its absence in the report summary |
 
 ## Process Rules
 
-1. **All three channels are mandatory** — skip only when a tool is genuinely not installed, never by choice.
-2. **Auth failures are not silent** — always surface to the user with the exact recovery command.
-3. **Independence** — never share one channel's output with another. Each reviews independently.
-4. **Verify every fix** — run tests (or re-read the file) immediately after each fix before moving on.
-5. **3-round limit** — never attempt to fix the same finding more than 3 times. Surface unresolved findings to the user.
-6. **Document everything** — the report must show which channels ran, which were skipped, and why.
-7. **No auto-merge** — this tool modifies local files only. It never pushes, merges, or creates PRs.
+1. **Foreground only** — Always run Codex and Gemini CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`. Background execution produces empty output.
+2. **All three channels are mandatory** — a channel enters degraded mode (compensating pass) when not installed, auth cannot be recovered, or it fails during execution. Never skip silently by choice.
+3. **Auth failures are not silent** — always surface to the user with the exact recovery command (`! codex login` or `! gemini -p "hello"`). Wait for user response before queuing a compensating pass.
+4. **Independence** — never share one channel's output with another. Each reviews independently.
+5. **Verify every fix** — run tests (or re-read the file) immediately after each fix before moving on.
+6. **3-round limit** — never attempt to fix the same finding more than 3 times. Surface unresolved findings to the user.
+7. **Document everything** — the report must show which channels ran, which were compensating, which were skipped, and the root cause for any degraded channel.
+8. **No auto-merge** — this tool modifies local files only. It never pushes, merges, or creates PRs.
+9. **Dispatch pattern cross-reference** — Phase 2 parallel dispatch uses `superpowers:dispatching-parallel-agents`. Each story subagent dispatches its own `superpowers:code-reviewer` as Channel 3. This two-level nesting is intentional and supported.
 
 ## After This Step
 
@@ -642,7 +685,9 @@ When the review is complete, tell the user:
 **Post-implementation review complete.**
 
 Results:
-- Channels run: [list which ran in Phase 1 and Phase 2]
+- Coverage: [full-coverage / degraded-coverage / partial-coverage]
+- Channels (Phase 1): Codex [completed|compensating|skipped — reason] | Gemini [completed|compensating|skipped — reason] | Superpowers [completed]
+- Channels (Phase 2): [N] stories reviewed, [N] with full channels, [N] with compensating passes
 - Phase 1 (systemic): [N] findings — [N] fixed, [N] remaining
 - Phase 2 (functional): [N] findings across [N] stories — [N] fixed, [N] remaining
 - Report: `docs/reviews/post-implementation-review.md`

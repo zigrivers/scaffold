@@ -64,7 +64,7 @@ fi
 
 The `!` prefix runs the command in the user's terminal session, allowing interactive auth flows (browser OAuth, Y/n prompts) that can't work in headless mode.
 
-**If neither CLI is available or authenticated**: Fall back to structured Claude-only self-review. Re-read the artifact with an adversarial lens — actively try to find issues the initial review missed. Document this as "single-model review (no external CLIs available)."
+**If neither CLI is available or authenticated**: Queue a compensating Claude pass focused on the failed channel's strength area. Document this as "single-model review (no external CLIs available)."
 
 ## Correct Invocation Patterns
 
@@ -133,6 +133,12 @@ NO_BROWSER=true gemini -p "REVIEW_PROMPT_HERE" --output-format json -s --approva
 | `2>/dev/null` | Suppress progress output |
 
 **Output**: JSON on stdout with `{ response, stats, error }` structure.
+
+## Foreground-Only Execution
+
+Always run Codex and Gemini CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`. Background execution produces empty or truncated output from both CLIs. Multiple foreground calls in a single message are fine — the tool runner supports parallel invocations.
+
+This means: when dispatching reviews, make each CLI call a separate foreground Bash tool invocation. Do NOT use shell `&` or background subshells.
 
 ## Context Bundling
 
@@ -208,35 +214,27 @@ You are reviewing a pull request diff. Report P0, P1, and P2 issues.
 | PR diff | Full diff | If >2000 lines, split into file groups |
 | Implementation plan | Task list + representative tasks | Include full task list, detail for flagged tasks |
 
-## Dual-Model Reconciliation
+## Finding Reconciliation
 
-When both CLIs produce results, reconcile findings using these rules:
+When multiple models produce findings, reconcile them using the rules defined in `multi-model-review-dispatch`. Key principles:
 
-| Scenario | Confidence | Action |
-|----------|-----------|--------|
-| Both flag same issue | **High** | Fix immediately — two independent models agree |
-| Both approve (no findings) | **High** | Proceed confidently |
-| One flags P0, other approves | **High** | Fix it — P0 is critical enough from a single source |
-| One flags P1, other approves | **Medium** | Review the finding carefully before fixing. If the finding is specific and actionable, fix it. If vague, skip. |
-| Models contradict each other | **Low** | Present both findings to the user for adjudication |
+- **Independence rule**: Never share one model's review output with the other. Each model must review the artifact independently to avoid confirmation bias.
+- **Round tracking**: For iterative reviews (like PR review loops), track the round number. After 3 fix rounds with unresolved findings, stop and surface the verdict (`blocked` or `needs-user-decision`) to the user. Do NOT auto-merge.
 
-**Independence rule**: Never share one model's review output with the other. Each model must review the artifact independently to avoid confirmation bias.
-
-**Round tracking**: For iterative reviews (like PR review loops), track the round number. After 3 fix rounds, merge with a warning and create a follow-up issue for remaining findings.
+For the full consensus rules, confidence scoring, and disagreement resolution process, see `multi-model-review-dispatch`.
 
 ## Fallback Behavior
 
 | Situation | Fallback |
 |-----------|----------|
-| Neither CLI available | Structured Claude-only adversarial self-review |
-| Codex only | Single-model review with Codex |
-| Gemini only | Single-model review with Gemini |
-| **CLI auth expired** | **Surface to user with recovery command — do NOT silently fall back** |
-| One CLI fails mid-review (non-auth) | Continue with the other; note the failure in summary |
-| Both CLIs fail (non-auth) | Fall back to Claude-only self-review; warn user |
-| CLI output not parseable as JSON | Treat as text, extract findings manually |
+| Neither CLI available | Queue two compensating Claude passes (one per missing channel's strength area). Label findings. Max verdict: `degraded-pass`. |
+| Codex only | Single-model review with Codex + compensating Claude pass for Gemini |
+| Gemini only | Single-model review with Gemini + compensating Claude pass for Codex |
+| **CLI auth expired** | **Surface to user with `!` recovery command — do NOT silently fall back** |
+| One CLI fails mid-review | Use partial results if available, else queue compensating pass. Note failure in summary. |
+| Both CLIs fail | Two compensating passes, max verdict: `degraded-pass`. Warn user. |
 
-**Auth failures are NOT silent fallbacks.** The difference between "CLI not installed" (fall back quietly) and "CLI auth expired" (user action required) is critical. Auth can be fixed in 30 seconds with an interactive command — silently skipping wastes the user's review infrastructure.
+Auth failures are NOT silent fallbacks.
 
 ## Integration with Review Steps
 

@@ -15,6 +15,7 @@ AI-assisted code reviews using multiple model CLIs (Claude, Gemini, Codex) are u
 - Output parsing is fragile (Gemini wraps JSON in metadata, Codex emits thinking tokens to stderr)
 - Finding reconciliation across channels is manual and inconsistent
 - No structured gate mechanism — agents decide ad-hoc whether findings are blocking
+- Background execution (`run_in_background`) produces empty output from both Codex and Gemini CLIs, forcing foreground-only dispatch that blocks the agent
 
 ## Solution
 
@@ -27,6 +28,7 @@ AI-assisted code reviews using multiple model CLIs (Claude, Gemini, Codex) are u
 - **Automated reconciliation** — consensus rules produce a unified findings list
 - **Configurable severity gates** — project default + CLI override for which findings block the gate
 - **Structured output** — JSON default, with text/markdown/SARIF formatters
+- **Compensating passes** — when a channel is unavailable, mmr optionally runs a one-shot compensating Claude self-review pass focused on the missing channel's strength area, with explicit labeling and single-source confidence
 
 ## Architecture
 
@@ -79,9 +81,11 @@ Options:
   --template <name>                   # Use a named prompt template
   --format json|text|markdown|sarif   # Output format (applied at results time)
   --sync                              # Block until all channels complete or timeout; returns reconciled results directly
+  --compensate              # Run compensating Claude passes for unavailable channels (default: from config)
+  --no-compensate           # Skip compensating passes
 ```
 
-Returns a job ID immediately (unless `--sync`). Exit code 0 = dispatched successfully.
+Returns a job ID immediately (unless `--sync`). See Global Exit Codes below for exit code semantics.
 
 ### `mmr status <job-id>`
 
@@ -90,18 +94,33 @@ Returns a job ID immediately (unless `--sync`). Exit code 0 = dispatched success
   "job_id": "mmr-a1b2c3",
   "status": "running",
   "channels": {
-    "claude": { "status": "completed", "elapsed": "47s", "findings_count": 2 },
+    "claude": { "status": "completed", "root_cause": null, "coverage_status": "full", "elapsed": "47s", "findings_count": 2 },
     "gemini": { "status": "running", "elapsed": "2m12s" },
-    "codex": { "status": "completed", "elapsed": "1m03s", "findings_count": 0 }
+    "codex": { "status": "completed", "root_cause": null, "coverage_status": "full", "elapsed": "1m03s", "findings_count": 0 }
   }
 }
 ```
 
-Exit codes: `0` = all complete, `1` = still running, `2` = at least one failed.
-
 ### `mmr results <job-id>`
 
-Returns reconciled findings when all channels are complete (or timed out). Exit code reflects the gate: `0` = gate passed, `1` = gate failed.
+Returns reconciled findings when all channels are complete (or timed out).
+
+### Global Exit Codes
+
+| Exit Code | Meaning | Commands |
+|-----------|---------|----------|
+| 0 | Success (dispatched / all complete / gate passed) | all |
+| 1 | In progress (still running) | `mmr status` only |
+| 2 | Gate failed (findings above threshold) | `mmr results`, `mmr review --sync` |
+| 3 | Gate degraded (passed with compensating channels) | `mmr results`, `mmr review --sync` |
+| 4 | Channel failure (no reconciled result possible) | `mmr status`, `mmr results` |
+| 5 | CLI error (bad arguments, config error) | all |
+
+**`mmr review --sync` exit semantics:** `--sync` blocks until all channels complete (or timeout), runs reconciliation, and returns the same exit codes as `mmr results`. It is the recommended single-command entry point for AI agents and CI/CD.
+
+**CI/CD note:** Use `mmr review --sync` for gate decisions, never `mmr status` directly. Exit 3 is a warning, not failure.
+
+**Exit code precedence:** Gate codes (0/2/3) take precedence over channel-failure (4) when a reconciled result exists. Exit 4 = no result possible. `needs-user-decision` verdict maps to exit 2 with a `verdict: "needs-user-decision"` field in JSON output.
 
 ### `mmr config`
 
@@ -128,7 +147,9 @@ Each channel definition includes an `auth` block with a check command, timeout, 
 
 ### Auth Lifecycle
 
-Auth is verified **every time** before dispatch — never cached or assumed:
+Auth results are cached internally for up to `auth_cache_ttl` seconds (default: 300). The cache is machine-local (`~/.mmr/auth-cache.json`), never written to project config, and busts immediately on any auth failure. This balances the original "verify every time" principle against the practical cost of repeated slow auth probes in session-scoped workflows.
+
+> **Rationale:** Auth tokens expire mid-session without warning. Pre-flight checks are non-negotiable, but repeated 5-second probes across N story reviews in post-implementation-review waste minutes. The TTL-based cache was chosen over a `--skip-auth-check` flag to prevent cargo-culting in CI scripts.
 
 1. Check CLI installed (`command -v <tool>`)
    - Not installed → silent skip, noted in job metadata
@@ -143,7 +164,7 @@ Auth is verified **every time** before dispatch — never cached or assumed:
 |-----------|----------|-------------|
 | CLI not installed | Silent skip, note in results | Install the CLI |
 | Auth expired/invalid | **Loud failure**, surface recovery command | Re-authenticate |
-| Auth check timeout | Treat as transient, retry once | Check network |
+| Auth check timeout | Retry once, then record `auth_timeout` (distinct from `auth_failed`) | Check network |
 
 Auth failures are **never silent**. The initial `mmr review` response includes immediate auth status:
 
@@ -152,13 +173,17 @@ Auth failures are **never silent**. The initial `mmr review` response includes i
   "job_id": "mmr-a1b2c3",
   "dispatched": {
     "claude": { "auth": "ok", "status": "dispatched" },
-    "gemini": { "auth": "failed", "recovery": "Run: gemini -p 'hello'", "status": "skipped" },
+    "gemini": { "auth": "failed", "recovery": "gemini -p 'hello'", "status": "skipped" },
     "codex": { "auth": "ok", "status": "dispatched" }
   },
   "auth_failures": 1,
   "message": "2/3 channels dispatched. Gemini auth expired."
 }
 ```
+
+> **Rationale:** Auth tokens expire mid-session. The loud-failure contract ensures agents never silently skip a channel that could be recovered in 30 seconds.
+
+Recovery commands are stored as raw commands in `.mmr.yaml`. Platform wrappers (Claude Code skill, AGENTS.md) add the `!` prefix dynamically for interactive contexts.
 
 ### `mmr config test`
 
@@ -174,6 +199,8 @@ $ mmr config test
   2/3 channels ready. 1 auth failure.
 ```
 
+> **Foreground note:** AI agents calling `mmr` must run it in the foreground. Background execution produces empty output. `--sync` is the recommended mode for agent workflows.
+
 ## Core Prompt Engine
 
 ### Layered Assembly
@@ -185,6 +212,8 @@ Prompts are assembled from four layers. The core is immutable; user context is a
 - Output JSON schema specification
 - Review criteria: correctness, regressions, edge cases, test coverage, security
 - Instruction: return ONLY structured findings or NO FINDINGS
+
+> **Rationale:** Layer 1 severity definitions are intentionally duplicated from `review-methodology`. External models receive only the assembled prompt — they cannot resolve cross-references to knowledge entries.
 
 **Layer 2 — Project (from `.mmr.yaml` `review_criteria`):**
 - Project-specific review criteria (e.g., "Verify parameterized DB queries", "Check HIPAA compliance")
@@ -229,11 +258,20 @@ Invoked as: `mmr review --template plan --diff plan.md`
 ### Job Lifecycle
 
 ```
-mmr review → DISPATCHED → RUNNING → COMPLETED
-                            │            │
-                            ├→ TIMEOUT   ├→ GATE_PASSED
-                            ├→ FAILED    └→ GATE_FAILED
-                            └→ AUTH_FAILED
+Per-channel (preflight):
+  PREFLIGHT -> NOT_INSTALLED -> COMPENSATING -> COMP_COMPLETED / COMP_FAILED
+  PREFLIGHT -> AUTH_FAILED   -> COMPENSATING -> COMP_COMPLETED / COMP_FAILED
+  PREFLIGHT -> AUTH_TIMEOUT  -> COMPENSATING -> COMP_COMPLETED / COMP_FAILED
+  PREFLIGHT -> READY -> DISPATCHED
+
+Per-channel (dispatch):
+  DISPATCHED -> RUNNING -> COMPLETED
+                 |
+                 +-> TIMEOUT -> PARTIAL_TIMEOUT (if partial output)
+                 +-> FAILED -> COMPENSATING -> COMP_COMPLETED / COMP_FAILED
+
+Per-job (terminal):
+  GATE_PASSED / GATE_FAILED / GATE_DEGRADED / GATE_NEEDS_USER
 ```
 
 ### Job State Directory
@@ -256,18 +294,53 @@ mmr review → DISPATCHED → RUNNING → COMPLETED
 
 Jobs are retained for 7 days by default (configurable via `defaults.job_retention_days`).
 
+#### Channel Metadata (`.meta.json`)
+
+Each channel directory may contain a `.meta.json` file:
+
+```json
+{
+  "root_cause": "auth_failed",
+  "coverage_status": "compensating",
+  "compensated_by": "claude",
+  "original_channel": "gemini",
+  "compensate_focus": ["architectural patterns", "design reasoning"],
+  "compensate_elapsed": "15s"
+}
+```
+
+Valid `root_cause`: `null | auth_failed | auth_timeout | timeout | partial_timeout | failed | not_installed`
+Valid `coverage_status`: `full | partial | compensating | none`
+
 ## Reconciliation Engine
+
+### Compensation Eligibility
+
+| Root Cause | Eligible? | Rationale |
+|-----------|-----------|-----------|
+| `not_installed` | Yes | Tool absent |
+| `auth_failed` | Yes | Compensate immediately; discard if auth recovers |
+| `auth_timeout` (after retry) | Yes | Transient |
+| `timeout` (no output) | Yes | No data |
+| `partial_timeout` | No | Use partial results |
+| `failed` | Yes | No output |
 
 ### Consensus Rules
 
 | Scenario | Confidence | Action |
-|----------|------------|--------|
-| 2+ channels flag same location + same severity | **High** | Report at agreed severity |
-| 2+ channels flag same location, different severity | **Medium** | Report at the *higher* severity, note disagreement |
-| All channels approve (no findings) | **High** | Gate passed |
-| One channel flags P0, others approve | **High** | Report P0 — critical from any single source |
-| One channel flags P1/P2, others approve | **Medium** | Report with attribution, flag as single-source |
-| Channels contradict | **Low** | Present both, mark for user adjudication |
+|----------|-----------|--------|
+| 2+ real channels, same location + severity | **High** | Report at agreed severity |
+| 2+ real channels, same location, different severity | **Medium** | Report at higher severity |
+| Real + compensating agree | **Medium** | Report, note compensating source |
+| All real channels approve | **High** | Gate passed |
+| One real P0, others approve | **High** | Report P0 |
+| One real P1/P2, others approve | **Medium** | Report with attribution |
+| Compensating-only finding | **Low** | Report, flag single-source |
+| Real channels contradict | **Low** | User adjudication |
+
+**Confidence cap rule:** Compensating evidence caps confidence at Medium only when it is necessary to reach the agreement threshold. Existing multi-real-channel consensus is not downgraded.
+
+**Severity is never capped.** A compensating P0 is still reported as P0 with Low confidence. Fix threshold gates on severity, not confidence.
 
 ### Reconciled Output Schema
 
@@ -304,8 +377,15 @@ Jobs are retained for 7 days by default (configurable via `defaults.job_retentio
 ### Gate Logic
 
 ```
-gate_passed = no reconciled finding has severity ≤ fix_threshold
+gate_passed      = no finding <= fix_threshold AND all channels coverage_status = "full"
+gate_degraded    = no finding <= fix_threshold AND any channel coverage_status in ("partial", "compensating", "none")
+gate_failed      = any finding <= fix_threshold unresolved
+gate_needs_user  = contradictions or unresolvable findings requiring human judgment
 ```
+
+**Quality gate failures** (e.g., missing raw output, unmet minimum finding count) map to `gate_failed`.
+
+> **Rationale:** Partial results beat no results. A review with 2/3 channels at degraded confidence is better than blocking on the third.
 
 Default `fix_threshold: P2` means P0, P1, and P2 findings fail the gate. P3-only results pass.
 
@@ -324,6 +404,15 @@ defaults:
   format: json
   parallel: true
   job_retention_days: 7
+  compensate: true
+  auth_cache_ttl: 300
+  compensate_focus:
+    codex:
+      aspects: ["implementation correctness", "security", "API contracts"]
+    gemini:
+      aspects: ["architectural patterns", "design reasoning", "broad context"]
+
+# Note: compensate_focus.aspects is additive with --focus (CLI focus areas are appended on top)
 
 review_criteria:
   - "Project-specific criterion here"
@@ -338,7 +427,7 @@ channels:
       check: "claude -p 'respond with ok' 2>/dev/null"
       timeout: 5
       failure_exit_codes: [1]
-      recovery: "Run: claude login"
+      recovery: "claude login"
     prompt_wrapper: "{{prompt}}"
     output_parser: default
     timeout: 300
@@ -355,7 +444,7 @@ channels:
       check: "NO_BROWSER=true gemini -p 'respond with ok' -o json 2>&1"
       timeout: 5
       failure_exit_codes: [41]
-      recovery: "Run: gemini -p 'hello' (interactive, opens browser)"
+      recovery: "gemini -p 'hello'"
     prompt_wrapper: "{{prompt}}\nIMPORTANT: Return raw JSON only. No markdown fences."
     output_parser: gemini
     timeout: 360
@@ -372,7 +461,7 @@ channels:
       check: "codex login status 2>/dev/null"
       timeout: 5
       failure_exit_codes: [1]
-      recovery: "Run: codex login"
+      recovery: "codex login"
     prompt_wrapper: "{{prompt}}"
     output_parser: default
     stderr: suppress
@@ -398,6 +487,8 @@ Add to `.mmr.yaml` with command, flags, env, auth block, and output parser. Zero
 - **PostToolUse hook**: After `gh pr create`, auto-dispatches `mmr review --pr <number>`
 - **Scaffold runner integration**: Review gate calls `mmr` instead of manual 3-channel orchestration
 
+**Recommended mode:** Claude Code agents should always use `mmr review --sync` to avoid background execution issues. `--sync` blocks until results are ready, returning reconciled findings directly.
+
 ### Codex CLI / Gemini CLI
 
 AGENTS.md / GEMINI.md instructions:
@@ -409,7 +500,18 @@ Collect with: mmr results <job-id>
 Fix all findings above threshold before merging.
 ```
 
+**Recommended mode:** Codex and Gemini agents should always use `mmr review --sync` to avoid background execution issues. `--sync` blocks until results are ready, returning reconciled findings directly.
+
 The wrappers are intentionally thin — three commands is the entire integration surface.
+
+### Output Surface Consistency
+
+All externally visible surfaces must use the canonical `root_cause` / `coverage_status` vocabulary:
+- `mmr status` JSON output
+- `mmr results` JSON output (all formats: json, text, markdown, sarif)
+- `mmr jobs list` output
+- `mmr review --replay` input validation
+- Error messages referencing channel states
 
 ### Agent Experience (Before vs. After)
 
@@ -455,6 +557,7 @@ packages/mmr/
       auth.ts              # Per-channel auth verification
       prompt.ts            # Layered prompt assembly engine
       reconciler.ts        # Multi-channel finding reconciliation
+      compensator.ts     # Compensating pass dispatch and labeling
       parser.ts            # Output parsers (default, gemini, custom)
       job-store.ts         # Job state directory management
     config/
@@ -504,3 +607,6 @@ packages/mmr/
 5. Severity gate is configurable per-project and per-invocation
 6. Adding a new model CLI requires only a YAML config change, no code
 7. Reconciliation produces a unified findings list with confidence and attribution
+8. Compensating passes run automatically for unavailable channels when `--compensate` is enabled
+9. Compensating findings are clearly labeled and never inflate confidence scores
+10. `--sync` mode works reliably for AI agent workflows (no empty output, no polling needed)
