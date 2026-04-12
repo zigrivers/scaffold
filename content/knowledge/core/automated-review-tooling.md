@@ -25,7 +25,7 @@ These are the authoritative verdict definitions. Tool files (`review-code.md`, `
 | Verdict | Condition |
 |---------|-----------|
 | `pass` | All configured channels ran, no unresolved P0/P1/P2 |
-| `degraded-pass` | Channels skipped/compensated, no unresolved P0/P1/P2 |
+| `degraded-pass` | Channels skipped, compensated, or have non-full coverage (e.g., partial timeout), no unresolved P0/P1/P2 |
 | `blocked` | Unresolved P0/P1/P2 after 3 fix rounds |
 | `needs-user-decision` | Contradictions or unresolvable findings |
 
