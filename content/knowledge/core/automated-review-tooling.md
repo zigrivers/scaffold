@@ -102,11 +102,11 @@ When Codex is unavailable (not installed or auth failure), the orchestration pro
 2. A compensating Codex-equivalent pass is queued: a Claude self-review focused on implementation correctness, security, and API contracts.
 3. Gemini and Superpowers channels run normally.
 4. The compensating pass runs, producing findings labeled `[compensating: Codex-equivalent]`.
-5. Reconciliation merges findings from all four sources (Gemini, Superpowers, compensating-Codex, compensating-Gemini if applicable).
+5. Reconciliation merges findings from all three sources (Gemini, Superpowers, compensating-Codex).
 6. Maximum achievable verdict is `degraded-pass` because a real channel was absent.
 7. The review summary notes: "Codex channel: not_installed (compensating: Codex-equivalent pass ran)."
 
-**Fix-cycle channel rule:** During fix rounds, never retry a channel with status `not_installed`, `auth_failed`, or `auth_timeout`. These statuses indicate a persistent environment condition that will not resolve between fix rounds. Only retry channels with status `failed` (transient execution error).
+**Fix-cycle channel rule:** Only re-run channels that originally completed or ran as compensating passes. `failed` channels are covered by their compensating pass and are not retried during fix rounds. Never retry a channel with status `not_installed`, `auth_failed`, or `auth_timeout` — these indicate persistent environment conditions that will not resolve between fix rounds.
 
 ### Verdict Decision Flow
 
@@ -117,7 +117,7 @@ Verdict evaluation order:
 1. Any contradictions or unresolvable findings? → needs-user-decision
 2. Any unresolved P0/P1/P2 after 3 fix rounds? → blocked
 3. Any channel not at full coverage? → degraded-pass
-4. All channels completed, no findings? → pass
+4. All channels completed, no unresolved P0/P1/P2? → pass
 ```
 
 A "contradiction" exists when two channels report opposite conclusions about the same code location — for example, Codex flags a function as insecure while Gemini explicitly approves it. Contradictions cannot be resolved by the agent alone and must be surfaced to the user.

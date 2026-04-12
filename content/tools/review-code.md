@@ -170,8 +170,8 @@ command -v codex >/dev/null 2>&1
 codex login status 2>/dev/null
 ```
 
-- If `codex` is not installed: skip this channel and record `skipped (not installed)`
-- If auth fails: tell the user to run `! codex login`, retry after recovery, and if recovery is not possible, record `skipped (auth failed)` and continue with the remaining channels
+- If `codex` is not installed: skip this channel and record root-cause `not_installed`
+- If auth fails: tell the user to run `! codex login`, retry after recovery, and if recovery is not possible, record root-cause `auth_failed` and continue with the remaining channels
 
 If auth cannot be recovered, or if Codex is not installed, queue a compensating Claude self-review pass focused on implementation correctness, security, and API contracts. Label findings as `[compensating: Codex-equivalent]`. If auth check times out (~5s), retry once; if still failing, record `auth timeout` and queue compensating pass. This pass runs after all channel dispatch attempts complete.
 
@@ -194,8 +194,8 @@ command -v gemini >/dev/null 2>&1
 NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1
 ```
 
-- If `gemini` is not installed: skip this channel and record `skipped (not installed)`
-- If auth fails (including exit 41): tell the user to run `! gemini -p "hello"`, retry after recovery, and if recovery is not possible, record `skipped (auth failed)` and continue with the remaining channels
+- If `gemini` is not installed: skip this channel and record root-cause `not_installed`
+- If auth fails (including exit 41): tell the user to run `! gemini -p "hello"`, retry after recovery, and if recovery is not possible, record root-cause `auth_failed` and continue with the remaining channels
 
 If auth cannot be recovered, or if Gemini is not installed, queue a compensating Claude self-review pass focused on architectural patterns, design reasoning, and broad context. Label findings as `[compensating: Gemini-equivalent]`. If auth check times out (~5s), retry once; if still failing, record `auth timeout` and queue compensating pass. This pass runs after all channel dispatch attempts complete.
 

@@ -156,8 +156,6 @@ providing:
 - `HEAD_SHA` — head commit
 - `DESCRIPTION` — PR summary
 
-If the CLI exits with a non-zero code, produces malformed/unparseable output, or is killed by the tool runner timeout, record root-cause `failed` and queue a compensating pass for that channel.
-
 **After all channels:** Run any queued compensating passes as foreground Claude self-review passes. Each uses the same review prompt as the missing channel, focused on that channel's strength area. Label findings as `[compensating: Codex-equivalent]` or `[compensating: Gemini-equivalent]`.
 
 ### Step 4: Reconcile Findings
