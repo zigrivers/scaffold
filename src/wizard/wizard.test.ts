@@ -317,4 +317,92 @@ describe('runWizard', () => {
     expect(output.select).not.toHaveBeenCalled()
     expect(output.confirm).not.toHaveBeenCalled()
   })
+
+  // Test 16: Banner prints once in interactive mode
+  it('prints first-prompt banner before projectType in interactive mode', async () => {
+    const output = makeOutputContext()
+    vi.mocked(output.supportsInteractivePrompts).mockReturnValue(true)
+
+    // Mock the prompt chain for a minimal interactive run
+    vi.mocked(output.prompt).mockResolvedValueOnce('deep')  // methodology
+    vi.mocked(output.confirm)
+      .mockResolvedValueOnce(false)   // Codex adapter
+      .mockResolvedValueOnce(false)   // Gemini adapter
+      .mockResolvedValueOnce(false)   // web trait
+      .mockResolvedValueOnce(false)   // mobile trait
+    vi.mocked(output.select)
+      .mockResolvedValueOnce('web-app')  // projectType
+      .mockResolvedValueOnce('spa')        // renderingStrategy
+      .mockResolvedValueOnce('serverless') // deployTarget
+      .mockResolvedValueOnce('none')       // realtime
+      .mockResolvedValueOnce('none')       // authFlow
+
+    await runWizard({
+      projectRoot: tmpDir,
+      auto: false,
+      force: true,
+      output,
+    })
+
+    // Verify banner was printed exactly once
+    expect(output.info).toHaveBeenCalledWith(
+      expect.stringContaining('Type ?'),
+    )
+    const bannerCalls = vi.mocked(output.info).mock.calls.filter(
+      (call) => typeof call[0] === 'string' && call[0].includes('Type ?'),
+    )
+    expect(bannerCalls).toHaveLength(1)
+  })
+
+  // Test 17: Banner does NOT print in auto mode
+  it('does not print banner in auto mode', async () => {
+    const output = makeOutputContext()
+
+    await runWizard({
+      projectRoot: tmpDir,
+      auto: true,
+      force: true,
+      output,
+      methodology: 'deep',
+      projectType: 'web-app',
+      webAppFlags: { webRendering: 'spa' },
+    })
+
+    const bannerCalls = vi.mocked(output.info).mock.calls.filter(
+      (call) => typeof call[0] === 'string' && call[0].includes('Type ?'),
+    )
+    expect(bannerCalls).toHaveLength(0)
+  })
+
+  // Test 18: Banner does NOT print when supportsInteractivePrompts is false
+  it('does not print banner when supportsInteractivePrompts is false', async () => {
+    const output = makeOutputContext()
+    // supportsInteractivePrompts already returns false by default in makeOutputContext
+
+    // Mock the prompt chain for a minimal interactive run
+    vi.mocked(output.prompt).mockResolvedValueOnce('deep')  // methodology
+    vi.mocked(output.confirm)
+      .mockResolvedValueOnce(false)   // Codex adapter
+      .mockResolvedValueOnce(false)   // Gemini adapter
+      .mockResolvedValueOnce(false)   // web trait
+      .mockResolvedValueOnce(false)   // mobile trait
+    vi.mocked(output.select)
+      .mockResolvedValueOnce('web-app')  // projectType
+      .mockResolvedValueOnce('spa')        // renderingStrategy
+      .mockResolvedValueOnce('serverless') // deployTarget
+      .mockResolvedValueOnce('none')       // realtime
+      .mockResolvedValueOnce('none')       // authFlow
+
+    await runWizard({
+      projectRoot: tmpDir,
+      auto: false,
+      force: true,
+      output,
+    })
+
+    const bannerCalls = vi.mocked(output.info).mock.calls.filter(
+      (call) => typeof call[0] === 'string' && call[0].includes('Type ?'),
+    )
+    expect(bannerCalls).toHaveLength(0)
+  })
 })
