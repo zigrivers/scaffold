@@ -2,7 +2,7 @@
 
 All notable changes to Scaffold are documented here.
 
-## [3.12.0] — 2026-04-12
+## [3.13.0] — 2026-04-12
 
 ### Added
 - **Wizard helper text** — every `scaffold init` prompt now shows inline
