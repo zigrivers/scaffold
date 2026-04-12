@@ -11,20 +11,22 @@
 **Test command:** `cd packages/mmr && npx vitest run`
 **Type check:** `cd packages/mmr && npx tsc --noEmit`
 
+**Branch:** Already on `mmr/cli-fixes` branch.
+
 ---
 
 ## File Map
 
 | File | Action | Responsibility |
 |------|--------|----------------|
-| `packages/mmr/src/core/job-store.ts` | Modify (lines 107-113) | Per-channel status files to eliminate race |
-| `packages/mmr/src/core/dispatcher.ts` | Modify (lines 50-58, 78-124) | stdin error handler, settled flag for timeout race |
-| `packages/mmr/src/commands/review.ts` | Modify (lines 211-233) | Fix sequential dispatch |
-| `packages/mmr/src/core/parser.ts` | Modify (lines 28-43, 99) | String-aware brace extraction, Gemini validation |
-| `packages/mmr/src/config/defaults.ts` | Modify (lines 37, 68) | Fix parser names |
-| `packages/mmr/tests/core/job-store.test.ts` | Modify | Add concurrent write test |
-| `packages/mmr/tests/core/dispatcher.test.ts` | Modify | Add stdin error test, happy-path output test, settled flag test |
-| `packages/mmr/tests/core/parser.test.ts` | Modify | Add string-brace test, empty input test, Gemini validation test |
+| `packages/mmr/src/core/job-store.ts` | Modify | Derive channel state on `loadJob` read; eliminate race |
+| `packages/mmr/src/core/dispatcher.ts` | Modify | stdin error handler, settled flag, return Promise on completion |
+| `packages/mmr/src/commands/review.ts` | Modify | Fix sequential dispatch |
+| `packages/mmr/src/core/parser.ts` | Modify | String-aware brace extraction, Gemini validation |
+| `packages/mmr/src/config/defaults.ts` | Modify | Fix parser names |
+| `packages/mmr/tests/core/job-store.test.ts` | Modify | Add channel-state-on-read tests |
+| `packages/mmr/tests/core/dispatcher.test.ts` | Modify | Add stdin error, happy-path output, settled flag tests |
+| `packages/mmr/tests/core/parser.test.ts` | Modify | Add string-brace, empty input, Gemini validation tests |
 
 ---
 
@@ -34,80 +36,111 @@
 - Modify: `packages/mmr/src/core/job-store.ts:107-113`
 - Test: `packages/mmr/tests/core/job-store.test.ts`
 
-The current `updateChannel` does `loadJob()` → modify → `saveJob()`, which is a read-modify-write race when multiple channels complete concurrently. Fix: write per-channel status files atomically, then derive aggregate by reading all channel files.
+The current `updateChannel` does `loadJob()` → modify → `saveJob()`, which is a read-modify-write race when multiple channels complete concurrently. Fix: write per-channel status files atomically, and make `loadJob` derive channel state by reading those files on every load — eliminating the aggregate rebuild race entirely.
 
-- [ ] **Step 1: Write the failing test for concurrent channel updates**
+- [ ] **Step 1: Write the test for derived channel state on read**
 
 Add to `packages/mmr/tests/core/job-store.test.ts`:
 
 ```typescript
-it('preserves both channel updates when two channels update concurrently', async () => {
+it('derives channel state from per-channel status files on loadJob', () => {
   const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude', 'gemini'] })
 
-  // Simulate concurrent updates (both load job before either saves)
-  await Promise.all([
-    new Promise<void>(resolve => {
-      store.updateChannel(job.job_id, 'claude', { status: 'completed', completed_at: new Date().toISOString() })
-      resolve()
-    }),
-    new Promise<void>(resolve => {
-      store.updateChannel(job.job_id, 'gemini', { status: 'completed', completed_at: new Date().toISOString() })
-      resolve()
-    }),
-  ])
+  // Update channels independently (simulates concurrent completion)
+  store.updateChannel(job.job_id, 'claude', { status: 'completed', completed_at: '2026-04-13T00:00:01Z' })
+  store.updateChannel(job.job_id, 'gemini', { status: 'completed', completed_at: '2026-04-13T00:00:02Z' })
 
+  // loadJob should always reflect the latest per-channel state
   const loaded = store.loadJob(job.job_id)
   expect(loaded.channels.claude.status).toBe('completed')
   expect(loaded.channels.gemini.status).toBe('completed')
+  expect(loaded.status).toBe('completed')
+})
+
+it('derives running status when some channels still in progress', () => {
+  const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude', 'gemini'] })
+
+  store.updateChannel(job.job_id, 'claude', { status: 'completed', completed_at: '2026-04-13T00:00:01Z' })
+  // gemini still dispatched (no update)
+
+  const loaded = store.loadJob(job.job_id)
+  expect(loaded.channels.claude.status).toBe('completed')
+  expect(loaded.channels.gemini.status).toBe('dispatched')
+  expect(loaded.status).toBe('running')
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run test to verify current behavior**
 
 Run: `cd packages/mmr && npx vitest run tests/core/job-store.test.ts`
-Expected: May pass non-deterministically (race), but the implementation is unsafe. Proceed to fix regardless.
+Expected: First test may pass (serial execution), but the race exists. Second test should pass with current code. Proceed to implement the safe pattern.
 
-- [ ] **Step 3: Implement per-channel status files**
+- [ ] **Step 3: Implement per-channel status files with derive-on-read**
 
-In `packages/mmr/src/core/job-store.ts`, replace the `updateChannel` method (lines 107-113):
+In `packages/mmr/src/core/job-store.ts`, make these changes:
+
+**a)** Add a channel name validation helper at the top of the class (after `constructor`):
 
 ```typescript
-/** Update a channel entry atomically via per-channel status file, then rebuild job.json */
+/** Validate channel name is safe for use in file paths */
+private validateChannelName(channel: string): void {
+  if (!/^[a-zA-Z0-9._-]+$/.test(channel)) {
+    throw new Error(`Unsafe channel name: ${channel}`)
+  }
+}
+```
+
+**b)** Replace the `updateChannel` method (lines 107-113):
+
+```typescript
+/** Write a per-channel status file atomically — no read-modify-write on job.json */
 updateChannel(jobId: string, channel: string, update: Partial<ChannelJobEntry>): void {
-  const channelStatusPath = path.join(this.getJobDir(jobId), 'channels', `${channel}.status.json`)
+  this.validateChannelName(channel)
+  const channelsDir = path.join(this.getJobDir(jobId), 'channels')
+  fs.mkdirSync(channelsDir, { recursive: true })
+  const channelStatusPath = path.join(channelsDir, `${channel}.status.json`)
 
   // Read existing channel status if file exists, merge update
   let existing: Partial<ChannelJobEntry> = {}
   try {
-    existing = JSON.parse(fs.readFileSync(channelStatusPath, 'utf-8'))
-  } catch {
-    // No existing status file — first update for this channel
+    const raw = fs.readFileSync(channelStatusPath, 'utf-8')
+    existing = JSON.parse(raw)
+  } catch (err: unknown) {
+    // ENOENT is expected (first update). Any other error is a problem.
+    if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw err
+    }
   }
 
   const merged = { ...existing, ...update }
   fs.writeFileSync(channelStatusPath, JSON.stringify(merged, null, 2))
-
-  // Rebuild job.json from all channel status files
-  this.rebuildJobMetadata(jobId)
 }
+```
 
-/** Rebuild job.json by reading per-channel status files and merging into base metadata */
-private rebuildJobMetadata(jobId: string): void {
-  const metadata = this.loadJob(jobId)
-  const channelsDir = path.join(this.getJobDir(jobId), 'channels')
+**c)** Modify `loadJob` to derive channel state from status files (replace lines 62-67):
 
+```typescript
+/** Read job metadata and derive channel state from per-channel status files */
+loadJob(jobId: string): JobMetadata {
+  const jobDir = this.getJobDir(jobId)
+  const raw = fs.readFileSync(path.join(jobDir, 'job.json'), 'utf-8')
+  const metadata = JSON.parse(raw) as JobMetadata
+
+  // Overlay per-channel status files onto base metadata
+  const channelsDir = path.join(jobDir, 'channels')
   for (const channelName of Object.keys(metadata.channels)) {
     const statusPath = path.join(channelsDir, `${channelName}.status.json`)
     try {
-      const channelUpdate = JSON.parse(fs.readFileSync(statusPath, 'utf-8')) as Partial<ChannelJobEntry>
+      const statusRaw = fs.readFileSync(statusPath, 'utf-8')
+      const channelUpdate = JSON.parse(statusRaw) as Partial<ChannelJobEntry>
       metadata.channels[channelName] = { ...metadata.channels[channelName], ...channelUpdate }
     } catch {
-      // No status file yet — keep initial values
+      // No status file yet — keep initial values from job.json
     }
   }
 
   metadata.status = this.deriveJobStatus(metadata.channels)
-  this.saveJob(jobId, metadata)
+  return metadata
 }
 ```
 
@@ -125,22 +158,26 @@ Expected: No errors
 
 ```bash
 git add packages/mmr/src/core/job-store.ts packages/mmr/tests/core/job-store.test.ts
-git commit -m "fix(mmr): eliminate concurrent job.json write race with per-channel status files
+git commit -m "fix(mmr): eliminate concurrent job.json write race with derive-on-read
 
 P0-4: updateChannel() had a read-modify-write race when parallel channels
 completed simultaneously. Now writes per-channel .status.json files
-atomically and rebuilds job.json from those files."
+atomically and derives aggregate state in loadJob() by reading those
+files on every load. No mutable aggregate file in the critical path.
+Also adds channel name validation to prevent path traversal."
 ```
 
 ---
 
-### Task 2: Fix unhandled stdin.write() error (P0-5)
+### Task 2: Fix unhandled stdin.write() error and add settled flag (P0-5, P1-15)
 
 **Files:**
-- Modify: `packages/mmr/src/core/dispatcher.ts:50-58`
+- Modify: `packages/mmr/src/core/dispatcher.ts`
 - Test: `packages/mmr/tests/core/dispatcher.test.ts`
 
-`proc.stdin.write(prompt)` has no error handler. If the child process closes stdin early or the pipe buffer fills, the unhandled `'error'` event on the stream crashes Node.
+Two related dispatcher fixes: (1) `proc.stdin.write(prompt)` has no error handler — crashes Node on EPIPE. (2) Timeout/close handlers race via filesystem reads — use an in-memory `settled` boolean instead.
+
+Combined into one task since both modify the same function and the settled flag interacts with the stdin fix.
 
 - [ ] **Step 1: Write the failing test for stdin pipe error**
 
@@ -151,18 +188,18 @@ it('handles stdin pipe error without crashing', async () => {
   const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['badstdin'] })
   store.savePrompt(job.job_id, 'Review this.')
 
-  // 'true' exits immediately without reading stdin, causing EPIPE
+  // Use node -e to exit immediately without reading stdin, causing EPIPE on large write
   await dispatchChannel(store, job.job_id, 'badstdin', {
-    command: 'true',
-    prompt: 'x'.repeat(1024 * 1024), // 1MB prompt to trigger pipe error
-    flags: [],
+    command: 'node',
+    prompt: 'x'.repeat(4 * 1024 * 1024), // 4MB to overflow any OS pipe buffer
+    flags: ['-e', 'process.exit(0)'],
     env: {},
     timeout: 5,
     stderr: 'capture',
   })
 
   // Wait for process to complete
-  await new Promise(resolve => setTimeout(resolve, 1000))
+  await new Promise(resolve => setTimeout(resolve, 2000))
 
   // Should not crash — channel should be marked as completed or failed
   const loaded = store.loadJob(job.job_id)
@@ -171,144 +208,62 @@ it('handles stdin pipe error without crashing', async () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails (or crashes)**
-
-Run: `cd packages/mmr && npx vitest run tests/core/dispatcher.test.ts`
-Expected: Test crashes or fails with unhandled error
-
-- [ ] **Step 3: Add stdin error handler**
-
-In `packages/mmr/src/core/dispatcher.ts`, add an error handler before the `write()` call. Replace lines 56-58:
-
-```typescript
-  // Handle stdin pipe errors (child may close stdin early)
-  proc.stdin.on('error', () => {
-    // Swallow EPIPE — the close handler will deal with the process exit
-  })
-
-  // Write prompt to stdin
-  proc.stdin.write(opts.prompt)
-  proc.stdin.end()
-```
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-Run: `cd packages/mmr && npx vitest run tests/core/dispatcher.test.ts`
-Expected: All tests PASS
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add packages/mmr/src/core/dispatcher.ts packages/mmr/tests/core/dispatcher.test.ts
-git commit -m "fix(mmr): handle stdin pipe errors in dispatcher
-
-P0-5: proc.stdin.write() with no error handler crashes Node when the
-child process closes stdin early. Add handler to swallow EPIPE errors
-gracefully — the close handler handles the exit."
-```
-
----
-
-### Task 3: Fix timeout/close race condition (P1-15)
-
-**Files:**
-- Modify: `packages/mmr/src/core/dispatcher.ts:78-124`
-- Test: `packages/mmr/tests/core/dispatcher.test.ts`
-
-The timeout handler writes `status: 'timeout'` to the store via `updateChannel`, then SIGKILL triggers the `close` event which re-reads the store to check status. Replace the filesystem check with an in-memory `settled` boolean, matching the pattern already used in `auth.ts`.
-
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 2: Write the test for successful dispatch saves output**
 
 Add to `packages/mmr/tests/core/dispatcher.test.ts`:
 
 ```typescript
-it('does not overwrite timeout status when close fires after timeout', async () => {
-  const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['racetest'] })
+it('saves channel output and marks completed on success', async () => {
+  const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['echo'] })
   store.savePrompt(job.job_id, 'Review this.')
 
-  // sleep exits after timeout kills it — close fires after timeout handler
-  await dispatchChannel(store, job.job_id, 'racetest', {
-    command: 'sleep 10',
+  await dispatchChannel(store, job.job_id, 'echo', {
+    command: 'node',
     prompt: '',
-    flags: [],
+    flags: ['-e', 'process.stdout.write(JSON.stringify({approved:true,findings:[],summary:"ok"}))'],
     env: {},
-    timeout: 1,
+    timeout: 10,
     stderr: 'capture',
   })
 
   await new Promise(resolve => setTimeout(resolve, 2000))
 
   const loaded = store.loadJob(job.job_id)
-  expect(loaded.channels.racetest.status).toBe('timeout')
+  expect(loaded.channels.echo.status).toBe('completed')
+
+  const output = store.loadChannelOutput(job.job_id, 'echo')
+  expect(output).toContain('approved')
 })
 ```
 
-- [ ] **Step 2: Run test — may pass, but the current implementation is fragile**
+- [ ] **Step 3: Run tests to verify stdin test crashes**
 
 Run: `cd packages/mmr && npx vitest run tests/core/dispatcher.test.ts`
-Expected: Likely passes (filesystem check usually works), but proceed with fix to eliminate the race.
+Expected: stdin test crashes or fails with unhandled error
 
-- [ ] **Step 3: Refactor dispatcher to use in-memory settled flag**
+- [ ] **Step 4: Apply targeted fixes to dispatcher.ts**
 
-Replace the entire `dispatchChannel` function body in `packages/mmr/src/core/dispatcher.ts` (lines 30-138) with:
+Make these targeted edits to `packages/mmr/src/core/dispatcher.ts`:
+
+**a)** Add stdin error handler. Before line 57 (`proc.stdin.write(opts.prompt)`), insert:
 
 ```typescript
-export async function dispatchChannel(
-  store: JobStore,
-  jobId: string,
-  channelName: string,
-  opts: DispatchOptions,
-): Promise<void> {
-  const jobDir = store.getJobDir(jobId)
-  const channelsDir = path.join(jobDir, 'channels')
-
-  // Split multi-word commands (e.g. "claude -p" → ["claude", "-p"])
-  const [cmd, ...cmdArgs] = opts.command.split(/\s+/)
-  const args = [...cmdArgs, ...opts.flags]
-
-  // Update channel to running
-  store.updateChannel(jobId, channelName, {
-    status: 'running',
-    started_at: new Date().toISOString(),
-  })
-
-  // Pipe prompt via stdin to avoid E2BIG on large diffs
-  const proc = spawn(cmd, args, {
-    detached: true,
-    stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, ...opts.env },
-  })
-
   // Handle stdin pipe errors (child may close stdin early)
   proc.stdin.on('error', () => {
     // Swallow EPIPE — the close handler will deal with the process exit
   })
+```
 
-  // Write prompt to stdin
-  proc.stdin.write(opts.prompt)
-  proc.stdin.end()
+**b)** Add settled flag. After the stderr listener (after line 74 `stderr += chunk.toString()`), insert:
 
-  // Write PID file
-  const pidFile = path.join(channelsDir, `${channelName}.pid`)
-  fs.writeFileSync(pidFile, String(proc.pid))
-
-  // Collect stdout and stderr
-  let stdout = ''
-  let stderr = ''
-
-  proc.stdout.on('data', (chunk: Buffer) => {
-    stdout += chunk.toString()
-  })
-
-  proc.stderr.on('data', (chunk: Buffer) => {
-    stderr += chunk.toString()
-  })
-
+```typescript
   // In-memory settled flag to prevent timeout/close race
   let settled = false
+```
 
-  // Set up timeout
-  const timeoutMs = opts.timeout * 1000
+**c)** Guard the timeout handler. Replace lines 78-95:
+
+```typescript
   const timer = setTimeout(() => {
     if (settled) return
     settled = true
@@ -328,8 +283,11 @@ export async function dispatchChannel(
       store.saveChannelLog(jobId, channelName, stderr)
     }
   }, timeoutMs)
+```
 
-  // Handle process close
+**d)** Guard the close handler. Replace lines 98-124:
+
+```typescript
   proc.on('close', (code: number | null) => {
     clearTimeout(timer)
     if (settled) return
@@ -352,8 +310,11 @@ export async function dispatchChannel(
       })
     }
   })
+```
 
-  // Handle spawn errors
+**e)** Guard the error handler. Replace lines 127-134:
+
+```typescript
   proc.on('error', (err: Error) => {
     clearTimeout(timer)
     if (settled) return
@@ -364,32 +325,188 @@ export async function dispatchChannel(
     })
     store.saveChannelLog(jobId, channelName, err.message)
   })
-
-  // Unref so parent process can exit
-  proc.unref()
-}
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [ ] **Step 5: Run tests to verify they pass**
 
 Run: `cd packages/mmr && npx vitest run tests/core/dispatcher.test.ts`
 Expected: All tests PASS
 
-- [ ] **Step 5: Run full test suite and type check**
+- [ ] **Step 6: Run full test suite and type check**
 
 Run: `cd packages/mmr && npx tsc --noEmit && npx vitest run`
 Expected: All pass
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add packages/mmr/src/core/dispatcher.ts packages/mmr/tests/core/dispatcher.test.ts
-git commit -m "fix(mmr): eliminate timeout/close race with in-memory settled flag
+git commit -m "fix(mmr): handle stdin pipe errors and eliminate timeout/close race
 
-P1-15: The timeout handler wrote status to disk, then SIGKILL triggered
-the close handler which re-read the store to check status — a filesystem
-race. Now uses an in-memory settled boolean (matching auth.ts pattern)
-to ensure only the first handler writes the terminal status."
+P0-5: proc.stdin.write() with no error handler crashes Node on EPIPE.
+Added handler to swallow pipe errors gracefully.
+
+P1-15: timeout and close handlers raced via filesystem reads. Now uses
+an in-memory settled boolean (matching auth.ts pattern) to ensure only
+the first handler writes the terminal status.
+
+Also adds test for successful dispatch output capture."
+```
+
+---
+
+### Task 3: Make dispatchChannel return a Promise that settles on completion (P1-9 prerequisite)
+
+**Files:**
+- Modify: `packages/mmr/src/core/dispatcher.ts`
+- Test: `packages/mmr/tests/core/dispatcher.test.ts`
+
+`dispatchChannel` is `async` but resolves immediately after spawning. For sequential dispatch and future `--sync` mode, it must return a Promise that settles when the channel process completes (close/error/timeout).
+
+- [ ] **Step 1: Write the test for awaitable dispatch**
+
+Add to `packages/mmr/tests/core/dispatcher.test.ts`:
+
+```typescript
+it('returned promise resolves only after process completes', async () => {
+  const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['awaitable'] })
+  store.savePrompt(job.job_id, 'Review this.')
+
+  // node -e sleeps 1s then writes output — dispatch should not resolve until after
+  const before = Date.now()
+  await dispatchChannel(store, job.job_id, 'awaitable', {
+    command: 'node',
+    prompt: '',
+    flags: ['-e', 'setTimeout(() => { process.stdout.write("done"); process.exit(0) }, 1000)'],
+    env: {},
+    timeout: 10,
+    stderr: 'capture',
+  })
+  const elapsed = Date.now() - before
+
+  // Should have waited at least ~1s for the process to complete
+  expect(elapsed).toBeGreaterThanOrEqual(800)
+
+  const loaded = store.loadJob(job.job_id)
+  expect(loaded.channels.awaitable.status).toBe('completed')
+})
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd packages/mmr && npx vitest run tests/core/dispatcher.test.ts`
+Expected: FAIL — `elapsed` is near 0 because `dispatchChannel` resolves immediately
+
+- [ ] **Step 3: Wrap dispatcher in a completion Promise**
+
+In `packages/mmr/src/core/dispatcher.ts`, wrap the event handlers in a `new Promise` and return it. Replace the function signature and add the Promise wrapper.
+
+After the `proc.unref()` line at the end of the function, the function currently returns `void` (implicit). Instead, wrap the event handlers:
+
+Remove `proc.unref()` (line 137). Replace the entire section from the `settled` flag declaration through the end of the function with:
+
+```typescript
+  // In-memory settled flag to prevent timeout/close race
+  let settled = false
+
+  return new Promise<void>((resolve) => {
+    // Set up timeout
+    const timeoutMs = opts.timeout * 1000
+    const timer = setTimeout(() => {
+      if (settled) return
+      settled = true
+      try {
+        if (proc.pid) {
+          process.kill(-proc.pid, 'SIGKILL')
+        }
+      } catch {
+        // Process may have already exited
+      }
+      const completedAt = new Date().toISOString()
+      store.updateChannel(jobId, channelName, {
+        status: 'timeout',
+        completed_at: completedAt,
+      })
+      if (stderr) {
+        store.saveChannelLog(jobId, channelName, stderr)
+      }
+      resolve()
+    }, timeoutMs)
+
+    // Handle process close
+    proc.on('close', (code: number | null) => {
+      clearTimeout(timer)
+      if (settled) return
+      settled = true
+
+      const completedAt = new Date().toISOString()
+
+      if (code === 0 && stdout) {
+        store.saveChannelOutput(jobId, channelName, stdout)
+        store.updateChannel(jobId, channelName, {
+          status: 'completed',
+          completed_at: completedAt,
+        })
+      } else {
+        const errorMsg = stderr || `Process exited with code ${code}`
+        store.saveChannelLog(jobId, channelName, errorMsg)
+        store.updateChannel(jobId, channelName, {
+          status: 'failed',
+          completed_at: completedAt,
+        })
+      }
+      resolve()
+    })
+
+    // Handle spawn errors
+    proc.on('error', (err: Error) => {
+      clearTimeout(timer)
+      if (settled) return
+      settled = true
+      store.updateChannel(jobId, channelName, {
+        status: 'failed',
+        completed_at: new Date().toISOString(),
+      })
+      store.saveChannelLog(jobId, channelName, err.message)
+      resolve()
+    })
+  })
+```
+
+- [ ] **Step 4: Remove setTimeout waits from existing tests**
+
+Now that `dispatchChannel` returns a promise that settles on completion, remove the `await new Promise(resolve => setTimeout(resolve, ...))` lines from all dispatcher tests. The `await dispatchChannel(...)` call itself will wait for completion.
+
+In all existing dispatcher tests and the new tests from Task 2, remove lines like:
+```typescript
+// Remove these:
+await new Promise(resolve => setTimeout(resolve, 500))
+await new Promise(resolve => setTimeout(resolve, 1000))
+await new Promise(resolve => setTimeout(resolve, 1500))
+await new Promise(resolve => setTimeout(resolve, 2000))
+```
+
+- [ ] **Step 5: Run tests to verify they pass**
+
+Run: `cd packages/mmr && npx vitest run tests/core/dispatcher.test.ts`
+Expected: All tests PASS — and they run faster without sleep waits
+
+- [ ] **Step 6: Run full suite and type check**
+
+Run: `cd packages/mmr && npx tsc --noEmit && npx vitest run`
+Expected: All pass
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add packages/mmr/src/core/dispatcher.ts packages/mmr/tests/core/dispatcher.test.ts
+git commit -m "fix(mmr): make dispatchChannel return Promise that settles on completion
+
+Prerequisite for P1-9 sequential dispatch fix and future --sync mode.
+dispatchChannel now wraps its event handlers in a Promise that resolves
+when the process closes, times out, or errors. Removes proc.unref() so
+the event loop stays alive while awaiting. Also removes flaky setTimeout
+waits from dispatcher tests."
 ```
 
 ---
@@ -398,13 +515,12 @@ to ensure only the first handler writes the terminal status."
 
 **Files:**
 - Modify: `packages/mmr/src/commands/review.ts:211-233`
-- Create: `packages/mmr/tests/commands/review.test.ts`
 
-When `parallel: false`, all `dispatchChannel()` calls start immediately when pushed to the `dispatches` array. The sequential `for await` loop just awaits already-running promises. Fix: only call `dispatchChannel()` inside the loop when not parallel.
+Now that `dispatchChannel` returns a proper completion Promise (Task 3), sequential dispatch will work correctly. Fix the eager dispatch pattern.
 
 - [ ] **Step 1: Implement the fix**
 
-In `packages/mmr/src/commands/review.ts`, replace lines 211-233:
+In `packages/mmr/src/commands/review.ts`, replace lines 211-233 (the dispatch section):
 
 ```typescript
     // 8. Dispatch channels
@@ -454,7 +570,8 @@ git commit -m "fix(mmr): fix sequential dispatch — channels were starting conc
 
 P1-9: dispatchChannel() was called eagerly when building the dispatches
 array, so all processes started immediately regardless of parallel flag.
-Now only calls dispatchChannel inside the loop when parallel is false."
+Now only calls dispatchChannel inside the loop when parallel is false.
+Works correctly because dispatchChannel now returns a completion Promise."
 ```
 
 ---
@@ -467,7 +584,7 @@ Now only calls dispatchChannel inside the loop when parallel is false."
 
 The `extractJson` function counts `{` and `}` to find matching braces but doesn't account for braces inside JSON string values. Input like `"description": "use { carefully"` causes early termination.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the failing tests**
 
 Add to `packages/mmr/tests/core/parser.test.ts` inside the `default parser` describe block:
 
@@ -541,7 +658,7 @@ function extractJson(text: string): string {
 Run: `cd packages/mmr && npx vitest run tests/core/parser.test.ts`
 Expected: All tests PASS
 
-- [ ] **Step 5: Also add tests for empty input and unbalanced braces**
+- [ ] **Step 5: Add tests for empty input and unbalanced braces**
 
 Add to `packages/mmr/tests/core/parser.test.ts` in the `parseChannelOutput` describe block:
 
@@ -575,7 +692,8 @@ git commit -m "fix(mmr): make extractJson string-aware to handle braces in value
 
 P1-10: extractJson counted braces without tracking JSON string context,
 causing early extraction on input like {\"description\": \"use { carefully\"}.
-Now tracks in-string state and handles escaped quotes."
+Now tracks in-string state and handles escaped quotes.
+Also adds tests for empty input and unbalanced braces edge cases."
 ```
 
 ---
@@ -594,10 +712,8 @@ Add to `packages/mmr/tests/core/parser.test.ts` in the `gemini parser` describe 
 
 ```typescript
 it('validates unwrapped gemini output (missing fields get defaults)', () => {
-  // Gemini returns JSON without the response wrapper, but also missing required fields
   const raw = '{"status": "done", "result": "all good"}'
   const result = parse(raw)
-  // Should get defaults from validateParsedOutput, not raw object
   expect(result.approved).toBe(false)
   expect(result.findings).toEqual([])
   expect(result.summary).toBe('')
@@ -607,7 +723,7 @@ it('validates unwrapped gemini output (missing fields get defaults)', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd packages/mmr && npx vitest run tests/core/parser.test.ts`
-Expected: FAIL — `approved` is `undefined` (not `false`), or `findings` is `undefined`
+Expected: FAIL — `approved` is `undefined` (not `false`)
 
 - [ ] **Step 3: Fix the Gemini parser**
 
@@ -646,11 +762,11 @@ would propagate nulls/undefineds to the reconciler."
 **Files:**
 - Modify: `packages/mmr/src/config/defaults.ts`
 
-The `claude` and `codex` channels specify `output_parser: 'claude'` and `output_parser: 'codex'`, but no such parsers exist — they silently fall back to `'default'`. Make the intent explicit.
+The `claude` and `codex` channels specify `output_parser: 'claude'` (line 36) and `output_parser: 'codex'` (line 66), but no such parsers exist — they silently fall back to `'default'`. Make the intent explicit.
 
 - [ ] **Step 1: Read the defaults file**
 
-Read `packages/mmr/src/config/defaults.ts` to see current values.
+Read `packages/mmr/src/config/defaults.ts` to see current values and exact line numbers.
 
 - [ ] **Step 2: Fix parser names**
 
@@ -677,15 +793,15 @@ don't exist — they silently fell back to 'default'. Make intent explicit."
 
 **Files:**
 - Modify: `packages/mmr/package.json` (version bump to 0.2.0)
-- Modify: `packages/mmr/CHANGELOG.md` (create if needed, add v0.2.0 entry)
+- Create: `packages/mmr/CHANGELOG.md` (add v0.2.0 entry)
 
 - [ ] **Step 1: Bump version**
 
-In `packages/mmr/package.json`, change `"version": "0.1.0"` to `"version": "0.2.0"`.
+In `packages/mmr/package.json`, update the `version` field to `"0.2.0"`.
 
-- [ ] **Step 2: Create/update CHANGELOG.md**
+- [ ] **Step 2: Create CHANGELOG.md**
 
-Create `packages/mmr/CHANGELOG.md` if it doesn't exist:
+Create `packages/mmr/CHANGELOG.md`:
 
 ```markdown
 # Changelog
@@ -693,12 +809,12 @@ Create `packages/mmr/CHANGELOG.md` if it doesn't exist:
 ## [0.2.0] — 2026-04-13
 
 ### Fixed
-- **P0-4:** Concurrent job.json writes race — per-channel status files eliminate lost updates
+- **P0-4:** Concurrent job.json writes race — derive channel state on read from per-channel status files
 - **P0-5:** stdin.write() crash — handle EPIPE when child closes stdin early
 - **P1-15:** Timeout/close race condition — in-memory settled flag prevents double writes
-- **P1-9:** Sequential dispatch was broken — channels started concurrently regardless of parallel flag
-- **P1-10:** extractJson brace counting failed on braces inside JSON strings
-- **P1-11:** Gemini parser skipped validation on unwrapped output
+- **P1-9:** Sequential dispatch was broken — dispatchChannel now returns completion Promise; channels only dispatched inside loop when parallel is false
+- **P1-10:** extractJson brace counting failed on braces inside JSON strings — now string-aware
+- **P1-11:** Gemini parser skipped validation on unwrapped output — unsafe cast replaced with validation
 - **P2-23:** Parser names 'claude'/'codex' silently fell back to 'default' — made explicit
 ```
 
@@ -722,21 +838,25 @@ parser name cleanup."
 
 ```bash
 git push -u origin HEAD
-gh pr create --title "fix(mmr): critical code fixes and parser hardening (v0.2.0)" --body "## Summary
-- Fix concurrent job.json write race with per-channel status files (P0-4)
+gh pr create --title "fix(mmr): critical code fixes and parser hardening (v0.2.0)" --body "$(cat <<'EOF'
+## Summary
+- Fix concurrent job.json write race with derive-on-read pattern (P0-4)
 - Handle stdin pipe errors in dispatcher (P0-5)
 - Eliminate timeout/close race with in-memory settled flag (P1-15)
+- Make dispatchChannel return completion Promise (P1-9 prereq)
 - Fix sequential dispatch starting all channels concurrently (P1-9)
 - Make extractJson string-aware for braces in JSON values (P1-10)
 - Validate unwrapped Gemini parser output (P1-11)
 - Fix misleading parser names in channel defaults (P2-23)
 
 ## Test plan
-- [ ] \`cd packages/mmr && npx vitest run\` — all tests pass
-- [ ] \`cd packages/mmr && npx tsc --noEmit\` — no type errors
-- [ ] New tests cover concurrent writes, stdin error, brace-in-string, Gemini validation
+- [ ] `cd packages/mmr && npx vitest run` — all tests pass
+- [ ] `cd packages/mmr && npx tsc --noEmit` — no type errors
+- [ ] New tests: derived channel state, stdin error, awaitable dispatch, brace-in-string, Gemini validation
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
 ```
 
 - [ ] **Step 6: After CI passes, merge and tag**
