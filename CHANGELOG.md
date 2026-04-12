@@ -2,6 +2,41 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.12.0] — 2026-04-12
+
+### Fixed
+- **Multi-model review pipeline hardened** — comprehensive overhaul of the MMR
+  pipeline based on lessons learned during the spark tool implementation (v3.11.0).
+  - **Foreground-only constraint** — Codex and Gemini CLIs must always run as
+    foreground Bash calls. Background execution (`run_in_background`, `&`, `nohup`)
+    produces empty output. This constraint is now enforced in all knowledge entries,
+    CLAUDE.md, review tool prompts, and the multi-model-dispatch skill.
+  - **Compensating passes** — when an external channel (Codex or Gemini) is
+    unavailable, Claude runs a self-review pass focused on that channel's strength
+    area (Codex: implementation correctness, security, API contracts; Gemini:
+    architectural patterns, design reasoning, broad context). Findings are labeled
+    `[compensating: Codex-equivalent]` or `[compensating: Gemini-equivalent]` and
+    treated as single-source confidence.
+  - **Four-verdict system** — review-code and review-pr tools now use formal verdicts
+    (`pass`, `degraded-pass`, `blocked`, `needs-user-decision`) with precedence rules.
+    post-implementation-review uses coverage indicators (`full-coverage`,
+    `degraded-coverage`, `partial-coverage`) instead, as it is report-oriented.
+  - **Canonical channel status vocabulary** — standardized across all files:
+    `not_installed`, `auth_failed`, `auth_timeout`, `completed`, `failed`, plus
+    `compensating (X-equivalent)` coverage labels. Two-track status model
+    (root-cause + coverage label) for clear reporting.
+  - **Scope delineation** — `multi-model-review-dispatch` owns dispatch mechanics,
+    `automated-review-tooling` owns orchestration/verdicts/compensating passes,
+    `review-methodology` owns severity definitions. Cross-references replace
+    duplicated content.
+  - **CLAUDE.md streamlined** — review section now references `scaffold run review-pr`
+    as the entry point with a quick-reference escape hatch, instead of 35 lines of
+    raw CLI commands.
+  - **MMR CLI spec updated** — auth cache (5min TTL), global exit code table,
+    compensation eligibility matrix, unified 8-row consensus table, expanded
+    lifecycle state machine with preflight states, and `.meta.json` per-channel
+    metadata schema.
+
 ## [3.11.0] — 2026-04-11
 
 ### Added
