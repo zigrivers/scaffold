@@ -173,13 +173,15 @@ Auth failures are **never silent**. The initial `mmr review` response includes i
   "job_id": "mmr-a1b2c3",
   "dispatched": {
     "claude": { "auth": "ok", "status": "dispatched" },
-    "gemini": { "auth": "failed", "recovery": "Run: gemini -p 'hello'", "status": "skipped" },
+    "gemini": { "auth": "failed", "recovery": "gemini -p 'hello'", "status": "skipped" },
     "codex": { "auth": "ok", "status": "dispatched" }
   },
   "auth_failures": 1,
   "message": "2/3 channels dispatched. Gemini auth expired."
 }
 ```
+
+> **Rationale:** Auth tokens expire mid-session. The loud-failure contract ensures agents never silently skip a channel that could be recovered in 30 seconds.
 
 Recovery commands are stored as raw commands in `.mmr.yaml`. Platform wrappers (Claude Code skill, AGENTS.md) add the `!` prefix dynamically for interactive contexts.
 
@@ -402,6 +404,15 @@ defaults:
   format: json
   parallel: true
   job_retention_days: 7
+  compensate: true
+  auth_cache_ttl: 300
+  compensate_focus:
+    codex:
+      aspects: ["implementation correctness", "security", "API contracts"]
+    gemini:
+      aspects: ["architectural patterns", "design reasoning", "broad context"]
+
+# Note: compensate_focus.aspects is additive with --focus (CLI focus areas are appended on top)
 
 review_criteria:
   - "Project-specific criterion here"
@@ -416,7 +427,7 @@ channels:
       check: "claude -p 'respond with ok' 2>/dev/null"
       timeout: 5
       failure_exit_codes: [1]
-      recovery: "Run: claude login"
+      recovery: "claude login"
     prompt_wrapper: "{{prompt}}"
     output_parser: default
     timeout: 300
@@ -433,7 +444,7 @@ channels:
       check: "NO_BROWSER=true gemini -p 'respond with ok' -o json 2>&1"
       timeout: 5
       failure_exit_codes: [41]
-      recovery: "Run: gemini -p 'hello' (interactive, opens browser)"
+      recovery: "gemini -p 'hello'"
     prompt_wrapper: "{{prompt}}\nIMPORTANT: Return raw JSON only. No markdown fences."
     output_parser: gemini
     timeout: 360
@@ -450,7 +461,7 @@ channels:
       check: "codex login status 2>/dev/null"
       timeout: 5
       failure_exit_codes: [1]
-      recovery: "Run: codex login"
+      recovery: "codex login"
     prompt_wrapper: "{{prompt}}"
     output_parser: default
     stderr: suppress
@@ -476,6 +487,8 @@ Add to `.mmr.yaml` with command, flags, env, auth block, and output parser. Zero
 - **PostToolUse hook**: After `gh pr create`, auto-dispatches `mmr review --pr <number>`
 - **Scaffold runner integration**: Review gate calls `mmr` instead of manual 3-channel orchestration
 
+**Recommended mode:** Claude Code agents should always use `mmr review --sync` to avoid background execution issues. `--sync` blocks until results are ready, returning reconciled findings directly.
+
 ### Codex CLI / Gemini CLI
 
 AGENTS.md / GEMINI.md instructions:
@@ -487,7 +500,18 @@ Collect with: mmr results <job-id>
 Fix all findings above threshold before merging.
 ```
 
+**Recommended mode:** Codex and Gemini agents should always use `mmr review --sync` to avoid background execution issues. `--sync` blocks until results are ready, returning reconciled findings directly.
+
 The wrappers are intentionally thin — three commands is the entire integration surface.
+
+### Output Surface Consistency
+
+All externally visible surfaces must use the canonical `root_cause` / `coverage_status` vocabulary:
+- `mmr status` JSON output
+- `mmr results` JSON output (all formats: json, text, markdown, sarif)
+- `mmr jobs list` output
+- `mmr review --replay` input validation
+- Error messages referencing channel states
 
 ### Agent Experience (Before vs. After)
 
@@ -533,6 +557,7 @@ packages/mmr/
       auth.ts              # Per-channel auth verification
       prompt.ts            # Layered prompt assembly engine
       reconciler.ts        # Multi-channel finding reconciliation
+      compensator.ts     # Compensating pass dispatch and labeling
       parser.ts            # Output parsers (default, gemini, custom)
       job-store.ts         # Job state directory management
     config/
@@ -582,3 +607,6 @@ packages/mmr/
 5. Severity gate is configurable per-project and per-invocation
 6. Adding a new model CLI requires only a YAML config change, no code
 7. Reconciliation produces a unified findings list with confidence and attribution
+8. Compensating passes run automatically for unavailable channels when `--compensate` is enabled
+9. Compensating findings are clearly labeled and never inflate confidence scores
+10. `--sync` mode works reliably for AI agent workflows (no empty output, no polling needed)
