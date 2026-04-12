@@ -262,7 +262,8 @@ describe('reset command', () => {
     // Use a withResource mock that calls cleanup after fn
     const { shutdown: shutdownMock } = await import('../shutdown.js')
     vi.mocked(shutdownMock.withResource).mockImplementationOnce(
-      async (_name: string, cleanup: () => void, fn: () => Promise<unknown>) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      async (_name: string, cleanup: any, fn: any) => {
         try { return await fn() } finally { cleanup() }
       },
     )

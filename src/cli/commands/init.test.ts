@@ -280,7 +280,7 @@ describe('init command', () => {
 
     // The mock withPrompt calls process.exit(4) then throws a sentinel
     // to simulate process termination, so the handler rejects.
-    await initCommand.handler(defaultArgv({ root: tmpDir })).catch(() => {})
+    await Promise.resolve(initCommand.handler(defaultArgv({ root: tmpDir }))).catch(() => {})
 
     expect(exitSpy).toHaveBeenCalledWith(4)
     expect(mockRunBuild).not.toHaveBeenCalled()

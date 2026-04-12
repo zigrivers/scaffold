@@ -86,6 +86,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       process.exitCode = 1
       return
     }
+    const config = context.config
     const pipeline = resolvePipeline(context, { output })
 
     const metaPrompt = context.metaPrompts.get(step)
@@ -234,7 +235,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       // Step 6: Check update mode and depth downgrade
       // -----------------------------------------------------------------------
       const cliDepth = argv.depth !== undefined ? (argv.depth as DepthLevel) : undefined
-      const { depth, provenance } = resolveDepth(step, context.config, pipeline.preset, cliDepth)
+      const { depth, provenance } = resolveDepth(step, config, pipeline.preset, cliDepth)
 
       const updateModeResult = detectUpdateMode({ step, state, currentDepth: depth, projectRoot })
 
@@ -279,7 +280,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       }
 
       // Check methodology change
-      const methodologyChangeResult = detectMethodologyChange({ state, config: context.config })
+      const methodologyChangeResult = detectMethodologyChange({ state, config })
       for (const w of methodologyChangeResult.warnings) {
         output.warn(w)
       }
@@ -376,7 +377,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
                     } catch (err) {
                       output.warn({
                         code: 'ARTIFACT_READ_ERROR',
-                        message: `Could not read artifact '${relPath}' from step '${readStep}': ${(err as Error).message}`,
+                        message: `Could not read artifact '${relPath}' from step` +
+                          ` '${readStep}': ${(err as Error).message}`,
                       })
                     }
                   }
@@ -402,7 +404,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
               // -----------------------------------------------------------------------
               const engine = new AssemblyEngine()
               const assemblyResult = engine.assemble(step, {
-                config: context.config,
+                config,
                 state,
                 metaPrompt,
                 knowledgeEntries,

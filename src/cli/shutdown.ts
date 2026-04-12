@@ -60,18 +60,18 @@ export class ShutdownManager {
     }
 
     switch (this.sigintState) {
-      case 'idle':
-        this.sigintState = 'cleaning'
-        this.shutdown(ExitCode.UserCancellation)
-        break
-      case 'cleaning':
-        this.proc.stderr.write('\nPress Ctrl+C again to force quit.\n')
-        this.sigintState = 'armed'
-        break
-      case 'armed':
-        this.proc.stderr.write('\nForce quit.\n')
-        this.proc.exit(ExitCode.UserCancellation)
-        break
+    case 'idle':
+      this.sigintState = 'cleaning'
+      this.shutdown(ExitCode.UserCancellation)
+      break
+    case 'cleaning':
+      this.proc.stderr.write('\nPress Ctrl+C again to force quit.\n')
+      this.sigintState = 'armed'
+      break
+    case 'armed':
+      this.proc.stderr.write('\nForce quit.\n')
+      this.proc.exit(ExitCode.UserCancellation)
+      break
     }
   }
 

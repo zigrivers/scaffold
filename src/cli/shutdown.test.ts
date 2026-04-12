@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { EventEmitter } from 'node:events'
 import { ShutdownManager } from './shutdown.js'
@@ -137,7 +138,7 @@ describe('ShutdownManager', () => {
   describe('shutdown()', () => {
     it('sets isShuttingDown to true', async () => {
       mgr.install()
-      const promise = mgr.shutdown()
+      mgr.shutdown()
       expect(mgr.isShuttingDown).toBe(true)
       await vi.waitFor(() => expect(proc.exit).toHaveBeenCalled())
     })
@@ -153,10 +154,11 @@ describe('ShutdownManager', () => {
       mgr.shutdown()
       await vi.waitFor(() => expect(proc.exit).toHaveBeenCalled())
 
-      const exitCallCount = (proc.exit as ReturnType<typeof vi.fn>).mock.calls.length
+      const exitMock = proc.exit as unknown as ReturnType<typeof vi.fn>
+      const exitCallCount = exitMock.mock.calls.length
       mgr.shutdown()
       await new Promise(r => setTimeout(r, 10))
-      expect((proc.exit as ReturnType<typeof vi.fn>).mock.calls.length).toBe(exitCallCount)
+      expect(exitMock.mock.calls.length).toBe(exitCallCount)
     })
 
     it('writes context message to stderr', async () => {
@@ -344,7 +346,7 @@ describe('ShutdownManager', () => {
 
       const stderrCalls = (proc.stderr.write as ReturnType<typeof vi.fn>).mock.calls
       const cursorRestores = stderrCalls.filter(
-        ([arg]: [string]) => arg.includes('\x1b[?25h'),
+        (args: unknown[]) => typeof args[0] === 'string' && args[0].includes('\x1b[?25h'),
       )
       expect(cursorRestores.length).toBe(1)
     })

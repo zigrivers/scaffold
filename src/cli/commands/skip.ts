@@ -71,7 +71,9 @@ const skipCommand: CommandModule<Record<string, unknown>, SkipArgs> = {
 
     shutdown.registerLockOwnership(getLockPath(projectRoot))
 
-    await shutdown.withResource('lock', () => { releaseLock(projectRoot); shutdown.releaseLockOwnership() }, async () => {
+    await shutdown.withResource('lock', () => {
+      releaseLock(projectRoot); shutdown.releaseLockOwnership()
+    }, async () => {
       const context = loadPipelineContext(projectRoot)
       const pipeline = resolvePipeline(context)
       const stateManager = new StateManager(projectRoot, pipeline.computeEligible)

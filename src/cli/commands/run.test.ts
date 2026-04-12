@@ -311,14 +311,14 @@ function makeSuccessAssemblyResult(): AssemblyResult {
 
 const PROJECT_ROOT = '/test/project'
 
-let exitSpy: MockInstance
+let _exitSpy: MockInstance
 let stdoutSpy: MockInstance
 let mockOutput: ReturnType<typeof makeOutputContext>
 
 beforeEach(() => {
   vi.clearAllMocks()
 
-  exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
+  _exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
     // no-op — run.ts no longer calls process.exit(); it sets process.exitCode
   }) as never)
 
