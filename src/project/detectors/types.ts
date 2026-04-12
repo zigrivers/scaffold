@@ -2,7 +2,7 @@
 import type { z } from 'zod'
 import type {
   WebAppConfigSchema, BackendConfigSchema, CliConfigSchema, LibraryConfigSchema,
-  MobileAppConfigSchema, DataPipelineConfigSchema, MlConfigSchema,
+  MobileAppConfigSchema, DataPipelineConfigSchema, MlConfigSchema, ResearchConfigSchema,
   BrowserExtensionConfigSchema, GameConfigSchema,
 } from '../../config/schema.js'
 
@@ -47,6 +47,10 @@ export interface MlMatch extends BaseMatch {
   readonly projectType: 'ml'
   readonly partialConfig: Partial<z.infer<typeof MlConfigSchema>>
 }
+export interface ResearchMatch extends BaseMatch {
+  readonly projectType: 'research'
+  readonly partialConfig: Partial<z.infer<typeof ResearchConfigSchema>>
+}
 export interface BrowserExtensionMatch extends BaseMatch {
   readonly projectType: 'browser-extension'
   readonly partialConfig: Partial<z.infer<typeof BrowserExtensionConfigSchema>>
@@ -58,7 +62,7 @@ export interface GameMatch extends BaseMatch {
 
 export type DetectionMatch =
   | WebAppMatch | BackendMatch | CliMatch | LibraryMatch | MobileAppMatch
-  | DataPipelineMatch | MlMatch | BrowserExtensionMatch | GameMatch
+  | DataPipelineMatch | MlMatch | ResearchMatch | BrowserExtensionMatch | GameMatch
 
 export type Detector = (ctx: import('./context.js').SignalContext) => DetectionMatch | null
 
