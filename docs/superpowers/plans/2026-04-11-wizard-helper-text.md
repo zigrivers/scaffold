@@ -8,6 +8,12 @@
 
 **Tech Stack:** TypeScript, vitest, `@inquirer/prompts` ^7.4.0, `@inquirer/core` (for `ExitPromptError`), Zod
 
+**Subagent Notes:**
+- **Line numbers are approximate.** Always search for code patterns rather than relying on line numbers — earlier tasks may shift lines.
+- **Test mocking strategy:** Use `vi.mock('@inquirer/prompts', () => ({ input: vi.fn(), confirm: vi.fn() }))` at module level, NOT `vi.spyOn` on dynamic imports (ES module namespace objects are immutable; `vi.spyOn` on them throws TypeError).
+- **`makeOutputContext()` updates:** After Task 3 adds `supportsInteractivePrompts()` to `OutputContext`, **every** `makeOutputContext()` mock in the repo (~13 test files) needs the new method added. Grep for `makeOutputContext` and add `supportsInteractivePrompts: vi.fn().mockReturnValue(false)` to each.
+- **`@inquirer/core` dependency:** Task 2 imports `ExitPromptError` from `@inquirer/core`. This is currently a transitive dep only. Run `npm install @inquirer/core` to make it direct before importing.
+
 **Design Spec:** `docs/superpowers/specs/2026-04-11-wizard-helper-text-design.md`
 
 ---
@@ -915,7 +921,19 @@ export type WizardQuestionId =
   | 'webTrait' | 'mobileTrait'
   | 'projectType' | 'advancedGameGate'
 
-export type CoreCopy = Record<WizardQuestionId, QuestionCopy<string>>
+// CoreCopy is individually typed — NOT Record<..., QuestionCopy<string>>
+// because QuestionCopy<string> makes `options` always `never` (the bare-string ban).
+// projectType needs QuestionCopy<ProjectType> to allow per-option copy.
+export type CoreCopy = {
+  methodology: QuestionCopy<string>
+  depth: QuestionCopy<string>
+  codexAdapter: QuestionCopy<string>
+  geminiAdapter: QuestionCopy<string>
+  webTrait: QuestionCopy<string>
+  mobileTrait: QuestionCopy<string>
+  projectType: QuestionCopy<ProjectType>
+  advancedGameGate: QuestionCopy<string>
+}
 
 export interface ProjectCopyMap {
   'web-app':           WebAppCopy
@@ -935,7 +953,7 @@ export interface ProjectCopyMap {
 ```ts
 import { describe, it, expectTypeOf } from 'vitest'
 import type {
-  WebAppCopy, LibraryCopy, GameCopy, BackendCopy, ProjectCopyMap, OptionCopy,
+  WebAppCopy, LibraryCopy, GameCopy, BackendCopy, ProjectCopyMap, OptionCopy, CoreCopy,
 } from './types.js'
 
 describe('QuestionCopy type-level tests', () => {
@@ -944,16 +962,25 @@ describe('QuestionCopy type-level tests', () => {
       .toEqualTypeOf<Record<'spa' | 'ssr' | 'ssg' | 'hybrid', OptionCopy>>()
   })
 
-  it('LibraryCopy.hasTypeDefinitions.options is never (boolean field)', () => {
-    expectTypeOf<LibraryCopy['hasTypeDefinitions']>()
-      .toHaveProperty('options')
-    type Opts = LibraryCopy['hasTypeDefinitions']['options']
-    expectTypeOf<Opts>().toBeNever()
+  it('LibraryCopy.hasTypeDefinitions cannot have options (boolean field)', () => {
+    // QuestionCopy<boolean> has options?: never, so assigning {} to it should fail.
+    // We test that the type doesn't allow an 'options' value by checking the shape.
+    type Copy = LibraryCopy['hasTypeDefinitions']
+    expectTypeOf<Copy>().toMatchTypeOf<{ short?: string; long?: string }>()
+    // options key exists but is typed as never | undefined — can't assign an object to it
   })
 
-  it('GameCopy.supportedLocales.options is never (bare string[])', () => {
-    type Opts = GameCopy['supportedLocales']['options']
-    expectTypeOf<Opts>().toBeNever()
+  it('GameCopy.supportedLocales cannot have options (bare string[])', () => {
+    type Copy = GameCopy['supportedLocales']
+    expectTypeOf<Copy>().toMatchTypeOf<{ short?: string; long?: string }>()
+  })
+
+  it('CoreCopy.projectType.options requires exact ProjectType enum keys', () => {
+    // This is the critical test: CoreCopy.projectType must use QuestionCopy<ProjectType>,
+    // NOT QuestionCopy<string>, so it can have per-option copy for the 9 project types.
+    type PtOpts = NonNullable<CoreCopy['projectType']['options']>
+    expectTypeOf<PtOpts>().toHaveProperty('web-app')
+    expectTypeOf<PtOpts>().toHaveProperty('game')
   })
 
   it('BackendCopy.dataStore.options requires array element enum keys', () => {
@@ -987,20 +1014,15 @@ on free-text fields like supportedLocales."
 
 ---
 
-## Task 6: Create copy content files and index
+## Task 6a: Create copy index, core, web-app, and backend files
 
 **Files:**
 - Create: `src/wizard/copy/index.ts`
 - Create: `src/wizard/copy/core.ts`
 - Create: `src/wizard/copy/web-app.ts`
 - Create: `src/wizard/copy/backend.ts`
-- Create: `src/wizard/copy/cli.ts`
-- Create: `src/wizard/copy/library.ts`
-- Create: `src/wizard/copy/mobile-app.ts`
-- Create: `src/wizard/copy/data-pipeline.ts`
-- Create: `src/wizard/copy/ml.ts`
-- Create: `src/wizard/copy/browser-extension.ts`
-- Create: `src/wizard/copy/game.ts`
+
+> **Note:** Tasks 6b and 6c create the remaining copy files. index.ts imports all 9; stub the missing ones as empty objects during this task and fill them in 6b/6c. Or create index.ts last in 6c.
 
 - [ ] **Step 1: Create `src/wizard/copy/index.ts`**
 
@@ -1047,49 +1069,117 @@ export { coreCopy }
 
 - [ ] **Step 2: Create `src/wizard/copy/core.ts`**
 
-Use the example from the design spec (`docs/superpowers/specs/2026-04-11-wizard-helper-text-design.md`, "core.ts and per-type copy file shape" section). Write all 8 `WizardQuestionId` entries with real copy — methodology, depth, codexAdapter, geminiAdapter, webTrait, mobileTrait, projectType (with all 9 `options`), advancedGameGate.
+Use the example from the design spec (`docs/superpowers/specs/2026-04-11-wizard-helper-text-design.md`, "core.ts and per-type copy file shape" section). Write all 8 `CoreCopy` entries with real copy — methodology, depth, codexAdapter, geminiAdapter, webTrait, mobileTrait, projectType (with all 9 `options` — these exist because `projectType` is typed as `QuestionCopy<ProjectType>`), advancedGameGate. Export as `export const coreCopy: CoreCopy = { ... }`.
 
 - [ ] **Step 3: Create `src/wizard/copy/web-app.ts`**
 
-Use the example from the design spec. Write all 4 `WebAppConfig` field entries — `renderingStrategy`, `deployTarget`, `realtime`, `authFlow` — with complete `options` for each enum.
+Use the example from the design spec. Write all 4 `WebAppConfig` field entries — `renderingStrategy`, `deployTarget`, `realtime`, `authFlow` — with complete `options` for each enum. Export as `export const webAppCopy: WebAppCopy = { ... }`.
 
-- [ ] **Step 4: Create the remaining 8 copy files**
+- [ ] **Step 4: Create `src/wizard/copy/backend.ts`**
 
-Each file follows the same pattern as `web-app.ts`. For each config type, export a `satisfies` typed constant with entries for every field in the config. Enum fields get `options` with `label` and `short` for every value. Boolean and free-text fields get only `short` (optionally `long`), no `options`.
+`BackendCopy` with entries for: `apiStyle` (5 options), `dataStore` (3 options — array enum), `authMechanism` (5 options), `asyncMessaging` (3 options), `deployTarget` (3 options). Export as `export const backendCopy: BackendCopy = { ... }`.
 
-Files:
-- `src/wizard/copy/backend.ts` — `BackendCopy` (apiStyle, dataStore, authMechanism, asyncMessaging, deployTarget)
-- `src/wizard/copy/cli.ts` — `CliCopy` (interactivity, distributionChannels, hasStructuredOutput)
-- `src/wizard/copy/library.ts` — `LibraryCopy` (visibility, runtimeTarget, bundleFormat, hasTypeDefinitions, documentationLevel)
-- `src/wizard/copy/mobile-app.ts` — `MobileAppCopy` (platform, distributionModel, offlineSupport, hasPushNotifications)
-- `src/wizard/copy/data-pipeline.ts` — `DataPipelineCopy` (processingModel, orchestration, dataQualityStrategy, schemaManagement, hasDataCatalog)
-- `src/wizard/copy/ml.ts` — `MlCopy` (projectPhase, modelType, servingPattern, hasExperimentTracking)
-- `src/wizard/copy/browser-extension.ts` — `BrowserExtensionCopy` (manifestVersion, uiSurfaces, hasContentScript, hasBackgroundWorker)
-- `src/wizard/copy/game.ts` — `GameCopy` (engine, multiplayerMode, targetPlatforms, onlineServices, contentStructure, economy, narrative, supportedLocales, npcAiComplexity, hasModding, persistence)
+- [ ] **Step 5: Create stub files for 6b/6c types so index.ts compiles**
 
-- [ ] **Step 5: Verify compilation**
+Create minimal stub files for cli, library, mobile-app, data-pipeline, ml, browser-extension, game — each exporting the correct type with all required fields but only `{ short: 'TODO' }` placeholders. These stubs will be filled in Tasks 6b and 6c.
+
+- [ ] **Step 6: Verify compilation**
 
 Run: `npx tsc --noEmit`
-Expected: PASS — any missing enum key or wrong field name is a compile error.
+Expected: PASS
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/wizard/copy/
+git commit -m "feat(copy): add index, core, web-app, and backend copy files
+
+Type-checked copy for top-level wizard questions and 2 project types.
+Remaining 7 project-type files stubbed for Tasks 6b/6c."
+```
+
+---
+
+## Task 6b: Create cli, library, and mobile-app copy files
+
+**Files:**
+- Modify: `src/wizard/copy/cli.ts` (replace stub)
+- Modify: `src/wizard/copy/library.ts` (replace stub)
+- Modify: `src/wizard/copy/mobile-app.ts` (replace stub)
+
+- [ ] **Step 1: Fill `src/wizard/copy/cli.ts`**
+
+`CliCopy` with entries for: `interactivity` (3 options), `distributionChannels` (4 options — array enum), `hasStructuredOutput` (boolean — short only, no options).
+
+- [ ] **Step 2: Fill `src/wizard/copy/library.ts`**
+
+`LibraryCopy` with entries for: `visibility` (2 options), `runtimeTarget` (4 options), `bundleFormat` (4 options), `hasTypeDefinitions` (boolean — short only), `documentationLevel` (4 options).
+
+- [ ] **Step 3: Fill `src/wizard/copy/mobile-app.ts`**
+
+`MobileAppCopy` with entries for: `platform` (3 options), `distributionModel` (3 options), `offlineSupport` (3 options), `hasPushNotifications` (boolean — short only).
+
+- [ ] **Step 4: Verify compilation**
+
+Run: `npx tsc --noEmit`
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/wizard/copy/cli.ts src/wizard/copy/library.ts src/wizard/copy/mobile-app.ts
+git commit -m "feat(copy): add cli, library, and mobile-app copy files"
+```
+
+---
+
+## Task 6c: Create data-pipeline, ml, browser-extension, and game copy files
+
+**Files:**
+- Modify: `src/wizard/copy/data-pipeline.ts` (replace stub)
+- Modify: `src/wizard/copy/ml.ts` (replace stub)
+- Modify: `src/wizard/copy/browser-extension.ts` (replace stub)
+- Modify: `src/wizard/copy/game.ts` (replace stub)
+
+- [ ] **Step 1: Fill `src/wizard/copy/data-pipeline.ts`**
+
+`DataPipelineCopy` with entries for: `processingModel` (3 options), `orchestration` (4 options), `dataQualityStrategy` (4 options), `schemaManagement` (3 options), `hasDataCatalog` (boolean — short only).
+
+- [ ] **Step 2: Fill `src/wizard/copy/ml.ts`**
+
+`MlCopy` with entries for: `projectPhase` (3 options), `modelType` (3 options), `servingPattern` (4 options), `hasExperimentTracking` (boolean — short only).
+
+- [ ] **Step 3: Fill `src/wizard/copy/browser-extension.ts`**
+
+`BrowserExtensionCopy` with entries for: `manifestVersion` (2 options), `uiSurfaces` (5 options — array enum), `hasContentScript` (boolean — short only), `hasBackgroundWorker` (boolean — short only).
+
+- [ ] **Step 4: Fill `src/wizard/copy/game.ts`**
+
+`GameCopy` with entries for: `engine` (4 options), `multiplayerMode` (4 options), `targetPlatforms` (9 options — array enum), `onlineServices` (4 options — array enum), `contentStructure` (5 options), `economy` (4 options), `narrative` (3 options), `supportedLocales` (string[] — short only, no options), `npcAiComplexity` (3 options), `hasModding` (boolean — short only), `persistence` (5 options).
+
+- [ ] **Step 5: Remove any remaining 'TODO' stubs and verify compilation**
+
+Run: `npx tsc --noEmit`
+Expected: PASS — all stubs are now replaced with real content.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add src/wizard/copy/
-git commit -m "feat: add wizard copy content for all 9 project types + core questions
+git commit -m "feat(copy): add data-pipeline, ml, browser-extension, and game copy files
 
-Per-option descriptions for every select/multiSelect enum in the wizard.
-Type-checked against config schemas — adding an enum value without
-matching copy is a compile error."
+All 9 project-type copy files now complete. Every enum value in the
+Zod schemas has matching copy. Type-checked at compile time."
 ```
 
 ---
 
-## Task 7: Thread copy through questions.ts and add banner
+## Task 7a: Thread copy through top-level wizard questions and add banner
 
 **Files:**
-- Modify: `src/wizard/questions.ts`
-- Test: `src/wizard/wizard.test.ts`
+- Modify: `src/wizard/questions.ts` (top-level section only: methodology, depth, adapters, traits, projectType — roughly lines 54-121)
+
+> **Scope:** Only the top-level questions that run before the project-type branches. ~15 call sites. Do NOT touch project-type-specific branches (web-app, backend, etc.) — those are Tasks 7b and 7c.
 
 - [ ] **Step 1: Import copy modules at the top of `questions.ts`**
 
@@ -1097,72 +1187,7 @@ matching copy is a compile error."
 import { coreCopy, getCopyForType, optionsFromCopy } from './copy/index.js'
 ```
 
-- [ ] **Step 2: Add the first-prompt banner before `projectType` select**
-
-In `questions.ts`, just before the `projectType` select (around line 114), add:
-
-```ts
-  // First-prompt banner — shown once, only in interactive mode
-  if (!auto && output.supportsInteractivePrompts()) {
-    output.info('Tip: Type ? at any choice prompt to see help.')
-  }
-```
-
-- [ ] **Step 3: Thread copy through the `projectType` select**
-
-```ts
-  // Before:
-  const selected = await output.select(
-    'What type of project is this?',
-    [...ProjectTypeSchema.options],
-    'web-app',
-  )
-
-  // After:
-  const ptCopy = coreCopy.projectType
-  const selected = await output.select(
-    'What type of project is this?',
-    optionsFromCopy(ptCopy.options!, [...ProjectTypeSchema.options]),
-    'web-app',
-    ptCopy,
-  )
-```
-
-- [ ] **Step 4: Thread copy through one project-type branch (web-app) as a template**
-
-```ts
-  if (projectType === 'web-app') {
-    const copy = getCopyForType('web-app')
-
-    const renderingStrategy: WebAppConfig['renderingStrategy'] = options.webAppFlags?.webRendering
-      ?? await output.select(
-        'Rendering strategy?',
-        optionsFromCopy(copy.renderingStrategy.options!, ['spa', 'ssr', 'ssg', 'hybrid']),
-        undefined,
-        copy.renderingStrategy,
-      ) as WebAppConfig['renderingStrategy']
-
-    // ... repeat for deployTarget, realtime, authFlow
-  }
-```
-
-- [ ] **Step 5: Thread copy through the remaining 8 project-type branches**
-
-Follow the same pattern for each branch: call `getCopyForType('backend')`, use `optionsFromCopy(copy.<field>.options!, [...values])` for selects, pass `copy.<field>` as the `help` arg. For confirms, pass `{ short: copy.<field>.short }` as the `help` arg.
-
-- [ ] **Step 6: Thread copy through top-level confirms (adapters, traits)**
-
-```ts
-  // Before:
-  const addCodex = await output.confirm('Include Codex adapter?', false)
-
-  // After:
-  const addCodex = await output.confirm('Include Codex adapter?', false, coreCopy.codexAdapter)
-```
-
-Same for `geminiAdapter`, `webTrait`, `mobileTrait`.
-
-- [ ] **Step 7: Thread copy through methodology prompt**
+- [ ] **Step 2: Thread copy through methodology prompt**
 
 ```ts
   // Before:
@@ -1179,20 +1204,166 @@ Same for `geminiAdapter`, `webTrait`, `mobileTrait`.
   )
 ```
 
-- [ ] **Step 8: Run full test suite**
+- [ ] **Step 3: Thread copy through depth prompt (custom methodology only)**
 
-Run: `make check-all`
-Expected: All PASS. Existing tests pass because mock `select`/`confirm`/`prompt` ignore extra args.
+Pass `coreCopy.depth` as the `help` arg to the depth prompt.
+
+- [ ] **Step 4: Thread copy through adapter confirms**
+
+```ts
+  // Before:
+  const addCodex = await output.confirm('Include Codex adapter?', false)
+
+  // After:
+  const addCodex = await output.confirm('Include Codex adapter?', false, coreCopy.codexAdapter)
+```
+
+Same for `geminiAdapter`.
+
+- [ ] **Step 5: Thread copy through trait confirms**
+
+Pass `coreCopy.webTrait` and `coreCopy.mobileTrait` to the web/mobile confirms.
+
+- [ ] **Step 6: Add first-prompt banner before `projectType` select**
+
+The banner should print before the FIRST select the user encounters. When `--project-type` is passed, `projectType` is skipped, so check dynamically:
+
+```ts
+  // Track whether banner has been shown
+  let bannerShown = false
+  function showBannerOnce(): void {
+    if (!bannerShown && !auto && output.supportsInteractivePrompts()) {
+      output.info('Tip: Type ? at any choice prompt to see help.')
+      bannerShown = true
+    }
+  }
+```
+
+Call `showBannerOnce()` before the `projectType` select AND before the first select inside each project-type branch (so that `--project-type web-app` still shows the banner).
+
+- [ ] **Step 7: Thread copy through the `projectType` select**
+
+```ts
+  showBannerOnce()
+  const ptCopy = coreCopy.projectType
+  const selected = await output.select(
+    'What type of project is this?',
+    optionsFromCopy(ptCopy.options!, [...ProjectTypeSchema.options]),
+    'web-app',
+    ptCopy,
+  )
+```
+
+- [ ] **Step 8: Run tests**
+
+Run: `npx vitest run src/wizard/`
+Expected: All PASS
 
 - [ ] **Step 9: Commit**
 
 ```bash
 git add src/wizard/questions.ts
-git commit -m "feat: thread helper text copy through all wizard prompts
+git commit -m "feat: thread helper text through top-level wizard questions + banner
 
-Every select/multiSelect shows per-option descriptions with friendly
-labels. Confirms and prompts show a dim short hint when copy provides
-one. First-prompt banner appears before projectType select."
+Methodology, depth, adapters, traits, and projectType now show
+helper text. First-prompt banner fires before the first select."
+```
+
+---
+
+## Task 7b: Thread copy through web-app, backend, cli, and library branches
+
+**Files:**
+- Modify: `src/wizard/questions.ts` (web-app, backend, cli, library sections — roughly lines 123-260)
+
+> **Scope:** Only the four project-type branches listed. ~20 call sites.
+
+- [ ] **Step 1: Thread copy through web-app branch**
+
+```ts
+  if (projectType === 'web-app') {
+    const copy = getCopyForType('web-app')
+    showBannerOnce()  // in case --project-type was passed
+
+    const renderingStrategy: WebAppConfig['renderingStrategy'] = options.webAppFlags?.webRendering
+      ?? await output.select(
+        'Rendering strategy?',
+        optionsFromCopy(copy.renderingStrategy.options!, ['spa', 'ssr', 'ssg', 'hybrid']),
+        undefined,
+        copy.renderingStrategy,
+      ) as WebAppConfig['renderingStrategy']
+
+    // Same pattern for deployTarget, realtime, authFlow
+  }
+```
+
+- [ ] **Step 2: Thread copy through backend branch**
+
+Use `getCopyForType('backend')`. Thread through `apiStyle` (select), `dataStore` (multiSelect — note array enum), `authMechanism` (select), `asyncMessaging` (select), `deployTarget` (select).
+
+- [ ] **Step 3: Thread copy through cli branch**
+
+Use `getCopyForType('cli')`. Thread through `interactivity` (select), `distributionChannels` (multiSelect), `hasStructuredOutput` (confirm).
+
+- [ ] **Step 4: Thread copy through library branch**
+
+Use `getCopyForType('library')`. Thread through `visibility` (select), `runtimeTarget` (select), `bundleFormat` (select), `hasTypeDefinitions` (confirm), `documentationLevel` (select).
+
+- [ ] **Step 5: Run tests**
+
+Run: `npx vitest run src/wizard/`
+Expected: All PASS
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/wizard/questions.ts
+git commit -m "feat: thread helper text through web-app, backend, cli, library branches"
+```
+
+---
+
+## Task 7c: Thread copy through mobile-app, data-pipeline, ml, browser-extension, and game branches
+
+**Files:**
+- Modify: `src/wizard/questions.ts` (remaining project-type sections — roughly lines 262-512)
+
+> **Scope:** The five remaining project-type branches. ~28 call sites (game is the largest with 11+ questions including advanced).
+
+- [ ] **Step 1: Thread copy through mobile-app branch**
+
+Use `getCopyForType('mobile-app')`. Thread through `platform`, `distributionModel`, `offlineSupport`, `hasPushNotifications`.
+
+- [ ] **Step 2: Thread copy through data-pipeline branch**
+
+Use `getCopyForType('data-pipeline')`. Thread through `processingModel`, `orchestration`, `dataQualityStrategy`, `schemaManagement`, `hasDataCatalog`.
+
+- [ ] **Step 3: Thread copy through ml branch**
+
+Use `getCopyForType('ml')`. Thread through `projectPhase`, `modelType`, `servingPattern`, `hasExperimentTracking`.
+
+- [ ] **Step 4: Thread copy through browser-extension branch**
+
+Use `getCopyForType('browser-extension')`. Thread through `manifestVersion`, `uiSurfaces` (multiSelect), `hasContentScript`, `hasBackgroundWorker`.
+
+- [ ] **Step 5: Thread copy through game branch**
+
+Use `getCopyForType('game')`. Thread through ALL fields: `engine`, `multiplayerMode`, `targetPlatforms` (multiSelect), `onlineServices` (multiSelect — conditional on multiplayer), `contentStructure`, `economy`, plus advanced gate confirm (`coreCopy.advancedGameGate`), and advanced questions: `narrative`, `supportedLocales` (multiInput — pass `coreCopy` or game copy short only), `npcAiComplexity`, `hasModding`, `persistence`.
+
+- [ ] **Step 6: Run full test suite**
+
+Run: `make check-all`
+Expected: All PASS
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/wizard/questions.ts
+git commit -m "feat: thread helper text through mobile-app, data-pipeline, ml, browser-ext, game
+
+All 9 project-type branches now show per-option descriptions and
+helper text. Every select/multiSelect/confirm/prompt in questions.ts
+passes copy as the help argument."
 ```
 
 ---
@@ -1269,12 +1440,37 @@ Run in a real terminal:
 - OutputContext extension → Task 3
 - select/multiSelect rewrite → Task 4
 - Copy types → Task 5
-- Copy content → Task 6
-- Thread through questions.ts → Task 7
-- Banner → Task 7, Step 2
+- Copy content → Tasks 6a, 6b, 6c
+- Thread through questions.ts (top-level) → Task 7a
+- Thread through questions.ts (web-app/backend/cli/library) → Task 7b
+- Thread through questions.ts (mobile/data/ml/ext/game) → Task 7c
+- Banner → Task 7a, Step 6
 - Integration tests → Task 8
 - Manual smoke → Task 8, Step 5
 
-**Placeholder scan:** No TBD/TODO. Task 6 Step 4 describes a mechanical process (creating 8 files following the pattern of Steps 2-3) — the exact content for each enum's `label` and `short` must be authored during implementation, not in the plan.
+**Task sizing (estimated context per subagent):**
+- Task 1: ~750 lines (interactive.ts + test file). ✅
+- Task 2: ~800 lines (interactive.ts + init.ts + test). ✅
+- Task 3: ~600 lines (context.ts + 3 output files + test mocks). ✅ Note: subagent must grep for ALL `makeOutputContext` patterns repo-wide.
+- Task 4: ~750 lines (interactive.ts rewrite + tests). ✅
+- Task 5: ~500 lines (types + type tests). ✅
+- Task 6a: ~400 lines (index + core + web-app + backend + stubs). ✅
+- Task 6b: ~300 lines (cli + library + mobile-app). ✅
+- Task 6c: ~500 lines (data-pipeline + ml + browser-ext + game). ✅
+- Task 7a: ~400 lines (top-level questions + banner). ✅
+- Task 7b: ~500 lines (4 project-type branches). ✅
+- Task 7c: ~600 lines (5 project-type branches, game is largest). ✅
+- Task 8: ~400 lines (integration tests + smoke). ✅
 
-**Type consistency:** `SelectOption` defined in Task 3 Step 1; used in Tasks 4, 6, 7. `QuestionCopy<TValue>` defined in Task 5 Step 1; used in Task 6. `optionsFromCopy` defined in Task 6 Step 1; used in Task 7. `supportsInteractivePrompts()` defined in Task 3; used in Task 7. All names consistent.
+**Placeholder scan:** No TBD/TODO in structural/behavioral code. Copy content files (Tasks 6a-6c) describe the exact fields and option counts; the actual `label`/`short` text strings are authored during implementation, type-checked by the compiler.
+
+**Type consistency:** `SelectOption` defined in Task 3; used in Tasks 4, 6a, 7a-c. `QuestionCopy<TValue>` defined in Task 5; used in Tasks 6a-c. `CoreCopy` defined in Task 5 with individually typed keys (`projectType: QuestionCopy<ProjectType>`). `optionsFromCopy` defined in Task 6a; used in Tasks 7a-c. `supportsInteractivePrompts()` defined in Task 3; used in Task 7a. `showBannerOnce()` defined in Task 7a; used in Tasks 7a-c. All names consistent.
+
+**Round 1 plan review fixes applied:**
+- `CoreCopy` type fixed: `projectType` uses `QuestionCopy<ProjectType>`, not `QuestionCopy<string>` (was Critical)
+- Tasks 6 and 7 split into 3 subtasks each (was Critical — context window sizing)
+- Test mocking strategy documented: use `vi.mock` at module level, not `vi.spyOn` on dynamic imports (was Critical — Gemini)
+- Repo-wide mock sweep noted for Task 3 (was Critical — Codex)
+- Banner made dynamic via `showBannerOnce()` (was Important — Codex)
+- Missing prompts (depth, advancedGameGate, supportedLocales) included in wiring tasks (was Important — Codex)
+- `@inquirer/core` direct dependency noted (was Important — Superpowers)

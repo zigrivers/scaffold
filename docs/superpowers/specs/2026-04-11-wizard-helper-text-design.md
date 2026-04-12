@@ -153,7 +153,19 @@ type WizardQuestionId =
   | 'projectType'
   | 'advancedGameGate'
 
-type CoreCopy = Record<WizardQuestionId, QuestionCopy<string>>
+// Individually typed — NOT Record<..., QuestionCopy<string>>
+// because QuestionCopy<string> bans `options` (the bare-string clause).
+// projectType needs QuestionCopy<ProjectType> to allow per-option copy.
+type CoreCopy = {
+  methodology: QuestionCopy<string>
+  depth: QuestionCopy<string>
+  codexAdapter: QuestionCopy<string>
+  geminiAdapter: QuestionCopy<string>
+  webTrait: QuestionCopy<string>
+  mobileTrait: QuestionCopy<string>
+  projectType: QuestionCopy<ProjectType>
+  advancedGameGate: QuestionCopy<string>
+}
 
 // Indexed-access map preserves the per-key shape — getCopyForType('web-app')
 // returns WebAppCopy, not the union of all 9 copy types.
