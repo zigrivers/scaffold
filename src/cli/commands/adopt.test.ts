@@ -41,6 +41,7 @@ vi.mock('../../state/state-manager.js', () => ({
 
 vi.mock('../../state/lock-manager.js', () => ({
   acquireLock: vi.fn(() => ({ acquired: true })),
+  getLockPath: vi.fn(() => '/mock/.scaffold/lock.json'),
   releaseLock: vi.fn(),
 }))
 
@@ -70,6 +71,14 @@ vi.mock('../../project/adopt.js', () => ({
 
 vi.mock('../../core/assembly/meta-prompt-loader.js', () => ({
   discoverMetaPrompts: vi.fn(() => new Map()),
+}))
+
+vi.mock('../shutdown.js', () => ({
+  shutdown: {
+    registerLockOwnership: vi.fn(),
+    releaseLockOwnership: vi.fn(),
+    withResource: vi.fn(async (_name: string, _cleanup: () => void, fn: () => Promise<unknown>) => fn()),
+  },
 }))
 
 // ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@ import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { StateManager } from '../../state/state-manager.js'
-import { acquireLock, releaseLock } from '../../state/lock-manager.js'
+import { acquireLock, getLockPath, releaseLock } from '../../state/lock-manager.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { getPackagePipelineDir } from '../../utils/fs.js'
 import { runAdoption, TYPE_KEY } from '../../project/adopt.js'
@@ -21,6 +21,7 @@ import type { ProjectType } from '../../types/index.js'
 import { asScaffoldError } from '../../utils/errors.js'
 import { configParseError, configNotObject } from '../../utils/errors.js'
 import { ExitCode } from '../../types/enums.js'
+import { shutdown } from '../shutdown.js'
 
 interface AdoptArgs {
   format?: string
@@ -447,7 +448,12 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
       return
     }
 
-    try {
+    shutdown.registerLockOwnership(getLockPath(projectRoot))
+
+    await shutdown.withResource('lock', () => {
+      releaseLock(projectRoot)
+      shutdown.releaseLockOwnership()
+    }, async () => {
       const dryRun = argv['dry-run'] ?? false
       const metaPromptDir = getPackagePipelineDir(projectRoot)
       const methodology = 'deep'
@@ -539,10 +545,7 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
       }
 
       process.exitCode = 0
-      return
-    } finally {
-      releaseLock(projectRoot)
-    }
+    })
   },
 }
 
