@@ -684,3 +684,140 @@ describe('AutoOutput — wizard primitives', () => {
     expect(result).toEqual(['x', 'y'])
   })
 })
+
+describe('InteractiveOutput — re-prompt on invalid input (A3)', () => {
+  let stdoutWrite: WriteSpy
+
+  beforeEach(() => {
+    stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('select() re-prompts on invalid input then accepts valid input', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      // First call returns invalid input, second returns valid input
+      inputMock.mockResolvedValueOnce('banana')
+      inputMock.mockResolvedValueOnce('spa')
+
+      const out = new InteractiveOutput()
+      const result = await out.select('Pick:', ['spa', 'web', 'api'], 'web')
+      expect(result).toBe('spa')
+      // Should have been called twice (first invalid, second valid)
+      expect(inputMock).toHaveBeenCalledTimes(2)
+      // Error message should have been printed
+      const allWritten = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+      expect(allWritten).toContain('Invalid')
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+
+  it('select() re-prompts on invalid number then accepts valid number', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      // First call: out-of-range number; second: valid number
+      inputMock.mockResolvedValueOnce('99')
+      inputMock.mockResolvedValueOnce('2')
+
+      const out = new InteractiveOutput()
+      const result = await out.select('Pick:', ['spa', 'web', 'api'], 'spa')
+      expect(result).toBe('web')
+      expect(inputMock).toHaveBeenCalledTimes(2)
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+
+  it('select() does NOT re-print options on re-prompt', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      inputMock.mockResolvedValueOnce('invalid')
+      inputMock.mockResolvedValueOnce('spa')
+
+      const out = new InteractiveOutput()
+      await out.select('Pick:', ['spa', 'web', 'api'], 'web')
+
+      // Count how many times "1. spa" appears — should be exactly once
+      const allWritten = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+      const optionMatches = allWritten.match(/1\. spa/g)
+      expect(optionMatches).toHaveLength(1)
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+
+  it('multiSelect() re-prompts when no valid selections from non-empty input', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      // First call: all invalid; second call: valid
+      inputMock.mockResolvedValueOnce('banana, grape')
+      inputMock.mockResolvedValueOnce('1, 3')
+
+      const out = new InteractiveOutput()
+      const result = await out.multiSelect('Pick:', ['spa', 'web', 'api'], ['spa'])
+      expect(result).toEqual(['spa', 'api'])
+      expect(inputMock).toHaveBeenCalledTimes(2)
+      // Error message should have been printed
+      const allWritten = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+      expect(allWritten).toContain('Invalid')
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+
+  it('multiSelect() returns defaults on empty input (pressing Enter)', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      // inquirer returns the default value string when user presses Enter
+      inputMock.mockResolvedValueOnce('spa')
+
+      const out = new InteractiveOutput()
+      const result = await out.multiSelect('Pick:', ['spa', 'web', 'api'], ['spa'])
+      expect(result).toEqual(['spa'])
+      // Should NOT re-prompt — only called once
+      expect(inputMock).toHaveBeenCalledTimes(1)
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+})

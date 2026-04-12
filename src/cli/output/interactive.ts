@@ -105,66 +105,78 @@ export class InteractiveOutput implements OutputContext {
     if (!canPrompt()) {
       return defaultValue ?? options[0] ?? ''
     }
-    // Display numbered options
+    // Display numbered options once
     process.stdout.write(`${message}\n`)
     for (let i = 0; i < options.length; i++) {
       const marker = options[i] === defaultValue ? ' (default)' : ''
       process.stdout.write(`  ${i + 1}. ${options[i]}${marker}\n`)
     }
     const { input } = await import('@inquirer/prompts')
-    const answer = await input({
-      message: 'Enter number or text:',
-      default: defaultValue,
-    })
-    // Accept number input (strict: entire string must be a valid integer)
-    const trimmed = answer.trim()
-    if (/^\d+$/.test(trimmed)) {
-      const num = Number(trimmed)
-      if (num >= 1 && num <= options.length) {
-        return options[num - 1] ?? defaultValue ?? options[0] ?? ''
+    // Loop until valid input
+    for (;;) {
+      const answer = await input({
+        message: 'Enter number or text:',
+        default: defaultValue,
+      })
+      // Accept number input (strict: entire string must be a valid integer)
+      const trimmed = answer.trim()
+      if (/^\d+$/.test(trimmed)) {
+        const num = Number(trimmed)
+        if (num >= 1 && num <= options.length) {
+          return options[num - 1] ?? defaultValue ?? options[0] ?? ''
+        }
       }
+      // Accept exact text match (trimmed)
+      if (options.includes(trimmed)) {
+        return trimmed
+      }
+      // Invalid input — print error and re-prompt (do not re-print options)
+      process.stdout.write(`  Invalid input "${trimmed}". Please enter a number (1-${options.length}) or one of: ${options.join(', ')}\n`)
     }
-    // Accept exact text match (trimmed)
-    if (options.includes(trimmed)) {
-      return trimmed
-    }
-    // Inform user their input was invalid, fall back to default
-    const fallback = defaultValue ?? options[0] ?? ''
-    process.stdout.write(`  Invalid input "${trimmed}", using default: ${fallback}\n`)
-    return fallback
   }
 
   async multiSelect(message: string, options: string[], defaults?: string[]): Promise<string[]> {
     if (!canPrompt()) {
       return defaults ?? []
     }
-    // Display options with defaults marked
+    // Display options with defaults marked once
     process.stdout.write(`${message}\n`)
     for (let i = 0; i < options.length; i++) {
       const isDefault = defaults?.includes(options[i] ?? '') ? ' *' : ''
       process.stdout.write(`  ${i + 1}. ${options[i]}${isDefault}\n`)
     }
     const { input } = await import('@inquirer/prompts')
-    const answer = await input({
-      message: 'Enter numbers or text (comma-separated):',
-      default: defaults?.join(', '),
-    })
-    const parts = answer.split(',').map(s => s.trim()).filter(Boolean)
-    const selected: string[] = []
-    for (const part of parts) {
-      if (/^\d+$/.test(part)) {
-        const num = Number(part)
-        if (num >= 1 && num <= options.length) {
-          const opt = options[num - 1]
-          if (opt !== undefined && !selected.includes(opt)) {
-            selected.push(opt)
-          }
-        }
-      } else if (options.includes(part) && !selected.includes(part)) {
-        selected.push(part)
+    // Loop until valid input
+    for (;;) {
+      const answer = await input({
+        message: 'Enter numbers or text (comma-separated):',
+        default: defaults?.join(', '),
+      })
+      const parts = answer.split(',').map(s => s.trim()).filter(Boolean)
+      // Empty input (user pressed Enter) — return defaults
+      if (parts.length === 0) {
+        return defaults ?? []
       }
+      const selected: string[] = []
+      for (const part of parts) {
+        if (/^\d+$/.test(part)) {
+          const num = Number(part)
+          if (num >= 1 && num <= options.length) {
+            const opt = options[num - 1]
+            if (opt !== undefined && !selected.includes(opt)) {
+              selected.push(opt)
+            }
+          }
+        } else if (options.includes(part) && !selected.includes(part)) {
+          selected.push(part)
+        }
+      }
+      if (selected.length > 0) {
+        return selected
+      }
+      // Non-empty input but no valid selections — print error and re-prompt
+      process.stdout.write(`  Invalid input. Please enter numbers (1-${options.length}) or values from: ${options.join(', ')}\n`)
     }
-    return selected.length > 0 ? selected : (defaults ?? [])
   }
 
   async multiInput(message: string, defaultValue?: string[]): Promise<string[]> {
