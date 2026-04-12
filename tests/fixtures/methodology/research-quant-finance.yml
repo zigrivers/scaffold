@@ -1,0 +1,9 @@
+name: research-quant-finance
+description: Quant-finance domain sub-overlay for testing
+project-type: research
+
+knowledge-overrides:
+  tech-stack:
+    append: [quant-data-feeds]
+  tdd:
+    append: [backtest-validation]
