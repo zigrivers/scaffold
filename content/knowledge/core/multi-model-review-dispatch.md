@@ -48,7 +48,7 @@ See `review-methodology` for severity definitions (P0-P3). This entry uses those
 
 ### Dispatch Mechanics
 
-### Foreground-Only Execution
+#### Foreground-Only Execution
 
 When an AI agent dispatches CLI reviews via a tool runner (Claude Code Bash tool, Codex exec, etc.), always run commands in the foreground. Background execution (`run_in_background`, `&`, `nohup`) produces empty or truncated output from Codex and Gemini CLIs. Multiple foreground calls can still run in parallel if the tool runner supports parallel tool invocations.
 
@@ -278,7 +278,7 @@ If the primary Claude review produces zero findings and external models are unav
 When channels are skipped and compensating passes are used:
 
 - **Minimum finding count** gate: compensating passes count toward the total but are not treated as separate external channels for consensus purposes.
-- **Cross-model disagreement documentation** gate: applies whenever 2+ distinct model perspectives participate (Claude + one external counts). N/A only when Claude is the sole perspective (no external models and no compensating passes that introduce genuinely different framing).
+- **Reconciliation completeness** gate (cross-model disagreement documentation): applies whenever 2+ distinct model perspectives participate (Claude + one external counts). N/A only when Claude is the sole perspective (no external models and no compensating passes that introduce genuinely different framing).
 - **Coverage threshold** gate: compensating passes satisfy the "every pass has at least one finding or explicit no-issues note" requirement.
 - The reconciled output must record which channels were real, which were compensating, and which were skipped, so the orchestration layer can apply appropriate verdict logic.
 
