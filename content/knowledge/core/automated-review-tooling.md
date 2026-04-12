@@ -10,143 +10,58 @@ Automated PR review leverages AI models to provide consistent, thorough code rev
 
 ## Summary
 
-### Architecture: Local CLI Review
+### Review Severity and Reconciliation
 
-The scaffold approach uses local CLI review rather than GitHub Actions:
-- **No CI secrets required** — models run locally via CLI tools
-- **Dual-model review** — run Codex and Gemini (when available) for independent perspectives
-- **Agent-managed loop** — Claude orchestrates the review-fix cycle locally
+See `review-methodology` for severity definitions (P0-P3). See `multi-model-review-dispatch` for finding reconciliation rules.
 
-Components:
-- `AGENTS.md` — reviewer instructions with project-specific rules
-- `docs/review-standards.md` — severity definitions (P0-P3) and criteria
-- `scripts/cli-pr-review.sh` — dual-model review script
-- `scripts/await-pr-review.sh` — polling script for external bot mode
+**Action thresholds:** P0/P1/P2 findings must be fixed before proceeding to the next task. P3 findings are recorded but not actioned.
 
-### Review Severity Levels
+### Degraded-Mode Behavior
 
-Consistent with the pipeline's review step severity:
-- **P0 (blocking)** — must fix before merge (security, data loss, broken functionality)
-- **P1 (important)** — should fix before merge (bugs, missing tests, performance)
-- **P2 (suggestion)** — consider fixing (style, naming, documentation)
-- **P3 (nit)** — optional (personal preference, minor optimization)
+#### Verdict Definitions
 
-### Dual-Model Review Pattern
+These are the authoritative verdict definitions. Tool files (`review-code.md`, `review-pr.md`) reference these.
 
-When both Codex CLI and Gemini CLI are available:
-1. Run both reviewers independently on the PR diff
-2. Collect findings from each
-3. Reconcile: consensus findings get higher confidence
-4. Disagreements are flagged for the implementing agent to resolve
+| Verdict | Condition |
+|---------|-----------|
+| `pass` | All configured channels ran, no unresolved P0/P1/P2 |
+| `degraded-pass` | Channels skipped/compensated, no unresolved P0/P1/P2 |
+| `blocked` | Unresolved P0/P1/P2 after 3 fix rounds |
+| `needs-user-decision` | Contradictions or unresolvable findings |
 
-### Integration with PR Workflow
+**Verdict precedence:** `needs-user-decision` > `blocked` > `degraded-pass` > `pass`. When multiple conditions apply, the higher-precedence verdict wins.
 
-The review step integrates into the standard PR flow:
-1. Agent creates PR
-2. Agent runs `scripts/cli-pr-review.sh` (or review runs automatically)
-3. Review findings are posted as PR comments or written to a local file
-4. Agent addresses P0/P1/P2 findings, pushes fixes
-5. Re-review until no P0/P1/P2 findings remain
-6. PR is ready for merge
+**Both external channels missing:** Maximum achievable verdict is `degraded-pass` — never `pass`. Review summary must note: "All findings are single-model (Claude only). External validation was unavailable."
+
+#### Status Model
+
+`compensating` is a **coverage label** applied to a channel's output, not a replacement for the root-cause status. Each channel retains its root-cause status (`not_installed`, `auth_failed`, `auth_timeout`, `failed`) AND gains a coverage label (`compensating (X-equivalent)`) when a compensating pass ran. The fix cycle uses the **root-cause status** to decide whether to retry (never retry `not_installed`, `auth_failed`, `auth_timeout`). The report uses the **coverage label** to show the reader what ran.
+
+#### Compensating Passes
+
+When an external channel (Codex or Gemini) is unavailable, run a compensating Claude self-review pass:
+
+- Same prompt structure as the missing channel, executed as a Claude self-review pass.
+- Labeled `[compensating: Codex-equivalent]` or `[compensating: Gemini-equivalent]` in the review summary.
+- Missing Codex → focus on implementation correctness, security, API contracts.
+- Missing Gemini → focus on architectural patterns, design reasoning, broad context.
+- Missing both → two compensating passes (one per missing channel's strength area).
+- Compensating-pass findings are **single-source confidence** — they do NOT raise to high confidence even if they agree with another channel's findings.
+- Normal mandatory-fix thresholds apply: P0/P1/P2 findings from compensating passes still require fixing.
+
+**Superpowers channel:** No compensating pass needed — Superpowers is a Claude subagent and is always available. If the Superpowers plugin is not installed, run available external CLIs and warn the user that review coverage is reduced.
+
+#### Foreground-Only Execution
+
+Always run Codex and Gemini CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`. Background execution produces empty or truncated output from Codex and Gemini CLIs. Multiple foreground calls can still run in parallel if the tool runner supports parallel tool invocations.
+
+This constraint is intentionally duplicated from `multi-model-review-dispatch`. Knowledge entries are injected independently by the assembly engine — an agent may receive this entry without `multi-model-review-dispatch`, so both need the constraint.
 
 ## Deep Guidance
 
-### AGENTS.md Structure
+### Finding Reconciliation
 
-The `AGENTS.md` file provides reviewer instructions:
-
-```markdown
-# Code Review Instructions
-
-## Project Context
-[Brief description of what this project does]
-
-## Review Focus Areas
-- Security: [project-specific security concerns]
-- Performance: [known hot paths or constraints]
-- Testing: [coverage requirements, test patterns]
-
-## Coding Standards Reference
-See docs/coding-standards.md for:
-- Naming conventions
-- Error handling patterns
-- Logging standards
-
-## Known Patterns
-[Project-specific patterns reviewers should enforce]
-
-## Out of Scope
-[Things reviewers should NOT flag]
-```
-
-### CLI Review Script Pattern
-
-The `cli-pr-review.sh` script follows this structure:
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-# 1. Get the PR diff
-diff=$(gh pr diff "$PR_NUMBER")
-
-# 2. Run Codex review (if available)
-if command -v codex &>/dev/null; then
-  codex_findings=$(echo "$diff" | codex review --context AGENTS.md)
-fi
-
-# 3. Run Gemini review (if available)
-if command -v gemini &>/dev/null; then
-  gemini_findings=$(echo "$diff" | gemini review --context AGENTS.md)
-fi
-
-# 4. Reconcile findings
-# - Findings from both models: HIGH confidence
-# - Findings from one model: MEDIUM confidence
-# - Contradictions: flagged for human review
-```
-
-### Review Standards Document
-
-`docs/review-standards.md` should define:
-- Severity levels with concrete examples per project
-- What constitutes a blocking review (P0/P1/P2 threshold)
-- Auto-approve criteria (when review can be skipped)
-- Review SLA (how long before auto-approve kicks in)
-
-### Fallback When Models Unavailable
-
-If neither Codex nor Gemini CLI is available:
-1. Claude performs an enhanced self-review of the diff
-2. Focus on the AGENTS.md review criteria
-3. Apply the same severity classification
-4. Document that the review was single-model
-
-### Updating Review Standards Over Time
-
-As the project evolves:
-- Add new review focus areas when new patterns emerge
-- Remove rules that linters now enforce automatically
-- Update AGENTS.md when architecture changes
-- Track false-positive rates and adjust thresholds
-
-### Review Finding Reconciliation
-
-When running dual-model review, reconcile findings systematically:
-
-```
-Finding Classification:
-┌─────────────────┬──────────┬──────────┬───────────────────┐
-│                 │ Codex    │ Gemini   │ Action            │
-├─────────────────┼──────────┼──────────┼───────────────────┤
-│ Same issue      │ Found    │ Found    │ HIGH confidence   │
-│ Unique finding  │ Found    │ -        │ MEDIUM confidence │
-│ Unique finding  │ -        │ Found    │ MEDIUM confidence │
-│ Contradiction   │ Fix X    │ Keep X   │ Flag for agent    │
-└─────────────────┴──────────┴──────────┴───────────────────┘
-```
-
-HIGH confidence findings are always addressed. MEDIUM confidence findings are addressed if P0/P1/P2. Contradictions require the implementing agent to make a judgment call and document the reasoning.
+After all channels complete (including compensating passes), reconcile findings using the rules in `multi-model-review-dispatch`. This orchestration entry triggers reconciliation; the dispatch entry defines how to perform it.
 
 ### Security-Focused Review Checklist
 
@@ -168,20 +83,6 @@ Look for these performance anti-patterns:
 - Missing caching for expensive computations
 - Unbounded growth in arrays or maps
 
-### Integration with CLAUDE.md
-
-The workflow-audit step should add review commands to CLAUDE.md:
-
-```markdown
-## Code Review
-| Command | Purpose |
-|---------|---------|
-| `scripts/cli-pr-review.sh <PR#>` | Run dual-model review |
-| `scripts/await-pr-review.sh <PR#>` | Poll for external review |
-```
-
-This ensures agents always know how to trigger reviews without consulting separate docs.
-
 ### Common False Positives
 
 Track and suppress recurring false positives:
@@ -201,3 +102,13 @@ Track these metrics over time to improve review quality:
 - **Model agreement rate** — how often Codex and Gemini agree
 
 Use these metrics to calibrate severity thresholds and update AGENTS.md focus areas.
+
+### Fallback When Models Unavailable
+
+When external CLIs are unavailable, the degraded-mode behavior defined above applies:
+
+1. For each unavailable external channel, queue a compensating Claude self-review pass focused on that channel's strength area.
+2. Label findings as `[compensating: Codex-equivalent]` or `[compensating: Gemini-equivalent]`.
+3. Treat compensating findings as single-source confidence.
+4. Maximum verdict is `degraded-pass` when any channel is compensated.
+5. When both external channels are unavailable, note "All findings are single-model" in the review summary.
