@@ -1,5 +1,6 @@
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
 import type { OutputContext, SelectOption } from './context.js'
+import { shutdown } from '../shutdown.js'
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
@@ -46,6 +47,7 @@ function isScaffoldWarning(w: ScaffoldWarning | string): w is ScaffoldWarning {
 
 export class InteractiveOutput implements OutputContext {
   private spinnerInterval: ReturnType<typeof setInterval> | null = null
+  private spinnerDeregister: (() => void) | null = null
   private spinnerFrame = 0
   private progressTotal = 0
   private progressLabel = ''
@@ -311,6 +313,7 @@ export class InteractiveOutput implements OutputContext {
       process.stdout.write(`\r${frame} ${message}`)
       this.spinnerFrame++
     }, 80)
+    this.spinnerDeregister = shutdown.register('spinner', () => this.stopSpinner())
   }
 
   stopSpinner(success = true): void {
@@ -320,6 +323,8 @@ export class InteractiveOutput implements OutputContext {
       // Clear spinner line
       process.stdout.write('\r\x1b[K')
     }
+    this.spinnerDeregister?.()
+    this.spinnerDeregister = null
     if (success) {
       // Spinner stopped successfully — caller will call success() if needed
     }

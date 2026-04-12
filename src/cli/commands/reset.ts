@@ -5,7 +5,8 @@ import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { StateManager } from '../../state/state-manager.js'
-import { acquireLock, releaseLock } from '../../state/lock-manager.js'
+import { acquireLock, getLockPath, releaseLock } from '../../state/lock-manager.js'
+import { shutdown } from '../shutdown.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
@@ -78,7 +79,7 @@ async function resetStep(
     return
   }
 
-  try {
+  const doReset = async (): Promise<void> => {
     const context = loadPipelineContext(projectRoot)
     const pipeline = resolvePipeline(context)
     const stateManager = new StateManager(projectRoot, pipeline.computeEligible)
@@ -96,7 +97,7 @@ async function resetStep(
         exitCode: 2,
         recovery: 'Run `scaffold list` to see available steps',
       })
-      process.exit(2)
+      process.exitCode = 2
       return
     }
 
@@ -105,7 +106,7 @@ async function resetStep(
     // Already pending — nothing to do
     if (stepEntry.status === 'pending') {
       output.info(`Step '${step}' is already pending`)
-      process.exit(0)
+      process.exitCode = 0
       return
     }
 
@@ -118,12 +119,14 @@ async function resetStep(
 
     // Confirm if completed (interactive mode)
     if (stepEntry.status === 'completed' && outputMode === 'interactive') {
-      const proceed = await output.confirm(
-        `Step '${step}' is completed. Reset to pending? (You can re-run it afterward.)`,
-        false,
+      const proceed = await shutdown.withPrompt(() =>
+        output.confirm(
+          `Step '${step}' is completed. Reset to pending? (You can re-run it afterward.)`,
+          false,
+        ),
       )
       if (!proceed) {
-        process.exit(0)
+        process.exitCode = 0
         return
       }
     } else if (stepEntry.status === 'completed' && !argv.force) {
@@ -133,7 +136,7 @@ async function resetStep(
         exitCode: 3,
         recovery: 'Use --force to reset a completed step',
       })
-      process.exit(3)
+      process.exitCode = 3
       return
     }
 
@@ -161,11 +164,18 @@ async function resetStep(
       output.success(`Step '${step}' reset to pending`)
       output.info('Run `scaffold next` to see eligible steps')
     }
-    process.exit(0)
-  } finally {
-    if (lockResult.acquired) {
+    process.exitCode = 0
+  }
+
+  if (lockResult.acquired) {
+    shutdown.registerLockOwnership(getLockPath(projectRoot))
+    await shutdown.withResource('lock', () => {
       releaseLock(projectRoot)
-    }
+      shutdown.releaseLockOwnership()
+    }, doReset)
+  } else {
+    // --force bypass: no lock acquired, run without withResource
+    await doReset()
   }
 }
 
@@ -180,13 +190,15 @@ async function resetPipeline(
 ): Promise<void> {
   const scaffoldDir = path.join(projectRoot, '.scaffold')
 
-  // Confirmation logic
+  // Confirmation logic — prompt happens BEFORE lock acquisition
   const confirmFlagSet = argv['confirm-reset'] === true || argv.confirmReset === true
 
   if (outputMode === 'interactive') {
-    const confirmed = await output.confirm(
-      'This will delete state.json and decisions.jsonl. Are you sure?',
-      false,
+    const confirmed = await shutdown.withPrompt(() =>
+      output.confirm(
+        'This will delete state.json and decisions.jsonl. Are you sure?',
+        false,
+      ),
     )
     if (!confirmed) {
       output.info('Reset cancelled.')
@@ -204,26 +216,10 @@ async function resetPipeline(
     return
   }
 
-  // Acquire lock
-  let lockAcquired = false
-  if (!argv.force) {
-    const lockResult = acquireLock(projectRoot, 'reset')
-    if (!lockResult.acquired) {
-      if (lockResult.error) {
-        output.warn(`${lockResult.error.code}: ${lockResult.error.message}`)
-      } else {
-        output.warn('Lock is held by another process')
-      }
-      process.exit(3)
-      return
-    }
-    lockAcquired = true
-  }
+  const doReset = async (): Promise<void> => {
+    const filesDeleted: string[] = []
+    const filesPreserved: string[] = []
 
-  const filesDeleted: string[] = []
-  const filesPreserved: string[] = []
-
-  try {
     // Delete state.json
     const statePath = path.join(scaffoldDir, 'state.json')
     if (fs.existsSync(statePath)) {
@@ -252,15 +248,30 @@ async function resetPipeline(
         output.info(`Preserved: ${filesPreserved.join(', ')}`)
       }
     }
-    process.exit(0)
-  } finally {
-    if (lockAcquired) {
-      try {
-        releaseLock(projectRoot)
-      } catch {
-        // ignore
+    process.exitCode = 0
+  }
+
+  if (argv.force) {
+    // --force bypass: no lock acquisition, run directly
+    await doReset()
+  } else {
+    // Acquire lock
+    const lockResult = acquireLock(projectRoot, 'reset')
+    if (!lockResult.acquired) {
+      if (lockResult.error) {
+        output.warn(`${lockResult.error.code}: ${lockResult.error.message}`)
+      } else {
+        output.warn('Lock is held by another process')
       }
+      process.exit(3)
+      return
     }
+
+    shutdown.registerLockOwnership(getLockPath(projectRoot))
+    await shutdown.withResource('lock', () => {
+      releaseLock(projectRoot)
+      shutdown.releaseLockOwnership()
+    }, doReset)
   }
 }
 

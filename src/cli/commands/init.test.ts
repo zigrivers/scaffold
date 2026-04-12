@@ -42,6 +42,29 @@ vi.mock('../../core/skills/sync.js', () => ({
   syncSkillsIfNeeded: vi.fn(),
 }))
 
+vi.mock('../shutdown.js', () => {
+  const ExitCode = { UserCancellation: 4 }
+  return {
+    shutdown: {
+      withPrompt: vi.fn(async (fn: () => Promise<unknown>) => {
+        try {
+          return await fn()
+        } catch (e) {
+          if (e instanceof Error && e.name === 'ExitPromptError') {
+            process.exit(ExitCode.UserCancellation)
+            // Simulate process termination — throw so callers don't continue
+            const sentinel = new Error('process.exit')
+            sentinel.name = 'ProcessExit'
+            throw sentinel
+          }
+          throw e
+        }
+      }),
+      withContext: vi.fn(async (_msg: string, fn: () => Promise<unknown>) => fn()),
+    },
+  }
+})
+
 // Mock the build command to avoid circular deps / actual build execution
 vi.mock('./build.js', () => ({
   runBuild: vi.fn().mockResolvedValue({
@@ -151,6 +174,7 @@ describe('init command', () => {
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
     vi.restoreAllMocks()
+    process.exitCode = undefined
   })
 
   // Test 1: Runs wizard successfully in temp directory and auto-runs build
@@ -167,7 +191,7 @@ describe('init command', () => {
       expect.any(Object),
     )
     expect(syncSkillsIfNeeded).toHaveBeenCalled()
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode ?? 0).toBe(0)
   })
 
   // Test 2: JSON mode outputs single InitResult payload including buildResult
@@ -205,7 +229,7 @@ describe('init command', () => {
         }),
       }),
     )
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode ?? 0).toBe(0)
   })
 
   // Test 3: --force backs up existing .scaffold/
@@ -220,7 +244,7 @@ describe('init command', () => {
   it('exits 1 when wizard returns INIT_SCAFFOLD_EXISTS error', async () => {
     mockRunWizard.mockResolvedValue(makeFailResult(tmpDir))
     await initCommand.handler(defaultArgv({ root: tmpDir }))
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
     expect(mockRunBuild).not.toHaveBeenCalled()
   })
 
@@ -250,35 +274,16 @@ describe('init command', () => {
     )
   })
 
-  it('handles Ctrl-C (ExitPromptError) with info message and exit 130', async () => {
+  it('handles Ctrl-C (ExitPromptError) via shutdown.withPrompt and exits 4', async () => {
     const exitPromptError = new Error('prompt was cancelled')
     exitPromptError.name = 'ExitPromptError'
     mockRunWizard.mockRejectedValue(exitPromptError)
 
-    const mockOutput = {
-      success: vi.fn(),
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      result: vi.fn(),
-      supportsInteractivePrompts: vi.fn().mockReturnValue(false),
-      prompt: vi.fn().mockResolvedValue(''),
-      confirm: vi.fn().mockResolvedValue(false),
-      select: vi.fn().mockResolvedValue(''),
-      multiSelect: vi.fn().mockResolvedValue([]),
-      multiInput: vi.fn().mockResolvedValue([]),
-      startSpinner: vi.fn(),
-      stopSpinner: vi.fn(),
-      startProgress: vi.fn(),
-      updateProgress: vi.fn(),
-      stopProgress: vi.fn(),
-    }
-    vi.mocked(createOutputContext).mockReturnValue(mockOutput)
+    // The mock withPrompt calls process.exit(4) then throws a sentinel
+    // to simulate process termination, so the handler rejects.
+    await Promise.resolve(initCommand.handler(defaultArgv({ root: tmpDir }))).catch(() => {})
 
-    await initCommand.handler(defaultArgv({ root: tmpDir }))
-
-    expect(mockOutput.info).toHaveBeenCalledWith('Cancelled.')
-    expect(exitSpy).toHaveBeenCalledWith(130)
+    expect(exitSpy).toHaveBeenCalledWith(4)
     expect(mockRunBuild).not.toHaveBeenCalled()
   })
 
@@ -287,7 +292,7 @@ describe('init command', () => {
 
     await initCommand.handler(defaultArgv({ root: tmpDir }))
 
-    expect(exitSpy).toHaveBeenCalledWith(5)
+    expect(process.exitCode).toBe(5)
   })
 })
 
