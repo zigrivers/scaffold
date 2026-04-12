@@ -15,6 +15,7 @@ AI-assisted code reviews using multiple model CLIs (Claude, Gemini, Codex) are u
 - Output parsing is fragile (Gemini wraps JSON in metadata, Codex emits thinking tokens to stderr)
 - Finding reconciliation across channels is manual and inconsistent
 - No structured gate mechanism — agents decide ad-hoc whether findings are blocking
+- Background execution (`run_in_background`) produces empty output from both Codex and Gemini CLIs, forcing foreground-only dispatch that blocks the agent
 
 ## Solution
 
@@ -27,6 +28,7 @@ AI-assisted code reviews using multiple model CLIs (Claude, Gemini, Codex) are u
 - **Automated reconciliation** — consensus rules produce a unified findings list
 - **Configurable severity gates** — project default + CLI override for which findings block the gate
 - **Structured output** — JSON default, with text/markdown/SARIF formatters
+- **Compensating passes** — when a channel is unavailable, mmr optionally runs a one-shot compensating Claude self-review pass focused on the missing channel's strength area, with explicit labeling and single-source confidence
 
 ## Architecture
 
@@ -79,9 +81,11 @@ Options:
   --template <name>                   # Use a named prompt template
   --format json|text|markdown|sarif   # Output format (applied at results time)
   --sync                              # Block until all channels complete or timeout; returns reconciled results directly
+  --compensate              # Run compensating Claude passes for unavailable channels (default: from config)
+  --no-compensate           # Skip compensating passes
 ```
 
-Returns a job ID immediately (unless `--sync`). Exit code 0 = dispatched successfully.
+Returns a job ID immediately (unless `--sync`). See Global Exit Codes below for exit code semantics.
 
 ### `mmr status <job-id>`
 
@@ -90,18 +94,33 @@ Returns a job ID immediately (unless `--sync`). Exit code 0 = dispatched success
   "job_id": "mmr-a1b2c3",
   "status": "running",
   "channels": {
-    "claude": { "status": "completed", "elapsed": "47s", "findings_count": 2 },
+    "claude": { "status": "completed", "root_cause": null, "coverage_status": "full", "elapsed": "47s", "findings_count": 2 },
     "gemini": { "status": "running", "elapsed": "2m12s" },
-    "codex": { "status": "completed", "elapsed": "1m03s", "findings_count": 0 }
+    "codex": { "status": "completed", "root_cause": null, "coverage_status": "full", "elapsed": "1m03s", "findings_count": 0 }
   }
 }
 ```
 
-Exit codes: `0` = all complete, `1` = still running, `2` = at least one failed.
-
 ### `mmr results <job-id>`
 
-Returns reconciled findings when all channels are complete (or timed out). Exit code reflects the gate: `0` = gate passed, `1` = gate failed.
+Returns reconciled findings when all channels are complete (or timed out).
+
+### Global Exit Codes
+
+| Exit Code | Meaning | Commands |
+|-----------|---------|----------|
+| 0 | Success (dispatched / all complete / gate passed) | all |
+| 1 | In progress (still running) | `mmr status` only |
+| 2 | Gate failed (findings above threshold) | `mmr results`, `mmr review --sync` |
+| 3 | Gate degraded (passed with compensating channels) | `mmr results`, `mmr review --sync` |
+| 4 | Channel failure (no reconciled result possible) | `mmr status`, `mmr results` |
+| 5 | CLI error (bad arguments, config error) | all |
+
+**`mmr review --sync` exit semantics:** `--sync` blocks until all channels complete (or timeout), runs reconciliation, and returns the same exit codes as `mmr results`. It is the recommended single-command entry point for AI agents and CI/CD.
+
+**CI/CD note:** Use `mmr review --sync` for gate decisions, never `mmr status` directly. Exit 3 is a warning, not failure.
+
+**Exit code precedence:** Gate codes (0/2/3) take precedence over channel-failure (4) when a reconciled result exists. Exit 4 = no result possible. `needs-user-decision` verdict maps to exit 2 with a `verdict: "needs-user-decision"` field in JSON output.
 
 ### `mmr config`
 
@@ -128,7 +147,9 @@ Each channel definition includes an `auth` block with a check command, timeout, 
 
 ### Auth Lifecycle
 
-Auth is verified **every time** before dispatch — never cached or assumed:
+Auth results are cached internally for up to `auth_cache_ttl` seconds (default: 300). The cache is machine-local (`~/.mmr/auth-cache.json`), never written to project config, and busts immediately on any auth failure. This balances the original "verify every time" principle against the practical cost of repeated slow auth probes in session-scoped workflows.
+
+> **Rationale:** Auth tokens expire mid-session without warning. Pre-flight checks are non-negotiable, but repeated 5-second probes across N story reviews in post-implementation-review waste minutes. The TTL-based cache was chosen over a `--skip-auth-check` flag to prevent cargo-culting in CI scripts.
 
 1. Check CLI installed (`command -v <tool>`)
    - Not installed → silent skip, noted in job metadata
@@ -143,7 +164,7 @@ Auth is verified **every time** before dispatch — never cached or assumed:
 |-----------|----------|-------------|
 | CLI not installed | Silent skip, note in results | Install the CLI |
 | Auth expired/invalid | **Loud failure**, surface recovery command | Re-authenticate |
-| Auth check timeout | Treat as transient, retry once | Check network |
+| Auth check timeout | Retry once, then record `auth_timeout` (distinct from `auth_failed`) | Check network |
 
 Auth failures are **never silent**. The initial `mmr review` response includes immediate auth status:
 
@@ -160,6 +181,8 @@ Auth failures are **never silent**. The initial `mmr review` response includes i
 }
 ```
 
+Recovery commands are stored as raw commands in `.mmr.yaml`. Platform wrappers (Claude Code skill, AGENTS.md) add the `!` prefix dynamically for interactive contexts.
+
 ### `mmr config test`
 
 Pre-flight check for all channels:
@@ -173,6 +196,8 @@ $ mmr config test
 
   2/3 channels ready. 1 auth failure.
 ```
+
+> **Foreground note:** AI agents calling `mmr` must run it in the foreground. Background execution produces empty output. `--sync` is the recommended mode for agent workflows.
 
 ## Core Prompt Engine
 
