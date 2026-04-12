@@ -159,6 +159,8 @@ Format the changed-file context like:
 
 Each channel reviews independently. Do NOT share one channel's output with another.
 
+**Foreground only:** Always run Codex and Gemini CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`. Background execution produces empty output. Multiple foreground calls in a single message are fine.
+
 #### Channel 1: Codex CLI
 
 Check installation and auth:
@@ -168,8 +170,10 @@ command -v codex >/dev/null 2>&1
 codex login status 2>/dev/null
 ```
 
-- If `codex` is not installed: skip this channel and record `skipped (not installed)`
-- If auth fails: tell the user to run `! codex login`, retry after recovery, and if recovery is not possible, record `skipped (auth failed)` and continue with the remaining channels
+- If `codex` is not installed: skip this channel and record root-cause `not_installed`
+- If auth fails: tell the user to run `! codex login`, retry after recovery, and if recovery is not possible, record root-cause `auth_failed` and continue with the remaining channels
+
+If auth cannot be recovered, or if Codex is not installed, queue a compensating Claude self-review pass focused on implementation correctness, security, and API contracts. Label findings as `[compensating: Codex-equivalent]`. If auth check times out (~5s), retry once; if still failing, record `auth timeout` and queue compensating pass. This pass runs after all channel dispatch attempts complete.
 
 Build the prompt in a temporary file and pass it over stdin:
 
@@ -178,6 +182,8 @@ PROMPT_FILE=$(mktemp)
 # ...write the full review prompt to "$PROMPT_FILE"...
 codex exec --skip-git-repo-check -s read-only --ephemeral - < "$PROMPT_FILE" 2>/dev/null
 ```
+
+If the CLI exits with a non-zero code, produces malformed/unparseable output, or is killed by the tool runner timeout, record root-cause `failed` and queue a compensating pass for that channel.
 
 #### Channel 2: Gemini CLI
 
@@ -188,8 +194,10 @@ command -v gemini >/dev/null 2>&1
 NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1
 ```
 
-- If `gemini` is not installed: skip this channel and record `skipped (not installed)`
-- If auth fails (including exit 41): tell the user to run `! gemini -p "hello"`, retry after recovery, and if recovery is not possible, record `skipped (auth failed)` and continue with the remaining channels
+- If `gemini` is not installed: skip this channel and record root-cause `not_installed`
+- If auth fails (including exit 41): tell the user to run `! gemini -p "hello"`, retry after recovery, and if recovery is not possible, record root-cause `auth_failed` and continue with the remaining channels
+
+If auth cannot be recovered, or if Gemini is not installed, queue a compensating Claude self-review pass focused on architectural patterns, design reasoning, and broad context. Label findings as `[compensating: Gemini-equivalent]`. If auth check times out (~5s), retry once; if still failing, record `auth timeout` and queue compensating pass. This pass runs after all channel dispatch attempts complete.
 
 Build the prompt in a temporary file and pass it as a single prompt string:
 
@@ -198,6 +206,8 @@ PROMPT_FILE=$(mktemp)
 # ...write the full review prompt to "$PROMPT_FILE"...
 NO_BROWSER=true gemini -p "$(cat "$PROMPT_FILE")" --output-format json --approval-mode yolo 2>/dev/null
 ```
+
+If the CLI exits with a non-zero code, produces malformed/unparseable output, or is killed by the tool runner timeout, record root-cause `failed` and queue a compensating pass for that channel.
 
 #### Channel 3: Superpowers code-reviewer
 
@@ -212,6 +222,8 @@ Dispatch the `superpowers:code-reviewer` subagent.
 
 This channel must review the same local delivery candidate, even when no PR or
 clean ref range exists.
+
+**After all channels:** Run any queued compensating passes as foreground Claude self-review passes. Each compensating pass uses the same review prompt as the missing channel, focusing on that channel's strength area.
 
 ### Step 5: Use This Review Prompt
 
@@ -270,6 +282,7 @@ Use these rules:
 | Any single P2 | Fix unless clearly inapplicable; if disputed, surface to user |
 | All executed channels approve | Candidate passes review |
 | Strong contradiction on a medium-severity issue | Verdict becomes `needs-user-decision` |
+| Compensating-pass P0/P1/P2 finding | Single-source confidence — fix per normal thresholds, but label as compensating in summary |
 
 ### Step 7: Apply Fixes Unless in Report-Only Mode
 
@@ -284,14 +297,18 @@ Otherwise:
 3. Repeat for up to 3 fix rounds
 4. If any finding remains unresolved after 3 rounds, stop with verdict `needs-user-decision`
 
+**Fix cycle channel rule:** Re-run only channels that originally completed or ran as compensating passes. Never retry a channel marked `not installed`, `auth failed`, or `auth timeout` during fix rounds — its availability does not change within a session.
+
 ### Step 8: Final Verdict
 
 Return exactly one verdict:
 
-- `pass` — all available channels ran and no unresolved P0/P1/P2 findings remain
-- `degraded-pass` — at least one channel was skipped because the tool is not installed or auth could not be recovered, but all executed channels passed
-- `blocked` — reviewer execution failure or unresolved mandatory findings
-- `needs-user-decision` — reviewer disagreement or findings still unresolved after 3 fix rounds
+- `pass` — all channels completed with `full` coverage, no unresolved P0/P1/P2
+- `degraded-pass` — at least one channel was skipped/compensated (coverage is not all `full`), but all executed and compensating channels have no unresolved P0/P1/P2
+- `blocked` — unresolved P0/P1/P2 findings remain after 3 fix rounds, OR no reconciled result was possible
+- `needs-user-decision` — reviewer disagreement on a finding, or findings still unresolved after 3 rounds that require human judgment
+
+When compensating passes ran for any channel, the maximum achievable verdict is `degraded-pass` — never `pass`, even if all findings are resolved. When both external channels were compensated, the review summary must note: "All findings are single-model (Claude only)."
 
 ### Step 9: Report Results
 
@@ -304,9 +321,9 @@ Output a concise summary in this format:
 [scope label]
 
 ### Channels Executed
-- Codex CLI — [completed / skipped (not installed) / skipped (auth failed) / error]
-- Gemini CLI — [completed / skipped (not installed) / skipped (auth failed) / error]
-- Superpowers code-reviewer — [completed / error]
+- Codex CLI — root cause: [completed / not installed / auth failed / auth timeout / failed], coverage: [full / compensating (Codex-equivalent)]
+- Gemini CLI — root cause: [completed / not installed / auth failed / auth timeout / failed], coverage: [full / compensating (Gemini-equivalent)]
+- Superpowers code-reviewer — [completed / failed]
 
 ### Findings
 [consensus findings first, then single-source findings]
@@ -317,3 +334,12 @@ Output a concise summary in this format:
 
 If the verdict is `pass` or `degraded-pass`, explicitly say the code is ready
 for the next delivery step (commit, push, or PR creation).
+
+## Process Rules
+
+1. **Foreground only** — Always run Codex and Gemini CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`.
+2. **All 3 channels are mandatory** — skip only when a tool is genuinely not installed, never by choice.
+3. **Auth failures are not silent** — always surface to the user with recovery instructions.
+4. **Independence** — never share one channel's output with another.
+5. **Fix before proceeding** — P0/P1/P2 findings must be resolved before moving to the next task.
+6. **Dispatch pattern** follows `multi-model-review-dispatch` knowledge entry. When modifying channel dispatch in this file, verify consistency with `review-pr.md` and `post-implementation-review.md`.

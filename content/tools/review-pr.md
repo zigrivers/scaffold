@@ -66,7 +66,15 @@ Read these files for review context (skip any that don't exist):
 
 Run all three channels. Track which ones complete successfully.
 
+**Foreground only:** Always run Codex and Gemini CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`. Background execution produces empty output.
+
 #### Channel 1: Codex CLI
+
+**Installation check:**
+```bash
+command -v codex >/dev/null 2>&1
+```
+- If `codex` is not installed: queue a compensating Claude self-review pass focused on implementation correctness, security, and API contracts. Record root-cause `not_installed`. Skip to next channel.
 
 **Auth check first** (auth tokens expire — always re-verify):
 
@@ -74,9 +82,11 @@ Run all three channels. Track which ones complete successfully.
 codex login status 2>/dev/null && echo "codex authenticated" || echo "codex NOT authenticated"
 ```
 
-If Codex is not installed, skip this channel and note it in the summary.
 If auth fails, tell the user: "Codex auth expired. Run: `! codex login`" — do NOT
 silently fall back. After the user re-authenticates, retry.
+
+If auth cannot be recovered, queue a compensating pass (same focus as above). Record root-cause `auth_failed`.
+If auth check times out (~5s), retry once. If still failing, record root-cause `auth_timeout` and queue compensating pass.
 
 **Run the review:**
 
@@ -90,7 +100,15 @@ The review prompt must include:
 - Review standards from docs/review-standards.md (if exists)
 - Instruction to report P0/P1/P2 findings as JSON with severity, location (file:line), description, and suggestion
 
+If the CLI exits with a non-zero code, produces malformed/unparseable output, or is killed by the tool runner timeout, record root-cause `failed` and queue a compensating pass for that channel.
+
 #### Channel 2: Gemini CLI
+
+**Installation check:**
+```bash
+command -v gemini >/dev/null 2>&1
+```
+- If `gemini` is not installed: queue a compensating Claude self-review pass focused on architectural patterns, design reasoning, and broad context. Record root-cause `not_installed`. Label findings as `[compensating: Gemini-equivalent]`. Skip to next channel.
 
 **Auth check first:**
 
@@ -104,8 +122,10 @@ elif [ "$GEMINI_EXIT" -eq 41 ]; then
 fi
 ```
 
-If Gemini is not installed, skip this channel and note it in the summary.
 If auth fails (exit 41), tell the user: "Gemini auth expired. Run: `! gemini -p \"hello\"`" — do NOT silently fall back. After the user re-authenticates, retry.
+
+If auth cannot be recovered, queue a compensating pass focused on architectural patterns, design reasoning, and broad context. Record root-cause `auth_failed`. Label findings as `[compensating: Gemini-equivalent]`.
+If auth check times out (~5s), retry once. If still failing, record root-cause `auth_timeout` and queue compensating pass labeled `[compensating: Gemini-equivalent]`.
 
 **Run the review:**
 
@@ -115,6 +135,8 @@ NO_BROWSER=true gemini -p "REVIEW_PROMPT" --output-format json --approval-mode y
 
 Same review prompt content as Codex. Do NOT share one model's output with the other —
 each reviews independently.
+
+If the CLI exits with a non-zero code, produces malformed/unparseable output, or is killed by the tool runner timeout, record root-cause `failed` and queue a compensating pass for that channel.
 
 #### Channel 3: Superpowers Code-Reviewer Subagent
 
@@ -134,6 +156,8 @@ providing:
 - `HEAD_SHA` — head commit
 - `DESCRIPTION` — PR summary
 
+**After all channels:** Run any queued compensating passes as foreground Claude self-review passes. Each uses the same review prompt as the missing channel, focused on that channel's strength area. Label findings as `[compensating: Codex-equivalent]` or `[compensating: Gemini-equivalent]`.
+
 ### Step 4: Reconcile Findings
 
 After all channels complete, reconcile findings:
@@ -145,6 +169,7 @@ After all channels complete, reconcile findings:
 | One channel flags P0, others approve | **High** | Fix it — P0 is critical from any source |
 | One channel flags P1, others approve | **Medium** | Fix it — P1 findings are mandatory regardless of source count |
 | Channels contradict each other | **Low** | Present to user for adjudication |
+| Compensating-pass P0/P1/P2 finding | **Single-source** | Fix per normal thresholds, label as compensating |
 
 ### Step 5: Report Results
 
@@ -154,9 +179,9 @@ Output a review summary in this format:
 ## Code Review Summary — PR #[number]
 
 ### Channels Executed
-- [ ] Codex CLI — [completed / skipped (not installed) / skipped (auth failed) / error]
-- [ ] Gemini CLI — [completed / skipped (not installed) / skipped (auth failed) / error]
-- [ ] Superpowers code-reviewer — [completed / error]
+- [ ] Codex CLI — root cause: [completed / not installed / auth failed / auth timeout / failed], coverage: [full / compensating (Codex-equivalent)]
+- [ ] Gemini CLI — root cause: [completed / not installed / auth failed / auth timeout / failed], coverage: [full / compensating (Gemini-equivalent)]
+- [ ] Superpowers code-reviewer — [completed / failed]
 
 ### Consensus Findings (High Confidence)
 [Findings flagged by 2+ channels]
@@ -168,8 +193,21 @@ Output a review summary in this format:
 [Contradictions between channels]
 
 ### Verdict
-[All channels approve / Fix required (list P0/P1/P2 items) / User adjudication needed]
+[pass / degraded-pass / blocked / needs-user-decision]
 ```
+
+### Step 5a: Final Verdict
+
+Return exactly one verdict:
+
+- `pass` — all channels ran, no unresolved P0/P1/P2
+- `degraded-pass` — channels skipped/compensated, no unresolved P0/P1/P2
+- `blocked` — unresolved P0/P1/P2 after 3 fix rounds
+- `needs-user-decision` — contradictions or unresolvable findings
+
+Verdict precedence: `needs-user-decision` > `blocked` > `degraded-pass` > `pass`.
+
+When compensating passes ran, maximum achievable verdict is `degraded-pass`. When both external channels were compensated, note "All findings are single-model."
 
 ### Step 6: Fix P0/P1/P2 Findings
 
@@ -179,12 +217,14 @@ If any P0, P1, or P2 findings exist:
 3. Re-run the channels that produced findings to verify fixes
 4. After 3 fix rounds with unresolved P0/P1/P2 findings, stop and ask the user for direction — do NOT merge automatically. Document remaining findings and let the user decide whether to continue fixing, create follow-up issues, or override.
 
+**Fix cycle channel rule:** Re-run only channels that originally completed or ran as compensating passes. Never retry a channel marked `not installed`, `auth failed`, or `auth timeout` during fix rounds — its availability does not change within a session.
+
 ### Step 7: Confirm Completion
 
 After all findings are resolved (or 3 rounds complete), output:
 
 ```
-Code review complete. All 3 channels executed. PR #[number] is ready for merge.
+Code review complete. Verdict: [pass/degraded-pass]. Channels: [N] executed, [N] compensating. PR #[number] is ready for merge.
 ```
 
 Do NOT proceed to the next task or merge until this confirmation is output.
@@ -193,19 +233,24 @@ Do NOT proceed to the next task or merge until this confirmation is output.
 
 | Situation | Action |
 |-----------|--------|
-| Neither Codex nor Gemini installed | Run Superpowers code-reviewer only; document as "single-channel review" |
-| One CLI installed, one not | Run available CLI + Superpowers; document missing channel |
-| CLI auth expired | Surface to user with recovery command; do NOT silently skip |
-| Superpowers plugin not installed | Run both CLIs; warn user to install superpowers plugin |
-| All external channels unavailable | Superpowers code-reviewer only; warn user that review coverage is reduced |
+| Channel not installed | Queue compensating pass, report root-cause `not_installed` |
+| Auth expired, user recovers | Retry dispatch |
+| Auth expired, user declines | Queue compensating pass, report root-cause `auth_failed` |
+| Auth check timeout (after retry) | Queue compensating pass, report root-cause `auth_timeout` |
+| Channel fails during execution | Queue compensating pass, report root-cause `failed` |
+| Both external channels unavailable | Two compensating passes, max verdict: `degraded-pass`, note "All findings single-model" |
+| Superpowers unavailable | Run available CLIs, warn user (Superpowers is always-available Claude — no compensating pass) |
 
 ## Process Rules
 
-1. **All three channels are mandatory** — skip only when the tool is genuinely unavailable (not installed), never by choice.
-2. **Auth failures are not silent** — always surface to the user with recovery instructions.
-3. **Independence** — never share one channel's output with another. Each reviews the diff independently.
-4. **Fix before proceeding** — P0/P1/P2 findings must be resolved before moving to the next task.
-5. **Document everything** — the review summary must show which channels ran and which were skipped, with reasons.
+1. **Foreground only** — Always run Codex and Gemini CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`.
+2. **All three channels are mandatory** — skip only when a tool is genuinely not installed, never by choice.
+3. **Auth failures are not silent** — always surface to the user with the exact recovery command.
+4. **Independence** — never share one channel's output with another. Each reviews the diff independently.
+5. **Fix before proceeding** — P0/P1/P2 findings must be resolved before moving to the next task.
+6. **3-round limit** — never attempt more than 3 fix rounds. Surface unresolved findings to the user.
+7. **Document everything** — the review summary must show which channels ran and which were skipped, with reasons.
+8. **Dispatch pattern** follows `multi-model-review-dispatch` knowledge entry. When modifying channel dispatch in this file, verify consistency with `review-code.md` and `post-implementation-review.md`.
 
 ---
 
@@ -214,16 +259,13 @@ Do NOT proceed to the next task or merge until this confirmation is output.
 When code review is complete, tell the user:
 
 ---
-**Code review complete** — All channels executed for PR #[number].
+**Code review complete** — Verdict: [pass/degraded-pass]. All channels executed for PR #[number].
 
 **Results:**
-- Channels run: [list which of the 3 ran]
+- Channels run: [list which of the 3 ran, noting any compensating]
 - Findings fixed: [count]
 - Remaining: [none / list]
 
-**Next:** Return to the task execution loop — mark the task complete and pick up
-the next unblocked task with `/scaffold:single-agent-start`.
-
-**Pipeline reference:** `/scaffold:prompt-pipeline`
+**Next:** Return to the task execution loop.
 
 ---

@@ -113,40 +113,64 @@ Before pushing, review `git diff origin/main...HEAD` against CLAUDE.md and docs/
 
 ### Mandatory 3-Channel PR Review
 
-After creating every PR, run **all three** code review channels before moving to the next task. A PostToolUse hook on `gh pr create` will remind you.
+After creating every PR, run **all three** code review channels before moving
+to the next task. A PostToolUse hook on `gh pr create` will remind you.
 
-**Channel 1 — Codex CLI:**
+**Entry point:** Use `scaffold run review-pr` or follow the instructions in
+`content/tools/review-pr.md`. The tool handles dispatch, auth checks,
+reconciliation, and verdict logic.
+
+**The three channels:**
+1. **Codex CLI** — implementation correctness, security, API contracts
+2. **Gemini CLI** — architectural patterns, broad-context reasoning
+3. **Superpowers code-reviewer** — plan alignment, code quality, testing
+
+**Critical rules:**
+- **Foreground only** — Always run Codex and Gemini CLI commands as foreground
+  Bash calls. Never use `run_in_background`, `&`, or `nohup`. Background
+  execution produces empty output. Multiple foreground calls in a single
+  message are fine (the tool runner supports parallel invocations).
+- **All 3 channels are required** — A channel enters degraded mode when it is
+  not installed (`command -v` fails), auth fails and the user cannot recover,
+  or it fails during execution (non-zero exit, malformed output, timeout).
+  Run a compensating Claude self-review pass for each missing **external**
+  channel (Codex or Gemini), focused on that channel's strength area and
+  labeled `[compensating: Codex-equivalent]` or
+  `[compensating: Gemini-equivalent]`. Compensating findings are single-source
+  confidence. (Superpowers is a Claude subagent and is always available — no
+  compensating pass needed.)
+- **Auth failures are NOT silent** — surface to the user with recovery commands:
+  - Codex: `! codex login`
+  - Gemini: `! gemini -p "hello"`
+- **Independence** — never share one channel's output with another.
+- **Fix all P0/P1/P2** findings before proceeding to the next task.
+- **Verdict handling** — proceed only on `pass` or `degraded-pass`. If the
+  review returns `blocked` or `needs-user-decision`, stop and surface the
+  verdict and remaining findings to the user. Do NOT merge automatically.
+- **3-round limit** — after 3 fix rounds with unresolved findings, stop and
+  ask the user.
+
+**Quick reference** (when `scaffold run` is unavailable):
+<!-- Escape hatch only. Canonical commands live in content/tools/review-pr.md.
+     Update both if CLI syntax changes. -->
 ```bash
-# Verify auth (tokens expire mid-session — always check)
+# Installation checks
+command -v codex >/dev/null 2>&1 || echo "Codex not installed"
+command -v gemini >/dev/null 2>&1 || echo "Gemini not installed"
+
+# Auth checks
 codex login status 2>/dev/null
-# Run review (replace REVIEW_PROMPT with the actual prompt including PR diff)
-codex exec --skip-git-repo-check -s read-only --ephemeral "REVIEW_PROMPT" 2>/dev/null
-```
-If auth fails: tell user to run `! codex login`
-
-**Channel 2 — Gemini CLI:**
-```bash
-# Verify auth (exit 41 = auth failure)
 NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1
-# Run review
-NO_BROWSER=true gemini -p "REVIEW_PROMPT" --output-format json --approval-mode yolo 2>/dev/null
-```
-If auth fails: tell user to run `! gemini -p "hello"`
 
-**Channel 3 — Superpowers code-reviewer:**
-```bash
-# Get SHAs for the PR
+# Review dispatch (foreground only — never run_in_background)
+codex exec --skip-git-repo-check -s read-only --ephemeral "PROMPT" 2>/dev/null
+NO_BROWSER=true gemini -p "PROMPT" --output-format json --approval-mode yolo 2>/dev/null
+
+# Superpowers code-reviewer
 BASE_SHA=$(gh pr view --json baseRefOid -q .baseRefOid)
 HEAD_SHA=$(gh pr view --json headRefOid -q .headRefOid)
+# Dispatch superpowers:code-reviewer subagent with base/head SHAs and PR description
 ```
-Dispatch `superpowers:code-reviewer` subagent with the base/head SHAs and PR description.
-
-**Rules:**
-- All 3 channels are mandatory — skip only if a tool is genuinely not installed
-- Auth failures are NOT silent fallbacks — surface to the user with recovery commands
-- Each channel reviews independently — never share one channel's output with another
-- Fix all P0/P1/P2 findings before proceeding to the next task
-- After 3 fix rounds with unresolved findings, stop and ask the user — do NOT merge automatically
 
 ## Project Structure Quick Reference
 

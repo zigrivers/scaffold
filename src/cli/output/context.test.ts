@@ -393,6 +393,193 @@ describe('AutoOutput', () => {
   })
 })
 
+// Module-level mock for @inquirer/prompts (ES module namespace is immutable, so vi.spyOn won't work)
+vi.mock('@inquirer/prompts', () => ({ input: vi.fn(), confirm: vi.fn() }))
+
+describe('InteractiveOutput — bug fixes', () => {
+  let _stdoutWrite: WriteSpy
+
+  beforeEach(() => {
+    _stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  // Bug A2: canPrompt() should check both stdin and stdout
+  describe('canPrompt checks both stdin and stdout', () => {
+    it('prompt() returns default when stdin is not a TTY (piped input)', async () => {
+      const originalStdinIsTTY = process.stdin.isTTY
+      const originalStdoutIsTTY = process.stdout.isTTY
+      try {
+        // Simulate `scaffold init < answers.txt`: stdout is TTY but stdin is not
+        Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+        Object.defineProperty(process.stdin, 'isTTY', { value: undefined, configurable: true })
+
+        const out = new InteractiveOutput()
+        const result = await out.prompt('Name:', 'fallback')
+        expect(result).toBe('fallback')
+      } finally {
+        Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+        Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+      }
+    })
+
+    it('confirm() returns default when stdin is not a TTY', async () => {
+      const originalStdinIsTTY = process.stdin.isTTY
+      const originalStdoutIsTTY = process.stdout.isTTY
+      try {
+        Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+        Object.defineProperty(process.stdin, 'isTTY', { value: undefined, configurable: true })
+
+        const out = new InteractiveOutput()
+        const result = await out.confirm('Continue?', true)
+        expect(result).toBe(true)
+      } finally {
+        Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+        Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+      }
+    })
+
+    it('select() returns default when stdin is not a TTY', async () => {
+      const originalStdinIsTTY = process.stdin.isTTY
+      const originalStdoutIsTTY = process.stdout.isTTY
+      try {
+        Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+        Object.defineProperty(process.stdin, 'isTTY', { value: undefined, configurable: true })
+
+        const out = new InteractiveOutput()
+        const result = await out.select('Pick:', ['a', 'b'], 'b')
+        expect(result).toBe('b')
+      } finally {
+        Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+        Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+      }
+    })
+
+    it('prompt() returns default when stdout is not a TTY (piped output)', async () => {
+      const originalStdinIsTTY = process.stdin.isTTY
+      const originalStdoutIsTTY = process.stdout.isTTY
+      try {
+        // Simulate `scaffold init | less`: stdin is TTY but stdout is not
+        Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+        Object.defineProperty(process.stdout, 'isTTY', { value: undefined, configurable: true })
+
+        const out = new InteractiveOutput()
+        const result = await out.prompt('Name:', 'fallback')
+        expect(result).toBe('fallback')
+      } finally {
+        Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+        Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+      }
+    })
+  })
+
+  // Bug A1: NO_COLOR should NOT disable interactivity
+  describe('NO_COLOR does not disable interactivity', () => {
+    it('prompt() calls inquirer when TTY even with NO_COLOR set', async () => {
+      const originalStdinIsTTY = process.stdin.isTTY
+      const originalStdoutIsTTY = process.stdout.isTTY
+      const originalNoColor = process.env['NO_COLOR']
+      try {
+        Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+        Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+        process.env['NO_COLOR'] = '1'
+
+        const { input } = await import('@inquirer/prompts')
+        const inputMock = vi.mocked(input)
+        inputMock.mockResolvedValueOnce('user-typed')
+
+        const out = new InteractiveOutput()
+        const result = await out.prompt('Name:', 'default')
+        expect(result).toBe('user-typed')
+        expect(inputMock).toHaveBeenCalled()
+      } finally {
+        Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+        Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+        if (originalNoColor === undefined) {
+          delete process.env['NO_COLOR']
+        } else {
+          process.env['NO_COLOR'] = originalNoColor
+        }
+      }
+    })
+
+    it('confirm() calls inquirer when TTY even with NO_COLOR set', async () => {
+      const originalStdinIsTTY = process.stdin.isTTY
+      const originalStdoutIsTTY = process.stdout.isTTY
+      const originalNoColor = process.env['NO_COLOR']
+      try {
+        Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+        Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+        process.env['NO_COLOR'] = '1'
+
+        const { confirm } = await import('@inquirer/prompts')
+        const confirmMock = vi.mocked(confirm)
+        confirmMock.mockResolvedValueOnce(true)
+
+        const out = new InteractiveOutput()
+        const result = await out.confirm('Continue?', false)
+        expect(result).toBe(true)
+        expect(confirmMock).toHaveBeenCalled()
+      } finally {
+        Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+        Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+        if (originalNoColor === undefined) {
+          delete process.env['NO_COLOR']
+        } else {
+          process.env['NO_COLOR'] = originalNoColor
+        }
+      }
+    })
+  })
+
+  // Bug A4: select() should trim input before exact text match
+  describe('select() trims input before exact text match', () => {
+    it('select() matches option when input has trailing whitespace', async () => {
+      const originalStdinIsTTY = process.stdin.isTTY
+      const originalStdoutIsTTY = process.stdout.isTTY
+      try {
+        Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+        Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+        const { input } = await import('@inquirer/prompts')
+        const inputMock = vi.mocked(input)
+        inputMock.mockResolvedValueOnce('spa ')  // trailing space
+
+        const out = new InteractiveOutput()
+        const result = await out.select('Pick:', ['spa', 'web', 'api'], 'web')
+        expect(result).toBe('spa')
+      } finally {
+        Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+        Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+      }
+    })
+
+    it('select() returns trimmed value (not raw) for exact text match', async () => {
+      const originalStdinIsTTY = process.stdin.isTTY
+      const originalStdoutIsTTY = process.stdout.isTTY
+      try {
+        Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+        Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+        const { input } = await import('@inquirer/prompts')
+        const inputMock = vi.mocked(input)
+        inputMock.mockResolvedValueOnce('  api  ')  // leading + trailing spaces
+
+        const out = new InteractiveOutput()
+        const result = await out.select('Pick:', ['spa', 'web', 'api'], 'web')
+        expect(result).toBe('api')  // trimmed, not '  api  '
+      } finally {
+        Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+        Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+      }
+    })
+  })
+})
+
 describe('InteractiveOutput — wizard primitives', () => {
   beforeEach(() => {
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
@@ -495,5 +682,466 @@ describe('AutoOutput — wizard primitives', () => {
     const out = new AutoOutput()
     const result = await out.multiInput('Enter:', ['x', 'y'])
     expect(result).toEqual(['x', 'y'])
+  })
+})
+
+describe('InteractiveOutput — re-prompt on invalid input (A3)', () => {
+  let stdoutWrite: WriteSpy
+
+  beforeEach(() => {
+    stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('select() re-prompts on invalid input then accepts valid input', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      // First call returns invalid input, second returns valid input
+      inputMock.mockResolvedValueOnce('banana')
+      inputMock.mockResolvedValueOnce('spa')
+
+      const out = new InteractiveOutput()
+      const result = await out.select('Pick:', ['spa', 'web', 'api'], 'web')
+      expect(result).toBe('spa')
+      // Should have been called twice (first invalid, second valid)
+      expect(inputMock).toHaveBeenCalledTimes(2)
+      // Error message should have been printed
+      const allWritten = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+      expect(allWritten).toContain('Invalid')
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+
+  it('select() re-prompts on invalid number then accepts valid number', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      // First call: out-of-range number; second: valid number
+      inputMock.mockResolvedValueOnce('99')
+      inputMock.mockResolvedValueOnce('2')
+
+      const out = new InteractiveOutput()
+      const result = await out.select('Pick:', ['spa', 'web', 'api'], 'spa')
+      expect(result).toBe('web')
+      expect(inputMock).toHaveBeenCalledTimes(2)
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+
+  it('select() does NOT re-print options on re-prompt', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      inputMock.mockResolvedValueOnce('invalid')
+      inputMock.mockResolvedValueOnce('spa')
+
+      const out = new InteractiveOutput()
+      await out.select('Pick:', ['spa', 'web', 'api'], 'web')
+
+      // Count how many times "1. spa" appears — should be exactly once
+      const allWritten = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+      const optionMatches = allWritten.match(/1\. spa/g)
+      expect(optionMatches).toHaveLength(1)
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+
+  it('multiSelect() re-prompts when no valid selections from non-empty input', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      // First call: all invalid; second call: valid
+      inputMock.mockResolvedValueOnce('banana, grape')
+      inputMock.mockResolvedValueOnce('1, 3')
+
+      const out = new InteractiveOutput()
+      const result = await out.multiSelect('Pick:', ['spa', 'web', 'api'], ['spa'])
+      expect(result).toEqual(['spa', 'api'])
+      expect(inputMock).toHaveBeenCalledTimes(2)
+      // Error message should have been printed
+      const allWritten = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+      expect(allWritten).toContain('Invalid')
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+
+  it('multiSelect() warns about partial invalid entries and returns valid ones', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      inputMock.mockResolvedValueOnce('1, banana, 2')
+
+      const out = new InteractiveOutput()
+      const result = await out.multiSelect('Pick:', ['a', 'b', 'c'])
+      expect(result).toEqual(['a', 'b'])
+      // Should NOT re-prompt — only called once
+      expect(inputMock).toHaveBeenCalledTimes(1)
+      // Warning about unrecognized entries
+      const allWritten = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+      expect(allWritten).toContain('Ignored unrecognized: banana')
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+
+  it('multiSelect() returns defaults on empty input (pressing Enter)', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      // inquirer returns the default value string when user presses Enter
+      inputMock.mockResolvedValueOnce('spa')
+
+      const out = new InteractiveOutput()
+      const result = await out.multiSelect('Pick:', ['spa', 'web', 'api'], ['spa'])
+      expect(result).toEqual(['spa'])
+      // Should NOT re-prompt — only called once
+      expect(inputMock).toHaveBeenCalledTimes(1)
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+})
+
+describe('InteractiveOutput — rich rendering + ? help', () => {
+  let stdoutWrite: WriteSpy
+
+  beforeEach(() => {
+    stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('select renders friendly labels from rich options', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      inputMock.mockResolvedValueOnce('1')
+
+      const out = new InteractiveOutput()
+      await out.select('Pick:', [
+        { value: 'spa', label: 'SPA App', short: 'Client side.' },
+        { value: 'ssr', label: 'SSR App' },
+      ], 'spa')
+
+      const allWritten = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+      expect(allWritten).toContain('SPA App')
+      expect(allWritten).toContain('Client side.')
+      // Should NOT contain raw value as the display name (label takes precedence)
+      expect(allWritten).not.toContain('1. spa')
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+
+  it('select shows (? for help) suffix only when help.long is set', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+
+      // With help.long — should show suffix
+      inputMock.mockResolvedValueOnce('1')
+      const out1 = new InteractiveOutput()
+      await out1.select('Pick:', ['a', 'b'], 'a', { long: 'Detailed help text.' })
+      const written1 = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+      expect(written1).toContain('(? for help)')
+
+      // Reset
+      stdoutWrite.mockClear()
+
+      // Without help — should NOT show suffix
+      inputMock.mockResolvedValueOnce('1')
+      const out2 = new InteractiveOutput()
+      await out2.select('Pick:', ['a', 'b'], 'a')
+      const written2 = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+      expect(written2).not.toContain('(? for help)')
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+
+  it('typing ? prints long help and re-prompts', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      // First call returns ?, second returns valid input
+      inputMock.mockResolvedValueOnce('?')
+      inputMock.mockResolvedValueOnce('1')
+
+      const out = new InteractiveOutput()
+      const result = await out.select('Pick:', ['a', 'b'], 'a', { long: 'Here is detailed help.' })
+      expect(result).toBe('a')
+
+      const allWritten = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+      expect(allWritten).toContain('Here is detailed help.')
+      // input should have been called twice (? then valid)
+      expect(inputMock).toHaveBeenCalledTimes(2)
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+
+  it('typing ? with no long help prints "no additional help"', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      inputMock.mockResolvedValueOnce('?')
+      inputMock.mockResolvedValueOnce('1')
+
+      const out = new InteractiveOutput()
+      const result = await out.select('Pick:', ['a', 'b'], 'a')
+      expect(result).toBe('a')
+
+      const allWritten = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+      expect(allWritten).toContain('No additional help')
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+
+  it('multiSelect ? handling triggers help', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      inputMock.mockResolvedValueOnce('?')
+      inputMock.mockResolvedValueOnce('1')
+
+      const out = new InteractiveOutput()
+      const result = await out.multiSelect('Pick:', ['a', 'b'], ['a'], { long: 'Multi help text.' })
+      expect(result).toEqual(['a'])
+
+      const allWritten = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+      expect(allWritten).toContain('Multi help text.')
+      expect(inputMock).toHaveBeenCalledTimes(2)
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+
+  it('prompt prints dim short hint', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      inputMock.mockResolvedValueOnce('typed')
+
+      const out = new InteractiveOutput()
+      await out.prompt('Name:', 'default', { short: 'A hint.' })
+
+      const allWritten = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+      expect(allWritten).toContain('A hint.')
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+
+  it('confirm prints dim short hint', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+      const { confirm } = await import('@inquirer/prompts')
+      const confirmMock = vi.mocked(confirm)
+      confirmMock.mockResolvedValueOnce(true)
+
+      const out = new InteractiveOutput()
+      await out.confirm('Continue?', false, { short: 'Confirm hint.' })
+
+      const allWritten = stdoutWrite.mock.calls.map(c => String(c[0])).join('')
+      expect(allWritten).toContain('Confirm hint.')
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, configurable: true })
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true })
+    }
+  })
+})
+
+describe('InteractiveOutput — label text matching', () => {
+  beforeEach(() => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('select accepts label text input (case-insensitive)', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: true, configurable: true,
+      })
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: true, configurable: true,
+      })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      inputMock.mockResolvedValueOnce('Backend Service')
+
+      const out = new InteractiveOutput()
+      const result = await out.select('Pick:', [
+        { value: 'backend', label: 'Backend service' },
+        { value: 'frontend', label: 'Frontend app' },
+      ], 'frontend')
+      expect(result).toBe('backend')
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: originalStdoutIsTTY, configurable: true,
+      })
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalStdinIsTTY, configurable: true,
+      })
+    }
+  })
+
+  it('select prefers exact value match over label match', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: true, configurable: true,
+      })
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: true, configurable: true,
+      })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      inputMock.mockResolvedValueOnce('spa')
+
+      const out = new InteractiveOutput()
+      const result = await out.select('Pick:', [
+        { value: 'spa', label: 'SPA App' },
+        { value: 'ssr', label: 'SSR App' },
+      ], 'ssr')
+      // Should match as exact value, not fall through to label
+      expect(result).toBe('spa')
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: originalStdoutIsTTY, configurable: true,
+      })
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalStdinIsTTY, configurable: true,
+      })
+    }
+  })
+
+  it('multiSelect accepts label text input (case-insensitive)', async () => {
+    const originalStdinIsTTY = process.stdin.isTTY
+    const originalStdoutIsTTY = process.stdout.isTTY
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: true, configurable: true,
+      })
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: true, configurable: true,
+      })
+
+      const { input } = await import('@inquirer/prompts')
+      const inputMock = vi.mocked(input)
+      inputMock.mockResolvedValueOnce('Backend Service, Frontend app')
+
+      const out = new InteractiveOutput()
+      const result = await out.multiSelect('Pick:', [
+        { value: 'backend', label: 'Backend service' },
+        { value: 'frontend', label: 'Frontend app' },
+        { value: 'cli', label: 'CLI tool' },
+      ])
+      expect(result).toEqual(['backend', 'frontend'])
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: originalStdoutIsTTY, configurable: true,
+      })
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalStdinIsTTY, configurable: true,
+      })
+    }
   })
 })

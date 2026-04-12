@@ -13,6 +13,7 @@ const { mockOutput } = vi.hoisted(() => ({
     warn: vi.fn(),
     error: vi.fn(),
     result: vi.fn(),
+    supportsInteractivePrompts: vi.fn().mockReturnValue(false),
     prompt: vi.fn().mockResolvedValue(''),
     confirm: vi.fn().mockResolvedValue(false),
     select: vi.fn().mockResolvedValue(''),

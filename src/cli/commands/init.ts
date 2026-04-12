@@ -455,83 +455,93 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
                       : undefined
     const projectType = argv['project-type'] ?? detectedType
 
-    const result = await runWizard({
-      projectRoot,
-      auto: argv.auto ?? false,
-      force: argv.force ?? false,
-      methodology: argv.methodology,
-      projectType,
-      idea: argv.idea,
-      output,
-      depth: argv.depth,
-      adapters: argv.adapters as string[] | undefined,
-      traits: argv.traits as string[] | undefined,
-      // yargs `choices:` validates these at runtime, so the narrow casts at
-      // this CLI boundary are safe. See src/wizard/flags.ts for rationale.
-      gameFlags: hasGameFlag ? {
-        engine: argv.engine as GameFlags['engine'],
-        multiplayer: argv.multiplayer as GameFlags['multiplayer'],
-        targetPlatforms: argv['target-platforms'] as GameFlags['targetPlatforms'],
-        onlineServices: argv['online-services'] as GameFlags['onlineServices'],
-        contentStructure: argv['content-structure'] as GameFlags['contentStructure'],
-        economy: argv.economy as GameFlags['economy'],
-        narrative: argv.narrative as GameFlags['narrative'],
-        locales: argv.locales as GameFlags['locales'],
-        npcAi: argv['npc-ai'] as GameFlags['npcAi'],
-        modding: argv.modding,
-        persistence: argv.persistence as GameFlags['persistence'],
-      } : undefined,
-      webAppFlags: hasWebFlag ? {
-        webRendering: argv['web-rendering'] as WebAppFlags['webRendering'],
-        webDeployTarget: argv['web-deploy-target'] as WebAppFlags['webDeployTarget'],
-        webRealtime: argv['web-realtime'] as WebAppFlags['webRealtime'],
-        webAuthFlow: argv['web-auth-flow'] as WebAppFlags['webAuthFlow'],
-      } : undefined,
-      backendFlags: hasBackendFlag ? {
-        backendApiStyle: argv['backend-api-style'] as BackendFlags['backendApiStyle'],
-        backendDataStore: argv['backend-data-store'] as BackendFlags['backendDataStore'],
-        backendAuth: argv['backend-auth'] as BackendFlags['backendAuth'],
-        backendMessaging: argv['backend-messaging'] as BackendFlags['backendMessaging'],
-        backendDeployTarget: argv['backend-deploy-target'] as BackendFlags['backendDeployTarget'],
-      } : undefined,
-      cliFlags: hasCliTypeFlag ? {
-        cliInteractivity: argv['cli-interactivity'] as CliFlags['cliInteractivity'],
-        cliDistribution: argv['cli-distribution'] as CliFlags['cliDistribution'],
-        cliStructuredOutput: argv['cli-structured-output'],
-      } : undefined,
-      libraryFlags: hasLibFlag ? {
-        libVisibility: argv['lib-visibility'] as LibraryFlags['libVisibility'],
-        libRuntimeTarget: argv['lib-runtime-target'] as LibraryFlags['libRuntimeTarget'],
-        libBundleFormat: argv['lib-bundle-format'] as LibraryFlags['libBundleFormat'],
-        libTypeDefinitions: argv['lib-type-definitions'],
-        libDocLevel: argv['lib-doc-level'] as LibraryFlags['libDocLevel'],
-      } : undefined,
-      mobileAppFlags: hasMobileFlag ? {
-        mobilePlatform: argv['mobile-platform'] as MobileAppFlags['mobilePlatform'],
-        mobileDistribution: argv['mobile-distribution'] as MobileAppFlags['mobileDistribution'],
-        mobileOffline: argv['mobile-offline'] as MobileAppFlags['mobileOffline'],
-        mobilePushNotifications: argv['mobile-push-notifications'],
-      } : undefined,
-      dataPipelineFlags: hasPipelineFlag ? {
-        pipelineProcessing: argv['pipeline-processing'] as DataPipelineFlags['pipelineProcessing'],
-        pipelineOrchestration: argv['pipeline-orchestration'] as DataPipelineFlags['pipelineOrchestration'],
-        pipelineQuality: argv['pipeline-quality'] as DataPipelineFlags['pipelineQuality'],
-        pipelineSchema: argv['pipeline-schema'] as DataPipelineFlags['pipelineSchema'],
-        pipelineCatalog: argv['pipeline-catalog'],
-      } : undefined,
-      mlFlags: hasMlFlag ? {
-        mlPhase: argv['ml-phase'] as MlFlags['mlPhase'],
-        mlModelType: argv['ml-model-type'] as MlFlags['mlModelType'],
-        mlServing: argv['ml-serving'] as MlFlags['mlServing'],
-        mlExperimentTracking: argv['ml-experiment-tracking'],
-      } : undefined,
-      browserExtensionFlags: hasExtFlag ? {
-        extManifest: argv['ext-manifest'] as BrowserExtensionFlags['extManifest'],
-        extUiSurfaces: argv['ext-ui-surfaces'] as BrowserExtensionFlags['extUiSurfaces'],
-        extContentScript: argv['ext-content-script'],
-        extBackgroundWorker: argv['ext-background-worker'],
-      } : undefined,
-    })
+    let result: Awaited<ReturnType<typeof runWizard>>
+    try {
+      result = await runWizard({
+        projectRoot,
+        auto: argv.auto ?? false,
+        force: argv.force ?? false,
+        methodology: argv.methodology,
+        projectType,
+        idea: argv.idea,
+        output,
+        depth: argv.depth,
+        adapters: argv.adapters as string[] | undefined,
+        traits: argv.traits as string[] | undefined,
+        // yargs `choices:` validates these at runtime, so the narrow casts at
+        // this CLI boundary are safe. See src/wizard/flags.ts for rationale.
+        gameFlags: hasGameFlag ? {
+          engine: argv.engine as GameFlags['engine'],
+          multiplayer: argv.multiplayer as GameFlags['multiplayer'],
+          targetPlatforms: argv['target-platforms'] as GameFlags['targetPlatforms'],
+          onlineServices: argv['online-services'] as GameFlags['onlineServices'],
+          contentStructure: argv['content-structure'] as GameFlags['contentStructure'],
+          economy: argv.economy as GameFlags['economy'],
+          narrative: argv.narrative as GameFlags['narrative'],
+          locales: argv.locales as GameFlags['locales'],
+          npcAi: argv['npc-ai'] as GameFlags['npcAi'],
+          modding: argv.modding,
+          persistence: argv.persistence as GameFlags['persistence'],
+        } : undefined,
+        webAppFlags: hasWebFlag ? {
+          webRendering: argv['web-rendering'] as WebAppFlags['webRendering'],
+          webDeployTarget: argv['web-deploy-target'] as WebAppFlags['webDeployTarget'],
+          webRealtime: argv['web-realtime'] as WebAppFlags['webRealtime'],
+          webAuthFlow: argv['web-auth-flow'] as WebAppFlags['webAuthFlow'],
+        } : undefined,
+        backendFlags: hasBackendFlag ? {
+          backendApiStyle: argv['backend-api-style'] as BackendFlags['backendApiStyle'],
+          backendDataStore: argv['backend-data-store'] as BackendFlags['backendDataStore'],
+          backendAuth: argv['backend-auth'] as BackendFlags['backendAuth'],
+          backendMessaging: argv['backend-messaging'] as BackendFlags['backendMessaging'],
+          backendDeployTarget: argv['backend-deploy-target'] as BackendFlags['backendDeployTarget'],
+        } : undefined,
+        cliFlags: hasCliTypeFlag ? {
+          cliInteractivity: argv['cli-interactivity'] as CliFlags['cliInteractivity'],
+          cliDistribution: argv['cli-distribution'] as CliFlags['cliDistribution'],
+          cliStructuredOutput: argv['cli-structured-output'],
+        } : undefined,
+        libraryFlags: hasLibFlag ? {
+          libVisibility: argv['lib-visibility'] as LibraryFlags['libVisibility'],
+          libRuntimeTarget: argv['lib-runtime-target'] as LibraryFlags['libRuntimeTarget'],
+          libBundleFormat: argv['lib-bundle-format'] as LibraryFlags['libBundleFormat'],
+          libTypeDefinitions: argv['lib-type-definitions'],
+          libDocLevel: argv['lib-doc-level'] as LibraryFlags['libDocLevel'],
+        } : undefined,
+        mobileAppFlags: hasMobileFlag ? {
+          mobilePlatform: argv['mobile-platform'] as MobileAppFlags['mobilePlatform'],
+          mobileDistribution: argv['mobile-distribution'] as MobileAppFlags['mobileDistribution'],
+          mobileOffline: argv['mobile-offline'] as MobileAppFlags['mobileOffline'],
+          mobilePushNotifications: argv['mobile-push-notifications'],
+        } : undefined,
+        dataPipelineFlags: hasPipelineFlag ? {
+          pipelineProcessing: argv['pipeline-processing'] as DataPipelineFlags['pipelineProcessing'],
+          pipelineOrchestration: argv['pipeline-orchestration'] as DataPipelineFlags['pipelineOrchestration'],
+          pipelineQuality: argv['pipeline-quality'] as DataPipelineFlags['pipelineQuality'],
+          pipelineSchema: argv['pipeline-schema'] as DataPipelineFlags['pipelineSchema'],
+          pipelineCatalog: argv['pipeline-catalog'],
+        } : undefined,
+        mlFlags: hasMlFlag ? {
+          mlPhase: argv['ml-phase'] as MlFlags['mlPhase'],
+          mlModelType: argv['ml-model-type'] as MlFlags['mlModelType'],
+          mlServing: argv['ml-serving'] as MlFlags['mlServing'],
+          mlExperimentTracking: argv['ml-experiment-tracking'],
+        } : undefined,
+        browserExtensionFlags: hasExtFlag ? {
+          extManifest: argv['ext-manifest'] as BrowserExtensionFlags['extManifest'],
+          extUiSurfaces: argv['ext-ui-surfaces'] as BrowserExtensionFlags['extUiSurfaces'],
+          extContentScript: argv['ext-content-script'],
+          extBackgroundWorker: argv['ext-background-worker'],
+        } : undefined,
+      })
+    } catch (err) {
+      if (err instanceof Error && err.name === 'ExitPromptError') {
+        output.info('Cancelled.')
+        process.exit(130)
+        return
+      }
+      throw err
+    }
 
     if (!result.success) {
       for (const err of result.errors) {

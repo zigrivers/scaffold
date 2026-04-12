@@ -10,7 +10,7 @@ Scaffold is a composable meta-prompt pipeline built for [Claude Code](https://do
 
 Here's how it works:
 
-1. **Initialize** — run `scaffold init` in your project directory. The init wizard detects whether you're starting fresh (greenfield) or working with an existing codebase (brownfield), and lets you pick a methodology preset (deep, mvp, or custom).
+1. **Initialize** — run `scaffold init` in your project directory. The init wizard detects whether you're starting fresh (greenfield) or working with an existing codebase (brownfield), and lets you pick a methodology preset (deep, mvp, or custom). Every question shows inline descriptions and friendly labels — type `?` at any choice prompt for detailed help.
 
 2. **Run steps** — each step is a composable meta-prompt (a short intent declaration in `content/pipeline/`) that gets assembled at runtime into a full 7-section prompt. The assembly engine injects relevant knowledge base entries, project context from prior steps, methodology settings, and depth-appropriate instructions.
 
@@ -38,7 +38,7 @@ Either way, Scaffold constructs the prompt and the target AI tool does the work.
 
 **Depth scale** (1-5) — Controls how thorough each step's output is, from "focus on the core deliverable" (1) to "explore all angles, tradeoffs, and edge cases" (5). Depth resolves with 4-level precedence: CLI flag > step override > custom default > preset default.
 
-**Multi-model validation** — At depth 4-5, all 19 review and validation steps can dispatch independent reviews to Codex and/or Gemini CLIs. Two independent models catch more blind spots than one. When both CLIs are available, findings are reconciled by confidence level (both agree = high confidence, single model P0 = still actionable). Auth is verified before every dispatch (`codex login status`, `NO_BROWSER=true gemini -p "respond with ok"`). See the [Multi-Model Review](#multi-model-review) section.
+**Multi-model validation** — At depth 4-5, all 19 review and validation steps can dispatch independent reviews to Codex and/or Gemini CLIs. Two independent models catch more blind spots than one. When both CLIs are available, findings are reconciled by confidence level (both agree = high confidence, single model P0 = still actionable). When a channel is unavailable, a compensating Claude self-review pass runs in its place (labeled `[compensating: Codex-equivalent]` or `[compensating: Gemini-equivalent]`, single-source confidence). CLI commands must always run in the foreground — background execution produces empty output. See the [Multi-Model Review](#multi-model-review) section.
 
 **State management** — Pipeline progress is tracked in `.scaffold/state.json` with atomic file writes and crash recovery. An advisory lock prevents concurrent runs. Decisions are logged to an append-only `decisions.jsonl`.
 
@@ -217,7 +217,7 @@ git init
 scaffold init
 ```
 
-The init wizard detects that this is a brand new project and asks you to pick a methodology. Choose **mvp** if you want to get to working code fast — it runs only 7 critical steps instead of the full 60. You can always switch to `deep` or `custom` later.
+The init wizard detects that this is a brand new project and walks you through setup with friendly labels and inline descriptions for every option. Type `?` at any choice prompt for detailed guidance. Choose **mvp** if you want to get to working code fast — it runs only 7 critical steps instead of the full 60. You can always switch to `deep` or `custom` later.
 
 **Open Claude Code in your project directory**, then start talking:
 
@@ -931,12 +931,13 @@ mmr review --pr 47           ──→  Dispatches to all channels in background
                                    Agent continues working
 
 mmr status mmr-a1b2c3        ──→  Poll progress (which channels done?)
-                                   Exit code: 0=done, 1=running, 2=failed
+                                   Exit code: 0=done, 1=running, 4=failed
 
 mmr results mmr-a1b2c3       ──→  Reconcile findings across channels
+                                   Run compensating passes for unavailable channels
                                    Apply severity gate
                                    Output unified findings
-                                   Exit code: 0=passed, 1=gate failed
+                                   Exit code: 0=passed, 2=gate failed, 3=degraded
 ```
 
 **Key features:**
