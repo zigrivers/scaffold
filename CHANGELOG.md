@@ -2,6 +2,42 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.14.0] — 2026-04-12
+
+### Added
+- **Research project type** — scaffold's 10th project type, covering
+  autonomous and semi-autonomous experiment loops where an LLM agent (or
+  human-guided script) iterates through hypothesis → experiment → evaluation
+  cycles.
+  - **Three research domains** with deep knowledge bases: `quant-finance`
+    (trading strategy backtesting, risk metrics, market data), `ml-research`
+    (architecture search, ablation studies, experiment tracking), and
+    `simulation` (physics/materials parameter optimization, compute
+    management).
+  - **Four experiment drivers**: `code-driven` (agent edits source files),
+    `config-driven` (agent generates config files), `api-driven` (agent calls
+    experiment APIs), `notebook-driven` (agent edits notebooks).
+  - **Three interaction modes**: `autonomous` (run until interrupted),
+    `checkpoint-gated` (pause for human review), `human-guided` (human
+    decides, agent executes).
+  - **Smart wizard filtering** — `autonomous` mode is automatically hidden
+    when `notebook-driven` is selected (notebooks require human readability).
+  - **25 domain knowledge files** injected into 21 pipeline steps via the
+    overlay system.
+  - **Tiered project detection** for `scaffold adopt` — detects autoresearch
+    protocol files, trading/simulation/optimization framework deps, and
+    academic research artifacts (.tex, .bib, paper/).
+  - **CLI flags**: `--research-driver`, `--research-interaction`,
+    `--research-domain`, `--research-tracking`.
+- **Generic domain sub-overlay system** — project types can now define
+  domain-specific knowledge overlays that layer on top of the core type
+  overlay. The research type uses this for its three domains, but the
+  mechanism is reusable by future types. Sub-overlays are knowledge-only
+  (enforced at loader level).
+- **Shared detector signal library** — `ML_FRAMEWORK_DEPS` and
+  `EXPERIMENT_TRACKING_DEPS` extracted to `shared-signals.ts` for reuse
+  across ML and research detectors.
+
 ## [3.13.0] — 2026-04-12
 
 ### Added

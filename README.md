@@ -29,7 +29,7 @@ Either way, Scaffold constructs the prompt and the target AI tool does the work.
 
 **Assembly engine** — At execution time, Scaffold builds a 7-section prompt from: system metadata, the meta-prompt, knowledge base entries, project context (artifacts from prior steps), methodology settings, layered instructions, and depth-specific execution guidance.
 
-**Knowledge base** — 194 domain expertise entries in `content/knowledge/` organized in sixteen categories (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension) covering testing strategy, domain modeling, API design, security best practices, eval craft, TDD execution, task claiming, worktree management, release management, rendering strategies, data stores, CLI patterns, game engines, library bundling, mobile deployment, batch and streaming pipelines, model training and serving, browser extension manifests and service workers, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
+**Knowledge base** — 222 domain expertise entries in `content/knowledge/` organized in seventeen categories (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research) covering testing strategy, domain modeling, API design, security best practices, eval craft, TDD execution, task claiming, worktree management, release management, rendering strategies, data stores, CLI patterns, game engines, library bundling, mobile deployment, batch and streaming pipelines, model training and serving, browser extension manifests and service workers, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
 
 **Methodology presets** — Three built-in presets control which steps run and how deep the analysis goes:
 - **deep** (depth 5) — all steps enabled, exhaustive analysis
@@ -368,7 +368,7 @@ Every `scaffold init` wizard question can be answered via CLI flags, making scaf
 | `--depth` | 1-5 | Custom methodology depth (requires `--methodology custom`) |
 | `--adapters` | comma-sep | AI adapters: claude-code, codex, gemini |
 | `--traits` | comma-sep | Project traits: web, mobile |
-| `--project-type` | string | web-app, mobile-app, backend, cli, library, game, data-pipeline, ml, browser-extension |
+| `--project-type` | string | web-app, mobile-app, backend, cli, library, game, data-pipeline, ml, browser-extension, research |
 | `--auto` | boolean | Non-interactive mode (uses Zod defaults for unset flags) |
 
 #### Web-App Config Flags (require `--project-type web-app` or auto-set it)
@@ -445,6 +445,15 @@ Every `scaffold init` wizard question can be answered via CLI flags, making scaf
 | `--ext-content-script` | boolean | `--ext-content-script` / `--no-ext-content-script` |
 | `--ext-background-worker` | boolean | `--ext-background-worker` / `--no-ext-background-worker` |
 
+#### Research Config Flags (require `--project-type research` or auto-set it)
+
+| Flag | Type | Values |
+|------|------|--------|
+| `--research-driver` | string | code-driven, config-driven, api-driven, notebook-driven |
+| `--research-interaction` | string | autonomous, checkpoint-gated, human-guided |
+| `--research-domain` | string | none, quant-finance, ml-research, simulation |
+| `--research-tracking` | boolean | `--research-tracking` / `--no-research-tracking` |
+
 #### Game Config Flags (require `--project-type game` or auto-set it)
 
 | Flag | Type | Values |
@@ -467,9 +476,9 @@ Every `scaffold init` wizard question can be answered via CLI flags, making scaf
 
 - **Flag > auto > interactive**: Flags always take highest precedence. `--auto --engine unreal` uses defaults for everything except engine.
 - **Partial flags + interactive**: Provide some flags and the wizard asks only the remaining questions. `scaffold init --project-type game --engine unreal` prompts interactively for multiplayer, platforms, etc.
-- **Type-specific flags auto-set project type**: `--engine unity` automatically sets `--project-type game`, `--web-rendering ssr` sets `--project-type web-app`, `--backend-api-style rest` sets `--project-type backend`, `--cli-interactivity hybrid` sets `--project-type cli`, `--lib-visibility public` sets `--project-type library`, `--mobile-platform ios` sets `--project-type mobile-app`, `--pipeline-processing batch` sets `--project-type data-pipeline`, `--ml-phase training` sets `--project-type ml`, `--ext-manifest 3` sets `--project-type browser-extension`. Error if conflicting type.
-- **Cannot mix flag families**: `--web-rendering ssr --backend-api-style rest` is an error. Each flag family (`--web-*`, `--backend-*`, `--cli-*`, `--lib-*`, `--mobile-*`, `--pipeline-*`, `--ml-*`, `--ext-*`, game) is exclusive.
-- **Validation**: `--depth` requires `--methodology custom`. `--online-services` requires `--multiplayer online` or `hybrid`. SSR/hybrid rendering is incompatible with static deploy target. Session auth requires server state (not static). ML inference projects must specify a serving pattern. Browser extensions must declare at least one capability (UI surface, content script, or background worker).
+- **Type-specific flags auto-set project type**: `--engine unity` automatically sets `--project-type game`, `--web-rendering ssr` sets `--project-type web-app`, `--backend-api-style rest` sets `--project-type backend`, `--cli-interactivity hybrid` sets `--project-type cli`, `--lib-visibility public` sets `--project-type library`, `--mobile-platform ios` sets `--project-type mobile-app`, `--pipeline-processing batch` sets `--project-type data-pipeline`, `--ml-phase training` sets `--project-type ml`, `--ext-manifest 3` sets `--project-type browser-extension`, `--research-driver code-driven` sets `--project-type research`. Error if conflicting type.
+- **Cannot mix flag families**: `--web-rendering ssr --backend-api-style rest` is an error. Each flag family (`--web-*`, `--backend-*`, `--cli-*`, `--lib-*`, `--mobile-*`, `--pipeline-*`, `--ml-*`, `--research-*`, `--ext-*`, game) is exclusive.
+- **Validation**: `--depth` requires `--methodology custom`. `--online-services` requires `--multiplayer online` or `hybrid`. SSR/hybrid rendering is incompatible with static deploy target. Session auth requires server state (not static). ML inference projects must specify a serving pattern. Browser extensions must declare at least one capability (UI surface, content script, or background worker). Notebook-driven research cannot be fully autonomous.
 
 #### CI Examples
 
@@ -550,6 +559,16 @@ scaffold init --auto --methodology mvp --project-type browser-extension \
   --ext-manifest 3 --ext-ui-surfaces devtools \
   --no-ext-content-script
 
+# Autonomous quant-finance research (trading strategy optimization)
+scaffold init --auto --methodology deep --project-type research \
+  --research-driver code-driven --research-interaction autonomous \
+  --research-domain quant-finance
+
+# Checkpoint-gated ML architecture search
+scaffold init --auto --methodology deep --project-type research \
+  --research-driver config-driven --research-interaction checkpoint-gated \
+  --research-domain ml-research
+
 # Multiplayer mobile game with Unity
 scaffold init --project-type game --methodology deep --auto \
   --engine unity --multiplayer online --target-platforms ios,android \
@@ -576,7 +595,7 @@ Scaffold supports **project-type overlays** — domain-specific knowledge and pi
 
 - **Injects domain knowledge** into existing pipeline steps (e.g., SSR caching strategies into `tech-stack`, API pagination patterns into `coding-standards`)
 
-The game overlay additionally adjusts step enablement, remaps artifact references, and adds dependency overrides (because game development has fundamentally different artifacts). The web-app, backend, CLI, library, mobile-app, data-pipeline, ML, and browser-extension overlays are **knowledge-only** — they inject domain expertise into existing steps without changing which steps run or how they depend on each other.
+The game overlay additionally adjusts step enablement, remaps artifact references, and adds dependency overrides (because game development has fundamentally different artifacts). The web-app, backend, CLI, library, mobile-app, data-pipeline, ML, browser-extension, and research overlays are **knowledge-only** — they inject domain expertise into existing steps without changing which steps run or how they depend on each other. The research type additionally supports **domain sub-overlays** (quant-finance, ml-research, simulation) that layer domain-specific knowledge on top of the core research overlay.
 
 Overlays are composable with methodology presets. An MVP web-app gets fewer steps at lower depth; a deep backend project gets exhaustive analysis of every architectural decision.
 
@@ -590,6 +609,7 @@ Overlays are composable with methodology presets. An MVP web-app gets fewer step
 | `data-pipeline` | `data-pipeline-overlay.yml` | 12 entries (architecture, batch and streaming patterns, orchestration, schema management, quality, testing, security) | Processing model, orchestration, data quality strategy, schema management, data catalog |
 | `ml` | `ml-overlay.yml` | 12 entries (architecture, training and serving patterns, experiment tracking, model evaluation, observability, testing, security) | Project phase, model type, serving pattern, experiment tracking |
 | `browser-extension` | `browser-extension-overlay.yml` | 12 entries (architecture, manifest configuration, service workers, content scripts, cross-browser, store submission, testing, security) | Manifest version, UI surfaces, content script, background worker |
+| `research` | `research-overlay.yml` + domain sub-overlays | 25 entries (experiment loop, tracking, overfitting prevention, backtesting, risk metrics, architecture search, simulation) | Experiment driver, interaction mode, domain, experiment tracking |
 | `game` | `game-overlay.yml` | 24 entries (engines, networking, audio, VR/AR, economy, save systems, certification) | Engine, multiplayer, platforms, economy, narrative, and 6 more |
 
 ### Game Development
@@ -675,7 +695,7 @@ These answers control which conditional steps activate. A single-player puzzle g
 
 #### Multi-type Detection
 
-`scaffold adopt` detects 9 project types from manifest files and directory layouts:
+`scaffold adopt` detects 10 project types from manifest files and directory layouts:
 
 | Type | Key Signals |
 |------|-------------|
@@ -688,6 +708,7 @@ These answers control which conditional steps activate. A single-player puzzle g
 | `data-pipeline` | `dags/` dir, Airflow/Prefect/Dagster deps, Spark configs |
 | `ml` | `training/`/`models/` dirs, PyTorch/TensorFlow deps, MLflow configs |
 | `browser-extension` | `manifest.json` with `manifest_version` field |
+| `research` | `program.md` + `results.tsv`, backtest/strategy files with trading deps, optimization deps + experiment dirs, simulation framework deps |
 
 Each detector returns a confidence tier (high/medium/low) with evidence trails. Override detection with `--project-type <type>`.
 
@@ -1316,7 +1337,7 @@ scaffold dashboard
 
 ## Knowledge System
 
-Scaffold ships with 194 domain expertise entries organized in sixteen categories:
+Scaffold ships with 222 domain expertise entries organized in sixteen categories:
 
 - **core/** (26 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, design system tokens, user story innovation, AI memory management, coding conventions, tech stack selection, project structure patterns, task tracking, CLAUDE.md patterns, multi-model review dispatch, review step template, dev environment, git workflow patterns, automated review tooling, vision craft
 - **product/** (5 entries) — PRD craft, PRD innovation, gap analysis, vision craft, vision innovation
@@ -1334,6 +1355,7 @@ Scaffold ships with 194 domain expertise entries organized in sixteen categories
 - **data-pipeline/** (12 entries) — batch/streaming/hybrid patterns, orchestration (DAG/event-driven/scheduled), data quality, schema management, lineage, pipeline testing
 - **ml/** (12 entries) — training and inference patterns, model types (classical/deep-learning/llm), serving patterns, experiment tracking, model evaluation, MLOps observability
 - **browser-extension/** (12 entries) — Manifest V3, content scripts, service workers, cross-browser compatibility, extension security, store submission
+- **research/** (25 entries) — experiment loop architecture, parameter optimization, overfitting prevention, experiment tracking, security/sandboxing; domain knowledge for quant-finance (backtesting, risk metrics, market data, strategy patterns), ML-research (architecture search, ablation studies, evaluation), and simulation (engine integration, parameter spaces, compute management)
 
 Each pipeline step declares which knowledge entries it needs in its frontmatter. The assembly engine injects them automatically. Knowledge files with a `## Deep Guidance` section are optimized for the CLI — only the deep guidance content is loaded into the assembled prompt, skipping the summary to avoid redundancy with the prompt text.
 
@@ -1540,7 +1562,7 @@ All build inputs live under `content/`:
 content/
 ├── pipeline/         # 60 meta-prompts organized by 16 phases (phases 0-15, including build)
 ├── tools/            # 10 tool meta-prompts (stateless, category: tool)
-├── knowledge/        # 194 domain expertise entries (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension)
+├── knowledge/        # 222 domain expertise entries (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension)
 ├── methodology/      # 3 YAML presets (deep, mvp, custom)
 └── skills/           # Skill templates with {{markers}} for multi-platform resolution (includes mmr)
 ```
