@@ -2,6 +2,45 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.12.0] — 2026-04-12
+
+### Added
+- **Wizard helper text** — every `scaffold init` prompt now shows inline
+  descriptions so users understand exactly what they're choosing.
+  - **Per-option descriptions** on all `select`/`multiSelect` prompts with
+    friendly labels (e.g., "Single-page app (SPA)" instead of raw `spa`) and
+    hanging-indent one-line explanations beneath each option.
+  - **`?` for long help** — typing `?` at any choice prompt shows a paragraph
+    of recommendation/consequence guidance, then re-renders the options.
+  - **Dim short hints** above `prompt`/`confirm`/`multiInput` calls when the
+    question benefits from a one-line explanation.
+  - **First-prompt banner** — "Tip: Type ? at any choice prompt to see help."
+    appears once before the first select, suppressed in auto/non-interactive
+    modes.
+  - **Type-safe copy system** — helper text lives in `src/wizard/copy/` (one
+    file per project type), derived from Zod config schemas via a
+    `QuestionCopy<TValue>` conditional type. Adding an enum value to a schema
+    without matching copy is a compile error.
+  - **Label text accepted as input** — users can type the displayed label
+    (case-insensitive) instead of the raw enum value.
+
+### Fixed
+- **`NO_COLOR` no longer disables interactivity** — previously, setting
+  `NO_COLOR=1` silently skipped all prompts and used defaults. Now it only
+  strips ANSI color codes, per the [no-color.org](https://no-color.org/) spec.
+- **Piped stdin no longer crashes the wizard** — `isTTY()` was only checking
+  stdout; now `canPrompt()` checks both stdin and stdout before entering
+  interactive mode.
+- **`select()` trims input before matching** — trailing whitespace (e.g.,
+  `'spa '`) no longer causes silent fallback to the default.
+- **`select()`/`multiSelect()` re-prompt on invalid input** — previously
+  returned the default silently; now prints an error and re-prompts.
+- **`multiSelect()` warns on partial invalid input** — mixed valid/invalid
+  entries (e.g., `1, banana, 2`) now print "Ignored unrecognized: banana"
+  instead of silently dropping the bad entry.
+- **Ctrl-C exits cleanly** — `init` now catches `ExitPromptError` and exits
+  with code 130 and a "Cancelled." message instead of dumping a stack trace.
+
 ## [3.11.0] — 2026-04-11
 
 ### Added

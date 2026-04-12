@@ -10,7 +10,7 @@ Scaffold is a composable meta-prompt pipeline built for [Claude Code](https://do
 
 Here's how it works:
 
-1. **Initialize** — run `scaffold init` in your project directory. The init wizard detects whether you're starting fresh (greenfield) or working with an existing codebase (brownfield), and lets you pick a methodology preset (deep, mvp, or custom).
+1. **Initialize** — run `scaffold init` in your project directory. The init wizard detects whether you're starting fresh (greenfield) or working with an existing codebase (brownfield), and lets you pick a methodology preset (deep, mvp, or custom). Every question shows inline descriptions and friendly labels — type `?` at any choice prompt for detailed help.
 
 2. **Run steps** — each step is a composable meta-prompt (a short intent declaration in `content/pipeline/`) that gets assembled at runtime into a full 7-section prompt. The assembly engine injects relevant knowledge base entries, project context from prior steps, methodology settings, and depth-appropriate instructions.
 
@@ -217,7 +217,7 @@ git init
 scaffold init
 ```
 
-The init wizard detects that this is a brand new project and asks you to pick a methodology. Choose **mvp** if you want to get to working code fast — it runs only 7 critical steps instead of the full 60. You can always switch to `deep` or `custom` later.
+The init wizard detects that this is a brand new project and walks you through setup with friendly labels and inline descriptions for every option. Type `?` at any choice prompt for detailed guidance. Choose **mvp** if you want to get to working code fast — it runs only 7 critical steps instead of the full 60. You can always switch to `deep` or `custom` later.
 
 **Open Claude Code in your project directory**, then start talking:
 
