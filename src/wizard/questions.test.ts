@@ -872,6 +872,63 @@ describe('ml wizard questions', () => {
   })
 })
 
+describe('research wizard questions', () => {
+  it('throws in auto mode without required --research-driver', async () => {
+    const output = makeOutputContext()
+
+    await expect(askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'research',
+      researchFlags: {},
+    })).rejects.toThrow('--research-driver is required')
+  })
+
+  it('auto mode with all flags returns matching researchConfig', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'research',
+      researchFlags: {
+        researchDriver: 'api-driven',
+        researchInteraction: 'autonomous',
+        researchDomain: 'quant-finance',
+        researchTracking: false,
+      },
+    })
+    expect(answers.researchConfig).toEqual({
+      experimentDriver: 'api-driven',
+      interactionMode: 'autonomous',
+      domain: 'quant-finance',
+      hasExperimentTracking: false,
+    })
+    // No interactive calls in auto mode
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.confirm).not.toHaveBeenCalled()
+  })
+
+  it('auto mode with only --research-driver uses defaults for remaining fields', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'research',
+      researchFlags: { researchDriver: 'code-driven' },
+    })
+    expect(answers.researchConfig).toEqual({
+      experimentDriver: 'code-driven',
+      interactionMode: 'checkpoint-gated',
+      domain: 'none',
+      hasExperimentTracking: true,
+    })
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.confirm).not.toHaveBeenCalled()
+  })
+})
+
 describe('browser-extension wizard questions', () => {
   it('uses flag values when all flags provided (skips prompts)', async () => {
     const output = makeOutputContext()

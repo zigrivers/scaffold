@@ -3,6 +3,7 @@ import {
   PROJECT_TYPE_FLAG,
   GAME_FLAGS, WEB_FLAGS, BACKEND_FLAGS, CLI_TYPE_FLAGS,
   LIB_FLAGS, MOBILE_FLAGS, PIPELINE_FLAGS, ML_FLAGS, EXT_FLAGS,
+  RESEARCH_FLAGS,
   applyFlagFamilyValidation,
   buildFlagOverrides,
 } from './init-flag-families.js'
@@ -144,6 +145,37 @@ describe('applyFlagFamilyValidation', () => {
     expect(() => applyFlagFamilyValidation(argv))
       .toThrow(/Session auth requires server state/)
   })
+
+  // -------------------------------------------------------------------------
+  // Research flags
+  // -------------------------------------------------------------------------
+
+  it('rejects --research-driver with --project-type ml (type consistency)', () => {
+    const argv = { 'project-type': 'ml', 'research-driver': 'code-driven' }
+    expect(() => applyFlagFamilyValidation(argv))
+      .toThrow(/--research-\* flags require --project-type research/)
+  })
+
+  it('rejects notebook-driven + autonomous (cross-field)', () => {
+    const argv = {
+      'project-type': 'research',
+      'research-driver': 'notebook-driven',
+      'research-interaction': 'autonomous',
+    }
+    expect(() => applyFlagFamilyValidation(argv))
+      .toThrow(/Notebook-driven execution cannot be fully autonomous/)
+  })
+
+  it('rejects mixing --research-driver and --ml-phase (mixed family)', () => {
+    const argv = { 'research-driver': 'code-driven', 'ml-phase': 'training' }
+    expect(() => applyFlagFamilyValidation(argv))
+      .toThrow(/Cannot mix flags from multiple project types/)
+  })
+
+  it('accepts valid --research-driver code-driven with --project-type research', () => {
+    const argv = { 'project-type': 'research', 'research-driver': 'code-driven' }
+    expect(() => applyFlagFamilyValidation(argv)).not.toThrow()
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -263,6 +295,25 @@ describe('buildFlagOverrides', () => {
     })
   })
 
+  it('returns research partial', () => {
+    const argv = {
+      'research-driver': 'code-driven',
+      'research-interaction': 'checkpoint-gated',
+      'research-domain': 'ml-research',
+      'research-tracking': true,
+    }
+    const result = buildFlagOverrides(argv)
+    expect(result).toEqual({
+      type: 'research',
+      partial: {
+        experimentDriver: 'code-driven',
+        interactionMode: 'checkpoint-gated',
+        domain: 'ml-research',
+        hasExperimentTracking: true,
+      },
+    })
+  })
+
   it('omits fields for flags not passed', () => {
     // Only --engine passed, no --multiplayer, --locales, etc.
     const result = buildFlagOverrides({ engine: 'unity' } as Record<string, unknown>)
@@ -339,6 +390,12 @@ describe('flag family type preservation (as const survives extraction)', () => {
   it('EXT_FLAGS[number] narrows to literal union', () => {
     expectTypeOf<typeof EXT_FLAGS[number]>().toEqualTypeOf<
       'ext-manifest' | 'ext-ui-surfaces' | 'ext-content-script' | 'ext-background-worker'
+    >()
+  })
+
+  it('RESEARCH_FLAGS[number] narrows to literal union', () => {
+    expectTypeOf<typeof RESEARCH_FLAGS[number]>().toEqualTypeOf<
+      'research-driver' | 'research-interaction' | 'research-domain' | 'research-tracking'
     >()
   })
 })

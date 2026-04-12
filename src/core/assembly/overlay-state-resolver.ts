@@ -100,6 +100,8 @@ export function resolveOverlayState(options: {
                 const toAppend = overrides.append ?? []
                 overlayKnowledge[step] = [...overlayKnowledge[step], ...toAppend]
               }
+              // else: sub-overlay references a step not in the pipeline — silently skip
+              // (common when domain overlays target optional steps that aren't enabled)
             }
           }
         }

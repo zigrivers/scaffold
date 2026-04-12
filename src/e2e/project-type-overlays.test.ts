@@ -1662,4 +1662,26 @@ describe('research overlay integration', () => {
     expect(state.knowledge['tdd']).not.toContain('research-quant-backtesting')
     expect(state.knowledge['operations']).not.toContain('research-quant-metrics')
   })
+
+  it('ml-research domain knowledge appended after core', async () => {
+    const state = await resolveResearchOverlay({ experimentDriver: 'code-driven', domain: 'ml-research' })
+    // Core knowledge present
+    expect(state.knowledge['system-architecture']).toContain('research-architecture')
+    // ML-research domain knowledge present
+    expect(state.knowledge['system-architecture']).toContain('research-ml-architecture-search')
+    // Domain after core
+    const sysArch = state.knowledge['system-architecture']
+    expect(sysArch.indexOf('research-ml-architecture-search')).toBeGreaterThan(sysArch.indexOf('research-architecture'))
+  })
+
+  it('simulation domain knowledge appended after core', async () => {
+    const state = await resolveResearchOverlay({ experimentDriver: 'code-driven', domain: 'simulation' })
+    // Core knowledge present
+    expect(state.knowledge['system-architecture']).toContain('research-architecture')
+    // Simulation domain knowledge present
+    expect(state.knowledge['system-architecture']).toContain('research-sim-engine-patterns')
+    // Domain after core
+    const sysArch = state.knowledge['system-architecture']
+    expect(sysArch.indexOf('research-sim-engine-patterns')).toBeGreaterThan(sysArch.indexOf('research-architecture'))
+  })
 })
