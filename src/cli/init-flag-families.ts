@@ -21,6 +21,7 @@ import type {
   DataPipelineConfigSchema,
   MlConfigSchema,
   BrowserExtensionConfigSchema,
+  ResearchConfigSchema,
 } from '../config/schema.js'
 
 // Local type aliases keep the `buildFlagOverrides` cast sites readable
@@ -34,6 +35,7 @@ type MobileAppConfig = z.infer<typeof MobileAppConfigSchema>
 type DataPipelineConfig = z.infer<typeof DataPipelineConfigSchema>
 type MlConfig = z.infer<typeof MlConfigSchema>
 type BrowserExtensionConfig = z.infer<typeof BrowserExtensionConfigSchema>
+type ResearchConfig = z.infer<typeof ResearchConfigSchema>
 
 // ---------------------------------------------------------------------------
 // Flag family constants (verbatim from init.ts)
@@ -77,6 +79,9 @@ export const PIPELINE_FLAGS = [
 ] as const
 export const ML_FLAGS = ['ml-phase', 'ml-model-type', 'ml-serving', 'ml-experiment-tracking'] as const
 export const EXT_FLAGS = ['ext-manifest', 'ext-ui-surfaces', 'ext-content-script', 'ext-background-worker'] as const
+export const RESEARCH_FLAGS = [
+  'research-driver', 'research-interaction', 'research-domain', 'research-tracking',
+] as const
 
 // ---------------------------------------------------------------------------
 // Discriminated-union payload for adopt's merge pipeline
@@ -92,6 +97,7 @@ export type PartialConfigOverrides =
   | { type: 'data-pipeline'; partial: Partial<DataPipelineConfig> }
   | { type: 'ml'; partial: Partial<MlConfig> }
   | { type: 'browser-extension'; partial: Partial<BrowserExtensionConfig> }
+  | { type: 'research'; partial: Partial<ResearchConfig> }
   | undefined
 
 // ---------------------------------------------------------------------------
@@ -123,6 +129,7 @@ function detectFamily(
   | 'data-pipeline'
   | 'ml'
   | 'browser-extension'
+  | 'research'
   | undefined {
   if (GAME_FLAGS.some((f) => argv[f] !== undefined)) return 'game'
   if (WEB_FLAGS.some((f) => argv[f] !== undefined)) return 'web-app'
@@ -133,6 +140,7 @@ function detectFamily(
   if (PIPELINE_FLAGS.some((f) => argv[f] !== undefined)) return 'data-pipeline'
   if (ML_FLAGS.some((f) => argv[f] !== undefined)) return 'ml'
   if (EXT_FLAGS.some((f) => argv[f] !== undefined)) return 'browser-extension'
+  if (RESEARCH_FLAGS.some((f) => argv[f] !== undefined)) return 'research'
   return undefined
 }
 
@@ -206,12 +214,14 @@ export function applyFlagFamilyValidation(argv: Record<string, unknown>): true |
   const hasPipelineFlag = PIPELINE_FLAGS.some((f) => argv[f] !== undefined)
   const hasMlFlag = ML_FLAGS.some((f) => argv[f] !== undefined)
   const hasExtFlag = EXT_FLAGS.some((f) => argv[f] !== undefined)
+  const hasResearchFlag = RESEARCH_FLAGS.some((f) => argv[f] !== undefined)
 
   // Reject mixed-family flags
   const typeCount = [
     hasGameFlag, hasWebFlag, hasBackendFlag,
     hasCliFlag, hasLibFlag, hasMobileFlag,
     hasPipelineFlag, hasMlFlag, hasExtFlag,
+    hasResearchFlag,
   ].filter(Boolean).length
   if (typeCount > 1) {
     throw new Error(
@@ -244,6 +254,13 @@ export function applyFlagFamilyValidation(argv: Record<string, unknown>): true |
   }
   if (hasExtFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'browser-extension') {
     throw new Error('--ext-* flags require --project-type browser-extension')
+  }
+  if (hasResearchFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'research') {
+    throw new Error('--research-* flags require --project-type research')
+  }
+  // Cross-field: notebook-driven + autonomous
+  if (argv['research-driver'] === 'notebook-driven' && argv['research-interaction'] === 'autonomous') {
+    throw new Error('Notebook-driven execution cannot be fully autonomous')
   }
 
   // CSV enum validation for array flags
@@ -503,6 +520,22 @@ export function buildFlagOverrides(argv: Record<string, unknown>): PartialConfig
       partial.hasBackgroundWorker = argv['ext-background-worker'] as boolean
     }
     return { type: 'browser-extension', partial }
+  }
+  case 'research': {
+    const partial: Partial<ResearchConfig> = {}
+    if (argv['research-driver'] !== undefined) {
+      partial.experimentDriver = argv['research-driver'] as ResearchConfig['experimentDriver']
+    }
+    if (argv['research-interaction'] !== undefined) {
+      partial.interactionMode = argv['research-interaction'] as ResearchConfig['interactionMode']
+    }
+    if (argv['research-domain'] !== undefined) {
+      partial.domain = argv['research-domain'] as ResearchConfig['domain']
+    }
+    if (argv['research-tracking'] !== undefined) {
+      partial.hasExperimentTracking = argv['research-tracking'] as boolean
+    }
+    return { type: 'research', partial }
   }
   default:
     return undefined

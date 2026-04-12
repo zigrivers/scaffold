@@ -9,11 +9,12 @@ import { coerceCSV } from '../utils/coerce.js'
 import {
   GAME_FLAGS, WEB_FLAGS, BACKEND_FLAGS, CLI_TYPE_FLAGS,
   LIB_FLAGS, MOBILE_FLAGS, PIPELINE_FLAGS, ML_FLAGS, EXT_FLAGS,
-  applyFlagFamilyValidation,
+  RESEARCH_FLAGS, applyFlagFamilyValidation,
 } from '../init-flag-families.js'
 import type {
   GameFlags, WebAppFlags, BackendFlags, CliFlags, LibraryFlags,
   MobileAppFlags, DataPipelineFlags, MlFlags, BrowserExtensionFlags,
+  ResearchFlags,
 } from '../../wizard/flags.js'
 
 interface InitArgs {
@@ -81,6 +82,11 @@ interface InitArgs {
   'ext-ui-surfaces'?: string[]
   'ext-content-script'?: boolean
   'ext-background-worker'?: boolean
+  // Research flags
+  'research-driver'?: string
+  'research-interaction'?: string
+  'research-domain'?: string
+  'research-tracking'?: boolean
 }
 
 const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
@@ -297,6 +303,26 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         type: 'boolean',
         describe: 'Background worker support',
       })
+      // Research Configuration
+      .option('research-driver', {
+        type: 'string',
+        describe: 'Experiment driver',
+        choices: ['code-driven', 'config-driven', 'api-driven', 'notebook-driven'] as const,
+      })
+      .option('research-interaction', {
+        type: 'string',
+        describe: 'Interaction mode',
+        choices: ['autonomous', 'checkpoint-gated', 'human-guided'] as const,
+      })
+      .option('research-domain', {
+        type: 'string',
+        describe: 'Research domain',
+        choices: ['none', 'quant-finance', 'ml-research', 'simulation'] as const,
+      })
+      .option('research-tracking', {
+        type: 'boolean',
+        describe: 'Experiment tracking',
+      })
       // Game configuration options
       .option('engine', {
         type: 'string',
@@ -405,6 +431,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       .group([...PIPELINE_FLAGS], 'Data Pipeline Configuration:')
       .group([...ML_FLAGS], 'ML Configuration:')
       .group([...EXT_FLAGS], 'Browser Extension Configuration:')
+      .group([...RESEARCH_FLAGS], 'Research Configuration:')
       .group([
         'game-engine', 'game-multiplayer', 'game-target-platforms', 'game-online-services',
         'game-content-structure', 'game-economy', 'game-narrative', 'game-locales',
@@ -433,6 +460,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
     const hasPipelineFlag = PIPELINE_FLAGS.some((f) => argv[f] !== undefined)
     const hasMlFlag = ML_FLAGS.some((f) => argv[f] !== undefined)
     const hasExtFlag = EXT_FLAGS.some((f) => argv[f] !== undefined)
+    const hasResearchFlag = RESEARCH_FLAGS.some((f) => argv[f] !== undefined)
 
     const detectedType = hasGameFlag
       ? 'game'
@@ -452,7 +480,9 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
                     ? 'ml'
                     : hasExtFlag
                       ? 'browser-extension'
-                      : undefined
+                      : hasResearchFlag
+                        ? 'research'
+                        : undefined
     const projectType = argv['project-type'] ?? detectedType
 
     let result: Awaited<ReturnType<typeof runWizard>>
@@ -532,6 +562,12 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
           extUiSurfaces: argv['ext-ui-surfaces'] as BrowserExtensionFlags['extUiSurfaces'],
           extContentScript: argv['ext-content-script'],
           extBackgroundWorker: argv['ext-background-worker'],
+        } : undefined,
+        researchFlags: hasResearchFlag ? {
+          researchDriver: argv['research-driver'] as ResearchFlags['researchDriver'],
+          researchInteraction: argv['research-interaction'] as ResearchFlags['researchInteraction'],
+          researchDomain: argv['research-domain'] as ResearchFlags['researchDomain'],
+          researchTracking: argv['research-tracking'],
         } : undefined,
       })
     } catch (err) {

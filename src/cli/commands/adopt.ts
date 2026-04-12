@@ -15,7 +15,7 @@ import { ProjectTypeSchema } from '../../config/schema.js'
 import { coerceCSV } from '../utils/coerce.js'
 import {
   LIB_FLAGS, MOBILE_FLAGS, PIPELINE_FLAGS, ML_FLAGS, EXT_FLAGS,
-  applyFlagFamilyValidation, buildFlagOverrides,
+  RESEARCH_FLAGS, applyFlagFamilyValidation, buildFlagOverrides,
 } from '../init-flag-families.js'
 import type { ProjectType } from '../../types/index.js'
 import { asScaffoldError } from '../../utils/errors.js'
@@ -337,6 +337,26 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
         type: 'boolean',
         describe: 'Background worker support',
       })
+      // Research Configuration
+      .option('research-driver', {
+        type: 'string',
+        describe: 'Experiment driver',
+        choices: ['code-driven', 'config-driven', 'api-driven', 'notebook-driven'] as const,
+      })
+      .option('research-interaction', {
+        type: 'string',
+        describe: 'Interaction mode',
+        choices: ['autonomous', 'checkpoint-gated', 'human-guided'] as const,
+      })
+      .option('research-domain', {
+        type: 'string',
+        describe: 'Research domain',
+        choices: ['none', 'quant-finance', 'ml-research', 'simulation'] as const,
+      })
+      .option('research-tracking', {
+        type: 'boolean',
+        describe: 'Experiment tracking',
+      })
       // Game configuration options
       .option('engine', {
         type: 'string',
@@ -419,6 +439,7 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
       .group([...PIPELINE_FLAGS], 'Data Pipeline Configuration:')
       .group([...ML_FLAGS], 'ML Configuration:')
       .group([...EXT_FLAGS], 'Browser Extension Configuration:')
+      .group([...RESEARCH_FLAGS], 'Research Configuration:')
       .group([
         'game-engine', 'game-multiplayer', 'game-target-platforms', 'game-online-services',
         'game-content-structure', 'game-economy', 'game-narrative', 'game-locales',
