@@ -3,10 +3,12 @@ import type {
   ProjectType, GameConfig, WebAppConfig, BackendConfig,
   CliConfig, LibraryConfig, MobileAppConfig,
   DataPipelineConfig, MlConfig, BrowserExtensionConfig,
+  ResearchConfig,
 } from '../types/index.js'
 import type {
   GameFlags, WebAppFlags, BackendFlags, CliFlags, LibraryFlags,
   MobileAppFlags, DataPipelineFlags, MlFlags, BrowserExtensionFlags,
+  ResearchFlags,
 } from './flags.js'
 import { GameConfigSchema, ProjectTypeSchema } from '../config/schema.js'
 import { coreCopy, getCopyForType, optionsFromCopy } from './copy/index.js'
@@ -26,6 +28,7 @@ export interface WizardAnswers {
   dataPipelineConfig?: DataPipelineConfig
   mlConfig?: MlConfig
   browserExtensionConfig?: BrowserExtensionConfig
+  researchConfig?: ResearchConfig
 }
 
 /**
@@ -51,6 +54,7 @@ export async function askWizardQuestions(options: {
   dataPipelineFlags?: DataPipelineFlags
   mlFlags?: MlFlags
   browserExtensionFlags?: BrowserExtensionFlags
+  researchFlags?: ResearchFlags
 }): Promise<WizardAnswers> {
   const { output, suggestion, auto } = options
 
@@ -466,6 +470,55 @@ export async function askWizardQuestions(options: {
     mlConfig = { projectPhase, modelType, servingPattern, hasExperimentTracking }
   }
 
+  // Research configuration
+  let researchConfig: ResearchConfig | undefined
+  if (projectType === 'research') {
+    const copy = getCopyForType('research')
+    showBannerOnce()
+
+    if (auto && !options.researchFlags?.researchDriver) {
+      throw new Error('--research-driver is required in auto mode for research projects')
+    }
+
+    const experimentDriver: ResearchConfig['experimentDriver'] = options.researchFlags?.researchDriver
+      ?? await output.select(
+        'Experiment driver?',
+        optionsFromCopy(copy.experimentDriver.options,
+          ['code-driven', 'config-driven', 'api-driven', 'notebook-driven']),
+        undefined,
+        copy.experimentDriver,
+      ) as ResearchConfig['experimentDriver']
+
+    // Smart filtering: omit autonomous when notebook-driven
+    const interactionOptions: ResearchConfig['interactionMode'][] =
+      experimentDriver === 'notebook-driven'
+        ? ['checkpoint-gated', 'human-guided']
+        : ['autonomous', 'checkpoint-gated', 'human-guided']
+
+    const interactionMode: ResearchConfig['interactionMode'] = options.researchFlags?.researchInteraction
+      ?? (!auto
+        ? await output.select('Interaction mode?',
+          optionsFromCopy(copy.interactionMode.options, interactionOptions),
+          'checkpoint-gated',
+          copy.interactionMode,
+        ) as ResearchConfig['interactionMode']
+        : 'checkpoint-gated')
+
+    const domain: ResearchConfig['domain'] = options.researchFlags?.researchDomain
+      ?? (!auto
+        ? await output.select('Research domain?',
+          optionsFromCopy(copy.domain.options, ['none', 'quant-finance', 'ml-research', 'simulation']),
+          'none',
+          copy.domain,
+        ) as ResearchConfig['domain']
+        : 'none')
+
+    const hasExperimentTracking = options.researchFlags?.researchTracking
+      ?? (!auto ? await output.confirm('Experiment tracking?', true, copy.hasExperimentTracking) : true)
+
+    researchConfig = { experimentDriver, interactionMode, domain, hasExperimentTracking }
+  }
+
   // Browser extension configuration
   let browserExtensionConfig: BrowserExtensionConfig | undefined
   if (projectType === 'browser-extension') {
@@ -652,6 +705,6 @@ export async function askWizardQuestions(options: {
     methodology, depth, platforms, traits, projectType,
     webAppConfig, backendConfig, cliConfig,
     libraryConfig, mobileAppConfig, dataPipelineConfig,
-    mlConfig, browserExtensionConfig, gameConfig,
+    mlConfig, browserExtensionConfig, researchConfig, gameConfig,
   }
 }

@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import type { ScaffoldConfig, StepEnablementEntry } from '../../types/index.js'
 import type { MetaPromptFrontmatter } from '../../types/frontmatter.js'
 import type { OutputContext } from '../../cli/output/context.js'
-import { loadOverlay } from './overlay-loader.js'
+import { loadOverlay, loadSubOverlay } from './overlay-loader.js'
 import { applyOverlay } from './overlay-resolver.js'
 
 export interface OverlayState {
@@ -52,33 +52,60 @@ export function resolveOverlayState(options: {
 
     // Only attempt overlay loading when an overlay file actually exists.
     // Most project types (backend, cli, library, etc.) don't have overlays —
-    // silently return defaults instead of emitting misleading warnings.
-    if (!fs.existsSync(overlayPath)) {
-      return { steps: { ...presetSteps }, knowledge: knowledgeMap, reads: readsMap, dependencies: dependencyMap }
-    }
-
-    const { overlay, errors: overlayErrors, warnings: overlayWarnings } = loadOverlay(overlayPath)
-    for (const w of overlayWarnings) {
-      output.warn(w)
-    }
-    // Overlay errors are non-fatal — warn but continue without overlay
-    if (overlayErrors.length > 0) {
-      for (const err of overlayErrors) {
-        output.warn(`[${err.code}] ${err.message}${err.recovery ? ` — ${err.recovery}` : ''}`)
+    // skip silently instead of emitting misleading warnings.
+    if (fs.existsSync(overlayPath)) {
+      const { overlay, errors: overlayErrors, warnings: overlayWarnings } = loadOverlay(overlayPath)
+      for (const w of overlayWarnings) {
+        output.warn(w)
+      }
+      // Overlay errors are non-fatal — warn but continue without overlay
+      if (overlayErrors.length > 0) {
+        for (const err of overlayErrors) {
+          output.warn(`[${err.code}] ${err.message}${err.recovery ? ` — ${err.recovery}` : ''}`)
+        }
+      }
+      if (overlay) {
+        const merged = applyOverlay(
+          overlaySteps,
+          knowledgeMap,
+          readsMap,
+          dependencyMap,
+          overlay,
+        )
+        overlaySteps = merged.steps
+        overlayKnowledge = merged.knowledge
+        overlayReads = merged.reads
+        overlayDependencies = merged.dependencies
       }
     }
-    if (overlay) {
-      const merged = applyOverlay(
-        overlaySteps,
-        knowledgeMap,
-        readsMap,
-        dependencyMap,
-        overlay,
-      )
-      overlaySteps = merged.steps
-      overlayKnowledge = merged.knowledge
-      overlayReads = merged.reads
-      overlayDependencies = merged.dependencies
+
+    // Generic domain sub-overlay: types with a 'domain' config field get sub-overlay injection
+    const TYPE_DOMAIN_CONFIG: Partial<Record<string, string>> = {
+      'research': 'researchConfig',
+      // Future types with domain support can be added here
+    }
+    const domainConfigKey = TYPE_DOMAIN_CONFIG[projectType]
+    if (domainConfigKey) {
+      const typeConfig = config.project?.[domainConfigKey] as Record<string, unknown> | undefined
+      if (typeConfig && typeof typeConfig.domain === 'string' && typeConfig.domain !== 'none') {
+        const subOverlayPath = path.join(methodologyDir, `${projectType}-${typeConfig.domain}.yml`)
+        if (fs.existsSync(subOverlayPath)) {
+          const { overlay: subOverlay, errors: subErrors, warnings: subWarnings } = loadSubOverlay(subOverlayPath)
+          for (const err of subErrors) output.warn(`[${err.code}] ${err.message}`)
+          for (const w of subWarnings) output.warn(w)
+          if (subOverlay) {
+            // Apply knowledge-overrides only, starting from ALREADY-MERGED overlayKnowledge
+            for (const [step, overrides] of Object.entries(subOverlay.knowledgeOverrides ?? {})) {
+              if (step in overlayKnowledge) {
+                const toAppend = overrides.append ?? []
+                overlayKnowledge[step] = [...overlayKnowledge[step], ...toAppend]
+              }
+              // else: sub-overlay references a step not in the pipeline — silently skip
+              // (common when domain overlays target optional steps that aren't enabled)
+            }
+          }
+        }
+      }
     }
   }
 

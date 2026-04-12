@@ -81,6 +81,7 @@ vi.mock('../../project/adopt.js', () => ({
     ml: 'mlConfig',
     'browser-extension': 'browserExtensionConfig',
     game: 'gameConfig',
+    research: 'researchConfig',
   },
 }))
 
@@ -247,6 +248,49 @@ describe('adopt CLI JSON serialization', () => {
 
     expect(json.game_config).toEqual({ engine: 'unity' })
     expect(json.detected_config).toEqual({ type: 'game', config: { engine: 'unity' } })
+  })
+
+  it('research detection roundtrips through JSON serialization', async () => {
+    vi.mocked(runAdoption).mockResolvedValueOnce({
+      mode: 'brownfield',
+      artifactsFound: 0,
+      detectedArtifacts: [],
+      stepsCompleted: [],
+      stepsRemaining: [],
+      methodology: 'deep',
+      errors: [],
+      warnings: [],
+      projectType: 'research',
+      detectedConfig: {
+        type: 'research',
+        config: {
+          experimentDriver: 'code-driven',
+          interactionMode: 'checkpoint-gated',
+          hasExperimentTracking: true,
+          domain: 'quant-finance',
+        },
+      },
+      detectionConfidence: 'high',
+      detectionEvidence: [{ signal: 'jupyter-notebooks', file: 'experiments/' }],
+    } as unknown as AdoptionResult)
+
+    await adoptCommand.handler(defaultArgv())
+    const json = parseJsonOutput()
+
+    expect(json.project_type).toBe('research')
+    expect(json.detected_config).toEqual({
+      type: 'research',
+      config: {
+        experimentDriver: 'code-driven',
+        interactionMode: 'checkpoint-gated',
+        hasExperimentTracking: true,
+        domain: 'quant-finance',
+      },
+    })
+    expect(json.detection_confidence).toBe('high')
+    expect(json.detection_evidence).toEqual([
+      { signal: 'jupyter-notebooks', file: 'experiments/' },
+    ])
   })
 
   it('omits optional fields when not present', async () => {

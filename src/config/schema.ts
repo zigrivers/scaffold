@@ -14,7 +14,7 @@ const CustomSchema = z.object({
 
 export const ProjectTypeSchema = z.enum([
   'web-app', 'mobile-app', 'backend', 'cli', 'library', 'game',
-  'data-pipeline', 'ml', 'browser-extension',
+  'data-pipeline', 'ml', 'browser-extension', 'research',
 ])
 
 export const WebAppConfigSchema = z.object({
@@ -77,6 +77,19 @@ export const BrowserExtensionConfigSchema = z.object({
   hasBackgroundWorker: z.boolean().default(true),
 }).strict()
 
+export const ResearchConfigSchema = z.object({
+  experimentDriver: z.enum([
+    'code-driven', 'config-driven', 'api-driven', 'notebook-driven',
+  ]),
+  interactionMode: z.enum([
+    'autonomous', 'checkpoint-gated', 'human-guided',
+  ]).default('checkpoint-gated'),
+  hasExperimentTracking: z.boolean().default(true),
+  domain: z.enum([
+    'none', 'quant-finance', 'ml-research', 'simulation',
+  ]).default('none'),
+}).strict()
+
 export const GameConfigSchema = z.object({
   engine: z.enum(['unity', 'unreal', 'godot', 'custom']),
   multiplayerMode: z.enum(['none', 'local', 'online', 'hybrid']).default('none'),
@@ -108,6 +121,7 @@ const ProjectSchema = z.object({
   dataPipelineConfig: DataPipelineConfigSchema.optional(),
   mlConfig: MlConfigSchema.optional(),
   browserExtensionConfig: BrowserExtensionConfigSchema.optional(),
+  researchConfig: ResearchConfigSchema.optional(),
 }).passthrough()  // allow unknown fields per ADR-033
   .superRefine((data, ctx) => {
     if (data.gameConfig !== undefined && data.projectType !== 'game') {
@@ -145,6 +159,17 @@ const ProjectSchema = z.object({
     if (data.browserExtensionConfig !== undefined && data.projectType !== 'browser-extension') {
       ctx.addIssue({ path: ['browserExtensionConfig'], code: 'custom',
         message: 'browserExtensionConfig requires projectType: browser-extension' })
+    }
+    if (data.researchConfig !== undefined && data.projectType !== 'research') {
+      ctx.addIssue({ path: ['researchConfig'], code: 'custom',
+        message: 'researchConfig requires projectType: research' })
+    }
+    if (data.researchConfig) {
+      const { experimentDriver, interactionMode } = data.researchConfig
+      if (experimentDriver === 'notebook-driven' && interactionMode === 'autonomous') {
+        ctx.addIssue({ path: ['researchConfig', 'interactionMode'], code: 'custom',
+          message: 'Notebook-driven execution cannot be fully autonomous' })
+      }
     }
     if (data.libraryConfig) {
       const { visibility, documentationLevel } = data.libraryConfig

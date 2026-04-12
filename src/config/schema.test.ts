@@ -6,6 +6,7 @@ import {
   WebAppConfigSchema, BackendConfigSchema, CliConfigSchema,
   LibraryConfigSchema, MobileAppConfigSchema,
   DataPipelineConfigSchema, MlConfigSchema, BrowserExtensionConfigSchema,
+  ResearchConfigSchema,
 } from './schema.js'
 
 describe('ProjectTypeSchema', () => {
@@ -13,10 +14,10 @@ describe('ProjectTypeSchema', () => {
     expect(ProjectTypeSchema.options).toEqual(
       expect.arrayContaining([
         'web-app', 'mobile-app', 'backend', 'cli', 'library', 'game',
-        'data-pipeline', 'ml', 'browser-extension',
+        'data-pipeline', 'ml', 'browser-extension', 'research',
       ]),
     )
-    expect(ProjectTypeSchema.options).toHaveLength(9)
+    expect(ProjectTypeSchema.options).toHaveLength(10)
   })
 })
 
@@ -878,6 +879,114 @@ describe('ProjectSchema cross-field validation — new project types', () => {
       project: {
         projectType: 'browser-extension',
         browserExtensionConfig: {},
+      },
+    })
+    expect(result.success).toBe(true)
+  })
+})
+
+describe('ResearchConfigSchema', () => {
+  it('accepts valid research config with all fields', () => {
+    const result = ResearchConfigSchema.safeParse({
+      experimentDriver: 'code-driven',
+      interactionMode: 'autonomous',
+      hasExperimentTracking: false,
+      domain: 'quant-finance',
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data).toEqual({
+        experimentDriver: 'code-driven',
+        interactionMode: 'autonomous',
+        hasExperimentTracking: false,
+        domain: 'quant-finance',
+      })
+    }
+  })
+
+  it('applies defaults for all fields except experimentDriver', () => {
+    const result = ResearchConfigSchema.safeParse({
+      experimentDriver: 'api-driven',
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data).toEqual({
+        experimentDriver: 'api-driven',
+        interactionMode: 'checkpoint-gated',
+        hasExperimentTracking: true,
+        domain: 'none',
+      })
+    }
+  })
+
+  it('rejects missing experimentDriver', () => {
+    const result = ResearchConfigSchema.safeParse({})
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects unknown fields (.strict())', () => {
+    const result = ResearchConfigSchema.safeParse({
+      experimentDriver: 'code-driven',
+      unknownField: 'value',
+    })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('ProjectSchema cross-field validation — research', () => {
+  it('rejects researchConfig when projectType is not research', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'backend',
+        researchConfig: { experimentDriver: 'code-driven' },
+      },
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const msgs = result.error.issues.map(i => i.message)
+      expect(msgs).toContain('researchConfig requires projectType: research')
+    }
+  })
+
+  it('rejects notebook-driven + autonomous', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'research',
+        researchConfig: {
+          experimentDriver: 'notebook-driven',
+          interactionMode: 'autonomous',
+        },
+      },
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const msgs = result.error.issues.map(i => i.message)
+      expect(msgs).toContain('Notebook-driven execution cannot be fully autonomous')
+    }
+  })
+
+  it('accepts notebook-driven + checkpoint-gated', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'research',
+        researchConfig: {
+          experimentDriver: 'notebook-driven',
+          interactionMode: 'checkpoint-gated',
+        },
+      },
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts valid research config with research projectType', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        projectType: 'research',
+        researchConfig: { experimentDriver: 'config-driven' },
       },
     })
     expect(result.success).toBe(true)

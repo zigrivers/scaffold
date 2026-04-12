@@ -1,0 +1,29 @@
+# methodology/research-quant-finance.yml
+name: research-quant-finance
+description: >
+  Quant-finance domain sub-overlay — adds trading strategy, backtesting,
+  risk analysis, and market data knowledge to research projects.
+project-type: research
+domain: quant-finance
+
+knowledge-overrides:
+  create-prd:
+    append: [research-quant-requirements]
+  system-architecture:
+    append: [research-quant-backtesting, research-quant-strategy-patterns]
+  domain-modeling:
+    append: [research-quant-market-data]
+  security:
+    append: [research-quant-risk]
+  operations:
+    append: [research-quant-metrics]
+  tdd:
+    append: [research-quant-backtesting]
+  create-evals:
+    append: [research-quant-metrics, research-quant-backtesting]
+  review-architecture:
+    append: [research-quant-backtesting, research-quant-strategy-patterns]
+  review-testing:
+    append: [research-quant-backtesting]
+  implementation-plan:
+    append: [research-quant-backtesting, research-quant-strategy-patterns]

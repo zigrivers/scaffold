@@ -21,7 +21,7 @@ export interface DisambiguateResult {
 
 const PROJECT_TYPE_PREFERENCE: readonly ProjectType[] = [
   'web-app', 'backend', 'cli', 'library', 'mobile-app',
-  'data-pipeline', 'ml', 'browser-extension', 'game',
+  'data-pipeline', 'ml', 'research', 'browser-extension', 'game',
 ]
 
 function tierRank(c: Confidence): number {

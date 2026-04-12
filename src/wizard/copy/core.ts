@@ -26,6 +26,10 @@ export const coreCopy: CoreCopy = {
         short: 'Add-on that runs inside Chrome, Firefox, or similar.',
       },
       'game':              { label: 'Game',               short: 'Interactive entertainment with a game loop.' },
+      'research': {
+        label: 'Research project',
+        short: 'Iterative experiment loops where an agent drives the research cycle.',
+      },
     },
   },
   methodology: {

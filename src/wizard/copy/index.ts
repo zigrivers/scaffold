@@ -11,6 +11,7 @@ import { dataPipelineCopy } from './data-pipeline.js'
 import { mlCopy } from './ml.js'
 import { browserExtensionCopy } from './browser-extension.js'
 import { gameCopy } from './game.js'
+import { researchCopy } from './research.js'
 
 const PROJECT_COPY: ProjectCopyMap = {
   'web-app': webAppCopy,
@@ -22,6 +23,7 @@ const PROJECT_COPY: ProjectCopyMap = {
   'ml': mlCopy,
   'browser-extension': browserExtensionCopy,
   'game': gameCopy,
+  'research': researchCopy,
 }
 
 export function getCopyForType<T extends ProjectType>(type: T): ProjectCopyMap[T] {

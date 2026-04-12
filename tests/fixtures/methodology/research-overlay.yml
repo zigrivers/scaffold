@@ -1,0 +1,12 @@
+name: research
+description: Research project overlay for testing
+project-type: research
+
+step-overrides: {}
+
+knowledge-overrides:
+  tech-stack:
+    append: [research-tooling]
+
+reads-overrides: {}
+dependency-overrides: {}

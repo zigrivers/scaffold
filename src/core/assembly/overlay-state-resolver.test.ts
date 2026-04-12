@@ -255,6 +255,92 @@ describe('resolveOverlayState', () => {
     expect(output.warn).toHaveBeenCalled()
   })
 
+  it('does not load sub-overlay when domain is none', () => {
+    const config = makeConfig({
+      project: {
+        projectType: 'research',
+        researchConfig: {
+          experimentDriver: 'code-driven',
+          interactionMode: 'checkpoint-gated',
+          hasExperimentTracking: true,
+          domain: 'none',
+        },
+      },
+    })
+    const presetSteps: Record<string, StepEnablementEntry> = {
+      'tech-stack': { enabled: true },
+      'tdd': { enabled: true },
+    }
+    const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+      ['tech-stack', { frontmatter: makeFrontmatter({
+        name: 'tech-stack', knowledgeBase: ['tech-stack-selection'],
+        reads: [], dependencies: [],
+      }) }],
+      ['tdd', { frontmatter: makeFrontmatter({
+        name: 'tdd', knowledgeBase: ['tdd-basics'],
+        reads: [], dependencies: [],
+      }) }],
+    ])
+
+    const result = resolveOverlayState({
+      config,
+      methodologyDir: fixtureDir,
+      metaPrompts,
+      presetSteps,
+      output: makeOutput(),
+    })
+
+    // research-overlay.yml appends research-tooling to tech-stack, but no sub-overlay
+    expect(result.knowledge['tech-stack']).toEqual(['tech-stack-selection', 'research-tooling'])
+    // tdd should NOT have quant-finance sub-overlay entries
+    expect(result.knowledge['tdd']).toEqual(['tdd-basics'])
+  })
+
+  it('appends domain sub-overlay knowledge AFTER core overlay knowledge', () => {
+    const config = makeConfig({
+      project: {
+        projectType: 'research',
+        researchConfig: {
+          experimentDriver: 'code-driven',
+          interactionMode: 'checkpoint-gated',
+          hasExperimentTracking: true,
+          domain: 'quant-finance',
+        },
+      },
+    })
+    const presetSteps: Record<string, StepEnablementEntry> = {
+      'tech-stack': { enabled: true },
+      'tdd': { enabled: true },
+    }
+    const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+      ['tech-stack', { frontmatter: makeFrontmatter({
+        name: 'tech-stack', knowledgeBase: ['tech-stack-selection'],
+        reads: [], dependencies: [],
+      }) }],
+      ['tdd', { frontmatter: makeFrontmatter({
+        name: 'tdd', knowledgeBase: ['tdd-basics'],
+        reads: [], dependencies: [],
+      }) }],
+    ])
+
+    const result = resolveOverlayState({
+      config,
+      methodologyDir: fixtureDir,
+      metaPrompts,
+      presetSteps,
+      output: makeOutput(),
+    })
+
+    // Core overlay appends research-tooling, then sub-overlay appends quant-data-feeds
+    expect(result.knowledge['tech-stack']).toEqual([
+      'tech-stack-selection', 'research-tooling', 'quant-data-feeds',
+    ])
+    // Sub-overlay appends backtest-validation to tdd
+    expect(result.knowledge['tdd']).toEqual([
+      'tdd-basics', 'backtest-validation',
+    ])
+  })
+
   it('handles undefined config.project gracefully', () => {
     const config = makeConfig() // config.project is undefined
     const presetSteps: Record<string, StepEnablementEntry> = {

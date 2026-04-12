@@ -50,6 +50,7 @@ import { loadOverlay } from '../core/assembly/overlay-loader.js'
 import { getPackagePipelineDir, getPackageMethodologyDir } from '../utils/fs.js'
 import type { MetaPromptFile } from '../types/index.js'
 import type { OverlayState } from '../core/assembly/overlay-state-resolver.js'
+import type { ResearchConfig } from '../types/config.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1546,5 +1547,141 @@ describe('project-type overlay cross-validation', () => {
         },
       },
     }).success).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Tests — Research
+// ---------------------------------------------------------------------------
+
+describe('research overlay integration', () => {
+  /**
+   * Resolve a research overlay with optional domain sub-overlay.
+   * Cannot use the generic resolveProjectOverlay helper because 'research'
+   * is not in its union and requires researchConfig.
+   */
+  async function resolveResearchOverlay(
+    partial: { experimentDriver: ResearchConfig['experimentDriver']; domain?: ResearchConfig['domain'] },
+  ): Promise<OverlayState> {
+    const researchConfig: ResearchConfig = {
+      experimentDriver: partial.experimentDriver,
+      interactionMode: 'checkpoint-gated',
+      hasExperimentTracking: true,
+      domain: partial.domain ?? 'none',
+    }
+    const methodologyDir = getPackageMethodologyDir()
+    const realMetaPrompts = await discoverRealMetaPrompts()
+    const knownSteps = [...realMetaPrompts.keys()]
+    const presets = loadAllPresets(methodologyDir, knownSteps)
+    const output = createMockOutput()
+
+    const preset = presets.deep
+    return resolveOverlayState({
+      config: {
+        version: 2,
+        methodology: 'deep',
+        platforms: ['claude-code'],
+        project: {
+          projectType: 'research',
+          researchConfig,
+        },
+      },
+      methodologyDir,
+      metaPrompts: realMetaPrompts,
+      presetSteps: preset?.steps ?? {},
+      output,
+    })
+  }
+
+  it('core research overlay injects knowledge into all 21 steps', async () => {
+    const state = await resolveResearchOverlay({
+      experimentDriver: 'code-driven',
+    })
+
+    // Spot-check key knowledge injections from research-overlay.yml
+    expect(state.knowledge['system-architecture']).toContain('research-architecture')
+    expect(state.knowledge['tdd']).toContain('research-testing')
+    expect(state.knowledge['operations']).toContain('research-experiment-tracking')
+
+    // Verify all 21 steps from the overlay have research knowledge
+    const expectedSteps = [
+      'create-prd', 'user-stories', 'coding-standards', 'project-structure',
+      'dev-env-setup', 'git-workflow',
+      'system-architecture', 'tech-stack', 'adrs', 'domain-modeling',
+      'security', 'operations',
+      'tdd', 'add-e2e-testing', 'create-evals', 'story-tests',
+      'review-architecture', 'review-security', 'review-operations', 'review-testing',
+      'implementation-plan',
+    ]
+    for (const step of expectedSteps) {
+      expect(state.knowledge[step], `${step} should have research knowledge`).toBeDefined()
+      const hasResearch = state.knowledge[step].some(k => k.startsWith('research-'))
+      expect(hasResearch, `${step} should contain at least one research-* entry`).toBe(true)
+    }
+  })
+
+  it('quant-finance domain knowledge appended after core', async () => {
+    const state = await resolveResearchOverlay({
+      experimentDriver: 'code-driven',
+      domain: 'quant-finance',
+    })
+
+    // system-architecture should contain both core and domain knowledge
+    expect(state.knowledge['system-architecture']).toContain('research-architecture')
+    expect(state.knowledge['system-architecture']).toContain('research-quant-backtesting')
+
+    // Domain knowledge should appear AFTER core knowledge (appended)
+    const archKnowledge = state.knowledge['system-architecture']
+    const coreIdx = archKnowledge.indexOf('research-architecture')
+    const domainIdx = archKnowledge.indexOf('research-quant-backtesting')
+    expect(domainIdx).toBeGreaterThan(coreIdx)
+
+    // Check another step to confirm pattern holds
+    const tddKnowledge = state.knowledge['tdd']
+    expect(tddKnowledge).toContain('research-testing')
+    expect(tddKnowledge).toContain('research-quant-backtesting')
+    const coreTddIdx = tddKnowledge.indexOf('research-testing')
+    const domainTddIdx = tddKnowledge.indexOf('research-quant-backtesting')
+    expect(domainTddIdx).toBeGreaterThan(coreTddIdx)
+  })
+
+  it('domain=none skips sub-overlay', async () => {
+    const state = await resolveResearchOverlay({
+      experimentDriver: 'code-driven',
+      domain: 'none',
+    })
+
+    // Core research knowledge is present
+    expect(state.knowledge['system-architecture']).toContain('research-architecture')
+    expect(state.knowledge['tdd']).toContain('research-testing')
+    expect(state.knowledge['operations']).toContain('research-experiment-tracking')
+
+    // Domain-specific quant knowledge is NOT present
+    expect(state.knowledge['system-architecture']).not.toContain('research-quant-backtesting')
+    expect(state.knowledge['system-architecture']).not.toContain('research-quant-strategy-patterns')
+    expect(state.knowledge['tdd']).not.toContain('research-quant-backtesting')
+    expect(state.knowledge['operations']).not.toContain('research-quant-metrics')
+  })
+
+  it('ml-research domain knowledge appended after core', async () => {
+    const state = await resolveResearchOverlay({ experimentDriver: 'code-driven', domain: 'ml-research' })
+    // Core knowledge present
+    expect(state.knowledge['system-architecture']).toContain('research-architecture')
+    // ML-research domain knowledge present
+    expect(state.knowledge['system-architecture']).toContain('research-ml-architecture-search')
+    // Domain after core
+    const sysArch = state.knowledge['system-architecture']
+    expect(sysArch.indexOf('research-ml-architecture-search')).toBeGreaterThan(sysArch.indexOf('research-architecture'))
+  })
+
+  it('simulation domain knowledge appended after core', async () => {
+    const state = await resolveResearchOverlay({ experimentDriver: 'code-driven', domain: 'simulation' })
+    // Core knowledge present
+    expect(state.knowledge['system-architecture']).toContain('research-architecture')
+    // Simulation domain knowledge present
+    expect(state.knowledge['system-architecture']).toContain('research-sim-engine-patterns')
+    // Domain after core
+    const sysArch = state.knowledge['system-architecture']
+    expect(sysArch.indexOf('research-sim-engine-patterns')).toBeGreaterThan(sysArch.indexOf('research-architecture'))
   })
 })

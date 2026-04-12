@@ -23,6 +23,7 @@ export type {
   DataPipelineFlags,
   MlFlags,
   BrowserExtensionFlags,
+  ResearchFlags,
 } from './flags.js'
 
 import type {
@@ -35,6 +36,7 @@ import type {
   DataPipelineFlags,
   MlFlags,
   BrowserExtensionFlags,
+  ResearchFlags,
 } from './flags.js'
 
 export interface WizardOptions {
@@ -59,6 +61,7 @@ export interface WizardOptions {
   dataPipelineFlags?: DataPipelineFlags
   mlFlags?: MlFlags
   browserExtensionFlags?: BrowserExtensionFlags
+  researchFlags?: ResearchFlags
 }
 
 export interface WizardResult {
@@ -76,6 +79,7 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
     depth, adapters, traits,
     gameFlags, webAppFlags, backendFlags, cliFlags, libraryFlags,
     mobileAppFlags, dataPipelineFlags, mlFlags, browserExtensionFlags,
+    researchFlags,
   } = options
   const scaffoldDir = path.join(projectRoot, '.scaffold')
 
@@ -149,6 +153,7 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
     dataPipelineFlags,
     mlFlags,
     browserExtensionFlags,
+    researchFlags,
   })
 
   // Build config — methodology is a top-level string per the real ScaffoldConfig schema
@@ -168,6 +173,7 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
       ...(answers.dataPipelineConfig && { dataPipelineConfig: answers.dataPipelineConfig }),
       ...(answers.mlConfig && { mlConfig: answers.mlConfig }),
       ...(answers.browserExtensionConfig && { browserExtensionConfig: answers.browserExtensionConfig }),
+      ...(answers.researchConfig && { researchConfig: answers.researchConfig }),
     },
   }
 

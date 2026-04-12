@@ -1,0 +1,23 @@
+# methodology/research-simulation.yml
+name: research-simulation
+description: >
+  Simulation domain sub-overlay — adds physics/materials simulation engine,
+  parameter space, and compute management knowledge.
+project-type: research
+domain: simulation
+
+knowledge-overrides:
+  system-architecture:
+    append: [research-sim-engine-patterns, research-sim-parameter-spaces]
+  domain-modeling:
+    append: [research-sim-parameter-spaces]
+  operations:
+    append: [research-sim-compute-management]
+  tdd:
+    append: [research-sim-validation]
+  create-evals:
+    append: [research-sim-validation, research-sim-parameter-spaces]
+  review-architecture:
+    append: [research-sim-engine-patterns]
+  implementation-plan:
+    append: [research-sim-engine-patterns]

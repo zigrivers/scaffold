@@ -4,7 +4,7 @@ import {
   ProjectTypeSchema, WebAppConfigSchema, BackendConfigSchema,
   CliConfigSchema, LibraryConfigSchema, MobileAppConfigSchema,
   DataPipelineConfigSchema, MlConfigSchema, BrowserExtensionConfigSchema,
-  GameConfigSchema,
+  GameConfigSchema, ResearchConfigSchema,
 } from '../config/schema.js'
 
 /** Step enablement entry used in presets and overlays. */
@@ -52,6 +52,9 @@ export type MlConfig = z.infer<typeof MlConfigSchema>
 /** Browser extension configuration — derived from Zod schema (single source of truth). */
 export type BrowserExtensionConfig = z.infer<typeof BrowserExtensionConfigSchema>
 
+/** Research project configuration — derived from Zod schema (single source of truth). */
+export type ResearchConfig = z.infer<typeof ResearchConfigSchema>
+
 /**
  * Game-specific configuration — derived from Zod schema (single source of truth).
  * Only valid when projectType === 'game'.
@@ -76,6 +79,7 @@ export type DetectedConfig =
   | { type: 'ml'; config: MlConfig }
   | { type: 'browser-extension'; config: BrowserExtensionConfig }
   | { type: 'game'; config: GameConfig }
+  | { type: 'research'; config: ResearchConfig }
 
 /** Override entry for knowledge injection. */
 export interface KnowledgeOverride {
@@ -119,6 +123,7 @@ export interface ProjectConfig {
   dataPipelineConfig?: DataPipelineConfig
   mlConfig?: MlConfig
   browserExtensionConfig?: BrowserExtensionConfig
+  researchConfig?: ResearchConfig
   [key: string]: unknown  // forward compatibility
 }
 

@@ -14,7 +14,7 @@ import { resolveDetection } from './detectors/resolve-detection.js'
 import {
   WebAppConfigSchema, BackendConfigSchema, CliConfigSchema, LibraryConfigSchema,
   MobileAppConfigSchema, DataPipelineConfigSchema, MlConfigSchema,
-  BrowserExtensionConfigSchema, GameConfigSchema,
+  BrowserExtensionConfigSchema, GameConfigSchema, ResearchConfigSchema,
 } from '../config/schema.js'
 import { ExitCode } from '../types/enums.js'
 import { configParseError, configNotObject } from '../utils/errors.js'
@@ -32,6 +32,7 @@ const TYPE_KEY: Record<ProjectType, string> = {
   'data-pipeline':     'dataPipelineConfig',
   'ml':                'mlConfig',
   'browser-extension': 'browserExtensionConfig',
+  'research':          'researchConfig',
 }
 
 // Exported for use by CLI handler's writeOrUpdateConfig
@@ -49,6 +50,7 @@ function schemaForType(type: ProjectType): z.ZodType {
   case 'ml':                return MlConfigSchema
   case 'browser-extension': return BrowserExtensionConfigSchema
   case 'game':              return GameConfigSchema
+  case 'research':          return ResearchConfigSchema
   default: return assertNever(type as never)
   }
 }
