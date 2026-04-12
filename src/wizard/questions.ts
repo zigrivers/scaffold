@@ -9,6 +9,7 @@ import type {
   MobileAppFlags, DataPipelineFlags, MlFlags, BrowserExtensionFlags,
 } from './flags.js'
 import { GameConfigSchema, ProjectTypeSchema } from '../config/schema.js'
+import { coreCopy, getCopyForType, optionsFromCopy } from './copy/index.js'
 
 export interface WizardAnswers {
   methodology: 'deep' | 'mvp' | 'custom'
@@ -53,6 +54,14 @@ export async function askWizardQuestions(options: {
 }): Promise<WizardAnswers> {
   const { output, suggestion, auto } = options
 
+  let bannerShown = false
+  function showBannerOnce(): void {
+    if (!bannerShown && !auto && output.supportsInteractivePrompts()) {
+      output.info('Tip: Type ? at any choice prompt to see help.')
+      bannerShown = true
+    }
+  }
+
   // Methodology question (skip if --methodology was provided)
   let methodology: 'deep' | 'mvp' | 'custom' = suggestion as 'deep' | 'mvp'
   if (options.methodology) {
@@ -62,6 +71,7 @@ export async function askWizardQuestions(options: {
     const answer = await output.prompt<string>(
       `Select methodology (deep/mvp/custom) [${suggestion}]:`,
       suggestion,
+      coreCopy.methodology,
     )
     if (['deep', 'mvp', 'custom'].includes(answer)) {
       methodology = answer as 'deep' | 'mvp' | 'custom'
@@ -74,7 +84,7 @@ export async function askWizardQuestions(options: {
   if (options.depth !== undefined) {
     depth = options.depth as 1 | 2 | 3 | 4 | 5
   } else if (methodology === 'custom' && !auto) {
-    const depthStr = await output.prompt<string>('Depth (1-5) [3]:', '3')
+    const depthStr = await output.prompt<string>('Depth (1-5) [3]:', '3', coreCopy.depth)
     const parsed = parseInt(depthStr)
     if (parsed >= 1 && parsed <= 5) depth = parsed as 1 | 2 | 3 | 4 | 5
   }
@@ -85,9 +95,9 @@ export async function askWizardQuestions(options: {
     platforms = options.adapters as Array<'claude-code' | 'codex' | 'gemini'>
   } else if (!auto) {
     platforms = ['claude-code']
-    const addCodex = await output.confirm('Include Codex adapter?', false)
+    const addCodex = await output.confirm('Include Codex adapter?', false, coreCopy.codexAdapter)
     if (addCodex) platforms.push('codex')
-    const addGemini = await output.confirm('Include Gemini adapter?', false)
+    const addGemini = await output.confirm('Include Gemini adapter?', false, coreCopy.geminiAdapter)
     if (addGemini) platforms.push('gemini')
   } else {
     platforms = ['claude-code']
@@ -99,9 +109,9 @@ export async function askWizardQuestions(options: {
     traits = options.traits
   } else if (!auto) {
     traits = []
-    const isWeb = await output.confirm('Is this a web application?', false)
+    const isWeb = await output.confirm('Is this a web application?', false, coreCopy.webTrait)
     if (isWeb) traits.push('web')
-    const isMobile = await output.confirm('Is this a mobile application?', false)
+    const isMobile = await output.confirm('Is this a mobile application?', false, coreCopy.mobileTrait)
     if (isMobile) traits.push('mobile')
   } else {
     traits = []
@@ -112,10 +122,13 @@ export async function askWizardQuestions(options: {
   if (options.projectType) {
     projectType = options.projectType as ProjectType
   } else if (!auto) {
+    showBannerOnce()
+    const ptCopy = coreCopy.projectType
     const selected = await output.select(
       'What type of project is this?',
-      [...ProjectTypeSchema.options],
+      optionsFromCopy(ptCopy.options!, [...ProjectTypeSchema.options]),
       'web-app',
+      ptCopy,
     )
     projectType = selected as ProjectType
   }
@@ -123,30 +136,46 @@ export async function askWizardQuestions(options: {
   // Web-App configuration
   let webAppConfig: WebAppConfig | undefined
   if (projectType === 'web-app') {
+    const copy = getCopyForType('web-app')
+    showBannerOnce()
+
     if (auto && !options.webAppFlags?.webRendering) {
       throw new Error('--web-rendering is required in auto mode for web-app projects')
     }
 
     const renderingStrategy: WebAppConfig['renderingStrategy'] = options.webAppFlags?.webRendering
       ?? await output.select(
-        'Rendering strategy?', ['spa', 'ssr', 'ssg', 'hybrid'],
+        'Rendering strategy?',
+        optionsFromCopy(copy.renderingStrategy.options!, ['spa', 'ssr', 'ssg', 'hybrid']),
+        undefined,
+        copy.renderingStrategy,
       ) as WebAppConfig['renderingStrategy']
 
     const deployTarget: WebAppConfig['deployTarget'] = options.webAppFlags?.webDeployTarget
       ?? (!auto
         ? await output.select('Deploy target?',
-          ['static', 'serverless', 'container', 'edge', 'long-running'], 'serverless') as WebAppConfig['deployTarget']
+          optionsFromCopy(copy.deployTarget.options!, ['static', 'serverless', 'container', 'edge', 'long-running']),
+          'serverless',
+          copy.deployTarget,
+        ) as WebAppConfig['deployTarget']
         : 'serverless')
 
     const realtime: WebAppConfig['realtime'] = options.webAppFlags?.webRealtime
       ?? (!auto
-        ? await output.select('Real-time needs?', ['none', 'websocket', 'sse'], 'none') as WebAppConfig['realtime']
+        ? await output.select('Real-time needs?',
+          optionsFromCopy(copy.realtime.options!, ['none', 'websocket', 'sse']),
+          'none',
+          copy.realtime,
+        ) as WebAppConfig['realtime']
         : 'none')
 
     const authFlow: WebAppConfig['authFlow'] = options.webAppFlags?.webAuthFlow
       ?? (!auto
         ? await output.select('How do users authenticate?',
-          ['none', 'session', 'oauth', 'passkey'], 'none') as WebAppConfig['authFlow']
+          optionsFromCopy(copy.authFlow.options!, ['none', 'session', 'oauth', 'passkey']),
+          'none',
+          copy.authFlow,
+        ) as WebAppConfig['authFlow']
         : 'none')
 
     webAppConfig = { renderingStrategy, deployTarget, realtime, authFlow }
@@ -155,18 +184,27 @@ export async function askWizardQuestions(options: {
   // Backend configuration
   let backendConfig: BackendConfig | undefined
   if (projectType === 'backend') {
+    const copy = getCopyForType('backend')
+    showBannerOnce()
+
     if (auto && !options.backendFlags?.backendApiStyle) {
       throw new Error('--backend-api-style is required in auto mode for backend projects')
     }
 
     const apiStyle: BackendConfig['apiStyle'] = options.backendFlags?.backendApiStyle
       ?? await output.select('API style?',
-        ['rest', 'graphql', 'grpc', 'trpc', 'none']) as BackendConfig['apiStyle']
+        optionsFromCopy(copy.apiStyle.options!, ['rest', 'graphql', 'grpc', 'trpc', 'none']),
+        undefined,
+        copy.apiStyle,
+      ) as BackendConfig['apiStyle']
 
     const dataStore: BackendConfig['dataStore'] = options.backendFlags?.backendDataStore
       ?? (!auto
         ? await output.multiSelect('Data store(s)?',
-          ['relational', 'document', 'key-value'], ['relational']) as BackendConfig['dataStore']
+          optionsFromCopy(copy.dataStore.options!, ['relational', 'document', 'key-value']),
+          ['relational'],
+          copy.dataStore,
+        ) as BackendConfig['dataStore']
         : ['relational'])
 
     let authMechanism: BackendConfig['authMechanism']
@@ -179,21 +217,29 @@ export async function askWizardQuestions(options: {
       authMechanism = options.backendFlags?.backendAuth
         ?? (!auto
           ? await output.select('How does the API verify requests?',
-            ['none', 'jwt', 'session', 'oauth', 'apikey'],
-            'none') as BackendConfig['authMechanism']
+            optionsFromCopy(copy.authMechanism.options!, ['none', 'jwt', 'session', 'oauth', 'apikey']),
+            'none',
+            copy.authMechanism,
+          ) as BackendConfig['authMechanism']
           : 'none')
     }
 
     const asyncMessaging: BackendConfig['asyncMessaging'] = options.backendFlags?.backendMessaging
       ?? (!auto
         ? await output.select('Async messaging?',
-          ['none', 'queue', 'event-driven'], 'none') as BackendConfig['asyncMessaging']
+          optionsFromCopy(copy.asyncMessaging.options!, ['none', 'queue', 'event-driven']),
+          'none',
+          copy.asyncMessaging,
+        ) as BackendConfig['asyncMessaging']
         : 'none')
 
     const deployTarget: BackendConfig['deployTarget'] = options.backendFlags?.backendDeployTarget
       ?? (!auto
         ? await output.select('Deploy target?',
-          ['serverless', 'container', 'long-running'], 'container') as BackendConfig['deployTarget']
+          optionsFromCopy(copy.deployTarget.options!, ['serverless', 'container', 'long-running']),
+          'container',
+          copy.deployTarget,
+        ) as BackendConfig['deployTarget']
         : 'container')
 
     backendConfig = { apiStyle, dataStore, authMechanism, asyncMessaging, deployTarget }
@@ -202,23 +248,31 @@ export async function askWizardQuestions(options: {
   // CLI configuration
   let cliConfig: CliConfig | undefined
   if (projectType === 'cli') {
+    const copy = getCopyForType('cli')
+    showBannerOnce()
+
     if (auto && !options.cliFlags?.cliInteractivity) {
       throw new Error('--cli-interactivity is required in auto mode for cli projects')
     }
 
     const interactivity: CliConfig['interactivity'] = options.cliFlags?.cliInteractivity
       ?? await output.select('Interactivity model?',
-        ['args-only', 'interactive', 'hybrid']) as CliConfig['interactivity']
+        optionsFromCopy(copy.interactivity.options!, ['args-only', 'interactive', 'hybrid']),
+        undefined,
+        copy.interactivity,
+      ) as CliConfig['interactivity']
 
     const distributionChannels: CliConfig['distributionChannels'] = options.cliFlags?.cliDistribution
       ?? (!auto
         ? await output.multiSelect('Distribution channels?',
-          ['package-manager', 'system-package-manager', 'standalone-binary', 'container'],
-          ['package-manager']) as CliConfig['distributionChannels']
+          optionsFromCopy(copy.distributionChannels.options!, ['package-manager', 'system-package-manager', 'standalone-binary', 'container']),
+          ['package-manager'],
+          copy.distributionChannels,
+        ) as CliConfig['distributionChannels']
         : ['package-manager'])
 
     const hasStructuredOutput = options.cliFlags?.cliStructuredOutput
-      ?? (!auto ? await output.confirm('Support structured output (--json)?', false) : false)
+      ?? (!auto ? await output.confirm('Support structured output (--json)?', false, copy.hasStructuredOutput) : false)
 
     cliConfig = { interactivity, distributionChannels, hasStructuredOutput }
   }
@@ -226,34 +280,47 @@ export async function askWizardQuestions(options: {
   // Library configuration
   let libraryConfig: LibraryConfig | undefined
   if (projectType === 'library') {
+    const copy = getCopyForType('library')
+    showBannerOnce()
+
     if (auto && !options.libraryFlags?.libVisibility) {
       throw new Error('--lib-visibility is required in auto mode for library projects')
     }
     const visibility: LibraryConfig['visibility'] = options.libraryFlags?.libVisibility
-      ?? await output.select('Library visibility?', ['public', 'internal']) as LibraryConfig['visibility']
+      ?? await output.select('Library visibility?',
+        optionsFromCopy(copy.visibility.options!, ['public', 'internal']),
+        undefined,
+        copy.visibility,
+      ) as LibraryConfig['visibility']
 
     const runtimeTarget: LibraryConfig['runtimeTarget'] = options.libraryFlags?.libRuntimeTarget
       ?? (!auto
         ? await output.select('Runtime target?',
-          ['node', 'browser', 'isomorphic', 'edge'],
-          'isomorphic') as LibraryConfig['runtimeTarget']
+          optionsFromCopy(copy.runtimeTarget.options!, ['node', 'browser', 'isomorphic', 'edge']),
+          'isomorphic',
+          copy.runtimeTarget,
+        ) as LibraryConfig['runtimeTarget']
         : 'isomorphic')
 
     const bundleFormat: LibraryConfig['bundleFormat'] = options.libraryFlags?.libBundleFormat
       ?? (!auto
         ? await output.select('Bundle format?',
-          ['esm', 'cjs', 'dual', 'unbundled'],
-          'dual') as LibraryConfig['bundleFormat']
+          optionsFromCopy(copy.bundleFormat.options!, ['esm', 'cjs', 'dual', 'unbundled']),
+          'dual',
+          copy.bundleFormat,
+        ) as LibraryConfig['bundleFormat']
         : 'dual')
 
     const hasTypeDefinitions = options.libraryFlags?.libTypeDefinitions
-      ?? (!auto ? await output.confirm('Ship type definitions?', true) : true)
+      ?? (!auto ? await output.confirm('Ship type definitions?', true, copy.hasTypeDefinitions) : true)
 
     const documentationLevel: LibraryConfig['documentationLevel'] = options.libraryFlags?.libDocLevel
       ?? (!auto
         ? await output.select('Documentation level?',
-          ['none', 'readme', 'api-docs', 'full-site'],
-          'readme') as LibraryConfig['documentationLevel']
+          optionsFromCopy(copy.documentationLevel.options!, ['none', 'readme', 'api-docs', 'full-site']),
+          'readme',
+          copy.documentationLevel,
+        ) as LibraryConfig['documentationLevel']
         : 'readme')
 
     libraryConfig = { visibility, runtimeTarget, bundleFormat, hasTypeDefinitions, documentationLevel }
