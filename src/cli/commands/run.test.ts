@@ -26,6 +26,7 @@ vi.mock('../../state/lock-manager.js', () => ({
   acquireLock: vi.fn(),
   releaseLock: vi.fn(),
   checkLock: vi.fn(),
+  getLockPath: vi.fn(() => '/mock/.scaffold/lock.json'),
 }))
 
 vi.mock('../../state/completion.js', () => ({
@@ -138,12 +139,23 @@ vi.mock('../../cli/middleware/output-mode.js', () => ({
   resolveOutputMode: vi.fn(),
 }))
 
+vi.mock('../shutdown.js', () => ({
+  shutdown: {
+    withResource: vi.fn((_name: string, _cleanup: unknown, fn: () => unknown) => fn()),
+    withPrompt: vi.fn((fn: () => unknown) => fn()),
+    withContext: vi.fn((_msg: unknown, fn: () => unknown) => fn()),
+    registerLockOwnership: vi.fn(),
+    releaseLockOwnership: vi.fn(),
+  },
+}))
+
 // ---------------------------------------------------------------------------
 // Import mocked modules
 // ---------------------------------------------------------------------------
 
 import { StateManager } from '../../state/state-manager.js'
 import { acquireLock, releaseLock } from '../../state/lock-manager.js'
+import { shutdown } from '../shutdown.js'
 import { analyzeCrash } from '../../state/completion.js'
 import { AssemblyEngine } from '../../core/assembly/engine.js'
 import { discoverMetaPrompts, discoverAllMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
@@ -703,13 +715,17 @@ describe('run command handler', () => {
   })
 
   describe('lock release', () => {
-    it('releases lock after successful run', async () => {
+    it('delegates lock cleanup to shutdown.withResource', async () => {
       vi.mocked(resolveOutputMode).mockReturnValue('interactive')
       mockOutput.confirm = vi.fn().mockResolvedValue(true)
 
       await invokeHandler({ step: 'create-prd', _: ['run'] })
 
-      expect(releaseLock).toHaveBeenCalledWith(PROJECT_ROOT)
+      expect(shutdown.withResource).toHaveBeenCalledWith(
+        'lock',
+        expect.any(Function),
+        expect.any(Function),
+      )
     })
   })
 
@@ -791,7 +807,11 @@ describe('run command handler', () => {
       await invokeHandler({ step: 'create-prd', _: ['run'] })
 
       expect(process.exitCode).toBe(4)
-      expect(releaseLock).toHaveBeenCalledWith(PROJECT_ROOT)
+      expect(shutdown.withResource).toHaveBeenCalledWith(
+        'lock',
+        expect.any(Function),
+        expect.any(Function),
+      )
     })
 
     it('proceeds when user confirms depth downgrade', async () => {
@@ -821,7 +841,11 @@ describe('run command handler', () => {
       await invokeHandler({ step: 'create-prd', _: ['run'] })
 
       expect(process.exitCode).toBe(4)
-      expect(releaseLock).toHaveBeenCalledWith(PROJECT_ROOT)
+      expect(shutdown.withResource).toHaveBeenCalledWith(
+        'lock',
+        expect.any(Function),
+        expect.any(Function),
+      )
     })
 
     it('outputs warnings and proceeds in auto mode with depth downgrade', async () => {
@@ -905,14 +929,18 @@ describe('run command handler', () => {
   })
 
   describe('unexpected error handling', () => {
-    it('releases lock and exits 1 when assembly engine throws unexpected error', async () => {
+    it('delegates lock cleanup to withResource and exits 1 when assembly engine throws unexpected error', async () => {
       vi.mocked(AssemblyEngine.prototype.assemble).mockImplementation(() => {
         throw new Error('unexpected engine failure')
       })
 
       await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
 
-      expect(releaseLock).toHaveBeenCalledWith(PROJECT_ROOT)
+      expect(shutdown.withResource).toHaveBeenCalledWith(
+        'lock',
+        expect.any(Function),
+        expect.any(Function),
+      )
       expect(mockOutput.error).toHaveBeenCalledWith(
         expect.objectContaining({
           code: 'RUN_UNEXPECTED_ERROR',
