@@ -24,6 +24,7 @@ vi.mock('../output/context.js', () => ({
     warn: vi.fn(),
     error: vi.fn(),
     result: vi.fn(),
+    supportsInteractivePrompts: vi.fn().mockReturnValue(false),
     prompt: vi.fn().mockResolvedValue(''),
     confirm: vi.fn().mockResolvedValue(false),
     select: vi.fn().mockResolvedValue(''),
@@ -178,6 +179,7 @@ describe('init command', () => {
       warn: vi.fn(),
       error: vi.fn(),
       result: vi.fn(),
+      supportsInteractivePrompts: vi.fn().mockReturnValue(false),
       prompt: vi.fn().mockResolvedValue(''),
       confirm: vi.fn().mockResolvedValue(false),
       select: vi.fn().mockResolvedValue(''),
@@ -246,6 +248,38 @@ describe('init command', () => {
     expect(mockRunWizard).toHaveBeenCalledWith(
       expect.objectContaining({ projectRoot: cwd }),
     )
+  })
+
+  it('handles Ctrl-C (ExitPromptError) with info message and exit 130', async () => {
+    const exitPromptError = new Error('prompt was cancelled')
+    exitPromptError.name = 'ExitPromptError'
+    mockRunWizard.mockRejectedValue(exitPromptError)
+
+    const mockOutput = {
+      success: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      result: vi.fn(),
+      supportsInteractivePrompts: vi.fn().mockReturnValue(false),
+      prompt: vi.fn().mockResolvedValue(''),
+      confirm: vi.fn().mockResolvedValue(false),
+      select: vi.fn().mockResolvedValue(''),
+      multiSelect: vi.fn().mockResolvedValue([]),
+      multiInput: vi.fn().mockResolvedValue([]),
+      startSpinner: vi.fn(),
+      stopSpinner: vi.fn(),
+      startProgress: vi.fn(),
+      updateProgress: vi.fn(),
+      stopProgress: vi.fn(),
+    }
+    vi.mocked(createOutputContext).mockReturnValue(mockOutput)
+
+    await initCommand.handler(defaultArgv({ root: tmpDir }))
+
+    expect(mockOutput.info).toHaveBeenCalledWith('Cancelled.')
+    expect(exitSpy).toHaveBeenCalledWith(130)
+    expect(mockRunBuild).not.toHaveBeenCalled()
   })
 
   it('exits with build exit code when auto-build fails', async () => {
