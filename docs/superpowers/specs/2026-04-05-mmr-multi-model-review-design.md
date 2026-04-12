@@ -211,6 +211,8 @@ Prompts are assembled from four layers. The core is immutable; user context is a
 - Review criteria: correctness, regressions, edge cases, test coverage, security
 - Instruction: return ONLY structured findings or NO FINDINGS
 
+> **Rationale:** Layer 1 severity definitions are intentionally duplicated from `review-methodology`. External models receive only the assembled prompt — they cannot resolve cross-references to knowledge entries.
+
 **Layer 2 — Project (from `.mmr.yaml` `review_criteria`):**
 - Project-specific review criteria (e.g., "Verify parameterized DB queries", "Check HIPAA compliance")
 - Coding standards references
@@ -254,11 +256,20 @@ Invoked as: `mmr review --template plan --diff plan.md`
 ### Job Lifecycle
 
 ```
-mmr review → DISPATCHED → RUNNING → COMPLETED
-                            │            │
-                            ├→ TIMEOUT   ├→ GATE_PASSED
-                            ├→ FAILED    └→ GATE_FAILED
-                            └→ AUTH_FAILED
+Per-channel (preflight):
+  PREFLIGHT -> NOT_INSTALLED -> COMPENSATING -> COMP_COMPLETED / COMP_FAILED
+  PREFLIGHT -> AUTH_FAILED   -> COMPENSATING -> COMP_COMPLETED / COMP_FAILED
+  PREFLIGHT -> AUTH_TIMEOUT  -> COMPENSATING -> COMP_COMPLETED / COMP_FAILED
+  PREFLIGHT -> READY -> DISPATCHED
+
+Per-channel (dispatch):
+  DISPATCHED -> RUNNING -> COMPLETED
+                 |
+                 +-> TIMEOUT -> PARTIAL_TIMEOUT (if partial output)
+                 +-> FAILED -> COMPENSATING -> COMP_COMPLETED / COMP_FAILED
+
+Per-job (terminal):
+  GATE_PASSED / GATE_FAILED / GATE_DEGRADED / GATE_NEEDS_USER
 ```
 
 ### Job State Directory
@@ -281,18 +292,53 @@ mmr review → DISPATCHED → RUNNING → COMPLETED
 
 Jobs are retained for 7 days by default (configurable via `defaults.job_retention_days`).
 
+#### Channel Metadata (`.meta.json`)
+
+Each channel directory may contain a `.meta.json` file:
+
+```json
+{
+  "root_cause": "auth_failed",
+  "coverage_status": "compensating",
+  "compensated_by": "claude",
+  "original_channel": "gemini",
+  "compensate_focus": ["architectural patterns", "design reasoning"],
+  "compensate_elapsed": "15s"
+}
+```
+
+Valid `root_cause`: `null | auth_failed | auth_timeout | timeout | partial_timeout | failed | not_installed`
+Valid `coverage_status`: `full | partial | compensating | none`
+
 ## Reconciliation Engine
+
+### Compensation Eligibility
+
+| Root Cause | Eligible? | Rationale |
+|-----------|-----------|-----------|
+| `not_installed` | Yes | Tool absent |
+| `auth_failed` | Yes | Compensate immediately; discard if auth recovers |
+| `auth_timeout` (after retry) | Yes | Transient |
+| `timeout` (no output) | Yes | No data |
+| `partial_timeout` | No | Use partial results |
+| `failed` | Yes | No output |
 
 ### Consensus Rules
 
 | Scenario | Confidence | Action |
-|----------|------------|--------|
-| 2+ channels flag same location + same severity | **High** | Report at agreed severity |
-| 2+ channels flag same location, different severity | **Medium** | Report at the *higher* severity, note disagreement |
-| All channels approve (no findings) | **High** | Gate passed |
-| One channel flags P0, others approve | **High** | Report P0 — critical from any single source |
-| One channel flags P1/P2, others approve | **Medium** | Report with attribution, flag as single-source |
-| Channels contradict | **Low** | Present both, mark for user adjudication |
+|----------|-----------|--------|
+| 2+ real channels, same location + severity | **High** | Report at agreed severity |
+| 2+ real channels, same location, different severity | **Medium** | Report at higher severity |
+| Real + compensating agree | **Medium** | Report, note compensating source |
+| All real channels approve | **High** | Gate passed |
+| One real P0, others approve | **High** | Report P0 |
+| One real P1/P2, others approve | **Medium** | Report with attribution |
+| Compensating-only finding | **Low** | Report, flag single-source |
+| Real channels contradict | **Low** | User adjudication |
+
+**Confidence cap rule:** Compensating evidence caps confidence at Medium only when it is necessary to reach the agreement threshold. Existing multi-real-channel consensus is not downgraded.
+
+**Severity is never capped.** A compensating P0 is still reported as P0 with Low confidence. Fix threshold gates on severity, not confidence.
 
 ### Reconciled Output Schema
 
@@ -329,8 +375,15 @@ Jobs are retained for 7 days by default (configurable via `defaults.job_retentio
 ### Gate Logic
 
 ```
-gate_passed = no reconciled finding has severity ≤ fix_threshold
+gate_passed      = no finding <= fix_threshold AND all channels coverage_status = "full"
+gate_degraded    = no finding <= fix_threshold AND any channel coverage_status in ("partial", "compensating", "none")
+gate_failed      = any finding <= fix_threshold unresolved
+gate_needs_user  = contradictions or unresolvable findings requiring human judgment
 ```
+
+**Quality gate failures** (e.g., missing raw output, unmet minimum finding count) map to `gate_failed`.
+
+> **Rationale:** Partial results beat no results. A review with 2/3 channels at degraded confidence is better than blocking on the third.
 
 Default `fix_threshold: P2` means P0, P1, and P2 findings fail the gate. P3-only results pass.
 
