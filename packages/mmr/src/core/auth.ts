@@ -14,19 +14,19 @@ export async function checkInstalled(command: string): Promise<boolean> {
   // Validate command name contains only safe characters
   if (!/^[a-zA-Z0-9._-]+$/.test(command)) return false
   return new Promise((resolve) => {
-    // Use 'which' with argument array to avoid shell interpolation
-    const child = spawn('which', [command], { stdio: 'ignore' })
+    // Use POSIX-portable 'command -v' via shell (command name already validated above)
+    const child = spawn('sh', ['-c', `command -v ${command}`], { stdio: 'ignore' })
     child.on('close', (code) => resolve(code === 0))
     child.on('error', () => resolve(false))
   })
 }
 
 /**
- * Run the auth check defined in a channel config.
- * Spawns `sh -c <auth.check>` with the channel's env merged into process.env.
- * Returns ok/failed/timeout based on exit code and timeout.
+ * Single-attempt auth check. Spawns `sh -c <auth.check>` with the channel's
+ * env merged into process.env. Returns ok/failed/timeout based on exit code
+ * and timeout.
  */
-export async function checkAuth(config: ChannelConfigParsed): Promise<AuthResult> {
+async function runAuthCheck(config: ChannelConfigParsed): Promise<AuthResult> {
   const { auth, env } = config
 
   return new Promise((resolve) => {
@@ -69,4 +69,17 @@ export async function checkAuth(config: ChannelConfigParsed): Promise<AuthResult
       resolve({ status: 'failed', recovery: auth.recovery })
     })
   })
+}
+
+/**
+ * Run the auth check defined in a channel config, retrying once on timeout
+ * to handle transient network issues.
+ */
+export async function checkAuth(config: ChannelConfigParsed): Promise<AuthResult> {
+  const result = await runAuthCheck(config)
+  if (result.status === 'timeout') {
+    // Retry once on timeout (transient network issue)
+    return runAuthCheck(config)
+  }
+  return result
 }
