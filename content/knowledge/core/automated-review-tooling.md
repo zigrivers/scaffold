@@ -24,10 +24,10 @@ These are the authoritative verdict definitions. Tool files (`review-code.md`, `
 
 | Verdict | Condition |
 |---------|-----------|
-| `pass` | All configured channels ran, no unresolved P0/P1/P2 |
-| `degraded-pass` | Channels skipped, compensated, or have non-full coverage (e.g., partial timeout), no unresolved P0/P1/P2 |
-| `blocked` | Unresolved P0/P1/P2 after 3 fix rounds |
-| `needs-user-decision` | Contradictions or unresolvable findings |
+| `pass` | All channels completed, no unresolved P0/P1/P2 |
+| `degraded-pass` | Some channels unavailable, compensating passes ran, no unresolved P0/P1/P2 |
+| `blocked` | Findings at or above fix threshold remain unresolved |
+| `needs-user-decision` | No channels completed, or contradictions requiring human judgment |
 
 **Verdict precedence:** `needs-user-decision` > `blocked` > `degraded-pass` > `pass`. When multiple conditions apply, the higher-precedence verdict wins.
 
@@ -35,21 +35,19 @@ These are the authoritative verdict definitions. Tool files (`review-code.md`, `
 
 #### Status Model
 
-`compensating` is a **coverage label** applied to a channel's output, not a replacement for the root-cause status. Each channel retains its root-cause status (`not_installed`, `auth_failed`, `auth_timeout`, `failed`) AND gains a coverage label (`compensating (X-equivalent)`) when a compensating pass ran. The fix cycle uses the **root-cause status** to decide whether to retry (never retry `not_installed`, `auth_failed`, `auth_timeout`). The report uses the **coverage label** to show the reader what ran.
+`compensating` is a **coverage label** applied to a channel's output, not a replacement for the root-cause status. Each channel retains its root-cause status (`not_installed`, `auth_failed`, `timeout`, `failed`) AND gains a coverage label (`compensating (X-equivalent)`) when a compensating pass ran. The fix cycle uses the **root-cause status** to decide whether to retry (never retry `not_installed`, `auth_failed`, `timeout`). The report uses the **coverage label** to show the reader what ran.
 
 #### Compensating Passes
 
-When an external channel (Codex or Gemini) is unavailable, run a compensating Claude self-review pass:
+When a channel (Codex or Gemini) is unavailable, the CLI dispatches a compensating pass via `claude -p`:
 
-- Same prompt structure as the missing channel, executed as a Claude self-review pass.
+- Same prompt structure as the missing channel, executed as a `claude -p` dispatch.
 - Labeled `[compensating: Codex-equivalent]` or `[compensating: Gemini-equivalent]` in the review summary.
 - Missing Codex → focus on implementation correctness, security, API contracts.
 - Missing Gemini → focus on architectural patterns, design reasoning, broad context.
 - Missing both → two compensating passes (one per missing channel's strength area).
 - Compensating-pass findings are **single-source confidence** — they do NOT raise to high confidence even if they agree with another channel's findings.
 - Normal mandatory-fix thresholds apply: P0/P1/P2 findings from compensating passes still require fixing.
-
-**Superpowers channel:** No compensating pass needed — Superpowers is a Claude subagent and is always available. If the Superpowers plugin is not installed, run available external CLIs and warn the user that review coverage is reduced.
 
 #### Foreground-Only Execution
 
@@ -67,7 +65,7 @@ Reconciliation normalizes findings from all channels (real and compensating) to 
 
 The reconciliation output is a deduplicated list of findings with confidence scores. High-confidence findings (agreed by 2+ real channels) are actionable without further discussion. Low-confidence findings (single-source, or from compensating passes) still require action at P0/P1/P2 but should be noted as lower-confidence in the review summary.
 
-Findings that appear in all three channels (Codex, Gemini, Superpowers) are considered maximum-confidence and should be surfaced first in the review summary. Findings that appear in only one channel should include the channel name in the finding description to help the developer assess confidence independently.
+Findings that appear in all three channels (Codex, Gemini, Claude) are considered maximum-confidence and should be surfaced first in the review summary. Findings that appear in only one channel should include the channel name in the finding description to help the developer assess confidence independently.
 
 ```bash
 # Orchestration reconciliation workflow
@@ -80,16 +78,15 @@ Findings that appear in all three channels (Codex, Gemini, Superpowers) are cons
 
 ### Channel Dispatch Pattern and Orchestration
 
-Each external channel (Codex, Gemini) follows the same dispatch pattern: check installation, check auth, then dispatch as a foreground call. If any step fails, record the root-cause status, queue a compensating pass, and continue to the next channel. The Superpowers channel is always available as a Claude subagent and does not require installation or auth checks.
+Each channel (Codex, Gemini, Claude) follows the same dispatch pattern: check installation, check auth, then dispatch as a foreground call. If any step fails, record the root-cause status, queue a compensating pass (for Codex/Gemini), and continue to the next channel.
 
 ```bash
 # Channel dispatch pattern
-# For each external channel (Codex, Gemini):
+# For each channel (codex, gemini, claude):
 #   1. command -v <tool> >/dev/null 2>&1 || { status=not_installed; queue_compensating; continue; }
 #   2. <auth_check> || { status=auth_failed; queue_compensating; continue; }
 #   3. <dispatch_foreground> || { status=failed; queue_compensating; continue; }
-# For Superpowers: dispatch subagent (always available)
-# After all: run queued compensating passes → reconcile → verdict
+# After all: run queued compensating passes (via claude -p) → reconcile → verdict
 ```
 
 After all channels and compensating passes complete, run the reconciliation workflow above and apply the verdict decision flow. Channel results and compensating-pass labels must be preserved in the review output for auditability — do not collapse or omit them even when findings are empty.
@@ -99,14 +96,14 @@ After all channels and compensating passes complete, run the reconciliation work
 When Codex is unavailable (not installed or auth failure), the orchestration proceeds as follows:
 
 1. The installation check (`command -v codex`) fails. Codex channel status is set to `not_installed`.
-2. A compensating Codex-equivalent pass is queued: a Claude self-review focused on implementation correctness, security, and API contracts.
-3. Gemini and Superpowers channels run normally.
+2. A compensating Codex-equivalent pass is queued: a `claude -p` dispatch focused on implementation correctness, security, and API contracts.
+3. Gemini and Claude channels run normally.
 4. The compensating pass runs, producing findings labeled `[compensating: Codex-equivalent]`.
-5. Reconciliation merges findings from all three sources (Gemini, Superpowers, compensating-Codex).
+5. Reconciliation merges findings from all three sources (Gemini, Claude, compensating-Codex).
 6. Maximum achievable verdict is `degraded-pass` because a real channel was absent.
 7. The review summary notes: "Codex channel: not_installed (compensating: Codex-equivalent pass ran)."
 
-**Fix-cycle channel rule:** Only re-run channels that originally completed or ran as compensating passes. `failed` channels are covered by their compensating pass and are not retried during fix rounds. Never retry a channel with status `not_installed`, `auth_failed`, or `auth_timeout` — these indicate persistent environment conditions that will not resolve between fix rounds.
+**Fix-cycle channel rule:** Only re-run channels that originally completed or ran as compensating passes. `failed` channels are covered by their compensating pass and are not retried during fix rounds. Never retry a channel with status `not_installed`, `auth_failed`, or `timeout` — these indicate persistent environment conditions that will not resolve between fix rounds.
 
 ### Verdict Decision Flow
 
@@ -122,7 +119,7 @@ Verdict evaluation order:
 
 A "contradiction" exists when two channels report opposite conclusions about the same code location — for example, Codex flags a function as insecure while Gemini explicitly approves it. Contradictions cannot be resolved by the agent alone and must be surfaced to the user.
 
-A channel is "not at full coverage" when: it ran as a compensating pass instead of a real tool, it timed out partially, or the Superpowers plugin is not installed and available channels do not cover the full diff.
+A channel is "not at full coverage" when: it ran as a compensating pass instead of a real tool, or it timed out.
 
 **Verdict precedence reminder:** `needs-user-decision` > `blocked` > `degraded-pass` > `pass`. If multiple conditions apply simultaneously (for example, both a contradiction and an unresolved P0 exist), the higher-precedence verdict wins.
 
@@ -197,4 +194,4 @@ When external CLIs are unavailable, the degraded-mode behavior defined in the Su
 5. When both external channels are unavailable, note "All findings are single-model (Claude only). External validation was unavailable." in the review summary.
 6. Never silently drop unavailable channels — always record the channel status and compensating coverage label in the review output.
 
-**Superpowers channel exception:** Superpowers is a Claude subagent and requires no external CLI or auth. It is always available as long as the Superpowers plugin is installed in the Claude Code environment. If the plugin is not installed, run available external CLIs and warn the user that review coverage is reduced — but do not run a compensating pass for Superpowers (the compensating-pass mechanism only applies to external CLIs that have an installation/auth gate).
+**Claude CLI channel:** Claude CLI handles its own auth and is generally always available. The compensating-pass mechanism applies to external CLIs (Codex, Gemini) that have an installation/auth gate. When Codex or Gemini are unavailable, compensating passes are dispatched via `claude -p` with focused prompts targeting the missing channel's strength area.
