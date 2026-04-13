@@ -110,7 +110,7 @@ describe('runResultsPipeline', () => {
     store.saveChannelOutput(job.job_id, 'claude', rawOutput)
 
     const { results } = runResultsPipeline(store, store.loadJob(job.job_id), 'json', true)
-    expect(results.per_channel['claude'].raw_output).toBeDefined()
+    expect(results.per_channel['claude'].raw_output).toContain('approved')
   })
 
   it('omits raw output by default', () => {

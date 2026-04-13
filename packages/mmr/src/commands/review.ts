@@ -108,11 +108,11 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       .option('format', {
         type: 'string',
         describe: 'Output format',
-        choices: ['json', 'text', 'markdown', 'sarif'],
+        choices: ['json', 'text', 'markdown'],
       })
       .option('sync', {
         type: 'boolean',
-        describe: 'Wait for all channels to complete (blocking)',
+        describe: 'Run full review pipeline: dispatch, parse, reconcile, and output results with verdict',
         default: false,
       }),
   handler: async (args: ArgumentsCamelCase<ReviewArgs>) => {

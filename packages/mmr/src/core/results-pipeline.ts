@@ -29,11 +29,16 @@ export function runResultsPipeline(
 
   for (const [name, entry] of Object.entries(job.channels)) {
     if (entry.status !== 'completed') {
+      const errorMsg = entry.status === 'failed' ? 'Channel failed'
+        : entry.status === 'timeout' ? 'Channel timed out'
+        : entry.status === 'auth_failed' ? 'Auth check failed'
+        : entry.status === 'not_installed' ? 'CLI not found on PATH'
+        : undefined
       perChannel[name] = {
         status: entry.status,
         elapsed: entry.elapsed ?? '0s',
         findings: [],
-        error: entry.status === 'failed' ? 'Channel failed' : undefined,
+        error: errorMsg,
       }
       continue
     }
@@ -71,6 +76,7 @@ export function runResultsPipeline(
       elapsed,
       findings,
       raw_output: includeRaw ? raw : undefined,
+      error: raw === '' ? 'Failed to load or parse channel output' : undefined,
     }
   }
 
