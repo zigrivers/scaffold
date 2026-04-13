@@ -26,7 +26,7 @@ export const statusCommand: CommandModule<object, StatusArgs> = {
       job = store.loadJob(args['job-id'] as string)
     } catch {
       console.error(`Job not found: ${args['job-id']}`)
-      process.exit(2)
+      process.exit(5)
     }
 
     const channelStatuses: Record<string, { status: string; elapsed?: string }> = {}
@@ -58,7 +58,7 @@ export const statusCommand: CommandModule<object, StatusArgs> = {
 
     console.log(JSON.stringify(output, null, 2))
 
-    // Exit codes: 0 = all complete, 1 = still running, 2 = at least one failed
+    // Exit codes: 0=all complete, 1=still running, 2=at least one failed, 5=CLI error (job not found)
     if (!allComplete) {
       process.exit(1)
     }
