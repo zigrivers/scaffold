@@ -20,6 +20,9 @@ mmr review --pr 47 --sync
 mmr review --pr 47          # Dispatch to all channels
 mmr status mmr-a1b2c3       # Check progress
 mmr results mmr-a1b2c3      # Reconcile and output findings
+
+# Inject external review findings
+mmr reconcile <job-id> --channel superpowers --input findings.json
 ```
 
 ## Commands
@@ -34,6 +37,7 @@ mmr results mmr-a1b2c3      # Reconcile and output findings
 | `mmr config test` | Verify channel installation and auth |
 | `mmr jobs list` | List recent review jobs |
 | `mmr jobs prune` | Remove old jobs |
+| `mmr reconcile <job-id>` | Inject external findings and re-reconcile |
 
 ## Verdict System
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.0] — 2026-04-13
+
+### Added
+- `mmr reconcile <job-id> --channel <name> --input <source>` — inject external review findings into a job for unified reconciliation
+- `normalizeExternalInput` helper — handles wrapper and bare-array input with strict validation, markdown fence stripping, prose-wrapped extraction
+- Strict validators (`validateFindingStrict`, `validateParsedOutputStrict`) that throw on invalid input
+- Exported parser helpers for reuse: `stripMarkdownFences`, `extractJson`, `fixTrailingCommas`
+
+### Changed
+- Tool specs updated for 4-channel flow: 3 CLI channels via `mmr review` + agent skill via `mmr reconcile`
+- CLAUDE.md updated with `mmr reconcile` quick reference
+
 ## [1.0.0] — 2026-04-13
 
 ### Added
