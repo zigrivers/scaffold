@@ -11,14 +11,14 @@ export type Parser = (raw: string) => ParsedOutput
 /**
  * Remove ```json and ``` markdown fence markers from text.
  */
-function stripMarkdownFences(text: string): string {
+export function stripMarkdownFences(text: string): string {
   return text.replace(/^```(?:json)?\s*\n?/gm, '').replace(/\n?```\s*$/gm, '')
 }
 
 /**
  * Remove trailing commas before `}` and `]`.
  */
-function fixTrailingCommas(text: string): string {
+export function fixTrailingCommas(text: string): string {
   return text.replace(/,\s*([}\]])/g, '$1')
 }
 
@@ -26,7 +26,7 @@ function fixTrailingCommas(text: string): string {
  * Find first `{`, count brace depth, extract to matching `}`.
  * Tracks in-string state to ignore braces inside JSON string values.
  */
-function extractJson(text: string): string {
+export function extractJson(text: string): string {
   const start = text.indexOf('{')
   if (start === -1) throw new Error('No JSON object found in output')
 
@@ -64,7 +64,7 @@ function extractJson(text: string): string {
  * Default parser: strips markdown fences, extracts JSON from surrounding text,
  * fixes trailing commas, then JSON.parse.
  */
-function validateParsedOutput(obj: unknown): ParsedOutput {
+export function validateParsedOutput(obj: unknown): ParsedOutput {
   if (typeof obj !== 'object' || obj === null) {
     throw new Error('Parsed output is not an object')
   }
@@ -76,7 +76,7 @@ function validateParsedOutput(obj: unknown): ParsedOutput {
   }
 }
 
-function validateFinding(f: unknown): Finding {
+export function validateFinding(f: unknown): Finding {
   if (typeof f !== 'object' || f === null) {
     return { severity: 'P2', location: 'unknown', description: 'Malformed finding', suggestion: '' }
   }
@@ -89,6 +89,45 @@ function validateFinding(f: unknown): Finding {
     suggestion: typeof record.suggestion === 'string' ? record.suggestion : '',
     ...(typeof record.id === 'string' ? { id: record.id } : {}),
     ...(typeof record.category === 'string' ? { category: record.category } : {}),
+  }
+}
+
+export function validateFindingStrict(f: unknown): Finding {
+  if (typeof f !== 'object' || f === null) {
+    throw new Error('Finding must be an object')
+  }
+  const record = f as Record<string, unknown>
+  if (!['P0', 'P1', 'P2', 'P3'].includes(record.severity as string)) {
+    throw new Error('Finding missing or invalid severity (must be P0-P3)')
+  }
+  if (typeof record.location !== 'string' || !record.location) {
+    throw new Error('Finding missing location')
+  }
+  if (typeof record.description !== 'string' || !record.description) {
+    throw new Error('Finding missing description')
+  }
+  return {
+    severity: record.severity as Finding['severity'],
+    location: record.location as string,
+    description: record.description as string,
+    suggestion: typeof record.suggestion === 'string' ? record.suggestion : '',
+    ...(typeof record.id === 'string' ? { id: record.id } : {}),
+    ...(typeof record.category === 'string' ? { category: record.category } : {}),
+  }
+}
+
+export function validateParsedOutputStrict(obj: unknown): ParsedOutput {
+  if (typeof obj !== 'object' || obj === null) {
+    throw new Error('Input must be an object')
+  }
+  const record = obj as Record<string, unknown>
+  if (!Array.isArray(record.findings)) {
+    throw new Error('Input findings must be an array')
+  }
+  return {
+    approved: typeof record.approved === 'boolean' ? record.approved : false,
+    findings: record.findings.map(validateFindingStrict),
+    summary: typeof record.summary === 'string' ? record.summary : '',
   }
 }
 

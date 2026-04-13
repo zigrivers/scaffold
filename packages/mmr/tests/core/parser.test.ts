@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseChannelOutput, getParser } from '../../src/core/parser.js'
+import { parseChannelOutput, getParser, validateFindingStrict, validateParsedOutputStrict } from '../../src/core/parser.js'
 
 describe('default parser', () => {
   const parse = getParser('default')
@@ -108,5 +108,62 @@ describe('parseChannelOutput', () => {
     expect(result.approved).toBe(false)
     expect(result.findings).toHaveLength(1)
     expect(result.findings[0].description).toContain('Unbalanced braces')
+  })
+})
+
+describe('validateFindingStrict', () => {
+  it('accepts a valid finding', () => {
+    const f = validateFindingStrict({ severity: 'P1', location: 'f.ts:10', description: 'bug', suggestion: 'fix' })
+    expect(f.severity).toBe('P1')
+  })
+
+  it('throws on missing severity', () => {
+    expect(() => validateFindingStrict({ location: 'f.ts:1', description: 'bug', suggestion: '' }))
+      .toThrow('missing or invalid severity')
+  })
+
+  it('throws on invalid severity value', () => {
+    expect(() => validateFindingStrict({ severity: 'CRITICAL', location: 'f.ts:1', description: 'bug', suggestion: '' }))
+      .toThrow('missing or invalid severity')
+  })
+
+  it('throws on missing description', () => {
+    expect(() => validateFindingStrict({ severity: 'P2', location: 'f.ts:1', suggestion: '' }))
+      .toThrow('missing description')
+  })
+
+  it('throws on missing location', () => {
+    expect(() => validateFindingStrict({ severity: 'P2', description: 'bug', suggestion: '' }))
+      .toThrow('missing location')
+  })
+
+  it('preserves optional id and category', () => {
+    const f = validateFindingStrict({ id: 'X-1', category: 'security', severity: 'P0', location: 'f.ts:1', description: 'vuln', suggestion: 'fix' })
+    expect(f.id).toBe('X-1')
+    expect(f.category).toBe('security')
+  })
+})
+
+describe('validateParsedOutputStrict', () => {
+  it('accepts valid wrapper with findings', () => {
+    const result = validateParsedOutputStrict({
+      approved: false,
+      findings: [{ severity: 'P1', location: 'f.ts:1', description: 'bug', suggestion: 'fix' }],
+      summary: 'found bug',
+    })
+    expect(result.findings).toHaveLength(1)
+  })
+
+  it('throws when findings is not an array', () => {
+    expect(() => validateParsedOutputStrict({ approved: true, findings: 'none', summary: 'ok' }))
+      .toThrow('findings must be an array')
+  })
+
+  it('throws when a finding inside is invalid', () => {
+    expect(() => validateParsedOutputStrict({
+      approved: false,
+      findings: [{ severity: 'BAD', location: 'f.ts:1', description: 'x', suggestion: '' }],
+      summary: 'x',
+    })).toThrow('missing or invalid severity')
   })
 })
