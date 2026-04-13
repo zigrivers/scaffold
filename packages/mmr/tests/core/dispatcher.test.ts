@@ -39,6 +39,51 @@ describe('dispatchChannel', () => {
     expect(fs.existsSync(pidFile)).toBe(true)
   })
 
+  it('handles stdin pipe error without crashing', async () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['badstdin'] })
+    store.savePrompt(job.job_id, 'Review this.')
+
+    // node -e exits immediately without reading stdin, causing EPIPE on large write
+    await dispatchChannel(store, job.job_id, 'badstdin', {
+      command: 'node',
+      prompt: 'x'.repeat(4 * 1024 * 1024), // 4MB to overflow pipe buffer
+      flags: ['-e', 'process.exit(0)'],
+      env: {},
+      timeout: 5,
+      stderr: 'capture',
+    })
+
+    // Wait for process to complete
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    const loaded = store.loadJob(job.job_id)
+    const status = loaded.channels.badstdin.status
+    expect(['completed', 'failed']).toContain(status)
+  })
+
+  it('saves channel output and marks completed on success', async () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['echo'] })
+    store.savePrompt(job.job_id, 'Review this.')
+
+    await dispatchChannel(store, job.job_id, 'echo', {
+      command: 'node',
+      prompt: '',
+      flags: ['-e', 'process.stdout.write(JSON.stringify({approved:true,findings:[],summary:"ok"}))'],
+      env: {},
+      timeout: 10,
+      stderr: 'capture',
+    })
+
+    // Wait for process to complete
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    const loaded = store.loadJob(job.job_id)
+    expect(loaded.channels.echo.status).toBe('completed')
+
+    const output = store.loadChannelOutput(job.job_id, 'echo')
+    expect(output).toContain('approved')
+  })
+
   it('handles channel timeout', async () => {
     const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['slow'] })
     store.savePrompt(job.job_id, 'Review this.')

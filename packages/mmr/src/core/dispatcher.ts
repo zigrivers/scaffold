@@ -33,6 +33,10 @@ export async function dispatchChannel(
   channelName: string,
   opts: DispatchOptions,
 ): Promise<void> {
+  if (!/^[a-zA-Z0-9._-]+$/.test(channelName)) {
+    throw new Error(`Unsafe channel name: ${channelName}`)
+  }
+
   const jobDir = store.getJobDir(jobId)
   const channelsDir = path.join(jobDir, 'channels')
 
@@ -51,6 +55,11 @@ export async function dispatchChannel(
     detached: true,
     stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...process.env, ...opts.env },
+  })
+
+  // Handle stdin pipe errors (child may close stdin early)
+  proc.stdin.on('error', () => {
+    // Swallow EPIPE — the close handler will deal with the process exit
   })
 
   // Write prompt to stdin
@@ -73,9 +82,14 @@ export async function dispatchChannel(
     stderr += chunk.toString()
   })
 
+  // In-memory settled flag to prevent timeout/close race
+  let settled = false
+
   // Set up timeout
   const timeoutMs = opts.timeout * 1000
   const timer = setTimeout(() => {
+    if (settled) return
+    settled = true
     try {
       // Kill the process group (negative PID kills the group)
       if (proc.pid) {
@@ -97,14 +111,10 @@ export async function dispatchChannel(
   // Handle process close
   proc.on('close', (code: number | null) => {
     clearTimeout(timer)
+    if (settled) return
+    settled = true
 
     const completedAt = new Date().toISOString()
-    const meta = store.loadJob(jobId)
-
-    // If already marked as timeout, don't overwrite
-    if (meta.channels[channelName]?.status === 'timeout') {
-      return
-    }
 
     if (code === 0 && stdout) {
       // Always save raw stdout — parser.ts handles format quirks
@@ -126,6 +136,8 @@ export async function dispatchChannel(
   // Handle spawn errors
   proc.on('error', (err: Error) => {
     clearTimeout(timer)
+    if (settled) return
+    settled = true
     store.updateChannel(jobId, channelName, {
       status: 'failed',
       completed_at: new Date().toISOString(),
