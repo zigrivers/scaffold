@@ -24,6 +24,7 @@ function deepMerge<T extends Record<string, unknown>>(base: T, overlay: Record<s
   for (const key of Object.keys(overlay)) {
     const baseVal = result[key]
     const overVal = overlay[key]
+    if (overVal === undefined) continue
 
     if (
       overVal !== null &&

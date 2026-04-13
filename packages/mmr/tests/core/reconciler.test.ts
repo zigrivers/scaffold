@@ -87,6 +87,15 @@ describe('reconcile', () => {
     expect(result[0].sources).toEqual(['compensating-codex'])
   })
 
+  it('uses the finding with the longest description as representative', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      claude: [{ severity: 'P1', location: 'file.ts:10', description: 'short', suggestion: 'fix A' }],
+      gemini: [{ severity: 'P1', location: 'file.ts:10', description: 'this is a much longer and more detailed description of the bug', suggestion: 'fix B' }],
+    }
+    const result = reconcile(channelFindings)
+    expect(result[0].description).toContain('much longer')
+  })
+
   it('assigns high confidence to P0 even from compensating channels', () => {
     const channelFindings: Record<string, Finding[]> = {
       'compensating-codex': [{ severity: 'P0', location: 'f.ts:1', description: 'critical', suggestion: 'fix' }],

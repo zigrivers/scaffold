@@ -79,6 +79,8 @@ export interface ReconciledResults {
   job_id: string
   verdict: Verdict
   fix_threshold: Severity
+  approved: boolean
+  summary: string
   reconciled_findings: ReconciledFinding[]
   per_channel: Record<string, ChannelResult>
   metadata: {

@@ -71,8 +71,10 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
         : 'medium'
     }
 
-    // Use first finding's description/suggestion as representative
-    const representative = group[0]
+    // Use the finding with the longest description as representative (deterministic)
+    const representative = group.reduce((best, current) =>
+      current.description.length > best.description.length ? current : best
+    )
 
     results.push({
       severity: effectiveSeverity,

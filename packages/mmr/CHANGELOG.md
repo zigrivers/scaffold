@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.8.0] — 2026-04-13
+
+### Fixed
+- **P2-24:** Job ID uses 6 random bytes (12 hex chars) to reduce collision risk
+- **P2-25:** loadJob validates job metadata structure after JSON parse
+- **P2-26:** Reconciler uses longest description as representative (deterministic)
+- **P2-28:** Markdown formatter escapes newlines with `<br>` in table cells
+- **P2-35:** deepMerge skips undefined overlay values
+
+### Added
+- **P3-41:** `approved` boolean and `summary` string added to ReconciledResults
+- **P3-43:** Gemini channel default timeout set to 360s (was inheriting global 300s)
+
+### Changed
+- **P3-42:** Recovery commands no longer include `Run:` prefix — consumers add formatting
+
 ## [0.7.0] — 2026-04-13
 
 ### Fixed
