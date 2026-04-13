@@ -23,6 +23,10 @@ node_modules/
 # Temp files (atomic writes)
 *.tmp
 
+# Runtime artifacts
+.remember/tmp/*.pid
+.remember/logs/
+
 # Editor backups
 *~
 *.bak
