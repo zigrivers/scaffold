@@ -2,6 +2,28 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.16.0] — 2026-04-13
+
+### Added
+- **MMR CLI v0.2.0–v1.1.0** — 11 releases resolving all 45 audit findings plus the new `reconcile` command
+- **`mmr reconcile` command** — inject external review findings (from agent skills, manual reviews) into existing MMR jobs for unified reconciliation
+- **4-channel review flow** — 3 CLI channels via `mmr review` + agent skill via `mmr reconcile`
+- **Verdict system** — `pass`/`degraded-pass`/`blocked`/`needs-user-decision` replaces binary gate
+- **Compensating passes** — Claude-based review for unavailable channels
+- **`--sync` mode** — single-command review pipeline for agents and CI
+
+### Changed
+- **Tool specs aligned with CLI-first architecture** — `review-pr`, `review-code`, `post-implementation-review` updated for MMR CLI + `mmr reconcile` 4-channel flow
+- **Knowledge base updated** — `multi-model-review-dispatch`, `automated-review-tooling` match CLI implementation
+- **CLAUDE.md MMR section** — CLI-first model, correct channel names, `mmr reconcile` quick reference
+- **README.md** — MMR section updated with `--sync` as primary entry point, `reconcile` command documented
+
+### Fixed
+- MMR dispatcher: concurrent write race, stdin crash, timeout race, sequential dispatch, orphan cleanup
+- MMR parser: string-aware brace counting, Gemini validation, markdown newline escaping
+- MMR auth: POSIX-portable `command -v`, timeout retry, skipped channel recording
+- MMR store: job ID collision risk, JSON validation, deterministic reconciliation
+
 ## [3.15.0] — 2026-04-12
 
 ### Added
