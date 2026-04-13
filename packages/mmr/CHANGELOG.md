@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.0] — 2026-04-13
+
+### Fixed
+- **P2-20:** Parent process now cleans up child processes on SIGINT/SIGTERM
+- **P2-21:** Stderr modes `suppress`, `capture`, `passthrough` correctly mapped to child stdio
+- **P2-27:** `resolveDiff` uses 10MB maxBuffer to handle large diffs
+- **P2-37:** Status command exit codes aligned with results command (5=CLI error)
+
 ## [0.6.0] — 2026-04-13
 
 ### Added
