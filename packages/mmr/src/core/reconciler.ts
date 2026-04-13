@@ -65,7 +65,10 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
     } else {
       // Single source -> unique
       agreement = 'unique'
-      confidence = effectiveSeverity === 'P0' ? 'high' : 'medium'
+      const isCompensating = sources[0].startsWith('compensating-')
+      confidence = effectiveSeverity === 'P0' ? 'high'
+        : isCompensating ? 'low'
+        : 'medium'
     }
 
     // Use first finding's description/suggestion as representative
