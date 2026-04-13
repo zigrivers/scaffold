@@ -17,7 +17,7 @@ describe('formatText', () => {
     expect(output).toContain('mmr-abc123')
   })
 
-  it('shows FAILED with findings when gate fails', () => {
+  it('shows BLOCKED with findings when gate fails', () => {
     const results: ReconciledResults = {
       job_id: 'mmr-abc123',
       verdict: 'blocked',
@@ -34,9 +34,35 @@ describe('formatText', () => {
       metadata: { channels_dispatched: 2, channels_completed: 2, channels_partial: 0, total_elapsed: '45s' },
     }
     const output = formatText(results)
-    expect(output).toContain('FAILED')
+    expect(output).toContain('BLOCKED')
     expect(output).toContain('P1')
     expect(output).toContain('file.ts:10')
     expect(output).toContain('Bug found')
+  })
+
+  it('displays PASSED for degraded-pass verdict', () => {
+    const results: ReconciledResults = {
+      job_id: 'mmr-test',
+      verdict: 'degraded-pass',
+      fix_threshold: 'P2',
+      reconciled_findings: [],
+      per_channel: {},
+      metadata: { channels_dispatched: 2, channels_completed: 1, channels_partial: 1, total_elapsed: '5s' },
+    }
+    const output = formatText(results)
+    expect(output).toContain('PASSED')
+  })
+
+  it('displays NEEDS DECISION for needs-user-decision verdict', () => {
+    const results: ReconciledResults = {
+      job_id: 'mmr-test',
+      verdict: 'needs-user-decision',
+      fix_threshold: 'P2',
+      reconciled_findings: [],
+      per_channel: {},
+      metadata: { channels_dispatched: 2, channels_completed: 0, channels_partial: 2, total_elapsed: '5s' },
+    }
+    const output = formatText(results)
+    expect(output).toContain('NEEDS DECISION')
   })
 })

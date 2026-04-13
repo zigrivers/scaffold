@@ -85,6 +85,11 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
   // Step 4: Sort by severity (P0 first)
   results.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity])
 
+  // Auto-generate finding IDs
+  results.forEach((f, i) => {
+    f.id = `F-${String(i + 1).padStart(3, '0')}`
+  })
+
   return results
 }
 

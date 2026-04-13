@@ -81,7 +81,7 @@ describe('review lifecycle (unit integration)', () => {
       metadata: { channels_dispatched: 2, channels_completed: 2, channels_partial: 0, total_elapsed: '45s' },
     }
     const text = formatText(results)
-    expect(text).toContain('FAILED')
+    expect(text).toContain('BLOCKED')
     expect(text).toContain('P1')
   })
 

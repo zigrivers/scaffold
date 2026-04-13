@@ -32,6 +32,8 @@ export const TERMINAL_STATUSES: ReadonlySet<ChannelStatus> = new Set([
 ])
 
 export interface Finding {
+  id?: string
+  category?: string
   severity: Severity
   location: string
   description: string
