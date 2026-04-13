@@ -4,6 +4,7 @@ import { statusCommand } from './commands/status.js'
 import { resultsCommand } from './commands/results.js'
 import { configCommand } from './commands/config.js'
 import { jobsCommand } from './commands/jobs.js'
+import { reconcileCommand } from './commands/reconcile.js'
 
 export async function runCli(argv: string[]): Promise<void> {
   await yargs(argv)
@@ -14,6 +15,7 @@ export async function runCli(argv: string[]): Promise<void> {
     .command(resultsCommand)
     .command(configCommand)
     .command(jobsCommand)
+    .command(reconcileCommand)
     .demandCommand(1, 'Run mmr --help for usage')
     .strict()
     .help()
