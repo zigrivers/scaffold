@@ -8,7 +8,7 @@ import { JobStore } from '../core/job-store.js'
 import { checkInstalled, checkAuth } from '../core/auth.js'
 import { assemblePrompt } from '../core/prompt.js'
 import { dispatchChannel } from '../core/dispatcher.js'
-import type { Severity, OutputFormat } from '../types.js'
+import type { Severity, OutputFormat, ChannelStatus } from '../types.js'
 
 interface ReviewArgs {
   diff?: string
@@ -181,13 +181,22 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     const job = store.createJob({
       fix_threshold: config.defaults.fix_threshold as Severity,
       format: config.defaults.format as OutputFormat,
-      channels: validChannels,
+      channels: channelNames,
     })
 
-    // Update skipped/failed channels in job metadata
+    // Record skipped/auth-failed channels in job metadata
     for (const name of channelNames) {
-      if (!validChannels.includes(name) && job.channels[name] === undefined) {
-        // Channel was skipped at auth — not in job, skip
+      if (!validChannels.includes(name)) {
+        const authStatus = authResults[name]
+        const channelStatus: ChannelStatus = authStatus?.status === 'not_installed' ? 'not_installed'
+          : authStatus?.status === 'failed' ? 'auth_failed'
+          : authStatus?.status === 'timeout' ? 'timeout'
+          : 'skipped'
+        store.updateChannel(job.job_id, name, {
+          status: channelStatus,
+          auth: channelStatus === 'skipped' ? 'skipped' : 'failed',
+          recovery: authStatus?.recovery,
+        })
       }
     }
 

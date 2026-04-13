@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0] — 2026-04-13
+
+### Fixed
+- **P1-18:** Use POSIX-portable `command -v` instead of `which` for installation checks
+- **P1-19:** Auth check retries once on timeout before reporting failure
+- **P2-22:** Skipped and auth-failed channels now recorded in job metadata with status and recovery info
+
 ## [0.3.0] — 2026-04-13
 
 ### Added

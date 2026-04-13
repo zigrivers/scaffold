@@ -11,6 +11,11 @@ describe('checkInstalled', () => {
     const result = await checkInstalled('nonexistent-binary-xyz-123')
     expect(result).toBe(false)
   })
+
+  it('rejects command names with unsafe characters', async () => {
+    const result = await checkInstalled('node; rm -rf /')
+    expect(result).toBe(false)
+  })
 })
 
 describe('checkAuth', () => {
@@ -71,4 +76,27 @@ describe('checkAuth', () => {
     })
     expect(result.status).toBe('timeout')
   })
+
+  it('retries auth check once on timeout', async () => {
+    const start = Date.now()
+    const result = await checkAuth({
+      enabled: true,
+      command: 'echo',
+      flags: [],
+      env: {},
+      auth: {
+        check: 'sleep 10',
+        timeout: 1,
+        failure_exit_codes: [1],
+        recovery: 'do something',
+      },
+      prompt_wrapper: '{{prompt}}',
+      output_parser: 'default',
+      stderr: 'capture',
+    })
+    const elapsed = Date.now() - start
+    expect(result.status).toBe('timeout')
+    // Must take >= 1.8s (two 1-second timeouts), proving retry occurred
+    expect(elapsed).toBeGreaterThanOrEqual(1800)
+  }, 10000)
 })
