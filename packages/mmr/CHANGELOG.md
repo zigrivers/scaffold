@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0] — 2026-04-13
+
+### Added
+- **P0-3:** Verdict system — `pass`, `degraded-pass`, `blocked`, `needs-user-decision` replaces binary `gate_passed`
+- **P1-8:** Exit codes — 0=pass/degraded-pass, 2=blocked, 3=needs-user-decision, 5=CLI error
+- **P1-17:** `not_installed` channel status for missing CLI tools
+- **P2-34:** Optional `id` (auto-generated F-001) and `category` fields on Finding type
+
+### Changed
+- **P3-38:** `TERMINAL_STATUSES` exported from types.ts; duplicated lists removed from dispatcher, status, results
+- **P2-36:** Removed unused `divergent` from Agreement type
+- Verdict derivation considers channel health: degraded-pass when some channels failed, needs-user-decision when none completed
+
 ## [0.2.0] — 2026-04-13
 
 ### Fixed
