@@ -33,7 +33,7 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
       recovery: 'Run: claude login',
     },
     prompt_wrapper: '{{prompt}}',
-    output_parser: 'claude',
+    output_parser: 'default',
     stderr: 'capture',
   },
   gemini: {
@@ -63,7 +63,7 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
       recovery: 'Run: codex login',
     },
     prompt_wrapper: '{{prompt}}',
-    output_parser: 'codex',
+    output_parser: 'default',
     stderr: 'suppress',
   },
 }
