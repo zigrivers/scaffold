@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.0] — 2026-04-13
+
+### Added
+- **P0-6:** Degraded-mode lifecycle tests — partial failure, all-failed, timeout+parse paths
+- **P1-16:** Spawn error test for nonexistent commands
+- **P3-39:** JSDoc comment on JobStatus documenting intentional subset relationship
+
+### Summary
+All 45 findings from the MMR CLI audit are resolved across 10 batches (v0.2.0–v1.0.0).
+The CLI is now production-ready with comprehensive test coverage, proper type system,
+verdict-based gating, compensating passes, and spec-aligned documentation.
+
 ## [0.9.0] — 2026-04-13
 
 ### Changed
