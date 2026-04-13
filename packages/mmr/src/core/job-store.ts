@@ -32,9 +32,9 @@ export class JobStore {
     return path.join(this.getJobDir(jobId), 'channels', filename)
   }
 
-  /** Generate a unique job ID: mmr-{6 hex chars} */
+  /** Generate a unique job ID: mmr-{12 hex chars} */
   private generateId(): string {
-    const hex = crypto.randomBytes(3).toString('hex')
+    const hex = crypto.randomBytes(6).toString('hex')
     return `mmr-${hex}`
   }
 
@@ -79,6 +79,9 @@ export class JobStore {
     const jobDir = this.getJobDir(jobId)
     const raw = fs.readFileSync(path.join(jobDir, 'job.json'), 'utf-8')
     const metadata = JSON.parse(raw) as JobMetadata
+    if (!metadata.job_id || !metadata.channels || typeof metadata.channels !== 'object') {
+      throw new Error(`Malformed job metadata in ${jobId}/job.json`)
+    }
 
     for (const channelName of Object.keys(metadata.channels)) {
       const statusPath = this.channelFilePath(jobId, channelName, `${channelName}.status.json`)

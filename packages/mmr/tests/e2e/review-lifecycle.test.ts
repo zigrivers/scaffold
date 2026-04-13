@@ -71,8 +71,11 @@ describe('review lifecycle (unit integration)', () => {
     // 7. Derive verdict and format output
     const channelStatuses: Record<string, ChannelStatus> = { claude: 'completed', gemini: 'completed' }
     const verdict = deriveVerdict(gatePassed, channelStatuses)
+    const approved = verdict === 'pass' || verdict === 'degraded-pass'
     const results: ReconciledResults = {
       job_id: job.job_id, verdict, fix_threshold: 'P2',
+      approved,
+      summary: approved ? 'Review passed' : `Review blocked — ${reconciled.length} finding(s) at or above P2`,
       reconciled_findings: reconciled,
       per_channel: {
         claude: { status: 'completed', elapsed: '30s', findings: claudeParsed.findings },

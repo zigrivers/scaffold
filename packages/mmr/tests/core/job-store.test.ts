@@ -23,7 +23,7 @@ describe('JobStore', () => {
       format: 'json',
       channels: ['claude', 'gemini'],
     })
-    expect(job.job_id).toMatch(/^mmr-[a-z0-9]{6}$/)
+    expect(job.job_id).toMatch(/^mmr-[a-f0-9]{12}$/)
     expect(job.status).toBe('dispatched')
     expect(fs.existsSync(path.join(tmpDir, job.job_id, 'job.json'))).toBe(true)
   })

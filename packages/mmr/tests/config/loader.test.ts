@@ -118,6 +118,16 @@ describe('loadConfig', () => {
     expect(config.channels.claude.command).toBe('claude -p')
   })
 
+  it('does not overwrite base values with undefined overlay values', () => {
+    const config = loadConfig({
+      projectRoot: tmpDir,
+      userHome: tmpDir,
+      cliOverrides: { fix_threshold: undefined },
+    })
+    // Should keep the default P2, not overwrite with undefined
+    expect(config.defaults.fix_threshold).toBe('P2')
+  })
+
   it('throws on malformed YAML', () => {
     fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), '{ invalid yaml: [}')
     expect(() => loadConfig({ projectRoot: tmpDir, userHome: tmpDir })).toThrow('Failed to parse')

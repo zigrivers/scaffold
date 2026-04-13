@@ -98,10 +98,19 @@ export function runResultsPipeline(
     ? `${((Math.max(...endTimes) - Math.min(...startTimes)) / 1000).toFixed(1)}s`
     : '0s'
 
+  const approved = verdict === 'pass' || verdict === 'degraded-pass'
+  const summary = approved
+    ? `Review passed${verdict === 'degraded-pass' ? ' (degraded — some channels unavailable)' : ''}`
+    : verdict === 'needs-user-decision'
+      ? 'No channels completed — manual review needed'
+      : `Review blocked — ${reconciledFindings.length} finding(s) at or above ${fixThreshold}`
+
   const results: ReconciledResults = {
     job_id: job.job_id,
     verdict,
     fix_threshold: fixThreshold,
+    approved,
+    summary,
     reconciled_findings: reconciledFindings,
     per_channel: perChannel,
     metadata: {

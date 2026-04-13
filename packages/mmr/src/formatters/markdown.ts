@@ -29,7 +29,7 @@ export function formatMarkdown(results: ReconciledResults): string {
     lines.push('|----------|----------|-------------|------------|---------|-----------|')
     for (const f of results.reconciled_findings) {
       const src = f.sources.join(', ')
-      const esc = (s: string) => s.replace(/\|/g, '\\|')
+      const esc = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, '<br>')
       const row = [
         f.severity, f.location, esc(f.description),
         esc(f.suggestion), src, f.agreement,
