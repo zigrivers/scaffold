@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.9.0] — 2026-04-13
+
+### Changed
+- **P1-7:** Tool spec (`review-pr.md`) updated for CLI-first architecture — 3 CLI channels (claude, gemini, codex), `mmr review --sync` as primary entry point
+- **P1-12:** Fix cycle documented as orchestration concern, not CLI responsibility
+- **P1-13:** Knowledge base entries (`multi-model-review-dispatch`, `automated-review-tooling`) updated to match CLI implementation
+- **P1-14:** CLAUDE.md MMR section updated with CLI-first model and correct channel names
+
+### Removed
+- **P2-30:** Removed `sarif` from OutputFormat (no formatter exists)
+- Superpowers subagent references replaced with Claude CLI channel
+- Depth-based scaling removed from knowledge base (CLI always runs all enabled channels)
+
 ## [0.8.0] — 2026-04-13
 
 ### Fixed
