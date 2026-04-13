@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.0] — 2026-04-13
+
+### Added
+- **P0-2:** Compensating passes — when channels are unavailable (not_installed, auth_failed, timeout), a Claude-based review is dispatched focused on the missing channel's strength area
+- **P2-33:** Compensating findings assigned `low` confidence in reconciliation
+- Codex-equivalent focus: implementation correctness, security, API contracts
+- Gemini-equivalent focus: architectural patterns, design consistency
+- Generic focus for unknown channels
+
 ## [0.5.0] — 2026-04-13
 
 ### Added
