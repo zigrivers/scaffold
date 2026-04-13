@@ -53,6 +53,30 @@ describe('reconcile', () => {
     const result = reconcile(channelFindings)
     expect(result).toHaveLength(0)
   })
+
+  it('auto-generates IDs for findings without them', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      claude: [{ severity: 'P1', location: 'a.ts:1', description: 'bug', suggestion: 'fix' }],
+    }
+    const result = reconcile(channelFindings)
+    expect(result[0].id).toBe('F-001')
+  })
+
+  it('preserves caller-supplied IDs', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      claude: [{ id: 'MY-1', severity: 'P1', location: 'a.ts:1', description: 'bug', suggestion: 'fix' }],
+    }
+    const result = reconcile(channelFindings)
+    expect(result[0].id).toBe('MY-1')
+  })
+
+  it('carries category through reconciliation', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      claude: [{ category: 'security', severity: 'P0', location: 'a.ts:1', description: 'vuln', suggestion: 'fix' }],
+    }
+    const result = reconcile(channelFindings)
+    expect(result[0].category).toBe('security')
+  })
 })
 
 describe('evaluateGate', () => {

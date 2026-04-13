@@ -76,6 +76,8 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
       location: representative.location,
       description: representative.description,
       suggestion: representative.suggestion,
+      ...(representative.id !== undefined ? { id: representative.id } : {}),
+      ...(representative.category !== undefined ? { category: representative.category } : {}),
       confidence,
       sources,
       agreement,
@@ -85,9 +87,11 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
   // Step 4: Sort by severity (P0 first)
   results.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity])
 
-  // Auto-generate finding IDs
+  // Auto-generate finding IDs (only backfill when absent)
   results.forEach((f, i) => {
-    f.id = `F-${String(i + 1).padStart(3, '0')}`
+    if (!f.id) {
+      f.id = `F-${String(i + 1).padStart(3, '0')}`
+    }
   })
 
   return results

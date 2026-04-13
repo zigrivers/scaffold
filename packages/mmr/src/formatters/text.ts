@@ -6,6 +6,7 @@ function verdictLabel(verdict: ReconciledResults['verdict']): string {
     case 'degraded-pass': return 'PASSED'
     case 'blocked': return 'BLOCKED'
     case 'needs-user-decision': return 'NEEDS DECISION'
+    default: return 'UNKNOWN'
   }
 }
 
