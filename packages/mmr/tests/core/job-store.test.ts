@@ -91,6 +91,15 @@ describe('JobStore', () => {
     expect(() => store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['../evil'] })).toThrow('Unsafe channel name')
   })
 
+  it('registers a new channel in job.json visible to loadJob', () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
+    store.registerChannel(job.job_id, 'compensating-codex', { status: 'dispatched', auth: 'ok' })
+
+    const loaded = store.loadJob(job.job_id)
+    expect(loaded.channels['compensating-codex']).toBeDefined()
+    expect(loaded.channels['compensating-codex'].status).toBe('dispatched')
+  })
+
   it('prunes jobs older than retention days', () => {
     const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
     const jobDir = path.join(tmpDir, job.job_id)

@@ -77,6 +77,23 @@ describe('reconcile', () => {
     const result = reconcile(channelFindings)
     expect(result[0].category).toBe('security')
   })
+
+  it('assigns low confidence to findings from compensating channels', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      'compensating-codex': [{ severity: 'P2', location: 'f.ts:10', description: 'issue', suggestion: 'fix' }],
+    }
+    const result = reconcile(channelFindings)
+    expect(result[0].confidence).toBe('low')
+    expect(result[0].sources).toEqual(['compensating-codex'])
+  })
+
+  it('assigns high confidence to P0 even from compensating channels', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      'compensating-codex': [{ severity: 'P0', location: 'f.ts:1', description: 'critical', suggestion: 'fix' }],
+    }
+    const result = reconcile(channelFindings)
+    expect(result[0].confidence).toBe('high')
+  })
 })
 
 describe('evaluateGate', () => {

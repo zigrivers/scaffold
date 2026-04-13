@@ -9,6 +9,7 @@ import { checkInstalled, checkAuth } from '../core/auth.js'
 import { assemblePrompt } from '../core/prompt.js'
 import { dispatchChannel } from '../core/dispatcher.js'
 import { runResultsPipeline } from '../core/results-pipeline.js'
+import { getCompensatingChannels, dispatchCompensatingPasses } from '../core/compensator.js'
 import type { Severity, OutputFormat, ChannelStatus } from '../types.js'
 
 interface ReviewArgs {
@@ -248,6 +249,25 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
           stderr: chConfig.stderr as 'capture' | 'ignore',
         })
       }
+    }
+
+    // 8b. Dispatch compensating passes for unavailable channels
+    const completedJob1 = store.loadJob(job.job_id)
+    const channelStatuses = Object.fromEntries(
+      Object.entries(completedJob1.channels).map(([n, ch]) => [n, ch.status]),
+    ) as Record<string, ChannelStatus>
+    const compensating = getCompensatingChannels(channelStatuses)
+
+    if (compensating.length > 0) {
+      // Register compensating channels in job.json so loadJob can discover them
+      for (const comp of compensating) {
+        store.registerChannel(job.job_id, comp.compensatingName, {
+          status: 'dispatched',
+          auth: 'ok',
+          output_parser: 'default',
+        })
+      }
+      await dispatchCompensatingPasses(store, job.job_id, prompt, compensating, config.defaults.timeout)
     }
 
     // 9. Output results

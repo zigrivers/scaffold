@@ -138,6 +138,16 @@ export class JobStore {
     fs.writeFileSync(filePath, log)
   }
 
+  /** Register a new channel in the base job.json metadata so loadJob can discover it */
+  registerChannel(jobId: string, channel: string, initial: Partial<ChannelJobEntry>): void {
+    this.validateChannelName(channel)
+    const jobJsonPath = path.join(this.getJobDir(jobId), 'job.json')
+    const raw = fs.readFileSync(jobJsonPath, 'utf-8')
+    const metadata = JSON.parse(raw) as JobMetadata
+    metadata.channels[channel] = { status: 'dispatched', auth: 'ok', ...initial }
+    fs.writeFileSync(jobJsonPath, JSON.stringify(metadata, null, 2))
+  }
+
   /** Update a channel entry by writing a per-channel status file atomically */
   updateChannel(jobId: string, channel: string, update: Partial<ChannelJobEntry>): void {
     const channelsDir = path.join(this.getJobDir(jobId), 'channels')
