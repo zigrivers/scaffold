@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { reconcile, evaluateGate } from '../../src/core/reconciler.js'
-import type { Finding, ReconciledFinding } from '../../src/types.js'
+import { reconcile, evaluateGate, deriveVerdict } from '../../src/core/reconciler.js'
+import type { Finding, ReconciledFinding, ChannelStatus } from '../../src/types.js'
 
 describe('reconcile', () => {
   it('marks findings as consensus when 2+ channels agree on location and severity', () => {
@@ -82,5 +82,47 @@ describe('evaluateGate', () => {
       confidence: 'high', sources: ['claude', 'gemini'], agreement: 'consensus',
     }]
     expect(evaluateGate(findings, 'P2')).toBe(false)
+  })
+})
+
+describe('deriveVerdict', () => {
+  it('returns pass when gate passes and all channels completed', () => {
+    const statuses: Record<string, ChannelStatus> = { claude: 'completed', gemini: 'completed' }
+    expect(deriveVerdict(true, statuses)).toBe('pass')
+  })
+
+  it('returns blocked when gate fails regardless of channel status', () => {
+    const statuses: Record<string, ChannelStatus> = { claude: 'completed', gemini: 'completed' }
+    expect(deriveVerdict(false, statuses)).toBe('blocked')
+  })
+
+  it('returns degraded-pass when gate passes but some channels failed', () => {
+    const statuses: Record<string, ChannelStatus> = { claude: 'completed', gemini: 'failed' }
+    expect(deriveVerdict(true, statuses)).toBe('degraded-pass')
+  })
+
+  it('returns degraded-pass when gate passes but some channels timed out', () => {
+    const statuses: Record<string, ChannelStatus> = { claude: 'completed', codex: 'timeout' }
+    expect(deriveVerdict(true, statuses)).toBe('degraded-pass')
+  })
+
+  it('returns degraded-pass when some channels are not_installed', () => {
+    const statuses: Record<string, ChannelStatus> = { claude: 'completed', codex: 'not_installed' }
+    expect(deriveVerdict(true, statuses)).toBe('degraded-pass')
+  })
+
+  it('returns needs-user-decision when no channels completed', () => {
+    const statuses: Record<string, ChannelStatus> = { claude: 'failed', gemini: 'timeout' }
+    expect(deriveVerdict(true, statuses)).toBe('needs-user-decision')
+  })
+
+  it('returns needs-user-decision when all channels auth_failed', () => {
+    const statuses: Record<string, ChannelStatus> = { claude: 'auth_failed', gemini: 'auth_failed' }
+    expect(deriveVerdict(true, statuses)).toBe('needs-user-decision')
+  })
+
+  it('returns degraded-pass when some channels are skipped', () => {
+    const statuses: Record<string, ChannelStatus> = { claude: 'completed', codex: 'skipped' }
+    expect(deriveVerdict(true, statuses)).toBe('degraded-pass')
   })
 })

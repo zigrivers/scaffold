@@ -1,4 +1,4 @@
-import type { Finding, ReconciledFinding, Severity, Agreement, Confidence } from '../types.js'
+import type { Finding, ReconciledFinding, Severity, Agreement, Confidence, Verdict, ChannelStatus } from '../types.js'
 import { SEVERITY_ORDER } from '../types.js'
 
 interface AttributedFinding extends Finding {
@@ -95,4 +95,28 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
 export function evaluateGate(findings: ReconciledFinding[], threshold: Severity): boolean {
   const thresholdOrder = SEVERITY_ORDER[threshold]
   return findings.every((f) => SEVERITY_ORDER[f.severity] > thresholdOrder)
+}
+
+/**
+ * Derive the review verdict from gate evaluation and channel health.
+ *
+ * Priority: blocked > needs-user-decision > degraded-pass > pass
+ */
+export function deriveVerdict(
+  gatePassed: boolean,
+  channelStatuses: Record<string, ChannelStatus>,
+): Verdict {
+  const statuses = Object.values(channelStatuses)
+  const completedCount = statuses.filter(s => s === 'completed').length
+
+  // No channels completed — can't make a determination
+  if (completedCount === 0) return 'needs-user-decision'
+
+  // Gate failed — findings at or above threshold
+  if (!gatePassed) return 'blocked'
+
+  // Gate passed but some channels didn't complete
+  if (completedCount < statuses.length) return 'degraded-pass'
+
+  return 'pass'
 }
