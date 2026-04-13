@@ -17,6 +17,7 @@ export type ChannelStatus =
   | 'not_installed'
   | 'skipped'
 
+/** Intentional subset of ChannelStatus — represents aggregate job lifecycle, not individual channel states */
 export type JobStatus = 'dispatched' | 'running' | 'completed'
 
 export type Verdict = 'pass' | 'degraded-pass' | 'blocked' | 'needs-user-decision'
