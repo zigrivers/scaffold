@@ -78,7 +78,7 @@ describe('checkAuth', () => {
   })
 
   it('retries auth check once on timeout', async () => {
-    // Both attempts will timeout, final result should still be timeout
+    const start = Date.now()
     const result = await checkAuth({
       enabled: true,
       command: 'echo',
@@ -94,7 +94,9 @@ describe('checkAuth', () => {
       output_parser: 'default',
       stderr: 'capture',
     })
-    // Both attempts should timeout, final result is timeout
+    const elapsed = Date.now() - start
     expect(result.status).toBe('timeout')
+    // Must take >= 1.8s (two 1-second timeouts), proving retry occurred
+    expect(elapsed).toBeGreaterThanOrEqual(1800)
   }, 10000)
 })

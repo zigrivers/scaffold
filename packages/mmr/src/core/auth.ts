@@ -15,7 +15,7 @@ export async function checkInstalled(command: string): Promise<boolean> {
   if (!/^[a-zA-Z0-9._-]+$/.test(command)) return false
   return new Promise((resolve) => {
     // Use POSIX-portable 'command -v' via shell (command name already validated above)
-    const child = spawn('sh', ['-c', `command -v ${command}`], { stdio: 'ignore' })
+    const child = spawn('sh', ['-c', 'command -v "$1"', '--', command], { stdio: 'ignore' })
     child.on('close', (code) => resolve(code === 0))
     child.on('error', () => resolve(false))
   })

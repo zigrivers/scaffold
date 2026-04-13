@@ -190,7 +190,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         const authStatus = authResults[name]
         const channelStatus: ChannelStatus = authStatus?.status === 'not_installed' ? 'not_installed'
           : authStatus?.status === 'failed' ? 'auth_failed'
-          : authStatus?.status === 'timeout' ? 'auth_failed'
+          : authStatus?.status === 'timeout' ? 'timeout'
           : 'skipped'
         store.updateChannel(job.job_id, name, {
           status: channelStatus,
