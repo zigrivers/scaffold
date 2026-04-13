@@ -24,18 +24,36 @@ function fixTrailingCommas(text: string): string {
 
 /**
  * Find first `{`, count brace depth, extract to matching `}`.
+ * Tracks in-string state to ignore braces inside JSON string values.
  */
 function extractJson(text: string): string {
   const start = text.indexOf('{')
   if (start === -1) throw new Error('No JSON object found in output')
 
   let depth = 0
-  for (let i = start; i < text.length; i++) {
-    if (text[i] === '{') depth++
-    else if (text[i] === '}') depth--
+  let inString = false
 
-    if (depth === 0) {
-      return text.slice(start, i + 1)
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]
+
+    if (inString) {
+      if (ch === '\\') {
+        i++ // Skip escaped character
+      } else if (ch === '"') {
+        inString = false
+      }
+      continue
+    }
+
+    if (ch === '"') {
+      inString = true
+    } else if (ch === '{') {
+      depth++
+    } else if (ch === '}') {
+      depth--
+      if (depth === 0) {
+        return text.slice(start, i + 1)
+      }
     }
   }
 
@@ -95,8 +113,8 @@ function geminiParser(raw: string): ParsedOutput {
       // Unwrap the response field and parse it with the default parser
       return defaultParser(outer.response)
     }
-    // No wrapper — treat as direct ParsedOutput
-    return outer as ParsedOutput
+    // No wrapper — validate and return as ParsedOutput
+    return validateParsedOutput(outer)
   } catch {
     // Fall back to default parser on the original raw input
     return defaultParser(raw)
