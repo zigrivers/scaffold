@@ -123,22 +123,23 @@ reconciliation, and verdict logic.
 **The three channels:**
 1. **Codex CLI** — implementation correctness, security, API contracts
 2. **Gemini CLI** — architectural patterns, broad-context reasoning
-3. **Superpowers code-reviewer** — plan alignment, code quality, testing
+3. **Claude CLI** — plan alignment, code quality, testing
+
+**Primary entry point:** `mmr review --pr <number> --sync --format text`
 
 **Critical rules:**
-- **Foreground only** — Always run Codex and Gemini CLI commands as foreground
-  Bash calls. Never use `run_in_background`, `&`, or `nohup`. Background
-  execution produces empty output. Multiple foreground calls in a single
-  message are fine (the tool runner supports parallel invocations).
+- **Foreground only** — Always run Codex, Gemini, and Claude CLI commands as
+  foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`.
+  Background execution produces empty output. Multiple foreground calls in a
+  single message are fine (the tool runner supports parallel invocations).
 - **All 3 channels are required** — A channel enters degraded mode when it is
   not installed (`command -v` fails), auth fails and the user cannot recover,
   or it fails during execution (non-zero exit, malformed output, timeout).
-  Run a compensating Claude self-review pass for each missing **external**
+  Run a compensating pass via `claude -p` for each missing **external**
   channel (Codex or Gemini), focused on that channel's strength area and
   labeled `[compensating: Codex-equivalent]` or
   `[compensating: Gemini-equivalent]`. Compensating findings are single-source
-  confidence. (Superpowers is a Claude subagent and is always available — no
-  compensating pass needed.)
+  confidence.
 - **Auth failures are NOT silent** — surface to the user with recovery commands:
   - Codex: `! codex login`
   - Gemini: `! gemini -p "hello"`
@@ -154,22 +155,21 @@ reconciliation, and verdict logic.
 <!-- Escape hatch only. Canonical commands live in content/tools/review-pr.md.
      Update both if CLI syntax changes. -->
 ```bash
-# Installation checks
+# Primary entry point (MMR CLI)
+mmr review --pr "$PR_NUMBER" --sync --format text
+
+# Manual fallback — installation checks
 command -v codex >/dev/null 2>&1 || echo "Codex not installed"
 command -v gemini >/dev/null 2>&1 || echo "Gemini not installed"
 
-# Auth checks
+# Manual fallback — auth checks
 codex login status 2>/dev/null
 NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1
 
-# Review dispatch (foreground only — never run_in_background)
+# Manual fallback — review dispatch (foreground only — never run_in_background)
 codex exec --skip-git-repo-check -s read-only --ephemeral "PROMPT" 2>/dev/null
 NO_BROWSER=true gemini -p "PROMPT" --output-format json --approval-mode yolo 2>/dev/null
-
-# Superpowers code-reviewer
-BASE_SHA=$(gh pr view --json baseRefOid -q .baseRefOid)
-HEAD_SHA=$(gh pr view --json headRefOid -q .headRefOid)
-# Dispatch superpowers:code-reviewer subagent with base/head SHAs and PR description
+claude -p "PROMPT" --output-format json 2>/dev/null
 ```
 
 ## Project Structure Quick Reference

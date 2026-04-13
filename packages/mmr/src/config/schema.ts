@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 export const Severity = z.enum(['P0', 'P1', 'P2', 'P3'])
 
-export const OutputFormat = z.enum(['json', 'text', 'markdown', 'sarif'])
+export const OutputFormat = z.enum(['json', 'text', 'markdown'])
 
 const AuthConfigSchema = z.object({
   check: z.string(),

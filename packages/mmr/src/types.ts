@@ -25,7 +25,7 @@ export type Agreement = 'consensus' | 'majority' | 'unique'
 
 export type Confidence = 'high' | 'medium' | 'low'
 
-export type OutputFormat = 'json' | 'text' | 'markdown' | 'sarif'
+export type OutputFormat = 'json' | 'text' | 'markdown'
 
 export const TERMINAL_STATUSES: ReadonlySet<ChannelStatus> = new Set([
   'completed', 'timeout', 'failed', 'auth_failed', 'not_installed', 'skipped',

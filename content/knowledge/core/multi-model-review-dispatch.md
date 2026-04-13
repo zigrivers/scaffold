@@ -1,27 +1,18 @@
 ---
 name: multi-model-review-dispatch
-description: Patterns for dispatching reviews to external AI models (Codex, Gemini) at depth 4+, including fallback strategies and finding reconciliation
-topics: [multi-model, code-review, depth-scaling, codex, gemini, review-synthesis]
+description: Patterns for dispatching reviews to AI CLI tools (Codex, Gemini, Claude), including fallback strategies and finding reconciliation
+topics: [multi-model, code-review, codex, gemini, claude, review-synthesis]
 ---
 
 # Multi-Model Review Dispatch
 
-At higher methodology depths (4+), reviews benefit from independent validation by external AI models. Different models have different blind spots — Codex excels at code-centric analysis while Gemini brings strength in design and architectural reasoning. Dispatching to multiple models and reconciling their findings produces higher-quality reviews than any single model alone. This knowledge covers when to dispatch, how to dispatch, how to handle failures, and how to reconcile disagreements.
+Reviews benefit from independent validation by multiple AI models. Different models have different blind spots — Codex excels at code-centric analysis, Gemini brings strength in design and architectural reasoning, and Claude provides plan alignment and code quality assessment. Dispatching to multiple models and reconciling their findings produces higher-quality reviews than any single model alone. This knowledge covers how to dispatch, how to handle failures, and how to reconcile disagreements.
 
 ## Summary
 
 ### When to Dispatch
 
-Multi-model review activates at depth 4+ in the methodology scaling system:
-
-| Depth | Review Approach |
-|-------|----------------|
-| 1-2 | Claude-only, reduced pass count |
-| 3 | Claude-only, full pass count |
-| 4 | Full passes + one external model (if available) |
-| 5 | Full passes + multi-model with reconciliation |
-
-Dispatch is always optional. If no external model CLI is available, the review proceeds as a Claude-only enhanced review with additional self-review passes to partially compensate.
+Multi-model review runs all enabled channels on every review. The MMR CLI (`mmr review --sync`) is the primary entry point and handles dispatch, parsing, reconciliation, and verdict derivation automatically.
 
 ### Model Selection
 
@@ -29,15 +20,16 @@ Dispatch is always optional. If no external model CLI is available, the review p
 |-------|----------|----------|
 | **Codex** (OpenAI) | Code analysis, implementation correctness, API contract validation | Code reviews, security reviews, API reviews, database schema reviews |
 | **Gemini** (Google) | Design reasoning, architectural patterns, broad context understanding | Architecture reviews, PRD reviews, UX reviews, domain model reviews |
+| **Claude** (Anthropic) | Plan alignment, code quality, testing thoroughness | Code reviews, plan verification, test coverage |
 
-When both models are available at depth 5, dispatch to both and reconcile. At depth 4, choose the model best suited to the artifact type.
+All enabled channels run on every review. When a channel is unavailable, a compensating pass is dispatched via `claude -p` focused on the missing channel's strength area.
 
 ### Graceful Fallback
 
 External models are never required. The fallback chain:
 1. Attempt dispatch to selected model(s)
 2. If CLI unavailable → skip that model, note in report
-3. If timeout → use partial results if any, note incompleteness
+3. If timeout → CLI kills the process; no partial output preserved; compensating pass runs
 4. If all external models fail → Claude-only enhanced review (additional self-review passes)
 
 The review never blocks on external model availability.
@@ -82,15 +74,15 @@ If auth fails, report status `auth_failed` and surface recovery to the user:
 - Codex: "Codex auth expired — run `! codex login` to re-authenticate"
 - Gemini: "Gemini auth expired — run `! gemini -p \"hello\"` to re-authenticate"
 
-If auth check times out (~5 seconds), retry once. If still failing, report `auth_timeout`.
+If auth check times out (~5 seconds), retry once. If still failing, report `timeout`.
 If auth succeeds, report `ready` and proceed to dispatch.
 
 **Post-dispatch terminal states:**
 - `completed` — channel produced results, use normally
-- `partial_timeout` — partial output before timeout; use what was received, note incompleteness. Does NOT trigger compensating pass.
-- `failed` — crashed or unparseable output; triggers compensating pass.
+- `timeout` — channel exceeded time limit; CLI kills the process and marks it as `timeout`; triggers compensating pass
+- `failed` — crashed or unparseable output; triggers compensating pass
 
-Verdict impact: `partial_timeout` and `failed` channels mean the review is degraded. Maximum verdict is `degraded-pass` when any channel has a non-`completed` terminal state.
+Verdict impact: `timeout` and `failed` channels mean the review is degraded. Maximum verdict is `degraded-pass` when any channel has a non-`completed` terminal state.
 
 #### Prompt Formatting
 
@@ -126,10 +118,12 @@ Respond with a JSON array of findings:
     "severity": "P0|P1|P2|P3",
     "category": "coverage|consistency|correctness|completeness",
     "location": "section or line reference",
-    "finding": "description of the issue",
+    "description": "description of the issue",
     "suggestion": "recommended fix"
   }
 ]
+
+Note: `id` and `category` are optional — the CLI auto-generates IDs (F-001, F-002, ...) when omitted.
 ```
 
 #### Output Parsing
@@ -137,15 +131,11 @@ Respond with a JSON array of findings:
 External model output is parsed as JSON. Handle common parsing issues:
 - Strip markdown code fences (```json ... ```) if the model wraps output
 - Handle trailing commas in JSON arrays
-- Validate that each finding has the required fields (severity, category, finding)
+- Validate that each finding has the required fields (severity, location, description, suggestion)
 - Discard malformed entries rather than failing the entire parse
 
-Store raw output for audit:
-```
-docs/reviews/{artifact}/codex-review.json   — raw Codex findings
-docs/reviews/{artifact}/gemini-review.json  — raw Gemini findings
-docs/reviews/{artifact}/review-summary.md   — reconciled synthesis
-```
+The CLI stores raw output at `~/.mmr/jobs/{job-id}/` per channel. Review results
+are available via `mmr results <job-id>`.
 
 ### Timeout Handling
 
@@ -158,14 +148,7 @@ External model calls can hang or take unreasonably long. Set reasonable timeouts
 | Medium artifact review (2000-10000 words) | 120 seconds | Needs more processing time |
 | Large artifact review (>10000 words) | 180 seconds | Maximum reasonable wait |
 
-#### Partial Result Handling
-
-If a timeout occurs mid-response:
-1. Check if the partial output contains valid JSON entries
-2. If yes, use the valid entries and note "partial results" in the report
-3. If no, treat as a model failure and fall back
-
-Never wait indefinitely. A review that completes in 3 minutes with Claude-only findings is better than one that blocks for 10 minutes waiting for an external model.
+Never wait indefinitely. A review that completes in 3 minutes with Claude-only findings is better than one that blocks for 10 minutes waiting for an external model. When a channel times out, the CLI kills the process — no partial output is preserved. A compensating pass runs in its place.
 
 ### Finding Reconciliation
 
@@ -224,9 +207,9 @@ When synthesizing multi-model findings, classify each finding:
 # Multi-Model Review Summary: [Artifact Name]
 
 ## Models Used
-- Claude (primary reviewer)
-- Codex (external, depth 4+) — [available/unavailable/timeout]
-- Gemini (external, depth 5) — [available/unavailable/timeout]
+- Claude CLI — [available/unavailable/timeout]
+- Codex CLI — [available/unavailable/timeout]
+- Gemini CLI — [available/unavailable/timeout]
 
 ## Consensus Findings
 | # | Severity | Finding | Models | Confidence |
@@ -251,14 +234,10 @@ or areas where external models provided unique value]
 
 #### Raw JSON Preservation
 
-Always preserve the raw JSON output from external models, even after reconciliation. The raw findings serve as an audit trail and enable re-analysis if the reconciliation logic is later improved.
+Always preserve the raw JSON output from each channel, even after reconciliation. The raw findings serve as an audit trail and enable re-analysis if the reconciliation logic is later improved.
 
-```
-docs/reviews/{artifact}/
-  codex-review.json     — raw output from Codex
-  gemini-review.json    — raw output from Gemini
-  review-summary.md     — reconciled synthesis
-```
+The CLI stores raw output at `~/.mmr/jobs/{job-id}/` with per-channel result files.
+Results are accessible via `mmr results <job-id>`.
 
 ### Quality Gates
 
@@ -266,20 +245,18 @@ Minimum standards for a multi-model review to be considered complete:
 
 | Gate | Threshold | Rationale |
 |------|-----------|-----------|
-| Minimum finding count | At least 3 findings across all models | A review with zero findings likely missed something |
-| Coverage threshold | Every review pass has at least one finding or explicit "no issues found" note | Ensures all passes were actually executed |
+| Coverage threshold | Every channel has at least one finding or explicit "no issues found" note | Ensures all channels were actually executed |
 | Reconciliation completeness | All cross-model disagreements have documented resolutions | No unresolved conflicts |
-| Raw output preserved | JSON files exist for all models that were dispatched | Audit trail |
+| Raw output preserved | Per-channel results exist for all dispatched channels | Audit trail |
 
-If the primary Claude review produces zero findings and external models are unavailable, the review should explicitly note this as unusual and recommend a targeted re-review at a later stage.
+Zero findings across all channels is a valid outcome when the diff is clean.
 
 #### Degraded-Mode Gate Adaptation
 
 When channels are skipped and compensating passes are used:
 
-- **Minimum finding count** gate: compensating passes count toward the total but are not treated as separate external channels for consensus purposes.
 - **Reconciliation completeness** gate (cross-model disagreement documentation): applies whenever 2+ distinct model perspectives participate (Claude + one external counts). N/A only when Claude is the sole perspective (no external models and no compensating passes that introduce genuinely different framing).
-- **Coverage threshold** gate: compensating passes satisfy the "every pass has at least one finding or explicit no-issues note" requirement.
+- **Coverage threshold** gate: compensating passes satisfy the "every channel has at least one finding or explicit no-issues note" requirement.
 - The reconciled output must record which channels were real, which were compensating, and which were skipped, so the orchestration layer can apply appropriate verdict logic.
 
 ### Common Anti-Patterns
@@ -288,12 +265,10 @@ When channels are skipped and compensating passes are used:
 
 **Ignoring disagreements.** Two models disagree, and the reviewer picks one without analysis. Fix: disagreements are the most valuable signal in multi-model review. They identify areas of genuine ambiguity or complexity. Always investigate and document the resolution.
 
-**Dispatching at low depth.** Running external model reviews at depth 1-2 where the review scope is intentionally minimal. The external model does a full analysis anyway, producing findings that are out of scope. Fix: only dispatch at depth 4+. Lower depths use Claude-only review with reduced pass count.
-
-**No fallback plan.** The review pipeline assumes external models are always available. When Codex is down, the review fails entirely. Fix: external dispatch is always optional. The fallback to Claude-only enhanced review must be implemented and tested.
+**No fallback plan.** The review pipeline assumes external models are always available. When Codex is down, the review fails entirely. Fix: external dispatch is always optional. The CLI automatically dispatches compensating passes via `claude -p` when channels are unavailable.
 
 **Over-weighting consensus.** Two models agree on a finding, so it must be correct. But both models may share the same bias (e.g., both flag a pattern as an anti-pattern that is actually appropriate for this project's constraints). Fix: consensus increases confidence but does not guarantee correctness. All findings still require artifact-level verification.
 
 **Dispatching the full pipeline context.** Sending the entire project context (all docs, all code) to the external model. This exceeds context limits and dilutes focus. Fix: send only the artifact under review and the minimal upstream context needed for that specific review.
 
-**Ignoring partial results.** A model times out after producing 3 of 5 findings. The reviewer discards all results because the review is "incomplete." Fix: partial results are still valuable. Include them with a note about incompleteness. Three real findings are better than zero.
+**Treating a timeout as a silent skip.** A channel times out and the reviewer proceeds without documenting it. Fix: when a channel times out, record the root-cause status as `timeout`, queue a compensating pass, and include it in the review summary. The CLI kills timed-out processes — no partial output is available, but the compensating pass ensures coverage.
