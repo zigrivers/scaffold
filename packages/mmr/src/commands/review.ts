@@ -27,6 +27,9 @@ interface ReviewArgs {
   sync?: boolean
 }
 
+/** 10MB buffer for large diffs (default is ~1MB which can throw) */
+const MAX_DIFF_BUFFER = 10 * 1024 * 1024
+
 /**
  * Resolve diff content from the various input modes.
  * Priority: --diff file/stdin > --pr > --staged > --base/--head > default (unstaged)
@@ -40,23 +43,23 @@ function resolveDiff(args: ReviewArgs): string {
   }
 
   if (args.pr !== undefined) {
-    return execFileSync('gh', ['pr', 'diff', String(args.pr)], { encoding: 'utf-8' })
+    return execFileSync('gh', ['pr', 'diff', String(args.pr)], { encoding: 'utf-8', maxBuffer: MAX_DIFF_BUFFER })
   }
 
   if (args.staged) {
-    return execFileSync('git', ['diff', '--cached'], { encoding: 'utf-8' })
+    return execFileSync('git', ['diff', '--cached'], { encoding: 'utf-8', maxBuffer: MAX_DIFF_BUFFER })
   }
 
   if (args.base && args.head) {
-    return execFileSync('git', ['diff', `${args.base}...${args.head}`], { encoding: 'utf-8' })
+    return execFileSync('git', ['diff', `${args.base}...${args.head}`], { encoding: 'utf-8', maxBuffer: MAX_DIFF_BUFFER })
   }
 
   if (args.base) {
-    return execFileSync('git', ['diff', `${args.base}...HEAD`], { encoding: 'utf-8' })
+    return execFileSync('git', ['diff', `${args.base}...HEAD`], { encoding: 'utf-8', maxBuffer: MAX_DIFF_BUFFER })
   }
 
   // Default: unstaged changes
-  return execFileSync('git', ['diff'], { encoding: 'utf-8' })
+  return execFileSync('git', ['diff'], { encoding: 'utf-8', maxBuffer: MAX_DIFF_BUFFER })
 }
 
 export const reviewCommand: CommandModule<object, ReviewArgs> = {
@@ -231,7 +234,9 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
             flags: chConfig.flags,
             env: chConfig.env,
             timeout: chConfig.timeout ?? config.defaults.timeout,
-            stderr: chConfig.stderr as 'capture' | 'ignore',
+            stderr: chConfig.stderr === 'passthrough' ? 'passthrough'
+              : chConfig.stderr === 'suppress' ? 'suppress'
+              : 'capture',
           }),
         )
       }
@@ -246,7 +251,9 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
           flags: chConfig.flags,
           env: chConfig.env,
           timeout: chConfig.timeout ?? config.defaults.timeout,
-          stderr: chConfig.stderr as 'capture' | 'ignore',
+          stderr: chConfig.stderr === 'passthrough' ? 'passthrough'
+            : chConfig.stderr === 'suppress' ? 'suppress'
+            : 'capture',
         })
       }
     }

@@ -11,7 +11,30 @@ export interface DispatchOptions {
   flags: string[]
   env: Record<string, string>
   timeout: number
-  stderr: 'capture' | 'ignore'
+  stderr: 'capture' | 'suppress' | 'passthrough'
+}
+
+/** Track active child PIDs for cleanup on parent exit */
+const activeChildren = new Set<number>()
+
+function cleanupChildren(): void {
+  for (const pid of activeChildren) {
+    try {
+      process.kill(-pid, 'SIGTERM')
+    } catch {
+      // Process may have already exited
+    }
+  }
+  activeChildren.clear()
+}
+
+// Register cleanup once
+let cleanupRegistered = false
+function ensureCleanupRegistered(): void {
+  if (cleanupRegistered) return
+  cleanupRegistered = true
+  process.on('SIGINT', () => { cleanupChildren(); process.exit(130) })
+  process.on('SIGTERM', () => { cleanupChildren(); process.exit(143) })
 }
 
 /** Check whether a channel status represents a terminal (done) state */
@@ -26,6 +49,8 @@ export async function dispatchChannel(
   channelName: string,
   opts: DispatchOptions,
 ): Promise<void> {
+  ensureCleanupRegistered()
+
   if (!/^[a-zA-Z0-9._-]+$/.test(channelName)) {
     throw new Error(`Unsafe channel name: ${channelName}`)
   }
@@ -43,21 +68,29 @@ export async function dispatchChannel(
     started_at: new Date().toISOString(),
   })
 
+  // Map stderr option to stdio descriptor
+  const stderrStdio = opts.stderr === 'passthrough' ? 'inherit'
+    : opts.stderr === 'capture' ? 'pipe'
+    : 'ignore'  // suppress
+
   // Pipe prompt via stdin to avoid E2BIG on large diffs
   const proc = spawn(cmd, args, {
     detached: true,
-    stdio: ['pipe', 'pipe', 'pipe'],
+    stdio: ['pipe', 'pipe', stderrStdio],
     env: { ...process.env, ...opts.env },
   })
 
+  if (proc.pid) activeChildren.add(proc.pid)
+
   // Handle stdin pipe errors (child may close stdin early)
-  proc.stdin.on('error', () => {
+  // stdin is always 'pipe' so proc.stdin is guaranteed non-null
+  proc.stdin!.on('error', () => {
     // Swallow EPIPE — the close handler will deal with the process exit
   })
 
   // Write prompt to stdin
-  proc.stdin.write(opts.prompt)
-  proc.stdin.end()
+  proc.stdin!.write(opts.prompt)
+  proc.stdin!.end()
 
   // Write PID file
   const pidFile = path.join(channelsDir, `${channelName}.pid`)
@@ -67,13 +100,16 @@ export async function dispatchChannel(
   let stdout = ''
   let stderr = ''
 
-  proc.stdout.on('data', (chunk: Buffer) => {
+  // stdout is always 'pipe' so proc.stdout is guaranteed non-null
+  proc.stdout!.on('data', (chunk: Buffer) => {
     stdout += chunk.toString()
   })
 
-  proc.stderr.on('data', (chunk: Buffer) => {
-    stderr += chunk.toString()
-  })
+  if (opts.stderr === 'capture' && proc.stderr) {
+    proc.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString()
+    })
+  }
 
   // In-memory settled flag to prevent timeout/close race
   let settled = false
@@ -84,6 +120,7 @@ export async function dispatchChannel(
     const timer = setTimeout(() => {
       if (settled) return
       settled = true
+      if (proc.pid) activeChildren.delete(proc.pid)
       try {
         // Kill the process group (negative PID kills the group)
         if (proc.pid) {
@@ -108,6 +145,7 @@ export async function dispatchChannel(
       clearTimeout(timer)
       if (settled) return
       settled = true
+      if (proc.pid) activeChildren.delete(proc.pid)
 
       const completedAt = new Date().toISOString()
 
@@ -134,6 +172,7 @@ export async function dispatchChannel(
       clearTimeout(timer)
       if (settled) return
       settled = true
+      if (proc.pid) activeChildren.delete(proc.pid)
       store.updateChannel(jobId, channelName, {
         status: 'failed',
         completed_at: new Date().toISOString(),

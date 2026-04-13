@@ -93,6 +93,40 @@ describe('dispatchChannel', () => {
     expect(loaded.channels.slow.status).toBe('timeout')
   })
 
+  it('handles passthrough stderr mode without data handler', async () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['passthrough'] })
+    store.savePrompt(job.job_id, 'Review this.')
+
+    await dispatchChannel(store, job.job_id, 'passthrough', {
+      command: 'node',
+      prompt: '',
+      flags: ['-e', 'process.stderr.write("warning"); process.stdout.write("ok"); process.exit(0)'],
+      env: {},
+      timeout: 10,
+      stderr: 'passthrough',
+    })
+
+    const loaded = store.loadJob(job.job_id)
+    expect(loaded.channels.passthrough.status).toBe('completed')
+  })
+
+  it('suppresses stderr in suppress mode', async () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['suppress'] })
+    store.savePrompt(job.job_id, 'Review this.')
+
+    await dispatchChannel(store, job.job_id, 'suppress', {
+      command: 'node',
+      prompt: '',
+      flags: ['-e', 'process.stderr.write("ignored"); process.stdout.write("ok"); process.exit(0)'],
+      env: {},
+      timeout: 10,
+      stderr: 'suppress',
+    })
+
+    const loaded = store.loadJob(job.job_id)
+    expect(loaded.channels.suppress.status).toBe('completed')
+  })
+
   it('returned promise resolves only after process completes', async () => {
     const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['awaitable'] })
     store.savePrompt(job.job_id, 'Review this.')
