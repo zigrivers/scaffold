@@ -110,6 +110,23 @@ describe('dispatchChannel', () => {
     expect(loaded.channels.passthrough.status).toBe('completed')
   })
 
+  it('marks channel as failed when command does not exist', async () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['nosuch'] })
+    store.savePrompt(job.job_id, 'Review this.')
+
+    await dispatchChannel(store, job.job_id, 'nosuch', {
+      command: 'nonexistent-command-xyz-12345',
+      prompt: 'test',
+      flags: [],
+      env: {},
+      timeout: 5,
+      stderr: 'capture',
+    })
+
+    const loaded = store.loadJob(job.job_id)
+    expect(loaded.channels.nosuch.status).toBe('failed')
+  })
+
   it('suppresses stderr in suppress mode', async () => {
     const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['suppress'] })
     store.savePrompt(job.job_id, 'Review this.')
