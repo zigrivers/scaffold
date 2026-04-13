@@ -57,6 +57,40 @@ describe('JobStore', () => {
     expect(jobs).toHaveLength(2)
   })
 
+  it('derives channel state from per-channel status files on loadJob', () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude', 'gemini'] })
+
+    store.updateChannel(job.job_id, 'claude', { status: 'completed', completed_at: '2026-04-13T00:00:01Z' })
+    store.updateChannel(job.job_id, 'gemini', { status: 'completed', completed_at: '2026-04-13T00:00:02Z' })
+
+    const loaded = store.loadJob(job.job_id)
+    expect(loaded.channels.claude.status).toBe('completed')
+    expect(loaded.channels.gemini.status).toBe('completed')
+    expect(loaded.status).toBe('completed')
+  })
+
+  it('derives running status when some channels still in progress', () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude', 'gemini'] })
+
+    store.updateChannel(job.job_id, 'claude', { status: 'completed', completed_at: '2026-04-13T00:00:01Z' })
+
+    const loaded = store.loadJob(job.job_id)
+    expect(loaded.channels.claude.status).toBe('completed')
+    expect(loaded.channels.gemini.status).toBe('dispatched')
+    expect(loaded.status).toBe('running')
+  })
+
+  it('rejects unsafe channel names', () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
+    expect(() => store.updateChannel(job.job_id, '../../../etc', { status: 'completed' })).toThrow('Unsafe channel name')
+    expect(() => store.saveChannelOutput(job.job_id, 'foo bar', 'output')).toThrow('Unsafe channel name')
+    expect(() => store.saveChannelLog(job.job_id, 'has/slash', 'log')).toThrow('Unsafe channel name')
+  })
+
+  it('rejects unsafe channel names at job creation', () => {
+    expect(() => store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['../evil'] })).toThrow('Unsafe channel name')
+  })
+
   it('prunes jobs older than retention days', () => {
     const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
     const jobDir = path.join(tmpDir, job.job_id)

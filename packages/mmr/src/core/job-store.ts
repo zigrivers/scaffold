@@ -18,6 +18,19 @@ export class JobStore {
     fs.mkdirSync(jobsDir, { recursive: true })
   }
 
+  /** Validate that a channel name contains only safe characters */
+  private validateChannelName(channel: string): void {
+    if (!/^[a-zA-Z0-9._-]+$/.test(channel)) {
+      throw new Error(`Unsafe channel name: ${channel}`)
+    }
+  }
+
+  /** Validate channel name and return path for a channel file */
+  private channelFilePath(jobId: string, channel: string, filename: string): string {
+    this.validateChannelName(channel)
+    return path.join(this.getJobDir(jobId), 'channels', filename)
+  }
+
   /** Generate a unique job ID: mmr-{6 hex chars} */
   private generateId(): string {
     const hex = crypto.randomBytes(3).toString('hex')
@@ -37,6 +50,7 @@ export class JobStore {
 
     const channels: Record<string, ChannelJobEntry> = {}
     for (const ch of opts.channels) {
+      this.validateChannelName(ch)
       channels[ch] = { status: 'dispatched', auth: 'ok' }
     }
 
@@ -59,11 +73,30 @@ export class JobStore {
     fs.writeFileSync(path.join(jobDir, 'job.json'), JSON.stringify(metadata, null, 2))
   }
 
-  /** Read job metadata from job.json */
+  /** Read job metadata from job.json, deriving channel state from per-channel status files */
   loadJob(jobId: string): JobMetadata {
     const jobDir = this.getJobDir(jobId)
     const raw = fs.readFileSync(path.join(jobDir, 'job.json'), 'utf-8')
-    return JSON.parse(raw) as JobMetadata
+    const metadata = JSON.parse(raw) as JobMetadata
+
+    for (const channelName of Object.keys(metadata.channels)) {
+      const statusPath = this.channelFilePath(jobId, channelName, `${channelName}.status.json`)
+      try {
+        const statusRaw = fs.readFileSync(statusPath, 'utf-8')
+        const channelUpdate = JSON.parse(statusRaw) as Partial<ChannelJobEntry>
+        metadata.channels[channelName] = { ...metadata.channels[channelName], ...channelUpdate }
+      } catch (err: unknown) {
+        // ENOENT (no status file) and SyntaxError (corrupted) fall through to initial values
+        if (err instanceof Error) {
+          const code = (err as NodeJS.ErrnoException).code
+          if (code !== 'ENOENT' && code !== undefined) throw err
+          if (code === undefined && err.name !== 'SyntaxError') throw err
+        }
+      }
+    }
+
+    metadata.status = this.deriveJobStatus(metadata.channels)
+    return metadata
   }
 
   /** Save the assembled prompt text */
@@ -88,28 +121,44 @@ export class JobStore {
 
   /** Save parsed channel output as JSON */
   saveChannelOutput(jobId: string, channel: string, output: unknown): void {
-    const filePath = path.join(this.getJobDir(jobId), 'channels', `${channel}.json`)
+    const filePath = this.channelFilePath(jobId, channel, `${channel}.json`)
     fs.writeFileSync(filePath, JSON.stringify(output, null, 2))
   }
 
   /** Load raw channel output string */
   loadChannelOutput(jobId: string, channel: string): string {
-    const filePath = path.join(this.getJobDir(jobId), 'channels', `${channel}.json`)
+    const filePath = this.channelFilePath(jobId, channel, `${channel}.json`)
     return fs.readFileSync(filePath, 'utf-8')
   }
 
   /** Save raw channel log output */
   saveChannelLog(jobId: string, channel: string, log: string): void {
-    const filePath = path.join(this.getJobDir(jobId), 'channels', `${channel}.log`)
+    const filePath = this.channelFilePath(jobId, channel, `${channel}.log`)
     fs.writeFileSync(filePath, log)
   }
 
-  /** Update a channel entry and auto-update overall job status */
+  /** Update a channel entry by writing a per-channel status file atomically */
   updateChannel(jobId: string, channel: string, update: Partial<ChannelJobEntry>): void {
-    const metadata = this.loadJob(jobId)
-    metadata.channels[channel] = { ...metadata.channels[channel], ...update }
-    metadata.status = this.deriveJobStatus(metadata.channels)
-    this.saveJob(jobId, metadata)
+    const channelsDir = path.join(this.getJobDir(jobId), 'channels')
+    fs.mkdirSync(channelsDir, { recursive: true })
+    const channelStatusPath = this.channelFilePath(jobId, channel, `${channel}.status.json`)
+
+    let existing: Partial<ChannelJobEntry> = {}
+    try {
+      const raw = fs.readFileSync(channelStatusPath, 'utf-8')
+      existing = JSON.parse(raw)
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        const code = (err as NodeJS.ErrnoException).code
+        if (code !== 'ENOENT' && code !== undefined) throw err
+        if (code === undefined && err.name !== 'SyntaxError') throw err
+      }
+    }
+
+    const merged = { ...existing, ...update }
+    const tmpPath = channelStatusPath + '.tmp'
+    fs.writeFileSync(tmpPath, JSON.stringify(merged, null, 2))
+    fs.renameSync(tmpPath, channelStatusPath)
   }
 
   /** Save reconciled results */
@@ -132,8 +181,7 @@ export class JobStore {
       const jobJsonPath = path.join(this.jobsDir, entry.name, 'job.json')
       if (!fs.existsSync(jobJsonPath)) continue
       try {
-        const raw = fs.readFileSync(jobJsonPath, 'utf-8')
-        jobs.push(JSON.parse(raw) as JobMetadata)
+        jobs.push(this.loadJob(entry.name))
       } catch {
         // Skip malformed job directories
       }
