@@ -44,6 +44,13 @@ describe('default parser', () => {
     expect(result.approved).toBe(true)
     expect(result.summary).toContain('use {braces}')
   })
+
+  it('preserves optional id and category fields', () => {
+    const raw = '{"approved": false, "findings": [{"id": "X-1", "category": "security", "severity": "P0", "location": "f.ts:1", "description": "vuln", "suggestion": "fix"}], "summary": "found issue"}'
+    const result = parse(raw)
+    expect(result.findings[0].id).toBe('X-1')
+    expect(result.findings[0].category).toBe('security')
+  })
 })
 
 describe('gemini parser', () => {

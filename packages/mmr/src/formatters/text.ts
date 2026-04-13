@@ -1,8 +1,18 @@
 import type { ReconciledResults } from '../types.js'
 
+function verdictLabel(verdict: ReconciledResults['verdict']): string {
+  switch (verdict) {
+    case 'pass': return 'PASSED'
+    case 'degraded-pass': return 'PASSED'
+    case 'blocked': return 'BLOCKED'
+    case 'needs-user-decision': return 'NEEDS DECISION'
+    default: return 'UNKNOWN'
+  }
+}
+
 export function formatText(results: ReconciledResults): string {
   const lines: string[] = []
-  const gate = results.gate_passed ? 'PASSED' : 'FAILED'
+  const gate = verdictLabel(results.verdict)
 
   lines.push(`MMR ${gate} — ${results.job_id}`)
   const chCount = `${results.metadata.channels_completed}/${results.metadata.channels_dispatched}`

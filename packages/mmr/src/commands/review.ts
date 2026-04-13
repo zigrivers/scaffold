@@ -156,7 +156,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       const cmd = chConfig.command.split(' ')[0]
       const installed = await checkInstalled(cmd)
       if (!installed) {
-        authResults[name] = { status: 'skipped', recovery: `${cmd} not found on PATH` }
+        authResults[name] = { status: 'not_installed', recovery: `${cmd} not found on PATH` }
         continue
       }
 

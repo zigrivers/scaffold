@@ -5,9 +5,9 @@ import os from 'node:os'
 import { JobStore } from '../../src/core/job-store.js'
 import { assemblePrompt } from '../../src/core/prompt.js'
 import { parseChannelOutput } from '../../src/core/parser.js'
-import { reconcile, evaluateGate } from '../../src/core/reconciler.js'
+import { reconcile, evaluateGate, deriveVerdict } from '../../src/core/reconciler.js'
 import { formatText } from '../../src/formatters/text.js'
-import type { Finding, ReconciledResults } from '../../src/types.js'
+import type { Finding, ReconciledResults, ChannelStatus } from '../../src/types.js'
 
 describe('review lifecycle (unit integration)', () => {
   let tmpDir: string
@@ -68,9 +68,11 @@ describe('review lifecycle (unit integration)', () => {
     const gatePassed = evaluateGate(reconciled, 'P2')
     expect(gatePassed).toBe(false)
 
-    // 7. Format output
+    // 7. Derive verdict and format output
+    const channelStatuses: Record<string, ChannelStatus> = { claude: 'completed', gemini: 'completed' }
+    const verdict = deriveVerdict(gatePassed, channelStatuses)
     const results: ReconciledResults = {
-      job_id: job.job_id, gate_passed: gatePassed, fix_threshold: 'P2',
+      job_id: job.job_id, verdict, fix_threshold: 'P2',
       reconciled_findings: reconciled,
       per_channel: {
         claude: { status: 'completed', elapsed: '30s', findings: claudeParsed.findings },
@@ -79,7 +81,7 @@ describe('review lifecycle (unit integration)', () => {
       metadata: { channels_dispatched: 2, channels_completed: 2, channels_partial: 0, total_elapsed: '45s' },
     }
     const text = formatText(results)
-    expect(text).toContain('FAILED')
+    expect(text).toContain('BLOCKED')
     expect(text).toContain('P1')
   })
 

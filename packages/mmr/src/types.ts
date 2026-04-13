@@ -14,17 +14,26 @@ export type ChannelStatus =
   | 'timeout'
   | 'failed'
   | 'auth_failed'
+  | 'not_installed'
   | 'skipped'
 
 export type JobStatus = 'dispatched' | 'running' | 'completed'
 
-export type Agreement = 'consensus' | 'majority' | 'unique' | 'divergent'
+export type Verdict = 'pass' | 'degraded-pass' | 'blocked' | 'needs-user-decision'
+
+export type Agreement = 'consensus' | 'majority' | 'unique'
 
 export type Confidence = 'high' | 'medium' | 'low'
 
 export type OutputFormat = 'json' | 'text' | 'markdown' | 'sarif'
 
+export const TERMINAL_STATUSES: ReadonlySet<ChannelStatus> = new Set([
+  'completed', 'timeout', 'failed', 'auth_failed', 'not_installed', 'skipped',
+])
+
 export interface Finding {
+  id?: string
+  category?: string
   severity: Severity
   location: string
   description: string
@@ -68,7 +77,7 @@ export interface ChannelJobEntry {
 
 export interface ReconciledResults {
   job_id: string
-  gate_passed: boolean
+  verdict: Verdict
   fix_threshold: Severity
   reconciled_findings: ReconciledFinding[]
   per_channel: Record<string, ChannelResult>

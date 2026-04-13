@@ -2,6 +2,7 @@ import type { CommandModule, ArgumentsCamelCase } from 'yargs'
 import path from 'node:path'
 import os from 'node:os'
 import { JobStore } from '../core/job-store.js'
+import { TERMINAL_STATUSES } from '../types.js'
 
 interface StatusArgs {
   'job-id': string
@@ -41,10 +42,10 @@ export const statusCommand: CommandModule<object, StatusArgs> = {
 
       channelStatuses[name] = { status: entry.status, elapsed }
 
-      if (!['completed', 'failed', 'timeout', 'auth_failed', 'skipped'].includes(entry.status)) {
+      if (!TERMINAL_STATUSES.has(entry.status)) {
         allComplete = false
       }
-      if (['failed', 'timeout', 'auth_failed'].includes(entry.status)) {
+      if (['failed', 'timeout', 'auth_failed', 'not_installed'].includes(entry.status)) {
         anyFailed = true
       }
     }

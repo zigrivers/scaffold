@@ -87,6 +87,8 @@ function validateFinding(f: unknown): Finding {
     location: typeof record.location === 'string' ? record.location : 'unknown',
     description: typeof record.description === 'string' ? record.description : String(record.description ?? ''),
     suggestion: typeof record.suggestion === 'string' ? record.suggestion : '',
+    ...(typeof record.id === 'string' ? { id: record.id } : {}),
+    ...(typeof record.category === 'string' ? { category: record.category } : {}),
   }
 }
 

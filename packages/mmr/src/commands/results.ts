@@ -3,11 +3,12 @@ import path from 'node:path'
 import os from 'node:os'
 import { JobStore } from '../core/job-store.js'
 import { parseChannelOutput } from '../core/parser.js'
-import { reconcile, evaluateGate } from '../core/reconciler.js'
+import { reconcile, evaluateGate, deriveVerdict } from '../core/reconciler.js'
 import { formatJson } from '../formatters/json.js'
 import { formatText } from '../formatters/text.js'
 import { formatMarkdown } from '../formatters/markdown.js'
-import type { Severity, OutputFormat, ChannelResult, ReconciledResults, Finding } from '../types.js'
+import { TERMINAL_STATUSES } from '../types.js'
+import type { Severity, OutputFormat, ChannelResult, ReconciledResults, Finding, ChannelStatus } from '../types.js'
 
 interface ResultsArgs {
   'job-id': string
@@ -45,12 +46,12 @@ export const resultsCommand: CommandModule<object, ResultsArgs> = {
       job = store.loadJob(args['job-id'] as string)
     } catch {
       console.error(`Job not found: ${args['job-id']}`)
-      process.exit(2)
+      process.exit(5)
     }
 
     // Check all channels done
     const incompleteChannels = Object.entries(job.channels)
-      .filter(([, entry]) => !['completed', 'failed', 'timeout', 'auth_failed', 'skipped'].includes(entry.status))
+      .filter(([, entry]) => !TERMINAL_STATUSES.has(entry.status))
       .map(([name]) => name)
 
     if (incompleteChannels.length > 0) {
@@ -118,6 +119,12 @@ export const resultsCommand: CommandModule<object, ResultsArgs> = {
       ? evaluateGate(reconciledFindings, fixThreshold)
       : false
 
+    // Derive verdict from gate + channel health
+    const channelStatuses = Object.fromEntries(
+      Object.entries(job.channels).map(([name, ch]) => [name, ch.status]),
+    ) as Record<string, ChannelStatus>
+    const verdict = deriveVerdict(gatePassed, channelStatuses)
+
     // 5. Build ReconciledResults
     const totalElapsed = startTimes.length > 0 && endTimes.length > 0
       ? `${((Math.max(...endTimes) - Math.min(...startTimes)) / 1000).toFixed(1)}s`
@@ -130,7 +137,7 @@ export const resultsCommand: CommandModule<object, ResultsArgs> = {
 
     const results: ReconciledResults = {
       job_id: job.job_id,
-      gate_passed: gatePassed,
+      verdict,
       fix_threshold: fixThreshold,
       reconciled_findings: reconciledFindings,
       per_channel: perChannel,
@@ -163,7 +170,10 @@ export const resultsCommand: CommandModule<object, ResultsArgs> = {
     store.saveResults(job.job_id, results)
     console.log(formatted)
 
-    // Exit codes: 0 = gate passed, 1 = gate failed
-    process.exit(gatePassed ? 0 : 1)
+    // Exit codes: 0=pass/degraded-pass, 2=blocked, 3=needs-user-decision, 5=CLI error
+    const exitCode = verdict === 'pass' || verdict === 'degraded-pass' ? 0
+      : verdict === 'needs-user-decision' ? 3
+      : 2
+    process.exit(exitCode)
   },
 }
