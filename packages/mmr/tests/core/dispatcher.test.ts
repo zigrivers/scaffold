@@ -32,9 +32,6 @@ describe('dispatchChannel', () => {
       stderr: 'capture',
     })
 
-    // Wait for background process to complete
-    await new Promise(resolve => setTimeout(resolve, 500))
-
     const pidFile = path.join(tmpDir, job.job_id, 'channels', 'test.pid')
     expect(fs.existsSync(pidFile)).toBe(true)
   })
@@ -53,9 +50,6 @@ describe('dispatchChannel', () => {
       stderr: 'capture',
     })
 
-    // Wait for process to complete
-    await new Promise(resolve => setTimeout(resolve, 2000))
-
     const loaded = store.loadJob(job.job_id)
     const status = loaded.channels.badstdin.status
     expect(['completed', 'failed']).toContain(status)
@@ -73,9 +67,6 @@ describe('dispatchChannel', () => {
       timeout: 10,
       stderr: 'capture',
     })
-
-    // Wait for process to complete
-    await new Promise(resolve => setTimeout(resolve, 2000))
 
     const loaded = store.loadJob(job.job_id)
     expect(loaded.channels.echo.status).toBe('completed')
@@ -98,9 +89,29 @@ describe('dispatchChannel', () => {
       stderr: 'capture',
     })
 
-    await new Promise(resolve => setTimeout(resolve, 1500))
     const loaded = store.loadJob(job.job_id)
     expect(loaded.channels.slow.status).toBe('timeout')
+  })
+
+  it('returned promise resolves only after process completes', async () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['awaitable'] })
+    store.savePrompt(job.job_id, 'Review this.')
+
+    const before = Date.now()
+    await dispatchChannel(store, job.job_id, 'awaitable', {
+      command: 'node',
+      prompt: '',
+      flags: ['-e', 'setTimeout(() => { process.stdout.write("done"); process.exit(0) }, 1000)'],
+      env: {},
+      timeout: 10,
+      stderr: 'capture',
+    })
+    const elapsed = Date.now() - before
+
+    expect(elapsed).toBeGreaterThanOrEqual(800)
+
+    const loaded = store.loadJob(job.job_id)
+    expect(loaded.channels.awaitable.status).toBe('completed')
   })
 })
 

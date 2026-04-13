@@ -85,66 +85,68 @@ export async function dispatchChannel(
   // In-memory settled flag to prevent timeout/close race
   let settled = false
 
-  // Set up timeout
-  const timeoutMs = opts.timeout * 1000
-  const timer = setTimeout(() => {
-    if (settled) return
-    settled = true
-    try {
-      // Kill the process group (negative PID kills the group)
-      if (proc.pid) {
-        process.kill(-proc.pid, 'SIGKILL')
+  return new Promise<void>((resolve) => {
+    // Set up timeout
+    const timeoutMs = opts.timeout * 1000
+    const timer = setTimeout(() => {
+      if (settled) return
+      settled = true
+      try {
+        // Kill the process group (negative PID kills the group)
+        if (proc.pid) {
+          process.kill(-proc.pid, 'SIGKILL')
+        }
+      } catch {
+        // Process may have already exited
       }
-    } catch {
-      // Process may have already exited
-    }
-    const completedAt = new Date().toISOString()
-    store.updateChannel(jobId, channelName, {
-      status: 'timeout',
-      completed_at: completedAt,
-    })
-    if (stderr) {
-      store.saveChannelLog(jobId, channelName, stderr)
-    }
-  }, timeoutMs)
-
-  // Handle process close
-  proc.on('close', (code: number | null) => {
-    clearTimeout(timer)
-    if (settled) return
-    settled = true
-
-    const completedAt = new Date().toISOString()
-
-    if (code === 0 && stdout) {
-      // Always save raw stdout — parser.ts handles format quirks
-      store.saveChannelOutput(jobId, channelName, stdout)
+      const completedAt = new Date().toISOString()
       store.updateChannel(jobId, channelName, {
-        status: 'completed',
+        status: 'timeout',
         completed_at: completedAt,
       })
-    } else {
-      const errorMsg = stderr || `Process exited with code ${code}`
-      store.saveChannelLog(jobId, channelName, errorMsg)
+      if (stderr) {
+        store.saveChannelLog(jobId, channelName, stderr)
+      }
+      resolve()
+    }, timeoutMs)
+
+    // Handle process close
+    proc.on('close', (code: number | null) => {
+      clearTimeout(timer)
+      if (settled) return
+      settled = true
+
+      const completedAt = new Date().toISOString()
+
+      if (code === 0 && stdout) {
+        // Always save raw stdout — parser.ts handles format quirks
+        store.saveChannelOutput(jobId, channelName, stdout)
+        store.updateChannel(jobId, channelName, {
+          status: 'completed',
+          completed_at: completedAt,
+        })
+      } else {
+        const errorMsg = stderr || `Process exited with code ${code}`
+        store.saveChannelLog(jobId, channelName, errorMsg)
+        store.updateChannel(jobId, channelName, {
+          status: 'failed',
+          completed_at: completedAt,
+        })
+      }
+      resolve()
+    })
+
+    // Handle spawn errors
+    proc.on('error', (err: Error) => {
+      clearTimeout(timer)
+      if (settled) return
+      settled = true
       store.updateChannel(jobId, channelName, {
         status: 'failed',
-        completed_at: completedAt,
+        completed_at: new Date().toISOString(),
       })
-    }
-  })
-
-  // Handle spawn errors
-  proc.on('error', (err: Error) => {
-    clearTimeout(timer)
-    if (settled) return
-    settled = true
-    store.updateChannel(jobId, channelName, {
-      status: 'failed',
-      completed_at: new Date().toISOString(),
+      store.saveChannelLog(jobId, channelName, err.message)
+      resolve()
     })
-    store.saveChannelLog(jobId, channelName, err.message)
   })
-
-  // Unref so parent process can exit
-  proc.unref()
 }
