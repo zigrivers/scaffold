@@ -947,23 +947,22 @@ You don't need both — Scaffold works with whichever CLIs are available. Having
 #### How mmr Works
 
 ```
-mmr review --pr 47           ──→  Dispatches to all channels in background
-                                   Returns job ID immediately
-                                   Agent continues working
+# Recommended: single-command pipeline (--sync)
+mmr review --pr 47 --sync    ──→  Dispatches to all channels
+                                   Runs compensating passes for unavailable channels
+                                   Parses outputs, reconciles findings
+                                   Applies severity gate, derives verdict
+                                   Exit code: 0=pass, 2=blocked, 3=needs-decision
 
-mmr status mmr-a1b2c3        ──→  Poll progress (which channels done?)
-                                   Exit code: 0=done, 1=running, 4=failed
-
-mmr results mmr-a1b2c3       ──→  Reconcile findings across channels
-                                   Run compensating passes for unavailable channels
-                                   Apply severity gate
-                                   Output unified findings
-                                   Exit code: 0=passed, 2=gate failed, 3=degraded
+# Alternative: step-by-step (for async workflows)
+mmr review --pr 47           ──→  Dispatch and await all channels
+mmr results mmr-a1b2c3       ──→  Reconcile findings, output verdict
 ```
 
 **Key features:**
 
-- **Async job model** — reviews run in background processes. The agent fires `mmr review` and continues working. No blocking for 4-6 minutes.
+- **--sync mode** — single-command pipeline: dispatch, parse, reconcile, verdict. The recommended entry point for agents and CI.
+- **Compensating passes** — when a channel is unavailable, a Claude-based review focused on that channel's strength area runs automatically.
 - **Per-channel auth verification** — checks authentication before every dispatch. Auth failures are never silent — `mmr` tells you exactly what expired and the command to fix it.
 - **Immutable core prompt** — every channel gets the same severity definitions (P0-P3), output format spec (JSON), and review criteria. No prompt drift between channels.
 - **Automated reconciliation** — when two channels flag the same location, that's consensus (high confidence). When only one channel flags something, it's unique (medium confidence). P0 from any single source is always high confidence.
@@ -1079,6 +1078,14 @@ You can also adjust per-channel timeouts, the default severity threshold, and na
 **After creating a PR:**
 
 ```bash
+# Recommended: single-command review
+mmr review --pr 47 --sync --focus "auth flow, session handling"
+# → Full review output with verdict and findings
+
+# Or with text output for readability:
+mmr review --pr 47 --sync --format text
+
+# Step-by-step (when you want to continue working while review runs):
 mmr review --pr 47 --focus "auth flow, session handling"
 # → Job mmr-a1b2c3 started. 2/2 channels dispatched.
 ```
