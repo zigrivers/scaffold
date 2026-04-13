@@ -4,6 +4,7 @@ import { formatJson } from '../formatters/json.js'
 import { formatText } from '../formatters/text.js'
 import { formatMarkdown } from '../formatters/markdown.js'
 import type { JobMetadata, Severity, OutputFormat, ChannelResult, ReconciledResults, Finding, ChannelStatus } from '../types.js'
+import { SEVERITY_ORDER } from '../types.js'
 import type { JobStore } from './job-store.js'
 
 export interface PipelineResult {
@@ -103,7 +104,10 @@ export function runResultsPipeline(
     ? `Review passed${verdict === 'degraded-pass' ? ' (degraded — some channels unavailable)' : ''}`
     : verdict === 'needs-user-decision'
       ? 'No channels completed — manual review needed'
-      : `Review blocked — ${reconciledFindings.length} finding(s) at or above ${fixThreshold}`
+      : (() => {
+          const blockingCount = reconciledFindings.filter(f => SEVERITY_ORDER[f.severity] <= SEVERITY_ORDER[fixThreshold]).length
+          return `Review blocked — ${blockingCount} finding(s) at or above ${fixThreshold}`
+        })()
 
   const results: ReconciledResults = {
     job_id: job.job_id,
