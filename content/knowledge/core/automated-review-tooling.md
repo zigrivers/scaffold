@@ -1,6 +1,6 @@
 ---
 name: automated-review-tooling
-description: Patterns for setting up automated PR code review using AI models (Codex, Gemini) via local CLI, including dual-model review, reconciliation, and CI integration
+description: Patterns for automated PR code review using AI CLI tools (Codex, Gemini, Claude) — orchestration, reconciliation, compensating passes, and CI integration
 topics: [code-review, automation, codex, gemini, pull-requests, ci-cd, review-tooling]
 ---
 
@@ -27,7 +27,7 @@ These are the authoritative verdict definitions. Tool files (`review-code.md`, `
 | `pass` | All channels completed, no unresolved P0/P1/P2 |
 | `degraded-pass` | Some channels unavailable, compensating passes ran, no unresolved P0/P1/P2 |
 | `blocked` | Findings at or above fix threshold remain unresolved |
-| `needs-user-decision` | No channels completed, or contradictions requiring human judgment |
+| `needs-user-decision` | No channels completed — insufficient data for a determination |
 
 **Verdict precedence:** `needs-user-decision` > `blocked` > `degraded-pass` > `pass`. When multiple conditions apply, the higher-precedence verdict wins.
 
@@ -111,19 +111,17 @@ Apply the following evaluation order to determine the final verdict. The first m
 
 ```
 Verdict evaluation order:
-1. Any contradictions or unresolvable findings? → needs-user-decision
+1. No channels completed? → needs-user-decision
 2. Any unresolved P0/P1/P2 after 3 fix rounds? → blocked
 3. Any channel not at full coverage? → degraded-pass
 4. All channels completed, no unresolved P0/P1/P2? → pass
 ```
 
-A "contradiction" exists when two channels report opposite conclusions about the same code location — for example, Codex flags a function as insecure while Gemini explicitly approves it. Contradictions cannot be resolved by the agent alone and must be surfaced to the user.
-
 A channel is "not at full coverage" when: it ran as a compensating pass instead of a real tool, or it timed out.
 
-**Verdict precedence reminder:** `needs-user-decision` > `blocked` > `degraded-pass` > `pass`. If multiple conditions apply simultaneously (for example, both a contradiction and an unresolved P0 exist), the higher-precedence verdict wins.
+**Verdict precedence reminder:** `needs-user-decision` > `blocked` > `degraded-pass` > `pass`. When multiple conditions apply simultaneously, the higher-precedence verdict wins.
 
-The verdict is always computed after all fix rounds are exhausted — do not emit a partial verdict mid-cycle. If a fix round resolves all P0/P1/P2 findings and no contradictions remain, the verdict upgrades from `blocked` to `pass` or `degraded-pass` depending on channel coverage. This upgrade must be verified explicitly by re-running the reconciliation step after each fix round, not assumed from the fact that fixes were applied.
+The verdict is always computed after all fix rounds are exhausted — do not emit a partial verdict mid-cycle. If a fix round resolves all P0/P1/P2 findings, the verdict upgrades from `blocked` to `pass` or `degraded-pass` depending on channel coverage. This upgrade must be verified explicitly by re-running the reconciliation step after each fix round, not assumed from the fact that fixes were applied.
 
 ### Security-Focused Review Checklist
 

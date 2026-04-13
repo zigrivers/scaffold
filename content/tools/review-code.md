@@ -23,7 +23,7 @@ anything leaves the machine.
 The three channels are:
 1. **Codex CLI** — implementation correctness, security, API contracts
 2. **Gemini CLI** — architectural patterns, broad-context reasoning
-3. **Superpowers code-reviewer** — Claude subagent review of code quality, tests, and plan alignment
+3. **Claude CLI** — Claude subagent review of code quality, tests, and plan alignment
 
 ## Inputs
 
@@ -173,7 +173,7 @@ codex login status 2>/dev/null
 - If `codex` is not installed: skip this channel and record root-cause `not_installed`
 - If auth fails: tell the user to run `! codex login`, retry after recovery, and if recovery is not possible, record root-cause `auth_failed` and continue with the remaining channels
 
-If auth cannot be recovered, or if Codex is not installed, queue a compensating Claude self-review pass focused on implementation correctness, security, and API contracts. Label findings as `[compensating: Codex-equivalent]`. If auth check times out (~5s), retry once; if still failing, record `auth timeout` and queue compensating pass. This pass runs after all channel dispatch attempts complete.
+If auth cannot be recovered, or if Codex is not installed, queue a compensating Claude self-review pass focused on implementation correctness, security, and API contracts. Label findings as `[compensating: Codex-equivalent]`. If auth check times out (~5s), retry once; if still failing, record `timeout` and queue compensating pass. This pass runs after all channel dispatch attempts complete.
 
 Build the prompt in a temporary file and pass it over stdin:
 
@@ -209,9 +209,9 @@ NO_BROWSER=true gemini -p "$(cat "$PROMPT_FILE")" --output-format json --approva
 
 If the CLI exits with a non-zero code, produces malformed/unparseable output, or is killed by the tool runner timeout, record root-cause `failed` and queue a compensating pass for that channel.
 
-#### Channel 3: Superpowers code-reviewer
+#### Channel 3: Claude CLI
 
-Dispatch the `superpowers:code-reviewer` subagent.
+Dispatch via `claude -p` with the review prompt.
 
 - If explicit refs are being reviewed, provide `BASE_SHA` and `HEAD_SHA`
 - Otherwise provide:
@@ -297,7 +297,7 @@ Otherwise:
 3. Repeat for up to 3 fix rounds
 4. If any finding remains unresolved after 3 rounds, stop with verdict `needs-user-decision`
 
-**Fix cycle channel rule:** Re-run only channels that originally completed or ran as compensating passes. Never retry a channel marked `not installed`, `auth failed`, or `auth timeout` during fix rounds — its availability does not change within a session.
+**Fix cycle channel rule:** Re-run only channels that originally completed or ran as compensating passes. Never retry a channel marked `not_installed`, `auth_failed`, or `timeout` during fix rounds — its availability does not change within a session.
 
 ### Step 8: Final Verdict
 
@@ -321,9 +321,9 @@ Output a concise summary in this format:
 [scope label]
 
 ### Channels Executed
-- Codex CLI — root cause: [completed / not installed / auth failed / auth timeout / failed], coverage: [full / compensating (Codex-equivalent)]
-- Gemini CLI — root cause: [completed / not installed / auth failed / auth timeout / failed], coverage: [full / compensating (Gemini-equivalent)]
-- Superpowers code-reviewer — [completed / failed]
+- Codex CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / compensating (Codex-equivalent)]
+- Gemini CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / compensating (Gemini-equivalent)]
+- Claude CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / compensating]
 
 ### Findings
 [consensus findings first, then single-source findings]

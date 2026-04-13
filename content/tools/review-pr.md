@@ -133,7 +133,7 @@ Output a review summary in this format:
 ### Channels Executed
 - [ ] Codex CLI — root cause: [completed / not installed / auth failed / timeout / failed], coverage: [full / compensating (Codex-equivalent)]
 - [ ] Gemini CLI — root cause: [completed / not installed / auth failed / timeout / failed], coverage: [full / compensating (Gemini-equivalent)]
-- [ ] Claude CLI — [completed / failed]
+- [ ] Claude CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / compensating]
 
 ### Consensus Findings (High Confidence)
 [Findings flagged by 2+ channels]

@@ -26,7 +26,7 @@ comprehensive quality check before releasing or handing off the project.
 The three channels are:
 1. **Codex CLI** — Implementation correctness, security, API contracts
 2. **Gemini CLI** — Design reasoning, architectural patterns, broad context
-3. **Superpowers code-reviewer** — Plan alignment, code quality, testing
+3. **Claude CLI** — Plan alignment, code quality, testing
 
 ## Inputs
 
@@ -226,7 +226,7 @@ If not installed: queue a compensating pass (implementation correctness, securit
 codex login status 2>/dev/null && echo "codex authenticated" || echo "codex NOT authenticated"
 ```
 
-If not authenticated: tell the user "Codex auth expired. Run: `! codex login`". Do NOT silently skip. Wait for re-auth and retry once. If auth cannot be recovered (auth_timeout or user declines): queue a compensating pass (implementation correctness, security, API contracts, labeled `[compensating: Codex-equivalent]`).
+If not authenticated: tell the user "Codex auth expired. Run: `! codex login`". Do NOT silently skip. Wait for re-auth and retry once. If auth cannot be recovered (timeout or user declines): queue a compensating pass (implementation correctness, security, API contracts, labeled `[compensating: Codex-equivalent]`).
 
 If Codex fails during execution (non-zero exit, malformed output, timeout): queue a compensating pass with the same focus and label.
 
@@ -254,7 +254,7 @@ If not installed: queue a compensating pass (architectural patterns, design reas
 NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1
 ```
 
-If exit code is 41: tell the user "Gemini auth expired. Run: `! gemini -p \"hello\"`". Do NOT silently skip. Wait for re-auth and retry once. If auth cannot be recovered (auth_timeout or user declines): queue a compensating pass (architectural patterns, design reasoning, broad context, labeled `[compensating: Gemini-equivalent]`).
+If exit code is 41: tell the user "Gemini auth expired. Run: `! gemini -p \"hello\"`". Do NOT silently skip. Wait for re-auth and retry once. If auth cannot be recovered (timeout or user declines): queue a compensating pass (architectural patterns, design reasoning, broad context, labeled `[compensating: Gemini-equivalent]`).
 
 If Gemini fails during execution (non-zero exit, malformed output, timeout): queue a compensating pass with the same focus and label.
 
@@ -441,8 +441,8 @@ before returning. Then return all three channels' findings plus channel status:
 {
   "story": "[STORY_TITLE]",
   "channel_status": {
-    "codex": { "root_cause": "null|not_installed|auth_failed|auth_timeout|failed", "coverage_status": "full|compensating" },
-    "gemini": { "root_cause": "null|not_installed|auth_failed|auth_timeout|failed", "coverage_status": "full|compensating" },
+    "codex": { "root_cause": "null|not_installed|auth_failed|timeout|failed", "coverage_status": "full|compensating" },
+    "gemini": { "root_cause": "null|not_installed|auth_failed|timeout|failed", "coverage_status": "full|compensating" },
     "superpowers": { "root_cause": null, "coverage_status": "full" }
   },
   "codex": { "findings": [...] },
@@ -656,9 +656,9 @@ the user they require manual attention before the project is ready to release.
 | Codex not installed (`command -v` fails) | Queue compensating pass (implementation correctness, security, API contracts, labeled `[compensating: Codex-equivalent]`); document as "not_installed" in report |
 | Gemini not installed (`command -v` fails) | Queue compensating pass (architectural patterns, design reasoning, broad context, labeled `[compensating: Gemini-equivalent]`); document as "not_installed" in report |
 | Codex auth expired — user recovers | Re-run auth check; proceed with full Codex channel |
-| Codex auth expired — user declines or auth_timeout | Queue compensating pass (implementation correctness, security, API contracts, labeled `[compensating: Codex-equivalent]`); document as "auth_failed" or "auth_timeout" in report |
+| Codex auth expired — user declines or timeout | Queue compensating pass (implementation correctness, security, API contracts, labeled `[compensating: Codex-equivalent]`); document as "auth_failed" or "timeout" in report |
 | Gemini auth expired (exit 41) — user recovers | Re-run auth check; proceed with full Gemini channel |
-| Gemini auth expired — user declines or auth_timeout | Queue compensating pass (architectural patterns, design reasoning, broad context, labeled `[compensating: Gemini-equivalent]`); document as "auth_failed" or "auth_timeout" in report |
+| Gemini auth expired — user declines or timeout | Queue compensating pass (architectural patterns, design reasoning, broad context, labeled `[compensating: Gemini-equivalent]`); document as "auth_failed" or "timeout" in report |
 | Channel fails during execution (non-zero exit, malformed output, timeout) | Queue compensating pass for that channel with same focus and label; document root cause in report |
 | Both external CLIs unavailable (any combination of not_installed / auth failure) | Run all compensating passes plus Superpowers code-reviewer; report coverage as "degraded-coverage"; warn user that review coverage is reduced |
 | Superpowers unavailable | Document as "unavailable" in report; proceed with remaining channels; Superpowers is a Claude subagent and should always be available |

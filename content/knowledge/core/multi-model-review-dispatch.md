@@ -1,6 +1,6 @@
 ---
 name: multi-model-review-dispatch
-description: Patterns for dispatching reviews to AI models (Codex, Gemini, Claude) via CLI, including fallback strategies and finding reconciliation
+description: Patterns for dispatching reviews to AI CLI tools (Codex, Gemini, Claude), including fallback strategies and finding reconciliation
 topics: [multi-model, code-review, codex, gemini, claude, review-synthesis]
 ---
 
@@ -29,7 +29,7 @@ All enabled channels run on every review. When a channel is unavailable, a compe
 External models are never required. The fallback chain:
 1. Attempt dispatch to selected model(s)
 2. If CLI unavailable → skip that model, note in report
-3. If timeout → use partial results if any, note incompleteness
+3. If timeout → CLI kills the process; no partial output preserved; compensating pass runs
 4. If all external models fail → Claude-only enhanced review (additional self-review passes)
 
 The review never blocks on external model availability.
@@ -79,7 +79,7 @@ If auth succeeds, report `ready` and proceed to dispatch.
 
 **Post-dispatch terminal states:**
 - `completed` — channel produced results, use normally
-- `timeout` — channel exceeded time limit; triggers compensating pass
+- `timeout` — channel exceeded time limit; CLI kills the process and marks it as `timeout`; triggers compensating pass
 - `failed` — crashed or unparseable output; triggers compensating pass
 
 Verdict impact: `timeout` and `failed` channels mean the review is degraded. Maximum verdict is `degraded-pass` when any channel has a non-`completed` terminal state.
@@ -148,14 +148,7 @@ External model calls can hang or take unreasonably long. Set reasonable timeouts
 | Medium artifact review (2000-10000 words) | 120 seconds | Needs more processing time |
 | Large artifact review (>10000 words) | 180 seconds | Maximum reasonable wait |
 
-#### Partial Result Handling
-
-If a timeout occurs mid-response:
-1. Check if the partial output contains valid JSON entries
-2. If yes, use the valid entries and note "partial results" in the report
-3. If no, treat as a model failure and fall back
-
-Never wait indefinitely. A review that completes in 3 minutes with Claude-only findings is better than one that blocks for 10 minutes waiting for an external model.
+Never wait indefinitely. A review that completes in 3 minutes with Claude-only findings is better than one that blocks for 10 minutes waiting for an external model. When a channel times out, the CLI kills the process — no partial output is preserved. A compensating pass runs in its place.
 
 ### Finding Reconciliation
 
@@ -278,4 +271,4 @@ When channels are skipped and compensating passes are used:
 
 **Dispatching the full pipeline context.** Sending the entire project context (all docs, all code) to the external model. This exceeds context limits and dilutes focus. Fix: send only the artifact under review and the minimal upstream context needed for that specific review.
 
-**Ignoring partial results.** A model times out after producing 3 of 5 findings. The reviewer discards all results because the review is "incomplete." Fix: partial results are still valuable. Include them with a note about incompleteness. Three real findings are better than zero.
+**Treating a timeout as a silent skip.** A channel times out and the reviewer proceeds without documenting it. Fix: when a channel times out, record the root-cause status as `timeout`, queue a compensating pass, and include it in the review summary. The CLI kills timed-out processes — no partial output is available, but the compensating pass ensures coverage.
