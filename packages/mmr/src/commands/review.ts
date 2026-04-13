@@ -207,37 +207,49 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     store.savePrompt(job.job_id, prompt)
     store.saveDiff(job.job_id, diff)
 
-    // 8. Dispatch channels (save output_parser in job metadata for results)
-    const dispatches: Promise<void>[] = []
-    for (const name of validChannels) {
-      const chConfig = config.channels[name]
-      store.updateChannel(job.job_id, name, { output_parser: chConfig.output_parser })
-      dispatches.push(
-        dispatchChannel(store, job.job_id, name, {
+    // 8. Dispatch channels
+    if (config.defaults.parallel) {
+      const dispatches: Promise<void>[] = []
+      for (const name of validChannels) {
+        const chConfig = config.channels[name]
+        store.updateChannel(job.job_id, name, { output_parser: chConfig.output_parser })
+        dispatches.push(
+          dispatchChannel(store, job.job_id, name, {
+            command: chConfig.command,
+            prompt,
+            flags: chConfig.flags,
+            env: chConfig.env,
+            timeout: chConfig.timeout ?? config.defaults.timeout,
+            stderr: chConfig.stderr as 'capture' | 'ignore',
+          }),
+        )
+      }
+      await Promise.all(dispatches)
+    } else {
+      for (const name of validChannels) {
+        const chConfig = config.channels[name]
+        store.updateChannel(job.job_id, name, { output_parser: chConfig.output_parser })
+        await dispatchChannel(store, job.job_id, name, {
           command: chConfig.command,
           prompt,
           flags: chConfig.flags,
           env: chConfig.env,
           timeout: chConfig.timeout ?? config.defaults.timeout,
           stderr: chConfig.stderr as 'capture' | 'ignore',
-        }),
-      )
-    }
-
-    if (config.defaults.parallel) {
-      await Promise.all(dispatches)
-    } else {
-      for (const dispatch of dispatches) {
-        await dispatch
+        })
       }
     }
 
     // 9. Output dispatch result
+    const completedJob = store.loadJob(job.job_id)
     const result = {
       job_id: job.job_id,
-      status: 'dispatched',
+      status: completedJob.status,
       channels: Object.fromEntries(
-        channelNames.map((name) => [name, authResults[name]?.status ?? 'dispatched']),
+        channelNames.map((name) => [
+          name,
+          completedJob.channels[name]?.status ?? authResults[name]?.status ?? 'skipped',
+        ]),
       ),
       valid_channels: validChannels,
     }
