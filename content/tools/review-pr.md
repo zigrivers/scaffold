@@ -54,7 +54,9 @@ If no PR is found, stop and tell the user to create a PR first.
 Use the MMR CLI as the primary entry point for automated dispatch, reconciliation, and verdict:
 
 ```bash
-mmr review --pr "$PR_NUMBER" --sync --format text
+MMR_RESULT=$(mmr review --pr "$PR_NUMBER" --sync --format json)
+# Extract job_id from JSON output for use in mmr reconcile
+JOB_ID=$(echo "$MMR_RESULT" | grep -o '"job_id": "[^"]*"' | head -1 | cut -d'"' -f4)
 ```
 
 The CLI handles:
@@ -109,7 +111,33 @@ Claude CLI handles its own auth. Focus: plan alignment, code quality, testing.
 dispatches with focused prompts. Label findings as `[compensating: Codex-equivalent]`
 or `[compensating: Gemini-equivalent]`.
 
-### Step 3: Reconcile Findings
+### Step 3: Run Agent Code Review (4th channel)
+
+Dispatch your platform's code-reviewer skill for a complementary review:
+- **Claude Code:** dispatch `superpowers:code-reviewer` subagent with the PR diff and review criteria
+- **Other platforms:** use your platform's equivalent agent review skill
+
+The agent skill runs inside your agent's context — it has access to conversation history, project knowledge, and plan context that external CLIs lack.
+
+**Important:** The agent's review output must use MMR-compatible finding schema: each finding needs `severity` (P0-P3), `location` (file:line), and `description` (`suggestion` is optional). The strict validator in `mmr reconcile` will reject findings with missing or invalid required fields.
+
+### Step 4: Inject Agent Review into MMR
+
+Feed the agent review findings into MMR for unified reconciliation:
+
+```bash
+# job_id is captured from mmr review --sync --format json output
+# Write agent findings to a temp file for mmr reconcile
+echo "$AGENT_FINDINGS" > /tmp/agent-findings.json
+mmr reconcile "$JOB_ID" --channel superpowers --input /tmp/agent-findings.json
+```
+
+The `reconcile` command:
+- Adds the agent's findings as a new channel in the job
+- Re-runs reconciliation across ALL channels (CLI + agent)
+- Outputs the unified verdict with all sources included
+
+### Step 5: Reconcile Findings
 
 When using `mmr review --sync`, reconciliation is automatic. For manual fallback,
 reconcile findings after all channels complete:
@@ -123,7 +151,7 @@ reconcile findings after all channels complete:
 | Channels contradict each other | **Low** | Present to user for adjudication |
 | Compensating-pass P0/P1/P2 finding | **Single-source** | Fix per normal thresholds, label as compensating |
 
-### Step 4: Report Results
+### Step 6: Report Results
 
 Output a review summary in this format:
 
@@ -134,6 +162,7 @@ Output a review summary in this format:
 - [ ] Codex CLI — root cause: [completed / not installed / auth failed / timeout / failed], coverage: [full / compensating (Codex-equivalent)]
 - [ ] Gemini CLI — root cause: [completed / not installed / auth failed / timeout / failed], coverage: [full / compensating (Gemini-equivalent)]
 - [ ] Claude CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / compensating]
+- [ ] Agent review — [completed / skipped], injected via mmr reconcile
 
 ### Consensus Findings (High Confidence)
 [Findings flagged by 2+ channels]
@@ -148,7 +177,7 @@ Output a review summary in this format:
 [pass / degraded-pass / blocked / needs-user-decision]
 ```
 
-### Step 4a: Final Verdict
+### Step 6a: Final Verdict
 
 Return exactly one verdict:
 
@@ -161,19 +190,19 @@ Verdict precedence: `needs-user-decision` > `blocked` > `degraded-pass` > `pass`
 
 When compensating passes ran, maximum achievable verdict is `degraded-pass`. When both external channels were compensated, note "All findings are single-model."
 
-### Step 5: Fix P0/P1/P2 Findings
+### Step 7: Fix P0/P1/P2 Findings
 
 If any P0, P1, or P2 findings exist:
 1. Fix them in the code
 2. Push the fixes: `git push`
-3. Re-run the review to verify fixes: `mmr review --pr "$PR_NUMBER" --sync --format text`
+3. Re-run the review to verify fixes: `mmr review --pr "$PR_NUMBER" --sync --format json`
 4. After 3 fix rounds with unresolved P0/P1/P2 findings, stop and ask the user for direction — do NOT merge automatically. Document remaining findings and let the user decide whether to continue fixing, create follow-up issues, or override.
 
 **Note:** Fix cycles are an orchestration concern — the caller (agent or human) handles the fix loop. The CLI provides the review and verdict; the caller decides whether to fix and re-run.
 
 **Fix cycle channel rule:** Re-run only channels that originally completed or ran as compensating passes. Never retry a channel marked `not_installed`, `auth_failed`, or `timeout` during fix rounds — its availability does not change within a session.
 
-### Step 6: Confirm Completion
+### Step 8: Confirm Completion
 
 After all findings are resolved (or 3 rounds complete), output:
 

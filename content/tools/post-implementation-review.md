@@ -191,6 +191,7 @@ Return ALL findings as valid JSON:
     {
       "severity": "P0|P1|P2|P3",
       "category": "architecture-alignment|security|error-handling|test-coverage|complexity|dependencies",
+      "location": "relative/path/to/file.ts:42",
       "file": "relative/path/to/file.ts",
       "line": 42,
       "description": "Specific description of the issue",
@@ -291,6 +292,7 @@ surfaces to this format before returning):
     {
       "severity": "P0|P1|P2|P3",
       "category": "architecture-alignment|security|error-handling|test-coverage|complexity|dependencies",
+      "location": "relative/path/to/file.ts:42",
       "file": "relative/path/to/file.ts",
       "line": 42,
       "description": "Specific description of the issue",
@@ -299,6 +301,10 @@ surfaces to this format before returning):
   ]
 }
 ```
+
+**MMR compatibility:** The `location` field (`file:line` format) is required for
+`mmr reconcile` injection. The `file` and `line` fields are retained for backward
+compatibility with direct channel consumers.
 
 Store as `SUPERPOWERS_PHASE1_FINDINGS`.
 
@@ -452,6 +458,29 @@ before returning. Then return all three channels' findings plus channel status:
 ```
 
 Collect findings from all subagents. Store as `PHASE2_FINDINGS`.
+
+### Step 5e: Optional — Inject Findings into MMR for Unified Reconciliation
+
+If an MMR job exists (e.g., from a prior `mmr review` run on the same branch), the
+agent can inject its post-implementation review findings into MMR for unified
+reconciliation across all channels:
+
+```bash
+# Inject Phase 1 and Phase 2 findings into an existing MMR job
+# Write agent findings to a temp file for mmr reconcile
+echo "$AGENT_FINDINGS" > /tmp/agent-findings.json
+mmr reconcile "$JOB_ID" --channel superpowers --input /tmp/agent-findings.json
+```
+
+All findings injected via `mmr reconcile` must use MMR-compatible schema: each
+finding needs `severity` (P0-P3), `location` (file:line), and `description`
+(`suggestion` is optional). The strict validator will reject findings with
+missing or invalid required fields.
+
+This step is optional — post-implementation review is a full-codebase review (not
+diff-only), so it operates independently of `mmr review`. Use `mmr reconcile` only
+when you want to merge post-implementation findings into an existing MMR job for a
+single unified verdict.
 
 ### Step 6: Consolidate Findings
 

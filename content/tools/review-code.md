@@ -46,6 +46,31 @@ The three channels are:
 
 ## Instructions
 
+### Primary: MMR CLI + Agent Reconcile
+
+When the MMR CLI is installed, use it as the primary entry point:
+
+```bash
+# Staged changes
+mmr review --staged --sync --format json
+
+# Branch diff against main
+mmr review --base main --sync --format json
+```
+
+After the CLI review completes, dispatch the agent's code-reviewer skill (4th channel) and inject findings into the MMR job for unified reconciliation:
+
+```bash
+# job_id is captured from mmr review --sync --format json output
+# Write agent findings to a temp file for mmr reconcile
+echo "$AGENT_FINDINGS" > /tmp/agent-findings.json
+mmr reconcile "$JOB_ID" --channel superpowers --input /tmp/agent-findings.json
+```
+
+The agent's review output must use MMR-compatible finding schema: each finding needs `severity` (P0-P3), `location` (file:line), and `description` (`suggestion` is optional).
+
+If `mmr` is not installed (`command -v mmr` fails), fall back to the manual multi-channel flow below.
+
 ### Step 1: Detect Mode
 
 Parse `$ARGUMENTS` and set:

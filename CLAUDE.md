@@ -125,7 +125,7 @@ reconciliation, and verdict logic.
 2. **Gemini CLI** — architectural patterns, broad-context reasoning
 3. **Claude CLI** — plan alignment, code quality, testing
 
-**Primary entry point:** `mmr review --pr <number> --sync --format text`
+**Primary entry point:** `mmr review --pr <number> --sync --format json`
 
 **Critical rules:**
 - **Foreground only** — Always run Codex, Gemini, and Claude CLI commands as
@@ -155,7 +155,12 @@ reconciliation, and verdict logic.
 <!-- Escape hatch only. Canonical commands live in content/tools/review-pr.md.
      Update both if CLI syntax changes. -->
 ```bash
-# Primary entry point (MMR CLI)
+# Primary (recommended):
+mmr review --pr "$PR_NUMBER" --sync --format json
+# Capture job_id, dispatch agent review, then inject:
+mmr reconcile "$JOB_ID" --channel superpowers --input findings.json
+
+# Fallback (text output for human reading)
 mmr review --pr "$PR_NUMBER" --sync --format text
 
 # Manual fallback — installation checks
