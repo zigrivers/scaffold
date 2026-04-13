@@ -6,7 +6,7 @@ describe('formatText', () => {
   it('shows PASSED when gate passes', () => {
     const results: ReconciledResults = {
       job_id: 'mmr-abc123',
-      gate_passed: true,
+      verdict: 'pass',
       fix_threshold: 'P2',
       reconciled_findings: [],
       per_channel: { claude: { status: 'completed', elapsed: '30s', findings: [] } },
@@ -20,7 +20,7 @@ describe('formatText', () => {
   it('shows FAILED with findings when gate fails', () => {
     const results: ReconciledResults = {
       job_id: 'mmr-abc123',
-      gate_passed: false,
+      verdict: 'blocked',
       fix_threshold: 'P2',
       reconciled_findings: [{
         severity: 'P1', confidence: 'high', location: 'file.ts:10',

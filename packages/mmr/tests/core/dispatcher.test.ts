@@ -124,6 +124,7 @@ describe('isChannelComplete', () => {
     expect(isChannelComplete('failed')).toBe(true)
     expect(isChannelComplete('auth_failed')).toBe(true)
     expect(isChannelComplete('skipped')).toBe(true)
+    expect(isChannelComplete('not_installed')).toBe(true)
   })
   it('returns false for in-progress statuses', () => {
     expect(isChannelComplete('dispatched')).toBe(false)

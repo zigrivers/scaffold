@@ -3,6 +3,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import type { JobMetadata, ChannelJobEntry, Severity, OutputFormat } from '../types.js'
 import type { ReconciledResults } from '../types.js'
+import { TERMINAL_STATUSES } from '../types.js'
 
 export interface CreateJobOpts {
   fix_threshold: Severity
@@ -211,9 +212,7 @@ export class JobStore {
   /** Derive overall job status from channel statuses */
   private deriveJobStatus(channels: Record<string, ChannelJobEntry>): JobMetadata['status'] {
     const statuses = Object.values(channels).map((ch) => ch.status)
-    const allTerminal = statuses.every((s) =>
-      ['completed', 'failed', 'timeout', 'auth_failed', 'skipped'].includes(s),
-    )
+    const allTerminal = statuses.every((s) => TERMINAL_STATUSES.has(s))
     if (allTerminal) return 'completed'
     const anyRunning = statuses.some((s) => s === 'running' || s === 'completed')
     if (anyRunning) return 'running'

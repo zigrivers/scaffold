@@ -7,6 +7,7 @@ import { reconcile, evaluateGate } from '../core/reconciler.js'
 import { formatJson } from '../formatters/json.js'
 import { formatText } from '../formatters/text.js'
 import { formatMarkdown } from '../formatters/markdown.js'
+import { TERMINAL_STATUSES } from '../types.js'
 import type { Severity, OutputFormat, ChannelResult, ReconciledResults, Finding } from '../types.js'
 
 interface ResultsArgs {
@@ -50,7 +51,7 @@ export const resultsCommand: CommandModule<object, ResultsArgs> = {
 
     // Check all channels done
     const incompleteChannels = Object.entries(job.channels)
-      .filter(([, entry]) => !['completed', 'failed', 'timeout', 'auth_failed', 'skipped'].includes(entry.status))
+      .filter(([, entry]) => !TERMINAL_STATUSES.has(entry.status))
       .map(([name]) => name)
 
     if (incompleteChannels.length > 0) {
@@ -130,7 +131,7 @@ export const resultsCommand: CommandModule<object, ResultsArgs> = {
 
     const results: ReconciledResults = {
       job_id: job.job_id,
-      gate_passed: gatePassed,
+      verdict: gatePassed ? 'pass' : 'blocked',
       fix_threshold: fixThreshold,
       reconciled_findings: reconciledFindings,
       per_channel: perChannel,
@@ -163,7 +164,7 @@ export const resultsCommand: CommandModule<object, ResultsArgs> = {
     store.saveResults(job.job_id, results)
     console.log(formatted)
 
-    // Exit codes: 0 = gate passed, 1 = gate failed
-    process.exit(gatePassed ? 0 : 1)
+    // Exit codes: 0 = pass/degraded-pass, 1 = blocked/needs-user-decision
+    process.exit(results.verdict === 'pass' || results.verdict === 'degraded-pass' ? 0 : 1)
   },
 }

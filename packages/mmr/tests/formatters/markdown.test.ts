@@ -6,7 +6,7 @@ describe('formatMarkdown', () => {
   it('produces markdown with findings table', () => {
     const results: ReconciledResults = {
       job_id: 'mmr-abc123',
-      gate_passed: false,
+      verdict: 'blocked',
       fix_threshold: 'P2',
       reconciled_findings: [{
         severity: 'P0', confidence: 'high', location: 'file.ts:10',

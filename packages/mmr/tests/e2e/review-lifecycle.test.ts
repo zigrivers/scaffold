@@ -70,7 +70,7 @@ describe('review lifecycle (unit integration)', () => {
 
     // 7. Format output
     const results: ReconciledResults = {
-      job_id: job.job_id, gate_passed: gatePassed, fix_threshold: 'P2',
+      job_id: job.job_id, verdict: gatePassed ? 'pass' : 'blocked', fix_threshold: 'P2',
       reconciled_findings: reconciled,
       per_channel: {
         claude: { status: 'completed', elapsed: '30s', findings: claudeParsed.findings },

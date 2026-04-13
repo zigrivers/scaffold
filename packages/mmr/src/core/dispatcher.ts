@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+import { TERMINAL_STATUSES } from '../types.js'
 import type { ChannelStatus } from '../types.js'
 import type { JobStore } from './job-store.js'
 
@@ -12,14 +13,6 @@ export interface DispatchOptions {
   timeout: number
   stderr: 'capture' | 'ignore'
 }
-
-const TERMINAL_STATUSES: ReadonlySet<ChannelStatus> = new Set([
-  'completed',
-  'timeout',
-  'failed',
-  'auth_failed',
-  'skipped',
-])
 
 /** Check whether a channel status represents a terminal (done) state */
 export function isChannelComplete(status: ChannelStatus): boolean {

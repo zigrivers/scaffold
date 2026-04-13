@@ -2,7 +2,7 @@ import type { ReconciledResults } from '../types.js'
 
 export function formatMarkdown(results: ReconciledResults): string {
   const lines: string[] = []
-  const gate = results.gate_passed ? 'PASSED' : 'FAILED'
+  const gate = results.verdict === 'pass' || results.verdict === 'degraded-pass' ? 'PASSED' : 'FAILED'
 
   lines.push(`## Multi-Model Review — ${gate}`)
   lines.push('')
