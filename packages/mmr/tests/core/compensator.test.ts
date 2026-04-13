@@ -56,4 +56,14 @@ describe('getCompensatingChannels', () => {
     const result = getCompensatingChannels(statuses)
     expect(result).toHaveLength(2)
   })
+
+  it('compensates for failed channels', () => {
+    const statuses: Record<string, ChannelStatus> = {
+      claude: 'completed',
+      codex: 'failed',
+    }
+    const result = getCompensatingChannels(statuses)
+    expect(result).toHaveLength(1)
+    expect(result[0].originalChannel).toBe('codex')
+  })
 })

@@ -31,7 +31,7 @@ export function getCompensatingChannels(
 
   for (const [name, status] of Object.entries(channelStatuses)) {
     if (SKIP_COMPENSATION.has(name)) continue
-    if (status === 'not_installed' || status === 'auth_failed' || status === 'timeout' || status === 'skipped') {
+    if (status === 'not_installed' || status === 'auth_failed' || status === 'timeout' || status === 'skipped' || status === 'failed') {
       const focus = COMPENSATING_FOCUS[name] ?? `Focus your review on areas typically covered by ${name}. You are compensating for a missing ${name} review.`
       compensating.push({
         originalChannel: name,
@@ -55,15 +55,17 @@ export async function dispatchCompensatingPasses(
   compensatingChannels: CompensatingChannel[],
   timeout: number,
 ): Promise<void> {
-  for (const comp of compensatingChannels) {
-    const compensatingPrompt = `${comp.focusPrompt}\n\n${prompt}`
-    await dispatchChannel(store, jobId, comp.compensatingName, {
-      command: 'claude -p',
-      prompt: compensatingPrompt,
-      flags: ['--output-format', 'json'],
-      env: {},
-      timeout,
-      stderr: 'capture',
-    })
-  }
+  await Promise.all(
+    compensatingChannels.map((comp) => {
+      const compensatingPrompt = `${comp.focusPrompt}\n\n${prompt}`
+      return dispatchChannel(store, jobId, comp.compensatingName, {
+        command: 'claude -p',
+        prompt: compensatingPrompt,
+        flags: ['--output-format', 'json'],
+        env: {},
+        timeout,
+        stderr: 'capture',
+      })
+    }),
+  )
 }

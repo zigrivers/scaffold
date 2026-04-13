@@ -259,11 +259,12 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     const compensating = getCompensatingChannels(channelStatuses)
 
     if (compensating.length > 0) {
-      // Add compensating channels to job metadata
+      // Register compensating channels in job.json so loadJob can discover them
       for (const comp of compensating) {
-        store.updateChannel(job.job_id, comp.compensatingName, {
+        store.registerChannel(job.job_id, comp.compensatingName, {
           status: 'dispatched',
           auth: 'ok',
+          output_parser: 'default',
         })
       }
       await dispatchCompensatingPasses(store, job.job_id, prompt, compensating, config.defaults.timeout)
