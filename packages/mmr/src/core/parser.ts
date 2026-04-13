@@ -113,8 +113,8 @@ function geminiParser(raw: string): ParsedOutput {
       // Unwrap the response field and parse it with the default parser
       return defaultParser(outer.response)
     }
-    // No wrapper — treat as direct ParsedOutput
-    return outer as ParsedOutput
+    // No wrapper — validate and return as ParsedOutput
+    return validateParsedOutput(outer)
   } catch {
     // Fall back to default parser on the original raw input
     return defaultParser(raw)

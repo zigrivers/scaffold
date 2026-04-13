@@ -69,6 +69,14 @@ describe('gemini parser', () => {
     const result = parse(raw)
     expect(result.approved).toBe(true)
   })
+
+  it('validates unwrapped gemini output (missing fields get defaults)', () => {
+    const raw = '{"status": "done", "result": "all good"}'
+    const result = parse(raw)
+    expect(result.approved).toBe(false)
+    expect(result.findings).toEqual([])
+    expect(result.summary).toBe('')
+  })
 })
 
 describe('parseChannelOutput', () => {
