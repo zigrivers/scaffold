@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0] — 2026-04-13
+
+### Added
+- **P0-1:** `--sync` flag on `mmr review` — single-command entry point that dispatches, parses, reconciles, formats, and exits with verdict code
+- Extracted `runResultsPipeline` shared helper — eliminates code duplication between review --sync and results command
+- Fixed latent bug where `loadChannelOutput` returned JSON-encoded strings that the parser couldn't handle (double-encoding from `saveChannelOutput`)
+
 ## [0.4.0] — 2026-04-13
 
 ### Fixed

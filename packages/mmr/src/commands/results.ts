@@ -2,13 +2,9 @@ import type { CommandModule, ArgumentsCamelCase } from 'yargs'
 import path from 'node:path'
 import os from 'node:os'
 import { JobStore } from '../core/job-store.js'
-import { parseChannelOutput } from '../core/parser.js'
-import { reconcile, evaluateGate, deriveVerdict } from '../core/reconciler.js'
-import { formatJson } from '../formatters/json.js'
-import { formatText } from '../formatters/text.js'
-import { formatMarkdown } from '../formatters/markdown.js'
+import { runResultsPipeline } from '../core/results-pipeline.js'
 import { TERMINAL_STATUSES } from '../types.js'
-import type { Severity, OutputFormat, ChannelResult, ReconciledResults, Finding, ChannelStatus } from '../types.js'
+import type { OutputFormat } from '../types.js'
 
 interface ResultsArgs {
   'job-id': string
@@ -60,120 +56,11 @@ export const resultsCommand: CommandModule<object, ResultsArgs> = {
       process.exit(1)
     }
 
-    // 2. Parse each channel's output
-    const channelFindings: Record<string, Finding[]> = {}
-    const perChannel: Record<string, ChannelResult> = {}
-    const startTimes: number[] = []
-    const endTimes: number[] = []
-
-    for (const [name, entry] of Object.entries(job.channels)) {
-      if (entry.status !== 'completed') {
-        perChannel[name] = {
-          status: entry.status,
-          elapsed: entry.elapsed ?? '0s',
-          findings: [],
-          error: entry.status === 'failed' ? 'Channel failed' : undefined,
-        }
-        continue
-      }
-
-      // Try to load and parse channel output
-      let raw: string
-      let findings: Finding[] = []
-      try {
-        const output = store.loadChannelOutput(job.job_id, name)
-        raw = output
-        const parserName = entry.output_parser ?? 'default'
-        const parsed = parseChannelOutput(raw, parserName)
-        findings = parsed.findings
-      } catch {
-        // Fall back: no parseable output
-        raw = ''
-      }
-
-      channelFindings[name] = findings
-
-      const elapsed = entry.started_at && entry.completed_at
-        ? `${((new Date(entry.completed_at).getTime() - new Date(entry.started_at).getTime()) / 1000).toFixed(1)}s`
-        : '0s'
-
-      if (entry.started_at) startTimes.push(new Date(entry.started_at).getTime())
-      if (entry.completed_at) endTimes.push(new Date(entry.completed_at).getTime())
-
-      perChannel[name] = {
-        status: entry.status,
-        elapsed,
-        findings,
-        raw_output: args.raw ? raw : undefined,
-      }
-    }
-
-    // 3. Reconcile findings
-    const reconciledFindings = reconcile(channelFindings)
-
-    // 4. Evaluate gate (fail-safe: if no channels completed, gate fails)
-    const fixThreshold = job.fix_threshold as Severity
-    const completedChannels = Object.values(job.channels)
-      .filter((ch) => ch.status === 'completed').length
-    const gatePassed = completedChannels > 0
-      ? evaluateGate(reconciledFindings, fixThreshold)
-      : false
-
-    // Derive verdict from gate + channel health
-    const channelStatuses = Object.fromEntries(
-      Object.entries(job.channels).map(([name, ch]) => [name, ch.status]),
-    ) as Record<string, ChannelStatus>
-    const verdict = deriveVerdict(gatePassed, channelStatuses)
-
-    // 5. Build ReconciledResults
-    const totalElapsed = startTimes.length > 0 && endTimes.length > 0
-      ? `${((Math.max(...endTimes) - Math.min(...startTimes)) / 1000).toFixed(1)}s`
-      : '0s'
-
-    const completedCount = Object.values(job.channels)
-      .filter((ch) => ch.status === 'completed').length
-    const partialCount = Object.values(job.channels)
-      .filter((ch) => ['failed', 'timeout'].includes(ch.status)).length
-
-    const results: ReconciledResults = {
-      job_id: job.job_id,
-      verdict,
-      fix_threshold: fixThreshold,
-      reconciled_findings: reconciledFindings,
-      per_channel: perChannel,
-      metadata: {
-        channels_dispatched: Object.keys(job.channels).length,
-        channels_completed: completedCount,
-        channels_partial: partialCount,
-        total_elapsed: totalElapsed,
-      },
-    }
-
-    // 6. Format output
+    // 2. Run results pipeline (parse -> reconcile -> format)
     const outputFormat = (args.format ?? job.format ?? 'json') as OutputFormat
-    let formatted: string
-
-    switch (outputFormat) {
-    case 'text':
-      formatted = formatText(results)
-      break
-    case 'markdown':
-      formatted = formatMarkdown(results)
-      break
-    case 'json':
-    default:
-      formatted = formatJson(results)
-      break
-    }
-
-    // 7. Save results + output to stdout
+    const { results, formatted, exitCode } = runResultsPipeline(store, job, outputFormat, args.raw)
     store.saveResults(job.job_id, results)
     console.log(formatted)
-
-    // Exit codes: 0=pass/degraded-pass, 2=blocked, 3=needs-user-decision, 5=CLI error
-    const exitCode = verdict === 'pass' || verdict === 'degraded-pass' ? 0
-      : verdict === 'needs-user-decision' ? 3
-      : 2
     process.exit(exitCode)
   },
 }

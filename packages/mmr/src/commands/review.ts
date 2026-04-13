@@ -8,6 +8,7 @@ import { JobStore } from '../core/job-store.js'
 import { checkInstalled, checkAuth } from '../core/auth.js'
 import { assemblePrompt } from '../core/prompt.js'
 import { dispatchChannel } from '../core/dispatcher.js'
+import { runResultsPipeline } from '../core/results-pipeline.js'
 import type { Severity, OutputFormat, ChannelStatus } from '../types.js'
 
 interface ReviewArgs {
@@ -107,11 +108,11 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       .option('format', {
         type: 'string',
         describe: 'Output format',
-        choices: ['json', 'text', 'markdown', 'sarif'],
+        choices: ['json', 'text', 'markdown'],
       })
       .option('sync', {
         type: 'boolean',
-        describe: 'Wait for all channels to complete (blocking)',
+        describe: 'Run full review pipeline: dispatch, parse, reconcile, and output results with verdict',
         default: false,
       }),
   handler: async (args: ArgumentsCamelCase<ReviewArgs>) => {
@@ -249,20 +250,30 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       }
     }
 
-    // 9. Output dispatch result
-    const completedJob = store.loadJob(job.job_id)
-    const result = {
-      job_id: job.job_id,
-      status: completedJob.status,
-      channels: Object.fromEntries(
-        channelNames.map((name) => [
-          name,
-          completedJob.channels[name]?.status ?? authResults[name]?.status ?? 'skipped',
-        ]),
-      ),
-      valid_channels: validChannels,
+    // 9. Output results
+    if (args.sync) {
+      // --sync: full results pipeline (dispatch -> parse -> reconcile -> format -> exit)
+      const completedJob = store.loadJob(job.job_id)
+      const outputFormat = (args.format ?? completedJob.format ?? 'json') as OutputFormat
+      const { results, formatted, exitCode } = runResultsPipeline(store, completedJob, outputFormat)
+      store.saveResults(job.job_id, results)
+      console.log(formatted)
+      process.exit(exitCode)
+    } else {
+      // Default: dispatch summary only
+      const completedJob = store.loadJob(job.job_id)
+      const result = {
+        job_id: job.job_id,
+        status: completedJob.status,
+        channels: Object.fromEntries(
+          channelNames.map((name) => [
+            name,
+            completedJob.channels[name]?.status ?? authResults[name]?.status ?? 'skipped',
+          ]),
+        ),
+        valid_channels: validChannels,
+      }
+      console.log(JSON.stringify(result, null, 2))
     }
-
-    console.log(JSON.stringify(result, null, 2))
   },
 }
