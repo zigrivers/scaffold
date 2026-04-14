@@ -19,6 +19,7 @@ import { createOutputContext } from '../../cli/output/context.js'
 import { displayErrors } from '../../cli/output/error-display.js'
 import { resolveOutputMode } from '../../cli/middleware/output-mode.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
+import { resolveContainedArtifactPath } from '../../utils/artifact-path.js'
 import { shutdown } from '../shutdown.js'
 import type { DepthLevel } from '../../types/enums.js'
 import type { ArtifactEntry } from '../../types/assembly.js'
@@ -334,7 +335,14 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
               const depEntry = state.steps[dep]
               if (depEntry?.status === 'completed' && depEntry.produces) {
                 for (const relPath of depEntry.produces) {
-                  const fullPath = path.resolve(projectRoot, relPath)
+                  const fullPath = resolveContainedArtifactPath(projectRoot, relPath)
+                  if (fullPath === null) {
+                    output.warn({
+                      code: 'ARTIFACT_PATH_REJECTED',
+                      message: `Artifact '${relPath}' from step '${dep}' resolves outside project root — skipping`,
+                    })
+                    continue
+                  }
                   if (fs.existsSync(fullPath)) {
                     try {
                       const content = fs.readFileSync(fullPath, 'utf8')
@@ -368,7 +376,14 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
                 // Deduplicate: skip paths already gathered from deps
                 if (gatheredPaths.has(relPath)) continue
 
-                const fullPath = path.resolve(projectRoot, relPath)
+                const fullPath = resolveContainedArtifactPath(projectRoot, relPath)
+                if (fullPath === null) {
+                  output.warn({
+                    code: 'ARTIFACT_PATH_REJECTED',
+                    message: `Artifact '${relPath}' from step '${readStep}' resolves outside project root — skipping`,
+                  })
+                  continue
+                }
                 if (fs.existsSync(fullPath)) {
                   try {
                     const content = fs.readFileSync(fullPath, 'utf8')
