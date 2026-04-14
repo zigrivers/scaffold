@@ -193,3 +193,13 @@ When external CLIs are unavailable, the degraded-mode behavior defined in the Su
 6. Never silently drop unavailable channels — always record the channel status and compensating coverage label in the review output.
 
 **Claude CLI channel:** Claude CLI handles its own auth and is generally always available. The compensating-pass mechanism applies to external CLIs (Codex, Gemini) that have an installation/auth gate. When Codex or Gemini are unavailable, compensating passes are dispatched via `claude -p` with focused prompts targeting the missing channel's strength area.
+
+### Auth Recovery Paths
+
+Each external CLI has a distinct auth recovery path. Agents should surface these directly to the user rather than silently downgrading to a compensating pass:
+
+- **Codex:** `codex login` — opens an interactive OAuth flow. After success, `codex login status` should return cleanly.
+- **Gemini:** `gemini -p "hello"` — refreshes the token if expired; `NO_BROWSER=true` is required in headless environments.
+- **Claude:** `claude auth login` if `claude -p` returns auth errors; rare in practice because Claude CLI tokens are long-lived.
+
+If the user cannot complete auth recovery within the review session, treat the channel as unavailable and document the compensating pass. Never attempt to work around auth failures by embedding credentials in review prompts or by piping through alternative providers that weren't explicitly requested.
