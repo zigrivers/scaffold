@@ -3,7 +3,15 @@ import { reconcile, evaluateGate, deriveVerdict } from './reconciler.js'
 import { formatJson } from '../formatters/json.js'
 import { formatText } from '../formatters/text.js'
 import { formatMarkdown } from '../formatters/markdown.js'
-import type { JobMetadata, Severity, OutputFormat, ChannelResult, ReconciledResults, Finding, ChannelStatus } from '../types.js'
+import type {
+  JobMetadata,
+  Severity,
+  OutputFormat,
+  ChannelResult,
+  ReconciledResults,
+  Finding,
+  ChannelStatus,
+} from '../types.js'
 import { SEVERITY_ORDER } from '../types.js'
 import type { JobStore } from './job-store.js'
 
@@ -32,9 +40,9 @@ export function runResultsPipeline(
     if (entry.status !== 'completed') {
       const errorMsg = entry.status === 'failed' ? 'Channel failed'
         : entry.status === 'timeout' ? 'Channel timed out'
-        : entry.status === 'auth_failed' ? 'Auth check failed'
-        : entry.status === 'not_installed' ? 'CLI not found on PATH'
-        : undefined
+          : entry.status === 'auth_failed' ? 'Auth check failed'
+            : entry.status === 'not_installed' ? 'CLI not found on PATH'
+              : undefined
       perChannel[name] = {
         status: entry.status,
         elapsed: entry.elapsed ?? '0s',
@@ -105,9 +113,11 @@ export function runResultsPipeline(
     : verdict === 'needs-user-decision'
       ? 'No channels completed — manual review needed'
       : (() => {
-          const blockingCount = reconciledFindings.filter(f => SEVERITY_ORDER[f.severity] <= SEVERITY_ORDER[fixThreshold]).length
-          return `Review blocked — ${blockingCount} finding(s) at or above ${fixThreshold}`
-        })()
+        const blockingCount = reconciledFindings.filter(
+          (f) => SEVERITY_ORDER[f.severity] <= SEVERITY_ORDER[fixThreshold],
+        ).length
+        return `Review blocked — ${blockingCount} finding(s) at or above ${fixThreshold}`
+      })()
 
   const results: ReconciledResults = {
     job_id: job.job_id,
@@ -142,7 +152,7 @@ export function runResultsPipeline(
 
   const exitCode = verdict === 'pass' || verdict === 'degraded-pass' ? 0
     : verdict === 'needs-user-decision' ? 3
-    : 2
+      : 2
 
   return { results, formatted, exitCode }
 }

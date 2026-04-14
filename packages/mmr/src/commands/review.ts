@@ -51,7 +51,11 @@ function resolveDiff(args: ReviewArgs): string {
   }
 
   if (args.base && args.head) {
-    return execFileSync('git', ['diff', `${args.base}...${args.head}`], { encoding: 'utf-8', maxBuffer: MAX_DIFF_BUFFER })
+    return execFileSync(
+      'git',
+      ['diff', `${args.base}...${args.head}`],
+      { encoding: 'utf-8', maxBuffer: MAX_DIFF_BUFFER },
+    )
   }
 
   if (args.base) {
@@ -195,8 +199,8 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         const authStatus = authResults[name]
         const channelStatus: ChannelStatus = authStatus?.status === 'not_installed' ? 'not_installed'
           : authStatus?.status === 'failed' ? 'auth_failed'
-          : authStatus?.status === 'timeout' ? 'timeout'
-          : 'skipped'
+            : authStatus?.status === 'timeout' ? 'timeout'
+              : 'skipped'
         store.updateChannel(job.job_id, name, {
           status: channelStatus,
           auth: channelStatus === 'skipped' ? 'skipped' : 'failed',
@@ -236,7 +240,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
             timeout: chConfig.timeout ?? config.defaults.timeout,
             stderr: chConfig.stderr === 'passthrough' ? 'passthrough'
               : chConfig.stderr === 'suppress' ? 'suppress'
-              : 'capture',
+                : 'capture',
           }),
         )
       }
@@ -253,7 +257,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
           timeout: chConfig.timeout ?? config.defaults.timeout,
           stderr: chConfig.stderr === 'passthrough' ? 'passthrough'
             : chConfig.stderr === 'suppress' ? 'suppress'
-            : 'capture',
+              : 'capture',
         })
       }
     }

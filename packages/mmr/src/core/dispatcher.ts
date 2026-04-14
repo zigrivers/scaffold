@@ -71,7 +71,7 @@ export async function dispatchChannel(
   // Map stderr option to stdio descriptor
   const stderrStdio = opts.stderr === 'passthrough' ? 'inherit'
     : opts.stderr === 'capture' ? 'pipe'
-    : 'ignore'  // suppress
+      : 'ignore'  // suppress
 
   // Pipe prompt via stdin to avoid E2BIG on large diffs
   const proc = spawn(cmd, args, {
