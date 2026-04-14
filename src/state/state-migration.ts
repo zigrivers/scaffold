@@ -2,6 +2,7 @@
 
 import type { PipelineState } from '../types/index.js'
 import { fileExists } from '../utils/fs.js'
+import { resolveContainedArtifactPath } from '../utils/artifact-path.js'
 import path from 'node:path'
 
 /**
@@ -139,18 +140,20 @@ export function resolvePrdPath(projectRoot: string): string {
  * Generalizes PRD resolution for any aliased artifact path.
  */
 export function resolveArtifactPath(projectRoot: string, artifactPath: string): string {
-  // Check if the path itself exists
-  if (fileExists(path.join(projectRoot, artifactPath))) {
+  const selfPath = resolveContainedArtifactPath(projectRoot, artifactPath)
+  if (selfPath !== null && fileExists(selfPath)) {
     return artifactPath
   }
 
   // Check reverse aliases (canonical → old)
   for (const [oldPath, canonicalPath] of Object.entries(ARTIFACT_ALIASES)) {
-    if (artifactPath === canonicalPath && fileExists(path.join(projectRoot, oldPath))) {
-      return oldPath
+    if (artifactPath === canonicalPath) {
+      const aliased = resolveContainedArtifactPath(projectRoot, oldPath)
+      if (aliased !== null && fileExists(aliased)) return oldPath
     }
-    if (artifactPath === oldPath && fileExists(path.join(projectRoot, canonicalPath))) {
-      return canonicalPath
+    if (artifactPath === oldPath) {
+      const aliased = resolveContainedArtifactPath(projectRoot, canonicalPath)
+      if (aliased !== null && fileExists(aliased)) return canonicalPath
     }
   }
 

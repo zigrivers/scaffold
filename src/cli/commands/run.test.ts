@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { MockInstance } from 'vitest'
+import path from 'node:path'
 import type { PipelineState } from '../../types/state.js'
 import type { StepStateEntry } from '../../types/state.js'
 import type { MetaPromptFile, MetaPromptFrontmatter } from '../../types/frontmatter.js'
@@ -139,6 +140,11 @@ vi.mock('../../cli/middleware/output-mode.js', () => ({
   resolveOutputMode: vi.fn(),
 }))
 
+vi.mock('../../utils/artifact-path.js', () => ({
+  resolveContainedArtifactPath: vi.fn((projectRoot: string, relPath: string) =>
+    path.join(projectRoot, relPath)),
+}))
+
 vi.mock('../shutdown.js', () => ({
   shutdown: {
     withResource: vi.fn((_name: string, _cleanup: unknown, fn: () => unknown) => fn()),
@@ -174,6 +180,7 @@ import { computeEligible } from '../../core/dependency/eligibility.js'
 import { findProjectRoot } from '../../cli/middleware/project-root.js'
 import { createOutputContext } from '../../cli/output/context.js'
 import { resolveOutputMode } from '../../cli/middleware/output-mode.js'
+import { resolveContainedArtifactPath } from '../../utils/artifact-path.js'
 import fs from 'node:fs'
 
 // ---------------------------------------------------------------------------
@@ -1059,6 +1066,79 @@ describe('run command handler', () => {
         }),
       )
       expect(process.exitCode).toBeUndefined()
+    })
+
+    it('emits ARTIFACT_PATH_REJECTED when helper returns null for an out-of-root artifact', async () => {
+      // Make the helper reject a specific relPath ("docs/setup.md") to simulate
+      // an out-of-root resolution. Other calls fall back to the default
+      // path.join behavior so unrelated artifacts work normally.
+      vi.mocked(resolveContainedArtifactPath).mockImplementation(
+        (root: string, relPath: string) =>
+          relPath === 'docs/setup.md' ? null : path.join(root, relPath),
+      )
+
+      const setupMeta = makeMetaPrompt({
+        stepName: 'setup-project',
+        frontmatter: makeFrontmatter({
+          name: 'setup-project',
+          phase: 'prerequisites',
+          order: 0,
+          dependencies: [],
+          outputs: ['docs/setup.md'],
+        }),
+      })
+      const prdMeta = makeMetaPrompt({
+        stepName: 'create-prd',
+        frontmatter: makeFrontmatter({
+          name: 'create-prd',
+          dependencies: ['setup-project'],
+          outputs: ['docs/prd.md'],
+        }),
+      })
+      const artMap = new Map([
+        ['setup-project', setupMeta],
+        ['create-prd', prdMeta],
+      ])
+      vi.mocked(discoverMetaPrompts).mockReturnValue(artMap)
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(artMap)
+
+      const state = makeState({
+        'setup-project': {
+          status: 'completed',
+          source: 'pipeline',
+          produces: ['docs/setup.md'],
+          depth: 3,
+          completed_by: 'scaffold-run',
+        },
+        'create-prd': { status: 'pending', source: 'pipeline', produces: ['docs/prd.md'] },
+      })
+      vi.mocked(StateManager.prototype.loadState).mockReturnValue(state)
+
+      const graph: DependencyGraph = {
+        nodes: new Map([
+          ['setup-project', {
+            slug: 'setup-project', phase: 'prerequisites',
+            order: 0, dependencies: [], enabled: true,
+          }],
+          ['create-prd', {
+            slug: 'create-prd', phase: 'modeling',
+            order: 1, dependencies: ['setup-project'], enabled: true,
+          }],
+        ]),
+        edges: new Map([
+          ['setup-project', ['create-prd']],
+          ['create-prd', []],
+        ]),
+      }
+      vi.mocked(buildGraph).mockReturnValue(graph)
+
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
+
+      expect(mockOutput.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'ARTIFACT_PATH_REJECTED' }),
+      )
     })
   })
 

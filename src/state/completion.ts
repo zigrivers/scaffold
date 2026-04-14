@@ -1,6 +1,6 @@
 import type { PipelineState } from '../types/index.js'
 import { fileExists } from '../utils/fs.js'
-import path from 'node:path'
+import { resolveContainedArtifactPath } from '../utils/artifact-path.js'
 
 export interface CompletionResult {
   complete: boolean
@@ -25,8 +25,8 @@ export function detectCompletion(
   const artifactsMissing: string[] = []
 
   for (const output of expectedOutputs) {
-    const fullPath = path.resolve(projectRoot, output)
-    if (fileExists(fullPath)) {
+    const fullPath = resolveContainedArtifactPath(projectRoot, output)
+    if (fullPath !== null && fileExists(fullPath)) {
       artifactsPresent.push(output)
     } else {
       artifactsMissing.push(output)
@@ -58,8 +58,8 @@ export function checkCompletion(
   const missingArtifacts: string[] = []
 
   for (const output of expectedOutputs) {
-    const fullPath = path.resolve(projectRoot, output)
-    if (fileExists(fullPath)) {
+    const fullPath = resolveContainedArtifactPath(projectRoot, output)
+    if (fullPath !== null && fileExists(fullPath)) {
       presentArtifacts.push(output)
     } else {
       missingArtifacts.push(output)
@@ -94,8 +94,8 @@ export function analyzeCrash(state: PipelineState, projectRoot: string): CrashRe
   const missingArtifacts: string[] = []
 
   for (const output of expectedOutputs) {
-    const fullPath = path.resolve(projectRoot, output)
-    if (fileExists(fullPath)) {
+    const fullPath = resolveContainedArtifactPath(projectRoot, output)
+    if (fullPath !== null && fileExists(fullPath)) {
       presentArtifacts.push(output)
     } else {
       missingArtifacts.push(output)

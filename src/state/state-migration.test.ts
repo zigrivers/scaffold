@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest'
-import { migrateState } from './state-migration.js'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { afterEach, describe, it, expect, vi } from 'vitest'
+import { migrateState, resolveArtifactPath } from './state-migration.js'
 import type { PipelineState } from '../types/index.js'
 
 function makeState(steps: Record<string, { status: string; produces?: string[] }>): PipelineState {
@@ -551,5 +554,52 @@ describe('migrateState', () => {
       expect(raw['analytics']).toEqual({ runs: 42, last_run: '2026-03-28' })
       expect(raw['custom-metadata']).toBe('some value')
     })
+  })
+})
+
+describe('resolveArtifactPath (containment-hardened)', () => {
+  const tmpDirs: string[] = []
+
+  afterEach(() => {
+    for (const d of tmpDirs) {
+      try { fs.rmSync(d, { recursive: true, force: true }) } catch { /* ignore */ }
+    }
+    tmpDirs.length = 0
+    vi.restoreAllMocks()
+  })
+
+  function tmpRoot() {
+    const p = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffold-test-'))
+    tmpDirs.push(p)
+    return p
+  }
+
+  it('returns the alias when canonical path does not exist but alias does', () => {
+    const root = tmpRoot()
+    fs.mkdirSync(path.join(root, 'docs'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'docs', 'prd.md'), 'x')
+
+    // ARTIFACT_ALIASES maps 'docs/prd.md' → 'docs/plan.md'. Asking for the
+    // canonical name when only the legacy name is on disk round-trips
+    // to the legacy name — proving the function still walks aliases after
+    // the containment refactor.
+    expect(resolveArtifactPath(root, 'docs/plan.md')).toBe('docs/prd.md')
+  })
+
+  it('does not probe the filesystem at all for traversal inputs', () => {
+    // Before this hardening, resolveArtifactPath('../../etc/passwd') called
+    // fileExists(path.join(root, '../../etc/passwd')) — a real existsSync
+    // probe on '/etc/passwd'. After the refactor, resolveContainedArtifactPath
+    // returns null for that input, fileExists is skipped, and no alias key
+    // in ARTIFACT_ALIASES matches '../../etc/passwd', so the alias loop also
+    // never probes. The observable difference between old and new code is
+    // that `fs.existsSync` is now called zero times for a traversal input.
+    const root = tmpRoot()
+    const existsSpy = vi.spyOn(fs, 'existsSync')
+
+    const result = resolveArtifactPath(root, '../../etc/passwd')
+
+    expect(existsSpy).not.toHaveBeenCalled()
+    expect(result).toBe('../../etc/passwd') // function still returns the input
   })
 })

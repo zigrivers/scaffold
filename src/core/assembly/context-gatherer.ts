@@ -3,8 +3,8 @@ import type { PipelineState, ScaffoldConfig, DecisionEntry } from '../../types/i
 import { fileExists } from '../../utils/fs.js'
 import { readDecisions } from '../../state/decision-logger.js'
 import { resolveArtifactPath } from '../../state/state-migration.js'
+import { resolveContainedArtifactPath } from '../../utils/artifact-path.js'
 import fs from 'node:fs'
-import path from 'node:path'
 
 /**
  * Gather project context for assembly.
@@ -31,7 +31,8 @@ export function gatherContext(options: {
     for (const outputPath of produces) {
       // Resolve aliased paths (e.g., docs/prd.md ↔ docs/plan.md)
       const resolvedPath = resolveArtifactPath(projectRoot, outputPath)
-      const fullPath = path.resolve(projectRoot, resolvedPath)
+      const fullPath = resolveContainedArtifactPath(projectRoot, resolvedPath)
+      if (fullPath === null) continue // path escapes project root — skip silently
       if (fileExists(fullPath)) {
         try {
           const content = fs.readFileSync(fullPath, 'utf8')

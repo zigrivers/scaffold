@@ -3,7 +3,7 @@ import type { PipelineState } from '../../types/state.js'
 import type { ExistingArtifact } from '../../types/assembly.js'
 import type { ScaffoldWarning } from '../../types/errors.js'
 import fs from 'node:fs'
-import path from 'node:path'
+import { resolveContainedArtifactPath } from '../../utils/artifact-path.js'
 
 export interface UpdateModeResult {
   isUpdateMode: boolean
@@ -41,14 +41,17 @@ export function detectUpdateMode(options: {
     return { isUpdateMode: false, currentDepth, warnings: [] }
   }
 
-  // Find the first file artifact that exists on disk (skip directories)
-  let firstExistingRelPath: string | undefined
+  // Find the first file artifact that exists on disk (skip directories).
+  // Both relPath and its containment-checked fullPath are tracked together
+  // so the downstream read site does not need a non-null assertion.
+  let firstExisting: { relPath: string; fullPath: string } | undefined
   for (const relativePath of produces) {
-    const fullPath = path.resolve(projectRoot, relativePath)
+    const fullPath = resolveContainedArtifactPath(projectRoot, relativePath)
+    if (fullPath === null) continue // path escapes project root — skip
     try {
       const stat = fs.statSync(fullPath)
       if (stat.isFile()) {
-        firstExistingRelPath = relativePath
+        firstExisting = { relPath: relativePath, fullPath }
         break
       }
     } catch {
@@ -57,12 +60,14 @@ export function detectUpdateMode(options: {
   }
 
   // No artifacts exist on disk — not update mode
-  if (firstExistingRelPath === undefined) {
+  if (firstExisting === undefined) {
     return { isUpdateMode: false, currentDepth, warnings: [] }
   }
 
-  // Update mode triggered — read first artifact content
-  const fullPath = path.resolve(projectRoot, firstExistingRelPath)
+  // Update mode triggered — read first artifact content.
+  // TypeScript has narrowed `firstExisting` to non-undefined by this point
+  // (the early-return for the not-found case runs above this line).
+  const { relPath: firstExistingRelPath, fullPath } = firstExisting
   const content = fs.readFileSync(fullPath, 'utf8')
   const previousDepth = stepEntry.depth as DepthLevel | undefined
   const completionTimestamp = stepEntry.at ?? ''
