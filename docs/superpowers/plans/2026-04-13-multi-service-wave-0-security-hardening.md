@@ -4,7 +4,7 @@
 
 **Goal:** Close a pre-existing path traversal vulnerability by introducing a single `resolveContainedArtifactPath()` helper and using it at all 5 artifact resolution sites.
 
-**Architecture:** Extract a pure function that resolves a relative path against the project root, canonicalizes with `fs.realpathSync()` to defeat symlink bypass, and verifies the result stays within `projectRoot` using `path.sep`-suffixed prefix comparison to defeat prefix collision. Replace direct `path.resolve(projectRoot, relPath)` calls at 5 sites so every artifact read goes through the same containment check.
+**Architecture:** Extract a pure function that resolves a relative path against the project root, canonicalizes with `fs.realpathSync()` (including a walk-up-to-existing-ancestor pass for not-yet-existing paths) to defeat symlink bypass, and verifies the result stays within `projectRoot` via a `path.relative`-based containment check that naturally handles prefix collisions and filesystem-root edge cases. Replace direct `path.resolve(projectRoot, relPath)` calls at 5 sites so every artifact read goes through the same containment check.
 
 **Tech Stack:** TypeScript, vitest (test framework), Node.js `fs.realpathSync` / `path.resolve`. No new dependencies.
 
@@ -16,7 +16,7 @@
 
 ### Created
 
-- `src/utils/artifact-path.ts` — Single pure helper function + a small wrapper that emits a standard warning when containment fails. Tests co-located at `src/utils/artifact-path.test.ts`.
+- `src/utils/artifact-path.ts` — Single pure helper function that returns `null` when containment fails. Each call site decides how to react (warn-and-skip, treat-as-missing, or silent-skip) based on its own UX contract. Tests co-located at `src/utils/artifact-path.test.ts`.
 
 ### Modified
 
@@ -88,9 +88,9 @@ describe('resolveContainedArtifactPath', () => {
     expect(resolved).toBeNull()
   })
 
-  it('returns null when a symlink escapes the project root', () => {
+  it('returns null when a symlink escapes the project root (existing leaf)', () => {
     const root = tmpRoot()
-    const outside = tmpRoot() // a second tmp dir outside `root`
+    const outside = tmpRoot()
     fs.writeFileSync(path.join(outside, 'secret.txt'), 'nope')
     fs.mkdirSync(path.join(root, 'docs'), { recursive: true })
     fs.symlinkSync(outside, path.join(root, 'docs', 'escape'))
@@ -100,8 +100,24 @@ describe('resolveContainedArtifactPath', () => {
     expect(resolved).toBeNull()
   })
 
+  it('returns null when a symlinked ancestor escapes and the leaf does NOT exist', () => {
+    // Critical case: the leaf is missing, but an ancestor in the chain is a
+    // symlink that points outside the project root. A naive ENOENT fallback
+    // that only does string-prefix checks would accept this. The helper must
+    // canonicalize the deepest existing ancestor and reject.
+    const root = tmpRoot()
+    const outside = tmpRoot()
+    fs.mkdirSync(path.join(root, 'docs'), { recursive: true })
+    fs.symlinkSync(outside, path.join(root, 'docs', 'escape'))
+    // `docs/escape/missing.txt` does not exist — but resolving it follows the
+    // symlink and lands outside the project root.
+
+    const resolved = resolveContainedArtifactPath(root, 'docs/escape/missing.txt')
+
+    expect(resolved).toBeNull()
+  })
+
   it('returns null on prefix collision (project vs project-malicious)', () => {
-    // Two sibling dirs that share a prefix without a separator
     const parent = tmpRoot()
     const project = path.join(parent, 'project')
     const malicious = path.join(parent, 'project-malicious')
@@ -114,22 +130,59 @@ describe('resolveContainedArtifactPath', () => {
     expect(resolved).toBeNull()
   })
 
-  it('returns the resolved path for a file that does not yet exist', () => {
-    // Defense: pre-completion checks pass a path whose file does not exist yet.
-    // The helper must NOT reject these — it must return the would-be resolved path
-    // after verifying it would land inside the project root.
+  it('returns the canonical path for a file that does not yet exist', () => {
+    // Pre-completion checks pass a path whose file does not exist yet. The
+    // helper must NOT reject these — it must return a canonical would-be path
+    // after verifying the deepest existing ancestor stays within the root.
     const root = tmpRoot()
-    const expected = path.resolve(root, 'docs/not-yet.md')
+    fs.mkdirSync(path.join(root, 'docs'), { recursive: true })
+    const canonicalRoot = fs.realpathSync(root)
 
     const resolved = resolveContainedArtifactPath(root, 'docs/not-yet.md')
 
-    expect(resolved).toBe(expected)
+    expect(resolved).toBe(path.join(canonicalRoot, 'docs', 'not-yet.md'))
+  })
+
+  it('returns a canonical path when the project root itself is a symlink', () => {
+    // macOS tmpdir is /var/folders/... which is a symlink to /private/var/... —
+    // this test makes the behavior explicit regardless of platform.
+    const realParent = tmpRoot()
+    const realRoot = path.join(realParent, 'real-proj')
+    fs.mkdirSync(realRoot, { recursive: true })
+    const symlinkedRoot = path.join(tmpRoot(), 'via-symlink')
+    fs.symlinkSync(realRoot, symlinkedRoot)
+
+    const resolved = resolveContainedArtifactPath(symlinkedRoot, 'docs/not-yet.md')
+
+    expect(resolved).toBe(path.join(fs.realpathSync(symlinkedRoot), 'docs', 'not-yet.md'))
   })
 
   it('returns null when the file does not exist AND the path would escape', () => {
     const root = tmpRoot()
 
     const resolved = resolveContainedArtifactPath(root, '../../does-not-exist')
+
+    expect(resolved).toBeNull()
+  })
+
+  it('returns null when relPath is absolute and points outside the root', () => {
+    // path.resolve(root, '/etc/passwd') === '/etc/passwd' — the root arg is
+    // ignored when the second arg is absolute. This is the single most
+    // important attack vector for a poisoned state.json with an absolute
+    // `produces` entry.
+    const root = tmpRoot()
+
+    const resolved = resolveContainedArtifactPath(root, '/etc/passwd')
+
+    expect(resolved).toBeNull()
+  })
+
+  it('returns null for relPath containing a null byte', () => {
+    // fs APIs throw on null bytes; reject them at the boundary rather than
+    // leaking undefined behavior to callers.
+    const root = tmpRoot()
+
+    const resolved = resolveContainedArtifactPath(root, 'docs/foo\0.md')
 
     expect(resolved).toBeNull()
   })
@@ -142,13 +195,29 @@ describe('resolveContainedArtifactPath', () => {
     expect(resolved).toBeNull()
   })
 
-  it('accepts the project root itself (empty relative path)', () => {
-    // path.resolve(root, '') === root. Must be allowed (containment equal-case).
+  it('rejects any relPath that resolves to the project root itself', () => {
+    // The project root directory is not a legitimate artifact. Empty
+    // string, '.', './', and an absolute path to the root all resolve
+    // to projectRoot and must all fail — otherwise existence-only
+    // callers (detectCompletion, checkCompletion, analyzeCrash) would
+    // count the project root directory as a present artifact.
     const root = tmpRoot()
 
-    const resolved = resolveContainedArtifactPath(root, '')
+    expect(resolveContainedArtifactPath(root, '')).toBeNull()
+    expect(resolveContainedArtifactPath(root, '.')).toBeNull()
+    expect(resolveContainedArtifactPath(root, './')).toBeNull()
+    expect(resolveContainedArtifactPath(root, root)).toBeNull()
+    expect(resolveContainedArtifactPath(root, fs.realpathSync(root))).toBeNull()
+  })
 
-    expect(resolved).toBe(fs.realpathSync(root))
+  it('rejects non-string relPath (state boundary is untrusted)', () => {
+    // State is JSON-loaded via a trust-cast; a poisoned state.json could
+    // put a non-string in produces[]. Fail closed.
+    const root = tmpRoot()
+
+    const resolved = resolveContainedArtifactPath(root, 42 as unknown as string)
+
+    expect(resolved).toBeNull()
   })
 })
 ```
@@ -170,19 +239,30 @@ import path from 'node:path'
  * Resolve an artifact path and verify it stays within the project root.
  *
  * Returns the canonicalized (symlink-resolved) absolute path if the target
- * is inside `projectRoot`. Returns `null` if:
+ * stays inside `projectRoot`. Returns `null` if:
+ *   - `relPath` is not a non-empty string, or contains a null byte
  *   - the project root does not exist
  *   - the resolved target escapes the project root
- *   - a symlink in the path chain points outside the project root
+ *   - a symlink anywhere in the path chain (including above a missing leaf)
+ *     points outside the project root
+ *   - any fs error other than ENOENT/ENOTDIR surfaces during canonicalization
+ *     (EACCES, ELOOP, EINVAL, …) — we fail closed rather than guess
  *
- * For paths whose target file does not yet exist, falls back to a string-prefix
- * check against the canonicalized project root. This preserves the ability to
- * reference expected-output paths before the step runs.
+ * TOCTOU note: callers MUST use the returned absolute path for all
+ * subsequent fs operations. Re-resolving `relPath` after this function
+ * returns reintroduces the race window between canonicalization and use.
  */
 export function resolveContainedArtifactPath(
   projectRoot: string,
   relPath: string,
 ): string | null {
+  // State is JSON-loaded with a trust-cast, so `relPath` may be any type at
+  // runtime. Reject non-strings, empty strings (would resolve to the project
+  // root itself — never a legitimate artifact), and null-byte injections.
+  if (typeof relPath !== 'string' || relPath === '' || relPath.includes('\0')) {
+    return null
+  }
+
   const resolved = path.resolve(projectRoot, relPath)
 
   let canonicalRoot: string
@@ -192,34 +272,66 @@ export function resolveContainedArtifactPath(
     return null
   }
 
-  let canonicalPath: string
-  try {
-    canonicalPath = fs.realpathSync(resolved)
-  } catch {
-    // File does not exist yet. Fall back to the non-symlink-resolved path —
-    // safe because any `..` components were already collapsed by path.resolve
-    // and no symlinks can be traversed through a path that does not exist.
-    if (!isContained(resolved, canonicalRoot)) return null
-    return resolved
-  }
+  const canonicalPath = canonicalizeWithMissingTail(resolved)
+  if (canonicalPath === null) return null
 
   if (!isContained(canonicalPath, canonicalRoot)) return null
+  // Reject root-equivalent inputs ('.', './', an absolute path equal to the
+  // root, etc.). Callers never legitimately ask for the project root itself
+  // as an artifact, and accepting it would let existence-only call sites
+  // count the project root directory as a present artifact.
+  if (canonicalPath === canonicalRoot) return null
   return canonicalPath
 }
 
+/**
+ * Canonicalize a path whose leaf may not exist. Walk up until an ancestor
+ * exists, `realpathSync` it, then re-append the missing tail. This defeats
+ * symlink escape through intermediate directories even when the leaf is
+ * absent — a plain string-prefix check on the unresolved `path.resolve`
+ * output would miss this.
+ *
+ * Only climbs past ENOENT/ENOTDIR (genuine "does not exist" conditions).
+ * Any other errno (EACCES, ELOOP, EINVAL, Windows UNC/drive failures, …)
+ * returns null — we must not silently walk past a permission-denied
+ * ancestor and reach a canonical root that trivially passes containment.
+ */
+function canonicalizeWithMissingTail(target: string): string | null {
+  let head = target
+  const tail: string[] = []
+  while (true) {
+    try {
+      const canonicalHead = fs.realpathSync(head)
+      return tail.length === 0 ? canonicalHead : path.join(canonicalHead, ...tail)
+    } catch (err) {
+      const code = err instanceof Error ? (err as NodeJS.ErrnoException).code : undefined
+      if (code !== 'ENOENT' && code !== 'ENOTDIR') return null
+      const parent = path.dirname(head)
+      if (parent === head) return null
+      tail.unshift(path.basename(head))
+      head = parent
+    }
+  }
+}
+
 function isContained(candidate: string, root: string): boolean {
-  // Equal path is allowed (artifact at the project root itself).
-  if (candidate === root) return true
-  // Prefix match MUST include the path separator to defeat prefix collision
-  // (e.g., /project vs /project-malicious).
-  return candidate.startsWith(root + path.sep)
+  // `path.relative` normalizes the comparison across platforms (POSIX `/`,
+  // Windows drive roots, UNC shares) and naturally defeats both prefix
+  // collision (`/project` vs `/project-malicious` → `../project-malicious/…`)
+  // and root-slash edge cases (`/` + `path.sep` = `//`, which a manual
+  // `startsWith` check would mishandle).
+  const rel = path.relative(root, candidate)
+  if (rel === '') return true // candidate === root
+  if (rel === '..' || rel.startsWith('..' + path.sep)) return false
+  if (path.isAbsolute(rel)) return false // different Windows drive
+  return true
 }
 ```
 
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npx vitest run src/utils/artifact-path.test.ts`
-Expected: PASS — all 8 tests pass.
+Expected: PASS — all 13 tests pass.
 
 - [ ] **Step 5: Commit**
 
@@ -228,8 +340,9 @@ git add src/utils/artifact-path.ts src/utils/artifact-path.test.ts
 git commit -m "feat(security): add resolveContainedArtifactPath helper
 
 Pure function that resolves an artifact path and verifies it stays
-within the project root using realpathSync + path.sep-suffixed prefix
-comparison. Handles ENOENT gracefully for not-yet-existing paths."
+within the project root using realpathSync (with a walk-up-to-existing
+pass for not-yet-created paths) plus a path.relative containment check.
+Rejects null-byte, non-string, and root-equivalent inputs."
 ```
 
 ---
@@ -240,9 +353,51 @@ comparison. Handles ENOENT gracefully for not-yet-existing paths."
 - Modify: `src/cli/commands/run.ts` (lines ~337, ~371)
 - Test: existing `tests/` run.ts coverage; no new test file needed for this task (covered by Task 1's helper tests). Manual smoke test via `make check-all` at the end of Task 7.
 
-- [ ] **Step 1: Write a failing integration test proving the traversal-blocking behavior at the call site**
+- [ ] **Step 1: Update `run.test.ts` to tolerate real `realpathSync` on `projectRoot`**
 
-There is no existing test for traversal at the `run.ts` call sites. Add one to the helper test file (`src/utils/artifact-path.test.ts`) that proves the function returns the expected null — which we already did in Task 1. Move on; the unit tests are sufficient guarantee for Tasks 2-6.
+`src/cli/commands/run.test.ts` uses a synthetic `PROJECT_ROOT = '/test/project'` and mocks only `existsSync`/`readFileSync`. After this task, the artifact-gathering path calls real `fs.realpathSync(projectRoot)`, which will throw ENOENT and make every artifact lookup return `null`. Pick one remediation and apply it before editing `run.ts`:
+
+**Option A (recommended) — Mock the helper in `run.test.ts`:**
+
+Add to the top-level `vi.mock` block:
+
+```typescript
+import path from 'node:path'
+
+vi.mock('../../utils/artifact-path.js', () => ({
+  resolveContainedArtifactPath: vi.fn((projectRoot: string, relPath: string) =>
+    path.join(projectRoot, relPath)),
+}))
+```
+
+Then import `resolveContainedArtifactPath` in the same style as existing mocks and reset it in `beforeEach` if needed. This preserves the existing unit-test boundary: `run.test.ts` does not exercise the helper's real logic — the helper's own test file does.
+
+**Option B — Use a real tmp dir:** replace `PROJECT_ROOT = '/test/project'` with `fs.mkdtempSync(...)`. Higher-cost change; only choose this if Option A conflicts with other parts of the test file.
+
+Run `npx vitest run src/cli/commands/run.test.ts` after the mock is in place and before step 2. Expected: all existing run tests still pass.
+
+After step 4 (the second run.ts edit), add one targeted regression test so the new `ARTIFACT_PATH_REJECTED` branch does not silently disappear in a future refactor. Add to the existing "artifact loading from completed dependencies" describe block:
+
+```typescript
+it('emits ARTIFACT_PATH_REJECTED when helper returns null for an out-of-root artifact', async () => {
+  vi.mocked(resolveContainedArtifactPath).mockImplementation(
+    (root: string, relPath: string) =>
+      relPath === 'docs/plan.md' ? null : path.join(root, relPath),
+  )
+  // Wire up a pipeline where create-prd depends on setup-project, and
+  // setup-project has produces: ['docs/plan.md']. Use existing test fixtures.
+  // ... (reuse the setup in the neighboring "loads artifacts from completed
+  // dependency steps" test)
+
+  await invokeHandler({ step: 'create-prd', _: ['run'] })
+
+  expect(mockOutput.warn).toHaveBeenCalledWith(
+    expect.objectContaining({ code: 'ARTIFACT_PATH_REJECTED' }),
+  )
+})
+```
+
+This proves (1) `run.ts` actually calls the helper and (2) the null branch fires the documented warning.
 
 - [ ] **Step 2: Add the import to `run.ts`**
 
@@ -538,17 +693,17 @@ for (const relativePath of produces) {
 Replace with:
 
 ```typescript
-// Find the first file artifact that exists on disk (skip directories)
-let firstExistingRelPath: string | undefined
-let firstExistingFullPath: string | undefined
+// Find the first file artifact that exists on disk (skip directories).
+// Both relPath and its containment-checked fullPath are tracked together
+// so the downstream read site does not need a non-null assertion.
+let firstExisting: { relPath: string; fullPath: string } | undefined
 for (const relativePath of produces) {
   const fullPath = resolveContainedArtifactPath(projectRoot, relativePath)
   if (fullPath === null) continue // path escapes project root — skip
   try {
     const stat = fs.statSync(fullPath)
     if (stat.isFile()) {
-      firstExistingRelPath = relativePath
-      firstExistingFullPath = fullPath
+      firstExisting = { relPath: relativePath, fullPath }
       break
     }
   } catch {
@@ -556,6 +711,8 @@ for (const relativePath of produces) {
   }
 }
 ```
+
+Update any downstream references to `firstExistingRelPath` in this function to `firstExisting?.relPath` (or destructure once the early-return has narrowed the type).
 
 - [ ] **Step 3: Replace the second call site (line 65) — content read**
 
@@ -570,11 +727,13 @@ const content = fs.readFileSync(fullPath, 'utf8')
 Replace with:
 
 ```typescript
-// Update mode triggered — read first artifact content
-// firstExistingFullPath is guaranteed non-null here because we only set
-// firstExistingRelPath when its containment-checked fullPath existed.
-const content = fs.readFileSync(firstExistingFullPath!, 'utf8')
+// Update mode triggered — read first artifact content.
+// TypeScript has narrowed `firstExisting` to non-undefined by this point
+// (the early-return for the not-found case runs above this line).
+const content = fs.readFileSync(firstExisting.fullPath, 'utf8')
 ```
+
+Adjust the early-return guard above this point to check `if (firstExisting === undefined)` instead of `if (firstExistingRelPath === undefined)`, so TypeScript narrows `firstExisting` correctly for the read.
 
 - [ ] **Step 4: Check for unused `path` import**
 
@@ -739,25 +898,90 @@ export function resolveArtifactPath(projectRoot: string, artifactPath: string): 
 }
 ```
 
-Note: leave the earlier `fileExists(path.join(projectRoot, candidate))` at line ~130 inside `detectPrdCanonicalPath()` unchanged — that function scans a hardcoded candidate list from frontmatter, not state, and changing it is outside Wave 0's scope.
-
-Wait — re-check. The spec explicitly lists lines 143 and 149 in `resolveArtifactPath`. The `detectPrdCanonicalPath` reference at line 130 is NOT in the spec's Affected Sites table. Leave it alone.
+Note: leave the earlier `fileExists(path.join(projectRoot, candidate))` at line ~130 inside `resolvePrdPath()` unchanged — that function scans a hardcoded candidate list from frontmatter, not state, and changing it is outside Wave 0's scope. The spec's Affected Sites table explicitly lists only lines 143 and 149 in `resolveArtifactPath`.
 
 - [ ] **Step 3: Verify the remaining `path.join` usages are out of Wave 0's scope**
 
 Run: `grep -n "path\.join(projectRoot" src/state/state-migration.ts`
 
-Expected output: at most one remaining match (inside `detectPrdCanonicalPath` around line 130). That call is explicitly out of scope for Wave 0.
+Expected output: at most one remaining match (inside `resolvePrdPath` around line 130). That call is explicitly out of scope for Wave 0.
 
-- [ ] **Step 4: Run the test suite**
+- [ ] **Step 4: Add regression coverage for `resolveArtifactPath`**
+
+`src/state/state-migration.test.ts` currently exercises `migrateState` only — there are no existing tests for `resolveArtifactPath`. Add a small coverage block so this hardening does not silently drift.
+
+First, ensure these imports exist at the top of the test file (add any that are missing):
+
+```typescript
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { afterEach, describe, it, expect, vi } from 'vitest'
+import { resolveArtifactPath } from './state-migration.js'
+```
+
+Then add the block (place it alongside the existing `migrateState` describe):
+
+```typescript
+describe('resolveArtifactPath (containment-hardened)', () => {
+  const tmpDirs: string[] = []
+
+  afterEach(() => {
+    for (const d of tmpDirs) {
+      try { fs.rmSync(d, { recursive: true, force: true }) } catch { /* ignore */ }
+    }
+    tmpDirs.length = 0
+    vi.restoreAllMocks()
+  })
+
+  function tmpRoot() {
+    const p = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffold-test-'))
+    tmpDirs.push(p)
+    return p
+  }
+
+  it('returns the alias when canonical path does not exist but alias does', () => {
+    const root = tmpRoot()
+    fs.mkdirSync(path.join(root, 'docs'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'docs', 'prd.md'), 'x')
+
+    // ARTIFACT_ALIASES maps 'docs/prd.md' → 'docs/plan.md'. Asking for the
+    // canonical name when only the legacy name is on disk round-trips
+    // to the legacy name — proving the function still walks aliases after
+    // the containment refactor.
+    expect(resolveArtifactPath(root, 'docs/plan.md')).toBe('docs/prd.md')
+  })
+
+  it('does not probe the filesystem at all for traversal inputs', () => {
+    // Before this hardening, resolveArtifactPath('../../etc/passwd') called
+    // fileExists(path.join(root, '../../etc/passwd')) — a real existsSync
+    // probe on '/etc/passwd'. After the refactor, resolveContainedArtifactPath
+    // returns null for that input, fileExists is skipped, and no alias key
+    // in ARTIFACT_ALIASES matches '../../etc/passwd', so the alias loop also
+    // never probes. The observable difference between old and new code is
+    // that `fs.existsSync` is now called zero times for a traversal input.
+    const root = tmpRoot()
+    const existsSpy = vi.spyOn(fs, 'existsSync')
+
+    const result = resolveArtifactPath(root, '../../etc/passwd')
+
+    expect(existsSpy).not.toHaveBeenCalled()
+    expect(result).toBe('../../etc/passwd') // function still returns the input
+  })
+})
+```
+
+Verify the alias direction at `src/state/state-migration.ts` (`ARTIFACT_ALIASES` declaration around line 50) and flip the first test if it has reversed since this plan was written.
+
+- [ ] **Step 5: Run the test suite**
 
 Run: `npx vitest run`
-Expected: all tests pass. `state-migration.test.ts` (if present) covers `resolveArtifactPath`.
+Expected: all tests pass, including the two new cases above.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/state/state-migration.ts
+git add src/state/state-migration.ts src/state/state-migration.test.ts
 git commit -m "fix(security): contain artifact paths in state-migration alias resolution
 
 Route resolveArtifactPath existence checks through
@@ -776,12 +1000,11 @@ containment model consistent across all artifact resolution."
 
 Run: `grep -rn "path\.resolve(projectRoot" src/`
 
-Expected output lines — only these, which are NOT artifact sites:
+Expected output lines — only these non-artifact sites may remain:
 - `src/state/state-manager.ts` — state path construction (not artifact)
 - `src/state/lock-manager.ts` — lock path construction (not artifact)
 - `src/state/decision-logger.ts` — decisions log path (not artifact)
 - `src/state/rework-manager.ts` — rework path (not artifact)
-- `src/util/…` (if present elsewhere) — other unrelated uses
 
 Zero results should appear in:
 - `src/cli/commands/run.ts`
@@ -811,11 +1034,13 @@ node /path/to/scaffold/dist/cli.js status
 
 Expected: command runs as before; no new warnings for legitimate artifact paths. (Skip this step if no throwaway project is available — the unit tests in Task 1 are the authoritative proof of correctness.)
 
-- [ ] **Step 4: Create the final commit for the review-history entry**
+- [ ] **Step 4: Update the spec to match reality and record Wave 0 as implemented**
 
-No code changes expected here, but update the spec's review-history section to record Wave 0 as implemented:
+Two changes to `docs/superpowers/specs/2026-04-13-multi-service-evolution-design.md`:
 
-Modify `docs/superpowers/specs/2026-04-13-multi-service-evolution-design.md`, in the "Review History" section, add after the last entry:
+1. Correct the helper filename — the spec currently says `src/util/artifact-path.ts` but the codebase convention (and this plan) uses `src/utils/` plural. Search the spec for `src/util/artifact-path` and replace with `src/utils/artifact-path`.
+
+2. Append to the "Review History" section:
 
 ```markdown
 - **Implementation — Wave 0** (2026-MM-DD): `resolveContainedArtifactPath()` helper added to `src/utils/artifact-path.ts`. All 5 artifact resolution sites (run.ts, completion.ts, update-mode.ts, context-gatherer.ts, state-migration.ts) routed through the helper. All tests green.
@@ -825,7 +1050,7 @@ Replace `2026-MM-DD` with today's date.
 
 ```bash
 git add docs/superpowers/specs/2026-04-13-multi-service-evolution-design.md
-git commit -m "docs(spec): mark Wave 0 as implemented"
+git commit -m "docs(spec): mark Wave 0 as implemented + correct src/utils path"
 ```
 
 - [ ] **Step 5: Done**
@@ -837,5 +1062,5 @@ Wave 0 is complete. Wave 1 depends on Wave 0 shipping — once this branch merge
 ## Out of Scope for This Plan
 
 - **Wave 1 onward** — fintech knowledge docs, service manifest, cross-service pipeline, per-service execution. Each wave gets its own plan.
-- **`detectPrdCanonicalPath` inside `state-migration.ts`** — uses `path.join` on hardcoded candidates from frontmatter. Not in the spec's Affected Sites table for Wave 0.
+- **`resolvePrdPath` inside `state-migration.ts`** — uses `path.join` on hardcoded candidates from frontmatter. Not in the spec's Affected Sites table for Wave 0.
 - **Other `path.resolve(projectRoot, …)` calls in state managers (lock, rework, decisions, state)** — those resolve state paths, not artifact paths, and are addressed by Wave 3b's `StatePathResolver` abstraction.
