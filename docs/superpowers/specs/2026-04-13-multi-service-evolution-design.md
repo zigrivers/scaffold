@@ -47,7 +47,7 @@ All 5 artifact path resolution sites use `path.resolve(projectRoot, relPath)` wh
 Extract a single containment helper:
 
 ```typescript
-// src/util/artifact-path.ts
+// src/utils/artifact-path.ts
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -757,3 +757,4 @@ All cross-service artifact reads go through `resolveContainedArtifactPath()` (wa
 - **Round 6 — spec document review** (2 channels: Codex, Claude): Found 0 P0, 3 P1s, 1 P2. Fixes: added global-vs-service step classification table, added service-scoped overlay resolution flow, added `exports` field to ServiceSchema, added frontmatter schema update section for `cross-reads`. 2 Codex P2s were false positives (`state-validator.ts` does exist; `cross-service-auth` was already fixed in round 5).
 - **Round 7 — final convergence** (3 channels: Codex, Claude, Codex+Gemini-equivalent): Found 0 P0, 1 P1, 2 P2s. Fix: added vision/PRD steps to multi-service-overlay step-overrides to make global classification heuristic self-consistent; specified `ProjectTypeOverlay.projectType` optionality change for structural overlays.
 - **Final state**: 0 P0, 0 P1 remaining. All 3 channels converge on same findings.
+- **Implementation — Wave 0** (2026-04-13): `resolveContainedArtifactPath()` helper added to `src/utils/artifact-path.ts`. All 5 artifact resolution sites (run.ts, completion.ts, update-mode.ts, context-gatherer.ts, state-migration.ts) routed through the helper. All tests green.
