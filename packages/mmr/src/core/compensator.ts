@@ -4,8 +4,14 @@ import type { ChannelStatus } from '../types.js'
 
 /** Focus areas for compensating passes, keyed by the channel being compensated */
 const COMPENSATING_FOCUS: Record<string, string> = {
-  codex: 'Focus your review on: implementation correctness, security vulnerabilities, API contract violations, input validation, and error handling. You are compensating for a missing Codex review.',
-  gemini: 'Focus your review on: architectural patterns, design consistency, broad-context reasoning, separation of concerns, and dependency analysis. You are compensating for a missing Gemini review.',
+  codex:
+    'Focus your review on: implementation correctness, security vulnerabilities,'
+    + ' API contract violations, input validation, and error handling.'
+    + ' You are compensating for a missing Codex review.',
+  gemini:
+    'Focus your review on: architectural patterns, design consistency,'
+    + ' broad-context reasoning, separation of concerns, and dependency analysis.'
+    + ' You are compensating for a missing Gemini review.',
 }
 
 /** Channels that should NOT be compensated (e.g., claude can't compensate for itself) */
@@ -31,8 +37,16 @@ export function getCompensatingChannels(
 
   for (const [name, status] of Object.entries(channelStatuses)) {
     if (SKIP_COMPENSATION.has(name)) continue
-    if (status === 'not_installed' || status === 'auth_failed' || status === 'timeout' || status === 'skipped' || status === 'failed') {
-      const focus = COMPENSATING_FOCUS[name] ?? `Focus your review on areas typically covered by ${name}. You are compensating for a missing ${name} review.`
+    if (
+      status === 'not_installed'
+      || status === 'auth_failed'
+      || status === 'timeout'
+      || status === 'skipped'
+      || status === 'failed'
+    ) {
+      const focus = COMPENSATING_FOCUS[name]
+        ?? `Focus your review on areas typically covered by ${name}.`
+        + ` You are compensating for a missing ${name} review.`
       compensating.push({
         originalChannel: name,
         compensatingName: `compensating-${name}`,

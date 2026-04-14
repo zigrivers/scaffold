@@ -1,5 +1,11 @@
 import fs from 'node:fs'
-import { stripMarkdownFences, extractJson, fixTrailingCommas, validateParsedOutputStrict, validateFindingStrict } from './parser.js'
+import {
+  stripMarkdownFences,
+  extractJson,
+  fixTrailingCommas,
+  validateParsedOutputStrict,
+  validateFindingStrict,
+} from './parser.js'
 import type { ParsedOutput } from './parser.js'
 
 /**
@@ -43,7 +49,12 @@ export function normalizeExternalInput(raw: string): ParsedOutput {
       const extracted = extractJson(text)
       const candidate = JSON.parse(fixTrailingCommas(extracted))
       // Only accept as wrapper if it has findings array AND does not look like a bare finding
-      if (typeof candidate === 'object' && candidate !== null && Array.isArray(candidate.findings) && typeof candidate.severity !== 'string') {
+      if (
+        typeof candidate === 'object'
+        && candidate !== null
+        && Array.isArray(candidate.findings)
+        && typeof candidate.severity !== 'string'
+      ) {
         parsed = candidate
         extractedWrapper = true
       }
@@ -64,7 +75,14 @@ export function normalizeExternalInput(raw: string): ParsedOutput {
         if (inStr) { if (c === '\\') i++; else if (c === '"') inStr = false; continue }
         if (c === '"') inStr = true
         else if (c === '[') depth++
-        else if (c === ']') { depth--; if (depth === 0) { const arrayText = fixTrailingCommas(stripped.slice(arrayStart, i + 1)); parsed = JSON.parse(arrayText); break } }
+        else if (c === ']') {
+          depth--
+          if (depth === 0) {
+            const arrayText = fixTrailingCommas(stripped.slice(arrayStart, i + 1))
+            parsed = JSON.parse(arrayText)
+            break
+          }
+        }
       }
       if (parsed === undefined) throw new Error('Unbalanced brackets in array input')
     }

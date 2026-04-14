@@ -79,7 +79,13 @@ export class JobStore {
     const jobDir = this.getJobDir(jobId)
     const raw = fs.readFileSync(path.join(jobDir, 'job.json'), 'utf-8')
     const metadata = JSON.parse(raw) as JobMetadata
-    if (!metadata || !metadata.job_id || !metadata.channels || typeof metadata.channels !== 'object' || Array.isArray(metadata.channels)) {
+    if (
+      !metadata
+      || !metadata.job_id
+      || !metadata.channels
+      || typeof metadata.channels !== 'object'
+      || Array.isArray(metadata.channels)
+    ) {
       throw new Error(`Malformed job metadata in ${jobId}/job.json`)
     }
 

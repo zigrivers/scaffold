@@ -68,12 +68,12 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
       const isCompensating = sources[0].startsWith('compensating-')
       confidence = effectiveSeverity === 'P0' ? 'high'
         : isCompensating ? 'low'
-        : 'medium'
+          : 'medium'
     }
 
     // Use the finding with the longest description as representative (deterministic)
     const representative = group.reduce((best, current) =>
-      current.description.length > best.description.length ? current : best
+      current.description.length > best.description.length ? current : best,
     )
 
     results.push({
