@@ -52,6 +52,7 @@ interface InitArgs {
   'backend-auth'?: string
   'backend-messaging'?: string
   'backend-deploy-target'?: string
+  'backend-domain'?: string
   // CLI flags
   'cli-interactivity'?: string
   'cli-distribution'?: string[]
@@ -177,6 +178,11 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         type: 'string',
         describe: 'Deploy target',
         choices: ['serverless', 'container', 'long-running'] as const,
+      })
+      .option('backend-domain', {
+        type: 'string',
+        describe: 'Backend domain (none | fintech)',
+        choices: ['none', 'fintech'] as const,
       })
       // CLI Configuration
       .option('cli-interactivity', {
@@ -425,7 +431,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       .group(['methodology', 'depth', 'adapters', 'traits', 'project-type'], 'Configuration:')
       .group(['web-rendering', 'web-deploy-target', 'web-realtime', 'web-auth-flow'], 'Web-App Configuration:')
       .group(['backend-api-style', 'backend-data-store', 'backend-auth',
-        'backend-messaging', 'backend-deploy-target'], 'Backend Configuration:')
+        'backend-messaging', 'backend-deploy-target', 'backend-domain'], 'Backend Configuration:')
       .group(['cli-interactivity', 'cli-distribution', 'cli-structured-output'], 'CLI Configuration:')
       .group([...LIB_FLAGS], 'Library Configuration:')
       .group([...MOBILE_FLAGS], 'Mobile-App Configuration:')
@@ -527,6 +533,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
           backendAuth: argv['backend-auth'] as BackendFlags['backendAuth'],
           backendMessaging: argv['backend-messaging'] as BackendFlags['backendMessaging'],
           backendDeployTarget: argv['backend-deploy-target'] as BackendFlags['backendDeployTarget'],
+          backendDomain: argv['backend-domain'] as BackendFlags['backendDomain'],
         } : undefined,
         cliFlags: hasCliTypeFlag ? {
           cliInteractivity: argv['cli-interactivity'] as CliFlags['cliInteractivity'],
