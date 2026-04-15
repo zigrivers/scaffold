@@ -1,0 +1,32 @@
+# methodology/backend-fintech.yml
+name: backend-fintech
+description: >
+  Fintech domain sub-overlay — adds compliance, ledger design,
+  broker integration, order lifecycle, risk management, and
+  observability knowledge to backend projects.
+project-type: backend
+domain: fintech
+
+knowledge-overrides:
+  create-prd:
+    append: [backend-fintech-compliance, backend-fintech-broker-integration]
+  user-stories:
+    append: [backend-fintech-order-lifecycle, backend-fintech-risk-management]
+  domain-modeling:
+    append: [backend-fintech-ledger, backend-fintech-order-lifecycle, backend-fintech-data-modeling]
+  system-architecture:
+    append: [backend-fintech-broker-integration, backend-fintech-risk-management]
+  database-schema:
+    append: [backend-fintech-ledger, backend-fintech-data-modeling]
+  api-contracts:
+    append: [backend-fintech-order-lifecycle]
+  security:
+    append: [backend-fintech-compliance]
+  operations:
+    append: [backend-fintech-observability, backend-fintech-risk-management]
+  tdd:
+    append: [backend-fintech-testing]
+  create-evals:
+    append: [backend-fintech-testing, backend-fintech-compliance]
+  story-tests:
+    append: [backend-fintech-testing]
