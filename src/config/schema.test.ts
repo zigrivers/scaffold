@@ -433,14 +433,14 @@ describe('BackendConfigSchema', () => {
 })
 
 describe('BackendConfigSchema — domain field', () => {
-  it("defaults `domain` to 'none' when omitted", () => {
+  it('defaults `domain` to \'none\' when omitted', () => {
     const result = BackendConfigSchema.parse({
       apiStyle: 'rest',
     })
     expect(result.domain).toBe('none')
   })
 
-  it("accepts `domain: 'fintech'`", () => {
+  it('accepts `domain: \'fintech\'`', () => {
     const result = BackendConfigSchema.parse({
       apiStyle: 'rest',
       domain: 'fintech',

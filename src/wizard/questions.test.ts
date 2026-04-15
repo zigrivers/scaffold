@@ -597,7 +597,7 @@ describe('backend wizard questions', () => {
     })).rejects.toThrow('--backend-api-style is required')
   })
 
-  it("defaults domain to 'none' in auto mode when --backend-domain is not provided", async () => {
+  it('defaults domain to \'none\' in auto mode when --backend-domain is not provided', async () => {
     const output = makeOutputContext()
 
     const answers = await askWizardQuestions({
@@ -610,7 +610,7 @@ describe('backend wizard questions', () => {
     expect(answers.backendConfig?.domain).toBe('none')
   })
 
-  it("uses backendDomain flag value 'fintech' in auto mode", async () => {
+  it('uses backendDomain flag value \'fintech\' in auto mode', async () => {
     const output = makeOutputContext()
 
     const answers = await askWizardQuestions({
@@ -624,7 +624,7 @@ describe('backend wizard questions', () => {
     expect(answers.backendConfig?.domain).toBe('fintech')
   })
 
-  it("prompts 'Backend domain?' in interactive mode and records 'fintech' answer", async () => {
+  it('prompts \'Backend domain?\' in interactive mode and records \'fintech\' answer', async () => {
     const output = makeOutputContext()
     vi.mocked(output.select)
       .mockResolvedValueOnce('rest')       // apiStyle

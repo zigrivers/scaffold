@@ -49,10 +49,14 @@ export const backendCopy: BackendCopy = {
   },
   domain: {
     short: 'Optional domain-specific knowledge to include.',
-    long: 'Adds a curated set of knowledge documents and prompt guidance tailored to a specific industry or problem space.',
+    long: 'Adds a curated set of knowledge documents and prompt guidance '
+      + 'tailored to a specific industry or problem space.',
     options: {
-      none:    { label: 'None',    short: 'No domain-specific knowledge.' },
-      fintech: { label: 'Fintech', short: 'Compliance, ledger design, broker integration, order lifecycle, risk management.' },
+      none: { label: 'None', short: 'No domain-specific knowledge.' },
+      fintech: {
+        label: 'Fintech',
+        short: 'Compliance, ledger design, broker integration, order lifecycle, risk management.',
+      },
     },
   },
 }

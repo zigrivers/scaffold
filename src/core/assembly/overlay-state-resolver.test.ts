@@ -379,7 +379,7 @@ describe('resolveOverlayState', () => {
     ])
   })
 
-  it("does NOT load backend-fintech.yml when BackendConfig.domain is 'none'", () => {
+  it('does NOT load backend-fintech.yml when BackendConfig.domain is \'none\'', () => {
     const config = makeConfig({
       project: {
         projectType: 'backend',

@@ -409,7 +409,7 @@ describe('init command — .check() validation', () => {
     )
   })
 
-  it("forwards --backend-domain=fintech into the wizard's backendFlags", async () => {
+  it('forwards --backend-domain=fintech into the wizard\'s backendFlags', async () => {
     const argv = defaultArgv({
       root: os.tmpdir(),
       'backend-api-style': 'rest',
