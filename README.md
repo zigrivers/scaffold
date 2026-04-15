@@ -389,6 +389,7 @@ Every `scaffold init` wizard question can be answered via CLI flags, making scaf
 | `--backend-auth` | string | none, jwt, session, oauth, apikey |
 | `--backend-messaging` | string | none, queue, event-driven |
 | `--backend-deploy-target` | string | serverless, container, long-running |
+| `--backend-domain` | string | none, fintech |
 
 #### CLI Config Flags (require `--project-type cli` or auto-set it)
 

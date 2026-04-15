@@ -30,3 +30,17 @@ knowledge-overrides:
     append: [backend-fintech-testing, backend-fintech-compliance]
   story-tests:
     append: [backend-fintech-testing]
+  review-architecture:
+    append: [backend-fintech-broker-integration, backend-fintech-risk-management, backend-fintech-ledger]
+  review-api:
+    append: [backend-fintech-order-lifecycle]
+  review-database:
+    append: [backend-fintech-ledger, backend-fintech-data-modeling]
+  review-security:
+    append: [backend-fintech-compliance]
+  review-operations:
+    append: [backend-fintech-observability, backend-fintech-risk-management]
+  review-testing:
+    append: [backend-fintech-testing]
+  implementation-plan:
+    append: [backend-fintech-ledger, backend-fintech-broker-integration, backend-fintech-order-lifecycle, backend-fintech-risk-management, backend-fintech-compliance]

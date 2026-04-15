@@ -93,6 +93,7 @@ export interface BrokerAdapter {
   fetchPositions(accountId: string): Promise<Position[]>;
   fetchBalance(accountId: string): Promise<Balance>;
   subscribeFills(onFill: (f: Fill) => void): Promise<Subscription>;
+  subscribeQuotes(symbols: string[], onQuote: (q: Quote) => void): Promise<Subscription>;
   healthCheck(): Promise<HealthStatus>;
 }
 ```
