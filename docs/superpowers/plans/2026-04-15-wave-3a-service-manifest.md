@@ -1702,7 +1702,9 @@ initializeState(options: {
 
 Return type is **`void`** (the state is persisted to disk internally; caller uses `loadState()` to read it back if needed).
 
-**Widen to add `config` only.** Do NOT add `oldState` to this function — state merging stays at the caller layer (Task 12's `materializeScaffoldProject`).
+**Widen to add `config` as OPTIONAL.** Do NOT add `oldState` to this function — state merging stays at the caller layer (Task 12's `materializeScaffoldProject`).
+
+`config` must be optional so existing test callers (`src/state/state-manager.test.ts`'s `INIT_OPTIONS` constant, `src/e2e/rework.test.ts`'s direct call, etc.) continue to compile without per-test updates. When `config` is absent, the dispatcher defaults to `hasServices: false` → `schema-version: 1`. Every Wave 3a caller that CAN pass config DOES pass it; existing test callers leave it undefined and get v1, which matches their current expectation.
 
 ```ts
 initializeState(options: {
@@ -1710,13 +1712,20 @@ initializeState(options: {
   scaffoldVersion: string
   methodology: string
   initMode: 'greenfield' | 'brownfield' | 'v1-migration'
-  config: { project?: { services?: unknown[] } }   // Wave 3a
+  config?: { project?: { services?: unknown[] } }   // Wave 3a — optional
 }): void {
   const schemaVersion: 1 | 2 =
     (options.config?.project?.services?.length ?? 0) > 0 ? 2 : 1
   // ... existing body unchanged, but use schemaVersion instead of hardcoded 1 ...
 }
 ```
+
+Verified test callers that rely on `config` being optional (do NOT touch these in Wave 3a):
+- `src/state/state-manager.test.ts` — multiple `manager.initializeState(INIT_OPTIONS)` calls
+- `src/e2e/rework.test.ts` — at least one direct call
+- Any other `initializeState(` grep hits in test files
+
+The test suites for these files should stay green unchanged; their state.json files will still have `schema-version: 1` as they do today.
 
 Do **NOT** change the `initMode` enum values (`'greenfield' | 'brownfield' | 'v1-migration'`) — that would be a state-shape change outside Wave 3a's scope. Both the wizard path and the `--from` path continue to pass one of those three values.
 
@@ -2063,6 +2072,26 @@ This mirrors the behavior at today's `wizard.ts:104-117` exactly, including the 
 
 ```ts
 export async function runWizard(options: WizardOptions): Promise<WizardResult> {
+  // PREFLIGHT — preserves today's behavior: reject existing .scaffold/
+  // without --force BEFORE prompting the user. Current wizard.ts:87-102
+  // does this as a WizardResult error return; we keep that contract so
+  // existing init/wizard tests stay green.
+  const scaffoldDir = path.join(options.projectRoot, '.scaffold')
+  if (fs.existsSync(scaffoldDir) && !options.force) {
+    return {
+      success: false,
+      projectRoot: options.projectRoot,
+      configPath: path.join(scaffoldDir, 'config.yml'),
+      methodology: 'unknown',
+      errors: [{
+        code: 'INIT_SCAFFOLD_EXISTS',
+        message: '.scaffold/ directory already exists',
+        exitCode: 1,
+        recovery: 'Use --force to back up and reinitialize',
+      }],
+    }
+  }
+
   const config = await collectWizardAnswers(options)
   const oldState = readOldStateIfExists(options.projectRoot)
   await materializeScaffoldProject(config, {
@@ -2079,6 +2108,15 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
   }
 }
 ```
+
+The `--from` path in `init.ts` (Task 13) uses `materializeScaffoldProject` directly, WITHOUT running through `runWizard`. Its preflight is the `ExistingScaffoldError` throw inside `materializeScaffoldProject` itself (mapped to exit 2 via the handler-level catch). The two entry points use two different error signaling mechanisms because they have two different contracts:
+
+- **Wizard path**: returns `WizardResult.errors` with `exitCode: 1` — today's behavior for existing init tests.
+- **`--from` path**: throws `ExistingScaffoldError` → handler catch → exit 2.
+
+This asymmetry is deliberate. The CHANGELOG entry (Task 17) notes the `--from`-specific exit code.
+
+**Instructions directory**: `materializeScaffoldProject` MUST also create `.scaffold/instructions/` because current wizard/init tests assert its existence. Mirror the current wizard.ts behavior (search wizard.ts for `instructions/` to find the exact mkdir / seeding).
 
 **Old-state merge logic** (the loop that preserves completed steps from the old state into the fresh state, currently at `wizard.ts:214-231`): this must stay inside `materializeScaffoldProject`, running AFTER `initializeState()` returns a fresh state but BEFORE the decisions-log priming. Copy the loop verbatim from the old position. The merge reads `oldState` (the `MaterializeOptions` field) and writes the merged state back via `stateManager.saveState(mergedState)`. Keep helper function signatures used by `runWizard`'s callers (e.g., `WizardResult` exact shape) unchanged.
 
@@ -2115,6 +2153,26 @@ for both paths (current behavior, preserved)."
 - Create: `src/cli/commands/init-from.test.ts`
 
 ### Step 1: Write failing tests for --from
+
+**ALSO: update the existing `src/cli/commands/init.test.ts` mock.** Today's mock (line ~12) declares only `runWizard`:
+
+```ts
+vi.mock('../../wizard/wizard.js', () => ({
+  runWizard: vi.fn(),
+}))
+```
+
+After Task 12 adds `materializeScaffoldProject` and `readOldStateIfExists` as exports from `wizard.js`, and Task 13 imports them in `init.ts`, the existing init test will fail to resolve those imports unless the mock is extended. Update the mock in `init.test.ts` to:
+
+```ts
+vi.mock('../../wizard/wizard.js', () => ({
+  runWizard: vi.fn(),
+  materializeScaffoldProject: vi.fn(),
+  readOldStateIfExists: vi.fn().mockReturnValue(undefined),
+}))
+```
+
+The existing wizard-path tests still only interact with `runWizard`; the two new mocks are inert for the existing test suite. Add this edit to Task 13's commit.
 
 - [ ] **Create `src/cli/commands/init-from.test.ts`:**
 
@@ -2252,6 +2310,23 @@ project:
     await initCommand.handler(argv)
     expect(process.exitCode).toBe(2)
     process.exitCode = 0
+  })
+
+  it('--from success path calls runBuild and syncSkillsIfNeeded', async () => {
+    // Proves that --from falls through to the shared post-materialize block,
+    // NOT a half-init. Mocks for runBuild and syncSkillsIfNeeded are in the
+    // test file's top-level vi.mock blocks.
+    const file = withTmpFile(validManifest)
+    const root = withTmpDir()
+    const argv = await parseInitArgs(['--from', file, '--root', root, '--auto'])
+    await initCommand.handler(argv)
+    // runBuild is mocked; assert it was called with the right projectRoot.
+    expect(vi.mocked(runBuild)).toHaveBeenCalledWith(
+      expect.objectContaining({ root }),
+      expect.anything(),
+    )
+    // syncSkillsIfNeeded is mocked; assert it was called with projectRoot.
+    expect(vi.mocked(syncSkillsIfNeeded)).toHaveBeenCalledWith(root)
   })
 
   it('errors on --from - when stdin is a TTY', async () => {
@@ -2842,7 +2917,7 @@ For each of the 9 commands, the specific placement:
 
 - [ ] **`src/cli/commands/status.ts`**: status.ts does NOT currently load config. Add a `loadConfig(projectRoot, [])` call at the top of the handler, then the guard, then proceed.
 
-- [ ] **`src/cli/commands/dashboard.ts`**: config is already loaded at line 86 (`const { config } = loadConfig(projectRoot, [])`). Insert the guard immediately after that line. The guard must fire before any state or pipeline work.
+- [ ] **`src/cli/commands/dashboard.ts`**: **dashboard.ts currently loads STATE before config** — state is loaded around line 70, config at line 86. Task 11's StateManager configProvider wiring must be set up to receive the config, AND Task 15's guard must fire before the StateManager loads state. **Reorder the handler**: move the `const { config } = loadConfig(projectRoot, [])` call to BEFORE the state-loading block. Then run `assertSingleServiceOrExit(config ?? {}, { commandName: 'dashboard', output })`. Then construct the StateManager with `() => config ?? undefined`. Then load state. Apply the same reorder pattern anywhere else the same anti-pattern exists (grep for `new StateManager` preceding `loadConfig` in the same file).
 
 - [ ] **`src/cli/commands/info.ts`**: this file has TWO branches. Line 46 (project-info) loads config; line 71 (step-info) does not. Insert the guard in BOTH branches, loading config in the step-info branch if needed:
 
@@ -2953,6 +3028,10 @@ import { ConfigSchema } from '../config/schema.js'
 import initCommand from '../cli/commands/init.js'
 import runCommand from '../cli/commands/run.js'
 
+// E2E test: do NOT mock runBuild or syncSkillsIfNeeded — we want the
+// real post-materialize fall-through so we can assert .claude/skills/
+// actually lands (proving the seam change is effective).
+
 async function parseInitArgs(args: string[]): Promise<Record<string, unknown>> {
   return yargs(args)
     .command(initCommand as never)
@@ -3051,6 +3130,11 @@ describe('E2E: scaffold init --from <nibble.yml>', () => {
 
     // decisions.jsonl is empty (current behavior preserved).
     expect(fs.readFileSync(decisionsPath, 'utf8')).toBe('')
+
+    // Confirms --from falls through to the shared post-materialize block,
+    // not a half-init. Proves the spec §2 "materializer is the shared seam"
+    // contract: downstream artifacts land.
+    expect(fs.existsSync(path.join(root, '.claude', 'skills'))).toBe(true)
 
     // Project is "configured but not executable": scaffold run fails BEFORE
     // any lock/pipeline work — the guard (Task 15) must run first.
