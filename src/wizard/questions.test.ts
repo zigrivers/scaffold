@@ -62,9 +62,9 @@ describe('askWizardQuestions', () => {
 
     expect(result.projectType).toBe('backend')
     expect(result.gameConfig).toBeUndefined()
-    // select called for: projectType + apiStyle + authMechanism + asyncMessaging + deployTarget
+    // select called for: projectType + apiStyle + authMechanism + asyncMessaging + deployTarget + domain
     // never for engine/multiplayer/etc. (game questions not triggered)
-    expect(output.select).toHaveBeenCalledTimes(5)
+    expect(output.select).toHaveBeenCalledTimes(6)
   })
 
   it('game projectType triggers engine question and returns gameConfig', async () => {
@@ -571,6 +571,7 @@ describe('backend wizard questions', () => {
         backendAuth: 'jwt',
         backendMessaging: 'queue',
         backendDeployTarget: 'serverless',
+        backendDomain: 'none',
       },
     })
     expect(answers.backendConfig).toEqual({
@@ -579,6 +580,7 @@ describe('backend wizard questions', () => {
       authMechanism: 'jwt',
       asyncMessaging: 'queue',
       deployTarget: 'serverless',
+      domain: 'none',
     })
     // All backend questions were provided via flags — no select/multiSelect calls
     expect(output.select).not.toHaveBeenCalled()
@@ -593,6 +595,53 @@ describe('backend wizard questions', () => {
       methodology: 'deep',
       projectType: 'backend',
     })).rejects.toThrow('--backend-api-style is required')
+  })
+
+  it("defaults domain to 'none' in auto mode when --backend-domain is not provided", async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true, methodology: 'deep',
+      projectType: 'backend',
+      backendFlags: {
+        backendApiStyle: 'rest',
+      },
+    })
+    expect(answers.backendConfig?.domain).toBe('none')
+  })
+
+  it("uses backendDomain flag value 'fintech' in auto mode", async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true, methodology: 'deep',
+      projectType: 'backend',
+      backendFlags: {
+        backendApiStyle: 'rest',
+        backendDomain: 'fintech',
+      },
+    })
+    expect(answers.backendConfig?.domain).toBe('fintech')
+  })
+
+  it("prompts 'Backend domain?' in interactive mode and records 'fintech' answer", async () => {
+    const output = makeOutputContext()
+    vi.mocked(output.select)
+      .mockResolvedValueOnce('rest')       // apiStyle
+      .mockResolvedValueOnce('none')       // authMechanism
+      .mockResolvedValueOnce('none')       // asyncMessaging
+      .mockResolvedValueOnce('container')  // deployTarget
+      .mockResolvedValueOnce('fintech')    // domain
+    vi.mocked(output.multiSelect)
+      .mockResolvedValueOnce(['relational'])
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: false, methodology: 'deep',
+      projectType: 'backend',
+    })
+    expect(answers.backendConfig?.domain).toBe('fintech')
+    const selectCalls = vi.mocked(output.select).mock.calls
+    expect(selectCalls.some(call => call[0] === 'Backend domain?')).toBe(true)
   })
 })
 

@@ -414,6 +414,7 @@ describe('BackendConfigSchema', () => {
       authMechanism: 'none',
       asyncMessaging: 'none',
       deployTarget: 'container',
+      domain: 'none',
     })
   })
 
@@ -428,6 +429,30 @@ describe('BackendConfigSchema', () => {
   it('accepts apiStyle none for workers', () => {
     const result = BackendConfigSchema.parse({ apiStyle: 'none' })
     expect(result.apiStyle).toBe('none')
+  })
+})
+
+describe('BackendConfigSchema — domain field', () => {
+  it("defaults `domain` to 'none' when omitted", () => {
+    const result = BackendConfigSchema.parse({
+      apiStyle: 'rest',
+    })
+    expect(result.domain).toBe('none')
+  })
+
+  it("accepts `domain: 'fintech'`", () => {
+    const result = BackendConfigSchema.parse({
+      apiStyle: 'rest',
+      domain: 'fintech',
+    })
+    expect(result.domain).toBe('fintech')
+  })
+
+  it('rejects invalid `domain` values', () => {
+    expect(() => BackendConfigSchema.parse({
+      apiStyle: 'rest',
+      domain: 'healthcare',
+    })).toThrow()
   })
 })
 
