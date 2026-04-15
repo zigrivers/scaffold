@@ -341,6 +341,81 @@ describe('resolveOverlayState', () => {
     ])
   })
 
+  it('loads backend-fintech.yml when BackendConfig.domain is fintech', () => {
+    const config = makeConfig({
+      project: {
+        projectType: 'backend',
+        backendConfig: {
+          apiStyle: 'rest',
+          dataStore: ['relational'],
+          authMechanism: 'jwt',
+          asyncMessaging: 'none',
+          deployTarget: 'container',
+          domain: 'fintech',
+        },
+      },
+    })
+    const presetSteps: Record<string, StepEnablementEntry> = {
+      'tech-stack': { enabled: true },
+    }
+    const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+      ['tech-stack', { frontmatter: makeFrontmatter({
+        name: 'tech-stack', knowledgeBase: ['tech-stack-selection'],
+        reads: [], dependencies: [],
+      }) }],
+    ])
+
+    const result = resolveOverlayState({
+      config,
+      methodologyDir: fixtureDir,
+      metaPrompts,
+      presetSteps,
+      output: makeOutput(),
+    })
+
+    // backend-fintech.yml appends fintech-compliance to tech-stack
+    expect(result.knowledge['tech-stack']).toEqual([
+      'tech-stack-selection', 'fintech-compliance',
+    ])
+  })
+
+  it("does NOT load backend-fintech.yml when BackendConfig.domain is 'none'", () => {
+    const config = makeConfig({
+      project: {
+        projectType: 'backend',
+        backendConfig: {
+          apiStyle: 'rest',
+          dataStore: ['relational'],
+          authMechanism: 'jwt',
+          asyncMessaging: 'none',
+          deployTarget: 'container',
+          domain: 'none',
+        },
+      },
+    })
+    const presetSteps: Record<string, StepEnablementEntry> = {
+      'tech-stack': { enabled: true },
+    }
+    const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+      ['tech-stack', { frontmatter: makeFrontmatter({
+        name: 'tech-stack', knowledgeBase: ['tech-stack-selection'],
+        reads: [], dependencies: [],
+      }) }],
+    ])
+
+    const result = resolveOverlayState({
+      config,
+      methodologyDir: fixtureDir,
+      metaPrompts,
+      presetSteps,
+      output: makeOutput(),
+    })
+
+    // Domain is 'none' — sub-overlay must not load
+    expect(result.knowledge['tech-stack']).toEqual(['tech-stack-selection'])
+    expect(result.knowledge['tech-stack']).not.toContain('fintech-compliance')
+  })
+
   it('handles undefined config.project gracefully', () => {
     const config = makeConfig() // config.project is undefined
     const presetSteps: Record<string, StepEnablementEntry> = {

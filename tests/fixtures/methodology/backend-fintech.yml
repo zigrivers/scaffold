@@ -1,0 +1,7 @@
+name: backend-fintech
+description: Fintech domain sub-overlay for testing
+project-type: backend
+
+knowledge-overrides:
+  tech-stack:
+    append: [fintech-compliance]
