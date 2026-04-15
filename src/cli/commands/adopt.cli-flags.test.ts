@@ -192,4 +192,25 @@ describe('adopt CLI flag integration', () => {
     expect(result.projectType).toBe('backend')
     expect((result.detectedConfig?.config as Record<string, unknown>)?.apiStyle).toBe('graphql')
   })
+
+  it('--backend-domain fintech with --project-type backend sets domain', async () => {
+    const dir = tracked(makeTmpProject({}))
+    const overrides = buildFlagOverrides({
+      'backend-api-style': 'rest',
+      'backend-domain': 'fintech',
+    })
+    const result = await runAdoption({
+      projectRoot: dir,
+      metaPromptDir: path.join(dir, '.scaffold'),
+      methodology: 'deep',
+      dryRun: true,
+      auto: true,
+      force: true,
+      verbose: false,
+      explicitProjectType: 'backend',
+      flagOverrides: overrides,
+    })
+    expect(result.projectType).toBe('backend')
+    expect((result.detectedConfig?.config as Record<string, unknown>)?.domain).toBe('fintech')
+  })
 })

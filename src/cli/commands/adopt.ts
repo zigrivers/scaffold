@@ -212,6 +212,11 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
         describe: 'Deploy target',
         choices: ['serverless', 'container', 'long-running'] as const,
       })
+      .option('backend-domain', {
+        type: 'string',
+        describe: 'Backend domain (none | fintech)',
+        choices: ['none', 'fintech'] as const,
+      })
       // CLI Configuration
       .option('cli-interactivity', {
         type: 'string',
@@ -433,7 +438,7 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
       .group(['project-type'], 'Configuration:')
       .group(['web-rendering', 'web-deploy-target', 'web-realtime', 'web-auth-flow'], 'Web-App Configuration:')
       .group(['backend-api-style', 'backend-data-store', 'backend-auth',
-        'backend-messaging', 'backend-deploy-target'], 'Backend Configuration:')
+        'backend-messaging', 'backend-deploy-target', 'backend-domain'], 'Backend Configuration:')
       .group(['cli-interactivity', 'cli-distribution', 'cli-structured-output'], 'CLI Configuration:')
       .group([...LIB_FLAGS], 'Library Configuration:')
       .group([...MOBILE_FLAGS], 'Mobile-App Configuration:')

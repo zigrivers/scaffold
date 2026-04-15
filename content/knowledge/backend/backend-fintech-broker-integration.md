@@ -114,15 +114,28 @@ type InternalErrorClass =
   | 'outage'          // broker-wide failure; circuit-break; alert on-call
   | 'unknown';        // indeterminate state; reconcile, do NOT retry
 
-// Alpaca → internal (illustrative)
-function classifyAlpacaError(resp: AlpacaErrorResponse): InternalErrorClass {
-  if (resp.httpStatus >= 500) return 'transient';
+// Alpaca → internal (illustrative).
+// Order matters: ambiguous/specific cases must match BEFORE the generic 5xx
+// branch or a timeout on a mutating call would be silently retried as
+// `transient` and duplicate orders. Split idempotent reads from mutations
+// at the call site so a read-path 500 can still retry freely.
+function classifyAlpacaError(
+  resp: AlpacaErrorResponse,
+  op: 'read' | 'mutate',
+): InternalErrorClass {
   if (resp.httpStatus === 429) return 'rate_limited';
   if (resp.httpStatus === 401 || resp.httpStatus === 403) return 'auth';
   if (resp.httpStatus === 422 && resp.code === 40010001) return 'invalid'; // insufficient buying power
   if (resp.httpStatus === 422 && resp.code === 40310000) return 'invalid'; // market closed
-  if (resp.httpStatus === 504 || resp.code === 'timeout') return 'unknown'; // order may or may not exist
+  // Specific 5xx shapes first:
   if (resp.httpStatus === 503 && /maintenance/i.test(resp.message)) return 'outage';
+  if (resp.httpStatus === 504 || resp.code === 'timeout') {
+    // Mutating call + indeterminate response = reconcile, never blind-retry.
+    return op === 'mutate' ? 'unknown' : 'transient';
+  }
+  // Generic 5xx last. A 500 on a mutation is STILL ambiguous — bubble as
+  // `unknown` so the order-lifecycle reconciler resolves it.
+  if (resp.httpStatus >= 500) return op === 'mutate' ? 'unknown' : 'transient';
   return 'unknown';
 }
 ```
