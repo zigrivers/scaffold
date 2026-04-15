@@ -919,7 +919,7 @@ Expected: all tests FAIL — `ServiceSchema` is not exported yet.
 
 ### Step 3: Add ServiceSchema to src/config/schema.ts
 
-- [ ] **Insert after the main `ProjectSchema` definition but before the exports at the bottom:**
+**Declaration order matters**: Task 6 adds `services: z.array(ServiceSchema).min(1).optional()` to `ProjectSchema`, which means `ServiceSchema` must be declared BEFORE `ProjectSchema` (at module evaluation time the `z.array(ServiceSchema)` expression runs during `ProjectSchema`'s definition, and forward-referencing a later `const` fails). **Insert `ServiceSchema` immediately BEFORE the `ProjectSchema = z.object({...})` declaration** (currently at line 112 of `src/config/schema.ts`). Do not use `z.lazy` — straight ordering is correct here.
 
 ```ts
 import { configKeyFor } from './validators/index.js'
@@ -1690,50 +1690,69 @@ import { dispatchStateMigration } from './state-version-dispatch.js'
 
 - [ ] **In the same file, find `initializeState()` at line 165 and widen to take the config so it can emit the correct version.**
 
-**Real current signature** (`src/state/state-manager.ts:165-174`):
+**Real current signature** (`src/state/state-manager.ts:165-170`):
 ```ts
 initializeState(options: {
   enabledSteps: Array<{ slug: string; produces: string[] }>
   scaffoldVersion: string
-  methodology: MethodologyName
-  depth: DepthLevel
-  initMode?: 'wizard' | 'from-config'
-  skipTools?: boolean
-}): PipelineState
+  methodology: string
+  initMode: 'greenfield' | 'brownfield' | 'v1-migration'
+}): void
 ```
 
-(Verify actual signature in your checkout — the plan mirrors what was at state-manager.ts:165 when the plan was written; small field names may have drifted.)
+Return type is **`void`** (the state is persisted to disk internally; caller uses `loadState()` to read it back if needed).
 
-**Widen to add `config` + `oldState`:**
+**Widen to add `config` only.** Do NOT add `oldState` to this function — state merging stays at the caller layer (Task 12's `materializeScaffoldProject`).
 
 ```ts
 initializeState(options: {
   enabledSteps: Array<{ slug: string; produces: string[] }>
   scaffoldVersion: string
-  methodology: MethodologyName
-  depth: DepthLevel
-  initMode?: 'wizard' | 'from-config'
-  skipTools?: boolean
+  methodology: string
+  initMode: 'greenfield' | 'brownfield' | 'v1-migration'
   config: { project?: { services?: unknown[] } }   // Wave 3a
-  oldState?: PipelineState                         // Wave 3a — preserved on --force
-}): PipelineState {
+}): void {
   const schemaVersion: 1 | 2 =
     (options.config?.project?.services?.length ?? 0) > 0 ? 2 : 1
   // ... existing body unchanged, but use schemaVersion instead of hardcoded 1 ...
 }
 ```
 
-**`oldState` semantics**: if provided, preserved-step merging happens AFTER this function returns, back in `materializeScaffoldProject` (Task 12). `initializeState` itself only writes the fresh state; the merge loop (wizard.ts:214–231 today) stays at the caller layer and is part of Task 12's materializer. Adding `oldState` to this signature is purely a pass-through for now, for symmetry with the caller's payload. This is intentional — we preserve today's behavior exactly, with zero merge-logic relocation.
+Do **NOT** change the `initMode` enum values (`'greenfield' | 'brownfield' | 'v1-migration'`) — that would be a state-shape change outside Wave 3a's scope. Both the wizard path and the `--from` path continue to pass one of those three values.
 
 ### Step 5: Widen src/validation/state-validator.ts
 
-- [ ] **Find the `schemaVersion !== 1` check (likely around line 73). Change to:**
+`state-validator.ts` uses an **issue-accumulator pattern** — it pushes issues into a `messages[]` array and returns a `ValidationResult`, not `throw`. The current check at line 72-80 looks like:
 
 ```ts
-if (schemaVersion !== 1 && schemaVersion !== 2) {
-  throw stateSchemaVersion([1, 2], schemaVersion, file)
+const schemaVersion = parsed['schema-version']
+if (schemaVersion !== 1) {
+  messages.push({
+    severity: 'error',
+    code: 'STATE_SCHEMA_VERSION',
+    message: `state.json schema version ${String(schemaVersion)} is not supported (expected 1)`,
+    // ... other fields ...
+    context: { file: statePath, expected: 1, actual: schemaVersion as number },
+  })
 }
 ```
+
+- [ ] **Widen the condition AND update the message + context to accept both versions. Do NOT introduce a `throw`:**
+
+```ts
+const schemaVersion = parsed['schema-version']
+if (schemaVersion !== 1 && schemaVersion !== 2) {
+  messages.push({
+    severity: 'error',
+    code: 'STATE_SCHEMA_VERSION',
+    message: `state.json schema version ${String(schemaVersion)} is not supported (expected 1 or 2)`,
+    // ... preserve all other existing message fields ...
+    context: { file: statePath, expected: [1, 2], actual: schemaVersion as number },
+  })
+}
+```
+
+Match the exact field names used by the surrounding validator code (`severity`, `code`, etc.). Read the file before editing to see the exact message shape.
 
 ### Step 6: Update the 12 existing StateManager call-sites
 
@@ -1751,7 +1770,18 @@ Run `grep -rn "new StateManager" src/` for the authoritative list. As of this pl
 - `src/cli/commands/status.ts`
 - `src/wizard/wizard.ts`
 
-**Config loader contract**: the real loader is `loadConfig(projectRoot, knownSteps)` from `src/config/loader.js`. It returns `{ config, errors, warnings }` — it does NOT return undefined on missing config. If `.scaffold/config.yml` is missing, it returns `{ config: undefined, errors: [...] }` or equivalent. There is NO `loadConfigIfExists` function today; use `loadConfig` and handle the undefined case.
+**Config loader contract**: the real loader is `loadConfig(projectRoot, knownSteps)` from `src/config/loader.js`. It returns `{ config, errors, warnings }` where `config` is `ScaffoldConfig | null` — on missing/invalid config, `config` is `null` (NOT `undefined`; see `src/config/loader.ts:54,62,69,73`). There is NO `loadConfigIfExists` function today.
+
+**Provider callback must normalize null → undefined** (the `StateManager.configProvider` signature expects `ScaffoldConfig | undefined`). Pattern:
+
+```ts
+const { config } = loadConfig(projectRoot, [])
+const stateManager = new StateManager(
+  projectRoot,
+  pipeline.computeEligible,
+  () => config ?? undefined,   // null → undefined normalization
+)
+```
 
 For call-sites that have a fully-loaded `config` already in scope (`wizard.ts`, `run.ts`, `rework.ts`, `reset.ts`, `next.ts`, `complete.ts`, `skip.ts`), add the provider arg:
 
@@ -1774,7 +1804,7 @@ const stateManager = new StateManager(
 )
 ```
 
-For `info.ts`, config is loaded at line 46 in the project-info branch. The same pattern works there. Pass `() => undefined` for the step-info branch at line 71 where no config is yet loaded — if the guard in Task 15 fires before StateManager is used, this branch's `hasServices = false` default is fine.
+For `info.ts`, config is loaded at line 46 in the project-info branch. The same pattern works there. Pass `() => undefined` for the step-info branch at line 71 where no config is yet loaded — Task 15 will later add a `loadConfig` call to this branch too (for the multi-service guard), at which point the `() => undefined` provider can be upgraded to `() => stepConfig ?? undefined`. Leave it as `() => undefined` here; Task 15 completes the wiring.
 
 For `adopt.ts`, config is loaded via its own path (adopt builds a config from detection rather than loading existing). Pass `() => undefined` to both `new StateManager(projectRoot, () => [])` call sites — adopt always writes fresh state and doesn't hit the v1→v2 migration path.
 
@@ -1802,29 +1832,26 @@ Run `grep -rn "initializeState({" src/` to find every call. As of this plan ther
 
 Both must receive the new required `config` field; `oldState` is optional and only the wizard path uses it.
 
-- [ ] **Update `src/wizard/wizard.ts:201`:**
+- [ ] **Update `src/wizard/wizard.ts:201`:** add the `config` field to the call (preserve all existing fields, including the existing `initMode` value — do not change it):
 
 ```ts
 stateManager.initializeState({
   enabledSteps,
   scaffoldVersion,
   methodology,
-  depth,
-  initMode: 'wizard',
+  initMode,    // unchanged — the wizard computes one of 'greenfield' | 'brownfield' | 'v1-migration'
   config,      // Wave 3a: ScaffoldConfig from collectWizardAnswers
-  oldState,    // Wave 3a: preserved from readOldStateIfExists above
 })
 ```
 
-- [ ] **Update `src/cli/commands/adopt.ts:117`:**
+The `oldState` merge happens in `materializeScaffoldProject` AFTER this call (Task 12 Step 5); it does NOT go into `initializeState`.
 
-Inspect the call site for the exact option shape used there, then add:
+- [ ] **Update `src/cli/commands/adopt.ts:117`:** inspect the call site for the exact option shape, then add the `config` field:
 
 ```ts
 stateManager.initializeState({
-  ...existingOptions,
+  ...existingOptions,   // preserve enabledSteps, scaffoldVersion, methodology, initMode
   config: adoptedConfig,   // Wave 3a: the ScaffoldConfig adopt is about to write
-  // oldState omitted — adopt always writes fresh state by design
 })
 ```
 
@@ -1964,51 +1991,73 @@ export async function materializeScaffoldProject(
   options: MaterializeOptions,
 ): Promise<void> {
   const { projectRoot, force, oldState } = options
+  const scaffoldDir = path.join(projectRoot, '.scaffold')
 
-  // 1. Backup: if force AND .scaffold/ exists, move to .scaffold.backup.<ts>
-  //    (mirror current wizard.ts:119-125). oldState was already read by the
-  //    caller before backup, so it's safe to move the directory here.
+  // 1. Pre-write guard: if .scaffold/ exists and --force is NOT set, throw
+  //    a ScaffoldUserError with code INIT_SCAFFOLD_EXISTS mirroring today's
+  //    wizard.ts:91-102 behavior. Do NOT silently overwrite. Example:
+  //
+  //      if (fs.existsSync(scaffoldDir) && !force) {
+  //        throw new ExistingScaffoldError(projectRoot)  // user-error
+  //      }
+  //
+  //    Alternative: reuse today's error factory directly
+  //    (`scaffoldExists(scaffoldDir)` from src/utils/errors.ts if it exists,
+  //    otherwise add `ExistingScaffoldError` to user-errors.ts in Task 8).
 
-  // 2. Ensure .scaffold/ directory exists.
+  // 2. Backup: if force AND .scaffold/ exists, move to .scaffold.backup
+  //    (mirror current wizard.ts:119-125). `oldState` was already read by the
+  //    caller before backup, so it is safe to move the directory here.
 
-  // 3. Write .scaffold/config.yml (mirror current wizard.ts:186-191).
+  // 3. Ensure .scaffold/ directory exists.
 
-  // 4. Construct StateManager with a configProvider returning the new config:
+  // 4. Write .scaffold/config.yml (mirror current wizard.ts:186-191).
+
+  // 5. Construct StateManager with a configProvider returning the new config:
   //      new StateManager(projectRoot, computeEligibleFn, () => config)
 
-  // 5. Call stateManager.initializeState({
-  //      enabledSteps, scaffoldVersion, methodology, depth,
-  //      initMode, config, oldState,
+  // 6. Call stateManager.initializeState({
+  //      enabledSteps, scaffoldVersion, methodology, initMode, config,
   //    })
   //    Emits schema-version 2 when config.project?.services?.length > 0,
-  //    else 1.
+  //    else 1. Return type is void.
 
-  // 6. Old-state merge (mirror wizard.ts:214-231). If oldState is defined,
-  //    iterate its completed steps and copy status + artifacts into the
-  //    fresh state, then stateManager.saveState(mergedState).
+  // 7. Old-state merge (mirror wizard.ts:214-231). If oldState is defined,
+  //    load the fresh state (stateManager.loadState()), iterate oldState's
+  //    completed steps and copy status + artifacts into the fresh state,
+  //    then stateManager.saveState(mergedState). The oldState passed in
+  //    should already have step-name migration applied by
+  //    readOldStateIfExists (see Step 6 below).
 
-  // 7. Prime empty decisions.jsonl (mirror current wizard.ts:234-237).
+  // 8. Prime empty decisions.jsonl (mirror current wizard.ts:234-237).
 }
 ```
 
+Add `ExistingScaffoldError` to Task 8's taxonomy (extends `ScaffoldUserError`) if the existing `src/utils/errors.ts` does NOT already have a suitable factory. Otherwise reuse the existing factory and map it to exit 2 via the handler-level catch.
+
 ### Step 6: Refactor runWizard to compose the two + define readOldStateIfExists
 
-Define `readOldStateIfExists` as a new helper near the top of `wizard.ts` (or export it if you need to call it from `init.ts` — Task 13 uses it):
+Define `readOldStateIfExists` as a new exported helper near the top of `wizard.ts`. **Include the step-name `migrateState()` call** so that preserved completed steps survive renames (exact pattern from today's `wizard.ts:104-117`):
 
 ```ts
+import { migrateState } from '../state/state-migration.js'  // existing step-name migration
+// ... then, near the top of wizard.ts:
+
 export function readOldStateIfExists(projectRoot: string): PipelineState | undefined {
   const statePath = path.join(projectRoot, '.scaffold', 'state.json')
   if (!fs.existsSync(statePath)) return undefined
   try {
-    const raw = fs.readFileSync(statePath, 'utf8')
-    return JSON.parse(raw) as PipelineState
+    const raw = JSON.parse(fs.readFileSync(statePath, 'utf8')) as PipelineState
+    migrateState(raw)   // apply step-name migrations so preserved steps line up
+                        // with the current pipeline after renames (T-033 behavior)
+    return raw
   } catch {
-    return undefined
+    return undefined   // couldn't read / parse — proceed without preserving
   }
 }
 ```
 
-This mirrors the old inline logic at today's `wizard.ts:104-117`.
+This mirrors the behavior at today's `wizard.ts:104-117` exactly, including the `migrateState()` call that otherwise regresses re-init for renamed step slugs. Do NOT omit the `migrateState()` call — that's a regression bug.
 
 - [ ] **Replace the old monolithic runWizard body with:**
 
@@ -2069,9 +2118,15 @@ for both paths (current behavior, preserved)."
 
 - [ ] **Create `src/cli/commands/init-from.test.ts`:**
 
-Before pasting, open `src/cli/commands/init.test.ts` and copy its `vi.mock(...)` block (lines 1-90 or wherever it ends) for `runWizard`, `resolveOutputMode`, `createOutputContext`, `syncSkillsIfNeeded`, `shutdown`, and `runBuild`. These mocks must be present or the handler will try to run the real build pipeline and fail in the test environment.
+Before pasting, open `src/cli/commands/init.test.ts` and copy its `vi.mock(...)` blocks (through the imports section) for `resolveOutputMode`, `createOutputContext`, `syncSkillsIfNeeded`, `shutdown`, and `runBuild`. These mocks must be present or the handler will try to run the real build pipeline and fail in the test environment.
 
-Also add a `vi.mock('../../wizard/wizard.js', ...)` entry that mocks BOTH `runWizard` AND the new `materializeScaffoldProject` + `readOldStateIfExists` exports from Task 12. The mocked materializer should accept the call without side-effects; the tests assert the `.check()` rejection and the `materializeScaffoldProject` mock being called with the parsed config.
+**Mock scope — two different test groups have different needs:**
+
+1. **Flag-conflict + parse-error + invalid-schema tests**: mock `materializeScaffoldProject` (and `readOldStateIfExists`) from `'../../wizard/wizard.js'` so the handler short-circuits before any filesystem write. Assert that the mock is called (for happy-path), and that it is NOT called (for error paths).
+
+2. **"Reads a valid services.yml file and writes .scaffold/" test** (at Step 1's 5th `it` block): this one needs the REAL `materializeScaffoldProject`. Use `vi.unmock('../../wizard/wizard.js')` inside the test, OR split the file into two — `init-from.cli.test.ts` (mocked) and `init-from.integration.test.ts` (unmocked). The split is cleaner; either works.
+
+For BOTH groups: `runBuild` and `syncSkillsIfNeeded` are always mocked — the test does not need to actually run the build pipeline to validate `--from` behavior.
 
 ```ts
 import { describe, it, expect, vi } from 'vitest'
@@ -2198,6 +2253,50 @@ project:
     expect(process.exitCode).toBe(2)
     process.exitCode = 0
   })
+
+  it('errors on --from - when stdin is a TTY', async () => {
+    // Force isTTY = true for this test; restore after.
+    const origIsTTY = process.stdin.isTTY
+    Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+    try {
+      const root = withTmpDir()
+      const argv = await parseInitArgs(['--from', '-', '--root', root, '--auto'])
+      await initCommand.handler(argv)
+      expect(process.exitCode).toBe(2)
+    } finally {
+      Object.defineProperty(process.stdin, 'isTTY', { value: origIsTTY, configurable: true })
+      process.exitCode = 0
+    }
+  })
+})
+
+describe('init flag universe linter — every config-setting flag is classified', () => {
+  it('every non-operational init flag is in CONFIG_SETTING_FLAGS', async () => {
+    // Parse --help to enumerate every declared option on init.
+    // Exempt: operational flags (don't set config content).
+    const operational = new Set([
+      'root', 'force', 'auto', 'verbose', 'format', 'help', 'version', 'from',
+    ])
+    const helpOutput = await new Promise<string>((resolve) => {
+      const y = yargs(['--help'])
+        .command(initCommand as never)
+        .exitProcess(false)
+      // Capture via showHelp
+      y.showHelp((s) => resolve(s))
+    })
+    // Extract flag names from --help output (lines starting with '  --').
+    const declaredFlags = [...helpOutput.matchAll(/--([a-z][a-z0-9-]*)/g)]
+      .map(m => m[1])
+      .filter(f => !operational.has(f))
+    // Import CONFIG_SETTING_FLAGS from init.ts (export it alongside the builder).
+    // If init.ts doesn't export it, refactor to export it.
+    const { CONFIG_SETTING_FLAGS } = await import('./init.js') as unknown as {
+      CONFIG_SETTING_FLAGS: readonly string[]
+    }
+    const classified = new Set(CONFIG_SETTING_FLAGS)
+    const unclassified = declaredFlags.filter(f => !classified.has(f))
+    expect(unclassified).toEqual([])
+  })
 })
 ```
 
@@ -2209,7 +2308,19 @@ npx vitest run src/cli/commands/init-from.test.ts
 ```
 Expected: FAIL — `--from` not declared.
 
-### Step 3: Declare --from option and builder-level .check()
+### Step 3: Declare --from option, export CONFIG_SETTING_FLAGS, and add builder-level .check()
+
+Export the flag-enumeration constant at module scope (near the top of init.ts, after the flag-family imports). The flag-universe linter test (Step 1's last `describe` block) imports it:
+
+```ts
+// EXPORTED so the flag-universe linter test can iterate it.
+export const CONFIG_SETTING_FLAGS: readonly string[] = [
+  'methodology', 'depth', 'adapters', 'traits', 'project-type', 'idea',
+  ...GAME_FLAGS, ...WEB_FLAGS, ...BACKEND_FLAGS, ...CLI_TYPE_FLAGS,
+  ...LIB_FLAGS, ...MOBILE_FLAGS, ...PIPELINE_FLAGS, ...ML_FLAGS,
+  ...EXT_FLAGS, ...RESEARCH_FLAGS,
+]
+```
 
 - [ ] **In `src/cli/commands/init.ts`, near the other `.option(...)` calls (around lines 100-290), add:**
 
@@ -2227,13 +2338,7 @@ Expected: FAIL — `--from` not declared.
   if (argv.from === undefined) return true
 
   // Flags that set config content — conflict with --from.
-  const configSettingFlags: readonly string[] = [
-    'methodology', 'depth', 'adapters', 'traits', 'project-type', 'idea',
-    ...GAME_FLAGS, ...WEB_FLAGS, ...BACKEND_FLAGS, ...CLI_TYPE_FLAGS,
-    ...LIB_FLAGS, ...MOBILE_FLAGS, ...PIPELINE_FLAGS, ...ML_FLAGS,
-    ...EXT_FLAGS, ...RESEARCH_FLAGS,
-  ]
-  const conflicts = configSettingFlags.filter(f => (argv as Record<string, unknown>)[f] !== undefined)
+  const conflicts = CONFIG_SETTING_FLAGS.filter(f => (argv as Record<string, unknown>)[f] !== undefined)
   if (conflicts.length > 0) {
     const summary = conflicts.map(f => '--' + f).join(', ')
     // Throw a PLAIN Error, not ScaffoldUserError — builder .check() failures
@@ -2341,47 +2446,59 @@ function formatZodError(error: z.ZodError): string {
 
 ### Step 5: Restructure the handler to share the post-materialize block
 
-The existing init handler wraps user-facing sections in `shutdown.withPrompt(...)` (for wizard Ctrl+C) and `shutdown.withContext(...)` (for the post-materialize Ctrl+C message). **Preserve both wrappers.** The goal is to add the `--from` branch and wrap EVERYTHING in a try/catch for runtime `ScaffoldUserError` mapping — without dropping existing cancellation behavior.
+The existing init handler has a specific nested cancellation structure at `init.ts:497` and `init.ts:591`:
 
-- [ ] **Replace the existing handler body with this structure. Read the current handler (around init.ts:492-620) first to see exact variable names and preserve them:**
+- **Outer** `shutdown.withContext('Cancelled. No changes were made.', …)` wraps the wizard invocation (Ctrl+C during prompts → "no changes" message, no partial state on disk).
+- **Inner** `shutdown.withPrompt(…)` wraps the `runWizard(…)` call itself (question/prompt lifecycle).
+- **Second outer** `shutdown.withContext('Cancelled. Partial output may exist. Run `scaffold build` to regenerate.', …)` wraps the post-wizard build block (Ctrl+C during build → "partial output" message because config + state were already written).
+
+**Preserve all three wrappers.** The goal is to add the `--from` branch and wrap EVERYTHING in a try/catch for runtime `ScaffoldUserError` mapping — without dropping existing cancellation behavior.
+
+- [ ] **Replace the existing handler body with this structure. Read the current handler at init.ts:492-620 first to see exact variable names and preserve them:**
 
 ```ts
 handler: async (argv) => {
   const projectRoot = path.resolve(argv.root ?? process.cwd())
+  // ... existing output/outputMode setup stays here (unchanged) ...
   try {
-    if (argv.from !== undefined) {
-      // --from path: parse, validate, materialize directly.
-      const sourceLabel = argv.from === '-' ? '<stdin>' : argv.from
-      const raw = argv.from === '-' ? readStdinOrError() : readFromPath(argv.from)
+    // Phase 1: "no changes yet" cancellation context — applies to both
+    // the wizard prompt path and --from YAML-parsing.
+    await shutdown.withContext('Cancelled. No changes were made.', async () => {
+      if (argv.from !== undefined) {
+        // --from path: parse, validate, materialize directly.
+        const sourceLabel = argv.from === '-' ? '<stdin>' : argv.from
+        const raw = argv.from === '-' ? readStdinOrError() : readFromPath(argv.from)
 
-      let parsedYaml: unknown
-      try {
-        parsedYaml = parseYaml(raw)
-      } catch (err) {
-        throw new InvalidYamlError(sourceLabel, (err as Error).message)
+        let parsedYaml: unknown
+        try {
+          parsedYaml = parseYaml(raw)
+        } catch (err) {
+          throw new InvalidYamlError(sourceLabel, (err as Error).message)
+        }
+        const result = ConfigSchema.safeParse(parsedYaml)
+        if (!result.success) {
+          throw new InvalidConfigError(sourceLabel, formatZodError(result.error))
+        }
+        const oldState = readOldStateIfExists(projectRoot)
+        await materializeScaffoldProject(result.data, {
+          projectRoot, force: argv.force, oldState,
+        })
+      } else {
+        // Wizard path — preserves the existing shutdown.withPrompt wrapper.
+        const wizardResult = await shutdown.withPrompt(async () =>
+          runWizard({ /* ... existing wizard options ... */ })
+        )
+        if (!wizardResult.success) {
+          for (const err of wizardResult.errors) output.error(err)
+          process.exitCode = 1
+          return
+        }
       }
-      const result = ConfigSchema.safeParse(parsedYaml)
-      if (!result.success) {
-        throw new InvalidConfigError(sourceLabel, formatZodError(result.error))
-      }
-      const oldState = readOldStateIfExists(projectRoot)
-      await materializeScaffoldProject(result.data, {
-        projectRoot, force: argv.force, oldState,
-      })
-    } else {
-      // Wizard path — preserves the existing shutdown.withPrompt wrapper.
-      const result = await shutdown.withPrompt(async () =>
-        runWizard({ /* ... existing wizard options ... */ })
-      )
-      if (!result.success) {
-        for (const err of result.errors) output.error(err)
-        process.exitCode = 1
-        return
-      }
-    }
+    })
+    if (process.exitCode) return   // early-out on wizard failure
 
-    // Shared post-materialize block — preserves the existing
-    // shutdown.withContext wrapper and its cancellation message.
+    // Phase 2: post-materialize cancellation context — state + config already
+    // exist on disk, so partial output is possible.
     await shutdown.withContext(
       'Cancelled. Partial output may exist. Run `scaffold build` to regenerate.',
       async () => {
@@ -2397,7 +2514,7 @@ handler: async (argv) => {
         try {
           syncSkillsIfNeeded(projectRoot)
         } catch { /* best-effort */ }
-        // ... existing output.result call ...
+        // ... existing output.result call (exact body from init.ts:617+) ...
       },
     )
   } catch (err) {
@@ -2411,7 +2528,7 @@ handler: async (argv) => {
 }
 ```
 
-The try/catch wraps BOTH `shutdown.withPrompt` and `shutdown.withContext`. Runtime `ScaffoldUserError` subclasses (from the `--from` branch) are mapped to exit 2. Wizard-path failures go through the existing `result.success === false` path (unchanged). Builder-level `.check()` failures (plain `Error`) do NOT reach this catch — they go through yargs at parse time.
+The outer try/catch wraps BOTH `shutdown.withContext` blocks, so runtime `ScaffoldUserError` subclasses (thrown from inside the `--from` branch) propagate up through Phase 1's withContext and land in the catch. Wizard-path failures go through the existing `wizardResult.success === false` path (unchanged, early-exits before Phase 2). Builder-level `.check()` failures (plain `Error` from Task 13 Step 3) do NOT reach this catch — they go through yargs at parse time.
 
 ### Step 6: Run tests
 
@@ -2692,6 +2809,8 @@ Expected: FAIL — guards not wired yet.
 ### Step 3: Wire the guard into each of the 9 command handlers
 
 **Ordering constraint**: the guard MUST fire BEFORE lock acquisition, before pipeline resolution, and before `StateManager` instantiation. If the guard runs after lock acquisition, a multi-service project with a stale lock will fail on the lock check rather than the guard. The Task 16 E2E test depends on this ordering.
+
+**Prerequisite in scope**: the guard pattern requires `output` in scope (for the `output.error` call). Each of the 9 command handlers already constructs `output` via `createOutputContext(resolveOutputMode(argv))` — place the guard AFTER that construction. All `output*` functions are side-effect-free to create, so constructing them before the guard has no behavioral cost.
 
 **Common pattern** for all 9 commands:
 
