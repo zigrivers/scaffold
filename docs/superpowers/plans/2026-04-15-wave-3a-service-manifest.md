@@ -236,27 +236,11 @@ export function configKeyFor(projectType: ProjectType): string {
 export type { CouplingValidator } from './types.js'
 ```
 
-### Step 5: Run tests — registry completeness should fail, harness should pass vacuously
+### Step 5: Do NOT commit yet
 
-- [ ] Run:
-```
-npx vitest run src/config/validators/
-```
-Expected: `registry.test.ts` FAILS (registry is empty; `ALL_COUPLING_VALIDATORS.length === 0 !== ProjectTypeSchema.options.length`); `validators.test.ts` passes vacuously (empty `.each`).
+This task leaves the registry empty — the completeness test in `registry.test.ts` will fail. That's expected: **Task 2 will populate the registry and both tasks will be committed together as one atomic, green commit**. Do NOT create a red commit here; every task-ending commit in this plan must leave `make check-all` green.
 
-### Step 6: Commit
-
-- [ ] **Commit:**
-```bash
-git add src/config/validators/
-git commit -m "feat(config): scaffold validator registry interface and harness
-
-Adds CouplingValidator<T> interface, empty ALL_COUPLING_VALIDATORS
-registry, derived PROJECT_TYPE_TO_CONFIG_KEY map + configKeyFor helper,
-parameterized harness, and registry-completeness test. Registry is
-empty — completeness test intentionally fails until Task 2 registers
-all 10 validators."
-```
+Proceed directly to Task 2 without committing Task 1's interim state.
 
 ---
 
@@ -291,7 +275,9 @@ export const backendCouplingValidator: CouplingValidator<BackendConfig> = {
 }
 ```
 
-### Step 2: Create `src/config/validators/web-app.ts`
+### Step 2: Create `src/config/validators/web-app.ts` (includes intra-type rules)
+
+Mirrors current `ProjectSchema.superRefine` rules at `src/config/schema.ts:186-196`: SSR/hybrid + static-deploy conflict, session-auth + static-deploy conflict.
 
 - [ ] **Content:**
 
@@ -309,6 +295,23 @@ export const webAppCouplingValidator: CouplingValidator<WebAppConfig> = {
         code: 'custom',
         message: 'webAppConfig requires projectType: web-app',
       })
+    }
+    if (config) {
+      const { renderingStrategy, deployTarget, authFlow } = config
+      if (['ssr', 'hybrid'].includes(renderingStrategy) && deployTarget === 'static') {
+        ctx.addIssue({
+          path: [...path, 'webAppConfig', 'deployTarget'],
+          code: 'custom',
+          message: 'SSR/hybrid rendering requires compute, not static hosting',
+        })
+      }
+      if (authFlow === 'session' && deployTarget === 'static') {
+        ctx.addIssue({
+          path: [...path, 'webAppConfig', 'authFlow'],
+          code: 'custom',
+          message: 'Session auth requires server state, incompatible with static hosting',
+        })
+      }
     }
   },
 }
@@ -370,9 +373,9 @@ export const cliCouplingValidator: CouplingValidator<CliConfig> = {
 }
 ```
 
-### Step 5: Create `src/config/validators/library.ts`
+### Step 5: Create `src/config/validators/library.ts` (includes intra-type rule)
 
-Before writing, **read** `src/config/schema.ts` lines 170-200 to find the existing library-specific cross-field rules. If any exist, mirror them here; if not, the validator is coupling-only.
+Mirrors current rule at `src/config/schema.ts:175-184`: public visibility + documentationLevel: none conflict.
 
 - [ ] **Content:**
 
@@ -391,8 +394,17 @@ export const libraryCouplingValidator: CouplingValidator<LibraryConfig> = {
         message: 'libraryConfig requires projectType: library',
       })
     }
-    // If src/config/schema.ts has additional library-specific refinements,
-    // mirror them here with `path` prefixed.
+    if (config) {
+      const { visibility, documentationLevel } = config
+      if (visibility === 'public' && documentationLevel === 'none') {
+        ctx.addIssue({
+          path: [...path, 'libraryConfig', 'documentationLevel'],
+          code: 'custom',
+          message: 'Public libraries should have documentation'
+            + ' (documentationLevel: none with visibility: public)',
+        })
+      }
+    }
   },
 }
 ```
@@ -443,7 +455,7 @@ export const dataPipelineCouplingValidator: CouplingValidator<DataPipelineConfig
 }
 ```
 
-- [ ] **`src/config/validators/ml.ts`:**
+- [ ] **`src/config/validators/ml.ts`** (mirrors intra-type rules at `src/config/schema.ts:197-207`):
 
 ```ts
 import type { CouplingValidator } from './types.js'
@@ -459,6 +471,23 @@ export const mlCouplingValidator: CouplingValidator<MlConfig> = {
         code: 'custom',
         message: 'mlConfig requires projectType: ml',
       })
+    }
+    if (config) {
+      const { projectPhase, servingPattern } = config
+      if (projectPhase === 'inference' && servingPattern === 'none') {
+        ctx.addIssue({
+          path: [...path, 'mlConfig', 'servingPattern'],
+          code: 'custom',
+          message: 'Inference projects must specify a serving pattern',
+        })
+      }
+      if (projectPhase === 'training' && servingPattern !== 'none') {
+        ctx.addIssue({
+          path: [...path, 'mlConfig', 'servingPattern'],
+          code: 'custom',
+          message: 'Training-only projects should not have a serving pattern',
+        })
+      }
     }
   },
 }
@@ -485,7 +514,7 @@ export const gameCouplingValidator: CouplingValidator<GameConfig> = {
 }
 ```
 
-- [ ] **`src/config/validators/browser-extension.ts`:**
+- [ ] **`src/config/validators/browser-extension.ts`** (mirrors intra-type rule at `src/config/schema.ts:208-214`):
 
 ```ts
 import type { CouplingValidator } from './types.js'
@@ -501,6 +530,16 @@ export const browserExtensionCouplingValidator: CouplingValidator<BrowserExtensi
         code: 'custom',
         message: 'browserExtensionConfig requires projectType: browser-extension',
       })
+    }
+    if (config) {
+      const { uiSurfaces, hasContentScript, hasBackgroundWorker } = config
+      if ((!uiSurfaces || uiSurfaces.length === 0) && !hasContentScript && !hasBackgroundWorker) {
+        ctx.addIssue({
+          path: [...path, 'browserExtensionConfig'],
+          code: 'custom',
+          message: 'Extension must have at least one UI surface, content script, or background worker',
+        })
+      }
     }
   },
 }
@@ -618,21 +657,35 @@ npx tsc --noEmit
 ```
 Expected: clean.
 
-### Step 11: Commit
+### Step 11: Commit (bundles Task 1's scaffold + Task 2's full registry)
 
 - [ ] **Commit:**
 ```bash
 git add src/config/validators/
-git commit -m "feat(config): extract all 10 per-type coupling validators
+git commit -m "feat(config): extract per-type coupling validators + intra-type rules
 
-Each project type's config-to-projectType coupling rule lives in its
-own module under src/config/validators/. Registry at index.ts
-enumerates them and exposes PROJECT_TYPE_TO_CONFIG_KEY / configKeyFor
-helpers for downstream consumers. Preserves current asymmetric
-behavior: config-without-matching-type is an error; type-without-
-matching-config is still permitted at root (ServiceSchema will layer
-a forward rule later). Research's intra-type rule (notebook-driven +
-autonomous forbidden) moves into research.ts with a bespoke test."
+Each project type's rules live in its own module under
+src/config/validators/. Registry at index.ts enumerates them and
+exposes PROJECT_TYPE_TO_CONFIG_KEY / configKeyFor helpers.
+
+Preserves current asymmetric behavior at root: config-without-
+matching-type is an error; type-without-matching-config is still
+permitted (ServiceSchema will layer a forward rule). Intra-type
+cross-field rules are mirrored exactly from the old inline block
+in ProjectSchema.superRefine:
+
+- research: notebook-driven + autonomous forbidden
+- library: public visibility + documentationLevel=none forbidden
+- web-app: SSR/hybrid + static-deploy forbidden; session auth +
+          static-deploy forbidden
+- ml: inference + servingPattern=none forbidden; training-only +
+      servingPattern forbidden
+- browser-extension: must have ≥1 UI surface / content script /
+          background worker
+
+This commit bundles the Task 1 scaffold (interface, registry,
+harness, completeness test) with the Task 2 validator modules so
+make check-all stays green end-to-end."
 ```
 
 ---
@@ -642,33 +695,23 @@ autonomous forbidden) moves into research.ts with a bespoke test."
 **Files:**
 - Modify: `src/config/schema.ts`
 
-### Step 1: Read current `ProjectSchema.superRefine` in `src/config/schema.ts` (around lines 126–214)
+### Step 1: Read current `ProjectSchema.superRefine` in `src/config/schema.ts` lines 127–214
 
-Familiarize yourself with the existing inline rules. You should find 10 per-type coupling rules (one per type) plus the research-intra-type rule plus possibly other non-per-type cross-field rules (library, web-app, ml, browser-extension may have them — inspect).
+The current block contains **all of these rules, all of which move into validators** (Task 2 extracted them):
 
-### Step 2: Replace the per-type rules with a registry loop
+- 10 coupling rules (one per type, lines 128–167)
+- Research intra-type: `notebook-driven + autonomous` (lines 168–174)
+- Library intra-type: `public + documentationLevel=none` (lines 175–184)
+- Web-app intra-type: `ssr/hybrid + static-deploy`, `session + static-deploy` (lines 185–195)
+- ML intra-type: `inference + servingPattern=none`, `training + servingPattern` (lines 196–207)
+- Browser-extension intra-type: requires ≥1 UI surface (lines 208–213)
 
-- [ ] **In `src/config/schema.ts`, find the `.superRefine((data, ctx) => { ... })` block after the main `ProjectSchema` object definition. Replace the body:**
+After the registry loop replaces all of these, the superRefine block may contain no more rules in Wave 3a. The services[] unique-names refinement added in Task 6 will be the only remaining inline rule.
 
-**Before (illustrative, actual code similar):**
-```ts
-.superRefine((data, ctx) => {
-  if (data.gameConfig !== undefined && data.projectType !== 'game') {
-    ctx.addIssue({ path: ['gameConfig'], code: 'custom',
-      message: 'gameConfig is only valid when projectType is "game"' })
-  }
-  // ... 9 more identical-shape rules ...
-  if (data.researchConfig) {
-    const { experimentDriver, interactionMode } = data.researchConfig
-    if (experimentDriver === 'notebook-driven' && interactionMode === 'autonomous') {
-      ctx.addIssue({ ... })
-    }
-  }
-  // ... other non-per-type rules ...
-})
-```
+### Step 2: Replace the entire superRefine body with a registry loop
 
-**After:**
+- [ ] **In `src/config/schema.ts`, replace the entire `.superRefine((data, ctx) => { ... })` block body with:**
+
 ```ts
 .superRefine((data, ctx) => {
   for (const v of ALL_COUPLING_VALIDATORS) {
@@ -679,9 +722,9 @@ Familiarize yourself with the existing inline rules. You should find 10 per-type
       (data as Record<string, unknown>)[v.configKey],
     )
   }
-  // Preserve any non-per-type cross-field rules that existed before the
-  // refactor (for example: adapter/trait validation, methodology/depth
-  // coupling). These do NOT move to per-type modules.
+  // Intentionally no other rules here: all per-type coupling + intra-type
+  // rules moved into validator modules. Task 6 will add the services[]
+  // unique-names refinement.
 })
 ```
 
@@ -743,6 +786,22 @@ If any gate fails, return to the relevant task and fix before proceeding.
 **Files:**
 - Modify: `src/config/schema.ts`
 - Modify: `src/config/schema.test.ts`
+
+### Step 0: Export ProjectSchema
+
+`src/config/schema.ts:112` currently declares `const ProjectSchema` without export. Task 6's new tests need to import it directly. Change the declaration from:
+
+```ts
+const ProjectSchema = z.object({
+```
+
+to:
+
+```ts
+export const ProjectSchema = z.object({
+```
+
+No other change — all existing internal references (`ProjectSchema` used inside `ConfigSchema = z.object({ project: ProjectSchema, ... })` at line 217) continue to work.
 
 ### Step 1: Write failing ServiceSchema tests
 
@@ -1629,35 +1688,42 @@ import { dispatchStateMigration } from './state-version-dispatch.js'
 
 ### Step 4: Widen initializeState signature
 
-- [ ] **In the same file, find `initializeState()` and widen to take the config so it can emit the correct version:**
+- [ ] **In the same file, find `initializeState()` at line 165 and widen to take the config so it can emit the correct version.**
 
-Current signature (approximate):
+**Real current signature** (`src/state/state-manager.ts:165-174`):
 ```ts
-initializeState(opts: {
-  enabledSteps: string[]
+initializeState(options: {
+  enabledSteps: Array<{ slug: string; produces: string[] }>
   scaffoldVersion: string
   methodology: MethodologyName
-  initMode: string
+  depth: DepthLevel
+  initMode?: 'wizard' | 'from-config'
+  skipTools?: boolean
 }): PipelineState
 ```
 
-Add `config`:
+(Verify actual signature in your checkout — the plan mirrors what was at state-manager.ts:165 when the plan was written; small field names may have drifted.)
+
+**Widen to add `config` + `oldState`:**
 
 ```ts
-initializeState(opts: {
-  enabledSteps: string[]
+initializeState(options: {
+  enabledSteps: Array<{ slug: string; produces: string[] }>
   scaffoldVersion: string
   methodology: MethodologyName
-  initMode: string
+  depth: DepthLevel
+  initMode?: 'wizard' | 'from-config'
+  skipTools?: boolean
   config: { project?: { services?: unknown[] } }   // Wave 3a
   oldState?: PipelineState                         // Wave 3a — preserved on --force
 }): PipelineState {
-  const schemaVersion = (opts.config?.project?.services?.length ?? 0) > 0 ? 2 : 1
-  // ... existing body, but use schemaVersion instead of hardcoded 1 ...
+  const schemaVersion: 1 | 2 =
+    (options.config?.project?.services?.length ?? 0) > 0 ? 2 : 1
+  // ... existing body unchanged, but use schemaVersion instead of hardcoded 1 ...
 }
 ```
 
-If `oldState` is provided, preserve completed-steps exactly as today's implicit behavior in `src/wizard/wizard.ts` does.
+**`oldState` semantics**: if provided, preserved-step merging happens AFTER this function returns, back in `materializeScaffoldProject` (Task 12). `initializeState` itself only writes the fresh state; the merge loop (wizard.ts:214–231 today) stays at the caller layer and is part of Task 12's materializer. Adding `oldState` to this signature is purely a pass-through for now, for symmetry with the caller's payload. This is intentional — we preserve today's behavior exactly, with zero merge-logic relocation.
 
 ### Step 5: Widen src/validation/state-validator.ts
 
@@ -1669,9 +1735,9 @@ if (schemaVersion !== 1 && schemaVersion !== 2) {
 }
 ```
 
-### Step 6: Update the 13 existing StateManager call-sites
+### Step 6: Update the 12 existing StateManager call-sites
 
-Call-sites that should begin passing a config provider (see `grep -rn "new StateManager" src/` for the full list):
+Run `grep -rn "new StateManager" src/` for the authoritative list. As of this plan there are 12 call sites across 11 files:
 
 - `src/cli/commands/adopt.ts` (2 sites)
 - `src/cli/commands/complete.ts`
@@ -1685,7 +1751,9 @@ Call-sites that should begin passing a config provider (see `grep -rn "new State
 - `src/cli/commands/status.ts`
 - `src/wizard/wizard.ts`
 
-For each call-site that has a `config` object in scope, add the provider arg:
+**Config loader contract**: the real loader is `loadConfig(projectRoot, knownSteps)` from `src/config/loader.js`. It returns `{ config, errors, warnings }` — it does NOT return undefined on missing config. If `.scaffold/config.yml` is missing, it returns `{ config: undefined, errors: [...] }` or equivalent. There is NO `loadConfigIfExists` function today; use `loadConfig` and handle the undefined case.
+
+For call-sites that have a fully-loaded `config` already in scope (`wizard.ts`, `run.ts`, `rework.ts`, `reset.ts`, `next.ts`, `complete.ts`, `skip.ts`), add the provider arg:
 
 ```ts
 const stateManager = new StateManager(
@@ -1695,45 +1763,72 @@ const stateManager = new StateManager(
 )
 ```
 
-For sites without immediate config access (`dashboard.ts`, `info.ts`, `adopt.ts` early paths), load the config on demand:
+For call-sites without immediate full config access, load on demand. For example, `dashboard.ts:86` already does `const { config } = loadConfig(projectRoot, [])` — reuse it:
 
 ```ts
-import { loadConfigIfExists } from '../../config/loader.js'  // or the existing loader path
-
+const { config } = loadConfig(projectRoot, [])
 const stateManager = new StateManager(
   projectRoot,
   () => [],
-  () => loadConfigIfExists(projectRoot) ?? undefined,
+  () => config,   // may be undefined if config.yml is missing — that's OK
 )
 ```
 
-Use the existing config loader used elsewhere in the codebase. If the loader doesn't exist by exactly this name, grep `src/config/` for the canonical loader function and use that.
+For `info.ts`, config is loaded at line 46 in the project-info branch. The same pattern works there. Pass `() => undefined` for the step-info branch at line 71 where no config is yet loaded — if the guard in Task 15 fires before StateManager is used, this branch's `hasServices = false` default is fine.
+
+For `adopt.ts`, config is loaded via its own path (adopt builds a config from detection rather than loading existing). Pass `() => undefined` to both `new StateManager(projectRoot, () => [])` call sites — adopt always writes fresh state and doesn't hit the v1→v2 migration path.
+
+For `status.ts` which does NOT currently load config, load it at the top of the handler:
+
+```ts
+import { loadConfig } from '../../config/loader.js'
+// ... inside handler, before new StateManager(...):
+const { config } = loadConfig(projectRoot, [])
+const stateManager = new StateManager(
+  projectRoot,
+  pipeline.computeEligible,
+  () => config,
+)
+```
+
+**Pattern**: the provider callback's return value can be `undefined` when the config is missing — `dispatchStateMigration` treats that as `hasServices: false` via the null-coalesce in its caller (Task 11 Step 3).
 
 ### Step 7: Update initializeState call-sites to pass config + oldState
 
-- [ ] **Find `stateManager.initializeState(...)` call in `src/wizard/wizard.ts`:**
+Run `grep -rn "initializeState({" src/` to find every call. As of this plan there are 2 call sites:
 
-Currently approximately:
+1. **`src/wizard/wizard.ts:201`** — the wizard path.
+2. **`src/cli/commands/adopt.ts:117`** — the adopt path.
+
+Both must receive the new required `config` field; `oldState` is optional and only the wizard path uses it.
+
+- [ ] **Update `src/wizard/wizard.ts:201`:**
+
 ```ts
 stateManager.initializeState({
   enabledSteps,
   scaffoldVersion,
   methodology,
-  initMode: ...
+  depth,
+  initMode: 'wizard',
+  config,      // Wave 3a: ScaffoldConfig from collectWizardAnswers
+  oldState,    // Wave 3a: preserved from readOldStateIfExists above
 })
 ```
 
-Update to:
+- [ ] **Update `src/cli/commands/adopt.ts:117`:**
+
+Inspect the call site for the exact option shape used there, then add:
+
 ```ts
 stateManager.initializeState({
-  enabledSteps,
-  scaffoldVersion,
-  methodology,
-  initMode: ...,
-  config,      // Wave 3a: in-scope from wizard answer collection
-  oldState,    // Wave 3a: preserved from preservable-state read above
+  ...existingOptions,
+  config: adoptedConfig,   // Wave 3a: the ScaffoldConfig adopt is about to write
+  // oldState omitted — adopt always writes fresh state by design
 })
 ```
+
+If `adoptedConfig` isn't the exact variable name in adopt.ts, substitute the local variable holding the `ScaffoldConfig` that's being persisted.
 
 ### Step 8: Run tests
 
@@ -1757,16 +1852,20 @@ git add src/state/state-manager.ts src/validation/state-validator.ts \
         src/cli/commands/rework.ts src/cli/commands/run.ts \
         src/cli/commands/skip.ts src/cli/commands/status.ts \
         src/wizard/wizard.ts
-git commit -m "feat(state): thread dispatch through StateManager and 13 call-sites
+git commit -m "feat(state): thread dispatch through StateManager and 12 call-sites
 
 StateManager constructor accepts an optional configProvider callback.
 loadState() calls dispatchStateMigration() with hasServices computed
 from the provider. initializeState() takes the config directly and
-emits schema-version 2 when services.length > 0, else 1 — it also
-accepts an oldState parameter for --force state preservation.
-state-validator.ts widens to accept 1|2. All 13 existing call-sites
-updated; sites without immediate config load the config on demand via
-the existing loader."
+emits schema-version 2 when services.length > 0, else 1; also
+accepts an oldState parameter for --force state preservation
+(pass-through only — the merge stays at the materializer layer).
+state-validator.ts widens to accept 1|2. All 12 'new StateManager'
+call-sites updated across 11 files. Both initializeState call-sites
+(wizard.ts:201, adopt.ts:117) pass config. Sites without immediate
+config use loadConfig(projectRoot, []) — the real loader's signature.
+status.ts gets a new config load at handler entry (it did not load
+config before)."
 ```
 
 ---
@@ -1866,39 +1965,62 @@ export async function materializeScaffoldProject(
 ): Promise<void> {
   const { projectRoot, force, oldState } = options
 
-  // 1. Old-state preservation: if oldState is not explicitly passed AND
-  //    state.json exists, read it here (mirror current wizard.ts:104-117).
+  // 1. Backup: if force AND .scaffold/ exists, move to .scaffold.backup.<ts>
+  //    (mirror current wizard.ts:119-125). oldState was already read by the
+  //    caller before backup, so it's safe to move the directory here.
 
-  // 2. Backup: if force AND .scaffold/ exists, move to .scaffold.backup.<ts>
-  //    (mirror current wizard.ts:119-125).
+  // 2. Ensure .scaffold/ directory exists.
 
-  // 3. Ensure .scaffold/ directory exists.
+  // 3. Write .scaffold/config.yml (mirror current wizard.ts:186-191).
 
-  // 4. Write .scaffold/config.yml (mirror current wizard.ts:186-191).
+  // 4. Construct StateManager with a configProvider returning the new config:
+  //      new StateManager(projectRoot, computeEligibleFn, () => config)
 
-  // 5. Construct StateManager with configProvider returning `config`.
+  // 5. Call stateManager.initializeState({
+  //      enabledSteps, scaffoldVersion, methodology, depth,
+  //      initMode, config, oldState,
+  //    })
+  //    Emits schema-version 2 when config.project?.services?.length > 0,
+  //    else 1.
 
-  // 6. stateManager.initializeState({ ..., config, oldState })
-  //    (schema-version 2 if config.project?.services?.length > 0, else 1).
+  // 6. Old-state merge (mirror wizard.ts:214-231). If oldState is defined,
+  //    iterate its completed steps and copy status + artifacts into the
+  //    fresh state, then stateManager.saveState(mergedState).
 
   // 7. Prime empty decisions.jsonl (mirror current wizard.ts:234-237).
 }
 ```
 
-### Step 6: Refactor runWizard to compose the two
+### Step 6: Refactor runWizard to compose the two + define readOldStateIfExists
+
+Define `readOldStateIfExists` as a new helper near the top of `wizard.ts` (or export it if you need to call it from `init.ts` — Task 13 uses it):
+
+```ts
+export function readOldStateIfExists(projectRoot: string): PipelineState | undefined {
+  const statePath = path.join(projectRoot, '.scaffold', 'state.json')
+  if (!fs.existsSync(statePath)) return undefined
+  try {
+    const raw = fs.readFileSync(statePath, 'utf8')
+    return JSON.parse(raw) as PipelineState
+  } catch {
+    return undefined
+  }
+}
+```
+
+This mirrors the old inline logic at today's `wizard.ts:104-117`.
 
 - [ ] **Replace the old monolithic runWizard body with:**
 
 ```ts
 export async function runWizard(options: WizardOptions): Promise<WizardResult> {
   const config = await collectWizardAnswers(options)
-  const oldState = readOldStateIfExists(options.projectRoot)   // existing helper, or inline
+  const oldState = readOldStateIfExists(options.projectRoot)
   await materializeScaffoldProject(config, {
     projectRoot: options.projectRoot,
     force: options.force,
     oldState,
   })
-  // Return the existing WizardResult shape.
   return {
     success: true,
     projectRoot: options.projectRoot,
@@ -1909,7 +2031,7 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
 }
 ```
 
-Keep helper function signatures used by `runWizard`'s callers (e.g., `WizardResult` exact shape) unchanged.
+**Old-state merge logic** (the loop that preserves completed steps from the old state into the fresh state, currently at `wizard.ts:214-231`): this must stay inside `materializeScaffoldProject`, running AFTER `initializeState()` returns a fresh state but BEFORE the decisions-log priming. Copy the loop verbatim from the old position. The merge reads `oldState` (the `MaterializeOptions` field) and writes the merged state back via `stateManager.saveState(mergedState)`. Keep helper function signatures used by `runWizard`'s callers (e.g., `WizardResult` exact shape) unchanged.
 
 ### Step 7: Run tests to verify pass
 
@@ -1947,12 +2069,31 @@ for both paths (current behavior, preserved)."
 
 - [ ] **Create `src/cli/commands/init-from.test.ts`:**
 
+Before pasting, open `src/cli/commands/init.test.ts` and copy its `vi.mock(...)` block (lines 1-90 or wherever it ends) for `runWizard`, `resolveOutputMode`, `createOutputContext`, `syncSkillsIfNeeded`, `shutdown`, and `runBuild`. These mocks must be present or the handler will try to run the real build pipeline and fail in the test environment.
+
+Also add a `vi.mock('../../wizard/wizard.js', ...)` entry that mocks BOTH `runWizard` AND the new `materializeScaffoldProject` + `readOldStateIfExists` exports from Task 12. The mocked materializer should accept the call without side-effects; the tests assert the `.check()` rejection and the `materializeScaffoldProject` mock being called with the parsed config.
+
 ```ts
-import { describe, it, expect } from 'vitest'
-import { parseInitArgs, initCommand } from './init.js'   // adapt names to actual exports
+import { describe, it, expect, vi } from 'vitest'
+// ... (paste vi.mock blocks from init.test.ts here, extending the
+//      wizard.js mock to include materializeScaffoldProject + readOldStateIfExists)
+import initCommand from './init.js'
+import yargs from 'yargs'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import { materializeScaffoldProject } from '../../wizard/wizard.js'
+
+// Local parseInitArgs helper — mirrors the pattern at init.test.ts:307 so
+// init-from.test.ts stays self-contained. Uses yargs non-strict-mode-with-
+// rejection to mirror the handler's actual parse path.
+async function parseInitArgs(args: string[]): Promise<Record<string, unknown>> {
+  return yargs(args)
+    .command(initCommand as never)
+    .exitProcess(false)
+    .fail(false)
+    .parseAsync()
+}
 
 const validManifest = `version: 2
 methodology: deep
@@ -2088,28 +2229,38 @@ Expected: FAIL — `--from` not declared.
   // Flags that set config content — conflict with --from.
   const configSettingFlags: readonly string[] = [
     'methodology', 'depth', 'adapters', 'traits', 'project-type', 'idea',
-    ...GAME_FLAGS, ...WEB_FLAGS, ...BACKEND_FLAGS, ...CLI_FLAGS,
+    ...GAME_FLAGS, ...WEB_FLAGS, ...BACKEND_FLAGS, ...CLI_TYPE_FLAGS,
     ...LIB_FLAGS, ...MOBILE_FLAGS, ...PIPELINE_FLAGS, ...ML_FLAGS,
     ...EXT_FLAGS, ...RESEARCH_FLAGS,
   ]
   const conflicts = configSettingFlags.filter(f => (argv as Record<string, unknown>)[f] !== undefined)
   if (conflicts.length > 0) {
     const summary = conflicts.map(f => '--' + f).join(', ')
-    throw new FlagConflictError(summary)
+    // Throw a PLAIN Error, not ScaffoldUserError — builder .check() failures
+    // fire during yargs parse (before the handler), so they go through yargs'
+    // own error path in runCli (src/cli/index.ts:77 `.strict()`), not the
+    // handler's try/catch. This matches the existing pattern for
+    // applyFlagFamilyValidation. Exit code is yargs-default (1), which is
+    // acceptable — the diagnostic is still clear.
+    throw new Error(`--from cannot be combined with: ${summary}. Edit services.yml and re-run.`)
   }
   return true
 })
 ```
 
-Import at the top:
+Import at the top of init.ts:
 ```ts
-import { FlagConflictError, InvalidYamlError, InvalidConfigError,
+// Runtime error classes (thrown from INSIDE the handler, caught by its try/catch → exit 2):
+import { InvalidYamlError, InvalidConfigError,
          FromPathReadError, TTYStdinError, isScaffoldUserError } from '../../utils/user-errors.js'
+// Flag family constants:
 import {
-  GAME_FLAGS, WEB_FLAGS, BACKEND_FLAGS, CLI_FLAGS, LIB_FLAGS,
+  GAME_FLAGS, WEB_FLAGS, BACKEND_FLAGS, CLI_TYPE_FLAGS, LIB_FLAGS,
   MOBILE_FLAGS, PIPELINE_FLAGS, ML_FLAGS, EXT_FLAGS, RESEARCH_FLAGS,
-} from '../init-flag-families.js'   // adjust path to match actual location
+} from '../init-flag-families.js'
 ```
+
+`FlagConflictError` from Task 8 is NOT imported here — that class was for handler-level scenarios (if we ever add flag-conflict checking outside `.check()`, it'd be used there). For now, builder `.check()` uses a plain Error matching the existing `applyFlagFamilyValidation` pattern.
 
 ### Step 4: Add --from handler logic
 
@@ -2130,7 +2281,7 @@ if (argv.from !== undefined) {
       throw new InvalidYamlError(sourceLabel, (err as Error).message)
     }
 
-    const result = ScaffoldConfigSchema.safeParse(parsedYaml)
+    const result = ConfigSchema.safeParse(parsedYaml)
     if (!result.success) {
       const detail = formatZodError(result.error)
       throw new InvalidConfigError(sourceLabel, detail)
@@ -2156,9 +2307,8 @@ Add helper functions near the top of `init.ts` (or in a new helpers module if th
 
 ```ts
 import { parse as parseYaml } from 'yaml'
-import { ScaffoldConfigSchema } from '../../config/schema.js'
-import { materializeScaffoldProject } from '../../wizard/wizard.js'
-import { readOldStateIfExists } from '../../state/helpers.js'  // create or reuse
+import { ConfigSchema } from '../../config/schema.js'
+import { materializeScaffoldProject, readOldStateIfExists } from '../../wizard/wizard.js'
 import { z } from 'zod'
 
 function readFromPath(pathArg: string): string {
@@ -2189,23 +2339,40 @@ function formatZodError(error: z.ZodError): string {
 }
 ```
 
-### Step 5: Wrap the existing wizard path + post-materialize block in the same try/catch
+### Step 5: Restructure the handler to share the post-materialize block
 
-- [ ] **Ensure the existing wizard invocation (around `runWizard(...)` at lines 495-500) and the post-materialize `runBuild` + `syncSkillsIfNeeded` block (lines 594-614) both live inside a try/catch that handles `ScaffoldUserError`. After the try block completes normally, the `runBuild` + `syncSkillsIfNeeded` block runs unchanged.** Both the `--from` branch and the wizard branch should fall through to the same build + sync block.
+The existing init handler wraps user-facing sections in `shutdown.withPrompt(...)` (for wizard Ctrl+C) and `shutdown.withContext(...)` (for the post-materialize Ctrl+C message). **Preserve both wrappers.** The goal is to add the `--from` branch and wrap EVERYTHING in a try/catch for runtime `ScaffoldUserError` mapping — without dropping existing cancellation behavior.
 
-The cleanest structure for the handler:
+- [ ] **Replace the existing handler body with this structure. Read the current handler (around init.ts:492-620) first to see exact variable names and preserve them:**
 
 ```ts
 handler: async (argv) => {
   const projectRoot = path.resolve(argv.root ?? process.cwd())
   try {
     if (argv.from !== undefined) {
-      // --from path: parse, validate, materialize
-      // ... code from Step 4 ...
+      // --from path: parse, validate, materialize directly.
+      const sourceLabel = argv.from === '-' ? '<stdin>' : argv.from
+      const raw = argv.from === '-' ? readStdinOrError() : readFromPath(argv.from)
+
+      let parsedYaml: unknown
+      try {
+        parsedYaml = parseYaml(raw)
+      } catch (err) {
+        throw new InvalidYamlError(sourceLabel, (err as Error).message)
+      }
+      const result = ConfigSchema.safeParse(parsedYaml)
+      if (!result.success) {
+        throw new InvalidConfigError(sourceLabel, formatZodError(result.error))
+      }
+      const oldState = readOldStateIfExists(projectRoot)
+      await materializeScaffoldProject(result.data, {
+        projectRoot, force: argv.force, oldState,
+      })
     } else {
-      // wizard path (existing code, now internally using collectWizardAnswers
-      // + materializeScaffoldProject via the split in Task 12)
-      const result = await shutdown.withPrompt(async () => runWizard({ ... }))
+      // Wizard path — preserves the existing shutdown.withPrompt wrapper.
+      const result = await shutdown.withPrompt(async () =>
+        runWizard({ /* ... existing wizard options ... */ })
+      )
       if (!result.success) {
         for (const err of result.errors) output.error(err)
         process.exitCode = 1
@@ -2213,30 +2380,38 @@ handler: async (argv) => {
       }
     }
 
-    // Shared post-materialize block: build + skill sync
-    await shutdown.withContext('Cancelled. Partial output may exist...', async () => {
-      const buildResult = await runBuild({ ... })
-      if (buildResult.exitCode !== 0) {
-        process.exitCode = buildResult.exitCode
-        return
-      }
-      try {
-        syncSkillsIfNeeded(projectRoot)
-      } catch { /* best-effort */ }
-      // ... existing output.result call ...
-    })
+    // Shared post-materialize block — preserves the existing
+    // shutdown.withContext wrapper and its cancellation message.
+    await shutdown.withContext(
+      'Cancelled. Partial output may exist. Run `scaffold build` to regenerate.',
+      async () => {
+        const buildResult = await runBuild({
+          'validate-only': false, force: false,
+          format: argv.format, auto: argv.auto, verbose: argv.verbose,
+          root: projectRoot,
+        }, { output, suppressFinalResult: outputMode === 'json' })
+        if (buildResult.exitCode !== 0) {
+          process.exitCode = buildResult.exitCode
+          return
+        }
+        try {
+          syncSkillsIfNeeded(projectRoot)
+        } catch { /* best-effort */ }
+        // ... existing output.result call ...
+      },
+    )
   } catch (err) {
     if (isScaffoldUserError(err)) {
       output.error(err.message)
       process.exitCode = 2
       return
     }
-    throw err
+    throw err   // unexpected — let runCli's default handler surface it
   }
 }
 ```
 
-Adapt the existing wizard handler's control flow; this is a structural rewrite of the handler to share the post-materialize block between both entry points.
+The try/catch wraps BOTH `shutdown.withPrompt` and `shutdown.withContext`. Runtime `ScaffoldUserError` subclasses (from the `--from` branch) are mapped to exit 2. Wizard-path failures go through the existing `result.success === false` path (unchanged). Builder-level `.check()` failures (plain `Error`) do NOT reach this catch — they go through yargs at parse time.
 
 ### Step 6: Run tests
 
@@ -2270,6 +2445,8 @@ clean diagnostics. Empty decisions.jsonl preserved for both paths."
 **Files:**
 - Create: `src/cli/guards.ts`
 - Create: `src/cli/guards.test.ts`
+
+**Note:** `MultiServiceNotSupportedError` was already defined in Task 8 (`src/utils/user-errors.ts`). This task imports and uses it — do NOT re-declare it.
 
 ### Step 1: Write failing tests
 
@@ -2514,24 +2691,90 @@ Expected: FAIL — guards not wired yet.
 
 ### Step 3: Wire the guard into each of the 9 command handlers
 
-For each of `run.ts`, `next.ts`, `complete.ts`, `skip.ts`, `status.ts`, `rework.ts`, `reset.ts`, `info.ts`, `dashboard.ts`:
+**Ordering constraint**: the guard MUST fire BEFORE lock acquisition, before pipeline resolution, and before `StateManager` instantiation. If the guard runs after lock acquisition, a multi-service project with a stale lock will fail on the lock check rather than the guard. The Task 16 E2E test depends on this ordering.
 
-- [ ] **Add import:**
+**Common pattern** for all 9 commands:
 
 ```ts
+// At the top of the handler, after argv destructuring:
+import { loadConfig } from '../../config/loader.js'
 import { assertSingleServiceOrExit } from '../guards.js'
+
+// ... inside handler ...
+const { config } = loadConfig(projectRoot, [])
+assertSingleServiceOrExit(config ?? {}, { commandName: '<cmd>', output })
+if (process.exitCode === 2) return
+// ... continue with existing logic ...
 ```
 
-- [ ] **After the config load (usually `const config = await loadConfig(...)` or similar, near the top of the handler) and before any `StateManager` or pipeline work:**
+For each of the 9 commands, the specific placement:
+
+- [ ] **`src/cli/commands/run.ts`**: config is already loaded via existing `loadConfig(...)` call. Insert the guard immediately after that call, BEFORE the lock acquisition (whichever line calls `lockManager.acquire(...)` or the equivalent). The test in Task 16 relies on the guard firing before lock.
+
+- [ ] **`src/cli/commands/next.ts`**: follows the same pattern as run.ts — config loaded, then guard, then `new StateManager(...)`.
+
+- [ ] **`src/cli/commands/complete.ts`**: same pattern.
+
+- [ ] **`src/cli/commands/skip.ts`**: same pattern.
+
+- [ ] **`src/cli/commands/rework.ts`**: same pattern.
+
+- [ ] **`src/cli/commands/reset.ts`**: same pattern. Lock acquisition at reset.ts:71 — the guard must fire before that line.
+
+- [ ] **`src/cli/commands/status.ts`**: status.ts does NOT currently load config. Add a `loadConfig(projectRoot, [])` call at the top of the handler, then the guard, then proceed.
+
+- [ ] **`src/cli/commands/dashboard.ts`**: config is already loaded at line 86 (`const { config } = loadConfig(projectRoot, [])`). Insert the guard immediately after that line. The guard must fire before any state or pipeline work.
+
+- [ ] **`src/cli/commands/info.ts`**: this file has TWO branches. Line 46 (project-info) loads config; line 71 (step-info) does not. Insert the guard in BOTH branches, loading config in the step-info branch if needed:
+
+  ```ts
+  // Branch 1 (project-info, around line 46):
+  const { config } = loadConfig(projectRoot, [])
+  assertSingleServiceOrExit(config ?? {}, { commandName: 'info', output })
+  if (process.exitCode === 2) return
+
+  // Branch 2 (step-info, around line 71):
+  const { config: stepConfig } = loadConfig(projectRoot, [])
+  assertSingleServiceOrExit(stepConfig ?? {}, { commandName: 'info', output })
+  if (process.exitCode === 2) return
+  ```
+
+If a command already has a full `ScaffoldConfig` in scope via a different local variable name, pass that instead of re-loading. The pattern is: guard first, everything else second.
+
+### Step 3b: Add a static coverage test
+
+Per spec §8, add a test that asserts every command instantiating `StateManager` calls `assertSingleServiceOrExit` — preventing future silent regressions when a new command is added.
+
+- [ ] **Create `src/cli/guards-coverage.test.ts`:**
 
 ```ts
-assertSingleServiceOrExit(config, { commandName: '<cmd-name>', output })
-if (process.exitCode === 2) return
+import { describe, it, expect } from 'vitest'
+import fs from 'node:fs'
+import path from 'node:path'
+
+const COMMANDS_DIR = path.join(__dirname, 'commands')
+
+describe('multi-service guard static coverage', () => {
+  it('every command using StateManager also calls assertSingleServiceOrExit', () => {
+    const files = fs.readdirSync(COMMANDS_DIR)
+      .filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+
+    const missing: string[] = []
+    for (const f of files) {
+      const body = fs.readFileSync(path.join(COMMANDS_DIR, f), 'utf8')
+      const usesStateManager = /\bnew\s+StateManager\s*\(/.test(body)
+      if (!usesStateManager) continue
+
+      const callsGuard = /\bassertSingleServiceOrExit\s*\(/.test(body)
+      // adopt is exempt — it writes fresh state without loading a pre-existing
+      // multi-service config through the executing code path.
+      const isExempt = f === 'adopt.ts'
+      if (!callsGuard && !isExempt) missing.push(f)
+    }
+    expect(missing).toEqual([])
+  })
+})
 ```
-
-Replace `<cmd-name>` with the actual command name (`run`, `next`, etc.).
-
-For commands that don't load config today (if any), add the minimal config load using the existing loader, then gate on the result. If the command currently doesn't access config at all, consult existing similar commands for the loader pattern.
 
 ### Step 4: Run tests
 
@@ -2551,13 +2794,20 @@ git add src/cli/commands/run.ts src/cli/commands/next.ts \
         src/cli/commands/status.ts src/cli/commands/rework.ts \
         src/cli/commands/reset.ts src/cli/commands/info.ts \
         src/cli/commands/dashboard.ts \
-        src/cli/guards-integration.test.ts
+        src/cli/guards-integration.test.ts \
+        src/cli/guards-coverage.test.ts
 git commit -m "feat(cli): integrate multi-service guard into 9 stateful commands
 
 Every command that instantiates StateManager (run, next, complete,
 skip, status, rework, reset, info, dashboard) now calls
-assertSingleServiceOrExit() at the top of its handler. Covers both
+assertSingleServiceOrExit() at the top of its handler, before
+lock acquisition or StateManager instantiation. Covers both
 services-only and services + root projectType configurations.
+
+Static coverage test (guards-coverage.test.ts) asserts the same
+property by inspecting source files — future commands that add
+'new StateManager(...)' without the guard fail the test.
+
 Prevents silent-ignore of services[] ahead of Wave 2's real
 multi-service execution support."
 ```
@@ -2578,9 +2828,19 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import yargs from 'yargs'
 import { parse as parseYaml } from 'yaml'
-import { ScaffoldConfigSchema } from '../config/schema.js'
-import { initCommand, parseInitArgs } from '../cli/commands/init.js'
+import { ConfigSchema } from '../config/schema.js'
+import initCommand from '../cli/commands/init.js'
+import runCommand from '../cli/commands/run.js'
+
+async function parseInitArgs(args: string[]): Promise<Record<string, unknown>> {
+  return yargs(args)
+    .command(initCommand as never)
+    .exitProcess(false)
+    .fail(false)
+    .parseAsync()
+}
 
 const nibbleManifest = `version: 2
 methodology: deep
@@ -2663,7 +2923,7 @@ describe('E2E: scaffold init --from <nibble.yml>', () => {
     // Config round-trips (normalized).
     const parsedWritten = parseYaml(fs.readFileSync(configPath, 'utf8'))
     const parsedInput = parseYaml(nibbleManifest)
-    const normalizedInput = ScaffoldConfigSchema.parse(parsedInput)
+    const normalizedInput = ConfigSchema.parse(parsedInput)
     expect(parsedWritten).toEqual(normalizedInput)
 
     // State emits schema-version 2 because services[] is present.
@@ -2673,9 +2933,14 @@ describe('E2E: scaffold init --from <nibble.yml>', () => {
     // decisions.jsonl is empty (current behavior preserved).
     expect(fs.readFileSync(decisionsPath, 'utf8')).toBe('')
 
-    // Project is "configured but not executable": scaffold run fails.
-    const runCommand = (await import('../cli/commands/run.js')).default
-    await runCommand.handler({ root, _: ['create-prd'], $0: 'scaffold' } as never)
+    // Project is "configured but not executable": scaffold run fails BEFORE
+    // any lock/pipeline work — the guard (Task 15) must run first.
+    // Task 15's guard placement is "top of handler, after config load,
+    // before lock acquisition or pipeline resolution" — this test asserts
+    // that ordering.
+    await runCommand.handler({
+      root, _: ['create-prd'], step: 'create-prd', $0: 'scaffold',
+    } as never)
     expect(process.exitCode).toBe(2)
   })
 })
