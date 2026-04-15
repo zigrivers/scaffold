@@ -205,6 +205,17 @@ describe('buildFlagOverrides', () => {
     })
   })
 
+  it('maps --backend-domain=fintech to BackendConfig.domain via buildFlagOverrides', () => {
+    const result = buildFlagOverrides({
+      'backend-api-style': 'rest',
+      'backend-domain': 'fintech',
+    })
+    expect(result).toEqual({
+      type: 'backend',
+      partial: { apiStyle: 'rest', domain: 'fintech' },
+    })
+  })
+
   it('returns game partial with engine and multiplayerMode mapping', () => {
     const argv = { engine: 'unity', multiplayer: 'none' }
     const result = buildFlagOverrides(argv)
@@ -351,7 +362,7 @@ describe('flag family type preservation (as const survives extraction)', () => {
   it('BACKEND_FLAGS[number] narrows to literal union', () => {
     expectTypeOf<typeof BACKEND_FLAGS[number]>().toEqualTypeOf<
       'backend-api-style' | 'backend-data-store' | 'backend-auth'
-      | 'backend-messaging' | 'backend-deploy-target'
+      | 'backend-messaging' | 'backend-deploy-target' | 'backend-domain'
     >()
   })
 

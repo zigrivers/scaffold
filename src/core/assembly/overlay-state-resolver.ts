@@ -82,6 +82,7 @@ export function resolveOverlayState(options: {
     // Generic domain sub-overlay: types with a 'domain' config field get sub-overlay injection
     const TYPE_DOMAIN_CONFIG: Partial<Record<string, string>> = {
       'research': 'researchConfig',
+      'backend': 'backendConfig',
       // Future types with domain support can be added here
     }
     const domainConfigKey = TYPE_DOMAIN_CONFIG[projectType]

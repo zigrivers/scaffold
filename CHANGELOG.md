@@ -2,6 +2,11 @@
 
 All notable changes to Scaffold are documented here.
 
+## [Unreleased]
+
+### Added
+- **Backend fintech domain sub-overlay** — `BackendConfig.domain` accepts `'none' | 'fintech'` (default `'none'`). Opt in via wizard prompt or `--backend-domain fintech` (both `scaffold init` and `scaffold adopt`). Fintech-specific guidance — compliance (PCI-DSS, SEC 17a-4, SOC 2), ledger design, broker integration, order lifecycle, risk management, testing, data modeling, observability — is appended to the relevant pipeline steps via `content/methodology/backend-fintech.yml` and 8 new knowledge docs under `content/knowledge/backend/backend-fintech-*.md`. Mirrors the existing `research-quant-finance` sub-overlay pattern.
+
 ## [3.16.0] — 2026-04-13
 
 ### Added

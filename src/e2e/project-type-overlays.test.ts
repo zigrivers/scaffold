@@ -50,7 +50,7 @@ import { loadOverlay } from '../core/assembly/overlay-loader.js'
 import { getPackagePipelineDir, getPackageMethodologyDir } from '../utils/fs.js'
 import type { MetaPromptFile } from '../types/index.js'
 import type { OverlayState } from '../core/assembly/overlay-state-resolver.js'
-import type { ResearchConfig } from '../types/config.js'
+import type { BackendConfig, ResearchConfig } from '../types/config.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -430,6 +430,87 @@ describe('backend overlay integration', () => {
 
     expect(overlayState.knowledge['system-architecture']).toContain('backend-architecture')
     expect(overlayState.knowledge['tech-stack']).toContain('backend-api-design')
+  })
+
+  // -------------------------------------------------------------------------
+  // Sub-overlay: backend-fintech
+  // -------------------------------------------------------------------------
+
+  /**
+   * Resolve a backend overlay with an explicit domain sub-overlay selection.
+   * Mirrors `resolveResearchOverlay` but for the backend project type.
+   * A FULL typed BackendConfig literal is required because BackendConfig is
+   * inferred from BackendConfigSchema's *output* shape (all defaults resolved).
+   */
+  async function resolveBackendOverlayWithDomain(
+    domain: BackendConfig['domain'],
+  ): Promise<OverlayState> {
+    const backendConfig: BackendConfig = {
+      apiStyle: 'rest',
+      dataStore: ['relational'],
+      authMechanism: 'none',
+      asyncMessaging: 'none',
+      deployTarget: 'container',
+      domain,
+    }
+    const methodologyDir = getPackageMethodologyDir()
+    const realMetaPrompts = await discoverRealMetaPrompts()
+    const knownSteps = [...realMetaPrompts.keys()]
+    const presets = loadAllPresets(methodologyDir, knownSteps)
+    const output = createMockOutput()
+
+    const preset = presets.deep
+    return resolveOverlayState({
+      config: {
+        version: 2,
+        methodology: 'deep',
+        platforms: ['claude-code'],
+        project: {
+          projectType: 'backend',
+          backendConfig,
+        },
+      },
+      methodologyDir,
+      metaPrompts: realMetaPrompts,
+      presetSteps: preset?.steps ?? {},
+      output,
+    })
+  }
+
+  it('fintech domain knowledge appended after core backend knowledge', async () => {
+    const state = await resolveBackendOverlayWithDomain('fintech')
+
+    // Core backend overlay entry is present in create-prd
+    expect(state.knowledge['create-prd']).toContain('backend-requirements')
+
+    // Fintech sub-overlay entries present on create-prd (per backend-fintech.yml)
+    expect(state.knowledge['create-prd']).toContain('backend-fintech-compliance')
+    expect(state.knowledge['create-prd']).toContain('backend-fintech-broker-integration')
+
+    // Domain knowledge appears AFTER core knowledge (appended)
+    const prdKnowledge = state.knowledge['create-prd']
+    const coreIdx = prdKnowledge.indexOf('backend-requirements')
+    const domainIdx = prdKnowledge.indexOf('backend-fintech-compliance')
+    expect(domainIdx).toBeGreaterThan(coreIdx)
+
+    // Spot-check another step: system-architecture gets broker-integration + risk-management
+    expect(state.knowledge['system-architecture']).toContain('backend-architecture')
+    expect(state.knowledge['system-architecture']).toContain('backend-fintech-broker-integration')
+    expect(state.knowledge['system-architecture']).toContain('backend-fintech-risk-management')
+  })
+
+  it('backend domain=none skips fintech sub-overlay', async () => {
+    const state = await resolveBackendOverlayWithDomain('none')
+
+    // Core backend knowledge is present
+    expect(state.knowledge['create-prd']).toContain('backend-requirements')
+    expect(state.knowledge['system-architecture']).toContain('backend-architecture')
+
+    // Fintech sub-overlay entries are NOT present
+    expect(state.knowledge['create-prd']).not.toContain('backend-fintech-compliance')
+    expect(state.knowledge['create-prd']).not.toContain('backend-fintech-broker-integration')
+    expect(state.knowledge['system-architecture']).not.toContain('backend-fintech-broker-integration')
+    expect(state.knowledge['system-architecture']).not.toContain('backend-fintech-risk-management')
   })
 })
 

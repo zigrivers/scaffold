@@ -30,6 +30,7 @@ export const BackendConfigSchema = z.object({
   authMechanism: z.enum(['none', 'jwt', 'session', 'oauth', 'apikey']).default('none'),
   asyncMessaging: z.enum(['none', 'queue', 'event-driven']).default('none'),
   deployTarget: z.enum(['serverless', 'container', 'long-running']).default('container'),
+  domain: z.enum(['none', 'fintech']).default('none'),
 }).strict()
 
 export const CliConfigSchema = z.object({

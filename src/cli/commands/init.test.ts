@@ -358,6 +358,14 @@ describe('init command — .check() validation', () => {
     })
   })
 
+  it('rejects --backend-domain with a value outside declared choices', async () => {
+    await expect(parseInitArgs([
+      '--project-type', 'backend',
+      '--backend-api-style', 'rest',
+      '--backend-domain', 'bogus',
+    ])).rejects.toThrow(/Invalid values|Choices/)
+  })
+
   it('accepts --cli-interactivity hybrid without explicit --project-type', async () => {
     await expect(parseInitArgs(['--cli-interactivity', 'hybrid'])).resolves.toMatchObject({
       'cli-interactivity': 'hybrid',
@@ -397,6 +405,20 @@ describe('init command — .check() validation', () => {
           backendApiStyle: 'rest',
           backendDataStore: ['relational'],
         }),
+      }),
+    )
+  })
+
+  it('forwards --backend-domain=fintech into the wizard\'s backendFlags', async () => {
+    const argv = defaultArgv({
+      root: os.tmpdir(),
+      'backend-api-style': 'rest',
+      'backend-domain': 'fintech',
+    } as Partial<InitArgv>)
+    await initCommand.handler(argv)
+    expect(runWizard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        backendFlags: expect.objectContaining({ backendDomain: 'fintech' }),
       }),
     )
   })

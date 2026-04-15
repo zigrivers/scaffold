@@ -246,7 +246,16 @@ export async function askWizardQuestions(options: {
         ) as BackendConfig['deployTarget']
         : 'container')
 
-    backendConfig = { apiStyle, dataStore, authMechanism, asyncMessaging, deployTarget }
+    const domain: BackendConfig['domain'] = options.backendFlags?.backendDomain
+      ?? (!auto
+        ? await output.select('Backend domain?',
+          optionsFromCopy(copy.domain.options, ['none', 'fintech']),
+          'none',
+          copy.domain,
+        ) as BackendConfig['domain']
+        : 'none')
+
+    backendConfig = { apiStyle, dataStore, authMechanism, asyncMessaging, deployTarget, domain }
   }
 
   // CLI configuration

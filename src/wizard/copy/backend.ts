@@ -47,4 +47,16 @@ export const backendCopy: BackendCopy = {
       'long-running': { label: 'Long-running',  short: 'Traditional always-on server process.' },
     },
   },
+  domain: {
+    short: 'Optional domain-specific knowledge to include.',
+    long: 'Adds a curated set of knowledge documents and prompt guidance '
+      + 'tailored to a specific industry or problem space.',
+    options: {
+      none: { label: 'None', short: 'No domain-specific knowledge.' },
+      fintech: {
+        label: 'Fintech',
+        short: 'Compliance, ledger design, broker integration, order lifecycle, risk management.',
+      },
+    },
+  },
 }

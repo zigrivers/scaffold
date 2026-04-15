@@ -49,6 +49,7 @@ export interface BackendFlags {
   backendAuth?: BackendConfig['authMechanism']
   backendMessaging?: BackendConfig['asyncMessaging']
   backendDeployTarget?: BackendConfig['deployTarget']
+  backendDomain?: BackendConfig['domain']
 }
 
 export interface CliFlags {

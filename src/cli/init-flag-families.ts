@@ -56,7 +56,7 @@ export const WEB_FLAGS = [
 
 export const BACKEND_FLAGS = [
   'backend-api-style', 'backend-data-store', 'backend-auth',
-  'backend-messaging', 'backend-deploy-target',
+  'backend-messaging', 'backend-deploy-target', 'backend-domain',
 ] as const
 
 export const CLI_TYPE_FLAGS = [
@@ -420,6 +420,9 @@ export function buildFlagOverrides(argv: Record<string, unknown>): PartialConfig
     }
     if (argv['backend-deploy-target'] !== undefined) {
       partial.deployTarget = argv['backend-deploy-target'] as BackendConfig['deployTarget']
+    }
+    if (argv['backend-domain'] !== undefined) {
+      partial.domain = argv['backend-domain'] as BackendConfig['domain']
     }
     return { type: 'backend', partial }
   }
