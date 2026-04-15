@@ -2033,7 +2033,7 @@ export async function materializeScaffoldProject(
 }
 ```
 
-Add `ExistingScaffoldError` to Task 8's taxonomy (extends `ScaffoldUserError`) if the existing `src/utils/errors.ts` does NOT already have a suitable factory. Otherwise reuse the existing factory and map it to exit 2 via the handler-level catch.
+Add `ExistingScaffoldError` to Task 8's taxonomy (extends `ScaffoldUserError`). Verified: `src/utils/errors.ts` does NOT have a suitable factory today; `src/wizard/wizard.ts:87-102` currently returns a `WizardResult.errors` record with `exitCode: 1` rather than throwing. Wave 3a consolidates this into the new error class and maps to exit 2 via the handler-level catch — a small user-visible exit-code change (1 → 2) noted in the CHANGELOG.
 
 ### Step 6: Refactor runWizard to compose the two + define readOldStateIfExists
 
@@ -2765,12 +2765,12 @@ function mkProjectWithConfig(configYaml: string): string {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-'))
   fs.mkdirSync(path.join(root, '.scaffold'), { recursive: true })
   fs.writeFileSync(path.join(root, '.scaffold', 'config.yml'), configYaml)
-  // Some commands also need a state.json; write a minimal v2 one.
+  // Write a minimal state.json. The guard fires BEFORE StateManager loads
+  // state, so this file's exact shape doesn't matter — even an empty file
+  // would suffice. Keep it minimal; do NOT spend time flesh out the full
+  // PipelineState shape.
   fs.writeFileSync(path.join(root, '.scaffold', 'state.json'), JSON.stringify({
     'schema-version': 2,
-    methodology: 'deep',
-    'scaffold-version': '0.0.0-test',
-    // ... other required fields per current state shape ...
   }))
   return root
 }
@@ -3139,6 +3139,7 @@ exits with code 2 and a clear diagnostic.
 - **State `schema-version`**: widened from literal `1` to `1 | 2`. Projects with `services[]` initialize state at version 2; single-service projects stay at version 1. The v2 shape is identical to v1 for Wave 3a; Wave 3b will change the shape and bump to 3.
 - **`ProjectSchema.superRefine` refactored**: per-type coupling validation moved into `src/config/validators/` modules shared by `ProjectSchema` and the new `ServiceSchema`. Behavior-preserving.
 - **`runWizard()` split**: `collectWizardAnswers` + `materializeScaffoldProject` exported separately. `scaffold init --from` uses the materializer directly.
+- **`scaffold init` exit code on existing `.scaffold/` without `--force`**: now exits with code 2 and a `ScaffoldUserError` diagnostic, consistent with the rest of the Wave 3a `--from` error surface. Previously exited with code 1 via the wizard's `WizardResult.errors` path. User-visible but trivial — the error message is clearer and the behavior is preserved.
 ```
 
 ### Step 3: Verify make check-all still green
