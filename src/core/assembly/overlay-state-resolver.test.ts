@@ -474,7 +474,7 @@ knowledge-overrides:
       const result = resolveOverlayState({
         config: makeConfig({
           project: {
-            services: [{ name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest', domain: 'none' } }],
+            services: [{ name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest', dataStore: ['relational'], authMechanism: 'jwt', asyncMessaging: 'none', deployTarget: 'container', domain: 'none' } }],
           },
         }),
         methodologyDir: tmpDir,
@@ -508,7 +508,7 @@ step-overrides:
       resolveOverlayState({
         config: makeConfig({
           project: {
-            services: [{ name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest', domain: 'none' } }],
+            services: [{ name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest', dataStore: ['relational'], authMechanism: 'jwt', asyncMessaging: 'none', deployTarget: 'container', domain: 'none' } }],
           },
         }),
         methodologyDir: tmpDir,
@@ -579,7 +579,7 @@ step-overrides:
       resolveOverlayState({
         config: makeConfig({
           project: {
-            services: [{ name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest', domain: 'none' } }],
+            services: [{ name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest', dataStore: ['relational'], authMechanism: 'jwt', asyncMessaging: 'none', deployTarget: 'container', domain: 'none' } }],
           },
         }),
         methodologyDir: tmpDir,

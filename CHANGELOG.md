@@ -9,8 +9,15 @@ All notable changes to Scaffold are documented here.
 - **Multi-service manifest schema**: `ProjectSchema.services[]` accepts an array of per-service configs (each with `name`, `projectType`, one matching per-type config, and optional `path`). Service names must be kebab-case.
 - **Declarative init**: `scaffold init --from <file.yml>` reads a full ScaffoldConfig from YAML (or stdin via `-`) instead of running the wizard. Exclusive with config-setting flags.
 - **Multi-service execution guard**: `scaffold run`, `next`, `complete`, `skip`, `status`, `rework`, `reset`, `info`, and `dashboard` reject configs containing `services[]` with a clear "lands in Wave 2" message until multi-service execution ships.
+- **Cross-service pipeline overlay** — structural overlay activated by `services[]` in config
+  - 5 new pipeline steps: `service-ownership-map`, `inter-service-contracts`, `cross-service-auth`, `cross-service-observability`, `integration-test-plan`
+  - 8 multi-service knowledge documents injected into 15 existing steps
+  - `multi-service-overlay.yml` with step, knowledge, reads, and dependency overrides
+- **`loadStructuralOverlay()`** — separate overlay loader that doesn't require `project-type` field
 
 ### Changed
+- **`ProjectTypeOverlay` renamed to `PipelineOverlay`** — `projectType` is now optional (`ProjectType | undefined`) for structural overlays
+- **`resolveOverlayState()`** — 4th overlay pass for structural overlays, independent of project-type block
 - **State `schema-version`**: widened from literal `1` to `1 | 2`. Projects with `services[]` initialize state at version 2; single-service projects stay at version 1. The v2 shape is identical to v1 for Wave 3a; Wave 3b will change the shape and bump to 3.
 - **`ProjectSchema.superRefine` refactored**: per-type coupling validation moved into `src/config/validators/` modules shared by `ProjectSchema` and the new `ServiceSchema`. Behavior-preserving.
 - **`runWizard()` split**: `collectWizardAnswers` + `materializeScaffoldProject` exported separately. `scaffold init --from` uses the materializer directly.
