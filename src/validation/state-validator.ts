@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { ScaffoldError, ScaffoldWarning } from '../types/index.js'
 import { ExitCode } from '../types/index.js'
+import { stateSchemaVersion } from '../utils/errors.js'
 
 const VALID_STATUSES = new Set(['pending', 'in_progress', 'completed', 'skipped'])
 
@@ -71,13 +72,7 @@ export function validateState(projectRoot: string): {
   // Check schema version (Wave 3a: widened to accept 1 or 2)
   const schemaVersion = parsed['schema-version']
   if (schemaVersion !== 1 && schemaVersion !== 2) {
-    errors.push({
-      code: 'STATE_SCHEMA_VERSION',
-      message: `state.json schema version ${String(schemaVersion)} is not supported (expected 1 or 2)`,
-      exitCode: ExitCode.StateCorruption,
-      recovery: 'Run "scaffold reset" to reinitialize state, or upgrade scaffold',
-      context: { file: statePath, expected: '1 or 2', actual: schemaVersion as number },
-    })
+    errors.push(stateSchemaVersion([1, 2], schemaVersion as number, statePath))
     return { errors, warnings }
   }
 
