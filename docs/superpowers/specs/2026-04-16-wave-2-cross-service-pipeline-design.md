@@ -29,7 +29,7 @@ export interface PipelineOverlay {
 
 **Type precision**: `projectType` is `ProjectType | undefined`, not `string | undefined`. The loader validates against `ProjectTypeSchema` when present.
 
-**Rename scope**: Update all references in `overlay-loader.ts`, `overlay-resolver.ts`, `overlay-state-resolver.ts`, `overlay-resolver.test.ts`, and any other consumers. Pure type rename — no runtime change.
+**Rename scope**: Update all references — direct type consumers are `config.ts` (definition), `config.test.ts`, `overlay-loader.ts` (3 references + return types), `overlay-resolver.ts` (import + parameter type), `overlay-resolver.test.ts` (import + helper). Indirect consumers via `types/index.ts` re-export: `overlay-state-resolver.ts`. Pure type rename — no runtime change.
 
 ### 1.2 New `loadStructuralOverlay()` Function
 
@@ -98,7 +98,7 @@ Deterministic and non-configurable:
 
 - **step-overrides**: Structural overlay wins (applied last). Warning emitted when it overrides a project-type overlay's value.
 - **knowledge-overrides**: Append-only with Set-based dedup. No conflict possible.
-- **reads-overrides / dependency-overrides**: Last-in-wins. Chained-replace warnings deferred until a real use case arises (no current overlay uses reads-overrides.replace in combination with the structural overlay).
+- **reads-overrides / dependency-overrides**: Replace-then-append-then-dedup composition (later overlays compose with earlier ones, they do not overwrite). Chained-replace warnings deferred until a real use case arises (no current overlay uses reads-overrides.replace in combination with the structural overlay).
 
 ### 1.6 Guard Interaction
 
@@ -120,6 +120,7 @@ All steps are disabled by default in presets and enabled by `multi-service-overl
 - **Phase**: architecture
 - **Order**: 721 (after `review-architecture` at 720)
 - **Dependencies**: `[review-architecture]`
+- **Reads**: `[system-architecture, domain-modeling]`
 - **Outputs**: `[docs/service-ownership-map.md]`
 - **Knowledge**: `[multi-service-architecture, multi-service-data-ownership]`
 
@@ -139,6 +140,7 @@ All steps are disabled by default in presets and enabled by `multi-service-overl
 - **Phase**: quality
 - **Order**: 952 (after `security` at 950, before `review-security` at 960)
 - **Dependencies**: `[security, service-ownership-map]`
+- **Reads**: `[inter-service-contracts]`
 - **Outputs**: `[docs/cross-service-auth.md]`
 - **Knowledge**: `[multi-service-auth]`
 
@@ -148,6 +150,7 @@ All steps are disabled by default in presets and enabled by `multi-service-overl
 - **Phase**: quality
 - **Order**: 941 (after `review-operations` at 940)
 - **Dependencies**: `[review-operations, service-ownership-map]`
+- **Reads**: `[operations]`
 - **Outputs**: `[docs/cross-service-observability.md]`
 - **Knowledge**: `[multi-service-observability]`
 
@@ -157,6 +160,7 @@ All steps are disabled by default in presets and enabled by `multi-service-overl
 - **Phase**: quality
 - **Order**: 942
 - **Dependencies**: `[review-testing, inter-service-contracts]`
+- **Reads**: `[service-ownership-map, cross-service-auth]`
 - **Outputs**: `[docs/integration-test-plan.md]`
 - **Knowledge**: `[multi-service-testing]`
 
@@ -169,9 +173,11 @@ Steps are intentionally placed **after** their phase review gates because they d
 - `cross-service-observability` (941) needs reviewed operations (940)
 - `integration-test-plan` (942) needs reviewed testing strategy (910)
 
-**Exception**: `cross-service-auth` (952) runs before `review-security` (960). The overlay wires `review-security` to read it.
+**Exception**: `cross-service-auth` (952) runs before `review-security` (960). The overlay wires `review-security` to both read and depend on it.
 
-**Holistic coverage**: `cross-phase-consistency` (validation phase) reads all 5 new outputs.
+**Holistic coverage**: `cross-phase-consistency` (validation phase) reads and depends on all 5 new outputs.
+
+**MVP methodology note**: Under MVP, the review/security/operations dependency steps are disabled, and disabled dependencies are treated as satisfied by `computeEligible()`. This means cross-service steps could become eligible without reviewed inputs — consistent with how MVP handles all steps (skip ceremony, go fast). Multi-service projects are complex enough that MVP is not the recommended methodology, but the system handles it consistently. Wave 3b can add methodology-level constraints if needed.
 
 ---
 
@@ -280,6 +286,26 @@ reads-overrides:
       - cross-service-auth
       - cross-service-observability
       - integration-test-plan
+
+# ---------------------------------------------------------------------------
+# dependency-overrides
+# ---------------------------------------------------------------------------
+# Reads alone don't gate execution — `next` only checks dependencies.
+# These overrides ensure downstream steps wait for cross-service artifacts.
+dependency-overrides:
+  review-security:
+    append: [cross-service-auth]
+  database-schema:
+    append: [service-ownership-map]
+  implementation-plan:
+    append: [service-ownership-map, inter-service-contracts]
+  cross-phase-consistency:
+    append:
+      - service-ownership-map
+      - inter-service-contracts
+      - cross-service-auth
+      - cross-service-observability
+      - integration-test-plan
 ```
 
 ---
@@ -346,3 +372,5 @@ This design went through 3 rounds of multi-model review (Codex, Gemini, Claude):
 **Round 2 (Section 2)**: 3 P1s, 3 P2s found and fixed — knowledge injection expanded from 3 to 15 steps, reads-overrides added for downstream wiring, review-security wired to read cross-service-auth, scope clarification for service-ownership-map.
 
 **Round 3 (Complete design)**: 0 P0s, 0 P1s, 1 P2 remaining — expanded multi-service-architecture topic list to include service discovery/networking.
+
+**Round 4 (Written spec)**: 2 P1s, 2 P2s found and fixed — added dependency-overrides section (reads don't gate execution), added reads fields to 4 step definitions missing them, documented MVP methodology behavior, fixed conflict-resolution text (compose not overwrite), tightened rename scope list.
