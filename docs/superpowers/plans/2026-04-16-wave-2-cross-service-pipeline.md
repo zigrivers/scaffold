@@ -10,6 +10,12 @@
 
 **Spec:** `docs/superpowers/specs/2026-04-16-wave-2-cross-service-pipeline-design.md`
 
+**Task ordering rationale:** Infrastructure tasks (1-3) have no content dependencies. Content tasks are ordered: knowledge docs (4-7) → pipeline steps (8-9) → presets + overlay + exemptions (10) so that each task's references resolve. Knowledge docs must exist before steps reference them in `knowledge-base` frontmatter, and steps must exist before presets register them.
+
+**Knowledge doc requirements:** Each `content/knowledge/core/` file must be at least 200 lines with at least 1 code block (enforced by `tests/evals/knowledge-quality.bats`).
+
+**Pipeline step requirements:** Each step must include `## Purpose`, `## Inputs`, `## Expected Outputs`, `## Quality Criteria`, `## Methodology Scaling`, `## Mode Detection`, and `## Update Mode Specifics` sections (enforced by `tests/evals/pipeline-completeness.bats`).
+
 ---
 
 ### Task 1: Rename `ProjectTypeOverlay` to `PipelineOverlay` and make `projectType` optional
@@ -439,13 +445,29 @@ Append to `src/core/assembly/overlay-state-resolver.test.ts`:
   describe('structural overlay (multi-service)', () => {
     it('activates structural overlay when services[] present', () => {
       const output = makeOutput()
+      // Use a temp dir with a multi-service-overlay.yml fixture
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'overlay-structural-'))
+      fs.writeFileSync(path.join(tmpDir, 'multi-service-overlay.yml'), `
+name: multi-service
+description: Test structural overlay
+
+step-overrides:
+  service-ownership-map: { enabled: true }
+
+knowledge-overrides:
+  system-architecture:
+    append: [multi-service-architecture]
+`, 'utf8')
+
       const presetSteps: Record<string, StepEnablementEntry> = {
         'create-vision': { enabled: true },
         'service-ownership-map': { enabled: false },
+        'system-architecture': { enabled: true },
       }
       const metaPrompts = new Map([
         ['create-vision', { frontmatter: makeFrontmatter({ name: 'create-vision' }) }],
         ['service-ownership-map', { frontmatter: makeFrontmatter({ name: 'service-ownership-map' }) }],
+        ['system-architecture', { frontmatter: makeFrontmatter({ name: 'system-architecture', knowledgeBase: ['system-architecture'] }) }],
       ])
 
       const result = resolveOverlayState({
@@ -454,16 +476,52 @@ Append to `src/core/assembly/overlay-state-resolver.test.ts`:
             services: [{ name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest', domain: 'none' } }],
           },
         }),
-        methodologyDir: fixtureDir,
+        methodologyDir: tmpDir,
         metaPrompts,
         presetSteps,
         output,
       })
 
-      // multi-service-overlay.yml in fixtureDir should enable service-ownership-map
-      // If fixture doesn't exist, the structural overlay silently skips
-      // This test verifies the code path runs without error
-      expect(result.steps).toBeDefined()
+      // Structural overlay should enable service-ownership-map
+      expect(result.steps['service-ownership-map']?.enabled).toBe(true)
+      // Knowledge injection should work
+      expect(result.knowledge['system-architecture']).toContain('multi-service-architecture')
+    })
+
+    it('emits warning when structural overlay conflicts with project-type overlay', () => {
+      const output = makeOutput()
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'overlay-conflict-'))
+      fs.writeFileSync(path.join(tmpDir, 'multi-service-overlay.yml'), `
+name: multi-service
+description: Test conflict
+
+step-overrides:
+  design-system: { enabled: true }
+`, 'utf8')
+
+      const presetSteps: Record<string, StepEnablementEntry> = {
+        'design-system': { enabled: false },
+      }
+      const metaPrompts = new Map([
+        ['design-system', { frontmatter: makeFrontmatter({ name: 'design-system' }) }],
+      ])
+
+      resolveOverlayState({
+        config: makeConfig({
+          project: {
+            services: [{ name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest', domain: 'none' } }],
+          },
+        }),
+        methodologyDir: tmpDir,
+        metaPrompts,
+        presetSteps,
+        output,
+      })
+
+      // Should warn about overriding design-system from disabled → enabled
+      expect(output.warn).toHaveBeenCalledWith(
+        expect.stringContaining('design-system'),
+      )
     })
 
     it('does NOT activate structural overlay when services[] absent', () => {
@@ -632,661 +690,281 @@ git commit -m "feat: add structural overlay pass gated on services[] in resolveO
 
 ---
 
-### Task 4: Register 5 new steps in methodology presets
+### Task 4: Knowledge documents batch 1 — architecture + data ownership
 
 **Files:**
-- Modify: `content/methodology/deep.yml` (after line 108)
-- Modify: `content/methodology/mvp.yml` (after line 107)
-- Modify: `content/methodology/custom-defaults.yml` (after line 108)
+- Create: `content/knowledge/core/multi-service-architecture.md`
+- Create: `content/knowledge/core/multi-service-data-ownership.md`
 
-- [ ] **Step 1: Add multi-service steps to `deep.yml`**
+**Requirements:** Each file must be 200+ lines with at least 1 code block. Follow the pattern in `content/knowledge/core/system-architecture.md`: frontmatter with `name`, `description`, `topics`, then substantial content sections with `##` headers.
 
-Append after line 108 (`platform-cert-prep: { enabled: false }`):
+- [ ] **Step 1: Create `multi-service-architecture.md`**
 
+Frontmatter:
 ```yaml
-  # Multi-service steps (enabled via multi-service overlay)
-  service-ownership-map: { enabled: false }
-  inter-service-contracts: { enabled: false }
-  cross-service-auth: { enabled: false }
-  cross-service-observability: { enabled: false }
-  integration-test-plan: { enabled: false }
+---
+name: multi-service-architecture
+description: Service boundary design, communication patterns, service discovery, and networking topology
+topics: [service-boundaries, communication-patterns, service-discovery, networking-topology, data-ownership, sync-vs-async]
+---
 ```
 
-- [ ] **Step 2: Add multi-service steps to `mvp.yml`**
+Content must cover: service decomposition strategies (domain-driven, team-aligned), sync vs async communication patterns (REST, gRPC, message queues, event streaming), service discovery patterns (DNS, service mesh, sidecar proxy), networking topology (API gateway, mesh, direct), data ownership at the architecture level. Include at least one code block (e.g., a service discovery config example or API gateway routing example).
 
-Append after line 107 (`platform-cert-prep: { enabled: false }`):
+- [ ] **Step 2: Create `multi-service-data-ownership.md`**
 
+Frontmatter:
 ```yaml
-  # Multi-service steps (enabled via multi-service overlay)
-  service-ownership-map: { enabled: false }
-  inter-service-contracts: { enabled: false }
-  cross-service-auth: { enabled: false }
-  cross-service-observability: { enabled: false }
-  integration-test-plan: { enabled: false }
+---
+name: multi-service-data-ownership
+description: Table ownership, shared-nothing data patterns, and event-driven synchronization
+topics: [table-ownership, shared-nothing, event-driven-sync, data-partitioning, eventual-consistency]
+---
 ```
 
-- [ ] **Step 3: Add multi-service steps to `custom-defaults.yml`**
+Content must cover: shared-nothing data patterns, table/collection ownership rules, event-driven data sync strategies, cross-service query patterns (API composition, CQRS), eventual consistency handling, data migration between services. Include at least one code block (e.g., event schema example or data ownership mapping).
 
-Append after line 108 (`platform-cert-prep: { enabled: false }`):
+- [ ] **Step 3: Verify line count and code blocks**
 
-```yaml
-  # Multi-service steps (enabled via multi-service overlay)
-  service-ownership-map: { enabled: false }
-  inter-service-contracts: { enabled: false }
-  cross-service-auth: { enabled: false }
-  cross-service-observability: { enabled: false }
-  integration-test-plan: { enabled: false }
+Run: `for f in content/knowledge/core/multi-service-architecture.md content/knowledge/core/multi-service-data-ownership.md; do echo "$f: $(wc -l < "$f") lines, $(grep -c '^\`\`\`' "$f") code fences"; done`
+Expected: Both 200+ lines, both have 2+ code fences (opening + closing = 1 block)
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add content/knowledge/core/multi-service-architecture.md content/knowledge/core/multi-service-data-ownership.md
+git commit -m "feat: add multi-service architecture and data ownership knowledge docs"
 ```
 
-- [ ] **Step 4: Run existing tests to verify no regression**
+---
 
-Run: `npx vitest run --reporter=verbose`
+### Task 5: Knowledge documents batch 2 — API contracts + auth
+
+**Files:**
+- Create: `content/knowledge/core/multi-service-api-contracts.md`
+- Create: `content/knowledge/core/multi-service-auth.md`
+
+Same requirements as Task 4: 200+ lines, 1+ code block.
+
+- [ ] **Step 1: Create `multi-service-api-contracts.md`**
+
+Topics: `[internal-api-versioning, backward-compatibility, retries, idempotency, contract-evolution]`. Cover: internal API versioning strategies, backward compatibility rules, retry policies with exponential backoff, idempotency key design, contract evolution and deprecation.
+
+- [ ] **Step 2: Create `multi-service-auth.md`**
+
+Topics: `[mtls, service-tokens, zero-trust, audience-scoping, token-rotation]`. Cover: mTLS setup and certificate management, service-to-service JWT patterns, zero-trust architecture, audience scoping and token validation, secret rotation strategies.
+
+- [ ] **Step 3: Verify and commit**
+
+```bash
+for f in content/knowledge/core/multi-service-api-contracts.md content/knowledge/core/multi-service-auth.md; do echo "$f: $(wc -l < "$f") lines"; done
+git add content/knowledge/core/multi-service-api-contracts.md content/knowledge/core/multi-service-auth.md
+git commit -m "feat: add multi-service API contracts and auth knowledge docs"
+```
+
+---
+
+### Task 6: Knowledge documents batch 3 — observability + testing
+
+**Files:**
+- Create: `content/knowledge/core/multi-service-observability.md`
+- Create: `content/knowledge/core/multi-service-testing.md`
+
+Same requirements: 200+ lines, 1+ code block.
+
+- [ ] **Step 1: Create `multi-service-observability.md`**
+
+Topics: `[distributed-tracing, correlation-ids, cross-service-slos, failure-attribution]`. Cover: distributed tracing with W3C Trace Context, correlation ID propagation, cross-service SLO definition, failure attribution and root cause analysis.
+
+- [ ] **Step 2: Create `multi-service-testing.md`**
+
+Topics: `[contract-tests, pact, schema-registry, cross-service-e2e, test-doubles]`. Cover: consumer-driven contract testing (Pact, schema registry), cross-service E2E test design, service test doubles and mocking strategies, CI integration for contract tests.
+
+- [ ] **Step 3: Verify and commit**
+
+```bash
+for f in content/knowledge/core/multi-service-observability.md content/knowledge/core/multi-service-testing.md; do echo "$f: $(wc -l < "$f") lines"; done
+git add content/knowledge/core/multi-service-observability.md content/knowledge/core/multi-service-testing.md
+git commit -m "feat: add multi-service observability and testing knowledge docs"
+```
+
+---
+
+### Task 7: Knowledge documents batch 4 — resilience + task decomposition
+
+**Files:**
+- Create: `content/knowledge/core/multi-service-resilience.md`
+- Create: `content/knowledge/core/multi-service-task-decomposition.md`
+
+Same requirements: 200+ lines, 1+ code block.
+
+- [ ] **Step 1: Create `multi-service-resilience.md`**
+
+Topics: `[circuit-breakers, bulkheads, timeout-budgets, failure-isolation, retry-storms]`. Cover: circuit breaker patterns (states, thresholds, recovery), bulkhead isolation, timeout budget allocation across call chains, failure isolation strategies, retry storm prevention.
+
+- [ ] **Step 2: Create `multi-service-task-decomposition.md`**
+
+Topics: `[per-service-waves, dependency-ordering, parallel-implementation, shared-infrastructure-first]`. Cover: breaking multi-service work into per-service implementation waves, dependency ordering for parallel development, shared infrastructure first pattern, integration milestones.
+
+- [ ] **Step 3: Verify and commit**
+
+```bash
+for f in content/knowledge/core/multi-service-resilience.md content/knowledge/core/multi-service-task-decomposition.md; do echo "$f: $(wc -l < "$f") lines"; done
+git add content/knowledge/core/multi-service-resilience.md content/knowledge/core/multi-service-task-decomposition.md
+git commit -m "feat: add multi-service resilience and task decomposition knowledge docs"
+```
+
+---
+
+### Task 8: Pipeline steps batch 1 — service-ownership-map + inter-service-contracts
+
+**Files:**
+- Create: `content/pipeline/architecture/service-ownership-map.md`
+- Create: `content/pipeline/specification/inter-service-contracts.md`
+
+**Requirements:** Each file must include all required sections: `## Purpose`, `## Inputs`, `## Expected Outputs`, `## Quality Criteria`, `## Methodology Scaling`, `## Mode Detection`, `## Update Mode Specifics`. Follow the pattern in `content/pipeline/quality/operations.md` exactly.
+
+- [ ] **Step 1: Create `service-ownership-map.md`**
+
+Use the frontmatter from the spec (architecture phase, order 721, deps [review-architecture], reads [system-architecture, domain-modeling], knowledge [multi-service-architecture, multi-service-data-ownership], outputs [docs/service-ownership-map.md]).
+
+Include ALL required sections. For Mode Detection: check for `docs/service-ownership-map.md` — if exists, operate in update mode. For Methodology Scaling: depth 1-2 = list services and their domains; depth 3+ = add data ownership, event topics, sync strategies.
+
+- [ ] **Step 2: Create `inter-service-contracts.md`**
+
+Frontmatter from spec (specification phase, order 841, deps [service-ownership-map, review-api], reads [api-contracts], knowledge [multi-service-api-contracts, multi-service-resilience], outputs [docs/inter-service-contracts.md]).
+
+Include ALL required sections. Mode Detection: check for `docs/inter-service-contracts.md`. Methodology Scaling: depth 1-2 = list contracts; depth 3+ = add versioning, retries, idempotency.
+
+- [ ] **Step 3: Validate frontmatter**
+
+Run: `scripts/validate-frontmatter.sh content/pipeline/architecture/service-ownership-map.md content/pipeline/specification/inter-service-contracts.md`
+Expected: All pass
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add content/pipeline/architecture/service-ownership-map.md content/pipeline/specification/inter-service-contracts.md
+git commit -m "feat: add service-ownership-map and inter-service-contracts pipeline steps"
+```
+
+---
+
+### Task 9: Pipeline steps batch 2 — cross-service-auth + observability + integration-test-plan
+
+**Files:**
+- Create: `content/pipeline/quality/cross-service-auth.md`
+- Create: `content/pipeline/quality/cross-service-observability.md`
+- Create: `content/pipeline/quality/integration-test-plan.md`
+
+Same requirements: all 7 required sections per file.
+
+- [ ] **Step 1: Create `cross-service-auth.md`**
+
+Frontmatter from spec (quality phase, order 952, deps [security, service-ownership-map], reads [inter-service-contracts], knowledge [multi-service-auth], outputs [docs/cross-service-auth.md]). Include all required sections.
+
+- [ ] **Step 2: Create `cross-service-observability.md`**
+
+Frontmatter from spec (quality phase, order 941, deps [review-operations, service-ownership-map], reads [operations], knowledge [multi-service-observability], outputs [docs/cross-service-observability.md]). Include all required sections.
+
+- [ ] **Step 3: Create `integration-test-plan.md`**
+
+Frontmatter from spec (quality phase, order 942, deps [review-testing, inter-service-contracts], reads [service-ownership-map, cross-service-auth], knowledge [multi-service-testing], outputs [docs/integration-test-plan.md]). Include all required sections.
+
+- [ ] **Step 4: Validate frontmatter**
+
+Run: `scripts/validate-frontmatter.sh content/pipeline/quality/cross-service-auth.md content/pipeline/quality/cross-service-observability.md content/pipeline/quality/integration-test-plan.md`
 Expected: All pass
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add content/methodology/deep.yml content/methodology/mvp.yml content/methodology/custom-defaults.yml
-git commit -m "feat: register 5 multi-service steps as disabled in all presets"
+git add content/pipeline/quality/cross-service-auth.md content/pipeline/quality/cross-service-observability.md content/pipeline/quality/integration-test-plan.md
+git commit -m "feat: add cross-service-auth, observability, and integration-test-plan pipeline steps"
 ```
 
 ---
 
-### Task 5: Create 5 pipeline step meta-prompt files
+### Task 10: Preset registration + multi-service overlay + output exemptions
 
 **Files:**
-- Create: `content/pipeline/architecture/service-ownership-map.md`
-- Create: `content/pipeline/specification/inter-service-contracts.md`
-- Create: `content/pipeline/quality/cross-service-auth.md`
-- Create: `content/pipeline/quality/cross-service-observability.md`
-- Create: `content/pipeline/quality/integration-test-plan.md`
-
-- [ ] **Step 1: Create `service-ownership-map.md`**
-
-Create `content/pipeline/architecture/service-ownership-map.md`:
-
-```markdown
----
-name: service-ownership-map
-description: Define logical domain and data ownership boundaries across services
-summary: "Maps which service owns which business domain, data concepts, and event topics. Establishes boundaries that inform database schema design, API contracts, and cross-service communication patterns."
-phase: "architecture"
-order: 721
-dependencies: [review-architecture]
-outputs: [docs/service-ownership-map.md]
-reads: [system-architecture, domain-modeling]
-conditional: null
-knowledge-base: [multi-service-architecture, multi-service-data-ownership]
----
-
-## Purpose
-Define the logical ownership boundaries for a multi-service system. Map each
-service to its business domain, the data concepts it owns, the events it
-publishes, and the events it subscribes to. This document becomes the
-authoritative reference for who owns what.
-
-## Inputs
-- docs/system-architecture.md (required) — service decomposition and communication patterns
-- docs/domain-model.md (required) — entities, aggregates, and domain events
-
-## Expected Outputs
-- docs/service-ownership-map.md — ownership boundaries and data flow map
-
-## Quality Criteria
-- Every service has a clear domain boundary with no overlapping ownership
-- Every entity from the domain model is assigned to exactly one owning service
-- Event flows are documented: publisher → topic → subscriber(s)
-- Data that crosses service boundaries is identified with sync strategy (event-driven, API call, shared cache)
-- No circular ownership dependencies between services
-```
-
-- [ ] **Step 2: Create `inter-service-contracts.md`**
-
-Create `content/pipeline/specification/inter-service-contracts.md`:
-
-```markdown
----
-name: inter-service-contracts
-description: Design API contracts between services with versioning, retries, and failure isolation
-summary: "Specifies internal service-to-service API contracts including versioning strategy, backward compatibility rules, retry policies, timeout budgets, idempotency requirements, and failure isolation patterns."
-phase: "specification"
-order: 841
-dependencies: [service-ownership-map, review-api]
-outputs: [docs/inter-service-contracts.md]
-reads: [api-contracts]
-conditional: null
-knowledge-base: [multi-service-api-contracts, multi-service-resilience]
----
-
-## Purpose
-Design the internal API contracts between services. Unlike the external
-api-contracts step (which covers client-facing APIs), this step covers
-service-to-service communication: internal endpoints, message schemas,
-versioning strategy, retry policies, and failure handling.
-
-## Inputs
-- docs/service-ownership-map.md (required) — who calls whom
-- docs/api-contracts.md (optional) — external API patterns to maintain consistency
-
-## Expected Outputs
-- docs/inter-service-contracts.md — internal service API specifications
-
-## Quality Criteria
-- Every cross-service call identified in the ownership map has a contract
-- Versioning strategy defined (URL path, header, or content negotiation)
-- Backward compatibility rules documented (additive changes only, deprecation timeline)
-- Retry policy per contract: max retries, backoff strategy, circuit breaker thresholds
-- Timeout budgets allocated per call chain (total budget < user-facing SLA)
-- Idempotency keys defined for all mutating operations
-```
-
-- [ ] **Step 3: Create `cross-service-auth.md`**
-
-Create `content/pipeline/quality/cross-service-auth.md`:
-
-```markdown
----
-name: cross-service-auth
-description: Define inter-service trust model — mTLS, service tokens, audience scoping
-summary: "Designs the internal service identity and trust framework: mutual TLS configuration, service-to-service token issuance and validation, audience scoping, and zero-trust boundary definitions."
-phase: "quality"
-order: 952
-dependencies: [security, service-ownership-map]
-outputs: [docs/cross-service-auth.md]
-reads: [inter-service-contracts]
-conditional: null
-knowledge-base: [multi-service-auth]
----
-
-## Purpose
-Design the inter-service trust and authentication model. This is distinct
-from the security step (which handles external threats and OWASP). This
-step covers how services prove their identity to each other, what
-permissions they have, and how trust boundaries are enforced.
-
-## Inputs
-- docs/security-review.md (required) — external threat model and auth architecture
-- docs/service-ownership-map.md (required) — service boundaries and trust zones
-- docs/inter-service-contracts.md (optional) — API patterns requiring auth
-
-## Expected Outputs
-- docs/cross-service-auth.md — inter-service authentication and authorization design
-
-## Quality Criteria
-- Every service-to-service call has an authentication mechanism (mTLS, JWT, API key)
-- Service identity is cryptographically verifiable (not just network-based trust)
-- Audience scoping prevents token reuse across unintended services
-- Trust boundaries match the ownership map — services in different zones require explicit auth
-- Token lifetime and rotation strategy documented
-- Zero-trust principles applied: no implicit trust based on network location
-```
-
-- [ ] **Step 4: Create `cross-service-observability.md`**
-
-Create `content/pipeline/quality/cross-service-observability.md`:
-
-```markdown
----
-name: cross-service-observability
-description: Design distributed tracing, correlation IDs, and cross-service SLOs
-summary: "Defines the observability strategy for multi-service systems: distributed tracing propagation, correlation ID standards, cross-service SLO definitions, and failure isolation alerting."
-phase: "quality"
-order: 941
-dependencies: [review-operations, service-ownership-map]
-outputs: [docs/cross-service-observability.md]
-reads: [operations]
-conditional: null
-knowledge-base: [multi-service-observability]
----
-
-## Purpose
-Design the observability strategy that spans service boundaries. The
-operations step designs single-service monitoring. This step extends
-that to cover distributed tracing, cross-service correlation, aggregate
-SLOs, and multi-service failure detection.
-
-## Inputs
-- docs/operations-runbook.md (required) — single-service monitoring baseline
-- docs/service-ownership-map.md (required) — service topology and call patterns
-
-## Expected Outputs
-- docs/cross-service-observability.md — distributed observability design
-
-## Quality Criteria
-- Distributed trace context propagation defined (W3C Trace Context or equivalent)
-- Correlation ID standard: format, generation point, propagation rules
-- Cross-service SLOs defined for critical user journeys (end-to-end latency, error rate)
-- Alert routing: which team gets paged for cross-service failures
-- Dashboards specified: service dependency map, cross-service latency heatmap
-- Failure isolation: how to identify which service caused a cascading failure
-```
-
-- [ ] **Step 5: Create `integration-test-plan.md`**
-
-Create `content/pipeline/quality/integration-test-plan.md`:
-
-```markdown
----
-name: integration-test-plan
-description: Design contract tests, cross-service E2E flows, and service mocking strategy
-summary: "Plans the cross-service testing strategy: consumer-driven contract tests, integration test flows covering critical multi-service journeys, and service dependency mocking approaches for isolated testing."
-phase: "quality"
-order: 942
-dependencies: [review-testing, inter-service-contracts]
-outputs: [docs/integration-test-plan.md]
-reads: [service-ownership-map, cross-service-auth]
-conditional: null
-knowledge-base: [multi-service-testing]
----
-
-## Purpose
-Design the testing strategy for cross-service interactions. The
-review-testing step validates a single service's test pyramid. This
-step validates how services are tested together: contract tests that
-verify API compatibility, integration tests that exercise multi-service
-flows, and mocking strategies for isolated development.
-
-## Inputs
-- docs/reviews/review-testing.md (required) — single-service testing baseline
-- docs/inter-service-contracts.md (required) — contracts to test against
-- docs/service-ownership-map.md (optional) — service topology
-- docs/cross-service-auth.md (optional) — auth patterns to test
-
-## Expected Outputs
-- docs/integration-test-plan.md — cross-service testing strategy
-
-## Quality Criteria
-- Contract tests defined for every inter-service API (consumer-driven or provider-driven)
-- Contract test tooling chosen (Pact, schema registry, OpenAPI diff)
-- Critical multi-service user journeys identified with E2E test coverage
-- Service mocking strategy: when to use mocks vs real services vs test doubles
-- Test environment strategy: shared staging, per-PR namespaces, or local compose
-- CI integration: when contract tests run, what blocks deployment
-```
-
-- [ ] **Step 6: Validate frontmatter on all new files**
-
-Run: `scripts/validate-frontmatter.sh content/pipeline/architecture/service-ownership-map.md content/pipeline/specification/inter-service-contracts.md content/pipeline/quality/cross-service-auth.md content/pipeline/quality/cross-service-observability.md content/pipeline/quality/integration-test-plan.md`
-Expected: All pass
-
-- [ ] **Step 7: Commit**
-
-```bash
-git add content/pipeline/architecture/service-ownership-map.md content/pipeline/specification/inter-service-contracts.md content/pipeline/quality/cross-service-auth.md content/pipeline/quality/cross-service-observability.md content/pipeline/quality/integration-test-plan.md
-git commit -m "feat: add 5 cross-service pipeline step meta-prompts"
-```
-
----
-
-### Task 6: Create 8 knowledge documents
-
-**Files:**
-- Create: `content/knowledge/core/multi-service-architecture.md`
-- Create: `content/knowledge/core/multi-service-data-ownership.md`
-- Create: `content/knowledge/core/multi-service-api-contracts.md`
-- Create: `content/knowledge/core/multi-service-auth.md`
-- Create: `content/knowledge/core/multi-service-observability.md`
-- Create: `content/knowledge/core/multi-service-testing.md`
-- Create: `content/knowledge/core/multi-service-resilience.md`
-- Create: `content/knowledge/core/multi-service-task-decomposition.md`
-
-Each knowledge document follows the pattern in `content/knowledge/core/system-architecture.md`: frontmatter with `name`, `description`, `topics`, then content sections with `##` headers.
-
-**Due to the volume (8 files), the implementer should write each file with substantial domain content (not placeholder text). Each file should be 40-80 lines with real, actionable guidance. The frontmatter structure is:**
-
-```yaml
----
-name: multi-service-<topic>
-description: <one-line description>
-topics: [<topic1>, <topic2>, ...]
----
-```
-
-- [ ] **Step 1: Create all 8 knowledge documents**
-
-Create each file following the frontmatter pattern above. Key topics per file:
-
-1. `multi-service-architecture.md` — topics: `[service-boundaries, communication-patterns, service-discovery, networking-topology, data-ownership]`
-2. `multi-service-data-ownership.md` — topics: `[table-ownership, shared-nothing, event-driven-sync, data-partitioning]`
-3. `multi-service-api-contracts.md` — topics: `[internal-api-versioning, backward-compatibility, retries, idempotency]`
-4. `multi-service-auth.md` — topics: `[mtls, service-tokens, zero-trust, audience-scoping]`
-5. `multi-service-observability.md` — topics: `[distributed-tracing, correlation-ids, cross-service-slos]`
-6. `multi-service-testing.md` — topics: `[contract-tests, pact, schema-registry, cross-service-e2e]`
-7. `multi-service-resilience.md` — topics: `[circuit-breakers, bulkheads, timeout-budgets, failure-isolation]`
-8. `multi-service-task-decomposition.md` — topics: `[per-service-waves, dependency-ordering, parallel-implementation]`
-
-- [ ] **Step 2: Verify all knowledge docs have valid frontmatter**
-
-Run: `for f in content/knowledge/core/multi-service-*.md; do echo "--- $f ---"; head -5 "$f"; done`
-Expected: All 8 files have name, description, topics fields
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add content/knowledge/core/multi-service-*.md
-git commit -m "feat: add 8 multi-service knowledge documents"
-```
-
----
-
-### Task 7: Create `multi-service-overlay.yml`
-
-**Files:**
+- Modify: `content/methodology/deep.yml` (append after last line)
+- Modify: `content/methodology/mvp.yml` (append after last line)
+- Modify: `content/methodology/custom-defaults.yml` (append after last line)
 - Create: `content/methodology/multi-service-overlay.yml`
+- Modify: `tests/evals/exemptions.bash` (add 2 terminal output exemptions)
 
-- [ ] **Step 1: Create the overlay file**
+- [ ] **Step 1: Add multi-service steps to all 3 presets**
 
-Create `content/methodology/multi-service-overlay.yml`:
+Append to `deep.yml`, `mvp.yml`, and `custom-defaults.yml` (after the last `platform-cert-prep` line in each):
 
 ```yaml
-# methodology/multi-service-overlay.yml
-name: multi-service
-description: >
-  Cross-service pipeline steps and knowledge for multi-service monorepos.
-  Activated by presence of services[] in config.
-
-# ---------------------------------------------------------------------------
-# step-overrides
-# ---------------------------------------------------------------------------
-step-overrides:
-  # Cross-service steps (wave 2)
-  service-ownership-map: { enabled: true }
-  inter-service-contracts: { enabled: true }
-  cross-service-auth: { enabled: true }
-  cross-service-observability: { enabled: true }
-  integration-test-plan: { enabled: true }
-  # Pre-phase steps marked global (already enabled — no-op for enablement,
-  # but marks them as global for the step classifier in wave 3b)
-  create-vision: { enabled: true }
-  review-vision: { enabled: true }
-  create-prd: { enabled: true }
-  review-prd: { enabled: true }
-
-# ---------------------------------------------------------------------------
-# knowledge-overrides
-# ---------------------------------------------------------------------------
-knowledge-overrides:
-  # Architecture awareness
-  system-architecture:
-    append: [multi-service-architecture, multi-service-resilience]
-  # Domain/data awareness
-  domain-modeling:
-    append: [multi-service-data-ownership]
-  database-schema:
-    append: [multi-service-data-ownership]
-  # API awareness
-  api-contracts:
-    append: [multi-service-api-contracts]
-  review-api:
-    append: [multi-service-api-contracts]
-  # Operations awareness
-  operations:
-    append: [multi-service-observability, multi-service-resilience]
-  review-operations:
-    append: [multi-service-observability]
-  # Security awareness
-  security:
-    append: [multi-service-auth]
-  review-security:
-    append: [multi-service-auth]
-  # Testing awareness
-  review-testing:
-    append: [multi-service-testing]
-  story-tests:
-    append: [multi-service-testing]
-  create-evals:
-    append: [multi-service-testing]
-  # Planning awareness
-  implementation-plan:
-    append: [multi-service-task-decomposition]
-  implementation-plan-review:
-    append: [multi-service-task-decomposition]
-
-# ---------------------------------------------------------------------------
-# reads-overrides
-# ---------------------------------------------------------------------------
-reads-overrides:
-  # Planning reads cross-service artifacts
-  implementation-plan:
-    append: [service-ownership-map, inter-service-contracts]
-  # Security review reads cross-service auth (order 952 < 960 allows this)
-  review-security:
-    append: [cross-service-auth]
-  # Database schema reads ownership map for data partitioning
-  database-schema:
-    append: [service-ownership-map]
-  # Validation phase reads all 5 new outputs for holistic review
-  cross-phase-consistency:
-    append:
-      - service-ownership-map
-      - inter-service-contracts
-      - cross-service-auth
-      - cross-service-observability
-      - integration-test-plan
-
-# ---------------------------------------------------------------------------
-# dependency-overrides
-# ---------------------------------------------------------------------------
-# Reads alone don't gate execution — next only checks dependencies.
-# These overrides ensure downstream steps wait for cross-service artifacts.
-dependency-overrides:
-  review-security:
-    append: [cross-service-auth]
-  database-schema:
-    append: [service-ownership-map]
-  implementation-plan:
-    append: [service-ownership-map, inter-service-contracts]
-  cross-phase-consistency:
-    append:
-      - service-ownership-map
-      - inter-service-contracts
-      - cross-service-auth
-      - cross-service-observability
-      - integration-test-plan
+  # Multi-service steps (enabled via multi-service overlay)
+  service-ownership-map: { enabled: false }
+  inter-service-contracts: { enabled: false }
+  cross-service-auth: { enabled: false }
+  cross-service-observability: { enabled: false }
+  integration-test-plan: { enabled: false }
 ```
 
-- [ ] **Step 2: Verify YAML is valid**
+- [ ] **Step 2: Create `multi-service-overlay.yml`**
+
+Create `content/methodology/multi-service-overlay.yml` with the full overlay YAML from the spec (Section 4). This includes step-overrides, knowledge-overrides, reads-overrides, and dependency-overrides sections. Copy the exact YAML from the spec document at `docs/superpowers/specs/2026-04-16-wave-2-cross-service-pipeline-design.md` Section 4.
+
+- [ ] **Step 3: Add output consumption exemptions**
+
+In `tests/evals/exemptions.bash`, add to the `TERMINAL_OUTPUT_EXEMPT` array (after the game development entries):
+
+```bash
+  # Multi-service steps — terminal artifacts consumed by developers, not pipeline.
+  "cross-service-observability"
+  "integration-test-plan"
+```
+
+These two steps produce terminal docs (`docs/cross-service-observability.md`, `docs/integration-test-plan.md`) consumed during implementation. Their cross-service wiring happens via overlay dependency-overrides into `cross-phase-consistency`, which the output-consumption eval doesn't check (it only checks pipeline frontmatter).
+
+- [ ] **Step 4: Verify YAML validity**
 
 Run: `node -e "const yaml = require('js-yaml'); const fs = require('fs'); yaml.load(fs.readFileSync('content/methodology/multi-service-overlay.yml', 'utf8')); console.log('Valid YAML')"`
 Expected: "Valid YAML"
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 5: Run tests**
+
+Run: `npx vitest run --reporter=verbose`
+Expected: All pass
+
+- [ ] **Step 6: Commit**
 
 ```bash
-git add content/methodology/multi-service-overlay.yml
-git commit -m "feat: add multi-service structural overlay YAML"
+git add content/methodology/deep.yml content/methodology/mvp.yml content/methodology/custom-defaults.yml content/methodology/multi-service-overlay.yml tests/evals/exemptions.bash
+git commit -m "feat: register multi-service steps in presets, add overlay YAML and output exemptions"
 ```
 
 ---
 
-### Task 8: E2E integration test
+### Task 11: E2E integration test
 
 **Files:**
 - Create: `src/e2e/multi-service-pipeline.test.ts`
 
-- [ ] **Step 1: Create the E2E test**
+Write `src/e2e/multi-service-pipeline.test.ts` following the pattern in `src/e2e/game-pipeline.test.ts`. Key differences from the game E2E test:
 
-Create `src/e2e/multi-service-pipeline.test.ts`:
 
-```typescript
-/**
- * E2E tests for multi-service pipeline — verifies that the structural overlay
- * activates when services[] is present in config, enabling cross-service steps
- * and injecting multi-service knowledge into existing steps.
- */
-import { describe, it, expect, vi, beforeAll } from 'vitest'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+- [ ] **Step 1: Create E2E test following game-pipeline.test.ts pattern**
 
-// Mock detectProjectMode before any imports that use it
-vi.mock('../project/detect-mode.js', () => ({
-  detectProjectMode: vi.fn().mockResolvedValue({ mode: 'fresh' }),
-}))
-vi.mock('../core/pipeline/meta-prompt-loader.js', () => ({
-  discoverMetaPrompts: vi.fn().mockResolvedValue(new Map()),
-  discoverAllMetaPrompts: vi.fn().mockResolvedValue(new Map()),
-}))
+Create `src/e2e/multi-service-pipeline.test.ts`. Follow the EXACT pattern from `src/e2e/game-pipeline.test.ts` — use the same mock structure, same `discoverRealMetaPrompts()` helper (note: `discoverAllMetaPrompts` is in `src/core/assembly/meta-prompt-loader.ts` and is synchronous, taking `(pipelineDir, toolsDir)` — NOT `(projectRoot)`), same `makeOutput()` helper, and same preset loading approach (using ESM `import` for `js-yaml` and `fs`, NOT `require()`).
 
-import { resolveOverlayState } from '../core/assembly/overlay-state-resolver.js'
-import type { ScaffoldConfig, StepEnablementEntry } from '../types/index.js'
-import type { MetaPromptFrontmatter } from '../types/frontmatter.js'
-import { discoverAllMetaPrompts } from '../core/pipeline/meta-prompt-loader.js'
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const projectRoot = path.resolve(__dirname, '../..')
-const methodologyDir = path.join(projectRoot, 'content', 'methodology')
-
-function makeOutput() {
-  return {
-    success: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    result: vi.fn(),
-    supportsInteractivePrompts: vi.fn().mockReturnValue(false),
-    prompt: vi.fn(),
-    confirm: vi.fn(),
-    select: vi.fn(),
-    multiSelect: vi.fn(),
-    multiInput: vi.fn(),
-    startSpinner: vi.fn(),
-    stopSpinner: vi.fn(),
-    startProgress: vi.fn(),
-    updateProgress: vi.fn(),
-    stopProgress: vi.fn(),
-  }
-}
-
-/**
- * Discover real meta-prompts from content/pipeline/ and build a Map
- * suitable for resolveOverlayState.
- */
-async function discoverRealMetaPrompts() {
-  const { discoverAllMetaPrompts: realDiscover } = await vi.importActual<
-    typeof import('../core/pipeline/meta-prompt-loader.js')
-  >('../core/pipeline/meta-prompt-loader.js')
-  const metaPrompts = await realDiscover(projectRoot)
-  const map = new Map<string, { frontmatter: MetaPromptFrontmatter }>()
-  for (const [name, mp] of metaPrompts) {
-    map.set(name, { frontmatter: mp })
-  }
-  return map
-}
-
-function loadPresetSteps(): Record<string, StepEnablementEntry> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const yaml = require('js-yaml')
-  const fs = require('node:fs')
-  const presetPath = path.join(methodologyDir, 'deep.yml')
-  const preset = yaml.load(fs.readFileSync(presetPath, 'utf8')) as {
-    steps: Record<string, StepEnablementEntry>
-  }
-  return preset.steps
-}
-
-describe('Multi-Service Pipeline E2E', () => {
-  let metaPrompts: Map<string, { frontmatter: MetaPromptFrontmatter }>
-  let presetSteps: Record<string, StepEnablementEntry>
-
-  beforeAll(async () => {
-    metaPrompts = await discoverRealMetaPrompts()
-    presetSteps = loadPresetSteps()
-  })
-
-  it('enables cross-service steps when services[] present', () => {
-    const output = makeOutput()
-    const config: ScaffoldConfig = {
-      version: 2,
-      methodology: 'deep',
-      platforms: ['claude-code'],
-      project: {
-        services: [
-          { name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest', domain: 'none' } },
-          { name: 'web', projectType: 'web-app', webAppConfig: { renderingStrategy: 'spa' } },
-        ],
-      },
-    }
-
-    const result = resolveOverlayState({
-      config,
-      methodologyDir,
-      metaPrompts,
-      presetSteps,
-      output,
-    })
-
-    // All 5 cross-service steps should be enabled
-    expect(result.steps['service-ownership-map']?.enabled).toBe(true)
-    expect(result.steps['inter-service-contracts']?.enabled).toBe(true)
-    expect(result.steps['cross-service-auth']?.enabled).toBe(true)
-    expect(result.steps['cross-service-observability']?.enabled).toBe(true)
-    expect(result.steps['integration-test-plan']?.enabled).toBe(true)
-  })
-
-  it('does NOT enable cross-service steps when services[] absent', () => {
-    const output = makeOutput()
-    const config: ScaffoldConfig = {
-      version: 2,
-      methodology: 'deep',
-      platforms: ['claude-code'],
-      project: { projectType: 'backend' },
-    }
-
-    const result = resolveOverlayState({
-      config,
-      methodologyDir,
-      metaPrompts,
-      presetSteps,
-      output,
-    })
-
-    expect(result.steps['service-ownership-map']?.enabled).toBe(false)
-    expect(result.steps['inter-service-contracts']?.enabled).toBe(false)
-  })
-
-  it('injects multi-service knowledge into existing steps', () => {
-    const output = makeOutput()
-    const config: ScaffoldConfig = {
-      version: 2,
-      methodology: 'deep',
-      platforms: ['claude-code'],
-      project: {
-        services: [
-          { name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest', domain: 'none' } },
-        ],
-      },
-    }
-
-    const result = resolveOverlayState({
-      config,
-      methodologyDir,
-      metaPrompts,
-      presetSteps,
-      output,
-    })
-
-    // Knowledge injection
-    expect(result.knowledge['system-architecture']).toContain('multi-service-architecture')
-    expect(result.knowledge['system-architecture']).toContain('multi-service-resilience')
-    expect(result.knowledge['security']).toContain('multi-service-auth')
-    expect(result.knowledge['operations']).toContain('multi-service-observability')
-
-    // Reads injection
-    expect(result.reads['implementation-plan']).toContain('service-ownership-map')
-    expect(result.reads['review-security']).toContain('cross-service-auth')
-    expect(result.reads['database-schema']).toContain('service-ownership-map')
-
-    // Dependency injection
-    expect(result.dependencies['review-security']).toContain('cross-service-auth')
-    expect(result.dependencies['database-schema']).toContain('service-ownership-map')
-  })
-})
-```
+The test should verify:
+1. When config has `services[]`, all 5 cross-service steps are enabled in the resolved overlay state
+2. When config has no `services[]`, cross-service steps remain disabled
+3. Knowledge injection works (e.g., `result.knowledge['system-architecture']` contains `'multi-service-architecture'`)
+4. Reads injection works (e.g., `result.reads['implementation-plan']` contains `'service-ownership-map'`)
+5. Dependency injection works (e.g., `result.dependencies['review-security']` contains `'cross-service-auth'`)
 
 - [ ] **Step 2: Run the E2E test**
 
 Run: `npx vitest run src/e2e/multi-service-pipeline.test.ts --reporter=verbose`
-Expected: All 3 tests pass
+Expected: All tests pass
 
 - [ ] **Step 3: Commit**
 
@@ -1297,9 +975,9 @@ git commit -m "test: add multi-service pipeline E2E tests"
 
 ---
 
-### Task 9: Final validation
+### Task 12: Final validation + CHANGELOG
 
-**Files:** None (verification only)
+**Files:** Modify `CHANGELOG.md`, verify everything
 
 - [ ] **Step 1: Run full test suite**
 
@@ -1314,7 +992,7 @@ Expected: No errors
 - [ ] **Step 3: Run make check-all**
 
 Run: `make check-all`
-Expected: All quality gates pass
+Expected: All quality gates pass (including pipeline-completeness, knowledge-quality, output-consumption evals)
 
 - [ ] **Step 4: Verify step count in presets matches**
 
