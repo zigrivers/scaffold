@@ -6,7 +6,26 @@ topics: [per-service-waves, dependency-ordering, parallel-implementation, shared
 
 ## Summary
 
-Multi-service implementation fails predictably when teams try to build everything in parallel without a dependency plan, or when they serialize everything and lose the parallelism that multi-service architecture is supposed to enable. The solution is structured wave planning: identify the shared infrastructure that every service depends on, build it first, then fan out to parallel per-service waves, and finally integrate at defined milestones. This document provides a concrete methodology for decomposing multi-service work — from contract-first design through stub-driven parallel implementation to release coordination — with enough specificity that an AI agent can execute each step without ambiguity.
+Multi-service implementation fails predictably when teams try to build everything in parallel without a dependency plan, or when they serialize everything and lose the parallelism that multi-service architecture is supposed to enable. The solution is structured wave planning.
+
+**Wave 0 — Shared infrastructure first (sequential, all teams):** Service scaffold template, shared TypeScript types, auth middleware, observability setup, database migration runner, CI pipeline. No service work begins until Wave 0 completes. Keep this wave minimal — if it takes more than two weeks, it is over-scoped.
+
+**Contract-first development:** For each inter-service integration, produce a machine-readable contract (OpenAPI spec or event schema) before writing any implementation code. Both teams review and ratify the contract. Then implement in parallel — provider builds the real endpoint; consumer implements against a generated stub or mock.
+
+**Per-service internal waves (A–D):**
+- Wave A: Database schema, domain models, repositories (no external dependencies)
+- Wave B: Core business logic, event publishing, unit tests
+- Wave C: HTTP controllers, auth integration, endpoint integration tests
+- Wave D: Downstream service clients, inbound event consumers, contract tests
+
+**Cross-service integration milestones** are explicit synchronization gates:
+- Milestone 1 (after Wave C): All services pass contract tests against stubs and expose `/health`.
+- Milestone 2 (after shared test environment deploy): End-to-end happy path works with real services.
+- Milestone 3 (before production): Load tested, circuit breakers validated, runbooks written.
+
+**Release ordering:** Leaf services (no upstream dependencies) release first. Services with dependencies release after their dependencies are live. Use expand-contract for breaking changes and feature flags to decouple deployment from release.
+
+## Deep Guidance
 
 ## Shared Infrastructure First
 

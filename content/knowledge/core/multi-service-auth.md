@@ -6,7 +6,21 @@ topics: [mtls, service-tokens, zero-trust, audience-scoping, token-rotation]
 
 ## Summary
 
-Service-to-service authentication is distinct from user authentication. Services are long-running workloads with machine identities, not human users. Relying on network perimeter security ("inside the firewall means trusted") is insufficient for modern multi-service architectures. This document provides concrete guidance on mutual TLS for transport-level identity, service-to-service JWT patterns for application-level authorization, zero-trust principles, audience scoping to prevent token misuse, and secret rotation strategies. Every internal service call should be authenticated, authorized, and encrypted — regardless of whether it is within a private network.
+Service-to-service authentication is distinct from user authentication. Services are long-running workloads with machine identities, not human users. Relying on network perimeter security ("inside the firewall means trusted") is insufficient for modern multi-service architectures.
+
+**Zero-trust principles:** Every service-to-service call must be authenticated and authorized regardless of source. All traffic is encrypted. Services request only minimum required permissions. Assume any service may be compromised and limit lateral movement.
+
+**Two complementary layers:**
+- **mTLS (transport layer):** Both services present certificates signed by a trusted internal CA. Provides encryption and cryptographic identity verification. A service mesh (Istio/Linkerd) can handle mTLS transparently without application code changes.
+- **Service JWTs (application layer):** Short-lived tokens (5 min TTL) carrying claims: `iss` (caller), `sub` (caller identity), `aud` (target service), `scope` (authorized operations), and optional propagated user context.
+
+**Audience scoping:** Tokens must include the target service's identifier in the `aud` claim. Without this, a stolen token can be replayed against any service.
+
+**SPIFFE/SPIRE:** Standard workload identity framework for multi-cloud/multi-cluster environments where a service mesh is insufficient.
+
+**Secret rotation:** mTLS certificates every 24–90 days; JWT signing keys every 30–90 days; database passwords every 30–90 days. Use zero-downtime rotation via JWKS endpoints that serve both old and new public keys during the transition window.
+
+## Deep Guidance
 
 ## Zero-Trust Architecture Principles
 

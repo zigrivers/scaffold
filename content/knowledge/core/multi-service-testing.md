@@ -6,7 +6,24 @@ topics: [contract-tests, pact, schema-registry, cross-service-e2e, test-doubles]
 
 ## Summary
 
-Testing a multi-service system requires a different strategy than testing a monolith. The test pyramid still applies, but each layer has multi-service-specific concerns: contract tests verify inter-service API agreements, cross-service E2E tests validate complete user journeys across service boundaries, and service test doubles replace real downstream services in isolated testing. This document covers consumer-driven contract testing with Pact and schema registry approaches, cross-service E2E test design and environment management, service test double strategies, CI integration for contract tests, and the complete test pyramid for multi-service systems.
+Testing a multi-service system requires a different strategy than testing a monolith. The test pyramid still applies, but each layer has multi-service-specific concerns.
+
+**The multi-service test pyramid** (bottom to top):
+- **Unit tests:** Business logic within a single service. No I/O, no other services.
+- **Integration tests:** A service with its own database, cache, and internal queue. Real infrastructure, no other services.
+- **Contract tests:** Verify inter-service API agreements. Consumers define expectations; providers verify them in CI. Fast, per-service, no full-system setup required.
+- **Cross-service E2E:** Full user journeys against a real multi-service environment. Highest confidence, highest maintenance cost. Use sparingly (5-15 tests for critical journeys).
+
+**Consumer-driven contract testing with Pact:** Consumers write tests that define expected interactions (request + response shape). These generate `.json` pact files published to a Pact Broker. Providers verify all consumer contracts in their CI pipeline. A breaking provider change fails the provider's CI before deployment. The `can-i-deploy` gate prevents incompatible versions from reaching production.
+
+**Async contracts via schema registry:** For Kafka events, Avro schemas registered in a schema registry enforce compatibility at registration time (`BACKWARD`, `FORWARD`, or `FULL` compatibility modes). Breaking schema changes are rejected before any message is produced.
+
+**Service test doubles:**
+- **WireMock:** Configurable HTTP stub servers for integration tests.
+- **In-memory fakes:** Stateful service simulators with rich assertion APIs.
+- **Full service in Docker:** Real service with isolated test database, used in E2E tests.
+
+## Deep Guidance
 
 ## The Multi-Service Test Pyramid
 

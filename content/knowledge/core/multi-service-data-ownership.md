@@ -6,7 +6,24 @@ topics: [table-ownership, shared-nothing, event-driven-sync, data-partitioning, 
 
 ## Summary
 
-Data ownership is the most consequential architectural decision in a multi-service system. Getting it wrong causes cascading failures, data inconsistency, impossible-to-test service boundaries, and coupling that defeats the purpose of service decomposition. This document provides concrete patterns for assigning table ownership, replicating data across service boundaries, handling eventual consistency, and migrating data when boundaries need to change.
+Data ownership is the most consequential architectural decision in a multi-service system. Getting it wrong causes cascading failures, data inconsistency, and coupling that defeats the purpose of service decomposition.
+
+**Core principle:** Each service owns its data exclusively — no service reads another service's database directly, and no two services write to the same table.
+
+**Data isolation levels** (strongest to weakest): separate clusters, separate databases, separate schemas, table prefix within a shared schema (not recommended).
+
+**Cross-boundary data access patterns:**
+- **Synchronous API call:** Simple but adds latency and temporal coupling.
+- **Event-driven projection:** Service subscribes to events and maintains a local read-optimized copy. Eliminates runtime dependency but introduces eventual consistency.
+- **API composition:** Gateway fans out to multiple services and merges results.
+
+**Reliable event publishing** requires the outbox pattern: write the event to an `outbox` table in the same database transaction as the state change, then a relay process publishes to the message broker. This prevents the dual-write problem (lost or phantom events).
+
+**Eventual consistency** is non-negotiable in event-driven systems. Design for it: define lag budgets per data type, make all event consumers idempotent, and implement explicit conflict resolution rules.
+
+**Event schemas are public API:** never remove fields, never change field meaning, add only optional fields for backward-compatible evolution, and introduce new event type versions for breaking changes.
+
+## Deep Guidance
 
 ## Shared-Nothing Data Patterns
 

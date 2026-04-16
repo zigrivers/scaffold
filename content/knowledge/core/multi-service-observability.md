@@ -6,7 +6,20 @@ topics: [distributed-tracing, correlation-ids, cross-service-slos, failure-attri
 
 ## Summary
 
-Observability in a multi-service system is not an optional enhancement — it is a prerequisite for operating correctly. When a request crosses four service boundaries before returning an error, you cannot debug it without distributed tracing and correlation IDs. This document provides concrete guidance on W3C Trace Context for distributed tracing, correlation ID propagation standards, cross-service SLO definition and error budget management, failure attribution techniques, OpenTelemetry integration patterns, distributed log aggregation, and cross-service dashboards.
+Observability in a multi-service system is a prerequisite for correct operation, not an optional enhancement. When a request crosses four service boundaries before returning an error, you cannot debug it without distributed tracing and correlation IDs.
+
+**Three pillars for multi-service systems:**
+- **Distributed tracing (W3C Trace Context):** Every request gets a `traceparent` header with a trace ID and span ID. Each service records spans. All spans for a single request share a trace ID, creating a complete picture of the request's journey. Use OpenTelemetry (vendor-neutral) and export to any backend (Jaeger, Tempo, Datadog).
+- **Correlation IDs (`X-Correlation-ID`):** Business-level identifier for a workflow, persisted in the application database. Survives async boundaries that distributed traces don't bridge (jobs, scheduled tasks, multi-request workflows). Include in every log entry and outgoing message.
+- **Structured logs (JSON):** Every log entry must include `correlationId`, `traceId`, `service`, `version`, and `level`. Ship to a central aggregation system (ELK, Loki, CloudWatch).
+
+**SLO strategy:** Define SLOs per service and per user-facing journey. Composite availability = product of all participating services' availabilities — a 5-service chain each at 99.9% yields ~99.5% composite. Alert on error budget burn rate (e.g., 14x sustainable rate in 1 hour), not hard thresholds.
+
+**Failure attribution:** Walk the span tree inward from the user-facing error to find the first span that recorded an error. Classify as infrastructure, dependency, or application failure.
+
+**OpenTelemetry Collector:** Route telemetry through a Collector (not directly from services to the backend) for backend-agnostic export, sampling, and buffering.
+
+## Deep Guidance
 
 ## Distributed Tracing with W3C Trace Context
 

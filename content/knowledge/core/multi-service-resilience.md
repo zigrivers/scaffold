@@ -6,7 +6,21 @@ topics: [circuit-breakers, bulkheads, timeout-budgets, failure-isolation, retry-
 
 ## Summary
 
-In a multi-service system, any individual service will fail. The question is whether that failure stays contained or cascades into a full system outage. Resilience patterns exist to answer that question: circuit breakers stop callers from hammering failing services; bulkheads prevent one misbehaving integration from consuming all threads and connections; timeout budgets enforce that calls fail fast rather than hang indefinitely; and graceful degradation strategies ensure users receive a degraded-but-working experience rather than an error page. This document provides concrete patterns, configuration guidance, and trade-off analysis for each technique.
+In a multi-service system, any individual service will fail. The question is whether that failure stays contained or cascades into a full system outage. Resilience patterns exist to answer that question.
+
+**Circuit breakers** wrap outbound calls and monitor failure rates. When failures exceed a threshold, the circuit opens and returns immediate failures instead of waiting for timeouts. Three states: closed (normal), open (failing fast), half-open (probing recovery).
+
+**Bulkheads** partition resources so a misbehaving integration cannot consume all threads and connections. Dedicate separate concurrency limits per downstream service — a payments outage fills only the payments pool, not the global pool.
+
+**Timeout budgets:** Every user-facing request has a total time budget (e.g., 2000ms). Propagate the absolute deadline via `x-request-deadline` header so all services share one clock. Timeouts must decrease with call depth — a chain of five services with 5000ms timeouts each can take 25 seconds to fail.
+
+**Graceful degradation:** Design each feature for full, degraded, and unavailable modes. Use `Promise.allSettled` for parallel enrichment calls so one failure doesn't cancel all others. Return stale cache or placeholder data for non-critical enrichments when the upstream is unavailable.
+
+**Retry storm prevention:** Add full jitter to exponential backoff. Coordinate retry budgets (allow at most 20% of traffic to be retries) in high-traffic services. Pair every retry block with a circuit breaker — retries should stop when the circuit opens.
+
+**Observability for resilience:** Every circuit breaker, bulkhead, and retry must emit metrics (`circuit_breaker_state`, `bulkhead_rejected_calls_total`, `retry_attempts_total`) so you know when they activate.
+
+## Deep Guidance
 
 ## Circuit Breaker Pattern
 

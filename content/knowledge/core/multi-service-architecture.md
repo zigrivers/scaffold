@@ -6,7 +6,26 @@ topics: [service-boundaries, communication-patterns, service-discovery, networki
 
 ## Summary
 
-Multi-service architectures distribute system functionality across independently deployable units. The decision to decompose a system into multiple services involves real trade-offs: independent deployment and scaling versus operational complexity, distributed failure modes, and data consistency challenges. This document provides concrete guidance on service boundary design, communication pattern selection, and networking topology for AI agents building multi-service systems.
+Multi-service architectures distribute system functionality across independently deployable units. The core trade-off is independent deployment and scaling versus operational complexity, distributed failure modes, and data consistency challenges.
+
+**Decomposition strategies:**
+- **Domain-driven:** Each bounded context becomes a candidate service — the most defensible approach.
+- **Team-aligned:** Organize services along team boundaries for clear ownership.
+- **Strangler Fig:** Incrementally extract from an existing monolith.
+
+**Communication patterns:**
+- **REST:** Default for synchronous request-response; universal support, easy to debug.
+- **gRPC:** High-throughput internal service calls; strongly typed, binary serialization.
+- **Message queues:** Async, single consumer; natural rate limiting, retry via dead-letter queues.
+- **Event streaming (Kafka):** Async, multiple independent consumers; durable, replayable log.
+
+**Service discovery:** DNS-based (Kubernetes default), client-side registry (Consul), or service mesh (Istio/Linkerd).
+
+**Networking:** API gateway for external traffic; BFF pattern per client type; direct service-to-service for internal calls.
+
+**Data ownership:** Each service owns its data exclusively — no cross-service direct database access. Data crosses boundaries via API calls, event subscriptions, or API composition.
+
+## Deep Guidance
 
 ## Service Decomposition Strategies
 

@@ -6,7 +6,24 @@ topics: [internal-api-versioning, backward-compatibility, retries, idempotency, 
 
 ## Summary
 
-Internal APIs between services have different constraints than public-facing APIs. They must evolve without coordinated deployments — service A cannot require service B to deploy simultaneously. This demands strict backward compatibility, well-defined deprecation timelines, retry policies that assume transient failures, and idempotency patterns that make retries safe. This document provides concrete guidance on versioning strategies, compatibility rules, retry configuration, idempotency key design, and timeout budgeting for multi-service systems.
+Internal APIs between services must evolve without coordinated deployments — service A cannot require service B to deploy simultaneously. This demands strict backward compatibility, well-defined deprecation timelines, retry policies that assume transient failures, and idempotency patterns that make retries safe.
+
+**Versioning strategies:**
+- **URL path versioning** (`/api/v1/`, `/api/v2/`): most discoverable, recommended for new services.
+- **Header-based versioning** (`X-API-Version`): stable URLs, better for webhooks and internal service APIs.
+- **Content negotiation** (`Accept: application/vnd.acme.v2+json`): strictest REST compliance.
+
+**Backward compatibility rules:** Adding fields, endpoints, or optional parameters is safe. Removing fields, renaming fields, changing types, or making optional parameters required requires a new version.
+
+**Retry policy:** Retry only on transient errors (5xx, 408, 429). Never retry non-idempotent POSTs without an idempotency key. Always add exponential backoff with jitter to prevent thundering herd. Combine with a circuit breaker so a failing service isn't hammered during recovery.
+
+**Idempotency keys:** Clients generate keys (UUID v4) scoped to the operation. Servers deduplicate by storing the key and returning the cached response on replay. Keys expire after 24-72 hours.
+
+**Timeout budgets:** Each call chain has a total budget (e.g., 2000ms). Propagate the absolute deadline via `x-request-deadline` header so all services share one clock rather than stacking per-hop timeouts.
+
+**Deprecation:** Minimum 90 days for internal APIs. Announce via `Deprecation` and `Sunset` HTTP response headers. Log all usage of deprecated endpoints to identify consumers who need to migrate.
+
+## Deep Guidance
 
 ## Internal API Versioning Strategies
 
