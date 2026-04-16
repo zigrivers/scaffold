@@ -9,6 +9,7 @@ import { StateManager } from '../state/state-manager.js'
 import { migrateState } from '../state/state-migration.js'
 import { discoverMetaPrompts } from '../core/assembly/meta-prompt-loader.js'
 import { atomicWriteFile, ensureDir, getPackagePipelineDir } from '../utils/fs.js'
+import { ExistingScaffoldError } from '../utils/user-errors.js'
 import yaml from 'js-yaml'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -72,57 +73,27 @@ export interface WizardResult {
   errors: ScaffoldError[]
 }
 
-export async function runWizard(options: WizardOptions): Promise<WizardResult> {
+export interface MaterializeOptions {
+  projectRoot: string
+  force: boolean
+  oldState?: PipelineState
+  output: OutputContext
+}
+
+/**
+ * Collect wizard answers and build a ScaffoldConfig. No filesystem writes.
+ */
+export async function collectWizardAnswers(
+  options: WizardOptions,
+): Promise<ScaffoldConfig> {
   const {
     projectRoot, idea, methodology: presetMethodology,
-    projectType: presetProjectType, force, auto, output,
+    projectType: presetProjectType, auto, output,
     depth, adapters, traits,
     gameFlags, webAppFlags, backendFlags, cliFlags, libraryFlags,
     mobileAppFlags, dataPipelineFlags, mlFlags, browserExtensionFlags,
     researchFlags,
   } = options
-  const scaffoldDir = path.join(projectRoot, '.scaffold')
-
-  // Check for existing .scaffold/
-  if (fs.existsSync(scaffoldDir) && !force) {
-    return {
-      success: false,
-      projectRoot,
-      configPath: path.join(scaffoldDir, 'config.yml'),
-      methodology: 'unknown',
-      errors: [
-        {
-          code: 'INIT_SCAFFOLD_EXISTS',
-          message: '.scaffold/ directory already exists',
-          exitCode: 1,
-          recovery: 'Use --force to back up and reinitialize',
-        },
-      ],
-    }
-  }
-
-  // Read old state before backup (to preserve completed steps)
-  let oldState: PipelineState | null = null
-  if (fs.existsSync(scaffoldDir) && force) {
-    const oldStatePath = path.join(scaffoldDir, 'state.json')
-    if (fs.existsSync(oldStatePath)) {
-      try {
-        const raw = JSON.parse(fs.readFileSync(oldStatePath, 'utf8')) as PipelineState
-        // Apply step name migrations before merging
-        migrateState(raw)
-        oldState = raw
-      } catch {
-        // Couldn't read old state — proceed without preserving
-      }
-    }
-
-    const backupPath = path.join(projectRoot, '.scaffold.backup')
-    const finalBackup = fs.existsSync(backupPath)
-      ? `${backupPath}.${Date.now()}`
-      : backupPath
-    fs.renameSync(scaffoldDir, finalBackup)
-    output.info(`Backed up existing .scaffold/ to ${path.basename(finalBackup)}`)
-  }
 
   // Detect project
   const detection = detectProjectMode(projectRoot)
@@ -182,6 +153,54 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
     config.custom = { default_depth: answers.depth }
   }
 
+  return config
+}
+
+/**
+ * Read old state from .scaffold/state.json if it exists.
+ * Applies migrateState() for step-name renames before returning.
+ * Returns undefined if the file is missing or corrupt.
+ */
+export function readOldStateIfExists(projectRoot: string): PipelineState | undefined {
+  const statePath = path.join(projectRoot, '.scaffold', 'state.json')
+  if (!fs.existsSync(statePath)) return undefined
+  try {
+    const raw = JSON.parse(fs.readFileSync(statePath, 'utf8')) as PipelineState
+    // Apply step name migrations before merging
+    migrateState(raw)
+    return raw
+  } catch {
+    // Couldn't read old state — proceed without preserving
+    return undefined
+  }
+}
+
+/**
+ * Write .scaffold/ directory: backup, config.yml, state.json, decisions.jsonl, instructions/.
+ * Throws ExistingScaffoldError if .scaffold/ exists and force is false.
+ */
+export async function materializeScaffoldProject(
+  config: ScaffoldConfig,
+  options: MaterializeOptions,
+): Promise<void> {
+  const { projectRoot, force, oldState, output } = options
+  const scaffoldDir = path.join(projectRoot, '.scaffold')
+
+  // Guard: if .scaffold/ exists and !force, throw ExistingScaffoldError
+  if (fs.existsSync(scaffoldDir) && !force) {
+    throw new ExistingScaffoldError(projectRoot)
+  }
+
+  // Backup existing .scaffold/ if force is set
+  if (fs.existsSync(scaffoldDir) && force) {
+    const backupPath = path.join(projectRoot, '.scaffold.backup')
+    const finalBackup = fs.existsSync(backupPath)
+      ? `${backupPath}.${Date.now()}`
+      : backupPath
+    fs.renameSync(scaffoldDir, finalBackup)
+    output.info(`Backed up existing .scaffold/ to ${path.basename(finalBackup)}`)
+  }
+
   // Write .scaffold/ directory structure
   ensureDir(scaffoldDir)
   ensureDir(path.join(scaffoldDir, 'instructions'))
@@ -198,11 +217,12 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
     produces: mp.frontmatter.outputs ?? [],
   }))
 
+  const detection = detectProjectMode(projectRoot)
   const stateManager = new StateManager(projectRoot, () => [], () => config)
   stateManager.initializeState({
     enabledSteps: allSteps,
     scaffoldVersion: '2.0.0',
-    methodology: answers.methodology,
+    methodology: config.methodology,
     initMode: detection.mode === 'v1-migration'
       ? 'v1-migration'
       : detection.mode === 'brownfield'
@@ -237,13 +257,48 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
     fs.writeFileSync(decisionsPath, '', 'utf8')
   }
 
-  output.success(`Initialized scaffold project (${answers.methodology}, depth ${answers.depth})`)
+  output.success(`Initialized scaffold project (${config.methodology}, depth ${config.custom?.default_depth ?? 3})`)
+}
+
+export async function runWizard(options: WizardOptions): Promise<WizardResult> {
+  const { projectRoot, force, output } = options
+  const scaffoldDir = path.join(projectRoot, '.scaffold')
+
+  // PREFLIGHT — check for existing .scaffold/ BEFORE prompting
+  if (fs.existsSync(scaffoldDir) && !force) {
+    return {
+      success: false,
+      projectRoot,
+      configPath: path.join(scaffoldDir, 'config.yml'),
+      methodology: 'unknown',
+      errors: [
+        {
+          code: 'INIT_SCAFFOLD_EXISTS',
+          message: '.scaffold/ directory already exists',
+          exitCode: 1,
+          recovery: 'Use --force to back up and reinitialize',
+        },
+      ],
+    }
+  }
+
+  // Read old state before backup (to preserve completed steps)
+  const oldState = readOldStateIfExists(projectRoot)
+
+  const config = await collectWizardAnswers(options)
+
+  await materializeScaffoldProject(config, {
+    projectRoot,
+    force,
+    oldState,
+    output,
+  })
 
   return {
     success: true,
     projectRoot,
-    configPath,
-    methodology: answers.methodology,
+    configPath: path.join(projectRoot, '.scaffold', 'config.yml'),
+    methodology: config.methodology,
     errors: [],
   }
 }

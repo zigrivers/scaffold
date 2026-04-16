@@ -49,6 +49,12 @@ export class MultiServiceNotSupportedError extends ScaffoldUserError {
   }
 }
 
+export class ExistingScaffoldError extends ScaffoldUserError {
+  constructor(projectRoot: string) {
+    super(`.scaffold/ already exists at "${projectRoot}". Use --force to back up and reinitialize.`)
+  }
+}
+
 export function isScaffoldUserError(err: unknown): err is ScaffoldUserError {
   return err instanceof ScaffoldUserError
 }

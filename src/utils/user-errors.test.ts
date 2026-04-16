@@ -7,6 +7,7 @@ import {
   FromPathReadError,
   TTYStdinError,
   MultiServiceNotSupportedError,
+  ExistingScaffoldError,
   isScaffoldUserError,
 } from './user-errors.js'
 
@@ -44,6 +45,13 @@ describe('ScaffoldUserError taxonomy', () => {
     const err = new MultiServiceNotSupportedError('run')
     expect(err.message).toContain('run')
     expect(err.message).toContain('Wave 2')
+  })
+
+  it('ExistingScaffoldError carries project root and recovery hint', () => {
+    const err = new ExistingScaffoldError('/tmp/my-project')
+    expect(err).toBeInstanceOf(ScaffoldUserError)
+    expect(err.message).toContain('/tmp/my-project')
+    expect(err.message).toContain('--force')
   })
 
   it('isScaffoldUserError narrows correctly', () => {

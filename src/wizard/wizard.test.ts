@@ -26,7 +26,14 @@ vi.mock('../core/assembly/meta-prompt-loader.js', () => ({
 // ---------------------------------------------------------------------------
 
 import { detectProjectMode } from '../project/detector.js'
-import { runWizard } from './wizard.js'
+import {
+  runWizard,
+  collectWizardAnswers,
+  materializeScaffoldProject,
+  readOldStateIfExists,
+} from './wizard.js'
+import type { ScaffoldConfig } from '../types/index.js'
+import { ExistingScaffoldError } from '../utils/user-errors.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -404,5 +411,231 @@ describe('runWizard', () => {
       (call) => typeof call[0] === 'string' && call[0].includes('Type ?'),
     )
     expect(bannerCalls).toHaveLength(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// collectWizardAnswers — seam split tests
+// ---------------------------------------------------------------------------
+
+describe('collectWizardAnswers', () => {
+  const mockDetectProjectMode = vi.mocked(detectProjectMode)
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = makeTempDir()
+    mockDetectProjectMode.mockReturnValue({
+      mode: 'greenfield',
+      signals: [],
+      methodologySuggestion: 'deep',
+      sourceFileCount: 0,
+    })
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+    vi.restoreAllMocks()
+  })
+
+  it('produces a ScaffoldConfig without filesystem writes', async () => {
+    const output = makeOutputContext()
+    const config = await collectWizardAnswers({
+      projectRoot: tmpDir,
+      auto: true,
+      force: false,
+      output,
+    })
+
+    // Config is valid
+    expect(config.version).toBe(2)
+    expect(config.methodology).toBe('deep')
+    expect(Array.isArray(config.platforms)).toBe(true)
+
+    // No .scaffold/ directory created
+    expect(fs.existsSync(path.join(tmpDir, '.scaffold'))).toBe(false)
+  })
+
+  it('uses preset methodology when provided', async () => {
+    const output = makeOutputContext()
+    const config = await collectWizardAnswers({
+      projectRoot: tmpDir,
+      auto: true,
+      force: false,
+      methodology: 'mvp',
+      output,
+    })
+    expect(config.methodology).toBe('mvp')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// materializeScaffoldProject — seam split tests
+// ---------------------------------------------------------------------------
+
+describe('materializeScaffoldProject', () => {
+  const mockDetectProjectMode = vi.mocked(detectProjectMode)
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = makeTempDir()
+    mockDetectProjectMode.mockReturnValue({
+      mode: 'greenfield',
+      signals: [],
+      methodologySuggestion: 'deep',
+      sourceFileCount: 0,
+    })
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+    vi.restoreAllMocks()
+  })
+
+  function makeConfig(): ScaffoldConfig {
+    return {
+      version: 2,
+      methodology: 'deep',
+      platforms: ['claude-code'],
+      project: { platforms: [] },
+    }
+  }
+
+  it('writes config.yml, state.json, decisions.jsonl, and instructions/', async () => {
+    const output = makeOutputContext()
+    const config = makeConfig()
+
+    await materializeScaffoldProject(config, {
+      projectRoot: tmpDir,
+      force: false,
+      output,
+    })
+
+    // config.yml
+    expect(fs.existsSync(path.join(tmpDir, '.scaffold', 'config.yml'))).toBe(true)
+    const parsed = yaml.load(
+      fs.readFileSync(path.join(tmpDir, '.scaffold', 'config.yml'), 'utf8'),
+    ) as Record<string, unknown>
+    expect(parsed).toMatchObject({ version: 2, methodology: 'deep' })
+
+    // state.json
+    const state = JSON.parse(
+      fs.readFileSync(path.join(tmpDir, '.scaffold', 'state.json'), 'utf8'),
+    ) as Record<string, unknown>
+    expect(state['schema-version']).toBe(1)
+
+    // decisions.jsonl
+    expect(fs.existsSync(path.join(tmpDir, '.scaffold', 'decisions.jsonl'))).toBe(true)
+
+    // instructions/
+    expect(fs.statSync(path.join(tmpDir, '.scaffold', 'instructions')).isDirectory()).toBe(true)
+  })
+
+  it('throws ExistingScaffoldError when .scaffold/ exists and force=false', async () => {
+    fs.mkdirSync(path.join(tmpDir, '.scaffold'))
+    const output = makeOutputContext()
+
+    await expect(
+      materializeScaffoldProject(makeConfig(), {
+        projectRoot: tmpDir,
+        force: false,
+        output,
+      }),
+    ).rejects.toThrow(ExistingScaffoldError)
+  })
+
+  it('backs up existing .scaffold/ when force=true', async () => {
+    const scaffoldDir = path.join(tmpDir, '.scaffold')
+    fs.mkdirSync(scaffoldDir)
+    fs.writeFileSync(path.join(scaffoldDir, 'marker.txt'), 'original')
+    const output = makeOutputContext()
+
+    await materializeScaffoldProject(makeConfig(), {
+      projectRoot: tmpDir,
+      force: true,
+      output,
+    })
+
+    // Backup exists
+    expect(fs.existsSync(path.join(tmpDir, '.scaffold.backup'))).toBe(true)
+    expect(fs.existsSync(path.join(tmpDir, '.scaffold.backup', 'marker.txt'))).toBe(true)
+
+    // New .scaffold/ has config.yml, not marker.txt
+    expect(fs.existsSync(path.join(scaffoldDir, 'config.yml'))).toBe(true)
+    expect(fs.existsSync(path.join(scaffoldDir, 'marker.txt'))).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// readOldStateIfExists
+// ---------------------------------------------------------------------------
+
+describe('readOldStateIfExists', () => {
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = makeTempDir()
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('returns undefined when .scaffold/state.json does not exist', () => {
+    expect(readOldStateIfExists(tmpDir)).toBeUndefined()
+  })
+
+  it('returns parsed state when .scaffold/state.json exists', () => {
+    const scaffoldDir = path.join(tmpDir, '.scaffold')
+    fs.mkdirSync(scaffoldDir)
+    const state = {
+      'schema-version': 1,
+      'scaffold-version': '2.0.0',
+      init_methodology: 'deep',
+      config_methodology: 'deep',
+      'init-mode': 'greenfield',
+      created: '2024-01-01T00:00:00.000Z',
+      in_progress: null,
+      steps: { 'tech-stack': { status: 'completed', source: 'pipeline', produces: [] } },
+      next_eligible: [],
+      'extra-steps': [],
+    }
+    fs.writeFileSync(path.join(scaffoldDir, 'state.json'), JSON.stringify(state))
+
+    const result = readOldStateIfExists(tmpDir)
+    expect(result).toBeDefined()
+    expect(result!.steps['tech-stack']?.status).toBe('completed')
+  })
+
+  it('applies migrateState to handle step renames', () => {
+    const scaffoldDir = path.join(tmpDir, '.scaffold')
+    fs.mkdirSync(scaffoldDir)
+    // Use an old step name that gets migrated
+    const state = {
+      'schema-version': 1,
+      'scaffold-version': '2.0.0',
+      init_methodology: 'deep',
+      config_methodology: 'deep',
+      'init-mode': 'greenfield',
+      created: '2024-01-01T00:00:00.000Z',
+      in_progress: null,
+      steps: { 'testing-strategy': { status: 'completed', source: 'pipeline', produces: [] } },
+      next_eligible: [],
+      'extra-steps': [],
+    }
+    fs.writeFileSync(path.join(scaffoldDir, 'state.json'), JSON.stringify(state))
+
+    const result = readOldStateIfExists(tmpDir)
+    expect(result).toBeDefined()
+    // 'testing-strategy' should have been renamed to 'tdd' by migrateState
+    expect(result!.steps['tdd']?.status).toBe('completed')
+    expect(result!.steps['testing-strategy']).toBeUndefined()
+  })
+
+  it('returns undefined when state.json is corrupt', () => {
+    const scaffoldDir = path.join(tmpDir, '.scaffold')
+    fs.mkdirSync(scaffoldDir)
+    fs.writeFileSync(path.join(scaffoldDir, 'state.json'), 'not-valid-json{{{')
+
+    expect(readOldStateIfExists(tmpDir)).toBeUndefined()
   })
 })
