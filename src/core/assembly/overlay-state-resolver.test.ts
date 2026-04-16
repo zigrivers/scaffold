@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import fs from 'node:fs'
+import os from 'node:os'
 import { resolveOverlayState } from './overlay-state-resolver.js'
 import type { ScaffoldConfig, StepEnablementEntry } from '../../types/index.js'
 import type { MetaPromptFrontmatter } from '../../types/frontmatter.js'
@@ -440,5 +442,155 @@ describe('resolveOverlayState', () => {
     expect(result.knowledge['step-a']).toEqual([])
     expect(result.reads['step-a']).toEqual(['step-b'])
     expect(result.dependencies['step-a']).toEqual(['step-c'])
+  })
+
+  describe('structural overlay (multi-service)', () => {
+    it('activates structural overlay when services[] present', () => {
+      const output = makeOutput()
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'overlay-structural-'))
+      fs.writeFileSync(path.join(tmpDir, 'multi-service-overlay.yml'), `
+name: multi-service
+description: Test structural overlay
+
+step-overrides:
+  service-ownership-map: { enabled: true }
+
+knowledge-overrides:
+  system-architecture:
+    append: [multi-service-architecture]
+`, 'utf8')
+
+      const presetSteps: Record<string, StepEnablementEntry> = {
+        'create-vision': { enabled: true },
+        'service-ownership-map': { enabled: false },
+        'system-architecture': { enabled: true },
+      }
+      const metaPrompts = new Map([
+        ['create-vision', { frontmatter: makeFrontmatter({ name: 'create-vision' }) }],
+        ['service-ownership-map', { frontmatter: makeFrontmatter({ name: 'service-ownership-map' }) }],
+        ['system-architecture', { frontmatter: makeFrontmatter({ name: 'system-architecture', knowledgeBase: ['system-architecture'] }) }],
+      ])
+
+      const result = resolveOverlayState({
+        config: makeConfig({
+          project: {
+            services: [{ name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest', domain: 'none' } }],
+          },
+        }),
+        methodologyDir: tmpDir,
+        metaPrompts,
+        presetSteps,
+        output,
+      })
+
+      expect(result.steps['service-ownership-map']?.enabled).toBe(true)
+      expect(result.knowledge['system-architecture']).toContain('multi-service-architecture')
+    })
+
+    it('emits warning when structural overlay conflicts with project-type overlay', () => {
+      const output = makeOutput()
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'overlay-conflict-'))
+      fs.writeFileSync(path.join(tmpDir, 'multi-service-overlay.yml'), `
+name: multi-service
+description: Test conflict
+
+step-overrides:
+  design-system: { enabled: true }
+`, 'utf8')
+
+      const presetSteps: Record<string, StepEnablementEntry> = {
+        'design-system': { enabled: false },
+      }
+      const metaPrompts = new Map([
+        ['design-system', { frontmatter: makeFrontmatter({ name: 'design-system' }) }],
+      ])
+
+      resolveOverlayState({
+        config: makeConfig({
+          project: {
+            services: [{ name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest', domain: 'none' } }],
+          },
+        }),
+        methodologyDir: tmpDir,
+        metaPrompts,
+        presetSteps,
+        output,
+      })
+
+      expect(output.warn).toHaveBeenCalledWith(
+        expect.stringContaining('design-system'),
+      )
+    })
+
+    it('does NOT activate structural overlay when services[] absent', () => {
+      const output = makeOutput()
+      const presetSteps: Record<string, StepEnablementEntry> = {
+        'service-ownership-map': { enabled: false },
+      }
+      const metaPrompts = new Map([
+        ['service-ownership-map', { frontmatter: makeFrontmatter({ name: 'service-ownership-map' }) }],
+      ])
+
+      const result = resolveOverlayState({
+        config: makeConfig(),
+        methodologyDir: fixtureDir,
+        metaPrompts,
+        presetSteps,
+        output,
+      })
+
+      expect(result.steps['service-ownership-map']?.enabled).toBe(false)
+    })
+
+    it('does NOT activate when services[] is empty array', () => {
+      const output = makeOutput()
+      const presetSteps: Record<string, StepEnablementEntry> = {
+        'service-ownership-map': { enabled: false },
+      }
+      const metaPrompts = new Map([
+        ['service-ownership-map', { frontmatter: makeFrontmatter({ name: 'service-ownership-map' }) }],
+      ])
+
+      const result = resolveOverlayState({
+        config: makeConfig({ project: { services: [] } }),
+        methodologyDir: fixtureDir,
+        metaPrompts,
+        presetSteps,
+        output,
+      })
+
+      expect(result.steps['service-ownership-map']?.enabled).toBe(false)
+    })
+
+    it('warns when structural overlay targets unknown step', () => {
+      const output = makeOutput()
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'overlay-test-'))
+      fs.writeFileSync(path.join(tmpDir, 'multi-service-overlay.yml'), `
+name: multi-service
+description: Test overlay
+
+step-overrides:
+  nonexistent-step: { enabled: true }
+`, 'utf8')
+
+      const presetSteps: Record<string, StepEnablementEntry> = {}
+      const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>()
+
+      resolveOverlayState({
+        config: makeConfig({
+          project: {
+            services: [{ name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest', domain: 'none' } }],
+          },
+        }),
+        methodologyDir: tmpDir,
+        metaPrompts,
+        presetSteps,
+        output,
+      })
+
+      expect(output.warn).toHaveBeenCalledWith(
+        expect.stringContaining('nonexistent-step'),
+      )
+    })
   })
 })
