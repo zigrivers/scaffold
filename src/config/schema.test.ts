@@ -6,7 +6,7 @@ import {
   WebAppConfigSchema, BackendConfigSchema, CliConfigSchema,
   LibraryConfigSchema, MobileAppConfigSchema,
   DataPipelineConfigSchema, MlConfigSchema, BrowserExtensionConfigSchema,
-  ResearchConfigSchema,
+  ResearchConfigSchema, ServiceSchema,
 } from './schema.js'
 
 describe('ProjectTypeSchema', () => {
@@ -1015,5 +1015,103 @@ describe('ProjectSchema cross-field validation — research', () => {
       },
     })
     expect(result.success).toBe(true)
+  })
+})
+
+describe('ServiceSchema', () => {
+  const validBackendService = {
+    name: 'research-engine',
+    projectType: 'backend' as const,
+    backendConfig: {
+      apiStyle: 'rest' as const,
+      dataStore: ['relational'] as const,
+      authMechanism: 'apikey' as const,
+      asyncMessaging: 'none' as const,
+      deployTarget: 'container' as const,
+      domain: 'fintech' as const,
+    },
+  }
+
+  it('accepts a valid backend service', () => {
+    const result = ServiceSchema.safeParse(validBackendService)
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects name that violates kebab-case regex', () => {
+    const invalid = [
+      { ...validBackendService, name: 'Research-Engine' },    // uppercase
+      { ...validBackendService, name: '1research' },           // leading digit
+      { ...validBackendService, name: 'research engine' },     // whitespace
+      { ...validBackendService, name: 'research.engine' },     // dot
+      { ...validBackendService, name: '' },                    // empty (caught by min(1) first)
+    ]
+    for (const s of invalid) {
+      expect(ServiceSchema.safeParse(s).success).toBe(false)
+    }
+  })
+
+  it('rejects config set without matching projectType (coupling)', () => {
+    const result = ServiceSchema.safeParse({
+      name: 'foo',
+      projectType: 'backend',
+      webAppConfig: { renderingStrategy: 'ssr', deployTarget: 'container',
+        realtime: 'none', authFlow: 'none' },
+      backendConfig: validBackendService.backendConfig,
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const paths = result.error.issues.map(i => i.path.join('.'))
+      expect(paths).toContain('webAppConfig')
+    }
+  })
+
+  it('rejects projectType without matching config (forward rule — ServiceSchema-only)', () => {
+    const result = ServiceSchema.safeParse({ name: 'foo', projectType: 'backend' })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const paths = result.error.issues.map(i => i.path.join('.'))
+      expect(paths).toContain('backendConfig')
+    }
+  })
+
+  it('emits BOTH coupling and forward issues for a doubly-malformed service', () => {
+    const result = ServiceSchema.safeParse({
+      name: 'foo',
+      projectType: 'web-app',
+      backendConfig: validBackendService.backendConfig,
+      // No webAppConfig.
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const paths = result.error.issues.map(i => i.path.join('.'))
+      expect(paths).toContain('backendConfig')   // coupling violation
+      expect(paths).toContain('webAppConfig')    // forward-direction violation
+    }
+  })
+
+  it('rejects extra fields via .strict()', () => {
+    const result = ServiceSchema.safeParse({
+      ...validBackendService,
+      extraField: 'x',
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const issue = result.error.issues.find(i => i.code === 'unrecognized_keys')
+      expect(issue).toBeDefined()
+      const keys = (issue as unknown as { keys?: string[] }).keys
+      expect(keys).toContain('extraField')
+    }
+  })
+
+  it('rejects missing projectType', () => {
+    const result = ServiceSchema.safeParse({ name: 'foo' })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects unknown projectType value', () => {
+    const result = ServiceSchema.safeParse({
+      name: 'foo', projectType: 'totally-made-up',
+    })
+    expect(result.success).toBe(false)
   })
 })

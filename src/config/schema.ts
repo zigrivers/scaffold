@@ -1,7 +1,7 @@
 // src/config/schema.ts
 
 import { z } from 'zod'
-import { ALL_COUPLING_VALIDATORS } from './validators/index.js'
+import { ALL_COUPLING_VALIDATORS, configKeyFor } from './validators/index.js'
 
 const CustomStepSchema = z.object({
   enabled: z.boolean().optional(),
@@ -110,7 +110,41 @@ export const GameConfigSchema = z.object({
   npcAiComplexity: z.enum(['none', 'simple', 'complex']).default('none'),
 }).strict()
 
-const ProjectSchema = z.object({
+export const ServiceSchema = z.object({
+  name: z.string().min(1).regex(/^[a-z][a-z0-9-]*$/, {
+    message: 'name must be kebab-case starting with a letter',
+  }),
+  description: z.string().optional(),
+  projectType: ProjectTypeSchema,
+  backendConfig: BackendConfigSchema.optional(),
+  webAppConfig: WebAppConfigSchema.optional(),
+  researchConfig: ResearchConfigSchema.optional(),
+  libraryConfig: LibraryConfigSchema.optional(),
+  cliConfig: CliConfigSchema.optional(),
+  mobileAppConfig: MobileAppConfigSchema.optional(),
+  dataPipelineConfig: DataPipelineConfigSchema.optional(),
+  mlConfig: MlConfigSchema.optional(),
+  gameConfig: GameConfigSchema.optional(),
+  browserExtensionConfig: BrowserExtensionConfigSchema.optional(),
+  path: z.string().optional(),
+  // NOTE: no `exports` field in Wave 3a — deferred to Wave 3c.
+}).strict().superRefine((svc, ctx) => {
+  // Shared per-type coupling (config present without matching projectType).
+  for (const v of ALL_COUPLING_VALIDATORS) {
+    v.validate(ctx, [], svc.projectType, (svc as Record<string, unknown>)[v.configKey])
+  }
+  // ServiceSchema-only forward rule: projectType without matching config.
+  const expectedKey = configKeyFor(svc.projectType)
+  if ((svc as Record<string, unknown>)[expectedKey] === undefined) {
+    ctx.addIssue({
+      path: [expectedKey],
+      code: 'custom',
+      message: `${svc.projectType} service "${svc.name}" requires ${expectedKey}`,
+    })
+  }
+})
+
+export const ProjectSchema = z.object({
   name: z.string().min(1).optional(),
   platforms: z.array(z.enum(['web', 'mobile', 'desktop'])).optional(),
   projectType: ProjectTypeSchema.optional(),
