@@ -43,8 +43,8 @@ export class TTYStdinError extends ScaffoldUserError {
 export class MultiServiceNotSupportedError extends ScaffoldUserError {
   constructor(commandName: string) {
     super(
-      'Multi-service projects are not yet executable. '
-      + `'scaffold ${commandName}' on a config with services[] lands in Wave 2.`,
+      `Multi-service projects are not yet executable. `
+      + `"scaffold ${commandName}" on a config with services[] lands in Wave 2.`,
     )
   }
 }
