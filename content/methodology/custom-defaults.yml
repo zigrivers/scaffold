@@ -106,3 +106,9 @@ steps:
   analytics-telemetry: { enabled: false }
   live-ops-plan: { enabled: false }
   platform-cert-prep: { enabled: false }
+  # Multi-service steps (enabled via multi-service overlay)
+  service-ownership-map: { enabled: false }
+  inter-service-contracts: { enabled: false }
+  cross-service-auth: { enabled: false }
+  cross-service-observability: { enabled: false }
+  integration-test-plan: { enabled: false }
