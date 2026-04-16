@@ -473,6 +473,28 @@ Every `scaffold init` wizard question can be answered via CLI flags, making scaf
 
 > **Flag aliases**: Game flags have `--game-*` aliases for consistency with other project types (e.g., `--game-engine` is equivalent to `--engine`). Bare flags like `--engine` still work.
 
+### Declarative init from a YAML manifest (`--from`)
+
+For multi-service projects, use `scaffold init --from <file>` to provide a
+full ScaffoldConfig as YAML instead of running the interactive wizard:
+
+```bash
+scaffold init --from services.yml --force
+```
+
+The file must be a complete ScaffoldConfig (with `version`, `methodology`,
+`platforms`, and `project.services[]`). Pass `-` to read from stdin.
+
+`--from` is exclusive with config-setting flags (`--methodology`, all
+`--backend-*`, `--web-*`, etc.); combining them is an error. Operational
+flags (`--root`, `--force`, `--auto`, `--verbose`, `--format`) still work.
+
+**Caveat — multi-service execution**: Wave 3a ships the services schema
+and declarative init path, but multi-service pipeline execution lands
+in a future wave. A `services[]` config is configured but not yet
+executable — running `scaffold run`, `scaffold next`, etc. against it
+exits with code 2 and a clear diagnostic.
+
 #### How Flags Interact
 
 - **Flag > auto > interactive**: Flags always take highest precedence. `--auto --engine unreal` uses defaults for everything except engine.

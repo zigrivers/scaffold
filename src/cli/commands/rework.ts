@@ -8,6 +8,8 @@ import { ReworkManager } from '../../state/rework-manager.js'
 import { StateManager } from '../../state/state-manager.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
+import { loadConfig } from '../../config/loader.js'
+import { assertSingleServiceOrExit } from '../guards.js'
 import { parsePhases, parseThrough, applyExclusions, resolveStepsForPhases } from '../../core/rework/phase-selector.js'
 import type { DepthLevel } from '../../types/enums.js'
 import type { ReworkConfig } from '../../types/index.js'
@@ -194,6 +196,11 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
 
     // --- Branch: new rework ---
 
+    // Guard: reject multi-service configs before phase resolution and lock acquisition
+    const { config: guardConfig } = loadConfig(projectRoot as string, [])
+    assertSingleServiceOrExit(guardConfig ?? {}, { commandName: 'rework', output })
+    if (process.exitCode === 2) return
+
     // Check for existing session
     if (reworkManager.hasSession() && !argv.force) {
       output.error({
@@ -286,7 +293,11 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
         return
       }
       const pipeline = resolvePipeline(context, { output })
-      const stateManager = new StateManager(projectRoot as string, pipeline.computeEligible)
+      const stateManager = new StateManager(
+        projectRoot as string,
+        pipeline.computeEligible,
+        () => context.config ?? undefined,
+      )
       const state = stateManager.loadState()
 
       const metaPromptList = [...context.metaPrompts.values()].map(m => m.frontmatter)

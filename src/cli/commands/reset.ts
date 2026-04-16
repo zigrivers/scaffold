@@ -10,6 +10,8 @@ import { shutdown } from '../shutdown.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
+import { loadConfig } from '../../config/loader.js'
+import { assertSingleServiceOrExit } from '../guards.js'
 
 interface ResetArgs {
   step?: string
@@ -48,6 +50,10 @@ const resetCommand: CommandModule<Record<string, unknown>, ResetArgs> = {
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
+    const { config: guardConfig } = loadConfig(projectRoot, [])
+    assertSingleServiceOrExit(guardConfig ?? {}, { commandName: 'reset', output })
+    if (process.exitCode === 2) return
+
     // Route: single step reset vs full pipeline reset
     if (argv.step) {
       await resetStep(argv.step, projectRoot, outputMode, output, argv)
@@ -82,7 +88,11 @@ async function resetStep(
   const doReset = async (): Promise<void> => {
     const context = loadPipelineContext(projectRoot)
     const pipeline = resolvePipeline(context)
-    const stateManager = new StateManager(projectRoot, pipeline.computeEligible)
+    const stateManager = new StateManager(
+      projectRoot,
+      pipeline.computeEligible,
+      () => context.config ?? undefined,
+    )
     const state = stateManager.loadState()
 
     // Check step exists in state

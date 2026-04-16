@@ -1,17 +1,26 @@
 import type { CommandModule, Argv } from 'yargs'
+import fs from 'node:fs'
+import path from 'node:path'
+import { z } from 'zod'
+import { parse as parseYaml } from 'yaml'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
-import { runWizard } from '../../wizard/wizard.js'
+import { runWizard, materializeScaffoldProject, readOldStateIfExists } from '../../wizard/wizard.js'
 import { runBuild } from './build.js'
 import { syncSkillsIfNeeded } from '../../core/skills/sync.js'
 import { shutdown } from '../shutdown.js'
-import { ProjectTypeSchema } from '../../config/schema.js'
+import { ProjectTypeSchema, ConfigSchema } from '../../config/schema.js'
 import { coerceCSV } from '../utils/coerce.js'
+import {
+  InvalidYamlError, InvalidConfigError, FromPathReadError,
+  TTYStdinError, isScaffoldUserError,
+} from '../../utils/user-errors.js'
 import {
   GAME_FLAGS, WEB_FLAGS, BACKEND_FLAGS, CLI_TYPE_FLAGS,
   LIB_FLAGS, MOBILE_FLAGS, PIPELINE_FLAGS, ML_FLAGS, EXT_FLAGS,
   RESEARCH_FLAGS, applyFlagFamilyValidation,
 } from '../init-flag-families.js'
+import type { ScaffoldConfig } from '../../types/index.js'
 import type {
   GameFlags, WebAppFlags, BackendFlags, CliFlags, LibraryFlags,
   MobileAppFlags, DataPipelineFlags, MlFlags, BrowserExtensionFlags,
@@ -24,6 +33,7 @@ interface InitArgs {
   verbose?: boolean
   root?: string
   force?: boolean
+  from?: string
   idea?: string
   methodology?: string
   'project-type'?: string
@@ -91,6 +101,52 @@ interface InitArgs {
   'research-tracking'?: boolean
 }
 
+// ---------------------------------------------------------------------------
+// CONFIG_SETTING_FLAGS — every flag that --from is mutually exclusive with
+// ---------------------------------------------------------------------------
+
+export const CONFIG_SETTING_FLAGS: readonly string[] = [
+  'methodology', 'depth', 'adapters', 'traits', 'project-type', 'idea',
+  ...GAME_FLAGS, ...WEB_FLAGS, ...BACKEND_FLAGS, ...CLI_TYPE_FLAGS,
+  ...LIB_FLAGS, ...MOBILE_FLAGS, ...PIPELINE_FLAGS, ...ML_FLAGS,
+  ...EXT_FLAGS, ...RESEARCH_FLAGS,
+]
+
+// ---------------------------------------------------------------------------
+// --from helpers
+// ---------------------------------------------------------------------------
+
+function readFromPath(pathArg: string): string {
+  try {
+    return fs.readFileSync(path.resolve(process.cwd(), pathArg), 'utf-8')
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code ?? (err as Error).message
+    throw new FromPathReadError(pathArg, code)
+  }
+}
+
+function readStdinOrError(): string {
+  if (process.stdin.isTTY) {
+    throw new TTYStdinError()
+  }
+  try {
+    return fs.readFileSync(0, 'utf-8')
+  } catch (err) {
+    throw new FromPathReadError('-', (err as Error).message)
+  }
+}
+
+function formatZodError(error: z.ZodError): string {
+  return error.issues.map(issue => {
+    const p = issue.path.join('.') || '(root)'
+    return `  ${p}: ${issue.message}`
+  }).join('\n')
+}
+
+// ---------------------------------------------------------------------------
+// Command
+// ---------------------------------------------------------------------------
+
 const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
   command: 'init',
   describe: 'Initialize scaffold for this project',
@@ -103,6 +159,10 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       .option('idea', { type: 'string', describe: 'One-line project idea for methodology suggestion' })
       .option('format', { type: 'string', describe: 'Output format (json/auto/interactive)' })
       .option('verbose', { type: 'boolean', default: false, describe: 'Verbose output' })
+      .option('from', {
+        type: 'string',
+        describe: 'Path to a ScaffoldConfig YAML file, or "-" for stdin. Exclusive with config-setting flags.',
+      })
       // Configuration options
       .option('methodology', {
         type: 'string',
@@ -401,6 +461,18 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       })
       // Validation
       .check((argv) => {
+        // --from is exclusive with all config-setting flags
+        if (argv.from !== undefined) {
+          const conflicts = CONFIG_SETTING_FLAGS.filter(
+            f => (argv as Record<string, unknown>)[f] !== undefined,
+          )
+          if (conflicts.length > 0) {
+            const summary = conflicts.map(f => '--' + f).join(', ')
+            throw new Error(`--from cannot be combined with: ${summary}. Edit services.yml and re-run.`)
+          }
+          return true  // skip all other validation when --from is set
+        }
+
         // --depth requires --methodology custom (init-only)
         if (argv.depth !== undefined && argv.methodology !== 'custom') {
           throw new Error('--depth requires --methodology custom')
@@ -444,149 +516,181 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         'game-content-structure', 'game-economy', 'game-narrative', 'game-locales',
         'game-npc-ai', 'game-modding', 'game-persistence',
       ], 'Game Configuration:')
-      .group(['root', 'force', 'auto', 'idea', 'format', 'verbose'], 'General:') as Argv<InitArgs>
+      .group(['root', 'force', 'auto', 'from', 'idea', 'format', 'verbose'], 'General:') as Argv<InitArgs>
   },
   handler: async (argv) => {
     const projectRoot = argv.root ?? process.cwd()
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
-    // Auto-detect project type from flags
-    const hasGameFlag = GAME_FLAGS.some((f) => argv[f] !== undefined)
-    const hasWebFlag = WEB_FLAGS.some(
-      (f) => argv[f] !== undefined,
-    )
-    const hasBackendFlag = BACKEND_FLAGS.some(
-      (f) => argv[f] !== undefined,
-    )
-    const hasCliTypeFlag = CLI_TYPE_FLAGS.some(
-      (f) => argv[f] !== undefined,
-    )
-    const hasLibFlag = LIB_FLAGS.some((f) => argv[f] !== undefined)
-    const hasMobileFlag = MOBILE_FLAGS.some((f) => argv[f] !== undefined)
-    const hasPipelineFlag = PIPELINE_FLAGS.some((f) => argv[f] !== undefined)
-    const hasMlFlag = ML_FLAGS.some((f) => argv[f] !== undefined)
-    const hasExtFlag = EXT_FLAGS.some((f) => argv[f] !== undefined)
-    const hasResearchFlag = RESEARCH_FLAGS.some((f) => argv[f] !== undefined)
+    // Track whether Phase 1 succeeded so we know to run Phase 2
+    let phase1Success = false
+    // Wizard result — populated by the wizard path, undefined for --from path
+    let result: Awaited<ReturnType<typeof runWizard>> | undefined
 
-    const detectedType = hasGameFlag
-      ? 'game'
-      : hasWebFlag
-        ? 'web-app'
-        : hasBackendFlag
-          ? 'backend'
-          : hasCliTypeFlag
-            ? 'cli'
-            : hasLibFlag
-              ? 'library'
-              : hasMobileFlag
-                ? 'mobile-app'
-                : hasPipelineFlag
-                  ? 'data-pipeline'
-                  : hasMlFlag
-                    ? 'ml'
-                    : hasExtFlag
-                      ? 'browser-extension'
-                      : hasResearchFlag
-                        ? 'research'
-                        : undefined
-    const projectType = argv['project-type'] ?? detectedType
+    try {
+      // Phase 1: collect or parse config (Ctrl-C → clean exit, no changes)
+      await shutdown.withContext('Cancelled. No changes were made.', async () => {
+        if (argv.from !== undefined) {
+          // --from declarative path: read YAML, validate, materialize
+          const sourceLabel = argv.from === '-' ? '<stdin>' : argv.from
+          const raw = argv.from === '-' ? readStdinOrError() : readFromPath(argv.from)
+          let parsedYaml: unknown
+          try {
+            parsedYaml = parseYaml(raw)
+          } catch (err) {
+            throw new InvalidYamlError(sourceLabel, (err as Error).message)
+          }
+          const parseResult = ConfigSchema.safeParse(parsedYaml)
+          if (!parseResult.success) {
+            throw new InvalidConfigError(sourceLabel, formatZodError(parseResult.error))
+          }
+          const config = parseResult.data as unknown as ScaffoldConfig
+          const oldState = readOldStateIfExists(projectRoot)
+          await materializeScaffoldProject(config, {
+            projectRoot, force: argv.force ?? false, oldState, output,
+          })
+          phase1Success = true
+        } else {
+          // Interactive wizard path
+          const hasGameFlag = GAME_FLAGS.some((f) => argv[f] !== undefined)
+          const hasWebFlag = WEB_FLAGS.some(
+            (f) => argv[f] !== undefined,
+          )
+          const hasBackendFlag = BACKEND_FLAGS.some(
+            (f) => argv[f] !== undefined,
+          )
+          const hasCliTypeFlag = CLI_TYPE_FLAGS.some(
+            (f) => argv[f] !== undefined,
+          )
+          const hasLibFlag = LIB_FLAGS.some((f) => argv[f] !== undefined)
+          const hasMobileFlag = MOBILE_FLAGS.some((f) => argv[f] !== undefined)
+          const hasPipelineFlag = PIPELINE_FLAGS.some((f) => argv[f] !== undefined)
+          const hasMlFlag = ML_FLAGS.some((f) => argv[f] !== undefined)
+          const hasExtFlag = EXT_FLAGS.some((f) => argv[f] !== undefined)
+          const hasResearchFlag = RESEARCH_FLAGS.some((f) => argv[f] !== undefined)
 
-    let result: Awaited<ReturnType<typeof runWizard>>
+          const detectedType = hasGameFlag
+            ? 'game'
+            : hasWebFlag
+              ? 'web-app'
+              : hasBackendFlag
+                ? 'backend'
+                : hasCliTypeFlag
+                  ? 'cli'
+                  : hasLibFlag
+                    ? 'library'
+                    : hasMobileFlag
+                      ? 'mobile-app'
+                      : hasPipelineFlag
+                        ? 'data-pipeline'
+                        : hasMlFlag
+                          ? 'ml'
+                          : hasExtFlag
+                            ? 'browser-extension'
+                            : hasResearchFlag
+                              ? 'research'
+                              : undefined
+          const projectType = argv['project-type'] ?? detectedType
 
-    await shutdown.withContext('Cancelled. No changes were made.', async () => {
-      result = await shutdown.withPrompt(async () => runWizard({
-        projectRoot,
-        auto: argv.auto ?? false,
-        force: argv.force ?? false,
-        methodology: argv.methodology,
-        projectType,
-        idea: argv.idea,
-        output,
-        depth: argv.depth,
-        adapters: argv.adapters as string[] | undefined,
-        traits: argv.traits as string[] | undefined,
-        // yargs `choices:` validates these at runtime, so the narrow casts at
-        // this CLI boundary are safe. See src/wizard/flags.ts for rationale.
-        gameFlags: hasGameFlag ? {
-          engine: argv.engine as GameFlags['engine'],
-          multiplayer: argv.multiplayer as GameFlags['multiplayer'],
-          targetPlatforms: argv['target-platforms'] as GameFlags['targetPlatforms'],
-          onlineServices: argv['online-services'] as GameFlags['onlineServices'],
-          contentStructure: argv['content-structure'] as GameFlags['contentStructure'],
-          economy: argv.economy as GameFlags['economy'],
-          narrative: argv.narrative as GameFlags['narrative'],
-          locales: argv.locales as GameFlags['locales'],
-          npcAi: argv['npc-ai'] as GameFlags['npcAi'],
-          modding: argv.modding,
-          persistence: argv.persistence as GameFlags['persistence'],
-        } : undefined,
-        webAppFlags: hasWebFlag ? {
-          webRendering: argv['web-rendering'] as WebAppFlags['webRendering'],
-          webDeployTarget: argv['web-deploy-target'] as WebAppFlags['webDeployTarget'],
-          webRealtime: argv['web-realtime'] as WebAppFlags['webRealtime'],
-          webAuthFlow: argv['web-auth-flow'] as WebAppFlags['webAuthFlow'],
-        } : undefined,
-        backendFlags: hasBackendFlag ? {
-          backendApiStyle: argv['backend-api-style'] as BackendFlags['backendApiStyle'],
-          backendDataStore: argv['backend-data-store'] as BackendFlags['backendDataStore'],
-          backendAuth: argv['backend-auth'] as BackendFlags['backendAuth'],
-          backendMessaging: argv['backend-messaging'] as BackendFlags['backendMessaging'],
-          backendDeployTarget: argv['backend-deploy-target'] as BackendFlags['backendDeployTarget'],
-          backendDomain: argv['backend-domain'] as BackendFlags['backendDomain'],
-        } : undefined,
-        cliFlags: hasCliTypeFlag ? {
-          cliInteractivity: argv['cli-interactivity'] as CliFlags['cliInteractivity'],
-          cliDistribution: argv['cli-distribution'] as CliFlags['cliDistribution'],
-          cliStructuredOutput: argv['cli-structured-output'],
-        } : undefined,
-        libraryFlags: hasLibFlag ? {
-          libVisibility: argv['lib-visibility'] as LibraryFlags['libVisibility'],
-          libRuntimeTarget: argv['lib-runtime-target'] as LibraryFlags['libRuntimeTarget'],
-          libBundleFormat: argv['lib-bundle-format'] as LibraryFlags['libBundleFormat'],
-          libTypeDefinitions: argv['lib-type-definitions'],
-          libDocLevel: argv['lib-doc-level'] as LibraryFlags['libDocLevel'],
-        } : undefined,
-        mobileAppFlags: hasMobileFlag ? {
-          mobilePlatform: argv['mobile-platform'] as MobileAppFlags['mobilePlatform'],
-          mobileDistribution: argv['mobile-distribution'] as MobileAppFlags['mobileDistribution'],
-          mobileOffline: argv['mobile-offline'] as MobileAppFlags['mobileOffline'],
-          mobilePushNotifications: argv['mobile-push-notifications'],
-        } : undefined,
-        dataPipelineFlags: hasPipelineFlag ? {
-          pipelineProcessing: argv['pipeline-processing'] as DataPipelineFlags['pipelineProcessing'],
-          pipelineOrchestration: argv['pipeline-orchestration'] as DataPipelineFlags['pipelineOrchestration'],
-          pipelineQuality: argv['pipeline-quality'] as DataPipelineFlags['pipelineQuality'],
-          pipelineSchema: argv['pipeline-schema'] as DataPipelineFlags['pipelineSchema'],
-          pipelineCatalog: argv['pipeline-catalog'],
-        } : undefined,
-        mlFlags: hasMlFlag ? {
-          mlPhase: argv['ml-phase'] as MlFlags['mlPhase'],
-          mlModelType: argv['ml-model-type'] as MlFlags['mlModelType'],
-          mlServing: argv['ml-serving'] as MlFlags['mlServing'],
-          mlExperimentTracking: argv['ml-experiment-tracking'],
-        } : undefined,
-        browserExtensionFlags: hasExtFlag ? {
-          extManifest: argv['ext-manifest'] as BrowserExtensionFlags['extManifest'],
-          extUiSurfaces: argv['ext-ui-surfaces'] as BrowserExtensionFlags['extUiSurfaces'],
-          extContentScript: argv['ext-content-script'],
-          extBackgroundWorker: argv['ext-background-worker'],
-        } : undefined,
-        researchFlags: hasResearchFlag ? {
-          researchDriver: argv['research-driver'] as ResearchFlags['researchDriver'],
-          researchInteraction: argv['research-interaction'] as ResearchFlags['researchInteraction'],
-          researchDomain: argv['research-domain'] as ResearchFlags['researchDomain'],
-          researchTracking: argv['research-tracking'],
-        } : undefined,
-      }))
+          result = await shutdown.withPrompt(async () => runWizard({
+            projectRoot,
+            auto: argv.auto ?? false,
+            force: argv.force ?? false,
+            methodology: argv.methodology,
+            projectType,
+            idea: argv.idea,
+            output,
+            depth: argv.depth,
+            adapters: argv.adapters as string[] | undefined,
+            traits: argv.traits as string[] | undefined,
+            // yargs `choices:` validates these at runtime, so the narrow casts at
+            // this CLI boundary are safe. See src/wizard/flags.ts for rationale.
+            gameFlags: hasGameFlag ? {
+              engine: argv.engine as GameFlags['engine'],
+              multiplayer: argv.multiplayer as GameFlags['multiplayer'],
+              targetPlatforms: argv['target-platforms'] as GameFlags['targetPlatforms'],
+              onlineServices: argv['online-services'] as GameFlags['onlineServices'],
+              contentStructure: argv['content-structure'] as GameFlags['contentStructure'],
+              economy: argv.economy as GameFlags['economy'],
+              narrative: argv.narrative as GameFlags['narrative'],
+              locales: argv.locales as GameFlags['locales'],
+              npcAi: argv['npc-ai'] as GameFlags['npcAi'],
+              modding: argv.modding,
+              persistence: argv.persistence as GameFlags['persistence'],
+            } : undefined,
+            webAppFlags: hasWebFlag ? {
+              webRendering: argv['web-rendering'] as WebAppFlags['webRendering'],
+              webDeployTarget: argv['web-deploy-target'] as WebAppFlags['webDeployTarget'],
+              webRealtime: argv['web-realtime'] as WebAppFlags['webRealtime'],
+              webAuthFlow: argv['web-auth-flow'] as WebAppFlags['webAuthFlow'],
+            } : undefined,
+            backendFlags: hasBackendFlag ? {
+              backendApiStyle: argv['backend-api-style'] as BackendFlags['backendApiStyle'],
+              backendDataStore: argv['backend-data-store'] as BackendFlags['backendDataStore'],
+              backendAuth: argv['backend-auth'] as BackendFlags['backendAuth'],
+              backendMessaging: argv['backend-messaging'] as BackendFlags['backendMessaging'],
+              backendDeployTarget: argv['backend-deploy-target'] as BackendFlags['backendDeployTarget'],
+              backendDomain: argv['backend-domain'] as BackendFlags['backendDomain'],
+            } : undefined,
+            cliFlags: hasCliTypeFlag ? {
+              cliInteractivity: argv['cli-interactivity'] as CliFlags['cliInteractivity'],
+              cliDistribution: argv['cli-distribution'] as CliFlags['cliDistribution'],
+              cliStructuredOutput: argv['cli-structured-output'],
+            } : undefined,
+            libraryFlags: hasLibFlag ? {
+              libVisibility: argv['lib-visibility'] as LibraryFlags['libVisibility'],
+              libRuntimeTarget: argv['lib-runtime-target'] as LibraryFlags['libRuntimeTarget'],
+              libBundleFormat: argv['lib-bundle-format'] as LibraryFlags['libBundleFormat'],
+              libTypeDefinitions: argv['lib-type-definitions'],
+              libDocLevel: argv['lib-doc-level'] as LibraryFlags['libDocLevel'],
+            } : undefined,
+            mobileAppFlags: hasMobileFlag ? {
+              mobilePlatform: argv['mobile-platform'] as MobileAppFlags['mobilePlatform'],
+              mobileDistribution: argv['mobile-distribution'] as MobileAppFlags['mobileDistribution'],
+              mobileOffline: argv['mobile-offline'] as MobileAppFlags['mobileOffline'],
+              mobilePushNotifications: argv['mobile-push-notifications'],
+            } : undefined,
+            dataPipelineFlags: hasPipelineFlag ? {
+              pipelineProcessing: argv['pipeline-processing'] as DataPipelineFlags['pipelineProcessing'],
+              pipelineOrchestration: argv['pipeline-orchestration'] as DataPipelineFlags['pipelineOrchestration'],
+              pipelineQuality: argv['pipeline-quality'] as DataPipelineFlags['pipelineQuality'],
+              pipelineSchema: argv['pipeline-schema'] as DataPipelineFlags['pipelineSchema'],
+              pipelineCatalog: argv['pipeline-catalog'],
+            } : undefined,
+            mlFlags: hasMlFlag ? {
+              mlPhase: argv['ml-phase'] as MlFlags['mlPhase'],
+              mlModelType: argv['ml-model-type'] as MlFlags['mlModelType'],
+              mlServing: argv['ml-serving'] as MlFlags['mlServing'],
+              mlExperimentTracking: argv['ml-experiment-tracking'],
+            } : undefined,
+            browserExtensionFlags: hasExtFlag ? {
+              extManifest: argv['ext-manifest'] as BrowserExtensionFlags['extManifest'],
+              extUiSurfaces: argv['ext-ui-surfaces'] as BrowserExtensionFlags['extUiSurfaces'],
+              extContentScript: argv['ext-content-script'],
+              extBackgroundWorker: argv['ext-background-worker'],
+            } : undefined,
+            researchFlags: hasResearchFlag ? {
+              researchDriver: argv['research-driver'] as ResearchFlags['researchDriver'],
+              researchInteraction: argv['research-interaction'] as ResearchFlags['researchInteraction'],
+              researchDomain: argv['research-domain'] as ResearchFlags['researchDomain'],
+              researchTracking: argv['research-tracking'],
+            } : undefined,
+          }))
 
-      if (!result.success) {
-        for (const err of result.errors) {
-          output.error(err)
+          if (!result!.success) {
+            for (const err of result!.errors) {
+              output.error(err)
+            }
+            process.exitCode = 1
+            return
+          }
+          phase1Success = true
         }
-        process.exitCode = 1
-        return
-      }
+      })
+
+      // Phase 2: build + skill sync (Ctrl-C → partial output warning)
+      if (!phase1Success) return
 
       await shutdown.withContext(
         'Cancelled. Partial output may exist. Run `scaffold build` to regenerate.',
@@ -616,18 +720,27 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
             // best-effort — don't fail init if skill sync fails
           }
 
-          if (outputMode === 'json') {
+          if (outputMode === 'json' && result) {
             output.result({
               ...result,
               buildResult: buildResult.data ?? null,
             })
-          } else {
+          } else if (result) {
             output.success(`Scaffold initialized at ${result.configPath}`)
+          } else {
+            // --from path: no WizardResult, just confirm success
+            output.success(`Scaffold initialized at ${path.join(projectRoot, '.scaffold', 'config.yml')}`)
           }
-
         },
       )
-    })
+    } catch (err) {
+      if (isScaffoldUserError(err)) {
+        output.error(err.message)
+        process.exitCode = 2
+        return
+      }
+      throw err
+    }
   },
 }
 

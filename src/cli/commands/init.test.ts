@@ -11,6 +11,8 @@ import yargs, { type Argv } from 'yargs'
 
 vi.mock('../../wizard/wizard.js', () => ({
   runWizard: vi.fn(),
+  materializeScaffoldProject: vi.fn(),
+  readOldStateIfExists: vi.fn().mockReturnValue(undefined),
 }))
 
 vi.mock('../middleware/output-mode.js', () => ({

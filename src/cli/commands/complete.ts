@@ -8,6 +8,7 @@ import { findClosestMatch } from '../../utils/levenshtein.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
 import { shutdown } from '../shutdown.js'
+import { assertSingleServiceOrExit } from '../guards.js'
 
 interface CompleteArgs {
   step: string
@@ -39,6 +40,10 @@ const completeCommand: CommandModule<Record<string, unknown>, CompleteArgs> = {
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
+    const context = loadPipelineContext(projectRoot)
+    assertSingleServiceOrExit(context.config ?? {}, { commandName: 'complete', output })
+    if (process.exitCode === 2) return
+
     // Acquire lock
     const lockResult = acquireLock(projectRoot, 'complete', argv.step)
     if (!lockResult.acquired && !argv.force) {
@@ -61,9 +66,12 @@ const completeCommand: CommandModule<Record<string, unknown>, CompleteArgs> = {
         shutdown.releaseLockOwnership()
       }
     }, async () => {
-      const context = loadPipelineContext(projectRoot)
       const pipeline = resolvePipeline(context)
-      const stateManager = new StateManager(projectRoot, pipeline.computeEligible)
+      const stateManager = new StateManager(
+        projectRoot,
+        pipeline.computeEligible,
+        () => context.config ?? undefined,
+      )
       const state = stateManager.loadState()
 
       // Check step exists in state

@@ -157,13 +157,21 @@ describe('validateState', () => {
   // ---- Schema version validation ----
 
   describe('schema version validation', () => {
-    it('returns STATE_SCHEMA_VERSION error when version is not 1', () => {
-      const state = makeState({ 'schema-version': 2 })
+    it('returns STATE_SCHEMA_VERSION error when version is not 1 or 2', () => {
+      // Wave 3a: validator now accepts schema-version 1 and 2. Use 99 to trigger the error.
+      const state = makeState({ 'schema-version': 99 })
       const root = makeProjectRoot(state)
       const result = validateState(root)
       expect(result.errors).toHaveLength(1)
       expect(result.errors[0].code).toBe('STATE_SCHEMA_VERSION')
       expect(result.errors[0].exitCode).toBe(ExitCode.StateCorruption)
+    })
+
+    it('accepts schema-version 2 (Wave 3a multi-service)', () => {
+      const state = makeState({ 'schema-version': 2 })
+      const root = makeProjectRoot(state)
+      const result = validateState(root)
+      expect(result.errors.filter(e => e.code === 'STATE_SCHEMA_VERSION')).toHaveLength(0)
     })
 
     it('returns STATE_SCHEMA_VERSION for version 0', () => {

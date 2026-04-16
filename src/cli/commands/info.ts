@@ -8,6 +8,7 @@ import { createOutputContext } from '../output/context.js'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
+import { assertSingleServiceOrExit } from '../guards.js'
 
 interface InfoArgs {
   step?: string
@@ -44,7 +45,14 @@ const infoCommand: CommandModule<Record<string, unknown>, InfoArgs> = {
     if (!argv.step) {
       // Project info mode
       const { config } = loadConfig(projectRoot, [])
-      const stateManager = new StateManager(projectRoot, () => [])
+      assertSingleServiceOrExit(config ?? {}, { commandName: 'info', output })
+      if (process.exitCode === 2) return
+
+      const stateManager = new StateManager(
+        projectRoot,
+        () => [],
+        () => config ?? undefined,
+      )
       let state
       try { state = stateManager.loadState() } catch { state = null }
 
@@ -68,6 +76,10 @@ const infoCommand: CommandModule<Record<string, unknown>, InfoArgs> = {
     }
 
     // Step info mode
+    const { config: stepInfoConfig } = loadConfig(projectRoot, [])
+    assertSingleServiceOrExit(stepInfoConfig ?? {}, { commandName: 'info', output })
+    if (process.exitCode === 2) return
+
     const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))
     const mp = metaPrompts.get(argv.step)
     if (!mp) {
@@ -80,7 +92,7 @@ const infoCommand: CommandModule<Record<string, unknown>, InfoArgs> = {
       return
     }
 
-    const stateManager = new StateManager(projectRoot, () => [])
+    const stateManager = new StateManager(projectRoot, () => [], () => undefined)
     let state
     try { state = stateManager.loadState() } catch { state = null }
     const stepState = state?.steps?.[argv.step]

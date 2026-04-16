@@ -6,6 +6,15 @@ All notable changes to Scaffold are documented here.
 
 ### Added
 - **Backend fintech domain sub-overlay** — `BackendConfig.domain` accepts `'none' | 'fintech'` (default `'none'`). Opt in via wizard prompt or `--backend-domain fintech` (both `scaffold init` and `scaffold adopt`). Fintech-specific guidance — compliance (PCI-DSS, SEC 17a-4, SOC 2), ledger design, broker integration, order lifecycle, risk management, testing, data modeling, observability — is appended to the relevant pipeline steps via `content/methodology/backend-fintech.yml` and 8 new knowledge docs under `content/knowledge/backend/backend-fintech-*.md`. Mirrors the existing `research-quant-finance` sub-overlay pattern.
+- **Multi-service manifest schema**: `ProjectSchema.services[]` accepts an array of per-service configs (each with `name`, `projectType`, one matching per-type config, and optional `path`). Service names must be kebab-case.
+- **Declarative init**: `scaffold init --from <file.yml>` reads a full ScaffoldConfig from YAML (or stdin via `-`) instead of running the wizard. Exclusive with config-setting flags.
+- **Multi-service execution guard**: `scaffold run`, `next`, `complete`, `skip`, `status`, `rework`, `reset`, `info`, and `dashboard` reject configs containing `services[]` with a clear "lands in Wave 2" message until multi-service execution ships.
+
+### Changed
+- **State `schema-version`**: widened from literal `1` to `1 | 2`. Projects with `services[]` initialize state at version 2; single-service projects stay at version 1. The v2 shape is identical to v1 for Wave 3a; Wave 3b will change the shape and bump to 3.
+- **`ProjectSchema.superRefine` refactored**: per-type coupling validation moved into `src/config/validators/` modules shared by `ProjectSchema` and the new `ServiceSchema`. Behavior-preserving.
+- **`runWizard()` split**: `collectWizardAnswers` + `materializeScaffoldProject` exported separately. `scaffold init --from` uses the materializer directly.
+- **`scaffold init` exit code on existing `.scaffold/` without `--force`**: now exits with code 2 and a `ScaffoldUserError` diagnostic, consistent with the rest of the Wave 3a `--from` error surface. Previously exited with code 1 via the wizard's `WizardResult.errors` path. User-visible but trivial — the error message is clearer and the behavior is preserved.
 
 ## [3.16.0] — 2026-04-13
 
