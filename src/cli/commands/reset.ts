@@ -82,7 +82,11 @@ async function resetStep(
   const doReset = async (): Promise<void> => {
     const context = loadPipelineContext(projectRoot)
     const pipeline = resolvePipeline(context)
-    const stateManager = new StateManager(projectRoot, pipeline.computeEligible)
+    const stateManager = new StateManager(
+      projectRoot,
+      pipeline.computeEligible,
+      () => context.config ?? undefined,
+    )
     const state = stateManager.loadState()
 
     // Check step exists in state

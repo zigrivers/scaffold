@@ -1,8 +1,9 @@
 import type { PipelineState, StepStateEntry, InProgressRecord, DepthLevel, StepStatus } from '../types/index.js'
 import type { ScaffoldError } from '../types/index.js'
 import { atomicWriteFile, fileExists, ensureDir } from '../utils/fs.js'
-import { stateMissing, stateParseError, stateSchemaVersion, psmAlreadyInProgress } from '../utils/errors.js'
+import { stateMissing, stateParseError, psmAlreadyInProgress } from '../utils/errors.js'
 import { migrateState } from './state-migration.js'
+import { dispatchStateMigration } from './state-version-dispatch.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { MethodologyName } from '../types/index.js'
@@ -13,6 +14,7 @@ export class StateManager {
   constructor(
     private projectRoot: string,
     private computeEligible: (steps: Record<string, StepStateEntry>) => string[],
+    private configProvider?: () => { project?: { services?: unknown[] } } | undefined,
   ) {
     this.statePath = path.join(projectRoot, '.scaffold', 'state.json')
   }
@@ -37,10 +39,13 @@ export class StateManager {
       throw stateParseError(this.statePath, (err as Error).message)
     }
 
-    const schemaVersion = parsed['schema-version']
-    if (schemaVersion !== 1) {
-      throw stateSchemaVersion(1, schemaVersion as number, this.statePath)
-    }
+    // Wave 3a: widen schema-version handling to 1 | 2 via dispatch.
+    // The dispatch asserts the version is 1 or 2 (throwing otherwise) and
+    // mutates raw in-place to bump v1 → v2 when the companion config has
+    // services[].
+    const config = this.configProvider?.()
+    const ctx = { hasServices: (config?.project?.services?.length ?? 0) > 0 }
+    dispatchStateMigration(parsed, ctx, this.statePath)
 
     // ADR-033: forward compatibility — unknown fields produce warnings (not errors) and are preserved
     const state = parsed as unknown as PipelineState
@@ -167,11 +172,17 @@ export class StateManager {
     scaffoldVersion: string
     methodology: string
     initMode: 'greenfield' | 'brownfield' | 'v1-migration'
+    // Wave 3a: config is optional so existing callers compile unchanged.
+    // When provided and project.services[] is non-empty, emit schema-version 2.
+    config?: { project?: { services?: unknown[] } }
   }): void {
     ensureDir(path.join(this.projectRoot, '.scaffold'))
 
+    const schemaVersion: 1 | 2 =
+      (options.config?.project?.services?.length ?? 0) > 0 ? 2 : 1
+
     const state: PipelineState = {
-      'schema-version': 1,
+      'schema-version': schemaVersion,
       'scaffold-version': options.scaffoldVersion,
       init_methodology: options.methodology as MethodologyName,
       config_methodology: options.methodology as MethodologyName,

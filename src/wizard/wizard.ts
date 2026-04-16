@@ -198,7 +198,7 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
     produces: mp.frontmatter.outputs ?? [],
   }))
 
-  const stateManager = new StateManager(projectRoot, () => [])
+  const stateManager = new StateManager(projectRoot, () => [], () => config)
   stateManager.initializeState({
     enabledSteps: allSteps,
     scaffoldVersion: '2.0.0',
@@ -208,6 +208,7 @@ export async function runWizard(options: WizardOptions): Promise<WizardResult> {
       : detection.mode === 'brownfield'
         ? 'brownfield'
         : 'greenfield',
+    config,
   })
 
   // Merge completed/skipped steps from old state (--force re-init)

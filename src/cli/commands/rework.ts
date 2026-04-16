@@ -286,7 +286,11 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
         return
       }
       const pipeline = resolvePipeline(context, { output })
-      const stateManager = new StateManager(projectRoot as string, pipeline.computeEligible)
+      const stateManager = new StateManager(
+        projectRoot as string,
+        pipeline.computeEligible,
+        () => context.config ?? undefined,
+      )
       const state = stateManager.loadState()
 
       const metaPromptList = [...context.metaPrompts.values()].map(m => m.frontmatter)

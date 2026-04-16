@@ -139,7 +139,11 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       // Step 4: Load and validate state
       // -----------------------------------------------------------------------
 
-      const stateManager = new StateManager(projectRoot, pipeline.computeEligible)
+      const stateManager = new StateManager(
+        projectRoot,
+        pipeline.computeEligible,
+        () => config,
+      )
       let state = stateManager.loadState()
 
       // Crash recovery: in_progress is non-null from a previous run

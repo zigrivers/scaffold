@@ -103,7 +103,11 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     // 3. Load pipeline context and resolve overlay/graph
     const context = loadPipelineContext(projectRoot)
     const pipeline = resolvePipeline(context, { output })
-    const stateManager = new StateManager(projectRoot, pipeline.computeEligible)
+    const stateManager = new StateManager(
+      projectRoot,
+      pipeline.computeEligible,
+      () => context.config ?? undefined,
+    )
 
     // Reconcile state with current pipeline — adds any new steps that were
     // introduced after the project was initialized (e.g., story-tests).

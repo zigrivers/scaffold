@@ -44,7 +44,11 @@ const infoCommand: CommandModule<Record<string, unknown>, InfoArgs> = {
     if (!argv.step) {
       // Project info mode
       const { config } = loadConfig(projectRoot, [])
-      const stateManager = new StateManager(projectRoot, () => [])
+      const stateManager = new StateManager(
+        projectRoot,
+        () => [],
+        () => config ?? undefined,
+      )
       let state
       try { state = stateManager.loadState() } catch { state = null }
 
@@ -80,7 +84,7 @@ const infoCommand: CommandModule<Record<string, unknown>, InfoArgs> = {
       return
     }
 
-    const stateManager = new StateManager(projectRoot, () => [])
+    const stateManager = new StateManager(projectRoot, () => [], () => undefined)
     let state
     try { state = stateManager.loadState() } catch { state = null }
     const stepState = state?.steps?.[argv.step]

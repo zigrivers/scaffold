@@ -377,4 +377,87 @@ describe('StateManager', () => {
       expect(fs.existsSync(tmpPath)).toBe(false)
     })
   })
+
+  describe('StateManager — schema-version dispatch (Wave 3a)', () => {
+    function writeRawState(dir: string, body: Record<string, unknown>): void {
+      const statePath = path.join(dir, '.scaffold', 'state.json')
+      fs.writeFileSync(statePath, JSON.stringify(body, null, 2), 'utf8')
+    }
+
+    function baseV1State(): Record<string, unknown> {
+      return {
+        'schema-version': 1,
+        'scaffold-version': '2.0.0',
+        init_methodology: 'deep',
+        config_methodology: 'deep',
+        'init-mode': 'greenfield',
+        created: new Date().toISOString(),
+        in_progress: null,
+        steps: {},
+        next_eligible: [],
+        'extra-steps': [],
+      }
+    }
+
+    it('loads v1 state when config has no services', () => {
+      const tempDir = makeTempDir()
+      writeRawState(tempDir, baseV1State())
+
+      // configProvider returns a single-service-shaped config (no services[])
+      const manager = new StateManager(
+        tempDir,
+        computeEligible,
+        () => ({ project: {} }),
+      )
+
+      const state = manager.loadState()
+      expect(state['schema-version']).toBe(1)
+    })
+
+    it('bumps v1 state to v2 in memory when config has services[]', () => {
+      const tempDir = makeTempDir()
+      writeRawState(tempDir, baseV1State())
+
+      const manager = new StateManager(
+        tempDir,
+        computeEligible,
+        () => ({ project: { services: [{ name: 'svc-a' }, { name: 'svc-b' }] } }),
+      )
+
+      const state = manager.loadState()
+      expect(state['schema-version']).toBe(2)
+    })
+
+    it('rejects unknown schema-version', () => {
+      const tempDir = makeTempDir()
+      const bad = baseV1State()
+      bad['schema-version'] = 99
+      writeRawState(tempDir, bad)
+
+      const manager = new StateManager(tempDir, computeEligible, () => undefined)
+
+      expect(() => manager.loadState()).toThrow()
+      try {
+        manager.loadState()
+      } catch (err) {
+        expect((err as { code: string }).code).toBe('STATE_SCHEMA_VERSION')
+      }
+    })
+
+    it('accepts v2 state unchanged', () => {
+      const tempDir = makeTempDir()
+      const v2 = baseV1State()
+      v2['schema-version'] = 2
+      writeRawState(tempDir, v2)
+
+      const manager = new StateManager(
+        tempDir,
+        computeEligible,
+        () => ({ project: { services: [{ name: 'svc-a' }] } }),
+      )
+
+      const state = manager.loadState()
+      expect(state['schema-version']).toBe(2)
+    })
+  })
 })

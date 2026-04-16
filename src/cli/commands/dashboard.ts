@@ -63,8 +63,15 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
-    // 3. Load state
-    const stateManager = new StateManager(projectRoot, () => [])
+    // 3. Load config (needed for state dispatch + methodology resolution)
+    const { config } = loadConfig(projectRoot, [])
+
+    // 4. Load state
+    const stateManager = new StateManager(
+      projectRoot,
+      () => [],
+      () => config ?? undefined,
+    )
     let state: PipelineState
     try {
       state = stateManager.loadState()
@@ -79,11 +86,8 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
       return
     }
 
-    // 4. Load decisions
+    // 5. Load decisions
     const decisions = readDecisions(projectRoot)
-
-    // 5. Load config for methodology
-    const { config } = loadConfig(projectRoot, [])
     const methodology =
       (config as ConfigWithMethodology)?.methodology?.preset ??
       state.config_methodology ??
