@@ -21,6 +21,7 @@ import { resolveOutputMode } from '../../cli/middleware/output-mode.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
 import { resolveContainedArtifactPath } from '../../utils/artifact-path.js'
 import { shutdown } from '../shutdown.js'
+import { assertSingleServiceOrExit } from '../guards.js'
 import type { DepthLevel } from '../../types/enums.js'
 import type { ArtifactEntry } from '../../types/assembly.js'
 
@@ -88,6 +89,9 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       return
     }
     const config = context.config
+    assertSingleServiceOrExit(config, { commandName: 'run', output })
+    if (process.exitCode === 2) return
+
     const pipeline = resolvePipeline(context, { output })
 
     const metaPrompt = context.metaPrompts.get(step)
@@ -139,7 +143,11 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       // Step 4: Load and validate state
       // -----------------------------------------------------------------------
 
-      const stateManager = new StateManager(projectRoot, pipeline.computeEligible)
+      const stateManager = new StateManager(
+        projectRoot,
+        pipeline.computeEligible,
+        () => config,
+      )
       let state = stateManager.loadState()
 
       // Crash recovery: in_progress is non-null from a previous run

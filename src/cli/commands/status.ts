@@ -9,6 +9,7 @@ import { StateManager } from '../../state/state-manager.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
 import { PHASES } from '../../types/frontmatter.js'
+import { assertSingleServiceOrExit } from '../guards.js'
 
 /** Check if any pipeline/knowledge source is newer than its generated command. */
 function checkCommandStaleness(projectRoot: string): number {
@@ -102,8 +103,15 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
 
     // 3. Load pipeline context and resolve overlay/graph
     const context = loadPipelineContext(projectRoot)
+    assertSingleServiceOrExit(context.config ?? {}, { commandName: 'status', output })
+    if (process.exitCode === 2) return
+
     const pipeline = resolvePipeline(context, { output })
-    const stateManager = new StateManager(projectRoot, pipeline.computeEligible)
+    const stateManager = new StateManager(
+      projectRoot,
+      pipeline.computeEligible,
+      () => context.config ?? undefined,
+    )
 
     // Reconcile state with current pipeline — adds any new steps that were
     // introduced after the project was initialized (e.g., story-tests).

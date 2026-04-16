@@ -162,13 +162,20 @@ export function frontmatterUnknownField(field: string, file: string): ScaffoldWa
   }
 }
 
-export function stateSchemaVersion(expected: number, actual: number, file: string): ScaffoldError {
+export function stateSchemaVersion(
+  expected: number | readonly number[],
+  actual: number,
+  file: string,
+): ScaffoldError {
+  const expectedDisplay = Array.isArray(expected)
+    ? expected.join(' or ')
+    : String(expected)
   return {
     code: 'STATE_SCHEMA_VERSION',
-    message: `state.json schema version ${actual} is not supported (expected ${expected})`,
+    message: `state.json schema version ${actual} is not supported (expected ${expectedDisplay})`,
     exitCode: 3,
     recovery: 'Run "scaffold reset" to reinitialize state, or upgrade scaffold',
-    context: { file, expected, actual },
+    context: { file, expected: Array.isArray(expected) ? expected[0] : expected, actual },
   }
 }
 

@@ -109,6 +109,25 @@ export interface ProjectTypeOverlay {
   dependencyOverrides: Record<string, DependencyOverride>
 }
 
+/** Service configuration — mirrors ServiceSchema structure for manual type declarations. */
+export interface ServiceConfig {
+  name: string
+  description?: string
+  projectType: ProjectType
+  backendConfig?: BackendConfig
+  webAppConfig?: WebAppConfig
+  researchConfig?: ResearchConfig
+  libraryConfig?: LibraryConfig
+  cliConfig?: CliConfig
+  mobileAppConfig?: MobileAppConfig
+  dataPipelineConfig?: DataPipelineConfig
+  mlConfig?: MlConfig
+  gameConfig?: GameConfig
+  browserExtensionConfig?: BrowserExtensionConfig
+  path?: string
+  // No `exports` field — Wave 3c.
+}
+
 /** Project characteristics from config.yml. */
 export interface ProjectConfig {
   name?: string
@@ -124,6 +143,7 @@ export interface ProjectConfig {
   mlConfig?: MlConfig
   browserExtensionConfig?: BrowserExtensionConfig
   researchConfig?: ResearchConfig
+  services?: ServiceConfig[]
   [key: string]: unknown  // forward compatibility
 }
 

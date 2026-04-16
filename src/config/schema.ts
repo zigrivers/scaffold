@@ -1,6 +1,7 @@
 // src/config/schema.ts
 
 import { z } from 'zod'
+import { ALL_COUPLING_VALIDATORS, configKeyFor } from './validators/index.js'
 
 const CustomStepSchema = z.object({
   enabled: z.boolean().optional(),
@@ -109,7 +110,41 @@ export const GameConfigSchema = z.object({
   npcAiComplexity: z.enum(['none', 'simple', 'complex']).default('none'),
 }).strict()
 
-const ProjectSchema = z.object({
+export const ServiceSchema = z.object({
+  name: z.string().min(1).regex(/^[a-z][a-z0-9-]*$/, {
+    message: 'name must be kebab-case starting with a letter',
+  }),
+  description: z.string().optional(),
+  projectType: ProjectTypeSchema,
+  backendConfig: BackendConfigSchema.optional(),
+  webAppConfig: WebAppConfigSchema.optional(),
+  researchConfig: ResearchConfigSchema.optional(),
+  libraryConfig: LibraryConfigSchema.optional(),
+  cliConfig: CliConfigSchema.optional(),
+  mobileAppConfig: MobileAppConfigSchema.optional(),
+  dataPipelineConfig: DataPipelineConfigSchema.optional(),
+  mlConfig: MlConfigSchema.optional(),
+  gameConfig: GameConfigSchema.optional(),
+  browserExtensionConfig: BrowserExtensionConfigSchema.optional(),
+  path: z.string().optional(),
+  // NOTE: no `exports` field in Wave 3a — deferred to Wave 3c.
+}).strict().superRefine((svc, ctx) => {
+  // Shared per-type coupling (config present without matching projectType).
+  for (const v of ALL_COUPLING_VALIDATORS) {
+    v.validate(ctx, [], svc.projectType, (svc as Record<string, unknown>)[v.configKey])
+  }
+  // ServiceSchema-only forward rule: projectType without matching config.
+  const expectedKey = configKeyFor(svc.projectType)
+  if ((svc as Record<string, unknown>)[expectedKey] === undefined) {
+    ctx.addIssue({
+      path: [expectedKey],
+      code: 'custom',
+      message: `${svc.projectType} service "${svc.name}" requires ${expectedKey}`,
+    })
+  }
+})
+
+export const ProjectSchema = z.object({
   name: z.string().min(1).optional(),
   platforms: z.array(z.enum(['web', 'mobile', 'desktop'])).optional(),
   projectType: ProjectTypeSchema.optional(),
@@ -123,93 +158,27 @@ const ProjectSchema = z.object({
   mlConfig: MlConfigSchema.optional(),
   browserExtensionConfig: BrowserExtensionConfigSchema.optional(),
   researchConfig: ResearchConfigSchema.optional(),
+  services: z.array(ServiceSchema).min(1).optional(),
 }).passthrough()  // allow unknown fields per ADR-033
   .superRefine((data, ctx) => {
-    if (data.gameConfig !== undefined && data.projectType !== 'game') {
-      ctx.addIssue({ path: ['gameConfig'], code: 'custom',
-        message: 'gameConfig is only valid when projectType is "game"' })
+    for (const v of ALL_COUPLING_VALIDATORS) {
+      v.validate(
+        ctx,
+        [],
+        data.projectType,
+        (data as Record<string, unknown>)[v.configKey],
+      )
     }
-    if (data.webAppConfig !== undefined && data.projectType !== 'web-app') {
-      ctx.addIssue({ path: ['webAppConfig'], code: 'custom',
-        message: 'webAppConfig requires projectType: web-app' })
-    }
-    if (data.backendConfig !== undefined && data.projectType !== 'backend') {
-      ctx.addIssue({ path: ['backendConfig'], code: 'custom',
-        message: 'backendConfig requires projectType: backend' })
-    }
-    if (data.cliConfig !== undefined && data.projectType !== 'cli') {
-      ctx.addIssue({ path: ['cliConfig'], code: 'custom',
-        message: 'cliConfig requires projectType: cli' })
-    }
-    if (data.libraryConfig !== undefined && data.projectType !== 'library') {
-      ctx.addIssue({ path: ['libraryConfig'], code: 'custom',
-        message: 'libraryConfig requires projectType: library' })
-    }
-    if (data.mobileAppConfig !== undefined && data.projectType !== 'mobile-app') {
-      ctx.addIssue({ path: ['mobileAppConfig'], code: 'custom',
-        message: 'mobileAppConfig requires projectType: mobile-app' })
-    }
-    if (data.dataPipelineConfig !== undefined && data.projectType !== 'data-pipeline') {
-      ctx.addIssue({ path: ['dataPipelineConfig'], code: 'custom',
-        message: 'dataPipelineConfig requires projectType: data-pipeline' })
-    }
-    if (data.mlConfig !== undefined && data.projectType !== 'ml') {
-      ctx.addIssue({ path: ['mlConfig'], code: 'custom',
-        message: 'mlConfig requires projectType: ml' })
-    }
-    if (data.browserExtensionConfig !== undefined && data.projectType !== 'browser-extension') {
-      ctx.addIssue({ path: ['browserExtensionConfig'], code: 'custom',
-        message: 'browserExtensionConfig requires projectType: browser-extension' })
-    }
-    if (data.researchConfig !== undefined && data.projectType !== 'research') {
-      ctx.addIssue({ path: ['researchConfig'], code: 'custom',
-        message: 'researchConfig requires projectType: research' })
-    }
-    if (data.researchConfig) {
-      const { experimentDriver, interactionMode } = data.researchConfig
-      if (experimentDriver === 'notebook-driven' && interactionMode === 'autonomous') {
-        ctx.addIssue({ path: ['researchConfig', 'interactionMode'], code: 'custom',
-          message: 'Notebook-driven execution cannot be fully autonomous' })
-      }
-    }
-    if (data.libraryConfig) {
-      const { visibility, documentationLevel } = data.libraryConfig
-      if (visibility === 'public' && documentationLevel === 'none') {
+    // Unique service names
+    if (data.services) {
+      const names = data.services.map(s => s.name)
+      const dupes = [...new Set(names.filter((n, i) => names.indexOf(n) !== i))]
+      if (dupes.length > 0) {
         ctx.addIssue({
-          path: ['libraryConfig', 'documentationLevel'],
+          path: ['services'],
           code: 'custom',
-          message: 'Public libraries should have documentation'
-            + ' (documentationLevel: none with visibility: public)',
+          message: `Duplicate service names: ${dupes.join(', ')}`,
         })
-      }
-    }
-    if (data.webAppConfig) {
-      const { renderingStrategy, deployTarget, authFlow } = data.webAppConfig
-      if (['ssr', 'hybrid'].includes(renderingStrategy) && deployTarget === 'static') {
-        ctx.addIssue({ path: ['webAppConfig', 'deployTarget'], code: 'custom',
-          message: 'SSR/hybrid rendering requires compute, not static hosting' })
-      }
-      if (authFlow === 'session' && deployTarget === 'static') {
-        ctx.addIssue({ path: ['webAppConfig', 'authFlow'], code: 'custom',
-          message: 'Session auth requires server state, incompatible with static hosting' })
-      }
-    }
-    if (data.mlConfig) {
-      const { projectPhase, servingPattern } = data.mlConfig
-      if (projectPhase === 'inference' && servingPattern === 'none') {
-        ctx.addIssue({ path: ['mlConfig', 'servingPattern'], code: 'custom',
-          message: 'Inference projects must specify a serving pattern' })
-      }
-      if (projectPhase === 'training' && servingPattern !== 'none') {
-        ctx.addIssue({ path: ['mlConfig', 'servingPattern'], code: 'custom',
-          message: 'Training-only projects should not have a serving pattern' })
-      }
-    }
-    if (data.browserExtensionConfig) {
-      const { uiSurfaces, hasContentScript, hasBackgroundWorker } = data.browserExtensionConfig
-      if ((!uiSurfaces || uiSurfaces.length === 0) && !hasContentScript && !hasBackgroundWorker) {
-        ctx.addIssue({ path: ['browserExtensionConfig'], code: 'custom',
-          message: 'Extension must have at least one UI surface, content script, or background worker' })
       }
     }
   })
