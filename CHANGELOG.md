@@ -9,6 +9,11 @@ All notable changes to Scaffold are documented here.
 - **Multi-service manifest schema**: `ProjectSchema.services[]` accepts an array of per-service configs (each with `name`, `projectType`, one matching per-type config, and optional `path`). Service names must be kebab-case.
 - **Declarative init**: `scaffold init --from <file.yml>` reads a full ScaffoldConfig from YAML (or stdin via `-`) instead of running the wizard. Exclusive with config-setting flags.
 - **Multi-service execution guard**: `scaffold run`, `next`, `complete`, `skip`, `status`, `rework`, `reset`, `info`, and `dashboard` reject configs containing `services[]` with a clear "lands in Wave 2" message until multi-service execution ships.
+- **Cross-service pipeline content (Wave 2)** — 5 new pipeline steps and 8 restructured knowledge documents supporting multi-service projects:
+  - **Pipeline steps**: `cross-service-ownership-map`, `cross-service-contracts`, `cross-service-auth`, `cross-service-observability`, `cross-service-test-plan` — each injects domain expertise into the appropriate pipeline phases for multi-service projects.
+  - **Knowledge docs**: `multi-service-architecture`, `multi-service-data-ownership`, `multi-service-api-contracts`, `multi-service-auth`, `multi-service-observability`, `multi-service-testing`, `multi-service-resilience`, `multi-service-task-decomposition` — all restructured with a concise `## Summary` (≤80 lines) and full-depth `## Deep Guidance` section.
+  - **`multi-service` preset**: registered in all three methodology YAMLs; enables the 5 cross-service steps while exempting them from phase-ordering and terminal-output constraints.
+  - **`PipelineOverlay` structural overlay**: `loadStructuralOverlay()` injects cross-service steps when `services[]` is present; the overlay resolves after the project-type overlay in `resolveOverlayState()`.
 
 ### Changed
 - **State `schema-version`**: widened from literal `1` to `1 | 2`. Projects with `services[]` initialize state at version 2; single-service projects stay at version 1. The v2 shape is identical to v1 for Wave 3a; Wave 3b will change the shape and bump to 3.
