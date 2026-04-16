@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { applyOverlay } from './overlay-resolver.js'
-import type { ProjectTypeOverlay, StepEnablementEntry } from '../../types/index.js'
+import type { PipelineOverlay, StepEnablementEntry } from '../../types/index.js'
 
-function makeOverlay(overrides: Partial<ProjectTypeOverlay> = {}): ProjectTypeOverlay {
+function makeOverlay(overrides: Partial<PipelineOverlay> = {}): PipelineOverlay {
   return {
     name: 'test-overlay',
     description: 'Test overlay',

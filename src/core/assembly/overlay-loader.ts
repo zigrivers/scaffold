@@ -1,6 +1,6 @@
 import type { StepEnablementEntry } from '../../types/index.js'
 import type {
-  ProjectTypeOverlay, KnowledgeOverride, ReadsOverride, DependencyOverride,
+  PipelineOverlay, KnowledgeOverride, ReadsOverride, DependencyOverride,
 } from '../../types/index.js'
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
 import { ProjectTypeSchema } from '../../config/schema.js'
@@ -140,7 +140,7 @@ export function parseDependencyOverrides(
  */
 export function loadOverlay(
   overlayPath: string,
-): { overlay: ProjectTypeOverlay | null; errors: ScaffoldError[]; warnings: ScaffoldWarning[] } {
+): { overlay: PipelineOverlay | null; errors: ScaffoldError[]; warnings: ScaffoldWarning[] } {
   const errors: ScaffoldError[] = []
   const warnings: ScaffoldWarning[] = []
 
@@ -219,10 +219,10 @@ export function loadOverlay(
   const dependencyOverridesRaw = isPlainObject(obj['dependency-overrides'])
     ? obj['dependency-overrides'] as Record<string, unknown> : {}
 
-  const overlay: ProjectTypeOverlay = {
+  const overlay: PipelineOverlay = {
     name: (obj['name'] as string).trim(),
     description: (obj['description'] as string).trim(),
-    projectType: (obj['project-type'] as string).trim() as ProjectTypeOverlay['projectType'],
+    projectType: (obj['project-type'] as string).trim() as PipelineOverlay['projectType'],
     stepOverrides: parseStepOverrides(stepOverridesRaw, warnings, overlayPath),
     knowledgeOverrides: parseKnowledgeOverrides(knowledgeOverridesRaw, warnings, overlayPath),
     readsOverrides: parseReadsOverrides(readsOverridesRaw, warnings, overlayPath),
@@ -241,7 +241,7 @@ export function loadOverlay(
  */
 export function loadSubOverlay(
   overlayPath: string,
-): { overlay: ProjectTypeOverlay | null; errors: ScaffoldError[]; warnings: ScaffoldWarning[] } {
+): { overlay: PipelineOverlay | null; errors: ScaffoldError[]; warnings: ScaffoldWarning[] } {
   const result = loadOverlay(overlayPath)
   if (!result.overlay) return result
 

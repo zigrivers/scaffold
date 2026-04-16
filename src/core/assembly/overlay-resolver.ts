@@ -1,5 +1,5 @@
 import type {
-  ProjectTypeOverlay,
+  PipelineOverlay,
   KnowledgeOverride,
   ReadsOverride,
   DependencyOverride,
@@ -18,7 +18,7 @@ export function applyOverlay(
   knowledgeMap: Record<string, string[]>,
   readsMap: Record<string, string[]>,
   dependencyMap: Record<string, string[]>,
-  overlay: ProjectTypeOverlay,
+  overlay: PipelineOverlay,
 ): {
   steps: Record<string, StepEnablementEntry>
   knowledge: Record<string, string[]>
