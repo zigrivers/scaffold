@@ -158,6 +158,7 @@ export const ProjectSchema = z.object({
   mlConfig: MlConfigSchema.optional(),
   browserExtensionConfig: BrowserExtensionConfigSchema.optional(),
   researchConfig: ResearchConfigSchema.optional(),
+  services: z.array(ServiceSchema).min(1).optional(),
 }).passthrough()  // allow unknown fields per ADR-033
   .superRefine((data, ctx) => {
     for (const v of ALL_COUPLING_VALIDATORS) {
@@ -168,9 +169,18 @@ export const ProjectSchema = z.object({
         (data as Record<string, unknown>)[v.configKey],
       )
     }
-    // Intentionally no other rules here: all per-type coupling + intra-type
-    // rules moved into validator modules. Task 6 will add the services[]
-    // unique-names refinement.
+    // Unique service names
+    if (data.services) {
+      const names = data.services.map(s => s.name)
+      const dupes = [...new Set(names.filter((n, i) => names.indexOf(n) !== i))]
+      if (dupes.length > 0) {
+        ctx.addIssue({
+          path: ['services'],
+          code: 'custom',
+          message: `Duplicate service names: ${dupes.join(', ')}`,
+        })
+      }
+    }
   })
 
 export const ConfigSchema = z.object({

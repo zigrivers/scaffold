@@ -6,7 +6,7 @@ import {
   WebAppConfigSchema, BackendConfigSchema, CliConfigSchema,
   LibraryConfigSchema, MobileAppConfigSchema,
   DataPipelineConfigSchema, MlConfigSchema, BrowserExtensionConfigSchema,
-  ResearchConfigSchema, ServiceSchema,
+  ResearchConfigSchema, ServiceSchema, ProjectSchema,
 } from './schema.js'
 
 describe('ProjectTypeSchema', () => {
@@ -1113,5 +1113,67 @@ describe('ServiceSchema', () => {
       name: 'foo', projectType: 'totally-made-up',
     })
     expect(result.success).toBe(false)
+  })
+})
+
+describe('ProjectSchema.services refinements', () => {
+  const backendService = {
+    name: 'research-engine',
+    projectType: 'backend' as const,
+    backendConfig: {
+      apiStyle: 'rest' as const,
+      dataStore: ['relational'] as const,
+      authMechanism: 'apikey' as const,
+      asyncMessaging: 'none' as const,
+      deployTarget: 'container' as const,
+      domain: 'none' as const,
+    },
+  }
+
+  it('accepts a project with one service and no root projectType', () => {
+    const result = ProjectSchema.safeParse({ services: [backendService] })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts a project with services AND root projectType (backcompat — D-BC)', () => {
+    const result = ProjectSchema.safeParse({
+      projectType: 'backend',
+      backendConfig: backendService.backendConfig,
+      services: [backendService],
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts a project with no projectType and no services (backcompat — D-BC)', () => {
+    expect(ProjectSchema.safeParse({}).success).toBe(true)
+  })
+
+  it('rejects empty services array via .min(1)', () => {
+    const result = ProjectSchema.safeParse({ services: [] })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects services with duplicate names', () => {
+    const result = ProjectSchema.safeParse({
+      services: [
+        backendService,
+        { ...backendService, name: 'research-engine' },
+      ],
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const dupIssue = result.error.issues.find(i => i.path.join('.') === 'services')
+      expect(dupIssue?.message).toMatch(/Duplicate service names/i)
+    }
+  })
+
+  it('accepts services with distinct names', () => {
+    const result = ProjectSchema.safeParse({
+      services: [
+        backendService,
+        { ...backendService, name: 'trading-bot' },
+      ],
+    })
+    expect(result.success).toBe(true)
   })
 })
