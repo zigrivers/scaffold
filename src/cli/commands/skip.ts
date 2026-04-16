@@ -8,6 +8,7 @@ import { shutdown } from '../shutdown.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
+import { assertSingleServiceOrExit } from '../guards.js'
 
 interface SkipArgs {
   step: string | string[]
@@ -53,6 +54,10 @@ const skipCommand: CommandModule<Record<string, unknown>, SkipArgs> = {
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
+    const context = loadPipelineContext(projectRoot)
+    assertSingleServiceOrExit(context.config ?? {}, { commandName: 'skip', output })
+    if (process.exitCode === 2) return
+
     // Normalize step to always be an array
     const steps = Array.isArray(argv.step) ? argv.step : [argv.step]
     const isBatch = steps.length > 1
@@ -78,7 +83,6 @@ const skipCommand: CommandModule<Record<string, unknown>, SkipArgs> = {
         releaseLock(projectRoot); shutdown.releaseLockOwnership()
       }
     }, async () => {
-      const context = loadPipelineContext(projectRoot)
       const pipeline = resolvePipeline(context)
       const stateManager = new StateManager(
         projectRoot,

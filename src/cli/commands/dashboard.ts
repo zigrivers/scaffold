@@ -9,6 +9,7 @@ import { createOutputContext } from '../output/context.js'
 import { StateManager } from '../../state/state-manager.js'
 import { readDecisions } from '../../state/decision-logger.js'
 import { loadConfig } from '../../config/loader.js'
+import { assertSingleServiceOrExit } from '../guards.js'
 import { generateDashboardData, generateHtml } from '../../dashboard/generator.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { getPackagePipelineDir, atomicWriteFile } from '../../utils/fs.js'
@@ -65,6 +66,8 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
 
     // 3. Load config (needed for state dispatch + methodology resolution)
     const { config } = loadConfig(projectRoot, [])
+    assertSingleServiceOrExit(config ?? {}, { commandName: 'dashboard', output })
+    if (process.exitCode === 2) return
 
     // 4. Load state
     const stateManager = new StateManager(

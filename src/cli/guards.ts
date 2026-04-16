@@ -1,9 +1,10 @@
 import { MultiServiceNotSupportedError } from '../utils/user-errors.js'
 import type { ScaffoldConfig } from '../types/index.js'
+import type { OutputContext } from './output/context.js'
 
 export interface GuardContext {
   commandName: string
-  output: { error: (message: string) => void; result: (...args: unknown[]) => void; warn: (...args: unknown[]) => void }
+  output: Pick<OutputContext, 'error' | 'result' | 'warn'>
 }
 
 export function assertSingleServiceOrExit(

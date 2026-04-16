@@ -6,6 +6,7 @@ import { createOutputContext } from '../output/context.js'
 import { StateManager } from '../../state/state-manager.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
+import { assertSingleServiceOrExit } from '../guards.js'
 
 interface NextArgs {
   count?: number
@@ -44,6 +45,9 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
 
     // 2. Load pipeline context and resolve overlay/graph
     const context = loadPipelineContext(projectRoot)
+    assertSingleServiceOrExit(context.config ?? {}, { commandName: 'next', output })
+    if (process.exitCode === 2) return
+
     const pipeline = resolvePipeline(context, { output })
     const stateManager = new StateManager(
       projectRoot,

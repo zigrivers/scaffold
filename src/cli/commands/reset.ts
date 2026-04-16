@@ -10,6 +10,8 @@ import { shutdown } from '../shutdown.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
+import { loadConfig } from '../../config/loader.js'
+import { assertSingleServiceOrExit } from '../guards.js'
 
 interface ResetArgs {
   step?: string
@@ -47,6 +49,10 @@ const resetCommand: CommandModule<Record<string, unknown>, ResetArgs> = {
 
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
+
+    const { config: guardConfig } = loadConfig(projectRoot, [])
+    assertSingleServiceOrExit(guardConfig ?? {}, { commandName: 'reset', output })
+    if (process.exitCode === 2) return
 
     // Route: single step reset vs full pipeline reset
     if (argv.step) {
