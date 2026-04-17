@@ -96,8 +96,20 @@ async function resolveMultiServiceOverlay(
       platforms: ['claude-code'],
       project: {
         services: [
-          { name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest', dataStore: ['relational'], authMechanism: 'jwt', asyncMessaging: 'none', deployTarget: 'container', domain: 'none' } },
-          { name: 'web', projectType: 'web-app', webAppConfig: { deployTarget: 'container', renderingStrategy: 'spa', realtime: 'none', authFlow: 'none' } },
+          {
+            name: 'api', projectType: 'backend',
+            backendConfig: {
+              apiStyle: 'rest', dataStore: ['relational'], authMechanism: 'jwt',
+              asyncMessaging: 'none', deployTarget: 'container', domain: 'none',
+            },
+          },
+          {
+            name: 'web', projectType: 'web-app',
+            webAppConfig: {
+              deployTarget: 'container', renderingStrategy: 'spa',
+              realtime: 'none', authFlow: 'none',
+            },
+          },
         ],
       },
     },
@@ -146,7 +158,13 @@ describe('multi-service pipeline E2E', () => {
         version: 2,
         methodology: 'deep',
         platforms: ['claude-code'],
-        project: { projectType: 'backend', backendConfig: { apiStyle: 'rest', dataStore: ['relational'], authMechanism: 'jwt', asyncMessaging: 'none', deployTarget: 'container', domain: 'none' } },
+        project: {
+          projectType: 'backend',
+          backendConfig: {
+            apiStyle: 'rest', dataStore: ['relational'], authMechanism: 'jwt',
+            asyncMessaging: 'none', deployTarget: 'container', domain: 'none',
+          },
+        },
       },
       methodologyDir,
       metaPrompts: realMetaPrompts,

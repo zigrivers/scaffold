@@ -24,7 +24,7 @@ knowledge-overrides:
   system-architecture:
     append: [multi-service-architecture]
 `)
-    const { overlay, errors, warnings } = loadStructuralOverlay(file)
+    const { overlay, errors } = loadStructuralOverlay(file)
 
     expect(errors).toHaveLength(0)
     expect(overlay).not.toBeNull()

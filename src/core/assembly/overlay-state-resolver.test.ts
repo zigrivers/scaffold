@@ -468,13 +468,22 @@ knowledge-overrides:
       const metaPrompts = new Map([
         ['create-vision', { frontmatter: makeFrontmatter({ name: 'create-vision' }) }],
         ['service-ownership-map', { frontmatter: makeFrontmatter({ name: 'service-ownership-map' }) }],
-        ['system-architecture', { frontmatter: makeFrontmatter({ name: 'system-architecture', knowledgeBase: ['system-architecture'] }) }],
+        ['system-architecture', {
+          frontmatter: makeFrontmatter({ name: 'system-architecture', knowledgeBase: ['system-architecture'] }),
+        }],
       ])
 
       const result = resolveOverlayState({
         config: makeConfig({
           project: {
-            services: [{ name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest', dataStore: ['relational'], authMechanism: 'jwt', asyncMessaging: 'none', deployTarget: 'container', domain: 'none' } }],
+            services: [{
+              name: 'api',
+              projectType: 'backend',
+              backendConfig: {
+                apiStyle: 'rest', dataStore: ['relational'], authMechanism: 'jwt',
+                asyncMessaging: 'none', deployTarget: 'container', domain: 'none',
+              },
+            }],
           },
         }),
         methodologyDir: tmpDir,
@@ -508,7 +517,14 @@ step-overrides:
       resolveOverlayState({
         config: makeConfig({
           project: {
-            services: [{ name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest', dataStore: ['relational'], authMechanism: 'jwt', asyncMessaging: 'none', deployTarget: 'container', domain: 'none' } }],
+            services: [{
+              name: 'api',
+              projectType: 'backend',
+              backendConfig: {
+                apiStyle: 'rest', dataStore: ['relational'], authMechanism: 'jwt',
+                asyncMessaging: 'none', deployTarget: 'container', domain: 'none',
+              },
+            }],
           },
         }),
         methodologyDir: tmpDir,
@@ -579,7 +595,14 @@ step-overrides:
       resolveOverlayState({
         config: makeConfig({
           project: {
-            services: [{ name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest', dataStore: ['relational'], authMechanism: 'jwt', asyncMessaging: 'none', deployTarget: 'container', domain: 'none' } }],
+            services: [{
+              name: 'api',
+              projectType: 'backend',
+              backendConfig: {
+                apiStyle: 'rest', dataStore: ['relational'], authMechanism: 'jwt',
+                asyncMessaging: 'none', deployTarget: 'container', domain: 'none',
+              },
+            }],
           },
         }),
         methodologyDir: tmpDir,
