@@ -32,6 +32,11 @@ export class StatePathResolver {
   get decisionsPath(): string { return path.join(this.scaffoldDir, 'decisions.jsonl') }
   get reworkPath(): string { return path.join(this.scaffoldDir, 'rework.json') }
 
+  /** Always returns root .scaffold/ — for shared files like config.yml. */
+  get rootScaffoldDir(): string {
+    return path.join(this.projectRoot, '.scaffold')
+  }
+
   /** Create the scaffold directory if it doesn't exist. Called by writers before first write. */
   ensureDir(): void {
     fs.mkdirSync(this.scaffoldDir, { recursive: true })
@@ -89,7 +94,7 @@ No class refactoring needed.
 
 **Step-less commands** (next, status, dashboard, info):
 - `services[]` + `--service` provided → show service-scoped state only
-- `services[]` + no `--service` → show global state + one-line per-service summary (e.g., "api: 12/45 completed")
+- `services[]` + no `--service` → show global state + per-service summary. For `status`: "api: 12/45 completed". For `next`: global eligible steps + per-service next eligible (e.g., "Global: service-ownership-map; api: tech-stack, coding-standards; web: tech-stack")
 - No `services[]` → reject `--service`
 
 **Reset** (dual-mode):
@@ -111,6 +116,8 @@ globalSteps: Set<string>  // from structural overlay stepOverrides keys
 **Fan-in semantics**: Global cross-service steps have frontmatter dependencies on per-service steps (e.g., `service-ownership-map` depends on `review-architecture`). In multi-service context, these deps would fan-in from N services. Resolution: **when computing eligibility for the global scope, per-service step dependencies are automatically treated as satisfied** — identical to how disabled deps are handled today. Rationale: global steps operate at a cross-service abstraction level with multi-service knowledge injected; they don't need a specific service's artifact to proceed. This matches the MVP pattern where review deps are disabled and treated as satisfied. The global step's prompt includes cross-service knowledge docs that provide the architectural context.
 
 **Note**: If a user wants global steps to wait for specific per-service completions, they can manually complete the global step after the service steps finish. This is a workflow choice, not a system constraint.
+
+**Extra-steps**: User-defined custom steps (`extra-steps` in PipelineState) are always project-wide — they stay in root state and are not subject to the per-service/global classification. They are tracked outside the `steps` map and don't flow through the guard's step classifier. Currently `extra-steps` is always `[]` (phase 2 feature), but the design is forward-compatible.
 
 ### 1.5 Service-Aware Pipeline Resolution
 
@@ -154,7 +161,7 @@ export function computeEligible(
 - Only local (service-scoped) steps are written to the service state file — global steps are stripped
 - `reconcileWithPipeline()` only adds steps that pass the scope filter (per-service steps only)
 - `next_eligible` is recomputed from the merged view but filtered to service-scope steps only
-- `in_progress` is written to whichever state file owns the step (global or service)
+- `in_progress` is scoped per-file: service StateManager reads `in_progress` from its own file only (not merged from global). Global in_progress doesn't block service steps at the state level (only at the lock level). Written to whichever state file owns the step.
 - Global state's `next_eligible` and mutators are maintained separately when global steps complete via root-scoped `StateManager`
 
 ---
@@ -340,3 +347,11 @@ This design went through 3 rounds of multi-model review (Codex, Gemini, Claude):
 - P1: readDecisions() and getLockPath() not threaded → all function-module exports gain pathResolver parameter
 - P2: ScaffoldUserError not caught outside init → fail-fast moved to guard logic (not thrown from resolvePipeline)
 - Test count increased from 71 to 81
+
+**Round 5 (cont.) — Gemini findings**: 1 P0, 2 P1, 3 P2 — all fixed:
+- P0: Extra-steps contradiction (classified as per-service but stored in root) → documented as always project-wide, outside step classifier
+- P1: in_progress sharding ambiguous → scoped per-file, service StateManager doesn't merge global in_progress
+- P1: next command output undefined without --service → specified: global eligible + per-service next eligible
+- P2: StatePathResolver needs rootScaffoldDir getter → added
+- P2: reset full mode should delete .scaffold/services/ directory → noted
+- P2: Shutdown collection formalized → already in spec
