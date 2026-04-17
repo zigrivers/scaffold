@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the state sharding infrastructure, pipeline resolution per-service, and guard logic that Wave 3b CLI commands depend on.
+**Goal:** Build the state sharding infrastructure, pipeline resolution per-service, and guard logic that Wave 3b CLI commands depend on. Plan A delivers the foundation; Plan B (separate plan) delivers CLI wiring, fresh-init v3, lazy v2→v3 migration, and E2E tests.
 
 **Architecture:** `StatePathResolver` centralizes path construction for global vs service-scoped state files. `StateManager` gains a merged view (global + service state) for service-scoped execution. `resolvePipeline()` gains `serviceId` for per-service overlay resolution. `computeEligible()` gains scope filtering. The guard system is replaced with context-aware logic.
 
@@ -134,6 +134,12 @@ export class StatePathResolver {
   get decisionsPath(): string { return path.join(this.scaffoldDir, 'decisions.jsonl') }
   get reworkPath(): string { return path.join(this.scaffoldDir, 'rework.json') }
 
+  /** Whether this resolver targets a specific service (vs root/global). */
+  get isServiceScoped(): boolean { return this.service !== undefined }
+
+  /** The service name, if service-scoped. */
+  get serviceName(): string | undefined { return this.service }
+
   /** Create the scaffold directory if it doesn't exist. */
   ensureDir(): void {
     fs.mkdirSync(this.scaffoldDir, { recursive: true })
@@ -159,7 +165,7 @@ git commit -m "feat: add StatePathResolver for global and service-scoped state p
 
 **Files:**
 - Modify: `src/types/state.ts:42` — widen schema-version to `1 | 2 | 3`
-- Modify: `src/utils/user-errors.ts` — add 4 new error classes
+- Modify: `src/utils/user-errors.ts` — add 5 new error classes
 - Modify: `src/utils/user-errors.test.ts` — add tests for new classes
 
 - [ ] **Step 1: Widen schema-version**
@@ -391,7 +397,7 @@ git commit -m "feat: lock-manager and decision-logger gain pathResolver paramete
 
 - [ ] **Step 1: Update shutdown.ts**
 
-Replace single `lockPath`/`lockOwned` fields with array tracking:
+Replace single `lockPath: string | null`/`lockOwned: boolean` fields with array tracking. Also update the `reset()` method (around line 119) which currently assigns `this.lockOwned = false; this.lockPath = null` — change to `this.lockPaths = []`:
 
 ```typescript
 // Fields (replace lockPath/lockOwned):
@@ -587,7 +593,7 @@ saveState(state: PipelineState): void {
 }
 ```
 
-Note: `StateManager` needs a `globalSteps?: Set<string>` parameter in its constructor (add as 5th optional param).
+Note: `StateManager` needs a `globalSteps?: Set<string>` field. Add as 5th optional constructor param and store as `private globalSteps?: Set<string>`. The merged-view `loadState()` check uses `this.pathResolver.isServiceScoped` (public getter added in Task 1), NOT `this.pathResolver.service` (private). The merged snippet must still call the existing validated parse/dispatch flow for the global state file (use `JSON.parse` + `dispatchStateMigration` on the global raw data, not bypass validation).
 
 - [ ] **Step 4: Run tests**
 
@@ -603,7 +609,11 @@ git commit -m "feat: StateManager merged state view + writeback filtering for se
 
 ---
 
+**IMPORTANT: Execution order for Tasks 7-8 is SWAPPED. Execute Task 8 (eligibility) BEFORE Task 7 (resolver), because the resolver's `computeEligibleFn` closure calls `computeEligible()` with the new `options` parameter that Task 8 introduces. Executing Task 7 first will fail `tsc --noEmit`.**
+
 ### Task 7: ResolvedPipeline gains globalSteps + resolver gains serviceId
+
+**(Execute AFTER Task 8.)**
 
 **Files:**
 - Modify: `src/core/pipeline/types.ts:24-30` — add `globalSteps` to ResolvedPipeline
@@ -830,17 +840,16 @@ git commit -m "feat: computeEligible gains scope filtering and fan-in for global
 
 ---
 
-### Task 9: Guard replacement
+### Task 9: Guard replacement — guardStepCommand
 
 **Files:**
-- Modify: `src/cli/guards.ts` — replace `assertSingleServiceOrExit` with context-aware guards
-- Modify: `src/cli/guards.test.ts` — update tests
+- Modify: `src/cli/guards.ts` — add `guardStepCommand` function (keep old `assertSingleServiceOrExit` for backward compat)
+- Modify: `src/cli/guards.test.ts` — add tests for guardStepCommand
 
-- [ ] **Step 1: Write failing tests for new guards**
+- [ ] **Step 1: Write failing tests for guardStepCommand**
 
-Replace guard tests with tests for:
-- `guardStepCommand(step, config, service, globalSteps, ctx)` — per-service step needs --service, global step rejects --service, no services[] rejects --service, validates service name
-- `guardSteplessCommand(config, service, ctx)` — services[] + no service OK, no services[] + service rejects
+Add tests for:
+- `guardStepCommand(step, config, service, globalSteps, ctx)` — per-service step needs --service, global step rejects --service, no services[] rejects --service, validates service name, empty globalSteps = overlay missing error
 
 - [ ] **Step 2: Implement new guard functions**
 
@@ -957,7 +966,21 @@ export function assertSingleServiceOrExit(
 Run: `npx vitest run src/cli/guards.test.ts --reporter=verbose`
 Expected: All pass
 
-- [ ] **Step 4: Run full test suite for regressions**
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/cli/guards.ts src/cli/guards.test.ts
+git commit -m "feat: add guardStepCommand and guardSteplessCommand"
+```
+
+---
+
+### Task 9a: Remove deprecated guard + verify no regressions
+
+**Files:**
+- Modify: `src/cli/guards.ts` — the deprecated `assertSingleServiceOrExit` stays for now (Plan B commands will migrate to new guards incrementally)
+
+- [ ] **Step 1: Run full test suite for regressions**
 
 Run: `npx vitest run --reporter=verbose 2>&1 | tail -5`
 Expected: All pass (old function preserved as deprecated alias)
@@ -971,7 +994,52 @@ git commit -m "feat: replace assertSingleServiceOrExit with context-aware guard 
 
 ---
 
-### Task 9b: validation accepts v3 + validates service state files
+### Task 9b: completion.ts + update-mode.ts service path resolution
+
+**Files:**
+- Modify: `src/state/completion.ts:18-30` — add optional `service` param for service-prefixed artifact paths
+- Modify: `src/core/assembly/update-mode.ts:22-28` — add optional `service` param
+
+- [ ] **Step 1: Update completion.ts**
+
+Add `service?: string` parameter to `detectCompletion()`. When provided, prefix artifact paths with `services/{name}/`:
+
+```typescript
+export function detectCompletion(
+  step: string,
+  state: PipelineState,
+  expectedOutputs: string[],
+  projectRoot: string,
+  service?: string,
+): CompletionResult {
+  // ...
+  for (const output of expectedOutputs) {
+    const relPath = service ? path.join('services', service, output) : output
+    const fullPath = resolveContainedArtifactPath(projectRoot, relPath)
+    // ...
+  }
+}
+```
+
+- [ ] **Step 2: Update update-mode.ts**
+
+Add `service?: string` to `detectUpdateMode()` options. Pass through to artifact path resolution.
+
+- [ ] **Step 3: Run tests**
+
+Run: `npx vitest run src/state/completion.test.ts src/core/assembly/update-mode.test.ts --reporter=verbose`
+Expected: All pass (existing callers pass no service → default behavior)
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/state/completion.ts src/core/assembly/update-mode.ts
+git commit -m "feat: completion and update-mode support service-prefixed artifact paths"
+```
+
+---
+
+### Task 9c: validation accepts v3 + validates service state files
 
 **Files:**
 - Modify: `src/validation/state-validator.ts` — update hardcoded version check to accept 3
