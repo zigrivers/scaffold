@@ -41,7 +41,10 @@ export class StatePathResolver {
 
 **Threading**: Injected into `StateManager` constructor (replaces hardcoded `statePath`). Passed as parameter to `acquireLock()`, `releaseLock()`, `appendDecision()` functions. Injected into `ReworkManager` constructor. Default (no service) = current paths = zero behavioral change for single-project workflows.
 
-**Note**: `lock-manager.ts` and `decision-logger.ts` are function modules (not classes). They gain a `pathResolver?: StatePathResolver` parameter defaulting to root-scoped. No class refactoring needed.
+**Note**: `lock-manager.ts` and `decision-logger.ts` are function modules (not classes). ALL exported functions gain a `pathResolver?: StatePathResolver` parameter defaulting to root-scoped:
+- `lock-manager.ts`: `acquireLock()`, `releaseLock()`, `getLockPath()` — all need pathResolver for service-scoped lock paths and shutdown registration
+- `decision-logger.ts`: `appendDecision()`, `readDecisions()` — both need pathResolver for service-scoped decision files
+No class refactoring needed.
 
 ### 1.2 State Bootstrap: v2 → v3 Migration
 
@@ -49,7 +52,7 @@ export class StatePathResolver {
 
 **Fresh init** (`scaffold init --from` with services[]): `initializeState()` creates v3 layout immediately — root state with global steps only + per-service state files with per-service steps. No lazy migration needed.
 
-**Lazy migration** (existing v2 project, first `--service` command): The command handler detects root state is v2 and triggers migration BEFORE normal lock acquisition (not inside `loadState()`). This avoids lock escalation.
+**Lazy migration** (existing v2 project): Triggered by ANY command on a multi-service v2 project — not just `--service` commands. This is because `scaffold status` (no `--service`) shows per-service summaries which require service state files. The command handler detects root state is v2 + `services[]` in config and triggers migration BEFORE normal lock acquisition (not inside `loadState()`). This avoids lock escalation.
 
 1. **Pre-check**: Acquire global lock (prevents concurrent migrations)
 2. **Pre-check**: If `state.in_progress` is non-null, reject: "Cannot migrate to per-service state while step '{step}' is in progress. Complete or reset it first." (Uses the top-level `in_progress` record, not per-step status.)
@@ -103,7 +106,11 @@ A step is "global" if it appears in `multi-service-overlay.yml` `step-overrides`
 globalSteps: Set<string>  // from structural overlay stepOverrides keys
 ```
 
-**Fail-fast**: When `services[].length > 0` and the structural overlay file is missing or invalid, `resolvePipeline()` throws a `ScaffoldUserError`: "Multi-service projects require multi-service-overlay.yml." This prevents silent reclassification of global steps as per-service.
+**Fail-fast**: When `services[].length > 0` and the structural overlay file is missing or invalid, the guard logic errors: "Multi-service projects require multi-service-overlay.yml." (Handled in the guard, not thrown from `resolvePipeline()`, to avoid unhandled error propagation — only `init` currently catches `ScaffoldUserError`.)
+
+**Fan-in semantics**: Global cross-service steps have frontmatter dependencies on per-service steps (e.g., `service-ownership-map` depends on `review-architecture`). In multi-service context, these deps would fan-in from N services. Resolution: **when computing eligibility for the global scope, per-service step dependencies are automatically treated as satisfied** — identical to how disabled deps are handled today. Rationale: global steps operate at a cross-service abstraction level with multi-service knowledge injected; they don't need a specific service's artifact to proceed. This matches the MVP pattern where review deps are disabled and treated as satisfied. The global step's prompt includes cross-service knowledge docs that provide the architectural context.
+
+**Note**: If a user wants global steps to wait for specific per-service completions, they can manually complete the global step after the service steps finish. This is a workflow choice, not a system constraint.
 
 ### 1.5 Service-Aware Pipeline Resolution
 
@@ -143,7 +150,12 @@ export function computeEligible(
 
 **Merged state view**: The service-scoped `StateManager` loads BOTH the service state AND the global state internally, presenting a merged `steps` map to all callers via `loadState()`: `{ ...globalState.steps, ...serviceState.steps }`. Writes only go to the service state file. This way ALL existing code that reads `state.steps` (dependency checking in `run.ts:223`, artifact gathering in `run.ts:343,380`, eligibility computation, `next_eligible` recomputation in `saveState()`) automatically sees the merged view without patching every call site.
 
-For `saveState()`, `next_eligible` is recomputed from the merged view but only service-scope eligible steps are persisted (using the scope filter). The global state's `next_eligible` is maintained separately when global steps complete.
+**Writeback filtering**: The service-scoped `StateManager` internally tracks which step keys are "local" (service-scoped) vs "foreign" (global, read-only). On `saveState()`:
+- Only local (service-scoped) steps are written to the service state file — global steps are stripped
+- `reconcileWithPipeline()` only adds steps that pass the scope filter (per-service steps only)
+- `next_eligible` is recomputed from the merged view but filtered to service-scope steps only
+- `in_progress` is written to whichever state file owns the step (global or service)
+- Global state's `next_eligible` and mutators are maintained separately when global steps complete via root-scoped `StateManager`
 
 ---
 
@@ -189,7 +201,11 @@ Two lock levels:
 
 No deadlocks: service steps never hold global lock. Lock acquisition is single-direction.
 
-**TOCTOU mitigation**: The "check global lock" step uses atomic `O_EXCL` file creation for the service lock — if the global lock appears between check and acquire, the service step will proceed but operates on disjoint state files (no shared writes). Global and service steps write to different state/decision files, so concurrent execution is data-safe.
+**Locking scope**: The locking model protects `.scaffold/` state files only, not repo source files. Concurrent step execution that edits shared source code requires git worktrees for isolation, consistent with the existing multi-agent workflow documented in `docs/git-workflow.md`.
+
+**Concurrent global + service execution**: A global step can start while service steps are running (global lock doesn't check service locks). This is safe because they write to disjoint `.scaffold/` files — global state vs service state. The global step's prompt assembly reads from `.scaffold/state.json` (global), while service steps read from `.scaffold/services/{name}/state.json`. No shared `.scaffold/` file writes.
+
+**TOCTOU mitigation**: Service lock acquisition uses atomic `O_EXCL` file creation. If a global lock appears between check and acquire, the service step proceeds — disjoint state files ensure data safety.
 
 **Shutdown cleanup**: `shutdown.ts` must track multiple lock paths (global + service). `registerLockOwnership()` is called for whichever lock(s) the process holds. On crash, all registered locks are released.
 
@@ -275,9 +291,9 @@ When `--service api` is provided:
 |----------|-------|---------|
 | StatePathResolver | 6 | Root paths, service paths, ensureDir creates dirs |
 | Synthetic config | 10 | `it.each` over all 10 project types — type override, methodology preserved, services[] preserved, other type configs cleared |
-| Merged state view | 6 | Service StateManager loads both files, merged steps map, writes only to service file, dependency check sees global steps, artifact gathering sees global artifacts |
-| Eligibility scope | 4 | Global scope, service scope, merged state view, disabled deps |
-| State migration v2→v3 | 8 | Happy path, in_progress rejection, idempotent, crash recovery, completed step duplication, global lock during migration, next_eligible recomputed, extra-steps stay in root |
+| Merged state view | 8 | Service StateManager loads both files, merged steps, writes only service steps, strips global on save, reconcileWithPipeline scope-filtered, in_progress routed correctly, dependency check sees global, artifact gathering sees global |
+| Eligibility scope | 6 | Global scope, service scope, merged state, disabled deps, fan-in (global step with per-service deps auto-satisfied), scope filter on next_eligible |
+| State migration v2→v3 | 10 | Happy path, in_progress rejection, idempotent, crash recovery, completed step duplication, global lock, next_eligible recomputed, extra-steps stay in root, triggered by status (no --service), triggered by next (no --service) |
 | Fresh init v3 | 3 | initializeState with services[] creates v3 root + service state files |
 | State version dispatch | 3 | dispatchStateMigration accepts 3, validator accepts 3, service state files validated |
 | Overlay with serviceId | 3 | Backend service, web-app service, no serviceId (backward compat) |
@@ -285,8 +301,9 @@ When `--service api` is provided:
 | Locking | 6 | Service lock, global lock blocks service, two services parallel, global during migration, shutdown tracks multiple locks, TOCTOU safety |
 | Artifact path resolution | 4 | Per-service output prefixed, global output at root, reads from global state, reads from service state |
 | Decision/rework sharding | 3 | Service decisions separate from global, readDecisions with service, rework session per service |
+| ScaffoldUserError handling | 2 | Guard catches missing overlay, guard error propagates to CLI output |
 | E2E | 5 | run --service flow, global step flow, status --service, status summary (no --service), dashboard with services |
-| **Total** | **71** | |
+| **Total** | **81** | |
 
 ---
 
@@ -314,3 +331,12 @@ This design went through 3 rounds of multi-model review (Codex, Gemini, Claude):
 - P1: Refactoring table missing 8 files → added pipeline/types.ts, overlay-state-resolver.ts, state-version-dispatch.ts, decisions.ts, dashboard/generator.ts, shutdown.ts, validation/index.ts
 - P1: rework is session-oriented, reset needs service file cleanup → rework gains --service for session scoping, reset deletes all service files
 - P2: Test count too low → increased from 48 to 71
+
+**Round 5 (Full spec — revised)**: Codex found 2 P0s, 3 P1s, 1 P2 — all fixed:
+- P0: Global steps depend on per-service steps (fan-in problem) → per-service deps auto-satisfied in global scope (same as disabled-dep pattern)
+- P0: Locking allows concurrent global+service execution → clarified: disjoint .scaffold/ files make it data-safe; source code isolation uses worktrees
+- P1: Migration trigger too narrow (only --service) → any multi-service command on v2 triggers migration
+- P1: Merged StateManager writeback under-specified → explicit filtering: saveState strips global steps, reconcileWithPipeline scope-filtered
+- P1: readDecisions() and getLockPath() not threaded → all function-module exports gain pathResolver parameter
+- P2: ScaffoldUserError not caught outside init → fail-fast moved to guard logic (not thrown from resolvePipeline)
+- Test count increased from 71 to 81
