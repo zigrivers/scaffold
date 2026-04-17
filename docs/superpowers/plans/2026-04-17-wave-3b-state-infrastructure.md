@@ -338,7 +338,9 @@ export function getLockPath(projectRoot: string, pathResolver?: StatePathResolve
 }
 ```
 
-Update `acquireLock` (line 75) — add `pathResolver?: StatePathResolver` as 4th parameter. Replace internal `getLockPath(projectRoot)` calls with `getLockPath(projectRoot, pathResolver)`.
+Update `acquireLock` (line 75) — add `pathResolver?: StatePathResolver` as 4th parameter. Replace ALL internal calls: `getLockPath(projectRoot)` → `getLockPath(projectRoot, pathResolver)`, and critically update the internal `checkLock()` helper (line 58) to also accept and pass `pathResolver`. `checkLock` calls `getLockPath` internally — if not updated, service lock acquisition will still read the root lock file.
+
+Update `checkLock` (line 58) — add `pathResolver?: StatePathResolver` as 2nd parameter. Use `getLockPath(projectRoot, pathResolver)`.
 
 Update `releaseLock` (line 123) — add `pathResolver?: StatePathResolver` as 2nd parameter. Use `getLockPath(projectRoot, pathResolver)` for path.
 
@@ -356,7 +358,9 @@ function decisionsPath(projectRoot: string, pathResolver?: StatePathResolver): s
 }
 ```
 
-Update `appendDecision` (line 64) — add `pathResolver?: StatePathResolver` as 3rd parameter. Pass through to `decisionsPath`.
+Update `appendDecision` (line 64) — add `pathResolver?: StatePathResolver` as 3rd parameter. Pass through to `decisionsPath`. Also update the `ensureDir` call inside `appendDecision` to use `pathResolver?.scaffoldDir` when available (currently hardcodes `.scaffold/`).
+
+Update `getNextId` (line 48) — add `pathResolver?: StatePathResolver` as 2nd parameter. Pass through to `decisionsPath` (currently reads root decisions file for ID sequencing).
 
 Update `readDecisions` (line 86) — add `pathResolver?: StatePathResolver` as 3rd parameter. Pass through to `decisionsPath`.
 
@@ -502,6 +506,103 @@ git commit -m "feat: StateManager accepts optional StatePathResolver"
 
 ---
 
+### Task 6b: StateManager merged state view + writeback filtering
+
+**Files:**
+- Modify: `src/state/state-manager.ts` — loadState reads both global + service state, saveState filters
+
+This is the core behavior change. When `StatePathResolver` has a service, `StateManager`:
+- `loadState()`: reads service state file, ALSO reads global state file (at `rootScaffoldDir/state.json`), merges `steps` maps (`{ ...globalSteps, ...serviceSteps }`)
+- `saveState()`: strips global steps before writing (only writes service-scoped steps to service state file)
+- `reconcileWithPipeline()`: only adds steps that are NOT in globalSteps set
+- `in_progress`: scoped per-file — service StateManager only reads/writes its own `in_progress`
+
+- [ ] **Step 1: Write failing tests**
+
+Add to `src/state/state-manager.test.ts`:
+
+```typescript
+describe('merged state view (service-scoped)', () => {
+  it('loadState returns merged steps from global + service state', () => {
+    // Create temp dir with .scaffold/state.json (global steps) and .scaffold/services/api/state.json (service steps)
+    // Load service-scoped StateManager
+    // Verify state.steps contains both global and service entries
+  })
+
+  it('saveState writes only service steps, not global', () => {
+    // Load service-scoped state (merged)
+    // Mark a service step as completed
+    // saveState()
+    // Read service state file directly — should NOT contain global steps
+  })
+
+  it('reconcileWithPipeline only adds non-global steps', () => {
+    // Provide globalSteps set to StateManager
+    // Call reconcileWithPipeline with both global and service step slugs
+    // Verify only service steps were added to service state file
+  })
+})
+```
+
+- [ ] **Step 2: Implement merged view in loadState**
+
+In `src/state/state-manager.ts`, update `loadState()`:
+
+```typescript
+loadState(): PipelineState {
+  // Read the primary state file (service or root)
+  const state = /* existing loadState logic */
+
+  // If service-scoped, merge global steps
+  if (this.pathResolver.service) {
+    const globalStatePath = path.join(this.pathResolver.rootScaffoldDir, 'state.json')
+    if (fs.existsSync(globalStatePath)) {
+      const globalRaw = JSON.parse(fs.readFileSync(globalStatePath, 'utf8'))
+      // Merge: global steps as read-only base, service steps override
+      state.steps = { ...globalRaw.steps, ...state.steps }
+    }
+  }
+  return state
+}
+```
+
+- [ ] **Step 3: Implement writeback filtering in saveState**
+
+Update `saveState()` to strip global steps before writing:
+
+```typescript
+saveState(state: PipelineState): void {
+  let stateToWrite = state
+  if (this.pathResolver.service && this.globalSteps) {
+    // Strip global steps — only write service-scoped steps
+    const filteredSteps: Record<string, StepStateEntry> = {}
+    for (const [name, entry] of Object.entries(state.steps)) {
+      if (!this.globalSteps.has(name)) {
+        filteredSteps[name] = entry
+      }
+    }
+    stateToWrite = { ...state, steps: filteredSteps }
+  }
+  // ... existing write logic with stateToWrite
+}
+```
+
+Note: `StateManager` needs a `globalSteps?: Set<string>` parameter in its constructor (add as 5th optional param).
+
+- [ ] **Step 4: Run tests**
+
+Run: `npx vitest run src/state/state-manager.test.ts --reporter=verbose`
+Expected: All pass
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/state/state-manager.ts src/state/state-manager.test.ts
+git commit -m "feat: StateManager merged state view + writeback filtering for service scope"
+```
+
+---
+
 ### Task 7: ResolvedPipeline gains globalSteps + resolver gains serviceId
 
 **Files:**
@@ -589,6 +690,22 @@ After overlay resolution, compute globalSteps:
 ```
 
 Add imports for `path`, `fs`, `loadStructuralOverlay`.
+
+Update the `computeEligibleFn` closure (line 72) to pass through scope options:
+```typescript
+  const computeEligibleFn = (
+    steps: Record<string, StepStateEntry>,
+    options?: { scope?: 'global' | 'service'; globalSteps?: Set<string> },
+  ): string[] => computeEligible(graph, steps, options)
+```
+
+Update the `ResolvedPipeline` `computeEligible` type in `types.ts` to match:
+```typescript
+  computeEligible: (
+    steps: Record<string, StepStateEntry>,
+    options?: { scope?: 'global' | 'service'; globalSteps?: Set<string> },
+  ) => string[]
+```
 
 Update return (line 75):
 ```typescript
@@ -754,6 +871,14 @@ export function guardStepCommand(
   const services = config?.project?.services
   const hasServices = services && services.length > 0
 
+  // Fail-fast: multi-service without overlay → empty globalSteps → broken classification
+  if (hasServices && globalSteps.size === 0) {
+    const err = new MultiServiceOverlayMissingError()
+    ctx.output.error(err.message)
+    process.exitCode = 2
+    return
+  }
+
   if (service && !hasServices) {
     const err = new ServiceFlagWithoutServicesError()
     ctx.output.error(err.message)
@@ -846,25 +971,53 @@ git commit -m "feat: replace assertSingleServiceOrExit with context-aware guard 
 
 ---
 
-### Task 9b: validation/state-validator.ts accepts v3
+### Task 9b: validation accepts v3 + validates service state files
 
 **Files:**
-- Modify: `src/validation/state-validator.ts` — update comment and schema-version acceptance
+- Modify: `src/validation/state-validator.ts` — update hardcoded version check to accept 3
+- Modify: `src/validation/index.ts` — validate service state files alongside root
 
-- [ ] **Step 1: Update validator**
+- [ ] **Step 1: Update state-validator.ts**
 
 In `src/validation/state-validator.ts`:
 - Update line 15 comment from "1 or 2" to "1, 2, or 3"
-- The actual validation delegates to `dispatchStateMigration` which was updated in Task 3
+- Find the hardcoded schema-version check (around line 72 — does NOT delegate to `dispatchStateMigration`) and update it to accept `1 | 2 | 3`. The actual check is a direct comparison, not a dispatch call. Update to:
 
-- [ ] **Step 2: Run validation tests**
+```typescript
+const version = parsed['schema-version']
+if (version !== 1 && version !== 2 && version !== 3) {
+  errors.push(stateSchemaVersion([1, 2, 3], version as number, statePath))
+}
+```
+
+- [ ] **Step 2: Update validation/index.ts**
+
+In `src/validation/index.ts`, find where `validateState(projectRoot)` is called. After the root state validation, add service state file validation:
+
+```typescript
+// Validate service state files if they exist
+const servicesDir = path.join(projectRoot, '.scaffold', 'services')
+if (fs.existsSync(servicesDir)) {
+  for (const entry of fs.readdirSync(servicesDir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      const serviceStatePath = path.join(servicesDir, entry.name, 'state.json')
+      if (fs.existsSync(serviceStatePath)) {
+        // Validate service state file (same checks as root)
+        // ... or call a shared validation helper
+      }
+    }
+  }
+}
+```
+
+- [ ] **Step 3: Run validation tests**
 
 Run: `npx vitest run src/validation/ --reporter=verbose`
 Expected: All pass
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add src/validation/state-validator.ts
-git commit -m "fix: state-validator accepts schema-version 3"
+git add src/validation/state-validator.ts src/validation/index.ts
+git commit -m "fix: state-validator accepts schema-version 3, validates service state files"
 ```
