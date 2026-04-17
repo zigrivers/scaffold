@@ -1,6 +1,6 @@
 import type { StepEnablementEntry } from '../../types/index.js'
 import type {
-  ProjectTypeOverlay, KnowledgeOverride, ReadsOverride, DependencyOverride,
+  PipelineOverlay, KnowledgeOverride, ReadsOverride, DependencyOverride,
 } from '../../types/index.js'
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
 import { ProjectTypeSchema } from '../../config/schema.js'
@@ -140,7 +140,7 @@ export function parseDependencyOverrides(
  */
 export function loadOverlay(
   overlayPath: string,
-): { overlay: ProjectTypeOverlay | null; errors: ScaffoldError[]; warnings: ScaffoldWarning[] } {
+): { overlay: PipelineOverlay | null; errors: ScaffoldError[]; warnings: ScaffoldWarning[] } {
   const errors: ScaffoldError[] = []
   const warnings: ScaffoldWarning[] = []
 
@@ -219,10 +219,10 @@ export function loadOverlay(
   const dependencyOverridesRaw = isPlainObject(obj['dependency-overrides'])
     ? obj['dependency-overrides'] as Record<string, unknown> : {}
 
-  const overlay: ProjectTypeOverlay = {
+  const overlay: PipelineOverlay = {
     name: (obj['name'] as string).trim(),
     description: (obj['description'] as string).trim(),
-    projectType: (obj['project-type'] as string).trim() as ProjectTypeOverlay['projectType'],
+    projectType: (obj['project-type'] as string).trim() as PipelineOverlay['projectType'],
     stepOverrides: parseStepOverrides(stepOverridesRaw, warnings, overlayPath),
     knowledgeOverrides: parseKnowledgeOverrides(knowledgeOverridesRaw, warnings, overlayPath),
     readsOverrides: parseReadsOverrides(readsOverridesRaw, warnings, overlayPath),
@@ -241,7 +241,7 @@ export function loadOverlay(
  */
 export function loadSubOverlay(
   overlayPath: string,
-): { overlay: ProjectTypeOverlay | null; errors: ScaffoldError[]; warnings: ScaffoldWarning[] } {
+): { overlay: PipelineOverlay | null; errors: ScaffoldError[]; warnings: ScaffoldWarning[] } {
   const result = loadOverlay(overlayPath)
   if (!result.overlay) return result
 
@@ -266,4 +266,94 @@ export function loadSubOverlay(
   }
 
   return { overlay, errors: result.errors, warnings }
+}
+
+/**
+ * Load a structural overlay YAML file (e.g., multi-service-overlay.yml).
+ * Structural overlays have no project-type — they apply across project types
+ * based on config properties (e.g., services[] presence).
+ *
+ * Validates name + description. Ignores project-type field if present.
+ * @param overlayPath - Absolute path to structural overlay file
+ * @returns { overlay, errors, warnings }
+ */
+export function loadStructuralOverlay(
+  overlayPath: string,
+): { overlay: PipelineOverlay | null; errors: ScaffoldError[]; warnings: ScaffoldWarning[] } {
+  const errors: ScaffoldError[] = []
+  const warnings: ScaffoldWarning[] = []
+
+  // 1. Check file exists
+  if (!fileExists(overlayPath)) {
+    const overlayName = path.basename(overlayPath, '.yml')
+    errors.push(overlayMissing(overlayName, overlayPath))
+    return { overlay: null, errors, warnings }
+  }
+
+  // 2. Read file
+  const raw = fs.readFileSync(overlayPath, 'utf8')
+
+  // 3. Parse YAML
+  let parsed: unknown
+  try {
+    parsed = yaml.load(raw)
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err)
+    errors.push(overlayParseError(overlayPath, detail))
+    return { overlay: null, errors, warnings }
+  }
+
+  // 4. Validate top-level structure
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    errors.push(overlayParseError(overlayPath, 'overlay must be a YAML object'))
+    return { overlay: null, errors, warnings }
+  }
+
+  const obj = parsed as Record<string, unknown>
+
+  // Validate required fields (name + description only — no project-type)
+  if (typeof obj['name'] !== 'string' || obj['name'].trim() === '') {
+    errors.push(overlayParseError(overlayPath, 'required field "name" must be a non-empty string'))
+  }
+
+  if (typeof obj['description'] !== 'string' || obj['description'].trim() === '') {
+    errors.push(overlayParseError(overlayPath, 'required field "description" must be a non-empty string'))
+  }
+
+  if (errors.length > 0) {
+    return { overlay: null, errors, warnings }
+  }
+
+  // 5. Parse override sections (gracefully handle missing/malformed)
+  const overrideSections = ['step-overrides', 'knowledge-overrides', 'reads-overrides', 'dependency-overrides'] as const
+
+  for (const section of overrideSections) {
+    const value = obj[section]
+    if (value !== undefined && value !== null) {
+      if (typeof value !== 'object' || Array.isArray(value)) {
+        warnings.push(overlayMalformedSection(section, overlayPath))
+      }
+    }
+  }
+
+  const stepOverridesRaw = isPlainObject(obj['step-overrides'])
+    ? obj['step-overrides'] as Record<string, unknown> : {}
+  const knowledgeOverridesRaw = isPlainObject(obj['knowledge-overrides'])
+    ? obj['knowledge-overrides'] as Record<string, unknown> : {}
+  const readsOverridesRaw = isPlainObject(obj['reads-overrides'])
+    ? obj['reads-overrides'] as Record<string, unknown> : {}
+  const dependencyOverridesRaw = isPlainObject(obj['dependency-overrides'])
+    ? obj['dependency-overrides'] as Record<string, unknown> : {}
+
+  const overlay: PipelineOverlay = {
+    name: (obj['name'] as string).trim(),
+    description: (obj['description'] as string).trim(),
+    // No projectType for structural overlays
+    stepOverrides: parseStepOverrides(stepOverridesRaw, warnings, overlayPath),
+    knowledgeOverrides: parseKnowledgeOverrides(knowledgeOverridesRaw, warnings, overlayPath),
+    readsOverrides: parseReadsOverrides(readsOverridesRaw, warnings, overlayPath),
+    dependencyOverrides: parseDependencyOverrides(dependencyOverridesRaw, warnings, overlayPath),
+  }
+
+  return { overlay, errors, warnings }
 }
