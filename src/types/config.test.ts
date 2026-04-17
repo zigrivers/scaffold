@@ -1,7 +1,7 @@
 // src/types/config.test.ts
 import { describe, it, expect } from 'vitest'
 import type {
-  ProjectConfig, GameConfig, ProjectTypeOverlay, KnowledgeOverride,
+  ProjectConfig, GameConfig, PipelineOverlay, KnowledgeOverride,
   ReadsOverride, DependencyOverride, StepEnablementEntry,
 } from './config.js'
 
@@ -42,9 +42,9 @@ describe('StepEnablementEntry type', () => {
   })
 })
 
-describe('ProjectTypeOverlay type', () => {
+describe('PipelineOverlay type', () => {
   it('accepts a valid overlay', () => {
-    const overlay: ProjectTypeOverlay = {
+    const overlay: PipelineOverlay = {
       name: 'game',
       description: 'Game development overlay',
       projectType: 'game',
@@ -65,6 +65,19 @@ describe('ProjectTypeOverlay type', () => {
     expect(overlay.name).toBe('game')
     expect(overlay.projectType).toBe('game')
     expect(overlay.stepOverrides['game-design-document']?.enabled).toBe(true)
+  })
+
+  it('accepts a structural overlay without projectType', () => {
+    const overlay: PipelineOverlay = {
+      name: 'multi-service',
+      description: 'Cross-service overlay',
+      stepOverrides: { 'service-ownership-map': { enabled: true } },
+      knowledgeOverrides: {},
+      readsOverrides: {},
+      dependencyOverrides: {},
+    }
+    expect(overlay.name).toBe('multi-service')
+    expect(overlay.projectType).toBeUndefined()
   })
 })
 

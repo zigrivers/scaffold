@@ -98,11 +98,11 @@ export interface DependencyOverride {
   append?: string[]
 }
 
-/** Project-type overlay definition (e.g., game-overlay.yml). */
-export interface ProjectTypeOverlay {
+/** Pipeline overlay definition (project-type or structural). */
+export interface PipelineOverlay {
   name: string
   description: string
-  projectType: ProjectType
+  projectType?: ProjectType
   stepOverrides: Record<string, StepEnablementEntry>
   knowledgeOverrides: Record<string, KnowledgeOverride>
   readsOverrides: Record<string, ReadsOverride>

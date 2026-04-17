@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import type { ScaffoldConfig, StepEnablementEntry } from '../../types/index.js'
 import type { MetaPromptFrontmatter } from '../../types/frontmatter.js'
 import type { OutputContext } from '../../cli/output/context.js'
-import { loadOverlay, loadSubOverlay } from './overlay-loader.js'
+import { loadOverlay, loadSubOverlay, loadStructuralOverlay } from './overlay-loader.js'
 import { applyOverlay } from './overlay-resolver.js'
 
 export interface OverlayState {
@@ -106,6 +106,51 @@ export function resolveOverlayState(options: {
             }
           }
         }
+      }
+    }
+  }
+
+  // Structural overlay pass (gated on services[])
+  if (config.project?.services?.length) {
+    const msOverlayPath = path.join(methodologyDir, 'multi-service-overlay.yml')
+    if (fs.existsSync(msOverlayPath)) {
+      const {
+        overlay: msOverlay,
+        errors: msErrors,
+        warnings: msWarnings,
+      } = loadStructuralOverlay(msOverlayPath)
+      for (const w of msWarnings) {
+        output.warn(w)
+      }
+      if (msErrors.length > 0) {
+        for (const err of msErrors) {
+          output.warn(`[${err.code}] ${err.message}${err.recovery ? ` — ${err.recovery}` : ''}`)
+        }
+      }
+      if (msOverlay) {
+        // Step-override conflict detection
+        for (const [step, override] of Object.entries(msOverlay.stepOverrides)) {
+          if (step in overlaySteps && overlaySteps[step].enabled !== override.enabled) {
+            output.warn(`Structural overlay overrides "${step}" enablement`)
+          }
+        }
+        // Validate step targets exist in metaPrompts
+        for (const step of Object.keys(msOverlay.stepOverrides)) {
+          if (!metaPrompts.has(step)) {
+            output.warn(`Structural overlay targets unknown step "${step}"`)
+          }
+        }
+        const merged = applyOverlay(
+          overlaySteps,
+          overlayKnowledge,
+          overlayReads,
+          overlayDependencies,
+          msOverlay,
+        )
+        overlaySteps = merged.steps
+        overlayKnowledge = merged.knowledge
+        overlayReads = merged.reads
+        overlayDependencies = merged.dependencies
       }
     }
   }

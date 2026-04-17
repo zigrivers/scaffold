@@ -1,0 +1,103 @@
+name: multi-service
+description: >
+  Cross-service pipeline steps and knowledge for multi-service monorepos.
+  Activated by presence of services[] in config.
+
+# ---------------------------------------------------------------------------
+# step-overrides
+# ---------------------------------------------------------------------------
+step-overrides:
+  # Cross-service steps (wave 2)
+  service-ownership-map: { enabled: true }
+  inter-service-contracts: { enabled: true }
+  cross-service-auth: { enabled: true }
+  cross-service-observability: { enabled: true }
+  integration-test-plan: { enabled: true }
+  # Pre-phase steps marked global (already enabled — no-op for enablement,
+  # but marks them as global for the step classifier in wave 3b)
+  create-vision: { enabled: true }
+  review-vision: { enabled: true }
+  create-prd: { enabled: true }
+  review-prd: { enabled: true }
+
+# ---------------------------------------------------------------------------
+# knowledge-overrides
+# ---------------------------------------------------------------------------
+knowledge-overrides:
+  # Architecture awareness
+  system-architecture:
+    append: [multi-service-architecture, multi-service-resilience]
+  # Domain/data awareness
+  domain-modeling:
+    append: [multi-service-data-ownership]
+  database-schema:
+    append: [multi-service-data-ownership]
+  # API awareness
+  api-contracts:
+    append: [multi-service-api-contracts]
+  review-api:
+    append: [multi-service-api-contracts]
+  # Operations awareness
+  operations:
+    append: [multi-service-observability, multi-service-resilience]
+  review-operations:
+    append: [multi-service-observability]
+  # Security awareness
+  security:
+    append: [multi-service-auth]
+  review-security:
+    append: [multi-service-auth]
+  # Testing awareness
+  review-testing:
+    append: [multi-service-testing]
+  story-tests:
+    append: [multi-service-testing]
+  create-evals:
+    append: [multi-service-testing]
+  # Planning awareness
+  implementation-plan:
+    append: [multi-service-task-decomposition]
+  implementation-plan-review:
+    append: [multi-service-task-decomposition]
+
+# ---------------------------------------------------------------------------
+# reads-overrides
+# ---------------------------------------------------------------------------
+reads-overrides:
+  # Planning reads cross-service artifacts
+  implementation-plan:
+    append: [service-ownership-map, inter-service-contracts]
+  # Security review reads cross-service auth (order 952 < 960 allows this)
+  review-security:
+    append: [cross-service-auth]
+  # Database schema reads ownership map for data partitioning
+  database-schema:
+    append: [service-ownership-map]
+  # Validation phase reads all 5 new outputs for holistic review
+  cross-phase-consistency:
+    append:
+      - service-ownership-map
+      - inter-service-contracts
+      - cross-service-auth
+      - cross-service-observability
+      - integration-test-plan
+
+# ---------------------------------------------------------------------------
+# dependency-overrides
+# ---------------------------------------------------------------------------
+# Reads alone don't gate execution — `next` only checks dependencies.
+# These overrides ensure downstream steps wait for cross-service artifacts.
+dependency-overrides:
+  review-security:
+    append: [cross-service-auth]
+  database-schema:
+    append: [service-ownership-map]
+  implementation-plan:
+    append: [service-ownership-map, inter-service-contracts]
+  cross-phase-consistency:
+    append:
+      - service-ownership-map
+      - inter-service-contracts
+      - cross-service-auth
+      - cross-service-observability
+      - integration-test-plan

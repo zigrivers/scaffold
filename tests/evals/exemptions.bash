@@ -21,6 +21,9 @@ TERMINAL_OUTPUT_EXEMPT=(
   "art-bible"
   "modding-ugc-spec"
   "ai-behavior-design"
+  # Multi-service steps — terminal artifacts consumed by developers, not pipeline.
+  "cross-service-observability"
+  "integration-test-plan"
 )
 
 # Output path patterns that are terminal by nature
