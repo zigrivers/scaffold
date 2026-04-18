@@ -4,6 +4,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { describe, it, expect, afterEach } from 'vitest'
 import { StateManager } from './state-manager.js'
+import { StatePathResolver } from './state-path-resolver.js'
 
 const tmpDirs: string[] = []
 
@@ -375,6 +376,191 @@ describe('StateManager', () => {
 
       const tmpPath = path.join(tempDir, '.scaffold', 'state.json.tmp')
       expect(fs.existsSync(tmpPath)).toBe(false)
+    })
+  })
+
+  describe('service-scoped merged state view', () => {
+    function writeState(dir: string, body: Record<string, unknown>): void {
+      fs.writeFileSync(path.join(dir, 'state.json'), JSON.stringify(body, null, 2), 'utf8')
+    }
+
+    function baseState(steps: Record<string, unknown> = {}): Record<string, unknown> {
+      return {
+        'schema-version': 2,
+        'scaffold-version': '2.0.0',
+        init_methodology: 'deep',
+        config_methodology: 'deep',
+        'init-mode': 'greenfield',
+        created: new Date().toISOString(),
+        in_progress: null,
+        steps,
+        next_eligible: [],
+        'extra-steps': [],
+      }
+    }
+
+    function makeServiceDirs(tempDir: string, serviceName: string): { rootDir: string; serviceDir: string } {
+      const rootDir = path.join(tempDir, '.scaffold')
+      const serviceDir = path.join(rootDir, 'services', serviceName)
+      fs.mkdirSync(rootDir, { recursive: true })
+      fs.mkdirSync(serviceDir, { recursive: true })
+      return { rootDir, serviceDir }
+    }
+
+    it('loadState returns merged steps (global + service)', () => {
+      const tempDir = makeTempDir()
+      const { rootDir, serviceDir } = makeServiceDirs(tempDir, 'api')
+
+      // Global state has create-prd completed
+      writeState(rootDir, baseState({
+        'create-prd': { status: 'completed', source: 'pipeline', produces: ['docs/prd.md'] },
+        'create-architecture': { status: 'pending', source: 'pipeline', produces: [] },
+      }))
+
+      // Service state has service-setup pending
+      writeState(serviceDir, baseState({
+        'service-setup': { status: 'pending', source: 'pipeline', produces: [] },
+      }))
+
+      const resolver = new StatePathResolver(tempDir, 'api')
+      const manager = new StateManager(
+        tempDir,
+        computeEligible,
+        () => ({ project: { services: [{ name: 'api' }] } }),
+        resolver,
+      )
+
+      const state = manager.loadState()
+      // Should have all three steps: two from global, one from service
+      expect(state.steps['create-prd']?.status).toBe('completed')
+      expect(state.steps['create-architecture']?.status).toBe('pending')
+      expect(state.steps['service-setup']?.status).toBe('pending')
+    })
+
+    it('loadState: service steps override global steps on conflict', () => {
+      const tempDir = makeTempDir()
+      const { rootDir, serviceDir } = makeServiceDirs(tempDir, 'api')
+
+      writeState(rootDir, baseState({
+        'create-prd': { status: 'pending', source: 'pipeline', produces: [] },
+      }))
+
+      // Service overrides same step with completed
+      writeState(serviceDir, baseState({
+        'create-prd': { status: 'completed', source: 'pipeline', produces: ['docs/prd.md'] },
+      }))
+
+      const resolver = new StatePathResolver(tempDir, 'api')
+      const manager = new StateManager(
+        tempDir,
+        computeEligible,
+        () => ({ project: { services: [{ name: 'api' }] } }),
+        resolver,
+      )
+
+      const state = manager.loadState()
+      expect(state.steps['create-prd']?.status).toBe('completed')
+    })
+
+    it('saveState strips global steps before writing', () => {
+      const tempDir = makeTempDir()
+      const { rootDir, serviceDir } = makeServiceDirs(tempDir, 'api')
+
+      const globalSteps = new Set(['create-prd', 'create-architecture'])
+
+      writeState(rootDir, baseState({
+        'create-prd': { status: 'completed', source: 'pipeline', produces: [] },
+        'create-architecture': { status: 'pending', source: 'pipeline', produces: [] },
+      }))
+
+      writeState(serviceDir, baseState({
+        'service-setup': { status: 'pending', source: 'pipeline', produces: [] },
+      }))
+
+      const resolver = new StatePathResolver(tempDir, 'api')
+      const manager = new StateManager(
+        tempDir,
+        computeEligible,
+        () => ({ project: { services: [{ name: 'api' }] } }),
+        resolver,
+        globalSteps,
+      )
+
+      // Load merged state then save it back
+      const state = manager.loadState()
+      // Merged state should have all 3 steps
+      expect(Object.keys(state.steps)).toHaveLength(3)
+
+      manager.saveState(state)
+
+      // Read the service state file directly — should only have service-setup
+      const written = JSON.parse(fs.readFileSync(path.join(serviceDir, 'state.json'), 'utf8'))
+      expect(written.steps['service-setup']).toBeDefined()
+      expect(written.steps['create-prd']).toBeUndefined()
+      expect(written.steps['create-architecture']).toBeUndefined()
+    })
+
+    it('reconcileWithPipeline skips global steps when service-scoped', () => {
+      const tempDir = makeTempDir()
+      const { rootDir, serviceDir } = makeServiceDirs(tempDir, 'api')
+
+      const globalSteps = new Set(['create-prd', 'create-architecture'])
+
+      writeState(rootDir, baseState({
+        'create-prd': { status: 'completed', source: 'pipeline', produces: [] },
+        'create-architecture': { status: 'pending', source: 'pipeline', produces: [] },
+      }))
+
+      writeState(serviceDir, baseState({}))
+
+      const resolver = new StatePathResolver(tempDir, 'api')
+      const manager = new StateManager(
+        tempDir,
+        computeEligible,
+        () => ({ project: { services: [{ name: 'api' }] } }),
+        resolver,
+        globalSteps,
+      )
+
+      const pipelineSteps = [
+        { slug: 'create-prd', produces: ['docs/prd.md'], enabled: true },
+        { slug: 'create-architecture', produces: ['docs/architecture.md'], enabled: true },
+        { slug: 'service-setup', produces: [], enabled: true },
+      ]
+
+      const changed = manager.reconcileWithPipeline(pipelineSteps)
+      expect(changed).toBe(true)
+
+      // Read back from service state file — only service-setup should be added
+      const written = JSON.parse(fs.readFileSync(path.join(serviceDir, 'state.json'), 'utf8'))
+      expect(written.steps['service-setup']).toBeDefined()
+      expect(written.steps['service-setup'].status).toBe('pending')
+      expect(written.steps['create-prd']).toBeUndefined()
+      expect(written.steps['create-architecture']).toBeUndefined()
+    })
+
+    it('loadState works without global state file', () => {
+      const tempDir = makeTempDir()
+      const { serviceDir } = makeServiceDirs(tempDir, 'api')
+
+      // Only service state, no global state
+      writeState(serviceDir, baseState({
+        'service-setup': { status: 'pending', source: 'pipeline', produces: [] },
+      }))
+
+      // Don't write any global state file
+
+      const resolver = new StatePathResolver(tempDir, 'api')
+      const manager = new StateManager(
+        tempDir,
+        computeEligible,
+        () => ({ project: { services: [{ name: 'api' }] } }),
+        resolver,
+      )
+
+      const state = manager.loadState()
+      expect(state.steps['service-setup']?.status).toBe('pending')
+      expect(Object.keys(state.steps)).toHaveLength(1)
     })
   })
 
