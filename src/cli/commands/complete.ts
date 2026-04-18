@@ -1,4 +1,4 @@
-import type { CommandModule } from 'yargs'
+import type { CommandModule, Argv } from 'yargs'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
@@ -8,7 +8,9 @@ import { findClosestMatch } from '../../utils/levenshtein.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
 import { shutdown } from '../shutdown.js'
-import { assertSingleServiceOrExit } from '../guards.js'
+import { guardStepCommand } from '../guards.js'
+import { StatePathResolver } from '../../state/state-path-resolver.js'
+import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
 
 interface CompleteArgs {
   step: string
@@ -17,17 +19,23 @@ interface CompleteArgs {
   verbose?: boolean
   root?: string
   force?: boolean
+  service?: string
 }
 
 const completeCommand: CommandModule<Record<string, unknown>, CompleteArgs> = {
   command: 'complete <step>',
   describe: 'Mark a step as completed (for steps executed outside scaffold run)',
   builder: (yargs) => {
-    return yargs.positional('step', {
-      type: 'string',
-      description: 'Step slug to mark as completed',
-      demandOption: true,
-    })
+    return yargs
+      .positional('step', {
+        type: 'string',
+        description: 'Step slug to mark as completed',
+        demandOption: true,
+      })
+      .option('service', {
+        type: 'string',
+        describe: 'Target service name (multi-service projects)',
+      }) as unknown as Argv<CompleteArgs>
   },
   handler: async (argv) => {
     const projectRoot = argv.root ?? findProjectRoot(process.cwd())
@@ -41,11 +49,19 @@ const completeCommand: CommandModule<Record<string, unknown>, CompleteArgs> = {
     const output = createOutputContext(outputMode)
 
     const context = loadPipelineContext(projectRoot)
-    assertSingleServiceOrExit(context.config ?? {}, { commandName: 'complete', output })
+    const service = argv.service as string | undefined
+    const pipeline = resolvePipeline(context, { output, serviceId: service })
+
+    // Trigger v2→v3 migration if needed
+    ensureV3Migration(projectRoot, context.config, pipeline.globalSteps)
+
+    // Guard check (needs globalSteps from pipeline)
+    guardStepCommand(argv.step, context.config ?? {}, service, pipeline.globalSteps, { commandName: 'complete', output })
     if (process.exitCode === 2) return
 
     // Acquire lock
-    const lockResult = acquireLock(projectRoot, 'complete', argv.step)
+    const pathResolver = new StatePathResolver(projectRoot, service)
+    const lockResult = acquireLock(projectRoot, 'complete', argv.step, pathResolver)
     if (!lockResult.acquired && !argv.force) {
       if (lockResult.error) {
         output.warn(`${lockResult.error.code}: ${lockResult.error.message}`)
@@ -57,20 +73,23 @@ const completeCommand: CommandModule<Record<string, unknown>, CompleteArgs> = {
     }
 
     if (lockResult.acquired) {
-      shutdown.registerLockOwnership(getLockPath(projectRoot))
+      const lockFilePath = getLockPath(projectRoot, pathResolver)
+      shutdown.registerLockOwnership(lockFilePath)
     }
 
     await shutdown.withResource('lock', () => {
       if (lockResult.acquired) {
-        releaseLock(projectRoot)
-        shutdown.releaseLockOwnership()
+        const lockFilePath = getLockPath(projectRoot, pathResolver)
+        releaseLock(projectRoot, pathResolver)
+        shutdown.releaseLockOwnership(lockFilePath)
       }
     }, async () => {
-      const pipeline = resolvePipeline(context)
       const stateManager = new StateManager(
         projectRoot,
         pipeline.computeEligible,
         () => context.config ?? undefined,
+        pathResolver,
+        pipeline.globalSteps,
       )
       const state = stateManager.loadState()
 

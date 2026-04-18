@@ -8,7 +8,9 @@ import { shutdown } from '../shutdown.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
-import { assertSingleServiceOrExit } from '../guards.js'
+import { guardStepCommand } from '../guards.js'
+import { StatePathResolver } from '../../state/state-path-resolver.js'
+import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
 
 interface SkipArgs {
   step: string | string[]
@@ -18,6 +20,7 @@ interface SkipArgs {
   verbose?: boolean
   root?: string
   force?: boolean
+  service?: string
 }
 
 interface SkipResult {
@@ -42,6 +45,10 @@ const skipCommand: CommandModule<Record<string, unknown>, SkipArgs> = {
         type: 'string',
         description: 'Reason for skipping',
       })
+      .option('service', {
+        type: 'string',
+        describe: 'Target service name (multi-service projects)',
+      })
   },
   handler: async (argv) => {
     const projectRoot = argv.root ?? findProjectRoot(process.cwd())
@@ -55,15 +62,23 @@ const skipCommand: CommandModule<Record<string, unknown>, SkipArgs> = {
     const output = createOutputContext(outputMode)
 
     const context = loadPipelineContext(projectRoot)
-    assertSingleServiceOrExit(context.config ?? {}, { commandName: 'skip', output })
-    if (process.exitCode === 2) return
+    const service = argv.service as string | undefined
+    const pipeline = resolvePipeline(context, { output, serviceId: service })
+
+    // Trigger v2→v3 migration if needed
+    ensureV3Migration(projectRoot, context.config, pipeline.globalSteps)
 
     // Normalize step to always be an array
     const steps = Array.isArray(argv.step) ? argv.step : [argv.step]
     const isBatch = steps.length > 1
 
+    // Guard check (needs globalSteps from pipeline)
+    guardStepCommand(steps[0], context.config ?? {}, service, pipeline.globalSteps, { commandName: 'skip', output })
+    if (process.exitCode === 2) return
+
     // Acquire lock
-    const lockResult = acquireLock(projectRoot, 'skip', steps[0])
+    const pathResolver = new StatePathResolver(projectRoot, service)
+    const lockResult = acquireLock(projectRoot, 'skip', steps[0], pathResolver)
     if (!lockResult.acquired && !argv.force) {
       if (lockResult.error) {
         output.warn(`${lockResult.error.code}: ${lockResult.error.message}`)
@@ -75,19 +90,22 @@ const skipCommand: CommandModule<Record<string, unknown>, SkipArgs> = {
     }
 
     if (lockResult.acquired) {
-      shutdown.registerLockOwnership(getLockPath(projectRoot))
+      const lockFilePath = getLockPath(projectRoot, pathResolver)
+      shutdown.registerLockOwnership(lockFilePath)
     }
 
     await shutdown.withResource('lock', () => {
       if (lockResult.acquired) {
-        releaseLock(projectRoot); shutdown.releaseLockOwnership()
+        const lockFilePath = getLockPath(projectRoot, pathResolver)
+        releaseLock(projectRoot, pathResolver); shutdown.releaseLockOwnership(lockFilePath)
       }
     }, async () => {
-      const pipeline = resolvePipeline(context)
       const stateManager = new StateManager(
         projectRoot,
         pipeline.computeEligible,
         () => context.config ?? undefined,
+        pathResolver,
+        pipeline.globalSteps,
       )
       const state = stateManager.loadState()
       const reason = argv.reason ?? 'user-requested'
