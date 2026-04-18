@@ -1,22 +1,25 @@
 import type { PipelineState, StepStateEntry, InProgressRecord, DepthLevel, StepStatus } from '../types/index.js'
 import type { ScaffoldError } from '../types/index.js'
-import { atomicWriteFile, fileExists, ensureDir } from '../utils/fs.js'
+import { atomicWriteFile, fileExists } from '../utils/fs.js'
 import { stateMissing, stateParseError, psmAlreadyInProgress } from '../utils/errors.js'
 import { migrateState } from './state-migration.js'
 import { dispatchStateMigration } from './state-version-dispatch.js'
+import { StatePathResolver } from './state-path-resolver.js'
 import fs from 'node:fs'
-import path from 'node:path'
 import type { MethodologyName } from '../types/index.js'
 
 export class StateManager {
   private statePath: string
+  private pathResolver: StatePathResolver
 
   constructor(
     private projectRoot: string,
     private computeEligible: (steps: Record<string, StepStateEntry>) => string[],
     private configProvider?: () => { project?: { services?: unknown[] } } | undefined,
+    pathResolver?: StatePathResolver,
   ) {
-    this.statePath = path.join(projectRoot, '.scaffold', 'state.json')
+    this.pathResolver = pathResolver ?? new StatePathResolver(projectRoot)
+    this.statePath = this.pathResolver.statePath
   }
 
   /** Load and validate state.json from disk. Throws ScaffoldError on schema mismatch. */
@@ -176,7 +179,7 @@ export class StateManager {
     // When provided and project.services[] is non-empty, emit schema-version 2.
     config?: { project?: { services?: unknown[] } }
   }): void {
-    ensureDir(path.join(this.projectRoot, '.scaffold'))
+    this.pathResolver.ensureDir()
 
     const schemaVersion: 1 | 2 =
       (options.config?.project?.services?.length ?? 0) > 0 ? 2 : 1
