@@ -10,7 +10,9 @@ import {
   ExistingScaffoldError,
   isScaffoldUserError,
   ServiceRequiredError,
+  ServiceRejectedError,
   ServiceNotFoundError,
+  ServiceFlagWithoutServicesError,
   MultiServiceOverlayMissingError,
 } from './user-errors.js'
 
@@ -75,6 +77,20 @@ describe('ScaffoldUserError taxonomy', () => {
     const err = new ServiceNotFoundError('nonexistent')
     expect(err).toBeInstanceOf(ScaffoldUserError)
     expect(err.message).toContain('nonexistent')
+  })
+
+  it('ServiceRejectedError', () => {
+    const err = new ServiceRejectedError('service-ownership-map')
+    expect(err).toBeInstanceOf(ScaffoldUserError)
+    expect(err.message).toContain('service-ownership-map')
+    expect(err.message).toContain('global')
+  })
+
+  it('ServiceFlagWithoutServicesError', () => {
+    const err = new ServiceFlagWithoutServicesError()
+    expect(err).toBeInstanceOf(ScaffoldUserError)
+    expect(err.message).toContain('--service')
+    expect(err.message).toContain('services[]')
   })
 
   it('MultiServiceOverlayMissingError', () => {
