@@ -58,6 +58,14 @@ describe('StatePathResolver', () => {
       expect(resolver.lockPath).toBe(path.join(root, '.scaffold', 'services', 'api', 'lock.json'))
     })
 
+    it('decisionsPath is .scaffold/services/api/decisions.jsonl', () => {
+      expect(resolver.decisionsPath).toBe(path.join(root, '.scaffold', 'services', 'api', 'decisions.jsonl'))
+    })
+
+    it('reworkPath is .scaffold/services/api/rework.json', () => {
+      expect(resolver.reworkPath).toBe(path.join(root, '.scaffold', 'services', 'api', 'rework.json'))
+    })
+
     it('rootScaffoldDir is always .scaffold/ regardless of service', () => {
       expect(resolver.rootScaffoldDir).toBe(path.join(root, '.scaffold'))
     })
@@ -68,6 +76,15 @@ describe('StatePathResolver', () => {
 
     it('serviceName is api', () => {
       expect(resolver.serviceName).toBe('api')
+    })
+  })
+
+  describe('empty string service', () => {
+    const resolver = new StatePathResolver(root, '')
+
+    it('treats empty string as root-scoped', () => {
+      expect(resolver.scaffoldDir).toBe(path.join(root, '.scaffold'))
+      expect(resolver.isServiceScoped).toBe(false)
     })
   })
 

@@ -13,7 +13,7 @@ export class StatePathResolver {
   ) {}
 
   get scaffoldDir(): string {
-    return this.service
+    return this.service !== undefined && this.service !== ''
       ? path.join(this.projectRoot, '.scaffold', 'services', this.service)
       : path.join(this.projectRoot, '.scaffold')
   }
@@ -28,7 +28,7 @@ export class StatePathResolver {
   get reworkPath(): string { return path.join(this.scaffoldDir, 'rework.json') }
 
   /** Whether this resolver targets a specific service (vs root/global). */
-  get isServiceScoped(): boolean { return this.service !== undefined }
+  get isServiceScoped(): boolean { return this.service !== undefined && this.service !== '' }
 
   /** The service name, if service-scoped. */
   get serviceName(): string | undefined { return this.service }
