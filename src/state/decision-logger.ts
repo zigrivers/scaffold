@@ -1,6 +1,6 @@
 import type { DecisionEntry } from '../types/index.js'
 import type { StatePathResolver } from './state-path-resolver.js'
-import { fileExists, ensureDir, atomicWriteFile } from '../utils/fs.js'
+import { fileExists, atomicWriteFile } from '../utils/fs.js'
 import { decisionParseError } from '../utils/errors.js'
 import fs from 'node:fs'
 import path from 'node:path'
