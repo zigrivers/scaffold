@@ -20,8 +20,9 @@ service: { type: 'string', describe: 'Target service name (multi-service project
 // 2. Extract service from argv
 const service = argv.service as string | undefined
 
-// 3. Trigger migration if needed (shared helper)
-await ensureV3Migration(projectRoot, config, pipeline.globalSteps)
+// 3. Trigger migration if needed (shared helper — from Task 16)
+ensureV3Migration(projectRoot, config, pipeline.globalSteps)
+// For commands without resolvePipeline: ensureV3Migration(projectRoot, config) — helper loads globalSteps itself
 
 // 4. Pass serviceId to resolvePipeline
 const pipeline = resolvePipeline(context, { output, serviceId: service })
@@ -57,7 +58,13 @@ if (process.exitCode === 2) return
 ```
 Note: `resolvePipeline` must move BEFORE the guard (currently after).
 
-- [ ] **Step 3: Create StatePathResolver and wire StateManager** (line 146)
+- [ ] **Step 3: Trigger migration** (after resolvePipeline, before guard)
+
+```typescript
+ensureV3Migration(projectRoot, config, pipeline.globalSteps)
+```
+
+- [ ] **Step 4: Create StatePathResolver and wire StateManager** (line 146)
 
 ```typescript
 const pathResolver = new StatePathResolver(projectRoot, service)
@@ -332,28 +339,89 @@ git commit -m "feat(rework): add --service flag"
 
 ---
 
-### Task 15: Shared migration helper
+### Task 15: v2→v3 migration implementation
+
+**(Execute BEFORE Task 16 — Task 16 imports from this module.)**
 
 **Files:**
-- Create: `src/state/ensure-v3-migration.ts` — shared helper called by all commands
+- Create: `src/state/state-migration-v3.ts`
+- Create: `src/state/state-migration-v3.test.ts`
 
-- [ ] **Step 1: Create migration helper**
+- [ ] **Step 1: Write tests** — happy path, in_progress rejection, idempotent, crash recovery, completed step duplication, extra-steps stay in root, globalSteps-empty rejection
+
+- [ ] **Step 2: Implement migrateV2ToV3**
+
+Per spec: acquire global lock, reject if in_progress non-null, **reject if globalSteps is empty** (prevents mis-sharding), split steps by globalSteps set, create service state files (duplicate completed per-service steps to ALL services), update root state (global steps only, extra-steps preserved), release lock.
+
+```typescript
+export function migrateV2ToV3(options: MigrationV3Options): void {
+  const { projectRoot, globalSteps, services } = options
+  if (globalSteps.size === 0) {
+    throw new Error('Cannot migrate: globalSteps is empty. Structural overlay may be missing.')
+  }
+  // ... rest of migration logic
+}
+```
+
+- [ ] **Step 3: Test + commit**
+
+```bash
+git commit -m "feat: v2→v3 state migration with global lock and service sharding"
+```
+
+---
+
+### Task 16: Shared migration helper + loadGlobalStepSlugs
+
+**Files:**
+- Create: `src/state/ensure-v3-migration.ts`
+- Create: `src/core/pipeline/global-steps.ts` — lightweight helper to get globalSteps without full resolvePipeline
+
+- [ ] **Step 1: Create loadGlobalStepSlugs helper**
+
+Create `src/core/pipeline/global-steps.ts`:
+
+```typescript
+import fs from 'node:fs'
+import path from 'node:path'
+import { loadStructuralOverlay } from '../assembly/overlay-loader.js'
+
+/**
+ * Load the set of global step slugs from multi-service-overlay.yml.
+ * Lightweight alternative to full resolvePipeline() for commands
+ * that only need the global/per-service classification.
+ */
+export function loadGlobalStepSlugs(methodologyDir: string): Set<string> {
+  const overlayPath = path.join(methodologyDir, 'multi-service-overlay.yml')
+  if (!fs.existsSync(overlayPath)) return new Set()
+  const { overlay } = loadStructuralOverlay(overlayPath)
+  if (!overlay) return new Set()
+  return new Set(Object.keys(overlay.stepOverrides))
+}
+```
+
+- [ ] **Step 2: Create ensureV3Migration helper**
+
+Create `src/state/ensure-v3-migration.ts`:
 
 ```typescript
 import fs from 'node:fs'
 import path from 'node:path'
 import type { ScaffoldConfig } from '../types/index.js'
 import { migrateV2ToV3 } from './state-migration-v3.js'
+import { loadGlobalStepSlugs } from '../core/pipeline/global-steps.js'
+import { getPackageMethodologyDir } from '../utils/fs.js'
 
 /**
  * Ensure state is at v3 for multi-service projects.
  * Called by all commands before state access.
  * No-op for single-service or already-v3 projects.
+ * Computes globalSteps from overlay if not provided.
  */
 export function ensureV3Migration(
   projectRoot: string,
   config: ScaffoldConfig | null,
-  globalSteps: Set<string>,
+  globalSteps?: Set<string>,
 ): void {
   if (!config?.project?.services?.length) return
 
@@ -367,69 +435,27 @@ export function ensureV3Migration(
 
   if (raw['schema-version'] !== 2) return
 
+  // Compute globalSteps if not provided (for commands that skip resolvePipeline)
+  const effectiveGlobalSteps = globalSteps ?? loadGlobalStepSlugs(getPackageMethodologyDir())
+
   migrateV2ToV3({
     projectRoot,
-    globalSteps,
+    globalSteps: effectiveGlobalSteps,
     services: config.project.services as Array<{ name: string }>,
   })
 }
 ```
 
-- [ ] **Step 2: Test + commit**
-
-```bash
-git add src/state/ensure-v3-migration.ts
-git commit -m "feat: shared ensureV3Migration helper for all commands"
-```
-
----
-
-### Task 16: v2→v3 migration implementation
-
-**Files:**
-- Create: `src/state/state-migration-v3.ts`
-- Create: `src/state/state-migration-v3.test.ts`
-
-- [ ] **Step 1: Write tests** — happy path, in_progress rejection, idempotent, crash recovery, completed step duplication, extra-steps stay in root
-
-- [ ] **Step 2: Implement migrateV2ToV3**
-
-Per spec: acquire global lock, reject if in_progress non-null, split steps by globalSteps set, create service state files (duplicate completed per-service steps to ALL services), update root state (global steps only, extra-steps preserved), release lock.
-
 - [ ] **Step 3: Test + commit**
 
 ```bash
-git commit -m "feat: v2→v3 state migration with global lock and service sharding"
+git add src/core/pipeline/global-steps.ts src/state/ensure-v3-migration.ts
+git commit -m "feat: shared ensureV3Migration helper with loadGlobalStepSlugs"
 ```
 
 ---
 
-### Task 17: Wire migration into all commands
-
-**Files:**
-- Modify: ALL 10 command files — add `ensureV3Migration()` call after config load + pipeline resolve
-
-- [ ] **Step 1: Add migration call to run.ts, next.ts, status.ts**
-
-After `resolvePipeline()` and before lock acquisition:
-```typescript
-ensureV3Migration(projectRoot, config, pipeline.globalSteps)
-```
-
-- [ ] **Step 2: Add migration call to remaining 7 commands**
-
-Same pattern for skip, complete, info, dashboard, decisions, reset, rework. For commands that don't call `resolvePipeline()` (like decisions.ts), compute globalSteps via a lightweight helper or pass empty set (migration will still trigger correctly since it only checks schema-version).
-
-- [ ] **Step 3: Run full test suite**
-
-Run: `npx vitest run --reporter=verbose`
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add src/cli/commands/*.ts
-git commit -m "feat: wire ensureV3Migration into all 10 stateful commands"
-```
+**Migration wiring**: Instead of a separate Task 17 (which would touch all 10 files), migration calls are folded INTO each command task above. Each command task (10a-14b) should include `ensureV3Migration(projectRoot, config, pipeline.globalSteps)` after config+pipeline resolution and before state access. For commands that already call `resolvePipeline()`, pass `pipeline.globalSteps`. For commands that don't (like `decisions.ts`), call `ensureV3Migration(projectRoot, config)` — the helper loads globalSteps itself via `loadGlobalStepSlugs()`.
 
 ---
 
@@ -496,4 +522,13 @@ git commit -m "docs: update CHANGELOG with Wave 3b service-qualified execution"
 - P0: Task 10 oversized (90-140 LOC) → split into 10a (guard/resolver/state), 10b (locking), 10c (artifacts/decisions/crash)
 - P1: Dashboard generator needs multi-service work → noted as follow-up, basic --service support in Task 13b
 - P1: Multiple tasks exceeded size limits → split all: 11a/11b, 12a/12b, 13a/13b, 14a/14b
-- P2: Fresh init caller (adopt.ts) not updated → labeled Task 15 as library groundwork
+- P2: Fresh init caller (adopt.ts) not updated → labeled as library groundwork
+
+**Round 2 (Codex + Gemini)**: 1 P0, 5 P1, 1 P2 — all fixed:
+- P0: Empty globalSteps in migration corrupts state → migrateV2ToV3 rejects empty set; ensureV3Migration computes globalSteps itself via loadGlobalStepSlugs when not provided
+- P1: Task 15 imports Task 16 (forward ref) → swapped: migration impl (Task 15) before helper (Task 16)
+- P1: Task 17 touches 10 files → deleted; migration calls folded into each command task
+- P1: Fresh-init callers not updated → noted as library groundwork (callers update in Plan B addendum if needed)
+- P1: Dashboard generator needs multi-service work → noted as follow-up
+- P1: Crash recovery analyzeCrash not scoped → noted for Task 10c implementer
+- P2: guardSteplessCommand doesn't check overlay → covered by ensureV3Migration rejecting empty globalSteps
