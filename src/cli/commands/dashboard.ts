@@ -9,7 +9,9 @@ import { createOutputContext } from '../output/context.js'
 import { StateManager } from '../../state/state-manager.js'
 import { readDecisions } from '../../state/decision-logger.js'
 import { loadConfig } from '../../config/loader.js'
-import { assertSingleServiceOrExit } from '../guards.js'
+import { guardSteplessCommand } from '../guards.js'
+import { StatePathResolver } from '../../state/state-path-resolver.js'
+import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
 import { generateDashboardData, generateHtml } from '../../dashboard/generator.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { getPackagePipelineDir, atomicWriteFile } from '../../utils/fs.js'
@@ -24,6 +26,7 @@ interface DashboardArgs {
   output?: string
   'no-open'?: boolean
   'json-only'?: boolean
+  service?: string
 }
 
 type ConfigWithMethodology = { methodology?: { preset?: string } } | null
@@ -47,6 +50,10 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
         description: 'Output data as JSON to stdout',
         default: false,
       })
+      .option('service', {
+        type: 'string',
+        describe: 'Target service name (multi-service projects)',
+      })
   },
   handler: async (argv) => {
     // 1. Resolve project root
@@ -66,14 +73,18 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
 
     // 3. Load config (needed for state dispatch + methodology resolution)
     const { config } = loadConfig(projectRoot, [])
-    assertSingleServiceOrExit(config ?? {}, { commandName: 'dashboard', output })
+    const service = argv.service as string | undefined
+    ensureV3Migration(projectRoot, config)
+    guardSteplessCommand(config ?? {}, service, { commandName: 'dashboard', output })
     if (process.exitCode === 2) return
 
     // 4. Load state
+    const pathResolver = new StatePathResolver(projectRoot, service)
     const stateManager = new StateManager(
       projectRoot,
       () => [],
       () => config ?? undefined,
+      pathResolver,
     )
     let state: PipelineState
     try {
@@ -90,7 +101,7 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
     }
 
     // 5. Load decisions
-    const decisions = readDecisions(projectRoot)
+    const decisions = readDecisions(projectRoot, {}, pathResolver)
     const methodology =
       (config as ConfigWithMethodology)?.methodology?.preset ??
       state.config_methodology ??
