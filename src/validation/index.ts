@@ -1,6 +1,7 @@
 // src/validation/index.ts
 
-
+import fs from 'node:fs'
+import path from 'node:path'
 import type { ScaffoldError, ScaffoldWarning } from '../types/index.js'
 import { discoverMetaPrompts } from '../core/assembly/meta-prompt-loader.js'
 import { getPackagePipelineDir } from '../utils/fs.js'
@@ -69,6 +70,21 @@ export function runValidation(
     const r = validateState(projectRoot)
     allErrors.push(...r.errors)
     allWarnings.push(...r.warnings)
+
+    // Validate service state files if they exist
+    const servicesDir = path.join(projectRoot, '.scaffold', 'services')
+    if (fs.existsSync(servicesDir)) {
+      for (const entry of fs.readdirSync(servicesDir, { withFileTypes: true })) {
+        if (entry.isDirectory()) {
+          const serviceStatePath = path.join(servicesDir, entry.name, 'state.json')
+          if (fs.existsSync(serviceStatePath)) {
+            const sr = validateState(projectRoot, serviceStatePath)
+            allErrors.push(...sr.errors)
+            allWarnings.push(...sr.warnings)
+          }
+        }
+      }
+    }
   }
 
   if (scopes.includes('dependencies')) {

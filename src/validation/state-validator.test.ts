@@ -157,8 +157,8 @@ describe('validateState', () => {
   // ---- Schema version validation ----
 
   describe('schema version validation', () => {
-    it('returns STATE_SCHEMA_VERSION error when version is not 1 or 2', () => {
-      // Wave 3a: validator now accepts schema-version 1 and 2. Use 99 to trigger the error.
+    it('returns STATE_SCHEMA_VERSION error when version is not 1, 2, or 3', () => {
+      // Wave 3b: validator now accepts schema-version 1, 2, and 3. Use 99 to trigger the error.
       const state = makeState({ 'schema-version': 99 })
       const root = makeProjectRoot(state)
       const result = validateState(root)
@@ -169,6 +169,13 @@ describe('validateState', () => {
 
     it('accepts schema-version 2 (Wave 3a multi-service)', () => {
       const state = makeState({ 'schema-version': 2 })
+      const root = makeProjectRoot(state)
+      const result = validateState(root)
+      expect(result.errors.filter(e => e.code === 'STATE_SCHEMA_VERSION')).toHaveLength(0)
+    })
+
+    it('accepts schema-version 3 (Wave 3b service execution)', () => {
+      const state = makeState({ 'schema-version': 3 })
       const root = makeProjectRoot(state)
       const result = validateState(root)
       expect(result.errors.filter(e => e.code === 'STATE_SCHEMA_VERSION')).toHaveLength(0)
@@ -373,6 +380,25 @@ describe('validateState', () => {
   describe('nonexistent project root', () => {
     it('returns STATE_MISSING for nonexistent root directory', () => {
       const result = validateState('/nonexistent/path/that/does/not/exist')
+      expect(result.errors).toHaveLength(1)
+      expect(result.errors[0].code).toBe('STATE_MISSING')
+    })
+  })
+
+  // ---- Custom statePath override ----
+
+  describe('custom statePath override', () => {
+    it('validates a state file at an explicit path', () => {
+      const root = makeTmpDir()
+      const customPath = path.join(root, 'custom-state.json')
+      fs.writeFileSync(customPath, validState, 'utf8')
+      const result = validateState(root, customPath)
+      expect(result.errors).toHaveLength(0)
+    })
+
+    it('returns STATE_MISSING when the explicit path does not exist', () => {
+      const root = makeTmpDir()
+      const result = validateState(root, path.join(root, 'nonexistent.json'))
       expect(result.errors).toHaveLength(1)
       expect(result.errors[0].code).toBe('STATE_MISSING')
     })

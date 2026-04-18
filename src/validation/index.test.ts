@@ -272,4 +272,60 @@ outputs:
     expect(result.totalFilesCount).toBe(2)
     expect(result.validFilesCount).toBe(1)
   })
+
+  // Test 9: Service state files are validated when present
+  it('validates service state files when services directory exists', () => {
+    const root = makeProjectRoot({
+      configContent: validConfig,
+      stateContent: validState,
+    })
+
+    // Create a valid service state file
+    const servicesDir = path.join(root, '.scaffold', 'services', 'api')
+    fs.mkdirSync(servicesDir, { recursive: true })
+    const serviceState = JSON.stringify({
+      'schema-version': 3,
+      'scaffold-version': '3.0.0',
+      in_progress: null,
+      steps: {},
+    })
+    fs.writeFileSync(path.join(servicesDir, 'state.json'), serviceState, 'utf8')
+
+    const result = runValidation(root, ['state'])
+    expect(result.errors.filter(e => e.code === 'STATE_SCHEMA_VERSION')).toHaveLength(0)
+    expect(result.errors).toHaveLength(0)
+  })
+
+  // Test 10: Service state validation errors are accumulated
+  it('accumulates errors from invalid service state files', () => {
+    const root = makeProjectRoot({
+      configContent: validConfig,
+      stateContent: validState,
+    })
+
+    // Create a service state file with an invalid schema version
+    const servicesDir = path.join(root, '.scaffold', 'services', 'bad-service')
+    fs.mkdirSync(servicesDir, { recursive: true })
+    const badServiceState = JSON.stringify({
+      'schema-version': 99,
+      'scaffold-version': '3.0.0',
+      in_progress: null,
+      steps: {},
+    })
+    fs.writeFileSync(path.join(servicesDir, 'state.json'), badServiceState, 'utf8')
+
+    const result = runValidation(root, ['state'])
+    expect(result.errors.some(e => e.code === 'STATE_SCHEMA_VERSION')).toBe(true)
+  })
+
+  // Test 11: No errors when services directory does not exist
+  it('does not error when services directory is absent', () => {
+    const root = makeProjectRoot({
+      configContent: validConfig,
+      stateContent: validState,
+    })
+
+    const result = runValidation(root, ['state'])
+    expect(result.errors.filter(e => e.code.startsWith('STATE_'))).toHaveLength(0)
+  })
 })

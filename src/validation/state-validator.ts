@@ -13,26 +13,29 @@ const VALID_STATUSES = new Set(['pending', 'in_progress', 'completed', 'skipped'
  *
  * - Returns STATE_MISSING error if file does not exist
  * - Returns STATE_PARSE_ERROR if file is not valid JSON
- * - Returns STATE_SCHEMA_VERSION error if schema-version is not 1 or 2
+ * - Returns STATE_SCHEMA_VERSION error if schema-version is not 1, 2, or 3
  * - Returns FIELD_INVALID_VALUE errors for steps with invalid status values
  * - Returns STATE_IN_PROGRESS warning if in_progress is non-null (potential crash)
+ *
+ * @param projectRoot - project root directory
+ * @param statePath - optional override for the state.json path (defaults to .scaffold/state.json)
  */
-export function validateState(projectRoot: string): {
+export function validateState(projectRoot: string, statePath?: string): {
   errors: ScaffoldError[]
   warnings: ScaffoldWarning[]
 } {
-  const statePath = path.join(projectRoot, '.scaffold', 'state.json')
+  const resolvedStatePath = statePath ?? path.join(projectRoot, '.scaffold', 'state.json')
   const errors: ScaffoldError[] = []
   const warnings: ScaffoldWarning[] = []
 
   // Check existence
-  if (!fs.existsSync(statePath)) {
+  if (!fs.existsSync(resolvedStatePath)) {
     errors.push({
       code: 'STATE_MISSING',
-      message: `Pipeline state not found at ${statePath}`,
+      message: `Pipeline state not found at ${resolvedStatePath}`,
       exitCode: ExitCode.ValidationError,
       recovery: 'Run "scaffold init" to initialize the pipeline',
-      context: { file: statePath },
+      context: { file: resolvedStatePath },
     })
     return { errors, warnings }
   }
@@ -40,7 +43,7 @@ export function validateState(projectRoot: string): {
   // Read file
   let raw: string
   try {
-    raw = fs.readFileSync(statePath, 'utf8')
+    raw = fs.readFileSync(resolvedStatePath, 'utf8')
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err)
     errors.push({
@@ -48,7 +51,7 @@ export function validateState(projectRoot: string): {
       message: `Failed to read state.json: ${detail}`,
       exitCode: ExitCode.StateCorruption,
       recovery: 'Run "scaffold reset" to reinitialize state',
-      context: { file: statePath, detail },
+      context: { file: resolvedStatePath, detail },
     })
     return { errors, warnings }
   }
@@ -64,15 +67,15 @@ export function validateState(projectRoot: string): {
       message: `Failed to parse state.json: ${detail}`,
       exitCode: ExitCode.StateCorruption,
       recovery: 'Run "scaffold reset" to reinitialize state',
-      context: { file: statePath, detail },
+      context: { file: resolvedStatePath, detail },
     })
     return { errors, warnings }
   }
 
-  // Check schema version (Wave 3a: widened to accept 1 or 2)
+  // Check schema version (Wave 3b: widened to accept 1, 2, or 3)
   const schemaVersion = parsed['schema-version']
-  if (schemaVersion !== 1 && schemaVersion !== 2) {
-    errors.push(stateSchemaVersion([1, 2], schemaVersion as number, statePath))
+  if (schemaVersion !== 1 && schemaVersion !== 2 && schemaVersion !== 3) {
+    errors.push(stateSchemaVersion([1, 2, 3], schemaVersion as number, resolvedStatePath))
     return { errors, warnings }
   }
 
@@ -88,7 +91,7 @@ export function validateState(projectRoot: string): {
           message: `Step "${slug}" has invalid status "${status}"`,
           exitCode: ExitCode.ValidationError,
           recovery: `Valid statuses: ${[...VALID_STATUSES].join(', ')}`,
-          context: { file: statePath, field: `steps.${slug}.status`, value: status },
+          context: { file: resolvedStatePath, field: `steps.${slug}.status`, value: status },
         })
       }
     }
@@ -102,7 +105,7 @@ export function validateState(projectRoot: string): {
     warnings.push({
       code: 'STATE_IN_PROGRESS',
       message: `Step "${step}" is marked in_progress — this may indicate a previous crash`,
-      context: { file: statePath, step },
+      context: { file: resolvedStatePath, step },
     })
   }
 
