@@ -55,6 +55,36 @@ export class ExistingScaffoldError extends ScaffoldUserError {
   }
 }
 
+export class ServiceRequiredError extends ScaffoldUserError {
+  constructor(stepName: string) {
+    super(`Step '${stepName}' requires --service flag when services[] is configured.`)
+  }
+}
+
+export class ServiceRejectedError extends ScaffoldUserError {
+  constructor(stepName: string) {
+    super(`Step '${stepName}' is a global cross-service step and does not accept --service.`)
+  }
+}
+
+export class ServiceNotFoundError extends ScaffoldUserError {
+  constructor(serviceName: string) {
+    super(`Service '${serviceName}' not found in services[].`)
+  }
+}
+
+export class ServiceFlagWithoutServicesError extends ScaffoldUserError {
+  constructor() {
+    super('--service requires services[] in config.')
+  }
+}
+
+export class MultiServiceOverlayMissingError extends ScaffoldUserError {
+  constructor() {
+    super('Multi-service projects require multi-service-overlay.yml.')
+  }
+}
+
 export function isScaffoldUserError(err: unknown): err is ScaffoldUserError {
   return err instanceof ScaffoldUserError
 }

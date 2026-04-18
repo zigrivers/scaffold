@@ -39,7 +39,7 @@ export interface ExtraStepEntry {
  * See state-json-schema.md.
  */
 export interface PipelineState {
-  'schema-version': 1 | 2
+  'schema-version': 1 | 2 | 3
   'scaffold-version': string  // semver
   init_methodology: MethodologyName
   config_methodology: MethodologyName
