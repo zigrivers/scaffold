@@ -1,13 +1,14 @@
 import fs from 'node:fs'
-import path from 'node:path'
 import type { ReworkSession, ReworkConfig, ReworkStep } from '../types/index.js'
 import { atomicWriteFile, fileExists } from '../utils/fs.js'
+import { StatePathResolver } from './state-path-resolver.js'
 
 export class ReworkManager {
   private reworkPath: string
 
-  constructor(private projectRoot: string) {
-    this.reworkPath = path.join(projectRoot, '.scaffold', 'rework.json')
+  constructor(projectRoot: string, service?: string) {
+    const resolver = new StatePathResolver(projectRoot, service)
+    this.reworkPath = resolver.reworkPath
   }
 
   hasSession(): boolean {

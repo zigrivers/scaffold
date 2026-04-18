@@ -329,12 +329,10 @@ describe('ShutdownManager', () => {
   describe('lock ownership', () => {
     it('registers and releases lock ownership', () => {
       mgr.registerLockOwnership('/path/to/lock.json')
-      expect((mgr as any).lockOwned).toBe(true)
-      expect((mgr as any).lockPath).toBe('/path/to/lock.json')
+      expect((mgr as any).lockPaths).toContain('/path/to/lock.json')
 
       mgr.releaseLockOwnership()
-      expect((mgr as any).lockOwned).toBe(false)
-      expect((mgr as any).lockPath).toBeNull()
+      expect((mgr as any).lockPaths).toEqual([])
     })
   })
 
