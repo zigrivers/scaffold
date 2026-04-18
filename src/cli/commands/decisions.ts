@@ -3,6 +3,10 @@ import { readDecisions } from '../../state/decision-logger.js'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
+import { guardSteplessCommand } from '../guards.js'
+import { StatePathResolver } from '../../state/state-path-resolver.js'
+import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
+import { loadConfig } from '../../config/loader.js'
 
 interface DecisionsArgs {
   step?: string
@@ -12,6 +16,7 @@ interface DecisionsArgs {
   verbose?: boolean
   root?: string
   force?: boolean
+  service?: string
 }
 
 const decisionsCommand: CommandModule<Record<string, unknown>, DecisionsArgs> = {
@@ -27,6 +32,10 @@ const decisionsCommand: CommandModule<Record<string, unknown>, DecisionsArgs> = 
         type: 'number',
         description: 'Show last N decisions',
       })
+      .option('service', {
+        type: 'string',
+        describe: 'Target service name (multi-service projects)',
+      })
   },
   handler: async (argv) => {
     const projectRoot = argv.root ?? findProjectRoot(process.cwd())
@@ -37,10 +46,16 @@ const decisionsCommand: CommandModule<Record<string, unknown>, DecisionsArgs> = 
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
-    const decisions = readDecisions(projectRoot, {
-      step: argv.step,
-      last: argv.last,
-    })
+    const service = argv.service as string | undefined
+    if (service) {
+      const { config } = loadConfig(projectRoot, [])
+      guardSteplessCommand(config ?? {}, service, { commandName: 'decisions', output })
+      if (process.exitCode === 2) return
+      ensureV3Migration(projectRoot, config)
+    }
+
+    const pathResolver = service ? new StatePathResolver(projectRoot, service) : undefined
+    const decisions = readDecisions(projectRoot, { step: argv.step, last: argv.last }, pathResolver)
 
     if (outputMode === 'json') {
       output.result({
