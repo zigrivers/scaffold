@@ -45,7 +45,11 @@ cross-reads:
 
 **Type**: `crossReads?: Array<{ service: string; step: string }>` on `MetaPromptFrontmatter` in `src/types/frontmatter.ts`.
 
-**Frontmatter parsing**: The loader deserializes `cross-reads` (kebab-case YAML) to `crossReads` (camelCase). Unknown frontmatter fields currently produce warnings — the parser must be updated to recognize `cross-reads` and suppress the warning.
+**Frontmatter parsing** in `src/project/frontmatter.ts` requires 4 touch points:
+1. Add `'cross-reads'` to `KNOWN_YAML_KEYS` set (suppresses unknown-field warning)
+2. Add normalization in `normalizeRawObject` to convert `cross-reads` (kebab-case) → `crossReads` (camelCase)
+3. Add validation in `frontmatterSchema` for the array-of-objects shape
+4. Add `crossReads: []` to `emptyFrontmatter` fallback (line ~275)
 
 ---
 
@@ -84,14 +88,15 @@ function resolveTransitiveCrossReads(
   crossReads: Array<{ service: string; step: string }>,
   config: ScaffoldConfig,
   projectRoot: string,
-  visiting: Set<string>,                    // gray — cycle detection
-  resolved: Map<string, ArtifactEntry[]>,   // black — memoization
+  metaPrompts: Map<string, MetaPromptFile>,  // required for transitive lookup
+  visiting: Set<string>,                      // gray — cycle detection
+  resolved: Map<string, ArtifactEntry[]>,     // black — memoized full closure
 ): ArtifactEntry[] {
   const artifacts: ArtifactEntry[] = []
   for (const cr of crossReads) {
     const key = `${cr.service}:${cr.step}`
     if (visiting.has(key)) continue        // cycle — skip silently
-    if (resolved.has(key)) {               // already resolved — reuse
+    if (resolved.has(key)) {               // already resolved — reuse full closure
       artifacts.push(...resolved.get(key)!)
       continue
     }
@@ -99,20 +104,24 @@ function resolveTransitiveCrossReads(
 
     // Direct resolution
     const direct = resolveDirectCrossRead(cr, config, projectRoot)
-    artifacts.push(...direct)
 
     // Transitive: check the foreign step template's own cross-reads
-    const foreignMeta = metaPrompts.get(cr.step)
-    if (foreignMeta?.frontmatter.crossReads?.length) {
-      const transitive = resolveTransitiveCrossReads(
-        foreignMeta.frontmatter.crossReads,
-        config, projectRoot, visiting, resolved,
-      )
-      artifacts.push(...transitive)
+    let transitive: ArtifactEntry[] = []
+    if (direct.length > 0) {  // only recurse if direct resolution succeeded
+      const foreignMeta = metaPrompts.get(cr.step)
+      if (foreignMeta?.frontmatter.crossReads?.length) {
+        transitive = resolveTransitiveCrossReads(
+          foreignMeta.frontmatter.crossReads,
+          config, projectRoot, metaPrompts, visiting, resolved,
+        )
+      }
     }
 
+    const fullClosure = [...direct, ...transitive]
+    artifacts.push(...fullClosure)
+
     visiting.delete(key)
-    resolved.set(key, direct)   // cache direct artifacts only
+    resolved.set(key, fullClosure)  // cache FULL closure (direct + transitive)
   }
   return artifacts
 }
@@ -145,13 +154,21 @@ function resolveTransitiveCrossReads(
 After the existing reads gathering loop, add a cross-reads loop:
 
 ```typescript
+// Cross-reads artifact gathering (after existing reads loop)
+// Uses the same `gatheredPaths` Set as existing dep/reads loops to deduplicate
 const crossReads = metaPrompt.frontmatter.crossReads ?? []
 if (crossReads.length > 0) {
   const crossArtifacts = resolveTransitiveCrossReads(
     crossReads, config, projectRoot,
+    context.metaPrompts,  // for transitive frontmatter lookup
     new Set(), new Map(),
   )
-  artifacts.push(...crossArtifacts)
+  for (const artifact of crossArtifacts) {
+    if (!gatheredPaths.has(artifact.filePath)) {
+      gatheredPaths.add(artifact.filePath)
+      artifacts.push(artifact)
+    }
+  }
 }
 ```
 
@@ -176,7 +193,8 @@ function resolveDirectCrossRead(
     return []
   }
 
-  // 3. Load foreign service state (non-fatal if missing)
+  // 3. Load foreign service state via StateManager (canonical load path — includes
+  //    migration, validation, and merged global+service view)
   const foreignResolver = new StatePathResolver(projectRoot, cr.service)
   if (!fs.existsSync(foreignResolver.statePath)) {
     output.warn(`cross-reads: service '${cr.service}' not bootstrapped`)
@@ -185,9 +203,12 @@ function resolveDirectCrossRead(
 
   let foreignState: PipelineState
   try {
-    foreignState = JSON.parse(fs.readFileSync(foreignResolver.statePath, 'utf8'))
+    const foreignManager = new StateManager(
+      projectRoot, () => [], undefined, foreignResolver,
+    )
+    foreignState = foreignManager.loadState()
   } catch {
-    output.warn(`cross-reads: failed to read state for '${cr.service}'`)
+    output.warn(`cross-reads: failed to load state for '${cr.service}'`)
     return []
   }
 
@@ -196,14 +217,15 @@ function resolveDirectCrossRead(
   if (!stepEntry || stepEntry.status !== 'completed' || !stepEntry.produces) return []
 
   // 5. Resolve artifacts with containment check
+  //    Uses existing ArtifactEntry shape: { stepName, filePath, content }
   const artifacts: ArtifactEntry[] = []
   for (const relPath of stepEntry.produces) {
     const fullPath = resolveContainedArtifactPath(projectRoot, relPath)
     if (fullPath && fs.existsSync(fullPath)) {
       artifacts.push({
-        path: relPath,
+        stepName: `${cr.service}:${cr.step}`,  // qualified name for cross-service context
+        filePath: relPath,
         content: fs.readFileSync(fullPath, 'utf8'),
-        source: `cross-read:${cr.service}:${cr.step}`,
       })
     }
   }
@@ -232,6 +254,8 @@ All cross-service artifact reads go through `resolveContainedArtifactPath()` (Wa
 | `src/cli/commands/run.ts` | Cross-reads artifact gathering loop |
 | `src/cli/commands/next.ts` | Cross-dependency readiness display |
 | `src/cli/commands/status.ts` | Cross-dependency readiness display |
+| `src/core/pipeline/resolver.ts` | Pass crossReads data through to buildGraph |
+| `src/types/assembly.ts` | Verify ArtifactEntry shape supports qualified stepName (e.g., `service:step`) |
 
 ---
 
@@ -240,12 +264,14 @@ All cross-service artifact reads go through `resolveContainedArtifactPath()` (Wa
 | Category | Count | Coverage |
 |----------|-------|---------|
 | Schema | 3 | exports field valid/invalid/optional on ServiceSchema |
-| Frontmatter | 3 | cross-reads parsed, empty, absent |
-| Artifact resolution | 4 | happy path, non-exported warning, missing service warning, containment enforced |
-| Transitive | 3 | A→B→C resolves, cycle detection, memoization |
+| Frontmatter | 4 | cross-reads parsed, empty, absent, KNOWN_YAML_KEYS no warning |
+| Artifact resolution | 5 | happy path, non-exported warning, missing service warning, containment enforced, dedup with gatheredPaths |
+| Transitive | 4 | A→B→C resolves, cycle detection, memoization caches full closure, failed direct skips transitive |
 | Graph | 2 | crossDependencies populated, absent when no cross-reads |
-| Edge cases | 2 | missing foreign state (non-fatal), step not completed (skip) |
-| **Total** | **17** | |
+| Edge cases | 3 | missing foreign state (non-fatal via StateManager), step not completed (skip), disabled step (skip) |
+| Display | 2 | next --service shows cross-dep readiness, status --service shows cross-dep readiness |
+| E2E | 2 | cross-read resolves foreign artifact, transitive chain resolves |
+| **Total** | **25** | |
 
 ---
 
@@ -264,3 +290,13 @@ All cross-service artifact reads go through `resolveContainedArtifactPath()` (Wa
 - P1: Missing foreign state must be non-fatal → warn + skip
 - P2: Depth limit 5 arbitrary → removed (cycle detection + memoization suffice)
 - P2: Export edge cases undefined → full table added
+
+**Round 2 (Full spec — Codex + Gemini)**: 1 P0, 4 P1s, 2 P2s — all fixed:
+- P0: ArtifactEntry uses wrong shape (`path`/`source` vs `filePath`/`stepName`) → fixed to use existing `{ stepName, filePath, content }` with qualified `service:step` for stepName
+- P1: Memoization caches only direct artifacts → fixed to cache full closure (direct + transitive)
+- P1: `metaPrompts` not in function signature → added as required parameter
+- P1: Raw JSON.parse bypasses StateManager → changed to use StateManager canonical load path
+- P1: Missing KNOWN_YAML_KEYS update → added 4 explicit frontmatter parser touch points
+- P1: Integration bypasses gatheredPaths dedup → fixed to use existing dedup Set
+- P2: Refactoring table missing resolver.ts + assembly.ts → added
+- P2: Test count 17 too low → increased to 25 with display + E2E coverage
