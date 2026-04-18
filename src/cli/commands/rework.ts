@@ -9,7 +9,8 @@ import { StateManager } from '../../state/state-manager.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
 import { loadConfig } from '../../config/loader.js'
-import { assertSingleServiceOrExit } from '../guards.js'
+import { guardSteplessCommand } from '../guards.js'
+import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
 import { parsePhases, parseThrough, applyExclusions, resolveStepsForPhases } from '../../core/rework/phase-selector.js'
 import type { DepthLevel } from '../../types/enums.js'
 import type { ReworkConfig } from '../../types/index.js'
@@ -31,6 +32,7 @@ interface ReworkArgs {
   verbose?: boolean
   root?: string
   force?: boolean
+  service?: string
 }
 
 const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
@@ -78,6 +80,10 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
         type: 'string',
         description: 'Mark a step as completed (used by runner skill)',
       })
+      .option('service', {
+        type: 'string',
+        description: 'Target service name (multi-service projects)',
+      })
   },
   handler: async (argv) => {
     const projectRoot = argv.root ?? findProjectRoot(process.cwd())
@@ -89,7 +95,8 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
 
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
-    const reworkManager = new ReworkManager(projectRoot as string)
+    const service = argv.service as string | undefined
+    const reworkManager = new ReworkManager(projectRoot as string, service)
 
     // --- Branch: --clear ---
     if (argv.clear) {
@@ -196,9 +203,10 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
 
     // --- Branch: new rework ---
 
-    // Guard: reject multi-service configs before phase resolution and lock acquisition
+    // Guard: validate service flag before phase resolution and lock acquisition
     const { config: guardConfig } = loadConfig(projectRoot as string, [])
-    assertSingleServiceOrExit(guardConfig ?? {}, { commandName: 'rework', output })
+    ensureV3Migration(projectRoot as string, guardConfig)
+    guardSteplessCommand(guardConfig ?? {}, service, { commandName: 'rework', output })
     if (process.exitCode === 2) return
 
     // Check for existing session
