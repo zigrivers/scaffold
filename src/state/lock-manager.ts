@@ -2,6 +2,7 @@
 
 import type { LockFile, LockableCommand } from '../types/index.js'
 import type { ScaffoldError, ScaffoldWarning } from '../types/index.js'
+import type { StatePathResolver } from './state-path-resolver.js'
 import { ensureDir } from '../utils/fs.js'
 import { lockHeld, lockWriteFailed, lockStaleCleared } from '../utils/errors.js'
 import fs from 'node:fs'
@@ -9,8 +10,8 @@ import path from 'node:path'
 import os from 'node:os'
 import { execSync } from 'node:child_process'
 
-export function getLockPath(projectRoot: string): string {
-  return path.join(projectRoot, '.scaffold', 'lock.json')
+export function getLockPath(projectRoot: string, pathResolver?: StatePathResolver): string {
+  return pathResolver?.lockPath ?? path.join(projectRoot, '.scaffold', 'lock.json')
 }
 
 function lockAcquisitionRace(filePath: string): ScaffoldError {
@@ -55,8 +56,8 @@ export function isStale(lock: LockFile): boolean {
 }
 
 /** Read lock file if exists; return null if absent or corrupt. */
-export function checkLock(projectRoot: string): LockFile | null {
-  const filePath = getLockPath(projectRoot)
+export function checkLock(projectRoot: string, pathResolver?: StatePathResolver): LockFile | null {
+  const filePath = getLockPath(projectRoot, pathResolver)
   if (!fs.existsSync(filePath)) return null
   try {
     const raw = fs.readFileSync(filePath, 'utf8')
@@ -76,14 +77,15 @@ export function acquireLock(
   projectRoot: string,
   command: LockableCommand,
   step?: string,
+  pathResolver?: StatePathResolver,
 ): { acquired: boolean; warning?: ScaffoldWarning; error?: ScaffoldError } {
-  ensureDir(path.join(projectRoot, '.scaffold'))
+  ensureDir(pathResolver?.scaffoldDir ?? path.join(projectRoot, '.scaffold'))
 
-  const filePath = getLockPath(projectRoot)
+  const filePath = getLockPath(projectRoot, pathResolver)
   let staleClearedWarning: ScaffoldWarning | undefined
 
   // Check for existing lock
-  const existing = checkLock(projectRoot)
+  const existing = checkLock(projectRoot, pathResolver)
   if (existing !== null) {
     if (isStale(existing)) {
       // Auto-clear stale lock
@@ -120,12 +122,12 @@ export function acquireLock(
 }
 
 /** Release lock by deleting .scaffold/lock.json (only if current process holds it). */
-export function releaseLock(projectRoot: string): void {
-  const lock = checkLock(projectRoot)
+export function releaseLock(projectRoot: string, pathResolver?: StatePathResolver): void {
+  const lock = checkLock(projectRoot, pathResolver)
   if (lock === null) return // no lock — no-op
 
   if (lock.pid === process.pid) {
-    try { fs.unlinkSync(getLockPath(projectRoot)) } catch { /* ignore if already gone */ }
+    try { fs.unlinkSync(getLockPath(projectRoot, pathResolver)) } catch { /* ignore if already gone */ }
   } else {
     // Different PID owns this lock — do not delete
     process.stderr.write(
