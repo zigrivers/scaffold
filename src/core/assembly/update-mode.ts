@@ -1,3 +1,4 @@
+import path from 'node:path'
 import type { DepthLevel } from '../../types/enums.js'
 import type { PipelineState } from '../../types/state.js'
 import type { ExistingArtifact } from '../../types/assembly.js'
@@ -25,8 +26,9 @@ export function detectUpdateMode(options: {
   state: PipelineState
   currentDepth: DepthLevel
   projectRoot: string
+  service?: string
 }): UpdateModeResult {
-  const { step, state, currentDepth, projectRoot } = options
+  const { step, state, currentDepth, projectRoot, service } = options
   const stepEntry = state.steps[step]
 
   // Not completed — definitely not update mode
@@ -46,7 +48,8 @@ export function detectUpdateMode(options: {
   // so the downstream read site does not need a non-null assertion.
   let firstExisting: { relPath: string; fullPath: string } | undefined
   for (const relativePath of produces) {
-    const fullPath = resolveContainedArtifactPath(projectRoot, relativePath)
+    const outputPath = service ? path.join('services', service, relativePath) : relativePath
+    const fullPath = resolveContainedArtifactPath(projectRoot, outputPath)
     if (fullPath === null) continue // path escapes project root — skip
     try {
       const stat = fs.statSync(fullPath)
