@@ -1,22 +1,27 @@
 import type { PipelineState, StepStateEntry, InProgressRecord, DepthLevel, StepStatus } from '../types/index.js'
 import type { ScaffoldError } from '../types/index.js'
-import { atomicWriteFile, fileExists, ensureDir } from '../utils/fs.js'
+import { atomicWriteFile, fileExists } from '../utils/fs.js'
 import { stateMissing, stateParseError, psmAlreadyInProgress } from '../utils/errors.js'
 import { migrateState } from './state-migration.js'
 import { dispatchStateMigration } from './state-version-dispatch.js'
-import fs from 'node:fs'
+import { StatePathResolver } from './state-path-resolver.js'
 import path from 'node:path'
+import fs from 'node:fs'
 import type { MethodologyName } from '../types/index.js'
 
 export class StateManager {
   private statePath: string
+  private pathResolver: StatePathResolver
 
   constructor(
     private projectRoot: string,
     private computeEligible: (steps: Record<string, StepStateEntry>) => string[],
     private configProvider?: () => { project?: { services?: unknown[] } } | undefined,
+    pathResolver?: StatePathResolver,
+    private globalSteps?: Set<string>,
   ) {
-    this.statePath = path.join(projectRoot, '.scaffold', 'state.json')
+    this.pathResolver = pathResolver ?? new StatePathResolver(projectRoot)
+    this.statePath = this.pathResolver.statePath
   }
 
   /** Load and validate state.json from disk. Throws ScaffoldError on schema mismatch. */
@@ -56,13 +61,35 @@ export class StateManager {
       this.saveState(state)
     }
 
+    // If service-scoped, merge global steps as read-only base
+    if (this.pathResolver.isServiceScoped) {
+      const globalStatePath = path.join(this.pathResolver.rootScaffoldDir, 'state.json')
+      if (fs.existsSync(globalStatePath)) {
+        const globalRaw = fs.readFileSync(globalStatePath, 'utf8')
+        const globalParsed = JSON.parse(globalRaw) as Record<string, unknown>
+        const globalState = globalParsed as unknown as PipelineState
+        // Merge: global steps as base, service steps override
+        state.steps = { ...globalState.steps, ...state.steps }
+      }
+    }
+
     return state
   }
 
   /** Atomically persist state to disk (write tmp + rename). */
   saveState(state: PipelineState): void {
     state.next_eligible = this.computeEligible(state.steps)
-    atomicWriteFile(this.statePath, JSON.stringify(state, null, 2))
+    let stateToWrite = state
+    if (this.pathResolver.isServiceScoped && this.globalSteps) {
+      const filteredSteps: Record<string, StepStateEntry> = {}
+      for (const [name, entry] of Object.entries(state.steps)) {
+        if (!this.globalSteps.has(name)) {
+          filteredSteps[name] = entry
+        }
+      }
+      stateToWrite = { ...state, steps: filteredSteps }
+    }
+    atomicWriteFile(this.statePath, JSON.stringify(stateToWrite, null, 2))
   }
 
   /** Transition step to in_progress; sets in_progress record with actor. */
@@ -146,6 +173,8 @@ export class StateManager {
     let changed = false
 
     for (const step of pipelineSteps) {
+      // Skip global steps when service-scoped — they belong to root state
+      if (this.pathResolver.isServiceScoped && this.globalSteps?.has(step.slug)) continue
       // Only add enabled steps that aren't already tracked
       if (step.enabled && !state.steps[step.slug]) {
         state.steps[step.slug] = {
@@ -176,7 +205,7 @@ export class StateManager {
     // When provided and project.services[] is non-empty, emit schema-version 2.
     config?: { project?: { services?: unknown[] } }
   }): void {
-    ensureDir(path.join(this.projectRoot, '.scaffold'))
+    this.pathResolver.ensureDir()
 
     const schemaVersion: 1 | 2 =
       (options.config?.project?.services?.length ?? 0) > 0 ? 2 : 1

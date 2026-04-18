@@ -9,6 +9,11 @@ import {
   MultiServiceNotSupportedError,
   ExistingScaffoldError,
   isScaffoldUserError,
+  ServiceRequiredError,
+  ServiceRejectedError,
+  ServiceNotFoundError,
+  ServiceFlagWithoutServicesError,
+  MultiServiceOverlayMissingError,
 } from './user-errors.js'
 
 describe('ScaffoldUserError taxonomy', () => {
@@ -59,5 +64,38 @@ describe('ScaffoldUserError taxonomy', () => {
     expect(isScaffoldUserError(new Error('plain'))).toBe(false)
     expect(isScaffoldUserError(null)).toBe(false)
     expect(isScaffoldUserError(undefined)).toBe(false)
+  })
+
+  it('ServiceRequiredError', () => {
+    const err = new ServiceRequiredError('tech-stack')
+    expect(err).toBeInstanceOf(ScaffoldUserError)
+    expect(err.message).toContain('tech-stack')
+    expect(err.message).toContain('--service')
+  })
+
+  it('ServiceNotFoundError', () => {
+    const err = new ServiceNotFoundError('nonexistent')
+    expect(err).toBeInstanceOf(ScaffoldUserError)
+    expect(err.message).toContain('nonexistent')
+  })
+
+  it('ServiceRejectedError', () => {
+    const err = new ServiceRejectedError('service-ownership-map')
+    expect(err).toBeInstanceOf(ScaffoldUserError)
+    expect(err.message).toContain('service-ownership-map')
+    expect(err.message).toContain('global')
+  })
+
+  it('ServiceFlagWithoutServicesError', () => {
+    const err = new ServiceFlagWithoutServicesError()
+    expect(err).toBeInstanceOf(ScaffoldUserError)
+    expect(err.message).toContain('--service')
+    expect(err.message).toContain('services[]')
+  })
+
+  it('MultiServiceOverlayMissingError', () => {
+    const err = new MultiServiceOverlayMissingError()
+    expect(err).toBeInstanceOf(ScaffoldUserError)
+    expect(err.message).toContain('multi-service-overlay.yml')
   })
 })

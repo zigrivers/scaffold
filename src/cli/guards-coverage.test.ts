@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename)
 const COMMANDS_DIR = path.join(__dirname, 'commands')
 
 describe('multi-service guard static coverage', () => {
-  it('every command using StateManager also calls assertSingleServiceOrExit', () => {
+  it('every command using StateManager also calls a guard function', () => {
     const files = fs.readdirSync(COMMANDS_DIR)
       .filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts'))
 
@@ -19,7 +19,7 @@ describe('multi-service guard static coverage', () => {
       const usesStateManager = /\bnew\s+StateManager\s*\(/.test(body)
       if (!usesStateManager) continue
 
-      const callsGuard = /\bassertSingleServiceOrExit\s*\(/.test(body)
+      const callsGuard = /\b(?:guardStepCommand|guardSteplessCommand|assertSingleServiceOrExit)\s*\(/.test(body)
       const isExempt = f === 'adopt.ts'
       if (!callsGuard && !isExempt) missing.push(f)
     }

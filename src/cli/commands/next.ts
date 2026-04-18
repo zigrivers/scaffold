@@ -6,7 +6,9 @@ import { createOutputContext } from '../output/context.js'
 import { StateManager } from '../../state/state-manager.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
-import { assertSingleServiceOrExit } from '../guards.js'
+import { guardSteplessCommand } from '../guards.js'
+import { StatePathResolver } from '../../state/state-path-resolver.js'
+import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
 
 interface NextArgs {
   count?: number
@@ -15,16 +17,22 @@ interface NextArgs {
   verbose?: boolean
   root?: string
   force?: boolean
+  service?: string
 }
 
 const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
   command: 'next',
   describe: 'Show next eligible step(s)',
   builder: (yargs) => {
-    return yargs.option('count', {
-      type: 'number',
-      description: 'Show up to N next eligible steps',
-    })
+    return yargs
+      .option('count', {
+        type: 'number',
+        description: 'Show up to N next eligible steps',
+      })
+      .option('service', {
+        type: 'string',
+        describe: 'Target service name (multi-service projects)',
+      })
   },
   handler: async (argv) => {
     // 1. Resolve project root
@@ -45,14 +53,23 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
 
     // 2. Load pipeline context and resolve overlay/graph
     const context = loadPipelineContext(projectRoot)
-    assertSingleServiceOrExit(context.config ?? {}, { commandName: 'next', output })
+    const service = argv.service as string | undefined
+    const pipeline = resolvePipeline(context, { output, serviceId: service })
+
+    // Trigger v2→v3 migration if needed
+    ensureV3Migration(projectRoot, context.config, pipeline.globalSteps)
+
+    // Guard check
+    guardSteplessCommand(context.config ?? {}, service, { commandName: 'next', output })
     if (process.exitCode === 2) return
 
-    const pipeline = resolvePipeline(context, { output })
+    const pathResolver = new StatePathResolver(projectRoot, service)
     const stateManager = new StateManager(
       projectRoot,
       pipeline.computeEligible,
       () => context.config ?? undefined,
+      pathResolver,
+      pipeline.globalSteps,
     )
 
     // Reconcile state with current pipeline — adds any new steps that were
@@ -67,7 +84,9 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     stateManager.reconcileWithPipeline(pipelineSteps)
 
     const state = stateManager.loadState()
-    const eligible = pipeline.computeEligible(state.steps)
+    const eligible = pipeline.computeEligible(state.steps,
+      service ? { scope: 'service', globalSteps: pipeline.globalSteps } : undefined,
+    )
 
     // 4. Apply --count limit
     const count = argv.count ?? eligible.length

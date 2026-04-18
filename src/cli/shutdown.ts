@@ -27,8 +27,7 @@ export class ShutdownManager {
   private sigintState: 'idle' | 'cleaning' | 'armed' = 'idle'
   private triggeredBySigterm = false
   private exitHandlerRan = false
-  private lockOwned = false
-  private lockPath: string | null = null
+  private lockPaths: string[] = []
   private registry = new Map<string, DisposerEntry>()
   private controller: AbortController
   private contextStorage = new AsyncLocalStorage<string | (() => string)>()
@@ -107,8 +106,8 @@ export class ShutdownManager {
     this.proc.on('exit', (() => {
       if (this.exitHandlerRan) return
       this.exitHandlerRan = true
-      if (this.lockOwned && this.lockPath) {
-        try { fs.unlinkSync(this.lockPath) } catch { /* ok */ }
+      for (const lp of this.lockPaths) {
+        try { fs.unlinkSync(lp) } catch { /* ok */ }
       }
       if (this.proc.stderr?.writable) {
         try { this.proc.stderr.write('\x1b[?25h\n') } catch { /* ok */ }
@@ -121,8 +120,7 @@ export class ShutdownManager {
     this.sigintState = 'idle'
     this.triggeredBySigterm = false
     this.exitHandlerRan = false
-    this.lockOwned = false
-    this.lockPath = null
+    this.lockPaths = []
     this.registry.clear()
     this.controller = new AbortController()
     setMaxListeners(0, this.controller.signal)
@@ -141,12 +139,16 @@ export class ShutdownManager {
   }
 
   registerLockOwnership(lockFilePath: string): void {
-    this.lockPath = lockFilePath
-    this.lockOwned = true
+    if (!this.lockPaths.includes(lockFilePath)) {
+      this.lockPaths.push(lockFilePath)
+    }
   }
-  releaseLockOwnership(): void {
-    this.lockOwned = false
-    this.lockPath = null
+  releaseLockOwnership(lockFilePath?: string): void {
+    if (lockFilePath) {
+      this.lockPaths = this.lockPaths.filter(p => p !== lockFilePath)
+    } else {
+      this.lockPaths = []
+    }
   }
   async shutdown(exitCode: number = ExitCode.UserCancellation): Promise<never> {
     if (this.shuttingDown) {

@@ -1,3 +1,4 @@
+import path from 'node:path'
 import type { PipelineState } from '../types/index.js'
 import { fileExists } from '../utils/fs.js'
 import { resolveContainedArtifactPath } from '../utils/artifact-path.js'
@@ -20,12 +21,14 @@ export function detectCompletion(
   state: PipelineState,
   expectedOutputs: string[],
   projectRoot: string,
+  service?: string,
 ): CompletionResult {
   const artifactsPresent: string[] = []
   const artifactsMissing: string[] = []
 
   for (const output of expectedOutputs) {
-    const fullPath = resolveContainedArtifactPath(projectRoot, output)
+    const relPath = service ? path.join('services', service, output) : output
+    const fullPath = resolveContainedArtifactPath(projectRoot, relPath)
     if (fullPath !== null && fileExists(fullPath)) {
       artifactsPresent.push(output)
     } else {

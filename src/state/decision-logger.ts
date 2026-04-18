@@ -1,5 +1,6 @@
 import type { DecisionEntry } from '../types/index.js'
-import { fileExists, ensureDir, atomicWriteFile } from '../utils/fs.js'
+import type { StatePathResolver } from './state-path-resolver.js'
+import { fileExists, atomicWriteFile } from '../utils/fs.js'
 import { decisionParseError } from '../utils/errors.js'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -7,8 +8,8 @@ import path from 'node:path'
 const DECISIONS_FILE = 'decisions.jsonl'
 const SCAFFOLD_DIR = '.scaffold'
 
-function decisionsPath(projectRoot: string): string {
-  return path.join(projectRoot, SCAFFOLD_DIR, DECISIONS_FILE)
+function decisionsPath(projectRoot: string, pathResolver?: StatePathResolver): string {
+  return pathResolver?.decisionsPath ?? path.join(projectRoot, SCAFFOLD_DIR, DECISIONS_FILE)
 }
 
 /**
@@ -45,8 +46,8 @@ function idToNumber(id: string): number {
 }
 
 /** Compute the next D-NNN id based on existing entries in the file. */
-function getNextId(projectRoot: string): string {
-  const filePath = decisionsPath(projectRoot)
+function getNextId(projectRoot: string, pathResolver?: StatePathResolver): string {
+  const filePath = decisionsPath(projectRoot, pathResolver)
   if (!fileExists(filePath)) return 'D-001'
 
   const entries = readAllEntries(filePath)
@@ -64,11 +65,13 @@ function getNextId(projectRoot: string): string {
 export function appendDecision(
   projectRoot: string,
   entry: Omit<DecisionEntry, 'id'>,
+  pathResolver?: StatePathResolver,
 ): string {
-  ensureDir(path.join(projectRoot, SCAFFOLD_DIR))
+  const scaffoldDir = pathResolver?.scaffoldDir ?? path.join(projectRoot, SCAFFOLD_DIR)
+  fs.mkdirSync(scaffoldDir, { recursive: true })
 
-  const filePath = decisionsPath(projectRoot)
-  const id = getNextId(projectRoot)
+  const filePath = decisionsPath(projectRoot, pathResolver)
+  const id = getNextId(projectRoot, pathResolver)
   const fullEntry: DecisionEntry = { id, ...entry }
   const newLine = JSON.stringify(fullEntry) + '\n'
 
@@ -86,8 +89,9 @@ export function appendDecision(
 export function readDecisions(
   projectRoot: string,
   filter?: { step?: string; last?: number },
+  pathResolver?: StatePathResolver,
 ): DecisionEntry[] {
-  const filePath = decisionsPath(projectRoot)
+  const filePath = decisionsPath(projectRoot, pathResolver)
   let entries = readAllEntries(filePath)
 
   if (filter?.step !== undefined) {

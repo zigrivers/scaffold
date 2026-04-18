@@ -7,16 +7,34 @@ import { PHASE_SORT_ORDER } from './dependency.js'
  * satisfied (completed, skipped, or disabled).
  *
  * Steps absent from `steps` are treated as pending.
+ *
+ * Optional `options.scope` and `options.globalSteps` enable scope filtering:
+ * - `scope='service'`: excludes global steps (those in globalSteps)
+ * - `scope='global'`: excludes per-service steps (those NOT in globalSteps)
+ *   and auto-satisfies per-service dependencies (fan-in)
+ * - no scope: existing behavior preserved (backward compatible)
  */
 export function computeEligible(
   graph: DependencyGraph,
   steps: Record<string, StepStateEntry>,
+  options?: {
+    scope?: 'global' | 'service'
+    globalSteps?: Set<string>
+  },
 ): string[] {
+  const { scope, globalSteps } = options ?? {}
   const eligible: string[] = []
 
   for (const [slug, node] of graph.nodes) {
     // Skip disabled steps — they are never candidates for execution
     if (!node.enabled) continue
+
+    // Scope filtering
+    if (scope && globalSteps) {
+      const isGlobal = globalSteps.has(slug)
+      if (scope === 'service' && isGlobal) continue
+      if (scope === 'global' && !isGlobal) continue
+    }
 
     const status = steps[slug]?.status
     // Only pending steps (or steps not yet in state) are candidates
@@ -27,6 +45,8 @@ export function computeEligible(
       const depNode = graph.nodes.get(dep)
       // Disabled deps count as satisfied
       if (depNode && !depNode.enabled) return true
+      // Fan-in: in global scope, per-service deps are auto-satisfied
+      if (scope === 'global' && globalSteps && !globalSteps.has(dep)) return true
       const depStatus = steps[dep]?.status
       return depStatus === 'completed' || depStatus === 'skipped'
     })

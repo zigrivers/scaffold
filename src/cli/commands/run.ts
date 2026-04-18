@@ -1,8 +1,7 @@
 import type { Argv, CommandModule } from 'yargs'
-import path from 'node:path'
 import fs from 'node:fs'
 import { StateManager } from '../../state/state-manager.js'
-import { acquireLock, getLockPath, releaseLock } from '../../state/lock-manager.js'
+import { acquireLock, checkLock, getLockPath, releaseLock } from '../../state/lock-manager.js'
 import { analyzeCrash } from '../../state/completion.js'
 import { AssemblyEngine } from '../../core/assembly/engine.js'
 import { getPackageKnowledgeDir } from '../../utils/fs.js'
@@ -21,7 +20,9 @@ import { resolveOutputMode } from '../../cli/middleware/output-mode.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
 import { resolveContainedArtifactPath } from '../../utils/artifact-path.js'
 import { shutdown } from '../shutdown.js'
-import { assertSingleServiceOrExit } from '../guards.js'
+import { guardStepCommand } from '../guards.js'
+import { StatePathResolver } from '../../state/state-path-resolver.js'
+import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
 import type { DepthLevel } from '../../types/enums.js'
 import type { ArtifactEntry } from '../../types/assembly.js'
 
@@ -34,6 +35,7 @@ interface RunArgs {
   auto?: boolean
   verbose?: boolean
   root?: string
+  service?: string
 }
 
 const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
@@ -58,6 +60,10 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
         type: 'boolean',
         description: 'Skip lock check and update-mode confirmation',
         default: false,
+      })
+      .option('service', {
+        type: 'string',
+        describe: 'Target service name (multi-service projects)',
       }) as unknown as Argv<RunArgs>
   },
   handler: async (argv) => {
@@ -89,10 +95,15 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       return
     }
     const config = context.config
-    assertSingleServiceOrExit(config, { commandName: 'run', output })
-    if (process.exitCode === 2) return
+    const service = argv.service as string | undefined
+    const pipeline = resolvePipeline(context, { output, serviceId: service })
 
-    const pipeline = resolvePipeline(context, { output })
+    // Trigger v2→v3 migration if needed
+    ensureV3Migration(projectRoot, config, pipeline.globalSteps)
+
+    // Guard check (needs globalSteps from pipeline)
+    guardStepCommand(step, config, service, pipeline.globalSteps, { commandName: 'run', output })
+    if (process.exitCode === 2) return
 
     const metaPrompt = context.metaPrompts.get(step)
     if (!metaPrompt) {
@@ -112,7 +123,19 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     // -----------------------------------------------------------------------
     // Step 3: Acquire lock
     // -----------------------------------------------------------------------
-    const lockResult = acquireLock(projectRoot, 'run', step)
+    const pathResolver = new StatePathResolver(projectRoot, service)
+
+    // For service steps: precheck that no global step is in progress
+    if (service) {
+      const globalLock = checkLock(projectRoot)
+      if (globalLock) {
+        output.error('Global step in progress, retry after completion')
+        process.exitCode = 3
+        return
+      }
+    }
+
+    const lockResult = acquireLock(projectRoot, 'run', step, pathResolver)
     let lockAcquired = lockResult.acquired
 
     if (!lockAcquired) {
@@ -147,6 +170,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
         projectRoot,
         pipeline.computeEligible,
         () => config,
+        pathResolver,
+        pipeline.globalSteps,
       )
       let state = stateManager.loadState()
 
@@ -246,7 +271,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       const cliDepth = argv.depth !== undefined ? (argv.depth as DepthLevel) : undefined
       const { depth, provenance } = resolveDepth(step, config, pipeline.preset, cliDepth)
 
-      const updateModeResult = detectUpdateMode({ step, state, currentDepth: depth, projectRoot })
+      const updateModeResult = detectUpdateMode({ step, state, currentDepth: depth, projectRoot, service })
 
       if (updateModeResult.isUpdateMode) {
         if (!argv.force) {
@@ -408,8 +433,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
               }
             }
 
-            // Read decisions log
-            const decisionsPath = path.join(projectRoot, '.scaffold', 'decisions.jsonl')
+            // Read decisions log (service-scoped when --service is set)
+            const decisionsPath = pathResolver.decisionsPath
             let decisions = ''
             if (fs.existsSync(decisionsPath)) {
               try {
@@ -544,10 +569,11 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     }
 
     if (lockAcquired) {
-      shutdown.registerLockOwnership(getLockPath(projectRoot))
+      const lockFilePath = getLockPath(projectRoot, pathResolver)
+      shutdown.registerLockOwnership(lockFilePath)
       await shutdown.withResource('lock', () => {
-        releaseLock(projectRoot)
-        shutdown.releaseLockOwnership()
+        releaseLock(projectRoot, pathResolver)
+        shutdown.releaseLockOwnership(lockFilePath)
       }, lockProtectedBody)
     } else {
       await lockProtectedBody()

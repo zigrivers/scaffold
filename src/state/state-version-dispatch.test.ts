@@ -42,4 +42,16 @@ describe('dispatchStateMigration', () => {
       dispatchStateMigration(null, { hasServices: false }, 'state.json'),
     ).toThrow()
   })
+
+  it('accepts schema-version 3 without modification', () => {
+    const raw = { 'schema-version': 3, steps: {} }
+    dispatchStateMigration(raw, { hasServices: true }, '/test/state.json')
+    expect(raw['schema-version']).toBe(3)
+  })
+
+  it('accepts schema-version 3 even without services', () => {
+    const raw = { 'schema-version': 3, steps: {} }
+    dispatchStateMigration(raw, { hasServices: false }, '/test/state.json')
+    expect(raw['schema-version']).toBe(3)
+  })
 })

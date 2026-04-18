@@ -170,13 +170,14 @@ describe('E2E: scaffold init --from <nibble.yml>', () => {
     // decisions.jsonl is empty (current behavior preserved).
     expect(fs.readFileSync(decisionsPath, 'utf8')).toBe('')
 
-    // Phase 2: scaffold run create-prd should exit 2 (multi-service guard).
-    // Reset exitCode from Phase 1 before calling run.
+    // Phase 2: scaffold run implementation-plan (a per-service step) should
+    // exit 2 because no --service flag is provided. Global steps like
+    // create-prd now run without --service; per-service steps require it.
     process.exitCode = 0
     await runCommand.handler({
       root,
-      _: ['create-prd'],
-      step: 'create-prd',
+      _: ['implementation-plan'],
+      step: 'implementation-plan',
       $0: 'scaffold',
     } as Parameters<typeof runCommand.handler>[0])
     expect(process.exitCode).toBe(2)

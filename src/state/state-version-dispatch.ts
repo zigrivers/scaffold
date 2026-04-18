@@ -22,13 +22,13 @@ export function dispatchStateMigration(
   raw: unknown,
   ctx: MigrationContext,
   file: string,
-): asserts raw is Record<string, unknown> & { 'schema-version': 1 | 2 } {
+): asserts raw is Record<string, unknown> & { 'schema-version': 1 | 2 | 3 } {
   if (!isPlainObject(raw) || typeof raw['schema-version'] !== 'number') {
-    throw stateSchemaVersion([1, 2], Number(raw && (raw as Record<string, unknown>)['schema-version']), file)
+    throw stateSchemaVersion([1, 2, 3], Number(raw && (raw as Record<string, unknown>)['schema-version']), file)
   }
   const version = raw['schema-version']
-  if (version !== 1 && version !== 2) {
-    throw stateSchemaVersion([1, 2], version, file)
+  if (version !== 1 && version !== 2 && version !== 3) {
+    throw stateSchemaVersion([1, 2, 3], version, file)
   }
   if (version === 1 && ctx.hasServices) {
     raw['schema-version'] = 2

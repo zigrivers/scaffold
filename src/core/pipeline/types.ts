@@ -26,5 +26,9 @@ export interface ResolvedPipeline {
   preset: MethodologyPreset
   overlay: OverlayState
   stepMeta: Map<string, MetaPromptFrontmatter>
-  computeEligible: (steps: Record<string, StepStateEntry>) => string[]
+  computeEligible: (
+    steps: Record<string, StepStateEntry>,
+    options?: { scope?: 'global' | 'service'; globalSteps?: Set<string> },
+  ) => string[]
+  globalSteps: Set<string>
 }
