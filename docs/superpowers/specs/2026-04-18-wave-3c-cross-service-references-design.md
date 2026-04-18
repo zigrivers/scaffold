@@ -129,7 +129,7 @@ function resolveTransitiveCrossReads(
 
 **Safety mechanisms**:
 - **Cycle detection**: `visiting` set (gray nodes) prevents infinite loops. Cycles are structural, skipped silently.
-- **Memoization**: `resolved` map (black nodes) caches direct artifact results for efficiency.
+- **Memoization**: `resolved` map (black nodes) caches the full closure (direct + transitive) for efficiency.
 - **No depth limit**: cycle detection + memoization naturally bound recursion by unique `service:step` nodes.
 
 ### 2.3 Edge Case Behaviors
@@ -141,7 +141,8 @@ function resolveTransitiveCrossReads(
 | Step not in service's `exports` | Warn + skip |
 | Foreign state file missing | Warn + skip ("service not bootstrapped") |
 | Foreign step not completed | Skip (only completed steps yield artifacts, matching existing `reads` behavior) |
-| Foreign step disabled | Skip |
+| Foreign step disabled but completed | Include (artifact exists and is valid — checking enablement would require resolving the foreign service's overlay, which is expensive and unnecessary since the content is already produced) |
+| Foreign step disabled and not completed | Skip (no artifact to read) |
 | Foreign step skipped | Skip |
 | Cycle detected (A→B→A) | Skip silently (structural, not an error) |
 
@@ -203,6 +204,10 @@ function resolveDirectCrossRead(
 
   let foreignState: PipelineState
   try {
+    // Read-only load — () => [] is safe because by Wave 3c all service states
+    // are v3 (migration completed in Wave 3b), so loadState won't trigger
+    // saveState/migration. If a future wave changes this, extract a read-only
+    // state loader instead.
     const foreignManager = new StateManager(
       projectRoot, () => [], undefined, foreignResolver,
     )
@@ -254,7 +259,7 @@ All cross-service artifact reads go through `resolveContainedArtifactPath()` (Wa
 | `src/cli/commands/run.ts` | Cross-reads artifact gathering loop |
 | `src/cli/commands/next.ts` | Cross-dependency readiness display |
 | `src/cli/commands/status.ts` | Cross-dependency readiness display |
-| `src/core/pipeline/resolver.ts` | Pass crossReads data through to buildGraph |
+| `src/core/pipeline/resolver.ts` | Verify crossReads flows through to buildGraph (may need no changes — frontmatters already passed) |
 | `src/types/assembly.ts` | Verify ArtifactEntry shape supports qualified stepName (e.g., `service:step`) |
 
 ---
@@ -300,3 +305,10 @@ All cross-service artifact reads go through `resolveContainedArtifactPath()` (Wa
 - P1: Integration bypasses gatheredPaths dedup → fixed to use existing dedup Set
 - P2: Refactoring table missing resolver.ts + assembly.ts → added
 - P2: Test count 17 too low → increased to 25 with display + E2E coverage
+
+**Round 3 (Full spec revised — Codex + Gemini)**:
+- Codex: 0 P0, 3 P1, 2 P2. Gemini: CLEAN (2 P2 only). All fixed:
+- P1: Prose said "direct artifacts" but code caches full closure → prose fixed
+- P1: StateManager() → [] could trigger bad saveState → added note: safe because v3 states don't trigger migration
+- P1: Disabled-but-completed foreign step → include (artifact exists, enablement check too expensive)
+- P2: resolver.ts may not need changes → noted as "verify only"
