@@ -8,7 +8,9 @@ import { createOutputContext } from '../output/context.js'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
-import { assertSingleServiceOrExit } from '../guards.js'
+import { guardSteplessCommand } from '../guards.js'
+import { StatePathResolver } from '../../state/state-path-resolver.js'
+import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
 
 interface InfoArgs {
   step?: string
@@ -17,16 +19,22 @@ interface InfoArgs {
   verbose?: boolean
   root?: string
   force?: boolean
+  service?: string
 }
 
 const infoCommand: CommandModule<Record<string, unknown>, InfoArgs> = {
   command: 'info [step]',
   describe: 'Show project info or detailed info about a step',
   builder: (yargs) => {
-    return yargs.positional('step', {
-      type: 'string',
-      description: 'Step slug to show info for',
-    })
+    return yargs
+      .positional('step', {
+        type: 'string',
+        description: 'Step slug to show info for',
+      })
+      .option('service', {
+        type: 'string',
+        describe: 'Target service name (multi-service projects)',
+      })
   },
   handler: async (argv) => {
     const projectRoot = argv.root ?? findProjectRoot(process.cwd())
@@ -42,16 +50,25 @@ const infoCommand: CommandModule<Record<string, unknown>, InfoArgs> = {
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
+    const service = argv.service as string | undefined
+
     if (!argv.step) {
       // Project info mode
       const { config } = loadConfig(projectRoot, [])
-      assertSingleServiceOrExit(config ?? {}, { commandName: 'info', output })
+
+      // Trigger v2→v3 migration if needed (no globalSteps — helper loads them itself)
+      ensureV3Migration(projectRoot, config)
+
+      guardSteplessCommand(config ?? {}, service, { commandName: 'info', output })
       if (process.exitCode === 2) return
 
+      const pathResolver = new StatePathResolver(projectRoot, service)
       const stateManager = new StateManager(
         projectRoot,
         () => [],
         () => config ?? undefined,
+        pathResolver,
+        new Set<string>(),
       )
       let state
       try { state = stateManager.loadState() } catch { state = null }
@@ -77,7 +94,11 @@ const infoCommand: CommandModule<Record<string, unknown>, InfoArgs> = {
 
     // Step info mode
     const { config: stepInfoConfig } = loadConfig(projectRoot, [])
-    assertSingleServiceOrExit(stepInfoConfig ?? {}, { commandName: 'info', output })
+
+    // Trigger v2→v3 migration if needed (no globalSteps — helper loads them itself)
+    ensureV3Migration(projectRoot, stepInfoConfig)
+
+    guardSteplessCommand(stepInfoConfig ?? {}, service, { commandName: 'info', output })
     if (process.exitCode === 2) return
 
     const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))
@@ -92,7 +113,14 @@ const infoCommand: CommandModule<Record<string, unknown>, InfoArgs> = {
       return
     }
 
-    const stateManager = new StateManager(projectRoot, () => [], () => undefined)
+    const stepPathResolver = new StatePathResolver(projectRoot, service)
+    const stateManager = new StateManager(
+      projectRoot,
+      () => [],
+      () => undefined,
+      stepPathResolver,
+      new Set<string>(),
+    )
     let state
     try { state = stateManager.loadState() } catch { state = null }
     const stepState = state?.steps?.[argv.step]
