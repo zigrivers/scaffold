@@ -164,6 +164,96 @@ describe('computeEligible', () => {
     const eligible = computeEligible(graph, steps)
     expect(eligible).not.toContain('a')
   })
+
+  // ---------------------------------------------------------------------------
+  // Scope filtering and fan-in
+  // ---------------------------------------------------------------------------
+
+  // Graph for scope tests:
+  //   global-init (global, no deps)
+  //   svc-setup (service, depends on global-init)
+  //   global-finalize (global, depends on svc-setup — fan-in case)
+  const scopeFrontmatters: MetaPromptFrontmatter[] = [
+    makeFm('global-init', 'pre', 1, []),
+    makeFm('svc-setup', 'pre', 2, ['global-init']),
+    makeFm('global-finalize', 'pre', 3, ['svc-setup']),
+  ]
+
+  const scopeAllEnabled = new Map([
+    ['global-init', { enabled: true }],
+    ['svc-setup', { enabled: true }],
+    ['global-finalize', { enabled: true }],
+  ])
+
+  // global-init and global-finalize are "global"; svc-setup is per-service
+  const globalStepsSet = new Set(['global-init', 'global-finalize'])
+
+  it("scope='service' filters out global steps", () => {
+    const graph = buildGraph(scopeFrontmatters, scopeAllEnabled)
+    const steps: Record<string, StepStateEntry> = {
+      'global-init': makeEntry('completed'),
+      'svc-setup': makeEntry('pending'),
+      'global-finalize': makeEntry('pending'),
+    }
+    const eligible = computeEligible(graph, steps, {
+      scope: 'service',
+      globalSteps: globalStepsSet,
+    })
+    // global-init and global-finalize must be excluded
+    expect(eligible).not.toContain('global-init')
+    expect(eligible).not.toContain('global-finalize')
+    // svc-setup dep (global-init) is completed → eligible
+    expect(eligible).toContain('svc-setup')
+  })
+
+  it("scope='global' filters out per-service steps", () => {
+    const graph = buildGraph(scopeFrontmatters, scopeAllEnabled)
+    const steps: Record<string, StepStateEntry> = {
+      'global-init': makeEntry('pending'),
+      'svc-setup': makeEntry('pending'),
+      'global-finalize': makeEntry('pending'),
+    }
+    const eligible = computeEligible(graph, steps, {
+      scope: 'global',
+      globalSteps: globalStepsSet,
+    })
+    // svc-setup is per-service → must be excluded
+    expect(eligible).not.toContain('svc-setup')
+    // global-init has no deps → eligible
+    expect(eligible).toContain('global-init')
+  })
+
+  it("scope='global' auto-satisfies per-service deps (fan-in)", () => {
+    const graph = buildGraph(scopeFrontmatters, scopeAllEnabled)
+    // global-finalize depends on svc-setup (per-service); svc-setup is not completed
+    // but in global scope, per-service deps are auto-satisfied
+    const steps: Record<string, StepStateEntry> = {
+      'global-init': makeEntry('completed'),
+      'svc-setup': makeEntry('pending'), // NOT completed — fan-in should still satisfy it
+      'global-finalize': makeEntry('pending'),
+    }
+    const eligible = computeEligible(graph, steps, {
+      scope: 'global',
+      globalSteps: globalStepsSet,
+    })
+    // global-finalize's dep on svc-setup (per-service) should be auto-satisfied
+    expect(eligible).toContain('global-finalize')
+  })
+
+  it('no scope = default behavior (backward compat)', () => {
+    // Without options, behaves exactly as before: both global and service steps visible
+    const graph = buildGraph(scopeFrontmatters, scopeAllEnabled)
+    const steps: Record<string, StepStateEntry> = {
+      'global-init': makeEntry('pending'),
+      'svc-setup': makeEntry('pending'),
+      'global-finalize': makeEntry('pending'),
+    }
+    const eligible = computeEligible(graph, steps)
+    // Only global-init has no deps → eligible; others have unsatisfied deps
+    expect(eligible).toEqual(['global-init'])
+    expect(eligible).not.toContain('svc-setup')
+    expect(eligible).not.toContain('global-finalize')
+  })
 })
 
 // ---------------------------------------------------------------------------
