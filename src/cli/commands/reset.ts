@@ -1,4 +1,5 @@
 import type { CommandModule, Argv } from 'yargs'
+import type { ScaffoldConfig } from '../../types/index.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import { findProjectRoot } from '../middleware/project-root.js'
@@ -10,8 +11,9 @@ import { shutdown } from '../shutdown.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
-import { loadConfig } from '../../config/loader.js'
-import { assertSingleServiceOrExit } from '../guards.js'
+import { guardStepCommand, guardSteplessCommand } from '../guards.js'
+import { StatePathResolver } from '../../state/state-path-resolver.js'
+import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
 
 interface ResetArgs {
   step?: string
@@ -22,6 +24,7 @@ interface ResetArgs {
   verbose?: boolean
   root?: string
   force?: boolean
+  service?: string
 }
 
 const resetCommand: CommandModule<Record<string, unknown>, ResetArgs> = {
@@ -38,6 +41,10 @@ const resetCommand: CommandModule<Record<string, unknown>, ResetArgs> = {
         description: 'Required in --auto mode to confirm full pipeline reset',
         default: false,
       })
+      .option('service', {
+        type: 'string',
+        describe: 'Target service name (multi-service projects)',
+      })
   },
   handler: async (argv) => {
     const projectRoot = argv.root ?? findProjectRoot(process.cwd())
@@ -50,15 +57,22 @@ const resetCommand: CommandModule<Record<string, unknown>, ResetArgs> = {
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
-    const { config: guardConfig } = loadConfig(projectRoot, [])
-    assertSingleServiceOrExit(guardConfig ?? {}, { commandName: 'reset', output })
-    if (process.exitCode === 2) return
+    const context = loadPipelineContext(projectRoot)
+    const service = argv.service as string | undefined
+    const pipeline = resolvePipeline(context, { output, serviceId: service })
+
+    // Trigger v2→v3 migration if needed
+    ensureV3Migration(projectRoot, context.config, pipeline.globalSteps)
 
     // Route: single step reset vs full pipeline reset
     if (argv.step) {
-      await resetStep(argv.step, projectRoot, outputMode, output, argv)
+      guardStepCommand(argv.step, context.config ?? {}, service, pipeline.globalSteps, { commandName: 'reset', output })
+      if (process.exitCode === 2) return
+      await resetStep(argv.step, projectRoot, outputMode, output, argv, service, pipeline)
     } else {
-      await resetPipeline(projectRoot, outputMode, output, argv)
+      guardSteplessCommand(context.config ?? {}, service, { commandName: 'reset', output })
+      if (process.exitCode === 2) return
+      await resetPipeline(projectRoot, outputMode, output, argv, service, context.config)
     }
   },
 }
@@ -72,9 +86,12 @@ async function resetStep(
   outputMode: string,
   output: ReturnType<typeof import('../output/context.js').createOutputContext>,
   argv: ResetArgs,
+  service?: string,
+  pipeline?: ReturnType<typeof resolvePipeline>,
 ): Promise<void> {
+  const pathResolver = new StatePathResolver(projectRoot, service)
   // Acquire lock
-  const lockResult = acquireLock(projectRoot, 'reset', step)
+  const lockResult = acquireLock(projectRoot, 'reset', step, pathResolver)
   if (!lockResult.acquired && !argv.force) {
     if (lockResult.error) {
       output.warn(`${lockResult.error.code}: ${lockResult.error.message}`)
@@ -87,11 +104,13 @@ async function resetStep(
 
   const doReset = async (): Promise<void> => {
     const context = loadPipelineContext(projectRoot)
-    const pipeline = resolvePipeline(context)
+    const resolvedPipeline = pipeline ?? resolvePipeline(context)
     const stateManager = new StateManager(
       projectRoot,
-      pipeline.computeEligible,
+      resolvedPipeline.computeEligible,
       () => context.config ?? undefined,
+      pathResolver,
+      resolvedPipeline.globalSteps,
     )
     const state = stateManager.loadState()
 
@@ -178,10 +197,11 @@ async function resetStep(
   }
 
   if (lockResult.acquired) {
-    shutdown.registerLockOwnership(getLockPath(projectRoot))
+    const lockFilePath = getLockPath(projectRoot, pathResolver)
+    shutdown.registerLockOwnership(lockFilePath)
     await shutdown.withResource('lock', () => {
-      releaseLock(projectRoot)
-      shutdown.releaseLockOwnership()
+      releaseLock(projectRoot, pathResolver)
+      shutdown.releaseLockOwnership(lockFilePath)
     }, doReset)
   } else {
     // --force bypass: no lock acquired, run without withResource
@@ -197,6 +217,8 @@ async function resetPipeline(
   outputMode: string,
   output: ReturnType<typeof import('../output/context.js').createOutputContext>,
   argv: ResetArgs,
+  service?: string,
+  config?: ScaffoldConfig | null,
 ): Promise<void> {
   const scaffoldDir = path.join(projectRoot, '.scaffold')
 
@@ -230,24 +252,51 @@ async function resetPipeline(
     const filesDeleted: string[] = []
     const filesPreserved: string[] = []
 
-    // Delete state.json
-    const statePath = path.join(scaffoldDir, 'state.json')
-    if (fs.existsSync(statePath)) {
-      fs.unlinkSync(statePath)
-      filesDeleted.push('.scaffold/state.json')
+    if (service) {
+      // Service-scoped reset: delete only that service's state/decisions/rework files
+      const serviceResolver = new StatePathResolver(projectRoot, service)
+      for (const [file, label] of [
+        [serviceResolver.statePath, `.scaffold/services/${service}/state.json`],
+        [serviceResolver.decisionsPath, `.scaffold/services/${service}/decisions.jsonl`],
+        [serviceResolver.reworkPath, `.scaffold/services/${service}/rework.json`],
+      ] as [string, string][]) {
+        if (fs.existsSync(file)) {
+          fs.unlinkSync(file)
+          filesDeleted.push(label)
+        }
+      }
+    } else {
+      // Global reset: delete root state + decisions + all service directories
+      // Delete state.json
+      const statePath = path.join(scaffoldDir, 'state.json')
+      if (fs.existsSync(statePath)) {
+        fs.unlinkSync(statePath)
+        filesDeleted.push('.scaffold/state.json')
+      }
+
+      // Delete decisions.jsonl
+      const decisionsPath = path.join(scaffoldDir, 'decisions.jsonl')
+      if (fs.existsSync(decisionsPath)) {
+        fs.unlinkSync(decisionsPath)
+        filesDeleted.push('.scaffold/decisions.jsonl')
+      }
+
+      // If multi-service project, also delete services/ directory
+      if (config?.project?.services?.length) {
+        const servicesDir = path.join(scaffoldDir, 'services')
+        if (fs.existsSync(servicesDir)) {
+          fs.rmSync(servicesDir, { recursive: true })
+          filesDeleted.push('.scaffold/services/')
+        }
+      }
     }
 
-    // Delete decisions.jsonl
-    const decisionsPath = path.join(scaffoldDir, 'decisions.jsonl')
-    if (fs.existsSync(decisionsPath)) {
-      fs.unlinkSync(decisionsPath)
-      filesDeleted.push('.scaffold/decisions.jsonl')
-    }
-
-    // Preserve config.yml
-    const configPath = path.join(scaffoldDir, 'config.yml')
-    if (fs.existsSync(configPath)) {
-      filesPreserved.push('.scaffold/config.yml')
+    // Preserve config.yml (global reset only)
+    if (!service) {
+      const configPath = path.join(scaffoldDir, 'config.yml')
+      if (fs.existsSync(configPath)) {
+        filesPreserved.push('.scaffold/config.yml')
+      }
     }
 
     if (outputMode === 'json') {
@@ -265,7 +314,7 @@ async function resetPipeline(
     // --force bypass: no lock acquisition, run directly
     await doReset()
   } else {
-    // Acquire lock
+    // Acquire lock (use global lock for full reset)
     const lockResult = acquireLock(projectRoot, 'reset')
     if (!lockResult.acquired) {
       if (lockResult.error) {
@@ -277,10 +326,11 @@ async function resetPipeline(
       return
     }
 
-    shutdown.registerLockOwnership(getLockPath(projectRoot))
+    const lockFilePath = getLockPath(projectRoot)
+    shutdown.registerLockOwnership(lockFilePath)
     await shutdown.withResource('lock', () => {
       releaseLock(projectRoot)
-      shutdown.releaseLockOwnership()
+      shutdown.releaseLockOwnership(lockFilePath)
     }, doReset)
   }
 }
