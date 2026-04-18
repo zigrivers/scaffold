@@ -1,5 +1,4 @@
 import type { Argv, CommandModule } from 'yargs'
-import path from 'node:path'
 import fs from 'node:fs'
 import { StateManager } from '../../state/state-manager.js'
 import { acquireLock, checkLock, getLockPath, releaseLock } from '../../state/lock-manager.js'
@@ -272,7 +271,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       const cliDepth = argv.depth !== undefined ? (argv.depth as DepthLevel) : undefined
       const { depth, provenance } = resolveDepth(step, config, pipeline.preset, cliDepth)
 
-      const updateModeResult = detectUpdateMode({ step, state, currentDepth: depth, projectRoot })
+      const updateModeResult = detectUpdateMode({ step, state, currentDepth: depth, projectRoot, service })
 
       if (updateModeResult.isUpdateMode) {
         if (!argv.force) {
@@ -434,8 +433,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
               }
             }
 
-            // Read decisions log
-            const decisionsPath = path.join(projectRoot, '.scaffold', 'decisions.jsonl')
+            // Read decisions log (service-scoped when --service is set)
+            const decisionsPath = pathResolver.decisionsPath
             let decisions = ''
             if (fs.existsSync(decisionsPath)) {
               try {
