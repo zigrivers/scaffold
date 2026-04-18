@@ -21,7 +21,9 @@ import { resolveOutputMode } from '../../cli/middleware/output-mode.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
 import { resolveContainedArtifactPath } from '../../utils/artifact-path.js'
 import { shutdown } from '../shutdown.js'
-import { assertSingleServiceOrExit } from '../guards.js'
+import { guardStepCommand } from '../guards.js'
+import { StatePathResolver } from '../../state/state-path-resolver.js'
+import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
 import type { DepthLevel } from '../../types/enums.js'
 import type { ArtifactEntry } from '../../types/assembly.js'
 
@@ -34,6 +36,7 @@ interface RunArgs {
   auto?: boolean
   verbose?: boolean
   root?: string
+  service?: string
 }
 
 const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
@@ -58,6 +61,10 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
         type: 'boolean',
         description: 'Skip lock check and update-mode confirmation',
         default: false,
+      })
+      .option('service', {
+        type: 'string',
+        describe: 'Target service name (multi-service projects)',
       }) as unknown as Argv<RunArgs>
   },
   handler: async (argv) => {
@@ -89,10 +96,15 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       return
     }
     const config = context.config
-    assertSingleServiceOrExit(config, { commandName: 'run', output })
-    if (process.exitCode === 2) return
+    const service = argv.service as string | undefined
+    const pipeline = resolvePipeline(context, { output, serviceId: service })
 
-    const pipeline = resolvePipeline(context, { output })
+    // Trigger v2→v3 migration if needed
+    ensureV3Migration(projectRoot, config, pipeline.globalSteps)
+
+    // Guard check (needs globalSteps from pipeline)
+    guardStepCommand(step, config, service, pipeline.globalSteps, { commandName: 'run', output })
+    if (process.exitCode === 2) return
 
     const metaPrompt = context.metaPrompts.get(step)
     if (!metaPrompt) {
@@ -143,10 +155,13 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       // Step 4: Load and validate state
       // -----------------------------------------------------------------------
 
+      const pathResolver = new StatePathResolver(projectRoot, service)
       const stateManager = new StateManager(
         projectRoot,
         pipeline.computeEligible,
         () => config,
+        pathResolver,
+        pipeline.globalSteps,
       )
       let state = stateManager.loadState()
 
