@@ -188,7 +188,7 @@ describe('computeEligible', () => {
   // global-init and global-finalize are "global"; svc-setup is per-service
   const globalStepsSet = new Set(['global-init', 'global-finalize'])
 
-  it("scope='service' filters out global steps", () => {
+  it('scope=\'service\' filters out global steps', () => {
     const graph = buildGraph(scopeFrontmatters, scopeAllEnabled)
     const steps: Record<string, StepStateEntry> = {
       'global-init': makeEntry('completed'),
@@ -206,7 +206,7 @@ describe('computeEligible', () => {
     expect(eligible).toContain('svc-setup')
   })
 
-  it("scope='global' filters out per-service steps", () => {
+  it('scope=\'global\' filters out per-service steps', () => {
     const graph = buildGraph(scopeFrontmatters, scopeAllEnabled)
     const steps: Record<string, StepStateEntry> = {
       'global-init': makeEntry('pending'),
@@ -223,7 +223,7 @@ describe('computeEligible', () => {
     expect(eligible).toContain('global-init')
   })
 
-  it("scope='global' auto-satisfies per-service deps (fan-in)", () => {
+  it('scope=\'global\' auto-satisfies per-service deps (fan-in)', () => {
     const graph = buildGraph(scopeFrontmatters, scopeAllEnabled)
     // global-finalize depends on svc-setup (per-service); svc-setup is not completed
     // but in global scope, per-service deps are auto-satisfied

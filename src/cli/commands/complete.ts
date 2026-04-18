@@ -56,7 +56,9 @@ const completeCommand: CommandModule<Record<string, unknown>, CompleteArgs> = {
     ensureV3Migration(projectRoot, context.config, pipeline.globalSteps)
 
     // Guard check (needs globalSteps from pipeline)
-    guardStepCommand(argv.step, context.config ?? {}, service, pipeline.globalSteps, { commandName: 'complete', output })
+    guardStepCommand(
+      argv.step, context.config ?? {}, service, pipeline.globalSteps, { commandName: 'complete', output },
+    )
     if (process.exitCode === 2) return
 
     // Acquire lock

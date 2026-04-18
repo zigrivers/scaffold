@@ -115,7 +115,7 @@ describe('migrateV2ToV3', () => {
     const services = [{ name: 'api' }]
 
     expect(() => migrateV2ToV3({ projectRoot: root, globalSteps, services })).toThrow(
-      "Cannot migrate to per-service state while step 'implement-api' is in progress.",
+      'Cannot migrate to per-service state while step \'implement-api\' is in progress.',
     )
 
     // Root should still be v2 — migration was rejected

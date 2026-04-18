@@ -74,7 +74,9 @@ export function resolvePipeline(
   // 3. Resolve overlay
   let overlay: OverlayState
   if (effectiveConfig) {
-    overlay = resolveOverlayState({ config: effectiveConfig, methodologyDir, metaPrompts, presetSteps: mergedSteps, output })
+    overlay = resolveOverlayState({
+      config: effectiveConfig, methodologyDir, metaPrompts, presetSteps: mergedSteps, output,
+    })
   } else {
     const knowledge: Record<string, string[]> = {}
     const reads: Record<string, string[]> = {}
