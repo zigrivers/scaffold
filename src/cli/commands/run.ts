@@ -2,7 +2,7 @@ import type { Argv, CommandModule } from 'yargs'
 import path from 'node:path'
 import fs from 'node:fs'
 import { StateManager } from '../../state/state-manager.js'
-import { acquireLock, getLockPath, releaseLock } from '../../state/lock-manager.js'
+import { acquireLock, checkLock, getLockPath, releaseLock } from '../../state/lock-manager.js'
 import { analyzeCrash } from '../../state/completion.js'
 import { AssemblyEngine } from '../../core/assembly/engine.js'
 import { getPackageKnowledgeDir } from '../../utils/fs.js'
@@ -124,7 +124,19 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     // -----------------------------------------------------------------------
     // Step 3: Acquire lock
     // -----------------------------------------------------------------------
-    const lockResult = acquireLock(projectRoot, 'run', step)
+    const pathResolver = new StatePathResolver(projectRoot, service)
+
+    // For service steps: precheck that no global step is in progress
+    if (service) {
+      const globalLock = checkLock(projectRoot)
+      if (globalLock) {
+        output.error('Global step in progress, retry after completion')
+        process.exitCode = 3
+        return
+      }
+    }
+
+    const lockResult = acquireLock(projectRoot, 'run', step, pathResolver)
     let lockAcquired = lockResult.acquired
 
     if (!lockAcquired) {
@@ -155,7 +167,6 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       // Step 4: Load and validate state
       // -----------------------------------------------------------------------
 
-      const pathResolver = new StatePathResolver(projectRoot, service)
       const stateManager = new StateManager(
         projectRoot,
         pipeline.computeEligible,
@@ -559,10 +570,11 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     }
 
     if (lockAcquired) {
-      shutdown.registerLockOwnership(getLockPath(projectRoot))
+      const lockFilePath = getLockPath(projectRoot, pathResolver)
+      shutdown.registerLockOwnership(lockFilePath)
       await shutdown.withResource('lock', () => {
-        releaseLock(projectRoot)
-        shutdown.releaseLockOwnership()
+        releaseLock(projectRoot, pathResolver)
+        shutdown.releaseLockOwnership(lockFilePath)
       }, lockProtectedBody)
     } else {
       await lockProtectedBody()
