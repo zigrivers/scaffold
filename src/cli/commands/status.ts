@@ -9,7 +9,9 @@ import { StateManager } from '../../state/state-manager.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
 import { PHASES } from '../../types/frontmatter.js'
-import { assertSingleServiceOrExit } from '../guards.js'
+import { guardSteplessCommand } from '../guards.js'
+import { StatePathResolver } from '../../state/state-path-resolver.js'
+import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
 
 /** Check if any pipeline/knowledge source is newer than its generated command. */
 function checkCommandStaleness(projectRoot: string): number {
@@ -65,6 +67,7 @@ interface StatusArgs {
   verbose?: boolean
   root?: string
   force?: boolean
+  service?: string
 }
 
 type ConfigWithMethodology = { methodology?: { preset?: string } } | null
@@ -81,6 +84,10 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       .option('compact', {
         type: 'boolean',
         description: 'Show only actionable steps (pending and in-progress)',
+      })
+      .option('service', {
+        type: 'string',
+        describe: 'Target service name (multi-service projects)',
       })
   },
   handler: async (argv) => {
@@ -103,14 +110,23 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
 
     // 3. Load pipeline context and resolve overlay/graph
     const context = loadPipelineContext(projectRoot)
-    assertSingleServiceOrExit(context.config ?? {}, { commandName: 'status', output })
+    const service = argv.service as string | undefined
+    const pipeline = resolvePipeline(context, { output, serviceId: service })
+
+    // Trigger v2→v3 migration if needed
+    ensureV3Migration(projectRoot, context.config, pipeline.globalSteps)
+
+    // Guard check
+    guardSteplessCommand(context.config ?? {}, service, { commandName: 'status', output })
     if (process.exitCode === 2) return
 
-    const pipeline = resolvePipeline(context, { output })
+    const pathResolver = new StatePathResolver(projectRoot, service)
     const stateManager = new StateManager(
       projectRoot,
       pipeline.computeEligible,
       () => context.config ?? undefined,
+      pathResolver,
+      pipeline.globalSteps,
     )
 
     // Reconcile state with current pipeline — adds any new steps that were
