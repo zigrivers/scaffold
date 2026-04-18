@@ -8,7 +8,16 @@ All notable changes to Scaffold are documented here.
 - **Backend fintech domain sub-overlay** — `BackendConfig.domain` accepts `'none' | 'fintech'` (default `'none'`). Opt in via wizard prompt or `--backend-domain fintech` (both `scaffold init` and `scaffold adopt`). Fintech-specific guidance — compliance (PCI-DSS, SEC 17a-4, SOC 2), ledger design, broker integration, order lifecycle, risk management, testing, data modeling, observability — is appended to the relevant pipeline steps via `content/methodology/backend-fintech.yml` and 8 new knowledge docs under `content/knowledge/backend/backend-fintech-*.md`. Mirrors the existing `research-quant-finance` sub-overlay pattern.
 - **Multi-service manifest schema**: `ProjectSchema.services[]` accepts an array of per-service configs (each with `name`, `projectType`, one matching per-type config, and optional `path`). Service names must be kebab-case.
 - **Declarative init**: `scaffold init --from <file.yml>` reads a full ScaffoldConfig from YAML (or stdin via `-`) instead of running the wizard. Exclusive with config-setting flags.
-- **Multi-service execution guard**: `scaffold run`, `next`, `complete`, `skip`, `status`, `rework`, `reset`, `info`, and `dashboard` reject configs containing `services[]` with a clear "lands in Wave 2" message until multi-service execution ships.
+- **Service-qualified execution** — `scaffold run <step> --service <name>` enables per-service pipeline execution
+  - Per-service overlay resolution: each service gets its own overlay stack based on its `projectType`
+  - State sharding: `.scaffold/services/{name}/state.json` with merged global+service state view
+  - Parallel-ready locking: service locks are independent; global lock blocks all service locks
+  - `--service` flag on all stateful commands (run, next, status, skip, complete, info, dashboard, decisions, reset, rework)
+  - v2→v3 state migration for existing multi-service projects
+  - Context-aware guard system (`guardStepCommand`, `guardSteplessCommand`)
+  - 5 new `ScaffoldUserError` subclasses for service validation
+- **`StatePathResolver`** — centralizes path construction for global vs service-scoped state files
+- **`loadGlobalStepSlugs()`** — lightweight helper to identify global steps without full pipeline resolution
 - **Cross-service pipeline overlay** — structural overlay activated by `services[]` in config
   - 5 new pipeline steps: `service-ownership-map`, `inter-service-contracts`, `cross-service-auth`, `cross-service-observability`, `integration-test-plan`
   - 8 multi-service knowledge documents injected into 15 existing steps
@@ -16,6 +25,15 @@ All notable changes to Scaffold are documented here.
 - **`loadStructuralOverlay()`** — separate overlay loader that doesn't require `project-type` field
 
 ### Changed
+- **`PipelineState.schema-version`** widened to `1 | 2 | 3` — v3 marks service-sharded state layout
+- **`StateManager`** accepts optional `StatePathResolver` + `globalSteps` for service-scoped merged state view
+- **`acquireLock`, `releaseLock`, `getLockPath`** accept optional `StatePathResolver`
+- **`appendDecision`, `readDecisions`** accept optional `StatePathResolver`
+- **`ReworkManager`** accepts optional service name for service-scoped sessions
+- **`computeEligible`** gains scope filtering (global/service) and fan-in for global steps
+- **`resolvePipeline`** gains `serviceId` for per-service overlay resolution
+- **`ResolvedPipeline`** gains `globalSteps: Set<string>`
+- **`ShutdownManager`** tracks multiple lock paths for crash cleanup
 - **`ProjectTypeOverlay` renamed to `PipelineOverlay`** — `projectType` is now optional (`ProjectType | undefined`) for structural overlays
 - **`resolveOverlayState()`** — 4th overlay pass for structural overlays, independent of project-type block
 - **State `schema-version`**: widened from literal `1` to `1 | 2`. Projects with `services[]` initialize state at version 2; single-service projects stay at version 1. The v2 shape is identical to v1 for Wave 3a; Wave 3b will change the shape and bump to 3.
