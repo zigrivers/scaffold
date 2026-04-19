@@ -442,6 +442,7 @@ describe('next command', () => {
         expect.anything(),  // config
         expect.any(String), // projectRoot
         expect.any(Set),    // globalSteps (Wave 3c runtime guard)
+        expect.any(Map),    // sharedForeignCache (hoisted per invocation)
       )
     })
 

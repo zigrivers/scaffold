@@ -13,6 +13,7 @@ import { guardSteplessCommand } from '../guards.js'
 import { StatePathResolver } from '../../state/state-path-resolver.js'
 import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
 import { resolveCrossReadReadiness, humanCrossReadStatus } from '../../core/assembly/cross-reads.js'
+import type { PipelineState } from '../../types/index.js'
 
 /** Check if any pipeline/knowledge source is newer than its generated command. */
 function checkCommandStaleness(projectRoot: string): number {
@@ -158,16 +159,22 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     const isCompact = argv.compact === true
     const actionableStatuses = new Set(['pending', 'in_progress'])
 
-    // Wave 3c — compute cross-dep readiness for actionable steps with crossReads
+    // Wave 3c — compute cross-dep readiness for EVERY surfaced step with crossReads
+    // (not just actionable ones — status surfaces completed/skipped too).
+    // Cache is hoisted across all steps so each foreign service's state is
+    // loaded + migrated at most once per status invocation.
     const crossDepMap = new Map<string, ReturnType<typeof resolveCrossReadReadiness>>()
-    for (const [slug, entry] of Object.entries(steps)) {
-      if (!actionableStatuses.has(entry.status)) continue
+    const sharedForeignCache = new Map<string, PipelineState | null | 'read-error'>()
+    for (const slug of Object.keys(steps)) {
       const crossReads =
         pipeline.overlay.crossReads?.[slug] ?? pipeline.stepMeta.get(slug)?.crossReads ?? []
       if (crossReads.length > 0 && context.config) {
         crossDepMap.set(
           slug,
-          resolveCrossReadReadiness(crossReads, context.config, projectRoot, pipeline.globalSteps),
+          resolveCrossReadReadiness(
+            crossReads, context.config, projectRoot,
+            pipeline.globalSteps, sharedForeignCache,
+          ),
         )
       }
     }

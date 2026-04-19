@@ -154,11 +154,15 @@ export function resolveTransitiveCrossReads(
       }
     }
 
-    const fullClosure: ArtifactEntry[] = [...direct.artifacts, ...transitive]
-    for (const a of fullClosure) closure.set(a.filePath, a)
+    // Dedup before caching so subsequent cache hits return unique paths,
+    // matching the per-traversal `closure` dedup semantics.
+    const dedupedClosure = [...new Map<string, ArtifactEntry>(
+      [...direct.artifacts, ...transitive].map(a => [a.filePath, a]),
+    ).values()]
+    for (const a of dedupedClosure) closure.set(a.filePath, a)
 
     visiting.delete(key)
-    resolved.set(key, fullClosure)  // cache FULL closure (direct + transitive)
+    resolved.set(key, dedupedClosure)  // cache FULL deduped closure (direct + transitive)
   }
   return [...closure.values()]
 }
@@ -167,6 +171,7 @@ export type CrossReadStatus =
   | 'completed'         // foreign step completed
   | 'pending'           // foreign step exists in state but not completed
   | 'not-bootstrapped'  // foreign service has no state.json
+  | 'read-error'        // foreign state.json exists but could not be loaded
   | 'service-unknown'   // foreign service not in config
   | 'not-exported'      // step not in foreign service's exports allowlist
 
@@ -176,6 +181,7 @@ export function humanCrossReadStatus(status: CrossReadStatus): string {
   case 'completed': return 'completed'
   case 'pending': return 'pending'
   case 'not-bootstrapped': return 'service not bootstrapped'
+  case 'read-error': return 'foreign state unreadable'
   case 'service-unknown': return 'service unknown'
   case 'not-exported': return 'not exported'
   }
@@ -192,13 +198,21 @@ export interface CrossReadReadiness {
  * and `status --service` so both commands surface identical diagnostics.
  * Uses a per-call Map cache to avoid re-reading the same foreign state file.
  */
+/**
+ * Internal sentinel distinguishing "foreign file missing" from "foreign file
+ * exists but failed to load". `null` = not-bootstrapped (no state.json);
+ * `'read-error'` = state.json existed but parse/validation failed.
+ */
+type ForeignStateCacheEntry = PipelineState | null | 'read-error'
+
 export function resolveCrossReadReadiness(
   crossReads: Array<{ service: string; step: string }>,
   config: ScaffoldConfig,
   projectRoot: string,
   globalSteps?: Set<string>,
+  cache?: Map<string, ForeignStateCacheEntry>,
 ): CrossReadReadiness[] {
-  const cache = new Map<string, PipelineState | null>()
+  const foreignCache = cache ?? new Map<string, ForeignStateCacheEntry>()
   return crossReads.map(cr => {
     // Defense-in-depth: global steps never participate in cross-reads (spec §2.3).
     // Display commands must agree with `run`'s runtime skip, not show the entry
@@ -212,27 +226,28 @@ export function resolveCrossReadReadiness(
       return { ...cr, status: 'not-exported' as const }
     }
 
-    let state = cache.get(cr.service)
-    if (state === undefined) {
+    let entry = foreignCache.get(cr.service)
+    if (entry === undefined) {
       const resolver = new StatePathResolver(projectRoot, cr.service)
       if (!fs.existsSync(resolver.statePath)) {
-        cache.set(cr.service, null)
+        foreignCache.set(cr.service, null)
         return { ...cr, status: 'not-bootstrapped' as const }
       }
       try {
-        state = StateManager.loadStateReadOnly(projectRoot, resolver, () => config)
-        cache.set(cr.service, state)
+        entry = StateManager.loadStateReadOnly(projectRoot, resolver, () => config)
+        foreignCache.set(cr.service, entry)
       } catch {
-        cache.set(cr.service, null)
-        return { ...cr, status: 'not-bootstrapped' as const }
+        foreignCache.set(cr.service, 'read-error')
+        return { ...cr, status: 'read-error' as const }
       }
     }
-    if (!state) return { ...cr, status: 'not-bootstrapped' as const }
+    if (entry === null) return { ...cr, status: 'not-bootstrapped' as const }
+    if (entry === 'read-error') return { ...cr, status: 'read-error' as const }
 
-    const entry = state.steps?.[cr.step]
+    const stepEntry = entry.steps?.[cr.step]
     return {
       ...cr,
-      status: entry?.status === 'completed' ? ('completed' as const) : ('pending' as const),
+      status: stepEntry?.status === 'completed' ? ('completed' as const) : ('pending' as const),
     }
   })
 }
