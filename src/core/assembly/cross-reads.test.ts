@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { StateManager } from '../../state/state-manager.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -469,5 +470,35 @@ describe('resolveCrossReadReadiness', () => {
 
   it('returns empty array when given no cross-reads', () => {
     expect(resolveCrossReadReadiness([], cfg([]), tmpRoot)).toEqual([])
+  })
+
+  it('caches foreign state so multiple cross-reads to same service trigger one load', () => {
+    fs.writeFileSync(
+      path.join(tmpRoot, '.scaffold', 'services', 'api', 'state.json'),
+      JSON.stringify({
+        'schema-version': 3,
+        steps: {
+          'x': { status: 'completed', source: 'pipeline', produces: [] },
+          'y': { status: 'pending', source: 'pipeline', produces: [] },
+        },
+        next_eligible: [], in_progress: null,
+      }),
+    )
+    const spy = vi.spyOn(StateManager, 'loadStateReadOnly')
+    try {
+      const r = resolveCrossReadReadiness(
+        [
+          { service: 'api', step: 'x' },
+          { service: 'api', step: 'y' },
+          { service: 'api', step: 'x' },
+        ],
+        cfg([{ step: 'x' }, { step: 'y' }]),
+        tmpRoot,
+      )
+      expect(r.map(e => e.status)).toEqual(['completed', 'pending', 'completed'])
+      expect(spy).toHaveBeenCalledTimes(1)  // cached after first read
+    } finally {
+      spy.mockRestore()
+    }
   })
 })
