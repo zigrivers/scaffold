@@ -55,7 +55,9 @@ export function resolveDirectCrossRead(
       return { completed: false, artifacts: [] }
     }
     try {
-      foreignState = StateManager.loadStateReadOnly(projectRoot, foreignResolver)
+      foreignState = StateManager.loadStateReadOnly(
+        projectRoot, foreignResolver, () => config,
+      )
       foreignStateCache.set(cr.service, foreignState)
     } catch {
       output.warn(`cross-reads: failed to load state for '${cr.service}'`)
@@ -194,9 +196,16 @@ export function resolveCrossReadReadiness(
   crossReads: Array<{ service: string; step: string }>,
   config: ScaffoldConfig,
   projectRoot: string,
+  globalSteps?: Set<string>,
 ): CrossReadReadiness[] {
   const cache = new Map<string, PipelineState | null>()
   return crossReads.map(cr => {
+    // Defense-in-depth: global steps never participate in cross-reads (spec §2.3).
+    // Display commands must agree with `run`'s runtime skip, not show the entry
+    // as completed/pending.
+    if (globalSteps && globalSteps.has(cr.step)) {
+      return { ...cr, status: 'not-exported' as const }
+    }
     const serviceEntry = config.project?.services?.find(s => s.name === cr.service)
     if (!serviceEntry) return { ...cr, status: 'service-unknown' as const }
     if (!serviceEntry.exports?.some(e => e.step === cr.step)) {
@@ -211,7 +220,7 @@ export function resolveCrossReadReadiness(
         return { ...cr, status: 'not-bootstrapped' as const }
       }
       try {
-        state = StateManager.loadStateReadOnly(projectRoot, resolver)
+        state = StateManager.loadStateReadOnly(projectRoot, resolver, () => config)
         cache.set(cr.service, state)
       } catch {
         cache.set(cr.service, null)

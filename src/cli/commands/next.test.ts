@@ -439,8 +439,9 @@ describe('next command', () => {
       ])
       expect(mockCrossRead).toHaveBeenCalledWith(
         [{ service: 'shared-lib', step: 'api-contracts' }],
-        expect.anything(),
-        expect.any(String),
+        expect.anything(),  // config
+        expect.any(String), // projectRoot
+        expect.any(Set),    // globalSteps (Wave 3c runtime guard)
       )
     })
 

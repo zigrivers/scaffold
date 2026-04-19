@@ -99,7 +99,10 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
       const crossReads =
         pipeline.overlay.crossReads?.[slug] ?? pipeline.stepMeta.get(slug)?.crossReads ?? []
       if (crossReads.length > 0 && context.config) {
-        crossDepMap.set(slug, resolveCrossReadReadiness(crossReads, context.config, projectRoot))
+        crossDepMap.set(
+          slug,
+          resolveCrossReadReadiness(crossReads, context.config, projectRoot, pipeline.globalSteps),
+        )
       }
     }
 

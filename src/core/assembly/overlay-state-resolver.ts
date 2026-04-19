@@ -35,14 +35,14 @@ export function resolveOverlayState(options: {
   const knowledgeMap: Record<string, string[]> = {}
   const readsMap: Record<string, string[]> = {}
   const dependencyMap: Record<string, string[]> = {}
+  // Wave 3c: crossReads is an OVERLAY-OVERRIDE seam (empty until the follow-on
+  // 'crossReads-overrides' feature lands). Consumers read frontmatter via the
+  // overlay-first fallback: `overlay.crossReads?.[slug] ?? frontmatter.crossReads`.
   const crossReadsMap: Record<string, Array<{ service: string; step: string }>> = {}
   for (const [name, mp] of metaPrompts) {
     knowledgeMap[name] = [...(mp.frontmatter.knowledgeBase ?? [])]
     readsMap[name] = [...(mp.frontmatter.reads ?? [])]
     dependencyMap[name] = [...(mp.frontmatter.dependencies ?? [])]
-    if (mp.frontmatter.crossReads?.length) {
-      crossReadsMap[name] = [...mp.frontmatter.crossReads]
-    }
   }
 
   // Start with preset defaults

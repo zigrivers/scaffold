@@ -484,6 +484,27 @@ describe('resolveCrossReadReadiness', () => {
     expect(resolveCrossReadReadiness([], cfg([]), tmpRoot)).toEqual([])
   })
 
+  it('returns not-exported when cr.step is a global step (defense-in-depth)', () => {
+    fs.writeFileSync(
+      path.join(tmpRoot, '.scaffold', 'services', 'api', 'state.json'),
+      JSON.stringify({
+        'schema-version': 3,
+        steps: {
+          'service-ownership-map': { status: 'completed', source: 'pipeline', produces: [] },
+        },
+        next_eligible: [], in_progress: null,
+      }),
+    )
+    const globalSteps = new Set(['service-ownership-map'])
+    const r = resolveCrossReadReadiness(
+      [{ service: 'api', step: 'service-ownership-map' }],
+      cfg([{ step: 'service-ownership-map' }]),  // parse-time allowlist would have already rejected this
+      tmpRoot,
+      globalSteps,
+    )
+    expect(r[0].status).toBe('not-exported')
+  })
+
   it('caches foreign state so multiple cross-reads to same service trigger one load', () => {
     fs.writeFileSync(
       path.join(tmpRoot, '.scaffold', 'services', 'api', 'state.json'),
