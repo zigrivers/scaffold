@@ -169,7 +169,7 @@ export function resolveTransitiveCrossReads(
 
 export type CrossReadStatus =
   | 'completed'         // foreign step completed
-  | 'pending'           // foreign step exists in state but not completed
+  | 'pending'           // foreign step exists in state but not completed, OR is exported but not yet tracked
   | 'not-bootstrapped'  // foreign service has no state.json
   | 'read-error'        // foreign state.json exists but could not be loaded
   | 'service-unknown'   // foreign service not in config

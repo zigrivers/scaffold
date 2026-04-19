@@ -334,8 +334,9 @@ function resolveDirectCrossRead(
 // src/core/assembly/cross-reads.ts (new file)
 export type CrossReadStatus =
   | 'completed'        // foreign step completed
-  | 'pending'          // foreign step exists in state but not completed
+  | 'pending'          // foreign step exists in state but not completed, OR is exported but not yet tracked (pre-run)
   | 'not-bootstrapped' // foreign service has no state.json
+  | 'read-error'       // foreign state.json exists but could not be loaded (corrupt JSON, schema mismatch, etc.)
   | 'service-unknown'  // foreign service not in config
   | 'not-exported'     // step not in foreign service's exports allowlist
 

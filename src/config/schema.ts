@@ -186,7 +186,11 @@ export const ProjectSchema = z.object({
       }
     }
 
-    // Reject global steps in service exports (Wave 3c)
+    // Reject global steps in service exports (Wave 3c).
+    // Note: this reads the packaged multi-service-overlay.yml; user-supplied
+    // methodology dirs aren't a feature yet (methodology is 'deep'|'mvp'|'custom'
+    // where 'custom' only overrides per-step settings). If that changes, plumb
+    // the resolved methodologyDir through ConfigSchema.superRefine instead.
     if (data.services) {
       try {
         const globalSteps = loadGlobalStepSlugs(getPackageMethodologyDir())
