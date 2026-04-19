@@ -6,17 +6,23 @@ import { resolveDirectCrossRead } from './cross-reads.js'
 import type { ScaffoldConfig, PipelineState } from '../../types/index.js'
 import type { OutputContext } from '../../cli/output/context.js'
 
-function mkOutput(): { warnings: string[]; output: OutputContext } {
-  const warnings: string[] = []
+interface CapturedWarning {
+  raw: unknown
+  asString: string
+}
+
+function mkOutput(): { warnings: CapturedWarning[]; output: OutputContext } {
+  const warnings: CapturedWarning[] = []
   const output = {
     warn: (w: unknown) => {
-      if (typeof w === 'string') warnings.push(w)
+      let asString = ''
+      if (typeof w === 'string') asString = w
       else if (w && typeof w === 'object' && 'message' in w) {
-        warnings.push(
+        asString =
           String((w as { code?: string; message: string }).code ?? '') +
-          ' ' + String((w as { message: string }).message),
-        )
+          ' ' + String((w as { message: string }).message)
       }
+      warnings.push({ raw: w, asString })
     },
     info: () => {}, success: () => {}, error: () => {}, result: () => {},
     supportsInteractivePrompts: () => false,
@@ -88,7 +94,7 @@ describe('resolveDirectCrossRead', () => {
       tmpRoot, output, new Map(),
     )
     expect(result).toEqual({ completed: false, artifacts: [] })
-    expect(warnings.some(w => /not exported/i.test(w))).toBe(true)
+    expect(warnings.some(w => /not exported/i.test(w.asString))).toBe(true)
   })
 
   it('warns when service not in config', () => {
@@ -99,7 +105,7 @@ describe('resolveDirectCrossRead', () => {
       tmpRoot, output, new Map(),
     )
     expect(result).toEqual({ completed: false, artifacts: [] })
-    expect(warnings.some(w => /not found/i.test(w))).toBe(true)
+    expect(warnings.some(w => /not found/i.test(w.asString))).toBe(true)
   })
 
   it('warns when foreign state file is missing', () => {
@@ -110,7 +116,7 @@ describe('resolveDirectCrossRead', () => {
       tmpRoot, output, new Map(),
     )
     expect(result).toEqual({ completed: false, artifacts: [] })
-    expect(warnings.some(w => /not bootstrapped/i.test(w))).toBe(true)
+    expect(warnings.some(w => /not bootstrapped/i.test(w.asString))).toBe(true)
   })
 
   it('returns { completed: true, artifacts: [] } when step completed but produces is empty', () => {
@@ -125,7 +131,7 @@ describe('resolveDirectCrossRead', () => {
     expect(result.artifacts).toEqual([])
   })
 
-  it('emits ARTIFACT_PATH_REJECTED warning when produces entry escapes project root', () => {
+  it('emits structured ARTIFACT_PATH_REJECTED warning when produces entry escapes project root', () => {
     seedForeign({ 'api-contracts': { status: 'completed', produces: ['../../../etc/passwd'] } })
     const { warnings, output } = mkOutput()
     resolveDirectCrossRead(
@@ -133,7 +139,16 @@ describe('resolveDirectCrossRead', () => {
       mkConfig([{ step: 'api-contracts' }]),
       tmpRoot, output, new Map(),
     )
-    expect(warnings.some(w => /ARTIFACT_PATH_REJECTED/.test(w))).toBe(true)
+    // Assert the structured warning object (matches the existing run.ts reads-loop contract)
+    const pathRejected = warnings.find(w =>
+      typeof w.raw === 'object' && w.raw !== null &&
+      (w.raw as { code?: string }).code === 'ARTIFACT_PATH_REJECTED',
+    )
+    expect(pathRejected).toBeDefined()
+    expect(pathRejected?.raw).toMatchObject({
+      code: 'ARTIFACT_PATH_REJECTED',
+      message: expect.stringContaining('shared-lib:api-contracts'),
+    })
   })
 
   it('caches foreign state after first load', () => {
@@ -161,6 +176,6 @@ describe('resolveDirectCrossRead', () => {
       tmpRoot, output, new Map(), globalSteps,
     )
     expect(result).toEqual({ completed: false, artifacts: [] })
-    expect(warnings.some(w => /global step/i.test(w))).toBe(true)
+    expect(warnings.some(w => /global step/i.test(w.asString))).toBe(true)
   })
 })
