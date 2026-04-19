@@ -11,6 +11,8 @@ export interface OverlayState {
   knowledge: Record<string, string[]>
   reads: Record<string, string[]>
   dependencies: Record<string, string[]>
+  /** Wave 3c — populated from frontmatter.crossReads; overlay-level overrides are post-release. */
+  crossReads?: Record<string, Array<{ service: string; step: string }>>
 }
 
 /**
@@ -33,10 +35,14 @@ export function resolveOverlayState(options: {
   const knowledgeMap: Record<string, string[]> = {}
   const readsMap: Record<string, string[]> = {}
   const dependencyMap: Record<string, string[]> = {}
+  const crossReadsMap: Record<string, Array<{ service: string; step: string }>> = {}
   for (const [name, mp] of metaPrompts) {
     knowledgeMap[name] = [...(mp.frontmatter.knowledgeBase ?? [])]
     readsMap[name] = [...(mp.frontmatter.reads ?? [])]
     dependencyMap[name] = [...(mp.frontmatter.dependencies ?? [])]
+    if (mp.frontmatter.crossReads?.length) {
+      crossReadsMap[name] = [...mp.frontmatter.crossReads]
+    }
   }
 
   // Start with preset defaults
@@ -160,5 +166,6 @@ export function resolveOverlayState(options: {
     knowledge: overlayKnowledge,
     reads: overlayReads,
     dependencies: overlayDependencies,
+    crossReads: crossReadsMap,
   }
 }

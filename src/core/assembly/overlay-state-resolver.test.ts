@@ -617,3 +617,43 @@ step-overrides:
     })
   })
 })
+
+describe('crossReads on OverlayState (Wave 3c)', () => {
+  it('populates crossReads from meta-prompt frontmatter', () => {
+    const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+      ['system-architecture', {
+        frontmatter: makeFrontmatter({
+          name: 'system-architecture',
+          phase: 'architecture',
+          order: 700,
+          outputs: ['docs/architecture.md'],
+          crossReads: [{ service: 'shared-lib', step: 'api-contracts' }],
+        }),
+      }],
+    ])
+    const result = resolveOverlayState({
+      config: makeConfig(),
+      methodologyDir: '/nonexistent',
+      metaPrompts,
+      presetSteps: {},
+      output: makeOutput(),
+    })
+    expect(result.crossReads?.['system-architecture']).toEqual([
+      { service: 'shared-lib', step: 'api-contracts' },
+    ])
+  })
+
+  it('returns crossReads as empty object when no step has crossReads', () => {
+    const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+      ['some-step', { frontmatter: makeFrontmatter({ name: 'some-step' }) }],
+    ])
+    const result = resolveOverlayState({
+      config: makeConfig(),
+      methodologyDir: '/nonexistent',
+      metaPrompts,
+      presetSteps: {},
+      output: makeOutput(),
+    })
+    expect(result.crossReads).toEqual({})
+  })
+})
