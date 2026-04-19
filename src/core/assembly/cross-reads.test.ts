@@ -270,19 +270,38 @@ describe('resolveTransitiveCrossReads', () => {
     expect(artifacts).toEqual([])  // no infinite loop
   })
 
-  it('memoizes full closure in the resolved map', () => {
+  it('memoizes FULL closure (direct + transitive) and reuses it on subsequent calls', () => {
+    // Chain: b-step → c-step. Closure for b:b-step must include BOTH b.md and c.md.
+    fs.writeFileSync(path.join(tmpRoot, 'docs', 'b.md'), 'B')
     fs.writeFileSync(path.join(tmpRoot, 'docs', 'c.md'), 'C')
+    seedService('b', { 'b-step': { status: 'completed', produces: ['docs/b.md'] } })
     seedService('c', { 'c-step': { status: 'completed', produces: ['docs/c.md'] } })
-    const metas = new Map<string, MetaPromptFile>([['c-step', mkMetaFile('c-step')]])
+    const metas = new Map<string, MetaPromptFile>([
+      ['b-step', mkMetaFile('b-step', [{ service: 'c', step: 'c-step' }])],
+      ['c-step', mkMetaFile('c-step')],
+    ])
     const { output } = mkOutput()
     const resolved = new Map<string, ArtifactEntry[]>()
-    resolveTransitiveCrossReads(
-      [{ service: 'c', step: 'c-step' }],
-      mkMultiConfig({ c: ['c-step'] }),
-      tmpRoot, metas, output, new Set(), resolved, new Map(),
+    const cfg = mkMultiConfig({ b: ['b-step'], c: ['c-step'] })
+
+    // First call — populates the cache with the full closure
+    const firstResult = resolveTransitiveCrossReads(
+      [{ service: 'b', step: 'b-step' }],
+      cfg, tmpRoot, metas, output, new Set(), resolved, new Map(),
     )
-    expect(resolved.has('c:c-step')).toBe(true)
+    expect(firstResult.map(a => a.filePath).sort()).toEqual(['docs/b.md', 'docs/c.md'])
+    // Cache must hold the FULL closure (2 entries), not just direct (1)
+    expect(resolved.get('b:b-step')).toHaveLength(2)
     expect(resolved.get('c:c-step')).toHaveLength(1)
+
+    // Second call — delete all foreign state to force cache-only path
+    fs.unlinkSync(path.join(tmpRoot, '.scaffold', 'services', 'b', 'state.json'))
+    fs.unlinkSync(path.join(tmpRoot, '.scaffold', 'services', 'c', 'state.json'))
+    const secondResult = resolveTransitiveCrossReads(
+      [{ service: 'b', step: 'b-step' }],
+      cfg, tmpRoot, metas, output, new Set(), resolved, new Map(),
+    )
+    expect(secondResult.map(a => a.filePath).sort()).toEqual(['docs/b.md', 'docs/c.md'])
   })
 
   it('recurses through completed step with empty produces (aggregator)', () => {
@@ -316,20 +335,49 @@ describe('resolveTransitiveCrossReads', () => {
     expect(artifacts).toEqual([])  // tool's crossReads ignored
   })
 
-  it('dedupes diamond deps via filePath Map inside traversal', () => {
-    fs.writeFileSync(path.join(tmpRoot, 'docs', 'shared.md'), 'SHARED')
-    seedService('b', { 'b-step': { status: 'completed', produces: ['docs/shared.md'] } })
-    const metas = new Map<string, MetaPromptFile>([['b-step', mkMetaFile('b-step')]])
+  it('dedupes diamond deps (A→B, A→C, B & C both → D) via filePath Map inside traversal', () => {
+    // Real diamond topology: top calls B and C; both B and C cross-read D.
+    // D's shared artifact must appear exactly once in the final closure.
+    fs.mkdirSync(path.join(tmpRoot, '.scaffold', 'services', 'd'), { recursive: true })
+    fs.writeFileSync(path.join(tmpRoot, 'docs', 'b.md'), 'B')
+    fs.writeFileSync(path.join(tmpRoot, 'docs', 'c.md'), 'C')
+    fs.writeFileSync(path.join(tmpRoot, 'docs', 'd.md'), 'D')
+    seedService('b', { 'b-step': { status: 'completed', produces: ['docs/b.md'] } })
+    seedService('c', { 'c-step': { status: 'completed', produces: ['docs/c.md'] } })
+    fs.writeFileSync(
+      path.join(tmpRoot, '.scaffold', 'services', 'd', 'state.json'),
+      JSON.stringify({
+        'schema-version': 3,
+        steps: { 'd-step': { status: 'completed', produces: ['docs/d.md'] } },
+        next_eligible: [], in_progress: null,
+      }),
+    )
+    const metas = new Map<string, MetaPromptFile>([
+      ['b-step', mkMetaFile('b-step', [{ service: 'd', step: 'd-step' }])],
+      ['c-step', mkMetaFile('c-step', [{ service: 'd', step: 'd-step' }])],
+      ['d-step', mkMetaFile('d-step')],
+    ])
     const { output } = mkOutput()
     const artifacts = resolveTransitiveCrossReads(
       [
         { service: 'b', step: 'b-step' },
-        { service: 'b', step: 'b-step' },  // duplicate
+        { service: 'c', step: 'c-step' },
       ],
-      mkMultiConfig({ b: ['b-step'] }),
+      {
+        version: 2, methodology: 'deep', platforms: ['claude-code'],
+        project: {
+          services: [
+            { name: 'b', projectType: 'library', libraryConfig: { visibility: 'internal' }, exports: [{ step: 'b-step' }] },
+            { name: 'c', projectType: 'library', libraryConfig: { visibility: 'internal' }, exports: [{ step: 'c-step' }] },
+            { name: 'd', projectType: 'library', libraryConfig: { visibility: 'internal' }, exports: [{ step: 'd-step' }] },
+          ],
+        },
+      } as ScaffoldConfig,
       tmpRoot, metas, output, new Set(), new Map(), new Map(),
     )
-    const sharedPaths = artifacts.map(a => a.filePath).filter(p => p === 'docs/shared.md')
-    expect(sharedPaths).toHaveLength(1)  // deduped
+    // B, C, and D each appear exactly once — D is the diamond bottom that would be 2× without dedup
+    const paths = artifacts.map(a => a.filePath).sort()
+    expect(paths).toEqual(['docs/b.md', 'docs/c.md', 'docs/d.md'])
+    expect(paths.filter(p => p === 'docs/d.md')).toHaveLength(1)
   })
 })
