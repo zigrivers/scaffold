@@ -6,16 +6,15 @@ Working document tracking completed work, in-progress items, and future directio
 
 ## Completed Releases
 
-### v3.17.0 (pending release)
+### v3.17.0 (2026-04-19)
 
-Release-ready bundle of 5 waves. All code merged to feature branches; actual
-`v3.17.0` tag + publish follows `docs/architecture/operations-runbook.md`.
+Multi-service monorepo support — 5 waves landing together.
 
 - **Wave 1: Domain Knowledge** (PR #277) — backend fintech sub-overlay (8 knowledge docs, `BackendConfig.domain: 'none' | 'fintech'`)
 - **Wave 2: Cross-Service Pipeline** (PR #279) — structural multi-service overlay, 5 cross-service steps, 8 knowledge docs, `PipelineOverlay` / `loadStructuralOverlay()`
 - **Wave 3a: Service Manifest** (PR #278) — `ServiceSchema`, `scaffold init --from`, `ScaffoldUserError` taxonomy, wizard seam split
 - **Wave 3b: Service-Qualified Execution** (PR #280) — `--service` flag on all stateful commands, per-service state sharding, v2→v3 migration, parallel-ready locking
-- **Wave 3c: Cross-Service References** (PR pending) — `exports` allowlist, `cross-reads` frontmatter, `StateManager.loadStateReadOnly`, transitive resolver with DFS/memo/cache/tool-guard, `crossDependencies` on `DependencyNode`, readiness display in `next`/`status` (text + JSON)
+- **Wave 3c: Cross-Service References** (PR #282) — `exports` allowlist, `cross-reads` frontmatter, `StateManager.loadStateReadOnly`, transitive resolver with DFS/memo/cache/tool-guard, `crossDependencies` on `DependencyNode`, readiness display in `next`/`status` (text + JSON)
 
 ### v3.16.0 (2026-04-13)
 
@@ -24,73 +23,7 @@ Release-ready bundle of 5 waves. All code merged to feature branches; actual
 
 ---
 
-## v3.17.0 implementation detail (see Completed Releases above for the summary)
-
-### Wave 1: Domain Knowledge (merged — PR #277)
-
-- Backend fintech domain sub-overlay (`backend-fintech.yml`)
-- `BackendConfig.domain` field: `'none' | 'fintech'` (default `'none'`)
-- 8 fintech knowledge documents under `content/knowledge/backend/`
-- Wizard prompt + `--backend-domain` flag for opt-in
-
-### Wave 3a: Service Manifest (merged — PR #278)
-
-- `ServiceSchema` with per-service `projectType` + coupling validators
-- `ProjectSchema.services[]` optional array with unique-name refinement
-- `scaffold init --from <file.yml>` declarative init
-- `assertSingleServiceOrExit` guard on 9 stateful commands
-- State `schema-version` widened to `1 | 2`
-- `ScaffoldUserError` taxonomy (7 error classes)
-- Wizard seam split: `collectWizardAnswers` + `materializeScaffoldProject`
-
-### Wave 2: Cross-Service Pipeline (merged — PR #279)
-
-- `PipelineOverlay` type (renamed from `ProjectTypeOverlay`, `projectType` optional)
-- `loadStructuralOverlay()` — overlay loader without project-type requirement
-- 4th overlay pass in `resolveOverlayState()` gated on `services[].length`
-- 5 pipeline steps: `service-ownership-map`, `inter-service-contracts`, `cross-service-auth`, `cross-service-observability`, `integration-test-plan`
-- 8 multi-service knowledge documents (architecture, data ownership, API contracts, auth, observability, testing, resilience, task decomposition)
-- `multi-service-overlay.yml` with step, knowledge, reads, and dependency overrides
-- Preset registration (5 steps as `enabled: false` in all 3 presets)
-
-### Wave 3b: Service-Qualified Execution (merged — PR #280)
-
-- `StatePathResolver` — centralizes path construction for global vs service-scoped state
-- Merged state view — service-scoped `StateManager` loads global + service state, writes only service steps
-- Per-service overlay resolution — `resolvePipeline()` gains `serviceId`, builds synthetic config
-- `computeEligible()` scope filtering + fan-in (global steps auto-satisfy per-service deps)
-- `guardStepCommand()` + `guardSteplessCommand()` replace `assertSingleServiceOrExit`
-- `--service` flag on all 10 stateful commands
-- Parallel-ready locking (service locks independent, global lock blocks all)
-- v2→v3 state migration with global lock + service sharding
-- `ensureV3Migration()` + `loadGlobalStepSlugs()` shared helpers
-- 5 new `ScaffoldUserError` subclasses for service validation
-- `schema-version` widened to `1 | 2 | 3`
-
-### Wave 3c: Cross-Service References (merged — PR pending)
-
-- `exports` allowlist on `ServiceConfig` — closed by default, kebab-case validation, global-step rejection via `ProjectSchema.superRefine` → `InvalidConfigError`
-- `cross-reads` frontmatter field on pipeline steps (4 parser touch-points)
-- `StateManager.loadStateReadOnly()` — side-effect-free foreign state loader (applies migrations in memory only; no saveState, no lock)
-- Transitive cross-reads resolution with DFS cycle detection, full-closure memoization, per-service state cache, per-traversal dedup, tool-category guard, and optional globalSteps runtime guard
-- `crossDependencies` on `DependencyNode` (informational, non-blocking) with overlay-first lookup
-- `crossReads` field on `OverlayState` (seam for post-release overlay-overrides)
-- `resolveCrossReadReadiness` + `CrossReadStatus` + `humanCrossReadStatus` — shared helper for `next` and `status` display
-- `run.ts` artifact gathering wired with `gatheredPaths` dedup
-- `next` and `status` text + JSON output include `crossDependencies` per shown step
-- E2E test coverage: foreign artifact resolution, transitive chain (A→B→C), no-write regression, concurrency under foreign lock
-- ~300 LOC production, ~450 LOC tests (across 14 TDD tasks with per-task multi-model review)
-
-**To ship v3.17.0 (final release steps):**
-1. Open PR from `feat/wave-3c`
-2. Follow CLAUDE.md 3-channel review flow
-3. Squash-merge + tag `v3.17.0` per `docs/architecture/operations-runbook.md`
-4. After tag lands, flip "pending release" → dated entry in the Completed Releases block
-4. Follow release workflow in `docs/architecture/operations-runbook.md`
-
----
-
-## Post-Release: Near-Term Enhancements
+## Near-Term Enhancements
 
 ### Multi-Service Dashboard (deferred from Wave 3b)
 
@@ -142,7 +75,7 @@ Requires overlay conflict resolution for knowledge injection when multiple domai
 
 ---
 
-## Post-Release: Phase 2 Features
+## Phase 2 Features
 
 These are features reserved in the current state schema but not yet implemented.
 
@@ -179,7 +112,7 @@ From the v2 PRD Phase 2:
 
 ---
 
-## Post-Release: Content & Quality
+## Content & Quality
 
 ### New Project Type Overlays
 
