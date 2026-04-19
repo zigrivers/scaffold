@@ -4,7 +4,7 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
-## [3.17.0] - 2026-04-19
+## [3.17.0] — 2026-04-19
 
 ### Added
 - **Cross-service references (Wave 3c)** — services can declare which pipeline-step artifacts they expose for cross-service consumption, and any step's frontmatter can read from a foreign service's exported step. `ServiceConfig.exports: Array<{step: string}>` is the allowlist (closed by default; kebab-case validated; global steps rejected at parse time). Step frontmatter gains `cross-reads:` (YAML) → `crossReads` (TS), threaded through `OverlayState.crossReads` with overlay-first lookup. `run.ts` invokes `resolveTransitiveCrossReads` — DFS traversal with cycle detection, full-closure memoization, per-service read-only state cache, per-traversal `filePath` dedup, and an optional `globalSteps` runtime guard. Foreign state is loaded via the new `StateManager.loadStateReadOnly()` static — applies `dispatchStateMigration` + `migrateState` in memory only, never calls `saveState`, and holds no lock. `next` and `status` surface cross-dep readiness in both text (human-facing labels via `humanCrossReadStatus`) and JSON (optional `crossDependencies` field per step).
