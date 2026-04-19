@@ -1497,6 +1497,80 @@ describe('run command handler', () => {
         }),
       )
     })
+
+    it('dedupes cross-reads against gatheredPaths from deps/reads (no double-gather)', async () => {
+      // Consumer step depends on setup-project (produces docs/setup.md) AND
+      // cross-reads a foreign step that ALSO "produces" docs/setup.md.
+      // The dep path wins; cross-read path is skipped via gatheredPaths dedup.
+      const setupMeta = makeMetaPrompt({
+        stepName: 'setup-project',
+        frontmatter: makeFrontmatter({
+          name: 'setup-project', phase: 'prerequisites', order: 0,
+          dependencies: [], outputs: ['docs/setup.md'],
+        }),
+      })
+      const consumerMeta = makeMetaPrompt({
+        stepName: 'create-prd',
+        frontmatter: makeFrontmatter({
+          name: 'create-prd', dependencies: ['setup-project'],
+          outputs: ['docs/prd.md'],
+          crossReads: [{ service: 'shared-lib', step: 'setup' }],
+        }),
+      })
+      const mp = new Map([
+        ['setup-project', setupMeta],
+        ['create-prd', consumerMeta],
+      ])
+      vi.mocked(discoverMetaPrompts).mockReturnValue(mp)
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(mp)
+
+      vi.mocked(StateManager.prototype.loadState).mockReturnValue(makeState({
+        'setup-project': {
+          status: 'completed', source: 'pipeline',
+          produces: ['docs/setup.md'], depth: 3, completed_by: 'scaffold-run',
+        },
+        'create-prd': { status: 'pending', source: 'pipeline', produces: ['docs/prd.md'] },
+      }))
+
+      vi.mocked(buildGraph).mockReturnValue({
+        nodes: new Map([
+          ['setup-project', {
+            slug: 'setup-project', phase: 'prerequisites',
+            order: 0, dependencies: [], enabled: true,
+          }],
+          ['create-prd', {
+            slug: 'create-prd', phase: 'modeling',
+            order: 1, dependencies: ['setup-project'], enabled: true,
+          }],
+        ]),
+        edges: new Map([['setup-project', ['create-prd']], ['create-prd', []]]),
+      })
+
+      vi.mocked(fs.existsSync).mockImplementation(
+        (p: fs.PathLike) => String(p).includes('docs/setup.md'),
+      )
+      vi.mocked(fs.readFileSync).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (String(p).includes('docs/setup.md')) return '# Setup from dep'
+          throw new Error(`ENOENT: ${String(p)}`)
+        },
+      )
+
+      // Cross-reads helper returns an artifact for the SAME filePath
+      vi.mocked(resolveTransitiveCrossReads).mockReturnValue([
+        { stepName: 'shared-lib:setup', filePath: 'docs/setup.md', content: '# Setup from cross-read' },
+      ])
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
+
+      const assembleCall = vi.mocked(AssemblyEngine.prototype.assemble).mock.calls[0]
+      const artifacts = (assembleCall?.[1] as { artifacts: Array<{ filePath: string; stepName: string }> })?.artifacts ?? []
+      const setupArtifacts = artifacts.filter(a => a.filePath === 'docs/setup.md')
+      expect(setupArtifacts).toHaveLength(1)
+      // The dep-path wins (loop runs before cross-reads loop)
+      expect(setupArtifacts[0].stepName).toBe('setup-project')
+    })
   })
 
   describe('disabled dependency bypass', () => {
