@@ -250,7 +250,8 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
         const cd = crossDepMap.get(slug)
         if (cd?.length) {
           for (const cdEntry of cd) {
-            output.info(`      cross-reads ${cdEntry.service}:${cdEntry.step} (${humanCrossReadStatus(cdEntry.status)})`)
+            const label = humanCrossReadStatus(cdEntry.status)
+            output.info(`      cross-reads ${cdEntry.service}:${cdEntry.step} (${label})`)
           }
         }
       }

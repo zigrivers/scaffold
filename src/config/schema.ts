@@ -201,7 +201,7 @@ export const ProjectSchema = z.object({
                 code: 'custom',
                 message:
                   `Service '${svc.name}' cannot export global step '${exp.step}' ` +
-                  `(global steps live in root state)`,
+                  '(global steps live in root state)',
               })
             }
           }

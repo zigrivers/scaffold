@@ -1565,7 +1565,8 @@ describe('run command handler', () => {
       await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
 
       const assembleCall = vi.mocked(AssemblyEngine.prototype.assemble).mock.calls[0]
-      const artifacts = (assembleCall?.[1] as { artifacts: Array<{ filePath: string; stepName: string }> })?.artifacts ?? []
+      type Art = { filePath: string; stepName: string }
+      const artifacts = (assembleCall?.[1] as { artifacts: Art[] })?.artifacts ?? []
       const setupArtifacts = artifacts.filter(a => a.filePath === 'docs/setup.md')
       expect(setupArtifacts).toHaveLength(1)
       // The dep-path wins (loop runs before cross-reads loop)

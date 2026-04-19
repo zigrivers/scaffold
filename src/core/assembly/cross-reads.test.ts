@@ -370,9 +370,21 @@ describe('resolveTransitiveCrossReads', () => {
         version: 2, methodology: 'deep', platforms: ['claude-code'],
         project: {
           services: [
-            { name: 'b', projectType: 'library', libraryConfig: { visibility: 'internal' }, exports: [{ step: 'b-step' }] },
-            { name: 'c', projectType: 'library', libraryConfig: { visibility: 'internal' }, exports: [{ step: 'c-step' }] },
-            { name: 'd', projectType: 'library', libraryConfig: { visibility: 'internal' }, exports: [{ step: 'd-step' }] },
+            {
+              name: 'b', projectType: 'library',
+              libraryConfig: { visibility: 'internal' },
+              exports: [{ step: 'b-step' }],
+            },
+            {
+              name: 'c', projectType: 'library',
+              libraryConfig: { visibility: 'internal' },
+              exports: [{ step: 'c-step' }],
+            },
+            {
+              name: 'd', projectType: 'library',
+              libraryConfig: { visibility: 'internal' },
+              exports: [{ step: 'd-step' }],
+            },
           ],
         },
       } as ScaffoldConfig,
