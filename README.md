@@ -489,11 +489,16 @@ The file must be a complete ScaffoldConfig (with `version`, `methodology`,
 `--backend-*`, `--web-*`, etc.); combining them is an error. Operational
 flags (`--root`, `--force`, `--auto`, `--verbose`, `--format`) still work.
 
-**Caveat — multi-service execution**: Wave 3a ships the services schema
-and declarative init path, but multi-service pipeline execution lands
-in a future wave. A `services[]` config is configured but not yet
-executable — running `scaffold run`, `scaffold next`, etc. against it
-exits with code 2 and a clear diagnostic.
+**Multi-service execution (v3.17.0+)**: Multi-service projects are
+fully executable. Every stateful command (`run`, `next`, `status`,
+`skip`, `complete`, `info`, `dashboard`, `decisions`, `reset`,
+`rework`) accepts `--service <name>` to target one service's pipeline.
+State is sharded under `.scaffold/services/<name>/state.json` with a
+merged global+service view; per-service locks are independent.
+Services can expose artifacts for cross-service consumption via the
+`exports` allowlist in config, and pipeline steps can declare
+`cross-reads:` in their frontmatter to consume foreign artifacts
+during assembly.
 
 #### How Flags Interact
 
