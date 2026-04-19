@@ -233,6 +233,48 @@ export class StateManager {
 
     this.saveState(state)
   }
+
+  /**
+   * Load state WITHOUT side effects — no saveState, no next_eligible recompute, no lock.
+   * Applies dispatchStateMigration + migrateState in memory only. Use ONLY for
+   * read-only inspection of foreign state (cross-reads, readiness display).
+   * The returned PipelineState is a detached snapshot — mutating it does not persist.
+   */
+  static loadStateReadOnly(
+    projectRoot: string,
+    pathResolver: StatePathResolver,
+    configProvider?: () => { project?: { services?: unknown[] } } | undefined,
+  ): PipelineState {
+    const statePath = pathResolver.statePath
+    if (!fileExists(statePath)) throw stateMissing(statePath)
+
+    const raw = fs.readFileSync(statePath, 'utf8')
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(raw) as Record<string, unknown>
+    } catch (err) {
+      throw stateParseError(statePath, (err as Error).message)
+    }
+
+    const config = configProvider?.()
+    const ctx = { hasServices: (config?.project?.services?.length ?? 0) > 0 }
+    dispatchStateMigration(parsed, ctx, statePath)
+
+    const state = parsed as unknown as PipelineState
+    migrateState(state)  // in-memory only; deliberately does NOT call saveState
+
+    if (pathResolver.isServiceScoped) {
+      const globalStatePath = path.join(pathResolver.rootScaffoldDir, 'state.json')
+      if (fs.existsSync(globalStatePath)) {
+        const globalRaw = fs.readFileSync(globalStatePath, 'utf8')
+        const globalParsed = JSON.parse(globalRaw) as Record<string, unknown>
+        const globalState = globalParsed as unknown as PipelineState
+        state.steps = { ...globalState.steps, ...state.steps }
+      }
+    }
+
+    return state
+  }
 }
 
 // Re-export ScaffoldError type for consumers
