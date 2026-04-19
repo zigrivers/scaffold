@@ -522,6 +522,41 @@ describe('status command', () => {
       ])
     })
 
+    it('compact JSON preserves crossDependencies on actionable steps', async () => {
+      mockResolveOutputMode.mockReturnValue('json')
+      vi.mocked(loadConfig).mockReturnValue({
+        config: {
+          version: 2, methodology: 'deep', platforms: ['claude-code'],
+          project: {
+            services: [
+              { name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest' } },
+            ],
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
+        errors: [], warnings: [],
+      })
+      mockDiscoverMetaPrompts.mockReturnValue(new Map([
+        ['system-architecture', stepWithCrossReads()],
+      ]))
+      mockStateWith(MockStateManager, {
+        'system-architecture': { status: 'pending', source: 'pipeline', produces: [] },
+      })
+      vi.mocked(resolveCrossReadReadiness).mockReturnValue([
+        { service: 'shared-lib', step: 'api-contracts', status: 'completed' },
+      ])
+
+      await statusCommand.handler(defaultArgv({ service: 'api', compact: true, format: 'json' }))
+
+      const envelope = JSON.parse(writtenLines.join(''))
+      const parsed = envelope.data ?? envelope
+      expect(parsed.compact).toBe(true)
+      const archStep = parsed.steps.find((s: { slug: string }) => s.slug === 'system-architecture')
+      expect(archStep?.crossDependencies).toEqual([
+        { service: 'shared-lib', step: 'api-contracts', status: 'completed' },
+      ])
+    })
+
     it('text output annotates actionable steps with readiness (human-facing strings)', async () => {
       mockResolveOutputMode.mockReturnValue('interactive')
       vi.mocked(loadConfig).mockReturnValue({

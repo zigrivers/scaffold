@@ -215,7 +215,14 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
         result.compact = true
         result.steps = Object.entries(steps)
           .filter(([, entry]) => actionableStatuses.has(entry.status))
-          .map(([slug, entry]) => ({ slug, status: entry.status }))
+          .map(([slug, entry]) => {
+            const cd = crossDepMap.get(slug)
+            return {
+              slug,
+              status: entry.status,
+              ...(cd && cd.length > 0 ? { crossDependencies: cd } : {}),
+            }
+          })
       }
       output.result(result)
     } else {
