@@ -119,6 +119,10 @@ vi.mock('../../core/dependency/dependency.js', () => ({
   detectCycles: vi.fn(),
 }))
 
+vi.mock('../../core/assembly/cross-reads.js', () => ({
+  resolveTransitiveCrossReads: vi.fn(() => []),
+}))
+
 vi.mock('../../core/dependency/eligibility.js', () => ({
   computeEligible: vi.fn(),
 }))
@@ -164,6 +168,7 @@ import { acquireLock, releaseLock } from '../../state/lock-manager.js'
 import { shutdown } from '../shutdown.js'
 import { analyzeCrash } from '../../state/completion.js'
 import { AssemblyEngine } from '../../core/assembly/engine.js'
+import { resolveTransitiveCrossReads } from '../../core/assembly/cross-reads.js'
 import { discoverMetaPrompts, discoverAllMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { buildIndexWithOverrides, loadEntries } from '../../core/assembly/knowledge-loader.js'
 import { loadInstructions } from '../../core/assembly/instruction-loader.js'
@@ -1427,6 +1432,73 @@ describe('run command handler', () => {
     })
   })
 
+  describe('cross-reads artifact gathering (Wave 3c)', () => {
+    it('passes frontmatter crossReads to resolveTransitiveCrossReads and includes returned artifacts', async () => {
+      const consumerMeta = makeMetaPrompt({
+        stepName: 'system-architecture',
+        frontmatter: makeFrontmatter({
+          name: 'system-architecture',
+          phase: 'architecture', order: 700,
+          dependencies: [], outputs: ['docs/arch.md'],
+          crossReads: [{ service: 'shared-lib', step: 'api-contracts' }],
+        }),
+      })
+      const crMap = new Map([['system-architecture', consumerMeta]])
+      vi.mocked(discoverMetaPrompts).mockReturnValue(crMap)
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(crMap)
+
+      const state = makeState({
+        'system-architecture': { status: 'pending', source: 'pipeline', produces: [] },
+      })
+      vi.mocked(StateManager.prototype.loadState).mockReturnValue(state)
+
+      const graph: DependencyGraph = {
+        nodes: new Map([['system-architecture', {
+          slug: 'system-architecture', phase: 'architecture', order: 700,
+          dependencies: [], enabled: true,
+        }]]),
+        edges: new Map([['system-architecture', []]]),
+      }
+      vi.mocked(buildGraph).mockReturnValue(graph)
+
+      // Program the helper to return one cross-read artifact
+      vi.mocked(resolveTransitiveCrossReads).mockReturnValue([
+        { stepName: 'shared-lib:api-contracts', filePath: 'docs/api.md', content: 'API CONTENT' },
+      ])
+
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await invokeHandler({ step: 'system-architecture', _: ['run'], auto: true })
+
+      // The helper was called with the step's crossReads and run.ts's context
+      expect(vi.mocked(resolveTransitiveCrossReads)).toHaveBeenCalledWith(
+        [{ service: 'shared-lib', step: 'api-contracts' }],
+        expect.anything(),  // config
+        expect.any(String), // projectRoot
+        expect.any(Map),    // metaPrompts
+        expect.anything(),  // output
+        expect.any(Set),    // visiting
+        expect.any(Map),    // resolved
+        expect.any(Map),    // foreignStateCache
+        expect.anything(),  // globalSteps (may be Set or undefined)
+      )
+
+      // The returned artifact landed in AssemblyEngine.assemble's input
+      expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+        'system-architecture',
+        expect.objectContaining({
+          artifacts: expect.arrayContaining([
+            expect.objectContaining({
+              stepName: 'shared-lib:api-contracts',
+              filePath: 'docs/api.md',
+              content: 'API CONTENT',
+            }),
+          ]),
+        }),
+      )
+    })
+  })
+
   describe('disabled dependency bypass', () => {
     it('does not return DEP_UNMET when dependency is disabled in graph', async () => {
       // create-arch depends on create-prd, but create-prd is disabled
@@ -1512,14 +1584,12 @@ describe('run command handler', () => {
       // Verify resolveOverlayState was called (overlay resolution delegated to resolver)
       expect(resolveOverlayState).toHaveBeenCalled()
 
-      // Verify buildGraph received merged steps (with overlay applied)
-      expect(buildGraph).toHaveBeenCalledWith(
-        expect.any(Array),
-        expect.any(Map),
-        expect.any(Object),
-      )
-      // The presetStepsMap passed to buildGraph should contain overlay-merged steps
+      // Verify buildGraph was called with the overlay-merged inputs.
+      expect(buildGraph).toHaveBeenCalled()
       const buildGraphCall = vi.mocked(buildGraph).mock.calls[0]
+      expect(buildGraphCall[0]).toEqual(expect.any(Array))
+      expect(buildGraphCall[1]).toEqual(expect.any(Map))
+      // The presetStepsMap passed to buildGraph should contain overlay-merged steps
       const stepsMap = buildGraphCall[1] as Map<string, { enabled: boolean }>
       expect(stepsMap.get('create-prd')).toEqual({ enabled: false })
     })
