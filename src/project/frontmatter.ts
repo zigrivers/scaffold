@@ -296,6 +296,7 @@ export function parseAndValidate(filePath: string): {
     conditional: null,
     knowledgeBase: [],
     reads: [],
+    crossReads: [],
     stateless: false,
     category: 'pipeline',
   }
