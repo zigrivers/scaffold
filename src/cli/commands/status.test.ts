@@ -58,6 +58,18 @@ vi.mock('../../core/assembly/overlay-state-resolver.js', () => ({
   })),
 }))
 
+vi.mock('../../core/assembly/cross-reads.js', () => ({
+  resolveCrossReadReadiness: vi.fn(() => []),
+  humanCrossReadStatus: (s: string): string => {
+    switch (s) {
+    case 'not-bootstrapped': return 'service not bootstrapped'
+    case 'service-unknown': return 'service unknown'
+    case 'not-exported': return 'not exported'
+    default: return s
+    }
+  },
+}))
+
 // ---------------------------------------------------------------------------
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
@@ -67,6 +79,7 @@ import { resolveOutputMode } from '../middleware/output-mode.js'
 import { loadConfig } from '../../config/loader.js'
 import { StateManager } from '../../state/state-manager.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
+import { resolveCrossReadReadiness } from '../../core/assembly/cross-reads.js'
 import { resolveOverlayState } from '../../core/assembly/overlay-state-resolver.js'
 import statusCommand from './status.js'
 
@@ -446,6 +459,97 @@ describe('status command', () => {
       const stepSlugs = parsed.steps.map((s: { slug: string }) => s.slug)
       expect(stepSlugs).toContain('todo')
       expect(stepSlugs).not.toContain('done')
+    })
+  })
+
+  describe('cross-dep readiness (Wave 3c)', () => {
+    function stepWithCrossReads() {
+      return {
+        frontmatter: {
+          name: 'system-architecture',
+          description: 'Arch',
+          phase: 'architecture',
+          order: 700,
+          dependencies: [],
+          outputs: ['docs/arch.md'],
+          conditional: null,
+          knowledgeBase: [],
+          reads: [],
+          crossReads: [{ service: 'shared-lib', step: 'api-contracts' }],
+          stateless: false,
+          category: 'pipeline' as const,
+        },
+        stepName: 'system-architecture',
+        filePath: '/fake/sa.md',
+        body: '',
+        sections: {},
+      }
+    }
+
+    it('JSON output includes crossDependencies on actionable steps', async () => {
+      mockResolveOutputMode.mockReturnValue('json')
+      vi.mocked(loadConfig).mockReturnValue({
+        config: {
+          version: 2, methodology: 'deep', platforms: ['claude-code'],
+          project: {
+            services: [
+              { name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest' } },
+            ],
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
+        errors: [], warnings: [],
+      })
+      mockDiscoverMetaPrompts.mockReturnValue(new Map([
+        ['system-architecture', stepWithCrossReads()],
+      ]))
+      mockStateWith(MockStateManager, {
+        'system-architecture': { status: 'pending', source: 'pipeline', produces: [] },
+      })
+      vi.mocked(resolveCrossReadReadiness).mockReturnValue([
+        { service: 'shared-lib', step: 'api-contracts', status: 'pending' },
+      ])
+
+      await statusCommand.handler(defaultArgv({ service: 'api' }))
+
+      const envelope = JSON.parse(writtenLines.join(''))
+      const parsed = envelope.data ?? envelope
+      const archStep = parsed.phases
+        .flatMap((p: { steps: Array<{ slug: string; crossDependencies?: unknown }> }) => p.steps)
+        .find((s: { slug: string }) => s.slug === 'system-architecture')
+      expect(archStep?.crossDependencies).toEqual([
+        { service: 'shared-lib', step: 'api-contracts', status: 'pending' },
+      ])
+    })
+
+    it('text output annotates actionable steps with readiness (human-facing strings)', async () => {
+      mockResolveOutputMode.mockReturnValue('interactive')
+      vi.mocked(loadConfig).mockReturnValue({
+        config: {
+          version: 2, methodology: 'deep', platforms: ['claude-code'],
+          project: {
+            services: [
+              { name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest' } },
+            ],
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
+        errors: [], warnings: [],
+      })
+      mockDiscoverMetaPrompts.mockReturnValue(new Map([
+        ['system-architecture', stepWithCrossReads()],
+      ]))
+      mockStateWith(MockStateManager, {
+        'system-architecture': { status: 'pending', source: 'pipeline', produces: [] },
+      })
+      vi.mocked(resolveCrossReadReadiness).mockReturnValue([
+        { service: 'shared-lib', step: 'api-contracts', status: 'not-bootstrapped' },
+      ])
+
+      await statusCommand.handler(defaultArgv({ service: 'api' }))
+
+      const out = writtenLines.join('')
+      expect(out).toMatch(/cross-reads shared-lib:api-contracts \(service not bootstrapped\)/)
     })
   })
 })
