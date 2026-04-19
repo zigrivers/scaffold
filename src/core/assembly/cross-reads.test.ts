@@ -484,6 +484,20 @@ describe('resolveCrossReadReadiness', () => {
     expect(resolveCrossReadReadiness([], cfg([]), tmpRoot)).toEqual([])
   })
 
+  it('returns read-error when foreign state.json exists but cannot be loaded', () => {
+    // Write malformed JSON that parses as JSON but not as state
+    fs.writeFileSync(
+      path.join(tmpRoot, '.scaffold', 'services', 'api', 'state.json'),
+      '{ not-valid-scaffold-state: no schema-version }',
+    )
+    const r = resolveCrossReadReadiness(
+      [{ service: 'api', step: 'x' }],
+      cfg([{ step: 'x' }]),
+      tmpRoot,
+    )
+    expect(r[0].status).toBe('read-error')
+  })
+
   it('returns not-exported when cr.step is a global step (defense-in-depth)', () => {
     fs.writeFileSync(
       path.join(tmpRoot, '.scaffold', 'services', 'api', 'state.json'),
