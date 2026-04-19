@@ -6,6 +6,17 @@ Working document tracking completed work, in-progress items, and future directio
 
 ## Completed Releases
 
+### v3.17.0 (pending release)
+
+Release-ready bundle of 5 waves. All code merged to feature branches; actual
+`v3.17.0` tag + publish follows `docs/architecture/operations-runbook.md`.
+
+- **Wave 1: Domain Knowledge** (PR #277) — backend fintech sub-overlay (8 knowledge docs, `BackendConfig.domain: 'none' | 'fintech'`)
+- **Wave 2: Cross-Service Pipeline** (PR #279) — structural multi-service overlay, 5 cross-service steps, 8 knowledge docs, `PipelineOverlay` / `loadStructuralOverlay()`
+- **Wave 3a: Service Manifest** (PR #278) — `ServiceSchema`, `scaffold init --from`, `ScaffoldUserError` taxonomy, wizard seam split
+- **Wave 3b: Service-Qualified Execution** (PR #280) — `--service` flag on all stateful commands, per-service state sharding, v2→v3 migration, parallel-ready locking
+- **Wave 3c: Cross-Service References** (PR pending) — `exports` allowlist, `cross-reads` frontmatter, `StateManager.loadStateReadOnly`, transitive resolver with DFS/memo/cache/tool-guard, `crossDependencies` on `DependencyNode`, readiness display in `next`/`status` (text + JSON)
+
 ### v3.16.0 (2026-04-13)
 
 - **MMR CLI v1.1.0** — Multi-Model Review overhaul with `mmr reconcile`, 4-channel flow, verdict system
@@ -13,9 +24,7 @@ Working document tracking completed work, in-progress items, and future directio
 
 ---
 
-## Unreleased (targeting v3.17.0)
-
-Everything below is merged to main or spec'd, awaiting release.
+## v3.17.0 implementation detail (see Completed Releases above for the summary)
 
 ### Wave 1: Domain Knowledge (merged — PR #277)
 
@@ -72,10 +81,11 @@ Everything below is merged to main or spec'd, awaiting release.
 - E2E test coverage: foreign artifact resolution, transitive chain (A→B→C), no-write regression, concurrency under foreign lock
 - ~300 LOC production, ~450 LOC tests (across 14 TDD tasks with per-task multi-model review)
 
-**To complete v3.17.0:**
+**To ship v3.17.0 (final release steps):**
 1. Open PR from `feat/wave-3c`
 2. Follow CLAUDE.md 3-channel review flow
-3. Squash-merge + tag release per `docs/architecture/operations-runbook.md`
+3. Squash-merge + tag `v3.17.0` per `docs/architecture/operations-runbook.md`
+4. After tag lands, flip "pending release" → dated entry in the Completed Releases block
 4. Follow release workflow in `docs/architecture/operations-runbook.md`
 
 ---
