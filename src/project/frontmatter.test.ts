@@ -244,3 +244,78 @@ conditional: if-needed
     expect(result.frontmatter.conditional).toBe('if-needed')
   })
 })
+
+describe('cross-reads frontmatter field (Wave 3c)', () => {
+  it('parses cross-reads into crossReads camelCase', () => {
+    const p = writeTmp(`---
+name: system-architecture
+description: System architecture design
+phase: architecture
+order: 700
+outputs:
+  - docs/architecture.md
+cross-reads:
+  - service: shared-lib
+    step: api-contracts
+  - service: trading-engine
+    step: domain-modeling
+---
+Body.`)
+    const result = parseAndValidate(p)
+    expect(result.errors).toEqual([])
+    expect(result.frontmatter.crossReads).toEqual([
+      { service: 'shared-lib', step: 'api-contracts' },
+      { service: 'trading-engine', step: 'domain-modeling' },
+    ])
+  })
+
+  it('defaults crossReads to empty array when absent', () => {
+    const p = writeTmp(`---
+name: some-step
+description: desc
+phase: architecture
+order: 701
+outputs:
+  - docs/x.md
+---
+Body.`)
+    const result = parseAndValidate(p)
+    expect(result.errors).toEqual([])
+    expect(result.frontmatter.crossReads).toEqual([])
+  })
+
+  it('does not emit unknown-field warning for cross-reads', () => {
+    const p = writeTmp(`---
+name: some-step
+description: desc
+phase: architecture
+order: 702
+outputs:
+  - docs/x.md
+cross-reads:
+  - service: lib
+    step: api-contracts
+---
+Body.`)
+    const result = parseAndValidate(p)
+    const unknownWarnings = result.warnings.filter(w => w.code === 'FRONTMATTER_UNKNOWN_FIELD')
+    expect(unknownWarnings).toEqual([])
+  })
+
+  it('rejects malformed service slug in cross-reads', () => {
+    const p = writeTmp(`---
+name: some-step
+description: desc
+phase: architecture
+order: 703
+outputs:
+  - docs/x.md
+cross-reads:
+  - service: Bad_Service
+    step: api-contracts
+---
+Body.`)
+    const result = parseAndValidate(p)
+    expect(result.errors.length).toBeGreaterThan(0)
+  })
+})
