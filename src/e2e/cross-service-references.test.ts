@@ -1,8 +1,18 @@
 /**
  * E2E integration tests for cross-service references (Wave 3c).
  *
+ * Scope note: these tests exercise the full cross-reads resolver against the
+ * real filesystem (StateManager.loadStateReadOnly, migrateState, state merging,
+ * per-service cache, transitive DFS). MetaPromptFile fixtures are typed objects
+ * rather than on-disk pipeline content because Wave 3c is the first feature to
+ * use the crossReads frontmatter field — no real pipeline step uses it yet.
+ * CLI-wiring coverage (loadPipelineContext + runCommand.handler) lives in
+ * src/cli/commands/run.test.ts's "cross-reads artifact gathering (Wave 3c)"
+ * suite, which mocks resolveTransitiveCrossReads at the module boundary.
+ *
  * Verifies:
  *  - resolveTransitiveCrossReads returns foreign service artifacts
+ *  - transitive chain A → B → C surfaces C's artifact via B's crossReads
  *  - the read-only loader NEVER writes to foreign state — regression test for
  *    the Round-4 P0 (migrateState → saveState clobbering next_eligible)
  *  - cross-reads work while a foreign service's lock is held (no deadlock,
@@ -119,6 +129,53 @@ describe('Cross-service references E2E (Wave 3c)', () => {
         content: 'CONTRACTS',
       }),
     ])
+  })
+
+  it('transitive chain: consumer → producer → shared-lib surfaces all artifacts', () => {
+    // A third service 'shared-lib' produces docs/shared.md; producer's
+    // domain-modeling step cross-reads shared-lib, so consumer cross-reading
+    // producer should transitively receive shared-lib's artifact too.
+    fs.mkdirSync(path.join(projectRoot, '.scaffold', 'services', 'shared-lib'), { recursive: true })
+    fs.writeFileSync(path.join(projectRoot, 'docs', 'shared.md'), 'SHARED')
+    writeState(
+      path.join(projectRoot, '.scaffold', 'services', 'shared-lib', 'state.json'),
+      { 'api-contracts': { status: 'completed', produces: ['docs/shared.md'] } },
+    )
+    const transitiveConfig: ScaffoldConfig = {
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        services: [
+          {
+            name: 'producer', projectType: 'library',
+            libraryConfig: { visibility: 'internal' },
+            exports: [{ step: producerStep }],
+          },
+          {
+            name: 'shared-lib', projectType: 'library',
+            libraryConfig: { visibility: 'internal' },
+            exports: [{ step: 'api-contracts' }],
+          },
+          {
+            name: 'consumer', projectType: 'backend',
+            backendConfig: { apiStyle: 'rest' },
+          },
+        ],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+    }
+    // Producer's step template declares a cross-read to shared-lib:api-contracts
+    const metas = new Map<string, MetaPromptFile>([
+      [producerStep, mkMetaFile(producerStep, [{ service: 'shared-lib', step: 'api-contracts' }])],
+      ['api-contracts', mkMetaFile('api-contracts')],
+    ])
+    const output = mkOutput()
+    const artifacts = resolveTransitiveCrossReads(
+      [{ service: 'producer', step: producerStep }],  // consumer → producer
+      transitiveConfig, projectRoot, metas, output,
+      new Set(), new Map(), new Map<string, PipelineState | null>(),
+    )
+    const paths = artifacts.map(a => a.filePath).sort()
+    expect(paths).toEqual(['docs/contracts.md', 'docs/shared.md'])
   })
 
   it('NEVER writes to foreign state file even when migrateState would apply a rename', () => {
