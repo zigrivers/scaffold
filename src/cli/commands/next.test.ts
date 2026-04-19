@@ -56,6 +56,10 @@ vi.mock('../../core/assembly/overlay-state-resolver.js', () => ({
   })),
 }))
 
+vi.mock('../../core/assembly/cross-reads.js', () => ({
+  resolveCrossReadReadiness: vi.fn(() => []),
+}))
+
 // ---------------------------------------------------------------------------
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
@@ -68,6 +72,7 @@ import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { resolveOverlayState } from '../../core/assembly/overlay-state-resolver.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { computeEligible } from '../../core/dependency/eligibility.js'
+import { resolveCrossReadReadiness } from '../../core/assembly/cross-reads.js'
 import nextCommand from './next.js'
 
 // ---------------------------------------------------------------------------
@@ -353,5 +358,86 @@ describe('next command', () => {
     const allOutput = writtenLines.join('')
     expect(allOutput).toContain('scaffold run game-design-document')
     expect(exitSpy).toHaveBeenCalledWith(0)
+  })
+
+  describe('cross-dep readiness (Wave 3c)', () => {
+    const mockOverlay = vi.mocked(resolveOverlayState)
+    const mockCrossRead = vi.mocked(resolveCrossReadReadiness)
+
+    function stepWithCrossReads() {
+      return {
+        frontmatter: {
+          name: 'system-architecture',
+          description: 'Arch',
+          phase: 'architecture',
+          order: 700,
+          dependencies: [],
+          outputs: ['docs/arch.md'],
+          conditional: null,
+          knowledgeBase: [],
+          reads: [],
+          crossReads: [{ service: 'shared-lib', step: 'api-contracts' }],
+          stateless: false,
+          category: 'pipeline' as const,
+        },
+        stepName: 'system-architecture',
+        filePath: '/fake/sa.md',
+        body: '',
+        sections: {},
+      }
+    }
+
+    it('JSON output includes crossDependencies on eligible steps', async () => {
+      mockResolveOutputMode.mockReturnValue('json')
+      vi.mocked(loadConfig).mockReturnValue({
+        config: { version: 2, methodology: 'deep', platforms: ['claude-code'] },
+        errors: [], warnings: [],
+      })
+      mockDiscoverMetaPrompts.mockReturnValue(new Map([
+        ['system-architecture', stepWithCrossReads()],
+      ]))
+      mockComputeEligible.mockReturnValue(['system-architecture'])
+      mockOverlay.mockReturnValue({
+        steps: {}, knowledge: {}, reads: {}, dependencies: {},
+      })
+      mockCrossRead.mockReturnValue([
+        { service: 'shared-lib', step: 'api-contracts', status: 'completed' },
+      ])
+
+      await nextCommand.handler(defaultArgv())
+
+      const envelope = JSON.parse(writtenLines.join(''))
+      expect(envelope.data.eligible[0].crossDependencies).toEqual([
+        { service: 'shared-lib', step: 'api-contracts', status: 'completed' },
+      ])
+      expect(mockCrossRead).toHaveBeenCalledWith(
+        [{ service: 'shared-lib', step: 'api-contracts' }],
+        expect.anything(),
+        expect.any(String),
+      )
+    })
+
+    it('text output annotates eligible steps with cross-dep readiness', async () => {
+      mockResolveOutputMode.mockReturnValue('interactive')
+      vi.mocked(loadConfig).mockReturnValue({
+        config: { version: 2, methodology: 'deep', platforms: ['claude-code'] },
+        errors: [], warnings: [],
+      })
+      mockDiscoverMetaPrompts.mockReturnValue(new Map([
+        ['system-architecture', stepWithCrossReads()],
+      ]))
+      mockComputeEligible.mockReturnValue(['system-architecture'])
+      mockOverlay.mockReturnValue({
+        steps: {}, knowledge: {}, reads: {}, dependencies: {},
+      })
+      mockCrossRead.mockReturnValue([
+        { service: 'shared-lib', step: 'api-contracts', status: 'completed' },
+      ])
+
+      await nextCommand.handler(defaultArgv())
+
+      const out = writtenLines.join('')
+      expect(out).toMatch(/cross-reads shared-lib:api-contracts \(completed\)/)
+    })
   })
 })
