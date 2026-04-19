@@ -9,6 +9,8 @@ import { resolvePipeline } from '../../core/pipeline/resolver.js'
 import { guardSteplessCommand } from '../guards.js'
 import { StatePathResolver } from '../../state/state-path-resolver.js'
 import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
+import { resolveCrossReadReadiness, humanCrossReadStatus } from '../../core/assembly/cross-reads.js'
+import type { PipelineState } from '../../types/index.js'
 
 interface NextArgs {
   count?: number
@@ -92,6 +94,25 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     const count = argv.count ?? eligible.length
     const shown = eligible.slice(0, count)
 
+    // Wave 3c — compute cross-dep readiness for each shown step with crossReads.
+    // Cache is hoisted across all shown steps so each foreign service's state
+    // is loaded + migrated at most once per next invocation.
+    const crossDepMap = new Map<string, ReturnType<typeof resolveCrossReadReadiness>>()
+    const sharedForeignCache = new Map<string, PipelineState | null | 'read-error'>()
+    for (const slug of shown) {
+      const crossReads =
+        pipeline.overlay.crossReads?.[slug] ?? pipeline.stepMeta.get(slug)?.crossReads ?? []
+      if (crossReads.length > 0 && context.config) {
+        crossDepMap.set(
+          slug,
+          resolveCrossReadReadiness(
+            crossReads, context.config, projectRoot,
+            pipeline.globalSteps, sharedForeignCache,
+          ),
+        )
+      }
+    }
+
     // 5. Check pipeline completion
     const stepValues = Object.values(state.steps)
     const allDone =
@@ -102,11 +123,13 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
       output.result({
         eligible: shown.map(s => {
           const fm = pipeline.stepMeta.get(s)
+          const cd = crossDepMap.get(s)
           return {
             slug: s,
             description: fm?.description ?? '',
             summary: fm?.summary ?? null,
             command: `scaffold run ${s}`,
+            ...(cd && cd.length > 0 ? { crossDependencies: cd } : {}),
           }
         }),
         blocked_steps: [],
@@ -123,6 +146,12 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
           const fm = pipeline.stepMeta.get(slug)
           const desc = fm?.summary ?? fm?.description ?? ''
           output.info(`  scaffold run ${slug}  — ${desc}`)
+          const cd = crossDepMap.get(slug)
+          if (cd?.length) {
+            for (const entry of cd) {
+              output.info(`    cross-reads ${entry.service}:${entry.step} (${humanCrossReadStatus(entry.status)})`)
+            }
+          }
         }
       }
     }

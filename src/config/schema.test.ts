@@ -1114,6 +1114,76 @@ describe('ServiceSchema', () => {
     })
     expect(result.success).toBe(false)
   })
+
+  describe('exports field (Wave 3c)', () => {
+    const validService = {
+      name: 'shared-lib',
+      projectType: 'library' as const,
+      libraryConfig: { visibility: 'internal' as const },
+    }
+
+    it('accepts a service with exports', () => {
+      const result = ServiceSchema.safeParse({
+        ...validService,
+        exports: [{ step: 'api-contracts' }, { step: 'domain-modeling' }],
+      })
+      expect(result.success).toBe(true)
+    })
+
+    it('accepts a service with no exports field (closed by default)', () => {
+      const result = ServiceSchema.safeParse(validService)
+      expect(result.success).toBe(true)
+      if (result.success) expect(result.data.exports).toBeUndefined()
+    })
+
+    it('rejects exports with a malformed kebab-case step slug', () => {
+      const result = ServiceSchema.safeParse({
+        ...validService,
+        exports: [{ step: 'Not_Kebab' }],
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects exports with empty step string', () => {
+      const result = ServiceSchema.safeParse({
+        ...validService,
+        exports: [{ step: '' }],
+      })
+      expect(result.success).toBe(false)
+    })
+  })
+
+  describe('exports global-step rejection (ProjectSchema superRefine)', () => {
+    const GLOBAL_STEP = 'service-ownership-map'  // known global step from multi-service-overlay
+
+    it('rejects a service that exports a global step', () => {
+      const result = ProjectSchema.safeParse({
+        services: [{
+          name: 'api',
+          projectType: 'backend',
+          backendConfig: { apiStyle: 'rest' },
+          exports: [{ step: GLOBAL_STEP }],
+        }],
+      })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        const msgs = result.error.issues.map(i => i.message).join(' | ')
+        expect(msgs).toMatch(/global step/i)
+      }
+    })
+
+    it('accepts a service exporting a non-global step', () => {
+      const result = ProjectSchema.safeParse({
+        services: [{
+          name: 'api',
+          projectType: 'backend',
+          backendConfig: { apiStyle: 'rest' },
+          exports: [{ step: 'api-contracts' }],
+        }],
+      })
+      expect(result.success).toBe(true)
+    })
+  })
 })
 
 describe('ProjectSchema.services refinements', () => {

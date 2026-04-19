@@ -12,6 +12,8 @@ import { PHASES } from '../../types/frontmatter.js'
 import { guardSteplessCommand } from '../guards.js'
 import { StatePathResolver } from '../../state/state-path-resolver.js'
 import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
+import { resolveCrossReadReadiness, humanCrossReadStatus } from '../../core/assembly/cross-reads.js'
+import type { PipelineState } from '../../types/index.js'
 
 /** Check if any pipeline/knowledge source is newer than its generated command. */
 function checkCommandStaleness(projectRoot: string): number {
@@ -157,6 +159,26 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     const isCompact = argv.compact === true
     const actionableStatuses = new Set(['pending', 'in_progress'])
 
+    // Wave 3c — compute cross-dep readiness for EVERY surfaced step with crossReads
+    // (not just actionable ones — status surfaces completed/skipped too).
+    // Cache is hoisted across all steps so each foreign service's state is
+    // loaded + migrated at most once per status invocation.
+    const crossDepMap = new Map<string, ReturnType<typeof resolveCrossReadReadiness>>()
+    const sharedForeignCache = new Map<string, PipelineState | null | 'read-error'>()
+    for (const slug of Object.keys(steps)) {
+      const crossReads =
+        pipeline.overlay.crossReads?.[slug] ?? pipeline.stepMeta.get(slug)?.crossReads ?? []
+      if (crossReads.length > 0 && context.config) {
+        crossDepMap.set(
+          slug,
+          resolveCrossReadReadiness(
+            crossReads, context.config, projectRoot,
+            pipeline.globalSteps, sharedForeignCache,
+          ),
+        )
+      }
+    }
+
     // 6. Check command staleness
     const staleCommandCount = checkCommandStaleness(projectRoot)
 
@@ -166,7 +188,12 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
         .filter(m => m.frontmatter.phase === phaseInfo.slug)
         .map(m => {
           const entry = steps[m.frontmatter.name]
-          return { slug: m.frontmatter.name, status: entry?.status ?? 'pending' }
+          const cd = crossDepMap.get(m.frontmatter.name)
+          return {
+            slug: m.frontmatter.name,
+            status: entry?.status ?? 'pending',
+            ...(cd && cd.length > 0 ? { crossDependencies: cd } : {}),
+          }
         })
       const phaseCompleted = phaseSteps.filter(s => s.status === 'completed').length
       const phaseSkipped = phaseSteps.filter(s => s.status === 'skipped').length
@@ -198,7 +225,14 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
         result.compact = true
         result.steps = Object.entries(steps)
           .filter(([, entry]) => actionableStatuses.has(entry.status))
-          .map(([slug, entry]) => ({ slug, status: entry.status }))
+          .map(([slug, entry]) => {
+            const cd = crossDepMap.get(slug)
+            return {
+              slug,
+              status: entry.status,
+              ...(cd && cd.length > 0 ? { crossDependencies: cd } : {}),
+            }
+          })
       }
       output.result(result)
     } else {
@@ -223,6 +257,13 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
         const icon = statusIcons[entry.status] ?? '?'
         if (argv.phase !== undefined && phase !== String(argv.phase)) continue
         output.info(`  ${icon} [${entry.status}] ${slug}`)
+        const cd = crossDepMap.get(slug)
+        if (cd?.length) {
+          for (const cdEntry of cd) {
+            const label = humanCrossReadStatus(cdEntry.status)
+            output.info(`      cross-reads ${cdEntry.service}:${cdEntry.step} (${label})`)
+          }
+        }
       }
 
       // Compute eligible live (don't rely on stale cache in state.json)

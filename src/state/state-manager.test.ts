@@ -646,4 +646,114 @@ describe('StateManager', () => {
       expect(state['schema-version']).toBe(2)
     })
   })
+
+  describe('loadStateReadOnly (Wave 3c)', () => {
+    it('applies migrateState in memory but does NOT write to disk', () => {
+      const tmpRoot = makeTempDir()
+      const statePath = path.join(tmpRoot, '.scaffold', 'state.json')
+      // v3 state with a deprecated step name that migrateState will rename
+      const preMigrationState = {
+        'schema-version': 3,
+        steps: {
+          'testing-strategy': {
+            status: 'completed',
+            source: 'pipeline',
+            produces: ['docs/tdd.md'],
+          },
+        },
+        next_eligible: ['keep-this'],
+        in_progress: null,
+      }
+      fs.writeFileSync(statePath, JSON.stringify(preMigrationState))
+      // Backdate so a subsequent write would produce a detectably newer mtime
+      const backdated = new Date(Date.now() - 2000)
+      fs.utimesSync(statePath, backdated, backdated)
+      const originalMtime = fs.statSync(statePath).mtimeMs
+
+      const resolver = new StatePathResolver(tmpRoot)
+      const state = StateManager.loadStateReadOnly(tmpRoot, resolver)
+
+      // Step rename applied in memory
+      expect(state.steps['tdd']).toBeDefined()
+      expect(state.steps['testing-strategy']).toBeUndefined()
+      // next_eligible preserved — NOT clobbered by a computeEligible sentinel
+      expect(state.next_eligible).toEqual(['keep-this'])
+      // File NOT written
+      expect(fs.statSync(statePath).mtimeMs).toBe(originalMtime)
+    })
+
+    it('merges global state as read-only base when pathResolver is service-scoped', () => {
+      const tmpRoot = makeTempDir()
+      fs.mkdirSync(path.join(tmpRoot, '.scaffold', 'services', 'api'), { recursive: true })
+      fs.writeFileSync(path.join(tmpRoot, '.scaffold', 'state.json'), JSON.stringify({
+        'schema-version': 3,
+        steps: {
+          'project-overview': {
+            status: 'completed',
+            source: 'pipeline',
+            produces: ['docs/vision.md'],
+          },
+        },
+        next_eligible: [],
+        in_progress: null,
+      }))
+      fs.writeFileSync(
+        path.join(tmpRoot, '.scaffold', 'services', 'api', 'state.json'),
+        JSON.stringify({
+          'schema-version': 3,
+          steps: {
+            'api-contracts': {
+              status: 'completed',
+              source: 'pipeline',
+              produces: ['docs/api.md'],
+            },
+          },
+          next_eligible: [],
+          in_progress: null,
+        }),
+      )
+
+      const resolver = new StatePathResolver(tmpRoot, 'api')
+      const state = StateManager.loadStateReadOnly(tmpRoot, resolver)
+      expect(state.steps['project-overview']).toBeDefined()  // from global
+      expect(state.steps['api-contracts']).toBeDefined()     // from service
+    })
+
+    it('throws STATE_MISSING when file does not exist', () => {
+      const tmpRoot = makeTempDir()
+      // Don't create state.json
+      const resolver = new StatePathResolver(tmpRoot)
+      expect(() => StateManager.loadStateReadOnly(tmpRoot, resolver)).toThrow(
+        expect.objectContaining({ code: 'STATE_MISSING' }),
+      )
+    })
+
+    it('applies migrations to merged global state (no stale step renames leak)', () => {
+      const tmpRoot = makeTempDir()
+      fs.mkdirSync(path.join(tmpRoot, '.scaffold', 'services', 'api'), { recursive: true })
+      // Global has a deprecated step name
+      fs.writeFileSync(path.join(tmpRoot, '.scaffold', 'state.json'), JSON.stringify({
+        'schema-version': 3,
+        steps: {
+          'testing-strategy': {
+            status: 'completed', source: 'pipeline', produces: ['docs/tdd.md'],
+          },
+        },
+        next_eligible: [], in_progress: null,
+      }))
+      fs.writeFileSync(
+        path.join(tmpRoot, '.scaffold', 'services', 'api', 'state.json'),
+        JSON.stringify({
+          'schema-version': 3,
+          steps: {},
+          next_eligible: [], in_progress: null,
+        }),
+      )
+      const resolver = new StatePathResolver(tmpRoot, 'api')
+      const state = StateManager.loadStateReadOnly(tmpRoot, resolver)
+      // Stale name renamed in merged view
+      expect(state.steps['tdd']).toBeDefined()
+      expect(state.steps['testing-strategy']).toBeUndefined()
+    })
+  })
 })

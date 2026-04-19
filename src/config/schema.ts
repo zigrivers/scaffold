@@ -2,6 +2,8 @@
 
 import { z } from 'zod'
 import { ALL_COUPLING_VALIDATORS, configKeyFor } from './validators/index.js'
+import { loadGlobalStepSlugs } from '../core/pipeline/global-steps.js'
+import { getPackageMethodologyDir } from '../utils/fs.js'
 
 const CustomStepSchema = z.object({
   enabled: z.boolean().optional(),
@@ -127,7 +129,9 @@ export const ServiceSchema = z.object({
   gameConfig: GameConfigSchema.optional(),
   browserExtensionConfig: BrowserExtensionConfigSchema.optional(),
   path: z.string().optional(),
-  // NOTE: no `exports` field in Wave 3a — deferred to Wave 3c.
+  exports: z.array(
+    z.object({ step: z.string().regex(/^[a-z][a-z0-9-]*$/, 'exports.step must be kebab-case') }),
+  ).optional(),
 }).strict().superRefine((svc, ctx) => {
   // Shared per-type coupling (config present without matching projectType).
   for (const v of ALL_COUPLING_VALIDATORS) {
@@ -179,6 +183,36 @@ export const ProjectSchema = z.object({
           code: 'custom',
           message: `Duplicate service names: ${dupes.join(', ')}`,
         })
+      }
+    }
+
+    // Reject global steps in service exports (Wave 3c).
+    // Note: this reads the packaged multi-service-overlay.yml; user-supplied
+    // methodology dirs aren't a feature yet (methodology is 'deep'|'mvp'|'custom'
+    // where 'custom' only overrides per-step settings). If that changes, plumb
+    // the resolved methodologyDir through ConfigSchema.superRefine instead.
+    if (data.services) {
+      try {
+        const globalSteps = loadGlobalStepSlugs(getPackageMethodologyDir())
+        for (let i = 0; i < data.services.length; i++) {
+          const svc = data.services[i]
+          const exps = svc.exports ?? []
+          for (let j = 0; j < exps.length; j++) {
+            const exp = exps[j]
+            if (globalSteps.has(exp.step)) {
+              ctx.addIssue({
+                path: ['services', i, 'exports', j, 'step'],
+                code: 'custom',
+                message:
+                  `Service '${svc.name}' cannot export global step '${exp.step}' ` +
+                  '(global steps live in root state)',
+              })
+            }
+          }
+        }
+      } catch {
+        // If the multi-service overlay can't be loaded (sandboxed tests, missing file),
+        // skip the check. Defense-in-depth happens at runtime in cross-reads.ts.
       }
     }
   })

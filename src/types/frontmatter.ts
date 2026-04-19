@@ -120,6 +120,8 @@ export interface MetaPromptFrontmatter {
   knowledgeBase: string[]  // from 'knowledge-base' YAML key
   /** Cross-cutting artifact references beyond the dependency chain. */
   reads: string[]
+  /** Cross-service artifact references — each entry points at a foreign service:step pair (Wave 3c). */
+  crossReads?: Array<{ service: string; step: string }>
   /** When true, step has no completion state tracking (on-demand, always available). */
   stateless: boolean
   /** Source category: 'pipeline' for sequential steps, 'tool' for utility commands. */

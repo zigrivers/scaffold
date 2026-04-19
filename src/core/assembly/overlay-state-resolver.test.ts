@@ -617,3 +617,45 @@ step-overrides:
     })
   })
 })
+
+describe('crossReads on OverlayState (Wave 3c)', () => {
+  // Per spec §2.1, crossReads is an OVERLAY-OVERRIDE seam (empty until the
+  // follow-on 'crossReads-overrides' feature lands). Consumers use the
+  // overlay-first fallback: `overlay.crossReads?.[slug] ?? frontmatter.crossReads`.
+  it('returns crossReads as empty object even when frontmatter has crossReads', () => {
+    const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+      ['system-architecture', {
+        frontmatter: makeFrontmatter({
+          name: 'system-architecture',
+          phase: 'architecture',
+          order: 700,
+          outputs: ['docs/architecture.md'],
+          crossReads: [{ service: 'shared-lib', step: 'api-contracts' }],
+        }),
+      }],
+    ])
+    const result = resolveOverlayState({
+      config: makeConfig(),
+      methodologyDir: '/nonexistent',
+      metaPrompts,
+      presetSteps: {},
+      output: makeOutput(),
+    })
+    // The overlay map is empty; consumers fall back to frontmatter.crossReads.
+    expect(result.crossReads).toEqual({})
+  })
+
+  it('returns crossReads as empty object when no step has crossReads', () => {
+    const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+      ['some-step', { frontmatter: makeFrontmatter({ name: 'some-step' }) }],
+    ])
+    const result = resolveOverlayState({
+      config: makeConfig(),
+      methodologyDir: '/nonexistent',
+      metaPrompts,
+      presetSteps: {},
+      output: makeOutput(),
+    })
+    expect(result.crossReads).toEqual({})
+  })
+})

@@ -4,6 +4,8 @@ import { StateManager } from '../../state/state-manager.js'
 import { acquireLock, checkLock, getLockPath, releaseLock } from '../../state/lock-manager.js'
 import { analyzeCrash } from '../../state/completion.js'
 import { AssemblyEngine } from '../../core/assembly/engine.js'
+import { resolveTransitiveCrossReads } from '../../core/assembly/cross-reads.js'
+import type { PipelineState } from '../../types/index.js'
 import { getPackageKnowledgeDir } from '../../utils/fs.js'
 import { buildIndexWithOverrides, loadEntries } from '../../core/assembly/knowledge-loader.js'
 import { loadInstructions } from '../../core/assembly/instruction-loader.js'
@@ -429,6 +431,30 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
                           ` '${readStep}': ${(err as Error).message}`,
                     })
                   }
+                }
+              }
+            }
+
+            // Gather artifacts from cross-reads (Wave 3c — foreign service artifacts)
+            const crossReadsList =
+              pipeline.overlay.crossReads?.[step] ?? metaPrompt.frontmatter.crossReads ?? []
+            if (crossReadsList.length > 0) {
+              const foreignStateCache = new Map<string, PipelineState | null>()
+              const crossArtifacts = resolveTransitiveCrossReads(
+                crossReadsList,
+                config,
+                projectRoot,
+                context.metaPrompts,
+                output,
+                new Set(),
+                new Map(),
+                foreignStateCache,
+                pipeline.globalSteps,
+              )
+              for (const a of crossArtifacts) {
+                if (!gatheredPaths.has(a.filePath)) {
+                  gatheredPaths.add(a.filePath)
+                  artifacts.push(a)
                 }
               }
             }

@@ -27,6 +27,7 @@ const KNOWN_YAML_KEYS = new Set([
   'conditional',
   'knowledge-base',
   'reads',
+  'cross-reads',
   'stateless',
   'category',
   'argument-hint',
@@ -49,6 +50,12 @@ const frontmatterSchema = z.object({
   conditional: z.enum(['if-needed']).nullable().default(null),
   knowledgeBase: z.array(z.string()).default([]),
   reads: z.array(z.string().regex(/^[a-z][a-z0-9-]*$/)).default([]),
+  crossReads: z.array(
+    z.object({
+      service: z.string().regex(/^[a-z][a-z0-9-]*$/, 'cross-reads.service must be kebab-case'),
+      step: z.string().regex(/^[a-z][a-z0-9-]*$/, 'cross-reads.step must be kebab-case'),
+    }),
+  ).default([]),
   stateless: z.boolean().default(false),
   category: z.enum(VALID_CATEGORIES).default('pipeline'),
 }).superRefine((data, ctx) => {
@@ -158,6 +165,12 @@ function normalizeRawObject(raw: Record<string, unknown>): Record<string, unknow
   // Always remove depends-on from the object
   if ('depends-on' in normalized) {
     delete normalized['depends-on']
+  }
+
+  // cross-reads → crossReads (Wave 3c)
+  if ('cross-reads' in normalized) {
+    normalized['crossReads'] = normalized['cross-reads']
+    delete normalized['cross-reads']
   }
 
   // FAILSAFE_SCHEMA returns all scalars as strings — coerce order to number
@@ -283,6 +296,7 @@ export function parseAndValidate(filePath: string): {
     conditional: null,
     knowledgeBase: [],
     reads: [],
+    crossReads: [],
     stateless: false,
     category: 'pipeline',
   }

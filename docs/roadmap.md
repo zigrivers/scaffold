@@ -6,6 +6,17 @@ Working document tracking completed work, in-progress items, and future directio
 
 ## Completed Releases
 
+### v3.17.0 (pending release)
+
+Release-ready bundle of 5 waves. All code merged to feature branches; actual
+`v3.17.0` tag + publish follows `docs/architecture/operations-runbook.md`.
+
+- **Wave 1: Domain Knowledge** (PR #277) — backend fintech sub-overlay (8 knowledge docs, `BackendConfig.domain: 'none' | 'fintech'`)
+- **Wave 2: Cross-Service Pipeline** (PR #279) — structural multi-service overlay, 5 cross-service steps, 8 knowledge docs, `PipelineOverlay` / `loadStructuralOverlay()`
+- **Wave 3a: Service Manifest** (PR #278) — `ServiceSchema`, `scaffold init --from`, `ScaffoldUserError` taxonomy, wizard seam split
+- **Wave 3b: Service-Qualified Execution** (PR #280) — `--service` flag on all stateful commands, per-service state sharding, v2→v3 migration, parallel-ready locking
+- **Wave 3c: Cross-Service References** (PR pending) — `exports` allowlist, `cross-reads` frontmatter, `StateManager.loadStateReadOnly`, transitive resolver with DFS/memo/cache/tool-guard, `crossDependencies` on `DependencyNode`, readiness display in `next`/`status` (text + JSON)
+
 ### v3.16.0 (2026-04-13)
 
 - **MMR CLI v1.1.0** — Multi-Model Review overhaul with `mmr reconcile`, 4-channel flow, verdict system
@@ -13,9 +24,7 @@ Working document tracking completed work, in-progress items, and future directio
 
 ---
 
-## Unreleased (targeting v3.17.0)
-
-Everything below is merged to main or spec'd, awaiting release.
+## v3.17.0 implementation detail (see Completed Releases above for the summary)
 
 ### Wave 1: Domain Knowledge (merged — PR #277)
 
@@ -58,21 +67,25 @@ Everything below is merged to main or spec'd, awaiting release.
 - 5 new `ScaffoldUserError` subclasses for service validation
 - `schema-version` widened to `1 | 2 | 3`
 
-### Wave 3c: Cross-Service References (spec done — not yet implemented)
+### Wave 3c: Cross-Service References (merged — PR pending)
 
-- **Spec**: `docs/superpowers/specs/2026-04-18-wave-3c-cross-service-references-design.md`
-- `exports` allowlist on `ServiceConfig` — closed by default
-- `cross-reads` frontmatter field on pipeline steps
-- Transitive cross-reads resolution with DFS cycle detection + memoization
-- `crossDependencies` on `DependencyNode` (informational, non-blocking)
-- Cross-dependency readiness display in `next`/`status`
-- Integration into `run.ts` artifact gathering with existing `gatheredPaths` dedup
-- ~150-200 lines production code, ~100 lines tests
+- `exports` allowlist on `ServiceConfig` — closed by default, kebab-case validation, global-step rejection via `ProjectSchema.superRefine` → `InvalidConfigError`
+- `cross-reads` frontmatter field on pipeline steps (4 parser touch-points)
+- `StateManager.loadStateReadOnly()` — side-effect-free foreign state loader (applies migrations in memory only; no saveState, no lock)
+- Transitive cross-reads resolution with DFS cycle detection, full-closure memoization, per-service state cache, per-traversal dedup, tool-category guard, and optional globalSteps runtime guard
+- `crossDependencies` on `DependencyNode` (informational, non-blocking) with overlay-first lookup
+- `crossReads` field on `OverlayState` (seam for post-release overlay-overrides)
+- `resolveCrossReadReadiness` + `CrossReadStatus` + `humanCrossReadStatus` — shared helper for `next` and `status` display
+- `run.ts` artifact gathering wired with `gatheredPaths` dedup
+- `next` and `status` text + JSON output include `crossDependencies` per shown step
+- E2E test coverage: foreign artifact resolution, transitive chain (A→B→C), no-write regression, concurrency under foreign lock
+- ~300 LOC production, ~450 LOC tests (across 14 TDD tasks with per-task multi-model review)
 
-**To complete v3.17.0:**
-1. Write Wave 3c implementation plan
-2. Execute plan (estimated 8-10 tasks)
-3. PR + merge
+**To ship v3.17.0 (final release steps):**
+1. Open PR from `feat/wave-3c`
+2. Follow CLAUDE.md 3-channel review flow
+3. Squash-merge + tag `v3.17.0` per `docs/architecture/operations-runbook.md`
+4. After tag lands, flip "pending release" → dated entry in the Completed Releases block
 4. Follow release workflow in `docs/architecture/operations-runbook.md`
 
 ---
