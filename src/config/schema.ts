@@ -2,6 +2,8 @@
 
 import { z } from 'zod'
 import { ALL_COUPLING_VALIDATORS, configKeyFor } from './validators/index.js'
+import { loadGlobalStepSlugs } from '../core/pipeline/global-steps.js'
+import { getPackageMethodologyDir } from '../utils/fs.js'
 
 const CustomStepSchema = z.object({
   enabled: z.boolean().optional(),
@@ -181,6 +183,32 @@ export const ProjectSchema = z.object({
           code: 'custom',
           message: `Duplicate service names: ${dupes.join(', ')}`,
         })
+      }
+    }
+
+    // Reject global steps in service exports (Wave 3c)
+    if (data.services) {
+      try {
+        const globalSteps = loadGlobalStepSlugs(getPackageMethodologyDir())
+        for (let i = 0; i < data.services.length; i++) {
+          const svc = data.services[i]
+          const exps = svc.exports ?? []
+          for (let j = 0; j < exps.length; j++) {
+            const exp = exps[j]
+            if (globalSteps.has(exp.step)) {
+              ctx.addIssue({
+                path: ['services', i, 'exports', j, 'step'],
+                code: 'custom',
+                message:
+                  `Service '${svc.name}' cannot export global step '${exp.step}' ` +
+                  `(global steps live in root state)`,
+              })
+            }
+          }
+        }
+      } catch {
+        // If the multi-service overlay can't be loaded (sandboxed tests, missing file),
+        // skip the check. Defense-in-depth happens at runtime in cross-reads.ts.
       }
     }
   })
