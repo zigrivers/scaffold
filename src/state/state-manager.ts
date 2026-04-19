@@ -268,7 +268,11 @@ export class StateManager {
       if (fs.existsSync(globalStatePath)) {
         const globalRaw = fs.readFileSync(globalStatePath, 'utf8')
         const globalParsed = JSON.parse(globalRaw) as Record<string, unknown>
+        // Apply migrations to global state in memory too, so merged view doesn't
+        // carry stale step renames (e.g., testing-strategy → tdd) from root state.
+        dispatchStateMigration(globalParsed, ctx, globalStatePath)
         const globalState = globalParsed as unknown as PipelineState
+        migrateState(globalState)
         state.steps = { ...globalState.steps, ...state.steps }
       }
     }

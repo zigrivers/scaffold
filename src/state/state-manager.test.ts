@@ -719,11 +719,41 @@ describe('StateManager', () => {
       expect(state.steps['api-contracts']).toBeDefined()     // from service
     })
 
-    it('throws when file does not exist', () => {
+    it('throws STATE_MISSING when file does not exist', () => {
       const tmpRoot = makeTempDir()
       // Don't create state.json
       const resolver = new StatePathResolver(tmpRoot)
-      expect(() => StateManager.loadStateReadOnly(tmpRoot, resolver)).toThrow()
+      expect(() => StateManager.loadStateReadOnly(tmpRoot, resolver)).toThrow(
+        expect.objectContaining({ code: 'STATE_MISSING' }),
+      )
+    })
+
+    it('applies migrations to merged global state (no stale step renames leak)', () => {
+      const tmpRoot = makeTempDir()
+      fs.mkdirSync(path.join(tmpRoot, '.scaffold', 'services', 'api'), { recursive: true })
+      // Global has a deprecated step name
+      fs.writeFileSync(path.join(tmpRoot, '.scaffold', 'state.json'), JSON.stringify({
+        'schema-version': 3,
+        steps: {
+          'testing-strategy': {
+            status: 'completed', source: 'pipeline', produces: ['docs/tdd.md'],
+          },
+        },
+        next_eligible: [], in_progress: null,
+      }))
+      fs.writeFileSync(
+        path.join(tmpRoot, '.scaffold', 'services', 'api', 'state.json'),
+        JSON.stringify({
+          'schema-version': 3,
+          steps: {},
+          next_eligible: [], in_progress: null,
+        }),
+      )
+      const resolver = new StatePathResolver(tmpRoot, 'api')
+      const state = StateManager.loadStateReadOnly(tmpRoot, resolver)
+      // Stale name renamed in merged view
+      expect(state.steps['tdd']).toBeDefined()
+      expect(state.steps['testing-strategy']).toBeUndefined()
     })
   })
 })
