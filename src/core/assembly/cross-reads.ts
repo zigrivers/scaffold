@@ -160,3 +160,59 @@ export function resolveTransitiveCrossReads(
   }
   return [...closure.values()]
 }
+
+export type CrossReadStatus =
+  | 'completed'         // foreign step completed
+  | 'pending'           // foreign step exists in state but not completed
+  | 'not-bootstrapped'  // foreign service has no state.json
+  | 'service-unknown'   // foreign service not in config
+  | 'not-exported'      // step not in foreign service's exports allowlist
+
+export interface CrossReadReadiness {
+  service: string
+  step: string
+  status: CrossReadStatus
+}
+
+/**
+ * Compute readiness status for a list of cross-reads. Shared by `next --service`
+ * and `status --service` so both commands surface identical diagnostics.
+ * Uses a per-call Map cache to avoid re-reading the same foreign state file.
+ */
+export function resolveCrossReadReadiness(
+  crossReads: Array<{ service: string; step: string }>,
+  config: ScaffoldConfig,
+  projectRoot: string,
+): CrossReadReadiness[] {
+  const cache = new Map<string, PipelineState | null>()
+  return crossReads.map(cr => {
+    const serviceEntry = config.project?.services?.find(s => s.name === cr.service)
+    if (!serviceEntry) return { ...cr, status: 'service-unknown' as const }
+    if (!serviceEntry.exports?.some(e => e.step === cr.step)) {
+      return { ...cr, status: 'not-exported' as const }
+    }
+
+    let state = cache.get(cr.service)
+    if (state === undefined) {
+      const resolver = new StatePathResolver(projectRoot, cr.service)
+      if (!fs.existsSync(resolver.statePath)) {
+        cache.set(cr.service, null)
+        return { ...cr, status: 'not-bootstrapped' as const }
+      }
+      try {
+        state = StateManager.loadStateReadOnly(projectRoot, resolver)
+        cache.set(cr.service, state)
+      } catch {
+        cache.set(cr.service, null)
+        return { ...cr, status: 'not-bootstrapped' as const }
+      }
+    }
+    if (!state) return { ...cr, status: 'not-bootstrapped' as const }
+
+    const entry = state.steps?.[cr.step]
+    return {
+      ...cr,
+      status: entry?.status === 'completed' ? ('completed' as const) : ('pending' as const),
+    }
+  })
+}

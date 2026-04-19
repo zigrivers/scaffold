@@ -2,7 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { resolveDirectCrossRead, resolveTransitiveCrossReads } from './cross-reads.js'
+import {
+  resolveDirectCrossRead, resolveTransitiveCrossReads, resolveCrossReadReadiness,
+} from './cross-reads.js'
 import type {
   ScaffoldConfig, PipelineState, ArtifactEntry, MetaPromptFile,
 } from '../../types/index.js'
@@ -379,5 +381,93 @@ describe('resolveTransitiveCrossReads', () => {
     const paths = artifacts.map(a => a.filePath).sort()
     expect(paths).toEqual(['docs/b.md', 'docs/c.md', 'docs/d.md'])
     expect(paths.filter(p => p === 'docs/d.md')).toHaveLength(1)
+  })
+})
+
+describe('resolveCrossReadReadiness', () => {
+  let tmpRoot: string
+  beforeEach(() => {
+    tmpRoot = path.join(os.tmpdir(), `scaffold-readiness-${Date.now()}-${Math.random()}`)
+    fs.mkdirSync(path.join(tmpRoot, '.scaffold', 'services', 'api'), { recursive: true })
+    fs.writeFileSync(path.join(tmpRoot, '.scaffold', 'state.json'), JSON.stringify({
+      'schema-version': 3, steps: {}, next_eligible: [], in_progress: null,
+    }))
+  })
+  afterEach(() => fs.rmSync(tmpRoot, { recursive: true, force: true }))
+
+  const cfg = (exports: Array<{ step: string }>): ScaffoldConfig => ({
+    version: 2, methodology: 'deep', platforms: ['claude-code'],
+    project: {
+      services: [{
+        name: 'api', projectType: 'backend',
+        backendConfig: { apiStyle: 'rest' },
+        exports,
+      }],
+    },
+  }) as ScaffoldConfig
+
+  it('returns service-unknown for missing service', () => {
+    const r = resolveCrossReadReadiness(
+      [{ service: 'ghost', step: 'x' }],
+      cfg([{ step: 'x' }]),
+      tmpRoot,
+    )
+    expect(r[0].status).toBe('service-unknown')
+  })
+
+  it('returns not-exported when step not in exports', () => {
+    const r = resolveCrossReadReadiness(
+      [{ service: 'api', step: 'secret' }],
+      cfg([]),
+      tmpRoot,
+    )
+    expect(r[0].status).toBe('not-exported')
+  })
+
+  it('returns not-bootstrapped when foreign state file missing', () => {
+    const r = resolveCrossReadReadiness(
+      [{ service: 'api', step: 'x' }],
+      cfg([{ step: 'x' }]),
+      tmpRoot,
+    )
+    expect(r[0].status).toBe('not-bootstrapped')
+  })
+
+  it('returns completed when foreign step completed', () => {
+    fs.writeFileSync(
+      path.join(tmpRoot, '.scaffold', 'services', 'api', 'state.json'),
+      JSON.stringify({
+        'schema-version': 3,
+        steps: { 'x': { status: 'completed', source: 'pipeline', produces: [] } },
+        next_eligible: [], in_progress: null,
+      }),
+    )
+    const r = resolveCrossReadReadiness(
+      [{ service: 'api', step: 'x' }],
+      cfg([{ step: 'x' }]),
+      tmpRoot,
+    )
+    expect(r[0].status).toBe('completed')
+  })
+
+  it('returns pending when foreign step not completed', () => {
+    fs.writeFileSync(
+      path.join(tmpRoot, '.scaffold', 'services', 'api', 'state.json'),
+      JSON.stringify({
+        'schema-version': 3,
+        steps: { 'x': { status: 'in_progress', source: 'pipeline', produces: [] } },
+        next_eligible: [], in_progress: null,
+      }),
+    )
+    const r = resolveCrossReadReadiness(
+      [{ service: 'api', step: 'x' }],
+      cfg([{ step: 'x' }]),
+      tmpRoot,
+    )
+    expect(r[0].status).toBe('pending')
+  })
+
+  it('returns empty array when given no cross-reads', () => {
+    expect(resolveCrossReadReadiness([], cfg([]), tmpRoot)).toEqual([])
   })
 })
