@@ -125,7 +125,8 @@ export interface ServiceConfig {
   gameConfig?: GameConfig
   browserExtensionConfig?: BrowserExtensionConfig
   path?: string
-  // No `exports` field — Wave 3c.
+  /** Pipeline step slugs this service exposes for cross-service reference. Closed by default. */
+  exports?: Array<{ step: string }>
 }
 
 /** Project characteristics from config.yml. */

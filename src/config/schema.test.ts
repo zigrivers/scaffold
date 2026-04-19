@@ -1114,6 +1114,44 @@ describe('ServiceSchema', () => {
     })
     expect(result.success).toBe(false)
   })
+
+  describe('exports field (Wave 3c)', () => {
+    const validService = {
+      name: 'shared-lib',
+      projectType: 'library' as const,
+      libraryConfig: { visibility: 'internal' as const },
+    }
+
+    it('accepts a service with exports', () => {
+      const result = ServiceSchema.safeParse({
+        ...validService,
+        exports: [{ step: 'api-contracts' }, { step: 'domain-modeling' }],
+      })
+      expect(result.success).toBe(true)
+    })
+
+    it('accepts a service with no exports field (closed by default)', () => {
+      const result = ServiceSchema.safeParse(validService)
+      expect(result.success).toBe(true)
+      if (result.success) expect(result.data.exports).toBeUndefined()
+    })
+
+    it('rejects exports with a malformed kebab-case step slug', () => {
+      const result = ServiceSchema.safeParse({
+        ...validService,
+        exports: [{ step: 'Not_Kebab' }],
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects exports with empty step string', () => {
+      const result = ServiceSchema.safeParse({
+        ...validService,
+        exports: [{ step: '' }],
+      })
+      expect(result.success).toBe(false)
+    })
+  })
 })
 
 describe('ProjectSchema.services refinements', () => {

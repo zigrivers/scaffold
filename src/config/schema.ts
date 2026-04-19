@@ -127,7 +127,9 @@ export const ServiceSchema = z.object({
   gameConfig: GameConfigSchema.optional(),
   browserExtensionConfig: BrowserExtensionConfigSchema.optional(),
   path: z.string().optional(),
-  // NOTE: no `exports` field in Wave 3a — deferred to Wave 3c.
+  exports: z.array(
+    z.object({ step: z.string().regex(/^[a-z][a-z0-9-]*$/, 'exports.step must be kebab-case') }),
+  ).optional(),
 }).strict().superRefine((svc, ctx) => {
   // Shared per-type coupling (config present without matching projectType).
   for (const v of ALL_COUPLING_VALIDATORS) {
