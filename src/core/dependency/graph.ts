@@ -23,11 +23,15 @@ export function buildGraph(
 
     const deps = dependencyMap?.[mp.name] ?? mp.dependencies
     const enabled = presetSteps.get(mp.name)?.enabled ?? true
+    const crossDeps = mp.crossReads && mp.crossReads.length > 0
+      ? [...mp.crossReads]
+      : undefined
     nodes.set(mp.name, {
       slug: mp.name,
       phase: mp.phase,
       order: mp.order,
       dependencies: deps,
+      ...(crossDeps ? { crossDependencies: crossDeps } : {}),
       enabled,
     })
     edges.set(mp.name, [])

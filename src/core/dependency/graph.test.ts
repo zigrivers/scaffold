@@ -405,3 +405,22 @@ describe('buildGraph with dependencyMap', () => {
     expect(graph.edges.get('b')).toContain('a')
   })
 })
+
+describe('buildGraph crossDependencies (Wave 3c)', () => {
+  it('populates crossDependencies when frontmatter has crossReads', () => {
+    const fm = makeFm('system-architecture', 'architecture', 700, [])
+    fm.crossReads = [{ service: 'shared-lib', step: 'api-contracts' }]
+    const graph = buildGraph([fm], new Map())
+    const node = graph.nodes.get('system-architecture')
+    expect(node?.crossDependencies).toEqual([
+      { service: 'shared-lib', step: 'api-contracts' },
+    ])
+  })
+
+  it('leaves crossDependencies undefined when frontmatter has no crossReads', () => {
+    const fm = makeFm('some-step', 'pre', 100, [])
+    const graph = buildGraph([fm], new Map())
+    const node = graph.nodes.get('some-step')
+    expect(node?.crossDependencies).toBeUndefined()
+  })
+})
