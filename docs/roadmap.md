@@ -58,21 +58,24 @@ Everything below is merged to main or spec'd, awaiting release.
 - 5 new `ScaffoldUserError` subclasses for service validation
 - `schema-version` widened to `1 | 2 | 3`
 
-### Wave 3c: Cross-Service References (spec done — not yet implemented)
+### Wave 3c: Cross-Service References (merged — PR pending)
 
-- **Spec**: `docs/superpowers/specs/2026-04-18-wave-3c-cross-service-references-design.md`
-- `exports` allowlist on `ServiceConfig` — closed by default
-- `cross-reads` frontmatter field on pipeline steps
-- Transitive cross-reads resolution with DFS cycle detection + memoization
-- `crossDependencies` on `DependencyNode` (informational, non-blocking)
-- Cross-dependency readiness display in `next`/`status`
-- Integration into `run.ts` artifact gathering with existing `gatheredPaths` dedup
-- ~150-200 lines production code, ~100 lines tests
+- `exports` allowlist on `ServiceConfig` — closed by default, kebab-case validation, global-step rejection via `ProjectSchema.superRefine` → `InvalidConfigError`
+- `cross-reads` frontmatter field on pipeline steps (4 parser touch-points)
+- `StateManager.loadStateReadOnly()` — side-effect-free foreign state loader (applies migrations in memory only; no saveState, no lock)
+- Transitive cross-reads resolution with DFS cycle detection, full-closure memoization, per-service state cache, per-traversal dedup, tool-category guard, and optional globalSteps runtime guard
+- `crossDependencies` on `DependencyNode` (informational, non-blocking) with overlay-first lookup
+- `crossReads` field on `OverlayState` (seam for post-release overlay-overrides)
+- `resolveCrossReadReadiness` + `CrossReadStatus` + `humanCrossReadStatus` — shared helper for `next` and `status` display
+- `run.ts` artifact gathering wired with `gatheredPaths` dedup
+- `next` and `status` text + JSON output include `crossDependencies` per shown step
+- E2E test coverage: foreign artifact resolution, transitive chain (A→B→C), no-write regression, concurrency under foreign lock
+- ~300 LOC production, ~450 LOC tests (across 14 TDD tasks with per-task multi-model review)
 
 **To complete v3.17.0:**
-1. Write Wave 3c implementation plan
-2. Execute plan (estimated 8-10 tasks)
-3. PR + merge
+1. Open PR from `feat/wave-3c`
+2. Follow CLAUDE.md 3-channel review flow
+3. Squash-merge + tag release per `docs/architecture/operations-runbook.md`
 4. Follow release workflow in `docs/architecture/operations-runbook.md`
 
 ---
