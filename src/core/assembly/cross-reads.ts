@@ -1,5 +1,7 @@
 import fs from 'node:fs'
-import type { ScaffoldConfig, PipelineState, ArtifactEntry } from '../../types/index.js'
+import type {
+  ScaffoldConfig, PipelineState, ArtifactEntry, MetaPromptFile,
+} from '../../types/index.js'
 import type { OutputContext } from '../../cli/output/context.js'
 import { StateManager } from '../../state/state-manager.js'
 import { StatePathResolver } from '../../state/state-path-resolver.js'
@@ -99,4 +101,62 @@ export function resolveDirectCrossRead(
     }
   }
   return { completed: true, artifacts }
+}
+
+/**
+ * DFS-driven transitive cross-reads resolver with:
+ *   - cycle detection via `visiting` set (gray nodes),
+ *   - memoization via `resolved` map (black nodes) caching the FULL closure per service:step,
+ *   - per-service foreign-state cache via `foreignStateCache`,
+ *   - per-traversal dedup via a local Map<filePath, entry>,
+ *   - skips foreign meta of category: 'tool' for transitive lookup.
+ *
+ * Gates transitive recursion on `direct.completed` (not artifact count) so
+ * aggregator steps with empty `produces` still participate in the chain.
+ */
+export function resolveTransitiveCrossReads(
+  crossReads: Array<{ service: string; step: string }>,
+  config: ScaffoldConfig,
+  projectRoot: string,
+  metaPrompts: Map<string, MetaPromptFile>,
+  output: OutputContext,
+  visiting: Set<string>,
+  resolved: Map<string, ArtifactEntry[]>,
+  foreignStateCache: Map<string, PipelineState | null>,
+  globalSteps?: Set<string>,
+): ArtifactEntry[] {
+  const closure = new Map<string, ArtifactEntry>()  // filePath → entry (dedup inside traversal)
+  for (const cr of crossReads) {
+    const key = `${cr.service}:${cr.step}`
+    if (visiting.has(key)) continue  // cycle — skip silently
+    if (resolved.has(key)) {
+      for (const a of resolved.get(key)!) closure.set(a.filePath, a)
+      continue
+    }
+    visiting.add(key)
+
+    const direct = resolveDirectCrossRead(
+      cr, config, projectRoot, output, foreignStateCache, globalSteps,
+    )
+
+    let transitive: ArtifactEntry[] = []
+    if (direct.completed) {
+      const foreignMeta = metaPrompts.get(cr.step)
+      const isTool = foreignMeta?.frontmatter.category === 'tool'
+      if (!isTool && foreignMeta?.frontmatter.crossReads?.length) {
+        transitive = resolveTransitiveCrossReads(
+          foreignMeta.frontmatter.crossReads,
+          config, projectRoot, metaPrompts, output,
+          visiting, resolved, foreignStateCache, globalSteps,
+        )
+      }
+    }
+
+    const fullClosure: ArtifactEntry[] = [...direct.artifacts, ...transitive]
+    for (const a of fullClosure) closure.set(a.filePath, a)
+
+    visiting.delete(key)
+    resolved.set(key, fullClosure)  // cache FULL closure (direct + transitive)
+  }
+  return [...closure.values()]
 }
