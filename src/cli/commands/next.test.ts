@@ -58,6 +58,15 @@ vi.mock('../../core/assembly/overlay-state-resolver.js', () => ({
 
 vi.mock('../../core/assembly/cross-reads.js', () => ({
   resolveCrossReadReadiness: vi.fn(() => []),
+  humanCrossReadStatus: (s: string): string => {
+    // Match real impl — keeps command output tests meaningful
+    switch (s) {
+    case 'not-bootstrapped': return 'service not bootstrapped'
+    case 'service-unknown': return 'service unknown'
+    case 'not-exported': return 'not exported'
+    default: return s
+    }
+  },
 }))
 
 // ---------------------------------------------------------------------------
@@ -390,7 +399,25 @@ describe('next command', () => {
     it('JSON output includes crossDependencies on eligible steps', async () => {
       mockResolveOutputMode.mockReturnValue('json')
       vi.mocked(loadConfig).mockReturnValue({
-        config: { version: 2, methodology: 'deep', platforms: ['claude-code'] },
+        config: {
+          version: 2, methodology: 'deep', platforms: ['claude-code'],
+          project: {
+            services: [
+              {
+                name: 'api',
+                projectType: 'backend',
+                backendConfig: { apiStyle: 'rest' },
+              },
+              {
+                name: 'shared-lib',
+                projectType: 'library',
+                libraryConfig: { visibility: 'internal' },
+                exports: [{ step: 'api-contracts' }],
+              },
+            ],
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
         errors: [], warnings: [],
       })
       mockDiscoverMetaPrompts.mockReturnValue(new Map([
@@ -404,7 +431,7 @@ describe('next command', () => {
         { service: 'shared-lib', step: 'api-contracts', status: 'completed' },
       ])
 
-      await nextCommand.handler(defaultArgv())
+      await nextCommand.handler(defaultArgv({ service: 'api' } as Partial<NextArgv>))
 
       const envelope = JSON.parse(writtenLines.join(''))
       expect(envelope.data.eligible[0].crossDependencies).toEqual([
@@ -420,7 +447,25 @@ describe('next command', () => {
     it('text output annotates eligible steps with cross-dep readiness', async () => {
       mockResolveOutputMode.mockReturnValue('interactive')
       vi.mocked(loadConfig).mockReturnValue({
-        config: { version: 2, methodology: 'deep', platforms: ['claude-code'] },
+        config: {
+          version: 2, methodology: 'deep', platforms: ['claude-code'],
+          project: {
+            services: [
+              {
+                name: 'api',
+                projectType: 'backend',
+                backendConfig: { apiStyle: 'rest' },
+              },
+              {
+                name: 'shared-lib',
+                projectType: 'library',
+                libraryConfig: { visibility: 'internal' },
+                exports: [{ step: 'api-contracts' }],
+              },
+            ],
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
         errors: [], warnings: [],
       })
       mockDiscoverMetaPrompts.mockReturnValue(new Map([
@@ -434,10 +479,43 @@ describe('next command', () => {
         { service: 'shared-lib', step: 'api-contracts', status: 'completed' },
       ])
 
-      await nextCommand.handler(defaultArgv())
+      await nextCommand.handler(defaultArgv({ service: 'api' } as Partial<NextArgv>))
 
       const out = writtenLines.join('')
       expect(out).toMatch(/cross-reads shared-lib:api-contracts \(completed\)/)
+    })
+
+    it('text output uses human-facing strings for non-completed statuses', async () => {
+      mockResolveOutputMode.mockReturnValue('interactive')
+      vi.mocked(loadConfig).mockReturnValue({
+        config: {
+          version: 2, methodology: 'deep', platforms: ['claude-code'],
+          project: {
+            services: [
+              { name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest' } },
+            ],
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
+        errors: [], warnings: [],
+      })
+      mockDiscoverMetaPrompts.mockReturnValue(new Map([
+        ['system-architecture', stepWithCrossReads()],
+      ]))
+      mockComputeEligible.mockReturnValue(['system-architecture'])
+      mockOverlay.mockReturnValue({
+        steps: {}, knowledge: {}, reads: {}, dependencies: {},
+      })
+      mockCrossRead.mockReturnValue([
+        { service: 'shared-lib', step: 'api-contracts', status: 'not-bootstrapped' },
+      ])
+
+      await nextCommand.handler(defaultArgv({ service: 'api' } as Partial<NextArgv>))
+
+      const out = writtenLines.join('')
+      // Human-facing string, not raw enum
+      expect(out).toMatch(/\(service not bootstrapped\)/)
+      expect(out).not.toMatch(/\(not-bootstrapped\)/)
     })
   })
 })

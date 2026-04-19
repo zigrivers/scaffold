@@ -9,7 +9,7 @@ import { resolvePipeline } from '../../core/pipeline/resolver.js'
 import { guardSteplessCommand } from '../guards.js'
 import { StatePathResolver } from '../../state/state-path-resolver.js'
 import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
-import { resolveCrossReadReadiness } from '../../core/assembly/cross-reads.js'
+import { resolveCrossReadReadiness, humanCrossReadStatus } from '../../core/assembly/cross-reads.js'
 
 interface NextArgs {
   count?: number
@@ -139,7 +139,7 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
           const cd = crossDepMap.get(slug)
           if (cd?.length) {
             for (const entry of cd) {
-              output.info(`    cross-reads ${entry.service}:${entry.step} (${entry.status})`)
+              output.info(`    cross-reads ${entry.service}:${entry.step} (${humanCrossReadStatus(entry.status)})`)
             }
           }
         }

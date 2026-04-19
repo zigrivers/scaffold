@@ -168,6 +168,17 @@ export type CrossReadStatus =
   | 'service-unknown'   // foreign service not in config
   | 'not-exported'      // step not in foreign service's exports allowlist
 
+/** Human-facing rendering of CrossReadStatus for text display in next/status. */
+export function humanCrossReadStatus(status: CrossReadStatus): string {
+  switch (status) {
+  case 'completed': return 'completed'
+  case 'pending': return 'pending'
+  case 'not-bootstrapped': return 'service not bootstrapped'
+  case 'service-unknown': return 'service unknown'
+  case 'not-exported': return 'not exported'
+  }
+}
+
 export interface CrossReadReadiness {
   service: string
   step: string
