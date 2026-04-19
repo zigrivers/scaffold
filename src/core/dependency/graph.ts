@@ -11,6 +11,7 @@ export function buildGraph(
   metaPrompts: MetaPromptFrontmatter[],
   presetSteps: Map<string, { enabled: boolean }>,
   dependencyMap?: Record<string, string[]>,
+  crossReadsMap?: Record<string, Array<{ service: string; step: string }>>,
 ): DependencyGraph {
   const nodes = new Map<string, DependencyNode>()
   const edges = new Map<string, string[]>()
@@ -23,8 +24,10 @@ export function buildGraph(
 
     const deps = dependencyMap?.[mp.name] ?? mp.dependencies
     const enabled = presetSteps.get(mp.name)?.enabled ?? true
-    const crossDeps = mp.crossReads && mp.crossReads.length > 0
-      ? [...mp.crossReads]
+    // Overlay-first lookup symmetric with dependencyMap (Wave 3c)
+    const crossReadsSource = crossReadsMap?.[mp.name] ?? mp.crossReads
+    const crossDeps = crossReadsSource && crossReadsSource.length > 0
+      ? [...crossReadsSource]
       : undefined
     nodes.set(mp.name, {
       slug: mp.name,

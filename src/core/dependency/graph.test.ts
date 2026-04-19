@@ -423,4 +423,17 @@ describe('buildGraph crossDependencies (Wave 3c)', () => {
     const node = graph.nodes.get('some-step')
     expect(node?.crossDependencies).toBeUndefined()
   })
+
+  it('overlay crossReadsMap takes precedence over frontmatter', () => {
+    const fm = makeFm('system-architecture', 'architecture', 700, [])
+    fm.crossReads = [{ service: 'old', step: 'old-step' }]
+    const overlay = {
+      'system-architecture': [{ service: 'new', step: 'new-step' }],
+    }
+    const graph = buildGraph([fm], new Map(), undefined, overlay)
+    const node = graph.nodes.get('system-architecture')
+    expect(node?.crossDependencies).toEqual([
+      { service: 'new', step: 'new-step' },
+    ])
+  })
 })
