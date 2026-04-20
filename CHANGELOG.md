@@ -4,6 +4,29 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.20.0] — 2026-04-20
+
+### Added
+- **Multi-Service Dashboard** — `scaffold dashboard` on a multi-service project (services[] configured, no `--service` flag) now renders a bird's-eye view: one page showing all services with per-service progress bars, counts, current phase, and next eligible step. Aggregate header shows average percentage, services complete, and services-by-phase breakdown. Click any service card to copy its `scaffold dashboard --service <name>` command to the clipboard for drill-down. Completes the roadmap's Near-Term "Multi-Service Dashboard (deferred from Wave 3b)" item.
+  - New `generateMultiServiceDashboardData(opts)` in `src/dashboard/generator.ts` — computes `ServiceSummary[]` (name, projectType, percentage, counts, current phase, next eligible) + `MultiServiceAggregate` (totalServices, averagePercentage from raw ratios, servicesComplete, servicesByPhase reached counts).
+  - New `generateMultiServiceHtml(data)` + `buildMultiServiceTemplate(dataJson, data)` in `src/dashboard/template.ts` — standalone service-grid HTML matching the existing theme tokens (dark/light, status colors). No modal, no phase drill-down in multi-service view; click a service card → copy command to open the per-service dashboard.
+  - New `MultiServiceDashboardData` / `ServiceSummary` / `MultiServiceAggregate` / `MultiServiceGeneratorOptions` types.
+  - Shared `writeAndOpenDashboard` helper in `src/cli/commands/dashboard.ts` (DRY between single/multi modes).
+  - 22 generator tests + 12 dashboard-command tests (including XSS, error narrowing, averagePercentage rounding, skeleton-state rendering as "Not started").
+
+### Changed
+- **`scaffold dashboard` dispatch** — if the project's config has `services[]` and `--service` is not set, the command now renders the multi-service view instead of a single root-state dashboard. `--service X` and single-project configs are unchanged.
+- **Missing per-service state.json** — in multi-service mode, a service whose state file hasn't been created renders as "Not started" at 0% rather than crashing the dashboard. Distinct from "Complete" so a misconfigured service is visually obvious.
+
+### Fixed
+- **Multi-service error narrowing** — the multi-service per-service `loadState` catch block now re-throws everything except `STATE_MISSING`. Corrupt JSON, schema-version mismatches, and permission errors surface their real errors instead of being absorbed into a silent skeleton state. (Codex + Claude MMR P2.)
+- **XSS hardening on service cards** — multi-service card click-to-copy uses a `data-copy` attribute + JS event listener (not inline `onclick`). A service name like `evil\');alert(1)//` can no longer escape a single-quoted JS string context. (Codex MMR P1.)
+- **averagePercentage rounding** — aggregate `averagePercentage` is now computed from raw `(completed + skipped) / total` ratios with a single final `Math.round`, avoiding the double-round drift of the previous implementation. (Codex MMR P3.)
+- **nextEligibleSummary consistency** — multi-service `ServiceSummary.nextEligibleSummary` no longer falls back to `frontmatter.description` when `summary` is absent. Matches single-service `computeNextEligible` behavior; keeps per-service cards short. (Claude MMR P2.)
+
+### Review journey
+- 3-channel PR MMR (Codex + Gemini + Claude) — round 1 caught 1 P1 XSS (blocked), 1 P1 skeleton-Complete-badge, 2 P2s, 1 P3 rounding. All 5 fixed + regression-locked. Round 2 verdict: Codex pass, Claude degraded-pass. Post-round-2, 2 additional lock tests landed.
+
 ## [3.19.0] — 2026-04-20
 
 ### Added

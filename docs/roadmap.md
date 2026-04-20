@@ -6,6 +6,16 @@ Working document tracking completed work, in-progress items, and future directio
 
 ## Completed Releases
 
+### v3.20.0 (2026-04-20)
+
+Multi-Service Dashboard — `scaffold dashboard` on a multi-service project renders a single bird's-eye page with per-service progress cards + aggregate stats. Completes roadmap Near-Term "Multi-Service Dashboard (deferred from Wave 3b)".
+
+- **New** `generateMultiServiceDashboardData` + `generateMultiServiceHtml` + `buildMultiServiceTemplate`. Types: `MultiServiceDashboardData`, `ServiceSummary`, `MultiServiceAggregate`.
+- **Dispatch**: services[] configured + no `--service` → multi-service view. Single-project and `--service X` paths unchanged.
+- **Defensive**: missing per-service `state.json` renders as "Not started" (distinct from "Complete"). Corrupt JSON / schema-version / permission errors re-throw instead of being hidden as skeletons.
+- **Security**: service-card click-to-copy uses `data-copy` + event listener (no inline `onclick`). Attacker-controlled service names can't reach a JS string context.
+- **Review**: 3-channel PR MMR caught 1 P1 XSS, 1 P1 skeleton-badge bug, 2 P2s, 1 P3 rounding. All fixed + regression-locked before merge. PR #292.
+
 ### v3.19.0 (2026-04-20)
 
 Eligible-Step Cache v2 — `scaffold next` + `status` now trust the `next_eligible` cache end-to-end, backed by graph-hash invalidation and TOCTOU-safe cross-file counters. Completes roadmap Phase 2 "Eligible Step Caching".
@@ -56,16 +66,14 @@ Multi-service monorepo support — 5 waves landing together.
 
 ## Near-Term Enhancements
 
-### Multi-Service Dashboard (deferred from Wave 3b)
+### Cross-Service Dependency Visualization (multi-service dashboard follow-up)
 
-The `scaffold dashboard` command with `--service` shows a single service's view. A full multi-service dashboard showing all services in one HTML page requires:
+Multi-Service Dashboard shipped in v3.20.0 without cross-service dep visualization. A graph view would show `exports`/`cross-reads` edges between services — useful for reasoning about upstream-ready gates in multi-service monorepos.
 
-- `src/dashboard/generator.ts` updated to accept multiple `PipelineState` objects
-- Service tabs or sections in the HTML layout
-- Aggregate progress indicators (e.g., "3/5 services complete through Phase 7")
-- Cross-service dependency visualization
+- Needs design: which edges to draw, graph layout (d3? graphviz? simple SVG?), whether to lay out alongside the service cards or a separate tab
+- Non-trivial to render without adding a heavy client-side dep in the currently zero-dep HTML output
 
-**Scope**: ~100-150 lines across 3-4 files. Small standalone feature.
+**Scope**: Design needed. Medium (~200 lines if kept server-rendered).
 
 ### Brownfield `adopt` for Multi-Service Monorepos
 
