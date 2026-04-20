@@ -48,5 +48,28 @@ export interface PipelineState {
   in_progress: InProgressRecord | null
   steps: Record<string, StepStateEntry>
   next_eligible: string[]  // Phase 2 cache; Phase 1 sets to []
+
+  /**
+   * Monotonic counter bumped on every root-state saveState. Used by service
+   * state files to detect when root has mutated since the service cached
+   * next_eligible. Present only in root state (service state files never
+   * carry a save_counter of their own). Absent on legacy files.
+   */
+  save_counter?: number
+
+  /**
+   * Pipeline-graph hash recorded when `next_eligible` was written. Absent on
+   * legacy files → treated as "always stale" on read → triggers live recompute.
+   */
+  next_eligible_hash?: string
+
+  /**
+   * SERVICE state only: root state's save_counter at cache-write time. If this
+   * no longer matches the current root save_counter, the service cache is
+   * invalidated (root mutation invalidates service eligibility because service
+   * steps depend on global step completion through the merged state view).
+   */
+  next_eligible_root_counter?: number
+
   'extra-steps': ExtraStepEntry[]  // Phase 2; always [] in Phase 1
 }
