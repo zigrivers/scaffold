@@ -451,4 +451,115 @@ describe('generateMultiServiceHtml', () => {
     expect(html).toContain('Product Definition')
     expect(html).toContain('Project Foundation')
   })
+
+  it('renders "Not started" badge for skeleton service with total=0 (MMR P1 lock)', () => {
+    // Regression guard: previously currentPhaseNumber === null was treated as
+    // "Complete" — but missing-state skeletons also have null phase. Must be
+    // distinguished by total > 0.
+    const data: ReturnType<typeof generateMultiServiceDashboardData> = {
+      generatedAt: '2026-04-20T00:00:00.000Z',
+      methodology: 'deep',
+      scaffoldVersion: '3.20.0',
+      services: [{
+        name: 'skeleton', projectType: 'backend',
+        percentage: 0, completed: 0, skipped: 0, pending: 0, inProgress: 0, total: 0,
+        currentPhaseNumber: null, currentPhaseName: null,
+        nextEligibleSlug: null, nextEligibleSummary: null,
+      }],
+      aggregate: {
+        totalServices: 1, averagePercentage: 0, servicesComplete: 0,
+        servicesByPhase: [],
+      },
+    }
+    const html = generateMultiServiceHtml(data)
+    expect(html).toContain('Not started')
+    // The "Complete" label MUST NOT be rendered (CSS class definition for the
+    // badge can exist in the stylesheet — but the span with that class should not).
+    expect(html).not.toMatch(/<span class="service-complete-badge">/)
+  })
+
+  it('uses data-copy attribute instead of inline onclick (XSS hardening, Codex MMR P1)', () => {
+    const data: ReturnType<typeof generateMultiServiceDashboardData> = {
+      generatedAt: '2026-04-20T00:00:00.000Z',
+      methodology: 'deep',
+      scaffoldVersion: '3.20.0',
+      services: [{
+        name: 'evil\\\');alert(1)//', projectType: 'backend',
+        percentage: 50, completed: 1, skipped: 0, pending: 1, inProgress: 0, total: 2,
+        currentPhaseNumber: 1, currentPhaseName: 'Product Definition',
+        nextEligibleSlug: null, nextEligibleSummary: null,
+      }],
+      aggregate: {
+        totalServices: 1, averagePercentage: 50, servicesComplete: 0,
+        servicesByPhase: [],
+      },
+    }
+    const html = generateMultiServiceHtml(data)
+    // No inline onclick on the service card (attribute-based click handler only).
+    expect(html).not.toMatch(/<div class="service-card"[^>]*onclick=/)
+    // data-copy attribute carries the command — HTML-escaped but not
+    // JS-string-escaped, so the backslash/quote attacker payload cannot
+    // escape any JS context.
+    expect(html).toContain('data-copy="scaffold dashboard --service')
+  })
+})
+
+describe('generateMultiServiceDashboardData — averagePercentage rounding', () => {
+  it('computes averagePercentage from raw ratios, not double-rounded per-service percentages (Codex MMR P3)', () => {
+    // Service A: 1/40 = 2.5% (rounds to 3). Service B: 0/1 = 0% (rounds to 0).
+    // Raw mean of ratios: (0.025 + 0) / 2 = 0.0125 → 1% after one round.
+    // Double-rounded would give (3 + 0) / 2 = 1.5 → 2%. Lock the correct value.
+    const stepsA: Record<string, { status: 'completed' | 'pending'; source: 'pipeline'; produces: string[] }> = {}
+    for (let i = 0; i < 40; i++) {
+      stepsA[`a${i}`] = i === 0
+        ? { status: 'completed', source: 'pipeline', produces: [] }
+        : { status: 'pending', source: 'pipeline', produces: [] }
+    }
+    const data = generateMultiServiceDashboardData({
+      methodology: 'deep',
+      services: [
+        {
+          name: 'svc-a', projectType: 'backend',
+          state: {
+            'schema-version': 3, 'scaffold-version': '1.0.0',
+            init_methodology: 'deep', config_methodology: 'deep',
+            'init-mode': 'greenfield', created: '2026-04-20T00:00:00.000Z',
+            in_progress: null, steps: stepsA,
+            next_eligible: [], 'extra-steps': [],
+          },
+        },
+        {
+          name: 'svc-b', projectType: 'backend',
+          state: {
+            'schema-version': 3, 'scaffold-version': '1.0.0',
+            init_methodology: 'deep', config_methodology: 'deep',
+            'init-mode': 'greenfield', created: '2026-04-20T00:00:00.000Z',
+            in_progress: null,
+            steps: { 'b0': { status: 'pending', source: 'pipeline', produces: [] } },
+            next_eligible: [], 'extra-steps': [],
+          },
+        },
+      ],
+    })
+    expect(data.aggregate.averagePercentage).toBe(1)
+  })
+
+  it('skeleton service (total=0) is not counted as complete in servicesComplete', () => {
+    const data = generateMultiServiceDashboardData({
+      methodology: 'deep',
+      services: [{
+        name: 'skel', projectType: 'backend',
+        state: {
+          'schema-version': 3, 'scaffold-version': '1.0.0',
+          init_methodology: 'deep', config_methodology: 'deep',
+          'init-mode': 'greenfield', created: '2026-04-20T00:00:00.000Z',
+          in_progress: null, steps: {},
+          next_eligible: [], 'extra-steps': [],
+        },
+      }],
+    })
+    expect(data.aggregate.servicesComplete).toBe(0)
+    expect(data.services[0].total).toBe(0)
+    expect(data.services[0].percentage).toBe(0)
+  })
 })

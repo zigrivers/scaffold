@@ -301,8 +301,10 @@ function summarizeService(
   const nextSlug = state.next_eligible?.[0] ?? null
   let nextSummary: string | null = null
   if (nextSlug) {
-    const fm = metaPrompts?.get(nextSlug)?.frontmatter
-    nextSummary = fm?.summary ?? fm?.description ?? null
+    // Match single-service computeNextEligible behavior: summary only, not
+    // description fallback. Description already renders in the per-service
+    // drill-down; the multi-service card should stay short.
+    nextSummary = metaPrompts?.get(nextSlug)?.frontmatter.summary ?? null
   }
 
   return {
@@ -355,11 +357,18 @@ export function generateMultiServiceDashboardData(
   const services = input.map(summarizeService)
 
   const totalServices = services.length
-  const averagePercentage =
-    totalServices > 0
-      ? Math.round(services.reduce((a, s) => a + s.percentage, 0) / totalServices)
-      : 0
-  const servicesComplete = services.filter(s => s.percentage === 100).length
+  // Compute averagePercentage from RAW ratios, not the per-service rounded
+  // percentages, to avoid double-rounding drift (Codex MMR P3). One final
+  // Math.round at the end.
+  let averagePercentage = 0
+  if (totalServices > 0) {
+    let sumRatio = 0
+    for (const s of services) {
+      sumRatio += s.total > 0 ? (s.completed + s.skipped) / s.total : 0
+    }
+    averagePercentage = Math.round((sumRatio / totalServices) * 100)
+  }
+  const servicesComplete = services.filter(s => s.total > 0 && s.percentage === 100).length
   const servicesByPhase = buildServicesByPhase(input)
 
   return {

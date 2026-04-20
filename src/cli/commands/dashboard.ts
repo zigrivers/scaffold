@@ -3,6 +3,10 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+const pkg = require('../../../package.json') as { version: string }
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
@@ -151,13 +155,18 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
           if (!fallbackStateMethodology) {
             fallbackStateMethodology = svcState.config_methodology
           }
-        } catch {
-          // Skeleton state: empty steps keeps the service visible at 0% rather
-          // than silently dropping it. Simpler than skip-with-warning and
-          // surfaces the missing-state condition in the UI.
+        } catch (err) {
+          // Only convert missing-state-file into a skeleton; re-throw anything
+          // else (corrupt JSON, schema-version mismatch, permission errors) so
+          // the user sees the real error instead of a confusing 0% row.
+          // Codex/Claude MMR P2: bare catch collapsed every failure mode.
+          const code = (err as { code?: string } | undefined)?.code
+          if (code !== 'STATE_MISSING') throw err
+          // Skeleton state: empty steps (total=0) renders as "Not started" in
+          // the multi-service template, distinct from "Complete".
           svcState = {
             'schema-version': 3,
-            'scaffold-version': '2.0.0',
+            'scaffold-version': pkg.version,
             init_methodology: configMethodology ?? 'unknown',
             config_methodology: configMethodology ?? 'unknown',
             'init-mode': 'greenfield',

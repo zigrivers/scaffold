@@ -854,23 +854,34 @@ export function buildMultiServiceTemplate(
     const name = escapeHtml(svc.name)
     const projectType = escapeHtml(svc.projectType)
     const pct = svc.percentage
-    const isComplete = svc.currentPhaseNumber === null
+    // "Complete" badge requires pipeline steps to have existed AND all to be done.
+    // total=0 (skeleton for missing state.json) renders "Not started" instead.
+    const isNotStarted = svc.total === 0
+    const isComplete = !isNotStarted && svc.currentPhaseNumber === null
     const phaseLine = isComplete
       ? '<span class="service-complete-badge">Complete</span>'
-      : `<span class="service-phase">Phase ${svc.currentPhaseNumber ?? ''}: ${escapeHtml(svc.currentPhaseName ?? '')}</span>`
+      : isNotStarted
+        ? '<span class="service-not-started-badge">Not started</span>'
+         
+        : `<span class="service-phase">Phase ${svc.currentPhaseNumber ?? ''}: ${escapeHtml(svc.currentPhaseName ?? '')}</span>`
     const nextLine = svc.nextEligibleSlug
+       
       ? `<div class="service-next"><span class="service-next-label">Next:</span> <span class="service-next-slug">${escapeHtml(svc.nextEligibleSlug)}</span>${svc.nextEligibleSummary ? ` <span class="service-next-summary">${escapeHtml(svc.nextEligibleSummary)}</span>` : ''}</div>`
       : ''
-    const cmd = `scaffold dashboard --service ${svc.name}`
-    const cmdEsc = escapeHtml(cmd).replace(/'/g, '\\\'')
+    // Command copy uses data-copy attribute + JS event listener (see script below).
+    // Avoids inline onclick XSS vectors where attacker-controlled svc.name could
+    // escape the single-quoted JS string (Codex MMR P1 — v3.20.0 PR #292).
+    const cmdRaw = `scaffold dashboard --service ${svc.name}`
+    const cmdAttr = escapeHtml(cmdRaw)
 
     return [
-      `<div class="service-card" data-service="${name}" onclick="copyCommand('${cmdEsc}', this)">`,
+      `<div class="service-card" data-service="${name}" data-copy="${cmdAttr}">`,
       '  <div class="service-card-head">',
       `    <div class="service-name">${name}</div>`,
       `    <span class="service-type-pill">${projectType}</span>`,
       '  </div>',
       '  <div class="service-progress-row">',
+       
       `    <div class="service-progress-bar"><div class="service-progress-fill" style="width:${pct}%"></div></div>`,
       `    <span class="service-pct">${pct}%</span>`,
       '  </div>',
@@ -882,7 +893,8 @@ export function buildMultiServiceTemplate(
       '  </div>',
       `  <div class="service-phase-line">${phaseLine}</div>`,
       nextLine,
-      `  <div class="service-cmd-hint"><code>${escapeHtml(cmd)}</code><span class="service-cmd-copy">Click to copy</span></div>`,
+       
+      `  <div class="service-cmd-hint"><code>${escapeHtml(cmdRaw)}</code><span class="service-cmd-copy">Click to copy</span></div>`,
       '</div>',
     ].filter(Boolean).join('\n')
   }).join('\n')
@@ -1091,6 +1103,15 @@ body {
   font-weight: 700;
   text-transform: uppercase;
 }
+.service-not-started-badge {
+  background: var(--border);
+  color: var(--muted);
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
 .service-next { font-size: 0.8rem; color: var(--muted); margin-bottom: 10px; }
 .service-next-label { color: var(--faint); text-transform: uppercase; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em; }
 .service-next-slug { color: var(--accent-light); font-weight: 600; }
@@ -1192,6 +1213,15 @@ ${serviceCards}
     }
   }
   window.copyCommand = copyCommand;
+
+  // Wire up service-card clicks via data-copy (no inline onclick — XSS-safe).
+  var cards = document.querySelectorAll('.service-card[data-copy]');
+  for (var i = 0; i < cards.length; i++) {
+    (function(card) {
+      var cmd = card.getAttribute('data-copy') || '';
+      card.addEventListener('click', function() { copyCommand(cmd, card); });
+    })(cards[i]);
+  }
 
   (function() {
     var dataEl = document.getElementById('scaffold-data');
