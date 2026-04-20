@@ -1,7 +1,38 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { resolvePipeline } from './resolver.js'
 import { loadPipelineContext } from './context.js'
 import type { StepStateEntry } from '../../types/state.js'
+import type { MetaPromptFile } from '../../types/index.js'
+import type { PipelineContext } from './types.js'
+import type { OutputContext } from '../../cli/output/context.js'
+
+function makeOutput(): OutputContext {
+  return {
+    success: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(),
+    result: vi.fn(),
+    supportsInteractivePrompts: vi.fn().mockReturnValue(false),
+    prompt: vi.fn(), confirm: vi.fn(), select: vi.fn(),
+    multiSelect: vi.fn(), multiInput: vi.fn(),
+    startSpinner: vi.fn(), stopSpinner: vi.fn(),
+    startProgress: vi.fn(), updateProgress: vi.fn(), stopProgress: vi.fn(),
+  } as unknown as OutputContext
+}
+
+/** Build a minimal valid PipelineContext for the config=null path.
+ *  Every field required by the PipelineContext interface is set — resolvePipeline
+ *  dereferences `presets.deep` on line 54, so these cannot be omitted. */
+function makeCtx(overrides: Partial<PipelineContext> = {}): PipelineContext {
+  return {
+    projectRoot: '/fake/root',
+    metaPrompts: new Map(),
+    config: null,
+    configErrors: [],
+    configWarnings: [],
+    presets: { mvp: null, deep: null, custom: null },
+    methodologyDir: '/fake/methodology',
+    ...overrides,
+  }
+}
 
 describe('resolvePipeline', () => {
   it('returns a DependencyGraph with nodes', () => {
@@ -108,5 +139,33 @@ describe('resolvePipeline', () => {
     expect(pipeline.preset).not.toBeNull()
     expect(pipeline.graph.nodes.size).toBeGreaterThan(50)
     expect(Object.keys(pipeline.overlay.knowledge).length).toBeGreaterThan(0)
+  })
+})
+
+describe('resolvePipeline fallback (no config)', () => {
+  it('builds overlay.crossReads from frontmatter even when ctx.config is null', () => {
+    const metaPrompts = new Map<string, MetaPromptFile>([
+      ['system-architecture', {
+        stepName: 'system-architecture',
+        filePath: '/fake/sa.md',
+        frontmatter: {
+          name: 'system-architecture',
+          description: '', summary: null,
+          phase: 'architecture', order: 700,
+          dependencies: [], outputs: ['docs/arch.md'],
+          conditional: null, knowledgeBase: [], reads: [],
+          crossReads: [{ service: 'shared-lib', step: 'api-contracts' }],
+          stateless: false, category: 'pipeline',
+        },
+        body: '', sections: {},
+      }],
+    ])
+    const pipeline = resolvePipeline(
+      makeCtx({ metaPrompts }),
+      { output: makeOutput() },
+    )
+    expect(pipeline.overlay.crossReads['system-architecture']).toEqual([
+      { service: 'shared-lib', step: 'api-contracts' },
+    ])
   })
 })
