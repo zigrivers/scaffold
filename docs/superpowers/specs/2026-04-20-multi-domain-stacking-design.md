@@ -17,9 +17,12 @@
 
 // Domain value enums — 'none' is NOT in the "real" list.
 // It is explicitly a separate literal in the union so it cannot appear
-// inside an array (rejected at parse time with a clear enum error).
-const backendRealDomains = ['fintech'] as const
-const researchRealDomains = ['quant-finance', 'ml-research', 'simulation'] as const
+// inside an array (rejected at parse time as an enum violation).
+//
+// EXPORTED so the packaging-integrity test (§5.4) can enumerate the
+// canonical values. Do not inline these — tests rely on the import.
+export const backendRealDomains = ['fintech'] as const
+export const researchRealDomains = ['quant-finance', 'ml-research', 'simulation'] as const
 
 /**
  * Build the domain field for a project-type config.
@@ -62,11 +65,13 @@ export const ResearchConfigSchema = z.object({
 | `domain: ['fintech']` | Valid — single-element array |
 | `domain: ['fintech', 'climate']` | Valid — multi-element array (once `'climate'` enum-added) |
 | `domain:` (absent) | Defaults to `'none'` via `.default()` |
-| `domain: []` | **Rejected** — `.min(1)` violation |
+| `domain: []` | **Rejected** — array branch's `.min(1)` |
 | `domain: ['none']` | **Rejected** — `'none'` not in array-branch enum |
 | `domain: ['none', 'fintech']` | **Rejected** — first element fails enum |
-| `domain: 'climate'` (unknown) | **Rejected** — string branch uses full enum |
+| `domain: 'climate'` (unknown) | **Rejected** — no matching union branch |
 | `domain: null` | **Rejected** — union not nullable |
+
+**Actual error surface:** All rejections flow through `src/config/loader.ts:130-148`, which wraps Zod issues as `FIELD_INVALID_VALUE` errors with message `` `Config validation error at "<fieldPath>": <issue.message>` ``. For union-branch failures, `issue.message` is Zod's generic `"Invalid input"` rather than a targeted per-branch explanation. This is existing behavior — the spec does **not** add per-branch error customization. A user who writes `domain: ['none']` sees `Config validation error at "backendConfig.domain": Invalid input`, which is less informative than an enum-specific message but matches how every other union field in the codebase reports errors. If that friction matters in practice, a future refactor of the loader's union-issue rendering can improve all union fields at once — out of scope for this feature.
 
 ### 1.2 Inferred TypeScript types
 
@@ -118,7 +123,11 @@ if (domainConfigKey) {
     if (!fs.existsSync(subOverlayPath)) continue  // packaging-integrity test is backstop
     const { overlay: subOverlay, errors: subErrors, warnings: subWarnings } =
       loadSubOverlay(subOverlayPath)
-    for (const err of subErrors) output.warn(`[${err.code}] ${err.message}`)
+    // Match the format already used by the project-type overlay error path
+    // at overlay-state-resolver.ts:72 — include recovery text if present.
+    for (const err of subErrors) {
+      output.warn(`[${err.code}] ${err.message}${err.recovery ? ` — ${err.recovery}` : ''}`)
+    }
     for (const w of subWarnings) output.warn(w)
     if (subOverlay) {
       for (const [step, overrides] of Object.entries(subOverlay.knowledgeOverrides ?? {})) {
@@ -216,7 +225,25 @@ Existing `if (domain === 'fintech')` branches remain reachable on the string sid
 
 ### 3.4 Serialization round-trip
 
-No `.transform()` means YAML parse preserves the user's shape. `yaml.dump(parseConfig(config).data)` round-trips both `domain: 'fintech'` and `domain: ['fintech', 'climate']` losslessly. Round-trip tests in §5.1 verify this.
+No `.transform()` means YAML parse preserves the user's shape. `yaml.dump(ConfigSchema.parse(raw))` round-trips both `domain: 'fintech'` and `domain: ['fintech', 'climate']` losslessly. Round-trip tests in §5.1 verify this.
+
+### 3.5 Service-mode multi-domain (`services[].backendConfig.domain`)
+
+`ServiceSchema` reuses `BackendConfigSchema` and `ResearchConfigSchema` by reference (`src/config/schema.ts:121-123`). Widening those schemas automatically widens service configs, so multi-domain arrays work for services in monorepos with zero extra schema plumbing:
+
+```yaml
+project:
+  services:
+    - name: api
+      projectType: backend
+      backendConfig:
+        apiStyle: rest
+        domain: ['fintech', 'climate']   # valid; stacks both sub-overlays
+```
+
+The overlay resolver runs per-service in service mode (v3.17.0 Wave 3b) and already receives the service's config as the `config.project` input, so `typeConfig?.['domain']` already reads the service-scoped domain. **No resolver changes are needed beyond §2 for service-mode multi-domain.**
+
+Test coverage: §5.3 adds one service-mode integration test asserting that `services[0].backendConfig.domain: ['fintech', 'climate']` produces the same knowledge-merge output as the root-level case.
 
 ---
 
@@ -224,7 +251,7 @@ No `.transform()` means YAML parse preserves the user's shape. `yaml.dump(parseC
 
 ### 4.1 Schema-level (Zod)
 
-All invalid inputs (§1.1 rejection rows) surface through the existing `parseConfig` path at `src/config/parseConfig.ts:79-94`, which maps Zod issues into `FIELD_INVALID_VALUE` errors. No new error category. Error messages include the field path (e.g., `backendConfig.domain`) so users can locate the problem.
+All invalid inputs (§1.1 rejection rows) surface through the existing `loadConfig` path at `src/config/loader.ts:130-148`, which maps Zod issues into `FIELD_INVALID_VALUE` errors. Messages include the field path (e.g., `backendConfig.domain` or `services.0.backendConfig.domain` for service-mode) so users can locate the problem. For union-branch failures, Zod's `issue.message` surfaces as `"Invalid input"` — see §1.1 for the trade-off and the rationale for not customizing it in this feature.
 
 ### 4.2 Resolver-level warnings
 
@@ -247,64 +274,81 @@ All invalid inputs (§1.1 rejection rows) surface through the existing `parseCon
 
 ## Section 5 — Testing plan
 
-### 5.1 Unit — schema
-
-Add to `src/config/schema.test.ts`:
+### 5.1 Unit — schema (`src/config/schema.test.ts`)
 
 1. Parses `domain: 'fintech'` as string (existing — keep).
 2. Parses `domain: 'none'` as string (existing — keep).
 3. Parses `domain: ['fintech']` as single-element array.
 4. Parses `domain: ['quant-finance', 'ml-research']` on research config as two-element array.
-5. **Rejects** `domain: []` with `.min(1)` error.
-6. **Rejects** `domain: ['none']` — `'none'` not in array enum.
-7. **Rejects** `domain: ['none', 'fintech']` — first element fails enum.
-8. **Rejects** `domain: 'climate'` (unknown value).
-9. **Rejects** `domain: null`.
-10. Round-trip: YAML-parse `domain: 'fintech'`, serialize, re-parse → same string.
-11. Round-trip: YAML-parse `domain: ['fintech']`, serialize, re-parse → same array.
+5. Rejects `domain: []` — assert `safeParse` returns `success: false`; do **not** assert a specific message (see §4.1).
+6. Rejects `domain: ['none']`.
+7. Rejects `domain: ['none', 'fintech']`.
+8. Rejects `domain: 'climate'` (unknown value).
+9. Rejects `domain: null`.
+10. Round-trip: parse `domain: 'fintech'`, serialize via `yaml.dump`, re-parse → same string.
+11. Round-trip: parse `domain: ['fintech']`, serialize, re-parse → same array.
 
-### 5.2 Unit — `normalizeDomains` helper
+### 5.2 Loader-level (`src/config/loader.test.ts` or equivalent)
 
-New tests in `src/core/assembly/overlay-state-resolver.test.ts`:
+Exercises the full YAML → `loadConfig` → parsed config path, not just `safeParse`:
 
-12. `undefined` → `[]`, no warning.
-13. `'none'` → `[]`, no warning.
-14. `'fintech'` → `['fintech']`, no warning.
-15. `['fintech']` → `['fintech']`, no warning.
-16. `['fintech', 'climate']` → `['fintech', 'climate']` — order preserved.
-17. `['fintech', 'fintech']` → `['fintech']` — deduped + warn.
-18. `['a', 'b', 'a']` → `['a', 'b']` — first-occurrence dedup.
-19. Warning message contains the literal config key passed in (e.g., `'backendConfig.domain'`).
+12. Valid YAML with `domain: ['fintech']` at root-level → `loadConfig` returns config with matching array.
+13. Valid YAML with `services[0].backendConfig.domain: ['fintech']` → service-mode shape preserved through `loadConfig`.
+14. Invalid YAML with `domain: []` → `loadConfig` returns `errors[]` containing a `FIELD_INVALID_VALUE` entry whose `context.field` is `backendConfig.domain`.
+15. Invalid YAML with `domain: ['none']` → same error shape as test 14.
 
-### 5.3 Integration — resolver with multi-domain
+### 5.3 Resolver integration — real research overlays
 
-Using **real** research sub-overlays (`research-quant-finance.yml`, `research-ml-research.yml`):
+These use the packaged `content/methodology/` sub-overlays to exercise end-to-end resolution. The two overlays both touch `system-architecture`, `operations`, `tdd`, `create-evals`, `review-architecture`, `review-testing`, `implementation-plan` (verified). `tech-stack` is **not** shared — do not use it for multi-domain assertions.
 
-20. `domain: ['quant-finance', 'ml-research']` merges both overlays' knowledge. Assert **exact arrays** on `tech-stack` and `tdd` target steps, not just containment.
-21. Declaration order matters: `['quant-finance', 'ml-research']` vs reversed produces knowledge arrays in different orders on shared steps.
-22. Mixed merge: core overlay provides `['core-a']`, domain A appends `['a', 'shared']`, domain B appends `['shared', 'b']` → expected `['core-a', 'a', 'shared', 'b']` (proves first-occurrence dedup across core + two sub-overlays).
-23. Missing sub-overlay at runtime → silent-skip, test passes without warnings emitted.
-24. String form still works: `domain: 'fintech'` resolves identically to `['fintech']` (invariant check).
+16. `domain: ['quant-finance', 'ml-research']` on research: assert `overlayKnowledge['system-architecture']` has exact-array equality to `[...baseKnowledge, ...quantFinanceKnowledge, ...mlResearchKnowledge]` with quant-finance entries first.
+17. Reversed order: `['ml-research', 'quant-finance']` produces the same knowledge *set* on `system-architecture` with the ml-research entries first.
+18. Shared dedup: on a step where both overlays append an entry that also appears in the core overlay, it appears **once** at first-occurrence position. (Uses `tdd` — both overlays append domain-specific entries, core may or may not have existing entries; the test constructs a controlled scenario.)
+19. String form invariant: `domain: 'fintech'` on backend produces knowledge identical to `['fintech']` on the same config.
 
-**Fixture sub-overlays** (only for contrived collision cases not covered by production overlays):
-Create `tests/fixtures/methodology/backend-fake-a.yml` and `backend-fake-b.yml` — each appends an overlapping knowledge doc to the same test-pipeline step — used for test 22. Do not add to production `content/methodology/`.
+### 5.4 Resolver unit — `normalizeDomains` and contrived collision
 
-### 5.4 Packaging-integrity
+`normalizeDomains` is a file-local helper; its behavior is exercised indirectly through resolver tests (§5.3) rather than via a standalone import. This avoids exporting internals and matches the pattern used for other resolver helpers.
 
-New file `tests/packaging/domain-overlay-alignment.test.ts`:
+For contrived collision cases that real overlays don't cover, use a **temp methodology directory** with schema-bypassed configs — the existing pattern in `overlay-state-resolver.test.ts:233` (`projectType: 'malformed' as never`). Example:
 
-25. For every non-`'none'` value in `BackendConfigSchema`'s domain enum, `content/methodology/backend-{value}.yml` exists and is a readable YAML file.
-26. Same for `ResearchConfigSchema`.
+```ts
+const config = makeConfig({
+  project: {
+    projectType: 'backend',
+    backendConfig: {
+      apiStyle: 'rest', dataStore: ['relational'], authMechanism: 'jwt',
+      asyncMessaging: 'none', deployTarget: 'container',
+      // Schema would reject these values; cast bypasses for isolated resolver testing.
+      domain: ['fake-a', 'fake-b'] as never,
+    },
+  },
+})
+// tmpDir contains backend-fake-a.yml + backend-fake-b.yml with known knowledge overlaps.
+```
 
-This test catches the class of packaging bugs that the retracted D5b warning was trying to catch at runtime — earlier, deterministically, and with zero runtime cost.
+20. Duplicate domain: `domain: ['fintech', 'fintech']` (cast-bypassed) → warns with message containing `backendConfig.domain`, resolver loads the overlay once.
+21. Contrived overlap: fixture `fake-a` appends `['a', 'shared']` to step X, fixture `fake-b` appends `['shared', 'b']` to step X; resolver output for step X starts with pipeline-base entries, then `['a', 'shared', 'b']` (first-occurrence dedup for `'shared'`).
+22. Missing sub-overlay file at runtime → silent-skip, resolver does not emit a warning.
 
-### 5.5 E2E
+Fixture sub-overlays live at `tests/fixtures/methodology/backend-fake-a.yml` and `backend-fake-b.yml`; each is ~10 lines.
 
-No new E2E tests. Multi-domain doesn't surface in CLI output, dashboard, or prompt-assembly beyond the knowledge-merge result, and that path is already exercised by the resolver integration tests (§5.3).
+### 5.5 Packaging-integrity (new file)
 
-### 5.6 Assertion style
+`tests/packaging/domain-overlay-alignment.test.ts`:
 
-All tests in §5.2, §5.3 use **exact-array equality** (`toEqual`) rather than `toContain`. Containment would pass a suite where merge ordering is subtly wrong.
+23. Import `backendRealDomains` from `src/config/schema.ts`; for each value, assert `content/methodology/backend-${value}.yml` exists and is readable.
+24. Import `researchRealDomains`; for each value, assert `content/methodology/research-${value}.yml` exists and is readable.
+
+This depends on the schema exporting the domain-value constants (§1, revised).
+
+### 5.6 E2E
+
+No new E2E tests. Multi-domain doesn't surface in CLI output, dashboard, or prompt-assembly beyond the knowledge-merge result, which is already covered above.
+
+### 5.7 Assertion style
+
+All tests in §5.3–§5.4 use **exact-array equality** (`toEqual`) rather than `toContain`. Containment would pass a suite where merge ordering is subtly wrong.
 
 ---
 
@@ -352,12 +396,13 @@ None. No fields removed, no enum values changed, no YAML syntax deprecated.
 
 | Artifact | LOC |
 |---|---|
-| Schema changes (3-way union + helper) | ~20 production + ~50 tests |
-| Resolver changes (normalize helper + loop rewrite) | ~35 production + ~100 tests |
-| Packaging-integrity test | ~20 tests |
-| Fixture sub-overlays (2 × ~8 lines) | ~16 fixtures |
-| CHANGELOG / roadmap updates | ~20 docs |
-| **Total** | **~80–120 production, ~200 tests** |
+| Schema changes (3-way union + exported constants + helper) | ~25 production + ~60 tests |
+| Resolver changes (normalize helper + loop rewrite) | ~35 production + ~120 tests |
+| Loader-level tests (array-shape end-to-end) | ~30 tests |
+| Packaging-integrity test | ~25 tests |
+| Fixture sub-overlays (2 × ~10 lines) | ~20 fixtures |
+| CHANGELOG / roadmap updates | ~25 docs |
+| **Total** | **~85–125 production, ~235 tests** |
 
 ---
 
