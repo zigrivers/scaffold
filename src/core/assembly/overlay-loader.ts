@@ -370,7 +370,7 @@ export function loadStructuralOverlay(
   }
 
   // 5. Parse override sections (gracefully handle missing/malformed)
-  const overrideSections = ['step-overrides', 'knowledge-overrides', 'reads-overrides', 'dependency-overrides'] as const
+  const overrideSections = ['step-overrides', 'knowledge-overrides', 'reads-overrides', 'dependency-overrides', 'cross-reads-overrides'] as const
 
   for (const section of overrideSections) {
     const value = obj[section]
@@ -389,6 +389,8 @@ export function loadStructuralOverlay(
     ? obj['reads-overrides'] as Record<string, unknown> : {}
   const dependencyOverridesRaw = isPlainObject(obj['dependency-overrides'])
     ? obj['dependency-overrides'] as Record<string, unknown> : {}
+  const crossReadsOverridesRaw = isPlainObject(obj['cross-reads-overrides'])
+    ? obj['cross-reads-overrides'] as Record<string, unknown> : {}
 
   const overlay: PipelineOverlay = {
     name: (obj['name'] as string).trim(),
@@ -398,7 +400,7 @@ export function loadStructuralOverlay(
     knowledgeOverrides: parseKnowledgeOverrides(knowledgeOverridesRaw, warnings, overlayPath),
     readsOverrides: parseReadsOverrides(readsOverridesRaw, warnings, overlayPath),
     dependencyOverrides: parseDependencyOverrides(dependencyOverridesRaw, warnings, overlayPath),
-    crossReadsOverrides: {},  // NEW — placeholder; Task 4 replaces with parseCrossReadsOverrides(...)
+    crossReadsOverrides: parseCrossReadsOverrides(crossReadsOverridesRaw, warnings, overlayPath),
   }
 
   return { overlay, errors, warnings }
