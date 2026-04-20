@@ -86,9 +86,17 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     stateManager.reconcileWithPipeline(pipelineSteps)
 
     const state = stateManager.loadState()
-    const eligible = pipeline.computeEligible(state.steps,
-      service ? { scope: 'service', globalSteps: pipeline.globalSteps } : undefined,
-    )
+
+    // Prefer the cached list (populated on every saveState — see StateManager.saveState).
+    // Fall back to live computation when the cache is empty; this covers the
+    // v2→v3 migration gap where next_eligible is initialized to [] and only
+    // gets populated after the first state mutation. Recomputing [] for a
+    // complete pipeline is harmless (returns []).
+    const eligible = state.next_eligible.length > 0
+      ? state.next_eligible
+      : pipeline.computeEligible(state.steps,
+        service ? { scope: 'service', globalSteps: pipeline.globalSteps } : undefined,
+      )
 
     // 4. Apply --count limit
     const count = argv.count ?? eligible.length

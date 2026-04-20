@@ -249,6 +249,39 @@ describe('next command', () => {
     expect(exitSpy).toHaveBeenCalledWith(0)
   })
 
+  it('prefers state.next_eligible cache when populated (does not call computeEligible)', async () => {
+    // Cache path: state has a populated next_eligible list. next.ts should read
+    // it directly without recomputing via pipeline.computeEligible().
+    const steps = {
+      'cached-a': { status: 'pending', source: 'pipeline', produces: [] },
+      'cached-b': { status: 'pending', source: 'pipeline', produces: [] },
+    }
+    // Mock with cache pre-populated (as a real saveState would have done).
+    type LoadReturn = ReturnType<InstanceType<typeof StateManager>['loadState']>
+    MockStateManager.mockImplementation(() => ({
+      loadState: vi.fn(
+        () => makeState({ steps, next_eligible: ['cached-a', 'cached-b'] }) as unknown as LoadReturn,
+      ),
+      reconcileWithPipeline: vi.fn(() => false),
+    }) as unknown as InstanceType<typeof StateManager>)
+    // If next.ts ignores the cache and falls through, this mock would fire.
+    // With the cache path taken, it must NOT be called.
+    mockComputeEligible.mockReturnValue(['wrong-step'])
+    const metaPrompts = new Map([
+      ['cached-a', makeFrontmatter('cached-a', 'desc', 'pre', 1)],
+      ['cached-b', makeFrontmatter('cached-b', 'desc', 'pre', 2)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
+    await nextCommand.handler(defaultArgv())
+    const allOutput = writtenLines.join('')
+    expect(allOutput).toContain('scaffold run cached-a')
+    expect(allOutput).toContain('scaffold run cached-b')
+    expect(allOutput).not.toContain('wrong-step')
+    expect(mockComputeEligible).not.toHaveBeenCalled()
+  })
+
   it('--count 2 limits output to 2 eligible steps', async () => {
     const steps = {
       's1': { status: 'pending', source: 'pipeline', produces: [] },
