@@ -92,4 +92,31 @@ describe('computePipelineHash', () => {
     expect(computePipelineHash(g1, new Set(), 'global'))
       .toBe(computePipelineHash(g2, new Set(), 'global'))
   })
+
+  it('different globalSteps membership produces different hash (Codex MMR P2 lock)', () => {
+    // Regression guard: the implementation includes isGlobal per spec §2, but
+    // if the line were to drop globalSteps.has(slug), no test above would
+    // catch it. Lock the contract: same graph, different globalSteps Set,
+    // must produce different hashes.
+    const g = mkGraph([
+      { slug: 'a', enabled: true, deps: [] },
+      { slug: 'b', enabled: true, deps: [] },
+    ])
+    const hNone = computePipelineHash(g, new Set(), 'global')
+    const hAGlobal = computePipelineHash(g, new Set(['a']), 'global')
+    const hBothGlobal = computePipelineHash(g, new Set(['a', 'b']), 'global')
+    expect(hNone).not.toBe(hAGlobal)
+    expect(hAGlobal).not.toBe(hBothGlobal)
+  })
+
+  it('dependency order within a node does not affect hash (dep-sort stability, Codex MMR P2 lock)', () => {
+    // Regression guard: implementation sorts deps before joining, but no prior
+    // test locks this. If the sort were removed and consumers happened to
+    // insert deps in canonical order, the suite would still pass — failing
+    // silently when a real caller inserts deps in a different order.
+    const g1 = mkGraph([{ slug: 'x', enabled: true, deps: ['a', 'b', 'c'] }])
+    const g2 = mkGraph([{ slug: 'x', enabled: true, deps: ['c', 'a', 'b'] }])
+    expect(computePipelineHash(g1, new Set(), 'global'))
+      .toBe(computePipelineHash(g2, new Set(), 'global'))
+  })
 })
