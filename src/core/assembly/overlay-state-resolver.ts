@@ -11,7 +11,18 @@ export interface OverlayState {
   knowledge: Record<string, string[]>
   reads: Record<string, string[]>
   dependencies: Record<string, string[]>
-  /** Populated via overlay-first merge: frontmatter + structural overlay's cross-reads-overrides. */
+  /**
+   * Cross-reads for each step (keyed by step slug).
+   *
+   * In this task (Task 8) the map is always `{}` — the field is required here
+   * only so every construction site carries the placeholder. Task 9 threads the
+   * real frontmatter map through two `applyOverlay` passes (project-type +
+   * structural) so this ends up as `frontmatter ∪ overlay.cross-reads-overrides`
+   * per spec §3.2.
+   *
+   * Consumers should read `overlay.crossReads[slug] ?? frontmatter.crossReads[slug]`
+   * until Task 10 populates the fallback branch and Task 11 completes the seam.
+   */
   crossReads: Record<string, Array<{ service: string; step: string }>>
 }
 
