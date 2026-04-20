@@ -12,10 +12,15 @@ import { loadConfig } from '../../config/loader.js'
 import { guardSteplessCommand } from '../guards.js'
 import { StatePathResolver } from '../../state/state-path-resolver.js'
 import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
-import { generateDashboardData, generateHtml } from '../../dashboard/generator.js'
+import {
+  generateDashboardData,
+  generateHtml,
+  generateMultiServiceDashboardData,
+  generateMultiServiceHtml,
+} from '../../dashboard/generator.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { getPackagePipelineDir, atomicWriteFile } from '../../utils/fs.js'
-import type { PipelineState } from '../../types/index.js'
+import type { PipelineState, ServiceConfig } from '../../types/index.js'
 
 interface DashboardArgs {
   format?: string
@@ -30,6 +35,36 @@ interface DashboardArgs {
 }
 
 type ConfigWithMethodology = { methodology?: { preset?: string } } | null
+
+/**
+ * Write HTML to the requested path (or a tmpfile), then optionally open it in
+ * the system browser. Shared between single-service and multi-service modes.
+ * Calls process.exit(0) on success.
+ */
+function writeAndOpenDashboard(
+  html: string,
+  argv: DashboardArgs,
+  output: { success: (msg: string) => void },
+): void {
+  const outputPath = argv.output ?? path.join(os.tmpdir(), `scaffold-dashboard-${Date.now()}.html`)
+
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true })
+  atomicWriteFile(outputPath, html)
+
+  if (!argv['no-open']) {
+    let opener = 'xdg-open'
+    if (process.platform === 'darwin') opener = 'open'
+    if (process.platform === 'win32') opener = 'start'
+    try {
+      execFileSync(opener, [outputPath])
+    } catch {
+      // Ignore errors when opening browser
+    }
+  }
+
+  output.success(`Dashboard generated: ${outputPath}`)
+  process.exit(0)
+}
 
 const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = {
   command: 'dashboard',
@@ -78,7 +113,88 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
     guardSteplessCommand(config ?? {}, service, { commandName: 'dashboard', output })
     if (process.exitCode === 2) return
 
-    // 4. Load state
+    // Multi-service mode: config has services[] AND no --service flag.
+    // Iterate per-service, render aggregate bird's-eye dashboard.
+    const configuredServices = config?.project?.services as ServiceConfig[] | undefined
+    const isMultiServiceMode =
+      !service && Array.isArray(configuredServices) && configuredServices.length > 0
+
+    if (isMultiServiceMode) {
+      // Load meta-prompts ONCE and share across all services.
+      const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))
+
+      // Methodology resolution: prefer config.methodology.preset; else fall back to
+      // the first loaded service state's config_methodology; else 'unknown'.
+      const configMethodology = (config as ConfigWithMethodology)?.methodology?.preset
+
+      const loadedServices: Array<{
+        name: string
+        projectType: string
+        state: PipelineState
+        metaPrompts: typeof metaPrompts
+      }> = []
+
+      let fallbackStateMethodology: string | undefined
+      for (const svc of configuredServices!) {
+        const svcResolver = new StatePathResolver(projectRoot, svc.name)
+        const svcStateManager = new StateManager(
+          projectRoot,
+          () => [],
+          () => config ?? undefined,
+          svcResolver,
+          new Set<string>(),
+          undefined,
+        )
+        let svcState: PipelineState
+        try {
+          svcState = svcStateManager.loadState()
+          if (!fallbackStateMethodology) {
+            fallbackStateMethodology = svcState.config_methodology
+          }
+        } catch {
+          // Skeleton state: empty steps keeps the service visible at 0% rather
+          // than silently dropping it. Simpler than skip-with-warning and
+          // surfaces the missing-state condition in the UI.
+          svcState = {
+            'schema-version': 3,
+            'scaffold-version': '2.0.0',
+            init_methodology: configMethodology ?? 'unknown',
+            config_methodology: configMethodology ?? 'unknown',
+            'init-mode': 'greenfield',
+            created: new Date().toISOString(),
+            in_progress: null,
+            steps: {},
+            next_eligible: [],
+            'extra-steps': [],
+          } as PipelineState
+        }
+        loadedServices.push({
+          name: svc.name,
+          projectType: svc.projectType,
+          state: svcState,
+          metaPrompts,
+        })
+      }
+
+      const methodology = configMethodology ?? fallbackStateMethodology ?? 'unknown'
+
+      const dashboardData = generateMultiServiceDashboardData({
+        services: loadedServices,
+        methodology,
+      })
+
+      if (argv['json-only']) {
+        output.result(dashboardData)
+        process.exit(0)
+        return
+      }
+
+      const html = generateMultiServiceHtml(dashboardData)
+      writeAndOpenDashboard(html, argv, output)
+      return
+    }
+
+    // 4. Load state (single-service / global scope)
     const pathResolver = new StatePathResolver(projectRoot, service)
     const stateManager = new StateManager(
       projectRoot,
@@ -126,31 +242,9 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
       return
     }
 
-    // 9. Generate HTML
+    // 9. Generate HTML + write + open
     const html = generateHtml(dashboardData)
-
-    // 10. Determine output path
-    const outputPath = argv.output ?? path.join(os.tmpdir(), `scaffold-dashboard-${Date.now()}.html`)
-
-    // 11. Create parent directory if needed and write file
-    fs.mkdirSync(path.dirname(outputPath), { recursive: true })
-    atomicWriteFile(outputPath, html)
-
-    // 12. Open in browser (unless --no-open)
-    if (!argv['no-open']) {
-      let opener = 'xdg-open'
-      if (process.platform === 'darwin') opener = 'open'
-      if (process.platform === 'win32') opener = 'start'
-      try {
-        execFileSync(opener, [outputPath])
-      } catch {
-        // Ignore errors when opening browser
-      }
-    }
-
-    // 13. Report success
-    output.success(`Dashboard generated: ${outputPath}`)
-    process.exit(0)
+    writeAndOpenDashboard(html, argv, output)
   },
 }
 
