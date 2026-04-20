@@ -40,4 +40,24 @@ describe('readRootSaveCounter', () => {
     )
     expect(readRootSaveCounter(tmpRoot)).toBeNull()
   })
+
+  it('returns null when save_counter is non-number (Codex + Gemini MMR coverage lock)', () => {
+    // Coverage lock: regression guard against a future change that forgets
+    // the typeof check and coerces with Number() or String().
+    fs.writeFileSync(
+      path.join(tmpRoot, '.scaffold', 'state.json'),
+      JSON.stringify({ save_counter: '42', 'schema-version': 3 }),
+    )
+    expect(readRootSaveCounter(tmpRoot)).toBeNull()
+  })
+
+  it('returns 0 (not null) when save_counter is the number zero', () => {
+    // Coverage lock: 0 is a valid counter value (truthy-confusing). A future
+    // refactor from `typeof === "number"` to `if (counter)` would regress.
+    fs.writeFileSync(
+      path.join(tmpRoot, '.scaffold', 'state.json'),
+      JSON.stringify({ save_counter: 0, 'schema-version': 3 }),
+    )
+    expect(readRootSaveCounter(tmpRoot)).toBe(0)
+  })
 })
