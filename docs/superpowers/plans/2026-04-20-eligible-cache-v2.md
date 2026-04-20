@@ -40,23 +40,22 @@
 
 **Files:**
 - Modify: `src/types/state.ts` (add 3 new optional fields)
-- Test: `src/types/state.test.ts` (if exists; create if not — or append to existing type test)
+- Create: `src/types/state.test.ts` (new test file — does not currently exist)
 
 **Goal:** Introduce the cache-version fields without behavioral change. Type-only.
 
-- [ ] **Step 1: Check if `src/types/state.test.ts` exists**
+- [ ] **Step 1: Create `src/types/state.test.ts` with failing test**
 
-Run: `ls src/types/state.test.ts 2>/dev/null || echo "NOT FOUND"`
+The file does NOT exist today. Create it with the test below — this is the red-test step for TDD. The test proves the new optional fields compile, and will fail initially because the fields are not yet on the interface.
 
-If NOT FOUND, skip the Step 2 test write — move directly to Step 3 (Types are simple enough that direct usage in Task 2+'s tests acts as the type-level check).
+- [ ] **Step 2: Write failing test (create the file)**
 
-If it EXISTS, append the tests in Step 2.
-
-- [ ] **Step 2: Write failing test (if test file exists)**
-
-Append to `src/types/state.test.ts`:
+Create `src/types/state.test.ts`:
 
 ```typescript
+import { describe, it, expect } from 'vitest'
+import type { PipelineState } from './state.js'
+
 describe('PipelineState cache-version fields (Eligible-Cache v2)', () => {
   it('PipelineState literal accepts save_counter, next_eligible_hash, next_eligible_root_counter as optional', () => {
     const state: PipelineState = {
@@ -512,8 +511,40 @@ describe('resolvePipeline getPipelineHash', () => {
     const pipeline = resolvePipeline(makeCtx({ metaPrompts }), { output: makeOutput() })
     expect(pipeline.getPipelineHash(null)).toBe(pipeline.getPipelineHash('global'))
   })
+
+  it('memoizes per scope — same scope twice does not recompute', async () => {
+    // Spy on the underlying hash function to verify memoization behavior.
+    const ghMod = await import('./graph-hash.js')
+    const spy = vi.spyOn(ghMod, 'computePipelineHash')
+    spy.mockClear()
+    const metaPrompts = new Map<string, MetaPromptFile>([
+      ['step-a', {
+        stepName: 'step-a',
+        filePath: '/fake/a.md',
+        frontmatter: {
+          name: 'step-a', description: '', summary: null,
+          phase: 'architecture', order: 100,
+          dependencies: [], outputs: [], conditional: null,
+          knowledgeBase: [], reads: [], crossReads: [],
+          stateless: false, category: 'pipeline',
+        },
+        body: '', sections: {},
+      }],
+    ])
+    const pipeline = resolvePipeline(makeCtx({ metaPrompts }), { output: makeOutput() })
+    pipeline.getPipelineHash('global')
+    pipeline.getPipelineHash('global')
+    pipeline.getPipelineHash('global')
+    expect(spy).toHaveBeenCalledTimes(1)
+    // Different scope forces another compute
+    pipeline.getPipelineHash('service')
+    expect(spy).toHaveBeenCalledTimes(2)
+    spy.mockRestore()
+  })
 })
 ```
+
+**Note on memoization test + ESM spying:** `vi.spyOn(ghMod, 'computePipelineHash')` requires that `resolver.ts` imports `computePipelineHash` via the namespace import or via an indirection that the spy can intercept. Direct named-import binding cannot be spied on in ESM. If the spy cannot intercept the call in Step 4, refactor `resolver.ts` to `import * as graphHash from './graph-hash.js'` and call `graphHash.computePipelineHash(...)` inside the `getPipelineHash` closure. Make this refactor part of Task 4 Step 4 if required.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
@@ -604,7 +635,7 @@ git commit -m "feat(pipeline): ResolvedPipeline.getPipelineHash(scope) — memoi
 - Modify: `src/state/state-manager.ts` (constructor signature + loadState capture)
 - Test: `src/state/state-manager.test.ts`
 
-**Goal:** Add `pipelineHash?` constructor param (type-compatible — optional) and capture root's `save_counter` during service-mode `loadState` for TOCTOU-safe later use in saveState.
+**Goal:** Extend `StateManager` with a new optional trailing `pipelineHash?` param, align the injected `computeEligible` type with the existing options-aware `ResolvedPipeline.computeEligible` contract (the underlying function in `src/core/dependency/eligibility.ts` already accepts options — we're only updating the class's field type so callers can pass the real `pipeline.computeEligible`), and capture root's `save_counter` during service-mode `loadState` for TOCTOU-safe later use in `saveState`.
 
 - [ ] **Step 1: Write failing tests**
 
@@ -615,7 +646,7 @@ describe('StateManager — pipelineHash + loadedRootCounter (Eligible-Cache v2)'
   it('constructor accepts optional pipelineHash parameter', () => {
     const sm = new StateManager(
       '/fake/project',
-      ((_steps, _opts) => [] as string[]) as unknown as (s: Record<string, StepStateEntry>) => string[],
+      (_steps, _opts) => [],
       () => undefined,
       new StatePathResolver('/fake/project'),
       undefined,
@@ -662,7 +693,7 @@ describe('StateManager — pipelineHash + loadedRootCounter (Eligible-Cache v2)'
       )
       const sm = new StateManager(
         tmpRoot,
-        ((_s, _o) => [] as string[]) as unknown as (s: Record<string, StepStateEntry>) => string[],
+        (_s, _o) => [],
         () => undefined,
         new StatePathResolver(tmpRoot, 'api'),
         new Set(),  // empty globalSteps
@@ -714,7 +745,7 @@ describe('StateManager — pipelineHash + loadedRootCounter (Eligible-Cache v2)'
       )
       const sm = new StateManager(
         tmpRoot,
-        ((_s, _o) => [] as string[]) as unknown as (s: Record<string, StepStateEntry>) => string[],
+        (_s, _o) => [],
         () => undefined,
         new StatePathResolver(tmpRoot, 'api'),
         new Set(),
@@ -741,83 +772,109 @@ Expected: FAIL — constructor rejects the 6th arg.
 
 In `src/state/state-manager.ts`, find the class and update.
 
-**3a — Constructor signature** — add `pipelineHash?` param + instance field for `loadedRootCounter`. Current constructor (around line 18):
+**3a — Constructor signature** — preserve EXACT modifiers on existing params. Only changes: (i) broaden the `computeEligible` field type so callers can pass the real options-aware `pipeline.computeEligible`, and (ii) append a new trailing optional `pipelineHash?: string` param. Do NOT change `configProvider` modifiers, do NOT add `private` to `pathResolver` (it is already a class field initialized in the body), do NOT drop `private` from `projectRoot`.
+
+**Current** (state-manager.ts lines 12-25 — READ verbatim before editing):
 
 ```typescript
-constructor(
-  projectRoot: string,
-  private computeEligible: (steps: Record<string, StepStateEntry>) => string[],
-  private configProvider: () => ScaffoldConfig | undefined,
-  private pathResolver: StatePathResolver,
-  private globalSteps?: Set<string>,
-) {
-  // ...
-}
-```
+export class StateManager {
+  private statePath: string
+  private pathResolver: StatePathResolver
 
-Replace with:
-
-```typescript
-constructor(
-  projectRoot: string,
-  private computeEligible: (
-    steps: Record<string, StepStateEntry>,
-    options?: { scope?: 'global' | 'service'; globalSteps?: Set<string> },
-  ) => string[],
-  private configProvider: () => ScaffoldConfig | undefined,
-  private pathResolver: StatePathResolver,
-  private globalSteps?: Set<string>,
-  /**
-   * Pipeline-graph hash for the manager's scope. If omitted, saveState writes
-   * `next_eligible_hash: undefined`, which consumers treat as invalid cache
-   * (live recompute). Legacy-safe default.
-   */
-  private pipelineHash?: string,
-) {
-  // ... existing body ...
-}
-```
-
-Also add a private field below the constructor for the captured root counter:
-
-```typescript
-/**
- * Captured during service-mode loadState. Used by saveState to stamp
- * next_eligible_root_counter TOCTOU-safely (spec §3). `undefined` = never
- * loaded; `null` = loaded but root file had no save_counter (legacy).
- */
-private loadedRootCounter: number | null | undefined = undefined
-```
-
-**3b — loadState capture** — find the `loadState()` method. Inside the service-scoped branch (where it merges root + service steps), capture root's `save_counter`. Locate the existing block that reads root state:
-
-Current behavior reads root state somewhere around `loadState()` lines 40-80. Grep for the root-state read pattern and add the capture immediately after:
-
-```typescript
-loadState(): PipelineState {
-  // ... existing logic (may vary) ...
-
-  if (this.pathResolver.isServiceScoped && this.globalSteps) {
-    const rootStatePath = path.join(this.projectRoot, '.scaffold', 'state.json')
-    // Existing code likely already reads root. Extend it to capture the counter.
-    if (fs.existsSync(rootStatePath)) {
-      const rootRaw = JSON.parse(fs.readFileSync(rootStatePath, 'utf8')) as Record<string, unknown>
-      // ... existing merge logic ...
-
-      // NEW — capture root's save_counter at the SAME read moment (TOCTOU-safe)
-      this.loadedRootCounter =
-        typeof rootRaw['save_counter'] === 'number' ? rootRaw['save_counter'] : null
-    } else {
-      this.loadedRootCounter = null
-    }
-    // ... rest of existing merge ...
+  constructor(
+    private projectRoot: string,
+    private computeEligible: (steps: Record<string, StepStateEntry>) => string[],
+    private configProvider?: () => { project?: { services?: unknown[] } } | undefined,
+    pathResolver?: StatePathResolver,
+    private globalSteps?: Set<string>,
+  ) {
+    this.pathResolver = pathResolver ?? new StatePathResolver(projectRoot)
+    this.statePath = this.pathResolver.statePath
   }
+```
 
-  return state
+**After** (only two deltas: expand `computeEligible` type, append `pipelineHash?`):
+
+```typescript
+export class StateManager {
+  private statePath: string
+  private pathResolver: StatePathResolver
+  /**
+   * Captured during service-mode loadState. Used by saveState to stamp
+   * next_eligible_root_counter TOCTOU-safely (spec §3). `undefined` = never
+   * loaded; `null` = loaded but root file had no save_counter (legacy).
+   */
+  private loadedRootCounter: number | null | undefined = undefined
+
+  constructor(
+    private projectRoot: string,
+    private computeEligible: (
+      steps: Record<string, StepStateEntry>,
+      options?: { scope?: 'global' | 'service'; globalSteps?: Set<string> },
+    ) => string[],
+    private configProvider?: () => { project?: { services?: unknown[] } } | undefined,
+    pathResolver?: StatePathResolver,
+    private globalSteps?: Set<string>,
+    /**
+     * Pipeline-graph hash for the manager's scope. If omitted, saveState writes
+     * `next_eligible_hash: undefined`, which consumers treat as invalid cache
+     * (live recompute). Legacy-safe default.
+     */
+    private pipelineHash?: string,
+  ) {
+    this.pathResolver = pathResolver ?? new StatePathResolver(projectRoot)
+    this.statePath = this.pathResolver.statePath
+  }
+```
+
+**Do NOT** import `ScaffoldConfig` — keep the existing inline `configProvider` shape.
+
+**3b — loadState capture** — extend the EXISTING service-scope root-state read. `loadState()` currently reads the root state file and stores the parsed object in a local variable `globalParsed` (state-manager.ts lines 64-74). Reuse that variable — do NOT add a second `fs.readFileSync` call; a second read would break TOCTOU safety by decoupling the counter from the merged-steps snapshot.
+
+**Current** (state-manager.ts lines 64-74):
+
+```typescript
+// If service-scoped, merge global steps as read-only base
+if (this.pathResolver.isServiceScoped) {
+  const globalStatePath = path.join(this.pathResolver.rootScaffoldDir, 'state.json')
+  if (fs.existsSync(globalStatePath)) {
+    const globalRaw = fs.readFileSync(globalStatePath, 'utf8')
+    const globalParsed = JSON.parse(globalRaw) as Record<string, unknown>
+    const globalState = globalParsed as unknown as PipelineState
+    // Merge: global steps as base, service steps override
+    state.steps = { ...globalState.steps, ...state.steps }
+  }
 }
 ```
 
-**CRITICAL**: the existing `loadState()` has logic that may be split across multiple parts. Do not duplicate the root-state read. Find the ONE existing read in the service-scope branch and add the capture line inline. If the existing code reads root state lazily via a helper method, call that helper and extract the counter after.
+**After** (add counter capture using the SAME `globalParsed` object; also handle the root-missing branch):
+
+```typescript
+// If service-scoped, merge global steps as read-only base AND capture
+// root save_counter for TOCTOU-safe cache stamping in saveState (spec §3).
+if (this.pathResolver.isServiceScoped) {
+  const globalStatePath = path.join(this.pathResolver.rootScaffoldDir, 'state.json')
+  if (fs.existsSync(globalStatePath)) {
+    const globalRaw = fs.readFileSync(globalStatePath, 'utf8')
+    const globalParsed = JSON.parse(globalRaw) as Record<string, unknown>
+    const globalState = globalParsed as unknown as PipelineState
+    // Merge: global steps as base, service steps override
+    state.steps = { ...globalState.steps, ...state.steps }
+    // NEW — capture root's save_counter at the SAME read moment (TOCTOU-safe)
+    this.loadedRootCounter =
+      typeof globalParsed['save_counter'] === 'number'
+        ? (globalParsed['save_counter'] as number)
+        : null
+  } else {
+    // Root state file missing — treat as legacy (null counter). saveState will
+    // still write next_eligible_root_counter = undefined, triggering stale-read
+    // fallback until root is created.
+    this.loadedRootCounter = null
+  }
+}
+```
+
+Do NOT remove, rename, or reorder the existing merge statements. Add only the `this.loadedRootCounter = ...` assignment inside the existing `if (fs.existsSync(...))` branch and the companion `else` branch that sets it to `null`.
 
 - [ ] **Step 4: Run the 3 new tests**
 
@@ -1062,8 +1119,14 @@ saveState(state: PipelineState): void {
 
   if (isService) {
     // Cross-file invalidation stamp: capture root counter at load time,
-    // reuse at save time (TOCTOU-safe per spec §3).
-    state.next_eligible_root_counter = this.loadedRootCounter ?? undefined
+    // reuse at save time (TOCTOU-safe per spec §3). Only stamp when a concrete
+    // counter value was captured; under strict `exactOptionalPropertyTypes`,
+    // omitting the key (via delete) is safer than assigning `undefined`.
+    if (typeof this.loadedRootCounter === 'number') {
+      state.next_eligible_root_counter = this.loadedRootCounter
+    } else {
+      delete state.next_eligible_root_counter
+    }
   } else {
     // Root state: bump the monotonic counter.
     state.save_counter = (state.save_counter ?? 0) + 1
@@ -1118,7 +1181,8 @@ Create `src/core/pipeline/read-eligible.test.ts`:
 ```typescript
 import { describe, it, expect, vi } from 'vitest'
 import { readEligible } from './read-eligible.js'
-import type { PipelineState, ResolvedPipeline } from '../../types/index.js'
+import type { PipelineState } from '../../types/index.js'
+import type { ResolvedPipeline } from './types.js'
 
 function mkState(overrides: Partial<PipelineState>): PipelineState {
   return {
@@ -1673,58 +1737,75 @@ git commit -m "feat(commands): thread pipelineHash through run/skip/reset/rework
 
 ---
 
-## Task 11: Thread pipelineHash through info/dashboard
+## Task 11: info.ts + dashboard.ts — explicit legacy-safe hash (no pipeline in scope)
 
 **Files:**
-- Modify: `src/cli/commands/info.ts`
-- Modify: `src/cli/commands/dashboard.ts`
-- Tests: corresponding `*.test.ts` files if tsc breaks
+- Modify: `src/cli/commands/info.ts` (two StateManager construction sites at lines ~66 and ~117)
+- Modify: `src/cli/commands/dashboard.ts` (StateManager construction at line ~83)
 
-**Goal:** Same mechanical threading as Task 10 but for the read-centric commands. `info` + `dashboard` use StateManager (for reconcile + load). Thread hash for consistency and future-proofing.
+**Goal:** Pass explicit `undefined` for `pipelineHash` in these read-only command paths. These files do NOT resolve a pipeline (they use `() => []` as `computeEligible` and never have `pipeline` in scope), so there is no hash to thread. Trying to resolve a pipeline here would be a significant scope expansion — out of scope for this PR.
 
-- [ ] **Step 1: Apply the same pattern as Task 10**
+**Why this is safe:** `info` and `dashboard` never call `saveState` directly. The only `saveState` they can trigger is through `loadState` → `migrateState` → `saveState` on the FIRST load of a pre-migration state file (state-manager.ts lines 60-62). Subsequent loads skip migration (idempotent). The one-time stale hash on migration is self-healing: the next `scaffold next`/`run`/`skip`/etc. command threads the real hash and repopulates the cache.
 
-In `src/cli/commands/info.ts`:
+- [ ] **Step 1: Make the `undefined` pass explicit for info.ts**
+
+`info.ts` has two StateManager sites. Both currently pass 5 args ending in `new Set<string>()`. Append an explicit `undefined` so the intent is documented:
 
 ```typescript
 const stateManager = new StateManager(
   projectRoot,
-  pipeline.computeEligible,
-  () => context.config ?? undefined,
+  () => [],
+  () => config ?? undefined,
   pathResolver,
-  pipeline.globalSteps,
-  pipeline.getPipelineHash(service ? 'service' : 'global'),  // NEW
+  new Set<string>(),
+  undefined,  // pipelineHash — info does not resolve pipeline; legacy-safe (see plan Task 11)
 )
 ```
 
-In `src/cli/commands/dashboard.ts`: same pattern. Dashboard is read-only but its reconcile-on-load could still trigger a save (if pipeline steps have drifted), so threading the hash keeps the cache correct.
+Apply to BOTH sites (around lines 66-72 and 117-123). Keep everything else identical.
 
-- [ ] **Step 2: Run tsc + tests**
+- [ ] **Step 2: Same for dashboard.ts**
+
+`dashboard.ts` currently passes 4 args (ends in `pathResolver`). Append two explicit `undefined`s — one for `globalSteps` (preserves prior behavior since it was absent before) and one for `pipelineHash`:
+
+```typescript
+const stateManager = new StateManager(
+  projectRoot,
+  () => [],
+  () => config ?? undefined,
+  pathResolver,
+  undefined,  // globalSteps — dashboard does not resolve pipeline
+  undefined,  // pipelineHash — legacy-safe; dashboard only triggers saveState via one-time migration
+)
+```
+
+- [ ] **Step 3: Run tsc + tests**
 
 ```
 npx tsc --noEmit
 npx vitest run src/cli/commands/info.test.ts src/cli/commands/dashboard.test.ts
 ```
 
-Expected: PASS. Extend mocks with `getPipelineHash: vi.fn(() => 'fake-hash')` if needed.
+Expected: PASS. No test changes needed — behavior is unchanged (hash was already effectively absent).
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add src/cli/commands/info.ts src/cli/commands/dashboard.ts src/cli/commands/info.test.ts src/cli/commands/dashboard.test.ts 2>/dev/null
-git commit -m "feat(commands): thread pipelineHash through info/dashboard StateManager"
+git add src/cli/commands/info.ts src/cli/commands/dashboard.ts
+git commit -m "refactor(commands): info/dashboard pass explicit undefined pipelineHash (no pipeline in scope)"
 ```
 
 ---
 
-## Task 12: Thread pipelineHash through adopt/wizard
+## Task 12: adopt.ts + wizard.ts — explicit legacy-safe hash (init paths)
 
 **Files:**
-- Modify: `src/cli/commands/adopt.ts`
-- Modify: `src/wizard/wizard.ts`
-- Tests: corresponding `*.test.ts` files
+- Modify: `src/cli/commands/adopt.ts` (two StateManager sites at lines ~119 and ~132)
+- Modify: `src/wizard/wizard.ts` (StateManager site at line ~221)
 
-**Goal:** Initial state creation paths. Without the hash, the very first saved state has `next_eligible_hash: undefined`, forcing `scaffold next` on a fresh project to live-recompute until the next mutation. Safe but suboptimal.
+**Goal:** Init paths write state BEFORE any `scaffold next`/`status` is run. These files currently construct StateManager with a 3-arg form (`projectRoot`, `() => []`, `configProvider`) and have NO `pipeline` in scope. Expanding them to resolve a full pipeline is out of scope for this PR. Instead, pass explicit `undefined` for `pipelineHash` and document why this is safe.
+
+**Why this is safe:** The init-time `initializeState` writes a state file whose `next_eligible` is empty (no steps completed yet). The very first `scaffold next` a user runs will detect `next_eligible_hash === undefined`, fall back to live compute, and the subsequent `saveState` (from any mutation like `scaffold run`) will stamp the real hash. No user-visible correctness issue; one extra live recompute on the first command.
 
 - [ ] **Step 1: Locate the StateManager constructions**
 
@@ -1732,39 +1813,44 @@ git commit -m "feat(commands): thread pipelineHash through info/dashboard StateM
 grep -n "new StateManager(" src/cli/commands/adopt.ts src/wizard/wizard.ts
 ```
 
-Expected: typically one per file in the project-init code path.
+Expected output:
+- `src/cli/commands/adopt.ts:119:    const stateManager = new StateManager(projectRoot, () => [], () => undefined)`
+- `src/cli/commands/adopt.ts:132:    const stateManager = new StateManager(projectRoot, () => [], () => undefined)`
+- `src/wizard/wizard.ts:221:  const stateManager = new StateManager(projectRoot, () => [], () => config)`
 
-- [ ] **Step 2: Apply the same threading pattern**
+- [ ] **Step 2: Expand the 3-arg form with explicit undefineds**
 
-In each file, add `pipeline.getPipelineHash(service ? 'service' : 'global')` as the 6th arg.
-
-**Note**: `adopt.ts` and `wizard.ts` may not have a `service` variable because they're invoked before any service-scope decision. If so, pass `'global'` directly:
+For BOTH sites in `adopt.ts` (lines 119 and 132), change:
 
 ```typescript
+// Before:
+const stateManager = new StateManager(projectRoot, () => [], () => undefined)
+// After:
 const stateManager = new StateManager(
   projectRoot,
-  pipeline.computeEligible,
-  () => context.config ?? undefined,
-  pathResolver,
-  pipeline.globalSteps,
-  pipeline.getPipelineHash('global'),  // Init paths are always root/global
+  () => [],
+  () => undefined,
+  undefined,  // pathResolver — fall through to default StatePathResolver(projectRoot)
+  undefined,  // globalSteps — init path; no pipeline resolution in scope
+  undefined,  // pipelineHash — legacy-safe; first scaffold next will live-recompute and repopulate
 )
 ```
 
-For wizard, if `pipeline` isn't available at the construction site (wizard runs before pipeline resolution), pass `undefined` as the 6th arg — legacy-safe fallback:
+For `wizard.ts` line 221:
 
 ```typescript
+// Before:
+const stateManager = new StateManager(projectRoot, () => [], () => config)
+// After:
 const stateManager = new StateManager(
   projectRoot,
-  pipeline?.computeEligible ?? (() => []),  // fallback if no pipeline yet
+  () => [],
   () => config,
-  pathResolver,
-  undefined,  // no globalSteps in init
-  pipeline?.getPipelineHash('global'),  // may be undefined — safe
+  undefined,  // pathResolver
+  undefined,  // globalSteps
+  undefined,  // pipelineHash — legacy-safe (see plan Task 12)
 )
 ```
-
-Inspect the existing wizard code at the construction site to determine which applies. If pipeline IS available, thread it. If NOT, pass `undefined` for pipelineHash (legacy behavior).
 
 - [ ] **Step 3: Run tsc + tests**
 
@@ -1773,42 +1859,73 @@ npx tsc --noEmit
 npx vitest run src/cli/commands/adopt.test.ts src/wizard/wizard.test.ts
 ```
 
-Expected: PASS.
+Expected: PASS. Behavior unchanged — the previously-omitted 4th/5th args were already using the defaults.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/cli/commands/adopt.ts src/wizard/wizard.ts src/cli/commands/adopt.test.ts src/wizard/wizard.test.ts 2>/dev/null
-git commit -m "feat(init): thread pipelineHash through adopt + wizard StateManager"
+git add src/cli/commands/adopt.ts src/wizard/wizard.ts
+git commit -m "refactor(init): adopt/wizard pass explicit undefined pipelineHash (out-of-scope pipeline resolution)"
 ```
 
 ---
 
-## Task 13: Update lingering test fixtures
+## Task 13: Update lingering test fixtures for `getPipelineHash` on `ResolvedPipeline` mocks
 
-**Files:**
-- Modify: any remaining `*.test.ts` files that construct `StateManager` or mock `resolvePipeline` without `getPipelineHash`
+**Files (to grep and update — exhaustive list):**
+- `src/cli/commands/run.test.ts`
+- `src/cli/commands/skip.test.ts`
+- `src/cli/commands/reset.test.ts`
+- `src/cli/commands/rework.test.ts`
+- `src/cli/commands/complete.test.ts`
+- `src/cli/commands/status.test.ts`
+- `src/cli/commands/next.test.ts`
+- `src/cli/commands/info.test.ts`
+- `src/cli/commands/dashboard.test.ts`
+- `src/core/pipeline/resolver.test.ts` (may already be covered by Task 4)
+- Any e2e test in `src/e2e/` that constructs a `ResolvedPipeline` literal or mocks `resolvePipeline`
 
-**Goal:** Catch any missed call sites from tsc/test failures.
+**Goal:** Every `ResolvedPipeline`-shaped test literal and `vi.mocked(resolvePipeline).mockReturnValue(...)` must include `getPipelineHash` on its returned object — otherwise tsc fails with "Property 'getPipelineHash' is missing". Task 4 added the field to the interface; Tasks 8–12 already fix the command-specific test files where new tests were added. This task sweeps every REMAINING test file that constructs `ResolvedPipeline` literals.
 
-- [ ] **Step 1: Run the full suite**
+- [ ] **Step 1: Find every `ResolvedPipeline`-shaped literal in tests**
 
+```bash
+grep -rn "computeEligible:\|globalSteps: new Set" src/cli src/core src/e2e --include="*.test.ts" | grep -v "getPipelineHash" | head -40
 ```
-npx vitest run 2>&1 | tail -30
+
+Each match is a candidate site that needs `getPipelineHash: vi.fn(() => 'fake-hash')` (or a specific hash string if the test validates cache behavior).
+
+- [ ] **Step 2: Add `getPipelineHash` to each literal**
+
+For every literal of the form:
+
+```typescript
+{
+  graph: ...,
+  preset: ...,
+  overlay: ...,
+  stepMeta: ...,
+  computeEligible: ...,
+  globalSteps: new Set(),
+}
 ```
 
-- [ ] **Step 2: Run tsc on the whole codebase**
+Append:
+
+```typescript
+  getPipelineHash: vi.fn(() => 'fake-hash'),
+```
+
+Use a unique hash string per test ONLY if the test needs to validate cache hit/miss (see Tasks 8 and 9 patterns). Otherwise `'fake-hash'` is fine — the mocked StateManager in most tests never reads the hash.
+
+- [ ] **Step 3: Run the full suite + tsc**
 
 ```
 npx tsc --noEmit 2>&1 | head -30
+npx vitest run 2>&1 | tail -30
 ```
 
-- [ ] **Step 3: Fix any remaining failures**
-
-For each failure:
-- If tsc says "Property 'getPipelineHash' is missing" on a `ResolvedPipeline`-shaped mock → add `getPipelineHash: vi.fn(() => 'fake-hash')` to the mock.
-- If a test fixture constructs `StateManager` with the OLD signature (5 args) → leaving the 6th arg off is fine; it's optional. TypeScript won't complain. But if the test has a REASON to assert specific cache behavior, update it to include the hash.
-- If a test fails because the cache path is now active (state has `next_eligible` + `next_eligible_hash` that match) → decide: update the fixture state to use an explicit hash that doesn't match (force fallback), OR update the expected values to reflect the cache contents.
+Expected: both clean. If a test fails because a state fixture now has `next_eligible_hash` matching the fake pipeline hash (triggering cache hit instead of live compute), either (a) change the fixture hash to `'different-hash'` to force fallback, or (b) update the expected value to the cached list. Pick whichever matches the test's original intent.
 
 - [ ] **Step 4: Run `make check-all` for all quality gates**
 
@@ -1822,10 +1939,10 @@ Expected: `Exit: 0`.
 
 ```bash
 git add -u
-git commit -m "test(cache-v2): update remaining fixtures for getPipelineHash interface"
+git commit -m "test(cache-v2): add getPipelineHash to ResolvedPipeline mocks across remaining test files"
 ```
 
-If no changes are needed, skip the commit.
+If Step 1's grep returns no matches, skip the commit.
 
 ---
 
@@ -1896,92 +2013,116 @@ project:
   })
 
   it('AC2: service cache is invalidated by root state mutation (cross-file)', () => {
-    // Boot a service-scoped StateManager, populate its cache via saveState, then
-    // mutate root state → service cache must be invalidated on next readEligible.
+    // Seed: do an initial root save so root.save_counter exists (otherwise the
+    // service's cached counter would be stamped as undefined and be trivially
+    // "stale" via the legacy fallback, which is NOT what AC2 tests).
     const context = loadPipelineContext(tmpRoot)
     const output = createOutputContext('auto')
-    const pipeline = resolvePipeline(context, { output, serviceId: 'api' })
-    const pathResolver = new StatePathResolver(tmpRoot, 'api')
-    const sm = new StateManager(
-      tmpRoot,
-      pipeline.computeEligible,
-      () => context.config ?? undefined,
-      pathResolver,
-      pipeline.globalSteps,
-      pipeline.getPipelineHash('service'),
-    )
-    const state = sm.loadState()
-    // Populate service state with at least one pending step
-    state.steps['some-step'] = { status: 'pending', source: 'pipeline', produces: [] }
-    sm.saveState(state)
-    // Now mutate root by constructing a root-scoped SM and bumping
+    const rootPipeline = resolvePipeline(context, { output })
     const rootPathResolver = new StatePathResolver(tmpRoot)
     const rootSm = new StateManager(
       tmpRoot,
-      pipeline.computeEligible,
+      rootPipeline.computeEligible,
       () => context.config ?? undefined,
       rootPathResolver,
-      pipeline.globalSteps,
-      pipeline.getPipelineHash('global'),
+      rootPipeline.globalSteps,
+      rootPipeline.getPipelineHash('global'),
     )
-    const rootState = rootSm.loadState()
-    rootSm.saveState(rootState)  // bumps save_counter to (at least) 1
+    rootSm.saveState(rootSm.loadState())  // save_counter = 1
 
-    // Service cache's next_eligible_root_counter is stale relative to root.
-    // readEligible should fall back to live compute.
-    const refreshedService = sm.loadState()
-    const computedLiveList: string[] = []
-    const fakePipeline = {
-      ...pipeline,
+    // Populate service cache. After this save, the service file records
+    // next_eligible_root_counter = 1.
+    const svcPipeline = resolvePipeline(context, { output, serviceId: 'api' })
+    const pathResolver = new StatePathResolver(tmpRoot, 'api')
+    const sm = new StateManager(
+      tmpRoot,
+      svcPipeline.computeEligible,
+      () => context.config ?? undefined,
+      pathResolver,
+      svcPipeline.globalSteps,
+      svcPipeline.getPipelineHash('service'),
+    )
+    const state = sm.loadState()
+    state.steps['some-step'] = { status: 'pending', source: 'pipeline', produces: [] }
+    sm.saveState(state)
+
+    // Verify the service file has the expected stamps on disk before mutation.
+    const svcDisk = JSON.parse(fs.readFileSync(
+      path.join(tmpRoot, '.scaffold', 'services', 'api', 'state.json'), 'utf8',
+    ))
+    expect(svcDisk.next_eligible_root_counter).toBe(1)
+    expect(typeof svcDisk.next_eligible_hash).toBe('string')
+
+    // MUTATE root — bumps save_counter from 1 to 2.
+    rootSm.saveState(rootSm.loadState())
+    expect(readRootSaveCounter(tmpRoot)).toBe(2)
+
+    // readEligible must now fall back to live compute because
+    // next_eligible_root_counter (1) !== current root counter (2).
+    const liveCalls: string[] = []
+    const sentinelPipeline = {
+      ...svcPipeline,
       computeEligible: ((steps, opts) => {
-        computedLiveList.push('live-recompute-fired')
-        return pipeline.computeEligible(steps, opts)
-      }) as typeof pipeline.computeEligible,
+        liveCalls.push('live-recompute-fired')
+        return svcPipeline.computeEligible(steps, opts)
+      }) as typeof svcPipeline.computeEligible,
     }
     readEligible(
-      refreshedService,
-      fakePipeline,
-      { scope: 'service', globalSteps: pipeline.globalSteps },
+      sm.loadState(),
+      sentinelPipeline,
+      { scope: 'service', globalSteps: svcPipeline.globalSteps },
       () => readRootSaveCounter(tmpRoot),
     )
-    expect(computedLiveList).toContain('live-recompute-fired')
+    expect(liveCalls).toContain('live-recompute-fired')
   })
 
-  it('AC3: pipeline-hash change invalidates cache on read', () => {
+  it('AC3: pipeline-graph change (different hash on re-resolution) invalidates cache on read', () => {
+    // End-to-end: save state against pipeline-A's hash, then re-resolve the
+    // pipeline from a context with a DIFFERENT metaPrompts map (simulating a
+    // real YAML edit that adds a dep/step). The re-resolved pipeline returns a
+    // different getPipelineHash('global') value, which readEligible detects.
     const context = loadPipelineContext(tmpRoot)
     const output = createOutputContext('auto')
-    const pipeline = resolvePipeline(context, { output })
+    const pipelineA = resolvePipeline(context, { output })
     const pathResolver = new StatePathResolver(tmpRoot)
     const sm = new StateManager(
       tmpRoot,
-      pipeline.computeEligible,
+      pipelineA.computeEligible,
       () => context.config ?? undefined,
       pathResolver,
-      pipeline.globalSteps,
-      pipeline.getPipelineHash('global'),
+      pipelineA.globalSteps,
+      pipelineA.getPipelineHash('global'),
     )
-    const state = sm.loadState()
-    sm.saveState(state)  // cache is now hash-stamped
+    sm.saveState(sm.loadState())  // cache stamped with pipelineA's hash
 
-    // Now read with a pipeline that reports a DIFFERENT hash (simulating
-    // a pipeline-YAML edit that changed deps/enabled/order).
-    const modifiedPipeline = {
-      ...pipeline,
-      getPipelineHash: (_scope: 'global' | 'service' | null) => 'totally-different-hash',
-    }
-    const computedLive: string[] = []
-    const fakePipeline = {
-      ...modifiedPipeline,
+    // Build a new context whose metaPrompts differs from context.metaPrompts
+    // by deleting one step — this changes the graph and therefore the hash.
+    // Using .metaPrompts.delete() on a cloned map guarantees pipelineB's hash
+    // differs without requiring actual YAML file edits.
+    const firstSlug = [...context.metaPrompts.keys()][0]
+    expect(firstSlug).toBeDefined()
+    const mutatedMetaPrompts = new Map(context.metaPrompts)
+    mutatedMetaPrompts.delete(firstSlug!)
+    const mutatedContext = { ...context, metaPrompts: mutatedMetaPrompts }
+    const pipelineB = resolvePipeline(mutatedContext, { output })
+    expect(pipelineB.getPipelineHash('global')).not.toBe(pipelineA.getPipelineHash('global'))
+
+    // readEligible against pipelineB must detect stale hash and fall back.
+    const liveCalls: string[] = []
+    const sentinelPipeline = {
+      ...pipelineB,
       computeEligible: ((steps, opts) => {
-        computedLive.push('live-fired')
-        return pipeline.computeEligible(steps, opts)
-      }) as typeof pipeline.computeEligible,
+        liveCalls.push('live-fired')
+        return pipelineB.computeEligible(steps, opts)
+      }) as typeof pipelineB.computeEligible,
     }
-    readEligible(sm.loadState(), fakePipeline, undefined, undefined)
-    expect(computedLive).toContain('live-fired')
+    readEligible(sm.loadState(), sentinelPipeline, undefined, undefined)
+    expect(liveCalls).toContain('live-fired')
   })
 })
 ```
+
+**Note on `loadPipelineContext`:** This E2E relies on `loadPipelineContext(tmpRoot)` successfully resolving the package pipeline dir (via `getPackagePipelineDir` fallback), so the test inherits the real pipeline graph. If `loadPipelineContext` fails on an empty tmpRoot, seed a minimal `.scaffold/` marker directory or pre-populate a pipeline dir. Run Step 2 below first to surface any loader errors before fighting the test logic.
 
 - [ ] **Step 2: Run the E2E tests**
 
