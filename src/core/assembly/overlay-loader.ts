@@ -1,12 +1,14 @@
 import type { StepEnablementEntry } from '../../types/index.js'
 import type {
   PipelineOverlay, KnowledgeOverride, ReadsOverride, DependencyOverride,
+  CrossReadsOverride,
 } from '../../types/index.js'
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
 import { ProjectTypeSchema } from '../../config/schema.js'
 import { fileExists } from '../../utils/fs.js'
 import {
   overlayMissing, overlayParseError, overlayMalformedSection, overlayMalformedEntry,
+  overlayMalformedAppendItem,
 } from '../../utils/errors.js'
 import yaml from 'js-yaml'
 import fs from 'node:fs'
@@ -129,6 +131,48 @@ export function parseDependencyOverrides(
       ? (obj['append'] as unknown[]).filter((v): v is string => typeof v === 'string')
       : []
     result[key] = { replace, append }
+  }
+  return result
+}
+
+const CROSS_READS_SLUG = /^[a-z][a-z0-9-]*$/
+
+/** Parse cross-reads-overrides section from YAML object. */
+export function parseCrossReadsOverrides(
+  raw: Record<string, unknown>,
+  warnings: ScaffoldWarning[],
+  filePath: string,
+): Record<string, CrossReadsOverride> {
+  const result: Record<string, CrossReadsOverride> = {}
+  for (const [key, value] of Object.entries(raw)) {
+    if (!isPlainObject(value)) {
+      warnings.push(overlayMalformedEntry(key, 'value', filePath))
+      continue
+    }
+    const obj = value as Record<string, unknown>
+    if (obj['append'] !== undefined && !Array.isArray(obj['append'])) {
+      warnings.push(overlayMalformedEntry(key, 'append', filePath))
+    }
+    const append: Array<{ service: string; step: string }> = []
+    if (Array.isArray(obj['append'])) {
+      for (let index = 0; index < obj['append'].length; index++) {
+        const item = obj['append'][index]
+        if (!isPlainObject(item)) {
+          warnings.push(overlayMalformedAppendItem(key, index, filePath))
+          continue
+        }
+        const entry = item as Record<string, unknown>
+        if (
+          typeof entry['service'] === 'string' && CROSS_READS_SLUG.test(entry['service'])
+          && typeof entry['step'] === 'string' && CROSS_READS_SLUG.test(entry['step'])
+        ) {
+          append.push({ service: entry['service'], step: entry['step'] })
+        } else {
+          warnings.push(overlayMalformedAppendItem(key, index, filePath))
+        }
+      }
+    }
+    result[key] = { append }
   }
   return result
 }

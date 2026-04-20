@@ -3,7 +3,8 @@ import path from 'node:path'
 import fs from 'node:fs'
 import os from 'node:os'
 import { fileURLToPath } from 'node:url'
-import { loadOverlay, loadSubOverlay } from './overlay-loader.js'
+import { loadOverlay, loadSubOverlay, parseCrossReadsOverrides } from './overlay-loader.js'
+import type { ScaffoldWarning } from '../../types/index.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const fixtureDir = path.resolve(__dirname, '../../../tests/fixtures/methodology')
@@ -288,5 +289,157 @@ describe('loadSubOverlay', () => {
     } finally {
       fs.rmSync(tmpDir, { recursive: true })
     }
+  })
+})
+
+describe('parseCrossReadsOverrides', () => {
+  it('parses valid entries', () => {
+    const warnings: ScaffoldWarning[] = []
+    const result = parseCrossReadsOverrides(
+      {
+        'system-architecture': {
+          append: [
+            { service: 'billing', step: 'api-contracts' },
+            { service: 'inventory', step: 'domain-modeling' },
+          ],
+        },
+      },
+      warnings,
+      '/path/to.yml',
+    )
+    expect(result['system-architecture'].append).toEqual([
+      { service: 'billing', step: 'api-contracts' },
+      { service: 'inventory', step: 'domain-modeling' },
+    ])
+    expect(warnings).toHaveLength(0)
+  })
+
+  it('warns when entry value is not an object (OVERLAY_MALFORMED_ENTRY)', () => {
+    const warnings: ScaffoldWarning[] = []
+    const result = parseCrossReadsOverrides(
+      { 'system-architecture': 'not-an-object' as unknown as Record<string, unknown> },
+      warnings,
+      '/path/to.yml',
+    )
+    expect(result['system-architecture']).toBeUndefined()
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0].code).toBe('OVERLAY_MALFORMED_ENTRY')
+  })
+
+  it('warns when append is present but not an array', () => {
+    const warnings: ScaffoldWarning[] = []
+    const result = parseCrossReadsOverrides(
+      { 'system-architecture': { append: 'not-an-array' } as unknown as Record<string, unknown> },
+      warnings,
+      '/path/to.yml',
+    )
+    expect(result['system-architecture'].append).toEqual([])
+    expect(warnings.some(w => w.code === 'OVERLAY_MALFORMED_ENTRY')).toBe(true)
+  })
+
+  it('warns when append item is not an object, preserving valid siblings', () => {
+    const warnings: ScaffoldWarning[] = []
+    const result = parseCrossReadsOverrides(
+      {
+        'system-architecture': {
+          append: [
+            { service: 'billing', step: 'api-contracts' },
+            'not-an-object' as unknown,
+            { service: 'inventory', step: 'domain-modeling' },
+          ],
+        } as unknown as Record<string, unknown>,
+      },
+      warnings,
+      '/path/to.yml',
+    )
+    expect(result['system-architecture'].append).toHaveLength(2)
+    expect(warnings.some(w => w.code === 'OVERLAY_MALFORMED_APPEND_ITEM')).toBe(true)
+  })
+
+  it('warns when append item is missing service or step', () => {
+    const warnings: ScaffoldWarning[] = []
+    const result = parseCrossReadsOverrides(
+      {
+        'system-architecture': {
+          append: [
+            { service: 'billing' },            // missing step
+            { step: 'api-contracts' },         // missing service
+          ],
+        } as unknown as Record<string, unknown>,
+      },
+      warnings,
+      '/path/to.yml',
+    )
+    expect(result['system-architecture'].append).toHaveLength(0)
+    const itemWarnings = warnings.filter(w => w.code === 'OVERLAY_MALFORMED_APPEND_ITEM')
+    expect(itemWarnings).toHaveLength(2)
+  })
+
+  it('warns when append item has non-kebab-case slug', () => {
+    const warnings: ScaffoldWarning[] = []
+    const result = parseCrossReadsOverrides(
+      {
+        'system-architecture': {
+          append: [
+            { service: 'Bad_Service', step: 'api-contracts' },
+            { service: 'billing', step: 'UpperCase' },
+          ],
+        } as unknown as Record<string, unknown>,
+      },
+      warnings,
+      '/path/to.yml',
+    )
+    expect(result['system-architecture'].append).toHaveLength(0)
+    expect(warnings.filter(w => w.code === 'OVERLAY_MALFORMED_APPEND_ITEM')).toHaveLength(2)
+  })
+
+  it('returns empty append array for entry with no append field', () => {
+    const warnings: ScaffoldWarning[] = []
+    const result = parseCrossReadsOverrides(
+      { 'system-architecture': {} },
+      warnings,
+      '/path/to.yml',
+    )
+    expect(result['system-architecture']).toEqual({ append: [] })
+    expect(warnings).toHaveLength(0)
+  })
+
+  it('includes correct index in OVERLAY_MALFORMED_APPEND_ITEM warning context', () => {
+    const warnings: ScaffoldWarning[] = []
+    parseCrossReadsOverrides(
+      {
+        'system-architecture': {
+          append: [
+            { service: 'billing', step: 'api-contracts' },   // 0 — valid
+            'bad' as unknown,                                   // 1 — malformed
+          ],
+        } as unknown as Record<string, unknown>,
+      },
+      warnings,
+      '/path/to.yml',
+    )
+    const itemWarning = warnings.find(w => w.code === 'OVERLAY_MALFORMED_APPEND_ITEM')
+    expect(itemWarning?.context?.index).toBe(1)
+  })
+
+  it('silently ignores unrecognized per-entry keys (e.g. replace) — matches knowledge-overrides behavior', () => {
+    // Spec §1.1: per-entry keys other than `append` are silently dropped,
+    // mirroring how parseKnowledgeOverrides treats the same shape.
+    const warnings: ScaffoldWarning[] = []
+    const result = parseCrossReadsOverrides(
+      {
+        'system-architecture': {
+          append: [{ service: 'billing', step: 'api-contracts' }],
+          replace: { foo: 'bar' },  // unrecognized — should be ignored silently
+          extraKey: 42,             // unrecognized — should be ignored silently
+        } as unknown as Record<string, unknown>,
+      },
+      warnings,
+      '/path/to.yml',
+    )
+    expect(result['system-architecture'].append).toEqual([
+      { service: 'billing', step: 'api-contracts' },
+    ])
+    expect(warnings).toHaveLength(0)
   })
 })
