@@ -30,7 +30,7 @@ describe('applyOverlay', () => {
         },
       })
 
-      const result = applyOverlay(steps, {}, {}, {}, overlay)
+      const result = applyOverlay(steps, {}, {}, {}, {}, overlay)
 
       expect(result.steps['design-system']).toEqual({ enabled: false })
       expect(result.steps['game-design-document']).toEqual({ enabled: true })
@@ -47,7 +47,7 @@ describe('applyOverlay', () => {
         },
       })
 
-      const result = applyOverlay(steps, {}, {}, {}, overlay)
+      const result = applyOverlay(steps, {}, {}, {}, {}, overlay)
 
       expect(result.steps['step-a']).toEqual({ enabled: false, conditional: 'if-needed' })
     })
@@ -62,7 +62,7 @@ describe('applyOverlay', () => {
         },
       })
 
-      const result = applyOverlay(steps, {}, {}, {}, overlay)
+      const result = applyOverlay(steps, {}, {}, {}, {}, overlay)
 
       expect(result.steps['optional-step']).toEqual({ enabled: true, conditional: 'if-needed' })
     })
@@ -79,7 +79,7 @@ describe('applyOverlay', () => {
         },
       })
 
-      const result = applyOverlay({}, knowledgeMap, {}, {}, overlay)
+      const result = applyOverlay({}, knowledgeMap, {}, {}, {}, overlay)
 
       expect(result.knowledge['tech-stack']).toEqual([
         'tech-stack-selection',
@@ -97,7 +97,7 @@ describe('applyOverlay', () => {
         },
       })
 
-      const result = applyOverlay({}, knowledgeMap, {}, {}, overlay)
+      const result = applyOverlay({}, knowledgeMap, {}, {}, {}, overlay)
 
       expect(result.knowledge['tech-stack']).toEqual([
         'tech-stack-selection',
@@ -117,7 +117,7 @@ describe('applyOverlay', () => {
         },
       })
 
-      const result = applyOverlay({}, {}, readsMap, {}, overlay)
+      const result = applyOverlay({}, {}, readsMap, {}, {}, overlay)
 
       expect(result.reads['story-tests']).toEqual(['game-ui-spec', 'user-stories'])
     })
@@ -132,7 +132,7 @@ describe('applyOverlay', () => {
         },
       })
 
-      const result = applyOverlay({}, {}, readsMap, {}, overlay)
+      const result = applyOverlay({}, {}, readsMap, {}, {}, overlay)
 
       expect(result.reads['story-tests']).toEqual(['ux-spec', 'game-mechanics'])
     })
@@ -150,7 +150,7 @@ describe('applyOverlay', () => {
         },
       })
 
-      const result = applyOverlay({}, {}, readsMap, {}, overlay)
+      const result = applyOverlay({}, {}, readsMap, {}, {}, overlay)
 
       // user-stories should appear only once
       expect(result.reads['story-tests']).toEqual(['user-stories'])
@@ -168,7 +168,7 @@ describe('applyOverlay', () => {
         },
       })
 
-      const result = applyOverlay({}, {}, {}, dependencyMap, overlay)
+      const result = applyOverlay({}, {}, {}, dependencyMap, {}, overlay)
 
       expect(result.dependencies['user-stories']).toEqual(['review-prd', 'review-gdd'])
     })
@@ -183,7 +183,7 @@ describe('applyOverlay', () => {
         },
       })
 
-      const result = applyOverlay({}, {}, {}, dependencyMap, overlay)
+      const result = applyOverlay({}, {}, {}, dependencyMap, {}, overlay)
 
       expect(result.dependencies['user-stories']).toEqual(['review-gdd'])
     })
@@ -201,7 +201,7 @@ describe('applyOverlay', () => {
         },
       })
 
-      const result = applyOverlay({}, {}, {}, dependencyMap, overlay)
+      const result = applyOverlay({}, {}, {}, dependencyMap, {}, overlay)
 
       expect(result.dependencies['user-stories']).toEqual(['review-gdd'])
     })
@@ -215,7 +215,7 @@ describe('applyOverlay', () => {
       const deps = { 'user-stories': ['review-prd'] }
       const overlay = makeOverlay()
 
-      const result = applyOverlay(steps, knowledge, reads, deps, overlay)
+      const result = applyOverlay(steps, knowledge, reads, deps, {}, overlay)
 
       expect(result.steps).toEqual(steps)
       expect(result.knowledge).toEqual(knowledge)
@@ -231,7 +231,7 @@ describe('applyOverlay', () => {
         stepOverrides: { 'totally-new-step': { enabled: true } },
       })
 
-      const result = applyOverlay(steps, {}, {}, {}, overlay)
+      const result = applyOverlay(steps, {}, {}, {}, {}, overlay)
 
       expect(result.steps['totally-new-step']).toEqual({ enabled: true })
       expect(result.steps['create-prd']).toEqual({ enabled: true })
@@ -244,7 +244,7 @@ describe('applyOverlay', () => {
         },
       })
 
-      const result = applyOverlay({}, {}, {}, {}, overlay)
+      const result = applyOverlay({}, {}, {}, {}, {}, overlay)
 
       expect(result.knowledge['new-step']).toEqual(['new-knowledge'])
     })
@@ -256,7 +256,7 @@ describe('applyOverlay', () => {
         },
       })
 
-      const result = applyOverlay({}, {}, {}, {}, overlay)
+      const result = applyOverlay({}, {}, {}, {}, {}, overlay)
 
       expect(result.reads['new-step']).toEqual(['some-doc'])
     })
@@ -268,7 +268,7 @@ describe('applyOverlay', () => {
         },
       })
 
-      const result = applyOverlay({}, {}, {}, {}, overlay)
+      const result = applyOverlay({}, {}, {}, {}, {}, overlay)
 
       expect(result.dependencies['new-step']).toEqual(['some-dep'])
     })
@@ -287,7 +287,7 @@ describe('applyOverlay', () => {
         dependencyOverrides: { 'user-stories': { append: ['new-dep'] } },
       })
 
-      applyOverlay(steps, knowledge, reads, deps, overlay)
+      applyOverlay(steps, knowledge, reads, deps, {}, overlay)
 
       // Original inputs should be unchanged
       expect(steps).toEqual({ 'create-prd': { enabled: true } })
@@ -295,5 +295,98 @@ describe('applyOverlay', () => {
       expect(reads).toEqual({ 'story-tests': ['ux-spec'] })
       expect(deps).toEqual({ 'user-stories': ['review-prd'] })
     })
+  })
+})
+
+describe('applyOverlay crossReads (Wave 3c+1)', () => {
+  function baseOverlay(): PipelineOverlay {
+    return {
+      name: 'test',
+      description: 'desc',
+      stepOverrides: {},
+      knowledgeOverrides: {},
+      readsOverrides: {},
+      dependencyOverrides: {},
+      crossReadsOverrides: {},
+    }
+  }
+
+  it('appends to empty crossReadsMap[step]', () => {
+    const result = applyOverlay(
+      {}, {}, {}, {},
+      {},  // empty crossReadsMap
+      {
+        ...baseOverlay(),
+        crossReadsOverrides: {
+          'system-architecture': {
+            append: [{ service: 'billing', step: 'api-contracts' }],
+          },
+        },
+      },
+    )
+    expect(result.crossReads['system-architecture']).toEqual([
+      { service: 'billing', step: 'api-contracts' },
+    ])
+  })
+
+  it('appends to existing frontmatter crossReads (preserves originals + adds new)', () => {
+    const result = applyOverlay(
+      {}, {}, {}, {},
+      {
+        'system-architecture': [{ service: 'shared-lib', step: 'api-contracts' }],
+      },
+      {
+        ...baseOverlay(),
+        crossReadsOverrides: {
+          'system-architecture': {
+            append: [{ service: 'billing', step: 'api-contracts' }],
+          },
+        },
+      },
+    )
+    expect(result.crossReads['system-architecture']).toEqual([
+      { service: 'shared-lib', step: 'api-contracts' },
+      { service: 'billing', step: 'api-contracts' },
+    ])
+  })
+
+  it('dedupes by service:step pair (preserving first occurrence)', () => {
+    const result = applyOverlay(
+      {}, {}, {}, {},
+      {
+        'system-architecture': [{ service: 'shared-lib', step: 'api-contracts' }],
+      },
+      {
+        ...baseOverlay(),
+        crossReadsOverrides: {
+          'system-architecture': {
+            append: [
+              { service: 'shared-lib', step: 'api-contracts' },  // duplicate of frontmatter
+              { service: 'billing', step: 'api-contracts' },      // new
+            ],
+          },
+        },
+      },
+    )
+    expect(result.crossReads['system-architecture']).toEqual([
+      { service: 'shared-lib', step: 'api-contracts' },  // first occurrence
+      { service: 'billing', step: 'api-contracts' },
+    ])
+  })
+
+  it('applies overrides across multiple steps without cross-contamination', () => {
+    const result = applyOverlay(
+      {}, {}, {}, {},
+      {},
+      {
+        ...baseOverlay(),
+        crossReadsOverrides: {
+          'system-architecture': { append: [{ service: 'a', step: 'x' }] },
+          'api-contracts': { append: [{ service: 'b', step: 'y' }] },
+        },
+      },
+    )
+    expect(result.crossReads['system-architecture']).toEqual([{ service: 'a', step: 'x' }])
+    expect(result.crossReads['api-contracts']).toEqual([{ service: 'b', step: 'y' }])
   })
 })

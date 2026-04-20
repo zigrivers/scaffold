@@ -76,6 +76,7 @@ export function resolveOverlayState(options: {
           knowledgeMap,
           readsMap,
           dependencyMap,
+          {},
           overlay,
         )
         overlaySteps = merged.steps
@@ -151,6 +152,7 @@ export function resolveOverlayState(options: {
           overlayKnowledge,
           overlayReads,
           overlayDependencies,
+          {},
           msOverlay,
         )
         overlaySteps = merged.steps
