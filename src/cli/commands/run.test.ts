@@ -92,6 +92,7 @@ vi.mock('../../core/assembly/overlay-state-resolver.js', () => ({
     knowledge: {},
     reads: {},
     dependencies: {},
+    crossReads: {},
   })),
 }))
 
@@ -1650,6 +1651,7 @@ describe('run command handler', () => {
         knowledge: { 'create-prd': [] },
         reads: { 'create-prd': [] },
         dependencies: { 'create-prd': [] },
+        crossReads: {},
       })
 
       vi.mocked(resolveOutputMode).mockReturnValue('auto')

@@ -86,7 +86,7 @@ export function resolvePipeline(
       reads[name] = [...(mp.frontmatter.reads ?? [])]
       dependencies[name] = [...(mp.frontmatter.dependencies ?? [])]
     }
-    overlay = { steps: mergedSteps, knowledge, reads, dependencies }
+    overlay = { steps: mergedSteps, knowledge, reads, dependencies, crossReads: {} }
   }
 
   // 4. Build graph (once)

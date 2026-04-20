@@ -11,8 +11,8 @@ export interface OverlayState {
   knowledge: Record<string, string[]>
   reads: Record<string, string[]>
   dependencies: Record<string, string[]>
-  /** Wave 3c — populated from frontmatter.crossReads; overlay-level overrides are post-release. */
-  crossReads?: Record<string, Array<{ service: string; step: string }>>
+  /** Populated via overlay-first merge: frontmatter + structural overlay's cross-reads-overrides. */
+  crossReads: Record<string, Array<{ service: string; step: string }>>
 }
 
 /**
