@@ -69,6 +69,7 @@ const infoCommand: CommandModule<Record<string, unknown>, InfoArgs> = {
         () => config ?? undefined,
         pathResolver,
         new Set<string>(),
+        undefined,  // pipelineHash — info does not resolve pipeline; legacy-safe (see plan Task 11)
       )
       let state
       try { state = stateManager.loadState() } catch { state = null }
@@ -120,6 +121,7 @@ const infoCommand: CommandModule<Record<string, unknown>, InfoArgs> = {
       () => undefined,
       stepPathResolver,
       new Set<string>(),
+      undefined,  // pipelineHash — info does not resolve pipeline; legacy-safe (see plan Task 11)
     )
     let state
     try { state = stateManager.loadState() } catch { state = null }

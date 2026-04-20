@@ -106,6 +106,7 @@ const skipCommand: CommandModule<Record<string, unknown>, SkipArgs> = {
         () => context.config ?? undefined,
         pathResolver,
         pipeline.globalSteps,
+        pipeline.getPipelineHash(service ? 'service' : 'global'),
       )
       const state = stateManager.loadState()
       const reason = argv.reason ?? 'user-requested'

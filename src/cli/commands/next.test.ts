@@ -47,6 +47,16 @@ vi.mock('../../core/dependency/eligibility.js', () => ({
   computeEligible: vi.fn(() => []),
 }))
 
+vi.mock('../../core/pipeline/resolver.js', async () => {
+  const actual = await vi.importActual<typeof import('../../core/pipeline/resolver.js')>(
+    '../../core/pipeline/resolver.js',
+  )
+  return {
+    ...actual,
+    resolvePipeline: vi.fn(actual.resolvePipeline),
+  }
+})
+
 vi.mock('../../core/assembly/overlay-state-resolver.js', () => ({
   resolveOverlayState: vi.fn((opts: {
     presetSteps: Record<string, unknown>
@@ -95,6 +105,7 @@ import { resolveOverlayState } from '../../core/assembly/overlay-state-resolver.
 import { buildGraph } from '../../core/dependency/graph.js'
 import { computeEligible } from '../../core/dependency/eligibility.js'
 import { resolveCrossReadReadiness } from '../../core/assembly/cross-reads.js'
+import { resolvePipeline } from '../../core/pipeline/resolver.js'
 import nextCommand from './next.js'
 
 // ---------------------------------------------------------------------------
@@ -560,5 +571,108 @@ describe('next command', () => {
       expect(out).toMatch(/\(service not bootstrapped\)/)
       expect(out).not.toMatch(/\(not-bootstrapped\)/)
     })
+  })
+
+  it('uses readEligible cache when hash+counter match (skips live computeEligible)', async () => {
+    const cachedEligible = ['cached-step-x', 'cached-step-y']
+    type LoadReturn = ReturnType<InstanceType<typeof StateManager>['loadState']>
+    MockStateManager.mockImplementation(() => ({
+      loadState: vi.fn(() => makeState({
+        steps: {
+          'cached-step-x': { status: 'pending', source: 'pipeline', produces: [] },
+        },
+        next_eligible: cachedEligible,
+        next_eligible_hash: 'test-hash-v1',
+      }) as unknown as LoadReturn),
+      reconcileWithPipeline: vi.fn(() => false),
+    }) as unknown as InstanceType<typeof StateManager>)
+    mockComputeEligible.mockReturnValue(['should-not-appear'])
+
+    vi.mocked(resolvePipeline).mockReturnValueOnce({
+      graph: { nodes: new Map(), edges: new Map() },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      preset: {} as any,
+      overlay: {
+        steps: {},
+        knowledge: {},
+        reads: {},
+        dependencies: {},
+        crossReads: {},
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      stepMeta: new Map([
+        ['cached-step-x', makeFrontmatter('cached-step-x', 'desc', 'pre', 1).frontmatter],
+        ['cached-step-y', makeFrontmatter('cached-step-y', 'desc', 'pre', 2).frontmatter],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ]) as any,
+      computeEligible: mockComputeEligible as unknown as ReturnType<
+        typeof resolvePipeline
+      >['computeEligible'],
+      globalSteps: new Set(),
+      getPipelineHash: vi.fn((_scope) => 'test-hash-v1'),
+    })
+
+    const metaPrompts = new Map([
+      ['cached-step-x', makeFrontmatter('cached-step-x', 'desc X', 'pre', 1)],
+      ['cached-step-y', makeFrontmatter('cached-step-y', 'desc Y', 'pre', 2)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
+
+    await nextCommand.handler(defaultArgv())
+
+    const allOutput = writtenLines.join('')
+    expect(allOutput).toContain('scaffold run cached-step-x')
+    expect(allOutput).toContain('scaffold run cached-step-y')
+    expect(allOutput).not.toContain('should-not-appear')
+    expect(mockComputeEligible).not.toHaveBeenCalled()
+  })
+
+  it('falls back to live compute when hash mismatches', async () => {
+    type LoadReturn = ReturnType<InstanceType<typeof StateManager>['loadState']>
+    MockStateManager.mockImplementation(() => ({
+      loadState: vi.fn(() => makeState({
+        steps: {
+          'any-step': { status: 'pending', source: 'pipeline', produces: [] },
+        },
+        next_eligible: ['stale-cached'],
+        next_eligible_hash: 'OLD-HASH',
+      }) as unknown as LoadReturn),
+      reconcileWithPipeline: vi.fn(() => false),
+    }) as unknown as InstanceType<typeof StateManager>)
+    mockComputeEligible.mockReturnValue(['fresh-step'])
+    vi.mocked(resolvePipeline).mockReturnValueOnce({
+      graph: { nodes: new Map(), edges: new Map() },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      preset: {} as any,
+      overlay: {
+        steps: {},
+        knowledge: {},
+        reads: {},
+        dependencies: {},
+        crossReads: {},
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      stepMeta: new Map([
+        ['fresh-step', makeFrontmatter('fresh-step', 'desc', 'pre', 1).frontmatter],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ]) as any,
+      computeEligible: mockComputeEligible as unknown as ReturnType<
+        typeof resolvePipeline
+      >['computeEligible'],
+      globalSteps: new Set(),
+      getPipelineHash: vi.fn(() => 'NEW-HASH'),
+    })
+    mockDiscoverMetaPrompts.mockReturnValue(new Map([
+      ['fresh-step', makeFrontmatter('fresh-step', 'desc', 'pre', 1)],
+    ]) as unknown as ReturnType<typeof discoverMetaPrompts>)
+
+    await nextCommand.handler(defaultArgv())
+
+    const allOutput = writtenLines.join('')
+    expect(allOutput).toContain('scaffold run fresh-step')
+    expect(allOutput).not.toContain('stale-cached')
+    expect(mockComputeEligible).toHaveBeenCalled()
   })
 })

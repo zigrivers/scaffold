@@ -13,6 +13,8 @@ import { guardSteplessCommand } from '../guards.js'
 import { StatePathResolver } from '../../state/state-path-resolver.js'
 import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
 import { resolveCrossReadReadiness, humanCrossReadStatus } from '../../core/assembly/cross-reads.js'
+import { readEligible } from '../../core/pipeline/read-eligible.js'
+import { readRootSaveCounter } from '../../state/root-counter-reader.js'
 import type { PipelineState } from '../../types/index.js'
 
 /** Check if any pipeline/knowledge source is newer than its generated command. */
@@ -129,6 +131,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       () => context.config ?? undefined,
       pathResolver,
       pipeline.globalSteps,
+      pipeline.getPipelineHash(service ? 'service' : 'global'),
     )
 
     // Reconcile state with current pipeline — adds any new steps that were
@@ -143,6 +146,20 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     stateManager.reconcileWithPipeline(pipelineSteps)
 
     const state = stateManager.loadState()
+
+    // Compute eligible once (cache-validated) — reused by both JSON and
+    // interactive output branches. readEligible returns the cached
+    // next_eligible list when the graph hash (and root save_counter, for
+    // service scope) still match, else falls back to a live compute.
+    const scopeOptionsForRead = service
+      ? { scope: 'service' as const, globalSteps: pipeline.globalSteps }
+      : undefined
+    const validatedEligible = readEligible(
+      state,
+      pipeline,
+      scopeOptionsForRead,
+      service ? () => readRootSaveCounter(projectRoot) : undefined,
+    )
 
     // 5. Build progress stats
     const { steps } = state
@@ -218,7 +235,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
         pipeline: { methodology, total, completed, skipped, pending, inProgress },
         progress: { completed, skipped, pending, inProgress, total, percentage: pct },
         phases: phasesData,
-        nextEligible: state.next_eligible,
+        nextEligible: validatedEligible,
         orphaned_entries: [],
         staleCommands: staleCommandCount,
       }
@@ -267,9 +284,8 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
         }
       }
 
-      // Compute eligible live (don't rely on stale cache in state.json)
-      const liveEligible = pipeline.computeEligible(state.steps)
-      const nextEligibleList = liveEligible.join(', ') || 'none'
+      // Reuse the cache-validated eligible list computed above.
+      const nextEligibleList = validatedEligible.join(', ') || 'none'
       output.info(`\nNext eligible: ${nextEligibleList}`)
 
       if (staleCommandCount > 0) {

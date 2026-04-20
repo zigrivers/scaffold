@@ -92,6 +92,7 @@ const completeCommand: CommandModule<Record<string, unknown>, CompleteArgs> = {
         () => context.config ?? undefined,
         pathResolver,
         pipeline.globalSteps,
+        pipeline.getPipelineHash(service ? 'service' : 'global'),
       )
       const state = stateManager.loadState()
 

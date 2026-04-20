@@ -111,6 +111,7 @@ async function resetStep(
       () => context.config ?? undefined,
       pathResolver,
       resolvedPipeline.globalSteps,
+      resolvedPipeline.getPipelineHash(service ? 'service' : 'global'),
     )
     const state = stateManager.loadState()
 

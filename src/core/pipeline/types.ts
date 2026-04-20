@@ -31,4 +31,9 @@ export interface ResolvedPipeline {
     options?: { scope?: 'global' | 'service'; globalSteps?: Set<string> },
   ) => string[]
   globalSteps: Set<string>
+  /**
+   * Memoized pipeline-graph hash for cache invalidation. Spec §5.
+   * `null` scope normalizes to `'global'` per spec §2.
+   */
+  getPipelineHash: (scope: 'global' | 'service' | null) => string
 }

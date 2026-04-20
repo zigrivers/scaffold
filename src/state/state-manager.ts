@@ -12,13 +12,28 @@ import type { MethodologyName } from '../types/index.js'
 export class StateManager {
   private statePath: string
   private pathResolver: StatePathResolver
+  /**
+   * Captured during service-mode loadState. Used by saveState to stamp
+   * next_eligible_root_counter TOCTOU-safely (spec §3). `undefined` = never
+   * loaded; `null` = loaded but root file had no save_counter (legacy).
+   */
+  private loadedRootCounter: number | null | undefined = undefined
 
   constructor(
     private projectRoot: string,
-    private computeEligible: (steps: Record<string, StepStateEntry>) => string[],
+    private computeEligible: (
+      steps: Record<string, StepStateEntry>,
+      options?: { scope?: 'global' | 'service'; globalSteps?: Set<string> },
+    ) => string[],
     private configProvider?: () => { project?: { services?: unknown[] } } | undefined,
     pathResolver?: StatePathResolver,
     private globalSteps?: Set<string>,
+    /**
+     * Pipeline-graph hash for the manager's scope. If omitted, saveState writes
+     * `next_eligible_hash: undefined`, which consumers treat as invalid cache
+     * (live recompute). Legacy-safe default.
+     */
+    private pipelineHash?: string,
   ) {
     this.pathResolver = pathResolver ?? new StatePathResolver(projectRoot)
     this.statePath = this.pathResolver.statePath
@@ -70,6 +85,14 @@ export class StateManager {
         const globalState = globalParsed as unknown as PipelineState
         // Merge: global steps as base, service steps override
         state.steps = { ...globalState.steps, ...state.steps }
+        // Capture root's save_counter at the SAME read moment (TOCTOU-safe, spec §3)
+        this.loadedRootCounter =
+          typeof globalParsed['save_counter'] === 'number'
+            ? (globalParsed['save_counter'] as number)
+            : null
+      } else {
+        // Root state file missing — treat as legacy (null counter)
+        this.loadedRootCounter = null
       }
     }
 
@@ -78,14 +101,43 @@ export class StateManager {
 
   /** Atomically persist state to disk (write tmp + rename). */
   saveState(state: PipelineState): void {
-    state.next_eligible = this.computeEligible(state.steps)
-    let stateToWrite = state
-    if (this.pathResolver.isServiceScoped && this.globalSteps) {
+    const isService = this.pathResolver.isServiceScoped && this.globalSteps
+    const scopeOptions = isService
+      ? { scope: 'service' as const, globalSteps: this.globalSteps }
+      : undefined
+
+    // FIXES ORIGINAL P0: compute with proper scope so service state only caches
+    // service-eligible steps.
+    state.next_eligible = this.computeEligible(state.steps, scopeOptions)
+    state.next_eligible_hash = this.pipelineHash
+
+    if (isService) {
+      // Cross-file invalidation stamp: capture root counter at load time,
+      // reuse at save time (TOCTOU-safe per spec §3). Only stamp when a concrete
+      // counter value was captured; under strict `exactOptionalPropertyTypes`,
+      // omitting the key (via delete) is safer than assigning `undefined`.
+      if (typeof this.loadedRootCounter === 'number') {
+        state.next_eligible_root_counter = this.loadedRootCounter
+      } else {
+        delete state.next_eligible_root_counter
+      }
+      // Spec §1 exclusivity: service saves must NEVER write save_counter on
+      // their own state. Strip any leftover (e.g. from a previously-polluted
+      // file) before persisting.
+      delete state.save_counter
+    } else {
+      // Root state: bump the monotonic counter.
+      state.save_counter = (state.save_counter ?? 0) + 1
+      // Spec §1 exclusivity: root state doesn't carry next_eligible_root_counter.
+      delete state.next_eligible_root_counter
+    }
+
+    // Existing global-step stripping for service-mode persisted steps
+    let stateToWrite: PipelineState = state
+    if (isService) {
       const filteredSteps: Record<string, StepStateEntry> = {}
       for (const [name, entry] of Object.entries(state.steps)) {
-        if (!this.globalSteps.has(name)) {
-          filteredSteps[name] = entry
-        }
+        if (!this.globalSteps!.has(name)) filteredSteps[name] = entry
       }
       stateToWrite = { ...state, steps: filteredSteps }
     }

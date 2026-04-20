@@ -10,6 +10,8 @@ import { guardSteplessCommand } from '../guards.js'
 import { StatePathResolver } from '../../state/state-path-resolver.js'
 import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
 import { resolveCrossReadReadiness, humanCrossReadStatus } from '../../core/assembly/cross-reads.js'
+import { readEligible } from '../../core/pipeline/read-eligible.js'
+import { readRootSaveCounter } from '../../state/root-counter-reader.js'
 import type { PipelineState } from '../../types/index.js'
 
 interface NextArgs {
@@ -72,6 +74,7 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
       () => context.config ?? undefined,
       pathResolver,
       pipeline.globalSteps,
+      pipeline.getPipelineHash(service ? 'service' : 'global'),
     )
 
     // Reconcile state with current pipeline — adds any new steps that were
@@ -86,8 +89,14 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     stateManager.reconcileWithPipeline(pipelineSteps)
 
     const state = stateManager.loadState()
-    const eligible = pipeline.computeEligible(state.steps,
-      service ? { scope: 'service', globalSteps: pipeline.globalSteps } : undefined,
+    const scopeOptions = service
+      ? { scope: 'service' as const, globalSteps: pipeline.globalSteps }
+      : undefined
+    const eligible = readEligible(
+      state,
+      pipeline,
+      scopeOptions,
+      service ? () => readRootSaveCounter(projectRoot) : undefined,
     )
 
     // 4. Apply --count limit

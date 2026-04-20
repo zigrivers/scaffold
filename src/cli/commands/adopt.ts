@@ -116,7 +116,14 @@ function writeOrUpdateState(
     // Wave 3a: adopt writes a fresh single-service state.json — no services[]
     // available here, so pass `() => undefined` for the configProvider and
     // omit the optional `config` param (schema-version stays 1).
-    const stateManager = new StateManager(projectRoot, () => [], () => undefined)
+    const stateManager = new StateManager(
+      projectRoot,
+      () => [],
+      () => undefined,
+      undefined, // pathResolver — fall through to default StatePathResolver(projectRoot)
+      undefined, // globalSteps — init path; no pipeline resolution in scope
+      undefined, // pipelineHash — legacy-safe; first scaffold next will live-recompute and repopulate
+    )
     stateManager.initializeState({
       enabledSteps: allSteps,
       scaffoldVersion: '2.0.0',
@@ -129,7 +136,14 @@ function writeOrUpdateState(
     })
   } else {
     // Update existing state — mark stepsCompleted
-    const stateManager = new StateManager(projectRoot, () => [], () => undefined)
+    const stateManager = new StateManager(
+      projectRoot,
+      () => [],
+      () => undefined,
+      undefined, // pathResolver — fall through to default StatePathResolver(projectRoot)
+      undefined, // globalSteps — init path; no pipeline resolution in scope
+      undefined, // pipelineHash — legacy-safe; first scaffold next will live-recompute and repopulate
+    )
     const state = stateManager.loadState()
     const now = new Date().toISOString()
     for (const slug of result.stepsCompleted) {

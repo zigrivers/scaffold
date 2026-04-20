@@ -85,6 +85,12 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
       () => [],
       () => config ?? undefined,
       pathResolver,
+      // Empty Set (truthy) so StateManager.saveState's `isServiceScoped && globalSteps`
+      // guard correctly classifies --service invocations as service-scope even though
+      // dashboard doesn't resolve a pipeline. Prevents mis-scoped saves (e.g. writing
+      // save_counter onto a service state file) when loadState triggers migration.
+      new Set<string>(),
+      undefined,  // pipelineHash — legacy-safe; dashboard only triggers saveState via one-time migration
     )
     let state: PipelineState
     try {
