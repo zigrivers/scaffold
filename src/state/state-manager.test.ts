@@ -756,4 +756,119 @@ describe('StateManager', () => {
       expect(state.steps['testing-strategy']).toBeUndefined()
     })
   })
+
+  describe('StateManager — pipelineHash + loadedRootCounter (Eligible-Cache v2)', () => {
+    it('constructor accepts optional pipelineHash parameter', () => {
+      const sm = new StateManager(
+        '/fake/project',
+        (_steps, _opts) => [],
+        () => undefined,
+        new StatePathResolver('/fake/project'),
+        undefined,
+        'test-hash-abc',  // NEW param
+      )
+      expect(sm).toBeDefined()
+    })
+
+    it('service-mode loadState captures root save_counter into loadedRootCounter', () => {
+      const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'sm-capture-'))
+      try {
+        fs.mkdirSync(path.join(tmpRoot, '.scaffold', 'services', 'api'), { recursive: true })
+        fs.writeFileSync(
+          path.join(tmpRoot, '.scaffold', 'state.json'),
+          JSON.stringify({
+            'schema-version': 3,
+            'scaffold-version': '1.0.0',
+            init_methodology: 'deep',
+            config_methodology: 'deep',
+            'init-mode': 'greenfield',
+            created: '2026-04-20T00:00:00.000Z',
+            in_progress: null,
+            steps: {},
+            next_eligible: [],
+            'extra-steps': [],
+            save_counter: 7,
+          }),
+        )
+        fs.writeFileSync(
+          path.join(tmpRoot, '.scaffold', 'services', 'api', 'state.json'),
+          JSON.stringify({
+            'schema-version': 3,
+            'scaffold-version': '1.0.0',
+            init_methodology: 'deep',
+            config_methodology: 'deep',
+            'init-mode': 'greenfield',
+            created: '2026-04-20T00:00:00.000Z',
+            in_progress: null,
+            steps: {},
+            next_eligible: [],
+            'extra-steps': [],
+          }),
+        )
+        const sm = new StateManager(
+          tmpRoot,
+          (_s, _o) => [],
+          () => undefined,
+          new StatePathResolver(tmpRoot, 'api'),
+          new Set(),
+          'test-hash',
+        )
+        sm.loadState()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        expect((sm as any).loadedRootCounter).toBe(7)
+      } finally {
+        fs.rmSync(tmpRoot, { recursive: true, force: true })
+      }
+    })
+
+    it('service-mode loadState sets loadedRootCounter to null when root is missing save_counter', () => {
+      const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'sm-capture-null-'))
+      try {
+        fs.mkdirSync(path.join(tmpRoot, '.scaffold', 'services', 'api'), { recursive: true })
+        fs.writeFileSync(
+          path.join(tmpRoot, '.scaffold', 'state.json'),
+          JSON.stringify({
+            'schema-version': 3,
+            'scaffold-version': '1.0.0',
+            init_methodology: 'deep',
+            config_methodology: 'deep',
+            'init-mode': 'greenfield',
+            created: '2026-04-20T00:00:00.000Z',
+            in_progress: null,
+            steps: {},
+            next_eligible: [],
+            'extra-steps': [],
+          }),
+        )
+        fs.writeFileSync(
+          path.join(tmpRoot, '.scaffold', 'services', 'api', 'state.json'),
+          JSON.stringify({
+            'schema-version': 3,
+            'scaffold-version': '1.0.0',
+            init_methodology: 'deep',
+            config_methodology: 'deep',
+            'init-mode': 'greenfield',
+            created: '2026-04-20T00:00:00.000Z',
+            in_progress: null,
+            steps: {},
+            next_eligible: [],
+            'extra-steps': [],
+          }),
+        )
+        const sm = new StateManager(
+          tmpRoot,
+          (_s, _o) => [],
+          () => undefined,
+          new StatePathResolver(tmpRoot, 'api'),
+          new Set(),
+          'test-hash',
+        )
+        sm.loadState()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        expect((sm as any).loadedRootCounter).toBeNull()
+      } finally {
+        fs.rmSync(tmpRoot, { recursive: true, force: true })
+      }
+    })
+  })
 })

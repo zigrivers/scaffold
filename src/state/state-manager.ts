@@ -12,13 +12,28 @@ import type { MethodologyName } from '../types/index.js'
 export class StateManager {
   private statePath: string
   private pathResolver: StatePathResolver
+  /**
+   * Captured during service-mode loadState. Used by saveState to stamp
+   * next_eligible_root_counter TOCTOU-safely (spec §3). `undefined` = never
+   * loaded; `null` = loaded but root file had no save_counter (legacy).
+   */
+  private loadedRootCounter: number | null | undefined = undefined
 
   constructor(
     private projectRoot: string,
-    private computeEligible: (steps: Record<string, StepStateEntry>) => string[],
+    private computeEligible: (
+      steps: Record<string, StepStateEntry>,
+      options?: { scope?: 'global' | 'service'; globalSteps?: Set<string> },
+    ) => string[],
     private configProvider?: () => { project?: { services?: unknown[] } } | undefined,
     pathResolver?: StatePathResolver,
     private globalSteps?: Set<string>,
+    /**
+     * Pipeline-graph hash for the manager's scope. If omitted, saveState writes
+     * `next_eligible_hash: undefined`, which consumers treat as invalid cache
+     * (live recompute). Legacy-safe default.
+     */
+    private pipelineHash?: string,
   ) {
     this.pathResolver = pathResolver ?? new StatePathResolver(projectRoot)
     this.statePath = this.pathResolver.statePath
@@ -70,6 +85,14 @@ export class StateManager {
         const globalState = globalParsed as unknown as PipelineState
         // Merge: global steps as base, service steps override
         state.steps = { ...globalState.steps, ...state.steps }
+        // Capture root's save_counter at the SAME read moment (TOCTOU-safe, spec §3)
+        this.loadedRootCounter =
+          typeof globalParsed['save_counter'] === 'number'
+            ? (globalParsed['save_counter'] as number)
+            : null
+      } else {
+        // Root state file missing — treat as legacy (null counter)
+        this.loadedRootCounter = null
       }
     }
 
