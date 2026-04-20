@@ -6,6 +6,16 @@ Working document tracking completed work, in-progress items, and future directio
 
 ## Completed Releases
 
+### v3.19.0 (2026-04-20)
+
+Eligible-Step Cache v2 — `scaffold next` + `status` now trust the `next_eligible` cache end-to-end, backed by graph-hash invalidation and TOCTOU-safe cross-file counters. Completes roadmap Phase 2 "Eligible Step Caching".
+
+- **Fixes 3 latent bugs** — service-scope leakage in `saveState`, stale cache on pipeline-YAML edits, cross-file staleness between root and service state (captured via monotonic `save_counter` at `loadState` time, stamped as `next_eligible_root_counter` on service state files).
+- **New helpers** — `computePipelineHash` (`src/core/pipeline/graph-hash.ts`), `readEligible` (`src/core/pipeline/read-eligible.ts`), `readRootSaveCounter` (`src/state/root-counter-reader.ts`), memoized `ResolvedPipeline.getPipelineHash(scope)` on the resolver.
+- **New optional state fields** — `save_counter?`, `next_eligible_hash?`, `next_eligible_root_counter?` on `PipelineState`. Pre-v3.19 state files degrade to live recompute once and self-heal.
+- **Consumer integration** — `next.ts` + `status.ts` (JSON + interactive) route through `readEligible`. All mutating command paths thread the scope-correct pipeline hash to `StateManager`. `info`/`dashboard`/`adopt`/`wizard` pass explicit undefined with rationale.
+- **Review discipline** — 5-round spec MMR + 2-round plan MMR + 15-task per-task 4-gate review + 3-channel PR review. PRs: #290 (23 commits). Comparable to Wave 3c's 13-task structure.
+
 ### v3.18.1 (2026-04-20)
 
 Internal cleanup — no user-facing behavior change.
@@ -95,16 +105,6 @@ The `PipelineState` interface has `'extra-steps': ExtraStepEntry[]` (always `[]`
 - Integration with dependency graph, `next`, `status`, and `run`
 
 **Scope**: Design needed. Medium-large (~300-400 lines).
-
-### Eligible Step Caching (`next_eligible`)
-
-The `PipelineState` interface has `next_eligible: string[]` (always `[]` in Phase 1). Phase 2 enables:
-
-- `saveState()` computes and caches eligible steps on every state change
-- `scaffold next` reads from cache instead of recomputing
-- Invalidated on step completion, skip, or pipeline reconciliation
-
-**Scope**: Small (~50-80 lines). Most infrastructure already in place.
 
 ### Plugin System
 
