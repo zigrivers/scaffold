@@ -101,14 +101,37 @@ export class StateManager {
 
   /** Atomically persist state to disk (write tmp + rename). */
   saveState(state: PipelineState): void {
-    state.next_eligible = this.computeEligible(state.steps)
-    let stateToWrite = state
-    if (this.pathResolver.isServiceScoped && this.globalSteps) {
+    const isService = this.pathResolver.isServiceScoped && this.globalSteps
+    const scopeOptions = isService
+      ? { scope: 'service' as const, globalSteps: this.globalSteps }
+      : undefined
+
+    // FIXES ORIGINAL P0: compute with proper scope so service state only caches
+    // service-eligible steps.
+    state.next_eligible = this.computeEligible(state.steps, scopeOptions)
+    state.next_eligible_hash = this.pipelineHash
+
+    if (isService) {
+      // Cross-file invalidation stamp: capture root counter at load time,
+      // reuse at save time (TOCTOU-safe per spec §3). Only stamp when a concrete
+      // counter value was captured; under strict `exactOptionalPropertyTypes`,
+      // omitting the key (via delete) is safer than assigning `undefined`.
+      if (typeof this.loadedRootCounter === 'number') {
+        state.next_eligible_root_counter = this.loadedRootCounter
+      } else {
+        delete state.next_eligible_root_counter
+      }
+    } else {
+      // Root state: bump the monotonic counter.
+      state.save_counter = (state.save_counter ?? 0) + 1
+    }
+
+    // Existing global-step stripping for service-mode persisted steps
+    let stateToWrite: PipelineState = state
+    if (isService) {
       const filteredSteps: Record<string, StepStateEntry> = {}
       for (const [name, entry] of Object.entries(state.steps)) {
-        if (!this.globalSteps.has(name)) {
-          filteredSteps[name] = entry
-        }
+        if (!this.globalSteps!.has(name)) filteredSteps[name] = entry
       }
       stateToWrite = { ...state, steps: filteredSteps }
     }

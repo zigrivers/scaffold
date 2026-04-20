@@ -2,9 +2,10 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { StateManager } from './state-manager.js'
 import { StatePathResolver } from './state-path-resolver.js'
+import type { PipelineState, StepStateEntry } from '../types/index.js'
 
 const tmpDirs: string[] = []
 
@@ -870,5 +871,195 @@ describe('StateManager', () => {
         fs.rmSync(tmpRoot, { recursive: true, force: true })
       }
     })
+  })
+})
+
+describe('StateManager.saveState — scope-correct eligibility + cache counters', () => {
+  let tmpRoot: string
+
+  beforeEach(() => {
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'sm-save-'))
+    fs.mkdirSync(path.join(tmpRoot, '.scaffold'), { recursive: true })
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpRoot, { recursive: true, force: true })
+  })
+
+  it('root-mode saveState bumps save_counter + stamps next_eligible_hash', () => {
+    const computeEligible = vi.fn(() => ['a', 'b'])
+    const sm = new StateManager(
+      tmpRoot,
+      computeEligible,
+      () => undefined,
+      new StatePathResolver(tmpRoot),
+      undefined,
+      'pipeline-hash-v1',
+    )
+    const state: PipelineState = {
+      'schema-version': 3,
+      'scaffold-version': '1.0.0',
+      init_methodology: 'deep',
+      config_methodology: 'deep',
+      'init-mode': 'greenfield',
+      created: '2026-04-20T00:00:00.000Z',
+      in_progress: null,
+      steps: {},
+      next_eligible: [],
+      'extra-steps': [],
+    }
+    sm.saveState(state)
+    const written = JSON.parse(
+      fs.readFileSync(path.join(tmpRoot, '.scaffold', 'state.json'), 'utf8'),
+    )
+    expect(written.save_counter).toBe(1)
+    expect(written.next_eligible_hash).toBe('pipeline-hash-v1')
+    expect(written.next_eligible).toEqual(['a', 'b'])
+    expect(written.next_eligible_root_counter).toBeUndefined()  // root state — no root-counter stamp
+  })
+
+  it('root-mode saveState increments save_counter on each save (monotonic)', () => {
+    const sm = new StateManager(
+      tmpRoot,
+      () => [],
+      () => undefined,
+      new StatePathResolver(tmpRoot),
+      undefined,
+      'hash',
+    )
+    const state: PipelineState = {
+      'schema-version': 3,
+      'scaffold-version': '1.0.0',
+      init_methodology: 'deep',
+      config_methodology: 'deep',
+      'init-mode': 'greenfield',
+      created: '2026-04-20T00:00:00.000Z',
+      in_progress: null,
+      steps: {},
+      next_eligible: [],
+      'extra-steps': [],
+    }
+    sm.saveState(state)
+    sm.saveState(state)
+    sm.saveState(state)
+    const written = JSON.parse(
+      fs.readFileSync(path.join(tmpRoot, '.scaffold', 'state.json'), 'utf8'),
+    )
+    expect(written.save_counter).toBe(3)
+  })
+
+  it('service-mode saveState passes {scope: "service", globalSteps} to computeEligible', () => {
+    fs.mkdirSync(path.join(tmpRoot, '.scaffold', 'services', 'api'), { recursive: true })
+    fs.writeFileSync(
+      path.join(tmpRoot, '.scaffold', 'state.json'),
+      JSON.stringify({
+        'schema-version': 3, 'scaffold-version': '1.0.0',
+        init_methodology: 'deep', config_methodology: 'deep',
+        'init-mode': 'greenfield', created: '2026-04-20T00:00:00.000Z',
+        in_progress: null, steps: {}, next_eligible: [], 'extra-steps': [],
+        save_counter: 10,
+      }),
+    )
+    fs.writeFileSync(
+      path.join(tmpRoot, '.scaffold', 'services', 'api', 'state.json'),
+      JSON.stringify({
+        'schema-version': 3, 'scaffold-version': '1.0.0',
+        init_methodology: 'deep', config_methodology: 'deep',
+        'init-mode': 'greenfield', created: '2026-04-20T00:00:00.000Z',
+        in_progress: null, steps: {}, next_eligible: [], 'extra-steps': [],
+      }),
+    )
+    const globalSteps = new Set(['global-a'])
+    const computeEligible = vi.fn(
+      (
+        _steps: Record<string, StepStateEntry>,
+        _opts?: { scope?: 'global' | 'service'; globalSteps?: Set<string> },
+      ) => ['svc-b'],
+    )
+    const sm = new StateManager(
+      tmpRoot,
+      computeEligible,
+      () => undefined,
+      new StatePathResolver(tmpRoot, 'api'),
+      globalSteps,
+      'svc-hash',
+    )
+    sm.loadState()  // populate loadedRootCounter
+    sm.saveState({
+      'schema-version': 3, 'scaffold-version': '1.0.0',
+      init_methodology: 'deep', config_methodology: 'deep',
+      'init-mode': 'greenfield', created: '2026-04-20T00:00:00.000Z',
+      in_progress: null, steps: { 'svc-a': { status: 'pending', source: 'pipeline', produces: [] } },
+      next_eligible: [], 'extra-steps': [],
+    })
+    expect(computeEligible).toHaveBeenCalled()
+    const call = computeEligible.mock.calls[0]
+    expect(call[1]).toEqual({ scope: 'service', globalSteps })
+  })
+
+  it('service-mode saveState stamps next_eligible_root_counter from loadedRootCounter', () => {
+    fs.mkdirSync(path.join(tmpRoot, '.scaffold', 'services', 'api'), { recursive: true })
+    fs.writeFileSync(
+      path.join(tmpRoot, '.scaffold', 'state.json'),
+      JSON.stringify({
+        'schema-version': 3, 'scaffold-version': '1.0.0',
+        init_methodology: 'deep', config_methodology: 'deep',
+        'init-mode': 'greenfield', created: '2026-04-20T00:00:00.000Z',
+        in_progress: null, steps: {}, next_eligible: [], 'extra-steps': [],
+        save_counter: 42,
+      }),
+    )
+    fs.writeFileSync(
+      path.join(tmpRoot, '.scaffold', 'services', 'api', 'state.json'),
+      JSON.stringify({
+        'schema-version': 3, 'scaffold-version': '1.0.0',
+        init_methodology: 'deep', config_methodology: 'deep',
+        'init-mode': 'greenfield', created: '2026-04-20T00:00:00.000Z',
+        in_progress: null, steps: {}, next_eligible: [], 'extra-steps': [],
+      }),
+    )
+    const sm = new StateManager(
+      tmpRoot,
+      () => [],
+      () => undefined,
+      new StatePathResolver(tmpRoot, 'api'),
+      new Set(),
+      'svc-hash',
+    )
+    sm.loadState()  // captures root counter = 42
+    sm.saveState({
+      'schema-version': 3, 'scaffold-version': '1.0.0',
+      init_methodology: 'deep', config_methodology: 'deep',
+      'init-mode': 'greenfield', created: '2026-04-20T00:00:00.000Z',
+      in_progress: null, steps: {}, next_eligible: [], 'extra-steps': [],
+    })
+    const written = JSON.parse(
+      fs.readFileSync(path.join(tmpRoot, '.scaffold', 'services', 'api', 'state.json'), 'utf8'),
+    )
+    expect(written.next_eligible_root_counter).toBe(42)
+    expect(written.next_eligible_hash).toBe('svc-hash')
+    expect(written.save_counter).toBeUndefined()  // service state — no own counter
+  })
+
+  it('omitted pipelineHash produces next_eligible_hash: undefined (legacy-safe)', () => {
+    const sm = new StateManager(
+      tmpRoot,
+      () => [],
+      () => undefined,
+      new StatePathResolver(tmpRoot),
+      undefined,
+      // no pipelineHash
+    )
+    sm.saveState({
+      'schema-version': 3, 'scaffold-version': '1.0.0',
+      init_methodology: 'deep', config_methodology: 'deep',
+      'init-mode': 'greenfield', created: '2026-04-20T00:00:00.000Z',
+      in_progress: null, steps: {}, next_eligible: [], 'extra-steps': [],
+    })
+    const written = JSON.parse(
+      fs.readFileSync(path.join(tmpRoot, '.scaffold', 'state.json'), 'utf8'),
+    )
+    expect(written.next_eligible_hash).toBeUndefined()
+    expect(written.save_counter).toBe(1)  // counter still bumps
   })
 })
