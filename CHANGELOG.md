@@ -4,6 +4,22 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.18.0] — 2026-04-19
+
+### Added
+- **Overlay `cross-reads-overrides`** — structural overlays (`multi-service-overlay.yml`) can now append per-step `crossReads` entries via a new `cross-reads-overrides` YAML section, completing the Wave 3c seam from v3.17.0. Projects with heterogeneous service relationships can express service-specific cross-reads in the overlay instead of forking step templates.
+  - New `CrossReadsOverride` type + required `PipelineOverlay.crossReadsOverrides` field
+  - New `parseCrossReadsOverrides()` parser with item-level warnings (`OVERLAY_MALFORMED_APPEND_ITEM`)
+  - New `applyCrossReadsOverrides()` helper — append + dedup by `service:step` pair, first-occurrence preserved, deep-copies entries
+  - Structural-only constraint: project-type overlays that declare `cross-reads-overrides` are stripped at parse time with `OVERLAY_CROSS_READS_NOT_ALLOWED` (detected with `!== undefined` so explicit YAML null is caught). Defense-in-depth re-strip in `loadSubOverlay`.
+  - `OverlayState.crossReads` becomes required (was optional Wave 3c seam). `resolveOverlayState` builds `crossReadsMap` from frontmatter and threads it through BOTH overlay passes (project-type + structural).
+  - `resolvePipeline` config-less fallback branch now populates `crossReads` from frontmatter
+  - `resolveTransitiveCrossReads` gains optional `overlayCrossReads?` (last-position param) for overlay-first recursion. `foreignMeta` existence guard preserved — overlay typos pointing at unknown steps never drive recursion.
+  - `run.ts` call site forwards `pipeline.overlay.crossReads` as the 10th positional arg
+
+### Changed
+- **`DependencyNode.crossDependencies` comment** — updated to reflect overlay-first merge (was "populated from frontmatter.crossReads")
+
 ## [3.17.0] — 2026-04-19
 
 ### Added
