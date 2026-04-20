@@ -301,13 +301,18 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
         return
       }
       const pipeline = resolvePipeline(context, { output })
+      // Note: rework does NOT yet route to service state (pre-existing behavior —
+      // pipeline and StateManager both use global/root scope regardless of
+      // --service). Always stamp the 'global' hash so the hash matches the
+      // state file we actually write. A full multi-service rework is tracked
+      // separately.
       const stateManager = new StateManager(
         projectRoot as string,
         pipeline.computeEligible,
         () => context.config ?? undefined,
         undefined,
         undefined,
-        pipeline.getPipelineHash(service ? 'service' : 'global'),
+        pipeline.getPipelineHash('global'),
       )
       const state = stateManager.loadState()
 
