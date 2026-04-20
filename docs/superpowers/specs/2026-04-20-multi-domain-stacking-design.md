@@ -71,7 +71,7 @@ export const ResearchConfigSchema = z.object({
 | `domain: 'climate'` (unknown) | **Rejected** — no matching union branch |
 | `domain: null` | **Rejected** — union not nullable |
 
-**Actual error surface:** All rejections flow through `src/config/loader.ts:130-148`, which wraps Zod issues as `FIELD_INVALID_VALUE` errors with message `` `Config validation error at "<fieldPath>": <issue.message>` ``. For union-branch failures, `issue.message` is Zod's generic `"Invalid input"` rather than a targeted per-branch explanation. This is existing behavior — the spec does **not** add per-branch error customization. A user who writes `domain: ['none']` sees `Config validation error at "backendConfig.domain": Invalid input`, which is less informative than an enum-specific message but matches how every other union field in the codebase reports errors. If that friction matters in practice, a future refactor of the loader's union-issue rendering can improve all union fields at once — out of scope for this feature.
+**Actual error surface:** All rejections flow through `src/config/loader.ts:130-148`, which wraps Zod issues as `FIELD_INVALID_VALUE` errors with message `` `Config validation error at "<fieldPath>": <issue.message>` ``. For union-branch failures, `issue.message` is Zod's generic `"Invalid input"` rather than a targeted per-branch explanation. This is existing behavior — the spec does **not** add per-branch error customization. A user who writes `domain: ['none']` sees `Config validation error at "project.backendConfig.domain": Invalid input`, which is less informative than an enum-specific message but matches how every other union field in the codebase reports errors. If that friction matters in practice, a future refactor of the loader's union-issue rendering can improve all union fields at once — out of scope for this feature.
 
 ### 1.2 Inferred TypeScript types
 
@@ -251,7 +251,7 @@ Test coverage: §5.3 adds one service-mode integration test asserting that `serv
 
 ### 4.1 Schema-level (Zod)
 
-All invalid inputs (§1.1 rejection rows) surface through the existing `loadConfig` path at `src/config/loader.ts:130-148`, which maps Zod issues into `FIELD_INVALID_VALUE` errors. Messages include the field path (e.g., `backendConfig.domain` or `services.0.backendConfig.domain` for service-mode) so users can locate the problem. For union-branch failures, Zod's `issue.message` surfaces as `"Invalid input"` — see §1.1 for the trade-off and the rationale for not customizing it in this feature.
+All invalid inputs (§1.1 rejection rows) surface through the existing `loadConfig` path at `src/config/loader.ts:130-148`, which maps Zod issues into `FIELD_INVALID_VALUE` errors. Messages include the field path (e.g., `project.backendConfig.domain` or `project.services.0.backendConfig.domain` for service-mode) so users can locate the problem. For union-branch failures, Zod's `issue.message` surfaces as `"Invalid input"` — see §1.1 for the trade-off and the rationale for not customizing it in this feature.
 
 ### 4.2 Resolver-level warnings
 
@@ -294,23 +294,31 @@ Exercises the full YAML → `loadConfig` → parsed config path, not just `safeP
 
 12. Valid YAML with `domain: ['fintech']` at root-level → `loadConfig` returns config with matching array.
 13. Valid YAML with `services[0].backendConfig.domain: ['fintech']` → service-mode shape preserved through `loadConfig`.
-14. Invalid YAML with `domain: []` → `loadConfig` returns `errors[]` containing a `FIELD_INVALID_VALUE` entry whose `context.field` is `backendConfig.domain`.
-15. Invalid YAML with `domain: ['none']` → same error shape as test 14.
+14. Invalid YAML with `domain: []` → `loadConfig` returns `errors[]` containing a `FIELD_INVALID_VALUE` entry whose `context.field` is `project.backendConfig.domain` (note the `project.` prefix — `loader.ts:130-148` joins `issue.path` which includes the root `project` segment from `ConfigSchema`).
+15. Invalid YAML with `domain: ['none']` → same error shape as test 14; `context.field` still `project.backendConfig.domain`.
 
 ### 5.3 Resolver integration — real research overlays
 
 These use the packaged `content/methodology/` sub-overlays to exercise end-to-end resolution. The two overlays both touch `system-architecture`, `operations`, `tdd`, `create-evals`, `review-architecture`, `review-testing`, `implementation-plan` (verified). `tech-stack` is **not** shared — do not use it for multi-domain assertions.
 
+**Important constraint:** real research overlays do **not** naturally collide — `research-quant-finance.yml:tdd: [research-quant-backtesting]` and `research-ml-research.yml:tdd: [research-ml-evaluation]` are disjoint on every shared step. Dedup collision cases belong in §5.4, which uses contrived fixtures.
+
 16. `domain: ['quant-finance', 'ml-research']` on research: assert `overlayKnowledge['system-architecture']` has exact-array equality to `[...baseKnowledge, ...quantFinanceKnowledge, ...mlResearchKnowledge]` with quant-finance entries first.
 17. Reversed order: `['ml-research', 'quant-finance']` produces the same knowledge *set* on `system-architecture` with the ml-research entries first.
-18. Shared dedup: on a step where both overlays append an entry that also appears in the core overlay, it appears **once** at first-occurrence position. (Uses `tdd` — both overlays append domain-specific entries, core may or may not have existing entries; the test constructs a controlled scenario.)
-19. String form invariant: `domain: 'fintech'` on backend produces knowledge identical to `['fintech']` on the same config.
+18. String form invariant: `domain: 'quant-finance'` resolves identically to `['quant-finance']` on the same config (proves the string branch and single-element-array branch produce the same resolved state).
 
-### 5.4 Resolver unit — `normalizeDomains` and contrived collision
+### 5.3.1 Service-mode integration — multi-domain per service
 
-`normalizeDomains` is a file-local helper; its behavior is exercised indirectly through resolver tests (§5.3) rather than via a standalone import. This avoids exporting internals and matches the pattern used for other resolver helpers.
+Exercises the real service-mode resolution path via `resolvePipeline({ ..., serviceId })` (see `src/core/pipeline/resolver.ts:28` and `src/e2e/service-execution.test.ts:152` for the test pattern). This proves multi-domain works under service-mode, not just that the schema preserves the shape.
 
-For contrived collision cases that real overlays don't cover, use a **temp methodology directory** with schema-bypassed configs — the existing pattern in `overlay-state-resolver.test.ts:233` (`projectType: 'malformed' as never`). Example:
+19. Config: `services[0].projectType: 'research'`, `services[0].researchConfig.domain: ['quant-finance', 'ml-research']`. Call `resolvePipeline(ctx, { serviceId: services[0].name })`. Assert resolved `overlay.knowledge['system-architecture']` contains entries from **both** sub-overlays in declaration order. (Research is used rather than backend because backend has only one real domain.)
+20. Same config, reversed order (`['ml-research', 'quant-finance']`). Assert order differs correspondingly, proving service-mode respects declaration order (same invariant as root-level test 17).
+
+### 5.4 Resolver unit — contrived collision fixtures
+
+`normalizeDomains` is a file-local helper; its behavior is exercised indirectly through the resolver tests in §5.3–§5.4 rather than via a standalone import. This avoids exporting internals and matches the pattern used for other resolver helpers.
+
+For contrived collision cases that real overlays don't cover (no natural collision exists in packaged research domains), use a **temp methodology directory** with schema-bypassed configs — the existing pattern in `overlay-state-resolver.test.ts:233` (`projectType: 'malformed' as never`). Example:
 
 ```ts
 const config = makeConfig({
@@ -327,9 +335,9 @@ const config = makeConfig({
 // tmpDir contains backend-fake-a.yml + backend-fake-b.yml with known knowledge overlaps.
 ```
 
-20. Duplicate domain: `domain: ['fintech', 'fintech']` (cast-bypassed) → warns with message containing `backendConfig.domain`, resolver loads the overlay once.
-21. Contrived overlap: fixture `fake-a` appends `['a', 'shared']` to step X, fixture `fake-b` appends `['shared', 'b']` to step X; resolver output for step X starts with pipeline-base entries, then `['a', 'shared', 'b']` (first-occurrence dedup for `'shared'`).
-22. Missing sub-overlay file at runtime → silent-skip, resolver does not emit a warning.
+21. Duplicate domain: `domain: ['fintech', 'fintech']` (cast-bypassed) → warns with message containing `backendConfig.domain`, resolver loads the overlay once.
+22. Contrived overlap: fixture `fake-a` appends `['a', 'shared']` to step X, fixture `fake-b` appends `['shared', 'b']` to step X; resolver output for step X starts with pipeline-base entries, then `['a', 'shared', 'b']` (first-occurrence dedup for `'shared'`).
+23. Missing sub-overlay file at runtime → silent-skip, resolver does not emit a warning.
 
 Fixture sub-overlays live at `tests/fixtures/methodology/backend-fake-a.yml` and `backend-fake-b.yml`; each is ~10 lines.
 
@@ -337,8 +345,8 @@ Fixture sub-overlays live at `tests/fixtures/methodology/backend-fake-a.yml` and
 
 `tests/packaging/domain-overlay-alignment.test.ts`:
 
-23. Import `backendRealDomains` from `src/config/schema.ts`; for each value, assert `content/methodology/backend-${value}.yml` exists and is readable.
-24. Import `researchRealDomains`; for each value, assert `content/methodology/research-${value}.yml` exists and is readable.
+24. Import `backendRealDomains` from `src/config/schema.ts`; for each value, assert `content/methodology/backend-${value}.yml` exists and is readable.
+25. Import `researchRealDomains`; for each value, assert `content/methodology/research-${value}.yml` exists and is readable.
 
 This depends on the schema exporting the domain-value constants (§1, revised).
 
@@ -398,11 +406,12 @@ None. No fields removed, no enum values changed, no YAML syntax deprecated.
 |---|---|
 | Schema changes (3-way union + exported constants + helper) | ~25 production + ~60 tests |
 | Resolver changes (normalize helper + loop rewrite) | ~35 production + ~120 tests |
+| Service-mode integration test (§5.3.1) | ~40 tests |
 | Loader-level tests (array-shape end-to-end) | ~30 tests |
 | Packaging-integrity test | ~25 tests |
 | Fixture sub-overlays (2 × ~10 lines) | ~20 fixtures |
 | CHANGELOG / roadmap updates | ~25 docs |
-| **Total** | **~85–125 production, ~235 tests** |
+| **Total** | **~85–125 production, ~275 tests** |
 
 ---
 
