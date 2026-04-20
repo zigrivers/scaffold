@@ -218,7 +218,14 @@ export async function materializeScaffoldProject(
   }))
 
   const detection = detectProjectMode(projectRoot)
-  const stateManager = new StateManager(projectRoot, () => [], () => config)
+  const stateManager = new StateManager(
+    projectRoot,
+    () => [],
+    () => config,
+    undefined, // pathResolver
+    undefined, // globalSteps
+    undefined, // pipelineHash — legacy-safe (see plan Task 12)
+  )
   stateManager.initializeState({
     enabledSteps: allSteps,
     scaffoldVersion: '2.0.0',
