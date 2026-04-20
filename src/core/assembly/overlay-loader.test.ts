@@ -456,3 +456,61 @@ describe('parseCrossReadsOverrides', () => {
     expect(warnings).toHaveLength(0)
   })
 })
+
+describe('loadOverlay forbids cross-reads-overrides (structural-only constraint)', () => {
+  it('emits OVERLAY_CROSS_READS_NOT_ALLOWED and returns empty crossReadsOverrides for project-type overlay', () => {
+    const tmpPath = path.join(os.tmpdir(), `proj-overlay-${Date.now()}.yml`)
+    fs.writeFileSync(tmpPath, `
+name: backend
+description: test
+project-type: backend
+cross-reads-overrides:
+  system-architecture:
+    append:
+      - service: billing
+        step: api-contracts
+`)
+    try {
+      const { overlay, warnings } = loadOverlay(tmpPath)
+      expect(overlay).not.toBeNull()
+      expect(overlay!.crossReadsOverrides).toEqual({})
+      expect(warnings.some(w => w.code === 'OVERLAY_CROSS_READS_NOT_ALLOWED')).toBe(true)
+    } finally {
+      fs.rmSync(tmpPath, { force: true })
+    }
+  })
+
+  it('emits OVERLAY_CROSS_READS_NOT_ALLOWED for explicit null (cross-reads-overrides: ~)', () => {
+    const tmpPath = path.join(os.tmpdir(), `proj-overlay-${Date.now()}.yml`)
+    fs.writeFileSync(tmpPath, `
+name: backend
+description: test
+project-type: backend
+cross-reads-overrides: ~
+`)
+    try {
+      const { overlay, warnings } = loadOverlay(tmpPath)
+      expect(overlay).not.toBeNull()
+      expect(overlay!.crossReadsOverrides).toEqual({})
+      expect(warnings.some(w => w.code === 'OVERLAY_CROSS_READS_NOT_ALLOWED')).toBe(true)
+    } finally {
+      fs.rmSync(tmpPath, { force: true })
+    }
+  })
+
+  it('does not emit warning when cross-reads-overrides is absent', () => {
+    const tmpPath = path.join(os.tmpdir(), `proj-overlay-${Date.now()}.yml`)
+    fs.writeFileSync(tmpPath, `
+name: backend
+description: test
+project-type: backend
+`)
+    try {
+      const { overlay, warnings } = loadOverlay(tmpPath)
+      expect(overlay!.crossReadsOverrides).toEqual({})
+      expect(warnings.every(w => w.code !== 'OVERLAY_CROSS_READS_NOT_ALLOWED')).toBe(true)
+    } finally {
+      fs.rmSync(tmpPath, { force: true })
+    }
+  })
+})

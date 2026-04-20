@@ -8,7 +8,7 @@ import { ProjectTypeSchema } from '../../config/schema.js'
 import { fileExists } from '../../utils/fs.js'
 import {
   overlayMissing, overlayParseError, overlayMalformedSection, overlayMalformedEntry,
-  overlayMalformedAppendItem,
+  overlayMalformedAppendItem, overlayCrossReadsNotAllowed,
 } from '../../utils/errors.js'
 import yaml from 'js-yaml'
 import fs from 'node:fs'
@@ -243,7 +243,10 @@ export function loadOverlay(
   }
 
   // 5. Parse override sections (gracefully handle missing/malformed)
-  const overrideSections = ['step-overrides', 'knowledge-overrides', 'reads-overrides', 'dependency-overrides'] as const
+  const overrideSections = [
+    'step-overrides', 'knowledge-overrides', 'reads-overrides',
+    'dependency-overrides', 'cross-reads-overrides',
+  ] as const
 
   for (const section of overrideSections) {
     const value = obj[section]
@@ -253,6 +256,13 @@ export function loadOverlay(
       }
     }
   }
+
+  // Project-type overlays are forbidden from declaring cross-reads-overrides.
+  // Detect with !== undefined so explicit null ("cross-reads-overrides: ~" in YAML) is caught.
+  if (obj['cross-reads-overrides'] !== undefined) {
+    warnings.push(overlayCrossReadsNotAllowed(overlayPath))
+  }
+  // No parse — overlay.crossReadsOverrides is set to {} in the literal below.
 
   const stepOverridesRaw = isPlainObject(obj['step-overrides'])
     ? obj['step-overrides'] as Record<string, unknown> : {}
@@ -271,7 +281,7 @@ export function loadOverlay(
     knowledgeOverrides: parseKnowledgeOverrides(knowledgeOverridesRaw, warnings, overlayPath),
     readsOverrides: parseReadsOverrides(readsOverridesRaw, warnings, overlayPath),
     dependencyOverrides: parseDependencyOverrides(dependencyOverridesRaw, warnings, overlayPath),
-    crossReadsOverrides: {},  // NEW — placeholder; Task 5 replaces with the strip-and-warn logic
+    crossReadsOverrides: {},    // structural-only — any value in YAML is rejected above
   }
 
   return { overlay, errors, warnings }
