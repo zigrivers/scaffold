@@ -1635,6 +1635,11 @@ describe('run command handler', () => {
         expect.anything(),                                    // 9: globalSteps
         SENTINEL_OVERLAY_CROSS_READS,                         // 10: overlayCrossReads (Wave 3c+1)
       )
+      // Reference-identity check: toHaveBeenCalledWith uses deep equality, so a
+      // regression that clones the map (e.g., `{...pipeline.overlay.crossReads}`)
+      // would still pass the above. Assert .toBe() to lock the exact reference.
+      const calls = vi.mocked(resolveTransitiveCrossReads).mock.calls
+      expect(calls[0][9]).toBe(SENTINEL_OVERLAY_CROSS_READS)
     })
   })
 
