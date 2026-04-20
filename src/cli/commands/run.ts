@@ -435,9 +435,11 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
               }
             }
 
-            // Gather artifacts from cross-reads (Wave 3c — foreign service artifacts)
-            const crossReadsList =
-              pipeline.overlay.crossReads?.[step] ?? metaPrompt.frontmatter.crossReads ?? []
+            // Gather artifacts from cross-reads. Since Wave 3c+1, overlay.crossReads
+            // is the authoritative merged map (frontmatter ∪ overlay overrides),
+            // populated per-step by resolveOverlayState. Defaults to [] for steps
+            // not in metaPrompts (shouldn't happen at runtime, but defensive).
+            const crossReadsList = pipeline.overlay.crossReads[step] ?? []
             if (crossReadsList.length > 0) {
               const foreignStateCache = new Map<string, PipelineState | null>()
               const crossArtifacts = resolveTransitiveCrossReads(

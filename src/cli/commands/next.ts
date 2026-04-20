@@ -100,8 +100,9 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     const crossDepMap = new Map<string, ReturnType<typeof resolveCrossReadReadiness>>()
     const sharedForeignCache = new Map<string, PipelineState | null | 'read-error'>()
     for (const slug of shown) {
-      const crossReads =
-        pipeline.overlay.crossReads?.[slug] ?? pipeline.stepMeta.get(slug)?.crossReads ?? []
+      // overlay.crossReads is the authoritative merged map (frontmatter ∪ overlay
+      // overrides) since Wave 3c+1. Defaults to [] for steps not in metaPrompts.
+      const crossReads = pipeline.overlay.crossReads[slug] ?? []
       if (crossReads.length > 0 && context.config) {
         crossDepMap.set(
           slug,

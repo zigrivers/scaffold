@@ -50,13 +50,25 @@ vi.mock('../../core/assembly/preset-loader.js', () => ({
 }))
 
 vi.mock('../../core/assembly/overlay-state-resolver.js', () => ({
-  resolveOverlayState: vi.fn(({ presetSteps }: { presetSteps: Record<string, unknown> }) => ({
-    steps: presetSteps,
-    knowledge: {},
-    reads: {},
-    dependencies: {},
-    crossReads: {},
-  })),
+  resolveOverlayState: vi.fn((opts: {
+    presetSteps: Record<string, unknown>
+    metaPrompts: Map<string, { frontmatter: { crossReads?: Array<{ service: string; step: string }> } }>
+  }) => {
+    // Mirror the real resolveOverlayState behavior: populate crossReads per-step
+    // from frontmatter. Tests that need overlay-level overrides use
+    // mockReturnValueOnce to override this default.
+    const crossReads: Record<string, Array<{ service: string; step: string }>> = {}
+    for (const [name, mp] of opts.metaPrompts) {
+      crossReads[name] = [...(mp.frontmatter.crossReads ?? [])]
+    }
+    return {
+      steps: opts.presetSteps,
+      knowledge: {},
+      reads: {},
+      dependencies: {},
+      crossReads,
+    }
+  }),
 }))
 
 vi.mock('../../core/assembly/cross-reads.js', () => ({

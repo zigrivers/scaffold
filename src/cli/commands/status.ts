@@ -166,8 +166,9 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     const crossDepMap = new Map<string, ReturnType<typeof resolveCrossReadReadiness>>()
     const sharedForeignCache = new Map<string, PipelineState | null | 'read-error'>()
     for (const slug of Object.keys(steps)) {
-      const crossReads =
-        pipeline.overlay.crossReads?.[slug] ?? pipeline.stepMeta.get(slug)?.crossReads ?? []
+      // overlay.crossReads is the authoritative merged map (frontmatter ∪ overlay
+      // overrides) since Wave 3c+1. Defaults to [] for steps not in metaPrompts.
+      const crossReads = pipeline.overlay.crossReads[slug] ?? []
       if (crossReads.length > 0 && context.config) {
         crossDepMap.set(
           slug,

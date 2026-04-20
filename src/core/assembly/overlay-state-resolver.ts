@@ -74,11 +74,15 @@ export function resolveOverlayState(options: {
         }
       }
       if (overlay) {
+        // Use the tracked overlay* working variables uniformly (parity with the
+        // structural-overlay pass below). At this point the working vars are
+        // reference-identical to the frontmatter maps, so behavior is unchanged;
+        // the symmetry avoids a footgun if a future pre-pass mutates the vars.
         const merged = applyOverlay(
           overlaySteps,
-          knowledgeMap,
-          readsMap,
-          dependencyMap,
+          overlayKnowledge,
+          overlayReads,
+          overlayDependencies,
           overlayCrossReads,
           overlay,
         )
