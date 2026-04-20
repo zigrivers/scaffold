@@ -1,5 +1,7 @@
 // src/utils/errors.ts
 
+import path from 'node:path'
+
 /** Structured scaffold error. */
 export interface ScaffoldError {
   code: string
@@ -322,6 +324,28 @@ export function overlayMalformedSection(section: string, file: string): Scaffold
     code: 'OVERLAY_MALFORMED_SECTION',
     message: `Overlay section "${section}" must be a YAML object — ignoring`,
     context: { section, file },
+  }
+}
+
+export function overlayMalformedAppendItem(
+  step: string,
+  index: number,
+  file: string,
+): ScaffoldWarning {
+  return {
+    code: 'OVERLAY_MALFORMED_APPEND_ITEM',
+    message: `Overlay entry "${step}" append[${index}] is malformed — ignoring that item`,
+    context: { step, index, file },
+  }
+}
+
+export function overlayCrossReadsNotAllowed(file: string): ScaffoldWarning {
+  return {
+    code: 'OVERLAY_CROSS_READS_NOT_ALLOWED',
+    message:
+      'cross-reads-overrides is only valid in structural overlays — '
+      + `stripping from ${path.basename(file)}`,
+    context: { file },
   }
 }
 
