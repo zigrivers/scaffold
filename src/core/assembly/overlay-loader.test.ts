@@ -305,7 +305,9 @@ step-overrides:
       const sub = warnings.find(w => w.code === 'SUB_OVERLAY_NON_KNOWLEDGE')
       expect(sub).toBeDefined()
       // Message must mention cross-reads in the list of stripped section types
-      expect(sub!.message).toContain('cross-reads')
+      // Tight assertion: lock the exact shorthand phrase so a typo/ordering
+      // regression is caught without being brittle on surrounding sentence.
+      expect(sub!.message).toContain('step/reads/dependency/cross-reads overrides')
     } finally {
       fs.rmSync(tmpPath, { force: true })
     }
