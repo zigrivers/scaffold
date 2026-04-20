@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module'
 import type { PipelineState, DecisionEntry, MetaPromptFile } from '../types/index.js'
 import { PHASES, PHASE_BY_SLUG } from '../types/frontmatter.js'
-import { buildTemplate } from './template.js'
+import { buildTemplate, buildMultiServiceTemplate } from './template.js'
 
 const require = createRequire(import.meta.url)
 const pkg = require('../../package.json') as { version: string }
@@ -374,4 +374,12 @@ export function generateMultiServiceDashboardData(
       servicesByPhase,
     },
   }
+}
+
+export function generateMultiServiceHtml(data: MultiServiceDashboardData): string {
+  // Escape `<` in the embedded JSON payload to prevent `</script>` breakout and
+  // keep arbitrary service names (which end up in the JSON block) from being
+  // parsed as HTML by the browser.
+  const dataJson = JSON.stringify(data, null, 2).replace(/</g, '\\u003c')
+  return buildMultiServiceTemplate(dataJson, data)
 }

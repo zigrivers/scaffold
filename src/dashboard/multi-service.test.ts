@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { generateMultiServiceDashboardData } from './generator.js'
-import type { MultiServiceGeneratorOptions } from './generator.js'
+import { generateMultiServiceDashboardData, generateMultiServiceHtml } from './generator.js'
+import type { MultiServiceGeneratorOptions, MultiServiceDashboardData } from './generator.js'
 import type { PipelineState, MetaPromptFile } from '../types/index.js'
 import { PHASES } from '../types/frontmatter.js'
 
@@ -319,5 +319,133 @@ describe('generateMultiServiceDashboardData', () => {
     expect(typeof data.scaffoldVersion).toBe('string')
     expect(data.scaffoldVersion.length).toBeGreaterThan(0)
     expect(typeof data.generatedAt).toBe('string')
+  })
+})
+
+// ---------- HTML rendering ----------
+
+function makeMultiData(overrides: Partial<MultiServiceDashboardData> = {}): MultiServiceDashboardData {
+  const base: MultiServiceDashboardData = {
+    generatedAt: new Date().toISOString(),
+    methodology: 'deep',
+    scaffoldVersion: '3.20.0',
+    services: [
+      {
+        name: 'api-service',
+        projectType: 'backend',
+        percentage: 42,
+        completed: 3,
+        skipped: 1,
+        pending: 5,
+        inProgress: 1,
+        total: 10,
+        currentPhaseNumber: 3,
+        currentPhaseName: 'System Architecture',
+        nextEligibleSlug: 'create-prd',
+        nextEligibleSummary: 'Define the product',
+      },
+      {
+        name: 'web-client',
+        projectType: 'web-app',
+        percentage: 100,
+        completed: 8,
+        skipped: 2,
+        pending: 0,
+        inProgress: 0,
+        total: 10,
+        currentPhaseNumber: null,
+        currentPhaseName: null,
+        nextEligibleSlug: null,
+        nextEligibleSummary: null,
+      },
+    ],
+    aggregate: {
+      totalServices: 2,
+      averagePercentage: 71,
+      servicesComplete: 1,
+      servicesByPhase: [
+        { phaseSlug: 'pre', phaseName: 'Product Definition', phaseNumber: 1, reachedCount: 2 },
+        { phaseSlug: 'foundation', phaseName: 'Project Foundation', phaseNumber: 2, reachedCount: 1 },
+      ],
+    },
+  }
+  return { ...base, ...overrides }
+}
+
+describe('generateMultiServiceHtml', () => {
+  it('renders service names', () => {
+    const html = generateMultiServiceHtml(makeMultiData())
+    expect(html).toContain('api-service')
+    expect(html).toContain('web-client')
+  })
+
+  it('renders project types', () => {
+    const html = generateMultiServiceHtml(makeMultiData())
+    expect(html).toContain('backend')
+    expect(html).toContain('web-app')
+  })
+
+  it('renders progress percentages', () => {
+    const html = generateMultiServiceHtml(makeMultiData())
+    expect(html).toContain('42%')
+    expect(html).toContain('100%')
+    // aggregate
+    expect(html).toContain('71%')
+  })
+
+  it('renders current phase or Complete badge', () => {
+    const html = generateMultiServiceHtml(makeMultiData())
+    // api-service has phase 3 → System Architecture
+    expect(html).toContain('Phase 3')
+    expect(html).toContain('System Architecture')
+    // web-client is complete
+    expect(html).toContain('Complete')
+  })
+
+  it('renders next eligible slug when present', () => {
+    const html = generateMultiServiceHtml(makeMultiData())
+    expect(html).toContain('create-prd')
+    expect(html).toContain('Next')
+  })
+
+  it('escapes HTML in service names (XSS guard)', () => {
+    const data = makeMultiData({
+      services: [
+        {
+          name: '<script>alert(1)</script>',
+          projectType: '<img src=x>',
+          percentage: 0,
+          completed: 0,
+          skipped: 0,
+          pending: 1,
+          inProgress: 0,
+          total: 1,
+          currentPhaseNumber: 1,
+          currentPhaseName: 'Product Definition',
+          nextEligibleSlug: '<b>evil</b>',
+          nextEligibleSummary: null,
+        },
+      ],
+    })
+    const html = generateMultiServiceHtml(data)
+    expect(html).not.toContain('<script>alert(1)</script>')
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+    expect(html).toContain('&lt;img src=x&gt;')
+    expect(html).toContain('&lt;b&gt;evil&lt;/b&gt;')
+  })
+
+  it('embeds data JSON in a script tag', () => {
+    const data = makeMultiData()
+    const html = generateMultiServiceHtml(data)
+    expect(html).toContain('<script id="scaffold-data" type="application/json">')
+    // JSON payload is embedded — service names should appear within the JSON block
+    expect(html).toContain('"api-service"')
+    expect(html).toContain('"web-client"')
+  })
+
+  it('renders services-by-phase aggregate row', () => {
+    const html = generateMultiServiceHtml(makeMultiData())
+    expect(html).toContain('Product Definition')
+    expect(html).toContain('Project Foundation')
   })
 })
