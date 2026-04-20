@@ -544,7 +544,7 @@ describe('resolvePipeline getPipelineHash', () => {
 })
 ```
 
-**Note on memoization test + ESM spying:** `vi.spyOn(ghMod, 'computePipelineHash')` requires that `resolver.ts` imports `computePipelineHash` via the namespace import or via an indirection that the spy can intercept. Direct named-import binding cannot be spied on in ESM. If the spy cannot intercept the call in Step 4, refactor `resolver.ts` to `import * as graphHash from './graph-hash.js'` and call `graphHash.computePipelineHash(...)` inside the `getPipelineHash` closure. Make this refactor part of Task 4 Step 4 if required.
+**REQUIRED refactor for the memoization test (apply in Step 4 below):** `vi.spyOn(ghMod, 'computePipelineHash')` cannot intercept an ESM named-import binding — direct named imports create a frozen read-only binding in the caller. To make the spy work, `resolver.ts` MUST import `computePipelineHash` via namespace import and call it via the namespace. This is non-negotiable: leaving the named import in place will make the memoization test fail regardless of implementation correctness.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
@@ -576,23 +576,25 @@ export interface ResolvedPipeline {
 
 - [ ] **Step 4: Implement memoized getter in `src/core/pipeline/resolver.ts`**
 
-At the top of the file, add the import:
+At the top of the file, add the import — it MUST be a namespace import so the memoization test's `vi.spyOn` can intercept the call (see note above):
 
 ```typescript
-import { computePipelineHash } from './graph-hash.js'
+import * as graphHash from './graph-hash.js'
 ```
 
 Inside `resolvePipeline`, before the `return` statement, add:
 
 ```typescript
-// 8. Memoized pipeline-graph hash (spec §5)
+// 8. Memoized pipeline-graph hash (spec §5).
+// Call computePipelineHash via the namespace import so ESM spying works
+// (test in graph-hash.test.ts / resolver.test.ts depends on this).
 const hashCache = new Map<string, string>()
 const getPipelineHash = (scope: 'global' | 'service' | null): string => {
   // Normalize null → 'global' for the cache key (spec §2 normalization).
   const key = scope === 'service' ? 'service' : 'global'
   let hash = hashCache.get(key)
   if (hash === undefined) {
-    hash = computePipelineHash(graph, globalSteps, scope)
+    hash = graphHash.computePipelineHash(graph, globalSteps, scope)
     hashCache.set(key, hash)
   }
   return hash
