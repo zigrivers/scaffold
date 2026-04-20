@@ -1,4 +1,4 @@
-import type { DashboardData } from './generator.js'
+import type { DashboardData, MultiServiceDashboardData } from './generator.js'
 
 export function escapeHtml(s: string): string {
   return s
@@ -829,6 +829,419 @@ body.modal-open { overflow: hidden; }
     renderPhases(data);
     renderDecisions(data);
   });
+})();
+</script>
+</body>
+</html>`
+}
+/* eslint-enable max-len */
+
+/* eslint-disable max-len */
+export function buildMultiServiceTemplate(
+  dataJson: string,
+  data: MultiServiceDashboardData,
+): string {
+  const generatedAt = new Date(data.generatedAt)
+  const ageMs = Date.now() - generatedAt.getTime()
+  const staleNotice = ageMs > 3600000
+    ? '<div id="stale-notice" class="stale-notice">&#9888; Data may be stale (generated more than 1 hour ago)</div>'
+    : ''
+
+  const methodology = escapeHtml(data.methodology)
+  const avgPct = data.aggregate.averagePercentage
+
+  const serviceCards = data.services.map(svc => {
+    const name = escapeHtml(svc.name)
+    const projectType = escapeHtml(svc.projectType)
+    const pct = svc.percentage
+    // "Complete" badge requires pipeline steps to have existed AND all to be done.
+    // total=0 (skeleton for missing state.json) renders "Not started" instead.
+    const isNotStarted = svc.total === 0
+    const isComplete = !isNotStarted && svc.currentPhaseNumber === null
+    const phaseLine = isComplete
+      ? '<span class="service-complete-badge">Complete</span>'
+      : isNotStarted
+        ? '<span class="service-not-started-badge">Not started</span>'
+         
+        : `<span class="service-phase">Phase ${svc.currentPhaseNumber ?? ''}: ${escapeHtml(svc.currentPhaseName ?? '')}</span>`
+    const nextLine = svc.nextEligibleSlug
+       
+      ? `<div class="service-next"><span class="service-next-label">Next:</span> <span class="service-next-slug">${escapeHtml(svc.nextEligibleSlug)}</span>${svc.nextEligibleSummary ? ` <span class="service-next-summary">${escapeHtml(svc.nextEligibleSummary)}</span>` : ''}</div>`
+      : ''
+    // Command copy uses data-copy attribute + JS event listener (see script below).
+    // Avoids inline onclick XSS vectors where attacker-controlled svc.name could
+    // escape the single-quoted JS string (Codex MMR P1 — v3.20.0 PR #292).
+    const cmdRaw = `scaffold dashboard --service ${svc.name}`
+    const cmdAttr = escapeHtml(cmdRaw)
+
+    return [
+      `<div class="service-card" data-service="${name}" data-copy="${cmdAttr}">`,
+      '  <div class="service-card-head">',
+      `    <div class="service-name">${name}</div>`,
+      `    <span class="service-type-pill">${projectType}</span>`,
+      '  </div>',
+      '  <div class="service-progress-row">',
+       
+      `    <div class="service-progress-bar"><div class="service-progress-fill" style="width:${pct}%"></div></div>`,
+      `    <span class="service-pct">${pct}%</span>`,
+      '  </div>',
+      '  <div class="service-counts">',
+      `    <span class="count-pill count-completed">${svc.completed} done</span>`,
+      svc.skipped > 0 ? `    <span class="count-pill count-skipped">${svc.skipped} skipped</span>` : '',
+      svc.inProgress > 0 ? `    <span class="count-pill count-in-progress">${svc.inProgress} active</span>` : '',
+      svc.pending > 0 ? `    <span class="count-pill count-pending">${svc.pending} pending</span>` : '',
+      '  </div>',
+      `  <div class="service-phase-line">${phaseLine}</div>`,
+      nextLine,
+       
+      `  <div class="service-cmd-hint"><code>${escapeHtml(cmdRaw)}</code><span class="service-cmd-copy">Click to copy</span></div>`,
+      '</div>',
+    ].filter(Boolean).join('\n')
+  }).join('\n')
+
+  const servicesByPhase = data.aggregate.servicesByPhase
+    .filter(p => p.reachedCount > 0)
+    .map(p => [
+      '<div class="phase-indicator">',
+      `  <div class="phase-indicator-num">P${p.phaseNumber}</div>`,
+      `  <div class="phase-indicator-name">${escapeHtml(p.phaseName)}</div>`,
+      `  <div class="phase-indicator-count">${p.reachedCount} / ${data.aggregate.totalServices}</div>`,
+      '</div>',
+    ].join('\n')).join('\n')
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scaffold Multi-Service Dashboard</title>
+<script id="scaffold-data" type="application/json">
+${dataJson}
+</script>
+<style>
+[data-theme="dark"] {
+  --bg: #0f172a;
+  --card-bg: #1e293b;
+  --border: #334155;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --faint: #64748b;
+  --status-completed: #4ade80;
+  --status-skipped: #818cf8;
+  --status-in-progress: #fbbf24;
+  --status-pending: #64748b;
+  --accent: #6366f1;
+  --accent-light: #818cf8;
+  --stale-bg: #451a03;
+  --stale-text: #fef3c7;
+}
+[data-theme="light"] {
+  --bg: #f8fafc;
+  --card-bg: #ffffff;
+  --border: #e2e8f0;
+  --text: #1e293b;
+  --muted: #64748b;
+  --faint: #94a3b8;
+  --status-completed: #4ade80;
+  --status-skipped: #818cf8;
+  --status-in-progress: #fbbf24;
+  --status-pending: #64748b;
+  --accent: #6366f1;
+  --accent-light: #818cf8;
+  --stale-bg: #fef3c7;
+  --stale-text: #92400e;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  margin: 0;
+  padding: 24px;
+  line-height: 1.5;
+}
+.container { max-width: 1120px; margin: 0 auto; }
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.header h1 { margin: 0 0 4px; font-size: 1.5rem; }
+.header-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.methodology-badge {
+  background: var(--accent);
+  color: #fff;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.pct-label { color: var(--muted); font-size: 0.9rem; }
+.theme-toggle {
+  cursor: pointer;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  padding: 6px 14px;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.85rem;
+}
+.theme-toggle:hover { border-color: var(--accent); }
+.stale-notice {
+  background: var(--stale-bg);
+  color: var(--stale-text);
+  padding: 10px 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+}
+.aggregate-block {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 28px;
+}
+.aggregate-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.aggregate-progress-bar {
+  flex: 1;
+  min-width: 200px;
+  height: 10px;
+  background: var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.aggregate-progress-fill {
+  height: 100%;
+  background: var(--status-completed);
+}
+.aggregate-pct { font-size: 1.1rem; font-weight: 700; min-width: 48px; text-align: right; }
+.aggregate-stat { color: var(--muted); font-size: 0.9rem; }
+.aggregate-stat strong { color: var(--text); font-weight: 700; }
+.phase-indicators {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+.phase-indicator {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  min-width: 90px;
+}
+.phase-indicator-num { font-size: 0.7rem; color: var(--faint); font-weight: 700; }
+.phase-indicator-name { font-size: 0.8rem; font-weight: 600; }
+.phase-indicator-count { font-size: 0.75rem; color: var(--muted); }
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+.service-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+}
+.service-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.service-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.service-name { font-size: 1.1rem; font-weight: 700; }
+.service-type-pill {
+  background: var(--border);
+  color: var(--muted);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: lowercase;
+}
+.service-progress-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.service-progress-bar { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.service-progress-fill { height: 100%; background: var(--status-completed); }
+.service-pct { font-size: 0.85rem; font-weight: 600; min-width: 42px; text-align: right; }
+.service-counts { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.count-pill {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.count-completed { background: var(--status-completed); color: #064e3b; }
+.count-skipped { background: var(--status-skipped); color: #1e1b4b; }
+.count-in-progress { background: var(--status-in-progress); color: #451a03; }
+.count-pending { background: var(--border); color: var(--muted); }
+.service-phase-line { font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+.service-phase { color: var(--text); font-weight: 500; }
+.service-complete-badge {
+  background: var(--status-completed);
+  color: #064e3b;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.service-not-started-badge {
+  background: var(--border);
+  color: var(--muted);
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.service-next { font-size: 0.8rem; color: var(--muted); margin-bottom: 10px; }
+.service-next-label { color: var(--faint); text-transform: uppercase; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em; }
+.service-next-slug { color: var(--accent-light); font-weight: 600; }
+.service-next-summary { color: var(--muted); }
+.service-cmd-hint {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.75rem;
+}
+.service-cmd-hint code { color: var(--text); }
+.service-cmd-copy { color: var(--faint); }
+.service-card.copied { border-color: var(--status-completed); }
+.service-card.copied .service-cmd-copy { color: var(--status-completed); font-weight: 600; }
+.footer {
+  margin-top: 40px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  color: var(--faint);
+  font-size: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+@media (max-width: 480px) {
+  body { padding: 16px; }
+  .header { flex-direction: column; }
+  .services-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<script>
+  var stored = localStorage.getItem('scaffold-theme');
+  var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  var theme = stored || (prefersDark ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', theme);
+</script>
+<div class="container">
+  <div class="header">
+    <div>
+      <h1>Multi-Service Pipeline</h1>
+      <div class="header-meta">
+        <span class="methodology-badge">${methodology}</span>
+        <span class="pct-label">${avgPct}% average</span>
+      </div>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()">Toggle theme</button>
+  </div>
+  ${staleNotice}
+  <div class="aggregate-block">
+    <div class="aggregate-row">
+      <div class="aggregate-progress-bar"><div class="aggregate-progress-fill" style="width:${avgPct}%"></div></div>
+      <span class="aggregate-pct">${avgPct}%</span>
+    </div>
+    <div class="aggregate-stat"><strong>${data.aggregate.servicesComplete}</strong> of <strong>${data.aggregate.totalServices}</strong> services complete</div>
+    ${servicesByPhase ? `<div class="phase-indicators">${servicesByPhase}</div>` : ''}
+  </div>
+  <div class="services-grid">
+${serviceCards}
+  </div>
+  <div class="footer">
+    <span>Generated ${escapeHtml(data.generatedAt)}</span>
+    <span>Scaffold v${escapeHtml(data.scaffoldVersion)}</span>
+  </div>
+</div>
+<script>
+(function() {
+  function toggleTheme() {
+    var current = document.documentElement.getAttribute('data-theme');
+    var next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('scaffold-theme', next);
+  }
+  window.toggleTheme = toggleTheme;
+
+  function copyCommand(text, card) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function() {
+        if (card) {
+          card.classList.add('copied');
+          var label = card.querySelector('.service-cmd-copy');
+          if (label) {
+            var orig = label.textContent;
+            label.textContent = 'Copied!';
+            setTimeout(function() {
+              label.textContent = orig;
+              card.classList.remove('copied');
+            }, 1500);
+          }
+        }
+      });
+    }
+  }
+  window.copyCommand = copyCommand;
+
+  // Wire up service-card clicks via data-copy (no inline onclick — XSS-safe).
+  var cards = document.querySelectorAll('.service-card[data-copy]');
+  for (var i = 0; i < cards.length; i++) {
+    (function(card) {
+      var cmd = card.getAttribute('data-copy') || '';
+      card.addEventListener('click', function() { copyCommand(cmd, card); });
+    })(cards[i]);
+  }
+
+  (function() {
+    var dataEl = document.getElementById('scaffold-data');
+    if (!dataEl) return;
+    var data = JSON.parse(dataEl.textContent || '{}');
+    if (data.generatedAt) {
+      var age = Date.now() - new Date(data.generatedAt).getTime();
+      if (age > 3600000) {
+        var existing = document.getElementById('stale-notice');
+        if (!existing) {
+          var notice = document.createElement('div');
+          notice.id = 'stale-notice';
+          notice.className = 'stale-notice';
+          notice.textContent = '\u26A0 Data may be stale (generated more than 1 hour ago)';
+          var container = document.querySelector('.container');
+          if (container) container.insertBefore(notice, container.children[1]);
+        }
+      }
+    }
+  })();
 })();
 </script>
 </body>
