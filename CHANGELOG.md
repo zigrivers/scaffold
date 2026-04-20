@@ -4,6 +4,13 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.18.1] — 2026-04-20
+
+### Changed
+- **Internal cleanup** — removed redundant fallback chains at 3 consumer sites (`run.ts`, `status.ts`, `next.ts`) that read cross-reads. Since v3.18.0, `OverlayState.crossReads` is required and populated per-step by `resolveOverlayState` (and `resolvePipeline`'s config-null fallback), so the `?.` optional chain and the frontmatter fallback were dead code. Simplified to `pipeline.overlay.crossReads[slug] ?? []` (defensive `?? []` preserved for steps not in `metaPrompts`, e.g. stale state entries in `status`).
+- **`resolveOverlayState` pass-1 threading** — project-type overlay `applyOverlay` call now passes the tracked working variables (`overlayKnowledge`/`overlayReads`/`overlayDependencies`) uniformly with pass 2. Behavior-preserving (references are identical at pass-1 entry); eliminates an asymmetry footgun.
+- **Test-mock parity** — the hoisted `resolveOverlayState` mocks in `run/status/next` test files now mirror the real function by populating `crossReads` per-step from `metaPrompts`, replacing the stale `crossReads: {}` default that previously relied on the now-removed consumer-site frontmatter fallback.
+
 ## [3.18.0] — 2026-04-19
 
 ### Added
