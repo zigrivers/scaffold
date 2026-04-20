@@ -474,7 +474,10 @@ cross-reads-overrides:
       const { overlay, warnings } = loadOverlay(tmpPath)
       expect(overlay).not.toBeNull()
       expect(overlay!.crossReadsOverrides).toEqual({})
-      expect(warnings.some(w => w.code === 'OVERLAY_CROSS_READS_NOT_ALLOWED')).toBe(true)
+      // Fires exactly once per load, regardless of how many child keys were declared.
+      // Lock against a regression that pushes the warning per-key.
+      const notAllowed = warnings.filter(w => w.code === 'OVERLAY_CROSS_READS_NOT_ALLOWED')
+      expect(notAllowed).toHaveLength(1)
     } finally {
       fs.rmSync(tmpPath, { force: true })
     }
