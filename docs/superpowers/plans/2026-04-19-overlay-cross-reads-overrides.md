@@ -19,18 +19,18 @@
 | # | Title | Files | Risk |
 |---|-------|-------|------|
 | 1 | Warning factories | 2 | — |
-| 2 | `CrossReadsOverride` type + `PipelineOverlay.crossReadsOverrides` | 2 | — |
-| 3 | `parseCrossReadsOverrides()` | 2 | parser edge cases |
+| 2 | `CrossReadsOverride` type + `PipelineOverlay.crossReadsOverrides` | 5 | explicit compile-site list (overlay-loader + overlay-resolver.test) |
+| 3 | `parseCrossReadsOverrides()` | 2 | parser edge cases (incl. silent-ignore of unrecognized keys) |
 | 4 | Wire parser into `loadStructuralOverlay` | 2 | — |
 | 5 | Strip `cross-reads-overrides` from `loadOverlay` (project-type) | 2 | — |
-| 6 | Defense-in-depth strip in `loadSubOverlay` | 2 | unreachable branch — test strip logic directly |
-| 7 | `applyCrossReadsOverrides` + extend `applyOverlay` signature | 3 | cross-task type ripple |
-| 8 | Make `OverlayState.crossReads` required + fix hoisted mocks | 5 | ripple through next/status/run test mocks |
-| 9 | `resolveOverlayState` threads `crossReadsMap` through both passes | 2 | five-map reassignment |
-| 10 | `resolver.ts` fallback branch builds frontmatter `crossReads` | 2 | config=null regression |
-| 11 | `resolveTransitiveCrossReads` gets `overlayCrossReads?` param | 2 | preserve `foreignMeta` guard |
-| 12 | `run.ts` passes `pipeline.overlay.crossReads` to transitive resolver | 2 | mock signature update |
-| 13 | E2E: overlay-only cross-read surfaces through `buildGraph` | 1 | — |
+| 6 | `loadSubOverlay` warning-message update + defense-in-depth strip | 2 | test the reachable message-text change; branch unreachable via public API |
+| 7 | `applyCrossReadsOverrides` + extend `applyOverlay` signature | 3 | cross-task type ripple — explicit call-site list |
+| 8 | `OverlayState.crossReads` required + resolver.ts placeholder + hoisted mocks | 5 | pure type/mock change; no behavioral assertions changed |
+| 9 | `resolveOverlayState` threads `crossReadsMap` through both passes | 2 | both passes exercised; stale Wave 3c assertion rewritten (no `.skip`) |
+| 10 | `resolver.ts` fallback branch builds frontmatter `crossReads` | 2 | full `PipelineContext` in test |
+| 11 | `resolveTransitiveCrossReads` + `overlayCrossReads?` + `dependency.ts` comment | 3 | preserve `foreignMeta` guard |
+| 12 | `run.ts` forwards `pipeline.overlay.crossReads` (10th positional arg) | 2 | sentinel-object assertion |
+| 13 | E2E: overlay append surfaces through `buildGraph` → `crossDependencies` + transitive | 2 | two acceptance tests |
 
 ---
 
@@ -222,26 +222,77 @@ export interface PipelineOverlay {
 Run: `npx vitest run src/types/config.test.ts && npx tsc --noEmit`
 Expected: PASS.
 
-The tsc pass means existing `PipelineOverlay` constructors (in overlay-loader, test fixtures) are breaking. That's intentional — we'll fix them in Task 4 (loader) and Task 8 (test fixtures). For now, the minimum fix keeping tsc green is to add `crossReadsOverrides: {}` to every compile-site that fails. Run `npx tsc --noEmit 2>&1 | head -40` to see which files need it, then add the field as `crossReadsOverrides: {}` wherever the error says "missing property":
+The tsc pass means existing `PipelineOverlay` constructors are breaking. That's intentional — the full parser wiring comes in Task 4. For now, apply the minimum-compile fix (add `crossReadsOverrides: {}` to every hit below) so `npx tsc --noEmit` is clean at the end of Task 2.
 
-Run: `npx tsc --noEmit 2>&1 | grep "crossReadsOverrides" | head -20`
+**Explicit compile-site list (confirmed by grep + code review — no hunting required):**
 
-Expected locations based on the spec's §6 file list:
-- `src/core/assembly/overlay-loader.ts` — two `PipelineOverlay` literals (in `loadOverlay`, `loadStructuralOverlay`). Add `crossReadsOverrides: {}` to each. The full parser wiring comes in Task 4.
-- `src/core/assembly/overlay-loader-structural.test.ts` — any `PipelineOverlay` test literal.
-- `src/types/config.test.ts` — same, but the new tests you just added already include `crossReadsOverrides`.
+**Site A**: `src/core/assembly/overlay-loader.ts` — `loadOverlay` builds a `PipelineOverlay` literal around line 227. Add `crossReadsOverrides: {}` to it:
 
-Apply minimum patches (just `crossReadsOverrides: {}` to each failing site) so `npx tsc --noEmit` is clean.
+```typescript
+const overlay: PipelineOverlay = {
+  name: (obj['name'] as string).trim(),
+  description: (obj['description'] as string).trim(),
+  projectType: (obj['project-type'] as string).trim() as PipelineOverlay['projectType'],
+  stepOverrides: parseStepOverrides(stepOverridesRaw, warnings, overlayPath),
+  knowledgeOverrides: parseKnowledgeOverrides(knowledgeOverridesRaw, warnings, overlayPath),
+  readsOverrides: parseReadsOverrides(readsOverridesRaw, warnings, overlayPath),
+  dependencyOverrides: parseDependencyOverrides(dependencyOverridesRaw, warnings, overlayPath),
+  crossReadsOverrides: {},  // NEW — placeholder; Task 5 replaces with the strip-and-warn logic
+}
+```
+
+**Site B**: `src/core/assembly/overlay-loader.ts` — `loadStructuralOverlay` builds a second `PipelineOverlay` literal around line 340. Add `crossReadsOverrides: {}`:
+
+```typescript
+const overlay: PipelineOverlay = {
+  name: (obj['name'] as string).trim(),
+  description: (obj['description'] as string).trim(),
+  stepOverrides: parseStepOverrides(stepOverridesRaw, warnings, overlayPath),
+  knowledgeOverrides: parseKnowledgeOverrides(knowledgeOverridesRaw, warnings, overlayPath),
+  readsOverrides: parseReadsOverrides(readsOverridesRaw, warnings, overlayPath),
+  dependencyOverrides: parseDependencyOverrides(dependencyOverridesRaw, warnings, overlayPath),
+  crossReadsOverrides: {},  // NEW — placeholder; Task 4 replaces with parseCrossReadsOverrides(...)
+}
+```
+
+**Site C**: `src/core/assembly/overlay-resolver.test.ts` — the file has a `makeOverlay()` factory at lines 5–14 that constructs a `PipelineOverlay`. Add `crossReadsOverrides: {},` to the default:
+
+```typescript
+function makeOverlay(overrides: Partial<PipelineOverlay> = {}): PipelineOverlay {
+  return {
+    name: 'test-overlay',
+    description: 'Test overlay',
+    stepOverrides: {},
+    knowledgeOverrides: {},
+    readsOverrides: {},
+    dependencyOverrides: {},
+    crossReadsOverrides: {},   // NEW
+    ...overrides,
+  }
+}
+```
+
+**Site D**: `src/core/assembly/overlay-loader-structural.test.ts` — if the test file constructs any `PipelineOverlay` literal directly (not via a factory), add `crossReadsOverrides: {}`. Scan the file for `PipelineOverlay =` — most tests use `loadStructuralOverlay()` returns and don't need a change.
+
+Leave `src/types/config.test.ts` alone — the tests added in Step 1 already include `crossReadsOverrides`.
+
+Final safety check:
+
+```
+npx tsc --noEmit 2>&1 | grep "crossReadsOverrides\|Property 'crossReadsOverrides'" | head -5
+```
+
+Expected: no output (all sites fixed).
 
 - [ ] **Step 6: Run full type check + regression**
 
-Run: `npx tsc --noEmit && npx vitest run src/types/config.test.ts src/core/assembly/overlay-loader-structural.test.ts`
+Run: `npx tsc --noEmit && npx vitest run src/types/config.test.ts src/core/assembly/overlay-loader-structural.test.ts src/core/assembly/overlay-resolver.test.ts`
 Expected: PASS.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/types/config.ts src/types/config.test.ts src/core/assembly/overlay-loader.ts src/core/assembly/overlay-loader-structural.test.ts
+git add src/types/config.ts src/types/config.test.ts src/core/assembly/overlay-loader.ts src/core/assembly/overlay-resolver.test.ts src/core/assembly/overlay-loader-structural.test.ts
 git commit -m "feat(overlay): add CrossReadsOverride + crossReadsOverrides on PipelineOverlay"
 ```
 
@@ -403,6 +454,28 @@ describe('parseCrossReadsOverrides', () => {
     const itemWarning = warnings.find(w => w.code === 'OVERLAY_MALFORMED_APPEND_ITEM')
     expect(itemWarning?.context?.index).toBe(1)
   })
+
+  it('silently ignores unrecognized per-entry keys (e.g. replace) — matches knowledge-overrides behavior', () => {
+    // Spec §1.1: per-entry keys other than `append` are silently dropped,
+    // mirroring how parseKnowledgeOverrides treats the same shape.
+    const warnings: ScaffoldWarning[] = []
+    const result = parseCrossReadsOverrides(
+      {
+        'system-architecture': {
+          append: [{ service: 'billing', step: 'api-contracts' }],
+          replace: { foo: 'bar' },  // unrecognized — should be ignored silently
+          extraKey: 42,             // unrecognized — should be ignored silently
+        } as unknown as Record<string, unknown>,
+      },
+      warnings,
+      '/path/to.yml',
+    )
+    expect(result['system-architecture'].append).toEqual([
+      { service: 'billing', step: 'api-contracts' },
+    ])
+    // No warnings for unrecognized keys
+    expect(warnings).toHaveLength(0)
+  })
 })
 ```
 
@@ -478,7 +551,7 @@ export function parseCrossReadsOverrides(
 - [ ] **Step 5: Run tests to verify pass**
 
 Run: `npx vitest run src/core/assembly/overlay-loader.test.ts -t "parseCrossReadsOverrides" && npx tsc --noEmit`
-Expected: PASS — 8 tests green.
+Expected: PASS — 9 tests green (8 from spec §5 + silent-ignore of unrecognized keys per spec §1.1).
 
 - [ ] **Step 6: Commit**
 
@@ -713,7 +786,7 @@ const overrideSections = [
 ] as const
 ```
 
-**3b.** Between the existing raw extractions and the `overlay` construction (around lines 213–229), detect + strip + warn for `cross-reads-overrides`:
+**3b.** Between the existing raw extractions and the `overlay` construction (around lines 213–229), detect + warn for `cross-reads-overrides`. The NEW lines are ONLY the `if (obj['cross-reads-overrides'] !== undefined)` block — the four existing raw extractions are already in the file; do not duplicate them, just insert the new block BEFORE them and keep the existing extractions as-is. The final shape looks like:
 
 ```typescript
 // Project-type overlays are forbidden from declaring cross-reads-overrides.
@@ -721,13 +794,25 @@ const overrideSections = [
 if (obj['cross-reads-overrides'] !== undefined) {
   warnings.push(overlayCrossReadsNotAllowed(overlayPath))
 }
+// No parse — overlay.crossReadsOverrides is set to {} in the literal below.
 
-// Do NOT parse cross-reads-overrides — set to {} in the overlay literal below.
-
+// ────────────────────────────────────────────────────────────────────────
+// BELOW THIS LINE: the four existing raw extractions are already in the
+// file. DO NOT duplicate them. They look like this — reference only:
+// ────────────────────────────────────────────────────────────────────────
 const stepOverridesRaw = isPlainObject(obj['step-overrides'])
   ? obj['step-overrides'] as Record<string, unknown> : {}
-// ... (existing raw extractions) ...
+const knowledgeOverridesRaw = isPlainObject(obj['knowledge-overrides'])
+  ? obj['knowledge-overrides'] as Record<string, unknown> : {}
+const readsOverridesRaw = isPlainObject(obj['reads-overrides'])
+  ? obj['reads-overrides'] as Record<string, unknown> : {}
+const dependencyOverridesRaw = isPlainObject(obj['dependency-overrides'])
+  ? obj['dependency-overrides'] as Record<string, unknown> : {}
+```
 
+**3c.** Update the existing `PipelineOverlay` literal (Task 2 added `crossReadsOverrides: {}` as a placeholder; leave that value but refresh the comment):
+
+```typescript
 const overlay: PipelineOverlay = {
   name: (obj['name'] as string).trim(),
   description: (obj['description'] as string).trim(),
@@ -736,7 +821,7 @@ const overlay: PipelineOverlay = {
   knowledgeOverrides: parseKnowledgeOverrides(knowledgeOverridesRaw, warnings, overlayPath),
   readsOverrides: parseReadsOverrides(readsOverridesRaw, warnings, overlayPath),
   dependencyOverrides: parseDependencyOverrides(dependencyOverridesRaw, warnings, overlayPath),
-  crossReadsOverrides: {},    // structural-only — not parsed here (see above warning)
+  crossReadsOverrides: {},    // structural-only — any value in YAML is rejected above
 }
 ```
 
@@ -754,16 +839,48 @@ git commit -m "feat(overlay): strip cross-reads-overrides from project-type over
 
 ---
 
-## Task 6: Defense-in-depth strip in `loadSubOverlay`
+## Task 6: `loadSubOverlay` warning-message update + defense-in-depth strip
 
 **Files:**
 - Modify: `src/core/assembly/overlay-loader.ts` (update `loadSubOverlay` around lines 242–269)
+- Test: `src/core/assembly/overlay-loader.test.ts` — this file already has a `describe('loadSubOverlay', ...)` block at line ~227 with SUB_OVERLAY_NON_KNOWLEDGE tests. Append the new test inside that existing block.
 
 **Goal:** `loadSubOverlay` also strips `crossReadsOverrides` (defense-in-depth) and updates its `SUB_OVERLAY_NON_KNOWLEDGE` warning message to mention cross-reads.
 
-Note: `loadSubOverlay` wraps `loadOverlay`, which already strips `cross-reads-overrides` (Task 5). By the time `loadSubOverlay` runs its checks, `overlay.crossReadsOverrides` is already `{}`. This task is defense-in-depth against a future path that bypasses `loadOverlay`. No direct test is claimed for the unreachable branch — we just make the code correct.
+Note: `loadSubOverlay` wraps `loadOverlay`, which already strips `cross-reads-overrides` (Task 5). By the time `loadSubOverlay` runs its checks, `overlay.crossReadsOverrides` is already `{}`. The `hasCrossReads` branch is therefore unreachable via the public API — but the **warning message text change** IS reachable: any sub-overlay with step/reads/dependency overrides triggers `SUB_OVERLAY_NON_KNOWLEDGE`, and the message now mentions cross-reads. That text is what we TDD against.
 
-- [ ] **Step 1: Update `loadSubOverlay` in `src/core/assembly/overlay-loader.ts`**
+- [ ] **Step 1: Write failing test for updated warning message text**
+
+Append the following test INSIDE the existing `describe('loadSubOverlay', ...)` block in `src/core/assembly/overlay-loader.test.ts` (located at line ~227). Do NOT create a new test file — the existing block already has imports for `loadSubOverlay`, `fs`, `path`, `os`:
+
+```typescript
+it('SUB_OVERLAY_NON_KNOWLEDGE message mentions cross-reads in the stripped-sections list', () => {
+  const tmpPath = path.join(os.tmpdir(), `sub-overlay-${Date.now()}.yml`)
+  fs.writeFileSync(tmpPath, `
+name: fintech
+description: test sub-overlay with step-overrides (triggers SUB_OVERLAY_NON_KNOWLEDGE)
+project-type: backend
+step-overrides:
+  some-step: { enabled: true }
+`)
+  try {
+    const { warnings } = loadSubOverlay(tmpPath)
+    const sub = warnings.find(w => w.code === 'SUB_OVERLAY_NON_KNOWLEDGE')
+    expect(sub).toBeDefined()
+    // Message must mention cross-reads in the list of stripped section types
+    expect(sub!.message).toContain('cross-reads')
+  } finally {
+    fs.rmSync(tmpPath, { force: true })
+  }
+})
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `npx vitest run src/core/assembly/overlay-loader.test.ts -t "SUB_OVERLAY_NON_KNOWLEDGE message mentions cross-reads"`
+Expected: FAIL — current message reads `(step/reads/dependency overrides)`, does not include "cross-reads".
+
+- [ ] **Step 3: Update `loadSubOverlay` in `src/core/assembly/overlay-loader.ts`**
 
 Current code (lines ~248–266):
 
@@ -818,16 +935,16 @@ if (hasStep || hasReads || hasDeps || hasCrossReads) {
 }
 ```
 
-- [ ] **Step 2: Run full overlay-loader tests to verify no regression**
+- [ ] **Step 4: Run full overlay-loader tests to verify new test passes + no regression**
 
 Run: `npx vitest run src/core/assembly/overlay-loader.test.ts src/core/assembly/overlay-loader-structural.test.ts && npx tsc --noEmit`
-Expected: PASS.
+Expected: PASS — new test is green, existing tests still pass.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add src/core/assembly/overlay-loader.ts
-git commit -m "feat(overlay): defense-in-depth cross-reads strip in loadSubOverlay"
+git add src/core/assembly/overlay-loader.ts src/core/assembly/overlay-loader.test.ts
+git commit -m "feat(overlay): defense-in-depth cross-reads strip in loadSubOverlay + warning message update"
 ```
 
 ---
@@ -1052,30 +1169,50 @@ function applyCrossReadsOverrides(
 
 - [ ] **Step 5: Fix compile errors at other `applyOverlay` call sites**
 
-Run: `npx tsc --noEmit 2>&1 | grep "applyOverlay\|arguments" | head -20`
+Two files break: `src/core/assembly/overlay-state-resolver.ts` (two call sites) and `src/core/assembly/overlay-resolver.test.ts` (existing Wave 3c tests).
 
-Expected: failures at `src/core/assembly/overlay-state-resolver.ts` (two `applyOverlay` calls) + potentially existing `overlay-resolver.test.ts` tests.
+**5a — overlay-state-resolver.ts**: find both `applyOverlay(...)` calls (one for the project-type overlay pass, one for the structural overlay pass). Each currently passes 5 args. Add `{}` as the 5th arg (before the `overlay` parameter) — this is a temporary placeholder; Task 9 replaces `{}` with the real threaded map.
 
-In `src/core/assembly/overlay-state-resolver.ts`, both existing `applyOverlay` calls currently pass 5 args — add a 6th argument before the `overlay` parameter so the `crossReadsMap` is passed. The minimal-compile patch for Task 7 is to pass an empty `{}` for the map at both sites (Task 9 will thread the real map):
-
-Find the two `applyOverlay(...)` calls in `overlay-state-resolver.ts` and add `{},` before the final `overlay` argument (temporary placeholder — Task 9 replaces `{}` with the real map):
+Both call sites end up looking like:
 
 ```typescript
 const merged = applyOverlay(
   overlaySteps,
-  knowledgeMap,
-  readsMap,
-  dependencyMap,
-  {},              // NEW — crossReadsMap placeholder; Task 9 plumbs the real map
-  overlay,
+  knowledgeMap,     // or overlayKnowledge in pass 2
+  readsMap,         // or overlayReads in pass 2
+  dependencyMap,    // or overlayDependencies in pass 2
+  {},               // NEW — crossReadsMap placeholder; Task 9 plumbs the real map
+  overlay,          // or msOverlay in pass 2
 )
 ```
 
-Apply the same to both `applyOverlay` calls in the file. If the merged result is destructured, it'll still be missing `crossReads` — either ignore it for now (spread operator preserves it) or add `crossReads` to the destructure. Minimum-change patch: just add `{}` and trust the spread `overlaySteps = merged.steps` etc. still works.
+**Destructure handling** (resolve the ambiguity): each call site currently assigns individual fields back to working variables (`overlaySteps = merged.steps`, etc.). Do NOT add a `crossReads = merged.crossReads` line in Task 7 — those working variables don't exist yet (they're introduced in Task 9). `merged.crossReads` is ignored here; TypeScript's structural typing allows the extra property to go unused. Task 9 wires the reassignment.
 
-In `src/core/assembly/overlay-resolver.test.ts`, any existing `applyOverlay(...)` call that passes only 5 args must add `{}` as the new 5th arg (before the overlay arg). Run tsc to see which lines need updating:
+**5b — overlay-resolver.test.ts**: every existing `applyOverlay(...)` call in this file currently passes 5 args. Add `{}` as the new 5th arg (before the overlay arg). The file uses a repeating pattern:
 
-Run: `npx tsc --noEmit 2>&1 | grep "overlay-resolver.test.ts" | head -10`
+```typescript
+// Before:
+const result = applyOverlay(steps, knowledge, reads, deps, overlay)
+
+// After (add {} before overlay):
+const result = applyOverlay(steps, knowledge, reads, deps, {}, overlay)
+```
+
+**Apply this edit to every `applyOverlay(` call in the file** (no exact count assumed — verify with the grep below). Every call has the same 5 → 6 argument shape.
+
+```
+grep -c "applyOverlay(" src/core/assembly/overlay-resolver.test.ts
+```
+
+Run that before and after editing. The count of `applyOverlay(` occurrences does NOT change (only the argument list inside each call); use the grep to cross-check you've edited the same number of call sites. Use `npx tsc --noEmit` as the final authority — if tsc is green for this file, every call has the right arity.
+
+Verify with:
+
+```
+npx tsc --noEmit 2>&1 | grep "overlay-resolver.test.ts\|overlay-state-resolver.ts" | head -10
+```
+
+Expected: no output.
 
 - [ ] **Step 6: Run tests + tsc**
 
@@ -1091,14 +1228,16 @@ git commit -m "feat(overlay): applyCrossReadsOverrides helper + extend applyOver
 
 ---
 
-## Task 8: Make `OverlayState.crossReads` required + fix hoisted mocks
+## Task 8: Make `OverlayState.crossReads` required + fix all compile sites
 
 **Files:**
 - Modify: `src/core/assembly/overlay-state-resolver.ts` (drop `?` from field)
-- Modify: `src/cli/commands/run.test.ts`, `src/cli/commands/next.test.ts`, `src/cli/commands/status.test.ts` (add `crossReads: {}` to hoisted `resolveOverlayState` mocks)
-- Test: `src/core/assembly/overlay-state-resolver.test.ts`
+- Modify: `src/core/pipeline/resolver.ts` (add `crossReads: {}` placeholder to fallback branch — Task 10 later replaces with frontmatter map)
+- Modify: `src/cli/commands/run.test.ts` (hoisted mock + any ad-hoc returns)
+- Modify: `src/cli/commands/next.test.ts` (hoisted mock + any ad-hoc returns)
+- Modify: `src/cli/commands/status.test.ts` (hoisted mock + any ad-hoc returns)
 
-**Goal:** `OverlayState.crossReads` is required. Mocks across the three command test files gain `crossReads: {}` in their returned overlay.
+**Goal:** `OverlayState.crossReads` becomes required. All compile sites that construct an `OverlayState` without the field get the minimum-compile fix (`crossReads: {}`). This task is **purely type + mock work** — no behavioral test changes here. The behavioral contract that `resolveOverlayState` now populates `crossReads` from frontmatter is driven by Task 9 (which owns the failing test + the real implementation).
 
 - [ ] **Step 1: Update `OverlayState` interface**
 
@@ -1128,14 +1267,38 @@ export interface OverlayState {
 }
 ```
 
-- [ ] **Step 2: Run tsc to find all broken mocks**
+- [ ] **Step 2: Run tsc to confirm the break surface**
 
-Run: `npx tsc --noEmit 2>&1 | grep "crossReads" | head -20`
-Expected: errors in `run.test.ts`, `next.test.ts`, `status.test.ts`, `resolver.ts` fallback branch, existing `overlay-state-resolver.test.ts`.
+Run: `npx tsc --noEmit 2>&1 | grep "crossReads\|Property 'crossReads'" | head -20`
+Expected: errors in `src/core/pipeline/resolver.ts` (fallback branch) and the three hoisted mocks in `src/cli/commands/run.test.ts`, `next.test.ts`, `status.test.ts`. `overlay-state-resolver.test.ts` does NOT appear — it only reads `result.crossReads` (never constructs an `OverlayState` literal), and the Wave 3c assertion `expect(result.crossReads).toEqual({})` remains valid during Task 8 (behavior unchanged; Task 9 rewrites that test alongside the behavior change).
 
-- [ ] **Step 3: Add `crossReads: {}` to hoisted mocks**
+The next steps fix each site. No hunting required — the list is explicit below.
 
-In each of `src/cli/commands/run.test.ts`, `src/cli/commands/next.test.ts`, `src/cli/commands/status.test.ts`, find the hoisted `vi.mock('../../core/assembly/overlay-state-resolver.js', ...)`:
+- [ ] **Step 3: Add `crossReads: {}` placeholder to `src/core/pipeline/resolver.ts` fallback branch**
+
+The fallback branch currently constructs `OverlayState` without `crossReads` (around lines 80–90). This is Task 10's territory to populate from frontmatter — for Task 8, add only the placeholder to keep tsc green:
+
+```typescript
+} else {
+  const knowledge: Record<string, string[]> = {}
+  const reads: Record<string, string[]> = {}
+  const dependencies: Record<string, string[]> = {}
+  for (const [name, mp] of metaPrompts) {
+    knowledge[name] = [...(mp.frontmatter.knowledgeBase ?? [])]
+    reads[name] = [...(mp.frontmatter.reads ?? [])]
+    dependencies[name] = [...(mp.frontmatter.dependencies ?? [])]
+  }
+  overlay = { steps: mergedSteps, knowledge, reads, dependencies, crossReads: {} }
+  //                                                              ^^^^^^^^^^^^^^^
+  //                                      NEW placeholder — Task 10 replaces with frontmatter map
+}
+```
+
+- [ ] **Step 4: Add `crossReads: {}` to hoisted `resolveOverlayState` mocks**
+
+Update all three files below — each has the same hoisted mock pattern. Do not grep for other ad-hoc returns; the next step handles those explicitly.
+
+**4a — `src/cli/commands/run.test.ts`** (hoisted mock block near line 68–77, verify exact lines by grepping `vi.mock\\('\\.\\./\\.\\./core/assembly/overlay-state-resolver'`):
 
 ```typescript
 vi.mock('../../core/assembly/overlay-state-resolver.js', () => ({
@@ -1144,33 +1307,83 @@ vi.mock('../../core/assembly/overlay-state-resolver.js', () => ({
     knowledge: {},
     reads: {},
     dependencies: {},
+    crossReads: {},    // NEW
   })),
 }))
 ```
 
-Change the returned object to include `crossReads: {}`:
+**4b — `src/cli/commands/next.test.ts`**: same edit, add `crossReads: {},` to the mock's returned object.
+
+**4c — `src/cli/commands/status.test.ts`**: same edit, add `crossReads: {},` to the mock's returned object.
+
+- [ ] **Step 5: Fix ad-hoc `resolveOverlayState` return-value overrides (explicit site list)**
+
+Some tests use `mockReturnValue({...})` to override the hoisted mock for a single test. These multiline overrides are NOT caught by a line-oriented grep. Here is the complete enumerated list (confirmed by grep for `knowledge: {}` under an override call site):
+
+**`src/cli/commands/run.test.ts`** — 1 site:
+- Around line 1646 (`describe('overlay application', ...)` → `it('applies overlay when resolveOverlayState returns disabled steps', ...)`). Add `crossReads: {},` to the returned object:
 
 ```typescript
-vi.mock('../../core/assembly/overlay-state-resolver.js', () => ({
-  resolveOverlayState: vi.fn(({ presetSteps }: { presetSteps: Record<string, unknown> }) => ({
-    steps: presetSteps,
-    knowledge: {},
-    reads: {},
-    dependencies: {},
-    crossReads: {},
-  })),
-}))
+vi.mocked(resolveOverlayState).mockReturnValue({
+  steps: {
+    'create-prd': { enabled: false },
+  },
+  knowledge: { 'create-prd': [] },
+  reads: { 'create-prd': [] },
+  dependencies: { 'create-prd': [] },
+  crossReads: {},     // NEW
+})
 ```
 
-Also check test bodies that call `mockOverlay.mockReturnValue({ steps, knowledge, reads, dependencies })` or similar ad-hoc returns — add `crossReads: {}` to each.
+**`src/cli/commands/next.test.ts`** — 4 sites:
+- Around line 332–338 (multiline `mockOverlay.mockReturnValue({steps: {...}, knowledge: {}, ...})`): add `crossReads: {},`
+- Around line 427–430 (compact `mockOverlay.mockReturnValue({ steps: {}, knowledge: {}, reads: {}, dependencies: {} })`): change to `{ steps: {}, knowledge: {}, reads: {}, dependencies: {}, crossReads: {} }`
+- Around line 477–480: same compact shape — add `crossReads: {}`
+- Around line 507–510: same compact shape — add `crossReads: {}`
 
-Run: `grep -n "knowledge: {}, reads: {}, dependencies: {}" src/cli/commands/*.test.ts` to find all ad-hoc returns that need the same update.
+**`src/cli/commands/status.test.ts`** — 1 site:
+- Around line 372–380 (multiline `mockOverlay.mockReturnValue({steps: {...}, knowledge: {}, ...})`): add `crossReads: {},`
 
-- [ ] **Step 4: Update stale Wave 3c assertion**
+Line numbers may drift slightly during edits. Verify each hit by running this grep after editing — expected output: none (all sites fixed):
 
-In `src/core/assembly/overlay-state-resolver.test.ts`, there is a test with the description *"returns crossReads as empty object even when frontmatter has crossReads"* (from Wave 3c round 5). That assertion becomes wrong: with this feature, when frontmatter has crossReads, `resolveOverlayState()` returns them populated (not `{}`). Find the test (search for `returns crossReads as empty object`) and update its expectation:
+```
+grep -n "knowledge: {}, reads: {}, dependencies: {}" src/cli/commands/run.test.ts src/cli/commands/next.test.ts src/cli/commands/status.test.ts
+```
+
+The grep still finds compact `{ steps, knowledge, reads, dependencies }` literals that now need `crossReads` — fix any remaining hits by adding `crossReads: {}` to that object.
+
+- [ ] **Step 6: Run tests + tsc**
+
+Run: `npx tsc --noEmit && npx vitest run src/cli/commands/run.test.ts src/cli/commands/next.test.ts src/cli/commands/status.test.ts src/core/assembly/overlay-state-resolver.test.ts`
+Expected: PASS — no test changes, only type/mock compatibility.
+
+Note: the existing Wave 3c test at `src/core/assembly/overlay-state-resolver.test.ts` titled `'returns crossReads as empty object even when frontmatter has crossReads'` still exists unchanged at the end of Task 8. Its assertion `expect(result.crossReads).toEqual({})` will still pass here because Task 8 did NOT change `resolveOverlayState`'s behavior — only the interface shape. Task 9 rewrites that assertion alongside the behavior change (no `.skip()` juggling needed).
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/core/assembly/overlay-state-resolver.ts src/core/pipeline/resolver.ts src/cli/commands/run.test.ts src/cli/commands/next.test.ts src/cli/commands/status.test.ts
+git commit -m "feat(overlay): OverlayState.crossReads becomes required; update all compile sites"
+```
+
+---
+
+## Task 9: `resolveOverlayState` threads `crossReadsMap` through both passes
+
+**Files:**
+- Modify: `src/core/assembly/overlay-state-resolver.ts` (update `resolveOverlayState`)
+- Test: `src/core/assembly/overlay-state-resolver.test.ts`
+
+**Goal:** `resolveOverlayState` builds a `crossReadsMap` from frontmatter, threads it through BOTH overlay passes (project-type first, structural second), and returns the merged map as `OverlayState.crossReads`.
+
+- [ ] **Step 1: Rewrite the stale Wave 3c test + add overlay-append test**
+
+In `src/core/assembly/overlay-state-resolver.test.ts` around lines 620–646, find the block titled `'returns crossReads as empty object even when frontmatter has crossReads'`. Replace the surrounding comment AND the test with the new contract:
 
 ```typescript
+// With Wave 3c+1, resolveOverlayState populates OverlayState.crossReads from
+// frontmatter merged with any overlay cross-reads-overrides. Consumers should
+// read `overlay.crossReads?.[slug]` as authoritative.
 it('returns crossReads populated from frontmatter when no overlay overrides configured', () => {
   const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
     ['system-architecture', {
@@ -1196,54 +1409,38 @@ it('returns crossReads populated from frontmatter when no overlay overrides conf
 })
 ```
 
-Note: this test will still FAIL until Task 9 threads the frontmatter map through `resolveOverlayState`. That's expected — Task 9 completes the behavior.
-
-Mark this test as `.skip` for now and let Task 9 un-skip it:
+The sibling test `'returns crossReads as empty object when no step has crossReads'` at line ~648 keeps working (no step has crossReads → each step's entry is `[]` → the object isn't strictly `{}` anymore but has `{ 'some-step': [] }`). Update that test's assertion too:
 
 ```typescript
-it.skip('returns crossReads populated from frontmatter when no overlay overrides configured', () => {
-  // ... same as above — un-skipped at end of Task 9
+it('returns crossReads keyed per-step with empty arrays when no step has crossReads', () => {
+  const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+    ['some-step', { frontmatter: makeFrontmatter({ name: 'some-step' }) }],
+  ])
+  const result = resolveOverlayState({
+    config: makeConfig(), methodologyDir: '/nonexistent', metaPrompts, presetSteps: {}, output: makeOutput(),
+  })
+  expect(result.crossReads['some-step']).toEqual([])
+})
 ```
 
-- [ ] **Step 5: Run tests + tsc**
-
-Run: `npx tsc --noEmit && npx vitest run src/cli/commands/run.test.ts src/cli/commands/next.test.ts src/cli/commands/status.test.ts src/core/assembly/overlay-state-resolver.test.ts`
-Expected: PASS (the skipped test is not counted as failure).
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add src/core/assembly/overlay-state-resolver.ts src/core/assembly/overlay-state-resolver.test.ts src/cli/commands/run.test.ts src/cli/commands/next.test.ts src/cli/commands/status.test.ts
-git commit -m "feat(overlay): OverlayState.crossReads becomes required; update hoisted mocks"
-```
-
----
-
-## Task 9: `resolveOverlayState` threads `crossReadsMap` through both passes
-
-**Files:**
-- Modify: `src/core/assembly/overlay-state-resolver.ts` (update `resolveOverlayState`)
-- Test: `src/core/assembly/overlay-state-resolver.test.ts`
-
-**Goal:** `resolveOverlayState` builds a `crossReadsMap` from frontmatter, threads it through both overlay passes, and returns the merged map as `OverlayState.crossReads`.
-
-- [ ] **Step 1: Write failing tests**
-
-Append to `src/core/assembly/overlay-state-resolver.test.ts` (the new test for overlay append, plus un-skipping the Task 8 skipped test):
+Then append a NEW test that exercises BOTH overlay passes (project-type `projectType: 'backend'` triggers pass 1, `services: [...]` plus a multi-service overlay YAML triggers pass 2). This catches the regression where pass 1 clobbers the map before pass 2:
 
 ```typescript
-it('applies structural overlay crossReadsOverrides on top of frontmatter crossReads', () => {
-  const fixtureDir = path.resolve(__dirname, '../../../tests/fixtures/methodology')
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cross-reads-'))
+it('threads crossReadsMap through BOTH project-type (pass 1) and structural (pass 2) passes', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cross-reads-both-'))
   try {
-    fs.copyFileSync(
-      path.join(fixtureDir, 'multi-service-overlay-empty.yml'),
-      path.join(tmpDir, 'multi-service-overlay.yml'),
-    )
-    // Rewrite the fixture to include cross-reads-overrides
+    // Pass-1 overlay (project-type: backend) — no cross-reads-overrides (forbidden per §4.1)
+    fs.writeFileSync(path.join(tmpDir, 'backend-overlay.yml'), `
+name: backend
+description: pass-1 overlay
+project-type: backend
+step-overrides:
+  system-architecture: { enabled: true }
+`)
+    // Pass-2 overlay (structural multi-service) — owns cross-reads-overrides
     fs.writeFileSync(path.join(tmpDir, 'multi-service-overlay.yml'), `
 name: multi-service
-description: test
+description: pass-2 overlay
 step-overrides:
   system-architecture: { enabled: true }
 cross-reads-overrides:
@@ -1258,6 +1455,9 @@ cross-reads-overrides:
           name: 'system-architecture',
           phase: 'architecture', order: 700,
           outputs: ['docs/arch.md'],
+          // Frontmatter entry MUST survive both passes. Pass 1 is a no-op for
+          // cross-reads (§4.1), pass 2 appends. A bug that zeroes the map
+          // before pass 2 would drop this entry.
           crossReads: [{ service: 'shared-lib', step: 'api-contracts' }],
         }),
       }],
@@ -1265,7 +1465,8 @@ cross-reads-overrides:
     const result = resolveOverlayState({
       config: makeConfig({
         project: {
-          services: [{
+          projectType: 'backend',        // triggers pass 1
+          services: [{                    // triggers pass 2
             name: 'api', projectType: 'backend',
             backendConfig: { apiStyle: 'rest' },
           }],
@@ -1277,10 +1478,10 @@ cross-reads-overrides:
       presetSteps: {},
       output: makeOutput(),
     })
-    // Frontmatter crossRead + structural overlay append
+    // Frontmatter entry (preserved through pass 1) + overlay append from pass 2
     expect(result.crossReads['system-architecture']).toEqual([
-      { service: 'shared-lib', step: 'api-contracts' },
-      { service: 'billing', step: 'api-contracts' },
+      { service: 'shared-lib', step: 'api-contracts' },  // from frontmatter
+      { service: 'billing', step: 'api-contracts' },      // from structural overlay
     ])
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true })
@@ -1288,18 +1489,12 @@ cross-reads-overrides:
 })
 ```
 
-If `tests/fixtures/methodology/multi-service-overlay-empty.yml` doesn't exist, write the file directly in the test (don't use copyFileSync) — just create a new tmp file with the desired contents.
-
-Also un-skip the Task 8 skipped test:
-
-```typescript
-// Change `it.skip(` → `it(` for the "returns crossReads populated from frontmatter ..." test
-```
+Note: **no `copyFileSync`, no fixture-file dependency**. The test writes its own YAML into a temp directory. Ensure `fs`, `path`, `os` are imported at the top.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `npx vitest run src/core/assembly/overlay-state-resolver.test.ts -t "crossReads"`
-Expected: FAIL — no frontmatter threading yet.
+Expected: FAIL — the rewritten "populated from frontmatter" test fails because `resolveOverlayState` still returns `{}` for `crossReads`; the new both-passes test fails for the same reason.
 
 - [ ] **Step 3: Thread `crossReadsMap` through `resolveOverlayState`**
 
@@ -1431,31 +1626,26 @@ git commit -m "feat(overlay): resolveOverlayState threads crossReadsMap through 
 
 **Files:**
 - Modify: `src/core/pipeline/resolver.ts` (update the `config === null` fallback branch around line 80–90)
-- Test: `src/core/pipeline/resolver.test.ts` (or existing test file — discover with grep)
+- Test: `src/core/pipeline/resolver.test.ts` (check if exists; if not, create)
 
-**Goal:** When `config` is null (no `.scaffold/config.yml`), `resolvePipeline` still returns a populated `overlay.crossReads` map from frontmatter.
+**Goal:** When `config` is null (no `.scaffold/config.yml`), `resolvePipeline` still returns a populated `overlay.crossReads` map from frontmatter (not the `{}` placeholder left by Task 8).
 
-- [ ] **Step 1: Locate an existing resolver test**
+- [ ] **Step 1: Check if `src/core/pipeline/resolver.test.ts` exists**
 
-Run: `ls src/core/pipeline/resolver.test.ts 2>/dev/null || grep -rln "resolvePipeline" src/core/pipeline/ 2>/dev/null | head -3`
+Run: `ls src/core/pipeline/resolver.test.ts 2>/dev/null || echo "NOT FOUND"`
 
-If no test file exists for `resolver.ts`, this task's test lives in the closest integration test. Grep for `config === null` or similar no-config assertions to find where to add:
+If NOT FOUND, create the file with the imports and helpers below. If it exists, add `resolvePipeline` + `MetaPromptFile` + `path`/`vi` etc. to the imports if missing and skip the helper-definition boilerplate.
 
-Run: `grep -rln "config: null\|ctx.config = null\|ctx\.config = undefined" src/ 2>/dev/null | head`
-
-If no suitable file exists, create `src/core/pipeline/resolver.test.ts` with minimal imports:
+Test-file scaffolding (put this at the top of a new file, or merge into existing imports):
 
 ```typescript
 import { describe, it, expect, vi } from 'vitest'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { resolvePipeline } from './resolver.js'
 import type { MetaPromptFile } from '../../types/index.js'
+import type { PipelineContext } from './types.js'
+import type { OutputContext } from '../../cli/output/context.js'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const fixtureDir = path.resolve(__dirname, '../../../tests/fixtures/methodology')
-
-function makeOutput() {
+function makeOutput(): OutputContext {
   return {
     success: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(),
     result: vi.fn(),
@@ -1464,6 +1654,22 @@ function makeOutput() {
     multiSelect: vi.fn(), multiInput: vi.fn(),
     startSpinner: vi.fn(), stopSpinner: vi.fn(),
     startProgress: vi.fn(), updateProgress: vi.fn(), stopProgress: vi.fn(),
+  } as unknown as OutputContext
+}
+
+/** Build a minimal valid PipelineContext for the config=null path.
+ *  Every field required by the PipelineContext interface is set — resolvePipeline
+ *  dereferences `presets.deep` on line 54, so these cannot be omitted. */
+function makeCtx(overrides: Partial<PipelineContext> = {}): PipelineContext {
+  return {
+    projectRoot: '/fake/root',
+    metaPrompts: new Map(),
+    config: null,
+    configErrors: [],
+    configWarnings: [],
+    presets: { mvp: null, deep: null, custom: null },
+    methodologyDir: '/fake/methodology',
+    ...overrides,
   }
 }
 ```
@@ -1492,12 +1698,8 @@ describe('resolvePipeline fallback (no config)', () => {
       }],
     ])
     const pipeline = resolvePipeline(
-      {
-        config: null,
-        metaPrompts,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any,
-      { output: makeOutput() as any },
+      makeCtx({ metaPrompts }),
+      { output: makeOutput() },
     )
     expect(pipeline.overlay.crossReads['system-architecture']).toEqual([
       { service: 'shared-lib', step: 'api-contracts' },
@@ -1509,7 +1711,7 @@ describe('resolvePipeline fallback (no config)', () => {
 - [ ] **Step 3: Run test to verify it fails**
 
 Run: `npx vitest run src/core/pipeline/resolver.test.ts -t "builds overlay.crossReads from frontmatter"`
-Expected: FAIL — `pipeline.overlay.crossReads` is `{}` (from Task 8's placeholder) or undefined.
+Expected: FAIL — `pipeline.overlay.crossReads['system-architecture']` is `undefined` because Task 8 placed `crossReads: {}` in the fallback branch (the placeholder has no per-step entries yet).
 
 - [ ] **Step 4: Update the fallback branch in `src/core/pipeline/resolver.ts`**
 
@@ -1649,6 +1851,39 @@ it('does NOT recurse when overlay references a step absent from metaPrompts (for
   // Only b's artifact surfaces; ghost recursion did not fire.
   expect(artifacts.map(a => a.filePath)).toEqual(['docs/b.md'])
 })
+
+it('overlayCrossReads takes PRECEDENCE over frontmatter when both disagree (overlay-first)', () => {
+  // Both present, but pointing at different foreign steps. The correct impl must
+  // recurse into the overlay target, NOT the frontmatter target. A buggy impl that
+  // still prefers frontmatter would pass the earlier tests (where only one is set).
+  fs.writeFileSync(path.join(tmpRoot, 'docs', 'b.md'), 'B')
+  fs.writeFileSync(path.join(tmpRoot, 'docs', 'c.md'), 'C')          // overlay target
+  fs.writeFileSync(path.join(tmpRoot, 'docs', 'from-fm.md'), 'FM')   // frontmatter target
+  seedService('b', { 'b-step': { status: 'completed', produces: ['docs/b.md'] } })
+  seedService('c', { 'c-step': { status: 'completed', produces: ['docs/c.md'] } })
+  seedService('fm', { 'fm-step': { status: 'completed', produces: ['docs/from-fm.md'] } })
+  // b-step has FRONTMATTER crossRead to fm:fm-step; overlay REPLACES with c:c-step.
+  const metas = new Map<string, MetaPromptFile>([
+    ['b-step', mkMetaFile('b-step', [{ service: 'fm', step: 'fm-step' }])],
+    ['c-step', mkMetaFile('c-step')],
+    ['fm-step', mkMetaFile('fm-step')],
+  ])
+  const overlayCrossReads = {
+    'b-step': [{ service: 'c', step: 'c-step' }],   // overlay wins
+  }
+  const { output } = mkOutput()
+  const artifacts = resolveTransitiveCrossReads(
+    [{ service: 'b', step: 'b-step' }],
+    mkMultiConfig({ b: ['b-step'], c: ['c-step'], fm: ['fm-step'] }),
+    tmpRoot, metas, output,
+    new Set(), new Map(), new Map(),
+    undefined, overlayCrossReads,
+  )
+  const paths = artifacts.map(a => a.filePath).sort()
+  // Overlay target (c.md) must be present; frontmatter target (from-fm.md) must NOT.
+  expect(paths).toEqual(['docs/b.md', 'docs/c.md'])
+  expect(paths).not.toContain('docs/from-fm.md')
+})
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -1720,10 +1955,35 @@ if (direct.completed) {
 Run: `npx vitest run src/core/assembly/cross-reads.test.ts && npx tsc --noEmit`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Update `DependencyNode.crossDependencies` comment (spec §6)**
+
+The comment at `src/types/dependency.ts:6` currently reads:
+
+```typescript
+/** Cross-service dependency edges (informational, non-blocking). Populated from frontmatter.crossReads (Wave 3c). */
+crossDependencies?: Array<{ service: string; step: string }>
+```
+
+Update to reflect the overlay-first merge (spec §6):
+
+```typescript
+/**
+ * Cross-service dependency edges (informational, non-blocking).
+ * Populated via overlay-first merge: `overlay.crossReads` takes precedence over
+ * `frontmatter.crossReads` (Wave 3c+1 — cross-reads-overrides).
+ */
+crossDependencies?: Array<{ service: string; step: string }>
+```
+
+- [ ] **Step 6: Run tests + tsc once more to confirm no regression**
+
+Run: `npx tsc --noEmit && npx vitest run src/core/assembly/cross-reads.test.ts`
+Expected: PASS.
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/core/assembly/cross-reads.ts src/core/assembly/cross-reads.test.ts
+git add src/core/assembly/cross-reads.ts src/core/assembly/cross-reads.test.ts src/types/dependency.ts
 git commit -m "feat(cross-reads): resolveTransitiveCrossReads accepts overlayCrossReads? for overlay-first recursion"
 ```
 
@@ -1735,16 +1995,31 @@ git commit -m "feat(cross-reads): resolveTransitiveCrossReads accepts overlayCro
 - Modify: `src/cli/commands/run.ts`
 - Test: `src/cli/commands/run.test.ts`
 
-**Goal:** The `run.ts` call site to `resolveTransitiveCrossReads` forwards `pipeline.overlay.crossReads` so overlay-appended entries on foreign steps surface transitively.
+**Goal:** The `run.ts` call site to `resolveTransitiveCrossReads` forwards `pipeline.overlay.crossReads` so overlay-appended entries on foreign steps surface transitively. The call site currently passes 9 positional args; this task adds a 10th (`pipeline.overlay.crossReads`, matching the signature defined in Task 11).
 
 - [ ] **Step 1: Write failing test**
 
-Append to the existing `describe('cross-reads artifact gathering (Wave 3c)', ...)` block in `src/cli/commands/run.test.ts`:
+Append to the existing `describe('cross-reads artifact gathering (Wave 3c)', ...)` block in `src/cli/commands/run.test.ts`.
+
+The test uses a **sentinel object** returned from the hoisted `resolveOverlayState` mock so the assertion catches the specific value, not just any object. That requires overriding the default hoisted mock for this test (it normally returns `crossReads: {}`):
 
 ```typescript
-it('forwards pipeline.overlay.crossReads to resolveTransitiveCrossReads as the 9th arg', async () => {
-  // Wire a consumer step with frontmatter crossReads; run.ts should invoke the
-  // helper with overlay.crossReads passed positionally.
+it('forwards pipeline.overlay.crossReads (as 10th positional arg) to resolveTransitiveCrossReads', async () => {
+  // Sentinel object — if run.ts forwards anything other than pipeline.overlay.crossReads,
+  // this assertion fails.
+  const SENTINEL_OVERLAY_CROSS_READS = {
+    'system-architecture': [{ service: 'overlay-only-svc', step: 'overlay-only-step' }],
+  }
+
+  // Override the default hoisted mock's return value for this test only.
+  vi.mocked(resolveOverlayState).mockReturnValueOnce({
+    steps: { 'system-architecture': { enabled: true } },
+    knowledge: {},
+    reads: {},
+    dependencies: {},
+    crossReads: SENTINEL_OVERLAY_CROSS_READS,
+  })
+
   const consumerMeta = makeMetaPrompt({
     stepName: 'system-architecture',
     frontmatter: makeFrontmatter({
@@ -1767,25 +2042,25 @@ it('forwards pipeline.overlay.crossReads to resolveTransitiveCrossReads as the 9
     }]]),
     edges: new Map([['system-architecture', []]]),
   })
-  // The mocked resolveOverlayState (in the hoisted mock) returns crossReads: {}
-  // by default. Verify run.ts reads that (possibly empty) object and forwards it.
   vi.mocked(resolveTransitiveCrossReads).mockReturnValue([])
   vi.mocked(resolveOutputMode).mockReturnValue('auto')
 
   await invokeHandler({ step: 'system-architecture', _: ['run'], auto: true })
 
-  // The 9th positional arg must be the overlayCrossReads map.
+  // The 10th positional arg must be the exact SENTINEL object from the mocked
+  // resolveOverlayState return value (proves run.ts forwards pipeline.overlay.crossReads,
+  // not some other map).
   expect(vi.mocked(resolveTransitiveCrossReads)).toHaveBeenCalledWith(
-    [{ service: 'shared-lib', step: 'api-contracts' }],
-    expect.anything(),           // config
-    expect.any(String),          // projectRoot
-    expect.any(Map),             // metaPrompts
-    expect.anything(),           // output
-    expect.any(Set),             // visiting
-    expect.any(Map),             // resolved
-    expect.any(Map),             // foreignStateCache
-    expect.anything(),           // globalSteps
-    expect.any(Object),          // overlayCrossReads (Wave 3c+1)
+    [{ service: 'shared-lib', step: 'api-contracts' }],  // 1: crossReads
+    expect.anything(),                                    // 2: config
+    expect.any(String),                                   // 3: projectRoot
+    expect.any(Map),                                      // 4: metaPrompts
+    expect.anything(),                                    // 5: output
+    expect.any(Set),                                      // 6: visiting
+    expect.any(Map),                                      // 7: resolved
+    expect.any(Map),                                      // 8: foreignStateCache
+    expect.anything(),                                    // 9: globalSteps
+    SENTINEL_OVERLAY_CROSS_READS,                         // 10: overlayCrossReads (Wave 3c+1)
   )
 })
 ```
@@ -1797,20 +2072,20 @@ Expected: FAIL — existing call site passes only 9 args (no `overlayCrossReads`
 
 - [ ] **Step 3: Update `run.ts` call site**
 
-In `src/cli/commands/run.ts`, find the existing call to `resolveTransitiveCrossReads` (grep for `resolveTransitiveCrossReads(`) and add `pipeline.overlay.crossReads` as the final positional arg:
+In `src/cli/commands/run.ts` (around lines 442–453; search for `resolveTransitiveCrossReads(` to confirm the current call site), add `pipeline.overlay.crossReads` as the 10th positional arg (after `pipeline.globalSteps`):
 
 ```typescript
 const crossArtifacts = resolveTransitiveCrossReads(
-  crossReadsList,
-  config,
-  projectRoot,
-  context.metaPrompts,
-  output,
-  new Set(),
-  new Map(),
-  foreignStateCache,
-  pipeline.globalSteps,
-  pipeline.overlay.crossReads,   // NEW
+  crossReadsList,                  // 1
+  config,                          // 2
+  projectRoot,                     // 3
+  context.metaPrompts,             // 4
+  output,                          // 5
+  new Set(),                       // 6: visiting
+  new Map(),                       // 7: resolved
+  foreignStateCache,               // 8
+  pipeline.globalSteps,            // 9
+  pipeline.overlay.crossReads,     // 10 — NEW (Wave 3c+1)
 )
 ```
 
@@ -1828,16 +2103,50 @@ git commit -m "feat(run): forward pipeline.overlay.crossReads to resolveTransiti
 
 ---
 
-## Task 13: E2E — overlay-only cross-read surfaces end-to-end
+## Task 13: E2E — overlay-only cross-read surfaces through `buildGraph` → `DependencyNode.crossDependencies`
 
 **Files:**
-- Modify: `src/e2e/cross-service-references.test.ts`
+- Modify: `src/core/dependency/graph.test.ts` (append integration test covering the overlay → graph → `crossDependencies` path)
+- Modify: `src/e2e/cross-service-references.test.ts` (append transitive-resolver E2E to cover the `resolveTransitiveCrossReads` surface)
 
-**Goal:** A single E2E test that asserts overlay-only cross-reads (no frontmatter entry) surface through `resolveTransitiveCrossReads` end-to-end, closing the feature's acceptance criteria.
+**Goal:** Two acceptance tests closing the feature. Per spec §5/§6, the critical E2E asserts that an overlay-appended cross-read surfaces through `buildGraph` into `DependencyNode.crossDependencies` (the advertised graph surface). A second test covers the transitive resolver end-to-end with `overlayCrossReads` propagation.
 
-- [ ] **Step 1: Append test to `src/e2e/cross-service-references.test.ts`**
+- [ ] **Step 1: Append graph-surface E2E test**
 
-Append this test to the existing `describe('Cross-service references E2E (Wave 3c)', ...)` block:
+Append to the existing `describe('buildGraph crossDependencies (Wave 3c)', ...)` block in `src/core/dependency/graph.test.ts`:
+
+```typescript
+it('overlay cross-reads-overrides append surfaces in DependencyNode.crossDependencies (Wave 3c+1 E2E)', () => {
+  // Simulate the end result of resolvePipeline with a structural overlay that
+  // appended to system-architecture's crossReads. Overlay map has the FINAL
+  // merged array (frontmatter entries + overlay append).
+  const fm = makeFm('system-architecture', 'architecture', 700, [])
+  fm.crossReads = [{ service: 'shared-lib', step: 'api-contracts' }]  // frontmatter entry
+  const mergedMap = {
+    'system-architecture': [
+      { service: 'shared-lib', step: 'api-contracts' },  // preserved from frontmatter
+      { service: 'billing', step: 'api-contracts' },      // appended by structural overlay
+    ],
+  }
+  const graph = buildGraph([fm], new Map(), undefined, mergedMap)
+  const node = graph.nodes.get('system-architecture')
+  expect(node?.crossDependencies).toEqual([
+    { service: 'shared-lib', step: 'api-contracts' },
+    { service: 'billing', step: 'api-contracts' },
+  ])
+})
+```
+
+- [ ] **Step 2: Run graph test to verify it passes**
+
+Run: `npx vitest run src/core/dependency/graph.test.ts -t "overlay cross-reads-overrides append surfaces"`
+Expected: PASS — `buildGraph` already accepts `crossReadsMap` (Wave 3c Task 5) and prefers overlay over frontmatter. This test locks the E2E contract at the buildGraph → crossDependencies seam.
+
+(Task 11 already covers the transitive-recursion path, and Task 9 covers the full `resolveOverlayState` merge — this test connects the two halves at the graph level.)
+
+- [ ] **Step 3: Append transitive-resolver E2E test**
+
+Append to the existing `describe('Cross-service references E2E (Wave 3c)', ...)` block in `src/e2e/cross-service-references.test.ts`:
 
 ```typescript
 it('overlay-only crossRead (no frontmatter entry) surfaces through resolveTransitiveCrossReads (Wave 3c+1)', () => {
@@ -1893,21 +2202,21 @@ it('overlay-only crossRead (no frontmatter entry) surfaces through resolveTransi
 })
 ```
 
-- [ ] **Step 2: Run E2E test to verify pass**
+- [ ] **Step 4: Run both E2E tests to verify pass**
 
-Run: `npx vitest run src/e2e/cross-service-references.test.ts && npx tsc --noEmit`
+Run: `npx vitest run src/core/dependency/graph.test.ts src/e2e/cross-service-references.test.ts && npx tsc --noEmit`
 Expected: PASS.
 
-- [ ] **Step 3: Run full test suite to catch any leftover regressions**
+- [ ] **Step 5: Run full test suite to catch any leftover regressions**
 
 Run: `make check-all`
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/e2e/cross-service-references.test.ts
-git commit -m "test(cross-reads): E2E — overlay-only crossRead surfaces through transitive resolver"
+git add src/core/dependency/graph.test.ts src/e2e/cross-service-references.test.ts
+git commit -m "test(cross-reads): E2E — overlay append surfaces through buildGraph + transitive resolver"
 ```
 
 ---
@@ -1965,20 +2274,20 @@ mmr review --pr "$PR_NUMBER" --sync --format json
 | §2.3 `loadSubOverlay` defense-in-depth + updated message | Task 6 |
 | §3.1 `applyOverlay` signature + `applyCrossReadsOverrides` helper | Task 7 |
 | §3.2 `resolveOverlayState` two-pass threading | Tasks 8, 9 |
-| §3.2.1 `resolvePipeline` fallback branch | Task 10 |
-| §3.3 `buildGraph` (no changes — already accepts map from Wave 3c) | covered by existing Wave 3c code |
+| §3.2.1 `resolvePipeline` fallback branch (placeholder in Task 8; real map in Task 10) | Tasks 8, 10 |
+| §3.3 `buildGraph` (no changes — already accepts map from Wave 3c; E2E locks the contract) | Task 13 |
 | §3.4 transitive resolver + `foreignMeta` guard + `overlayCrossReads?` | Task 11 |
-| §3.4 `run.ts` call site | Task 12 |
+| §3.4 `run.ts` call site (10th positional arg, sentinel assertion) | Task 12 |
 | §4.1 structural-only constraint (project-type overlays forbidden) | Task 5 |
-| §5 parser tests (8) | Task 3 |
+| §5 parser tests (8 + 1 silent-ignore per §1.1) | Task 3 |
 | §5 apply tests (4) | Task 7 |
 | §5 loader gate tests (4) | Tasks 4, 5 |
-| §5 resolveOverlayState integration (1) | Task 9 |
-| §5 sub-overlay (1) | Task 6 (warning message update; defense-in-depth branch is unreachable) |
+| §5 resolveOverlayState integration (1 both-passes + 1 frontmatter-only) | Task 9 |
+| §5 sub-overlay (1 — tests the reachable warning message text change) | Task 6 |
 | §5 resolvePipeline fallback (1) | Task 10 |
 | §5 transitive (3) | Task 11 |
-| §5 E2E (1) | Task 13 |
+| §5 E2E (1 graph-surface + 1 transitive) | Task 13 |
 | §6 impact list on test fixtures | Tasks 2, 7, 8 |
-| §6 `DependencyNode.crossDependencies` comment | *deferred*: Wave 3c comment is still technically correct after this feature (overlay-first with frontmatter fallback); update deferred to next cleanup |
+| §6 `DependencyNode.crossDependencies` comment | Task 11 Step 5 |
 
-No placeholders; all code blocks are concrete; all task sizes are small (13 tasks, mostly ≤6 steps each).
+No placeholders; all code blocks are concrete; all task sizes are small (13 tasks, mostly ≤7 steps each).
