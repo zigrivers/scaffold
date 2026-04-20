@@ -1107,6 +1107,7 @@ describe('StateManager.saveState — scope-correct eligibility + cache counters'
     expect(written.save_counter).toBeUndefined()  // service must never write this
   })
 
+  // eslint-disable-next-line max-len
   it('root-mode saveState deletes next_eligible_root_counter if present on state (spec §1 exclusivity — Codex MMR)', () => {
     const sm = new StateManager(
       tmpRoot,

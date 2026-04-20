@@ -140,5 +140,13 @@ export function resolvePipeline(
     return hash
   }
 
-  return { graph, preset: resolvedPreset, overlay, stepMeta, computeEligible: computeEligibleFn, globalSteps, getPipelineHash }
+  return {
+    graph,
+    preset: resolvedPreset,
+    overlay,
+    stepMeta,
+    computeEligible: computeEligibleFn,
+    globalSteps,
+    getPipelineHash,
+  }
 }
