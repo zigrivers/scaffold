@@ -334,7 +334,10 @@ describe('parseCrossReadsOverrides', () => {
       '/path/to.yml',
     )
     expect(result['system-architecture'].append).toEqual([])
-    expect(warnings.some(w => w.code === 'OVERLAY_MALFORMED_ENTRY')).toBe(true)
+    // Exact count + field — guards against a bug that warns on the wrong field or double-emits.
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0].code).toBe('OVERLAY_MALFORMED_ENTRY')
+    expect(warnings[0].context?.field).toBe('append')
   })
 
   it('warns when append item is not an object, preserving valid siblings', () => {
@@ -352,8 +355,14 @@ describe('parseCrossReadsOverrides', () => {
       warnings,
       '/path/to.yml',
     )
-    expect(result['system-architecture'].append).toHaveLength(2)
-    expect(warnings.some(w => w.code === 'OVERLAY_MALFORMED_APPEND_ITEM')).toBe(true)
+    // Pin the exact preserved items — guards against an impl that preserves wrong siblings.
+    expect(result['system-architecture'].append).toEqual([
+      { service: 'billing', step: 'api-contracts' },
+      { service: 'inventory', step: 'domain-modeling' },
+    ])
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0].code).toBe('OVERLAY_MALFORMED_APPEND_ITEM')
+    expect(warnings[0].context?.index).toBe(1)
   })
 
   it('warns when append item is missing service or step', () => {
@@ -375,14 +384,17 @@ describe('parseCrossReadsOverrides', () => {
     expect(itemWarnings).toHaveLength(2)
   })
 
-  it('warns when append item has non-kebab-case slug', () => {
+  it('warns when append item has non-kebab-case slug (underscore, uppercase, leading digit, empty)', () => {
     const warnings: ScaffoldWarning[] = []
     const result = parseCrossReadsOverrides(
       {
         'system-architecture': {
           append: [
-            { service: 'Bad_Service', step: 'api-contracts' },
-            { service: 'billing', step: 'UpperCase' },
+            { service: 'Bad_Service', step: 'api-contracts' },  // underscore
+            { service: 'billing', step: 'UpperCase' },            // mixed case
+            { service: '1invalid', step: 'api-contracts' },      // leading digit
+            { service: 'billing', step: '' },                     // empty string
+            { service: 'has space', step: 'api-contracts' },     // whitespace
           ],
         } as unknown as Record<string, unknown>,
       },
@@ -390,7 +402,8 @@ describe('parseCrossReadsOverrides', () => {
       '/path/to.yml',
     )
     expect(result['system-architecture'].append).toHaveLength(0)
-    expect(warnings.filter(w => w.code === 'OVERLAY_MALFORMED_APPEND_ITEM')).toHaveLength(2)
+    expect(warnings).toHaveLength(5)
+    expect(warnings.every(w => w.code === 'OVERLAY_MALFORMED_APPEND_ITEM')).toBe(true)
   })
 
   it('returns empty append array for entry with no append field', () => {
