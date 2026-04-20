@@ -1,4 +1,4 @@
-import type { PipelineState, StepStateEntry } from '../../types/index.js'
+import type { PipelineState } from '../../types/index.js'
 import type { ResolvedPipeline } from './types.js'
 
 /**
@@ -23,18 +23,12 @@ export function readEligible(
   const scope = scopeOptions?.scope === 'service' ? 'service' : 'global'
   const currentHash = pipeline.getPipelineHash(scope)
   if (state.next_eligible_hash !== currentHash) {
-    return pipeline.computeEligible(
-      state.steps as Record<string, StepStateEntry>,
-      scopeOptions,
-    )
+    return pipeline.computeEligible(state.steps, scopeOptions)
   }
   if (scope === 'service') {
     const currentRootCounter = rootCounterReader?.() ?? null
     if (state.next_eligible_root_counter !== currentRootCounter) {
-      return pipeline.computeEligible(
-        state.steps as Record<string, StepStateEntry>,
-        scopeOptions,
-      )
+      return pipeline.computeEligible(state.steps, scopeOptions)
     }
   }
   return state.next_eligible
