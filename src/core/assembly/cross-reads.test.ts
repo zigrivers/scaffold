@@ -446,30 +446,62 @@ describe('resolveTransitiveCrossReads', () => {
   })
 
   it('does NOT recurse when overlay references a step absent from metaPrompts (foreignMeta guard)', () => {
-    // Overlay has cross-reads for 'ghost-step' but ghost-step is not in metaPrompts.
-    // Recursion must not fire — the foreignMeta existence guard protects against this.
+    // Setup specifically designed to isolate the foreignMeta existence guard.
+    //
+    // The guard lives here: `if (foreignMeta && !isTool && foreignCrossReads.length > 0)`
+    //
+    // To prove it actually fires, we need a scenario where — WITHOUT the guard —
+    // recursion WOULD surface an artifact that SHOULDN'T appear. A previous
+    // version of this test relied on resolveDirectCrossRead rejecting a missing
+    // service, which short-circuits before the guard is reached, so the test
+    // would pass even if the guard were removed. This version fixes that.
+    //
+    // Scenario:
+    //   - Top-level cross-read: b:b-step → c:ghost-step
+    //   - ghost-step's direct state EXISTS (artifact 'docs/ghost.md' produced)
+    //     so `direct.completed` is true and recursion reaches the guard.
+    //   - overlayCrossReads['ghost-step'] = [{ d, deep-step }] (length > 0,
+    //     would recurse without the guard)
+    //   - metaPrompts has b-step + deep-step, but deliberately NOT ghost-step.
+    //   - d:deep-step produces 'docs/deep.md'.
+    //
+    // With the guard: recursion into ghost-step's overlay crossReads is blocked
+    //   (foreignMeta for ghost-step is undefined). docs/deep.md must NOT surface.
+    // Without the guard: recursion fires and docs/deep.md would appear.
+    fs.mkdirSync(path.join(tmpRoot, '.scaffold', 'services', 'c'), { recursive: true })
+    fs.mkdirSync(path.join(tmpRoot, '.scaffold', 'services', 'd'), { recursive: true })
     fs.writeFileSync(path.join(tmpRoot, 'docs', 'b.md'), 'B')
+    fs.writeFileSync(path.join(tmpRoot, 'docs', 'ghost.md'), 'GHOST')
+    fs.writeFileSync(path.join(tmpRoot, 'docs', 'deep.md'), 'DEEP')
     seedService('b', { 'b-step': { status: 'completed', produces: ['docs/b.md'] } })
+    seedService('c', { 'ghost-step': { status: 'completed', produces: ['docs/ghost.md'] } })
+    seedService('d', { 'deep-step': { status: 'completed', produces: ['docs/deep.md'] } })
     const metas = new Map<string, MetaPromptFile>([
       ['b-step', mkMetaFile('b-step')],
-      // ghost-step deliberately NOT added
+      ['deep-step', mkMetaFile('deep-step')],
+      // ghost-step deliberately NOT added — tests the existence guard
     ])
     const overlayCrossReads = {
-      'b-step': [{ service: 'ghost-service', step: 'ghost-step' }],
+      'b-step': [{ service: 'c', step: 'ghost-step' }],
+      'ghost-step': [{ service: 'd', step: 'deep-step' }],  // would recurse without guard
     }
     const { output } = mkOutput()
-    // The TOP-LEVEL cross-read points at a real step (b-step). Its transitive edge
-    // to ghost-service:ghost-step would recurse based on overlay lookup for ghost-step.
-    // Since ghost-step isn't in metaPrompts, recursion must not fire.
     const artifacts = resolveTransitiveCrossReads(
       [{ service: 'b', step: 'b-step' }],
-      mkMultiConfig({ b: ['b-step'] }),
+      mkMultiConfig({
+        b: ['b-step'],
+        c: ['ghost-step'],   // c exports ghost-step so direct lookup succeeds
+        d: ['deep-step'],
+      }),
       tmpRoot, metas, output,
       new Set(), new Map(), new Map(),
       undefined, overlayCrossReads,
     )
-    // Only b's artifact surfaces; ghost recursion did not fire.
-    expect(artifacts.map(a => a.filePath)).toEqual(['docs/b.md'])
+    const paths = artifacts.map(a => a.filePath).sort()
+    // Must contain b.md (self) + ghost.md (direct hop from b).
+    // Must NOT contain deep.md (guarded recursion into ghost-step would have surfaced it).
+    expect(paths).toEqual(['docs/b.md', 'docs/ghost.md'])
+    expect(paths).not.toContain('docs/deep.md')
   })
 
   it('overlayCrossReads takes PRECEDENCE over frontmatter when both disagree (overlay-first)', () => {
