@@ -544,6 +544,46 @@ describe('generateMultiServiceDashboardData — averagePercentage rounding', () 
     expect(data.aggregate.averagePercentage).toBe(1)
   })
 
+  it('nextEligibleSummary does NOT fall back to description (MMR P2 lock)', () => {
+    // Regression guard: earlier code used `fm?.summary ?? fm?.description ?? null`.
+    // Single-service behavior is summary-only; multi-service must match so the
+    // card line doesn't get flooded with long descriptions.
+    const stepSteps: Record<string, { status: 'pending'; source: 'pipeline'; produces: string[] }> = {
+      'desc-only-step': { status: 'pending', source: 'pipeline', produces: [] },
+    }
+    // Meta prompt with description but NO summary
+    const mp: Map<string, MetaPromptFile> = new Map([
+      ['desc-only-step', {
+        stepName: 'desc-only-step',
+        filePath: '/fake.md',
+        frontmatter: {
+          name: 'desc-only-step', description: 'A long description that should NOT leak',
+          summary: null,
+          phase: 'architecture', order: 1,
+          dependencies: [], outputs: [], conditional: null,
+          knowledgeBase: [], reads: [], crossReads: [],
+          stateless: false, category: 'pipeline',
+        },
+        body: '', sections: {},
+      }],
+    ])
+    const data = generateMultiServiceDashboardData({
+      methodology: 'deep',
+      services: [{
+        name: 's', projectType: 'backend', metaPrompts: mp,
+        state: {
+          'schema-version': 3, 'scaffold-version': '1.0.0',
+          init_methodology: 'deep', config_methodology: 'deep',
+          'init-mode': 'greenfield', created: '2026-04-20T00:00:00.000Z',
+          in_progress: null, steps: stepSteps,
+          next_eligible: ['desc-only-step'], 'extra-steps': [],
+        },
+      }],
+    })
+    expect(data.services[0].nextEligibleSlug).toBe('desc-only-step')
+    expect(data.services[0].nextEligibleSummary).toBeNull()
+  })
+
   it('skeleton service (total=0) is not counted as complete in servicesComplete', () => {
     const data = generateMultiServiceDashboardData({
       methodology: 'deep',

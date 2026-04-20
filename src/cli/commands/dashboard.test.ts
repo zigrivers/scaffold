@@ -419,5 +419,25 @@ describe('dashboard command', () => {
       const svcA = parsed.data.services.find(s => s.name === 'svc-a')
       expect(svcA?.total).toBeGreaterThan(0)
     })
+
+    it('re-throws non-STATE_MISSING errors (corrupt JSON does not become a skeleton — MMR P2 lock)', async () => {
+      // Regression guard: earlier bare catch collapsed every failure mode
+      // (corrupt JSON, schema-version mismatch, permission errors) into an
+      // empty skeleton, hiding real problems behind a 0% row.
+      const dir = makeMultiServiceProjectDir({
+        services: [
+          { name: 'svc-a', projectType: 'backend' },
+          { name: 'svc-b', projectType: 'library' },
+        ],
+      })
+      // Corrupt svc-b's state.json — not missing, but parse-broken.
+      const svcBPath = path.join(dir, '.scaffold', 'services', 'svc-b', 'state.json')
+      fs.writeFileSync(svcBPath, '{ this is not valid json')
+      vi.spyOn(projectRootModule, 'findProjectRoot').mockReturnValue(dir)
+
+      await expect(
+        runDashboardHandler({ ...BASE_ARGV, format: 'json', 'json-only': true }),
+      ).rejects.toThrow(/STATE_PARSE_ERROR|state\.json/i)
+    })
   })
 })
