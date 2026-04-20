@@ -83,6 +83,24 @@ vi.mock('../../core/assembly/cross-reads.js', () => ({
   },
 }))
 
+vi.mock('../../core/dependency/graph.js', () => ({
+  buildGraph: vi.fn(() => ({ nodes: new Map(), edges: new Map() })),
+}))
+
+vi.mock('../../core/dependency/eligibility.js', () => ({
+  computeEligible: vi.fn(() => []),
+}))
+
+vi.mock('../../core/pipeline/resolver.js', async () => {
+  const actual = await vi.importActual<typeof import('../../core/pipeline/resolver.js')>(
+    '../../core/pipeline/resolver.js',
+  )
+  return {
+    ...actual,
+    resolvePipeline: vi.fn(actual.resolvePipeline),
+  }
+})
+
 // ---------------------------------------------------------------------------
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
@@ -94,6 +112,9 @@ import { StateManager } from '../../state/state-manager.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { resolveCrossReadReadiness } from '../../core/assembly/cross-reads.js'
 import { resolveOverlayState } from '../../core/assembly/overlay-state-resolver.js'
+import { buildGraph } from '../../core/dependency/graph.js'
+import { computeEligible } from '../../core/dependency/eligibility.js'
+import { resolvePipeline } from '../../core/pipeline/resolver.js'
 import statusCommand from './status.js'
 
 // ---------------------------------------------------------------------------
@@ -177,6 +198,8 @@ describe('status command', () => {
   const mockResolveOutputMode = vi.mocked(resolveOutputMode)
   const MockStateManager = vi.mocked(StateManager)
   const mockDiscoverMetaPrompts = vi.mocked(discoverMetaPrompts)
+  const mockBuildGraph = vi.mocked(buildGraph)
+  const mockComputeEligible = vi.mocked(computeEligible)
 
   beforeEach(() => {
     writtenLines = []
@@ -190,6 +213,8 @@ describe('status command', () => {
     mockResolveOutputMode.mockReturnValue('interactive')
     mockFindProjectRoot.mockReturnValue('/fake/project')
     mockDiscoverMetaPrompts.mockReturnValue(new Map())
+    mockBuildGraph.mockReturnValue({ nodes: new Map(), edges: new Map() })
+    mockComputeEligible.mockReturnValue([])
     type LoadReturn = ReturnType<InstanceType<typeof StateManager>['loadState']>
     MockStateManager.mockImplementation(() => ({
       loadState: vi.fn(
@@ -600,5 +625,50 @@ describe('status command', () => {
       const out = writtenLines.join('')
       expect(out).toMatch(/cross-reads shared-lib:api-contracts \(service not bootstrapped\)/)
     })
+  })
+
+  it('JSON nextEligible falls back to live compute when hash mismatches', async () => {
+    mockResolveOutputMode.mockReturnValue('json')
+    type LoadReturn = ReturnType<InstanceType<typeof StateManager>['loadState']>
+    MockStateManager.mockImplementation(() => ({
+      loadState: vi.fn(() => makeState({
+        steps: {
+          'step-x': { status: 'pending', source: 'pipeline', produces: [] },
+        },
+        next_eligible: ['STALE'],  // pre-existing cached list
+        next_eligible_hash: 'OLD-HASH',  // mismatches fresh-hash below
+      }) as unknown as LoadReturn),
+      reconcileWithPipeline: vi.fn(() => false),
+    }) as unknown as InstanceType<typeof StateManager>)
+    mockComputeEligible.mockReturnValue(['FRESH'])  // live-compute result
+    vi.mocked(resolvePipeline).mockReturnValueOnce({
+      graph: { nodes: new Map(), edges: new Map() },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      preset: {} as any,
+      overlay: {
+        steps: {},
+        knowledge: {},
+        reads: {},
+        dependencies: {},
+        crossReads: {},
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      stepMeta: new Map(),
+      computeEligible: mockComputeEligible as unknown as ReturnType<
+        typeof resolvePipeline
+      >['computeEligible'],
+      globalSteps: new Set(),
+      getPipelineHash: vi.fn(() => 'FRESH-HASH'),  // mismatches OLD-HASH
+    })
+    mockDiscoverMetaPrompts.mockReturnValue(new Map([
+      ['step-x', makeFrontmatter('step-x', 'pre', 1)],
+    ]) as unknown as ReturnType<typeof discoverMetaPrompts>)
+
+    await statusCommand.handler(defaultArgv())
+    const envelope = JSON.parse(writtenLines.join(''))
+    // If status.ts emits state.next_eligible directly (bug), it'd emit 'STALE'.
+    // With readEligible, it falls back to live-compute result 'FRESH'.
+    expect(envelope.data.nextEligible).toEqual(['FRESH'])
+    expect(mockComputeEligible).toHaveBeenCalled()
   })
 })
