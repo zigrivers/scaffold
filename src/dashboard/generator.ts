@@ -273,10 +273,10 @@ function summarizeService(
 
   for (const [slug, entry] of entries) {
     switch (entry.status) {
-      case 'completed': completed++; break
-      case 'skipped': skipped++; break
-      case 'pending': pending++; break
-      case 'in_progress': inProgress++; break
+    case 'completed': completed++; break
+    case 'skipped': skipped++; break
+    case 'pending': pending++; break
+    case 'in_progress': inProgress++; break
     }
 
     if (entry.status === 'pending' || entry.status === 'in_progress') {

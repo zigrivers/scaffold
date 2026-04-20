@@ -51,7 +51,10 @@ function makeMetaPrompt(
   }
 }
 
-function makeMetaPrompts(entries: Array<[string, string, number, Partial<MetaPromptFile['frontmatter']>?]>): Map<string, MetaPromptFile> {
+type FmOverrides = Partial<MetaPromptFile['frontmatter']>
+function makeMetaPrompts(
+  entries: Array<[string, string, number, FmOverrides?]>,
+): Map<string, MetaPromptFile> {
   const map = new Map<string, MetaPromptFile>()
   for (const [name, phase, order, overrides] of entries) {
     map.set(name, makeMetaPrompt(name, phase, order, overrides ?? {}))
