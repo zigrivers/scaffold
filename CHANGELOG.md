@@ -4,6 +4,38 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.19.0] — 2026-04-20
+
+### Added
+- **Eligible-Step Cache v2** — `scaffold next` and `scaffold status` now trust the `next_eligible` cache end-to-end, backed by a pipeline-graph SHA-256 hash and (for service-scoped projects) a TOCTOU-safe cross-file invalidation counter. Three latent cache-correctness bugs are fixed simultaneously so the move from live-recompute to cache-trust ships with full invariants locked by tests. Completes the roadmap's Phase 2 "Eligible Step Caching" item.
+  - New `src/core/pipeline/graph-hash.ts` — `computePipelineHash(graph, globalSteps, scope)` produces a deterministic SHA-256 of the inputs that affect `computeEligible` output: slug set, `enabled`, `order`, `dependencies`, global-ness, and scope (`null` normalized to `'global'`). Excludes cosmetic inputs (phase, cross-reads). Locked by 9 tests including isGlobal + dep-sort stability.
+  - New `src/core/pipeline/read-eligible.ts` — `readEligible(state, pipeline, scopeOptions?, rootCounterReader?)` returns the cached list when hash (and, for service scope, root counter) match; falls back to `pipeline.computeEligible(...)` on any mismatch.
+  - New `src/state/root-counter-reader.ts` — read-path helper that returns the root state's `save_counter` or null; used by service-scope consumers to detect cross-file drift.
+  - New `ResolvedPipeline.getPipelineHash(scope)` — memoized per-scope hash getter on the resolver output (ESM-spyable via namespace import for the memoization test).
+- **New optional `PipelineState` fields** — `save_counter?`, `next_eligible_hash?`, `next_eligible_root_counter?`. Legacy-safe: pre-v3.19 state files degrade to live recompute on first read and self-heal on the next write.
+- **E2E test** — `src/e2e/eligible-cache.test.ts` exercises the real `StateManager` + `resolvePipeline` + `readEligible` stack for both acceptance criteria (AC2 cross-file invalidation; AC3 pipeline-hash invalidation via two resolvePipeline calls with different metaPrompts maps).
+
+### Fixed
+- **P0 (original) — service-scope leakage in `saveState()`** — service state files were persisting `next_eligible` polluted with global step slugs because `computeEligible` was called without scope options. Fixed by threading `{ scope: 'service', globalSteps }` through the class field type and save path.
+- **P1 (original) — stale cache on pipeline-YAML edits** — `reconcileWithPipeline` only detects added/removed steps; dep/enabled/order changes were silently cached. Fixed by the graph-hash invalidation (every `saveState` stamps the hash; every `readEligible` compares it).
+- **Round-1 P0 — cross-file staleness under service scope** — when a global step completes, root state rewrites but service state does not; service `next_eligible_hash` still matched → stale cache served. Fixed by a monotonic root `save_counter` captured at service `loadState` time (TOCTOU-safe, reused at the matching `saveState`) and stamped onto service state as `next_eligible_root_counter`.
+- **Spec §1 exclusivity** — `saveState` now actively strips scope-inappropriate counter fields before writing: service saves `delete state.save_counter`; root saves `delete state.next_eligible_root_counter`. Prevents polluted state files from surviving across reads.
+- **`status --json` stale read** — JSON emitter now goes through `readEligible` (previously read `state.next_eligible` directly, bypassing hash validation).
+- **`dashboard --service` scope mis-classification** — passing `globalSteps: undefined` caused `StateManager.saveState`'s `isServiceScoped && globalSteps` guard to fall into the root branch during migration-triggered saves. Fixed by passing an empty `Set<string>()` so the guard classifies correctly while preserving the no-filtering behavior.
+
+### Changed
+- **`StateManager` constructor** — accepts a new trailing optional `pipelineHash?: string`. When present, every `saveState` stamps it into `next_eligible_hash`; when absent, writes `undefined` (legacy-safe — consumers treat that as "always stale" and live-recompute).
+- **`StateManager.loadState()`** — now captures the root state's `save_counter` from the already-parsed `globalParsed` object during service-scope merge (TOCTOU-safe; no second `fs.readFileSync`). Stored on a private `loadedRootCounter` field for the matching `saveState` to reuse.
+- **`StateManager.computeEligible` field type** — widened to accept the 2-arg options-aware signature that `ResolvedPipeline.computeEligible` has exposed since Wave 3b. No behavior change at existing call sites.
+- **Command threading** — `run`, `next`, `status`, `skip`, `reset`, `rework`, `complete` now pass the resolved pipeline's hash to `StateManager`. `info` and `dashboard` pass explicit `undefined` with inline rationale (no pipeline in scope — legacy-safe since migration is idempotent). `adopt` and `wizard` same treatment (init paths write before the first `scaffold next`, so cache is moot on first run).
+- **`rework.ts`** — always stamps the `'global'` hash. Pre-existing behavior: `rework` does not route to service state regardless of `--service` (the pipeline resolves without `serviceId` and `StateManager` uses root scope). Pinning to `'global'` keeps the hash stamp consistent with the state file actually written; a multi-service rework is a separate feature.
+
+### Review journey
+- 5-round spec MMR caught 12 design issues before plan-writing.
+- 2-round plan MMR (Codex + Gemini foreground) caught 10 plan-level findings (P0×1, P1×6, P2×3, P3×1) before implementation.
+- Per-task 4-gate review (implementer self-review + spec-compliance subagent + code-quality subagent + Codex + Gemini MMR) across 15 tasks. Post-hoc P2/LOW fixes applied for: isGlobal + dep-sort lock tests (Task 2), non-number + zero-counter locks (Task 3), scope-exclusivity counter-strip (Task 6), signature `?` optionals + test title clarity (Task 7), rework.ts hash/scope mismatch (Task 10).
+- 3-channel PR review (Codex + Gemini + Claude compensating) converged on dashboard.ts service-mode globalSteps bug — fixed before merge.
+
 ## [3.18.1] — 2026-04-20
 
 ### Changed
