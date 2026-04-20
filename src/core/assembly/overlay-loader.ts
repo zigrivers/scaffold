@@ -227,6 +227,7 @@ export function loadOverlay(
     knowledgeOverrides: parseKnowledgeOverrides(knowledgeOverridesRaw, warnings, overlayPath),
     readsOverrides: parseReadsOverrides(readsOverridesRaw, warnings, overlayPath),
     dependencyOverrides: parseDependencyOverrides(dependencyOverridesRaw, warnings, overlayPath),
+    crossReadsOverrides: {},  // NEW — placeholder; Task 5 replaces with the strip-and-warn logic
   }
 
   return { overlay, errors, warnings }
@@ -353,6 +354,7 @@ export function loadStructuralOverlay(
     knowledgeOverrides: parseKnowledgeOverrides(knowledgeOverridesRaw, warnings, overlayPath),
     readsOverrides: parseReadsOverrides(readsOverridesRaw, warnings, overlayPath),
     dependencyOverrides: parseDependencyOverrides(dependencyOverridesRaw, warnings, overlayPath),
+    crossReadsOverrides: {},  // NEW — placeholder; Task 4 replaces with parseCrossReadsOverrides(...)
   }
 
   return { overlay, errors, warnings }

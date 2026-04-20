@@ -11,6 +11,7 @@ function makeOverlay(overrides: Partial<PipelineOverlay> = {}): PipelineOverlay 
     knowledgeOverrides: {},
     readsOverrides: {},
     dependencyOverrides: {},
+    crossReadsOverrides: {},
     ...overrides,
   }
 }
