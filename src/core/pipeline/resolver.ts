@@ -81,12 +81,14 @@ export function resolvePipeline(
     const knowledge: Record<string, string[]> = {}
     const reads: Record<string, string[]> = {}
     const dependencies: Record<string, string[]> = {}
+    const crossReads: Record<string, Array<{ service: string; step: string }>> = {}
     for (const [name, mp] of metaPrompts) {
       knowledge[name] = [...(mp.frontmatter.knowledgeBase ?? [])]
       reads[name] = [...(mp.frontmatter.reads ?? [])]
       dependencies[name] = [...(mp.frontmatter.dependencies ?? [])]
+      crossReads[name] = [...(mp.frontmatter.crossReads ?? [])]
     }
-    overlay = { steps: mergedSteps, knowledge, reads, dependencies }
+    overlay = { steps: mergedSteps, knowledge, reads, dependencies, crossReads }
   }
 
   // 4. Build graph (once)

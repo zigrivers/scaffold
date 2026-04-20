@@ -61,6 +61,7 @@ describe('PipelineOverlay type', () => {
       dependencyOverrides: {
         'user-stories': { replace: {}, append: ['review-gdd'] },
       },
+      crossReadsOverrides: {},
     }
     expect(overlay.name).toBe('game')
     expect(overlay.projectType).toBe('game')
@@ -75,6 +76,7 @@ describe('PipelineOverlay type', () => {
       knowledgeOverrides: {},
       readsOverrides: {},
       dependencyOverrides: {},
+      crossReadsOverrides: {},
     }
     expect(overlay.name).toBe('multi-service')
     expect(overlay.projectType).toBeUndefined()
@@ -119,5 +121,55 @@ describe('DependencyOverride type', () => {
   it('accepts a dependency override with only replace', () => {
     const override: DependencyOverride = { replace: { 'a': 'b' } }
     expect(override.append).toBeUndefined()
+  })
+})
+
+describe('CrossReadsOverride + PipelineOverlay.crossReadsOverrides (cross-reads overrides feature)', () => {
+  it('PipelineOverlay literal with crossReadsOverrides compiles and round-trips', () => {
+    const overlay: PipelineOverlay = {
+      name: 'test',
+      description: 'desc',
+      stepOverrides: {},
+      knowledgeOverrides: {},
+      readsOverrides: {},
+      dependencyOverrides: {},
+      crossReadsOverrides: {
+        'system-architecture': {
+          append: [{ service: 'billing', step: 'api-contracts' }],
+        },
+      },
+    }
+    expect(overlay.crossReadsOverrides['system-architecture'].append).toHaveLength(1)
+    expect(overlay.crossReadsOverrides['system-architecture'].append[0]).toEqual({
+      service: 'billing',
+      step: 'api-contracts',
+    })
+  })
+
+  it('PipelineOverlay requires crossReadsOverrides (empty object allowed)', () => {
+    const overlay: PipelineOverlay = {
+      name: 'test',
+      description: 'desc',
+      stepOverrides: {},
+      knowledgeOverrides: {},
+      readsOverrides: {},
+      dependencyOverrides: {},
+      crossReadsOverrides: {},
+    }
+    expect(overlay.crossReadsOverrides).toEqual({})
+
+    // Negative type assertion: omitting crossReadsOverrides must be a type error.
+    // If the field were to drift to optional, tsc would NOT flag this literal,
+    // and the @ts-expect-error directive would itself raise a compile error.
+    // @ts-expect-error — crossReadsOverrides is required on PipelineOverlay
+    const missing: PipelineOverlay = {
+      name: 'test',
+      description: 'desc',
+      stepOverrides: {},
+      knowledgeOverrides: {},
+      readsOverrides: {},
+      dependencyOverrides: {},
+    }
+    expect(missing).toBeDefined()
   })
 })

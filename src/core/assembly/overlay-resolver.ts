@@ -3,6 +3,7 @@ import type {
   KnowledgeOverride,
   ReadsOverride,
   DependencyOverride,
+  CrossReadsOverride,
   StepEnablementEntry,
 } from '../../types/index.js'
 
@@ -18,12 +19,14 @@ export function applyOverlay(
   knowledgeMap: Record<string, string[]>,
   readsMap: Record<string, string[]>,
   dependencyMap: Record<string, string[]>,
+  crossReadsMap: Record<string, Array<{ service: string; step: string }>>,
   overlay: PipelineOverlay,
 ): {
   steps: Record<string, StepEnablementEntry>
   knowledge: Record<string, string[]>
   reads: Record<string, string[]>
   dependencies: Record<string, string[]>
+  crossReads: Record<string, Array<{ service: string; step: string }>>
 } {
   // 1. Step overrides: deep-clone all entries so callers cannot mutate originals
   const mergedSteps: Record<string, StepEnablementEntry> = {}
@@ -55,11 +58,18 @@ export function applyOverlay(
     applyReplaceAppendEntry,
   )
 
+  // 5. Cross-reads overrides: append + dedup by service:step pair
+  const mergedCrossReads = applyCrossReadsOverrides(
+    crossReadsMap,
+    overlay.crossReadsOverrides,
+  )
+
   return {
     steps: mergedSteps,
     knowledge: mergedKnowledge,
     reads: mergedReads,
     dependencies: mergedDependencies,
+    crossReads: mergedCrossReads,
   }
 }
 
@@ -100,4 +110,35 @@ function applyReplaceAppendEntry(existing: string[], override: ReadsOverride | D
 
   // Step 3: deduplicate (preserves first occurrence order)
   return [...new Set(appended)]
+}
+
+/**
+ * Cross-reads overrides: append override entries, then dedup by `service:step`
+ * pair preserving first-occurrence order. Does not mutate `inputMap` or
+ * `overrides` — arrays AND entry objects are fresh copies in the result.
+ */
+function applyCrossReadsOverrides(
+  inputMap: Record<string, Array<{ service: string; step: string }>>,
+  overrides: Record<string, CrossReadsOverride>,
+): Record<string, Array<{ service: string; step: string }>> {
+  // Deep-copy entries so callers mutating result.crossReads[...][i] cannot
+  // reach back into the input maps.
+  const result: Record<string, Array<{ service: string; step: string }>> = {}
+  for (const [key, arr] of Object.entries(inputMap)) {
+    result[key] = arr.map(e => ({ service: e.service, step: e.step }))
+  }
+  for (const [step, override] of Object.entries(overrides)) {
+    const existing = result[step] ?? []
+    const appendClones = override.append.map(e => ({ service: e.service, step: e.step }))
+    const merged = [...existing, ...appendClones]
+    // Dedup by service:step key, preserving first-occurrence order
+    const seen = new Set<string>()
+    result[step] = merged.filter(e => {
+      const k = `${e.service}:${e.step}`
+      if (seen.has(k)) return false
+      seen.add(k)
+      return true
+    })
+  }
+  return result
 }

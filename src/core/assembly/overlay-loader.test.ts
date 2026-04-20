@@ -3,7 +3,8 @@ import path from 'node:path'
 import fs from 'node:fs'
 import os from 'node:os'
 import { fileURLToPath } from 'node:url'
-import { loadOverlay, loadSubOverlay } from './overlay-loader.js'
+import { loadOverlay, loadSubOverlay, parseCrossReadsOverrides } from './overlay-loader.js'
+import type { ScaffoldWarning } from '../../types/index.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const fixtureDir = path.resolve(__dirname, '../../../tests/fixtures/methodology')
@@ -287,6 +288,254 @@ describe('loadSubOverlay', () => {
       expect(warnings[0].message).toContain('non-knowledge')
     } finally {
       fs.rmSync(tmpDir, { recursive: true })
+    }
+  })
+
+  it('SUB_OVERLAY_NON_KNOWLEDGE message mentions cross-reads in the stripped-sections list', () => {
+    const tmpPath = path.join(os.tmpdir(), `sub-overlay-${Date.now()}.yml`)
+    fs.writeFileSync(tmpPath, `
+name: fintech
+description: test sub-overlay with step-overrides (triggers SUB_OVERLAY_NON_KNOWLEDGE)
+project-type: backend
+step-overrides:
+  some-step: { enabled: true }
+`)
+    try {
+      const { warnings } = loadSubOverlay(tmpPath)
+      const sub = warnings.find(w => w.code === 'SUB_OVERLAY_NON_KNOWLEDGE')
+      expect(sub).toBeDefined()
+      // Message must mention cross-reads in the list of stripped section types
+      // Tight assertion: lock the exact shorthand phrase so a typo/ordering
+      // regression is caught without being brittle on surrounding sentence.
+      expect(sub!.message).toContain('step/reads/dependency/cross-reads overrides')
+    } finally {
+      fs.rmSync(tmpPath, { force: true })
+    }
+  })
+})
+
+describe('parseCrossReadsOverrides', () => {
+  it('parses valid entries', () => {
+    const warnings: ScaffoldWarning[] = []
+    const result = parseCrossReadsOverrides(
+      {
+        'system-architecture': {
+          append: [
+            { service: 'billing', step: 'api-contracts' },
+            { service: 'inventory', step: 'domain-modeling' },
+          ],
+        },
+      },
+      warnings,
+      '/path/to.yml',
+    )
+    expect(result['system-architecture'].append).toEqual([
+      { service: 'billing', step: 'api-contracts' },
+      { service: 'inventory', step: 'domain-modeling' },
+    ])
+    expect(warnings).toHaveLength(0)
+  })
+
+  it('warns when entry value is not an object (OVERLAY_MALFORMED_ENTRY)', () => {
+    const warnings: ScaffoldWarning[] = []
+    const result = parseCrossReadsOverrides(
+      { 'system-architecture': 'not-an-object' as unknown as Record<string, unknown> },
+      warnings,
+      '/path/to.yml',
+    )
+    expect(result['system-architecture']).toBeUndefined()
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0].code).toBe('OVERLAY_MALFORMED_ENTRY')
+  })
+
+  it('warns when append is present but not an array', () => {
+    const warnings: ScaffoldWarning[] = []
+    const result = parseCrossReadsOverrides(
+      { 'system-architecture': { append: 'not-an-array' } as unknown as Record<string, unknown> },
+      warnings,
+      '/path/to.yml',
+    )
+    expect(result['system-architecture'].append).toEqual([])
+    // Exact count + field — guards against a bug that warns on the wrong field or double-emits.
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0].code).toBe('OVERLAY_MALFORMED_ENTRY')
+    expect(warnings[0].context?.field).toBe('append')
+  })
+
+  it('warns when append item is not an object, preserving valid siblings', () => {
+    const warnings: ScaffoldWarning[] = []
+    const result = parseCrossReadsOverrides(
+      {
+        'system-architecture': {
+          append: [
+            { service: 'billing', step: 'api-contracts' },
+            'not-an-object' as unknown,
+            { service: 'inventory', step: 'domain-modeling' },
+          ],
+        } as unknown as Record<string, unknown>,
+      },
+      warnings,
+      '/path/to.yml',
+    )
+    // Pin the exact preserved items — guards against an impl that preserves wrong siblings.
+    expect(result['system-architecture'].append).toEqual([
+      { service: 'billing', step: 'api-contracts' },
+      { service: 'inventory', step: 'domain-modeling' },
+    ])
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0].code).toBe('OVERLAY_MALFORMED_APPEND_ITEM')
+    expect(warnings[0].context?.index).toBe(1)
+  })
+
+  it('warns when append item is missing service or step', () => {
+    const warnings: ScaffoldWarning[] = []
+    const result = parseCrossReadsOverrides(
+      {
+        'system-architecture': {
+          append: [
+            { service: 'billing' },            // missing step
+            { step: 'api-contracts' },         // missing service
+          ],
+        } as unknown as Record<string, unknown>,
+      },
+      warnings,
+      '/path/to.yml',
+    )
+    expect(result['system-architecture'].append).toHaveLength(0)
+    const itemWarnings = warnings.filter(w => w.code === 'OVERLAY_MALFORMED_APPEND_ITEM')
+    expect(itemWarnings).toHaveLength(2)
+  })
+
+  it('warns when append item has non-kebab-case slug (underscore, uppercase, leading digit, empty)', () => {
+    const warnings: ScaffoldWarning[] = []
+    const result = parseCrossReadsOverrides(
+      {
+        'system-architecture': {
+          append: [
+            { service: 'Bad_Service', step: 'api-contracts' },  // underscore
+            { service: 'billing', step: 'UpperCase' },            // mixed case
+            { service: '1invalid', step: 'api-contracts' },      // leading digit
+            { service: 'billing', step: '' },                     // empty string
+            { service: 'has space', step: 'api-contracts' },     // whitespace
+          ],
+        } as unknown as Record<string, unknown>,
+      },
+      warnings,
+      '/path/to.yml',
+    )
+    expect(result['system-architecture'].append).toHaveLength(0)
+    expect(warnings).toHaveLength(5)
+    expect(warnings.every(w => w.code === 'OVERLAY_MALFORMED_APPEND_ITEM')).toBe(true)
+  })
+
+  it('returns empty append array for entry with no append field', () => {
+    const warnings: ScaffoldWarning[] = []
+    const result = parseCrossReadsOverrides(
+      { 'system-architecture': {} },
+      warnings,
+      '/path/to.yml',
+    )
+    expect(result['system-architecture']).toEqual({ append: [] })
+    expect(warnings).toHaveLength(0)
+  })
+
+  it('includes correct index in OVERLAY_MALFORMED_APPEND_ITEM warning context', () => {
+    const warnings: ScaffoldWarning[] = []
+    parseCrossReadsOverrides(
+      {
+        'system-architecture': {
+          append: [
+            { service: 'billing', step: 'api-contracts' },   // 0 — valid
+            'bad' as unknown,                                   // 1 — malformed
+          ],
+        } as unknown as Record<string, unknown>,
+      },
+      warnings,
+      '/path/to.yml',
+    )
+    const itemWarning = warnings.find(w => w.code === 'OVERLAY_MALFORMED_APPEND_ITEM')
+    expect(itemWarning?.context?.index).toBe(1)
+  })
+
+  it('silently ignores unrecognized per-entry keys (e.g. replace) — matches knowledge-overrides behavior', () => {
+    // Spec §1.1: per-entry keys other than `append` are silently dropped,
+    // mirroring how parseKnowledgeOverrides treats the same shape.
+    const warnings: ScaffoldWarning[] = []
+    const result = parseCrossReadsOverrides(
+      {
+        'system-architecture': {
+          append: [{ service: 'billing', step: 'api-contracts' }],
+          replace: { foo: 'bar' },  // unrecognized — should be ignored silently
+          extraKey: 42,             // unrecognized — should be ignored silently
+        } as unknown as Record<string, unknown>,
+      },
+      warnings,
+      '/path/to.yml',
+    )
+    expect(result['system-architecture'].append).toEqual([
+      { service: 'billing', step: 'api-contracts' },
+    ])
+    expect(warnings).toHaveLength(0)
+  })
+})
+
+describe('loadOverlay forbids cross-reads-overrides (structural-only constraint)', () => {
+  it('emits OVERLAY_CROSS_READS_NOT_ALLOWED and returns empty crossReadsOverrides for project-type overlay', () => {
+    const tmpPath = path.join(os.tmpdir(), `proj-overlay-${Date.now()}.yml`)
+    fs.writeFileSync(tmpPath, `
+name: backend
+description: test
+project-type: backend
+cross-reads-overrides:
+  system-architecture:
+    append:
+      - service: billing
+        step: api-contracts
+`)
+    try {
+      const { overlay, warnings } = loadOverlay(tmpPath)
+      expect(overlay).not.toBeNull()
+      expect(overlay!.crossReadsOverrides).toEqual({})
+      // Fires exactly once per load, regardless of how many child keys were declared.
+      // Lock against a regression that pushes the warning per-key.
+      const notAllowed = warnings.filter(w => w.code === 'OVERLAY_CROSS_READS_NOT_ALLOWED')
+      expect(notAllowed).toHaveLength(1)
+    } finally {
+      fs.rmSync(tmpPath, { force: true })
+    }
+  })
+
+  it('emits OVERLAY_CROSS_READS_NOT_ALLOWED for explicit null (cross-reads-overrides: ~)', () => {
+    const tmpPath = path.join(os.tmpdir(), `proj-overlay-${Date.now()}.yml`)
+    fs.writeFileSync(tmpPath, `
+name: backend
+description: test
+project-type: backend
+cross-reads-overrides: ~
+`)
+    try {
+      const { overlay, warnings } = loadOverlay(tmpPath)
+      expect(overlay).not.toBeNull()
+      expect(overlay!.crossReadsOverrides).toEqual({})
+      expect(warnings.some(w => w.code === 'OVERLAY_CROSS_READS_NOT_ALLOWED')).toBe(true)
+    } finally {
+      fs.rmSync(tmpPath, { force: true })
+    }
+  })
+
+  it('does not emit warning when cross-reads-overrides is absent', () => {
+    const tmpPath = path.join(os.tmpdir(), `proj-overlay-${Date.now()}.yml`)
+    fs.writeFileSync(tmpPath, `
+name: backend
+description: test
+project-type: backend
+`)
+    try {
+      const { overlay, warnings } = loadOverlay(tmpPath)
+      expect(overlay!.crossReadsOverrides).toEqual({})
+      expect(warnings.every(w => w.code !== 'OVERLAY_CROSS_READS_NOT_ALLOWED')).toBe(true)
+    } finally {
+      fs.rmSync(tmpPath, { force: true })
     }
   })
 })

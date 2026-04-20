@@ -233,4 +233,56 @@ describe('Cross-service references E2E (Wave 3c)', () => {
     // Still no write to foreign state
     expect(fs.statSync(statePath).mtimeMs).toBe(mtimeBefore)
   })
+
+  it('overlay-only crossRead (no frontmatter entry) surfaces through resolveTransitiveCrossReads (Wave 3c+1)', () => {
+    // Step B's frontmatter has no crossReads; an overlay adds one pointing at C.
+    // Passing the overlay map to the resolver must surface C's artifact.
+    fs.mkdirSync(path.join(projectRoot, '.scaffold', 'services', 'consumer2'), { recursive: true })
+    fs.writeFileSync(path.join(projectRoot, 'docs', 'extra.md'), 'EXTRA')
+    writeState(
+      path.join(projectRoot, '.scaffold', 'services', 'consumer2', 'state.json'),
+      { 'extra-step': { status: 'completed', produces: ['docs/extra.md'] } },
+    )
+
+    const configWithExtraExport: ScaffoldConfig = {
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        services: [
+          {
+            name: 'producer', projectType: 'library',
+            libraryConfig: { visibility: 'internal' },
+            exports: [{ step: producerStep }],
+          },
+          {
+            name: 'consumer2', projectType: 'library',
+            libraryConfig: { visibility: 'internal' },
+            exports: [{ step: 'extra-step' }],
+          },
+          {
+            name: 'consumer', projectType: 'backend',
+            backendConfig: { apiStyle: 'rest' },
+          },
+        ],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+    }
+    const metas = new Map<string, MetaPromptFile>([
+      [producerStep, mkMetaFile(producerStep)],  // no frontmatter crossReads
+    ])
+    // Overlay adds a cross-read to producer's step
+    const overlayCrossReads = {
+      [producerStep]: [{ service: 'consumer2', step: 'extra-step' }],
+    }
+    const output = mkOutput()
+    const artifacts = resolveTransitiveCrossReads(
+      [{ service: 'producer', step: producerStep }],
+      configWithExtraExport, projectRoot, metas, output,
+      new Set(), new Map(), new Map<string, PipelineState | null>(),
+      undefined,  // globalSteps
+      overlayCrossReads,
+    )
+    const paths = artifacts.map(a => a.filePath).sort()
+    // producer's own docs/contracts.md + consumer2's docs/extra.md (via overlay-added crossRead)
+    expect(paths).toEqual(['docs/contracts.md', 'docs/extra.md'])
+  })
 })

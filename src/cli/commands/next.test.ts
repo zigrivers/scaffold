@@ -53,6 +53,7 @@ vi.mock('../../core/assembly/overlay-state-resolver.js', () => ({
     knowledge: {},
     reads: {},
     dependencies: {},
+    crossReads: {},
   })),
 }))
 
@@ -336,6 +337,7 @@ describe('next command', () => {
       knowledge: {},
       reads: {},
       dependencies: {},
+      crossReads: {},
     })
 
     const metaPrompts = new Map([
@@ -425,7 +427,7 @@ describe('next command', () => {
       ]))
       mockComputeEligible.mockReturnValue(['system-architecture'])
       mockOverlay.mockReturnValue({
-        steps: {}, knowledge: {}, reads: {}, dependencies: {},
+        steps: {}, knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
       })
       mockCrossRead.mockReturnValue([
         { service: 'shared-lib', step: 'api-contracts', status: 'completed' },
@@ -475,7 +477,7 @@ describe('next command', () => {
       ]))
       mockComputeEligible.mockReturnValue(['system-architecture'])
       mockOverlay.mockReturnValue({
-        steps: {}, knowledge: {}, reads: {}, dependencies: {},
+        steps: {}, knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
       })
       mockCrossRead.mockReturnValue([
         { service: 'shared-lib', step: 'api-contracts', status: 'completed' },
@@ -506,7 +508,7 @@ describe('next command', () => {
       ]))
       mockComputeEligible.mockReturnValue(['system-architecture'])
       mockOverlay.mockReturnValue({
-        steps: {}, knowledge: {}, reads: {}, dependencies: {},
+        steps: {}, knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
       })
       mockCrossRead.mockReturnValue([
         { service: 'shared-lib', step: 'api-contracts', status: 'not-bootstrapped' },

@@ -619,10 +619,10 @@ step-overrides:
 })
 
 describe('crossReads on OverlayState (Wave 3c)', () => {
-  // Per spec §2.1, crossReads is an OVERLAY-OVERRIDE seam (empty until the
-  // follow-on 'crossReads-overrides' feature lands). Consumers use the
-  // overlay-first fallback: `overlay.crossReads?.[slug] ?? frontmatter.crossReads`.
-  it('returns crossReads as empty object even when frontmatter has crossReads', () => {
+  // With Wave 3c+1, resolveOverlayState populates OverlayState.crossReads from
+  // frontmatter merged with any overlay cross-reads-overrides. Consumers should
+  // read `overlay.crossReads?.[slug]` as authoritative.
+  it('returns crossReads populated from frontmatter when no overlay overrides configured', () => {
     const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
       ['system-architecture', {
         frontmatter: makeFrontmatter({
@@ -641,21 +641,80 @@ describe('crossReads on OverlayState (Wave 3c)', () => {
       presetSteps: {},
       output: makeOutput(),
     })
-    // The overlay map is empty; consumers fall back to frontmatter.crossReads.
-    expect(result.crossReads).toEqual({})
+    expect(result.crossReads['system-architecture']).toEqual([
+      { service: 'shared-lib', step: 'api-contracts' },
+    ])
   })
 
-  it('returns crossReads as empty object when no step has crossReads', () => {
+  it('returns crossReads keyed per-step with empty arrays when no step has crossReads', () => {
     const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
       ['some-step', { frontmatter: makeFrontmatter({ name: 'some-step' }) }],
     ])
     const result = resolveOverlayState({
-      config: makeConfig(),
-      methodologyDir: '/nonexistent',
-      metaPrompts,
-      presetSteps: {},
-      output: makeOutput(),
+      config: makeConfig(), methodologyDir: '/nonexistent', metaPrompts, presetSteps: {}, output: makeOutput(),
     })
-    expect(result.crossReads).toEqual({})
+    expect(result.crossReads['some-step']).toEqual([])
+  })
+
+  it('threads crossReadsMap through BOTH project-type (pass 1) and structural (pass 2) passes', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cross-reads-both-'))
+    try {
+      // Pass-1 overlay (project-type: backend) — no cross-reads-overrides (forbidden per §4.1)
+      fs.writeFileSync(path.join(tmpDir, 'backend-overlay.yml'), `
+name: backend
+description: pass-1 overlay
+project-type: backend
+step-overrides:
+  system-architecture: { enabled: true }
+`)
+      // Pass-2 overlay (structural multi-service) — owns cross-reads-overrides
+      fs.writeFileSync(path.join(tmpDir, 'multi-service-overlay.yml'), `
+name: multi-service
+description: pass-2 overlay
+step-overrides:
+  system-architecture: { enabled: true }
+cross-reads-overrides:
+  system-architecture:
+    append:
+      - service: billing
+        step: api-contracts
+`)
+      const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+        ['system-architecture', {
+          frontmatter: makeFrontmatter({
+            name: 'system-architecture',
+            phase: 'architecture', order: 700,
+            outputs: ['docs/arch.md'],
+            // Frontmatter entry MUST survive both passes. Pass 1 is a no-op for
+            // cross-reads (§4.1), pass 2 appends. A bug that zeroes the map
+            // before pass 2 would drop this entry.
+            crossReads: [{ service: 'shared-lib', step: 'api-contracts' }],
+          }),
+        }],
+      ])
+      const result = resolveOverlayState({
+        config: makeConfig({
+          project: {
+            projectType: 'backend',        // triggers pass 1
+            services: [{                    // triggers pass 2
+              name: 'api', projectType: 'backend',
+              backendConfig: { apiStyle: 'rest' },
+            }],
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any),
+        methodologyDir: tmpDir,
+        metaPrompts,
+        presetSteps: {},
+        output: makeOutput(),
+      })
+      // Frontmatter entry (preserved through pass 1) + overlay append from pass 2
+      expect(result.crossReads['system-architecture']).toEqual([
+        { service: 'shared-lib', step: 'api-contracts' },  // from frontmatter
+        { service: 'billing', step: 'api-contracts' },      // from structural overlay
+      ])
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
   })
 })

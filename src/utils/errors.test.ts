@@ -30,6 +30,8 @@ import {
   overlayMissing,
   overlayParseError,
   overlayMalformedEntry,
+  overlayMalformedAppendItem,
+  overlayCrossReadsNotAllowed,
   asScaffoldError,
   type ScaffoldError,
   type ScaffoldWarning,
@@ -89,6 +91,34 @@ describe('error factories — shape', () => {
       expect(warn).toHaveProperty('message')
       expect(warn).not.toHaveProperty('exitCode')
     }
+  })
+
+  it('overlayMalformedAppendItem produces a ScaffoldWarning with code, message, and context', () => {
+    const w = overlayMalformedAppendItem('system-architecture', 3, '/path/overlay.yml')
+    expect(w.code).toBe('OVERLAY_MALFORMED_APPEND_ITEM')
+    expect(w.message).toContain('system-architecture')
+    expect(w.message).toContain('append[3]')
+    // Lock the item-vs-entry distinction (spec §2.1) so a regression to the old
+    // 'ignoring entry' wording would fail this test.
+    expect(w.message).toContain('ignoring that item')
+    expect(w.message).not.toContain('ignoring entry')
+    expect(w).not.toHaveProperty('exitCode')
+    expect(w.context).toEqual({
+      step: 'system-architecture',
+      index: 3,
+      file: '/path/overlay.yml',
+    })
+  })
+
+  it('overlayCrossReadsNotAllowed produces a ScaffoldWarning using basename of file', () => {
+    const w = overlayCrossReadsNotAllowed('/some/absolute/path/backend-overlay.yml')
+    expect(w.code).toBe('OVERLAY_CROSS_READS_NOT_ALLOWED')
+    expect(w.message).toContain('structural overlays')
+    expect(w.message).toContain('stripping')
+    expect(w.message).toContain('backend-overlay.yml')
+    expect(w.message).not.toContain('/some/absolute/path')
+    expect(w).not.toHaveProperty('exitCode')
+    expect(w.context).toEqual({ file: '/some/absolute/path/backend-overlay.yml' })
   })
 })
 

@@ -436,4 +436,24 @@ describe('buildGraph crossDependencies (Wave 3c)', () => {
       { service: 'new', step: 'new-step' },
     ])
   })
+
+  it('overlay cross-reads-overrides append surfaces in DependencyNode.crossDependencies (Wave 3c+1 E2E)', () => {
+    // Simulate the end result of resolvePipeline with a structural overlay that
+    // appended to system-architecture's crossReads. Overlay map has the FINAL
+    // merged array (frontmatter entries + overlay append).
+    const fm = makeFm('system-architecture', 'architecture', 700, [])
+    fm.crossReads = [{ service: 'shared-lib', step: 'api-contracts' }]  // frontmatter entry
+    const mergedMap = {
+      'system-architecture': [
+        { service: 'shared-lib', step: 'api-contracts' },  // preserved from frontmatter
+        { service: 'billing', step: 'api-contracts' },      // appended by structural overlay
+      ],
+    }
+    const graph = buildGraph([fm], new Map(), undefined, mergedMap)
+    const node = graph.nodes.get('system-architecture')
+    expect(node?.crossDependencies).toEqual([
+      { service: 'shared-lib', step: 'api-contracts' },
+      { service: 'billing', step: 'api-contracts' },
+    ])
+  })
 })

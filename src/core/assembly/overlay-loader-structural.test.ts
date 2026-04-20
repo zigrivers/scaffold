@@ -126,3 +126,64 @@ step-overrides:
     expect(overlay!.projectType).toBeUndefined()
   })
 })
+
+describe('loadStructuralOverlay cross-reads-overrides (Wave 3c follow-on)', () => {
+  it('parses cross-reads-overrides into crossReadsOverrides', () => {
+    const tmpPath = path.join(os.tmpdir(), `struct-overlay-${Date.now()}.yml`)
+    fs.writeFileSync(tmpPath, `
+name: multi-service
+description: test
+cross-reads-overrides:
+  system-architecture:
+    append:
+      - service: billing
+        step: api-contracts
+      - service: inventory
+        step: domain-modeling
+`)
+    try {
+      const { overlay, errors } = loadStructuralOverlay(tmpPath)
+      expect(errors).toEqual([])
+      expect(overlay).not.toBeNull()
+      expect(overlay!.crossReadsOverrides['system-architecture'].append).toEqual([
+        { service: 'billing', step: 'api-contracts' },
+        { service: 'inventory', step: 'domain-modeling' },
+      ])
+    } finally {
+      fs.rmSync(tmpPath, { force: true })
+    }
+  })
+
+  it('returns empty crossReadsOverrides when section absent', () => {
+    const tmpPath = path.join(os.tmpdir(), `struct-overlay-${Date.now()}.yml`)
+    fs.writeFileSync(tmpPath, `
+name: multi-service
+description: test
+`)
+    try {
+      const { overlay } = loadStructuralOverlay(tmpPath)
+      expect(overlay!.crossReadsOverrides).toEqual({})
+    } finally {
+      fs.rmSync(tmpPath, { force: true })
+    }
+  })
+
+  it('emits OVERLAY_MALFORMED_SECTION when cross-reads-overrides is wrong shape (array)', () => {
+    const tmpPath = path.join(os.tmpdir(), `struct-overlay-${Date.now()}.yml`)
+    fs.writeFileSync(tmpPath, `
+name: multi-service
+description: test
+cross-reads-overrides: []
+`)
+    try {
+      const { overlay, warnings } = loadStructuralOverlay(tmpPath)
+      expect(overlay!.crossReadsOverrides).toEqual({})
+      expect(warnings.some(w =>
+        w.code === 'OVERLAY_MALFORMED_SECTION'
+        && String(w.context?.section) === 'cross-reads-overrides',
+      )).toBe(true)
+    } finally {
+      fs.rmSync(tmpPath, { force: true })
+    }
+  })
+})

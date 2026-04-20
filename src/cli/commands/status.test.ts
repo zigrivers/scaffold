@@ -55,6 +55,7 @@ vi.mock('../../core/assembly/overlay-state-resolver.js', () => ({
     knowledge: {},
     reads: {},
     dependencies: {},
+    crossReads: {},
   })),
 }))
 
@@ -377,6 +378,7 @@ describe('status command', () => {
       knowledge: {},
       reads: {},
       dependencies: {},
+      crossReads: {},
     })
 
     const metaPrompts = new Map([

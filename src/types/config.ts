@@ -98,6 +98,11 @@ export interface DependencyOverride {
   append?: string[]
 }
 
+/** Override entry for cross-reads (append-only; Wave 3c+1). */
+export interface CrossReadsOverride {
+  append: Array<{ service: string; step: string }>
+}
+
 /** Pipeline overlay definition (project-type or structural). */
 export interface PipelineOverlay {
   name: string
@@ -107,6 +112,7 @@ export interface PipelineOverlay {
   knowledgeOverrides: Record<string, KnowledgeOverride>
   readsOverrides: Record<string, ReadsOverride>
   dependencyOverrides: Record<string, DependencyOverride>
+  crossReadsOverrides: Record<string, CrossReadsOverride>
 }
 
 /** Service configuration — mirrors ServiceSchema structure for manual type declarations. */

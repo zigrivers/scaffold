@@ -395,6 +395,148 @@ describe('resolveTransitiveCrossReads', () => {
     expect(paths).toEqual(['docs/b.md', 'docs/c.md', 'docs/d.md'])
     expect(paths.filter(p => p === 'docs/d.md')).toHaveLength(1)
   })
+
+  it('uses overlayCrossReads for foreign step when provided (overlay-first)', () => {
+    // b-step frontmatter has no crossReads; overlay adds one to c-step
+    fs.writeFileSync(path.join(tmpRoot, 'docs', 'b.md'), 'B')
+    fs.writeFileSync(path.join(tmpRoot, 'docs', 'c.md'), 'C')
+    seedService('b', { 'b-step': { status: 'completed', produces: ['docs/b.md'] } })
+    seedService('c', { 'c-step': { status: 'completed', produces: ['docs/c.md'] } })
+    // b-step has NO frontmatter crossReads; overlay provides them for b-step
+    const metas = new Map<string, MetaPromptFile>([
+      ['b-step', mkMetaFile('b-step')],  // no frontmatter crossReads
+      ['c-step', mkMetaFile('c-step')],
+    ])
+    const overlayCrossReads = {
+      'b-step': [{ service: 'c', step: 'c-step' }],  // overlay-only
+    }
+    const { output } = mkOutput()
+    const artifacts = resolveTransitiveCrossReads(
+      [{ service: 'b', step: 'b-step' }],
+      mkMultiConfig({ b: ['b-step'], c: ['c-step'] }),
+      tmpRoot, metas, output,
+      new Set(), new Map(), new Map(),
+      undefined,  // globalSteps
+      overlayCrossReads,
+    )
+    const paths = artifacts.map(a => a.filePath).sort()
+    expect(paths).toEqual(['docs/b.md', 'docs/c.md'])
+  })
+
+  it('falls back to foreignMeta.frontmatter.crossReads when overlayCrossReads is omitted (backward compat)', () => {
+    // This is essentially the original Wave 3c test, restated to lock the backcompat contract.
+    fs.writeFileSync(path.join(tmpRoot, 'docs', 'b.md'), 'B')
+    fs.writeFileSync(path.join(tmpRoot, 'docs', 'c.md'), 'C')
+    seedService('b', { 'b-step': { status: 'completed', produces: ['docs/b.md'] } })
+    seedService('c', { 'c-step': { status: 'completed', produces: ['docs/c.md'] } })
+    const metas = new Map<string, MetaPromptFile>([
+      ['b-step', mkMetaFile('b-step', [{ service: 'c', step: 'c-step' }])],  // frontmatter only
+      ['c-step', mkMetaFile('c-step')],
+    ])
+    const { output } = mkOutput()
+    const artifacts = resolveTransitiveCrossReads(
+      [{ service: 'b', step: 'b-step' }],
+      mkMultiConfig({ b: ['b-step'], c: ['c-step'] }),
+      tmpRoot, metas, output,
+      new Set(), new Map(), new Map(),
+      // No globalSteps, no overlayCrossReads — omitted args
+    )
+    const paths = artifacts.map(a => a.filePath).sort()
+    expect(paths).toEqual(['docs/b.md', 'docs/c.md'])
+  })
+
+  it('does NOT recurse when overlay references a step absent from metaPrompts (foreignMeta guard)', () => {
+    // Setup specifically designed to isolate the foreignMeta existence guard.
+    //
+    // The guard lives here: `if (foreignMeta && !isTool && foreignCrossReads.length > 0)`
+    //
+    // To prove it actually fires, we need a scenario where — WITHOUT the guard —
+    // recursion WOULD surface an artifact that SHOULDN'T appear. A previous
+    // version of this test relied on resolveDirectCrossRead rejecting a missing
+    // service, which short-circuits before the guard is reached, so the test
+    // would pass even if the guard were removed. This version fixes that.
+    //
+    // Scenario:
+    //   - Top-level cross-read: b:b-step → c:ghost-step
+    //   - ghost-step's direct state EXISTS (artifact 'docs/ghost.md' produced)
+    //     so `direct.completed` is true and recursion reaches the guard.
+    //   - overlayCrossReads['ghost-step'] = [{ d, deep-step }] (length > 0,
+    //     would recurse without the guard)
+    //   - metaPrompts has b-step + deep-step, but deliberately NOT ghost-step.
+    //   - d:deep-step produces 'docs/deep.md'.
+    //
+    // With the guard: recursion into ghost-step's overlay crossReads is blocked
+    //   (foreignMeta for ghost-step is undefined). docs/deep.md must NOT surface.
+    // Without the guard: recursion fires and docs/deep.md would appear.
+    fs.mkdirSync(path.join(tmpRoot, '.scaffold', 'services', 'c'), { recursive: true })
+    fs.mkdirSync(path.join(tmpRoot, '.scaffold', 'services', 'd'), { recursive: true })
+    fs.writeFileSync(path.join(tmpRoot, 'docs', 'b.md'), 'B')
+    fs.writeFileSync(path.join(tmpRoot, 'docs', 'ghost.md'), 'GHOST')
+    fs.writeFileSync(path.join(tmpRoot, 'docs', 'deep.md'), 'DEEP')
+    seedService('b', { 'b-step': { status: 'completed', produces: ['docs/b.md'] } })
+    seedService('c', { 'ghost-step': { status: 'completed', produces: ['docs/ghost.md'] } })
+    seedService('d', { 'deep-step': { status: 'completed', produces: ['docs/deep.md'] } })
+    const metas = new Map<string, MetaPromptFile>([
+      ['b-step', mkMetaFile('b-step')],
+      ['deep-step', mkMetaFile('deep-step')],
+      // ghost-step deliberately NOT added — tests the existence guard
+    ])
+    const overlayCrossReads = {
+      'b-step': [{ service: 'c', step: 'ghost-step' }],
+      'ghost-step': [{ service: 'd', step: 'deep-step' }],  // would recurse without guard
+    }
+    const { output } = mkOutput()
+    const artifacts = resolveTransitiveCrossReads(
+      [{ service: 'b', step: 'b-step' }],
+      mkMultiConfig({
+        b: ['b-step'],
+        c: ['ghost-step'],   // c exports ghost-step so direct lookup succeeds
+        d: ['deep-step'],
+      }),
+      tmpRoot, metas, output,
+      new Set(), new Map(), new Map(),
+      undefined, overlayCrossReads,
+    )
+    const paths = artifacts.map(a => a.filePath).sort()
+    // Must contain b.md (self) + ghost.md (direct hop from b).
+    // Must NOT contain deep.md (guarded recursion into ghost-step would have surfaced it).
+    expect(paths).toEqual(['docs/b.md', 'docs/ghost.md'])
+    expect(paths).not.toContain('docs/deep.md')
+  })
+
+  it('overlayCrossReads takes PRECEDENCE over frontmatter when both disagree (overlay-first)', () => {
+    // Both present, but pointing at different foreign steps. The correct impl must
+    // recurse into the overlay target, NOT the frontmatter target. A buggy impl that
+    // still prefers frontmatter would pass the earlier tests (where only one is set).
+    fs.mkdirSync(path.join(tmpRoot, '.scaffold', 'services', 'fm'), { recursive: true })
+    fs.writeFileSync(path.join(tmpRoot, 'docs', 'b.md'), 'B')
+    fs.writeFileSync(path.join(tmpRoot, 'docs', 'c.md'), 'C')          // overlay target
+    fs.writeFileSync(path.join(tmpRoot, 'docs', 'from-fm.md'), 'FM')   // frontmatter target
+    seedService('b', { 'b-step': { status: 'completed', produces: ['docs/b.md'] } })
+    seedService('c', { 'c-step': { status: 'completed', produces: ['docs/c.md'] } })
+    seedService('fm', { 'fm-step': { status: 'completed', produces: ['docs/from-fm.md'] } })
+    // b-step has FRONTMATTER crossRead to fm:fm-step; overlay REPLACES with c:c-step.
+    const metas = new Map<string, MetaPromptFile>([
+      ['b-step', mkMetaFile('b-step', [{ service: 'fm', step: 'fm-step' }])],
+      ['c-step', mkMetaFile('c-step')],
+      ['fm-step', mkMetaFile('fm-step')],
+    ])
+    const overlayCrossReads = {
+      'b-step': [{ service: 'c', step: 'c-step' }],   // overlay wins
+    }
+    const { output } = mkOutput()
+    const artifacts = resolveTransitiveCrossReads(
+      [{ service: 'b', step: 'b-step' }],
+      mkMultiConfig({ b: ['b-step'], c: ['c-step'], fm: ['fm-step'] }),
+      tmpRoot, metas, output,
+      new Set(), new Map(), new Map(),
+      undefined, overlayCrossReads,
+    )
+    const paths = artifacts.map(a => a.filePath).sort()
+    // Overlay target (c.md) must be present; frontmatter target (from-fm.md) must NOT.
+    expect(paths).toEqual(['docs/b.md', 'docs/c.md'])
+    expect(paths).not.toContain('docs/from-fm.md')
+  })
 })
 
 describe('resolveCrossReadReadiness', () => {

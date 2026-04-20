@@ -11,8 +11,12 @@ export interface OverlayState {
   knowledge: Record<string, string[]>
   reads: Record<string, string[]>
   dependencies: Record<string, string[]>
-  /** Wave 3c — populated from frontmatter.crossReads; overlay-level overrides are post-release. */
-  crossReads?: Record<string, Array<{ service: string; step: string }>>
+  /**
+   * Cross-reads for each step (keyed by step slug). Populated via overlay-first
+   * merge: `frontmatter.crossReads ∪ overlay.cross-reads-overrides` (spec §3.2).
+   * Consumers can read `overlay.crossReads[slug]` as authoritative.
+   */
+  crossReads: Record<string, Array<{ service: string; step: string }>>
 }
 
 /**
@@ -35,14 +39,12 @@ export function resolveOverlayState(options: {
   const knowledgeMap: Record<string, string[]> = {}
   const readsMap: Record<string, string[]> = {}
   const dependencyMap: Record<string, string[]> = {}
-  // Wave 3c: crossReads is an OVERLAY-OVERRIDE seam (empty until the follow-on
-  // 'crossReads-overrides' feature lands). Consumers read frontmatter via the
-  // overlay-first fallback: `overlay.crossReads?.[slug] ?? frontmatter.crossReads`.
   const crossReadsMap: Record<string, Array<{ service: string; step: string }>> = {}
   for (const [name, mp] of metaPrompts) {
     knowledgeMap[name] = [...(mp.frontmatter.knowledgeBase ?? [])]
     readsMap[name] = [...(mp.frontmatter.reads ?? [])]
     dependencyMap[name] = [...(mp.frontmatter.dependencies ?? [])]
+    crossReadsMap[name] = [...(mp.frontmatter.crossReads ?? [])]
   }
 
   // Start with preset defaults
@@ -50,6 +52,7 @@ export function resolveOverlayState(options: {
   let overlayKnowledge = knowledgeMap
   let overlayReads = readsMap
   let overlayDependencies = dependencyMap
+  let overlayCrossReads = crossReadsMap
 
   // Load and apply project-type overlay if configured
   const projectType = config.project?.projectType
@@ -76,12 +79,14 @@ export function resolveOverlayState(options: {
           knowledgeMap,
           readsMap,
           dependencyMap,
+          overlayCrossReads,
           overlay,
         )
         overlaySteps = merged.steps
         overlayKnowledge = merged.knowledge
         overlayReads = merged.reads
         overlayDependencies = merged.dependencies
+        overlayCrossReads = merged.crossReads
       }
     }
 
@@ -151,12 +156,14 @@ export function resolveOverlayState(options: {
           overlayKnowledge,
           overlayReads,
           overlayDependencies,
+          overlayCrossReads,
           msOverlay,
         )
         overlaySteps = merged.steps
         overlayKnowledge = merged.knowledge
         overlayReads = merged.reads
         overlayDependencies = merged.dependencies
+        overlayCrossReads = merged.crossReads
       }
     }
   }
@@ -166,6 +173,6 @@ export function resolveOverlayState(options: {
     knowledge: overlayKnowledge,
     reads: overlayReads,
     dependencies: overlayDependencies,
-    crossReads: crossReadsMap,
+    crossReads: overlayCrossReads,
   }
 }

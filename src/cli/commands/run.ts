@@ -450,6 +450,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
                 new Map(),
                 foreignStateCache,
                 pipeline.globalSteps,
+                pipeline.overlay.crossReads,
               )
               for (const a of crossArtifacts) {
                 if (!gatheredPaths.has(a.filePath)) {

@@ -1,12 +1,14 @@
 import type { StepEnablementEntry } from '../../types/index.js'
 import type {
   PipelineOverlay, KnowledgeOverride, ReadsOverride, DependencyOverride,
+  CrossReadsOverride,
 } from '../../types/index.js'
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
 import { ProjectTypeSchema } from '../../config/schema.js'
 import { fileExists } from '../../utils/fs.js'
 import {
   overlayMissing, overlayParseError, overlayMalformedSection, overlayMalformedEntry,
+  overlayMalformedAppendItem, overlayCrossReadsNotAllowed,
 } from '../../utils/errors.js'
 import yaml from 'js-yaml'
 import fs from 'node:fs'
@@ -133,6 +135,48 @@ export function parseDependencyOverrides(
   return result
 }
 
+const CROSS_READS_SLUG = /^[a-z][a-z0-9-]*$/
+
+/** Parse cross-reads-overrides section from YAML object. */
+export function parseCrossReadsOverrides(
+  raw: Record<string, unknown>,
+  warnings: ScaffoldWarning[],
+  filePath: string,
+): Record<string, CrossReadsOverride> {
+  const result: Record<string, CrossReadsOverride> = {}
+  for (const [key, value] of Object.entries(raw)) {
+    if (!isPlainObject(value)) {
+      warnings.push(overlayMalformedEntry(key, 'value', filePath))
+      continue
+    }
+    const obj = value as Record<string, unknown>
+    if (obj['append'] !== undefined && !Array.isArray(obj['append'])) {
+      warnings.push(overlayMalformedEntry(key, 'append', filePath))
+    }
+    const append: Array<{ service: string; step: string }> = []
+    if (Array.isArray(obj['append'])) {
+      for (let index = 0; index < obj['append'].length; index++) {
+        const item = obj['append'][index]
+        if (!isPlainObject(item)) {
+          warnings.push(overlayMalformedAppendItem(key, index, filePath))
+          continue
+        }
+        const entry = item as Record<string, unknown>
+        if (
+          typeof entry['service'] === 'string' && CROSS_READS_SLUG.test(entry['service'])
+          && typeof entry['step'] === 'string' && CROSS_READS_SLUG.test(entry['step'])
+        ) {
+          append.push({ service: entry['service'], step: entry['step'] })
+        } else {
+          warnings.push(overlayMalformedAppendItem(key, index, filePath))
+        }
+      }
+    }
+    result[key] = { append }
+  }
+  return result
+}
+
 /**
  * Load a project-type overlay YAML file.
  * @param overlayPath - Absolute path to overlay file
@@ -199,7 +243,10 @@ export function loadOverlay(
   }
 
   // 5. Parse override sections (gracefully handle missing/malformed)
-  const overrideSections = ['step-overrides', 'knowledge-overrides', 'reads-overrides', 'dependency-overrides'] as const
+  const overrideSections = [
+    'step-overrides', 'knowledge-overrides', 'reads-overrides',
+    'dependency-overrides', 'cross-reads-overrides',
+  ] as const
 
   for (const section of overrideSections) {
     const value = obj[section]
@@ -209,6 +256,13 @@ export function loadOverlay(
       }
     }
   }
+
+  // Project-type overlays are forbidden from declaring cross-reads-overrides.
+  // Detect with !== undefined so explicit null ("cross-reads-overrides: ~" in YAML) is caught.
+  if (obj['cross-reads-overrides'] !== undefined) {
+    warnings.push(overlayCrossReadsNotAllowed(overlayPath))
+  }
+  // No parse — overlay.crossReadsOverrides is set to {} in the literal below.
 
   const stepOverridesRaw = isPlainObject(obj['step-overrides'])
     ? obj['step-overrides'] as Record<string, unknown> : {}
@@ -227,6 +281,7 @@ export function loadOverlay(
     knowledgeOverrides: parseKnowledgeOverrides(knowledgeOverridesRaw, warnings, overlayPath),
     readsOverrides: parseReadsOverrides(readsOverridesRaw, warnings, overlayPath),
     dependencyOverrides: parseDependencyOverrides(dependencyOverridesRaw, warnings, overlayPath),
+    crossReadsOverrides: {},    // structural-only — any value in YAML is rejected above
   }
 
   return { overlay, errors, warnings }
@@ -252,17 +307,22 @@ export function loadSubOverlay(
   const hasStep = Object.keys(overlay.stepOverrides ?? {}).length > 0
   const hasReads = Object.keys(overlay.readsOverrides ?? {}).length > 0
   const hasDeps = Object.keys(overlay.dependencyOverrides ?? {}).length > 0
+  // Defense-in-depth: loadOverlay already strips cross-reads-overrides, so this
+  // branch is unreachable via the public API. It guards against a future path
+  // that bypasses the parent loader.
+  const hasCrossReads = Object.keys(overlay.crossReadsOverrides ?? {}).length > 0
 
-  if (hasStep || hasReads || hasDeps) {
+  if (hasStep || hasReads || hasDeps || hasCrossReads) {
     warnings.push({
       code: 'SUB_OVERLAY_NON_KNOWLEDGE',
       message: `Sub-overlay ${overlayPath} contains non-knowledge sections`
-        + ' (step/reads/dependency overrides). These are stripped for domain sub-overlays.',
+        + ' (step/reads/dependency/cross-reads overrides). These are stripped for domain sub-overlays.',
       context: { file: overlayPath },
     })
     overlay.stepOverrides = {}
     overlay.readsOverrides = {}
     overlay.dependencyOverrides = {}
+    overlay.crossReadsOverrides = {}
   }
 
   return { overlay, errors: result.errors, warnings }
@@ -325,7 +385,10 @@ export function loadStructuralOverlay(
   }
 
   // 5. Parse override sections (gracefully handle missing/malformed)
-  const overrideSections = ['step-overrides', 'knowledge-overrides', 'reads-overrides', 'dependency-overrides'] as const
+  const overrideSections = [
+    'step-overrides', 'knowledge-overrides', 'reads-overrides',
+    'dependency-overrides', 'cross-reads-overrides',
+  ] as const
 
   for (const section of overrideSections) {
     const value = obj[section]
@@ -344,6 +407,8 @@ export function loadStructuralOverlay(
     ? obj['reads-overrides'] as Record<string, unknown> : {}
   const dependencyOverridesRaw = isPlainObject(obj['dependency-overrides'])
     ? obj['dependency-overrides'] as Record<string, unknown> : {}
+  const crossReadsOverridesRaw = isPlainObject(obj['cross-reads-overrides'])
+    ? obj['cross-reads-overrides'] as Record<string, unknown> : {}
 
   const overlay: PipelineOverlay = {
     name: (obj['name'] as string).trim(),
@@ -353,6 +418,7 @@ export function loadStructuralOverlay(
     knowledgeOverrides: parseKnowledgeOverrides(knowledgeOverridesRaw, warnings, overlayPath),
     readsOverrides: parseReadsOverrides(readsOverridesRaw, warnings, overlayPath),
     dependencyOverrides: parseDependencyOverrides(dependencyOverridesRaw, warnings, overlayPath),
+    crossReadsOverrides: parseCrossReadsOverrides(crossReadsOverridesRaw, warnings, overlayPath),
   }
 
   return { overlay, errors, warnings }
