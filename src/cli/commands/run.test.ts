@@ -87,13 +87,25 @@ vi.mock('../../core/assembly/overlay-resolver.js', () => ({
 }))
 
 vi.mock('../../core/assembly/overlay-state-resolver.js', () => ({
-  resolveOverlayState: vi.fn(({ presetSteps }: { presetSteps: Record<string, unknown> }) => ({
-    steps: presetSteps,
-    knowledge: {},
-    reads: {},
-    dependencies: {},
-    crossReads: {},
-  })),
+  resolveOverlayState: vi.fn((opts: {
+    presetSteps: Record<string, unknown>
+    metaPrompts: Map<string, { frontmatter: { crossReads?: Array<{ service: string; step: string }> } }>
+  }) => {
+    // Mirror the real resolveOverlayState behavior: populate crossReads per-step
+    // from frontmatter. Tests that need overlay-level overrides use
+    // mockReturnValueOnce to override this default.
+    const crossReads: Record<string, Array<{ service: string; step: string }>> = {}
+    for (const [name, mp] of opts.metaPrompts) {
+      crossReads[name] = [...(mp.frontmatter.crossReads ?? [])]
+    }
+    return {
+      steps: opts.presetSteps,
+      knowledge: {},
+      reads: {},
+      dependencies: {},
+      crossReads,
+    }
+  }),
 }))
 
 vi.mock('node:fs', async () => {
@@ -1577,10 +1589,12 @@ describe('run command handler', () => {
 
     it('forwards pipeline.overlay.crossReads (as 10th positional arg) to resolveTransitiveCrossReads', async () => {
       // Sentinel object — if run.ts forwards anything other than pipeline.overlay.crossReads,
-      // this assertion fails. Keyed on a different step so run.ts's consumer-step
-      // lookup (pipeline.overlay.crossReads?.[step]) still falls through to the
-      // frontmatter crossReads for 'system-architecture' (asserted as 1st arg).
+      // this assertion fails. Must include 'system-architecture' keyed with the same
+      // entries the frontmatter has (since Wave 3c+1 cleanup, run.ts reads ONLY from
+      // overlay.crossReads — no frontmatter fallback). Also carries a non-consumer
+      // entry so the map is uniquely identifiable beyond the per-step array.
       const SENTINEL_OVERLAY_CROSS_READS = {
+        'system-architecture': [{ service: 'shared-lib', step: 'api-contracts' }],
         'some-other-step': [{ service: 'overlay-only-svc', step: 'overlay-only-step' }],
       }
 

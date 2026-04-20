@@ -48,13 +48,25 @@ vi.mock('../../core/dependency/eligibility.js', () => ({
 }))
 
 vi.mock('../../core/assembly/overlay-state-resolver.js', () => ({
-  resolveOverlayState: vi.fn(({ presetSteps }: { presetSteps: Record<string, unknown> }) => ({
-    steps: presetSteps,
-    knowledge: {},
-    reads: {},
-    dependencies: {},
-    crossReads: {},
-  })),
+  resolveOverlayState: vi.fn((opts: {
+    presetSteps: Record<string, unknown>
+    metaPrompts: Map<string, { frontmatter: { crossReads?: Array<{ service: string; step: string }> } }>
+  }) => {
+    // Mirror the real resolveOverlayState behavior: populate crossReads per-step
+    // from frontmatter. Tests that need overlay-level overrides use
+    // mockReturnValueOnce to override this default.
+    const crossReads: Record<string, Array<{ service: string; step: string }>> = {}
+    for (const [name, mp] of opts.metaPrompts) {
+      crossReads[name] = [...(mp.frontmatter.crossReads ?? [])]
+    }
+    return {
+      steps: opts.presetSteps,
+      knowledge: {},
+      reads: {},
+      dependencies: {},
+      crossReads,
+    }
+  }),
 }))
 
 vi.mock('../../core/assembly/cross-reads.js', () => ({
@@ -427,7 +439,16 @@ describe('next command', () => {
       ]))
       mockComputeEligible.mockReturnValue(['system-architecture'])
       mockOverlay.mockReturnValue({
-        steps: {}, knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
+        steps: {},
+        knowledge: {},
+        reads: {},
+        dependencies: {},
+        // Cross-dep consumer lookup now reads from overlay.crossReads directly
+        // (no frontmatter fallback since Wave 3c+1 cleanup). Populate to match the
+        // step's frontmatter crossReads.
+        crossReads: {
+          'system-architecture': [{ service: 'shared-lib', step: 'api-contracts' }],
+        },
       })
       mockCrossRead.mockReturnValue([
         { service: 'shared-lib', step: 'api-contracts', status: 'completed' },
@@ -477,7 +498,16 @@ describe('next command', () => {
       ]))
       mockComputeEligible.mockReturnValue(['system-architecture'])
       mockOverlay.mockReturnValue({
-        steps: {}, knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
+        steps: {},
+        knowledge: {},
+        reads: {},
+        dependencies: {},
+        // Cross-dep consumer lookup now reads from overlay.crossReads directly
+        // (no frontmatter fallback since Wave 3c+1 cleanup). Populate to match the
+        // step's frontmatter crossReads.
+        crossReads: {
+          'system-architecture': [{ service: 'shared-lib', step: 'api-contracts' }],
+        },
       })
       mockCrossRead.mockReturnValue([
         { service: 'shared-lib', step: 'api-contracts', status: 'completed' },
@@ -508,7 +538,16 @@ describe('next command', () => {
       ]))
       mockComputeEligible.mockReturnValue(['system-architecture'])
       mockOverlay.mockReturnValue({
-        steps: {}, knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
+        steps: {},
+        knowledge: {},
+        reads: {},
+        dependencies: {},
+        // Cross-dep consumer lookup now reads from overlay.crossReads directly
+        // (no frontmatter fallback since Wave 3c+1 cleanup). Populate to match the
+        // step's frontmatter crossReads.
+        crossReads: {
+          'system-architecture': [{ service: 'shared-lib', step: 'api-contracts' }],
+        },
       })
       mockCrossRead.mockReturnValue([
         { service: 'shared-lib', step: 'api-contracts', status: 'not-bootstrapped' },
