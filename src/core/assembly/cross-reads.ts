@@ -126,6 +126,7 @@ export function resolveTransitiveCrossReads(
   resolved: Map<string, ArtifactEntry[]>,
   foreignStateCache: Map<string, PipelineState | null>,
   globalSteps?: Set<string>,
+  overlayCrossReads?: Record<string, Array<{ service: string; step: string }>>,
 ): ArtifactEntry[] {
   const closure = new Map<string, ArtifactEntry>()  // filePath → entry (dedup inside traversal)
   for (const cr of crossReads) {
@@ -145,11 +146,17 @@ export function resolveTransitiveCrossReads(
     if (direct.completed) {
       const foreignMeta = metaPrompts.get(cr.step)
       const isTool = foreignMeta?.frontmatter.category === 'tool'
-      if (!isTool && foreignMeta?.frontmatter.crossReads?.length) {
+      // Overlay-first: overlay map takes precedence over frontmatter.
+      // Preserve the foreignMeta existence guard — overlay typos pointing at a step
+      // absent from metaPrompts must NOT drive recursion (no tool-category check
+      // possible, not part of the pipeline).
+      const foreignCrossReads =
+        overlayCrossReads?.[cr.step] ?? foreignMeta?.frontmatter.crossReads ?? []
+      if (foreignMeta && !isTool && foreignCrossReads.length > 0) {
         transitive = resolveTransitiveCrossReads(
-          foreignMeta.frontmatter.crossReads,
+          foreignCrossReads,
           config, projectRoot, metaPrompts, output,
-          visiting, resolved, foreignStateCache, globalSteps,
+          visiting, resolved, foreignStateCache, globalSteps, overlayCrossReads,
         )
       }
     }
