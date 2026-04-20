@@ -1482,6 +1482,7 @@ describe('run command handler', () => {
         expect.any(Map),    // resolved
         expect.any(Map),    // foreignStateCache
         expect.anything(),  // globalSteps (may be Set or undefined)
+        expect.anything(),  // overlayCrossReads (Wave 3c+1 — see next test for strict assertion)
       )
 
       // The returned artifact landed in AssemblyEngine.assemble's input
@@ -1572,6 +1573,68 @@ describe('run command handler', () => {
       expect(setupArtifacts).toHaveLength(1)
       // The dep-path wins (loop runs before cross-reads loop)
       expect(setupArtifacts[0].stepName).toBe('setup-project')
+    })
+
+    it('forwards pipeline.overlay.crossReads (as 10th positional arg) to resolveTransitiveCrossReads', async () => {
+      // Sentinel object — if run.ts forwards anything other than pipeline.overlay.crossReads,
+      // this assertion fails. Keyed on a different step so run.ts's consumer-step
+      // lookup (pipeline.overlay.crossReads?.[step]) still falls through to the
+      // frontmatter crossReads for 'system-architecture' (asserted as 1st arg).
+      const SENTINEL_OVERLAY_CROSS_READS = {
+        'some-other-step': [{ service: 'overlay-only-svc', step: 'overlay-only-step' }],
+      }
+
+      // Override the default hoisted mock's return value for this test only.
+      vi.mocked(resolveOverlayState).mockReturnValueOnce({
+        steps: { 'system-architecture': { enabled: true } },
+        knowledge: {},
+        reads: {},
+        dependencies: {},
+        crossReads: SENTINEL_OVERLAY_CROSS_READS,
+      })
+
+      const consumerMeta = makeMetaPrompt({
+        stepName: 'system-architecture',
+        frontmatter: makeFrontmatter({
+          name: 'system-architecture',
+          phase: 'architecture', order: 700,
+          dependencies: [], outputs: ['docs/arch.md'],
+          crossReads: [{ service: 'shared-lib', step: 'api-contracts' }],
+        }),
+      })
+      const crMap = new Map([['system-architecture', consumerMeta]])
+      vi.mocked(discoverMetaPrompts).mockReturnValue(crMap)
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(crMap)
+      vi.mocked(StateManager.prototype.loadState).mockReturnValue(makeState({
+        'system-architecture': { status: 'pending', source: 'pipeline', produces: [] },
+      }))
+      vi.mocked(buildGraph).mockReturnValue({
+        nodes: new Map([['system-architecture', {
+          slug: 'system-architecture', phase: 'architecture', order: 700,
+          dependencies: [], enabled: true,
+        }]]),
+        edges: new Map([['system-architecture', []]]),
+      })
+      vi.mocked(resolveTransitiveCrossReads).mockReturnValue([])
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await invokeHandler({ step: 'system-architecture', _: ['run'], auto: true })
+
+      // The 10th positional arg must be the exact SENTINEL object from the mocked
+      // resolveOverlayState return value (proves run.ts forwards pipeline.overlay.crossReads,
+      // not some other map).
+      expect(vi.mocked(resolveTransitiveCrossReads)).toHaveBeenCalledWith(
+        [{ service: 'shared-lib', step: 'api-contracts' }],  // 1: crossReads
+        expect.anything(),                                    // 2: config
+        expect.any(String),                                   // 3: projectRoot
+        expect.any(Map),                                      // 4: metaPrompts
+        expect.anything(),                                    // 5: output
+        expect.any(Set),                                      // 6: visiting
+        expect.any(Map),                                      // 7: resolved
+        expect.any(Map),                                      // 8: foreignStateCache
+        expect.anything(),                                    // 9: globalSteps
+        SENTINEL_OVERLAY_CROSS_READS,                         // 10: overlayCrossReads (Wave 3c+1)
+      )
     })
   })
 
