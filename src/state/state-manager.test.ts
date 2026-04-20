@@ -1062,4 +1062,71 @@ describe('StateManager.saveState — scope-correct eligibility + cache counters'
     expect(written.next_eligible_hash).toBeUndefined()
     expect(written.save_counter).toBe(1)  // counter still bumps
   })
+
+  it('service-mode saveState deletes save_counter if present on state (spec §1 exclusivity — Codex MMR)', () => {
+    fs.mkdirSync(path.join(tmpRoot, '.scaffold', 'services', 'api'), { recursive: true })
+    fs.writeFileSync(
+      path.join(tmpRoot, '.scaffold', 'state.json'),
+      JSON.stringify({
+        'schema-version': 3, 'scaffold-version': '1.0.0',
+        init_methodology: 'deep', config_methodology: 'deep',
+        'init-mode': 'greenfield', created: '2026-04-20T00:00:00.000Z',
+        in_progress: null, steps: {}, next_eligible: [], 'extra-steps': [],
+        save_counter: 5,
+      }),
+    )
+    fs.writeFileSync(
+      path.join(tmpRoot, '.scaffold', 'services', 'api', 'state.json'),
+      JSON.stringify({
+        'schema-version': 3, 'scaffold-version': '1.0.0',
+        init_methodology: 'deep', config_methodology: 'deep',
+        'init-mode': 'greenfield', created: '2026-04-20T00:00:00.000Z',
+        in_progress: null, steps: {}, next_eligible: [], 'extra-steps': [],
+      }),
+    )
+    const sm = new StateManager(
+      tmpRoot,
+      () => [],
+      () => undefined,
+      new StatePathResolver(tmpRoot, 'api'),
+      new Set(),
+      'svc-hash',
+    )
+    sm.loadState()
+    sm.saveState({
+      'schema-version': 3, 'scaffold-version': '1.0.0',
+      init_methodology: 'deep', config_methodology: 'deep',
+      'init-mode': 'greenfield', created: '2026-04-20T00:00:00.000Z',
+      in_progress: null, steps: {}, next_eligible: [], 'extra-steps': [],
+      // Polluted input — simulates a file written by a bug elsewhere.
+      save_counter: 999,
+    } as PipelineState)
+    const written = JSON.parse(
+      fs.readFileSync(path.join(tmpRoot, '.scaffold', 'services', 'api', 'state.json'), 'utf8'),
+    )
+    expect(written.save_counter).toBeUndefined()  // service must never write this
+  })
+
+  it('root-mode saveState deletes next_eligible_root_counter if present on state (spec §1 exclusivity — Codex MMR)', () => {
+    const sm = new StateManager(
+      tmpRoot,
+      () => [],
+      () => undefined,
+      new StatePathResolver(tmpRoot),
+      undefined,
+      'root-hash',
+    )
+    sm.saveState({
+      'schema-version': 3, 'scaffold-version': '1.0.0',
+      init_methodology: 'deep', config_methodology: 'deep',
+      'init-mode': 'greenfield', created: '2026-04-20T00:00:00.000Z',
+      in_progress: null, steps: {}, next_eligible: [], 'extra-steps': [],
+      // Polluted input — simulates a previously-buggy write.
+      next_eligible_root_counter: 77,
+    } as PipelineState)
+    const written = JSON.parse(
+      fs.readFileSync(path.join(tmpRoot, '.scaffold', 'state.json'), 'utf8'),
+    )
+    expect(written.next_eligible_root_counter).toBeUndefined()  // root must never write this
+  })
 })

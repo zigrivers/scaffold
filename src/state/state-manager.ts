@@ -121,9 +121,15 @@ export class StateManager {
       } else {
         delete state.next_eligible_root_counter
       }
+      // Spec §1 exclusivity: service saves must NEVER write save_counter on
+      // their own state. Strip any leftover (e.g. from a previously-polluted
+      // file) before persisting.
+      delete state.save_counter
     } else {
       // Root state: bump the monotonic counter.
       state.save_counter = (state.save_counter ?? 0) + 1
+      // Spec §1 exclusivity: root state doesn't carry next_eligible_root_counter.
+      delete state.next_eligible_root_counter
     }
 
     // Existing global-step stripping for service-mode persisted steps
