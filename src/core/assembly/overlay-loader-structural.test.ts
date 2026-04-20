@@ -142,7 +142,7 @@ cross-reads-overrides:
         step: domain-modeling
 `)
     try {
-      const { overlay, errors, warnings } = loadStructuralOverlay(tmpPath)
+      const { overlay, errors } = loadStructuralOverlay(tmpPath)
       expect(errors).toEqual([])
       expect(overlay).not.toBeNull()
       expect(overlay!.crossReadsOverrides['system-architecture'].append).toEqual([
@@ -179,8 +179,8 @@ cross-reads-overrides: []
       const { overlay, warnings } = loadStructuralOverlay(tmpPath)
       expect(overlay!.crossReadsOverrides).toEqual({})
       expect(warnings.some(w =>
-        w.code === 'OVERLAY_MALFORMED_SECTION' &&
-        String(w.context?.section) === 'cross-reads-overrides'
+        w.code === 'OVERLAY_MALFORMED_SECTION'
+        && String(w.context?.section) === 'cross-reads-overrides',
       )).toBe(true)
     } finally {
       fs.rmSync(tmpPath, { force: true })

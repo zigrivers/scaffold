@@ -385,7 +385,10 @@ export function loadStructuralOverlay(
   }
 
   // 5. Parse override sections (gracefully handle missing/malformed)
-  const overrideSections = ['step-overrides', 'knowledge-overrides', 'reads-overrides', 'dependency-overrides', 'cross-reads-overrides'] as const
+  const overrideSections = [
+    'step-overrides', 'knowledge-overrides', 'reads-overrides',
+    'dependency-overrides', 'cross-reads-overrides',
+  ] as const
 
   for (const section of overrideSections) {
     const value = obj[section]
