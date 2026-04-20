@@ -6,6 +6,27 @@ Working document tracking completed work, in-progress items, and future directio
 
 ## Completed Releases
 
+### v3.18.1 (2026-04-20)
+
+Internal cleanup — no user-facing behavior change.
+
+- Removed redundant `?.` + frontmatter fallback chains at 3 consumer sites (`run.ts`, `status.ts`, `next.ts`) now that `OverlayState.crossReads` is authoritative + populated per-step (since v3.18.0)
+- Normalized `resolveOverlayState` pass-1 `applyOverlay` threading (symmetric with pass 2)
+- Hoisted `resolveOverlayState` test mocks updated to mirror real function behavior
+
+### v3.18.0 (2026-04-19)
+
+Overlay `cross-reads-overrides` — completes the Wave 3c seam from v3.17.0.
+
+- **Structural overlays can append per-step `crossReads`** via `cross-reads-overrides` YAML section in `multi-service-overlay.yml`
+- **Structural-only constraint** (spec §4.1) — project-type overlays that declare `cross-reads-overrides` are stripped at parse time with `OVERLAY_CROSS_READS_NOT_ALLOWED` warning (detected with `!== undefined` so explicit YAML null is caught)
+- `CrossReadsOverride` type + required `PipelineOverlay.crossReadsOverrides` field
+- `parseCrossReadsOverrides()` parser with item-level warnings (`OVERLAY_MALFORMED_APPEND_ITEM`)
+- `applyCrossReadsOverrides()` helper — append + dedup by `service:step`, first-occurrence preserved, deep-copies entries
+- `OverlayState.crossReads` becomes required (was Wave 3c seam); `resolveOverlayState` threads the map through BOTH overlay passes
+- `resolveTransitiveCrossReads` gains optional `overlayCrossReads?` param for overlay-first recursion; `foreignMeta` existence guard preserved
+- PRs: #284 (13 tasks, 23 commits) + #285 (release prep). #286 (cleanup) → v3.18.1.
+
 ### v3.17.0 (2026-04-19)
 
 Multi-service monorepo support — 5 waves landing together.
@@ -35,21 +56,6 @@ The `scaffold dashboard` command with `--service` shows a single service's view.
 - Cross-service dependency visualization
 
 **Scope**: ~100-150 lines across 3-4 files. Small standalone feature.
-
-### Overlay `crossReads` Overrides (deferred from Wave 3c)
-
-Currently cross-reads are defined only in frontmatter (step templates). Projects with heterogeneous service relationships may need service-specific cross-reads that can't be captured in a global template.
-
-Addition to `PipelineOverlay`:
-```yaml
-cross-reads-overrides:
-  system-architecture:
-    append:
-      - service: billing
-        step: api-contracts
-```
-
-**Scope**: ~50-80 lines. Extends existing overlay override pattern.
 
 ### Brownfield `adopt` for Multi-Service Monorepos
 
