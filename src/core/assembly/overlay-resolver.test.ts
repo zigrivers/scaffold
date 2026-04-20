@@ -374,6 +374,60 @@ describe('applyOverlay crossReads (Wave 3c+1)', () => {
     ])
   })
 
+  it('first-occurrence dedup: interleaved duplicates preserve insertion order', () => {
+    // frontmatter: [A]
+    // append: [B, A-dup, C]  (A-dup comes after B in the merged list)
+    // First-occurrence result: [A, B, C]  — A kept from frontmatter (earliest)
+    // Last-occurrence result would be:    [B, A, C]  — different order
+    // This test distinguishes the two dedup strategies by ordering.
+    const result = applyOverlay(
+      {}, {}, {}, {},
+      {
+        'system-architecture': [{ service: 'shared-lib', step: 'api-contracts' }],
+      },
+      {
+        ...baseOverlay(),
+        crossReadsOverrides: {
+          'system-architecture': {
+            append: [
+              { service: 'billing', step: 'api-contracts' },
+              { service: 'shared-lib', step: 'api-contracts' },  // dup of frontmatter's A
+              { service: 'inventory', step: 'domain-modeling' },
+            ],
+          },
+        },
+      },
+    )
+    // Must be [A, B, C], not [B, A, C]
+    expect(result.crossReads['system-architecture']).toEqual([
+      { service: 'shared-lib', step: 'api-contracts' },     // A — first, from frontmatter
+      { service: 'billing', step: 'api-contracts' },         // B
+      { service: 'inventory', step: 'domain-modeling' },    // C
+    ])
+  })
+
+  it('result entries are deep copies — mutating result does not affect inputs', () => {
+    const frontmatterEntry = { service: 'shared-lib', step: 'api-contracts' }
+    const frontmatterMap = { 'system-architecture': [frontmatterEntry] }
+    const appendEntry = { service: 'billing', step: 'api-contracts' }
+    const result = applyOverlay(
+      {}, {}, {}, {},
+      frontmatterMap,
+      {
+        ...baseOverlay(),
+        crossReadsOverrides: {
+          'system-architecture': { append: [appendEntry] },
+        },
+      },
+    )
+    // Mutate the returned entries
+    result.crossReads['system-architecture'][0].service = 'mutated'
+    result.crossReads['system-architecture'][1].service = 'mutated'
+    // Inputs must be untouched (deep-copy guarantee)
+    expect(frontmatterEntry.service).toBe('shared-lib')
+    expect(appendEntry.service).toBe('billing')
+  })
+
   it('applies overrides across multiple steps without cross-contamination', () => {
     const result = applyOverlay(
       {}, {}, {}, {},

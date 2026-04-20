@@ -112,19 +112,25 @@ function applyReplaceAppendEntry(existing: string[], override: ReadsOverride | D
   return [...new Set(appended)]
 }
 
-/** Cross-reads overrides: append + dedup by `service:step` pair. */
+/**
+ * Cross-reads overrides: append override entries, then dedup by `service:step`
+ * pair preserving first-occurrence order. Does not mutate `inputMap` or
+ * `overrides` — arrays AND entry objects are fresh copies in the result.
+ */
 function applyCrossReadsOverrides(
   inputMap: Record<string, Array<{ service: string; step: string }>>,
   overrides: Record<string, CrossReadsOverride>,
 ): Record<string, Array<{ service: string; step: string }>> {
-  // Shallow-copy arrays so we never mutate the input
+  // Deep-copy entries so callers mutating result.crossReads[...][i] cannot
+  // reach back into the input maps.
   const result: Record<string, Array<{ service: string; step: string }>> = {}
   for (const [key, arr] of Object.entries(inputMap)) {
-    result[key] = [...arr]
+    result[key] = arr.map(e => ({ service: e.service, step: e.step }))
   }
   for (const [step, override] of Object.entries(overrides)) {
     const existing = result[step] ?? []
-    const merged = [...existing, ...override.append]
+    const appendClones = override.append.map(e => ({ service: e.service, step: e.step }))
+    const merged = [...existing, ...appendClones]
     // Dedup by service:step key, preserving first-occurrence order
     const seen = new Set<string>()
     result[step] = merged.filter(e => {
