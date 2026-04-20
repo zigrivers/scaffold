@@ -97,14 +97,17 @@ describe('readEligible', () => {
     )).toEqual(['fallback'])
   })
 
-  it('service scope: matches when both counters are null (legacy root, no counter yet)', () => {
+  it('service scope: falls back when cache lacks counter and root reader returns null', () => {
+    // Stamped-counter semantics: an absent next_eligible_root_counter means
+    // the cache was never stamped with a counter (legacy or never-saved).
+    // `undefined !== null` triggers live recompute. Title + body match.
     const pipeline = mkPipeline('hash-global-v1', 'hash-service-v1')
     const state = mkState({
       next_eligible: ['svc-cached'],
       next_eligible_hash: 'hash-service-v1',
+      // no next_eligible_root_counter — cache never stamped
     })
     const rootReader = () => null
-    // Cache was not stamped with a counter → undefined !== null → fallback (stale).
     expect(readEligible(
       state,
       pipeline,

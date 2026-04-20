@@ -17,8 +17,8 @@ import type { ResolvedPipeline } from './types.js'
 export function readEligible(
   state: PipelineState,
   pipeline: ResolvedPipeline,
-  scopeOptions: { scope?: 'global' | 'service'; globalSteps?: Set<string> } | undefined,
-  rootCounterReader: (() => number | null) | undefined,
+  scopeOptions?: { scope?: 'global' | 'service'; globalSteps?: Set<string> },
+  rootCounterReader?: () => number | null,
 ): string[] {
   const scope = scopeOptions?.scope === 'service' ? 'service' : 'global'
   const currentHash = pipeline.getPipelineHash(scope)
