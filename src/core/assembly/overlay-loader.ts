@@ -307,17 +307,22 @@ export function loadSubOverlay(
   const hasStep = Object.keys(overlay.stepOverrides ?? {}).length > 0
   const hasReads = Object.keys(overlay.readsOverrides ?? {}).length > 0
   const hasDeps = Object.keys(overlay.dependencyOverrides ?? {}).length > 0
+  // Defense-in-depth: loadOverlay already strips cross-reads-overrides, so this
+  // branch is unreachable via the public API. It guards against a future path
+  // that bypasses the parent loader.
+  const hasCrossReads = Object.keys(overlay.crossReadsOverrides ?? {}).length > 0
 
-  if (hasStep || hasReads || hasDeps) {
+  if (hasStep || hasReads || hasDeps || hasCrossReads) {
     warnings.push({
       code: 'SUB_OVERLAY_NON_KNOWLEDGE',
       message: `Sub-overlay ${overlayPath} contains non-knowledge sections`
-        + ' (step/reads/dependency overrides). These are stripped for domain sub-overlays.',
+        + ' (step/reads/dependency/cross-reads overrides). These are stripped for domain sub-overlays.',
       context: { file: overlayPath },
     })
     overlay.stepOverrides = {}
     overlay.readsOverrides = {}
     overlay.dependencyOverrides = {}
+    overlay.crossReadsOverrides = {}
   }
 
   return { overlay, errors: result.errors, warnings }

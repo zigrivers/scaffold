@@ -290,6 +290,26 @@ describe('loadSubOverlay', () => {
       fs.rmSync(tmpDir, { recursive: true })
     }
   })
+
+  it('SUB_OVERLAY_NON_KNOWLEDGE message mentions cross-reads in the stripped-sections list', () => {
+    const tmpPath = path.join(os.tmpdir(), `sub-overlay-${Date.now()}.yml`)
+    fs.writeFileSync(tmpPath, `
+name: fintech
+description: test sub-overlay with step-overrides (triggers SUB_OVERLAY_NON_KNOWLEDGE)
+project-type: backend
+step-overrides:
+  some-step: { enabled: true }
+`)
+    try {
+      const { warnings } = loadSubOverlay(tmpPath)
+      const sub = warnings.find(w => w.code === 'SUB_OVERLAY_NON_KNOWLEDGE')
+      expect(sub).toBeDefined()
+      // Message must mention cross-reads in the list of stripped section types
+      expect(sub!.message).toContain('cross-reads')
+    } finally {
+      fs.rmSync(tmpPath, { force: true })
+    }
+  })
 })
 
 describe('parseCrossReadsOverrides', () => {
