@@ -157,5 +157,19 @@ describe('CrossReadsOverride + PipelineOverlay.crossReadsOverrides (cross-reads 
       crossReadsOverrides: {},
     }
     expect(overlay.crossReadsOverrides).toEqual({})
+
+    // Negative type assertion: omitting crossReadsOverrides must be a type error.
+    // If the field were to drift to optional, tsc would NOT flag this literal,
+    // and the @ts-expect-error directive would itself raise a compile error.
+    // @ts-expect-error — crossReadsOverrides is required on PipelineOverlay
+    const missing: PipelineOverlay = {
+      name: 'test',
+      description: 'desc',
+      stepOverrides: {},
+      knowledgeOverrides: {},
+      readsOverrides: {},
+      dependencyOverrides: {},
+    }
+    expect(missing).toBeDefined()
   })
 })
