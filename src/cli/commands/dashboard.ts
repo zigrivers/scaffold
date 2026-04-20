@@ -85,6 +85,8 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
       () => [],
       () => config ?? undefined,
       pathResolver,
+      undefined,  // globalSteps — dashboard does not resolve pipeline
+      undefined,  // pipelineHash — legacy-safe; dashboard only triggers saveState via one-time migration
     )
     let state: PipelineState
     try {
