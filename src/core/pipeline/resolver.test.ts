@@ -169,3 +169,93 @@ describe('resolvePipeline fallback (no config)', () => {
     ])
   })
 })
+
+describe('resolvePipeline getPipelineHash', () => {
+  it('exposes getPipelineHash(scope) that returns a deterministic hash', () => {
+    const metaPrompts = new Map<string, MetaPromptFile>([
+      ['step-a', {
+        stepName: 'step-a',
+        filePath: '/fake/a.md',
+        frontmatter: {
+          name: 'step-a', description: '', summary: null,
+          phase: 'architecture', order: 100,
+          dependencies: [], outputs: [], conditional: null,
+          knowledgeBase: [], reads: [], crossReads: [],
+          stateless: false, category: 'pipeline',
+        },
+        body: '', sections: {},
+      }],
+    ])
+    const pipeline = resolvePipeline(makeCtx({ metaPrompts }), { output: makeOutput() })
+    const h1 = pipeline.getPipelineHash('global')
+    const h2 = pipeline.getPipelineHash('global')
+    expect(h1).toBe(h2)
+    expect(h1).toMatch(/^[0-9a-f]{64}$/)
+  })
+
+  it('returns different hashes for different scopes', () => {
+    const metaPrompts = new Map<string, MetaPromptFile>([
+      ['step-a', {
+        stepName: 'step-a',
+        filePath: '/fake/a.md',
+        frontmatter: {
+          name: 'step-a', description: '', summary: null,
+          phase: 'architecture', order: 100,
+          dependencies: [], outputs: [], conditional: null,
+          knowledgeBase: [], reads: [], crossReads: [],
+          stateless: false, category: 'pipeline',
+        },
+        body: '', sections: {},
+      }],
+    ])
+    const pipeline = resolvePipeline(makeCtx({ metaPrompts }), { output: makeOutput() })
+    expect(pipeline.getPipelineHash('global')).not.toBe(pipeline.getPipelineHash('service'))
+  })
+
+  it('normalizes null to global (same hash)', () => {
+    const metaPrompts = new Map<string, MetaPromptFile>([
+      ['step-a', {
+        stepName: 'step-a',
+        filePath: '/fake/a.md',
+        frontmatter: {
+          name: 'step-a', description: '', summary: null,
+          phase: 'architecture', order: 100,
+          dependencies: [], outputs: [], conditional: null,
+          knowledgeBase: [], reads: [], crossReads: [],
+          stateless: false, category: 'pipeline',
+        },
+        body: '', sections: {},
+      }],
+    ])
+    const pipeline = resolvePipeline(makeCtx({ metaPrompts }), { output: makeOutput() })
+    expect(pipeline.getPipelineHash(null)).toBe(pipeline.getPipelineHash('global'))
+  })
+
+  it('memoizes per scope — same scope twice does not recompute', async () => {
+    const ghMod = await import('./graph-hash.js')
+    const spy = vi.spyOn(ghMod, 'computePipelineHash')
+    spy.mockClear()
+    const metaPrompts = new Map<string, MetaPromptFile>([
+      ['step-a', {
+        stepName: 'step-a',
+        filePath: '/fake/a.md',
+        frontmatter: {
+          name: 'step-a', description: '', summary: null,
+          phase: 'architecture', order: 100,
+          dependencies: [], outputs: [], conditional: null,
+          knowledgeBase: [], reads: [], crossReads: [],
+          stateless: false, category: 'pipeline',
+        },
+        body: '', sections: {},
+      }],
+    ])
+    const pipeline = resolvePipeline(makeCtx({ metaPrompts }), { output: makeOutput() })
+    pipeline.getPipelineHash('global')
+    pipeline.getPipelineHash('global')
+    pipeline.getPipelineHash('global')
+    expect(spy).toHaveBeenCalledTimes(1)
+    pipeline.getPipelineHash('service')
+    expect(spy).toHaveBeenCalledTimes(2)
+    spy.mockRestore()
+  })
+})

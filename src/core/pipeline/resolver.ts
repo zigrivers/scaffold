@@ -1,6 +1,7 @@
 import { resolveOverlayState } from '../assembly/overlay-state-resolver.js'
 import { buildGraph } from '../dependency/graph.js'
 import { computeEligible } from '../dependency/eligibility.js'
+import * as graphHash from './graph-hash.js'
 import { createOutputContext } from '../../cli/output/context.js'
 import type { OutputContext } from '../../cli/output/context.js'
 import type { StepEnablementEntry, ServiceConfig } from '../../types/config.js'
@@ -124,5 +125,20 @@ export function resolvePipeline(
     scopeOptions?: { scope?: 'global' | 'service'; globalSteps?: Set<string> },
   ): string[] => computeEligible(graph, steps, scopeOptions)
 
-  return { graph, preset: resolvedPreset, overlay, stepMeta, computeEligible: computeEligibleFn, globalSteps }
+  // 8. Memoized pipeline-graph hash (spec §5).
+  // Call computePipelineHash via the namespace import so ESM spying works
+  // (test in resolver.test.ts depends on this).
+  const hashCache = new Map<string, string>()
+  const getPipelineHash = (scope: 'global' | 'service' | null): string => {
+    // Normalize null → 'global' for the cache key (spec §2 normalization).
+    const key = scope === 'service' ? 'service' : 'global'
+    let hash = hashCache.get(key)
+    if (hash === undefined) {
+      hash = graphHash.computePipelineHash(graph, globalSteps, scope)
+      hashCache.set(key, hash)
+    }
+    return hash
+  }
+
+  return { graph, preset: resolvedPreset, overlay, stepMeta, computeEligible: computeEligibleFn, globalSteps, getPipelineHash }
 }
