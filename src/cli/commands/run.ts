@@ -174,6 +174,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
         () => config,
         pathResolver,
         pipeline.globalSteps,
+        pipeline.getPipelineHash(service ? 'service' : 'global'),
       )
       let state = stateManager.loadState()
 

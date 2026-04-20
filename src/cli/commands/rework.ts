@@ -305,6 +305,9 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
         projectRoot as string,
         pipeline.computeEligible,
         () => context.config ?? undefined,
+        undefined,
+        undefined,
+        pipeline.getPipelineHash(service ? 'service' : 'global'),
       )
       const state = stateManager.loadState()
 
