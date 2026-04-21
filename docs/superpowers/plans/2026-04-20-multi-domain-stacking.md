@@ -477,7 +477,7 @@ Run: `npx vitest run src/core/assembly/overlay-state-resolver.test.ts -t "array 
 Expected: FAIL — the current resolver has `typeof typeConfig.domain === 'string'` check (line 106), so the array-form branch loads no overlay, producing `['tech-stack-selection']` while the string branch produces `['tech-stack-selection', 'fintech-compliance']`.
 
 Run: `npx vitest run src/core/assembly/overlay-state-resolver.test.ts -t "duplicate domain entries"`
-Expected: FAIL — the current resolver has no duplicate detection; it silently accepts the array and tries to load a single overlay (the string check fails because the value is an array).
+Expected: FAIL — the current resolver has no duplicate detection; the string-guard check at `overlay-state-resolver.ts:106` fails because the value is an array, so the entire sub-overlay branch is skipped and no warning is ever emitted.
 
 Both tests MUST fail before proceeding to Step 3.3. If either passes unexpectedly, halt and diagnose — the pre-existing code behavior may differ from the spec's assumptions.
 
@@ -1249,7 +1249,7 @@ Multi-Domain Stacking — `backendConfig.domain` / `researchConfig.domain` accep
 - **Review discipline**: 4-round spec MMR (Codex + Gemini) + 3-channel PR MMR.
 ```
 
-The roadmap entry intentionally omits the PR number. It will be appended in Task 11b after the feature PR is merged, using `gh pr list` to discover the actual number dynamically.
+The roadmap entry intentionally omits the PR number. It is appended in Task 12.4 after the feature PR is merged, using the `$PR_NUMBER` shell variable captured in Task 10.3 (Tasks 10–12 run in a single continuous orchestrator session, so shell variables persist across tasks).
 
 - [ ] **Step 9.3: Commit**
 
@@ -1348,24 +1348,25 @@ Preferred path — use `mmr` if available:
 mmr review --pr "$PR_NUMBER" --sync --format json > /tmp/mmr-r1.json
 ```
 
-Fallback — manual dispatch (all foreground — never `run_in_background`, never `&`, never `nohup`):
+Fallback — manual dispatch (all foreground — never `run_in_background`, never `&`, never `nohup`). Note shell redirection order: `> file 2>&1` writes both stdout and stderr to the file; the reversed order `2>&1 > file` is a common error that discards stderr.
+
 ```bash
 gh pr diff "$PR_NUMBER" > /tmp/mdr-pr-diff.patch
 
 codex exec --skip-git-repo-check -s read-only --ephemeral "$(cat <<EOF
 Review PR #$PR_NUMBER (branch feat/multi-domain-stacking) for implementation correctness, security, and API contract issues. Read the spec at docs/superpowers/specs/2026-04-20-multi-domain-stacking-design.md and the plan at docs/superpowers/plans/2026-04-20-multi-domain-stacking.md for context. Return findings at P0-P3 severity with suggested fixes. Verdict: pass / degraded-pass / blocked / needs-user-decision.
 EOF
-)" 2>&1 | tail -400 > /tmp/mdr-codex.out
+)" > /tmp/mdr-codex.out 2>&1
 
 NO_BROWSER=true gemini -p "$(cat <<EOF
 Review PR #$PR_NUMBER (branch feat/multi-domain-stacking) for architectural patterns, broad-context reasoning, and test coverage. Read the spec and plan for context. Return findings at P0-P3 severity with suggested fixes. Verdict: pass / degraded-pass / blocked / needs-user-decision.
 EOF
-)" --output-format json --approval-mode yolo 2>&1 > /tmp/mdr-gemini.out
+)" --output-format json --approval-mode yolo > /tmp/mdr-gemini.out 2>&1
 
 claude -p "$(cat <<EOF
 Compensating channel review of PR #$PR_NUMBER (branch feat/multi-domain-stacking). Focus on plan alignment with docs/superpowers/specs/2026-04-20-multi-domain-stacking-design.md, code quality, and test-coverage gaps. Return findings at P0-P3 severity. Verdict: pass / degraded-pass / blocked / needs-user-decision.
 EOF
-)" --output-format json 2>&1 > /tmp/mdr-claude.out
+)" --output-format json > /tmp/mdr-claude.out 2>&1
 ```
 
 - [ ] **Step 11.2: Analyze findings and decide action**
@@ -1435,22 +1436,25 @@ grep -m1 '"version"' package-lock.json
 
 - [ ] **Step 12.4: Append PR number to roadmap entry**
 
-Discover the merged feature PR number dynamically and append it to the v3.21.0 roadmap entry:
+Reuse `$PR_NUMBER` from Task 10.3 (same orchestrator session, still in scope). Do **not** re-discover via `gh pr list --search` — that would also match the release-prep PR title in Task 12.6 and could pick the wrong one on any re-run of this step.
 
 ```bash
-MERGED_PR=$(gh pr list --state merged --search "multi-domain stacking in:title" --limit 1 --json number --jq '.[0].number')
-echo "MERGED_PR=$MERGED_PR"
+echo "Feature PR number: $PR_NUMBER"
 ```
 
-If the search returns no result, check recent merges manually: `gh pr list --state merged --limit 5`.
+If `$PR_NUMBER` isn't set (e.g., executing Task 12 in a new shell), recapture by exact title:
+```bash
+PR_NUMBER=$(gh pr list --state merged --search 'in:title "feat(overlays): multi-domain stacking (v3.21.0)"' --limit 1 --json number --jq '.[0].number')
+echo "PR_NUMBER=$PR_NUMBER"
+```
 
 Then edit `docs/roadmap.md` under the v3.21.0 "Completed Releases" entry — append a line at the end of that entry:
 
 ```markdown
-- **PR**: #<MERGED_PR>
+- **PR**: #<PR_NUMBER>
 ```
 
-(Replace `<MERGED_PR>` with the captured number, e.g., `#295`.)
+(Replace `<PR_NUMBER>` with the captured number, e.g., `#295`.)
 
 - [ ] **Step 12.5: Commit release prep**
 
