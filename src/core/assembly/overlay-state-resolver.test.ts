@@ -799,6 +799,28 @@ step-overrides:
         'research-quant-strategy-patterns',
       ])
     })
+
+    it('stacks quant-finance and simulation sub-overlays in declaration order', () => {
+      // research-simulation.yml appends to system-architecture:
+      //   [research-sim-engine-patterns, research-sim-parameter-spaces]
+      // Combined with core overlay + quant-finance, the resolved knowledge list
+      // is the concatenation of core, then quant-finance, then simulation.
+      const result = resolveOverlayState({
+        config: makeResearchConfigWithDomains(['quant-finance', 'simulation']),
+        methodologyDir: realMethodologyDir,
+        metaPrompts: makeMetaPromptsForSystemArch(),
+        presetSteps: { 'system-architecture': { enabled: true } },
+        output: makeOutput(),
+      })
+      expect(result.knowledge['system-architecture']).toEqual([
+        'research-architecture',
+        'research-experiment-loop',
+        'research-quant-backtesting',
+        'research-quant-strategy-patterns',
+        'research-sim-engine-patterns',
+        'research-sim-parameter-spaces',
+      ])
+    })
   })
 
   describe('multi-domain stacking — contrived fixtures', () => {

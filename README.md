@@ -391,6 +391,8 @@ Every `scaffold init` wizard question can be answered via CLI flags, making scaf
 | `--backend-deploy-target` | string | serverless, container, long-running |
 | `--backend-domain` | string | none, fintech |
 
+> The wizard and `--backend-domain` flag remain single-select in v1; multi-domain stacking requires hand-editing `.scaffold/config.yml` to use an array (e.g. `domain: ['fintech']`).
+
 #### CLI Config Flags (require `--project-type cli` or auto-set it)
 
 | Flag | Type | Values |
@@ -623,7 +625,7 @@ Scaffold supports **project-type overlays** — domain-specific knowledge and pi
 
 - **Injects domain knowledge** into existing pipeline steps (e.g., SSR caching strategies into `tech-stack`, API pagination patterns into `coding-standards`)
 
-The game overlay additionally adjusts step enablement, remaps artifact references, and adds dependency overrides (because game development has fundamentally different artifacts). The web-app, backend, CLI, library, mobile-app, data-pipeline, ML, browser-extension, and research overlays are **knowledge-only** — they inject domain expertise into existing steps without changing which steps run or how they depend on each other. The research type additionally supports **domain sub-overlays** (quant-finance, ml-research, simulation) that layer domain-specific knowledge on top of the core research overlay.
+The game overlay additionally adjusts step enablement, remaps artifact references, and adds dependency overrides (because game development has fundamentally different artifacts). The web-app, backend, CLI, library, mobile-app, data-pipeline, ML, browser-extension, and research overlays are **knowledge-only** — they inject domain expertise into existing steps without changing which steps run or how they depend on each other. The research type additionally supports **domain sub-overlays** (quant-finance, ml-research, simulation) that layer domain-specific knowledge on top of the core research overlay, and the backend type supports a `fintech` sub-overlay. Both research and backend accept `domain` as either a single string or an array (e.g. `domain: ['quant-finance', 'simulation']`) for stacking multiple sub-overlays; the wizard and CLI flags remain single-select in v1, so multi-domain stacking requires hand-editing `.scaffold/config.yml`.
 
 Overlays are composable with methodology presets. An MVP web-app gets fewer steps at lower depth; a deep backend project gets exhaustive analysis of every architectural decision.
 

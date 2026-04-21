@@ -1323,4 +1323,20 @@ describe('domain field — multi-domain union', () => {
     expect(result.success).toBe(true)
     if (result.success) expect(result.data.domain).toBe('none')
   })
+
+  it('ConfigSchema round-trip with array-shape domain under project', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2,
+      methodology: 'deep',
+      platforms: ['claude-code'],
+      project: {
+        projectType: 'backend',
+        backendConfig: { ...baseBackend, domain: ['fintech'] },
+      },
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.project?.backendConfig?.domain).toEqual(['fintech'])
+    }
+  })
 })
