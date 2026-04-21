@@ -14,7 +14,7 @@ Multi-Domain Stacking — `backendConfig.domain` / `researchConfig.domain` accep
 - **Resolver change**: `normalizeDomains` helper iterates over domains with warn-on-duplicate; knowledge merge now append + dedup (fixes latent single-domain bug).
 - **Service-mode**: inherited automatically via `ServiceSchema` reuse — `services[N].researchConfig.domain: [...]` works out of the box.
 - **Fixture-only test content**: no new production domain sub-overlays ship with this feature. Two contrived fixtures (`backend-fake-a.yml`, `backend-fake-b.yml`) used only to engineer collision cases.
-- **Review discipline**: 4-round spec MMR (Codex + Gemini) + 3-channel PR MMR.
+- **Review discipline**: 4-round spec MMR (Codex + Gemini) + 3-channel PR MMR (Codex + Gemini + Claude). Zero P0/P1/P2 findings from PR review; 3 P3s fixed before merge. PR #294.
 
 ### v3.20.0 (2026-04-20)
 
