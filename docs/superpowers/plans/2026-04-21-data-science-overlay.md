@@ -92,7 +92,7 @@ Open `src/config/schema.ts` line 184-198 (`ProjectSchema`). Same pattern — add
 - [ ] **Step 5: Run typecheck**
 
 ```bash
-cd /Users/kenallred/dev-projects/scaffold && npm run typecheck
+cd /Users/kenallred/dev-projects/scaffold && npm run type-check
 ```
 
 Expected: compile errors in downstream files that switch on `ProjectType` — specifically `src/wizard/copy/index.ts`, `src/wizard/copy/core.ts`, `src/project/adopt.ts`. These are expected; we'll fix them in Phase D. Do NOT fix them yet.
@@ -113,43 +113,49 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 **Files:**
 - Modify: `src/types/config.ts`
 
-- [ ] **Step 1: Check current ProjectConfig/ServiceConfig/DetectedConfig shape**
+- [ ] **Step 1: Read `src/types/config.ts` to see all three structures**
 
-```bash
-sed -n '60,90p' /Users/kenallred/dev-projects/scaffold/src/types/config.ts
-```
+Use the Read tool on `/Users/kenallred/dev-projects/scaffold/src/types/config.ts`. Focus on these ranges:
 
-Note the current shapes. `DetectedConfig` is `{ type: ProjectType; config: ... }` — a simple tagged union (it is NOT `DetectionMatch`; see §6.2 of the spec).
+- `DetectedConfig` (lines ~72-82) — discriminated union with `{ type, config }` variants using **full** config types, NOT `Partial<...>`.
+- `ServiceConfig` interface (lines ~119-136).
+- `ProjectConfig` interface (lines ~139-155).
 
-- [ ] **Step 2: Export `DataScienceConfig` type and extend interfaces**
+Note the ordering of config fields within `ServiceConfig` / `ProjectConfig`; match that ordering when inserting.
 
-Add near the other derived config types:
+- [ ] **Step 2: Export `DataScienceConfig` type**
+
+Locate the block of `export type XConfig = z.infer<typeof XConfigSchema>` declarations near the top of the file. Add:
 
 ```typescript
 export type DataScienceConfig = z.infer<typeof DataScienceConfigSchema>
 ```
 
-Then extend the `ProjectConfig` and `ServiceConfig` interfaces by adding:
+- [ ] **Step 3: Extend `ProjectConfig` and `ServiceConfig` interfaces**
+
+Add this line to BOTH interfaces, positioned after `researchConfig?: ResearchConfig`:
 
 ```typescript
   dataScienceConfig?: DataScienceConfig
 ```
 
-to each. Keep ordering consistent with the existing fields.
+- [ ] **Step 4: Extend `DetectedConfig` discriminated union**
 
-- [ ] **Step 3: Extend `DetectedConfig` discriminated union**
+Add the new variant at the end of the union. Use the **full** config type (not `Partial<...>`) — that matches every existing variant:
 
-Add a new variant with `type: 'data-science'` and `config: Partial<DataScienceConfig>` matching the shape of existing variants. Inspect one existing variant (e.g. `ml`) and follow the same pattern.
+```typescript
+  | { type: 'data-science'; config: DataScienceConfig }
+```
 
-- [ ] **Step 4: Run typecheck**
+- [ ] **Step 5: Run typecheck**
 
 ```bash
-cd /Users/kenallred/dev-projects/scaffold && npm run typecheck
+cd /Users/kenallred/dev-projects/scaffold && npm run type-check
 ```
 
 Expected: A2-related errors resolve. Other errors (copy, adopt, etc.) still present — expected.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git -C /Users/kenallred/dev-projects/scaffold add src/types/config.ts
@@ -167,31 +173,38 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Inspect existing `MlMatch`**
 
-```bash
-grep -n "MlMatch\|DetectionMatch" /Users/kenallred/dev-projects/scaffold/src/project/detectors/types.ts
-```
+Use Read on `/Users/kenallred/dev-projects/scaffold/src/project/detectors/types.ts`. Note:
+- `BaseMatch` interface carries `confidence` and `evidence` (readonly).
+- Every `{Type}Match` extends `BaseMatch` with `projectType` literal + `partialConfig: Partial<z.infer<typeof {Type}ConfigSchema>>` (readonly).
+- Schema types (not config types) are imported at the top.
 
-Note the existing shape (`projectType`, `confidence`, `partialConfig`, `evidence`).
+- [ ] **Step 2: Add `DataScienceMatch`**
 
-- [ ] **Step 2: Add `DataScienceMatch` and extend `DetectionMatch` union**
-
-Add a new `DataScienceMatch` interface mirroring `MlMatch`:
+Add `DataScienceConfigSchema` to the existing schema import block at the top (alphabetize with the others):
 
 ```typescript
-export interface DataScienceMatch {
-  projectType: 'data-science'
-  confidence: 'low' | 'medium' | 'high'
-  partialConfig: Partial<DataScienceConfig>
-  evidence: readonly DetectionEvidence[]
+import type {
+  WebAppConfigSchema, BackendConfigSchema, CliConfigSchema, LibraryConfigSchema,
+  MobileAppConfigSchema, DataPipelineConfigSchema, MlConfigSchema, ResearchConfigSchema,
+  BrowserExtensionConfigSchema, GameConfigSchema, DataScienceConfigSchema,
+} from '../../config/schema.js'
+```
+
+Add the new interface after `GameMatch`, mirroring the sibling pattern exactly:
+
+```typescript
+export interface DataScienceMatch extends BaseMatch {
+  readonly projectType: 'data-science'
+  readonly partialConfig: Partial<z.infer<typeof DataScienceConfigSchema>>
 }
 ```
 
-Extend the `DetectionMatch` union to include `DataScienceMatch`.
+Extend the `DetectionMatch` union by appending `| DataScienceMatch`.
 
 - [ ] **Step 3: Run typecheck**
 
 ```bash
-cd /Users/kenallred/dev-projects/scaffold && npm run typecheck
+cd /Users/kenallred/dev-projects/scaffold && npm run type-check
 ```
 
 Expected: types compile cleanly for this file (downstream compiler errors still expected until Phase D).
@@ -258,13 +271,18 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 **Files:**
 - Modify: `src/config/validators/index.ts`
 
-- [ ] **Step 1: Confirm `registry.test.ts` currently FAILS**
+- [ ] **Step 1: Confirm `registry.test.ts` currently FAILS (or errors cleanly)**
 
 ```bash
 cd /Users/kenallred/dev-projects/scaffold && npx vitest run src/config/validators/registry.test.ts 2>&1 | tail -40
 ```
 
-Expected: failure on "registers exactly one validator per ProjectType" — `data-science` is in the schema enum but not in the registry. This is our failing test.
+Expected one of two outcomes:
+
+1. Assertion failure on "registers exactly one validator per ProjectType" — `data-science` is in the schema enum but not in the registry.
+2. Module-load error if the transitive import graph can't resolve (less likely, but acceptable as "test does not pass" red state).
+
+Either outcome is satisfying-red. If the test unexpectedly passes, the A2/A3 work landed something else and the plan's invariants are off — stop and investigate before implementing.
 
 - [ ] **Step 2: Register the validator**
 
@@ -309,6 +327,10 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - Create: `tests/fixtures/adopt/detectors/data-science/marimo-only/` (fixture dir)
 - Create: `tests/fixtures/adopt/detectors/data-science/dvc-managed/` (fixture dir)
 - Create: `tests/fixtures/adopt/detectors/data-science/no-match/` (fixture dir)
+
+- [ ] **Step 0: Verify helper APIs before writing tests**
+
+Confirm `createFakeSignalContext` accepts the fields the test code uses. Read `src/project/detectors/context.ts` starting around line 675 (the `createFakeSignalContext` definition and `FakeContextInput` type) and confirm the shape in Step 2's test code matches. Specifically: `pyprojectToml`, `packageJson`, `files`, `dirs`, `rootEntries`, `dirListings` are accepted input keys. If the actual keys differ, adjust the Step 2 test code before moving on.
 
 - [ ] **Step 1: Create fixtures**
 
@@ -514,9 +536,9 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task C3: Add detector-registry completeness test
+### Task C3: Add detector-registry completeness test (single-source-of-truth approach)
 
-This closes the silent-miss hazard called out in spec §3.2 and §7.5 (no such test exists today).
+This closes the silent-miss hazard called out in spec §3.2 and §7.5 (no such test exists today). The test must enforce the actual invariant — "every ProjectType has a registered detector" — not a maintainer-updates-both-lists check. Approach: invoke each detector with a no-match context and walk the detectors' exported function names to infer coverage.
 
 **Files:**
 - Create: `src/project/detectors/coverage.test.ts`
@@ -528,55 +550,93 @@ This closes the silent-miss hazard called out in spec §3.2 and §7.5 (no such t
 import { describe, it, expect } from 'vitest'
 import { ProjectTypeSchema } from '../../config/schema.js'
 import { ALL_DETECTORS } from './index.js'
+import { createFakeSignalContext } from './context.js'
+import type { DetectionMatch } from './types.js'
 
 describe('detector registry completeness', () => {
-  it('ALL_DETECTORS covers every ProjectType', () => {
-    // Build the set of projectType strings a detector can produce by calling each
-    // detector with a fixture-less SignalContext — not every detector will match,
-    // but the projectType each detector CLAIMS is encoded in the function itself.
-    // We walk the detectors and assert their exported claim matches the schema.
+  it('ALL_DETECTORS claims one match per ProjectType', () => {
+    // Build a "maximally-signalled" fake context that triggers every detector
+    // we currently ship, then assert the union of projectType claims equals
+    // the schema enum.
     //
-    // Each detector file exports a single function named `detect{PascalCase}` and
-    // returns a match object with a `projectType` literal matching one of
-    // ProjectTypeSchema.options when it matches. We infer coverage by parsing the
-    // filenames in the ALL_DETECTORS barrel import pattern — or more robustly,
-    // by comparing project types returned by stub ctx invocations that don't
-    // intentionally match.
-    //
-    // Simpler approach: explicitly list the project types each detector handles.
-    const DETECTOR_COVERAGE: readonly string[] = [
-      'game', 'browser-extension', 'mobile-app', 'data-pipeline',
-      'web-app', 'backend', 'ml', 'research', 'cli',
-      'data-science',
-      'library',
-    ]
+    // This proves: if a new ProjectType lands without a detector, there is no
+    // possible context that yields a match for it — the union is incomplete.
+    const ctx = createFakeSignalContext({
+      packageJson: {
+        name: 'maximal-fixture',
+        dependencies: {
+          react: '^18.0.0',           // web-app
+          express: '^4.0.0',          // backend
+          next: '^14.0.0',            // web-app
+          'react-native': '^0.72.0',  // mobile-app
+        },
+        scripts: { build: 'tsc' },
+      },
+      pyprojectToml: {
+        project: {
+          name: 'm',
+          dependencies: [
+            'torch',       // ml
+            'pandas',       // data-pipeline
+            'fastapi',      // backend
+            'marimo',       // data-science
+            'dvc',          // data-science
+          ],
+        },
+      },
+      cargoToml: {
+        package: { name: 'game', version: '0.1.0' },
+        dependencies: { bevy: '^0.12.0' },   // game
+      },
+      files: {
+        'pyproject.toml': '...',
+        'dvc.yaml': 'stages: {}',
+        'manifest.json': '{"manifest_version":3}',   // browser-extension
+      },
+      dirs: ['src', 'lib'],
+      rootEntries: [
+        'package.json', 'pyproject.toml', 'Cargo.toml', 'dvc.yaml',
+        'manifest.json', 'analysis.ipynb',
+      ],
+    })
+
+    const claimedTypes = new Set<string>()
+    for (const detect of ALL_DETECTORS) {
+      const m: DetectionMatch | null = detect(ctx)
+      if (m) claimedTypes.add(m.projectType)
+    }
+
     const schemaTypes = new Set(ProjectTypeSchema.options as readonly string[])
-    const coveredTypes = new Set(DETECTOR_COVERAGE)
-    expect(coveredTypes).toEqual(schemaTypes)
-    expect(DETECTOR_COVERAGE.length).toBe(ALL_DETECTORS.length)
+    // Library acts as a catch-all fallback — it may or may not claim depending
+    // on the context. Whitelist it: remove it from both sides before equality
+    // check if it is absent from claimedTypes but present in the schema.
+    if (!claimedTypes.has('library')) {
+      schemaTypes.delete('library')
+    }
+    expect(claimedTypes).toEqual(schemaTypes)
   })
 })
 ```
 
-**Note to implementer:** if another approach to coverage detection is cleaner in the codebase (e.g. each detector exporting a `projectType` constant), refactor to that pattern. The list-based approach above is the simplest and avoids invoking detectors with fake contexts. The key invariant is: adding a new ProjectType without a detector must fail this test.
+**Note to implementer:** if the maximally-signalled context fails to trigger some detector for reasons unrelated to this PR (e.g., a detector requires a very specific signal combination), extend the fixture signals until every detector that CAN claim does so. The key invariant under test is "adding a new ProjectType to the enum without a detector must fail this test." Verify that invariant holds by the sanity check in Step 3.
 
 - [ ] **Step 2: Run test — should PASS (DS detector is registered)**
 
 ```bash
-cd /Users/kenallred/dev-projects/scaffold && npx vitest run src/project/detectors/coverage.test.ts 2>&1 | tail -10
+cd /Users/kenallred/dev-projects/scaffold && npx vitest run src/project/detectors/coverage.test.ts 2>&1 | tail -15
 ```
 
 Expected: PASS.
 
-- [ ] **Step 3: Sanity check — temporarily comment out DS detector registration to confirm test FAILS**
+- [ ] **Step 3: Sanity check — temporarily remove DS from the registry to confirm test FAILS**
 
-Open `src/project/detectors/index.ts`. Comment out the DS entry in `ALL_DETECTORS`. Run:
+Open `src/project/detectors/index.ts`. Comment out the `detectDataScience` entry in `ALL_DETECTORS`. Run:
 
 ```bash
 cd /Users/kenallred/dev-projects/scaffold && npx vitest run src/project/detectors/coverage.test.ts 2>&1 | tail -10
 ```
 
-Expected: FAIL — the test correctly catches missing registration. Uncomment the DS entry, confirm it passes again.
+Expected: FAIL — `data-science` missing from claimedTypes. Uncomment the entry, re-run, confirm PASS.
 
 - [ ] **Step 4: Commit**
 
@@ -610,7 +670,7 @@ Open `src/wizard/copy/core.ts`. Inside `coreCopy.projectType.options`, add after
 - [ ] **Step 2: Typecheck**
 
 ```bash
-cd /Users/kenallred/dev-projects/scaffold && npm run typecheck 2>&1 | head -20
+cd /Users/kenallred/dev-projects/scaffold && npm run type-check 2>&1 | head -20
 ```
 
 `core.ts`-related errors resolve. Other D-phase files still fail.
@@ -652,7 +712,7 @@ Also add `'data-science': DataScienceCopy` to `ProjectCopyMap`.
 - [ ] **Step 3: Typecheck**
 
 ```bash
-cd /Users/kenallred/dev-projects/scaffold && npm run typecheck 2>&1 | head -20
+cd /Users/kenallred/dev-projects/scaffold && npm run type-check 2>&1 | head -20
 ```
 
 Expected: `copy/index.ts` still errors (missing `data-science` key in `PROJECT_COPY`); `types.ts` itself compiles.
@@ -662,6 +722,56 @@ Expected: `copy/index.ts` still errors (missing `data-science` key in `PROJECT_C
 ```bash
 git -C /Users/kenallred/dev-projects/scaffold add src/wizard/copy/types.ts
 git -C /Users/kenallred/dev-projects/scaffold commit -m "feat(wizard): add DataScienceCopy mapped type
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task D2b: Add DS assertion to `src/wizard/copy/types.test-d.ts`
+
+Spec §7.5 requires this; the mapped-type compile-time guard is reinforced by a type-level assertion.
+
+**Files:**
+- Modify: `src/wizard/copy/types.test-d.ts`
+
+- [ ] **Step 1: Read existing file**
+
+Use Read on `/Users/kenallred/dev-projects/scaffold/src/wizard/copy/types.test-d.ts`. Note the `expectTypeOf` pattern and the existing per-type assertions.
+
+- [ ] **Step 2: Add DS assertions**
+
+Append inside the existing `describe` block, matching the `MlCopy` / `WebAppCopy` pattern:
+
+```typescript
+  it('DataScienceCopy.audience.options requires exact enum keys', () => {
+    expectTypeOf<NonNullable<DataScienceCopy['audience']['options']>>()
+      .toEqualTypeOf<Record<'solo', OptionCopy>>()
+  })
+
+  it('ProjectCopyMap["data-science"] narrows to DataScienceCopy', () => {
+    expectTypeOf<ProjectCopyMap['data-science']>().toEqualTypeOf<DataScienceCopy>()
+  })
+```
+
+Add `DataScienceCopy` to the import block at the top of the file.
+
+- [ ] **Step 3: Run type-check + type-level tests**
+
+```bash
+cd /Users/kenallred/dev-projects/scaffold && npm run type-check
+cd /Users/kenallred/dev-projects/scaffold && npx vitest typecheck run src/wizard/copy/types.test-d.ts 2>&1 | tail -15
+```
+
+(If the project runs type-d assertions via a different command, substitute — verify by running `npx vitest --help` or checking `package.json`.)
+
+Expected: PASS.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git -C /Users/kenallred/dev-projects/scaffold add src/wizard/copy/types.test-d.ts
+git -C /Users/kenallred/dev-projects/scaffold commit -m "test(wizard): add DataScienceCopy type-level assertions
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ```
@@ -729,7 +839,7 @@ Add to `PROJECT_COPY`:
 - [ ] **Step 2: Typecheck**
 
 ```bash
-cd /Users/kenallred/dev-projects/scaffold && npm run typecheck 2>&1 | head -20
+cd /Users/kenallred/dev-projects/scaffold && npm run type-check 2>&1 | head -20
 ```
 
 Expected: all copy-related errors resolve; `questions.ts`, `wizard.ts`, `adopt.ts` still error.
@@ -745,22 +855,79 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task D5: Add DS branch to `questions.ts`
+### Task D5a: Write failing test for DS question branch
+
+TDD: the test must fail first, before the implementation lands in D5b.
+
+**Files:**
+- Modify: `src/wizard/questions.test.ts`
+
+- [ ] **Step 1: Read the existing test file**
+
+Use Read on `/Users/kenallred/dev-projects/scaffold/src/wizard/questions.test.ts`. Focus on:
+- How existing project-type tests are set up (mock shape, `runWizard` or `buildAnswers` helper, non-interactive defaults).
+- Which project type test most closely matches the "single-value enum" shape we're adding (likely `ml` with `hasExperimentTracking` alone, or the simplest one).
+
+- [ ] **Step 2: Copy the closest-matching existing test and adapt for `data-science`**
+
+Identify the closest sibling test. Copy it verbatim into a new `it(...)` block, then change:
+- Project-type string → `'data-science'`
+- Expected config assertion → `{ audience: 'solo' }` at key `dataScienceConfig`
+- Any project-type-specific flag inputs → omit (DS has no flags)
+
+Example target shape (ADAPT to the real helper names from the file):
+
+```typescript
+it('data-science project type sets dataScienceConfig.audience to solo', async () => {
+  // Use the exact setup pattern from the nearest sibling test, with:
+  //   projectType: 'data-science'
+  //   no per-type flags
+  const result = await /* the helper used in sibling tests */({
+    projectType: 'data-science',
+    methodology: 'mvp',
+    // ... other required fields copied from sibling
+  })
+  expect(result.dataScienceConfig).toEqual({ audience: 'solo' })
+})
+```
+
+- [ ] **Step 3: Run the test to confirm it FAILS**
+
+```bash
+cd /Users/kenallred/dev-projects/scaffold && npx vitest run src/wizard/questions.test.ts -t 'data-science' 2>&1 | tail -15
+```
+
+Expected: FAIL — `questions.ts` does not yet handle `'data-science'`, so `dataScienceConfig` will be undefined.
+
+- [ ] **Step 4: Commit the failing test**
+
+```bash
+git -C /Users/kenallred/dev-projects/scaffold add src/wizard/questions.test.ts
+git -C /Users/kenallred/dev-projects/scaffold commit -m "test(wizard): add failing test for data-science question branch
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task D5b: Implement DS branch in `questions.ts`
 
 **Files:**
 - Modify: `src/wizard/questions.ts`
 
 - [ ] **Step 1: Extend `WizardAnswers`**
 
-Locate the `WizardAnswers` interface (near top of file). Add:
+Open `/Users/kenallred/dev-projects/scaffold/src/wizard/questions.ts`. Find the `WizardAnswers` interface (near top of file — around line 20-35). Add a field adjacent to the other per-type config fields:
 
 ```typescript
   dataScienceConfig?: DataScienceConfig
 ```
 
+Add a `DataScienceConfig` import at the top if not already present.
+
 - [ ] **Step 2: Add the DS question branch**
 
-Find the chain of `if (projectType === '...')` blocks (around line 140-570). After the `research` branch, add:
+Find the chain of `if (projectType === '...')` blocks (around line 140-570). Insert immediately AFTER the closing brace of `if (projectType === 'research') { ... }` and BEFORE any return or catch-all logic:
 
 ```typescript
   if (projectType === 'data-science') {
@@ -771,37 +938,32 @@ Find the chain of `if (projectType === '...')` blocks (around line 140-570). Aft
   }
 ```
 
-Pattern: follow the `ml` / `research` shape but short-circuit since there's only one value to set.
+Exact anchor: the line AFTER `  }  // end research branch` (or equivalent closing brace of the research `if` block).
 
-- [ ] **Step 3: Add `dataScienceConfig` to the return block**
+- [ ] **Step 3: Add `dataScienceConfig` to any return / destructuring blocks**
 
-At the bottom of the function (around line 714), locate the return object. Add `dataScienceConfig` to the destructured return fields in the same pattern as the existing configs.
+At the bottom of the function (around line 714), locate where the function returns `{ methodology, depth, platforms, traits, projectType, ... }`. Add `dataScienceConfig` adjacent to the other per-type configs if they are explicitly destructured (if the function returns `answers` as a whole, no edit needed).
 
-- [ ] **Step 4: Write a happy-path wizard test**
+- [ ] **Step 4: Run the D5a test to confirm it PASSES**
 
-Open `src/wizard/questions.test.ts` and add a test that exercises the DS branch. Follow the pattern of existing project-type test cases. Use the simplest interactive-mode mock that routes through the new branch.
-
-```typescript
-it('data-science project type sets audience to solo', async () => {
-  // Arrange: mock the project-type prompt to return 'data-science'.
-  // ... (follow existing test setup in this file)
-  const result = await buildAnswers({ projectType: 'data-science', /* ... */ })
-  expect(result.dataScienceConfig).toEqual({ audience: 'solo' })
-})
+```bash
+cd /Users/kenallred/dev-projects/scaffold && npx vitest run src/wizard/questions.test.ts -t 'data-science' 2>&1 | tail -15
 ```
 
-- [ ] **Step 5: Run tests**
+Expected: PASS.
+
+- [ ] **Step 5: Run the full wizard test file to catch regressions**
 
 ```bash
 cd /Users/kenallred/dev-projects/scaffold && npx vitest run src/wizard/questions.test.ts 2>&1 | tail -15
 ```
 
-Expected: PASS.
+Expected: all tests PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git -C /Users/kenallred/dev-projects/scaffold add src/wizard/questions.ts src/wizard/questions.test.ts
+git -C /Users/kenallred/dev-projects/scaffold add src/wizard/questions.ts
 git -C /Users/kenallred/dev-projects/scaffold commit -m "feat(wizard): add data-science branch to questions flow
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
@@ -836,7 +998,7 @@ After the `researchConfig` spread, add:
 - [ ] **Step 3: Typecheck**
 
 ```bash
-cd /Users/kenallred/dev-projects/scaffold && npm run typecheck 2>&1 | head -20
+cd /Users/kenallred/dev-projects/scaffold && npm run type-check 2>&1 | head -20
 ```
 
 - [ ] **Step 4: Commit**
@@ -880,7 +1042,7 @@ Also add the `DataScienceConfigSchema` import at the top if not already present.
 - [ ] **Step 3: Typecheck**
 
 ```bash
-cd /Users/kenallred/dev-projects/scaffold && npm run typecheck
+cd /Users/kenallred/dev-projects/scaffold && npm run type-check
 ```
 
 Expected: **ALL typecheck errors resolve.** The codebase now compiles end-to-end with the new project type.
@@ -960,7 +1122,7 @@ knowledge-overrides:
 Per the project feedback memory, `content/pipeline/` and `content/knowledge/` changes require a build. Overlay YAML changes may or may not — run anyway to be safe:
 
 ```bash
-cd /Users/kenallred/dev-projects/scaffold && ./node_modules/.bin/tsx src/cli/cli.ts build 2>&1 | tail -10
+cd /Users/kenallred/dev-projects/scaffold && npm run build && node dist/index.js build 2>&1 | tail -10
 ```
 
 (If the binary layout differs, substitute the correct invocation; check `package.json` scripts.)
@@ -1155,21 +1317,49 @@ PROJECT_TYPE_OVERLAYS="$(find "${PROJECT_ROOT}/content/methodology" -name '*-ove
 }
 ```
 
-- [ ] **Step 2: Run the eval — expect FAILURES (knowledge docs not yet created)**
+- [ ] **Step 2: Tolerate a missing knowledge dir in the entry-existence assertion**
+
+To avoid committing a deliberately-failing eval (breaks pre-push hook + git bisect), the "referenced knowledge entries exist" assertion must skip overlays whose knowledge dir does not yet exist — then Phase F lands the dir and the assertion fires. Adjust the last `@test` to start with a directory-existence guard:
 
 ```bash
-cd /Users/kenallred/dev-projects/scaffold && bats tests/evals/overlay-structural-coverage.bats 2>&1 | tail -20
+@test "every overlay's knowledge-overrides references existing knowledge entries" {
+  local failures=()
+  for overlay in ${PROJECT_TYPE_OVERLAYS}; do
+    local type entries
+    type="$(basename "$overlay" | sed 's/-overlay\.yml$//')"
+    # If the knowledge dir does not yet exist, skip — assertion will fire once it
+    # lands (typical during overlay bootstrap in a feature branch).
+    [[ -d "${PROJECT_ROOT}/content/knowledge/${type}" ]] || continue
+    entries="$(grep -oE 'append: \[[^]]+\]' "$overlay" | sed 's/append: \[//;s/\]$//' | tr ',' '\n' | sed 's/^ *//;s/ *$//' | sort -u | grep -v '^$')"
+    for entry in $entries; do
+      local file="${PROJECT_ROOT}/content/knowledge/${type}/${entry}.md"
+      if [[ ! -f "$file" ]]; then
+        failures+=("$(basename "$overlay"): references missing knowledge entry '${entry}' (expected at ${file})")
+      fi
+    done
+  done
+  if [[ ${#failures[@]} -gt 0 ]]; then
+    printf "%s\n" "${failures[@]}"
+    return 1
+  fi
+}
 ```
 
-Expected: the last @test ("every overlay's knowledge-overrides references existing knowledge entries") FAILS for DS — knowledge files don't exist yet. This is correct; Phase F creates them. The other tests should pass.
+Update your file with the guard line above. Every other assertion remains unchanged.
 
-- [ ] **Step 3: Commit without running to green (knowledge docs come next)**
+- [ ] **Step 3: Run the eval — all tests PASS now**
+
+```bash
+cd /Users/kenallred/dev-projects/scaffold && bats tests/evals/overlay-structural-coverage.bats 2>&1 | tail -15
+```
+
+Expected: PASS. The `data-science/` knowledge dir does not exist yet, so the last assertion skips DS and passes via the existence guard.
+
+- [ ] **Step 4: Commit**
 
 ```bash
 git -C /Users/kenallred/dev-projects/scaffold add tests/evals/overlay-structural-coverage.bats
 git -C /Users/kenallred/dev-projects/scaffold commit -m "test(evals): add overlay-structural-coverage.bats generic eval
-
-One assertion will fail until DS knowledge docs land in Phase F — expected.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ```
@@ -1289,15 +1479,55 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ### Task F3-F15: Author 13 knowledge documents
 
-**For each knowledge doc (one task each), follow this pattern:**
+**For each knowledge doc (one task each), follow this four-step pattern exactly:**
 
-1. Open the reference `content/knowledge/ml/{similar}.md` or `content/knowledge/web-app/{similar}.md` to internalize the tone.
-2. Draft the file at the target path with proper frontmatter.
-3. Keep length between 150 and 300 lines. Code blocks are mandatory for technical subsections.
-4. Must contain the required keyword(s) listed below (enforced by the Phase G content eval).
-5. Commit per task.
+1. **Read** the single named reference doc listed for that task.
+2. **Write** the new file at the target path with proper frontmatter (name / description / topics), an opening framing paragraph, a `## Summary` section, and a `## Deep Guidance` section with subsections that include code blocks.
+3. **Verify** the file with these shell checks:
+   ```bash
+   FILE="/Users/kenallred/dev-projects/scaffold/<target-path>"
+   # Length check: 150-300 lines
+   lines=$(wc -l < "$FILE"); [[ $lines -ge 150 && $lines -le 300 ]] && echo "OK lines=$lines" || echo "FAIL lines=$lines"
+   # Frontmatter check
+   head -5 "$FILE" | grep -q '^name:' && echo "OK name" || echo "FAIL name"
+   head -5 "$FILE" | grep -q '^description:' && echo "OK description" || echo "FAIL description"
+   # Required keywords (one grep per required keyword — all must return hit)
+   for kw in <LIST_REQUIRED_KEYWORDS_HERE>; do
+     grep -qF "$kw" "$FILE" && echo "OK $kw" || echo "FAIL $kw"
+   done
+   ```
+   If any check returns FAIL, extend the doc until all checks pass — do NOT commit a failing doc.
+4. **Commit** with the single-line message shown in the task.
 
-Each task below lists: target file, topic scope, key tool mentions (per spec §4.1), required keywords for the Phase G eval, a reference doc to model, and the commit message.
+**Style model:** every task lists one reference doc to read. Open ONLY that reference — don't browse `content/knowledge/` for alternatives. The Phase G eval (keyword presence) enforces the required keywords; pass the Step 3 verification before moving on.
+
+**Frontmatter template for every doc:**
+
+```markdown
+---
+name: <slug>
+description: <one line, 1-200 chars>
+topics: [<topic1>, <topic2>, ...]
+---
+
+<Opening framing paragraph — why this matters, 2-4 sentences, names the audience>
+
+## Summary
+
+<3-5 sentences. Opinionated, specific. Names the primary tool picks.>
+
+## Deep Guidance
+
+### <Subsection 1>
+
+<Prose with code block examples.>
+
+### <Subsection 2>
+
+<Prose with code block examples.>
+
+<... more subsections as needed, keep total file 150-300 lines>
+```
 
 ---
 
@@ -1647,7 +1877,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - [ ] **Step 1: Run `scaffold build`**
 
 ```bash
-cd /Users/kenallred/dev-projects/scaffold && ./node_modules/.bin/tsx src/cli/cli.ts build 2>&1 | tail -10
+cd /Users/kenallred/dev-projects/scaffold && npm run build && node dist/index.js build 2>&1 | tail -10
 ```
 
 (Substitute the correct build invocation if different.)
@@ -1755,74 +1985,139 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ## Phase H — E2E test extension
 
-### Task H1: Extend `src/e2e/project-type-overlays.test.ts` with a DS case
+### Task H1: Extend `src/e2e/project-type-overlays.test.ts` with a DS block
 
 **Files:**
 - Modify: `src/e2e/project-type-overlays.test.ts`
 
-- [ ] **Step 1: Read existing tests to find the DS-insertion point**
+- [ ] **Step 1: Read an existing project-type block verbatim**
 
-```bash
-grep -n "backend\|'ml'\|project-type" /Users/kenallred/dev-projects/scaffold/src/e2e/project-type-overlays.test.ts | head -30
-```
+The file uses sibling `describe` blocks per project type (web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research). Each block has ~9 tests following an identical skeleton. **Read** the existing `ml` describe block in full — it's the closest pattern to DS.
 
-The file uses `describe.each` or sibling `describe` blocks per project type. Follow the existing pattern.
+Key helpers the file uses (synchronous, not async — do NOT add `await`):
+- `loadOverlay(overlayPath)` returns `{ overlay, errors }` (sync).
+- `resolveOverlayState({ config, methodologyDir, metaPrompts, presetSteps, output })` (sync).
+- `loadConfig(tmpDir, [])` returns `{ config, errors, warnings }`.
+- The existing `resolveProjectOverlay(projectType, methodology)` helper lives in the file and wraps the plumbing.
+- Knowledge shape: `overlayState.knowledge['step-name']` is a `string[]` (Record<string, string[]>), NOT a Map — use bracket access, not `.get()`.
+- Config is written to `.scaffold/config.yml`, not `config.yml` at root.
 
-- [ ] **Step 2: Add a DS-specific `describe` block**
+- [ ] **Step 2: Update `resolveProjectOverlay` to accept `'data-science'`**
 
-Pattern (adapt to the existing file's shape):
+At the top of the file, the `resolveProjectOverlay` helper takes a union of project-type strings. Add `'data-science'` to that union:
 
 ```typescript
-describe('data-science overlay', () => {
-  it('init → config validates → overlay resolves → knowledge injects', async () => {
-    // Arrange
-    const tmp = makeTempDir()
-    const config = {
+async function resolveProjectOverlay(
+  projectType: 'web-app' | 'backend' | 'cli' | 'library' | 'mobile-app'
+    | 'data-pipeline' | 'ml' | 'browser-extension' | 'research' | 'data-science',
+  methodology: 'deep' | 'mvp' = 'deep',
+): Promise<{ overlayState: OverlayState; realMetaPrompts: Map<string, MetaPromptFile> }> {
+```
+
+(If `'research'` is not in the existing union, add it too — same rationale. Verify against the actual line in the file.)
+
+- [ ] **Step 3: Add a `data-science overlay integration` describe block**
+
+Insert after the last existing project-type block, before the closing bracket of the outer `describe`. Mirror the `ml` block exactly — 9 tests: config validates, runWizard creates config, YAML round-trip, overlay loads, overlay injects into {architecture / tech-stack / tdd / foundational}, no step-overrides, no cross-reads. Assertions use bracket access on `overlayState.knowledge`.
+
+```typescript
+describe('data-science overlay integration', () => {
+  let tmpDir: string
+  beforeEach(() => { tmpDir = makeTempDir() })
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+    vi.restoreAllMocks()
+  })
+
+  it('data-science config with dataScienceConfig validates through ConfigSchema', () => {
+    const result = ConfigSchema.safeParse({
       version: 2,
-      methodology: 'mvp',
+      methodology: 'deep',
+      platforms: ['claude-code'],
       project: {
-        projectType: 'data-science' as const,
-        dataScienceConfig: { audience: 'solo' as const },
+        projectType: 'data-science',
+        dataScienceConfig: { audience: 'solo' },
       },
-    }
-
-    // Act: write config, load, validate, resolve overlay
-    fs.writeFileSync(path.join(tmp, 'config.yml'), yaml.dump(config))
-    const loaded = await loadConfig(tmp)
-    const parsed = ConfigSchema.parse(loaded)
-    const overlay = await loadOverlay('data-science', getPackageMethodologyDir())
-    const state = await resolveOverlayState(parsed, {
-      overlay,
-      /* other args matching existing E2E tests */
     })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      const project = result.data.project as Record<string, unknown>
+      expect(project['projectType']).toBe('data-science')
+      const dsc = project['dataScienceConfig'] as Record<string, unknown>
+      expect(dsc['audience']).toBe('solo')
+    }
+  })
 
-    // Assert: knowledge injected into expected steps
-    expect(state.knowledge.get('create-prd')).toContain('data-science-requirements')
-    expect(state.knowledge.get('operations')).toEqual(
+  it('data-science overlay loads without errors', () => {
+    const methodologyDir = getPackageMethodologyDir()
+    const overlayPath = path.join(methodologyDir, 'data-science-overlay.yml')
+    const { overlay, errors } = loadOverlay(overlayPath)
+    expect(errors).toHaveLength(0)
+    expect(overlay).not.toBeNull()
+    expect(overlay!.projectType).toBe('data-science')
+    expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(0)
+  })
+
+  it('overlay injects data-science-architecture into system-architecture step', async () => {
+    const { overlayState } = await resolveProjectOverlay('data-science')
+    expect(overlayState.knowledge['system-architecture']).toContain('data-science-architecture')
+  })
+
+  it('overlay injects tool-stack knowledge into tech-stack step', async () => {
+    const { overlayState } = await resolveProjectOverlay('data-science')
+    expect(overlayState.knowledge['tech-stack']).toContain('data-science-architecture')
+    expect(overlayState.knowledge['tech-stack']).toContain('data-science-dev-environment')
+  })
+
+  it('overlay injects data-science-testing into TDD step', async () => {
+    const { overlayState } = await resolveProjectOverlay('data-science')
+    expect(overlayState.knowledge['tdd']).toContain('data-science-testing')
+  })
+
+  it('overlay injects data-science knowledge into foundational steps', async () => {
+    const { overlayState } = await resolveProjectOverlay('data-science')
+    expect(overlayState.knowledge['create-prd']).toContain('data-science-requirements')
+    expect(overlayState.knowledge['coding-standards']).toContain('data-science-conventions')
+    expect(overlayState.knowledge['project-structure']).toContain('data-science-project-structure')
+  })
+
+  it('overlay injects DS-specific knowledge into operations step', async () => {
+    const { overlayState } = await resolveProjectOverlay('data-science')
+    expect(overlayState.knowledge['operations']).toEqual(
       expect.arrayContaining([
         'data-science-experiment-tracking',
         'data-science-observability',
+        'data-science-reproducibility',
       ]),
     )
+  })
+
+  it('overlay is knowledge-only (no step-overrides, no cross-reads-overrides)', () => {
+    const methodologyDir = getPackageMethodologyDir()
+    const overlayPath = path.join(methodologyDir, 'data-science-overlay.yml')
+    const { overlay } = loadOverlay(overlayPath)
+    expect(overlay).not.toBeNull()
+    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+    expect(Object.keys(overlay!.crossReadsOverrides)).toHaveLength(0)
   })
 })
 ```
 
-Refer to the existing `ml` or `research` describe block for the exact helper APIs used in this test file.
+Do NOT add an `init`-exercising test unless an existing sibling block has one that you can mirror exactly — runWizard's flag shape depends on per-type knobs that DS doesn't have yet.
 
-- [ ] **Step 3: Run the E2E test**
+- [ ] **Step 4: Run the E2E test**
 
 ```bash
-cd /Users/kenallred/dev-projects/scaffold && npx vitest run src/e2e/project-type-overlays.test.ts 2>&1 | tail -15
+cd /Users/kenallred/dev-projects/scaffold && npx vitest run src/e2e/project-type-overlays.test.ts 2>&1 | tail -20
 ```
 
-Expected: PASS, including new DS case.
+Expected: all tests PASS, including the new `data-science overlay integration` block.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git -C /Users/kenallred/dev-projects/scaffold add src/e2e/project-type-overlays.test.ts
-git -C /Users/kenallred/dev-projects/scaffold commit -m "test(e2e): exercise data-science overlay through init → resolve → inject
+git -C /Users/kenallred/dev-projects/scaffold commit -m "test(e2e): exercise data-science overlay through config/load/inject
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ```
@@ -1864,10 +2159,12 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Add v3.23.0 entry under "Completed Releases"**
 
+Determine today's date with `date -u +%Y-%m-%d` and use it. Determine the PR number with `gh pr view --json number -q .number` (after Task J2 opens the PR) and return to edit this entry before merging. If you are running this task before J2, use a `PR #TBD` marker and set a reminder to backfill the PR number after `gh pr create`.
+
 Insert above the current latest entry (v3.22.0):
 
 ```markdown
-### v3.23.0 (YYYY-MM-DD)
+### v3.23.0 (<ISO-DATE-FROM-DATE-COMMAND>)
 
 Data Science Project-Type Overlay — `scaffold init --type data-science` targets solo / small-team data scientists with 13 knowledge documents covering reproducibility, experiment tracking, notebook discipline, model evaluation, and data versioning. Implements roadmap "Content & Quality > New Project Type Overlays" for the DS-1 audience; DS-2 (platform / larger-team) deferred to backlog.
 
@@ -1875,10 +2172,10 @@ Data Science Project-Type Overlay — `scaffold init --type data-science` target
 - **Forward-compatible schema**: `DataScienceConfig.audience: 'solo'` with `.default('solo')` — DS-2 will extend the enum additively.
 - **Low-tier detector**: surfaces DS repos with Marimo, DVC, or `dvc.yaml` to `scaffold adopt`; defers to `ml` when both match via `resolveDetection`.
 - **Wiring**: schema + validator + detector + wizard copy + adopt mapping. New packaging test + structural eval + detector-coverage test prevent future silent misregistration.
-- **Review discipline**: 4-round spec MMR (Codex + Claude + Gemini-compensating) + 3-channel PR MMR. PR #XXX.
+- **Review discipline**: 4-round spec MMR + round of plan MMR (Codex + Claude + Gemini-compensating) + 3-channel PR MMR. PR #<NUMBER>.
 ```
 
-Fill in the date and PR number at release time.
+**Backfill rule**: after `gh pr create` in Task J2, amend this entry with the real PR number via a separate commit on the same branch. After `gh release create` in Task J4, amend with the real ISO date if it differs from the commit date.
 
 - [ ] **Step 2: Move "Data Science/Analytics" out of "Content & Quality > New Project Type Overlays" → add DS-2 to a new "Backlog / Later" section**
 
