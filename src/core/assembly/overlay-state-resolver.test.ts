@@ -800,6 +800,99 @@ step-overrides:
       ])
     })
   })
+
+  describe('multi-domain stacking — contrived fixtures', () => {
+    const backendConfigBase = {
+      apiStyle: 'rest' as const,
+      dataStore: ['relational' as const],
+      authMechanism: 'jwt' as const,
+      asyncMessaging: 'none' as const,
+      deployTarget: 'container' as const,
+    }
+
+    function makeBackendConfigWithDomains(domain: unknown) {
+      return makeConfig({
+        project: {
+          projectType: 'backend',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          backendConfig: { ...backendConfigBase, domain: domain as any },
+        },
+      })
+    }
+
+    function makeMetaPromptsForTechStack() {
+      return new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+        ['tech-stack', { frontmatter: makeFrontmatter({
+          name: 'tech-stack', knowledgeBase: ['base-entry'],
+          reads: [], dependencies: [],
+        }) }],
+      ])
+    }
+
+    it('dedups first-occurrence across contrived fixture collision', () => {
+      // The resolved knowledge builds up as:
+      //   1. Frontmatter knowledgeBase seeds with [base-entry]
+      //   2. Core 'backend-overlay.yml' doesn't exist in fixtureDir (no-op)
+      //   3. fake-a sub-overlay appends [fake-a-only, shared-entry]
+      //   4. fake-b sub-overlay appends [shared-entry, fake-b-only]; 'shared-entry'
+      //      already present at step 3, so Set-based dedup drops this duplicate
+      //      at first-occurrence position.
+      //
+      // Note: the fixture dir also contains backend-fintech.yml, but we never
+      // reference 'fintech' in this test's domain list so it isn't loaded.
+      const result = resolveOverlayState({
+        config: makeBackendConfigWithDomains(['fake-a', 'fake-b']),
+        methodologyDir: fixtureDir,
+        metaPrompts: makeMetaPromptsForTechStack(),
+        presetSteps: { 'tech-stack': { enabled: true } },
+        output: makeOutput(),
+      })
+      expect(result.knowledge['tech-stack']).toEqual([
+        'base-entry',
+        'fake-a-only',
+        'shared-entry',
+        'fake-b-only',
+      ])
+    })
+
+    it('warns on duplicate domain names and loads the overlay once', () => {
+      const output = makeOutput()
+      const result = resolveOverlayState({
+        config: makeBackendConfigWithDomains(['fake-a', 'fake-a']),
+        methodologyDir: fixtureDir,
+        metaPrompts: makeMetaPromptsForTechStack(),
+        presetSteps: { 'tech-stack': { enabled: true } },
+        output,
+      })
+      // Duplicate warning mentions backendConfig.domain for user context
+      expect(output.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Duplicate domain(s) in backendConfig.domain'),
+      )
+      expect(output.warn).toHaveBeenCalledWith(expect.stringContaining('fake-a'))
+      // Overlay loaded only once — one set of fake-a entries (no double-append)
+      expect(result.knowledge['tech-stack']).toEqual([
+        'base-entry', 'fake-a-only', 'shared-entry',
+      ])
+    })
+
+    it('silently skips missing sub-overlay file (no warning)', () => {
+      const output = makeOutput()
+      // 'fake-c' domain has no corresponding fixture file — should silent-skip
+      const result = resolveOverlayState({
+        config: makeBackendConfigWithDomains(['fake-a', 'fake-c']),
+        methodologyDir: fixtureDir,
+        metaPrompts: makeMetaPromptsForTechStack(),
+        presetSteps: { 'tech-stack': { enabled: true } },
+        output,
+      })
+      // No warnings emitted for missing file (spec §5.4 test 23)
+      expect(output.warn).not.toHaveBeenCalled()
+      // fake-a still loaded; fake-c silently absent
+      expect(result.knowledge['tech-stack']).toEqual([
+        'base-entry', 'fake-a-only', 'shared-entry',
+      ])
+    })
+  })
 })
 
 describe('crossReads on OverlayState (Wave 3c)', () => {
