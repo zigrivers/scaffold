@@ -1,0 +1,39 @@
+# methodology/data-science-overlay.yml
+name: data-science
+description: >
+  Data science overlay — injects solo / small-team data science domain
+  knowledge into existing pipeline steps for local-first, reproducibility-first
+  analytical work and model prototyping.
+project-type: data-science
+
+knowledge-overrides:
+  # Foundational
+  create-prd:            { append: [data-science-requirements] }
+  user-stories:          { append: [data-science-requirements] }
+  coding-standards:      { append: [data-science-conventions, data-science-notebook-discipline] }
+  project-structure:     { append: [data-science-project-structure] }
+  dev-env-setup:         { append: [data-science-dev-environment] }
+  git-workflow:          { append: [data-science-reproducibility] }
+
+  # Architecture & Design
+  system-architecture:   { append: [data-science-architecture] }
+  tech-stack:            { append: [data-science-architecture, data-science-dev-environment] }
+  adrs:                  { append: [data-science-architecture] }
+  domain-modeling:       { append: [data-science-data-versioning] }
+  database-schema:       { append: [data-science-data-versioning] }
+  security:              { append: [data-science-security] }
+  operations:            { append: [data-science-experiment-tracking, data-science-observability, data-science-reproducibility] }
+
+  # Testing
+  tdd:                   { append: [data-science-testing] }
+  create-evals:          { append: [data-science-testing, data-science-model-evaluation] }
+
+  # Reviews
+  review-architecture:   { append: [data-science-architecture] }
+  review-database:       { append: [data-science-data-versioning] }
+  review-security:       { append: [data-science-security] }
+  review-operations:     { append: [data-science-experiment-tracking, data-science-observability] }
+  review-testing:        { append: [data-science-testing, data-science-model-evaluation] }
+
+  # Planning
+  implementation-plan:   { append: [data-science-architecture] }
