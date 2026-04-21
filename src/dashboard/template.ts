@@ -1,4 +1,5 @@
 import type { DashboardData, MultiServiceDashboardData } from './generator.js'
+import { NODE_WIDTH, NODE_HEIGHT } from './dependency-graph.js'
 
 export function escapeHtml(s: string): string {
   return s
@@ -1147,6 +1148,46 @@ body {
   .header { flex-direction: column; }
   .services-grid { grid-template-columns: 1fr; }
 }
+/* Cross-service dependency graph (§4.4) */
+.dep-graph {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 0 0 24px;
+  color: var(--muted);
+}
+.dep-graph-title {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  color: var(--text);
+}
+.dep-graph-svg { width: 100%; height: auto; max-height: 420px; display: block; }
+.dep-node-box { fill: var(--bg); stroke: var(--border); stroke-width: 1; }
+.dep-node-name { font-size: 13px; font-weight: 500; fill: var(--text); font-family: system-ui, sans-serif; }
+.dep-node-type { font-size: 11px; fill: var(--muted); font-family: system-ui, sans-serif; }
+.dep-edge { transition: color 0.1s ease; }
+.dep-edge-line { transition: stroke 0.1s ease, stroke-width 0.1s ease; }
+.dep-edge:hover,
+.dep-edge:focus-visible { color: var(--accent); }
+.dep-edge:hover .dep-edge-line,
+.dep-edge:focus-visible .dep-edge-line { stroke: var(--accent); stroke-width: 2; }
+.dep-tooltip {
+  position: fixed; pointer-events: none;
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 4px; padding: 8px; font-size: 12px; color: var(--text);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  max-width: 360px; z-index: 100;
+  opacity: 0; transition: opacity 0.1s ease;
+}
+.dep-tooltip.visible { opacity: 1; }
+.dep-tooltip-row { padding: 2px 0; }
+.dep-tooltip-status-completed { color: var(--status-completed); }
+.dep-tooltip-status-pending,
+.dep-tooltip-status-not-bootstrapped { color: var(--status-in-progress); }
+.dep-tooltip-status-read-error,
+.dep-tooltip-status-service-unknown,
+.dep-tooltip-status-not-exported { color: var(--stale-text); }
 </style>
 </head>
 <body>
@@ -1176,6 +1217,7 @@ body {
     <div class="aggregate-stat"><strong>${data.aggregate.servicesComplete}</strong> of <strong>${data.aggregate.totalServices}</strong> services complete</div>
     ${servicesByPhase ? `<div class="phase-indicators">${servicesByPhase}</div>` : ''}
   </div>
+  ${renderDependencyGraphSection(data.dependencyGraph)}
   <div class="services-grid">
 ${serviceCards}
   </div>
@@ -1242,9 +1284,154 @@ ${serviceCards}
       }
     }
   })();
+
+  // ---------- Cross-service dependency graph JS ----------
+  (function(){
+    var edges = document.querySelectorAll('.dep-edge');
+    if (edges.length === 0) return;
+    var tooltip = document.createElement('div');
+    tooltip.className = 'dep-tooltip';
+    tooltip.setAttribute('role', 'region');
+    tooltip.setAttribute('aria-live', 'polite');
+    tooltip.setAttribute('aria-label', 'Cross-service dependency details');
+    document.body.appendChild(tooltip);
+
+    function clearTooltip() {
+      while (tooltip.firstChild) tooltip.removeChild(tooltip.firstChild);
+    }
+
+    function showTooltip(edge) {
+      var consumer = edge.getAttribute('data-consumer');
+      var producer = edge.getAttribute('data-producer');
+      var stepsJson = edge.getAttribute('data-steps');
+      var steps;
+      try { steps = JSON.parse(stepsJson); } catch(_) { return; }
+      clearTooltip();
+      steps.forEach(function(s) {
+        var row = document.createElement('div');
+        row.className = 'dep-tooltip-row dep-tooltip-status-' + s.status;
+        row.textContent = consumer + ':' + s.consumerStep
+          + ' -> ' + producer + ':' + s.producerStep
+          + ' (' + s.status + ')';
+        tooltip.appendChild(row);
+      });
+      tooltip.classList.add('visible');
+    }
+
+    function hideTooltip() {
+      tooltip.classList.remove('visible');
+    }
+
+    function positionTooltip(x, y) {
+      var MARGIN = 12;
+      var MAX_W = 370;
+      var MAX_H = 200;
+      var left = Math.min(x + MARGIN, window.innerWidth - MAX_W);
+      var top = Math.min(y + MARGIN, window.innerHeight - MAX_H);
+      tooltip.style.left = Math.max(0, left) + 'px';
+      tooltip.style.top = Math.max(0, top) + 'px';
+    }
+
+    edges.forEach(function(edge) {
+      // mouseenter: position BEFORE showing so a stationary hover doesn't
+      // render at a stale/default location waiting for the first mousemove.
+      edge.addEventListener('mouseenter', function(e) {
+        positionTooltip(e.clientX, e.clientY);
+        showTooltip(edge);
+      });
+      edge.addEventListener('mousemove', function(e) { positionTooltip(e.clientX, e.clientY); });
+      edge.addEventListener('mouseleave', hideTooltip);
+      edge.addEventListener('focusin', function() {
+        var rect = edge.getBoundingClientRect();
+        positionTooltip(rect.right, rect.top);
+        showTooltip(edge);
+      });
+      edge.addEventListener('focusout', hideTooltip);
+    });
+
+    window.addEventListener('scroll', hideTooltip, { passive: true });
+  })();
 })();
 </script>
 </body>
 </html>`
+}
+/* eslint-enable max-len */
+
+/* eslint-disable max-len */
+// ---------- Cross-service dependency graph ----------
+
+/**
+ * Render the `<section class="dep-graph">` block containing the SVG graph.
+ * Exported so tests can assert on rendered output directly (§6.2).
+ *
+ * Returns '' when data is null/undefined — caller does string concatenation
+ * and the empty slot naturally collapses.
+ *
+ * Security: attacker-influenced strings (service names, step slugs) flow
+ * through escapeHtml before reaching attribute values or text content.
+ * data-steps holds JSON with escaped quotes (`&quot;`); consumers decode
+ * via replace(/&quot;/g, '"') then JSON.parse.
+ */
+export function renderDependencyGraphSection(
+  data: MultiServiceDashboardData['dependencyGraph'],
+): string {
+  if (!data) return ''
+  return [
+    '<section class="dep-graph" id="dep-graph">',
+    '  <h2 class="dep-graph-title">Cross-Service Dependencies</h2>',
+    // role="img" would flatten the SVG a11y tree and suppress descendant
+    // <title> elements on many AT combos. SVG AAM handles focusable
+    // descendants with <title> correctly without an explicit role.
+    `  <svg class="dep-graph-svg" viewBox="0 0 ${data.viewBox.width} ${data.viewBox.height}" xmlns="http://www.w3.org/2000/svg" aria-label="Cross-service dependency graph">`,
+    '    <defs>',
+    '      <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">',
+    '        <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>',
+    '      </marker>',
+    '    </defs>',
+    renderDepEdges(data),
+    renderDepNodes(data),
+    '  </svg>',
+    '</section>',
+  ].join('\n')
+}
+
+function renderDepEdges(
+  data: NonNullable<MultiServiceDashboardData['dependencyGraph']>,
+): string {
+  return data.edges.map(edge => {
+    const tooltipLines = edge.steps.map(s =>
+      `${edge.consumer}:${s.consumerStep} -> ${edge.producer}:${s.producerStep} (${s.status})`,
+    )
+    const titleText = escapeHtml(tooltipLines.join('\n'))
+    const stepsJson = escapeHtml(JSON.stringify(edge.steps))
+    // Defense-in-depth: svgPath is always produced by layoutGraph from numeric
+    // math today, but `svgPath: string` doesn't restrict content at the type
+    // level. Escape it so a future caller that hand-constructs edges cannot
+    // break out of the d=... attribute.
+    const safePath = escapeHtml(edge.svgPath)
+    return [
+      `    <g class="dep-edge" data-consumer="${escapeHtml(edge.consumer)}" data-producer="${escapeHtml(edge.producer)}" data-steps="${stepsJson}" tabindex="0">`,
+      `      <title>${titleText}</title>`,
+      `      <path class="dep-edge-hit" d="${safePath}" stroke="transparent" stroke-width="14" fill="none" pointer-events="stroke"/>`,
+      `      <path class="dep-edge-line" d="${safePath}" stroke="currentColor" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>`,
+      '    </g>',
+    ].join('\n')
+  }).join('\n')
+}
+
+function renderDepNodes(
+  data: NonNullable<MultiServiceDashboardData['dependencyGraph']>,
+): string {
+  const HALF_W = NODE_WIDTH / 2
+  const NAME_BASELINE = 20
+  const TYPE_BASELINE = NODE_HEIGHT - 8
+  return data.nodes.map(n => [
+    `    <g class="dep-node" data-service="${escapeHtml(n.name)}" transform="translate(${n.x}, ${n.y})">`,
+    `      <rect class="dep-node-box" width="${NODE_WIDTH}" height="${NODE_HEIGHT}" rx="6"/>`,
+    `      <text class="dep-node-name" x="${HALF_W}" y="${NAME_BASELINE}" text-anchor="middle">${escapeHtml(n.name)}</text>`,
+    `      <text class="dep-node-type" x="${HALF_W}" y="${TYPE_BASELINE}" text-anchor="middle">${escapeHtml(n.projectType)}</text>`,
+    '    </g>',
+  ].join('\n')).join('\n')
 }
 /* eslint-enable max-len */

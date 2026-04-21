@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { generateMultiServiceDashboardData, generateMultiServiceHtml } from './generator.js'
+import {
+  generateMultiServiceDashboardData, generateMultiServiceHtml,
+  generateHtml, generateDashboardData,
+} from './generator.js'
 import type { MultiServiceGeneratorOptions, MultiServiceDashboardData } from './generator.js'
 import type { PipelineState, MetaPromptFile } from '../types/index.js'
 import { PHASES } from '../types/frontmatter.js'
+import { renderDependencyGraphSection } from './template.js'
 
 function makeState(
   steps: PipelineState['steps'],
@@ -601,5 +605,280 @@ describe('generateMultiServiceDashboardData — averagePercentage rounding', () 
     expect(data.aggregate.servicesComplete).toBe(0)
     expect(data.services[0].total).toBe(0)
     expect(data.services[0].percentage).toBe(0)
+  })
+})
+
+describe('generateMultiServiceDashboardData — dependencyGraph pass-through', () => {
+  const baseOpts = (): MultiServiceGeneratorOptions => ({
+    services: [],
+    methodology: 'deep',
+  })
+
+  it('returns dependencyGraph as null when option omitted', () => {
+    const data = generateMultiServiceDashboardData(baseOpts())
+    expect(data.dependencyGraph).toBeNull()
+  })
+
+  it('normalizes undefined input to null', () => {
+    const data = generateMultiServiceDashboardData({ ...baseOpts(), dependencyGraph: undefined })
+    expect(data.dependencyGraph).toBeNull()
+  })
+
+  it('normalizes null input to null', () => {
+    const data = generateMultiServiceDashboardData({ ...baseOpts(), dependencyGraph: null })
+    expect(data.dependencyGraph).toBeNull()
+  })
+
+  it('passes populated DependencyGraphData through unchanged', () => {
+    const graph = {
+      nodes: [
+        { name: 'api', projectType: 'backend', layer: 0, x: 10, y: 20 },
+        { name: 'web', projectType: 'web-app', layer: 1, x: 230, y: 20 },
+      ],
+      edges: [{
+        consumer: 'web', producer: 'api',
+        steps: [{ consumerStep: 'impl', producerStep: 'prd', status: 'completed' as const }],
+        svgPath: 'M 230 42 C 175 42, 175 42, 150 42',
+      }],
+      viewBox: { width: 380, height: 92 },
+    }
+    const data = generateMultiServiceDashboardData({ ...baseOpts(), dependencyGraph: graph })
+    expect(data.dependencyGraph).toBe(graph)
+  })
+})
+
+describe('renderDependencyGraphSection', () => {
+  // Helper: extract data-steps attribute JSON for an edge (works around no jsdom).
+  function extractDataSteps(html: string, consumer: string, producer: string) {
+    const pattern = new RegExp(
+      `data-consumer="${consumer}"[^>]*data-producer="${producer}"[^>]*data-steps="([^"]*)"`,
+    )
+    const match = html.match(pattern)
+    if (!match) throw new Error(`edge ${consumer} -> ${producer} not found`)
+    const json = match[1].replace(/&quot;/g, '"')
+    return JSON.parse(json)
+  }
+
+  it('test 14: returns empty string for null and undefined', () => {
+    expect(renderDependencyGraphSection(null)).toBe('')
+    expect(renderDependencyGraphSection(undefined)).toBe('')
+  })
+
+  it('test 15: small graph renders <section class="dep-graph"> with expected viewBox', () => {
+    const data = {
+      nodes: [
+        { name: 'api', projectType: 'backend', layer: 0, x: 24, y: 24 },
+        { name: 'web', projectType: 'web-app', layer: 1, x: 244, y: 24 },
+      ],
+      edges: [
+        { consumer: 'web', producer: 'api', steps: [
+          { consumerStep: 'impl', producerStep: 'prd', status: 'completed' as const },
+        ], svgPath: 'M 244 46 C 192 46, 192 46, 164 46' },
+      ],
+      viewBox: { width: 408, height: 92 },
+    }
+    const html: string = renderDependencyGraphSection(data)
+    expect(html).toContain('<section class="dep-graph"')
+    expect(html).toContain('viewBox="0 0 408 92"')
+    expect(html).toContain('data-consumer="web"')
+    expect(html).toContain('data-producer="api"')
+  })
+
+  it('test 16: service names with special characters are HTML-escaped', () => {
+    const data = {
+      nodes: [
+        { name: '<svc>&"a', projectType: 'backend', layer: 0, x: 0, y: 0 },
+        { name: 'web', projectType: 'web-app', layer: 1, x: 220, y: 0 },
+      ],
+      edges: [
+        { consumer: 'web', producer: '<svc>&"a', steps: [
+          { consumerStep: 's', producerStep: 't', status: 'completed' as const },
+        ], svgPath: 'M 0 0' },
+      ],
+      viewBox: { width: 360, height: 92 },
+    }
+    const html: string = renderDependencyGraphSection(data)
+    expect(html).toContain('&lt;svc&gt;&amp;&quot;a')
+    // Raw form must NOT appear inside attribute values or text content.
+    // Narrowed regex avoids matching inside SVG path bytes.
+    expect(html).not.toMatch(/data-producer="<svc>&"a"/)
+    expect(html).not.toMatch(/<text[^>]*>.*<svc>&"a.*<\/text>/)
+  })
+
+  it('test 17: data-steps round-trips via extractDataSteps helper', () => {
+    const steps = [
+      { consumerStep: 'impl-plan', producerStep: 'create-prd', status: 'completed' as const },
+      { consumerStep: 'tech-stack', producerStep: 'arch', status: 'pending' as const },
+    ]
+    const data = {
+      nodes: [
+        { name: 'api', projectType: 'backend', layer: 0, x: 0, y: 0 },
+        { name: 'web', projectType: 'web-app', layer: 1, x: 220, y: 0 },
+      ],
+      edges: [{ consumer: 'web', producer: 'api', steps, svgPath: 'M 0 0' }],
+      viewBox: { width: 360, height: 92 },
+    }
+    const html: string = renderDependencyGraphSection(data)
+    const extracted = extractDataSteps(html, 'web', 'api')
+    expect(extracted).toEqual(steps)
+  })
+
+  it('test 18: defs contain <marker id="arrow" ... orient="auto">', () => {
+    const data = {
+      nodes: [
+        { name: 'api', projectType: 'backend', layer: 0, x: 0, y: 0 },
+        { name: 'web', projectType: 'web-app', layer: 1, x: 220, y: 0 },
+      ],
+      edges: [{ consumer: 'web', producer: 'api', steps: [
+        { consumerStep: 's', producerStep: 't', status: 'completed' as const },
+      ], svgPath: 'M 0 0' }],
+      viewBox: { width: 360, height: 92 },
+    }
+    const html: string = renderDependencyGraphSection(data)
+    expect(html).toMatch(/<marker\s+id="arrow"[^>]*orient="auto"/)
+  })
+
+  it('test 19: each edge has both dep-edge-hit and dep-edge-line paths', () => {
+    const data = {
+      nodes: [
+        { name: 'api', projectType: 'backend', layer: 0, x: 0, y: 0 },
+        { name: 'web', projectType: 'web-app', layer: 1, x: 220, y: 0 },
+      ],
+      edges: [{ consumer: 'web', producer: 'api', steps: [
+        { consumerStep: 's', producerStep: 't', status: 'completed' as const },
+      ], svgPath: 'M 0 0' }],
+      viewBox: { width: 360, height: 92 },
+    }
+    const html: string = renderDependencyGraphSection(data)
+    expect(html).toMatch(/class="dep-edge-hit"/)
+    expect(html).toMatch(/class="dep-edge-line"/)
+  })
+
+  it('test 20: each edge <g> has tabindex="0" and a nested <title>', () => {
+    const data = {
+      nodes: [
+        { name: 'api', projectType: 'backend', layer: 0, x: 0, y: 0 },
+        { name: 'web', projectType: 'web-app', layer: 1, x: 220, y: 0 },
+      ],
+      edges: [{ consumer: 'web', producer: 'api', steps: [
+        { consumerStep: 'impl', producerStep: 'prd', status: 'completed' as const },
+      ], svgPath: 'M 0 0' }],
+      viewBox: { width: 360, height: 92 },
+    }
+    const html: string = renderDependencyGraphSection(data)
+    expect(html).toMatch(/<g class="dep-edge"[^>]*tabindex="0"/)
+    expect(html).toMatch(/<title>[^<]*web:impl -&gt; api:prd \(completed\)[^<]*<\/title>/)
+  })
+})
+
+describe('buildMultiServiceTemplate — dependency-graph CSS + JS', () => {
+  function makeDashboardData(): MultiServiceDashboardData {
+    return {
+      generatedAt: new Date().toISOString(),
+      methodology: 'deep',
+      scaffoldVersion: '3.22.0',
+      services: [],
+      aggregate: {
+        totalServices: 0,
+        averagePercentage: 0,
+        servicesComplete: 0,
+        servicesByPhase: [],
+      },
+      dependencyGraph: null,
+    }
+  }
+
+  it('CSS block declares .dep-graph, .dep-node-box, .dep-edge, and .dep-tooltip rules', () => {
+    const html = generateMultiServiceHtml(makeDashboardData())
+    expect(html).toMatch(/\.dep-graph\s*\{/)
+    expect(html).toMatch(/\.dep-node-box\s*\{/)
+    expect(html).toMatch(/\.dep-edge\s*\{/)
+    expect(html).toMatch(/\.dep-tooltip\s*\{/)
+  })
+
+  it('JS block contains the dep-edge tooltip IIFE with textContent writes and no innerHTML', () => {
+    const html = generateMultiServiceHtml(makeDashboardData())
+    // IIFE presence
+    expect(html).toMatch(/querySelectorAll\(['"]\.dep-edge['"]\)/)
+    // Uses textContent (not innerHTML) for attacker-influenced strings
+    expect(html).toContain('row.textContent =')
+    // No innerHTML writes in the dep-tooltip JS segment
+    const depSegmentMatch = html.match(/\/\/ ---------- Cross-service dependency graph JS ----------[\s\S]*?\}\)\(\);/)
+    if (depSegmentMatch) {
+      expect(depSegmentMatch[0]).not.toContain('innerHTML =')
+    }
+  })
+})
+
+describe('buildMultiServiceTemplate — dependencyGraph integration', () => {
+  it('renders <section class="dep-graph"> between .aggregate-block and .services-grid when graph has edges', () => {
+    const graph = {
+      nodes: [
+        { name: 'api', projectType: 'backend', layer: 0, x: 24, y: 24 },
+        { name: 'web', projectType: 'web-app', layer: 1, x: 244, y: 24 },
+      ],
+      edges: [{
+        consumer: 'web', producer: 'api', steps: [
+          { consumerStep: 'impl', producerStep: 'prd', status: 'completed' as const },
+        ],
+        svgPath: 'M 244 46 C 192 46, 192 46, 164 46',
+      }],
+      viewBox: { width: 408, height: 92 },
+    }
+    const data: MultiServiceDashboardData = {
+      generatedAt: new Date().toISOString(),
+      methodology: 'deep',
+      scaffoldVersion: '3.22.0',
+      services: [],
+      aggregate: {
+        totalServices: 0, averagePercentage: 0, servicesComplete: 0,
+        servicesByPhase: [],
+      },
+      dependencyGraph: graph,
+    }
+    const html = generateMultiServiceHtml(data)
+    const aggPos = html.indexOf('<div class="aggregate-block">')
+    const depPos = html.indexOf('<section class="dep-graph"')
+    const gridPos = html.indexOf('<div class="services-grid">')
+    expect(aggPos).toBeGreaterThan(-1)
+    expect(depPos).toBeGreaterThan(-1)
+    expect(gridPos).toBeGreaterThan(-1)
+    expect(aggPos).toBeLessThan(depPos)
+    expect(depPos).toBeLessThan(gridPos)
+  })
+
+  it('omits <section class="dep-graph"> entirely when dependencyGraph is null', () => {
+    const data: MultiServiceDashboardData = {
+      generatedAt: new Date().toISOString(),
+      methodology: 'deep',
+      scaffoldVersion: '3.22.0',
+      services: [],
+      aggregate: {
+        totalServices: 0, averagePercentage: 0, servicesComplete: 0,
+        servicesByPhase: [],
+      },
+      dependencyGraph: null,
+    }
+    const html = generateMultiServiceHtml(data)
+    expect(html).not.toContain('<section class="dep-graph"')
+  })
+
+  it('single-service dashboard output does NOT include dep-graph section (spec §8.2 compat)', () => {
+    // Use the single-service path via generateHtml + generateDashboardData.
+    // The single-service path has NO dependencyGraph awareness at all; this
+    // test locks that v3.21.0 single-service output remains unaffected.
+    const state: PipelineState = {
+      'schema-version': 3, 'scaffold-version': '3.22.0',
+      init_methodology: 'deep', config_methodology: 'deep',
+      'init-mode': 'greenfield',
+      created: '2026-04-21T00:00:00Z',
+      in_progress: null, steps: {}, next_eligible: [], 'extra-steps': [],
+    } as PipelineState
+    const html = generateHtml(generateDashboardData({
+      state, decisions: [], methodology: 'deep',
+    }))
+    expect(html).not.toContain('dep-graph')
+    expect(html).not.toContain('dep-edge')
+    expect(html).not.toContain('dep-tooltip')
   })
 })
