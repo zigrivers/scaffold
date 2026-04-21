@@ -2410,7 +2410,7 @@ Expected: PASS — lint + validate + test + eval + TypeScript gates all green.
 - [ ] **Step 9.7: Commit**
 
 ```bash
-git add src/cli/commands/dashboard.ts src/e2e/dashboard-cross-service-graph.test.ts
+git add src/cli/commands/dashboard.ts src/e2e/dashboard-cross-service-graph.test.ts src/e2e/dashboard-cross-service-graph-wiring.test.ts
 git commit -m "$(cat <<'EOF'
 feat(dashboard): wire cross-service dependency graph into multi-service path
 
@@ -2478,9 +2478,9 @@ See `docs/superpowers/specs/2026-04-21-cross-service-dep-viz-design.md`. The spe
 ## Test plan
 
 - [ ] `npm run type-check` passes
-- [ ] `npx vitest run` passes (13 unit tests in dependency-graph.test.ts, 10 template tests in multi-service.test.ts, 5 E2E tests in dashboard-cross-service-graph.test.ts, plus all pre-existing tests)
+- [ ] `npx vitest run` passes (13 unit tests in dependency-graph.test.ts; 10 template tests + 1 integration + 1 single-service regression in multi-service.test.ts; 5 API-level tests in dashboard-cross-service-graph.test.ts; 1 wiring test in dashboard-cross-service-graph-wiring.test.ts; all pre-existing tests)
 - [ ] `make check-all` passes (bash + TypeScript gates)
-- [ ] Visual verification: `make dashboard-test` generates a test HTML; Playwright MCP to verify desktop + mobile + light/dark + tooltip-on-hover + tooltip-on-focus
+- [ ] Visual verification per Step 11.3: local `npm run build` then `node dist/index.js dashboard --output ... --no-open` against a throwaway temp project; Playwright MCP verifies desktop + mobile + light/dark + tooltip-on-hover + tooltip-on-focus. (NOTE: do NOT use `make dashboard-test` — it runs the legacy bash pipeline, not the TypeScript dashboard being changed.)
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
@@ -2536,9 +2536,29 @@ For each round:
 
 Spec §6.4 requires manual Playwright visual verification before merge. This is NOT optional — it's part of the pre-merge gate.
 
-IMPORTANT: `make dashboard-test` runs the bash `scripts/generate-dashboard.sh` path, which is the legacy v1 pipeline and does NOT exercise `src/dashboard/*`. Use the TypeScript `scaffold dashboard` CLI against a throwaway temp project instead.
+IMPORTANT: `make dashboard-test` runs the bash `scripts/generate-dashboard.sh` path, which is the legacy v1 pipeline and does NOT exercise `src/dashboard/*`. Use the TypeScript CLI binary from the LOCAL BUILD (`dist/index.js`) against a throwaway temp project instead — not a globally installed `scaffold` that could point at a different version.
 
-Create a throwaway fixture + generate HTML via the TypeScript dashboard:
+Build locally first so `dist/index.js` reflects the feature branch:
+
+```bash
+npm run build
+```
+
+Seed a cross-read in `content/methodology/multi-service-overlay.yml` under a new `cross-reads-overrides` section. This is a LOCAL-ONLY edit for visual verification — revert before committing. Append this block to the file:
+
+```yaml
+# ---------------------------------------------------------------------------
+# cross-reads-overrides (PREVIEW-ONLY — revert after verification)
+# ---------------------------------------------------------------------------
+cross-reads-overrides:
+  implementation-plan:
+    append:
+      - { service: api, step: system-architecture }
+```
+
+`implementation-plan` is a service-scoped step (not in the global list at the top of the overlay file). `system-architecture` is also service-scoped, so it's valid in `service.exports[]` (the schema rejects global steps in exports per `src/config/schema.ts`).
+
+Create the throwaway project fixture:
 
 ```bash
 TMP=$(mktemp -d -t scaffold-depgraph-preview-XXXX)
@@ -2559,22 +2579,29 @@ project:
         deployTarget: container
         domain: none
       exports:
-        - step: create-prd
+        - step: system-architecture
     - name: web
       projectType: web-app
+      webAppConfig:
+        rendering: ssr
+        stateComplexity: moderate
+        auth: none
+        deployTarget: edge
 YAML
 cat > "$TMP/.scaffold/services/api/state.json" <<'JSON'
-{"schema-version":3,"scaffold-version":"3.22.0","init_methodology":"deep","config_methodology":"deep","init-mode":"greenfield","created":"2026-04-21T00:00:00Z","in_progress":null,"steps":{"create-prd":{"status":"completed","source":"pipeline","produces":[]}},"next_eligible":[],"extra-steps":[]}
+{"schema-version":3,"scaffold-version":"3.22.0","init_methodology":"deep","config_methodology":"deep","init-mode":"greenfield","created":"2026-04-21T00:00:00Z","in_progress":null,"steps":{"system-architecture":{"status":"completed","source":"pipeline","produces":[]}},"next_eligible":[],"extra-steps":[]}
 JSON
 cat > "$TMP/.scaffold/services/web/state.json" <<'JSON'
 {"schema-version":3,"scaffold-version":"3.22.0","init_methodology":"deep","config_methodology":"deep","init-mode":"greenfield","created":"2026-04-21T00:00:00Z","in_progress":null,"steps":{"implementation-plan":{"status":"in_progress","source":"pipeline","produces":[]}},"next_eligible":["implementation-plan"],"extra-steps":[]}
 JSON
 HTML_PATH="$TMP/dashboard.html"
-( cd "$TMP" && scaffold dashboard --output "$HTML_PATH" --no-open )
+( cd "$TMP" && node $(git rev-parse --show-toplevel)/dist/index.js dashboard --output "$HTML_PATH" --no-open )
 echo "Preview HTML at: file://$HTML_PATH"
 ```
 
-Note: for the graph to render, the cross-read declaration needs to live in an active pipeline step. If the default pipeline doesn't ship a step whose frontmatter declares the api:create-prd cross-read, add a `cross-reads-overrides` section to `content/methodology/multi-service-overlay.yml` in a SEPARATE local edit (do NOT commit) to seed one for preview. Revert after verification.
+`node dist/index.js` guarantees the local build is what runs — not a globally installed `scaffold` binary that could point at a stale version.
+
+If the webAppConfig shape rejects, verify the schema's required fields in `src/config/schema.ts` (around the WebAppConfigSchema block) and adjust the `rendering`/`stateComplexity`/`auth`/`deployTarget` values to match the current enums. The exact values are less important than schema validity.
 
 Then verify in a browser using Playwright MCP tools (`mcp__plugin_playwright_playwright__*`):
 
