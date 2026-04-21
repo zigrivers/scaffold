@@ -345,6 +345,7 @@ describe('buildDependencyGraph — readiness + filters (regression)', () => {
     expect(result).toBeNull()  // 0 edges after filtering → null
   })
 
+  // eslint-disable-next-line max-len
   it('test 11: service-unknown filter — target not in services[] dropped BEFORE readiness lookup, edgeMap empty → null', () => {
     const input = makeInput({
       perServiceOverlay: new Map([
@@ -378,6 +379,7 @@ describe('buildDependencyGraph — readiness + filters (regression)', () => {
     expect(result).toBeNull()
   })
 
+  // eslint-disable-next-line max-len
   it('test 13: mixed filter — self-ref + unknown + disabled, all dropped BEFORE readiness lookup, null returned', () => {
     const input = makeInput({
       perServiceOverlay: new Map([

@@ -1353,6 +1353,7 @@ ${serviceCards}
 }
 /* eslint-enable max-len */
 
+/* eslint-disable max-len */
 // ---------- Cross-service dependency graph ----------
 
 /**
@@ -1428,3 +1429,4 @@ function renderDepNodes(
     '    </g>',
   ].join('\n')).join('\n')
 }
+/* eslint-enable max-len */

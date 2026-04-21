@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { generateMultiServiceDashboardData, generateMultiServiceHtml, generateHtml, generateDashboardData } from './generator.js'
+import {
+  generateMultiServiceDashboardData, generateMultiServiceHtml,
+  generateHtml, generateDashboardData,
+} from './generator.js'
 import type { MultiServiceGeneratorOptions, MultiServiceDashboardData } from './generator.js'
 import type { PipelineState, MetaPromptFile } from '../types/index.js'
 import { PHASES } from '../types/frontmatter.js'
