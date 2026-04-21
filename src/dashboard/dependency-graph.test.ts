@@ -177,6 +177,9 @@ describe('buildDependencyGraph — layer assignment', () => {
     const byName = new Map(result!.nodes.map(n => [n.name, n]))
     expect(byName.get('worker')!.layer).toBe(0)  // orphan at layer 0
     expect(byName.get('shared-lib')!.layer).toBe(0)
+    // Chain layers unaffected by the orphan — regression lock on cross-graph interference.
+    expect(byName.get('api')!.layer).toBe(1)
+    expect(byName.get('web')!.layer).toBe(2)
     // no edges touch worker
     expect(result!.edges.some(e => e.consumer === 'worker' || e.producer === 'worker')).toBe(false)
   })
