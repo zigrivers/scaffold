@@ -3,7 +3,7 @@ import type {
   ProjectType, GameConfig, WebAppConfig, BackendConfig,
   CliConfig, LibraryConfig, MobileAppConfig,
   DataPipelineConfig, MlConfig, BrowserExtensionConfig,
-  ResearchConfig,
+  ResearchConfig, DataScienceConfig,
 } from '../types/index.js'
 import type {
   GameFlags, WebAppFlags, BackendFlags, CliFlags, LibraryFlags,
@@ -29,6 +29,7 @@ export interface WizardAnswers {
   mlConfig?: MlConfig
   browserExtensionConfig?: BrowserExtensionConfig
   researchConfig?: ResearchConfig
+  dataScienceConfig?: DataScienceConfig
 }
 
 /**
@@ -528,6 +529,15 @@ export async function askWizardQuestions(options: {
     researchConfig = { experimentDriver, interactionMode, domain, hasExperimentTracking }
   }
 
+  // Data science configuration
+  let dataScienceConfig: DataScienceConfig | undefined
+  if (projectType === 'data-science') {
+    // DS-1 has a single-value enum (`audience`). Skip the interactive question
+    // and set the default directly — the wizard presents the type but the
+    // follow-up Q&A carries no meaningful options yet. DS-2 will extend this.
+    dataScienceConfig = { audience: 'solo' }
+  }
+
   // Browser extension configuration
   let browserExtensionConfig: BrowserExtensionConfig | undefined
   if (projectType === 'browser-extension') {
@@ -714,6 +724,6 @@ export async function askWizardQuestions(options: {
     methodology, depth, platforms, traits, projectType,
     webAppConfig, backendConfig, cliConfig,
     libraryConfig, mobileAppConfig, dataPipelineConfig,
-    mlConfig, browserExtensionConfig, researchConfig, gameConfig,
+    mlConfig, browserExtensionConfig, researchConfig, dataScienceConfig, gameConfig,
   }
 }
