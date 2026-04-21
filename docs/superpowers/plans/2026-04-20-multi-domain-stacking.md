@@ -1477,7 +1477,7 @@ EOF
 
 ```bash
 git push -u origin release/v3.21.0
-RELEASE_PR=$(gh pr create --title "chore(release): v3.21.0 — multi-domain stacking" --body "Bumps to 3.21.0. Feature PR: #$MERGED_PR" --json number --jq '.number')
+RELEASE_PR=$(gh pr create --title "chore(release): v3.21.0 — multi-domain stacking" --body "Bumps to 3.21.0. Feature PR: #$PR_NUMBER" --json number --jq '.number')
 echo "RELEASE_PR=$RELEASE_PR"
 gh pr checks --watch
 ```
@@ -1564,7 +1564,7 @@ If either returns an older version, wait up to 10 minutes for mirror propagation
 - §7 Migration + backcompat → verified in Task 1 (existing tests still pass) + Task 8 (full suite) ✓
 - §8 Size estimate → matches Tasks 1-7 LOC budget ✓
 
-**Placeholder scan:** none detected. Every step has concrete file paths, exact code, and concrete commands. The roadmap PR-number is intentionally appended post-merge in Task 12.4 using `gh pr list` dynamic discovery, not a cross-task placeholder.
+**Placeholder scan:** none detected. Every step has concrete file paths, exact code, and concrete commands. The roadmap PR-number is intentionally appended post-merge in Task 12.4 by reusing the `$PR_NUMBER` shell variable captured in Task 10.3 (Tasks 10–12 run in a single continuous orchestrator session), with an exact-title `gh pr list` fallback if the variable is out of scope.
 
 **Type consistency:**
 - `backendRealDomains` / `researchRealDomains` — exported from Task 1, imported in Tasks 5+7.
