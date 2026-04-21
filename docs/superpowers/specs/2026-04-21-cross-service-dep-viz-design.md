@@ -341,7 +341,7 @@ Code in `src/dashboard/template.ts` — same zero-dep server-rendered HTML strin
 
 ### 4.1 New helper
 
-**Exported** from `src/dashboard/template.ts` for direct unit testability (see §6.2 test 11). Consumer callers are internal to the dashboard pipeline; exporting doesn't widen the public API because `template.ts` isn't re-exported from `src/index.ts`.
+**Exported** from `src/dashboard/template.ts` for direct unit testability (see §6.2 tests 14–20). Consumer callers are internal to the dashboard pipeline; exporting doesn't widen the public API because `template.ts` isn't re-exported from `src/index.ts`.
 
 ```typescript
 export function renderDependencyGraphSection(
@@ -644,9 +644,15 @@ for (const svc of configuredServices!) {
   } catch (err) {
     output.warn(
       `Could not resolve pipeline for service '${svc.name}' — `
-      + `graph edges from/to this service omitted (${(err as Error).message})`,
+      + `outgoing graph edges from this service omitted `
+      + `(incoming edges from other services are still rendered) `
+      + `(${(err as Error).message})`,
     )
     // Continue to state-load block; this service's card still renders.
+    // Note: incoming edges (other services cross-reading INTO this service)
+    // are still built during their own iterations because knownServices still
+    // includes this service — only outgoing edges from this service's own
+    // step crossReads are missing.
   }
 
   // Existing state-loading block (unchanged) — populates loadedServices.
@@ -752,6 +758,15 @@ vi.mocked(resolveCrossReadReadiness).mockReturnValue([
 ])
 ```
 
+When a test needs varied statuses across multiple per-edge calls (e.g. test #7 exercising all five reachable statuses), use `mockImplementation` that returns a status based on `cr.step` or `cr.service`, rather than `mockReturnValue` which returns the same array for every call:
+
+```typescript
+vi.mocked(resolveCrossReadReadiness).mockImplementation(([cr]) => [{
+  ...cr,
+  status: cr.step === 'create-prd' ? 'completed' : 'pending',
+}])
+```
+
 `OverlayState` objects are constructed inline — no fixtures. `services[]` is a plain array of `{ name, projectType }` — enough for the builder.
 
 Tests:
@@ -793,7 +808,7 @@ The only HTML entity that appears in the JSON is `&quot;` (introduced by `escape
 14. `renderDependencyGraphSection(null)` returns `''`. Also `renderDependencyGraphSection(undefined)` returns `''` (optional-field compat with the type).
 15. Small graph: output contains `<section class="dep-graph">` with expected viewBox dimensions.
 16. Escapes service names with special characters (`<`, `>`, `&`, `"`) using existing `escapeHtml`. Asserts the escaped form appears; the raw form does not.
-17. `data-steps` attribute round-trips: extract via DOMParser, `JSON.parse`, assert exact `StepEdgeDetail[]` content (consumer/producer/status per entry).
+17. `data-steps` attribute round-trips: extract via the `extractDataSteps` regex helper (above), `JSON.parse`, assert exact `StepEdgeDetail[]` content (consumer/producer/status per entry).
 18. Output includes `<marker id="arrow"` with `orient="auto"` — locks the §4.1 revision.
 19. Each edge has both hit-target path (class `dep-edge-hit`) AND visible path (class `dep-edge-line`) — pointer-events delegation.
 20. Each edge `<g>` has `tabindex="0"` and a nested `<title>` — locks the accessibility contract.
@@ -806,7 +821,7 @@ Test numbers continue from §6.2:
 
 21. Multi-service config with real cross-reads → HTML contains `<section class="dep-graph">`.
 22. Multi-service config with zero cross-reads → HTML does NOT contain `class="dep-graph"`.
-23. Edge's `data-steps` (extracted via DOMParser) contains expected consumer/producer step pairs.
+23. Edge's `data-steps` (extracted via the `extractDataSteps` regex helper from §6.2) contains expected consumer/producer step pairs.
 24. Orphan service → appears as node in graph even with no edges (Q9 invariant at E2E level).
 25. Service-unknown edge (config declares a cross-read to a non-existent service) → graph renders without the bad edge, no crash. Locks the §2.1 service-unknown filter at E2E level.
 
