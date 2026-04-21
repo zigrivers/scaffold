@@ -291,3 +291,110 @@ describe('buildDependencyGraph — layout + determinism', () => {
     expect(tall.viewBox.height).toBeGreaterThan(small.viewBox.height)
   })
 })
+
+describe('buildDependencyGraph — readiness + filters (regression)', () => {
+  it('test 7: readiness threads 5 reachable statuses from resolveCrossReadReadiness', () => {
+    // service-unknown is filtered at aggregation time (§2.1) BEFORE readiness is
+    // called, so only 5 of the 6 CrossReadStatus values can appear on an edge.
+    const services = [
+      { name: 'producer', projectType: 'library' } as const,
+      { name: 'web', projectType: 'web-app' } as const,
+    ]
+    const input = makeInput({
+      services,
+      config: makeConfig(services.map(s => ({ name: s.name, projectType: s.projectType }))),
+      perServiceOverlay: new Map([
+        ['producer', makeOverlay()],
+        ['web', makeOverlay({
+          'step-1': [{ service: 'producer', step: 'completed-step' }],
+          'step-2': [{ service: 'producer', step: 'pending-step' }],
+          'step-3': [{ service: 'producer', step: 'not-bootstrapped-step' }],
+          'step-4': [{ service: 'producer', step: 'read-error-step' }],
+          'step-5': [{ service: 'producer', step: 'not-exported-step' }],
+        })],
+      ]),
+    })
+    // Mock returns a different status based on cr.step
+    vi.mocked(resolveCrossReadReadiness).mockImplementation(([cr]) => {
+      const map: Record<string, 'completed' | 'pending' | 'not-bootstrapped' | 'read-error' | 'not-exported'> = {
+        'completed-step': 'completed',
+        'pending-step': 'pending',
+        'not-bootstrapped-step': 'not-bootstrapped',
+        'read-error-step': 'read-error',
+        'not-exported-step': 'not-exported',
+      }
+      return [{ ...cr, status: map[cr.step] }]
+    })
+    const result = buildDependencyGraph(input)
+    expect(result).not.toBeNull()
+    expect(result!.edges).toHaveLength(1)
+    const statuses = result!.edges[0].steps.map(s => s.status).sort()
+    expect(statuses).toEqual(['completed', 'not-bootstrapped', 'not-exported', 'pending', 'read-error'])
+  })
+
+  it('test 10: self-reference filter — cr svc → svc dropped', () => {
+    const input = makeInput({
+      perServiceOverlay: new Map([
+        ['api', makeOverlay({
+          'step-a': [{ service: 'api', step: 'step-b' }],  // self-reference
+        })],
+        ['web', makeOverlay()],
+      ]),
+    })
+    const result = buildDependencyGraph(input)
+    expect(result).toBeNull()  // 0 edges after filtering → null
+  })
+
+  it('test 11: service-unknown filter — target not in services[] dropped BEFORE readiness lookup, edgeMap empty → null', () => {
+    const input = makeInput({
+      perServiceOverlay: new Map([
+        ['api', makeOverlay()],
+        ['web', makeOverlay({
+          'step-a': [{ service: 'nonexistent', step: 'step-b' }],  // unknown producer
+        })],
+      ]),
+    })
+    const result = buildDependencyGraph(input)
+    // Builder short-circuits when edgeMap.size === 0
+    expect(result).toBeNull()
+    // Filter order contract (spec §2.1): unknown-service cross-reads must be
+    // dropped BEFORE resolveCrossReadReadiness is called, both because that
+    // helper is filesystem-touching and because the caller (layoutGraph) does
+    // byName.get(producer)! which would crash. Lock the invariant:
+    expect(resolveCrossReadReadiness).not.toHaveBeenCalled()
+  })
+
+  it('test 12: disabled-step filter — cr declared on disabled consumer step dropped', () => {
+    const input = makeInput({
+      perServiceOverlay: new Map([
+        ['api', makeOverlay()],
+        ['web', makeOverlay(
+          { 'step-a': [{ service: 'api', step: 'create-prd' }] },
+          { 'step-a': false },  // step-a disabled
+        )],
+      ]),
+    })
+    const result = buildDependencyGraph(input)
+    expect(result).toBeNull()
+  })
+
+  it('test 13: mixed filter — self-ref + unknown + disabled, all dropped BEFORE readiness lookup, null returned', () => {
+    const input = makeInput({
+      perServiceOverlay: new Map([
+        ['api', makeOverlay()],
+        ['web', makeOverlay(
+          {
+            'self-ref-step': [{ service: 'web', step: 'x' }],         // self-ref
+            'unknown-step': [{ service: 'nonexistent', step: 'x' }],  // unknown
+            'disabled-step': [{ service: 'api', step: 'x' }],         // disabled
+          },
+          { 'disabled-step': false },
+        )],
+      ]),
+    })
+    const result = buildDependencyGraph(input)
+    expect(result).toBeNull()
+    // All three filter classes drop BEFORE readiness lookup:
+    expect(resolveCrossReadReadiness).not.toHaveBeenCalled()
+  })
+})
