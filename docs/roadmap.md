@@ -6,7 +6,7 @@ Working document tracking completed work, in-progress items, and future directio
 
 ## Completed Releases
 
-### v3.21.0 (2026-04-20)
+### v3.21.0 (2026-04-21)
 
 Multi-Domain Stacking — `backendConfig.domain` / `researchConfig.domain` accept arrays to stack multiple domain sub-overlays in declaration order. Completes roadmap Phase 2 "Multi-Domain Stacking."
 

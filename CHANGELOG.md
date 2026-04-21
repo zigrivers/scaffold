@@ -4,7 +4,7 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
-## [3.21.0] — 2026-04-20
+## [3.21.0] — 2026-04-21
 
 ### Added
 - **Multi-domain stacking**: `backendConfig.domain` and `researchConfig.domain` now accept arrays. Multiple domain sub-overlays stack in declaration order.
