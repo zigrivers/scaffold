@@ -857,22 +857,41 @@ step-overrides:
 
     it('warns on duplicate domain names and loads the overlay once', () => {
       const output = makeOutput()
-      const result = resolveOverlayState({
-        config: makeBackendConfigWithDomains(['fake-a', 'fake-a']),
-        methodologyDir: fixtureDir,
-        metaPrompts: makeMetaPromptsForTechStack(),
-        presetSteps: { 'tech-stack': { enabled: true } },
-        output,
-      })
-      // Duplicate warning mentions backendConfig.domain for user context
-      expect(output.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Duplicate domain(s) in backendConfig.domain'),
-      )
-      expect(output.warn).toHaveBeenCalledWith(expect.stringContaining('fake-a'))
-      // Overlay loaded only once — one set of fake-a entries (no double-append)
-      expect(result.knowledge['tech-stack']).toEqual([
-        'base-entry', 'fake-a-only', 'shared-entry',
-      ])
+      // Spy on fs.existsSync to count sub-overlay path checks. After dedup,
+      // `backend-fake-a.yml` path should be checked exactly once (not twice).
+      // Without the spy, a broken dedup would still produce a passing 3-element
+      // array assertion because Set-based knowledge merge is idempotent.
+      const existsSpy = vi.spyOn(fs, 'existsSync')
+      try {
+        const result = resolveOverlayState({
+          config: makeBackendConfigWithDomains(['fake-a', 'fake-a']),
+          methodologyDir: fixtureDir,
+          metaPrompts: makeMetaPromptsForTechStack(),
+          presetSteps: { 'tech-stack': { enabled: true } },
+          output,
+        })
+        // Duplicate warning mentions backendConfig.domain for user context
+        expect(output.warn).toHaveBeenCalledWith(
+          expect.stringContaining('Duplicate domain(s) in backendConfig.domain'),
+        )
+        expect(output.warn).toHaveBeenCalledWith(expect.stringContaining('fake-a'))
+        // Overlay loaded only once — one set of fake-a entries (no double-append)
+        expect(result.knowledge['tech-stack']).toEqual([
+          'base-entry', 'fake-a-only', 'shared-entry',
+        ])
+        // Robustness: verify the fake-a sub-overlay path was checked exactly
+        // twice (once by the resolver's existence guard, once inside
+        // loadSubOverlay's own fileExists). This catches the case where
+        // normalizeDomains silently fails to dedup and the resolver iterates
+        // twice — which Set-merge would hide but would show up here as 4
+        // existsSync calls instead of 2.
+        const fakeACalls = existsSpy.mock.calls.filter(
+          ([p]) => typeof p === 'string' && p.endsWith('backend-fake-a.yml'),
+        )
+        expect(fakeACalls).toHaveLength(2)
+      } finally {
+        existsSpy.mockRestore()
+      }
     })
 
     it('silently skips missing sub-overlay file (no warning)', () => {
