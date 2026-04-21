@@ -418,6 +418,89 @@ describe('resolveOverlayState', () => {
     expect(result.knowledge['tech-stack']).not.toContain('fintech-compliance')
   })
 
+  it('resolves identically for domain: "fintech" and domain: ["fintech"] (array shape invariant)', () => {
+    const backendConfigBase = {
+      apiStyle: 'rest' as const,
+      dataStore: ['relational' as const],
+      authMechanism: 'jwt' as const,
+      asyncMessaging: 'none' as const,
+      deployTarget: 'container' as const,
+    }
+    const presetSteps: Record<string, StepEnablementEntry> = {
+      'tech-stack': { enabled: true },
+    }
+    const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+      ['tech-stack', { frontmatter: makeFrontmatter({
+        name: 'tech-stack', knowledgeBase: ['tech-stack-selection'],
+        reads: [], dependencies: [],
+      }) }],
+    ])
+
+    const stringResult = resolveOverlayState({
+      config: makeConfig({
+        project: {
+          projectType: 'backend',
+          backendConfig: { ...backendConfigBase, domain: 'fintech' },
+        },
+      }),
+      methodologyDir: fixtureDir,
+      metaPrompts,
+      presetSteps,
+      output: makeOutput(),
+    })
+
+    const arrayResult = resolveOverlayState({
+      config: makeConfig({
+        project: {
+          projectType: 'backend',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          backendConfig: { ...backendConfigBase, domain: ['fintech'] as any },
+        },
+      }),
+      methodologyDir: fixtureDir,
+      metaPrompts,
+      presetSteps,
+      output: makeOutput(),
+    })
+
+    expect(stringResult.knowledge['tech-stack']).toEqual(arrayResult.knowledge['tech-stack'])
+  })
+
+  it('warns on duplicate domain entries with config-key context', () => {
+    const backendConfigBase = {
+      apiStyle: 'rest' as const,
+      dataStore: ['relational' as const],
+      authMechanism: 'jwt' as const,
+      asyncMessaging: 'none' as const,
+      deployTarget: 'container' as const,
+    }
+    const output = makeOutput()
+    resolveOverlayState({
+      config: makeConfig({
+        project: {
+          projectType: 'backend',
+          // Cast bypasses schema for isolated resolver behavior test.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          backendConfig: { ...backendConfigBase, domain: ['fintech', 'fintech'] as any },
+        },
+      }),
+      methodologyDir: fixtureDir,
+      metaPrompts: new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+        ['tech-stack', { frontmatter: makeFrontmatter({
+          name: 'tech-stack', knowledgeBase: ['tech-stack-selection'],
+          reads: [], dependencies: [],
+        }) }],
+      ]),
+      presetSteps: { 'tech-stack': { enabled: true } },
+      output,
+    })
+    // Warning must include the config key for user-facing disambiguation.
+    expect(output.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Duplicate domain(s) in backendConfig.domain'),
+    )
+    expect(output.warn).toHaveBeenCalledWith(expect.stringContaining('fintech'))
+  })
+
   it('handles undefined config.project gracefully', () => {
     const config = makeConfig() // config.project is undefined
     const presetSteps: Record<string, StepEnablementEntry> = {

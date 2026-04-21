@@ -94,7 +94,8 @@ export function resolveOverlayState(options: {
       }
     }
 
-    // Generic domain sub-overlay: types with a 'domain' config field get sub-overlay injection
+    // Generic domain sub-overlay: types with a 'domain' config field get sub-overlay injection.
+    // Supports both single-domain string and multi-domain array shapes (spec §2 v3.21.0).
     const TYPE_DOMAIN_CONFIG: Partial<Record<string, string>> = {
       'research': 'researchConfig',
       'backend': 'backendConfig',
@@ -103,22 +104,30 @@ export function resolveOverlayState(options: {
     const domainConfigKey = TYPE_DOMAIN_CONFIG[projectType]
     if (domainConfigKey) {
       const typeConfig = config.project?.[domainConfigKey] as Record<string, unknown> | undefined
-      if (typeConfig && typeof typeConfig.domain === 'string' && typeConfig.domain !== 'none') {
-        const subOverlayPath = path.join(methodologyDir, `${projectType}-${typeConfig.domain}.yml`)
-        if (fs.existsSync(subOverlayPath)) {
-          const { overlay: subOverlay, errors: subErrors, warnings: subWarnings } = loadSubOverlay(subOverlayPath)
-          for (const err of subErrors) output.warn(`[${err.code}] ${err.message}`)
-          for (const w of subWarnings) output.warn(w)
-          if (subOverlay) {
-            // Apply knowledge-overrides only, starting from ALREADY-MERGED overlayKnowledge
-            for (const [step, overrides] of Object.entries(subOverlay.knowledgeOverrides ?? {})) {
-              if (step in overlayKnowledge) {
-                const toAppend = overrides.append ?? []
-                overlayKnowledge[step] = [...overlayKnowledge[step], ...toAppend]
-              }
-              // else: sub-overlay references a step not in the pipeline — silently skip
-              // (common when domain overlays target optional steps that aren't enabled)
+      const rawDomain = typeConfig?.['domain'] as string | string[] | undefined
+      const domains = normalizeDomains(rawDomain, output, `${domainConfigKey}.domain`)
+      for (const domain of domains) {
+        const subOverlayPath = path.join(methodologyDir, `${projectType}-${domain}.yml`)
+        // Silent-skip missing files — packaging-integrity test is the backstop (spec §2.3, §5.5)
+        if (!fs.existsSync(subOverlayPath)) continue
+        const { overlay: subOverlay, errors: subErrors, warnings: subWarnings } =
+          loadSubOverlay(subOverlayPath)
+        for (const err of subErrors) {
+          output.warn(`[${err.code}] ${err.message}${err.recovery ? ` — ${err.recovery}` : ''}`)
+        }
+        for (const w of subWarnings) output.warn(w)
+        if (subOverlay) {
+          // Apply knowledge-overrides only, starting from ALREADY-MERGED overlayKnowledge.
+          // Append + dedup preserving first-occurrence order — matches applyOverlay contract
+          // (overlay-resolver.ts:97-100). The prior single-domain path did plain append
+          // without dedup, which multi-domain stacking would make observably wrong.
+          for (const [step, overrides] of Object.entries(subOverlay.knowledgeOverrides ?? {})) {
+            if (step in overlayKnowledge) {
+              const toAppend = overrides.append ?? []
+              overlayKnowledge[step] = [...new Set([...overlayKnowledge[step], ...toAppend])]
             }
+            // else: sub-overlay references a step not in the pipeline — silently skip
+            // (common when domain overlays target optional steps that aren't enabled)
           }
         }
       }
@@ -179,4 +188,31 @@ export function resolveOverlayState(options: {
     dependencies: overlayDependencies,
     crossReads: overlayCrossReads,
   }
+}
+
+/**
+ * Normalize a raw domain config value (string | string[] | undefined) into an
+ * iteration-ready list of domain names. Filters 'none' (treating it as
+ * "no domain configured"), dedups with warning, and preserves declaration order.
+ *
+ * Spec §2.2. Not exported: the resolver is the only consumer today. If a second
+ * consumer appears, export from this file.
+ */
+function normalizeDomains(
+  raw: string | string[] | undefined,
+  output: OutputContext,
+  configKeyForMessages: string,
+): string[] {
+  if (raw === undefined || raw === 'none') return []
+  const arr = Array.isArray(raw) ? raw : [raw]
+  // Schema rejects 'none' inside arrays (spec §1.1), so no 'none' filter is
+  // needed here. The resolver trusts the Zod-parsed shape.
+  const deduped = [...new Set(arr)]
+  if (deduped.length !== arr.length) {
+    const dupes = [...new Set(arr.filter((d, i) => arr.indexOf(d) !== i))]
+    output.warn(
+      `Duplicate domain(s) in ${configKeyForMessages}: ${dupes.join(', ')} — deduplicated`,
+    )
+  }
+  return deduped
 }
