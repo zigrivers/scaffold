@@ -16,10 +16,10 @@ describe('ProjectTypeSchema', () => {
     expect(ProjectTypeSchema.options).toEqual(
       expect.arrayContaining([
         'web-app', 'mobile-app', 'backend', 'cli', 'library', 'game',
-        'data-pipeline', 'ml', 'browser-extension', 'research',
+        'data-pipeline', 'ml', 'browser-extension', 'research', 'data-science',
       ]),
     )
-    expect(ProjectTypeSchema.options).toHaveLength(10)
+    expect(ProjectTypeSchema.options).toHaveLength(11)
   })
 })
 

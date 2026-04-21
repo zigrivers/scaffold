@@ -15,6 +15,7 @@ import {
   WebAppConfigSchema, BackendConfigSchema, CliConfigSchema, LibraryConfigSchema,
   MobileAppConfigSchema, DataPipelineConfigSchema, MlConfigSchema,
   BrowserExtensionConfigSchema, GameConfigSchema, ResearchConfigSchema,
+  DataScienceConfigSchema,
 } from '../config/schema.js'
 import { ExitCode } from '../types/enums.js'
 import { configParseError, configNotObject } from '../utils/errors.js'
@@ -33,6 +34,7 @@ const TYPE_KEY: Record<ProjectType, string> = {
   'ml':                'mlConfig',
   'browser-extension': 'browserExtensionConfig',
   'research':          'researchConfig',
+  'data-science':      'dataScienceConfig',
 }
 
 // Exported for use by CLI handler's writeOrUpdateConfig
@@ -51,6 +53,7 @@ function schemaForType(type: ProjectType): z.ZodType {
   case 'browser-extension': return BrowserExtensionConfigSchema
   case 'game':              return GameConfigSchema
   case 'research':          return ResearchConfigSchema
+  case 'data-science':      return DataScienceConfigSchema
   default: return assertNever(type as never)
   }
 }
