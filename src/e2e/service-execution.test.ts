@@ -135,6 +135,32 @@ function makeSingleServiceConfig(): ScaffoldConfig {
   } as unknown as ScaffoldConfig
 }
 
+/**
+ * Build a research-service config with the given multi-domain array.
+ * Cast pattern matches makeMultiServiceConfig / makeSingleServiceConfig above.
+ */
+function makeResearchMultiDomainConfig(domain: string[]): ScaffoldConfig {
+  return {
+    version: 2,
+    methodology: 'deep',
+    platforms: ['claude-code'],
+    project: {
+      services: [
+        {
+          name: 'experiments',
+          projectType: 'research',
+          researchConfig: {
+            experimentDriver: 'code-driven',
+            interactionMode: 'checkpoint-gated',
+            hasExperimentTracking: true,
+            domain,
+          },
+        },
+      ],
+    },
+  } as unknown as ScaffoldConfig
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -260,6 +286,56 @@ describe('service-qualified execution E2E', () => {
 
     for (const step of expectedGlobalSteps) {
       expect(pipeline.globalSteps.has(step), `globalSteps should contain '${step}'`).toBe(true)
+    }
+  })
+
+  // Service-mode multi-domain tests (spec §5.3.1): exercise the real
+  // resolvePipeline(ctx, { serviceId }) entry with a research service that
+  // declares multiple domains. Verifies that ServiceSchema's config-reuse of
+  // ResearchConfigSchema carries the widened multi-domain shape through, AND
+  // that declaration order is preserved.
+  it.each([
+    {
+      name: 'service-mode multi-domain preserves declaration order',
+      domain: ['quant-finance', 'ml-research'],
+      quantBeforeMl: true,
+    },
+    {
+      name: 'service-mode multi-domain preserves order when reversed',
+      domain: ['ml-research', 'quant-finance'],
+      quantBeforeMl: false,
+    },
+  ])('$name', async ({ domain, quantBeforeMl }) => {
+    const methodologyDir = getPackageMethodologyDir()
+    const realMetaPrompts = await discoverRealMetaPrompts()
+    const knownSteps = [...realMetaPrompts.keys()]
+    const presets = loadAllPresets(methodologyDir, knownSteps)
+    const output = createMockOutput()
+
+    const config = makeResearchMultiDomainConfig(domain)
+
+    const pipeline = resolvePipeline(
+      {
+        projectRoot: '/tmp/test',
+        metaPrompts: realMetaPrompts,
+        config,
+        configErrors: [],
+        configWarnings: [],
+        presets,
+        methodologyDir,
+      },
+      { output, serviceId: 'experiments' },
+    )
+
+    const sysArchKnowledge = pipeline.overlay.knowledge['system-architecture'] ?? []
+    const quantIdx = sysArchKnowledge.indexOf('research-quant-backtesting')
+    const mlIdx = sysArchKnowledge.indexOf('research-ml-architecture-search')
+    expect(quantIdx).toBeGreaterThan(-1)
+    expect(mlIdx).toBeGreaterThan(-1)
+    if (quantBeforeMl) {
+      expect(quantIdx).toBeLessThan(mlIdx)
+    } else {
+      expect(mlIdx).toBeLessThan(quantIdx)
     }
   })
 })

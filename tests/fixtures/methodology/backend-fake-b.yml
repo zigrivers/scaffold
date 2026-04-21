@@ -1,0 +1,8 @@
+name: backend-fake-b
+description: Test fixture sub-overlay B — stacks with fake-a to test collision dedup.
+project-type: backend
+domain: fake-b
+
+knowledge-overrides:
+  tech-stack:
+    append: [shared-entry, fake-b-only]

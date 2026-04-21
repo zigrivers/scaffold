@@ -1,12 +1,14 @@
 // src/config/schema.test.ts
 
 import { describe, it, expect } from 'vitest'
+import yaml from 'js-yaml'
 import {
   ConfigSchema, GameConfigSchema, ProjectTypeSchema,
   WebAppConfigSchema, BackendConfigSchema, CliConfigSchema,
   LibraryConfigSchema, MobileAppConfigSchema,
   DataPipelineConfigSchema, MlConfigSchema, BrowserExtensionConfigSchema,
   ResearchConfigSchema, ServiceSchema, ProjectSchema,
+  backendRealDomains, researchRealDomains,
 } from './schema.js'
 
 describe('ProjectTypeSchema', () => {
@@ -1245,5 +1247,96 @@ describe('ProjectSchema.services refinements', () => {
       ],
     })
     expect(result.success).toBe(true)
+  })
+})
+
+describe('domain field — multi-domain union', () => {
+  const baseBackend = {
+    apiStyle: 'rest' as const,
+    dataStore: ['relational'] as const,
+    authMechanism: 'jwt' as const,
+    asyncMessaging: 'none' as const,
+    deployTarget: 'container' as const,
+  }
+
+  const baseResearch = {
+    experimentDriver: 'code-driven' as const,
+    interactionMode: 'checkpoint-gated' as const,
+    hasExperimentTracking: true,
+  }
+
+  it('exports canonical real-domain arrays', () => {
+    expect(backendRealDomains).toEqual(['fintech'])
+    expect(researchRealDomains).toEqual(['quant-finance', 'ml-research', 'simulation'])
+  })
+
+  it('accepts domain as single-element array on backend', () => {
+    const result = BackendConfigSchema.safeParse({ ...baseBackend, domain: ['fintech'] })
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.domain).toEqual(['fintech'])
+  })
+
+  it('accepts domain as multi-element array on research', () => {
+    const result = ResearchConfigSchema.safeParse({
+      ...baseResearch, domain: ['quant-finance', 'ml-research'],
+    })
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.domain).toEqual(['quant-finance', 'ml-research'])
+  })
+
+  it('rejects empty array', () => {
+    expect(BackendConfigSchema.safeParse({ ...baseBackend, domain: [] }).success).toBe(false)
+  })
+
+  it('rejects [\'none\'] (none disallowed inside array)', () => {
+    expect(BackendConfigSchema.safeParse({ ...baseBackend, domain: ['none'] }).success).toBe(false)
+  })
+
+  it('rejects [\'none\', \'fintech\']', () => {
+    expect(BackendConfigSchema.safeParse({ ...baseBackend, domain: ['none', 'fintech'] }).success).toBe(false)
+  })
+
+  it('rejects unknown domain string', () => {
+    expect(BackendConfigSchema.safeParse({ ...baseBackend, domain: 'climate' }).success).toBe(false)
+  })
+
+  it('rejects null domain', () => {
+    expect(BackendConfigSchema.safeParse({ ...baseBackend, domain: null }).success).toBe(false)
+  })
+
+  it('preserves string shape through YAML roundtrip', () => {
+    const parsed = BackendConfigSchema.parse({ ...baseBackend, domain: 'fintech' })
+    const dumped = yaml.dump(parsed)
+    const reparsed = BackendConfigSchema.parse(yaml.load(dumped))
+    expect(reparsed.domain).toBe('fintech')
+  })
+
+  it('preserves array shape through YAML roundtrip', () => {
+    const parsed = BackendConfigSchema.parse({ ...baseBackend, domain: ['fintech'] })
+    const dumped = yaml.dump(parsed)
+    const reparsed = BackendConfigSchema.parse(yaml.load(dumped))
+    expect(reparsed.domain).toEqual(['fintech'])
+  })
+
+  it('defaults to "none" when domain omitted', () => {
+    const result = BackendConfigSchema.safeParse(baseBackend)
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.domain).toBe('none')
+  })
+
+  it('ConfigSchema round-trip with array-shape domain under project', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2,
+      methodology: 'deep',
+      platforms: ['claude-code'],
+      project: {
+        projectType: 'backend',
+        backendConfig: { ...baseBackend, domain: ['fintech'] },
+      },
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.project?.backendConfig?.domain).toEqual(['fintech'])
+    }
   })
 })

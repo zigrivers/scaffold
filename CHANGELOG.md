@@ -4,6 +4,24 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.21.0] — 2026-04-21
+
+### Added
+- **Multi-domain stacking**: `backendConfig.domain` and `researchConfig.domain` now accept arrays. Multiple domain sub-overlays stack in declaration order.
+  - Example: `researchConfig.domain: ['quant-finance', 'ml-research']` loads both sub-overlays, merging their knowledge with append + dedup.
+  - Service-mode multi-domain inherited automatically via `ServiceSchema` reuse — works out of the box for services[] in monorepos.
+  - Single-string form (`domain: 'fintech'`) continues to work unchanged — zero config migration required.
+  - Packaging-integrity test added (`tests/packaging/domain-overlay-alignment.test.ts`) — a Vitest check that catches enum-vs-file drift during the test run, rather than manifesting as a silent resolver no-op at runtime.
+  - No new production domain sub-overlays ship with this feature — it's the mechanism only. Multi-domain stacking is tested against two contrived fixture overlays (`tests/fixtures/methodology/backend-fake-{a,b}.yml`) plus the existing production `research-quant-finance.yml` and `research-ml-research.yml`.
+- Exported `backendRealDomains` / `researchRealDomains` canonical arrays from `src/config/schema.ts` for downstream enumeration.
+
+### Fixed
+- **Latent sub-overlay knowledge dedup bug** — sub-overlay knowledge merge now uses append + dedup (matching the documented `applyOverlay` contract). Previously plain-appended, which would have produced duplicate entries once multi-domain stacking made collisions possible. No observable impact for configs with a single domain whose sub-overlay knowledge doesn't overlap the core overlay — verified true for all shipped sub-overlays.
+
+### Internal
+- `normalizeDomains` helper in `overlay-state-resolver.ts` — file-local, not exported.
+- 10+ new tests across schema, loader, resolver, service-mode e2e, and packaging gates.
+
 ## [3.20.0] — 2026-04-20
 
 ### Added

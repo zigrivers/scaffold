@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 import os from 'node:os'
 import { resolveOverlayState } from './overlay-state-resolver.js'
+import { getPackageMethodologyDir } from '../../utils/fs.js'
 import type { ScaffoldConfig, StepEnablementEntry } from '../../types/index.js'
 import type { MetaPromptFrontmatter } from '../../types/frontmatter.js'
 import type { OutputContext } from '../../cli/output/context.js'
@@ -418,6 +419,89 @@ describe('resolveOverlayState', () => {
     expect(result.knowledge['tech-stack']).not.toContain('fintech-compliance')
   })
 
+  it('resolves identically for domain: "fintech" and domain: ["fintech"] (array shape invariant)', () => {
+    const backendConfigBase = {
+      apiStyle: 'rest' as const,
+      dataStore: ['relational' as const],
+      authMechanism: 'jwt' as const,
+      asyncMessaging: 'none' as const,
+      deployTarget: 'container' as const,
+    }
+    const presetSteps: Record<string, StepEnablementEntry> = {
+      'tech-stack': { enabled: true },
+    }
+    const metaPrompts = new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+      ['tech-stack', { frontmatter: makeFrontmatter({
+        name: 'tech-stack', knowledgeBase: ['tech-stack-selection'],
+        reads: [], dependencies: [],
+      }) }],
+    ])
+
+    const stringResult = resolveOverlayState({
+      config: makeConfig({
+        project: {
+          projectType: 'backend',
+          backendConfig: { ...backendConfigBase, domain: 'fintech' },
+        },
+      }),
+      methodologyDir: fixtureDir,
+      metaPrompts,
+      presetSteps,
+      output: makeOutput(),
+    })
+
+    const arrayResult = resolveOverlayState({
+      config: makeConfig({
+        project: {
+          projectType: 'backend',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          backendConfig: { ...backendConfigBase, domain: ['fintech'] as any },
+        },
+      }),
+      methodologyDir: fixtureDir,
+      metaPrompts,
+      presetSteps,
+      output: makeOutput(),
+    })
+
+    expect(stringResult.knowledge['tech-stack']).toEqual(arrayResult.knowledge['tech-stack'])
+  })
+
+  it('warns on duplicate domain entries with config-key context', () => {
+    const backendConfigBase = {
+      apiStyle: 'rest' as const,
+      dataStore: ['relational' as const],
+      authMechanism: 'jwt' as const,
+      asyncMessaging: 'none' as const,
+      deployTarget: 'container' as const,
+    }
+    const output = makeOutput()
+    resolveOverlayState({
+      config: makeConfig({
+        project: {
+          projectType: 'backend',
+          // Cast bypasses schema for isolated resolver behavior test.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          backendConfig: { ...backendConfigBase, domain: ['fintech', 'fintech'] as any },
+        },
+      }),
+      methodologyDir: fixtureDir,
+      metaPrompts: new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+        ['tech-stack', { frontmatter: makeFrontmatter({
+          name: 'tech-stack', knowledgeBase: ['tech-stack-selection'],
+          reads: [], dependencies: [],
+        }) }],
+      ]),
+      presetSteps: { 'tech-stack': { enabled: true } },
+      output,
+    })
+    // Warning must include the config key for user-facing disambiguation.
+    expect(output.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Duplicate domain(s) in backendConfig.domain'),
+    )
+    expect(output.warn).toHaveBeenCalledWith(expect.stringContaining('fintech'))
+  })
+
   it('handles undefined config.project gracefully', () => {
     const config = makeConfig() // config.project is undefined
     const presetSteps: Record<string, StepEnablementEntry> = {
@@ -614,6 +698,240 @@ step-overrides:
       expect(output.warn).toHaveBeenCalledWith(
         expect.stringContaining('nonexistent-step'),
       )
+    })
+  })
+
+  describe('multi-domain stacking — real research overlays', () => {
+    const realMethodologyDir = getPackageMethodologyDir()
+
+    const researchBase = {
+      experimentDriver: 'code-driven' as const,
+      interactionMode: 'checkpoint-gated' as const,
+      hasExperimentTracking: true,
+    }
+
+    // research-quant-finance.yml appends to system-architecture:
+    //   [research-quant-backtesting, research-quant-strategy-patterns]
+    // research-ml-research.yml appends to system-architecture:
+    //   [research-ml-architecture-search, research-ml-training-patterns]
+    // research-overlay.yml (pass-1 core) appends:
+    //   [research-architecture, research-experiment-loop]
+    // All entries are disjoint — no natural collision.
+
+    function makeResearchConfigWithDomains(domain: unknown) {
+      return makeConfig({
+        project: {
+          projectType: 'research',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          researchConfig: { ...researchBase, domain: domain as any },
+        },
+      })
+    }
+
+    function makeMetaPromptsForSystemArch() {
+      return new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+        ['system-architecture', { frontmatter: makeFrontmatter({
+          name: 'system-architecture', knowledgeBase: [],
+          reads: [], dependencies: [],
+        }) }],
+      ])
+    }
+
+    it('merges both overlays in declaration order (quant-finance, ml-research)', () => {
+      const result = resolveOverlayState({
+        config: makeResearchConfigWithDomains(['quant-finance', 'ml-research']),
+        methodologyDir: realMethodologyDir,
+        metaPrompts: makeMetaPromptsForSystemArch(),
+        presetSteps: { 'system-architecture': { enabled: true } },
+        output: makeOutput(),
+      })
+      // Core overlay first, then quant-finance, then ml-research
+      expect(result.knowledge['system-architecture']).toEqual([
+        'research-architecture',
+        'research-experiment-loop',
+        'research-quant-backtesting',
+        'research-quant-strategy-patterns',
+        'research-ml-architecture-search',
+        'research-ml-training-patterns',
+      ])
+    })
+
+    it('respects declaration order when reversed (ml-research, quant-finance)', () => {
+      const result = resolveOverlayState({
+        config: makeResearchConfigWithDomains(['ml-research', 'quant-finance']),
+        methodologyDir: realMethodologyDir,
+        metaPrompts: makeMetaPromptsForSystemArch(),
+        presetSteps: { 'system-architecture': { enabled: true } },
+        output: makeOutput(),
+      })
+      expect(result.knowledge['system-architecture']).toEqual([
+        'research-architecture',
+        'research-experiment-loop',
+        'research-ml-architecture-search',
+        'research-ml-training-patterns',
+        'research-quant-backtesting',
+        'research-quant-strategy-patterns',
+      ])
+    })
+
+    it('single-element array matches single-string behavior (invariant)', () => {
+      const stringResult = resolveOverlayState({
+        config: makeResearchConfigWithDomains('quant-finance'),
+        methodologyDir: realMethodologyDir,
+        metaPrompts: makeMetaPromptsForSystemArch(),
+        presetSteps: { 'system-architecture': { enabled: true } },
+        output: makeOutput(),
+      })
+      const arrayResult = resolveOverlayState({
+        config: makeResearchConfigWithDomains(['quant-finance']),
+        methodologyDir: realMethodologyDir,
+        metaPrompts: makeMetaPromptsForSystemArch(),
+        presetSteps: { 'system-architecture': { enabled: true } },
+        output: makeOutput(),
+      })
+      expect(stringResult.knowledge['system-architecture']).toEqual(
+        arrayResult.knowledge['system-architecture'],
+      )
+      expect(stringResult.knowledge['system-architecture']).toEqual([
+        'research-architecture',
+        'research-experiment-loop',
+        'research-quant-backtesting',
+        'research-quant-strategy-patterns',
+      ])
+    })
+
+    it('stacks quant-finance and simulation sub-overlays in declaration order', () => {
+      // research-simulation.yml appends to system-architecture:
+      //   [research-sim-engine-patterns, research-sim-parameter-spaces]
+      // Combined with core overlay + quant-finance, the resolved knowledge list
+      // is the concatenation of core, then quant-finance, then simulation.
+      const result = resolveOverlayState({
+        config: makeResearchConfigWithDomains(['quant-finance', 'simulation']),
+        methodologyDir: realMethodologyDir,
+        metaPrompts: makeMetaPromptsForSystemArch(),
+        presetSteps: { 'system-architecture': { enabled: true } },
+        output: makeOutput(),
+      })
+      expect(result.knowledge['system-architecture']).toEqual([
+        'research-architecture',
+        'research-experiment-loop',
+        'research-quant-backtesting',
+        'research-quant-strategy-patterns',
+        'research-sim-engine-patterns',
+        'research-sim-parameter-spaces',
+      ])
+    })
+  })
+
+  describe('multi-domain stacking — contrived fixtures', () => {
+    const backendConfigBase = {
+      apiStyle: 'rest' as const,
+      dataStore: ['relational' as const],
+      authMechanism: 'jwt' as const,
+      asyncMessaging: 'none' as const,
+      deployTarget: 'container' as const,
+    }
+
+    function makeBackendConfigWithDomains(domain: unknown) {
+      return makeConfig({
+        project: {
+          projectType: 'backend',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          backendConfig: { ...backendConfigBase, domain: domain as any },
+        },
+      })
+    }
+
+    function makeMetaPromptsForTechStack() {
+      return new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+        ['tech-stack', { frontmatter: makeFrontmatter({
+          name: 'tech-stack', knowledgeBase: ['base-entry'],
+          reads: [], dependencies: [],
+        }) }],
+      ])
+    }
+
+    it('dedups first-occurrence across contrived fixture collision', () => {
+      // The resolved knowledge builds up as:
+      //   1. Frontmatter knowledgeBase seeds with [base-entry]
+      //   2. Core 'backend-overlay.yml' doesn't exist in fixtureDir (no-op)
+      //   3. fake-a sub-overlay appends [fake-a-only, shared-entry]
+      //   4. fake-b sub-overlay appends [shared-entry, fake-b-only]; 'shared-entry'
+      //      already present at step 3, so Set-based dedup drops this duplicate
+      //      at first-occurrence position.
+      //
+      // Note: the fixture dir also contains backend-fintech.yml, but we never
+      // reference 'fintech' in this test's domain list so it isn't loaded.
+      const result = resolveOverlayState({
+        config: makeBackendConfigWithDomains(['fake-a', 'fake-b']),
+        methodologyDir: fixtureDir,
+        metaPrompts: makeMetaPromptsForTechStack(),
+        presetSteps: { 'tech-stack': { enabled: true } },
+        output: makeOutput(),
+      })
+      expect(result.knowledge['tech-stack']).toEqual([
+        'base-entry',
+        'fake-a-only',
+        'shared-entry',
+        'fake-b-only',
+      ])
+    })
+
+    it('warns on duplicate domain names and loads the overlay once', () => {
+      const output = makeOutput()
+      // Spy on fs.existsSync to count sub-overlay path checks. After dedup,
+      // `backend-fake-a.yml` path should be checked exactly once (not twice).
+      // Without the spy, a broken dedup would still produce a passing 3-element
+      // array assertion because Set-based knowledge merge is idempotent.
+      const existsSpy = vi.spyOn(fs, 'existsSync')
+      try {
+        const result = resolveOverlayState({
+          config: makeBackendConfigWithDomains(['fake-a', 'fake-a']),
+          methodologyDir: fixtureDir,
+          metaPrompts: makeMetaPromptsForTechStack(),
+          presetSteps: { 'tech-stack': { enabled: true } },
+          output,
+        })
+        // Duplicate warning mentions backendConfig.domain for user context
+        expect(output.warn).toHaveBeenCalledWith(
+          expect.stringContaining('Duplicate domain(s) in backendConfig.domain'),
+        )
+        expect(output.warn).toHaveBeenCalledWith(expect.stringContaining('fake-a'))
+        // Overlay loaded only once — one set of fake-a entries (no double-append)
+        expect(result.knowledge['tech-stack']).toEqual([
+          'base-entry', 'fake-a-only', 'shared-entry',
+        ])
+        // Robustness: verify the fake-a sub-overlay path was checked exactly
+        // twice (once by the resolver's existence guard, once inside
+        // loadSubOverlay's own fileExists). This catches the case where
+        // normalizeDomains silently fails to dedup and the resolver iterates
+        // twice — which Set-merge would hide but would show up here as 4
+        // existsSync calls instead of 2.
+        const fakeACalls = existsSpy.mock.calls.filter(
+          ([p]) => typeof p === 'string' && p.endsWith('backend-fake-a.yml'),
+        )
+        expect(fakeACalls).toHaveLength(2)
+      } finally {
+        existsSpy.mockRestore()
+      }
+    })
+
+    it('silently skips missing sub-overlay file (no warning)', () => {
+      const output = makeOutput()
+      // 'fake-c' domain has no corresponding fixture file — should silent-skip
+      const result = resolveOverlayState({
+        config: makeBackendConfigWithDomains(['fake-a', 'fake-c']),
+        methodologyDir: fixtureDir,
+        metaPrompts: makeMetaPromptsForTechStack(),
+        presetSteps: { 'tech-stack': { enabled: true } },
+        output,
+      })
+      // No warnings emitted for missing file (spec §5.4 test 23)
+      expect(output.warn).not.toHaveBeenCalled()
+      // fake-a still loaded; fake-c silently absent
+      expect(result.knowledge['tech-stack']).toEqual([
+        'base-entry', 'fake-a-only', 'shared-entry',
+      ])
     })
   })
 })

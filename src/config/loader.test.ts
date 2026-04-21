@@ -270,4 +270,84 @@ custom:
     expect(config).toBeNull()
     expect(errors.length).toBeGreaterThan(0)
   })
+
+  it('accepts array-shape domain at root (backend)', () => {
+    const root = makeTmpDir()
+    writeConfig(root, `
+version: 2
+methodology: deep
+platforms: [claude-code]
+project:
+  projectType: backend
+  backendConfig:
+    apiStyle: rest
+    domain: [fintech]
+`)
+    const { config, errors } = loadConfig(root, [])
+    expect(errors).toHaveLength(0)
+    expect(config).not.toBeNull()
+    expect(config?.project?.backendConfig?.domain).toEqual(['fintech'])
+  })
+
+  it('accepts array-shape domain on a service', () => {
+    const root = makeTmpDir()
+    writeConfig(root, `
+version: 2
+methodology: deep
+platforms: [claude-code]
+project:
+  services:
+    - name: api
+      projectType: backend
+      backendConfig:
+        apiStyle: rest
+        domain: [fintech]
+`)
+    const { config, errors } = loadConfig(root, [])
+    expect(errors).toHaveLength(0)
+    expect(config).not.toBeNull()
+    expect(config?.project?.services?.[0]?.backendConfig?.domain).toEqual(['fintech'])
+  })
+
+  it('rejects empty-array domain with project.backendConfig.domain field path', () => {
+    const root = makeTmpDir()
+    writeConfig(root, `
+version: 2
+methodology: deep
+platforms: [claude-code]
+project:
+  projectType: backend
+  backendConfig:
+    apiStyle: rest
+    domain: []
+`)
+    const { config, errors } = loadConfig(root, [])
+    expect(config).toBeNull()
+    const domainErrors = errors.filter(e =>
+      e.code === 'FIELD_INVALID_VALUE'
+      && e.context?.field === 'project.backendConfig.domain',
+    )
+    expect(domainErrors).toHaveLength(1)
+  })
+
+  it('rejects [\'none\'] array with project.backendConfig.domain field path', () => {
+    const root = makeTmpDir()
+    writeConfig(root, `
+version: 2
+methodology: deep
+platforms: [claude-code]
+project:
+  projectType: backend
+  backendConfig:
+    apiStyle: rest
+    domain: [none]
+`)
+    const { config, errors } = loadConfig(root, [])
+    expect(config).toBeNull()
+    const domainErrors = errors.filter(e =>
+      e.code === 'FIELD_INVALID_VALUE'
+      && e.context?.field === 'project.backendConfig.domain',
+    )
+    expect(domainErrors).toHaveLength(1)
+  })
 })
