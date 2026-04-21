@@ -1148,6 +1148,46 @@ body {
   .header { flex-direction: column; }
   .services-grid { grid-template-columns: 1fr; }
 }
+/* Cross-service dependency graph (§4.4) */
+.dep-graph {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 0 0 24px;
+  color: var(--muted);
+}
+.dep-graph-title {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  color: var(--text);
+}
+.dep-graph-svg { width: 100%; height: auto; max-height: 420px; display: block; }
+.dep-node-box { fill: var(--bg); stroke: var(--border); stroke-width: 1; }
+.dep-node-name { font-size: 13px; font-weight: 500; fill: var(--text); font-family: system-ui, sans-serif; }
+.dep-node-type { font-size: 11px; fill: var(--muted); font-family: system-ui, sans-serif; }
+.dep-edge { transition: color 0.1s ease; }
+.dep-edge-line { transition: stroke 0.1s ease, stroke-width 0.1s ease; }
+.dep-edge:hover,
+.dep-edge:focus-visible { color: var(--accent); }
+.dep-edge:hover .dep-edge-line,
+.dep-edge:focus-visible .dep-edge-line { stroke: var(--accent); stroke-width: 2; }
+.dep-tooltip {
+  position: fixed; pointer-events: none;
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 4px; padding: 8px; font-size: 12px; color: var(--text);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  max-width: 360px; z-index: 100;
+  opacity: 0; transition: opacity 0.1s ease;
+}
+.dep-tooltip.visible { opacity: 1; }
+.dep-tooltip-row { padding: 2px 0; }
+.dep-tooltip-status-completed { color: var(--status-completed); }
+.dep-tooltip-status-pending,
+.dep-tooltip-status-not-bootstrapped { color: var(--status-in-progress); }
+.dep-tooltip-status-read-error,
+.dep-tooltip-status-service-unknown,
+.dep-tooltip-status-not-exported { color: var(--stale-text); }
 </style>
 </head>
 <body>
@@ -1242,6 +1282,68 @@ ${serviceCards}
         }
       }
     }
+  })();
+
+  // ---------- Cross-service dependency graph JS ----------
+  (function(){
+    var edges = document.querySelectorAll('.dep-edge');
+    if (edges.length === 0) return;
+    var tooltip = document.createElement('div');
+    tooltip.className = 'dep-tooltip';
+    tooltip.setAttribute('role', 'region');
+    tooltip.setAttribute('aria-live', 'polite');
+    tooltip.setAttribute('aria-label', 'Cross-service dependency details');
+    document.body.appendChild(tooltip);
+
+    function clearTooltip() {
+      while (tooltip.firstChild) tooltip.removeChild(tooltip.firstChild);
+    }
+
+    function showTooltip(edge) {
+      var consumer = edge.getAttribute('data-consumer');
+      var producer = edge.getAttribute('data-producer');
+      var stepsJson = edge.getAttribute('data-steps');
+      var steps;
+      try { steps = JSON.parse(stepsJson); } catch(_) { return; }
+      clearTooltip();
+      steps.forEach(function(s) {
+        var row = document.createElement('div');
+        row.className = 'dep-tooltip-row dep-tooltip-status-' + s.status;
+        row.textContent = consumer + ':' + s.consumerStep
+          + ' -> ' + producer + ':' + s.producerStep
+          + ' (' + s.status + ')';
+        tooltip.appendChild(row);
+      });
+      tooltip.classList.add('visible');
+    }
+
+    function hideTooltip() {
+      tooltip.classList.remove('visible');
+    }
+
+    function positionTooltip(x, y) {
+      var MARGIN = 12;
+      var MAX_W = 370;
+      var MAX_H = 200;
+      var left = Math.min(x + MARGIN, window.innerWidth - MAX_W);
+      var top = Math.min(y + MARGIN, window.innerHeight - MAX_H);
+      tooltip.style.left = Math.max(0, left) + 'px';
+      tooltip.style.top = Math.max(0, top) + 'px';
+    }
+
+    edges.forEach(function(edge) {
+      edge.addEventListener('mouseenter', function() { showTooltip(edge); });
+      edge.addEventListener('mousemove', function(e) { positionTooltip(e.clientX, e.clientY); });
+      edge.addEventListener('mouseleave', hideTooltip);
+      edge.addEventListener('focusin', function() {
+        showTooltip(edge);
+        var rect = edge.getBoundingClientRect();
+        positionTooltip(rect.right, rect.top);
+      });
+      edge.addEventListener('focusout', hideTooltip);
+    });
+
+    window.addEventListener('scroll', hideTooltip, { passive: true });
   })();
 })();
 </script>

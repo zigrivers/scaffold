@@ -767,3 +767,42 @@ describe('renderDependencyGraphSection', () => {
     expect(html).toMatch(/<title>[^<]*web:impl -&gt; api:prd \(completed\)[^<]*<\/title>/)
   })
 })
+
+describe('buildMultiServiceTemplate — dependency-graph CSS + JS', () => {
+  function makeDashboardData(): MultiServiceDashboardData {
+    return {
+      generatedAt: new Date().toISOString(),
+      methodology: 'deep',
+      scaffoldVersion: '3.22.0',
+      services: [],
+      aggregate: {
+        totalServices: 0,
+        averagePercentage: 0,
+        servicesComplete: 0,
+        servicesByPhase: [],
+      },
+      dependencyGraph: null,
+    }
+  }
+
+  it('CSS block declares .dep-graph, .dep-node-box, .dep-edge, and .dep-tooltip rules', () => {
+    const html = generateMultiServiceHtml(makeDashboardData())
+    expect(html).toMatch(/\.dep-graph\s*\{/)
+    expect(html).toMatch(/\.dep-node-box\s*\{/)
+    expect(html).toMatch(/\.dep-edge\s*\{/)
+    expect(html).toMatch(/\.dep-tooltip\s*\{/)
+  })
+
+  it('JS block contains the dep-edge tooltip IIFE with textContent writes and no innerHTML', () => {
+    const html = generateMultiServiceHtml(makeDashboardData())
+    // IIFE presence
+    expect(html).toMatch(/querySelectorAll\(['"]\.dep-edge['"]\)/)
+    // Uses textContent (not innerHTML) for attacker-influenced strings
+    expect(html).toContain('row.textContent =')
+    // No innerHTML writes in the dep-tooltip JS segment
+    const depSegmentMatch = html.match(/\/\/ ---------- Cross-service dependency graph JS ----------[\s\S]*?\}\)\(\);/)
+    if (depSegmentMatch) {
+      expect(depSegmentMatch[0]).not.toContain('innerHTML =')
+    }
+  })
+})
