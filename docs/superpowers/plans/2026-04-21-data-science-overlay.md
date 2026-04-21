@@ -756,16 +756,15 @@ Append inside the existing `describe` block, matching the `MlCopy` / `WebAppCopy
 
 Add `DataScienceCopy` to the import block at the top of the file.
 
-- [ ] **Step 3: Run type-check + type-level tests**
+- [ ] **Step 3: Run type-check**
+
+The `types.test-d.ts` file exercises type-level assertions via `expectTypeOf`. These are caught by the project's `type-check` script (`tsc --noEmit`), which is the canonical verification for the entire codebase. No separate vitest command is needed.
 
 ```bash
 cd /Users/kenallred/dev-projects/scaffold && npm run type-check
-cd /Users/kenallred/dev-projects/scaffold && npx vitest typecheck run src/wizard/copy/types.test-d.ts 2>&1 | tail -15
 ```
 
-(If the project runs type-d assertions via a different command, substitute — verify by running `npx vitest --help` or checking `package.json`.)
-
-Expected: PASS.
+Expected: PASS. If the new assertion has a type mismatch, `tsc` fails loudly with a type error pointing at the test-d file.
 
 - [ ] **Step 4: Commit**
 
@@ -1225,10 +1224,13 @@ load '../evals/eval_helper'
 
 PROJECT_ROOT="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
 
-# Heuristic: project-type overlays are files of the form `{type}-overlay.yml`.
-# Domain sub-overlays are `{type}-{domain}.yml` (no `-overlay` suffix). The
-# naming convention is the source of truth because it matches loader behavior.
-PROJECT_TYPE_OVERLAYS="$(find "${PROJECT_ROOT}/content/methodology" -name '*-overlay.yml' -type f)"
+# Project-type overlays are files of the form `{type}-overlay.yml`.
+# Structural overlays (e.g. multi-service-overlay.yml) share the `-overlay.yml`
+# suffix but are NOT project-type overlays — they have no `project-type:` field.
+# Exclude them by name so the project-type-specific assertions don't fire on
+# structural overlays. Add future structural overlays to the exclusion list.
+PROJECT_TYPE_OVERLAYS="$(find "${PROJECT_ROOT}/content/methodology" -name '*-overlay.yml' -type f \
+  | grep -v '/multi-service-overlay\.yml$')"
 
 @test "every project-type overlay has required frontmatter fields" {
   local failures=()
@@ -1253,6 +1255,24 @@ PROJECT_TYPE_OVERLAYS="$(find "${PROJECT_ROOT}/content/methodology" -name '*-ove
     declared="$(grep '^project-type:' "$overlay" | sed 's/^project-type: *//;s/[[:space:]]*$//')"
     if [[ "$expected" != "$declared" ]]; then
       failures+=("$(basename "$overlay"): project-type='${declared}' but filename implies '${expected}'")
+    fi
+  done
+  if [[ ${#failures[@]} -gt 0 ]]; then
+    printf "%s\n" "${failures[@]}"
+    return 1
+  fi
+}
+
+@test "every project-type overlay uses inline-array append values (not block-style)" {
+  # The next assertion's grep-based reference scan assumes inline form
+  # (`append: [a, b]`). Block-style (`append:\n  - a\n  - b`) would escape
+  # the scan and silently pass. Enforce inline form so the reference check
+  # stays honest.
+  local failures=()
+  for overlay in ${PROJECT_TYPE_OVERLAYS}; do
+    # Lines where `append:` has no `[` after the colon → block-style
+    if grep -E '^[[:space:]]*append:[[:space:]]*$' "$overlay" > /dev/null; then
+      failures+=("$(basename "$overlay"): uses block-style 'append:' — switch to inline '[a, b]' form")
     fi
   done
   if [[ ${#failures[@]} -gt 0 ]]; then
@@ -1990,21 +2010,26 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 **Files:**
 - Modify: `src/e2e/project-type-overlays.test.ts`
 
-- [ ] **Step 1: Read an existing project-type block verbatim**
+- [ ] **Step 1: Read the existing file**
 
-The file uses sibling `describe` blocks per project type (web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research). Each block has ~9 tests following an identical skeleton. **Read** the existing `ml` describe block in full — it's the closest pattern to DS.
+The file uses sibling `describe` blocks per project type. Use Read on `/Users/kenallred/dev-projects/scaffold/src/e2e/project-type-overlays.test.ts` to internalize the shape. Focus on:
 
-Key helpers the file uses (synchronous, not async — do NOT add `await`):
+- The `resolveProjectOverlay(projectType, methodology)` helper at the top.
+- One existing project-type describe block (ml is similar in single-config-field feel).
+- The imports / helpers available.
+
+Key helper facts (synchronous, not async — do NOT add `await` before `loadOverlay` or `resolveOverlayState`):
 - `loadOverlay(overlayPath)` returns `{ overlay, errors }` (sync).
 - `resolveOverlayState({ config, methodologyDir, metaPrompts, presetSteps, output })` (sync).
 - `loadConfig(tmpDir, [])` returns `{ config, errors, warnings }`.
-- The existing `resolveProjectOverlay(projectType, methodology)` helper lives in the file and wraps the plumbing.
 - Knowledge shape: `overlayState.knowledge['step-name']` is a `string[]` (Record<string, string[]>), NOT a Map — use bracket access, not `.get()`.
 - Config is written to `.scaffold/config.yml`, not `config.yml` at root.
 
+**Scope note for this task:** H1 adds a focused 8-test block (the exact block pasted in Step 3). We do **not** mirror the full 10-test ml block here. The 2 tests we skip (`init` via `runWizard` with flag passthrough + YAML round-trip) are not critical for proving overlay resolution works; they can be added in a follow-up if valuable. Do not add them in this task.
+
 - [ ] **Step 2: Update `resolveProjectOverlay` to accept `'data-science'`**
 
-At the top of the file, the `resolveProjectOverlay` helper takes a union of project-type strings. Add `'data-science'` to that union:
+At the top of the file, the `resolveProjectOverlay` helper takes a union of project-type strings. Add `'data-science'` to that union. Also add `'research'` if it's missing (verify against the current line) — the existing research block may rely on a different code path but the helper's union should match the schema's options.
 
 ```typescript
 async function resolveProjectOverlay(
@@ -2014,11 +2039,9 @@ async function resolveProjectOverlay(
 ): Promise<{ overlayState: OverlayState; realMetaPrompts: Map<string, MetaPromptFile> }> {
 ```
 
-(If `'research'` is not in the existing union, add it too — same rationale. Verify against the actual line in the file.)
+- [ ] **Step 3: Add the `data-science overlay integration` describe block (8 tests)**
 
-- [ ] **Step 3: Add a `data-science overlay integration` describe block**
-
-Insert after the last existing project-type block, before the closing bracket of the outer `describe`. Mirror the `ml` block exactly — 9 tests: config validates, runWizard creates config, YAML round-trip, overlay loads, overlay injects into {architecture / tech-stack / tdd / foundational}, no step-overrides, no cross-reads. Assertions use bracket access on `overlayState.knowledge`.
+Insert the EXACT block below after the last existing project-type `describe` block, before the closing bracket of the outer `describe`. Do not add or remove tests — this is 8 tests, matching the rest of the plan's claims:
 
 ```typescript
 describe('data-science overlay integration', () => {
@@ -2103,7 +2126,7 @@ describe('data-science overlay integration', () => {
 })
 ```
 
-Do NOT add an `init`-exercising test unless an existing sibling block has one that you can mirror exactly — runWizard's flag shape depends on per-type knobs that DS doesn't have yet.
+(The block above has 8 tests total. Do NOT mirror other project-types' `init → runWizard` or YAML round-trip tests — those require flag-shape setup that DS-1 doesn't need.)
 
 - [ ] **Step 4: Run the E2E test**
 
