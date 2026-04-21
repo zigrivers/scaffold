@@ -327,7 +327,7 @@ project:
       e.code === 'FIELD_INVALID_VALUE'
       && e.context?.field === 'project.backendConfig.domain',
     )
-    expect(domainErrors.length).toBeGreaterThan(0)
+    expect(domainErrors).toHaveLength(1)
   })
 
   it('rejects [\'none\'] array with project.backendConfig.domain field path', () => {
@@ -348,6 +348,6 @@ project:
       e.code === 'FIELD_INVALID_VALUE'
       && e.context?.field === 'project.backendConfig.domain',
     )
-    expect(domainErrors.length).toBeGreaterThan(0)
+    expect(domainErrors).toHaveLength(1)
   })
 })
