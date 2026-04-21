@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-21
 **Target releases:** `v3.23.0` (Data Science), `v3.24.0` (Web3)
-**Status:** Design — round-2 review findings applied; ready for re-review
+**Status:** Design — round-3 review findings applied; ready for re-review
 
 ---
 
@@ -13,7 +13,7 @@ The [roadmap](../../roadmap.md) lists three candidate project-type overlays — 
 - **Data Science (DS)** — narrowed to the **solo / small-team** audience (DS-1). Platform-/larger-team data science (DS-2) is deferred to the backlog.
 - **Web3** — narrowed to **smart-contract projects on EVM chains** (W3-1). Web3 application / dApp work (W3-2) and non-EVM chains are deferred to the backlog.
 
-The roadmap entry previously said each overlay needs "~10-20 pipeline steps." That wording is stale — existing project-type overlays are **knowledge-injection only**; they do not add pipeline steps. This spec explicitly chooses to keep the knowledge-only model (Option A in brainstorming). Extending the architecture to allow overlay-contributed pipeline steps would be a separate, larger initiative.
+The roadmap entry previously said each overlay needs "~10-20 pipeline steps." That wording is stale — project-type overlays can carry `step-overrides` and `knowledge-overrides` (only `cross-reads-overrides` is restricted to structural overlays), but the commonly shipped overlays (web-app, mobile-app, ml, data-pipeline, backend, cli, library, browser-extension, research) use only `knowledge-overrides`; `game-overlay.yml` is the exception, using `step-overrides` to gate game-specific steps. The two overlays in this spec will be **knowledge-injection only** — they do not need new pipeline steps. Extending the architecture to allow overlay-contributed pipeline steps (as opposed to step gating) would be a separate, larger initiative.
 
 ## 2. Scope (in / out)
 
@@ -62,16 +62,19 @@ This is an exhaustive list. Some are compiler-enforced (`Record<ProjectType, …
 | `src/config/schema.ts` | Add enum value to `ProjectTypeSchema`; add `{Type}ConfigSchema` zod object with `.strict()`; add optional `{type}Config` field to both `ServiceSchema` and `ProjectSchema` | Compiler (types) + schema tests |
 | `src/types/config.ts` | Export derived `{Type}Config` type; extend `ProjectConfig` and `ServiceConfig` interfaces with optional `{type}Config` field; extend `DetectedConfig` discriminated union | Compiler |
 | `src/config/validators/index.ts` | Register new coupling validator in `ALL_COUPLING_VALIDATORS` | Silently-missable — `PROJECT_TYPE_TO_CONFIG_KEY` is built with an `as Readonly<Record<ProjectType, string>>` cast that suppresses the completeness check. Enforce via a registry-completeness vitest assertion (§7.5) |
-| `src/project/detectors/index.ts` | Register new detector in the detector list used by `runDetectors` | Silently-missable — detector list is untyped per-entry. Verified by per-detector unit test |
+| `src/project/detectors/index.ts` | Register new detector in the `ALL_DETECTORS` list used by `runDetectors` | Silently-missable — detector list is untyped per-entry, no completeness test exists today. Mitigation: a new `src/project/detectors/coverage.test.ts` asserts every `ProjectType` has a registered detector (see §7.5) |
 | `src/wizard/copy/index.ts` | Register new copy module in `PROJECT_COPY`; extend `ProjectCopyMap` type | Compiler (`Record<ProjectType, …>` on `PROJECT_COPY` and mapped-type on per-type copy interfaces) |
 | `src/wizard/copy/core.ts` | Add `coreCopy.projectType.options[{type}]` entry — label + description for the new project type in the top-level wizard picker | Compiler (`Record<ProjectType, OptionCopy>` on `CoreCopy.projectType.options`) |
 | `src/wizard/questions.ts` | Extend `WizardAnswers`; add project-type branch in the if-chain question flow | Silently-missable — no `assertNever` at the branch site; missing branches produce `*.Config: undefined` which fails Zod at runtime, not compile |
 | `src/wizard/flags.ts` | Extend flag interfaces for new project type | Compiler |
-| `src/wizard/wizard.ts` | Extend the config-assembly switch that maps `projectType` to its `{type}Config` shape | Silently-missable — verify at implementation time |
-| `src/cli/init-flag-families.ts` | Extend `PartialConfigOverrides`, `detectFamily`, `applyFlagFamilyValidation`, `buildFlagOverrides` (switch returns `undefined` on miss; missing entries are runtime-silent) | Silently-missable — `buildFlagOverrides` switch falls through to `undefined`; `detectFamily` returns `undefined` on miss. Unit-test coverage required |
-| `src/cli/commands/init.ts` | Extend the `--project-type` yargs `choices` enumeration and family-flag passthrough | Silently-missable — yargs `choices` is a runtime list; CLI tests exercise new value |
-| `src/cli/commands/adopt.ts` | Same as init.ts — extend yargs `--project-type` choices | Silently-missable — same as above |
+| `src/wizard/wizard.ts` | Add `...(answers.dataScienceConfig && { dataScienceConfig: answers.dataScienceConfig })` / `...(answers.web3Config && { web3Config: answers.web3Config })` to the conditional-spread block assembling `config.project` (the block is NOT a switch — it's a list of spread expressions) | Silently-missable — no enforcement; wizard E2E test exercises the path |
 | `src/project/adopt.ts` | Extend `TYPE_KEY` and `schemaForType` maps | Compiler (`Record<ProjectType, …>`) |
+
+**Files NOT modified by DS or Web3 PRs (explicit non-goals for round 1):**
+
+- `src/cli/commands/init.ts` / `src/cli/commands/adopt.ts` — both use `choices: ProjectTypeSchema.options as unknown as string[]`; the enum addition propagates automatically. No edit required.
+- `src/cli/init-flag-families.ts` — this file defines per-type CLI flag families (e.g. `--web-rendering`, `--backend-api-style`). DS-1 and W3-1 have single-value-enum configs with no user-facing flag surface yet, so `PartialConfigOverrides`, `detectFamily`, `applyFlagFamilyValidation`, and `buildFlagOverrides` have nothing to extend. Reserved for DS-2 / W3-2 when they introduce flag-configurable fields.
+- `src/wizard/flags.ts` — same reason; no new flag interface needed until additional config fields exist.
 
 ### 3.3 Files modified once (not per-overlay)
 
@@ -366,19 +369,7 @@ export const ALL_COUPLING_VALIDATORS = [
 ] as const
 ```
 
-**Completeness enforcement.** `PROJECT_TYPE_TO_CONFIG_KEY` is built via `Object.fromEntries(...) as Readonly<Record<ProjectType, string>>` — the `as` cast suppresses the missing-key compile-time check, so forgetting to register a validator compiles cleanly and only fails at runtime (`configKeyFor('data-science')` returns `undefined`; `ServiceSchema.superRefine` then reads `svc[undefined]`, silently admitting misconfigured services).
-
-A vitest assertion in `src/config/validators/registry.test.ts` enforces completeness instead:
-
-```typescript
-it('every ProjectType has a registered coupling validator', () => {
-  for (const t of ProjectTypeSchema.options) {
-    expect(PROJECT_TYPE_TO_CONFIG_KEY[t]).toBeDefined()
-  }
-})
-```
-
-Added in the DS PR; automatically covers Web3 once `web3` is added to the enum.
+**Completeness enforcement.** `PROJECT_TYPE_TO_CONFIG_KEY` is built via `Object.fromEntries(...) as Readonly<Record<ProjectType, string>>` — the `as` cast suppresses the missing-key compile-time check, so forgetting to register a validator in isolation would fail silently at runtime. However, the existing test at `src/config/validators/registry.test.ts:7-12` already asserts `registeredTypes === schemaTypes` (a strictly stronger "exactly one validator per ProjectType" invariant) — so forgetting to register a new validator will fail CI immediately. **No new test is needed for this** — just ensure the new validator IS registered.
 
 ### 6.4 `src/project/detectors/{type}.ts` + registration
 
@@ -403,7 +394,7 @@ Minimal low-tier detectors address this. Detectors are pure per-repo functions a
 - `lib/forge-std` directory exists → **low** (Foundry toolchain artifact, via `dirExists`)
 - `partialConfig`: omit `scope` for the same reason.
 
-**Signal constraint.** `SignalContext` exposes `hasFile(relPath)`, `dirExists(relPath)`, `rootEntries()` (root-level only), and `hasAnyDep()`. It has no subdirectory-glob primitive. "Solidity sources in `src/`" is therefore NOT a usable signal with the current API and is intentionally omitted — the four signals above are sufficient to surface web3 projects at low/medium tier.
+**Signal scope note.** `SignalContext` exposes `listDir(relPath)` (returns depth-1 entries for a given subdir), so `listDir('src').some(n => n.endsWith('.sol'))` would be technically implementable. It's omitted because `foundry.toml` and the Hardhat config already cover the same evidence at equal or higher confidence, and adding the redundant signal would slightly widen the false-positive surface on Solidity repos that are libraries, not projects.
 
 Register detectors in `src/project/detectors/index.ts` in the detector list used by `runDetectors`. Both detectors have tests following the `*.test.ts` sibling convention established by the existing 10 detectors.
 
@@ -413,19 +404,15 @@ Each overlay touches the wizard, CLI-command, and flag subsystems the way every 
 
 | File | Change |
 | --- | --- |
-| `src/wizard/copy/{type}.ts` (new) | New copy module. Must include (a) `CoreCopy` label + description for the project-type picker and (b) a per-config-field `audience` / `scope` entry with a single-option map (`{ solo: { label: ... } }` / `{ contracts: { label: ... } }`). The wizard can skip asking the question when only one option exists, but the copy is required by the mapped type. |
+| `src/wizard/copy/{type}.ts` (new) | New per-type copy module. Must include a per-config-field `audience` / `scope` entry with a single-option map (`{ solo: { label: ... } }` / `{ contracts: { label: ... } }`). The wizard can skip asking the question when only one option exists, but the copy entry is required by the mapped type `DataScienceCopy = { [K in keyof DataScienceConfig]: QuestionCopy<...> }`. |
 | `src/wizard/copy/index.ts` | Import the new copy module; add entry to `PROJECT_COPY`. `ProjectCopyMap` (`Record<ProjectType, …>`) forces coverage at compile time. |
 | `src/wizard/copy/types.ts` | Add `DataScienceCopy` / `Web3Copy` interfaces following the `MlCopy` mapped-type pattern. |
 | `src/wizard/copy/core.ts` | Add `coreCopy.projectType.options[{type}]` entry — the label + description shown in the top-level project-type picker. `CoreCopy.projectType.options` is typed as `Record<ProjectType, OptionCopy>` so this IS compiler-enforced. |
 | `src/wizard/questions.ts` | Extend `WizardAnswers`; add `if (projectType === '{type}')` branch in the question flow. No `assertNever` at this site — missing branches produce `*.Config: undefined` at runtime. Mitigation: add a happy-path vitest case that exercises the branch end-to-end. |
-| `src/wizard/flags.ts` | Extend flag interfaces for new project type. |
-| `src/wizard/wizard.ts` | Extend the config-assembly switch (`src/wizard/wizard.ts` has the `projectType → {type}Config` mapping). |
-| `src/cli/init-flag-families.ts` | Extend `PartialConfigOverrides`, add `detectFamily` entry, add `applyFlagFamilyValidation` case, extend `buildFlagOverrides` switch. Neither `buildFlagOverrides` nor `detectFamily` is `assertNever`-protected — missing entries fall through to `undefined`. Covered by `init-flag-families.test.ts` happy-path test. |
-| `src/cli/commands/init.ts` | Extend the yargs `--project-type` `.option({ choices: [...] })` enumeration. DS-1 / W3-1 have single-value enum configs, so no per-type flag family is needed yet (only the project-type choice itself). |
-| `src/cli/commands/adopt.ts` | Same as `init.ts` — extend yargs `--project-type` choices. |
+| `src/wizard/wizard.ts` | Add a conditional-spread entry in the config-assembly block (the block is a list of spreads, not a switch — see §3.2). |
 | `src/project/adopt.ts` | Extend `TYPE_KEY` and `schemaForType` maps (`Record<ProjectType, …>`). Compiler-enforced. |
 
-Initial copy content stays minimal: label + description for the project type, single-option map for the `audience` / `scope` field. The wizard treats the new project type as presentable but without deep config branching (matching the initial schema's single-value enum field). When DS-2 / W3-2 ships, it extends the enum and adds its new option to the same copy map — additive.
+Initial copy content stays minimal: single-option map for the `audience` / `scope` field, plus the project-type picker entry in `core.ts`. The wizard treats the new project type as presentable but without deep config branching (matching the initial schema's single-value enum field). When DS-2 / W3-2 ships, it extends the enum and adds its new option to the same copy map — additive.
 
 ## 7. Testing strategy
 
@@ -475,12 +462,12 @@ The highest-risk breakpoints are wizard typing, validator registry completeness,
 
 | Test file | Extension |
 | --- | --- |
-| `src/config/validators/registry.test.ts` | Add registry-completeness assertion: `for (const t of ProjectTypeSchema.options) { expect(PROJECT_TYPE_TO_CONFIG_KEY[t]).toBeDefined() }`. Added in DS PR; auto-covers Web3 |
+| `src/config/validators/registry.test.ts` | No spec-authored change — the existing "registers exactly one validator per ProjectType" assertion (lines 7-12) automatically fails CI if the new validator is not registered |
 | `src/config/validators/validators.test.ts` | Add per-validator happy-path and error-path cases following existing patterns |
 | `src/project/detectors/{type}.test.ts` (new) | Detector unit tests covering each signal + the null path |
+| `src/project/detectors/coverage.test.ts` (new) | Detector-registry completeness — assert `ALL_DETECTORS` covers every `ProjectType`. Added in DS PR; auto-covers Web3. No such test exists today; without it, forgetting to register a detector is user-observable only via "`scaffold adopt` always misses" |
 | `src/wizard/copy/types.test-d.ts` | Type-level assertions for new copy map entries — confirms mapped-type enforces `audience` / `scope` entry presence |
 | `src/wizard/questions.test.ts` | Happy-path branch coverage exercising the new project-type flow (no `assertNever` at the branch site, so branch coverage is the guard) |
-| `src/cli/init-flag-families.test.ts` | Flag-family happy-path coverage (`detectFamily` + `buildFlagOverrides` both fall through to `undefined` on miss, so branch coverage is the guard) |
 | `src/e2e/project-type-overlays.test.ts` | End-to-end overlay resolution — confirm new overlay loads, knowledge injects into the expected steps |
 
 Implementation-time audit: locate any other `switch (projectType)` or `Record<ProjectType, …>` site and verify compiler coverage.
@@ -493,7 +480,7 @@ Implementation-time audit: locate any other `switch (projectType)` or `Record<Pr
 2. **Reassess.** After DS merges, review what was surprising during authoring and apply lessons to the Web3 plan.
 3. **Web3 second — v3.24.0.** Benefits from lessons learned on DS.
 
-Branches may be prepared in parallel worktrees, but PRs merge serially. Each PR is independent; the second PR rebases on the first. Shared files touched by both PRs: `src/config/schema.ts`, `src/types/config.ts`, `src/config/validators/index.ts`, `src/project/detectors/index.ts`, `src/project/detectors/types.ts`, `src/wizard/copy/index.ts`, `src/wizard/copy/core.ts`, `src/wizard/questions.ts`, `src/wizard/flags.ts`, `src/wizard/wizard.ts`, `src/cli/init-flag-families.ts`, `src/cli/commands/init.ts`, `src/cli/commands/adopt.ts`, `src/project/adopt.ts`, and several `*.test.ts` files that enumerate `ProjectType` (`registry.test.ts`, `init-flag-families.test.ts`, `copy/types.test-d.ts`).
+Branches may be prepared in parallel worktrees, but PRs merge serially. Each PR is independent; the second PR rebases on the first. Shared files touched by both PRs: `src/config/schema.ts`, `src/types/config.ts`, `src/config/validators/index.ts`, `src/project/detectors/index.ts`, `src/project/detectors/types.ts`, `src/project/detectors/coverage.test.ts`, `src/wizard/copy/index.ts`, `src/wizard/copy/core.ts`, `src/wizard/copy/types.ts`, `src/wizard/questions.ts`, `src/wizard/wizard.ts`, `src/project/adopt.ts`, and `*.test.ts` files that enumerate `ProjectType` (primarily `copy/types.test-d.ts`).
 
 Schema and index-file rebase conflicts are mechanical (append new enum / new import / new registry entry). **Test-matrix conflicts need a line-by-line pass** — multiple test files enumerate `ProjectType` expansions in parallel arrays, and merge tools can silently drop the newer file's additions. Do a focused diff review on the `*.test.ts` rebase.
 
