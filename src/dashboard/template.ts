@@ -1296,11 +1296,16 @@ function renderDepEdges(
     )
     const titleText = escapeHtml(tooltipLines.join('\n'))
     const stepsJson = escapeHtml(JSON.stringify(edge.steps))
+    // Defense-in-depth: svgPath is always produced by layoutGraph from numeric
+    // math today, but `svgPath: string` doesn't restrict content at the type
+    // level. Escape it so a future caller that hand-constructs edges cannot
+    // break out of the d=... attribute.
+    const safePath = escapeHtml(edge.svgPath)
     return [
       `    <g class="dep-edge" data-consumer="${escapeHtml(edge.consumer)}" data-producer="${escapeHtml(edge.producer)}" data-steps="${stepsJson}" tabindex="0">`,
       `      <title>${titleText}</title>`,
-      `      <path class="dep-edge-hit" d="${edge.svgPath}" stroke="transparent" stroke-width="14" fill="none" pointer-events="stroke"/>`,
-      `      <path class="dep-edge-line" d="${edge.svgPath}" stroke="currentColor" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>`,
+      `      <path class="dep-edge-hit" d="${safePath}" stroke="transparent" stroke-width="14" fill="none" pointer-events="stroke"/>`,
+      `      <path class="dep-edge-line" d="${safePath}" stroke="currentColor" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>`,
       '    </g>',
     ].join('\n')
   }).join('\n')
