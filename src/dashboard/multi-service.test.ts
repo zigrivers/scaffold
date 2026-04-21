@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generateMultiServiceDashboardData, generateMultiServiceHtml } from './generator.js'
+import { generateMultiServiceDashboardData, generateMultiServiceHtml, generateHtml, generateDashboardData } from './generator.js'
 import type { MultiServiceGeneratorOptions, MultiServiceDashboardData } from './generator.js'
 import type { PipelineState, MetaPromptFile } from '../types/index.js'
 import { PHASES } from '../types/frontmatter.js'
@@ -804,5 +804,78 @@ describe('buildMultiServiceTemplate — dependency-graph CSS + JS', () => {
     if (depSegmentMatch) {
       expect(depSegmentMatch[0]).not.toContain('innerHTML =')
     }
+  })
+})
+
+describe('buildMultiServiceTemplate — dependencyGraph integration', () => {
+  it('renders <section class="dep-graph"> between .aggregate-block and .services-grid when graph has edges', () => {
+    const graph = {
+      nodes: [
+        { name: 'api', projectType: 'backend', layer: 0, x: 24, y: 24 },
+        { name: 'web', projectType: 'web-app', layer: 1, x: 244, y: 24 },
+      ],
+      edges: [{
+        consumer: 'web', producer: 'api', steps: [
+          { consumerStep: 'impl', producerStep: 'prd', status: 'completed' as const },
+        ],
+        svgPath: 'M 244 46 C 192 46, 192 46, 164 46',
+      }],
+      viewBox: { width: 408, height: 92 },
+    }
+    const data: MultiServiceDashboardData = {
+      generatedAt: new Date().toISOString(),
+      methodology: 'deep',
+      scaffoldVersion: '3.22.0',
+      services: [],
+      aggregate: {
+        totalServices: 0, averagePercentage: 0, servicesComplete: 0,
+        servicesByPhase: [],
+      },
+      dependencyGraph: graph,
+    }
+    const html = generateMultiServiceHtml(data)
+    const aggPos = html.indexOf('<div class="aggregate-block">')
+    const depPos = html.indexOf('<section class="dep-graph"')
+    const gridPos = html.indexOf('<div class="services-grid">')
+    expect(aggPos).toBeGreaterThan(-1)
+    expect(depPos).toBeGreaterThan(-1)
+    expect(gridPos).toBeGreaterThan(-1)
+    expect(aggPos).toBeLessThan(depPos)
+    expect(depPos).toBeLessThan(gridPos)
+  })
+
+  it('omits <section class="dep-graph"> entirely when dependencyGraph is null', () => {
+    const data: MultiServiceDashboardData = {
+      generatedAt: new Date().toISOString(),
+      methodology: 'deep',
+      scaffoldVersion: '3.22.0',
+      services: [],
+      aggregate: {
+        totalServices: 0, averagePercentage: 0, servicesComplete: 0,
+        servicesByPhase: [],
+      },
+      dependencyGraph: null,
+    }
+    const html = generateMultiServiceHtml(data)
+    expect(html).not.toContain('<section class="dep-graph"')
+  })
+
+  it('single-service dashboard output does NOT include dep-graph section (spec §8.2 compat)', () => {
+    // Use the single-service path via generateHtml + generateDashboardData.
+    // The single-service path has NO dependencyGraph awareness at all; this
+    // test locks that v3.21.0 single-service output remains unaffected.
+    const state: PipelineState = {
+      'schema-version': 3, 'scaffold-version': '3.22.0',
+      init_methodology: 'deep', config_methodology: 'deep',
+      'init-mode': 'greenfield',
+      created: '2026-04-21T00:00:00Z',
+      in_progress: null, steps: {}, next_eligible: [], 'extra-steps': [],
+    } as PipelineState
+    const html = generateHtml(generateDashboardData({
+      state, decisions: [], methodology: 'deep',
+    }))
+    expect(html).not.toContain('dep-graph')
+    expect(html).not.toContain('dep-edge')
+    expect(html).not.toContain('dep-tooltip')
   })
 })

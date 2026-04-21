@@ -1217,6 +1217,7 @@ body {
     <div class="aggregate-stat"><strong>${data.aggregate.servicesComplete}</strong> of <strong>${data.aggregate.totalServices}</strong> services complete</div>
     ${servicesByPhase ? `<div class="phase-indicators">${servicesByPhase}</div>` : ''}
   </div>
+  ${renderDependencyGraphSection(data.dependencyGraph)}
   <div class="services-grid">
 ${serviceCards}
   </div>
