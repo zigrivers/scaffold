@@ -12,6 +12,10 @@
 
 **Branch:** `feat/multi-domain-stacking` (already exists with the spec commits).
 
+**Execution model:**
+- **Tasks 1–9**: each dispatched to a fresh subagent via superpowers:subagent-driven-development. Per-task implementer → spec-compliance → code-quality review loops, plus a Codex + Gemini MMR as the 4th gate after the quality review passes. Fix all findings before advancing.
+- **Tasks 10–12**: orchestrator-run (the controlling session). These involve interactive GitHub operations and multi-round MMR cycles of unbounded length that don't fit a fresh-subagent model. The PR-level 3-channel MMR in Task 11 replaces the per-task 4th-gate MMR for the merged diff.
+
 ---
 
 ## File Structure
@@ -44,12 +48,28 @@ This task widens both schemas simultaneously and adds unit-test coverage for eve
 
 - [ ] **Step 1.1: Write the failing tests**
 
-Add the following to `src/config/schema.test.ts` in a new `describe('domain field — multi-domain union', () => { ... })` block near the end of the file (after the ProjectSchema tests):
+First, add `import yaml from 'js-yaml'` to the **top of the file** `src/config/schema.test.ts`, alongside the existing imports (the file already imports from `'./schema.js'` — add `backendRealDomains`, `researchRealDomains` to that existing import list). TypeScript ES modules require all imports at the top of the file; do not nest them inside the new describe block.
+
+Final import block at the top of the file should look like:
 
 ```typescript
-import yaml from 'js-yaml'
-import { BackendConfigSchema, ResearchConfigSchema, backendRealDomains, researchRealDomains } from './schema.js'
+// src/config/schema.test.ts
 
+import { describe, it, expect } from 'vitest'
+import yaml from 'js-yaml'
+import {
+  ConfigSchema, GameConfigSchema, ProjectTypeSchema,
+  WebAppConfigSchema, BackendConfigSchema, CliConfigSchema,
+  LibraryConfigSchema, MobileAppConfigSchema,
+  DataPipelineConfigSchema, MlConfigSchema, BrowserExtensionConfigSchema,
+  ResearchConfigSchema, ServiceSchema, ProjectSchema,
+  backendRealDomains, researchRealDomains,
+} from './schema.js'
+```
+
+Then append a new `describe` block at the end of the file (after the existing ProjectSchema describe block):
+
+```typescript
 describe('domain field — multi-domain union', () => {
   const baseBackend = {
     apiStyle: 'rest' as const,
@@ -238,7 +258,9 @@ EOF
 
 Adds end-to-end YAML → `loadConfig` → parsed-config tests. These exercise the full error-reporting surface (via `loader.ts:130-148`) and verify that Zod issue paths surface with the expected `project.` prefix.
 
-- [ ] **Step 2.1: Write the failing tests**
+**Note on TDD labeling**: Task 1 already widened the schema, so these tests are **regression coverage** — they pass on first run against the completed schema. This is intentional: loader-level tests verify the full stack stays correct, but the actual red-to-green loop happens at the schema level (Task 1).
+
+- [ ] **Step 2.1: Write the regression-coverage tests**
 
 Append the following tests to `src/config/loader.test.ts`, inside the existing `describe('loadConfig', () => { ... })` block (or a new nested `describe` block — match the file's existing convention):
 
@@ -358,9 +380,11 @@ EOF
 
 This is the core feature change. It adds `normalizeDomains`, rewrites the sub-overlay block to iterate, and fixes the latent append-without-dedup bug on knowledge merge.
 
-- [ ] **Step 3.1: Write the failing test (string-form invariant)**
+- [ ] **Step 3.1: Write the failing tests (TDD — two red tests before implementation)**
 
-This test proves that after the rewrite, single-string domain configs still produce the same resolved knowledge as they do today. Append to `src/core/assembly/overlay-state-resolver.test.ts` inside the existing top-level `describe('resolveOverlayState', () => { ... })` block, after the existing backend-fintech test at line ~346:
+Two tests drive this task red-first: (a) array-shape invariant — proves the iteration works and array form resolves identically to string form, and (b) duplicate-domain warning — proves `normalizeDomains` detects dupes and emits the right message. Together they cover the core behaviors this task introduces.
+
+Append both tests to `src/core/assembly/overlay-state-resolver.test.ts` inside the existing top-level `describe('resolveOverlayState', () => { ... })` block, after the existing backend-fintech test at line ~346:
 
 ```typescript
   it('resolves identically for domain: "fintech" and domain: ["fintech"] (array shape invariant)', () => {
@@ -410,12 +434,52 @@ This test proves that after the rewrite, single-string domain configs still prod
 
     expect(stringResult.knowledge['tech-stack']).toEqual(arrayResult.knowledge['tech-stack'])
   })
+
+  it('warns on duplicate domain entries with config-key context', () => {
+    const backendConfigBase = {
+      apiStyle: 'rest' as const,
+      dataStore: ['relational' as const],
+      authMechanism: 'jwt' as const,
+      asyncMessaging: 'none' as const,
+      deployTarget: 'container' as const,
+    }
+    const output = makeOutput()
+    resolveOverlayState({
+      config: makeConfig({
+        project: {
+          projectType: 'backend',
+          // Cast bypasses schema for isolated resolver behavior test.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          backendConfig: { ...backendConfigBase, domain: ['fintech', 'fintech'] as any },
+        },
+      }),
+      methodologyDir: fixtureDir,
+      metaPrompts: new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+        ['tech-stack', { frontmatter: makeFrontmatter({
+          name: 'tech-stack', knowledgeBase: ['tech-stack-selection'],
+          reads: [], dependencies: [],
+        }) }],
+      ]),
+      presetSteps: { 'tech-stack': { enabled: true } },
+      output,
+    })
+    // Warning must include the config key for user-facing disambiguation.
+    expect(output.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Duplicate domain(s) in backendConfig.domain'),
+    )
+    expect(output.warn).toHaveBeenCalledWith(expect.stringContaining('fintech'))
+  })
 ```
 
-- [ ] **Step 3.2: Run test to verify it fails**
+- [ ] **Step 3.2: Run tests to verify they fail**
 
 Run: `npx vitest run src/core/assembly/overlay-state-resolver.test.ts -t "array shape invariant"`
 Expected: FAIL — the current resolver has `typeof typeConfig.domain === 'string'` check (line 106), so the array-form branch loads no overlay, producing `['tech-stack-selection']` while the string branch produces `['tech-stack-selection', 'fintech-compliance']`.
+
+Run: `npx vitest run src/core/assembly/overlay-state-resolver.test.ts -t "duplicate domain entries"`
+Expected: FAIL — the current resolver has no duplicate detection; it silently accepts the array and tries to load a single overlay (the string check fails because the value is an array).
+
+Both tests MUST fail before proceeding to Step 3.3. If either passes unexpectedly, halt and diagnose — the pre-existing code behavior may differ from the spec's assumptions.
 
 - [ ] **Step 3.3: Implement the resolver change**
 
@@ -493,9 +557,12 @@ function normalizeDomains(
 }
 ```
 
-- [ ] **Step 3.4: Run failing test again to verify it passes**
+- [ ] **Step 3.4: Run failing tests again to verify they pass**
 
 Run: `npx vitest run src/core/assembly/overlay-state-resolver.test.ts -t "array shape invariant"`
+Expected: PASS.
+
+Run: `npx vitest run src/core/assembly/overlay-state-resolver.test.ts -t "duplicate domain entries"`
 Expected: PASS.
 
 - [ ] **Step 3.5: Run full resolver test suite to verify no regressions**
@@ -537,6 +604,8 @@ EOF
 
 Real-overlay coverage exercises end-to-end resolution against packaged content (`content/methodology/research-quant-finance.yml`, `research-ml-research.yml`). Both overlays touch `system-architecture` disjointly, which is perfect for order-preservation assertions. Per spec §5.3, do NOT use these for collision/dedup assertions — they don't collide naturally. Collision fixtures go in Task 5.
 
+**Note on TDD labeling**: Task 3 already implemented the resolver feature. These tests are **regression coverage** — they pass on first run. Their purpose is to lock merge semantics against the real production content so future content changes don't silently drift.
+
 - [ ] **Step 4.1: Find the methodology directory pointer**
 
 Look at `src/core/assembly/overlay-state-resolver.test.ts:12`:
@@ -550,7 +619,7 @@ For Task 4's tests we need the **real production methodology** dir, not fixtures
 import { getPackageMethodologyDir } from '../../utils/fs.js'
 ```
 
-- [ ] **Step 4.2: Write the failing tests**
+- [ ] **Step 4.2: Write the regression-coverage tests**
 
 Append the following tests to the existing `describe('resolveOverlayState', () => { ... })` block in `src/core/assembly/overlay-state-resolver.test.ts`:
 
@@ -685,6 +754,8 @@ EOF
 
 Real overlays don't collide, so dedup + duplicate-warning behavior is tested against hand-crafted fixtures that engineer the collision. Spec §5.4.
 
+**Note on TDD labeling**: Task 3 already implemented the dedup fix. These tests are **regression coverage** that verifies the fix against fixtures engineering a true collision (real production overlays can't prove dedup because they don't collide).
+
 - [ ] **Step 5.1: Create the fixture overlays**
 
 Create `tests/fixtures/methodology/backend-fake-a.yml`:
@@ -713,7 +784,7 @@ knowledge-overrides:
     append: [shared-entry, fake-b-only]
 ```
 
-- [ ] **Step 5.2: Write the failing tests**
+- [ ] **Step 5.2: Write the regression-coverage tests**
 
 Append to the existing `describe('resolveOverlayState', () => { ... })` block in `src/core/assembly/overlay-state-resolver.test.ts`:
 
@@ -747,11 +818,16 @@ Append to the existing `describe('resolveOverlayState', () => { ... })` block in
     }
 
     it('dedups first-occurrence across contrived fixture collision', () => {
-      // fake-a appends [fake-a-only, shared-entry]
-      // fake-b appends [shared-entry, fake-b-only]
-      // Expected: [base-entry, fintech-compliance, fake-a-only, shared-entry, fake-b-only]
-      // Note: fintech-compliance comes from the existing tests/fixtures/methodology/backend-fintech.yml
-      //       that the fixture dir includes. We're stacking fake-a + fake-b only, so no fintech entry.
+      // The resolved knowledge builds up as:
+      //   1. Frontmatter knowledgeBase seeds with [base-entry]
+      //   2. Core 'backend-overlay.yml' doesn't exist in fixtureDir (no-op)
+      //   3. fake-a sub-overlay appends [fake-a-only, shared-entry]
+      //   4. fake-b sub-overlay appends [shared-entry, fake-b-only]; 'shared-entry'
+      //      already present at step 3, so Set-based dedup drops this duplicate
+      //      at first-occurrence position.
+      //
+      // Note: the fixture dir also contains backend-fintech.yml, but we never
+      // reference 'fintech' in this test's domain list so it isn't loaded.
       const result = resolveOverlayState({
         config: makeBackendConfigWithDomains(['fake-a', 'fake-b']),
         methodologyDir: fixtureDir,
@@ -759,10 +835,6 @@ Append to the existing `describe('resolveOverlayState', () => { ... })` block in
         presetSteps: { 'tech-stack': { enabled: true } },
         output: makeOutput(),
       })
-      // Expected order:
-      //   base-entry (from frontmatter knowledgeBase)
-      //   fake-a-only + shared-entry (from fake-a.yml append)
-      //   fake-b-only (from fake-b.yml — shared-entry deduped away by Set)
       expect(result.knowledge['tech-stack']).toEqual([
         'base-entry',
         'fake-a-only',
@@ -851,7 +923,9 @@ EOF
 
 Proves multi-domain works when resolved via `resolvePipeline(context, { serviceId })` — the real service-mode entry point. Research is used because backend has only one real domain today.
 
-- [ ] **Step 6.1: Write the failing tests**
+**Note on TDD labeling**: Task 3 already implemented the resolver change. Service-mode tests are **regression coverage** — they verify the spec §3.5 claim that ServiceSchema config-reuse auto-inherits multi-domain support.
+
+- [ ] **Step 6.1: Write the regression-coverage tests**
 
 Append the following to `src/e2e/service-execution.test.ts` inside the existing `describe('service-qualified execution E2E', () => { ... })` block, after the existing tests:
 
@@ -1000,7 +1074,9 @@ EOF
 
 Asserts that every exported real-domain value has a matching `{projectType}-{domain}.yml` in `content/methodology/`. Catches the packaging-bug class that would otherwise surface only as silent resolver no-ops.
 
-- [ ] **Step 7.1: Write the failing test**
+**Note on TDD labeling**: This test passes today against current repo state (all four shipped domain files exist). It's **regression coverage** that prevents future drift between the domain enum and shipped content.
+
+- [ ] **Step 7.1: Write the regression-coverage test**
 
 Create `tests/packaging/domain-overlay-alignment.test.ts` with:
 
@@ -1170,10 +1246,10 @@ Multi-Domain Stacking — `backendConfig.domain` / `researchConfig.domain` accep
 - **Resolver change**: `normalizeDomains` helper iterates over domains with warn-on-duplicate; knowledge merge now append + dedup (fixes latent single-domain bug).
 - **Service-mode**: inherited automatically via `ServiceSchema` reuse — `services[N].researchConfig.domain: [...]` works out of the box.
 - **Fixture-only test content**: no new production domain sub-overlays ship with this feature. Two contrived fixtures (`backend-fake-a.yml`, `backend-fake-b.yml`) used only to engineer collision cases.
-- **Review discipline**: 4-round spec MMR (Codex + Gemini) + 3-channel PR MMR. PR #TBD.
+- **Review discipline**: 4-round spec MMR (Codex + Gemini) + 3-channel PR MMR.
 ```
 
-Replace `#TBD` with the real PR number once the feature PR is filed (Task 10).
+The roadmap entry intentionally omits the PR number. It will be appended in Task 11b after the feature PR is merged, using `gh pr list` to discover the actual number dynamically.
 
 - [ ] **Step 9.3: Commit**
 
@@ -1194,11 +1270,28 @@ EOF
 
 ---
 
-## Task 10: Feature PR + 3-channel MMR
+## Tasks 10–12: Orchestrator-only (not subagent-dispatched)
 
-**Workflow:** Per `CLAUDE.md` Mandatory 3-Channel PR Review section.
+> **IMPORTANT**: Tasks 10–12 are explicitly **not subagent-dispatched** during execution. They involve interactive GitHub operations, multi-round MMR cycles of unbounded length, and state that must be observed (CI status, MMR verdicts) rather than pre-planned. The controlling agent (the session that dispatched Tasks 1-9) executes these directly.
+>
+> Each task below is small enough to fit in the controller's context, and the sub-steps are bounded. The per-task "after each subagent, run MMR" cadence from the user's instruction applies only to Tasks 1-9. For Tasks 10-12, MMR already happens via the 3-channel PR review flow.
 
-- [ ] **Step 10.1: Push branch and create PR**
+---
+
+## Task 10: Push feature branch and create PR
+
+**Files:** none (git + GitHub operations only).
+
+- [ ] **Step 10.1: Verify working tree is clean and branch is up-to-date**
+
+```bash
+git status
+git log --oneline -15
+```
+
+Expected: no uncommitted changes. Commits 1-9 present in order.
+
+- [ ] **Step 10.2: Push branch and create PR**
 
 ```bash
 git push -u origin feat/multi-domain-stacking
@@ -1225,9 +1318,16 @@ EOF
 )"
 ```
 
-Capture the PR number; it's needed below.
+- [ ] **Step 10.3: Capture PR number**
 
-- [ ] **Step 10.2: Wait for CI green**
+```bash
+PR_NUMBER=$(gh pr view --json number --jq '.number')
+echo "PR_NUMBER=$PR_NUMBER"
+```
+
+Record this number; all subsequent steps reference it.
+
+- [ ] **Step 10.4: Wait for CI green**
 
 ```bash
 gh pr checks --watch
@@ -1235,65 +1335,83 @@ gh pr checks --watch
 
 Expected: `check` job passes.
 
-- [ ] **Step 10.3: Dispatch 3-channel MMR**
+---
 
-Use `mmr review --pr <PR_NUMBER> --sync --format json` per `CLAUDE.md`. Review returns a JSON verdict and findings.
+## Task 11: 3-channel PR MMR cycle
 
-If `mmr` isn't available, fall back to manual dispatch (all foreground — never `run_in_background`, never `&`, never `nohup`):
+**Files:** any fix commits land on `feat/multi-domain-stacking`.
 
+- [ ] **Step 11.1: Dispatch the 3-channel MMR (round 1)**
+
+Preferred path — use `mmr` if available:
 ```bash
-PR_NUMBER=<the number from step 10.1>
+mmr review --pr "$PR_NUMBER" --sync --format json > /tmp/mmr-r1.json
+```
 
-# Capture PR diff for reviewers
+Fallback — manual dispatch (all foreground — never `run_in_background`, never `&`, never `nohup`):
+```bash
 gh pr diff "$PR_NUMBER" > /tmp/mdr-pr-diff.patch
 
-# Codex
 codex exec --skip-git-repo-check -s read-only --ephemeral "$(cat <<EOF
-Review PR #$PR_NUMBER at feat/multi-domain-stacking for implementation correctness, security, and API contract issues. Read the spec at docs/superpowers/specs/2026-04-20-multi-domain-stacking-design.md for context. Return findings at P0-P3 severity with suggested fixes. Verdict: pass / degraded-pass / blocked / needs-user-decision.
+Review PR #$PR_NUMBER (branch feat/multi-domain-stacking) for implementation correctness, security, and API contract issues. Read the spec at docs/superpowers/specs/2026-04-20-multi-domain-stacking-design.md and the plan at docs/superpowers/plans/2026-04-20-multi-domain-stacking.md for context. Return findings at P0-P3 severity with suggested fixes. Verdict: pass / degraded-pass / blocked / needs-user-decision.
 EOF
-)" 2>&1 | tail -300 > /tmp/mdr-codex.out
+)" 2>&1 | tail -400 > /tmp/mdr-codex.out
 
-# Gemini
 NO_BROWSER=true gemini -p "$(cat <<EOF
-Review PR #$PR_NUMBER at feat/multi-domain-stacking for architectural patterns and broad-context reasoning. Read the spec at docs/superpowers/specs/2026-04-20-multi-domain-stacking-design.md for context. Return findings at P0-P3 severity with suggested fixes. Verdict: pass / degraded-pass / blocked / needs-user-decision.
+Review PR #$PR_NUMBER (branch feat/multi-domain-stacking) for architectural patterns, broad-context reasoning, and test coverage. Read the spec and plan for context. Return findings at P0-P3 severity with suggested fixes. Verdict: pass / degraded-pass / blocked / needs-user-decision.
 EOF
 )" --output-format json --approval-mode yolo 2>&1 > /tmp/mdr-gemini.out
 
-# Claude compensating (adds plan-alignment, testing-gap review)
 claude -p "$(cat <<EOF
-Compensating channel review of PR #$PR_NUMBER. Focus on: plan alignment with docs/superpowers/specs/2026-04-20-multi-domain-stacking-design.md, code quality, and test-coverage gaps. Return findings at P0-P3 severity. Verdict: pass / degraded-pass / blocked / needs-user-decision.
+Compensating channel review of PR #$PR_NUMBER (branch feat/multi-domain-stacking). Focus on plan alignment with docs/superpowers/specs/2026-04-20-multi-domain-stacking-design.md, code quality, and test-coverage gaps. Return findings at P0-P3 severity. Verdict: pass / degraded-pass / blocked / needs-user-decision.
 EOF
 )" --output-format json 2>&1 > /tmp/mdr-claude.out
 ```
 
-- [ ] **Step 10.4: Fix all P0/P1/P2 findings**
+- [ ] **Step 11.2: Analyze findings and decide action**
 
-Per CLAUDE.md §Mandatory 3-Channel PR Review: fix all P0, P1, and P2 findings. Do not defer P2s.
+- If verdict across all reachable channels is `pass` or `degraded-pass` with no P0/P1/P2 findings: proceed to Task 12.
+- If any P0/P1/P2 findings exist: fix them (Step 11.3).
+- If any channel reports `blocked` or `needs-user-decision`: stop and surface the verdict to the user. Do not auto-proceed.
 
-For each finding:
-- Root-cause the issue, write a failing test, apply the fix, re-run the test, commit with message pattern `fix(...): <desc> (Codex/Gemini/Claude MMR P<N>)`.
-- Re-push.
-- Wait for CI.
-- Re-run MMR (round 2 / round 3).
+- [ ] **Step 11.3: Fix findings (round N)**
 
-3-round limit. If findings remain unresolved after 3 rounds, stop and surface to the user.
+For each P0/P1/P2 finding:
+1. Root-cause the issue.
+2. Write a failing regression test that locks the fix.
+3. Apply the fix.
+4. Run the relevant test suite to verify green.
+5. Commit with message pattern `fix(<scope>): <desc> (Codex/Gemini/Claude MMR P<N>)`.
 
-- [ ] **Step 10.5: Merge on pass or degraded-pass**
-
+Push after each round:
 ```bash
-# Verify verdict before merging — blocked / needs-user-decision must stop
-gh pr merge "$PR_NUMBER" --squash --delete-branch
+git push
+gh pr checks --watch
 ```
 
-Expected: PR squashed to main with a clean commit message.
+- [ ] **Step 11.4: Re-run MMR (round N+1)**
+
+Repeat Step 11.1 against the updated PR. Re-analyze per Step 11.2.
+
+**3-round limit.** If P0/P1/P2 findings remain after 3 fix rounds, stop and surface to the user. Do not merge.
 
 ---
 
-## Task 11: Release v3.21.0
+## Task 12: Merge feature PR and release v3.21.0
 
-**Workflow:** Per `docs/architecture/operations-runbook.md` §4.
+**Files:** `package.json`, `package-lock.json`, `docs/roadmap.md` (post-merge PR-number update).
 
-- [ ] **Step 11.1: Check out main and create release branch**
+- [ ] **Step 12.1: Merge feature PR**
+
+Only proceed if Task 11 concluded with `pass` or `degraded-pass` verdict across all reachable channels.
+
+```bash
+gh pr merge "$PR_NUMBER" --squash --delete-branch
+```
+
+Expected: PR squashed to `main`, branch deleted on origin.
+
+- [ ] **Step 12.2: Start release-prep branch**
 
 ```bash
 git checkout main
@@ -1301,56 +1419,74 @@ git pull origin main
 git checkout -b release/v3.21.0
 ```
 
-- [ ] **Step 11.2: Bump package version**
+- [ ] **Step 12.3: Bump package version**
 
-Edit `package.json` and change `"version": "3.20.0"` to `"version": "3.21.0"`.
+Edit `package.json`: change `"version": "3.20.0"` → `"version": "3.21.0"`.
 
-Then:
-
+Then sync the lockfile:
 ```bash
-npm install  # Updates package-lock.json to reflect the new version
+npm install
 ```
 
-Verify `package-lock.json` also updated to 3.21.0 (check top-level `"version"` field).
+Verify `package-lock.json`'s top-level `"version"` also shows `3.21.0`:
+```bash
+grep -m1 '"version"' package-lock.json
+```
 
-- [ ] **Step 11.3: Update CHANGELOG PR number reference in roadmap (if #TBD still present)**
+- [ ] **Step 12.4: Append PR number to roadmap entry**
 
-Verify `docs/roadmap.md` doesn't still say `#TBD` — replace with the real merged PR number from Task 10. If it was updated in a release prep step, skip.
-
-- [ ] **Step 11.4: Commit release prep**
+Discover the merged feature PR number dynamically and append it to the v3.21.0 roadmap entry:
 
 ```bash
-git add package.json package-lock.json
+MERGED_PR=$(gh pr list --state merged --search "multi-domain stacking in:title" --limit 1 --json number --jq '.[0].number')
+echo "MERGED_PR=$MERGED_PR"
+```
+
+If the search returns no result, check recent merges manually: `gh pr list --state merged --limit 5`.
+
+Then edit `docs/roadmap.md` under the v3.21.0 "Completed Releases" entry — append a line at the end of that entry:
+
+```markdown
+- **PR**: #<MERGED_PR>
+```
+
+(Replace `<MERGED_PR>` with the captured number, e.g., `#295`.)
+
+- [ ] **Step 12.5: Commit release prep**
+
+```bash
+git add package.json package-lock.json docs/roadmap.md
 git commit -m "$(cat <<'EOF'
 chore(release): v3.21.0 — multi-domain stacking
 
-Bumps package version 3.20.0 -> 3.21.0.
+Bumps package version 3.20.0 -> 3.21.0. Appends merged feature PR
+number to the roadmap Completed Releases entry.
 
-See CHANGELOG.md for feature details and docs/roadmap.md for the
-Completed Releases entry.
+See CHANGELOG.md for feature details.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
 )"
 ```
 
-- [ ] **Step 11.5: Push + create release-prep PR**
+- [ ] **Step 12.6: Push + create release-prep PR**
 
 ```bash
 git push -u origin release/v3.21.0
-gh pr create --title "chore(release): v3.21.0 — multi-domain stacking" --body "Bumps to 3.21.0. Feature PR: #<PR from Task 10>"
+RELEASE_PR=$(gh pr create --title "chore(release): v3.21.0 — multi-domain stacking" --body "Bumps to 3.21.0. Feature PR: #$MERGED_PR" --json number --jq '.number')
+echo "RELEASE_PR=$RELEASE_PR"
 gh pr checks --watch
 ```
 
-Expected: CI green.
+Expected: CI green on the release-prep PR.
 
-- [ ] **Step 11.6: Squash-merge release-prep PR**
+- [ ] **Step 12.7: Squash-merge release-prep PR**
 
 ```bash
-gh pr merge --squash --delete-branch
+gh pr merge "$RELEASE_PR" --squash --delete-branch
 ```
 
-- [ ] **Step 11.7: Tag and push**
+- [ ] **Step 12.8: Tag main and push**
 
 ```bash
 git checkout main
@@ -1359,7 +1495,7 @@ git tag v3.21.0
 git push origin v3.21.0
 ```
 
-- [ ] **Step 11.8: Create GitHub release**
+- [ ] **Step 12.9: Create GitHub release**
 
 ```bash
 gh release create v3.21.0 --title "v3.21.0 — Multi-Domain Stacking" --notes "$(cat <<'EOF'
@@ -1380,19 +1516,18 @@ EOF
 )"
 ```
 
-- [ ] **Step 11.9: Verify npm + Homebrew publish**
+- [ ] **Step 12.10: Verify publish workflows**
 
 Monitor GitHub Actions:
-
 ```bash
 gh run list --limit 5
 ```
 
-Expected:
-- `publish.yml` workflow succeeds (npm trusted publishing via OIDC)
-- `update-homebrew.yml` workflow succeeds
+Expected (may take a few minutes):
+- `publish.yml` succeeds (npm trusted publishing via OIDC)
+- `update-homebrew.yml` succeeds
 
-Then verify externally:
+- [ ] **Step 12.11: Verify external artifacts**
 
 ```bash
 npm view @zigrivers/scaffold version
@@ -1402,7 +1537,7 @@ brew info scaffold | head -5
 # Expected: scaffold: stable 3.21.0
 ```
 
-If either command returns an older version, wait a few minutes for mirror propagation, then re-check. If still wrong after 10 minutes, diagnose the failing workflow.
+If either returns an older version, wait up to 10 minutes for mirror propagation, then re-check. If still stale, diagnose the failing workflow via `gh run view`.
 
 ---
 
@@ -1425,9 +1560,24 @@ If either command returns an older version, wait a few minutes for mirror propag
 - §7 Migration + backcompat → verified in Task 1 (existing tests still pass) + Task 8 (full suite) ✓
 - §8 Size estimate → matches Tasks 1-7 LOC budget ✓
 
-**Placeholder scan:** none detected. Every step has concrete file paths, exact code, and concrete commands.
+**Placeholder scan:** none detected. Every step has concrete file paths, exact code, and concrete commands. The roadmap PR-number is intentionally appended post-merge in Task 12.4 using `gh pr list` dynamic discovery, not a cross-task placeholder.
 
 **Type consistency:**
 - `backendRealDomains` / `researchRealDomains` — exported from Task 1, imported in Tasks 5+7.
 - `normalizeDomains(raw, output, configKeyForMessages)` — signature matches between Task 3 implementation and Task 5 usage.
 - `resolvePipeline(context, { serviceId })` — signature in Task 6 matches resolver.ts:18-21.
+
+**Task granularity for subagent dispatch (Tasks 1-9):**
+- Task 1: schema changes (~60 production + ~150 test lines) — fits.
+- Task 2: loader tests (~80 lines) — fits.
+- Task 3: resolver change + helper + 2 red tests (~90 production + ~150 test lines) — fits.
+- Task 4: real-overlay tests (~120 test lines) — fits.
+- Task 5: fixtures + collision tests (~100 test + 2 small YAML) — fits.
+- Task 6: service-mode tests (~120 test lines) — fits.
+- Task 7: packaging test (~40 lines) — fits.
+- Task 8: verification-only (no code changes) — trivial fit.
+- Task 9: docs (~40 lines of edits to CHANGELOG.md and roadmap.md) — fits.
+
+**TDD compliance:**
+- Tasks 1 and 3 are true red-to-green cycles with failing tests written before implementation.
+- Tasks 2, 4, 5, 6, 7 are labeled "regression coverage" — tests that pass on first run because the feature was implemented in Tasks 1+3. This is intentional and documented per-task.
