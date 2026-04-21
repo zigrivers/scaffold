@@ -1773,7 +1773,8 @@ EOF
 
 **Files:**
 - Modify: `src/cli/commands/dashboard.ts` (add loadPipelineContext + resolvePipeline per service + buildDependencyGraph + pass to generator)
-- Create: `src/e2e/dashboard-cross-service-graph.test.ts` (integration tests — API-level composition + a wiring-focused test that mocks dashboard.ts's dependencies)
+- Create: `src/e2e/dashboard-cross-service-graph.test.ts` (5 API-level composition tests)
+- Create: `src/e2e/dashboard-cross-service-graph-wiring.test.ts` (1 command-level wiring test with vi.mock isolation)
 
 Adds pipeline context loading once + per-service `resolvePipeline` (wrapped in try/catch mirroring the existing `loadState` STATE_MISSING fallback pattern) + `buildDependencyGraph` invocation. Passes `dependencyGraph` to the generator.
 
@@ -2022,10 +2023,15 @@ describe('dashboard integration — cross-service dependency graph', () => {
 })
 ```
 
-Also append the following wiring-test `describe` block at the end of the same file:
+Also create a SEPARATE test file for the wiring test so its file-wide `vi.mock` hoists do not bleed into the integration tests above. Create `src/e2e/dashboard-cross-service-graph-wiring.test.ts`:
 
 ```typescript
-// ---------- Wiring test: exercises dashboard.ts's new try/catch + resolvePipeline loop ----------
+import { describe, it, expect, vi } from 'vitest'
+import type { PipelineState } from '../types/index.js'
+
+// ---------- Module mocks ----------
+// All vi.mock calls are hoisted file-wide; keeping them in a separate file
+// prevents leakage into the API-level integration tests.
 
 vi.mock('../core/pipeline/context.js', () => ({
   loadPipelineContext: vi.fn(),
@@ -2066,13 +2072,31 @@ vi.mock('../state/ensure-v3-migration.js', () => ({ ensureV3Migration: vi.fn() }
 vi.mock('../core/assembly/meta-prompt-loader.js', () => ({
   discoverMetaPrompts: vi.fn(() => new Map()),
 }))
+vi.mock('../state/decision-logger.js', () => ({ readDecisions: vi.fn(() => []) }))
 vi.mock('../cli/middleware/project-root.js', () => ({
   findProjectRoot: vi.fn(() => '/tmp/fake-proj'),
 }))
+// CRITICAL: mock `utils/fs` to intercept atomicWriteFile. dashboard.ts calls
+// atomicWriteFile(outputPath, html) — we need to capture `html` here.
+// Module-level `let capturedHtml` allows the test block to read the captured
+// payload after the handler runs.
+let capturedHtml = ''
+vi.mock('../utils/fs.js', async (importActual) => {
+  const actual = await importActual<typeof import('../utils/fs.js')>()
+  return {
+    ...actual,
+    atomicWriteFile: vi.fn((_p: string, contents: string) => {
+      if (typeof contents === 'string' && contents.includes('<html')) capturedHtml = contents
+    }),
+  }
+})
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }))
+
+// ---------- Test ----------
 
 describe('dashboard.ts multi-service wiring — resolvePipeline integration', () => {
   it('test 26: resolvePipeline called per service; one service throwing does not crash the dashboard', async () => {
+    capturedHtml = ''
     const { loadPipelineContext } = await import('../core/pipeline/context.js')
     const { resolvePipeline } = await import('../core/pipeline/resolver.js')
     vi.mocked(loadPipelineContext).mockReturnValue({
@@ -2086,7 +2110,7 @@ describe('dashboard.ts multi-service wiring — resolvePipeline integration', ()
     } as unknown as ReturnType<typeof loadPipelineContext>)
     vi.mocked(resolvePipeline).mockImplementation((_ctx, opts) => {
       if (opts?.serviceId === 'api') throw new Error('simulated overlay parse error')
-      // 'web' resolves OK
+      // 'web' resolves OK with empty overlay (no edges → null graph)
       return {
         graph: { nodes: [], edges: [] },
         preset: { name: 'deep', description: '', default_depth: 3, steps: {} },
@@ -2099,18 +2123,14 @@ describe('dashboard.ts multi-service wiring — resolvePipeline integration', ()
       } as any
     })
 
-    // fs stubs: need to prevent the real writeAndOpenDashboard from failing.
-    // Dynamic import the module fresh, then patch process.exit.
-    const fs = await import('node:fs')
+    // dashboard.ts's handler calls process.exit(0) on success — intercept to
+    // keep the test process alive while still asserting success.
     const origExit = process.exit
     let exitCode: number | undefined
-    let capturedHtml = ''
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(process as any).exit = (code?: number) => { exitCode = code ?? 0; throw new Error('__exit__') }
-    const origWrite = fs.writeFileSync
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(fs as any).writeFileSync = (p: string, contents: string) => {
-      if (typeof contents === 'string' && contents.includes('<html')) capturedHtml = contents
+    ;(process as any).exit = (code?: number) => {
+      exitCode = code ?? 0
+      throw new Error('__exit__')
     }
 
     try {
@@ -2125,29 +2145,31 @@ describe('dashboard.ts multi-service wiring — resolvePipeline integration', ()
       if ((err as Error).message !== '__exit__') throw err
     } finally {
       process.exit = origExit
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(fs as any).writeFileSync = origWrite
     }
 
-    expect(vi.mocked(resolvePipeline)).toHaveBeenCalledTimes(2)  // called per service
-    expect(exitCode).toBe(0)  // handler completed despite one throw
-    // The HTML was written — dashboard did not crash on api's overlay failure.
-    // Web's successful resolvePipeline means no edges materialized (empty overlay),
-    // so dep-graph section is absent.
+    // Core assertion: resolvePipeline called once per configured service.
+    expect(vi.mocked(resolvePipeline)).toHaveBeenCalledTimes(2)
+    // Handler completed successfully despite api's throw.
+    expect(exitCode).toBe(0)
+    // HTML was written (atomicWriteFile was called with an <html> payload).
+    expect(capturedHtml).toContain('<html')
+    // Graph section absent (web has empty overlay, api threw → no edges).
     expect(capturedHtml).not.toContain('class="dep-graph"')
-    // Services grid still rendered — service cards present.
+    // Service cards still rendered — the whole dashboard didn't crash.
     expect(capturedHtml).toContain('class="services-grid"')
   })
 })
 ```
 
+Note: this test exercises the EXACT import paths used by `src/cli/commands/dashboard.ts` (verify by reading the file's import block before/after Step 9.3's edits). `vi.mock('../utils/fs.js')` intercepts `atomicWriteFile` directly — more reliable than monkey-patching `fs.writeFileSync` after module resolution, because ESM local bindings inside `utils/fs.ts` cannot be retroactively rebound.
+
 - [ ] **Step 9.2: Run tests to verify the expected pass/fail split**
 
-Run: `npx vitest run src/e2e/dashboard-cross-service-graph.test.ts`
+Run: `npx vitest run src/e2e/dashboard-cross-service-graph.test.ts src/e2e/dashboard-cross-service-graph-wiring.test.ts`
 
 Expected:
-- Tests 21–25 (API-level composition): **PASS** against Tasks 1–8 implementation. They confirm that buildDependencyGraph → generateMultiServiceDashboardData → buildMultiServiceTemplate composes correctly. They are regression coverage.
-- Test 26 (wiring-level): **FAIL** — dashboard.ts has not yet been modified to call `loadPipelineContext` + `resolvePipeline` per service, so `vi.mocked(resolvePipeline)` reports 0 calls. This is the TDD red signal for Step 9.3.
+- Tests 21–25 in `dashboard-cross-service-graph.test.ts` (API-level composition): **PASS** against Tasks 1–8 implementation. They confirm that buildDependencyGraph → generateMultiServiceDashboardData → buildMultiServiceTemplate composes correctly. They are regression coverage.
+- Test 26 in `dashboard-cross-service-graph-wiring.test.ts` (wiring-level): **FAIL** — dashboard.ts has not yet been modified to call `loadPipelineContext` + `resolvePipeline` per service, so `vi.mocked(resolvePipeline)` reports 0 calls. This is the TDD red signal for Step 9.3.
 
 If tests 21–25 fail, Tasks 1–8 left a seam broken; investigate the failure BEFORE modifying dashboard.ts.
 
@@ -2363,11 +2385,11 @@ Do not touch the single-service branch (the code path after `isMultiServiceMode`
 
 - [ ] **Step 9.4: Run tests to verify they pass**
 
-Run: `npx vitest run src/e2e/dashboard-cross-service-graph.test.ts`
+Run: `npx vitest run src/e2e/dashboard-cross-service-graph.test.ts src/e2e/dashboard-cross-service-graph-wiring.test.ts`
 
 Expected: PASS — all 6 tests (21–26) pass. In particular, test 26 now passes because the dashboard.ts handler calls `resolvePipeline` twice (once per configured service), handles the thrown error from the `api` mock without crashing, and writes HTML that contains `services-grid` but not `dep-graph` (web's overlay is empty in the mock).
 
-If test 26 still fails, most likely culprits: (a) `capturedGlobalSteps` never captured because BOTH services throw (check mock setup), (b) resolvePipeline called 0 or >2 times (check the loop position of the try/catch), (c) the generator's dependencyGraph argument isn't wired (check Edit 3's final block).
+If test 26 still fails, likely culprits: (a) `resolvePipeline` called 0 or ≠2 times — check the try/catch position inside the for-loop in Edit 3, (b) `capturedHtml` empty → mock of `atomicWriteFile` not hit, check that `vi.mock('../utils/fs.js')` path is relative to the test file and that dashboard.ts imports from `utils/fs.js` (NOT a sibling), (c) the `vi.mock` of `state-manager` doesn't satisfy the constructor-arity call pattern — compare against the actual `new StateManager(...)` call.
 
 - [ ] **Step 9.5: Run full suite + type-check**
 
@@ -2514,13 +2536,49 @@ For each round:
 
 Spec §6.4 requires manual Playwright visual verification before merge. This is NOT optional — it's part of the pre-merge gate.
 
+IMPORTANT: `make dashboard-test` runs the bash `scripts/generate-dashboard.sh` path, which is the legacy v1 pipeline and does NOT exercise `src/dashboard/*`. Use the TypeScript `scaffold dashboard` CLI against a throwaway temp project instead.
+
+Create a throwaway fixture + generate HTML via the TypeScript dashboard:
+
 ```bash
-make dashboard-test
+TMP=$(mktemp -d -t scaffold-depgraph-preview-XXXX)
+mkdir -p "$TMP/.scaffold/services/api" "$TMP/.scaffold/services/web"
+cat > "$TMP/.scaffold/config.yml" <<'YAML'
+version: 2
+methodology: deep
+platforms: [claude-code]
+project:
+  services:
+    - name: api
+      projectType: backend
+      backendConfig:
+        apiStyle: rest
+        dataStore: [relational]
+        authMechanism: jwt
+        asyncMessaging: none
+        deployTarget: container
+        domain: none
+      exports:
+        - step: create-prd
+    - name: web
+      projectType: web-app
+YAML
+cat > "$TMP/.scaffold/services/api/state.json" <<'JSON'
+{"schema-version":3,"scaffold-version":"3.22.0","init_methodology":"deep","config_methodology":"deep","init-mode":"greenfield","created":"2026-04-21T00:00:00Z","in_progress":null,"steps":{"create-prd":{"status":"completed","source":"pipeline","produces":[]}},"next_eligible":[],"extra-steps":[]}
+JSON
+cat > "$TMP/.scaffold/services/web/state.json" <<'JSON'
+{"schema-version":3,"scaffold-version":"3.22.0","init_methodology":"deep","config_methodology":"deep","init-mode":"greenfield","created":"2026-04-21T00:00:00Z","in_progress":null,"steps":{"implementation-plan":{"status":"in_progress","source":"pipeline","produces":[]}},"next_eligible":["implementation-plan"],"extra-steps":[]}
+JSON
+HTML_PATH="$TMP/dashboard.html"
+( cd "$TMP" && scaffold dashboard --output "$HTML_PATH" --no-open )
+echo "Preview HTML at: file://$HTML_PATH"
 ```
 
-The command outputs the path to a test HTML at `tests/screenshots/dashboard-test.html`. Open it in a browser and verify using Playwright MCP tools (`mcp__plugin_playwright_playwright__*`):
+Note: for the graph to render, the cross-read declaration needs to live in an active pipeline step. If the default pipeline doesn't ship a step whose frontmatter declares the api:create-prd cross-read, add a `cross-reads-overrides` section to `content/methodology/multi-service-overlay.yml` in a SEPARATE local edit (do NOT commit) to seed one for preview. Revert after verification.
 
-1. `browser_navigate` to `file://<path>`.
+Then verify in a browser using Playwright MCP tools (`mcp__plugin_playwright_playwright__*`):
+
+1. `browser_navigate` to `file://$HTML_PATH`.
 2. Resize to 1280×800 (desktop) — `browser_take_screenshot`, save to `tests/screenshots/current/dep-graph_desktop_light.png`.
 3. Resize to 375×812 (mobile) — screenshot `dep-graph_mobile_light.png`.
 4. `browser_run_code` to set `document.documentElement.setAttribute('data-theme', 'dark')` — re-screenshot desktop + mobile as `_dark.png`.
@@ -2529,7 +2587,13 @@ The command outputs the path to a test HTML at `tests/screenshots/dashboard-test
 7. Scroll the page → verify tooltip dismisses.
 8. `browser_snapshot` to sanity-check the accessibility tree (each edge announced, tooltip region live).
 
-If the dashboard-test fixture does not include cross-service services (and thus no graph), temporarily populate `.scaffold/config.yml` with a 2-service fixture that has a cross-read declaration before running `make dashboard-test`. Revert after screenshots are captured.
+Clean up:
+
+```bash
+rm -rf "$TMP"
+# And revert any local multi-service-overlay.yml edits if you seeded a cross-read override.
+git diff -- content/methodology/multi-service-overlay.yml  # should show nothing
+```
 
 If any visual regression is detected (graph clips, tooltip off-screen, broken arrowhead, dark-mode colors wrong), fix inline on the feature branch and push — the PR reopens for review. Do NOT merge with visual regressions.
 
