@@ -792,6 +792,12 @@ step-overrides:
       expect(stringResult.knowledge['system-architecture']).toEqual(
         arrayResult.knowledge['system-architecture'],
       )
+      expect(stringResult.knowledge['system-architecture']).toEqual([
+        'research-architecture',
+        'research-experiment-loop',
+        'research-quant-backtesting',
+        'research-quant-strategy-patterns',
+      ])
     })
   })
 })
