@@ -27,13 +27,48 @@ export const WebAppConfigSchema = z.object({
   authFlow: z.enum(['none', 'session', 'oauth', 'passkey']).default('none'),
 }).strict()
 
+/**
+ * Canonical lists of "real" domain values (excluding 'none') for each
+ * project-type family. These are the values a domain sub-overlay YAML file
+ * can be named for.
+ *
+ * EXPORTED so tests/packaging/domain-overlay-alignment.test.ts can enumerate
+ * them and assert that every value has a corresponding content/methodology/
+ * file shipped. Do not inline these into the schemas — the packaging test
+ * relies on the import.
+ */
+export const backendRealDomains = ['fintech'] as const
+export const researchRealDomains = ['quant-finance', 'ml-research', 'simulation'] as const
+
+/**
+ * Build the `domain` field for a project-type config.
+ *
+ * Accepts three shapes:
+ *   - 'none' (literal — explicit "no domain")
+ *   - a single real domain string (e.g. 'fintech')
+ *   - a non-empty array of real domain strings (e.g. ['fintech', 'climate'])
+ *
+ * DO NOT add `.transform()`. Transforming would coerce the Zod output type
+ * from `string | string[]` to `string[]`, which breaks every existing
+ * write-site (wizard, CLI flags, detector) that assigns single strings into
+ * `BackendConfig['domain']`. Normalization lives in the resolver instead.
+ * See spec §1.3 / §3.2 for the consumer audit.
+ */
+function domainField<const T extends readonly [string, ...string[]]>(realValues: T) {
+  return z.union([
+    z.literal('none'),
+    z.enum(realValues),
+    z.array(z.enum(realValues)).min(1),
+  ]).default('none')
+}
+
 export const BackendConfigSchema = z.object({
   apiStyle: z.enum(['rest', 'graphql', 'grpc', 'trpc', 'none']),
   dataStore: z.array(z.enum(['relational', 'document', 'key-value'])).min(1).default(['relational']),
   authMechanism: z.enum(['none', 'jwt', 'session', 'oauth', 'apikey']).default('none'),
   asyncMessaging: z.enum(['none', 'queue', 'event-driven']).default('none'),
   deployTarget: z.enum(['serverless', 'container', 'long-running']).default('container'),
-  domain: z.enum(['none', 'fintech']).default('none'),
+  domain: domainField(backendRealDomains),
 }).strict()
 
 export const CliConfigSchema = z.object({
@@ -89,9 +124,7 @@ export const ResearchConfigSchema = z.object({
     'autonomous', 'checkpoint-gated', 'human-guided',
   ]).default('checkpoint-gated'),
   hasExperimentTracking: z.boolean().default(true),
-  domain: z.enum([
-    'none', 'quant-finance', 'ml-research', 'simulation',
-  ]).default('none'),
+  domain: domainField(researchRealDomains),
 }).strict()
 
 export const GameConfigSchema = z.object({
