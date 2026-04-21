@@ -262,4 +262,107 @@ describe('service-qualified execution E2E', () => {
       expect(pipeline.globalSteps.has(step), `globalSteps should contain '${step}'`).toBe(true)
     }
   })
+
+  // Test: service-mode multi-domain resolves both sub-overlays in declaration order
+  it('service-mode multi-domain: research service with [quant-finance, ml-research]', async () => {
+    const methodologyDir = getPackageMethodologyDir()
+    const realMetaPrompts = await discoverRealMetaPrompts()
+    const knownSteps = [...realMetaPrompts.keys()]
+    const presets = loadAllPresets(methodologyDir, knownSteps)
+    const output = createMockOutput()
+
+    // Research service with multi-domain array. Cast bypasses the schema-at-test-
+    // construction check; the schema accepts this shape at actual load time (§5.3.1).
+    const config = {
+      version: 2,
+      methodology: 'deep',
+      platforms: ['claude-code'],
+      project: {
+        services: [
+          {
+            name: 'experiments',
+            projectType: 'research',
+            researchConfig: {
+              experimentDriver: 'code-driven',
+              interactionMode: 'checkpoint-gated',
+              hasExperimentTracking: true,
+              domain: ['quant-finance', 'ml-research'],
+            },
+          },
+        ],
+      },
+    } as unknown as ScaffoldConfig
+
+    const pipeline = resolvePipeline(
+      {
+        projectRoot: '/tmp/test',
+        metaPrompts: realMetaPrompts,
+        config,
+        configErrors: [],
+        configWarnings: [],
+        presets,
+        methodologyDir,
+      },
+      { output, serviceId: 'experiments' },
+    )
+
+    const sysArchKnowledge = pipeline.overlay.knowledge['system-architecture'] ?? []
+    // Both overlays contributed — declaration order means quant-finance entries
+    // appear before ml-research entries.
+    const quantIdx = sysArchKnowledge.indexOf('research-quant-backtesting')
+    const mlIdx = sysArchKnowledge.indexOf('research-ml-architecture-search')
+    expect(quantIdx).toBeGreaterThan(-1)
+    expect(mlIdx).toBeGreaterThan(-1)
+    expect(quantIdx).toBeLessThan(mlIdx)
+  })
+
+  // Test: service-mode multi-domain reversed order still respects declaration order
+  it('service-mode multi-domain: reversed order produces reversed positions', async () => {
+    const methodologyDir = getPackageMethodologyDir()
+    const realMetaPrompts = await discoverRealMetaPrompts()
+    const knownSteps = [...realMetaPrompts.keys()]
+    const presets = loadAllPresets(methodologyDir, knownSteps)
+    const output = createMockOutput()
+
+    const config = {
+      version: 2,
+      methodology: 'deep',
+      platforms: ['claude-code'],
+      project: {
+        services: [
+          {
+            name: 'experiments',
+            projectType: 'research',
+            researchConfig: {
+              experimentDriver: 'code-driven',
+              interactionMode: 'checkpoint-gated',
+              hasExperimentTracking: true,
+              domain: ['ml-research', 'quant-finance'],
+            },
+          },
+        ],
+      },
+    } as unknown as ScaffoldConfig
+
+    const pipeline = resolvePipeline(
+      {
+        projectRoot: '/tmp/test',
+        metaPrompts: realMetaPrompts,
+        config,
+        configErrors: [],
+        configWarnings: [],
+        presets,
+        methodologyDir,
+      },
+      { output, serviceId: 'experiments' },
+    )
+
+    const sysArchKnowledge = pipeline.overlay.knowledge['system-architecture'] ?? []
+    const quantIdx = sysArchKnowledge.indexOf('research-quant-backtesting')
+    const mlIdx = sysArchKnowledge.indexOf('research-ml-architecture-search')
+    expect(quantIdx).toBeGreaterThan(-1)
+    expect(mlIdx).toBeGreaterThan(-1)
+    // Reversed: ml-research entries appear BEFORE quant-finance entries
+    expect(mlIdx).toBeLessThan(quantIdx)
+  })
 })
