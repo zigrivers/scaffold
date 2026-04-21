@@ -209,3 +209,85 @@ describe('buildDependencyGraph — layer assignment', () => {
     expect(byName.get('svc-a')!.layer).toBe(byName.get('svc-b')!.layer)
   })
 })
+
+describe('buildDependencyGraph — layout + determinism', () => {
+  it('test 8: same input twice → identical x/y + identical SVG paths', () => {
+    const services = [
+      { name: 'api', projectType: 'backend' } as const,
+      { name: 'web', projectType: 'web-app' } as const,
+    ]
+    const input = makeInput({
+      services,
+      config: makeConfig(services.map(s => ({ name: s.name, projectType: s.projectType }))),
+      perServiceOverlay: new Map([
+        ['api', makeOverlay()],
+        ['web', makeOverlay({
+          'implementation-plan': [{ service: 'api', step: 'create-prd' }],
+        })],
+      ]),
+    })
+    const first = buildDependencyGraph(input)!
+    const second = buildDependencyGraph(input)!
+    expect(first.nodes.map(n => ({ name: n.name, x: n.x, y: n.y, layer: n.layer })))
+      .toEqual(second.nodes.map(n => ({ name: n.name, x: n.x, y: n.y, layer: n.layer })))
+    expect(first.edges.map(e => ({ consumer: e.consumer, producer: e.producer, path: e.svgPath })))
+      .toEqual(second.edges.map(e => ({ consumer: e.consumer, producer: e.producer, path: e.svgPath })))
+    expect(first.viewBox).toEqual(second.viewBox)
+  })
+
+  it('test 9: viewBox dimensions scale with layer count + tallest-layer node count', () => {
+    // Small graph: 2 layers, 1 node each → narrow + short.
+    const small = buildDependencyGraph(makeInput({
+      services: [
+        { name: 'api', projectType: 'backend' } as const,
+        { name: 'web', projectType: 'web-app' } as const,
+      ],
+      perServiceOverlay: new Map([
+        ['api', makeOverlay()],
+        ['web', makeOverlay({ step: [{ service: 'api', step: 's' }] })],
+      ]),
+    }))!
+
+    // Wider graph: 3 layers.
+    const wide = buildDependencyGraph(makeInput({
+      services: [
+        { name: 'a', projectType: 'backend' } as const,
+        { name: 'b', projectType: 'backend' } as const,
+        { name: 'c', projectType: 'backend' } as const,
+      ],
+      config: makeConfig([
+        { name: 'a', projectType: 'backend' },
+        { name: 'b', projectType: 'backend' },
+        { name: 'c', projectType: 'backend' },
+      ]),
+      perServiceOverlay: new Map([
+        ['a', makeOverlay()],
+        ['b', makeOverlay({ s: [{ service: 'a', step: 'x' }] })],
+        ['c', makeOverlay({ s: [{ service: 'b', step: 'x' }] })],
+      ]),
+    }))!
+
+    expect(wide.viewBox.width).toBeGreaterThan(small.viewBox.width)
+
+    // Taller graph: 2 layers with 2 nodes in the tall layer → taller than small.
+    const tall = buildDependencyGraph(makeInput({
+      services: [
+        { name: 'producer', projectType: 'library' } as const,
+        { name: 'cons-a', projectType: 'web-app' } as const,
+        { name: 'cons-b', projectType: 'web-app' } as const,
+      ],
+      config: makeConfig([
+        { name: 'producer', projectType: 'library' },
+        { name: 'cons-a', projectType: 'web-app' },
+        { name: 'cons-b', projectType: 'web-app' },
+      ]),
+      perServiceOverlay: new Map([
+        ['producer', makeOverlay()],
+        ['cons-a', makeOverlay({ s: [{ service: 'producer', step: 'x' }] })],
+        ['cons-b', makeOverlay({ s: [{ service: 'producer', step: 'x' }] })],
+      ]),
+    }))!
+
+    expect(tall.viewBox.height).toBeGreaterThan(small.viewBox.height)
+  })
+})

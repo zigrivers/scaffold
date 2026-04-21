@@ -10,6 +10,12 @@ import type {
 export const NODE_WIDTH = 140
 export const NODE_HEIGHT = 44
 
+// Module-private layout constants (template.ts imports only NODE_WIDTH/NODE_HEIGHT
+// since those align text/box positioning; the rest are layout-internal).
+const LAYER_GAP = 80
+const NODE_GAP = 16
+const PADDING = 24
+
 export interface BuildGraphInput {
   config: ScaffoldConfig
   projectRoot: string
@@ -138,13 +144,49 @@ function assignLayers(
 }
 
 /**
- * Position nodes in layered columns; compute cubic-bezier edge paths.
- * STUB in Task 2 — Task 4 implements. Returns a minimal valid shape so the
- * builder can return early.
+ * Position nodes in layered columns (one column per layer, alphabetical
+ * within layer). Compute cubic-bezier edge paths from consumer's left edge to
+ * producer's right edge. Deterministic output: same input → same bytes.
  */
 function layoutGraph(
   nodes: DependencyGraphNode[],
   edges: DependencyGraphEdge[],
 ): DependencyGraphData {
-  return { nodes, edges, viewBox: { width: 0, height: 0 } }
+  const maxLayer = Math.max(...nodes.map(n => n.layer), 0)
+  const byLayer: DependencyGraphNode[][] = Array.from({ length: maxLayer + 1 }, () => [])
+  for (const n of nodes) byLayer[n.layer].push(n)
+  // Deterministic within-layer ordering (alphabetical by service name).
+  for (const layer of byLayer) layer.sort((a, b) => a.name.localeCompare(b.name))
+
+  const width = PADDING * 2 + (maxLayer + 1) * NODE_WIDTH + maxLayer * LAYER_GAP
+  const tallestLayer = Math.max(...byLayer.map(l => l.length))
+  const height = PADDING * 2 + tallestLayer * NODE_HEIGHT + Math.max(0, tallestLayer - 1) * NODE_GAP
+
+  // Position nodes — each layer is a column, vertically centered.
+  for (let li = 0; li <= maxLayer; li++) {
+    const layerNodes = byLayer[li]
+    const layerHeight = layerNodes.length * NODE_HEIGHT
+      + Math.max(0, layerNodes.length - 1) * NODE_GAP
+    const offsetY = PADDING + (height - PADDING * 2 - layerHeight) / 2
+    const x = PADDING + li * (NODE_WIDTH + LAYER_GAP)
+    for (let ni = 0; ni < layerNodes.length; ni++) {
+      layerNodes[ni].x = x
+      layerNodes[ni].y = offsetY + ni * (NODE_HEIGHT + NODE_GAP)
+    }
+  }
+
+  // Edge paths — cubic bezier from consumer's left edge to producer's right edge.
+  const byName = new Map(nodes.map(n => [n.name, n]))
+  for (const edge of edges) {
+    const consumer = byName.get(edge.consumer)!
+    const producer = byName.get(edge.producer)!
+    const x1 = consumer.x                                    // consumer left
+    const y1 = consumer.y + NODE_HEIGHT / 2
+    const x2 = producer.x + NODE_WIDTH                       // producer right
+    const y2 = producer.y + NODE_HEIGHT / 2
+    const cx = (x1 + x2) / 2
+    edge.svgPath = `M ${x1} ${y1} C ${cx} ${y1}, ${cx} ${y2}, ${x2} ${y2}`
+  }
+
+  return { nodes, edges, viewBox: { width, height } }
 }
