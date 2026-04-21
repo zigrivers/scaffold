@@ -18,6 +18,7 @@ const CustomSchema = z.object({
 export const ProjectTypeSchema = z.enum([
   'web-app', 'mobile-app', 'backend', 'cli', 'library', 'game',
   'data-pipeline', 'ml', 'browser-extension', 'research',
+  'data-science',
 ])
 
 export const WebAppConfigSchema = z.object({
@@ -116,6 +117,12 @@ export const BrowserExtensionConfigSchema = z.object({
   hasBackgroundWorker: z.boolean().default(true),
 }).strict()
 
+export const DataScienceConfigSchema = z.object({
+  // 'solo' = current DS-1 scope (solo / small-team, local-first, prototyping).
+  // DS-2 will add 'platform' for platform-engineered / larger-team DS.
+  audience: z.enum(['solo']).default('solo'),
+}).strict()
+
 export const ResearchConfigSchema = z.object({
   experimentDriver: z.enum([
     'code-driven', 'config-driven', 'api-driven', 'notebook-driven',
@@ -161,6 +168,7 @@ export const ServiceSchema = z.object({
   mlConfig: MlConfigSchema.optional(),
   gameConfig: GameConfigSchema.optional(),
   browserExtensionConfig: BrowserExtensionConfigSchema.optional(),
+  dataScienceConfig: DataScienceConfigSchema.optional(),
   path: z.string().optional(),
   exports: z.array(
     z.object({ step: z.string().regex(/^[a-z][a-z0-9-]*$/, 'exports.step must be kebab-case') }),
@@ -195,6 +203,7 @@ export const ProjectSchema = z.object({
   mlConfig: MlConfigSchema.optional(),
   browserExtensionConfig: BrowserExtensionConfigSchema.optional(),
   researchConfig: ResearchConfigSchema.optional(),
+  dataScienceConfig: DataScienceConfigSchema.optional(),
   services: z.array(ServiceSchema).min(1).optional(),
 }).passthrough()  // allow unknown fields per ADR-033
   .superRefine((data, ctx) => {
