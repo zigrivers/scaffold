@@ -6,6 +6,17 @@ Working document tracking completed work, in-progress items, and future directio
 
 ## Completed Releases
 
+### v3.22.0 (2026-04-21)
+
+Cross-Service Dependency Visualization — `scaffold dashboard` on multi-service monorepos now renders a service-level dependency graph between phase indicators and service cards, with consumer→producer arrows and step-level readiness detail on hover/focus tooltips. Completes roadmap Near-Term "Cross-Service Dependency Visualization (multi-service dashboard follow-up)".
+
+- **New** `buildDependencyGraph` + `renderDependencyGraphSection`. New types: `DependencyGraphNode`, `StepEdgeDetail`, `DependencyGraphEdge`, `DependencyGraphData`.
+- **Pure server-rendered SVG** — zero new runtime dependencies. Layered Sugiyama-style layout (longest-path topological sort + cubic bezier edges). Deterministic.
+- **Filters** self-refs, unknown-service targets, and disabled consumer steps at aggregation. `knownServices` guard prevents layout crashes on service-unknown readiness.
+- **Accessibility** — `tabindex=0` on edges, nested `<title>`, `role=region` + `aria-live=polite` tooltip, `textContent`-only JS (zero `innerHTML`). Marker-end arrowhead inherits `currentColor` so hover/focus re-coloring propagates.
+- **Defensive** — one service's malformed overlay does not crash the multi-service dashboard; its card still renders via the pre-existing `loadState` fallback, only outgoing graph edges are dropped. Same-layer cycle edges route outside the column so arrowheads still point into producers.
+- **Review discipline** — 4-round spec MMR + 3-round plan MMR + 9 subagent-dispatched tasks each with per-task 4-gate review + 2-round 3-channel PR MMR. PR #296.
+
 ### v3.21.0 (2026-04-21)
 
 Multi-Domain Stacking — `backendConfig.domain` / `researchConfig.domain` accept arrays to stack multiple domain sub-overlays in declaration order. Completes roadmap Phase 2 "Multi-Domain Stacking."
@@ -75,15 +86,6 @@ Multi-service monorepo support — 5 waves landing together.
 ---
 
 ## Near-Term Enhancements
-
-### Cross-Service Dependency Visualization (multi-service dashboard follow-up)
-
-Multi-Service Dashboard shipped in v3.20.0 without cross-service dep visualization. A graph view would show `exports`/`cross-reads` edges between services — useful for reasoning about upstream-ready gates in multi-service monorepos.
-
-- Needs design: which edges to draw, graph layout (d3? graphviz? simple SVG?), whether to lay out alongside the service cards or a separate tab
-- Non-trivial to render without adding a heavy client-side dep in the currently zero-dep HTML output
-
-**Scope**: Design needed. Medium (~200 lines if kept server-rendered).
 
 ### Brownfield `adopt` for Multi-Service Monorepos
 

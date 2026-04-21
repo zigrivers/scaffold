@@ -4,6 +4,25 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.22.0] — 2026-04-21
+
+### Added
+- **Cross-Service Dependency Visualization** — `scaffold dashboard` on a multi-service monorepo now renders a service-level dependency graph between the phase indicators and the service-card grid. Consumer→producer cross-reads appear as arrows; hovering or keyboard-focusing an edge surfaces step-level readiness detail (`consumer:step → producer:step (status)`) in a tooltip. Completes roadmap Near-Term "Cross-Service Dependency Visualization (multi-service dashboard follow-up)".
+  - New `src/dashboard/dependency-graph.ts` — `buildDependencyGraph` entry point + longest-path topological sort + cubic bezier layout. Exports `NODE_WIDTH`/`NODE_HEIGHT` constants so template.ts shares node dimensions.
+  - New types: `DependencyGraphNode`, `StepEdgeDetail`, `DependencyGraphEdge`, `DependencyGraphData`. `MultiServiceDashboardData.dependencyGraph?: DependencyGraphData | null` — optional, normalized to `null` on output.
+  - New `renderDependencyGraphSection` exported helper in `src/dashboard/template.ts`, plus scoped CSS and a vanilla-JS tooltip IIFE.
+  - `src/cli/commands/dashboard.ts` multi-service branch now calls `loadPipelineContext` once + `resolvePipeline` per service (wrapped in a try/catch that mirrors the pre-existing `STATE_MISSING` `loadState` fallback) to capture each service's overlay for graph building.
+  - Pure server-rendered inline SVG — zero new runtime dependencies, zero `innerHTML` writes (tooltip content flows through `textContent` only), deterministic output.
+  - Accessibility: each edge is keyboard-focusable (`tabindex="0"`) with a nested `<title>`; tooltip uses `role="region"` + `aria-live="polite"`; `marker-end` arrow inherits `currentColor` so hover/focus re-coloring propagates cleanly.
+  - Filters at aggregation time: self-references, cross-reads targeting services not in config, and cross-reads declared on disabled consumer steps are all dropped before readiness lookup. Cycles render honestly (same-layer edges route outside the column so the arrowhead still points into the producer).
+  - Graph omitted entirely when no cross-service edges exist — no empty-state placeholder.
+  - Graceful degradation: a malformed overlay for one service does not crash the whole dashboard; its card still renders via the pre-existing `loadState` fallback, and only that service's outgoing graph edges are dropped. Incoming edges from other services are preserved.
+
+### Internal
+- 25 new tests across unit / template / API-level composition / command-level wiring layers (`dependency-graph.test.ts`, additions to `multi-service.test.ts`, `dashboard-cross-service-graph.test.ts`, `dashboard-cross-service-graph-wiring.test.ts`).
+- Single-service dashboard output is byte-clean of all `dep-*` tokens — regression-locked by an explicit test.
+- Review discipline: 4-round spec MMR + 3-round plan MMR + per-task 4-gate review (implementer → spec-compliance → code-quality → Codex MMR) + 2-round 3-channel PR MMR. PR #296.
+
 ## [3.21.0] — 2026-04-21
 
 ### Added
