@@ -11,7 +11,8 @@ All notable changes to Scaffold are documented here.
   - Example: `researchConfig.domain: ['quant-finance', 'ml-research']` loads both sub-overlays, merging their knowledge with append + dedup.
   - Service-mode multi-domain inherited automatically via `ServiceSchema` reuse — works out of the box for services[] in monorepos.
   - Single-string form (`domain: 'fintech'`) continues to work unchanged — zero config migration required.
-  - Packaging-integrity test added (`tests/packaging/domain-overlay-alignment.test.ts`) to catch enum-vs-file drift at build time rather than via silent runtime skip.
+  - Packaging-integrity test added (`tests/packaging/domain-overlay-alignment.test.ts`) — a Vitest check that catches enum-vs-file drift during the test run, rather than manifesting as a silent resolver no-op at runtime.
+  - No new production domain sub-overlays ship with this feature — it's the mechanism only. Multi-domain stacking is tested against two contrived fixture overlays (`tests/fixtures/methodology/backend-fake-{a,b}.yml`) plus the existing production `research-quant-finance.yml` and `research-ml-research.yml`.
 - Exported `backendRealDomains` / `researchRealDomains` canonical arrays from `src/config/schema.ts` for downstream enumeration.
 
 ### Fixed
