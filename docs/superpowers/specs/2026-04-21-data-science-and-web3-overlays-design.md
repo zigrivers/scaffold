@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-21
 **Target releases:** `v3.23.0` (Data Science), `v3.24.0` (Web3)
-**Status:** Design — round-3 review findings applied; ready for re-review
+**Status:** Design — round-4 review findings applied; zero P1 findings remain; ready for final verification
 
 ---
 
@@ -23,7 +23,7 @@ The roadmap entry previously said each overlay needs "~10-20 pipeline steps." Th
 - ~12-14 knowledge documents per overlay, following the hybrid backbone-plus-domain pattern
 - One overlay YAML per project type, mapping knowledge documents into existing universal pipeline steps
 - Full schema and wiring surface update per overlay (see §3.2, §6)
-- Low-confidence brownfield detectors so `scaffold adopt` can surface the new project types (see §6.4)
+- Low- to medium-confidence brownfield detectors so `scaffold adopt` can surface the new project types (see §6.4)
 - Packaging test, structural eval, and per-overlay content evals
 - Roadmap / README / CHANGELOG updates
 - Two independent PRs shipped sequentially: DS first (v3.23.0), then Web3 (v3.24.0)
@@ -46,7 +46,7 @@ Both overlays follow the existing project-type-overlay pattern used by `web-app`
 
 | Path | Purpose |
 | --- | --- |
-| `content/methodology/{type}-overlay.yml` | Knowledge-override mapping (no step-overrides, no cross-reads-overrides — project-type overlays are knowledge-only) |
+| `content/methodology/{type}-overlay.yml` | Knowledge-override mapping. These two overlays use only `knowledge-overrides` (no `step-overrides`, no `cross-reads-overrides`) even though the overlay loader permits `step-overrides` for project-type overlays — see §1 |
 | `content/knowledge/{type}/*.md` | 12-14 knowledge documents following `{type}-{topic}.md` naming |
 | `src/config/validators/{type}.ts` | Coupling validator (no-op for initial no-invariant configs) |
 | `src/project/detectors/{type}.ts` | Low-confidence brownfield detector |
@@ -61,12 +61,13 @@ This is an exhaustive list. Some are compiler-enforced (`Record<ProjectType, …
 | --- | --- | --- |
 | `src/config/schema.ts` | Add enum value to `ProjectTypeSchema`; add `{Type}ConfigSchema` zod object with `.strict()`; add optional `{type}Config` field to both `ServiceSchema` and `ProjectSchema` | Compiler (types) + schema tests |
 | `src/types/config.ts` | Export derived `{Type}Config` type; extend `ProjectConfig` and `ServiceConfig` interfaces with optional `{type}Config` field; extend `DetectedConfig` discriminated union | Compiler |
-| `src/config/validators/index.ts` | Register new coupling validator in `ALL_COUPLING_VALIDATORS` | Silently-missable — `PROJECT_TYPE_TO_CONFIG_KEY` is built with an `as Readonly<Record<ProjectType, string>>` cast that suppresses the completeness check. Enforce via a registry-completeness vitest assertion (§7.5) |
+| `src/project/detectors/types.ts` | Extend `DetectionMatch` discriminated union with `{Type}Match` variant following the `MlMatch` pattern (see §6.2) | Compiler |
+| `src/config/validators/index.ts` | Register new coupling validator in `ALL_COUPLING_VALIDATORS` | Silently-missable at the cast site, BUT the existing `registry.test.ts:7-12` fails CI if not registered — effectively CI-enforced (see §6.3) |
 | `src/project/detectors/index.ts` | Register new detector in the `ALL_DETECTORS` list used by `runDetectors` | Silently-missable — detector list is untyped per-entry, no completeness test exists today. Mitigation: a new `src/project/detectors/coverage.test.ts` asserts every `ProjectType` has a registered detector (see §7.5) |
-| `src/wizard/copy/index.ts` | Register new copy module in `PROJECT_COPY`; extend `ProjectCopyMap` type | Compiler (`Record<ProjectType, …>` on `PROJECT_COPY` and mapped-type on per-type copy interfaces) |
+| `src/wizard/copy/types.ts` | Add `{Type}Copy` mapped-type interface following the `MlCopy` pattern; extend the `ProjectCopyMap` union | Compiler (mapped type forces coverage of every config field) |
+| `src/wizard/copy/index.ts` | Register new copy module in `PROJECT_COPY` | Compiler (`Record<ProjectType, …>`) |
 | `src/wizard/copy/core.ts` | Add `coreCopy.projectType.options[{type}]` entry — label + description for the new project type in the top-level wizard picker | Compiler (`Record<ProjectType, OptionCopy>` on `CoreCopy.projectType.options`) |
 | `src/wizard/questions.ts` | Extend `WizardAnswers`; add project-type branch in the if-chain question flow | Silently-missable — no `assertNever` at the branch site; missing branches produce `*.Config: undefined` which fails Zod at runtime, not compile |
-| `src/wizard/flags.ts` | Extend flag interfaces for new project type | Compiler |
 | `src/wizard/wizard.ts` | Add `...(answers.dataScienceConfig && { dataScienceConfig: answers.dataScienceConfig })` / `...(answers.web3Config && { web3Config: answers.web3Config })` to the conditional-spread block assembling `config.project` (the block is NOT a switch — it's a list of spread expressions) | Silently-missable — no enforcement; wizard E2E test exercises the path |
 | `src/project/adopt.ts` | Extend `TYPE_KEY` and `schemaForType` maps | Compiler (`Record<ProjectType, …>`) |
 
@@ -75,6 +76,7 @@ This is an exhaustive list. Some are compiler-enforced (`Record<ProjectType, …
 - `src/cli/commands/init.ts` / `src/cli/commands/adopt.ts` — both use `choices: ProjectTypeSchema.options as unknown as string[]`; the enum addition propagates automatically. No edit required.
 - `src/cli/init-flag-families.ts` — this file defines per-type CLI flag families (e.g. `--web-rendering`, `--backend-api-style`). DS-1 and W3-1 have single-value-enum configs with no user-facing flag surface yet, so `PartialConfigOverrides`, `detectFamily`, `applyFlagFamilyValidation`, and `buildFlagOverrides` have nothing to extend. Reserved for DS-2 / W3-2 when they introduce flag-configurable fields.
 - `src/wizard/flags.ts` — same reason; no new flag interface needed until additional config fields exist.
+- `src/config/validators/registry.test.ts` — the existing `registers exactly one validator per ProjectType` assertion already enforces coverage; no spec-authored extension is required.
 
 ### 3.3 Files modified once (not per-overlay)
 
@@ -82,6 +84,8 @@ This is an exhaustive list. Some are compiler-enforced (`Record<ProjectType, …
 | --- | --- | --- |
 | `tests/packaging/project-type-overlay-alignment.test.ts` (new) | Assert every `ProjectType` enum value has a matching `content/methodology/{type}-overlay.yml` | Created in DS PR, covers both automatically |
 | `tests/evals/overlay-structural-coverage.bats` (new) | Generic structural eval for project-type overlays (see §7.3 for scope — deliberately narrower than the existing orphan check in `knowledge-quality.bats`) | Created in DS PR |
+| `src/project/detectors/coverage.test.ts` (new) | Detector-registry completeness: assert `ALL_DETECTORS` covers every `ProjectType`. Closes the silent-miss hazard (see §7.5) | Created in DS PR, covers both automatically |
+| `src/e2e/project-type-overlays.test.ts` | Extend existing E2E overlay-resolution test with DS / Web3 cases (new overlay loads; knowledge injects into expected steps) | Each PR extends in its own scope |
 | `docs/roadmap.md` | Each PR updates in its own scope (completed entry, backlog entry, stale-wording fix) | Both |
 | `README.md` | Extend the project-type list | Each PR in own scope |
 | `CHANGELOG.md` | One entry per release | Each PR in own scope |
@@ -111,7 +115,7 @@ The two overlays target different primary audiences: `ml/` targets production mo
 | # | Doc | Purpose | Tool recommendations |
 |---|---|---|---|
 | 1 | `data-science-requirements` | PRD / user-story shape for a DS project — what "done" looks like for a model or report | — |
-| 2 | `data-science-conventions` | Python coding conventions for DS work | `ruff` (lint + format), type hints encouraged, Black formatting rules |
+| 2 | `data-science-conventions` | Python coding conventions for DS work | `ruff` (lint + Black-compatible format in one tool), type hints encouraged |
 | 3 | `data-science-project-structure` | Directory layout | `notebooks/`, `src/`, `data/` (gitignored), `models/`, `reports/`, `tests/`, `configs/` |
 | 4 | `data-science-dev-environment` | Local reproducible environment setup | `uv` (package manager), `pyproject.toml`, `direnv`, `pre-commit` |
 | 5 | `data-science-security` | PII handling, credential hygiene, dataset access controls | Env-var secrets, 1Password CLI, data-classification basics |
