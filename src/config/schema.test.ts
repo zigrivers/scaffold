@@ -1288,11 +1288,11 @@ describe('domain field — multi-domain union', () => {
     expect(BackendConfigSchema.safeParse({ ...baseBackend, domain: [] }).success).toBe(false)
   })
 
-  it("rejects ['none'] (none disallowed inside array)", () => {
+  it('rejects [\'none\'] (none disallowed inside array)', () => {
     expect(BackendConfigSchema.safeParse({ ...baseBackend, domain: ['none'] }).success).toBe(false)
   })
 
-  it("rejects ['none', 'fintech']", () => {
+  it('rejects [\'none\', \'fintech\']', () => {
     expect(BackendConfigSchema.safeParse({ ...baseBackend, domain: ['none', 'fintech'] }).success).toBe(false)
   })
 
