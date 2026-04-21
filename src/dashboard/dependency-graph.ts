@@ -92,13 +92,49 @@ export function buildDependencyGraph(input: BuildGraphInput): DependencyGraphDat
 
 /**
  * Assign `layer` to each node. Layer 0 = no upstream (orphans + root producers).
- * STUB in Task 2 — Task 3 implements longest-path topological sort + cycle handling.
+ * Uses longest-path: node.layer = 1 + max(layer of producers it consumes).
+ *
+ * Cycle handling: if Kahn-style pull leaves nodes unassigned, all remaining
+ * nodes (cycle participants + any downstream, see §3.4 cascade limitation)
+ * get the current max layer. Deterministic, no failure.
  */
 function assignLayers(
-  _nodes: DependencyGraphNode[],
-  _edgeMap: Map<string, StepEdgeDetail[]>,
+  nodes: DependencyGraphNode[],
+  edgeMap: Map<string, StepEdgeDetail[]>,
 ): void {
-  // Stub — Task 3 implements.
+  const byName = new Map(nodes.map(n => [n.name, n]))
+  const producers = new Map<string, string[]>()  // consumer -> producers list
+  for (const key of edgeMap.keys()) {
+    const [consumer, producer] = key.split('|')
+    const list = producers.get(consumer) ?? []
+    list.push(producer)
+    producers.set(consumer, list)
+  }
+
+  const assigned = new Set<string>()
+  let currentLayer = 0
+  while (assigned.size < nodes.length) {
+    const ready = nodes.filter(n => {
+      if (assigned.has(n.name)) return false
+      const producersList = producers.get(n.name) ?? []
+      return producersList.every(p => assigned.has(p) || !byName.has(p))
+    })
+    if (ready.length === 0) {
+      // Cycle breakdown: assign all remaining to current layer.
+      for (const n of nodes) {
+        if (!assigned.has(n.name)) {
+          n.layer = currentLayer
+          assigned.add(n.name)
+        }
+      }
+      break
+    }
+    for (const n of ready) {
+      n.layer = currentLayer
+      assigned.add(n.name)
+    }
+    currentLayer++
+  }
 }
 
 /**
