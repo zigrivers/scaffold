@@ -1,4 +1,5 @@
 import type { DashboardData, MultiServiceDashboardData } from './generator.js'
+import { NODE_WIDTH, NODE_HEIGHT } from './dependency-graph.js'
 
 export function escapeHtml(s: string): string {
   return s
@@ -1248,3 +1249,74 @@ ${serviceCards}
 </html>`
 }
 /* eslint-enable max-len */
+
+// ---------- Cross-service dependency graph ----------
+
+/**
+ * Render the `<section class="dep-graph">` block containing the SVG graph.
+ * Exported so tests can assert on rendered output directly (§6.2).
+ *
+ * Returns '' when data is null/undefined — caller does string concatenation
+ * and the empty slot naturally collapses.
+ *
+ * Security: attacker-influenced strings (service names, step slugs) flow
+ * through escapeHtml before reaching attribute values or text content.
+ * data-steps holds JSON with escaped quotes (`&quot;`); consumers decode
+ * via replace(/&quot;/g, '"') then JSON.parse.
+ */
+export function renderDependencyGraphSection(
+  data: MultiServiceDashboardData['dependencyGraph'],
+): string {
+  if (!data) return ''
+  return [
+    '<section class="dep-graph" id="dep-graph">',
+    '  <h2 class="dep-graph-title">Cross-Service Dependencies</h2>',
+    // role="img" would flatten the SVG a11y tree and suppress descendant
+    // <title> elements on many AT combos. SVG AAM handles focusable
+    // descendants with <title> correctly without an explicit role.
+    `  <svg class="dep-graph-svg" viewBox="0 0 ${data.viewBox.width} ${data.viewBox.height}" xmlns="http://www.w3.org/2000/svg" aria-label="Cross-service dependency graph">`,
+    '    <defs>',
+    '      <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">',
+    '        <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>',
+    '      </marker>',
+    '    </defs>',
+    renderDepEdges(data),
+    renderDepNodes(data),
+    '  </svg>',
+    '</section>',
+  ].join('\n')
+}
+
+function renderDepEdges(
+  data: NonNullable<MultiServiceDashboardData['dependencyGraph']>,
+): string {
+  return data.edges.map(edge => {
+    const tooltipLines = edge.steps.map(s =>
+      `${edge.consumer}:${s.consumerStep} -> ${edge.producer}:${s.producerStep} (${s.status})`,
+    )
+    const titleText = escapeHtml(tooltipLines.join('\n'))
+    const stepsJson = escapeHtml(JSON.stringify(edge.steps))
+    return [
+      `    <g class="dep-edge" data-consumer="${escapeHtml(edge.consumer)}" data-producer="${escapeHtml(edge.producer)}" data-steps="${stepsJson}" tabindex="0">`,
+      `      <title>${titleText}</title>`,
+      `      <path class="dep-edge-hit" d="${edge.svgPath}" stroke="transparent" stroke-width="14" fill="none" pointer-events="stroke"/>`,
+      `      <path class="dep-edge-line" d="${edge.svgPath}" stroke="currentColor" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>`,
+      '    </g>',
+    ].join('\n')
+  }).join('\n')
+}
+
+function renderDepNodes(
+  data: NonNullable<MultiServiceDashboardData['dependencyGraph']>,
+): string {
+  const HALF_W = NODE_WIDTH / 2
+  const NAME_BASELINE = 20
+  const TYPE_BASELINE = NODE_HEIGHT - 8
+  return data.nodes.map(n => [
+    `    <g class="dep-node" data-service="${escapeHtml(n.name)}" transform="translate(${n.x}, ${n.y})">`,
+    `      <rect class="dep-node-box" width="${NODE_WIDTH}" height="${NODE_HEIGHT}" rx="6"/>`,
+    `      <text class="dep-node-name" x="${HALF_W}" y="${NAME_BASELINE}" text-anchor="middle">${escapeHtml(n.name)}</text>`,
+    `      <text class="dep-node-type" x="${HALF_W}" y="${TYPE_BASELINE}" text-anchor="middle">${escapeHtml(n.projectType)}</text>`,
+    '    </g>',
+  ].join('\n')).join('\n')
+}

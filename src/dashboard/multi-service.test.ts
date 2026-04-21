@@ -3,6 +3,7 @@ import { generateMultiServiceDashboardData, generateMultiServiceHtml } from './g
 import type { MultiServiceGeneratorOptions, MultiServiceDashboardData } from './generator.js'
 import type { PipelineState, MetaPromptFile } from '../types/index.js'
 import { PHASES } from '../types/frontmatter.js'
+import { renderDependencyGraphSection } from './template.js'
 
 function makeState(
   steps: PipelineState['steps'],
@@ -640,5 +641,129 @@ describe('generateMultiServiceDashboardData — dependencyGraph pass-through', (
     }
     const data = generateMultiServiceDashboardData({ ...baseOpts(), dependencyGraph: graph })
     expect(data.dependencyGraph).toBe(graph)
+  })
+})
+
+describe('renderDependencyGraphSection', () => {
+  // Helper: extract data-steps attribute JSON for an edge (works around no jsdom).
+  function extractDataSteps(html: string, consumer: string, producer: string) {
+    const pattern = new RegExp(
+      `data-consumer="${consumer}"[^>]*data-producer="${producer}"[^>]*data-steps="([^"]*)"`,
+    )
+    const match = html.match(pattern)
+    if (!match) throw new Error(`edge ${consumer} -> ${producer} not found`)
+    const json = match[1].replace(/&quot;/g, '"')
+    return JSON.parse(json)
+  }
+
+  it('test 14: returns empty string for null and undefined', () => {
+    expect(renderDependencyGraphSection(null)).toBe('')
+    expect(renderDependencyGraphSection(undefined)).toBe('')
+  })
+
+  it('test 15: small graph renders <section class="dep-graph"> with expected viewBox', () => {
+    const data = {
+      nodes: [
+        { name: 'api', projectType: 'backend', layer: 0, x: 24, y: 24 },
+        { name: 'web', projectType: 'web-app', layer: 1, x: 244, y: 24 },
+      ],
+      edges: [
+        { consumer: 'web', producer: 'api', steps: [
+          { consumerStep: 'impl', producerStep: 'prd', status: 'completed' as const },
+        ], svgPath: 'M 244 46 C 192 46, 192 46, 164 46' },
+      ],
+      viewBox: { width: 408, height: 92 },
+    }
+    const html: string = renderDependencyGraphSection(data)
+    expect(html).toContain('<section class="dep-graph"')
+    expect(html).toContain('viewBox="0 0 408 92"')
+    expect(html).toContain('data-consumer="web"')
+    expect(html).toContain('data-producer="api"')
+  })
+
+  it('test 16: service names with special characters are HTML-escaped', () => {
+    const data = {
+      nodes: [
+        { name: '<svc>&"a', projectType: 'backend', layer: 0, x: 0, y: 0 },
+        { name: 'web', projectType: 'web-app', layer: 1, x: 220, y: 0 },
+      ],
+      edges: [
+        { consumer: 'web', producer: '<svc>&"a', steps: [
+          { consumerStep: 's', producerStep: 't', status: 'completed' as const },
+        ], svgPath: 'M 0 0' },
+      ],
+      viewBox: { width: 360, height: 92 },
+    }
+    const html: string = renderDependencyGraphSection(data)
+    expect(html).toContain('&lt;svc&gt;&amp;&quot;a')
+    // Raw form must NOT appear inside attribute values or text content.
+    // Narrowed regex avoids matching inside SVG path bytes.
+    expect(html).not.toMatch(/data-producer="<svc>&"a"/)
+    expect(html).not.toMatch(/<text[^>]*>.*<svc>&"a.*<\/text>/)
+  })
+
+  it('test 17: data-steps round-trips via extractDataSteps helper', () => {
+    const steps = [
+      { consumerStep: 'impl-plan', producerStep: 'create-prd', status: 'completed' as const },
+      { consumerStep: 'tech-stack', producerStep: 'arch', status: 'pending' as const },
+    ]
+    const data = {
+      nodes: [
+        { name: 'api', projectType: 'backend', layer: 0, x: 0, y: 0 },
+        { name: 'web', projectType: 'web-app', layer: 1, x: 220, y: 0 },
+      ],
+      edges: [{ consumer: 'web', producer: 'api', steps, svgPath: 'M 0 0' }],
+      viewBox: { width: 360, height: 92 },
+    }
+    const html: string = renderDependencyGraphSection(data)
+    const extracted = extractDataSteps(html, 'web', 'api')
+    expect(extracted).toEqual(steps)
+  })
+
+  it('test 18: defs contain <marker id="arrow" ... orient="auto">', () => {
+    const data = {
+      nodes: [
+        { name: 'api', projectType: 'backend', layer: 0, x: 0, y: 0 },
+        { name: 'web', projectType: 'web-app', layer: 1, x: 220, y: 0 },
+      ],
+      edges: [{ consumer: 'web', producer: 'api', steps: [
+        { consumerStep: 's', producerStep: 't', status: 'completed' as const },
+      ], svgPath: 'M 0 0' }],
+      viewBox: { width: 360, height: 92 },
+    }
+    const html: string = renderDependencyGraphSection(data)
+    expect(html).toMatch(/<marker\s+id="arrow"[^>]*orient="auto"/)
+  })
+
+  it('test 19: each edge has both dep-edge-hit and dep-edge-line paths', () => {
+    const data = {
+      nodes: [
+        { name: 'api', projectType: 'backend', layer: 0, x: 0, y: 0 },
+        { name: 'web', projectType: 'web-app', layer: 1, x: 220, y: 0 },
+      ],
+      edges: [{ consumer: 'web', producer: 'api', steps: [
+        { consumerStep: 's', producerStep: 't', status: 'completed' as const },
+      ], svgPath: 'M 0 0' }],
+      viewBox: { width: 360, height: 92 },
+    }
+    const html: string = renderDependencyGraphSection(data)
+    expect(html).toMatch(/class="dep-edge-hit"/)
+    expect(html).toMatch(/class="dep-edge-line"/)
+  })
+
+  it('test 20: each edge <g> has tabindex="0" and a nested <title>', () => {
+    const data = {
+      nodes: [
+        { name: 'api', projectType: 'backend', layer: 0, x: 0, y: 0 },
+        { name: 'web', projectType: 'web-app', layer: 1, x: 220, y: 0 },
+      ],
+      edges: [{ consumer: 'web', producer: 'api', steps: [
+        { consumerStep: 'impl', producerStep: 'prd', status: 'completed' as const },
+      ], svgPath: 'M 0 0' }],
+      viewBox: { width: 360, height: 92 },
+    }
+    const html: string = renderDependencyGraphSection(data)
+    expect(html).toMatch(/<g class="dep-edge"[^>]*tabindex="0"/)
+    expect(html).toMatch(/<title>[^<]*web:impl -&gt; api:prd \(completed\)[^<]*<\/title>/)
   })
 })
