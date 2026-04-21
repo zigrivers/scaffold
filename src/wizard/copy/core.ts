@@ -30,6 +30,10 @@ export const coreCopy: CoreCopy = {
         label: 'Research project',
         short: 'Iterative experiment loops where an agent drives the research cycle.',
       },
+      'data-science': {
+        label: 'Data science project',
+        short: 'Analytics, reports, or models — solo / small-team, local-first.',
+      },
     },
   },
   methodology: {
