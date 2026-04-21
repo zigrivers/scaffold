@@ -74,9 +74,14 @@ describe('generateMultiServiceDashboardData — dependencyGraph pass-through', (
     const graph = {
       nodes: [
         { name: 'api', projectType: 'backend', layer: 0, x: 10, y: 20 },
+        { name: 'web', projectType: 'web-app', layer: 1, x: 230, y: 20 },
       ],
-      edges: [],
-      viewBox: { width: 100, height: 50 },
+      edges: [{
+        consumer: 'web', producer: 'api',
+        steps: [{ consumerStep: 'impl', producerStep: 'prd', status: 'completed' as const }],
+        svgPath: 'M 230 42 C 175 42, 175 42, 150 42',
+      }],
+      viewBox: { width: 380, height: 92 },
     }
     const data = generateMultiServiceDashboardData({ ...baseOpts(), dependencyGraph: graph })
     expect(data.dependencyGraph).toBe(graph)
@@ -930,12 +935,14 @@ EOF
 
 ---
 
-## Task 5: Filter + readiness coverage tests (regression)
+## Task 5: Filter + readiness coverage tests (regression — NOT TDD)
 
 **Files:**
 - Modify: `src/dashboard/dependency-graph.test.ts` (append 5 tests)
 
-No production code change — Task 2 already implemented the filters and readiness threading. These tests close the coverage gap: test 7 (readiness enum threading), tests 10/11/12/13 (filter edges).
+**TDD note:** This task is explicitly regression coverage, NOT red-green TDD. Task 2 already implemented the filters and readiness threading as part of the §2.1 entry point (necessary to pass tests 1-3 without crashes on malformed input). These new tests close the coverage gap — they pass immediately against Task 2's implementation and lock the contract for future refactors.
+
+Test 7 covers readiness enum threading. Tests 10/11/12/13 cover filter edges. Tests 11 and 13 additionally assert that `resolveCrossReadReadiness` was NOT called for filtered-out cross-reads — this locks the spec's "filter before readiness lookup" ordering contract (spec §2.1 filter-at-aggregation requirement).
 
 - [ ] **Step 5.1: Write the regression tests**
 
@@ -995,7 +1002,7 @@ describe('buildDependencyGraph — readiness + filters (regression)', () => {
     expect(result).toBeNull()  // 0 edges after filtering → null
   })
 
-  it('test 11: service-unknown filter — target not in services[] dropped, edgeMap empty → null', () => {
+  it('test 11: service-unknown filter — target not in services[] dropped BEFORE readiness lookup, edgeMap empty → null', () => {
     const input = makeInput({
       perServiceOverlay: new Map([
         ['api', makeOverlay()],
@@ -1007,6 +1014,11 @@ describe('buildDependencyGraph — readiness + filters (regression)', () => {
     const result = buildDependencyGraph(input)
     // Builder short-circuits when edgeMap.size === 0
     expect(result).toBeNull()
+    // Filter order contract (spec §2.1): unknown-service cross-reads must be
+    // dropped BEFORE resolveCrossReadReadiness is called, both because that
+    // helper is filesystem-touching and because the caller (layoutGraph) does
+    // byName.get(producer)! which would crash. Lock the invariant:
+    expect(resolveCrossReadReadiness).not.toHaveBeenCalled()
   })
 
   it('test 12: disabled-step filter — cr declared on disabled consumer step dropped', () => {
@@ -1023,7 +1035,7 @@ describe('buildDependencyGraph — readiness + filters (regression)', () => {
     expect(result).toBeNull()
   })
 
-  it('test 13: mixed filter — self-ref + unknown + disabled, all dropped, null returned', () => {
+  it('test 13: mixed filter — self-ref + unknown + disabled, all dropped BEFORE readiness lookup, null returned', () => {
     const input = makeInput({
       perServiceOverlay: new Map([
         ['api', makeOverlay()],
@@ -1039,6 +1051,8 @@ describe('buildDependencyGraph — readiness + filters (regression)', () => {
     })
     const result = buildDependencyGraph(input)
     expect(result).toBeNull()
+    // All three filter classes drop BEFORE readiness lookup:
+    expect(resolveCrossReadReadiness).not.toHaveBeenCalled()
   })
 })
 ```
@@ -1083,7 +1097,25 @@ EOF
 
 Adds the SVG-rendering helper. Tests cover null/undefined handling, small-graph structure, XSS escaping, data-steps round-trip, marker attrs, dual-path pattern, and accessibility (tabindex + `<title>`).
 
-- [ ] **Step 6.1: Write the failing tests**
+- [ ] **Step 6.1: Update the top-of-file import block**
+
+In `src/dashboard/multi-service.test.ts`, the existing top-of-file import block imports from `./generator.js`. Add a new line importing `renderDependencyGraphSection` from `./template.js`:
+
+```typescript
+// Existing imports at top of file (do not modify):
+import { describe, it, expect } from 'vitest'
+import { generateMultiServiceDashboardData, generateMultiServiceHtml } from './generator.js'
+import type { MultiServiceGeneratorOptions, MultiServiceDashboardData } from './generator.js'
+import type { PipelineState, MetaPromptFile } from '../types/index.js'
+import { PHASES } from '../types/frontmatter.js'
+
+// NEW — add this line alongside the existing imports:
+import { renderDependencyGraphSection } from './template.js'
+```
+
+The repo is `"type": "module"` (package.json:4). `require('./template.js')` would fail at runtime in ESM test files — use a regular top-level import.
+
+- [ ] **Step 6.2: Write the failing tests**
 
 Append the following `describe` block at the end of `src/dashboard/multi-service.test.ts`:
 
@@ -1101,13 +1133,11 @@ describe('renderDependencyGraphSection', () => {
   }
 
   it('test 14: returns empty string for null and undefined', () => {
-    const { renderDependencyGraphSection } = require('./template.js')
     expect(renderDependencyGraphSection(null)).toBe('')
     expect(renderDependencyGraphSection(undefined)).toBe('')
   })
 
   it('test 15: small graph renders <section class="dep-graph"> with expected viewBox', () => {
-    const { renderDependencyGraphSection } = require('./template.js')
     const data = {
       nodes: [
         { name: 'api', projectType: 'backend', layer: 0, x: 24, y: 24 },
@@ -1128,7 +1158,6 @@ describe('renderDependencyGraphSection', () => {
   })
 
   it('test 16: service names with special characters are HTML-escaped', () => {
-    const { renderDependencyGraphSection } = require('./template.js')
     const data = {
       nodes: [
         { name: '<svc>&"a', projectType: 'backend', layer: 0, x: 0, y: 0 },
@@ -1150,7 +1179,6 @@ describe('renderDependencyGraphSection', () => {
   })
 
   it('test 17: data-steps round-trips via extractDataSteps helper', () => {
-    const { renderDependencyGraphSection } = require('./template.js')
     const steps = [
       { consumerStep: 'impl-plan', producerStep: 'create-prd', status: 'completed' as const },
       { consumerStep: 'tech-stack', producerStep: 'arch', status: 'pending' as const },
@@ -1169,7 +1197,6 @@ describe('renderDependencyGraphSection', () => {
   })
 
   it('test 18: defs contain <marker id="arrow" ... orient="auto">', () => {
-    const { renderDependencyGraphSection } = require('./template.js')
     const data = {
       nodes: [
         { name: 'api', projectType: 'backend', layer: 0, x: 0, y: 0 },
@@ -1185,7 +1212,6 @@ describe('renderDependencyGraphSection', () => {
   })
 
   it('test 19: each edge has both dep-edge-hit and dep-edge-line paths', () => {
-    const { renderDependencyGraphSection } = require('./template.js')
     const data = {
       nodes: [
         { name: 'api', projectType: 'backend', layer: 0, x: 0, y: 0 },
@@ -1202,7 +1228,6 @@ describe('renderDependencyGraphSection', () => {
   })
 
   it('test 20: each edge <g> has tabindex="0" and a nested <title>', () => {
-    const { renderDependencyGraphSection } = require('./template.js')
     const data = {
       nodes: [
         { name: 'api', projectType: 'backend', layer: 0, x: 0, y: 0 },
@@ -1220,13 +1245,13 @@ describe('renderDependencyGraphSection', () => {
 })
 ```
 
-- [ ] **Step 6.2: Run tests to verify they fail**
+- [ ] **Step 6.3: Run tests to verify they fail**
 
 Run: `npx vitest run src/dashboard/multi-service.test.ts -t "renderDependencyGraphSection"`
 
-Expected: FAIL — `renderDependencyGraphSection` is not exported from `template.js`. Runtime import error.
+Expected: FAIL — `renderDependencyGraphSection` is not exported from `template.js`. Type-check error on the import line, or runtime error at test load time.
 
-- [ ] **Step 6.3: Implement `renderDependencyGraphSection` in `src/dashboard/template.ts`**
+- [ ] **Step 6.4: Implement `renderDependencyGraphSection` in `src/dashboard/template.ts`**
 
 At the top of `src/dashboard/template.ts`, add the NODE_WIDTH/NODE_HEIGHT import after the existing imports (line 1):
 
@@ -1309,19 +1334,19 @@ function renderDepNodes(
 }
 ```
 
-- [ ] **Step 6.4: Run tests to verify they pass**
+- [ ] **Step 6.5: Run tests to verify they pass**
 
 Run: `npx vitest run src/dashboard/multi-service.test.ts`
 
 Expected: PASS — 7 new renderDependencyGraphSection tests pass. All existing tests still pass.
 
-- [ ] **Step 6.5: Run full suite + type-check**
+- [ ] **Step 6.6: Run full suite + type-check**
 
 Run: `npm run type-check && npx vitest run`
 
 Expected: PASS.
 
-- [ ] **Step 6.6: Commit**
+- [ ] **Step 6.7: Commit**
 
 ```bash
 git add src/dashboard/template.ts src/dashboard/multi-service.test.ts
@@ -1576,6 +1601,20 @@ EOF
 
 Inserts `renderDependencyGraphSection(data.dependencyGraph)` as a sibling of `.aggregate-block` and `.services-grid` (not a child of either). Placement locked per spec §4.6.
 
+- [ ] **Step 8.1a: Extend multi-service.test.ts imports**
+
+In `src/dashboard/multi-service.test.ts`, the existing top-of-file import of generator exports currently reads:
+
+```typescript
+import { generateMultiServiceDashboardData, generateMultiServiceHtml } from './generator.js'
+```
+
+Replace with (add `generateHtml` + `generateDashboardData` for the spec §8.2 single-service regression test):
+
+```typescript
+import { generateMultiServiceDashboardData, generateMultiServiceHtml, generateHtml, generateDashboardData } from './generator.js'
+```
+
 - [ ] **Step 8.1: Write the failing test**
 
 Append to `src/dashboard/multi-service.test.ts` at the end:
@@ -1632,6 +1671,25 @@ describe('buildMultiServiceTemplate — dependencyGraph integration', () => {
     }
     const html = generateMultiServiceHtml(data)
     expect(html).not.toContain('<section class="dep-graph"')
+  })
+
+  it('single-service dashboard output does NOT include dep-graph section (spec §8.2 compat)', () => {
+    // Use the single-service path via generateHtml + generateDashboardData.
+    // The single-service path has NO dependencyGraph awareness at all; this
+    // test locks that v3.21.0 single-service output remains unaffected.
+    const state: PipelineState = {
+      'schema-version': 3, 'scaffold-version': '3.22.0',
+      init_methodology: 'deep', config_methodology: 'deep',
+      'init-mode': 'greenfield',
+      created: '2026-04-21T00:00:00Z',
+      in_progress: null, steps: {}, next_eligible: [], 'extra-steps': [],
+    } as PipelineState
+    const html = generateHtml(generateDashboardData({
+      state, decisions: [], methodology: 'deep',
+    }))
+    expect(html).not.toContain('dep-graph')
+    expect(html).not.toContain('dep-edge')
+    expect(html).not.toContain('dep-tooltip')
   })
 })
 ```
@@ -1715,13 +1773,16 @@ EOF
 
 **Files:**
 - Modify: `src/cli/commands/dashboard.ts` (add loadPipelineContext + resolvePipeline per service + buildDependencyGraph + pass to generator)
-- Create: `src/e2e/dashboard-cross-service-graph.test.ts` (5 integration tests)
+- Create: `src/e2e/dashboard-cross-service-graph.test.ts` (integration tests — API-level composition + a wiring-focused test that mocks dashboard.ts's dependencies)
 
 Adds pipeline context loading once + per-service `resolvePipeline` (wrapped in try/catch mirroring the existing `loadState` STATE_MISSING fallback pattern) + `buildDependencyGraph` invocation. Passes `dependencyGraph` to the generator.
 
-The integration tests exercise the `buildDependencyGraph` → `generateMultiServiceDashboardData` → `generateMultiServiceHtml` pipeline directly at the API level. This avoids CLI harness fragility (process.exit mocking, yargs internals, meta-prompt discovery from package paths) while still covering the glue wiring that Task 9 introduces.
+Two layers of tests:
 
-Note: running the full `scaffold dashboard` command end-to-end against a real temp project is NOT feasible in-test because `loadPipelineContext` resolves meta-prompts from package-internal paths (`getPackagePipelineDir`). The dashboard.ts code path itself is covered by: (a) `make check-all` running linting + type-checking across the modified file, (b) maintainer-run `make dashboard-test` + Playwright MCP visual verification before merge.
+1. **API-level composition tests** (tests 21–25 below): call `buildDependencyGraph` + `generateMultiServiceDashboardData` + `generateMultiServiceHtml` directly against in-memory fixtures. These lock the composition contract and verify rendered HTML shape.
+2. **Wiring test** (test 26): mocks `loadPipelineContext`, `resolvePipeline`, and `StateManager.prototype.loadState` so the full `dashboard` command handler can be invoked without filesystem/CLI harness. Exercises the new `try/catch` around `resolvePipeline`, verifies `resolvePipeline` is called once per service, and verifies a throw for one service doesn't crash the other.
+
+This covers both the regression invariant (tests 21–25 pass immediately after Tasks 1–8 as composition coverage) AND the new wiring invariant (test 26 fails until Step 9.3's wiring is applied).
 
 - [ ] **Step 9.1: Write the failing integration tests**
 
@@ -1961,27 +2022,172 @@ describe('dashboard integration — cross-service dependency graph', () => {
 })
 ```
 
-- [ ] **Step 9.2: Run tests to verify they fail**
+Also append the following wiring-test `describe` block at the end of the same file:
+
+```typescript
+// ---------- Wiring test: exercises dashboard.ts's new try/catch + resolvePipeline loop ----------
+
+vi.mock('../core/pipeline/context.js', () => ({
+  loadPipelineContext: vi.fn(),
+}))
+vi.mock('../core/pipeline/resolver.js', () => ({
+  resolvePipeline: vi.fn(),
+}))
+vi.mock('../state/state-manager.js', () => {
+  class MockStateManager {
+    loadState(): PipelineState {
+      return {
+        'schema-version': 3, 'scaffold-version': '3.22.0',
+        init_methodology: 'deep', config_methodology: 'deep',
+        'init-mode': 'greenfield',
+        created: '2026-04-21T00:00:00Z',
+        in_progress: null, steps: {}, next_eligible: [], 'extra-steps': [],
+      } as PipelineState
+    }
+    saveState() {}
+  }
+  return { StateManager: MockStateManager }
+})
+vi.mock('../config/loader.js', () => ({
+  loadConfig: vi.fn(() => ({
+    config: {
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+      project: {
+        services: [
+          { name: 'api', projectType: 'backend' },
+          { name: 'web', projectType: 'web-app' },
+        ],
+      },
+    },
+    errors: [], warnings: [],
+  })),
+}))
+vi.mock('../state/ensure-v3-migration.js', () => ({ ensureV3Migration: vi.fn() }))
+vi.mock('../core/assembly/meta-prompt-loader.js', () => ({
+  discoverMetaPrompts: vi.fn(() => new Map()),
+}))
+vi.mock('../cli/middleware/project-root.js', () => ({
+  findProjectRoot: vi.fn(() => '/tmp/fake-proj'),
+}))
+vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }))
+
+describe('dashboard.ts multi-service wiring — resolvePipeline integration', () => {
+  it('test 26: resolvePipeline called per service; one service throwing does not crash the dashboard', async () => {
+    const { loadPipelineContext } = await import('../core/pipeline/context.js')
+    const { resolvePipeline } = await import('../core/pipeline/resolver.js')
+    vi.mocked(loadPipelineContext).mockReturnValue({
+      projectRoot: '/tmp/fake-proj',
+      metaPrompts: new Map(),
+      config: undefined,
+      configErrors: [],
+      configWarnings: [],
+      presets: { deep: undefined, mvp: undefined, custom: undefined },
+      methodologyDir: '/tmp/fake-methodology',
+    } as unknown as ReturnType<typeof loadPipelineContext>)
+    vi.mocked(resolvePipeline).mockImplementation((_ctx, opts) => {
+      if (opts?.serviceId === 'api') throw new Error('simulated overlay parse error')
+      // 'web' resolves OK
+      return {
+        graph: { nodes: [], edges: [] },
+        preset: { name: 'deep', description: '', default_depth: 3, steps: {} },
+        overlay: { steps: {}, knowledge: {}, reads: {}, dependencies: {}, crossReads: {} },
+        stepMeta: new Map(),
+        computeEligible: () => [],
+        globalSteps: new Set<string>(),
+        getPipelineHash: () => 'hash',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any
+    })
+
+    // fs stubs: need to prevent the real writeAndOpenDashboard from failing.
+    // Dynamic import the module fresh, then patch process.exit.
+    const fs = await import('node:fs')
+    const origExit = process.exit
+    let exitCode: number | undefined
+    let capturedHtml = ''
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(process as any).exit = (code?: number) => { exitCode = code ?? 0; throw new Error('__exit__') }
+    const origWrite = fs.writeFileSync
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(fs as any).writeFileSync = (p: string, contents: string) => {
+      if (typeof contents === 'string' && contents.includes('<html')) capturedHtml = contents
+    }
+
+    try {
+      const dashboardCmd = (await import('../cli/commands/dashboard.js')).default
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (dashboardCmd.handler as (a: any) => Promise<void>)({
+        'no-open': true,
+        _: [],
+        $0: 'scaffold',
+      })
+    } catch (err) {
+      if ((err as Error).message !== '__exit__') throw err
+    } finally {
+      process.exit = origExit
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(fs as any).writeFileSync = origWrite
+    }
+
+    expect(vi.mocked(resolvePipeline)).toHaveBeenCalledTimes(2)  // called per service
+    expect(exitCode).toBe(0)  // handler completed despite one throw
+    // The HTML was written — dashboard did not crash on api's overlay failure.
+    // Web's successful resolvePipeline means no edges materialized (empty overlay),
+    // so dep-graph section is absent.
+    expect(capturedHtml).not.toContain('class="dep-graph"')
+    // Services grid still rendered — service cards present.
+    expect(capturedHtml).toContain('class="services-grid"')
+  })
+})
+```
+
+- [ ] **Step 9.2: Run tests to verify the expected pass/fail split**
 
 Run: `npx vitest run src/e2e/dashboard-cross-service-graph.test.ts`
 
-Expected: The tests FAIL or surface errors because either (a) `DependencyGraphData` isn't imported anywhere that matters in runtime for the generator, or (b) tests that reference `dependencyGraph` on `MultiServiceGeneratorOptions` don't find the field yet.
+Expected:
+- Tests 21–25 (API-level composition): **PASS** against Tasks 1–8 implementation. They confirm that buildDependencyGraph → generateMultiServiceDashboardData → buildMultiServiceTemplate composes correctly. They are regression coverage.
+- Test 26 (wiring-level): **FAIL** — dashboard.ts has not yet been modified to call `loadPipelineContext` + `resolvePipeline` per service, so `vi.mocked(resolvePipeline)` reports 0 calls. This is the TDD red signal for Step 9.3.
 
-Actually these tests should PASS on Task 1's types + Task 8's template wiring — they don't exercise the dashboard.ts wiring at all. They exercise the API-level pipeline that's already working after Task 8.
-
-Re-frame: these tests are regression coverage for the complete integration. Run them at Step 9.2 and expect PASS. If they fail, it means Tasks 1–8 left a seam broken; investigate before modifying dashboard.ts. The dashboard.ts wiring (Step 9.3) is verified by `make check-all`'s type-check + lint passes, since the glue code there is straight-through plumbing.
-
-Revised step:
-
-Run: `npx vitest run src/e2e/dashboard-cross-service-graph.test.ts`
-
-Expected: PASS — 5 integration tests pass against the Tasks 1–8 implementation. They confirm that buildDependencyGraph → generateMultiServiceDashboardData → buildMultiServiceTemplate composes correctly.
-
-Proceed to 9.3 to add the dashboard.ts wiring itself.
+If tests 21–25 fail, Tasks 1–8 left a seam broken; investigate the failure BEFORE modifying dashboard.ts.
 
 - [ ] **Step 9.3: Wire `dashboard.ts`**
 
-In `src/cli/commands/dashboard.ts`, add imports at the top alongside existing imports (near line 24):
+This step uses three precise structural edits. The instructions below quote the CURRENT file content (verbatim, from `src/cli/commands/dashboard.ts` at HEAD before this task) and specify exactly what replaces it. Do NOT insert placeholder comments like `// ...` into production code.
+
+**Edit 1 of 3 — add imports.** Locate the import block at the top of the file (around lines 1–27). The current block is:
+
+```typescript
+import type { CommandModule } from 'yargs'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { execFileSync } from 'node:child_process'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+const pkg = require('../../../package.json') as { version: string }
+import { findProjectRoot } from '../middleware/project-root.js'
+import { resolveOutputMode } from '../middleware/output-mode.js'
+import { createOutputContext } from '../output/context.js'
+import { StateManager } from '../../state/state-manager.js'
+import { readDecisions } from '../../state/decision-logger.js'
+import { loadConfig } from '../../config/loader.js'
+import { guardSteplessCommand } from '../guards.js'
+import { StatePathResolver } from '../../state/state-path-resolver.js'
+import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
+import {
+  generateDashboardData,
+  generateHtml,
+  generateMultiServiceDashboardData,
+  generateMultiServiceHtml,
+} from '../../dashboard/generator.js'
+import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
+import { getPackagePipelineDir, atomicWriteFile } from '../../utils/fs.js'
+import type { PipelineState, ServiceConfig } from '../../types/index.js'
+```
+
+Insert four NEW import lines immediately AFTER the last existing import (`import type { PipelineState, ServiceConfig } ...`):
 
 ```typescript
 import { loadPipelineContext } from '../../core/pipeline/context.js'
@@ -1990,31 +2196,98 @@ import { buildDependencyGraph } from '../../dashboard/dependency-graph.js'
 import type { OverlayState } from '../../core/assembly/overlay-state-resolver.js'
 ```
 
-Then modify the `isMultiServiceMode` branch (around line 126–203). Locate the block starting with `if (isMultiServiceMode) {` and ending with `return` after `writeAndOpenDashboard(html, argv, output)`.
-
-Immediately AFTER `const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))` (around line 128), add:
+**Edit 2 of 3 — add context + overlay-map setup.** Locate the line that currently reads:
 
 ```typescript
-      // Load pipeline context once (shared across all services).
-      // includeTools: false (default) — tool meta-prompts aren't pipeline participants;
+      // Load meta-prompts ONCE and share across all services.
+      const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))
+```
+
+IMMEDIATELY AFTER that line (blank line, then the new block), insert:
+
+```typescript
+
+      // NEW: load pipeline context once (shared across all services). Default
+      // includeTools: false — tool meta-prompts aren't pipeline participants;
       // their crossReads would leak into overlay.crossReads and into the graph.
       const pipelineContext = loadPipelineContext(projectRoot)
 
-      // Per-service overlay map populated alongside loadedServices.
+      // NEW: per-service overlay map populated alongside loadedServices below.
       const perServiceOverlay = new Map<string, OverlayState>()
       let capturedGlobalSteps: Set<string> | undefined
 ```
 
-Then, INSIDE the existing `for (const svc of configuredServices!) {` loop (around line 142), add the resolvePipeline call BEFORE the existing `StatePathResolver` / `StateManager` instantiation:
+**Edit 3 of 3 — add per-service resolvePipeline + post-loop graph build + generator call update.** The current loop + aftermath block (lines roughly 142–193) is:
 
 ```typescript
+      let fallbackStateMethodology: string | undefined
+      for (const svc of configuredServices!) {
+        const svcResolver = new StatePathResolver(projectRoot, svc.name)
+        const svcStateManager = new StateManager(
+          projectRoot,
+          () => [],
+          () => config ?? undefined,
+          svcResolver,
+          new Set<string>(),
+          undefined,
+        )
+        let svcState: PipelineState
+        try {
+          svcState = svcStateManager.loadState()
+          if (!fallbackStateMethodology) {
+            fallbackStateMethodology = svcState.config_methodology
+          }
+        } catch (err) {
+          // Only convert missing-state-file into a skeleton; re-throw anything
+          // else (corrupt JSON, schema-version mismatch, permission errors) so
+          // the user sees the real error instead of a confusing 0% row.
+          // Codex/Claude MMR P2: bare catch collapsed every failure mode.
+          const code = (err as { code?: string } | undefined)?.code
+          if (code !== 'STATE_MISSING') throw err
+          // Skeleton state: empty steps (total=0) renders as "Not started" in
+          // the multi-service template, distinct from "Complete".
+          svcState = {
+            'schema-version': 3,
+            'scaffold-version': pkg.version,
+            init_methodology: configMethodology ?? 'unknown',
+            config_methodology: configMethodology ?? 'unknown',
+            'init-mode': 'greenfield',
+            created: new Date().toISOString(),
+            in_progress: null,
+            steps: {},
+            next_eligible: [],
+            'extra-steps': [],
+          } as PipelineState
+        }
+        loadedServices.push({
+          name: svc.name,
+          projectType: svc.projectType,
+          state: svcState,
+          metaPrompts,
+        })
+      }
+
+      const methodology = configMethodology ?? fallbackStateMethodology ?? 'unknown'
+
+      const dashboardData = generateMultiServiceDashboardData({
+        services: loadedServices,
+        methodology,
+      })
+```
+
+Replace that entire block with this block (the only changes: (a) the `try/catch` around `resolvePipeline` at the START of the loop body, (b) the `buildDependencyGraph` call AFTER the loop, (c) the `dependencyGraph` argument added to `generateMultiServiceDashboardData`):
+
+```typescript
+      let fallbackStateMethodology: string | undefined
       for (const svc of configuredServices!) {
         // NEW: resolve pipeline per service to capture overlay + globalSteps.
         // Wrap in try/catch mirroring loadState's STATE_MISSING fallback — a
         // malformed overlay for one service must not crash the multi-service
         // dashboard. On failure, warn + skip this service's outgoing graph
-        // contribution; its card still renders because loadState's catch has
-        // its own fallback.
+        // contribution; the service's card still renders because the
+        // loadState block below has its own fallback. Incoming edges FROM
+        // other services INTO this service are still rendered — only this
+        // service's OWN outgoing declarations are lost.
         try {
           const svcPipeline = resolvePipeline(pipelineContext, { output, serviceId: svc.name })
           perServiceOverlay.set(svc.name, svcPipeline.overlay)
@@ -2028,17 +2301,49 @@ Then, INSIDE the existing `for (const svc of configuredServices!) {` loop (aroun
           )
         }
 
-        // existing state-loading block unchanged:
+        // Existing state-loading block (unchanged from HEAD):
         const svcResolver = new StatePathResolver(projectRoot, svc.name)
-        // ... (rest of existing loop body)
-```
+        const svcStateManager = new StateManager(
+          projectRoot,
+          () => [],
+          () => config ?? undefined,
+          svcResolver,
+          new Set<string>(),
+          undefined,
+        )
+        let svcState: PipelineState
+        try {
+          svcState = svcStateManager.loadState()
+          if (!fallbackStateMethodology) {
+            fallbackStateMethodology = svcState.config_methodology
+          }
+        } catch (err) {
+          const code = (err as { code?: string } | undefined)?.code
+          if (code !== 'STATE_MISSING') throw err
+          svcState = {
+            'schema-version': 3,
+            'scaffold-version': pkg.version,
+            init_methodology: configMethodology ?? 'unknown',
+            config_methodology: configMethodology ?? 'unknown',
+            'init-mode': 'greenfield',
+            created: new Date().toISOString(),
+            in_progress: null,
+            steps: {},
+            next_eligible: [],
+            'extra-steps': [],
+          } as PipelineState
+        }
+        loadedServices.push({
+          name: svc.name,
+          projectType: svc.projectType,
+          state: svcState,
+          metaPrompts,
+        })
+      }
 
-Do NOT delete or reorder any existing loop body — only prepend the try/catch.
+      const methodology = configMethodology ?? fallbackStateMethodology ?? 'unknown'
 
-After the loop ends (around line 186, right before the `const methodology = ...` line), add the graph build:
-
-```typescript
-      // Build the dependency graph (returns null if no edges after filtering).
+      // NEW: build the dependency graph (returns null if no edges after filtering).
       const dependencyGraph = buildDependencyGraph({
         config: config!,
         projectRoot,
@@ -2046,23 +2351,23 @@ After the loop ends (around line 186, right before the `const methodology = ...`
         perServiceOverlay,
         globalSteps: capturedGlobalSteps,
       })
-```
 
-Finally, modify the `generateMultiServiceDashboardData` call (around line 190) to thread `dependencyGraph`:
-
-```typescript
       const dashboardData = generateMultiServiceDashboardData({
         services: loadedServices,
         methodology,
-        dependencyGraph,
+        dependencyGraph,  // NEW — threaded into generator
       })
 ```
+
+Do not touch the single-service branch (the code path after `isMultiServiceMode` returns). That path must remain byte-identical to HEAD so spec §8.2 holds.
 
 - [ ] **Step 9.4: Run tests to verify they pass**
 
 Run: `npx vitest run src/e2e/dashboard-cross-service-graph.test.ts`
 
-Expected: PASS — all 5 E2E tests pass. (Tests 21, 24 may pass by the structural fallback path if the E2E fixture cannot produce a cross-read edge without modifying package-internal overlay files; this is documented in 9.2 and expected.)
+Expected: PASS — all 6 tests (21–26) pass. In particular, test 26 now passes because the dashboard.ts handler calls `resolvePipeline` twice (once per configured service), handles the thrown error from the `api` mock without crashing, and writes HTML that contains `services-grid` but not `dep-graph` (web's overlay is empty in the mock).
+
+If test 26 still fails, most likely culprits: (a) `capturedGlobalSteps` never captured because BOTH services throw (check mock setup), (b) resolvePipeline called 0 or >2 times (check the loop position of the try/catch), (c) the generator's dependencyGraph argument isn't wired (check Edit 3's final block).
 
 - [ ] **Step 9.5: Run full suite + type-check**
 
@@ -2205,7 +2510,30 @@ For each round:
 
 3-round limit. If findings remain after round 3, STOP and surface to the user — do not merge.
 
-- [ ] **Step 11.3: Verdict check + merge**
+- [ ] **Step 11.3: Playwright visual verification (spec §6.4)**
+
+Spec §6.4 requires manual Playwright visual verification before merge. This is NOT optional — it's part of the pre-merge gate.
+
+```bash
+make dashboard-test
+```
+
+The command outputs the path to a test HTML at `tests/screenshots/dashboard-test.html`. Open it in a browser and verify using Playwright MCP tools (`mcp__plugin_playwright_playwright__*`):
+
+1. `browser_navigate` to `file://<path>`.
+2. Resize to 1280×800 (desktop) — `browser_take_screenshot`, save to `tests/screenshots/current/dep-graph_desktop_light.png`.
+3. Resize to 375×812 (mobile) — screenshot `dep-graph_mobile_light.png`.
+4. `browser_run_code` to set `document.documentElement.setAttribute('data-theme', 'dark')` — re-screenshot desktop + mobile as `_dark.png`.
+5. `browser_hover` on a `.dep-edge` `<g>` → verify tooltip appears (`.dep-tooltip.visible`). Screenshot as `dep-graph_desktop_tooltip-hover.png`.
+6. `browser_press_key` `Tab` repeatedly to focus an edge → verify tooltip appears on focus. Screenshot as `dep-graph_desktop_tooltip-focus.png`.
+7. Scroll the page → verify tooltip dismisses.
+8. `browser_snapshot` to sanity-check the accessibility tree (each edge announced, tooltip region live).
+
+If the dashboard-test fixture does not include cross-service services (and thus no graph), temporarily populate `.scaffold/config.yml` with a 2-service fixture that has a cross-read declaration before running `make dashboard-test`. Revert after screenshots are captured.
+
+If any visual regression is detected (graph clips, tooltip off-screen, broken arrowhead, dark-mode colors wrong), fix inline on the feature branch and push — the PR reopens for review. Do NOT merge with visual regressions.
+
+- [ ] **Step 11.4: Verdict check + merge**
 
 Verdict handling per CLAUDE.md:
 - `pass` or `degraded-pass` → proceed to merge.
