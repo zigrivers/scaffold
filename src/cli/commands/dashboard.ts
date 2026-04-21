@@ -191,8 +191,14 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
             fallbackStateMethodology = svcState.config_methodology
           }
         } catch (err) {
+          // Only convert missing-state-file into a skeleton; re-throw anything
+          // else (corrupt JSON, schema-version mismatch, permission errors) so
+          // the user sees the real error instead of a confusing 0% row.
+          // Codex/Claude MMR P2: bare catch collapsed every failure mode.
           const code = (err as { code?: string } | undefined)?.code
           if (code !== 'STATE_MISSING') throw err
+          // Skeleton state: empty steps (total=0) renders as "Not started" in
+          // the multi-service template, distinct from "Complete".
           svcState = {
             'schema-version': 3,
             'scaffold-version': pkg.version,
