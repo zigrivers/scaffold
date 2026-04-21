@@ -1333,13 +1333,18 @@ ${serviceCards}
     }
 
     edges.forEach(function(edge) {
-      edge.addEventListener('mouseenter', function() { showTooltip(edge); });
+      // mouseenter: position BEFORE showing so a stationary hover doesn't
+      // render at a stale/default location waiting for the first mousemove.
+      edge.addEventListener('mouseenter', function(e) {
+        positionTooltip(e.clientX, e.clientY);
+        showTooltip(edge);
+      });
       edge.addEventListener('mousemove', function(e) { positionTooltip(e.clientX, e.clientY); });
       edge.addEventListener('mouseleave', hideTooltip);
       edge.addEventListener('focusin', function() {
-        showTooltip(edge);
         var rect = edge.getBoundingClientRect();
         positionTooltip(rect.right, rect.top);
+        showTooltip(edge);
       });
       edge.addEventListener('focusout', hideTooltip);
     });

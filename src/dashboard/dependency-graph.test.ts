@@ -208,6 +208,47 @@ describe('buildDependencyGraph — layer assignment', () => {
     const byName = new Map(result!.nodes.map(n => [n.name, n]))
     expect(byName.get('svc-a')!.layer).toBe(byName.get('svc-b')!.layer)
   })
+
+  it('test 6b: cycle cascade — root → A ↔ B → leaf collapses downstream into cycle layer', () => {
+    // Documents spec §3.4's known limitation: when a cycle has nodes strictly
+    // downstream of it, the simplified layered algorithm lumps the downstream
+    // node into the cycle layer alongside the participants (full SCC analysis
+    // would avoid this but triples the code size). Locks the current behavior
+    // so a future refactor that silently "fixes" it gets caught.
+    const services = [
+      { name: 'root', projectType: 'library' } as const,
+      { name: 'svc-a', projectType: 'backend' } as const,
+      { name: 'svc-b', projectType: 'backend' } as const,
+      { name: 'leaf', projectType: 'web-app' } as const,
+    ]
+    const input = makeInput({
+      services,
+      config: makeConfig(services.map(s => ({ name: s.name, projectType: s.projectType }))),
+      perServiceOverlay: new Map([
+        ['root', makeOverlay()],
+        ['svc-a', makeOverlay({
+          'step-a1': [
+            { service: 'root', step: 'seed' },
+            { service: 'svc-b', step: 'step-b1' },
+          ],
+        })],
+        ['svc-b', makeOverlay({
+          'step-b1': [{ service: 'svc-a', step: 'step-a1' }],
+        })],
+        ['leaf', makeOverlay({
+          'leaf-step': [{ service: 'svc-a', step: 'step-a1' }],
+        })],
+      ]),
+    })
+    const result = buildDependencyGraph(input)
+    expect(result).not.toBeNull()
+    const byName = new Map(result!.nodes.map(n => [n.name, n]))
+    expect(byName.get('root')!.layer).toBe(0)
+    const cycleLayer = byName.get('svc-a')!.layer
+    expect(byName.get('svc-b')!.layer).toBe(cycleLayer)
+    // Documented cascade: leaf (consumer of cycle) gets the same layer as the cycle.
+    expect(byName.get('leaf')!.layer).toBe(cycleLayer)
+  })
 })
 
 describe('buildDependencyGraph — layout + determinism', () => {
