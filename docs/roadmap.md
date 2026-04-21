@@ -140,25 +140,38 @@ Each requires: 1 overlay YAML + ~10 knowledge documents + ~10-20 pipeline steps 
 
 ### Knowledge Document Expansion
 
-Current knowledge coverage by category:
+Current knowledge coverage by category (files in `content/knowledge/<category>/`):
 
-| Category | Count | Status |
-|----------|-------|--------|
-| Core | 27 | Complete |
-| Game | 15 | Complete |
-| Research | 6 | Complete |
-| Backend (fintech) | 8 | Complete |
-| Multi-service | 8 | Complete |
+| Category | Count |
+|----------|-------|
+| Core | 35 |
+| Game | 25 |
+| Research | 25 |
+| Backend (incl. multi-service + fintech) | 22 |
+| Review | 20 |
+| Web-app | 17 |
+| Browser-extension | 12 |
+| Data-pipeline | 12 |
+| Library | 12 |
+| ML | 12 |
+| Mobile-app | 12 |
+| CLI | 10 |
+| Validation | 7 |
+| Product | 6 |
+| Execution | 4 |
+| Tools | 4 |
+| Finalization | 3 |
 
 Potential additions: mobile-specific patterns, DevOps/platform engineering, accessibility deep dives.
 
 ### Eval Coverage Expansion
 
-Current eval suite: 73 assertions across 8 eval files. Areas for expansion:
+Current eval suite: 73 `@test` blocks across 23 bats files in `tests/evals/`. Areas for expansion:
 
 - Cross-service step ordering validation
 - Service-scoped artifact consumption checks
 - Knowledge document freshness (content age vs industry evolution)
+- Cross-service dependency-graph rendering invariants (landed in v3.22.0 — eval coverage for the graph shape / determinism is currently in `src/dashboard/` unit tests, not the bats eval suite)
 
 ---
 
