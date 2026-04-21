@@ -6,6 +6,16 @@ Working document tracking completed work, in-progress items, and future directio
 
 ## Completed Releases
 
+### v3.21.0 (2026-04-20)
+
+Multi-Domain Stacking — `backendConfig.domain` / `researchConfig.domain` accept arrays to stack multiple domain sub-overlays in declaration order. Completes roadmap Phase 2 "Multi-Domain Stacking."
+
+- **Schema change**: 3-way union on `domain` field (`'none'` literal | single enum | non-empty array of enum). No `.transform()` — zero write-site breakage.
+- **Resolver change**: `normalizeDomains` helper iterates over domains with warn-on-duplicate; knowledge merge now append + dedup (fixes latent single-domain bug).
+- **Service-mode**: inherited automatically via `ServiceSchema` reuse — `services[N].researchConfig.domain: [...]` works out of the box.
+- **Fixture-only test content**: no new production domain sub-overlays ship with this feature. Two contrived fixtures (`backend-fake-a.yml`, `backend-fake-b.yml`) used only to engineer collision cases.
+- **Review discipline**: 4-round spec MMR (Codex + Gemini) + 3-channel PR MMR.
+
 ### v3.20.0 (2026-04-20)
 
 Multi-Service Dashboard — `scaffold dashboard` on a multi-service project renders a single bird's-eye page with per-service progress cards + aggregate stats. Completes roadmap Near-Term "Multi-Service Dashboard (deferred from Wave 3b)".
@@ -84,18 +94,6 @@ Multi-Service Dashboard shipped in v3.20.0 without cross-service dep visualizati
 - Initialize v3 state layout directly
 
 **Scope**: Design needed. Medium complexity (~200-300 lines).
-
-### Multi-Domain Stacking
-
-Currently each project type supports one domain (e.g., `backend` + `fintech`). Multi-domain would allow:
-```yaml
-backendConfig:
-  domain: ['fintech', 'healthcare']
-```
-
-Requires overlay conflict resolution for knowledge injection when multiple domains overlap.
-
-**Scope**: Design needed. Depends on Wave 2 overlay conflict resolution.
 
 ---
 
