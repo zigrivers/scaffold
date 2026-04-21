@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 import os from 'node:os'
 import { resolveOverlayState } from './overlay-state-resolver.js'
+import { getPackageMethodologyDir } from '../../utils/fs.js'
 import type { ScaffoldConfig, StepEnablementEntry } from '../../types/index.js'
 import type { MetaPromptFrontmatter } from '../../types/frontmatter.js'
 import type { OutputContext } from '../../cli/output/context.js'
@@ -696,6 +697,100 @@ step-overrides:
 
       expect(output.warn).toHaveBeenCalledWith(
         expect.stringContaining('nonexistent-step'),
+      )
+    })
+  })
+
+  describe('multi-domain stacking — real research overlays', () => {
+    const realMethodologyDir = getPackageMethodologyDir()
+
+    const researchBase = {
+      experimentDriver: 'code-driven' as const,
+      interactionMode: 'checkpoint-gated' as const,
+      hasExperimentTracking: true,
+    }
+
+    // research-quant-finance.yml appends to system-architecture:
+    //   [research-quant-backtesting, research-quant-strategy-patterns]
+    // research-ml-research.yml appends to system-architecture:
+    //   [research-ml-architecture-search, research-ml-training-patterns]
+    // research-overlay.yml (pass-1 core) appends:
+    //   [research-architecture, research-experiment-loop]
+    // All entries are disjoint — no natural collision.
+
+    function makeResearchConfigWithDomains(domain: unknown) {
+      return makeConfig({
+        project: {
+          projectType: 'research',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          researchConfig: { ...researchBase, domain: domain as any },
+        },
+      })
+    }
+
+    function makeMetaPromptsForSystemArch() {
+      return new Map<string, { frontmatter: MetaPromptFrontmatter }>([
+        ['system-architecture', { frontmatter: makeFrontmatter({
+          name: 'system-architecture', knowledgeBase: [],
+          reads: [], dependencies: [],
+        }) }],
+      ])
+    }
+
+    it('merges both overlays in declaration order (quant-finance, ml-research)', () => {
+      const result = resolveOverlayState({
+        config: makeResearchConfigWithDomains(['quant-finance', 'ml-research']),
+        methodologyDir: realMethodologyDir,
+        metaPrompts: makeMetaPromptsForSystemArch(),
+        presetSteps: { 'system-architecture': { enabled: true } },
+        output: makeOutput(),
+      })
+      // Core overlay first, then quant-finance, then ml-research
+      expect(result.knowledge['system-architecture']).toEqual([
+        'research-architecture',
+        'research-experiment-loop',
+        'research-quant-backtesting',
+        'research-quant-strategy-patterns',
+        'research-ml-architecture-search',
+        'research-ml-training-patterns',
+      ])
+    })
+
+    it('respects declaration order when reversed (ml-research, quant-finance)', () => {
+      const result = resolveOverlayState({
+        config: makeResearchConfigWithDomains(['ml-research', 'quant-finance']),
+        methodologyDir: realMethodologyDir,
+        metaPrompts: makeMetaPromptsForSystemArch(),
+        presetSteps: { 'system-architecture': { enabled: true } },
+        output: makeOutput(),
+      })
+      expect(result.knowledge['system-architecture']).toEqual([
+        'research-architecture',
+        'research-experiment-loop',
+        'research-ml-architecture-search',
+        'research-ml-training-patterns',
+        'research-quant-backtesting',
+        'research-quant-strategy-patterns',
+      ])
+    })
+
+    it('single-element array matches single-string behavior (invariant)', () => {
+      const stringResult = resolveOverlayState({
+        config: makeResearchConfigWithDomains('quant-finance'),
+        methodologyDir: realMethodologyDir,
+        metaPrompts: makeMetaPromptsForSystemArch(),
+        presetSteps: { 'system-architecture': { enabled: true } },
+        output: makeOutput(),
+      })
+      const arrayResult = resolveOverlayState({
+        config: makeResearchConfigWithDomains(['quant-finance']),
+        methodologyDir: realMethodologyDir,
+        metaPrompts: makeMetaPromptsForSystemArch(),
+        presetSteps: { 'system-architecture': { enabled: true } },
+        output: makeOutput(),
+      })
+      expect(stringResult.knowledge['system-architecture']).toEqual(
+        arrayResult.knowledge['system-architecture'],
       )
     })
   })
