@@ -19,7 +19,7 @@
 // It is explicitly a separate literal in the union so it cannot appear
 // inside an array (rejected at parse time as an enum violation).
 //
-// EXPORTED so the packaging-integrity test (§5.4) can enumerate the
+// EXPORTED so the packaging-integrity test (§5.5) can enumerate the
 // canonical values. Do not inline these — tests rely on the import.
 export const backendRealDomains = ['fintech'] as const
 export const researchRealDomains = ['quant-finance', 'ml-research', 'simulation'] as const
@@ -179,7 +179,7 @@ function normalizeDomains(
 - **First-occurrence dedup.** `['fintech', 'climate', 'fintech']` → `['fintech', 'climate']`.
 - **Dedup within step knowledge.** Applied per-step on each sub-overlay merge, not just across the final result. Matches `applyOverlay`'s existing contract.
 - **One domain's failure doesn't block others.** A missing file, malformed YAML, or empty overlay for domain A does not prevent domains B and C from loading.
-- **Silent-skip for missing files.** Matches current single-domain behavior. Packaging-integrity test (§5.3) is the backstop.
+- **Silent-skip for missing files.** Matches current single-domain behavior. Packaging-integrity test (§5.5) is the backstop.
 
 ### 2.4 Formal merge semantics
 
@@ -243,7 +243,7 @@ project:
 
 The overlay resolver runs per-service in service mode (v3.17.0 Wave 3b) and already receives the service's config as the `config.project` input, so `typeConfig?.['domain']` already reads the service-scoped domain. **No resolver changes are needed beyond §2 for service-mode multi-domain.**
 
-Test coverage: §5.3 adds one service-mode integration test asserting that `services[0].backendConfig.domain: ['fintech', 'climate']` produces the same knowledge-merge output as the root-level case.
+Test coverage: §5.3.1 adds two service-mode integration tests (tests 19–20) exercising `services[0].researchConfig.domain: ['quant-finance', 'ml-research']` under the `resolvePipeline(ctx, { serviceId })` path — research is used because backend has only one real domain today, so genuine multi-domain stacking isn't testable with real backend overlays.
 
 ---
 
@@ -309,7 +309,7 @@ These use the packaged `content/methodology/` sub-overlays to exercise end-to-en
 
 ### 5.3.1 Service-mode integration — multi-domain per service
 
-Exercises the real service-mode resolution path via `resolvePipeline({ ..., serviceId })` (see `src/core/pipeline/resolver.ts:28` and `src/e2e/service-execution.test.ts:152` for the test pattern). This proves multi-domain works under service-mode, not just that the schema preserves the shape.
+Exercises the real service-mode resolution path via `resolvePipeline(context, { serviceId })` — the actual signature per `src/core/pipeline/resolver.ts:18-21`, with `serviceId` in the second (options) argument. See `src/e2e/service-execution.test.ts:163-174` for the canonical invocation pattern. This proves multi-domain works under service-mode, not just that the schema preserves the shape.
 
 19. Config: `services[0].projectType: 'research'`, `services[0].researchConfig.domain: ['quant-finance', 'ml-research']`. Call `resolvePipeline(ctx, { serviceId: services[0].name })`. Assert resolved `overlay.knowledge['system-architecture']` contains entries from **both** sub-overlays in declaration order. (Research is used rather than backend because backend has only one real domain.)
 20. Same config, reversed order (`['ml-research', 'quant-finance']`). Assert order differs correspondingly, proving service-mode respects declaration order (same invariant as root-level test 17).
