@@ -25,6 +25,10 @@ import {
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { getPackagePipelineDir, atomicWriteFile } from '../../utils/fs.js'
 import type { PipelineState, ServiceConfig } from '../../types/index.js'
+import { loadPipelineContext } from '../../core/pipeline/context.js'
+import { resolvePipeline } from '../../core/pipeline/resolver.js'
+import { buildDependencyGraph } from '../../dashboard/dependency-graph.js'
+import type { OverlayState } from '../../core/assembly/overlay-state-resolver.js'
 
 interface DashboardArgs {
   format?: string
@@ -127,6 +131,15 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
       // Load meta-prompts ONCE and share across all services.
       const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))
 
+      // NEW: load pipeline context once (shared across all services). Default
+      // includeTools: false — tool meta-prompts aren't pipeline participants;
+      // their crossReads would leak into overlay.crossReads and into the graph.
+      const pipelineContext = loadPipelineContext(projectRoot)
+
+      // NEW: per-service overlay map populated alongside loadedServices below.
+      const perServiceOverlay = new Map<string, OverlayState>()
+      let capturedGlobalSteps: Set<string> | undefined
+
       // Methodology resolution: prefer config.methodology.preset; else fall back to
       // the first loaded service state's config_methodology; else 'unknown'.
       const configMethodology = (config as ConfigWithMethodology)?.methodology?.preset
@@ -140,6 +153,28 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
 
       let fallbackStateMethodology: string | undefined
       for (const svc of configuredServices!) {
+        // NEW: resolve pipeline per service to capture overlay + globalSteps.
+        // Wrap in try/catch mirroring loadState's STATE_MISSING fallback — a
+        // malformed overlay for one service must not crash the multi-service
+        // dashboard. On failure, warn + skip this service's outgoing graph
+        // contribution; the service's card still renders because the
+        // loadState block below has its own fallback. Incoming edges FROM
+        // other services INTO this service are still rendered — only this
+        // service's OWN outgoing declarations are lost.
+        try {
+          const svcPipeline = resolvePipeline(pipelineContext, { output, serviceId: svc.name })
+          perServiceOverlay.set(svc.name, svcPipeline.overlay)
+          if (!capturedGlobalSteps) capturedGlobalSteps = svcPipeline.globalSteps
+        } catch (err) {
+          output.warn(
+            `Could not resolve pipeline for service '${svc.name}' — `
+            + 'outgoing graph edges from this service omitted '
+            + '(incoming edges from other services are still rendered) '
+            + `(${(err as Error).message})`,
+          )
+        }
+
+        // Existing state-loading block (unchanged from HEAD):
         const svcResolver = new StatePathResolver(projectRoot, svc.name)
         const svcStateManager = new StateManager(
           projectRoot,
@@ -156,14 +191,8 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
             fallbackStateMethodology = svcState.config_methodology
           }
         } catch (err) {
-          // Only convert missing-state-file into a skeleton; re-throw anything
-          // else (corrupt JSON, schema-version mismatch, permission errors) so
-          // the user sees the real error instead of a confusing 0% row.
-          // Codex/Claude MMR P2: bare catch collapsed every failure mode.
           const code = (err as { code?: string } | undefined)?.code
           if (code !== 'STATE_MISSING') throw err
-          // Skeleton state: empty steps (total=0) renders as "Not started" in
-          // the multi-service template, distinct from "Complete".
           svcState = {
             'schema-version': 3,
             'scaffold-version': pkg.version,
@@ -187,9 +216,19 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
 
       const methodology = configMethodology ?? fallbackStateMethodology ?? 'unknown'
 
+      // NEW: build the dependency graph (returns null if no edges after filtering).
+      const dependencyGraph = buildDependencyGraph({
+        config: config!,
+        projectRoot,
+        services: configuredServices!.map(s => ({ name: s.name, projectType: s.projectType })),
+        perServiceOverlay,
+        globalSteps: capturedGlobalSteps,
+      })
+
       const dashboardData = generateMultiServiceDashboardData({
         services: loadedServices,
         methodology,
+        dependencyGraph,  // NEW — threaded into generator
       })
 
       if (argv['json-only']) {
