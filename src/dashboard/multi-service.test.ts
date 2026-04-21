@@ -603,3 +603,42 @@ describe('generateMultiServiceDashboardData — averagePercentage rounding', () 
     expect(data.services[0].percentage).toBe(0)
   })
 })
+
+describe('generateMultiServiceDashboardData — dependencyGraph pass-through', () => {
+  const baseOpts = (): MultiServiceGeneratorOptions => ({
+    services: [],
+    methodology: 'deep',
+  })
+
+  it('returns dependencyGraph as null when option omitted', () => {
+    const data = generateMultiServiceDashboardData(baseOpts())
+    expect(data.dependencyGraph).toBeNull()
+  })
+
+  it('normalizes undefined input to null', () => {
+    const data = generateMultiServiceDashboardData({ ...baseOpts(), dependencyGraph: undefined })
+    expect(data.dependencyGraph).toBeNull()
+  })
+
+  it('normalizes null input to null', () => {
+    const data = generateMultiServiceDashboardData({ ...baseOpts(), dependencyGraph: null })
+    expect(data.dependencyGraph).toBeNull()
+  })
+
+  it('passes populated DependencyGraphData through unchanged', () => {
+    const graph = {
+      nodes: [
+        { name: 'api', projectType: 'backend', layer: 0, x: 10, y: 20 },
+        { name: 'web', projectType: 'web-app', layer: 1, x: 230, y: 20 },
+      ],
+      edges: [{
+        consumer: 'web', producer: 'api',
+        steps: [{ consumerStep: 'impl', producerStep: 'prd', status: 'completed' as const }],
+        svgPath: 'M 230 42 C 175 42, 175 42, 150 42',
+      }],
+      viewBox: { width: 380, height: 92 },
+    }
+    const data = generateMultiServiceDashboardData({ ...baseOpts(), dependencyGraph: graph })
+    expect(data.dependencyGraph).toBe(graph)
+  })
+})

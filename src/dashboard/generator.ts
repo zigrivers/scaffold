@@ -198,6 +198,45 @@ export function generateHtml(data: DashboardData): string {
 
 // ---------- Multi-service dashboard ----------
 
+/** A node in the service dependency graph. One per service. */
+export interface DependencyGraphNode {
+  /** Service name (kebab-case, matches config). */
+  name: string
+  /** Project type — used for styling consistency with service cards. */
+  projectType: string
+  /** Depth in the topological ordering (0 = no upstream or orphan). */
+  layer: number
+  /** Layout-computed x,y in the SVG viewBox. Filled by layoutGraph, not the builder. */
+  x: number
+  y: number
+}
+
+/** A step-level cross-read relationship, aggregated into a service-level edge. */
+export interface StepEdgeDetail {
+  consumerStep: string          // e.g. 'implementation-plan'
+  producerStep: string          // e.g. 'create-prd'
+  /** Readiness from CrossReadStatus taxonomy (src/core/assembly/cross-reads.ts:177).
+   *  service-unknown is filtered upstream (§2.1 of spec) so cannot appear here in practice. */
+  status: 'completed' | 'pending' | 'not-bootstrapped' | 'read-error' | 'service-unknown' | 'not-exported'
+}
+
+/** A service-level aggregate edge: consumer depends on producer. */
+export interface DependencyGraphEdge {
+  consumer: string              // service name
+  producer: string              // service name
+  /** Step-level detail rolled up into this edge — rendered as tooltip rows. */
+  steps: StepEdgeDetail[]
+  /** SVG path string (cubic bezier) computed by layoutGraph. */
+  svgPath: string
+}
+
+export interface DependencyGraphData {
+  nodes: DependencyGraphNode[]
+  edges: DependencyGraphEdge[]
+  /** SVG viewBox dimensions — computed by layoutGraph. */
+  viewBox: { width: number; height: number }
+}
+
 export interface ServiceSummary {
   /** Service id from config (kebab-case). */
   name: string
@@ -245,6 +284,12 @@ export interface MultiServiceDashboardData {
   /** Preserves input order. */
   services: ServiceSummary[]
   aggregate: MultiServiceAggregate
+  /**
+   * Optional. null or absent when zero cross-service edges exist (graph
+   * section omitted per §4). Optional (not required-nullable) preserves
+   * source compatibility with hand-written literals in multi-service.test.ts.
+   */
+  dependencyGraph?: DependencyGraphData | null
 }
 
 export interface MultiServiceGeneratorOptions {
@@ -255,6 +300,8 @@ export interface MultiServiceGeneratorOptions {
     metaPrompts?: Map<string, MetaPromptFile>
   }>
   methodology: string
+  /** Optional. Pass pre-built DependencyGraphData; generator normalizes null/undefined to null on output. */
+  dependencyGraph?: DependencyGraphData | null
 }
 
 function summarizeService(
@@ -382,6 +429,7 @@ export function generateMultiServiceDashboardData(
       servicesComplete,
       servicesByPhase,
     },
+    dependencyGraph: opts.dependencyGraph ?? null,
   }
 }
 
