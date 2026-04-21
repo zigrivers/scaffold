@@ -175,11 +175,18 @@ export function buildDependencyGraph(input: BuildGraphInput): DependencyGraphDat
   }))
   assignLayers(nodes, edgeMap)
 
-  // 3. Build edges array (step detail already aggregated).
-  const edges: DependencyGraphEdge[] = [...edgeMap.entries()].map(([key, steps]) => {
-    const [consumer, producer] = key.split('|')
-    return { consumer, producer, steps, svgPath: '' }  // svgPath filled by layoutGraph
-  })
+  // 3. Build edges array (step detail already aggregated). Sort explicitly by
+  //    `consumer|producer` so SVG z-order is deterministic across runs — Map
+  //    iteration preserves insertion order, which depends on Object.entries
+  //    ordering of `overlay.crossReads`, which depends on services[] ordering
+  //    upstream. Explicit sort breaks that implicit coupling and keeps test #8
+  //    (deterministic output) honest.
+  const edges: DependencyGraphEdge[] = [...edgeMap.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, steps]) => {
+      const [consumer, producer] = key.split('|')
+      return { consumer, producer, steps, svgPath: '' }  // svgPath filled by layoutGraph
+    })
 
   // 4. Run layout.
   return layoutGraph(nodes, edges)
@@ -319,9 +326,10 @@ Key properties inherited from `resolveCrossReadReadiness`:
 
 ### 3.4 Properties
 
-- **Deterministic** — alphabetical within-layer ordering + longest-path layers + fresh `foreignCache` per call. Same input bytes → same output bytes.
+- **Deterministic** — alphabetical within-layer ordering + longest-path layers + explicit edge sort by `consumer|producer` + fresh `foreignCache` per call. Same input bytes → same output bytes (including SVG z-order).
 - **Zero layout libs** — ~80 LOC pure TS math; no d3, no graphviz, no external packages.
 - **Cycle-safe** — cycle participants collapse to one layer, no infinite loop, no crash.
+- **Cycle cascade limitation** — when a graph contains both a cycle AND nodes strictly downstream of the cycle (e.g., `root → A ↔ B → leaf`), the downstream nodes get lumped into the cycle layer alongside `A` and `B` instead of receiving their own strictly-downstream layer. This is a known limitation of the simplified layered algorithm (full SCC analysis would avoid it but triples the code size). Users are discouraged from creating cycles in config; if they do, the graph still renders honestly. §6.1 test 6 documents the expected behavior.
 - **Readable at our scale** — 2-8 service nodes, typical 1-15 edges. Layered bezier curves rarely cross for acyclic graphs.
 - **Responsive** — SVG `viewBox` with CSS `width: 100%` scales natively. `max-height: 420px` caps growth.
 
@@ -343,7 +351,13 @@ export function renderDependencyGraphSection(
   return [
     '<section class="dep-graph" id="dep-graph">',
     '  <h2 class="dep-graph-title">Cross-Service Dependencies</h2>',
-    `  <svg class="dep-graph-svg" viewBox="0 0 ${data.viewBox.width} ${data.viewBox.height}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cross-service dependency graph">`,
+    // Do NOT use role="img" here — it flattens the accessibility tree and
+    // suppresses descendant <title> elements in many AT combinations. The
+    // native SVG accessibility model (SVG2/SVG AAM) handles focusable
+    // descendants with <title> children correctly without an explicit role.
+    // `aria-label` on the outer <svg> names the whole graph for intro context;
+    // each edge's <title> names the individual relationship on focus/hover.
+    `  <svg class="dep-graph-svg" viewBox="0 0 ${data.viewBox.width} ${data.viewBox.height}" xmlns="http://www.w3.org/2000/svg" aria-label="Cross-service dependency graph">`,
     '    <defs>',
     // marker-end only — `orient="auto"` matches the actual usage (no marker-start).
     // Fill set via currentColor; CSS hover rules (§4.4) update `color` alongside
@@ -431,7 +445,11 @@ Added to the existing `<style>` block inside `buildMultiServiceTemplate`:
 .dep-node-box { fill: var(--bg); stroke: var(--border); stroke-width: 1; }
 .dep-node-name { font-size: 13px; font-weight: 500; fill: var(--text); font-family: system-ui, sans-serif; }
 .dep-node-type { font-size: 11px; fill: var(--muted); font-family: system-ui, sans-serif; }
-.dep-edge-line { transition: stroke-width 0.1s ease; }
+/* Animate all three properties so color + stroke + width change as one
+   motion. Without `color, stroke`, the marker fill (fed by currentColor)
+   jumps instantly while width fades — looks like the arrowhead pops. */
+.dep-edge { transition: color 0.1s ease; }
+.dep-edge-line { transition: stroke 0.1s ease, stroke-width 0.1s ease; }
 /* `color: var(--accent)` propagates through `currentColor` to the arrowhead
    marker fill — without this, the line re-colors on hover but the marker
    stays `--muted`, which visually breaks the arrow. */
@@ -546,6 +564,11 @@ Enhancements over the v1 draft (addressing accessibility + viewport clipping):
     });
     edge.addEventListener('focusout', hideTooltip);
   });
+
+  // Dismiss tooltip on page scroll — the tooltip uses position: fixed so it
+  // stays pinned while the edge it describes scrolls away. Hiding is simpler
+  // and clearer than trying to keep it pinned to a moving target.
+  window.addEventListener('scroll', hideTooltip, { passive: true });
 })();
 ```
 
@@ -563,11 +586,19 @@ Enhancements over the v1 draft (addressing accessibility + viewport clipping):
 
 ### 4.6 Integration into `buildMultiServiceTemplate`
 
-One new line in the existing template string, placed between the phase-indicator row and the service-card grid:
+**Exact insertion point**: the `<section class="dep-graph">` is a **sibling** of the existing `.aggregate-block` (which holds phase indicators) and `.services-grid`, NOT a child of `.aggregate-block`. Place the call **after** `.aggregate-block`'s closing `</div>` and **before** `.services-grid`'s opening `<div>`:
 
 ```typescript
-${renderDependencyGraphSection(data.dependencyGraph)}
+// Pseudocode — match existing template.ts indentation + string-concat style.
+//
+// ...existing lines rendering the aggregate-block close...
+`</div>  <!-- /.aggregate-block -->`,
+${renderDependencyGraphSection(data.dependencyGraph)},   // NEW — sibling block
+`<div class="services-grid">`,
+// ...existing lines rendering service cards...
 ```
+
+The sibling placement keeps DOM hierarchy flat and matches the `margin: 0 0 24px` spacing in §4.4 CSS (which assumes block-level siblings with uniform vertical rhythm, not nested padding).
 
 ---
 
@@ -589,7 +620,10 @@ import type { OverlayState } from '../../core/assembly/overlay-state-resolver.js
 // ... existing `isMultiServiceMode` guard ...
 
 // NEW: load pipeline context once (shared across all services).
-const pipelineContext = loadPipelineContext(projectRoot, { includeTools: true })
+// `includeTools: false` (the default) — tool meta-prompts are not pipeline
+// participants, and their `crossReads` declarations (if any) would leak into
+// the graph via overlay.crossReads. Keep the graph pipeline-scoped.
+const pipelineContext = loadPipelineContext(projectRoot)
 
 // NEW: per-service overlay map populated alongside the existing loadedServices loop.
 const perServiceOverlay = new Map<string, OverlayState>()
@@ -599,9 +633,21 @@ let capturedGlobalSteps: Set<string> | undefined
 // (Keep the existing state-loading logic verbatim; just interleave the graph data capture.)
 for (const svc of configuredServices!) {
   // NEW: resolve pipeline per service to get overlay.crossReads + globalSteps.
-  const svcPipeline = resolvePipeline(pipelineContext, { output, serviceId: svc.name })
-  perServiceOverlay.set(svc.name, svcPipeline.overlay)
-  if (!capturedGlobalSteps) capturedGlobalSteps = svcPipeline.globalSteps
+  // Wrap in try/catch mirroring the existing loadState() fallback pattern — a
+  // malformed overlay for one service should not crash the whole multi-service
+  // dashboard. On failure we skip this service's graph contribution; its card
+  // still renders because the state-load block below has its own fallback.
+  try {
+    const svcPipeline = resolvePipeline(pipelineContext, { output, serviceId: svc.name })
+    perServiceOverlay.set(svc.name, svcPipeline.overlay)
+    if (!capturedGlobalSteps) capturedGlobalSteps = svcPipeline.globalSteps
+  } catch (err) {
+    output.warn(
+      `Could not resolve pipeline for service '${svc.name}' — `
+      + `graph edges from/to this service omitted (${(err as Error).message})`,
+    )
+    // Continue to state-load block; this service's card still renders.
+  }
 
   // Existing state-loading block (unchanged) — populates loadedServices.
   // ...
@@ -617,10 +663,13 @@ const dependencyGraph = buildDependencyGraph({
 })
 
 // Existing call — now threads dependencyGraph. loadedServices shape unchanged.
+// dependencyGraph is `null` if buildDependencyGraph found zero edges after
+// filtering (§2.1); the generator passes it through and the template omits
+// the section (§4.1).
 const dashboardData = generateMultiServiceDashboardData({
   services: loadedServices,
   methodology,
-  dependencyGraph,  // NEW — null or absent if no edges
+  dependencyGraph,  // NEW — null if no edges
 })
 ```
 
@@ -641,12 +690,17 @@ export function generateMultiServiceDashboardData(
 ): MultiServiceDashboardData {
   return {
     // ...existing assembly...
-    dependencyGraph: opts.dependencyGraph ?? null,
+    dependencyGraph: opts.dependencyGraph ?? null,  // normalize undefined -> null
   }
 }
 ```
 
-Optional input preserves source compatibility with existing tests that don't pass `dependencyGraph` (they get `null`, section omitted in template).
+**null/undefined contract** (locked to avoid inconsistency — the spec initially had three different framings):
+- **Input (`MultiServiceGeneratorOptions.dependencyGraph`)**: optional-nullable. Callers may omit the field (`undefined`), pass `null`, or pass a populated `DependencyGraphData`.
+- **Output (`MultiServiceDashboardData.dependencyGraph`)**: the generator always normalizes to `null | DependencyGraphData` — `undefined` is never written. This matches the type's optional-nullable declaration and keeps consumer code simple (single branch: `if (data.dependencyGraph) { ... }` handles both "never set" and "explicitly absent").
+- **Type declarations**: both kept optional-nullable (`?: T | null`) to preserve source compatibility with existing hand-written literals that don't supply the field.
+
+Optional input + normalized null output preserves source compatibility with existing tests that don't pass `dependencyGraph` (they get `null` on the output, section omitted in template).
 
 ### 5.3 No changes in
 
@@ -708,19 +762,33 @@ Tests:
 4. Three-layer chain: `web -> api -> shared-lib` → layers 0, 1, 2 assigned correctly.
 5. Orphan service: 4 services, 1 with no edges → all 4 nodes present, orphan at layer 0, no edges touch it.
 6. Cycle: `A <-> B` → both same layer (deterministic), edges in both directions, no crash. `nodes.length === 2`, `edges.length === 2`.
-7. Readiness threads from **`resolveCrossReadReadiness`** (not `resolveDirectCrossRead`): the helper is mocked to return specific statuses; assert `StepEdgeDetail.status` matches each of the 6 enum values: `completed`, `pending`, `not-bootstrapped`, `read-error`, `service-unknown`, `not-exported`.
+7. Readiness threads from **`resolveCrossReadReadiness`** (not `resolveDirectCrossRead`): the helper is mocked to return specific statuses. Assert `StepEdgeDetail.status` matches each of the **five statuses that CAN reach a graph edge**: `completed`, `pending`, `not-bootstrapped`, `read-error`, `not-exported`. The sixth status (`service-unknown`) CANNOT appear on any edge because §2.1's `knownServices.has(cr.service)` filter drops those cross-reads BEFORE `resolveCrossReadReadiness` is ever called — this is the correct behavior, and tests 11/13 below separately verify the filter.
 8. Deterministic: same input twice → identical x/y coordinates + identical SVG paths.
 9. viewBox dimensions scale with layer count (width) and tallest-layer node count (height).
 10. Self-reference guard: cross-read `svc -> svc` filtered (defensive).
-11. **Service-unknown filter**: cross-read targeting a service NOT in `services[]` — edge dropped at aggregation time, no crash in `layoutGraph`. Asserts `edges.length === 0` when every cross-read targets an unknown service.
-12. **Disabled-step filter**: cross-read declared on a step whose `overlay.steps[step].enabled === false` — edge dropped. Asserts those cross-reads don't appear in output.
-13. **Mixed filter scenario**: 3 cross-reads where one self-references, one targets unknown service, one targets a disabled step — all three filtered; output has zero edges.
+11. **Service-unknown filter**: cross-read targeting a service NOT in `services[]` — edge dropped at aggregation time, no crash in `layoutGraph`. When ALL cross-reads target unknown services, the builder's `edgeMap.size === 0` short-circuit returns `null` — assert the return value is `null`, not `{ edges: [] }`.
+12. **Disabled-step filter**: cross-read declared on a step whose `overlay.steps[step].enabled === false` — edge dropped.
+13. **Mixed filter scenario**: 3 cross-reads where one self-references, one targets unknown service, one targets a disabled step — all three filtered; builder returns `null` (no edges survive filtering, `edgeMap.size === 0` → null per the entry-point short-circuit).
 
 ### 6.2 Template — `src/dashboard/multi-service.test.ts` (append to existing file)
 
 `renderDependencyGraphSection` is exported from `template.ts` (§4.1, revised) so tests import it directly. Tests construct `DependencyGraphData` literals inline.
 
-For `data-steps` extraction (tests 17 below), use the existing test pattern for attribute-JSON round-trips — either a regex that captures the attribute value + `.replace(/&quot;/g, '"')` decode, or `new DOMParser().parseFromString(html, 'text/html').querySelector('.dep-edge').getAttribute('data-steps')` (jsdom already available in the vitest env). Prefer the DOMParser approach — less fragile than manual entity decoding.
+For `data-steps` extraction (tests 17 below), use regex to capture the attribute value, then `.replace(/&quot;/g, '"')` to decode the only HTML entity `escapeHtml` introduces inside a JSON payload. **Do not use `DOMParser`** — the repo's `vitest.config.ts` uses the default Node environment (no `jsdom` dependency in `package.json`). Example helper for tests:
+
+```typescript
+function extractDataSteps(html: string, consumer: string, producer: string): StepEdgeDetail[] {
+  const pattern = new RegExp(
+    `data-consumer="${consumer}"[^>]*data-producer="${producer}"[^>]*data-steps="([^"]*)"`,
+  )
+  const match = html.match(pattern)
+  if (!match) throw new Error(`edge ${consumer} -> ${producer} not found`)
+  const json = match[1].replace(/&quot;/g, '"')
+  return JSON.parse(json)
+}
+```
+
+The only HTML entity that appears in the JSON is `&quot;` (introduced by `escapeHtml` on each `"` in the JSON payload). `<`, `>`, `&` don't occur inside the JSON shape because status values are a fixed enum and step slugs are kebab-case. If a step slug ever contains those characters, the schema-level regex would have already rejected it upstream.
 
 14. `renderDependencyGraphSection(null)` returns `''`. Also `renderDependencyGraphSection(undefined)` returns `''` (optional-field compat with the type).
 15. Small graph: output contains `<section class="dep-graph">` with expected viewBox dimensions.
@@ -797,7 +865,7 @@ No config schema changes. `services[]`, `exports`, and `crossReads` are all pre-
 ### 8.3 API compat
 
 - `MultiServiceDashboardData` gains one optional field (`dependencyGraph?: DependencyGraphData | null`). The field is optional (not required-nullable) so pre-existing hand-written `MultiServiceDashboardData` literals — e.g., in `src/dashboard/multi-service.test.ts` fixtures — continue to compile without edits. Absence (`undefined`) and explicit `null` both render as "no graph section" per §4.1.
-- `MultiServiceGeneratorOptions` gains one optional input field. Existing callers that don't pass `dependencyGraph` continue to work unchanged (generator writes `undefined` through to the output, template omits the section).
+- `MultiServiceGeneratorOptions` gains one optional input field. Existing callers that don't pass `dependencyGraph` continue to work unchanged. The generator **normalizes** `undefined` input to `null` on the output (see §5.2 locked contract) — so template consumers and snapshot tests only ever see `null | DependencyGraphData` on the returned object.
 
 ### 8.4 Deprecations
 
