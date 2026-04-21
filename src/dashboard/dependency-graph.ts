@@ -175,17 +175,35 @@ function layoutGraph(
     }
   }
 
-  // Edge paths — cubic bezier from consumer's left edge to producer's right edge.
+  // Edge paths — cubic bezier. For normal acyclic edges (consumer at higher
+  // layer than producer), route consumer-left → producer-right so the
+  // arrowhead tangent points leftward into the producer's right face. For
+  // same-layer cycle edges (A ↔ B), both nodes share a column; the normal
+  // routing would send the bezier horizontally through both nodes and the
+  // arrowhead would end pointing AWAY from the producer. Route cycle edges
+  // via an arc OUTSIDE the column (consumer-right → producer-right, control
+  // points displaced rightward by LAYER_GAP/2) so the tangent at the end
+  // still points leftward into the producer. Matches spec §3.4 "graceful
+  // failure" framing while keeping the arrow direction meaningful.
   const byName = new Map(nodes.map(n => [n.name, n]))
   for (const edge of edges) {
     const consumer = byName.get(edge.consumer)!
     const producer = byName.get(edge.producer)!
-    const x1 = consumer.x                                    // consumer left
-    const y1 = consumer.y + NODE_HEIGHT / 2
-    const x2 = producer.x + NODE_WIDTH                       // producer right
-    const y2 = producer.y + NODE_HEIGHT / 2
-    const cx = (x1 + x2) / 2
-    edge.svgPath = `M ${x1} ${y1} C ${cx} ${y1}, ${cx} ${y2}, ${x2} ${y2}`
+    if (consumer.layer === producer.layer) {
+      const x1 = consumer.x + NODE_WIDTH                     // consumer right
+      const y1 = consumer.y + NODE_HEIGHT / 2
+      const x2 = producer.x + NODE_WIDTH                     // producer right
+      const y2 = producer.y + NODE_HEIGHT / 2
+      const cx = x2 + LAYER_GAP / 2                          // arc outside the column
+      edge.svgPath = `M ${x1} ${y1} C ${cx} ${y1}, ${cx} ${y2}, ${x2} ${y2}`
+    } else {
+      const x1 = consumer.x                                  // consumer left
+      const y1 = consumer.y + NODE_HEIGHT / 2
+      const x2 = producer.x + NODE_WIDTH                     // producer right
+      const y2 = producer.y + NODE_HEIGHT / 2
+      const cx = (x1 + x2) / 2
+      edge.svgPath = `M ${x1} ${y1} C ${cx} ${y1}, ${cx} ${y2}, ${x2} ${y2}`
+    }
   }
 
   return { nodes, edges, viewBox: { width, height } }
