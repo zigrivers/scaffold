@@ -28,8 +28,10 @@ export function buildDependencyGraph(input: BuildGraphInput): DependencyGraphDat
   const knownServices = new Set(services.map(s => s.name))
 
   // Shared foreign-state cache across all readiness lookups — one foreign
-  // state.json read per service per graph build.
-  const readinessCache = new Map()
+  // state.json read per service per graph build. Derive the cache type from
+  // resolveCrossReadReadiness's signature so we don't silently land on Map<any,
+  // any> (cross-reads.ts doesn't export ForeignStateCacheEntry as of v3.22.0).
+  const readinessCache: NonNullable<Parameters<typeof resolveCrossReadReadiness>[4]> = new Map()
 
   // 1. Aggregate step-level cross-reads into service-level edges.
   //    Filters applied at aggregation time:
