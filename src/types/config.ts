@@ -4,7 +4,7 @@ import {
   ProjectTypeSchema, WebAppConfigSchema, BackendConfigSchema,
   CliConfigSchema, LibraryConfigSchema, MobileAppConfigSchema,
   DataPipelineConfigSchema, MlConfigSchema, BrowserExtensionConfigSchema,
-  GameConfigSchema, ResearchConfigSchema,
+  GameConfigSchema, ResearchConfigSchema, DataScienceConfigSchema,
 } from '../config/schema.js'
 
 /** Step enablement entry used in presets and overlays. */
@@ -55,6 +55,9 @@ export type BrowserExtensionConfig = z.infer<typeof BrowserExtensionConfigSchema
 /** Research project configuration — derived from Zod schema (single source of truth). */
 export type ResearchConfig = z.infer<typeof ResearchConfigSchema>
 
+/** Data science project configuration — derived from Zod schema (single source of truth). */
+export type DataScienceConfig = z.infer<typeof DataScienceConfigSchema>
+
 /**
  * Game-specific configuration — derived from Zod schema (single source of truth).
  * Only valid when projectType === 'game'.
@@ -80,6 +83,7 @@ export type DetectedConfig =
   | { type: 'browser-extension'; config: BrowserExtensionConfig }
   | { type: 'game'; config: GameConfig }
   | { type: 'research'; config: ResearchConfig }
+  | { type: 'data-science'; config: DataScienceConfig }
 
 /** Override entry for knowledge injection. */
 export interface KnowledgeOverride {
@@ -130,6 +134,7 @@ export interface ServiceConfig {
   mlConfig?: MlConfig
   gameConfig?: GameConfig
   browserExtensionConfig?: BrowserExtensionConfig
+  dataScienceConfig?: DataScienceConfig
   path?: string
   /** Pipeline step slugs this service exposes for cross-service reference. Closed by default. */
   exports?: Array<{ step: string }>
@@ -150,6 +155,7 @@ export interface ProjectConfig {
   mlConfig?: MlConfig
   browserExtensionConfig?: BrowserExtensionConfig
   researchConfig?: ResearchConfig
+  dataScienceConfig?: DataScienceConfig
   services?: ServiceConfig[]
   [key: string]: unknown  // forward compatibility
 }
