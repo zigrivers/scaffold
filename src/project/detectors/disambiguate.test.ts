@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- test mocks need flexible typing */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { disambiguate } from './disambiguate.js'
+import { disambiguate, PROJECT_TYPE_PREFERENCE } from './disambiguate.js'
+import { ProjectTypeSchema } from '../../config/schema.js'
 import type { DetectionMatch } from './types.js'
 
 vi.mock('@inquirer/prompts', () => ({
@@ -152,5 +153,14 @@ describe('disambiguate', () => {
       { interactive: true, acceptLowConfidence: true },
     )
     expect(messageArg).toContain('weak signals')
+  })
+})
+
+describe('PROJECT_TYPE_PREFERENCE completeness', () => {
+  it('includes every ProjectType so indexOf() tiebreak is stable', () => {
+    const listed = new Set(PROJECT_TYPE_PREFERENCE as readonly string[])
+    for (const t of ProjectTypeSchema.options) {
+      expect(listed.has(t)).toBe(true)
+    }
   })
 })
