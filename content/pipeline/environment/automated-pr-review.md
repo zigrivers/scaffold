@@ -15,13 +15,18 @@ knowledge-base: [review-methodology, automated-review-tooling]
 Configure an agent-driven automated code review system using local CLI
 reviewers dispatched through MMR (Codex, Gemini, Claude — runs all three when
 available) plus the Superpowers code-reviewer agent as a complementary 4th
-channel when using the scaffold wrappers (`scaffold run review-pr`,
-`scaffold run review-code`, `scaffold run post-implementation-review`). The
-review is mandatory after `gh pr create` and also runs on non-PR targets
-(local staged/unstaged code, branch diffs, specific files) via the same
-`mmr review` CLI. External GitHub App reviewers remain supported as a
-fallback when CLIs are unavailable. Zero GitHub Actions workflows. The agent
-manages the entire review-fix loop locally.
+channel when using the MMR wrappers `scaffold run review-pr` and
+`scaffold run review-code`. The review is mandatory after `gh pr create` and
+also runs on non-PR targets (local staged/unstaged code, branch diffs,
+specific files) via the same `mmr review` CLI.
+`scaffold run post-implementation-review` is a separate full-codebase review
+(Codex CLI + Gemini CLI + Superpowers code-reviewer) that runs after an AI
+agent completes all implementation tasks; it does not currently use Claude
+CLI as a standard channel and is not an MMR wrapper, though it can inject
+findings into an existing MMR job via `mmr reconcile`.
+External GitHub App reviewers remain supported as a fallback when CLIs are
+unavailable. Zero GitHub Actions workflows. The agent manages the entire
+review-fix loop locally.
 
 ## Inputs
 - docs/coding-standards.md (required) — review criteria reference
