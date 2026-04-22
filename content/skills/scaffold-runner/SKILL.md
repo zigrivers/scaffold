@@ -349,8 +349,8 @@ what the user is pointing at:
 |---|---|
 | GitHub PR (explicit number or current branch's PR) | `scaffold run review-pr [<PR#>]` |
 | Local uncommitted / staged code, before commit or push | `scaffold run review-code` |
-| Changes to a specific file or doc (tracked) | `git diff HEAD -- <path> \| mmr review --diff - --sync --format json` |
-| An untracked / brand-new file | `(diff -u /dev/null <path> \|\| true) \| mmr review --diff - --sync --format json` |
+| Pending edits to a tracked file (changes since HEAD) | `git diff HEAD -- <path> \| mmr review --diff - --sync --format json` |
+| Current contents of any file (tracked-with-no-changes, untracked, or brand-new) | `(diff -u /dev/null <path> \|\| true) \| mmr review --diff - --sync --format json` |
 | A branch diff against main (or another ref) | `mmr review --base <ref> --head <ref> --sync --format json` |
 | An existing patch or diff file | `mmr review --diff <path.patch> --sync --format json` |
 | A diff piped from another command | `<cmd> \| mmr review --diff - --sync --format json` (stdin) |

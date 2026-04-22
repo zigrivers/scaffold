@@ -165,8 +165,8 @@ CLIs for the local pre-commit review path.
 |------|---------|
 | After creating a PR | `/scaffold:review-pr <PR#>` |
 | Before commit / push (tracked local code: committed + staged + unstaged) | `scaffold run review-code` |
-| Changes to a specific tracked file or doc | `git diff HEAD -- <path> \| mmr review --diff - --sync --format json` |
-| Untracked / brand-new file | `(diff -u /dev/null <path> \|\| true) \| mmr review --diff - --sync --format json` |
+| Pending edits to a tracked file (changes since HEAD) | `git diff HEAD -- <path> \| mmr review --diff - --sync --format json` |
+| Current contents of any file (tracked-with-no-changes, untracked, or brand-new) | `(diff -u /dev/null <path> \|\| true) \| mmr review --diff - --sync --format json` |
 | Branch diff | `mmr review --base <ref> --head <ref> --sync --format json` |
 | Staged changes only | `mmr review --staged --sync --format json` |
 | All tracked uncommitted changes (staged + unstaged, no untracked) | `git diff HEAD \| mmr review --diff - --sync --format json` |

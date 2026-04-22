@@ -139,10 +139,13 @@ file directly rather than assuming it matches this pattern.)
   by `review-code`** — use the `(diff -u /dev/null <path> || true) | mmr
   review --diff -` pattern below.
 - Branch diff → `mmr review --base <ref> --head <ref>`
-- Changes to a specific file or doc →
-  `git diff HEAD -- path/to/file.md | mmr review --diff -`
-- Untracked / brand-new file (synthesize an "all added" diff) →
-  `(diff -u /dev/null path/to/new.md || true) | mmr review --diff -`
+- Changes to a specific tracked file or doc (pending edits only) →
+  `git diff HEAD -- path/to/file.md | mmr review --diff -` (fails with
+  "no diff content" if the file has no local changes — use the next
+  form instead)
+- Current contents of any file (tracked-with-no-changes, untracked, or
+  brand-new), synthesized as an "all added" diff →
+  `(diff -u /dev/null path/to/file.md || true) | mmr review --diff -`
   (the `|| true` guard is required because `diff` exits 1 whenever files
   differ, which breaks pipelines under `set -o pipefail`)
 - Pre-made patch or diff file → `mmr review --diff path/to/changes.patch`

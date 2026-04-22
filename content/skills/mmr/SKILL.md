@@ -31,13 +31,17 @@ git diff HEAD | mmr review --diff - --focus "..."
 # Branch diff / ref range
 mmr review --base main --head <branch> --focus "..."
 
-# Changes to a specific file or doc (tracked in git)
+# Changes to a specific tracked file since HEAD (pending edits only).
+# If the file has no local changes this pipeline sends an empty diff
+# and MMR will refuse with "no diff content"; use the next form instead
+# to review the file's current contents regardless of git state.
 git diff HEAD -- path/to/file.md | mmr review --diff - --focus "..."
 
-# Untracked / brand-new file — synthesize an "all added" diff.
+# A file's current contents, regardless of git state (tracked-with-no-
+# changes, untracked, or brand-new). Synthesizes an "all added" diff.
 # `|| true` is required: diff exits 1 whenever files differ, which breaks
 # pipelines under `set -o pipefail`.
-(diff -u /dev/null path/to/new.md || true) | mmr review --diff - --focus "..."
+(diff -u /dev/null path/to/file.md || true) | mmr review --diff - --focus "..."
 
 # Existing patch or diff file
 mmr review --diff path/to/changes.patch --focus "..."
@@ -77,14 +81,20 @@ pipelines under `set -o pipefail`.
 
 **Reviewing a document or arbitrary file**
 
-1. Wrap the target in a diff:
-   - Tracked file with uncommitted changes: `git diff HEAD -- path/to/doc.md`
-   - Untracked / new file: `(diff -u /dev/null path/to/doc.md || true)`
-     (the `|| true` guard avoids the `diff` exit-1-on-differences breaking
-     pipelines under `set -o pipefail`)
-2. Pipe it into `mmr review --diff -` with a focus string:
-   `git diff HEAD -- path/to/doc.md | mmr review --diff - --focus "clarity, completeness"`
-3. Same dispatch / status / results flow as above
+Pick the case that matches what the user wants reviewed:
+
+- **Just the pending edits** to a tracked file (what changed since last
+  commit): `git diff HEAD -- path/to/doc.md | mmr review --diff -
+  --focus "..."`. Fails with "no diff content" if the file has no
+  local changes.
+- **The file's current contents**, whether it's tracked-with-no-
+  changes, untracked, or brand-new: wrap as a synthetic "all added"
+  diff first: `(diff -u /dev/null path/to/doc.md || true) |
+  mmr review --diff - --focus "..."`. The `|| true` guard avoids
+  `diff`'s exit-1-on-differences breaking the pipeline under
+  `set -o pipefail`.
+
+Same dispatch / status / results flow as above.
 
 **Reviewing uncommitted work before push**
 

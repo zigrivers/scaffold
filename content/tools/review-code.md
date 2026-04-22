@@ -69,12 +69,21 @@ invocation that matches the scope the user asked for:
 # `mmr review` with no input flags defaults to `git diff` alone
 # (unstaged only), so we MUST synthesize the combined bundle explicitly
 # and pipe it in via --diff -:
-if   git rev-parse --verify origin/main >/dev/null 2>&1; then BASE_REF=origin/main
-elif git rev-parse --verify main        >/dev/null 2>&1; then BASE_REF=main
-else                                                         BASE_REF=HEAD
+# Resolve the base ref using the same precedence as the manual fallback
+# below (Mode C). Prefer the explicit upstream, then origin/HEAD, then
+# origin/main, main, master, and finally HEAD~1. If none exist, fall
+# through to a working-tree-only review (no committed diff segment).
+BASE_REF=""
+if   UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null) && [ -n "$UPSTREAM" ]; then BASE_REF="$UPSTREAM"
+elif ORIGIN_HEAD=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null); then BASE_REF="${ORIGIN_HEAD#refs/remotes/}"
+elif git rev-parse --verify origin/main   >/dev/null 2>&1; then BASE_REF=origin/main
+elif git rev-parse --verify main          >/dev/null 2>&1; then BASE_REF=main
+elif git rev-parse --verify origin/master >/dev/null 2>&1; then BASE_REF=origin/master
+elif git rev-parse --verify master        >/dev/null 2>&1; then BASE_REF=master
+elif git rev-parse --verify HEAD~1        >/dev/null 2>&1; then BASE_REF=HEAD~1
 fi
 {
-  if [ "$BASE_REF" != "HEAD" ]; then git diff "$BASE_REF...HEAD"; fi
+  if [ -n "$BASE_REF" ]; then git diff "$BASE_REF...HEAD"; fi
   git diff --cached
   git diff
 } | mmr review --diff - --sync --format json
