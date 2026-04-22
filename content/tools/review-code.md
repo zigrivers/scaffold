@@ -1,7 +1,7 @@
 ---
 name: review-code
 description: Run all configured code review channels on local code before commit or push
-summary: "Review the current local delivery candidate with Codex CLI, Gemini CLI, and Superpowers before committing or pushing, using staged changes, an explicit ref range, or the current branch diff."
+summary: "Review the current local delivery candidate with the three MMR CLI channels (Codex CLI, Gemini CLI, Claude CLI) plus the Superpowers code-reviewer agent as a complementary 4th channel reconciled into the same MMR job, before committing or pushing. Supports staged changes, an explicit ref range, or the full local delivery candidate (committed branch diff + staged + unstaged); untracked files are not included."
 phase: null
 order: null
 dependencies: []
@@ -15,15 +15,27 @@ argument-hint: "[--base <ref>] [--head <ref>] [--staged] [--report-only]"
 
 ## Purpose
 
-Run the same three-channel review stack used by `review-pr`, but on local code
-before commit or push. This is the preflight review entry point for bug fixes,
-small features, and quick tasks when the user wants multi-model review before
-anything leaves the machine.
+Run the same review stack used by `review-pr` (three MMR CLI channels plus
+the Superpowers code-reviewer agent as a complementary 4th channel), but on
+local code before commit or push. This is the preflight review entry point
+for bug fixes, small features, and quick tasks when the user wants
+multi-model review before anything leaves the machine.
 
-The three channels are:
+The three CLI channels are:
 1. **Codex CLI** — implementation correctness, security, API contracts
 2. **Gemini CLI** — architectural patterns, broad-context reasoning
-3. **Claude CLI** — Claude subagent review of code quality, tests, and plan alignment
+3. **Claude CLI** — code quality, tests, and plan alignment
+
+Plus the 4th channel:
+4. **Superpowers code-reviewer** — agent-based review dispatched via the
+   `superpowers:code-reviewer` skill, reconciled into the same MMR job via
+   `mmr reconcile` for a unified verdict.
+
+Scope: the full local delivery candidate (committed branch diff + staged +
+unstaged changes) by default, or a narrower slice when `--staged` or
+`--base`/`--head` flags are provided. **Untracked files are not reviewed** —
+use `(diff -u /dev/null <path> || true) | mmr review --diff -` directly for
+brand-new files.
 
 ## Inputs
 
@@ -40,7 +52,7 @@ The three channels are:
 
 ## Expected Outputs
 
-- A three-channel review summary for the local delivery candidate
+- A reconciled four-channel review summary for the local delivery candidate (three MMR CLI channels + Superpowers code-reviewer)
 - One of these verdicts: `pass`, `degraded-pass`, `blocked`, `needs-user-decision`
 - Fixed code when findings are resolved in normal mode
 

@@ -28,7 +28,10 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
     env: {},
     auth: {
       check: 'claude -p "respond with ok" 2>/dev/null',
-      timeout: 5,
+      // Claude CLI's auth probe is a full LLM round-trip (not a local
+      // status check) and routinely takes 9-14s from a cold CLI. 5s
+      // false-fails the vast majority of real environments.
+      timeout: 20,
       failure_exit_codes: [1],
       recovery: 'claude login',
     },
@@ -43,7 +46,11 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
     env: { NO_BROWSER: 'true' },
     auth: {
       check: 'NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1',
-      timeout: 5,
+      // Gemini CLI's auth probe is a full LLM round-trip (not a local
+      // status check) and routinely takes ~9s. 5s false-fails normal
+      // environments. Codex stays at 5s below because its auth probe
+      // is a local file check (`codex login status`), not a round-trip.
+      timeout: 20,
       failure_exit_codes: [41],
       recovery: 'gemini -p "hello"',
     },
