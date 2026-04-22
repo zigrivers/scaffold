@@ -373,30 +373,34 @@ or `diff -u /dev/null <path>` (untracked) and pipe the result into
 
 ### Multi-Model Review at Depth 4-5
 
-All review and validation steps support independent multi-model validation at depth 4-5.
+All review and validation steps support independent multi-model validation at depth 4-5. Two distinct paths exist — **never mix them** — pick based on what step is running:
 
-For **MMR-backed review steps** (review-pr, review-code, post-implementation-review, and any pipeline review step that calls `mmr review`), the channel model is three CLIs — Codex, Gemini, and Claude — dispatched and reconciled by the MMR CLI, with scaffold wrappers adding the Superpowers code-reviewer agent as a complementary 4th channel. See the `mmr` skill for invocation.
+#### Path A: MMR-backed review (PREFERRED — always use for these steps)
 
-For **legacy / non-MMR review and validation steps** that still dispatch CLIs directly (some depth-5 validation steps, ad-hoc manual dispatch), the `multi-model-dispatch` skill documents the raw invocation patterns:
+Applies to: `scaffold run review-pr`, `scaffold run review-code`, `scaffold run post-implementation-review`, and any pipeline review step that invokes `mmr review`.
 
-- **Codex**: `codex exec --skip-git-repo-check -s read-only --ephemeral "prompt" 2>/dev/null` (NOT bare `codex`)
-- **Gemini**: `NO_BROWSER=true gemini -p "prompt" --output-format json --approval-mode yolo 2>/dev/null`
-- **Claude CLI**: `claude -p "prompt" --output-format json 2>/dev/null`
+- **Channel model:** three CLIs (Codex + Gemini + Claude) dispatched and reconciled by the MMR CLI; scaffold wrappers add the Superpowers code-reviewer agent as a complementary 4th channel reconciled into the same MMR job via `mmr reconcile`.
+- **Invocation:** go through the wrapper (`scaffold run …`) or call `mmr review …` directly. Do NOT shell out to `codex`/`gemini`/`claude` yourself for these steps — MMR handles dispatch, parsing, compensating passes, and verdict.
+- **Auth pre-flight:** run `mmr config test` once per session — it probes all three CLIs and reports status in one call.
+- **If auth fails** for any channel, surface recovery commands to the user: `! codex login`, `! gemini -p "hello"`, or `! claude login`. MMR will emit a compensating pass (via `claude -p`) for each missing external channel, labelled `[compensating: Codex-equivalent]` / `[compensating: Gemini-equivalent]`. Maximum achievable verdict in that case is `degraded-pass`.
+- **Never silently skip a CLI due to auth failure** — surface it to the user.
+
+#### Path B: Legacy / non-MMR direct dispatch
+
+Applies to: some older depth-5 validation steps and any ad-hoc manual dispatch not routed through MMR. The `multi-model-dispatch` skill documents the raw invocation patterns:
+
+- **Codex:** `codex exec --skip-git-repo-check -s read-only --ephemeral "prompt" 2>/dev/null` (NOT bare `codex`)
+- **Gemini:** `NO_BROWSER=true gemini -p "prompt" --output-format json --approval-mode yolo 2>/dev/null`
+- **Claude CLI:** `claude -p "prompt" --output-format json 2>/dev/null`
 
 **`NO_BROWSER=true` is required for all Gemini invocations** from Claude Code's Bash tool. Without it, Gemini's child process relaunch shows a consent prompt that hangs in non-TTY shells.
 
-**Auth verification is mandatory before dispatch.** CLI tokens expire mid-session. Before running any review at depth 4-5:
-1. Check Codex auth: `codex login status`
-2. Check Gemini auth: `NO_BROWSER=true gemini -p "respond with ok" -o json` (exit 41 = auth failure)
-3. Check Claude CLI auth: `claude -p "respond with ok"` (handled automatically via the active Claude Code session in most cases)
-4. If any auth fails, tell the user to re-authenticate: `! codex login`, `! gemini -p "hello"`, or `! claude login` (the `!` prefix runs it interactively with TTY access). MMR's `mmr config test` pre-flights all three in one step.
-5. **Never silently skip a CLI due to auth failure** — surface it to the user
-
-When running a review step at depth 4-5 (preferred path: `mmr review` via a wrapper):
-1. Check CLI availability before dispatching
-2. If all three CLIs are available, MMR dispatches Codex + Gemini + Claude as independent channels for highest-quality three-CLI review; scaffold wrappers add the Superpowers code-reviewer agent as a complementary 4th channel reconciled through `mmr reconcile`
-3. If only one or two CLIs are available, MMR runs the available ones and emits compensating passes (via `claude -p`) for each missing external channel, labelled `[compensating: Codex-equivalent]` / `[compensating: Gemini-equivalent]`; the maximum achievable verdict in that case is `degraded-pass`
-4. If no external CLIs are available at all, fall back to Claude-only adversarial self-review (single-source confidence)
+Auth pre-flight for Path B dispatch:
+1. Codex: `codex login status`
+2. Gemini: `NO_BROWSER=true gemini -p "respond with ok" -o json` (exit 41 = auth failure)
+3. Claude CLI: `claude -p "respond with ok"` (typically uses the active Claude Code session)
+4. If any fail: `! codex login`, `! gemini -p "hello"`, or `! claude login` (the `!` prefix runs it interactively with TTY access).
+5. **Never silently skip a CLI due to auth failure** — surface it to the user.
 
 The runner should surface the depth choice as a decision point for review steps, noting that depth 4-5 enables three-CLI multi-model validation when the CLIs are available.
 
