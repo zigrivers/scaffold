@@ -373,10 +373,15 @@ or `diff -u /dev/null <path>` (untracked) and pipe the result into
 
 ### Multi-Model Review at Depth 4-5
 
-All review and validation steps now support independent multi-model validation at depth 4-5 using Codex and/or Gemini CLIs. The `multi-model-dispatch` skill documents the correct invocation patterns:
+All review and validation steps support independent multi-model validation at depth 4-5.
+
+For **MMR-backed review steps** (review-pr, review-code, post-implementation-review, and any pipeline review step that calls `mmr review`), the channel model is three CLIs — Codex, Gemini, and Claude — dispatched and reconciled by the MMR CLI, with scaffold wrappers adding the Superpowers code-reviewer agent as a complementary 4th channel. See the `mmr` skill for invocation.
+
+For **legacy / non-MMR review and validation steps** that still dispatch CLIs directly (some depth-5 validation steps, ad-hoc manual dispatch), the `multi-model-dispatch` skill documents the raw invocation patterns:
 
 - **Codex**: `codex exec --skip-git-repo-check -s read-only --ephemeral "prompt" 2>/dev/null` (NOT bare `codex`)
 - **Gemini**: `NO_BROWSER=true gemini -p "prompt" --output-format json --approval-mode yolo 2>/dev/null`
+- **Claude CLI**: `claude -p "prompt" --output-format json 2>/dev/null`
 
 **`NO_BROWSER=true` is required for all Gemini invocations** from Claude Code's Bash tool. Without it, Gemini's child process relaunch shows a consent prompt that hangs in non-TTY shells.
 
