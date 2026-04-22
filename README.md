@@ -1378,7 +1378,8 @@ scaffold check add-e2e-testing
 # → Applicable: yes | Platform: web | Brownfield: no | Mode: fresh
 
 scaffold check automated-pr-review
-# → Applicable: yes | GitHub remote: yes | Available CLIs: codex, gemini | Recommended: local-cli (dual-model)
+# → Applicable: yes | GitHub remote: yes | Available CLIs: codex, gemini, claude | Recommended: local-cli (three-CLI MMR review)
+# (suffix is `(three-CLI MMR review)` / `(two-CLI MMR review)` / `(single-CLI review)` based on how many of codex/gemini/claude are detected)
 
 scaffold check ai-memory-setup
 # → Rules: no | MCP server: none | Hooks: none | Mode: fresh

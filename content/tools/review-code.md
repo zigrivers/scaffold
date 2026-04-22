@@ -72,7 +72,7 @@ invocation that matches the scope the user asked for:
 # Resolve the base ref using the same precedence as the manual fallback
 # below (Mode C). Prefer the explicit upstream, then origin/HEAD, then
 # origin/main, main, master, and finally HEAD~1. If none exist, fall
-# through to a working-tree-only review (no committed diff segment).
+# through to HEAD (working-tree-only review against the last commit).
 BASE_REF=""
 if   UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null) && [ -n "$UPSTREAM" ]; then BASE_REF="$UPSTREAM"
 elif ORIGIN_HEAD=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null); then BASE_REF="${ORIGIN_HEAD#refs/remotes/}"
@@ -81,12 +81,14 @@ elif git rev-parse --verify main          >/dev/null 2>&1; then BASE_REF=main
 elif git rev-parse --verify origin/master >/dev/null 2>&1; then BASE_REF=origin/master
 elif git rev-parse --verify master        >/dev/null 2>&1; then BASE_REF=master
 elif git rev-parse --verify HEAD~1        >/dev/null 2>&1; then BASE_REF=HEAD~1
+else                                                           BASE_REF=HEAD
 fi
-{
-  if [ -n "$BASE_REF" ]; then git diff "$BASE_REF...HEAD"; fi
-  git diff --cached
-  git diff
-} | mmr review --diff - --sync --format json
+# Single diff covering committed branch work + staged + unstaged in
+# one coherent BASE_REF → working-tree patch. `git diff <ref>` compares
+# <ref> to the working tree (including the index), so repeated edits
+# to the same file collapse into one correct final patch rather than
+# concatenated intermediate-state hunks.
+git diff "$BASE_REF" | mmr review --diff - --sync --format json
 
 # Staged changes only:
 mmr review --staged --sync --format json
