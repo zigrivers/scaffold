@@ -1,0 +1,7 @@
+channels:
+  claude:
+    auth:
+      timeout: 20
+  gemini:
+    auth:
+      timeout: 20

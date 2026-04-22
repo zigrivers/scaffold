@@ -383,16 +383,17 @@ All review and validation steps now support independent multi-model validation a
 **Auth verification is mandatory before dispatch.** CLI tokens expire mid-session. Before running any review at depth 4-5:
 1. Check Codex auth: `codex login status`
 2. Check Gemini auth: `NO_BROWSER=true gemini -p "respond with ok" -o json` (exit 41 = auth failure)
-3. If auth fails, tell the user to re-authenticate: `! gemini -p "hello"` or `! codex login` (the `!` prefix runs it interactively with TTY access)
-4. **Never silently skip a CLI due to auth failure** — surface it to the user
+3. Check Claude CLI auth: `claude -p "respond with ok"` (handled automatically via the active Claude Code session in most cases)
+4. If any auth fails, tell the user to re-authenticate: `! codex login`, `! gemini -p "hello"`, or `! claude login` (the `!` prefix runs it interactively with TTY access). MMR's `mmr config test` pre-flights all three in one step.
+5. **Never silently skip a CLI due to auth failure** — surface it to the user
 
-When running a review step at depth 4-5:
+When running a review step at depth 4-5 (preferred path: `mmr review` via a wrapper):
 1. Check CLI availability before dispatching
-2. If both available, run dual-model review for highest quality
-3. If one available, run single-model external review
-4. If neither available, fall back to Claude-only adversarial self-review
+2. If all three CLIs are available, MMR dispatches Codex + Gemini + Claude as independent channels for highest-quality three-CLI review; scaffold wrappers add the Superpowers code-reviewer agent as a complementary 4th channel reconciled through `mmr reconcile`
+3. If only one or two CLIs are available, MMR runs the available ones and emits compensating passes (via `claude -p`) for each missing external channel, labelled `[compensating: Codex-equivalent]` / `[compensating: Gemini-equivalent]`; the maximum achievable verdict in that case is `degraded-pass`
+4. If no external CLIs are available at all, fall back to Claude-only adversarial self-review (single-source confidence)
 
-The runner should surface the depth choice as a decision point for review steps, noting that depth 4-5 enables multi-model validation if CLIs are available.
+The runner should surface the depth choice as a decision point for review steps, noting that depth 4-5 enables three-CLI multi-model validation when the CLIs are available.
 
 ## Batch Execution
 

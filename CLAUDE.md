@@ -123,7 +123,9 @@ The MMR CLI accepts any of these — the review is not gated to PRs.
 Gemini, Claude). The scaffold wrappers (`scaffold run review-pr` and
 `scaffold run review-code`) add the Superpowers code-reviewer agent as a
 complementary 4th channel and reconcile its findings into the same MMR job.
-`content/tools/post-implementation-review.md` follows the same 3+1 pattern.
+(`scaffold run post-implementation-review` has its own channel layout
+documented in `content/tools/post-implementation-review.md` — consult that
+file directly rather than assuming it matches this pattern.)
 
 **Entry points by target:**
 - PR → `scaffold run review-pr` (or `mmr review --pr <number>`)

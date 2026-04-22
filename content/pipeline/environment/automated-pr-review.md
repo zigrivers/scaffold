@@ -88,8 +88,10 @@ Check if AGENTS.md exists first. If it exists, check for scaffold tracking comme
   scope expanded beyond PRs (e.g., MMR now supports staged / diff / branch
   / file targets)
 - **Conflict resolution**: if review criteria changed in coding-standards.md,
-  update AGENTS.md review rules to match; if both CLI reviewers are now
-  available, offer to enable dual-model review
+  update AGENTS.md review rules to match; if additional CLI reviewers have
+  become available, offer to enable the full three-CLI MMR flow (Codex,
+  Gemini, Claude) and, on wrapper invocations, surface Superpowers
+  code-reviewer as the complementary 4th channel
 
 ## Instructions
 
