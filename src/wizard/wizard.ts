@@ -145,6 +145,7 @@ export async function collectWizardAnswers(
       ...(answers.mlConfig && { mlConfig: answers.mlConfig }),
       ...(answers.browserExtensionConfig && { browserExtensionConfig: answers.browserExtensionConfig }),
       ...(answers.researchConfig && { researchConfig: answers.researchConfig }),
+      ...(answers.dataScienceConfig && { dataScienceConfig: answers.dataScienceConfig }),
     },
   }
 

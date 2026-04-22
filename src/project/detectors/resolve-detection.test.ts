@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- test mocks need flexible typing */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { resolveDetection, synthesizeEmptyMatch } from './resolve-detection.js'
+import { runDetectors } from './index.js'
+import { createFakeSignalContext } from './context.js'
 import type { DetectionMatch } from './types.js'
 
 vi.mock('./disambiguate.js', () => ({
@@ -166,6 +168,39 @@ describe('resolveDetection Cases A-G', () => {
     })
     expect(result.chosen?.projectType).toBe('backend')
     expect(result.warnings.some(w => w.code === 'ADOPT_SECONDARY_MATCHES')).toBe(true)
+  })
+
+  it('pyproject.toml + marimo dep resolves to data-science (not library)', async () => {
+    // Regression: previously the library detector's isPurePyLib heuristic fired
+    // high-tier on any pyproject.toml without app-framework deps, stealing the
+    // commit away from the low-tier data-science match. Adding marimo/dvc to
+    // PYTHON_APP_DEPS fixes this — marimo alone indicates notebook DS, not a library.
+    const ctx = createFakeSignalContext({
+      pyprojectToml: {
+        project: {
+          name: 'my-analysis',
+          dependencies: ['marimo', 'polars'],
+        },
+      },
+      files: { 'pyproject.toml': '' },
+      rootEntries: ['pyproject.toml'],
+    })
+
+    const matches = runDetectors(ctx)
+    // Pre-condition: library detector no longer fires on marimo repos.
+    expect(matches.some(m => m.projectType === 'library')).toBe(false)
+    // And data-science fires (low tier).
+    const ds = matches.find(m => m.projectType === 'data-science')
+    expect(ds).toBeDefined()
+
+    // Case F (low-only) routes through disambiguate; simulate interactive acceptance.
+    vi.mocked(disambiguate).mockResolvedValueOnce({ chosen: ds as DetectionMatch })
+    const result = await resolveDetection({
+      matches,
+      opts: { interactive: true, acceptLowConfidence: true },
+    })
+
+    expect(result.chosen?.projectType).toBe('data-science')
   })
 
   it('synthesizeEmptyMatch produces a match with empty partialConfig', () => {

@@ -4,6 +4,18 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.23.0] — 2026-04-22
+
+### Added
+- `data-science` project-type overlay for solo / small-team data science work. Includes 13 knowledge documents injected into 21 universal pipeline steps (reproducibility, experiment tracking, notebook discipline, model evaluation, data versioning, etc.).
+- Low-tier brownfield detector recognizes DS repos via Marimo signals (`marimo` dep or `.marimo.toml`); DVC is supplementary evidence only.
+- Forward-compatible `DataScienceConfig.audience` discriminator (default `'solo'`) so DS-2 can extend additively.
+- New packaging test (`project-type-overlay-alignment.test.ts`), structural eval (`overlay-structural-coverage.bats`), detector-coverage test, and keyword-presence content eval.
+
+### Known limitations
+- `scaffold adopt` does not detect Marimo declared only in `project.optional-dependencies` or uv `[dependency-groups]`. Put `marimo` in main `project.dependencies` OR run `scaffold init --project-type data-science` explicitly.
+- A Python library using Marimo purely as internal tooling may be misclassified as `data-science` rather than `library`. Override with `--project-type library` or edit `config.yml` after `adopt`.
+
 ## [3.22.0] — 2026-04-21
 
 ### Added

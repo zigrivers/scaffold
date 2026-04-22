@@ -10,6 +10,7 @@ import { dataPipelineCouplingValidator } from './data-pipeline.js'
 import { mlCouplingValidator } from './ml.js'
 import { gameCouplingValidator } from './game.js'
 import { browserExtensionCouplingValidator } from './browser-extension.js'
+import { dataScienceCouplingValidator } from './data-science.js'
 
 export const ALL_COUPLING_VALIDATORS: readonly CouplingValidator<unknown>[] = [
   backendCouplingValidator as CouplingValidator<unknown>,
@@ -22,6 +23,7 @@ export const ALL_COUPLING_VALIDATORS: readonly CouplingValidator<unknown>[] = [
   mlCouplingValidator as CouplingValidator<unknown>,
   gameCouplingValidator as CouplingValidator<unknown>,
   browserExtensionCouplingValidator as CouplingValidator<unknown>,
+  dataScienceCouplingValidator as CouplingValidator<unknown>,
 ] as const
 
 export const PROJECT_TYPE_TO_CONFIG_KEY: Readonly<Record<ProjectType, string>> =

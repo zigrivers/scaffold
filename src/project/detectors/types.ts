@@ -3,7 +3,7 @@ import type { z } from 'zod'
 import type {
   WebAppConfigSchema, BackendConfigSchema, CliConfigSchema, LibraryConfigSchema,
   MobileAppConfigSchema, DataPipelineConfigSchema, MlConfigSchema, ResearchConfigSchema,
-  BrowserExtensionConfigSchema, GameConfigSchema,
+  BrowserExtensionConfigSchema, GameConfigSchema, DataScienceConfigSchema,
 } from '../../config/schema.js'
 
 export type Confidence = 'high' | 'medium' | 'low'
@@ -59,10 +59,15 @@ export interface GameMatch extends BaseMatch {
   readonly projectType: 'game'
   readonly partialConfig: Partial<z.infer<typeof GameConfigSchema>>
 }
+export interface DataScienceMatch extends BaseMatch {
+  readonly projectType: 'data-science'
+  readonly partialConfig: Partial<z.infer<typeof DataScienceConfigSchema>>
+}
 
 export type DetectionMatch =
   | WebAppMatch | BackendMatch | CliMatch | LibraryMatch | MobileAppMatch
   | DataPipelineMatch | MlMatch | ResearchMatch | BrowserExtensionMatch | GameMatch
+  | DataScienceMatch
 
 export type Detector = (ctx: import('./context.js').SignalContext) => DetectionMatch | null
 

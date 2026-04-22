@@ -37,7 +37,7 @@ get_min_lines() {
     [[ -z "$name" ]] && failures+=("$file: missing name")
     [[ -z "$desc" ]] && failures+=("$file: missing description")
     [[ -z "$topics" ]] && failures+=("$file: missing topics")
-  done < <(find "${PROJECT_ROOT}/content/knowledge" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/knowledge" -name '*.md' -type f ! -name 'README.md')
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Knowledge frontmatter failures:\n"
@@ -58,7 +58,7 @@ get_min_lines() {
     if [[ "$lines" -lt "$min" ]]; then
       failures+=("$(basename "$file") (${category}): ${lines} lines < ${min} minimum")
     fi
-  done < <(find "${PROJECT_ROOT}/content/knowledge" -name '*.md' -type f)
+  done < <(find "${PROJECT_ROOT}/content/knowledge" -name '*.md' -type f ! -name 'README.md')
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     printf "Knowledge files below minimum line count:\n"

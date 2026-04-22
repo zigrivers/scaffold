@@ -98,7 +98,7 @@ async function discoverRealMetaPrompts(): Promise<Map<string, MetaPromptFile>> {
  */
 async function resolveProjectOverlay(
   projectType: 'web-app' | 'backend' | 'cli' | 'library' | 'mobile-app'
-    | 'data-pipeline' | 'ml' | 'browser-extension',
+    | 'data-pipeline' | 'ml' | 'browser-extension' | 'research' | 'data-science',
   methodology: 'deep' | 'mvp' = 'deep',
 ): Promise<{ overlayState: OverlayState; realMetaPrompts: Map<string, MetaPromptFile> }> {
   const methodologyDir = getPackageMethodologyDir()
@@ -1764,5 +1764,90 @@ describe('research overlay integration', () => {
     // Domain after core
     const sysArch = state.knowledge['system-architecture']
     expect(sysArch.indexOf('research-sim-engine-patterns')).toBeGreaterThan(sysArch.indexOf('research-architecture'))
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Tests — Data-science
+// ---------------------------------------------------------------------------
+
+describe('data-science overlay integration', () => {
+  let tmpDir: string
+  beforeEach(() => { tmpDir = makeTempDir() })
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+    vi.restoreAllMocks()
+  })
+
+  it('data-science config with dataScienceConfig validates through ConfigSchema', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2,
+      methodology: 'deep',
+      platforms: ['claude-code'],
+      project: {
+        projectType: 'data-science',
+        dataScienceConfig: { audience: 'solo' },
+      },
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      const project = result.data.project as Record<string, unknown>
+      expect(project['projectType']).toBe('data-science')
+      const dsc = project['dataScienceConfig'] as Record<string, unknown>
+      expect(dsc['audience']).toBe('solo')
+    }
+  })
+
+  it('data-science overlay loads without errors', () => {
+    const methodologyDir = getPackageMethodologyDir()
+    const overlayPath = path.join(methodologyDir, 'data-science-overlay.yml')
+    const { overlay, errors } = loadOverlay(overlayPath)
+    expect(errors).toHaveLength(0)
+    expect(overlay).not.toBeNull()
+    expect(overlay!.projectType).toBe('data-science')
+    expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(0)
+  })
+
+  it('overlay injects data-science-architecture into system-architecture step', async () => {
+    const { overlayState } = await resolveProjectOverlay('data-science')
+    expect(overlayState.knowledge['system-architecture']).toContain('data-science-architecture')
+  })
+
+  it('overlay injects tool-stack knowledge into tech-stack step', async () => {
+    const { overlayState } = await resolveProjectOverlay('data-science')
+    expect(overlayState.knowledge['tech-stack']).toContain('data-science-architecture')
+    expect(overlayState.knowledge['tech-stack']).toContain('data-science-dev-environment')
+  })
+
+  it('overlay injects data-science-testing into TDD step', async () => {
+    const { overlayState } = await resolveProjectOverlay('data-science')
+    expect(overlayState.knowledge['tdd']).toContain('data-science-testing')
+  })
+
+  it('overlay injects data-science knowledge into foundational steps', async () => {
+    const { overlayState } = await resolveProjectOverlay('data-science')
+    expect(overlayState.knowledge['create-prd']).toContain('data-science-requirements')
+    expect(overlayState.knowledge['coding-standards']).toContain('data-science-conventions')
+    expect(overlayState.knowledge['project-structure']).toContain('data-science-project-structure')
+  })
+
+  it('overlay injects DS-specific knowledge into operations step', async () => {
+    const { overlayState } = await resolveProjectOverlay('data-science')
+    expect(overlayState.knowledge['operations']).toEqual(
+      expect.arrayContaining([
+        'data-science-experiment-tracking',
+        'data-science-observability',
+        'data-science-reproducibility',
+      ]),
+    )
+  })
+
+  it('overlay is knowledge-only (no step-overrides, no cross-reads-overrides)', () => {
+    const methodologyDir = getPackageMethodologyDir()
+    const overlayPath = path.join(methodologyDir, 'data-science-overlay.yml')
+    const { overlay } = loadOverlay(overlayPath)
+    expect(overlay).not.toBeNull()
+    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+    expect(Object.keys(overlay!.crossReadsOverrides)).toHaveLength(0)
   })
 })

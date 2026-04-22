@@ -1021,3 +1021,19 @@ describe('browser-extension wizard questions', () => {
     expect(output.confirm).not.toHaveBeenCalled()
   })
 })
+
+describe('data-science wizard questions', () => {
+  it('uses default audience in auto mode (no flags, no prompts)', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'data-science',
+    })
+    expect(answers.projectType).toBe('data-science')
+    expect(answers.dataScienceConfig).toEqual({ audience: 'solo' })
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.confirm).not.toHaveBeenCalled()
+  })
+})

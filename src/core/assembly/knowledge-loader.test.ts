@@ -111,6 +111,34 @@ describe('buildIndex', () => {
     expect(index.size).toBe(1)
     expect(index.has('prd-craft')).toBe(true)
   })
+
+  it('skips README.md files even with valid frontmatter', () => {
+    const dir = makeTmpDir()
+    writeTmpFile(dir, 'real-entry.md',
+      '---\nname: real-entry\ndescription: x\ntopics: []\n---\ncontent\n')
+    writeTmpFile(dir, 'README.md',
+      '---\nname: accidentally-entry\ndescription: x\ntopics: []\n---\ncontent\n')
+
+    const index = buildIndex(dir)
+
+    expect(index.has('real-entry')).toBe(true)
+    expect(index.has('accidentally-entry')).toBe(false)
+  })
+
+  it('skips README.md in nested subdirectories', () => {
+    const dir = makeTmpDir()
+    const subDir = path.join(dir, 'category')
+    fs.mkdirSync(subDir)
+    writeTmpFile(subDir, 'entry.md',
+      '---\nname: nested-entry\ndescription: x\ntopics: []\n---\ncontent\n')
+    writeTmpFile(subDir, 'README.md',
+      '---\nname: category-readme\ndescription: x\ntopics: []\n---\ncontent\n')
+
+    const index = buildIndex(dir)
+
+    expect(index.has('nested-entry')).toBe(true)
+    expect(index.has('category-readme')).toBe(false)
+  })
 })
 
 describe('buildIndexWithOverrides', () => {
@@ -669,6 +697,38 @@ describe('buildIndexWithOverrides — additional edge cases', () => {
 
     const index = buildIndexWithOverrides(tmpDir, globalDir)
     expect(index.size).toBe(0)
+  })
+
+  it('buildIndexWithOverrides skips README.md in both global and local dirs', () => {
+    const tmpDir = makeTmpDir()
+    const globalDir = path.join(tmpDir, 'knowledge')
+    fs.mkdirSync(globalDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(globalDir, 'README.md'),
+      '---\nname: global-readme\ndescription: readme\ntopics: []\n---\nbody',
+    )
+    fs.writeFileSync(
+      path.join(globalDir, 'real-global.md'),
+      '---\nname: real-global\ndescription: x\ntopics: []\n---\nbody',
+    )
+
+    const localDir = path.join(tmpDir, '.scaffold', 'knowledge')
+    fs.mkdirSync(localDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(localDir, 'README.md'),
+      '---\nname: local-readme\ndescription: readme\ntopics: []\n---\nbody',
+    )
+    fs.writeFileSync(
+      path.join(localDir, 'real-local.md'),
+      '---\nname: real-local\ndescription: x\ntopics: []\n---\nbody',
+    )
+
+    const index = buildIndexWithOverrides(tmpDir, globalDir)
+
+    expect(index.has('real-global')).toBe(true)
+    expect(index.has('real-local')).toBe(true)
+    expect(index.has('global-readme')).toBe(false)
+    expect(index.has('local-readme')).toBe(false)
   })
 
   it('merges global and local entries with distinct names', () => {

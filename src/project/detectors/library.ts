@@ -19,6 +19,7 @@ export function detectLibrary(ctx: SignalContext): LibraryMatch | null {
     'airflow', 'prefect', 'dagster', 'luigi',     // data-pipeline
     'torch', 'tensorflow', 'scikit-learn', 'jax', // ML
     'typer', 'click',                              // CLI
+    'marimo', 'dvc',                               // data-science (notebook/pipeline)
   ]
   const isPurePyLib = py && (py.project?.name || py.tool?.poetry) && !py.project?.scripts
     && !ctx.hasAnyDep(PYTHON_APP_DEPS, 'py')

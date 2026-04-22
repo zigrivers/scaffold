@@ -1,6 +1,7 @@
 import { describe, it, expectTypeOf } from 'vitest'
 import type {
   WebAppCopy, LibraryCopy, GameCopy, BackendCopy, ProjectCopyMap, OptionCopy, CoreCopy,
+  DataScienceCopy,
 } from './types.js'
 import type { ProjectType } from '../../types/index.js'
 
@@ -41,5 +42,14 @@ describe('QuestionCopy type-level tests', () => {
   it('getCopyForType narrows to the correct type', () => {
     expectTypeOf<ProjectCopyMap['web-app']>().toEqualTypeOf<WebAppCopy>()
     expectTypeOf<ProjectCopyMap['game']>().toEqualTypeOf<GameCopy>()
+  })
+
+  it('DataScienceCopy.audience.options requires exact enum keys', () => {
+    expectTypeOf<NonNullable<DataScienceCopy['audience']['options']>>()
+      .toEqualTypeOf<Record<'solo', OptionCopy>>()
+  })
+
+  it('ProjectCopyMap["data-science"] narrows to DataScienceCopy', () => {
+    expectTypeOf<ProjectCopyMap['data-science']>().toEqualTypeOf<DataScienceCopy>()
   })
 })

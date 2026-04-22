@@ -19,9 +19,10 @@ export interface DisambiguateResult {
 //   'user-cancelled'      — user Ctrl-C'd the prompt (ExitPromptError)
 //   'no-eligible-matches' — disambiguate() called with empty matches
 
-const PROJECT_TYPE_PREFERENCE: readonly ProjectType[] = [
+export const PROJECT_TYPE_PREFERENCE: readonly ProjectType[] = [
   'web-app', 'backend', 'cli', 'library', 'mobile-app',
-  'data-pipeline', 'ml', 'research', 'browser-extension', 'game',
+  'data-pipeline', 'ml', 'research', 'data-science',
+  'browser-extension', 'game',
 ]
 
 function tierRank(c: Confidence): number {
