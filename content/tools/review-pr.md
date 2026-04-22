@@ -53,7 +53,7 @@ in the review criteria config rather than read at dispatch time.
 
 ## Expected Outputs
 
-- All three review channels executed (or fallback documented)
+- All three CLI review channels executed (or fallback documented) plus the Superpowers code-reviewer 4th channel reconciled via `mmr reconcile`
 - P0/P1/P2 findings fixed before proceeding
 - Review summary with per-channel results and reconciliation
 
@@ -245,7 +245,7 @@ Do NOT proceed to the next task or merge until this confirmation is output.
 ## Process Rules
 
 1. **Foreground only** — Always run Codex, Gemini, and Claude CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`.
-2. **All three channels are mandatory** — Codex CLI, Gemini CLI, and Claude CLI. Skip only when a tool is genuinely not installed, never by choice.
+2. **All three CLI channels are mandatory** — Codex CLI, Gemini CLI, and Claude CLI. Plus the Superpowers code-reviewer agent as a complementary 4th channel reconciled via `mmr reconcile` (Step 3). Skip a CLI channel only when a tool is genuinely not installed or auth cannot be recovered (in which case MMR emits a compensating pass for missing Codex/Gemini channels; a missing Claude CLI has no compensator). Never skip by choice.
 3. **Auth failures are not silent** — always surface to the user with the exact recovery command.
 4. **Independence** — never share one channel's output with another. Each reviews the diff independently.
 5. **Fix before proceeding** — P0/P1/P2 findings must be resolved before moving to the next task.
