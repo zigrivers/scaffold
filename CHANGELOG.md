@@ -4,28 +4,66 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.24.0] — 2026-04-22
+
 ### Changed
 - Multi-model review (`mmr review`) is no longer framed as PR-only across skills,
   tool prompts, and seeded CLAUDE.md guidance. The CLI already supported
   `--staged`, `--base`/`--head`, and `--diff <path | ->` input modes; the
   wrapper documentation now surfaces all of them as first-class targets.
-  Requests like "multi-model review this doc" now route correctly (e.g.
-  `git diff HEAD -- path/to/doc.md | mmr review --diff -`) instead of
-  refusing. The `--diff` flag expects diff-format content, so raw files
-  are wrapped via `git diff …` or `(diff -u /dev/null … || true)` first
-  (the `|| true` guard is required because `diff` exits 1 whenever files
-  differ, which breaks pipelines under `set -o pipefail`).
+  Requests like "multi-model review this doc" now route correctly instead
+  of refusing. The `--diff` flag expects diff-format content, so raw files
+  are wrapped first, using the pattern that matches the user's intent:
+  - **Pending edits to a tracked file** →
+    `git diff HEAD -- <path> | mmr review --diff -`
+    (fails with "no diff content" if the file has no local changes — use
+    the next form instead).
+  - **Current contents of any file** (tracked-with-no-changes, untracked,
+    or brand-new), synthesized as an "all added" diff →
+    `(diff -u /dev/null <path> || true) | mmr review --diff -`
+    (the `|| true` guard is required because `diff` exits 1 whenever files
+    differ, which breaks pipelines under `set -o pipefail`).
 - `content/skills/mmr/SKILL.md` documents all input modes and common
-  non-PR workflows (doc review, pre-commit review).
+  non-PR workflows (doc review, pre-commit review), with file-review
+  split into "pending edits to a tracked file" vs. "current contents of
+  any file" cases.
 - `content/skills/scaffold-runner/SKILL.md` adds a Multi-Model Review Routing
   table that dispatches by target type (PR vs. local code vs. file vs. ref
-  range) instead of defaulting to `review-user-stories`.
+  range) instead of defaulting to `review-user-stories`. The "Multi-Model
+  Review at Depth 4-5" section is split into a Path A (MMR-backed) vs.
+  Path B (legacy direct dispatch) structure.
 - `content/tools/review-pr.md` clarifies it's the PR-scoped wrapper around
-  the more general `mmr review` CLI.
+  the more general `mmr review` CLI; Purpose/Expected Outputs/Process
+  Rules all aligned to the 3 CLI + Superpowers 4th-channel model.
+- `content/tools/review-code.md` Primary MMR path now resolves a trunk
+  BASE_REF (origin/HEAD → origin/main → main → origin/master → master
+  → HEAD~1 → HEAD) and dispatches one `git diff "$MERGE_BASE" |
+  mmr review --diff -` for the full delivery candidate, instead of
+  concatenating three segment diffs. Fallback Mode A now also accepts
+  `--base` without `--head`.
 - `content/pipeline/environment/automated-pr-review.md` now seeds a
   target-agnostic Code Review block into downstream projects, wrapped in
   `<!-- scaffold:automated-pr-review:claude-md start/end -->` markers for
-  idempotent Update Mode rewrites.
+  idempotent Update Mode rewrites. Purpose, Quality Criteria, and
+  Methodology Scaling all rewritten for the current 3-CLI + Superpowers
+  channel model instead of the legacy "dual-model Codex/Gemini" framing.
+  PostToolUse hook now probes Claude CLI auth and includes
+  `! claude login` in recovery guidance.
+- Build-loop templates (`multi-agent-start.md`, `multi-agent-resume.md`,
+  `single-agent-start.md`, `single-agent-resume.md`) updated to document
+  all 4 channels (3 CLIs + Superpowers) with `mmr config test` as the
+  one-shot auth pre-flight.
+- Knowledge entries (`automated-review-tooling.md`,
+  `multi-model-review-dispatch.md`) refreshed for three-CLI MMR and
+  non-PR review targets.
+- `README.md` review sections (utility tools table, Multi-Model Review
+  overview, What You Need, `scaffold check` example, MMR config YAML
+  example) updated to the current channel model and non-PR routing.
+- `scaffold check automated-pr-review` now detects all three MMR CLI
+  channels (codex, gemini, claude) and labels the recommendation as
+  "three-CLI MMR review" / "two-CLI MMR review" / "single-CLI review"
+  instead of the old "dual-model" label. Internal `execSync` callers
+  migrated to `execFileSync` for safer command invocation.
 
 ### Migration
 - Existing scaffold-initialized projects have a PR-only Code Review block in

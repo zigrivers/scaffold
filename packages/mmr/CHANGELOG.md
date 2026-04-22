@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0] — 2026-04-22
+
+### Changed
+- **Raise default auth-check timeout for `claude` and `gemini` channels
+  from 5s to 20s.** Both CLIs' auth probes (`claude -p "respond with ok"`,
+  `NO_BROWSER=true gemini -p "respond with ok" -o json`) are full LLM
+  round-trips that routinely take 9-14s, so 5s false-failed normal
+  environments and silently dropped them into compensating passes.
+  Codex's auth probe (`codex login status`) stays at 5s since it's a
+  local file check, not a round-trip. Defined in
+  `packages/mmr/src/config/defaults.ts`; callers can still override
+  via `~/.mmr/config.yaml` or a project `.mmr.yaml`.
+
 ## [1.1.0] — 2026-04-13
 
 ### Added

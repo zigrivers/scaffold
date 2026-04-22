@@ -6,6 +6,16 @@ Working document tracking completed work, in-progress items, and future directio
 
 ## Completed Releases
 
+### v3.24.0 (2026-04-22)
+
+Target-Agnostic Multi-Model Review — `mmr review` is no longer framed as PR-only. Skills, tool specs, knowledge entries, build-loop templates, and README all updated to the three-CLI + Superpowers channel model (Codex + Gemini + Claude + Superpowers code-reviewer), with non-PR targets (staged, branch diff, specific file, arbitrary diff) as first-class routing cases.
+
+- **Seeded CLAUDE.md block** now target-agnostic, wrapped in `<!-- scaffold:automated-pr-review:claude-md -->` markers for idempotent Update Mode rewrites. Existing projects should re-run `scaffold run automated-pr-review` to refresh.
+- **`scaffold check automated-pr-review`** detects all three MMR CLIs and labels recommended mode as "three-CLI MMR review" / "two-CLI MMR review" / "single-CLI review".
+- **`scaffold run review-code`** default mode now computes trunk merge-base and dispatches one coherent delivery-candidate diff instead of concatenating segment diffs.
+- **MMR CLI v1.2.0** (bundled) — raise default auth-check timeout for claude and gemini channels from 5s to 20s. Both are full LLM round-trips (9-14s in practice), so 5s was false-failing normal environments and silently dropping them into compensating passes.
+- **Review discipline**: 26-round iterative MMR review (Claude + Codex + Gemini-compensating) driving every inconsistency to resolution. PR #301 (impl) + PR #302 (release-prep).
+
 ### v3.23.0 (2026-04-22)
 
 Data Science Project-Type Overlay — `scaffold init --project-type data-science` targets solo / small-team data scientists with 13 knowledge documents covering reproducibility, experiment tracking, notebook discipline, model evaluation, and data versioning. Implements roadmap "Content & Quality > New Project Type Overlays" for the DS-1 audience; DS-2 (platform / larger-team) deferred to backlog.
@@ -91,7 +101,7 @@ Multi-service monorepo support — 5 waves landing together.
 
 ### v3.16.0 (2026-04-13)
 
-- **MMR CLI v1.1.0** — Multi-Model Review overhaul with `mmr reconcile`, 4-channel flow, verdict system
+- **MMR CLI v1.2.0** — Realistic auth-check timeouts (claude/gemini 5s→20s) unblock three-CLI review by default; builds on v1.1.0's `mmr reconcile` 4-channel flow and verdict system
 - **Wave 0 (Security)** — artifact path containment via `resolveContainedArtifactPath()` across all 5 artifact sites
 
 ---
