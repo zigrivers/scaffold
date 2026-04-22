@@ -1308,7 +1308,7 @@ At depth 1-3, reviews are Claude-only — still thorough with multiple passes, b
 ### What You Need
 
 - **Depth 4 or 5** — set during `scaffold init` or override per step
-- **At least one additional CLI** — Codex, Gemini, and/or Claude CLI. All three dispatched independently as MMR channels when available; missing channels fall back to compensating passes.
+- **At least one additional CLI** — Codex, Gemini, and/or Claude CLI. All three dispatched independently as MMR channels when available. Missing Codex or Gemini channels fall back to compensating Claude passes (labeled `[compensating: Codex-equivalent]` / `[compensating: Gemini-equivalent]`, single-source confidence); if Claude itself is unavailable, the review proceeds with the remaining channels — MMR does not compensate for a missing Claude channel.
 - **Valid authentication** — Scaffold checks before every dispatch (run `mmr config test` to pre-flight all three at once) and tells you if credentials need refreshing
 
 ## Methodology Presets

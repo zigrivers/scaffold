@@ -360,7 +360,7 @@ Output a concise summary in this format:
 ### Channels Executed
 - Codex CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / compensating (Codex-equivalent)]
 - Gemini CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / compensating (Gemini-equivalent)]
-- Claude CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / compensating]
+- Claude CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / none (Claude is never compensated — it IS the compensator for Codex/Gemini)]
 
 ### Findings
 [consensus findings first, then single-source findings]
