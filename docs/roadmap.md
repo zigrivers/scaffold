@@ -15,6 +15,7 @@ Data Science Project-Type Overlay — `scaffold init --project-type data-science
 - **Low-tier detector**: surfaces DS repos via Marimo signals (`marimo` dep or `.marimo.toml`); DVC signals (`dvc.yaml`, `.dvc/config`, `dvc` py dep) count as supplementary evidence. Defers to `ml` / `research` / `data-pipeline` via `resolveDetection` when those match at medium/high tier.
 - **Wiring**: schema + validator + detector + wizard copy + adopt mapping. New packaging test + structural eval + detector-coverage test prevent future silent misregistration.
 - **Review discipline**: 4-round spec MMR + 3-round plan MMR (Codex + Claude + Gemini-compensating) + 3-channel PR MMR. PR #299.
+- **Known limitations**: `scaffold adopt` misses Marimo-in-dev-deps and may misclassify libraries that use Marimo as tooling. See `CHANGELOG.md` for workarounds.
 
 ### v3.22.0 (2026-04-21)
 
