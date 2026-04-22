@@ -74,7 +74,9 @@ Check if AGENTS.md exists first. If it exists, check for scaffold tracking comme
   script customizations
 - **Triggers for update**: coding-standards.md changed (new review criteria),
   tdd-standards.md changed (coverage expectations), new external reviewer
-  CLI became available, git-workflow.md changed PR workflow steps
+  CLI became available, git-workflow.md changed PR workflow steps, review
+  scope expanded beyond PRs (e.g., MMR now supports staged / diff / branch
+  / file targets)
 - **Conflict resolution**: if review criteria changed in coding-standards.md,
   update AGENTS.md review rules to match; if both CLI reviewers are now
   available, offer to enable dual-model review
@@ -120,20 +122,42 @@ the actual CLI invocations ensures the agent can execute reviews even if the
 
 ### Add Review Workflow to CLAUDE.md
 
-Add the following to the project's CLAUDE.md in the Code Review section:
+Add the following to the project's CLAUDE.md in the Code Review section. Wrap
+the managed section in the `<!-- scaffold:automated-pr-review:claude-md -->`
+markers shown below so Update Mode can idempotently rewrite this block without
+duplicating it on re-run. If a prior version of the block exists **without**
+markers, replace it in place and add the markers.
 
 ```markdown
 ## Code Review
 
-After creating a PR, run `/scaffold:review-pr <PR#>` to execute all three review
-channels (Codex CLI, Gemini CLI, Superpowers code-reviewer). Fix P0/P1/P2 findings
-before moving to the next task. A post-hook on `gh pr create` will remind you.
+<!-- scaffold:automated-pr-review:claude-md start -->
+**Mandatory after `gh pr create`** — run `/scaffold:review-pr <PR#>` to execute
+all three review channels (Codex CLI, Gemini CLI, Superpowers code-reviewer).
+Fix P0/P1/P2 findings before moving to the next task. A post-hook on
+`gh pr create` will remind you.
 
-| Command | Purpose |
-|---------|---------|
-| `/scaffold:review-pr <PR#>` | Run all 3 review channels on a PR |
-| `scripts/cli-pr-review.sh <PR#>` | Run dual-model CLI review only |
+**Optional but supported** for non-PR targets — the same three-channel review
+works on any diff or file. Call `mmr review` directly or use `scaffold run
+review-code` for local pre-commit review. The review is not PR-gated.
+
+| When | Command |
+|------|---------|
+| After creating a PR | `/scaffold:review-pr <PR#>` |
+| Before commit / push (local code) | `scaffold run review-code` |
+| Specific file or document | `mmr review --diff <path> --sync --format json` |
+| Branch diff | `mmr review --base <ref> --head <ref> --sync --format json` |
+| Staged changes | `mmr review --staged --sync --format json` |
+| Dual-model CLI only (no reconciliation) | `scripts/cli-pr-review.sh <PR#>` |
+<!-- scaffold:automated-pr-review:claude-md end -->
 ```
+
+**Idempotency note:** In Update Mode, find the `<!-- scaffold:automated-pr-review:claude-md start -->`
+and `<!-- scaffold:automated-pr-review:claude-md end -->` markers and replace
+everything between them with the current version of the block above. If the
+markers are missing (pre-marker versions), locate the prior block by its
+"After creating a PR, run `/scaffold:review-pr`" lead-in and replace it in
+place, adding the markers around the new content. Never append a second copy.
 
 ### Configure AGENTS.md, Review Standards, and CLI Scripts
 

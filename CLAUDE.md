@@ -111,21 +111,30 @@ Minimum checklist:
 
 Before pushing, review `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md. Fix any issues and re-run `make check-all`. Log recurring patterns to tasks/lessons.md.
 
-### Mandatory 3-Channel PR Review
+### 3-Channel Code Review
 
-After creating every PR, run **all three** code review channels before moving
-to the next task. A PostToolUse hook on `gh pr create` will remind you.
+**Mandatory after `gh pr create`** — run all three code review channels before
+moving to the next task. A PostToolUse hook on `gh pr create` will remind you.
+**Optional but supported** for any non-PR target: uncommitted changes, a branch
+diff, a specific diff file, or an arbitrary document. The MMR CLI accepts any
+of these — the "3-channel review" is not gated to PRs.
 
-**Entry point:** Use `scaffold run review-pr` or follow the instructions in
-`content/tools/review-pr.md`. The tool handles dispatch, auth checks,
-reconciliation, and verdict logic.
+**Entry points by target:**
+- PR → `scaffold run review-pr` (or `mmr review --pr <number>`)
+- Local code before commit → `scaffold run review-code` (or `mmr review --staged`)
+- Branch diff → `mmr review --base <ref> --head <ref>`
+- Single file / document / arbitrary diff → `mmr review --diff <path>`
+  (use `--diff -` for stdin)
+
+The wrapper tools (`review-pr`, `review-code`) handle dispatch, auth checks,
+reconciliation, and verdict logic. For targets not covered by a wrapper, call
+`mmr review` directly — it accepts `--focus "…" --sync --format json` the same
+way.
 
 **The three channels:**
 1. **Codex CLI** — implementation correctness, security, API contracts
 2. **Gemini CLI** — architectural patterns, broad-context reasoning
 3. **Claude CLI** — plan alignment, code quality, testing
-
-**Primary entry point:** `mmr review --pr <number> --sync --format json`
 
 **Critical rules:**
 - **Foreground only** — Always run Codex, Gemini, and Claude CLI commands as
@@ -155,8 +164,13 @@ reconciliation, and verdict logic.
 <!-- Escape hatch only. Canonical commands live in content/tools/review-pr.md.
      Update both if CLI syntax changes. -->
 ```bash
-# Primary (recommended):
-mmr review --pr "$PR_NUMBER" --sync --format json
+# Primary — pick the input mode that matches your target
+mmr review --pr "$PR_NUMBER" --sync --format json               # PR
+mmr review --staged --sync --format json                        # pre-commit
+mmr review --base main --head "$BRANCH" --sync --format json    # branch diff
+mmr review --diff path/to/file.md --sync --format json          # single file / doc
+mmr review --diff - --sync --format json < /tmp/some.patch      # stdin
+
 # Capture job_id, dispatch agent review, then inject:
 mmr reconcile "$JOB_ID" --channel superpowers --input findings.json
 

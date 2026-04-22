@@ -240,7 +240,8 @@ Respond to these natural language requests:
 | "Is X applicable?" / "Do I need X?" | Run `scaffold check <step>` to detect platform and brownfield status |
 | "Set up memory" / "Configure AI memory" / "Add memory" | Run `scaffold run ai-memory-setup` — sets up modular rules, optional MCP memory server, and external context |
 | "Set up testing" / "Add Playwright" / "Add Maestro" | Run `scaffold run add-e2e-testing` — auto-detects web/mobile and configures the right framework(s) |
-| "Run multi-model review" / "Review stories with other models" | Run `scaffold run review-user-stories` at depth 5 (multi-model capabilities are now built into review-user-stories) |
+| "Run multi-model review" / "Review X with all three models" | Route by target — see [Multi-Model Review Routing](#multi-model-review-routing) |
+| "Review stories with other models" | Run `scaffold run review-user-stories` at depth 5 (multi-model capabilities are built into review-user-stories) |
 | "Skip X" | Run `scaffold skip <step> --reason "<user's reason>"` |
 | "Skip X, Y, and Z" | Run `scaffold skip <step1> <step2> <step3> --reason "<reason>"` |
 | "What's left?" / "Show remaining" | Run `scaffold status --compact`, show only pending/in-progress steps |
@@ -337,6 +338,30 @@ scaffold check add-e2e-testing
 ```
 
 This is useful when the user asks "Do I need this step?" or when previewing which optional steps apply before running them.
+
+### Multi-Model Review Routing
+
+When the user asks for a "multi-model review", "review this with all three models",
+"run MMR on X", or similar — **do not assume the target is a PR**. Route based on
+what the user is pointing at:
+
+| Target | Command |
+|---|---|
+| GitHub PR (explicit number or current branch's PR) | `scaffold run review-pr [<PR#>]` |
+| Local uncommitted / staged code, before commit or push | `scaffold run review-code` |
+| A specific file or document (e.g. `docs/foo.md`) | `mmr review --diff <path> --sync --format json` |
+| A branch diff against main (or another ref) | `mmr review --base <ref> --head <ref> --sync --format json` |
+| A diff piped from another command | `mmr review --diff - --sync --format json` (stdin) |
+| A user-story review specifically at depth 5 | `scaffold run review-user-stories` |
+
+If the user's target is ambiguous ("review this with MMR"), ask once which of
+the above applies — don't default to `review-pr` just because it's the most
+common entry point. Doc reviews and uncommitted-work reviews are equally
+first-class.
+
+Pass `--focus "..."` to MMR when the user describes what to evaluate (clarity,
+completeness, security, performance, etc.). See the `mmr` skill for all input
+modes and flags.
 
 ### Multi-Model Review at Depth 4-5
 

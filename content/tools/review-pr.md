@@ -15,8 +15,14 @@ argument-hint: "<PR number or blank for current branch>"
 ## Purpose
 
 Run all three code review channels on a pull request and reconcile findings.
-This is the single entry point for PR code review — agents call this once instead
-of remembering three separate review invocations.
+This is the single entry point for **PR-scoped** code review — agents call this
+once instead of remembering three separate review invocations.
+
+**For non-PR targets**, don't use this tool. Call `mmr review` directly with
+the appropriate input mode (`--staged`, `--base/--head`, `--diff <path>`, or
+`--diff -`), or use `scaffold run review-code` for local pre-commit review.
+The three-channel review is not PR-specific; this tool is the PR wrapper
+around the more general `mmr review` CLI.
 
 The three channels are:
 1. **Codex CLI** — OpenAI's code analysis (implementation correctness, security, API contracts)

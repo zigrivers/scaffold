@@ -14,9 +14,22 @@ Dispatch code reviews to multiple AI model CLIs, poll for results, and collect r
 
 ## Quick Reference
 
+`mmr review` works for any review target — not just PRs. Pick the input mode
+that matches what you want reviewed:
+
 ```bash
-# Dispatch a review for a PR
+# GitHub PR (fetches diff via `gh pr diff`)
 mmr review --pr <number> --focus "description of what to focus on"
+
+# Staged git changes (pre-commit review)
+mmr review --staged --focus "..."
+
+# Branch diff / ref range
+mmr review --base main --head <branch> --focus "..."
+
+# Single file, document, or arbitrary diff
+mmr review --diff path/to/file.md --focus "..."
+mmr review --diff - --focus "..." < /tmp/some.patch   # stdin
 
 # Check progress
 mmr status <job-id>
@@ -28,7 +41,13 @@ mmr results <job-id>
 mmr config test
 ```
 
-## After Creating a PR
+All input modes accept `--focus`, `--sync`, `--format`, and `--fix-threshold`
+the same way. The "3-channel review" is not PR-specific — it reviews whatever
+diff or content you point it at.
+
+## Common Workflows
+
+**After creating a PR**
 
 1. Run `mmr review --pr <number>`
 2. Note the job ID from the output
@@ -37,6 +56,23 @@ mmr config test
 5. Run `mmr results <job-id>` to get reconciled findings
 6. If gate failed: fix findings at or above the threshold severity
 7. If gate passed: proceed to merge
+
+**Reviewing a document or arbitrary file**
+
+1. Run `mmr review --diff path/to/doc.md --focus "what to evaluate"`
+2. Same dispatch / status / results flow as above
+
+**Reviewing uncommitted work before push**
+
+1. `git add` the files you want reviewed
+2. Run `mmr review --staged`
+3. Fix findings at or above the gate threshold, re-stage, re-run as needed
+
+Prefer the wrapper tools (`scaffold run review-pr`, `scaffold run review-code`)
+when they cover your target — they add auth checks, compensating passes, and
+the agent-review channel on top of `mmr review`. Call `mmr review` directly
+for targets the wrappers don't cover (docs, arbitrary diffs, ref ranges
+outside `main`).
 
 ## Auth Failures
 
