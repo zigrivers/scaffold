@@ -111,20 +111,27 @@ Minimum checklist:
 
 Before pushing, review `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md. Fix any issues and re-run `make check-all`. Log recurring patterns to tasks/lessons.md.
 
-### 3-Channel Code Review
+### Mandatory Code Review
 
-**Mandatory after `gh pr create`** — run all three code review channels before
-moving to the next task. A PostToolUse hook on `gh pr create` will remind you.
+**Mandatory after `gh pr create`** — run all review channels before moving to
+the next task. A PostToolUse hook on `gh pr create` will remind you.
 **Optional but supported** for any non-PR target: staged changes, an unstaged
 working tree, a branch diff, a specific diff file, or an arbitrary document.
-The MMR CLI accepts any of these — the "3-channel review" is not gated to PRs.
+The MMR CLI accepts any of these — the review is not gated to PRs.
+
+**Channel model:** direct `mmr review` runs the three CLI channels (Codex,
+Gemini, Claude). The scaffold wrappers (`scaffold run review-pr` and
+`scaffold run review-code`) add the Superpowers code-reviewer agent as a
+complementary 4th channel and reconcile its findings into the same MMR job.
+`content/tools/post-implementation-review.md` follows the same 3+1 pattern.
 
 **Entry points by target:**
 - PR → `scaffold run review-pr` (or `mmr review --pr <number>`)
 - Local code before commit → `scaffold run review-code` (recommended — covers
-  staged + unstaged). Direct-CLI equivalents: `mmr review --staged` for staged
-  only, or `git diff HEAD | mmr review --diff -` for all uncommitted changes
-  (staged + unstaged).
+  staged, unstaged, **and untracked** files). Direct-CLI equivalents:
+  `mmr review --staged` for staged only, or `git diff HEAD | mmr review --diff -`
+  for all **tracked** uncommitted changes (this does not include untracked
+  files; use `review-code` for full worktree coverage).
 - Branch diff → `mmr review --base <ref> --head <ref>`
 - Changes to a specific file or doc →
   `git diff HEAD -- path/to/file.md | mmr review --diff -`
@@ -177,7 +184,7 @@ way.
 # Primary — pick the input mode that matches your target
 mmr review --pr "$PR_NUMBER" --sync --format json                    # PR
 mmr review --staged --sync --format json                             # pre-commit (staged)
-git diff HEAD | mmr review --diff - --sync --format json             # all uncommitted
+git diff HEAD | mmr review --diff - --sync --format json             # tracked uncommitted (no untracked)
 mmr review --base main --head "$BRANCH" --sync --format json         # branch diff
 git diff HEAD -- docs/foo.md | mmr review --diff - --sync --format json  # single file
 mmr review --diff path/to/changes.patch --sync --format json         # existing diff file

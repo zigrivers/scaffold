@@ -1,7 +1,7 @@
 ---
 name: automated-pr-review
-description: Agent-driven automated PR review with external reviewers (Codex Cloud, Gemini Code Assist, or custom)
-summary: "Configures automated code review — using Codex and/or Gemini CLIs for dual-model review when available, or an external bot — with severity definitions and review criteria tailored to your project."
+description: "Agent-driven automated code review via MMR (Codex, Gemini, Claude CLIs + Superpowers as 4th channel in wrappers), for PRs and non-PR targets"
+summary: "Configures agent-driven automated code review: mandatory after `gh pr create` and also usable on any non-PR target. Direct `mmr review` runs three CLI channels (Codex, Gemini, Claude); `scaffold run review-pr` / `scaffold run review-code` add the Superpowers code-reviewer agent as a complementary 4th channel. An external GitHub App reviewer is supported as a fallback when CLIs are unavailable."
 phase: "environment"
 order: 340
 dependencies: [git-workflow]
@@ -12,10 +12,16 @@ knowledge-base: [review-methodology, automated-review-tooling]
 ---
 
 ## Purpose
-Configure an agent-driven automated PR review system using local CLI reviewers
-(Codex, Gemini — runs both when available for dual-model quality) or external
-GitHub App reviewers. Zero GitHub Actions workflows. The agent manages the
-entire review-fix loop locally.
+Configure an agent-driven automated code review system using local CLI
+reviewers dispatched through MMR (Codex, Gemini, Claude — runs all three when
+available) plus the Superpowers code-reviewer agent as a complementary 4th
+channel when using the scaffold wrappers (`scaffold run review-pr`,
+`scaffold run review-code`, `scaffold run post-implementation-review`). The
+review is mandatory after `gh pr create` and also runs on non-PR targets
+(local staged/unstaged code, branch diffs, specific files) via the same
+`mmr review` CLI. External GitHub App reviewers remain supported as a
+fallback when CLIs are unavailable. Zero GitHub Actions workflows. The agent
+manages the entire review-fix loop locally.
 
 ## Inputs
 - docs/coding-standards.md (required) — review criteria reference
@@ -26,7 +32,7 @@ entire review-fix loop locally.
 ## Expected Outputs
 - AGENTS.md — Reviewer instructions with project-specific rules
 - docs/review-standards.md — severity definitions (P0-P3) and review criteria
-- scripts/cli-pr-review.sh (local CLI mode) — dual-model review with reconciliation
+- scripts/cli-pr-review.sh (legacy dual-model fallback) — Codex+Gemini review with manual reconciliation, used when MMR / `scaffold run review-pr` is unavailable
 - scripts/await-pr-review.sh (external bot mode) — polling script with JSON output
 - docs/git-workflow.md updated with review loop integration
 - CLAUDE.md updated with agent-driven review workflow and review-pr hook
@@ -36,23 +42,27 @@ entire review-fix loop locally.
 - (mvp) Review standards document matches project coding conventions
 - (deep) Await script handles all exit conditions (approved, findings, cap, skip, timeout)
 - (mvp) CLAUDE.md workflow documents the agent-driven loop
+- (mvp) CLAUDE.md review block covers both PR and non-PR targets (staged, branch diff, single file)
 - (mvp) No GitHub Actions workflows created (zero Actions minutes)
 - (mvp) No ANTHROPIC_API_KEY secret required
 - (mvp) Post-PR-creation hook configured in settings to remind agents to run review-pr
 - (deep) Legacy GitHub Actions workflows detected and cleanup offered
-- (deep) Dual-model review enabled when both CLIs available
+- (deep) Three-CLI review (Codex, Gemini, Claude) enabled when all three CLIs available, with per-channel auth checks and compensating passes
+- (deep) Scaffold wrappers (review-pr, review-code, post-implementation-review) add the Superpowers code-reviewer agent as a complementary 4th channel and reconcile its findings through MMR
 
 ## Methodology Scaling
-- **deep**: Full setup with local CLI review (dual-model when both available),
-  review-standards.md, AGENTS.md, and comprehensive CLAUDE.md workflow.
-  Falls back to external bot review if no CLIs available.
+- **deep**: Full setup with local three-CLI review dispatched through MMR
+  (Codex, Gemini, Claude), scaffold wrappers adding the Superpowers
+  code-reviewer as a complementary 4th channel, review-standards.md,
+  AGENTS.md, and comprehensive CLAUDE.md workflow covering PR and non-PR
+  targets. Falls back to external bot review if no CLIs available.
 - **mvp**: Step is disabled. Local self-review from git-workflow suffices.
 - **custom:depth(1-5)**:
   - Depth 1: disabled — local self-review from git-workflow suffices.
   - Depth 2: disabled — same as depth 1.
-  - Depth 3: basic review-standards.md + single-CLI review (whichever CLI is available).
-  - Depth 4: add dual-model review when both CLIs available, AGENTS.md with project-specific rules.
-  - Depth 5: full suite with dual-model review, legacy Actions cleanup, and comprehensive CLAUDE.md workflow integration.
+  - Depth 3: basic review-standards.md + MMR dispatch using whichever CLIs are available (graceful compensating passes for any missing channel).
+  - Depth 4: three-CLI review via MMR when all CLIs available, plus AGENTS.md with project-specific rules and the Superpowers 4th channel on wrapper invocations.
+  - Depth 5: full suite — three-CLI + Superpowers review, legacy GitHub Actions cleanup, comprehensive CLAUDE.md workflow integration covering PR and non-PR targets.
 
 ## Conditional Evaluation
 Enable when: project uses GitHub for version control, team size > 1 or CI/CD is
@@ -150,7 +160,7 @@ review-code` for local pre-commit review. The review is not PR-gated.
 | Untracked / brand-new file | `diff -u /dev/null <path> \| mmr review --diff - --sync --format json` |
 | Branch diff | `mmr review --base <ref> --head <ref> --sync --format json` |
 | Staged changes only | `mmr review --staged --sync --format json` |
-| All uncommitted changes (staged + unstaged) | `git diff HEAD \| mmr review --diff - --sync --format json` |
+| All tracked uncommitted changes (staged + unstaged, no untracked) | `git diff HEAD \| mmr review --diff - --sync --format json` |
 | Existing patch or diff file | `mmr review --diff <path.patch> --sync --format json` |
 | Dual-model CLI only (no reconciliation) | `scripts/cli-pr-review.sh <PR#>` |
 

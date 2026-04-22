@@ -24,7 +24,8 @@ mmr review --pr <number> --focus "description of what to focus on"
 # Staged git changes (pre-commit review)
 mmr review --staged --focus "..."
 
-# All uncommitted changes (staged + unstaged)
+# All tracked uncommitted changes (staged + unstaged) — excludes untracked
+# files; use `scaffold run review-code` for full-worktree coverage
 git diff HEAD | mmr review --diff - --focus "..."
 
 # Branch diff / ref range
