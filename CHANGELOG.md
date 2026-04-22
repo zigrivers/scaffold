@@ -9,8 +9,10 @@ All notable changes to Scaffold are documented here.
   tool prompts, and seeded CLAUDE.md guidance. The CLI already supported
   `--staged`, `--base`/`--head`, and `--diff <path | ->` input modes; the
   wrapper documentation now surfaces all of them as first-class targets.
-  Requests like "multi-model review this doc" now route correctly to
-  `mmr review --diff <path>` instead of refusing.
+  Requests like "multi-model review this doc" now route correctly (e.g.
+  `git diff HEAD -- path/to/doc.md | mmr review --diff -`) instead of
+  refusing. The `--diff` flag expects diff-format content, so raw files
+  are wrapped via `git diff …` or `diff -u /dev/null …` first.
 - `content/skills/mmr/SKILL.md` documents all input modes and common
   non-PR workflows (doc review, pre-commit review).
 - `content/skills/scaffold-runner/SKILL.md` adds a Multi-Model Review Routing

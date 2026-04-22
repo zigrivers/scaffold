@@ -14,9 +14,11 @@ argument-hint: "<PR number or blank for current branch>"
 
 ## Purpose
 
-Run all three code review channels on a pull request and reconcile findings.
-This is the single entry point for **PR-scoped** code review — agents call this
-once instead of remembering three separate review invocations.
+Run the three CLI review channels (Codex, Gemini, Claude) on a pull request
+**plus** the Superpowers code-reviewer agent as a complementary 4th channel,
+and reconcile all findings through MMR. This is the single entry point for
+**PR-scoped** code review — agents call this once instead of remembering four
+separate review invocations.
 
 **For non-PR targets**, don't use this tool. Call `mmr review` directly with
 the appropriate input mode, or use `scaffold run review-code` for local

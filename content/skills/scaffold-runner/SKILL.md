@@ -202,9 +202,9 @@ When the user asks "what tools are available?", "what can I build?", or "show me
 | `scaffold run update` | Update scaffold to the latest version |
 | `scaffold run dashboard` | Open a visual progress dashboard in your browser |
 | `scaffold run prompt-pipeline` | Print the full pipeline reference table |
-| `scaffold run review-code` | Run all 3 code review channels on local code before commit or push |
+| `scaffold run review-code` | Run all 3 CLI review channels (Codex CLI, Gemini CLI, Claude CLI) on local code before commit or push, plus Superpowers code-reviewer as a complementary 4th channel |
 | `scaffold run review-pr` | Run all 3 code review channels (Codex CLI, Gemini CLI, Claude CLI) on a PR, plus Superpowers code-reviewer as a complementary 4th channel |
-| `scaffold run post-implementation-review` | Full 3-channel codebase review after an AI agent completes all tasks |
+| `scaffold run post-implementation-review` | Full codebase review (Codex, Gemini, Claude CLIs + Superpowers code-reviewer) after an AI agent completes all tasks |
 | `scaffold run session-analyzer` | Analyze Claude Code session logs for patterns and insights |
 
 **Display rules:**
