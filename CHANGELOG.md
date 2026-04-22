@@ -4,6 +4,14 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.23.0] — 2026-04-22
+
+### Added
+- `data-science` project-type overlay for solo / small-team data science work. Includes 13 knowledge documents injected into 21 universal pipeline steps (reproducibility, experiment tracking, notebook discipline, model evaluation, data versioning, etc.).
+- Low-tier brownfield detector recognizes DS repos via Marimo, DVC, or `dvc.yaml` signals.
+- Forward-compatible `DataScienceConfig.audience` discriminator (default `'solo'`) so DS-2 can extend additively.
+- New packaging test (`project-type-overlay-alignment.test.ts`), structural eval (`overlay-structural-coverage.bats`), detector-coverage test, and keyword-presence content eval.
+
 ## [3.22.0] — 2026-04-21
 
 ### Added
