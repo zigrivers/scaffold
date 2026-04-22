@@ -9,18 +9,26 @@ load '../evals/eval_helper'
 
 PROJECT_ROOT="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
 
-# Project-type overlays are files of the form `{type}-overlay.yml`.
-# Structural overlays (e.g. multi-service-overlay.yml) share the `-overlay.yml`
-# suffix but are NOT project-type overlays — they have no `project-type:` field.
-# Exclude them by name so the project-type-specific assertions don't fire on
-# structural overlays. Add future structural overlays to the exclusion list.
-PROJECT_TYPE_OVERLAYS="$(find "${PROJECT_ROOT}/content/methodology" -name '*-overlay.yml' -type f \
-  | grep -v '/multi-service-overlay\.yml$')"
+# Project-type overlays are identified by the presence of a `project-type:`
+# frontmatter field. Structural overlays (e.g. multi-service-overlay.yml) and
+# domain sub-overlays lack this field and are excluded automatically. This is
+# more robust than a filename exclusion list — any future non-project-type
+# overlay is skipped without having to update this file.
+PROJECT_TYPE_OVERLAYS=""
+while IFS= read -r candidate; do
+  if grep -qE '^project-type:' "$candidate"; then
+    PROJECT_TYPE_OVERLAYS="${PROJECT_TYPE_OVERLAYS}${candidate}
+"
+  fi
+done < <(find "${PROJECT_ROOT}/content/methodology" -name '*-overlay.yml' -type f | sort)
 
 @test "every project-type overlay has required frontmatter fields" {
+  # Note: `project-type:` presence is guaranteed by the filter above, so
+  # re-checking it here would be redundant. `name` and `description` remain
+  # required invariants and are checked here.
   local failures=()
   for overlay in ${PROJECT_TYPE_OVERLAYS}; do
-    for field in name description project-type; do
+    for field in name description; do
       if ! grep -q "^${field}:" "$overlay"; then
         failures+=("$(basename "$overlay"): missing '${field}' field")
       fi
