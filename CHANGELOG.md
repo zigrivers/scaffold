@@ -8,7 +8,7 @@ All notable changes to Scaffold are documented here.
 
 ### Added
 - `data-science` project-type overlay for solo / small-team data science work. Includes 13 knowledge documents injected into 21 universal pipeline steps (reproducibility, experiment tracking, notebook discipline, model evaluation, data versioning, etc.).
-- Low-tier brownfield detector recognizes DS repos via Marimo, DVC, or `dvc.yaml` signals.
+- Low-tier brownfield detector recognizes DS repos via Marimo signals (`marimo` dep or `.marimo.toml`); DVC is supplementary evidence only.
 - Forward-compatible `DataScienceConfig.audience` discriminator (default `'solo'`) so DS-2 can extend additively.
 - New packaging test (`project-type-overlay-alignment.test.ts`), structural eval (`overlay-structural-coverage.bats`), detector-coverage test, and keyword-presence content eval.
 

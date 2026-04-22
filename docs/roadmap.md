@@ -8,11 +8,11 @@ Working document tracking completed work, in-progress items, and future directio
 
 ### v3.23.0 (2026-04-22)
 
-Data Science Project-Type Overlay — `scaffold init --type data-science` targets solo / small-team data scientists with 13 knowledge documents covering reproducibility, experiment tracking, notebook discipline, model evaluation, and data versioning. Implements roadmap "Content & Quality > New Project Type Overlays" for the DS-1 audience; DS-2 (platform / larger-team) deferred to backlog.
+Data Science Project-Type Overlay — `scaffold init --project-type data-science` targets solo / small-team data scientists with 13 knowledge documents covering reproducibility, experiment tracking, notebook discipline, model evaluation, and data versioning. Implements roadmap "Content & Quality > New Project Type Overlays" for the DS-1 audience; DS-2 (platform / larger-team) deferred to backlog.
 
 - **New overlay**: `content/methodology/data-science-overlay.yml` injects 13 DS knowledge docs into 21 universal pipeline steps.
 - **Forward-compatible schema**: `DataScienceConfig.audience: 'solo'` with `.default('solo')` — DS-2 will extend the enum additively.
-- **Low-tier detector**: surfaces DS repos with Marimo, DVC, or `dvc.yaml` to `scaffold adopt`; defers to `ml` when both match via `resolveDetection`.
+- **Low-tier detector**: surfaces DS repos via Marimo signals (`marimo` dep or `.marimo.toml`); DVC signals (`dvc.yaml`, `.dvc/config`, `dvc` py dep) count as supplementary evidence. Defers to `ml` / `research` / `data-pipeline` via `resolveDetection` when those match at medium/high tier.
 - **Wiring**: schema + validator + detector + wizard copy + adopt mapping. New packaging test + structural eval + detector-coverage test prevent future silent misregistration.
 - **Review discipline**: 4-round spec MMR + 3-round plan MMR (Codex + Claude + Gemini-compensating) + 3-channel PR MMR. PR #TBD.
 

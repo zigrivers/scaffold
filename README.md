@@ -751,7 +751,7 @@ These answers control which conditional steps activate. A single-player puzzle g
 | `ml` | `training/`/`models/` dirs, PyTorch/TensorFlow deps, MLflow configs |
 | `browser-extension` | `manifest.json` with `manifest_version` field |
 | `research` | `program.md` + `results.tsv`, backtest/strategy files with trading deps, optimization deps + experiment dirs, simulation framework deps |
-| `data-science` | Marimo notebooks (`*.py` with `import marimo`), DVC (`.dvc/config`), or `dvc.yaml` — low-tier signals; defers to `ml` when both match |
+| `data-science` | Marimo signals required (`marimo` dep or `.marimo.toml`); DVC (`dvc.yaml`, `.dvc/config`, `dvc` py dep) is supplementary evidence only. Low-tier; defers to `ml` / `research` / `data-pipeline` when those match at medium/high tier |
 
 Each detector returns a confidence tier (high/medium/low) with evidence trails. Override detection with `--project-type <type>`.
 
