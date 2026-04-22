@@ -101,7 +101,7 @@ Add this to `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "if echo \"$CC_BASH_COMMAND\" | grep -q 'gh pr create'; then echo '\\n⚠️  MANDATORY: Run all 3 code review channels before proceeding to the next task:\\n\\n  1. Codex CLI:\\n     Auth: codex login status 2>/dev/null\\n     Run:  codex exec --skip-git-repo-check -s read-only --ephemeral \"REVIEW_PROMPT\" 2>/dev/null\\n\\n  2. Gemini CLI:\\n     Auth: NO_BROWSER=true gemini -p \"respond with ok\" -o json 2>&1\\n     Run:  NO_BROWSER=true gemini -p \"REVIEW_PROMPT\" --output-format json --approval-mode yolo 2>/dev/null\\n\\n  3. Superpowers code-reviewer:\\n     Dispatch superpowers:code-reviewer subagent with BASE_SHA and HEAD_SHA\\n\\nIf auth fails: tell user to run ! codex login or ! gemini -p \"hello\"\\nFix all P0/P1/P2 findings before moving on. Do NOT skip any channel.\\nFull instructions: scaffold run review-pr'; fi"
+            "command": "if echo \"$CC_BASH_COMMAND\" | grep -q 'gh pr create'; then echo '\\n⚠️  MANDATORY: Run all 3 code review channels before proceeding to the next task:\\n\\n  1. Codex CLI:\\n     Auth: codex login status 2>/dev/null\\n     Run:  codex exec --skip-git-repo-check -s read-only --ephemeral \"REVIEW_PROMPT\" 2>/dev/null\\n\\n  2. Gemini CLI:\\n     Auth: NO_BROWSER=true gemini -p \"respond with ok\" -o json 2>&1\\n     Run:  NO_BROWSER=true gemini -p \"REVIEW_PROMPT\" --output-format json --approval-mode yolo 2>/dev/null\\n\\n  3. Claude CLI:\\n     Run:  claude -p \"REVIEW_PROMPT\" --output-format json 2>/dev/null\\n\\n  4. Superpowers code-reviewer (complementary 4th channel):\\n     Dispatch superpowers:code-reviewer subagent with BASE_SHA and HEAD_SHA\\n\\nIf auth fails: tell user to run ! codex login or ! gemini -p \"hello\"\\nFix all P0/P1/P2 findings before moving on. Do NOT skip any channel.\\nFull instructions: scaffold run review-pr'; fi"
           }
         ]
       }
@@ -146,11 +146,16 @@ review-code` for local pre-commit review. The review is not PR-gated.
 |------|---------|
 | After creating a PR | `/scaffold:review-pr <PR#>` |
 | Before commit / push (local code, staged + unstaged) | `scaffold run review-code` |
-| Specific file or document | `mmr review --diff <path> --sync --format json` |
+| Changes to a specific tracked file or doc | `git diff HEAD -- <path> \| mmr review --diff - --sync --format json` |
+| Untracked / brand-new file | `diff -u /dev/null <path> \| mmr review --diff - --sync --format json` |
 | Branch diff | `mmr review --base <ref> --head <ref> --sync --format json` |
 | Staged changes only | `mmr review --staged --sync --format json` |
-| Unstaged working tree | `git diff HEAD \| mmr review --diff - --sync --format json` |
+| All uncommitted changes (staged + unstaged) | `git diff HEAD \| mmr review --diff - --sync --format json` |
+| Existing patch or diff file | `mmr review --diff <path.patch> --sync --format json` |
 | Dual-model CLI only (no reconciliation) | `scripts/cli-pr-review.sh <PR#>` |
+
+Note: `mmr review --diff` expects diff-format content; use the `git diff …`
+or `diff -u /dev/null …` wrappers shown above to review plain files.
 <!-- scaffold:automated-pr-review:claude-md end -->
 ```
 

@@ -19,10 +19,19 @@ This is the single entry point for **PR-scoped** code review — agents call thi
 once instead of remembering three separate review invocations.
 
 **For non-PR targets**, don't use this tool. Call `mmr review` directly with
-the appropriate input mode (`--staged`, `--base/--head`, `--diff <path>`, or
-`--diff -`), or use `scaffold run review-code` for local pre-commit review.
-The three-channel review is not PR-specific; this tool is the PR wrapper
-around the more general `mmr review` CLI.
+the appropriate input mode, or use `scaffold run review-code` for local
+pre-commit review:
+
+- `mmr review --staged` — staged changes
+- `mmr review --base <ref> --head <ref>` — branch diff
+- `mmr review --diff <path.patch>` — existing diff/patch file
+- `<git diff …> | mmr review --diff -` — any piped diff (including a single
+  tracked file via `git diff HEAD -- <path>`, or a new file via
+  `diff -u /dev/null <path>`)
+
+The `--diff` flag expects diff-format content; it does not read raw document
+content. The three-channel review itself is not PR-specific — this tool is
+just the PR wrapper around the more general `mmr review` CLI.
 
 The three channels are:
 1. **Codex CLI** — OpenAI's code analysis (implementation correctness, security, API contracts)

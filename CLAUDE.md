@@ -123,10 +123,18 @@ The MMR CLI accepts any of these — the "3-channel review" is not gated to PRs.
 - PR → `scaffold run review-pr` (or `mmr review --pr <number>`)
 - Local code before commit → `scaffold run review-code` (recommended — covers
   staged + unstaged). Direct-CLI equivalents: `mmr review --staged` for staged
-  only, or `git diff HEAD | mmr review --diff -` to include unstaged edits.
+  only, or `git diff HEAD | mmr review --diff -` for all uncommitted changes
+  (staged + unstaged).
 - Branch diff → `mmr review --base <ref> --head <ref>`
-- Single file / document / arbitrary diff → `mmr review --diff <path>`
-  (use `--diff -` for stdin)
+- Changes to a specific file or doc →
+  `git diff HEAD -- path/to/file.md | mmr review --diff -`
+- Untracked / brand-new file (synthesize an "all added" diff) →
+  `diff -u /dev/null path/to/new.md | mmr review --diff -`
+- Pre-made patch or diff file → `mmr review --diff path/to/changes.patch`
+
+The `--diff` flag expects diff-format content (a path to a `.patch`/`.diff`
+file, or `-` for stdin piping a git/diff command). It does **not** accept raw
+document content — wrap the target in a diff first.
 
 The wrapper tools (`review-pr`, `review-code`) handle dispatch, auth checks,
 reconciliation, and verdict logic. For targets not covered by a wrapper, call
@@ -167,11 +175,12 @@ way.
      Update both if CLI syntax changes. -->
 ```bash
 # Primary — pick the input mode that matches your target
-mmr review --pr "$PR_NUMBER" --sync --format json               # PR
-mmr review --staged --sync --format json                        # pre-commit
-mmr review --base main --head "$BRANCH" --sync --format json    # branch diff
-mmr review --diff path/to/file.md --sync --format json          # single file / doc
-mmr review --diff - --sync --format json < /tmp/some.patch      # stdin
+mmr review --pr "$PR_NUMBER" --sync --format json                    # PR
+mmr review --staged --sync --format json                             # pre-commit (staged)
+git diff HEAD | mmr review --diff - --sync --format json             # all uncommitted
+mmr review --base main --head "$BRANCH" --sync --format json         # branch diff
+git diff HEAD -- docs/foo.md | mmr review --diff - --sync --format json  # single file
+mmr review --diff path/to/changes.patch --sync --format json         # existing diff file
 
 # Capture job_id, dispatch agent review, then inject:
 mmr reconcile "$JOB_ID" --channel superpowers --input findings.json

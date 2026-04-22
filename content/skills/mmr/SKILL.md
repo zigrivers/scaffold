@@ -24,12 +24,20 @@ mmr review --pr <number> --focus "description of what to focus on"
 # Staged git changes (pre-commit review)
 mmr review --staged --focus "..."
 
+# All uncommitted changes (staged + unstaged)
+git diff HEAD | mmr review --diff - --focus "..."
+
 # Branch diff / ref range
 mmr review --base main --head <branch> --focus "..."
 
-# Single file, document, or arbitrary diff
-mmr review --diff path/to/file.md --focus "..."
-mmr review --diff - --focus "..." < /tmp/some.patch   # stdin
+# Changes to a specific file or doc (tracked in git)
+git diff HEAD -- path/to/file.md | mmr review --diff - --focus "..."
+
+# Untracked / brand-new file — synthesize an "all added" diff
+diff -u /dev/null path/to/new.md | mmr review --diff - --focus "..."
+
+# Existing patch or diff file
+mmr review --diff path/to/changes.patch --focus "..."
 
 # Check progress
 mmr status <job-id>
@@ -43,7 +51,12 @@ mmr config test
 
 All input modes accept `--focus`, `--sync`, `--format`, and `--fix-threshold`
 the same way. The "3-channel review" is not PR-specific — it reviews whatever
-diff or content you point it at.
+diff you point it at.
+
+**`--diff` contract:** the flag expects diff-format content (a path to a
+`.patch`/`.diff` file, or `-` for stdin). It does not read raw document
+content — wrap the target in a diff first (see the `git diff …` and
+`diff -u /dev/null …` patterns above).
 
 ## Common Workflows
 
@@ -59,8 +72,12 @@ diff or content you point it at.
 
 **Reviewing a document or arbitrary file**
 
-1. Run `mmr review --diff path/to/doc.md --focus "what to evaluate"`
-2. Same dispatch / status / results flow as above
+1. Wrap the target in a diff:
+   - Tracked file with uncommitted changes: `git diff HEAD -- path/to/doc.md`
+   - Untracked / new file: `diff -u /dev/null path/to/doc.md`
+2. Pipe it into `mmr review --diff -` with a focus string:
+   `git diff HEAD -- path/to/doc.md | mmr review --diff - --focus "clarity, completeness"`
+3. Same dispatch / status / results flow as above
 
 **Reviewing uncommitted work before push**
 

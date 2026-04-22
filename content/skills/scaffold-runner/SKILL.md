@@ -203,7 +203,7 @@ When the user asks "what tools are available?", "what can I build?", or "show me
 | `scaffold run dashboard` | Open a visual progress dashboard in your browser |
 | `scaffold run prompt-pipeline` | Print the full pipeline reference table |
 | `scaffold run review-code` | Run all 3 code review channels on local code before commit or push |
-| `scaffold run review-pr` | Run all 3 code review channels (Codex CLI, Gemini CLI, Superpowers) on a PR |
+| `scaffold run review-pr` | Run all 3 code review channels (Codex CLI, Gemini CLI, Claude CLI) on a PR, plus Superpowers code-reviewer as a complementary 4th channel |
 | `scaffold run post-implementation-review` | Full 3-channel codebase review after an AI agent completes all tasks |
 | `scaffold run session-analyzer` | Analyze Claude Code session logs for patterns and insights |
 
@@ -349,9 +349,11 @@ what the user is pointing at:
 |---|---|
 | GitHub PR (explicit number or current branch's PR) | `scaffold run review-pr [<PR#>]` |
 | Local uncommitted / staged code, before commit or push | `scaffold run review-code` |
-| A specific file or document (e.g. `docs/foo.md`) | `mmr review --diff <path> --sync --format json` |
+| Changes to a specific file or doc (tracked) | `git diff HEAD -- <path> \| mmr review --diff - --sync --format json` |
+| An untracked / brand-new file | `diff -u /dev/null <path> \| mmr review --diff - --sync --format json` |
 | A branch diff against main (or another ref) | `mmr review --base <ref> --head <ref> --sync --format json` |
-| A diff piped from another command | `mmr review --diff - --sync --format json` (stdin) |
+| An existing patch or diff file | `mmr review --diff <path.patch> --sync --format json` |
+| A diff piped from another command | `<cmd> \| mmr review --diff - --sync --format json` (stdin) |
 | A user-story review specifically at depth 5 | `scaffold run review-user-stories` |
 
 If the user's target is ambiguous ("review this with MMR"), ask once which of
@@ -362,6 +364,12 @@ first-class.
 Pass `--focus "..."` to MMR when the user describes what to evaluate (clarity,
 completeness, security, performance, etc.). See the `mmr` skill for all input
 modes and flags.
+
+**Note on `--diff`:** the flag requires diff-format content (path to a
+`.patch`/`.diff` file, or `-` for stdin). To review a regular document or
+source file, wrap it in a diff first using `git diff HEAD -- <path>` (tracked)
+or `diff -u /dev/null <path>` (untracked) and pipe the result into
+`mmr review --diff -`.
 
 ### Multi-Model Review at Depth 4-5
 
