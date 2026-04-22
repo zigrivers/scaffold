@@ -11,12 +11,18 @@ All notable changes to Scaffold are documented here.
   tool prompts, and seeded CLAUDE.md guidance. The CLI already supported
   `--staged`, `--base`/`--head`, and `--diff <path | ->` input modes; the
   wrapper documentation now surfaces all of them as first-class targets.
-  Requests like "multi-model review this doc" now route correctly (e.g.
-  `git diff HEAD -- path/to/doc.md | mmr review --diff -`) instead of
-  refusing. The `--diff` flag expects diff-format content, so raw files
-  are wrapped via `git diff …` or `(diff -u /dev/null … || true)` first
-  (the `|| true` guard is required because `diff` exits 1 whenever files
-  differ, which breaks pipelines under `set -o pipefail`).
+  Requests like "multi-model review this doc" now route correctly instead
+  of refusing. The `--diff` flag expects diff-format content, so raw files
+  are wrapped first, using the pattern that matches the user's intent:
+  - **Pending edits to a tracked file** →
+    `git diff HEAD -- <path> | mmr review --diff -`
+    (fails with "no diff content" if the file has no local changes — use
+    the next form instead).
+  - **Current contents of any file** (tracked-with-no-changes, untracked,
+    or brand-new), synthesized as an "all added" diff →
+    `(diff -u /dev/null <path> || true) | mmr review --diff -`
+    (the `|| true` guard is required because `diff` exits 1 whenever files
+    differ, which breaks pipelines under `set -o pipefail`).
 - `content/skills/mmr/SKILL.md` documents all input modes and common
   non-PR workflows (doc review, pre-commit review), with file-review
   split into "pending edits to a tracked file" vs. "current contents of
