@@ -35,7 +35,9 @@ describe('detector registry completeness', () => {
         'pyproject.toml': '...',
         'dvc.yaml': 'stages: {}',
         'dbt_project.yml': 'name: my-dbt\n',
-        'manifest.json': '{"manifest_version":3,"content_scripts":[{"matches":["*://*/*"]}],"action":{"default_popup":"popup.html"}}',
+        'manifest.json':
+          '{"manifest_version":3,"content_scripts":[{"matches":["*://*/*"]}],'
+          + '"action":{"default_popup":"popup.html"}}',
         'pubspec.yaml': 'name: m\n',
         'next.config.mjs': 'export default { output: "standalone" }',
         'experiment.py': '# experiment',
