@@ -69,11 +69,12 @@ invocation that matches the scope the user asked for:
 # `mmr review` with no input flags defaults to `git diff` alone
 # (unstaged only), so we MUST synthesize the combined bundle explicitly
 # and pipe it in via --diff -:
-BASE_REF=$(git rev-parse --verify origin/main 2>/dev/null && echo origin/main \
-  || git rev-parse --verify main 2>/dev/null && echo main \
-  || echo HEAD)
+if   git rev-parse --verify origin/main >/dev/null 2>&1; then BASE_REF=origin/main
+elif git rev-parse --verify main        >/dev/null 2>&1; then BASE_REF=main
+else                                                         BASE_REF=HEAD
+fi
 {
-  [ "$BASE_REF" != "HEAD" ] && git diff "$BASE_REF...HEAD"
+  if [ "$BASE_REF" != "HEAD" ]; then git diff "$BASE_REF...HEAD"; fi
   git diff --cached
   git diff
 } | mmr review --diff - --sync --format json
