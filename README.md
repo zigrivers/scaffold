@@ -38,7 +38,7 @@ Either way, Scaffold constructs the prompt and the target AI tool does the work.
 
 **Depth scale** (1-5) — Controls how thorough each step's output is, from "focus on the core deliverable" (1) to "explore all angles, tradeoffs, and edge cases" (5). Depth resolves with 4-level precedence: CLI flag > step override > custom default > preset default.
 
-**Multi-model validation** — At depth 4-5, all 19 review and validation steps can dispatch independent reviews to the three MMR CLI channels (Codex, Gemini, Claude) via the `mmr` CLI, plus the Superpowers code-reviewer agent as a complementary 4th channel on wrapper invocations (`scaffold run review-pr`, `scaffold run review-code`). Multiple independent models catch more blind spots than one. Findings are reconciled by confidence level (multiple channels agree = high confidence, single channel P0 = still actionable). When a channel is unavailable, a compensating Claude self-review pass runs in its place (labeled `[compensating: Codex-equivalent]` or `[compensating: Gemini-equivalent]`, single-source confidence). CLI commands must always run in the foreground — background execution produces empty output. `mmr review` also supports non-PR targets (staged changes, branch diff, specific files) — see the [Multi-Model Review](#multi-model-review) section.
+**Multi-model validation** — At depth 4-5, review and validation steps can dispatch independent reviews to the three MMR CLI channels (Codex, Gemini, Claude) via the `mmr` CLI, plus the Superpowers code-reviewer agent as a complementary 4th channel on wrapper invocations (`scaffold run review-pr`, `scaffold run review-code`). The MMR-backed wrappers are the preferred path; some older depth-5 validation steps still dispatch Codex/Gemini directly via the `multi-model-dispatch` skill (migration in progress). Multiple independent models catch more blind spots than one. Findings are reconciled by confidence level (multiple channels agree = high confidence, single channel P0 = still actionable). When Codex or Gemini is unavailable, a compensating Claude self-review pass runs in its place (labeled `[compensating: Codex-equivalent]` or `[compensating: Gemini-equivalent]`, single-source confidence); there is no compensating pass when Claude itself is unavailable — the review simply proceeds with the remaining channels. CLI commands must always run in the foreground — background execution produces empty output. `mmr review` also supports non-PR targets (staged changes, branch diff, specific files) — see the [Multi-Model Review](#multi-model-review) section.
 
 **State management** — Pipeline progress is tracked in `.scaffold/state.json` with atomic file writes and crash recovery. An advisory lock prevents concurrent runs. Decisions are logged to an append-only `decisions.jsonl`. Pressing Ctrl+C during any command exits cleanly with an informative message — no stack traces, no orphaned locks, no corrupted state.
 
@@ -1225,16 +1225,15 @@ channels:
     command: gemini -p
     flags:
       - "--approval-mode yolo"
-    auth:
-      # Gemini's auth probe is also a full LLM round-trip; same reasoning.
-      # Codex stays at the 5s default because its check is a local file probe.
-      timeout: 20
       - "--output-format json"
     env:
       NO_BROWSER: "true"
     auth:
       check: "NO_BROWSER=true gemini -p 'respond with ok' -o json 2>&1"
-      timeout: 5
+      # Gemini's auth probe is also a full LLM round-trip; same reasoning
+      # as Claude. Codex stays at the 5s default (see below) because its
+      # check is a local file probe.
+      timeout: 20
       failure_exit_codes: [41]
       recovery: "Run: gemini -p 'hello' (interactive, opens browser)"
     timeout: 360     # Gemini tends to be slower

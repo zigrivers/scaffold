@@ -65,7 +65,7 @@ review-fix loop locally.
 - **custom:depth(1-5)**:
   - Depth 1: disabled — local self-review from git-workflow suffices.
   - Depth 2: disabled — same as depth 1.
-  - Depth 3: basic review-standards.md + MMR dispatch using whichever CLIs are available (graceful compensating passes for any missing channel).
+  - Depth 3: basic review-standards.md + MMR dispatch using whichever CLIs are available (graceful compensating Claude passes for missing Codex or Gemini channels; if Claude CLI itself is unavailable, the review proceeds with the remaining channels — no compensating pass for missing Claude).
   - Depth 4: three-CLI review via MMR when all CLIs available, plus AGENTS.md with project-specific rules and the Superpowers 4th channel on wrapper invocations.
   - Depth 5: full suite — three-CLI + Superpowers review, legacy GitHub Actions cleanup, comprehensive CLAUDE.md workflow integration covering PR and non-PR targets.
 
