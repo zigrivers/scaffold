@@ -14,7 +14,7 @@ Data Science Project-Type Overlay — `scaffold init --project-type data-science
 - **Forward-compatible schema**: `DataScienceConfig.audience: 'solo'` with `.default('solo')` — DS-2 will extend the enum additively.
 - **Low-tier detector**: surfaces DS repos via Marimo signals (`marimo` dep or `.marimo.toml`); DVC signals (`dvc.yaml`, `.dvc/config`, `dvc` py dep) count as supplementary evidence. Defers to `ml` / `research` / `data-pipeline` via `resolveDetection` when those match at medium/high tier.
 - **Wiring**: schema + validator + detector + wizard copy + adopt mapping. New packaging test + structural eval + detector-coverage test prevent future silent misregistration.
-- **Review discipline**: 4-round spec MMR + 3-round plan MMR (Codex + Claude + Gemini-compensating) + 3-channel PR MMR. PR #TBD.
+- **Review discipline**: 4-round spec MMR + 3-round plan MMR (Codex + Claude + Gemini-compensating) + 3-channel PR MMR. PR #299.
 
 ### v3.22.0 (2026-04-21)
 
