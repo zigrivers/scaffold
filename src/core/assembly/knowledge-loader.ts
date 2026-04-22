@@ -135,6 +135,9 @@ export function buildIndex(knowledgeDir: string): Map<string, string> {
       if (entry.isDirectory()) {
         walkDir(fullPath)
       } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        // Skip directory READMEs — they are metadata, not knowledge entries.
+        if (entry.name === 'README.md') continue
+
         try {
           const content = fs.readFileSync(fullPath, 'utf8')
           const fm = extractKBFrontmatter(content)
@@ -180,6 +183,9 @@ export function buildIndexWithOverrides(
       if (entry.isDirectory()) {
         walkLocal(fullPath)
       } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        // Skip directory READMEs — they are metadata, not knowledge entries.
+        if (entry.name === 'README.md') continue
+
         try {
           const content = fs.readFileSync(fullPath, 'utf8')
           const fm = extractKBFrontmatter(content)
