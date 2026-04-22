@@ -1,3 +1,14 @@
+# Partial channel overrides. MMR's config loader (packages/mmr/src/config/loader.ts
+# deepMerge) merges this file into the built-in defaults recursively — it does NOT
+# replace the entire `channels` map. Codex, Claude, and Gemini all stay enabled
+# with their default commands/flags/env/auth recipes; only the fields explicitly
+# set below are overridden.
+#
+# Why raise auth timeouts for claude and gemini specifically: their "auth check"
+# commands (`claude -p 'respond with ok'` and
+# `NO_BROWSER=true gemini -p 'respond with ok' -o json`) are full LLM round-trips
+# that routinely take 9-14s in practice, well over MMR's 5s default. Codex's
+# check (`codex login status`) is a local file probe and stays at the default.
 channels:
   claude:
     auth:
