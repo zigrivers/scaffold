@@ -6,6 +6,16 @@ Working document tracking completed work, in-progress items, and future directio
 
 ## Completed Releases
 
+### v3.23.0 (2026-04-22)
+
+Data Science Project-Type Overlay — `scaffold init --type data-science` targets solo / small-team data scientists with 13 knowledge documents covering reproducibility, experiment tracking, notebook discipline, model evaluation, and data versioning. Implements roadmap "Content & Quality > New Project Type Overlays" for the DS-1 audience; DS-2 (platform / larger-team) deferred to backlog.
+
+- **New overlay**: `content/methodology/data-science-overlay.yml` injects 13 DS knowledge docs into 21 universal pipeline steps.
+- **Forward-compatible schema**: `DataScienceConfig.audience: 'solo'` with `.default('solo')` — DS-2 will extend the enum additively.
+- **Low-tier detector**: surfaces DS repos with Marimo, DVC, or `dvc.yaml` to `scaffold adopt`; defers to `ml` when both match via `resolveDetection`.
+- **Wiring**: schema + validator + detector + wizard copy + adopt mapping. New packaging test + structural eval + detector-coverage test prevent future silent misregistration.
+- **Review discipline**: 4-round spec MMR + 3-round plan MMR (Codex + Claude + Gemini-compensating) + 3-channel PR MMR. PR #TBD.
+
 ### v3.22.0 (2026-04-21)
 
 Cross-Service Dependency Visualization — `scaffold dashboard` on multi-service monorepos now renders a service-level dependency graph between phase indicators and service cards, with consumer→producer arrows and step-level readiness detail on hover/focus tooltips. Completes roadmap Near-Term "Cross-Service Dependency Visualization (multi-service dashboard follow-up)".
@@ -134,9 +144,8 @@ The overlay system supports any project type. Potential additions:
 
 - **IoT/Embedded** — firmware lifecycle, OTA updates, device provisioning
 - **Blockchain/Web3** — smart contract lifecycle, gas optimization, audit workflows
-- **Data Science/Analytics** — notebook workflows, data pipeline integration
 
-Each requires: 1 overlay YAML + ~10 knowledge documents + ~10-20 pipeline steps + preset registration.
+Each requires: 1 overlay YAML + ~12-14 knowledge documents. Project-type overlays are knowledge-injection (no new pipeline steps required).
 
 ### Knowledge Document Expansion
 
@@ -172,6 +181,14 @@ Current eval suite: 73 `@test` blocks across 23 bats files in `tests/evals/`. Ar
 - Service-scoped artifact consumption checks
 - Knowledge document freshness (content age vs industry evolution)
 - Cross-service dependency-graph rendering invariants (landed in v3.22.0 — eval coverage for the graph shape / determinism is currently in `src/dashboard/` unit tests, not the bats eval suite)
+
+---
+
+## Backlog / Later
+
+Items that are deliberately queued for a future release — scoped but not actively in-flight.
+
+- **DS-2 — Platform / larger-team data science**: extends `DataScienceConfig.audience` with `'platform'` discriminator; adds feature-store, orchestration (Airflow/Dagster), model-registry, lineage, governance knowledge docs.
 
 ---
 
