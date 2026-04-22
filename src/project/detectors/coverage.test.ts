@@ -6,7 +6,7 @@ import { createFakeSignalContext } from './context.js'
 import type { DetectionMatch } from './types.js'
 
 describe('detector registry completeness', () => {
-  it('ALL_DETECTORS claims one match per ProjectType', () => {
+  it('ALL_DETECTORS claims one match per ProjectType on maximal fixture', () => {
     const ctx = createFakeSignalContext({
       packageJson: {
         name: 'maximal-fixture',
@@ -56,10 +56,27 @@ describe('detector registry completeness', () => {
       if (m) claimedTypes.add(m.projectType)
     }
 
-    const schemaTypes = new Set(ProjectTypeSchema.options as readonly string[])
-    if (!claimedTypes.has('library')) {
-      schemaTypes.delete('library')
-    }
-    expect(claimedTypes).toEqual(schemaTypes)
+    // Library fires on this fixture because it has package.json with `main`
+    // plus `bin` (isDualNpm). We assert every schema type is covered, without
+    // the old conditional delete that made the library slot tautological.
+    const expected = new Set(ProjectTypeSchema.options as readonly string[])
+    expect(claimedTypes).toEqual(expected)
+  })
+
+  it('library detector fires on a pure-library fixture (prevents tautological pass)', () => {
+    const ctx = createFakeSignalContext({
+      packageJson: {
+        name: 'my-lib',
+        main: 'dist/index.js',
+        types: 'dist/index.d.ts',
+        version: '1.0.0',
+        exports: { '.': { import: './dist/index.mjs', require: './dist/index.cjs' } },
+      },
+      files: { 'package.json': '{}', 'README.md': '# my-lib' },
+      rootEntries: ['package.json', 'README.md'],
+    })
+    const claimed = ALL_DETECTORS.map(d => d(ctx)).filter((m): m is DetectionMatch => m !== null)
+    const types = claimed.map(m => m.projectType)
+    expect(types).toContain('library')
   })
 })
