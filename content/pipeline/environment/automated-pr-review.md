@@ -118,7 +118,7 @@ Add this to `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "if echo \"$CC_BASH_COMMAND\" | grep -q 'gh pr create'; then echo '\\n⚠️  MANDATORY: Run all 3 CLI review channels plus the Superpowers 4th channel before proceeding to the next task:\\n\\n  1. Codex CLI:\\n     Auth: codex login status 2>/dev/null\\n     Run:  codex exec --skip-git-repo-check -s read-only --ephemeral \"REVIEW_PROMPT\" 2>/dev/null\\n\\n  2. Gemini CLI:\\n     Auth: NO_BROWSER=true gemini -p \"respond with ok\" -o json 2>&1\\n     Run:  NO_BROWSER=true gemini -p \"REVIEW_PROMPT\" --output-format json --approval-mode yolo 2>/dev/null\\n\\n  3. Claude CLI:\\n     Auth: claude -p \"respond with ok\" 2>/dev/null\\n     Run:  claude -p \"REVIEW_PROMPT\" --output-format json 2>/dev/null\\n\\n  4. Superpowers code-reviewer (complementary 4th channel):\\n     Dispatch superpowers:code-reviewer subagent with BASE_SHA and HEAD_SHA\\n\\nIf auth fails: tell user to run ! codex login, ! gemini -p \"hello\", or ! claude login (as applicable)\\nFix all P0/P1/P2 findings before moving on. Do NOT skip any channel.\\nFull instructions: scaffold run review-pr'; fi"
+            "command": "if echo \"$CC_BASH_COMMAND\" | grep -q 'gh pr create'; then echo '\\n⚠️  MANDATORY: Run all 3 CLI review channels plus the Superpowers 4th channel before proceeding to the next task:\\n\\n  1. Codex CLI:\\n     Auth: codex login status 2>/dev/null\\n     Run:  codex exec --skip-git-repo-check -s read-only --ephemeral \"REVIEW_PROMPT\" 2>/dev/null\\n\\n  2. Gemini CLI:\\n     Auth: NO_BROWSER=true gemini -p \"respond with ok\" -o json 2>&1\\n     Run:  NO_BROWSER=true gemini -p \"REVIEW_PROMPT\" --output-format json --approval-mode yolo 2>/dev/null\\n\\n  3. Claude CLI:\\n     Auth: claude -p \"respond with ok\" 2>/dev/null\\n     Run:  claude -p \"REVIEW_PROMPT\" --output-format json 2>/dev/null\\n\\n  4. Superpowers code-reviewer (complementary 4th channel):\\n     Dispatch superpowers:code-reviewer subagent with BASE_SHA and HEAD_SHA\\n\\nIf auth fails: tell user to run ! codex login, ! gemini -p \"hello\", or ! claude login (as applicable).\\nDo not silently skip channels — surface auth failures and let MMR decide: missing Codex/Gemini get compensating Claude passes (degraded-pass verdict); missing Claude proceeds without compensation.\\nFix all P0/P1/P2 findings before moving on.\\nFull instructions: scaffold run review-pr'; fi"
           }
         ]
       }
@@ -155,9 +155,11 @@ Superpowers code-reviewer agent as a complementary 4th channel. Fix P0/P1/P2
 findings before moving to the next task. A post-hook on `gh pr create` will
 remind you.
 
-**Optional but supported** for non-PR targets — the same three-channel review
-works on any diff or file. Call `mmr review` directly or use `scaffold run
-review-code` for local pre-commit review. The review is not PR-gated.
+**Optional but supported** for non-PR targets — the review is not PR-gated.
+Direct `mmr review` runs the three CLI channels (Codex, Gemini, Claude) on
+any diff or file. `scaffold run review-code` adds the Superpowers
+code-reviewer agent as a complementary 4th channel on top of those three
+CLIs for the local pre-commit review path.
 
 | When | Command |
 |------|---------|
