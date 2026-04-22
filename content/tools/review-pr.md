@@ -29,7 +29,9 @@ pre-commit review:
 - `mmr review --diff <path.patch>` — existing diff/patch file
 - `<git diff …> | mmr review --diff -` — any piped diff (including a single
   tracked file via `git diff HEAD -- <path>`, or a new file via
-  `diff -u /dev/null <path>`)
+  `(diff -u /dev/null <path> || true)` — the `|| true` guard is required
+  because `diff` exits 1 whenever files differ, which breaks pipelines
+  under `set -o pipefail`)
 
 The `--diff` flag expects diff-format content; it does not read raw document
 content. The three-channel review itself is not PR-specific — this tool is

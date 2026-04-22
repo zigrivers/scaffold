@@ -34,8 +34,10 @@ mmr review --base main --head <branch> --focus "..."
 # Changes to a specific file or doc (tracked in git)
 git diff HEAD -- path/to/file.md | mmr review --diff - --focus "..."
 
-# Untracked / brand-new file — synthesize an "all added" diff
-diff -u /dev/null path/to/new.md | mmr review --diff - --focus "..."
+# Untracked / brand-new file — synthesize an "all added" diff.
+# `|| true` is required: diff exits 1 whenever files differ, which breaks
+# pipelines under `set -o pipefail`.
+(diff -u /dev/null path/to/new.md || true) | mmr review --diff - --focus "..."
 
 # Existing patch or diff file
 mmr review --diff path/to/changes.patch --focus "..."
@@ -57,7 +59,9 @@ diff you point it at.
 **`--diff` contract:** the flag expects diff-format content (a path to a
 `.patch`/`.diff` file, or `-` for stdin). It does not read raw document
 content — wrap the target in a diff first (see the `git diff …` and
-`diff -u /dev/null …` patterns above).
+`(diff -u /dev/null … || true)` patterns above). The `|| true` guard is
+required because `diff` exits 1 whenever files differ, which breaks
+pipelines under `set -o pipefail`.
 
 ## Common Workflows
 
@@ -75,7 +79,9 @@ content — wrap the target in a diff first (see the `git diff …` and
 
 1. Wrap the target in a diff:
    - Tracked file with uncommitted changes: `git diff HEAD -- path/to/doc.md`
-   - Untracked / new file: `diff -u /dev/null path/to/doc.md`
+   - Untracked / new file: `(diff -u /dev/null path/to/doc.md || true)`
+     (the `|| true` guard avoids the `diff` exit-1-on-differences breaking
+     pipelines under `set -o pipefail`)
 2. Pipe it into `mmr review --diff -` with a focus string:
    `git diff HEAD -- path/to/doc.md | mmr review --diff - --focus "clarity, completeness"`
 3. Same dispatch / status / results flow as above

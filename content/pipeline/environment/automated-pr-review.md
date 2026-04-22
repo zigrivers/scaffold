@@ -159,7 +159,7 @@ review-code` for local pre-commit review. The review is not PR-gated.
 | After creating a PR | `/scaffold:review-pr <PR#>` |
 | Before commit / push (local code: staged, unstaged, and untracked) | `scaffold run review-code` |
 | Changes to a specific tracked file or doc | `git diff HEAD -- <path> \| mmr review --diff - --sync --format json` |
-| Untracked / brand-new file | `diff -u /dev/null <path> \| mmr review --diff - --sync --format json` |
+| Untracked / brand-new file | `(diff -u /dev/null <path> \|\| true) \| mmr review --diff - --sync --format json` |
 | Branch diff | `mmr review --base <ref> --head <ref> --sync --format json` |
 | Staged changes only | `mmr review --staged --sync --format json` |
 | All tracked uncommitted changes (staged + unstaged, no untracked) | `git diff HEAD \| mmr review --diff - --sync --format json` |
@@ -167,7 +167,9 @@ review-code` for local pre-commit review. The review is not PR-gated.
 | Dual-model CLI only (no reconciliation) | `scripts/cli-pr-review.sh <PR#>` |
 
 Note: `mmr review --diff` expects diff-format content; use the `git diff …`
-or `diff -u /dev/null …` wrappers shown above to review plain files.
+or `(diff -u /dev/null … || true)` wrappers shown above to review plain
+files. The `|| true` guard on `diff` is required because `diff` exits with
+status 1 whenever files differ, which breaks pipelines under `pipefail`.
 <!-- scaffold:automated-pr-review:claude-md end -->
 ```
 

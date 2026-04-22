@@ -138,7 +138,9 @@ file directly rather than assuming it matches this pattern.)
 - Changes to a specific file or doc →
   `git diff HEAD -- path/to/file.md | mmr review --diff -`
 - Untracked / brand-new file (synthesize an "all added" diff) →
-  `diff -u /dev/null path/to/new.md | mmr review --diff -`
+  `(diff -u /dev/null path/to/new.md || true) | mmr review --diff -`
+  (the `|| true` guard is required because `diff` exits 1 whenever files
+  differ, which breaks pipelines under `set -o pipefail`)
 - Pre-made patch or diff file → `mmr review --diff path/to/changes.patch`
 
 The `--diff` flag expects diff-format content (a path to a `.patch`/`.diff`
