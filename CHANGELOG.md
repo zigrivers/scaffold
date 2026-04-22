@@ -12,7 +12,9 @@ All notable changes to Scaffold are documented here.
   Requests like "multi-model review this doc" now route correctly (e.g.
   `git diff HEAD -- path/to/doc.md | mmr review --diff -`) instead of
   refusing. The `--diff` flag expects diff-format content, so raw files
-  are wrapped via `git diff …` or `diff -u /dev/null …` first.
+  are wrapped via `git diff …` or `(diff -u /dev/null … || true)` first
+  (the `|| true` guard is required because `diff` exits 1 whenever files
+  differ, which breaks pipelines under `set -o pipefail`).
 - `content/skills/mmr/SKILL.md` documents all input modes and common
   non-PR workflows (doc review, pre-commit review).
 - `content/skills/scaffold-runner/SKILL.md` adds a Multi-Model Review Routing
