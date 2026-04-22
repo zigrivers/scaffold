@@ -1,6 +1,6 @@
 {
   "name": "@zigrivers/mmr",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Multi-model code review CLI — async dispatch, reconciliation, and severity gating",
   "type": "module",
   "license": "MIT",
@@ -13,11 +13,20 @@
     "access": "public",
     "registry": "https://registry.npmjs.org"
   },
-  "files": ["dist/", "templates/", "README.md", "LICENSE"],
-  "engines": { "node": ">=18" },
+  "files": [
+    "dist/",
+    "templates/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": { "mmr": "dist/index.js" },
+  "bin": {
+    "mmr": "dist/index.js"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
