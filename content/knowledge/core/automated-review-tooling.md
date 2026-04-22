@@ -1,12 +1,12 @@
 ---
 name: automated-review-tooling
-description: Patterns for automated PR code review using AI CLI tools (Codex, Gemini, Claude) — orchestration, reconciliation, compensating passes, and CI integration
-topics: [code-review, automation, codex, gemini, pull-requests, ci-cd, review-tooling]
+description: Patterns for automated code review using AI CLI tools (Codex, Gemini, Claude) — three-CLI MMR orchestration plus Superpowers 4th channel in wrappers, reconciliation, compensating passes, PR + non-PR targets, and CI integration
+topics: [code-review, automation, codex, gemini, claude, pull-requests, non-pr-review, mmr, ci-cd, review-tooling]
 ---
 
 # Automated Review Tooling
 
-Automated PR review leverages AI models to provide consistent, thorough code review without manual reviewer bottlenecks. This knowledge covers the local CLI approach (no GitHub Actions), dual-model review patterns, and integration with the PR workflow.
+Automated code review leverages AI models to provide consistent, thorough code review without manual reviewer bottlenecks. This knowledge covers the local CLI approach (no GitHub Actions), the three-channel MMR orchestration (Codex + Gemini + Claude) with the Superpowers code-reviewer added as a complementary 4th channel by the scaffold MMR wrappers, and integration with both PR and non-PR review targets (local code, branch diffs, specific files).
 
 ## Summary
 

@@ -1,5 +1,5 @@
 import type { CommandModule } from 'yargs'
-import { execSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
@@ -31,7 +31,7 @@ const MOBILE_SIGNALS = new Set([
 
 function detectGithubRemote(projectRoot: string): { hasGithub: boolean; reason: string } {
   try {
-    const output = execSync('git remote -v', { cwd: projectRoot, encoding: 'utf8', timeout: 5000 })
+    const output = execFileSync('git', ['remote', '-v'], { cwd: projectRoot, encoding: 'utf8', timeout: 5000 })
     const hasGithub = output.includes('github.com')
     return {
       hasGithub,
@@ -182,19 +182,28 @@ const checkCommand: CommandModule<Record<string, unknown>, CheckArgs> = {
       const hasAgentsMd = fs.existsSync(path.join(projectRoot, 'AGENTS.md'))
       const mode = !applicable ? 'skip' : hasAgentsMd ? 'update' : 'fresh'
 
-      // Detect available CLIs for local review
-      let hasCodexCli = false
-      let hasGeminiCli = false
-      try {
-        execSync('command -v codex', { encoding: 'utf8', timeout: 3000 })
-        hasCodexCli = true
-      } catch { /* not available */ }
-      try {
-        execSync('command -v gemini', { encoding: 'utf8', timeout: 3000 })
-        hasGeminiCli = true
-      } catch { /* not available */ }
-      const availableClis = [hasCodexCli && 'codex', hasGeminiCli && 'gemini'].filter(Boolean) as string[]
+      // Detect available CLIs for local review (three MMR channels)
+      const detectCli = (name: string): boolean => {
+        try {
+          execFileSync('sh', ['-c', 'command -v "$1"', '--', name], { encoding: 'utf8', timeout: 3000 })
+          return true
+        } catch {
+          return false
+        }
+      }
+      const hasCodexCli = detectCli('codex')
+      const hasGeminiCli = detectCli('gemini')
+      const hasClaudeCli = detectCli('claude')
+      const availableClis = [
+        hasCodexCli && 'codex',
+        hasGeminiCli && 'gemini',
+        hasClaudeCli && 'claude',
+      ].filter(Boolean) as string[]
       const recommendedMode = availableClis.length > 0 ? 'local-cli' : 'external-bot'
+      let modeLabel = ''
+      if (availableClis.length >= 3) modeLabel = ' (three-CLI MMR review)'
+      else if (availableClis.length === 2) modeLabel = ' (two-CLI MMR review)'
+      else if (availableClis.length === 1) modeLabel = ' (single-CLI review)'
 
       if (outputMode === 'json') {
         output.result({
@@ -214,7 +223,7 @@ const checkCommand: CommandModule<Record<string, unknown>, CheckArgs> = {
         output.info(`GitHub remote: ${hasGithub ? 'yes' : 'no'}`)
         output.info(`CI configured: ${hasCi ? 'yes' : 'no'}`)
         output.info(`Available CLIs: ${availableClis.length > 0 ? availableClis.join(', ') : 'none'}`)
-        output.info(`Recommended: ${recommendedMode}${availableClis.length === 2 ? ' (dual-model)' : ''}`)
+        output.info(`Recommended: ${recommendedMode}${modeLabel}`)
         output.info(`Mode: ${mode}`)
         output.info(`Reason: ${githubReason}`)
       }

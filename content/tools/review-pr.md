@@ -14,9 +14,28 @@ argument-hint: "<PR number or blank for current branch>"
 
 ## Purpose
 
-Run all three code review channels on a pull request and reconcile findings.
-This is the single entry point for PR code review — agents call this once instead
-of remembering three separate review invocations.
+Run the three CLI review channels (Codex, Gemini, Claude) on a pull request
+**plus** the Superpowers code-reviewer agent as a complementary 4th channel,
+and reconcile all findings through MMR. This is the single entry point for
+**PR-scoped** code review — agents call this once instead of remembering four
+separate review invocations.
+
+**For non-PR targets**, don't use this tool. Call `mmr review` directly with
+the appropriate input mode, or use `scaffold run review-code` for local
+pre-commit review:
+
+- `mmr review --staged` — staged changes
+- `mmr review --base <ref> --head <ref>` — branch diff
+- `mmr review --diff <path.patch>` — existing diff/patch file
+- `<git diff …> | mmr review --diff -` — any piped diff (including a single
+  tracked file via `git diff HEAD -- <path>`, or a new file via
+  `(diff -u /dev/null <path> || true)` — the `|| true` guard is required
+  because `diff` exits 1 whenever files differ, which breaks pipelines
+  under `set -o pipefail`)
+
+The `--diff` flag expects diff-format content; it does not read raw document
+content. The three-channel review itself is not PR-specific — this tool is
+just the PR wrapper around the more general `mmr review` CLI.
 
 The three channels are:
 1. **Codex CLI** — OpenAI's code analysis (implementation correctness, security, API contracts)
@@ -34,7 +53,7 @@ in the review criteria config rather than read at dispatch time.
 
 ## Expected Outputs
 
-- All three review channels executed (or fallback documented)
+- All three CLI review channels executed (or fallback documented) plus the Superpowers code-reviewer 4th channel reconciled via `mmr reconcile`
 - P0/P1/P2 findings fixed before proceeding
 - Review summary with per-channel results and reconciliation
 
@@ -161,7 +180,7 @@ Output a review summary in this format:
 ### Channels Executed
 - [ ] Codex CLI — root cause: [completed / not installed / auth failed / timeout / failed], coverage: [full / compensating (Codex-equivalent)]
 - [ ] Gemini CLI — root cause: [completed / not installed / auth failed / timeout / failed], coverage: [full / compensating (Gemini-equivalent)]
-- [ ] Claude CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / compensating]
+- [ ] Claude CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / none (Claude is never compensated — it IS the compensator for Codex/Gemini)]
 - [ ] Agent review — [completed / skipped], injected via mmr reconcile
 
 ### Consensus Findings (High Confidence)
@@ -226,7 +245,7 @@ Do NOT proceed to the next task or merge until this confirmation is output.
 ## Process Rules
 
 1. **Foreground only** — Always run Codex, Gemini, and Claude CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`.
-2. **All three channels are mandatory** — Codex CLI, Gemini CLI, and Claude CLI. Skip only when a tool is genuinely not installed, never by choice.
+2. **All three CLI channels are mandatory** — Codex CLI, Gemini CLI, and Claude CLI. Plus the Superpowers code-reviewer agent as a complementary 4th channel reconciled via `mmr reconcile` (Step 3). Skip a CLI channel only when a tool is genuinely not installed or auth cannot be recovered (in which case MMR emits a compensating pass for missing Codex/Gemini channels; a missing Claude CLI has no compensator). Never skip by choice.
 3. **Auth failures are not silent** — always surface to the user with the exact recovery command.
 4. **Independence** — never share one channel's output with another. Each reviews the diff independently.
 5. **Fix before proceeding** — P0/P1/P2 findings must be resolved before moving to the next task.

@@ -1,7 +1,7 @@
 ---
 name: review-code
 description: Run all configured code review channels on local code before commit or push
-summary: "Review the current local delivery candidate with Codex CLI, Gemini CLI, and Superpowers before committing or pushing, using staged changes, an explicit ref range, or the current branch diff."
+summary: "Review the current local delivery candidate with the three MMR CLI channels (Codex CLI, Gemini CLI, Claude CLI) plus the Superpowers code-reviewer agent as a complementary 4th channel reconciled into the same MMR job, before committing or pushing. Supports staged changes, an explicit ref range, or the full local delivery candidate (committed branch diff + staged + unstaged); untracked files are not included."
 phase: null
 order: null
 dependencies: []
@@ -15,15 +15,27 @@ argument-hint: "[--base <ref>] [--head <ref>] [--staged] [--report-only]"
 
 ## Purpose
 
-Run the same three-channel review stack used by `review-pr`, but on local code
-before commit or push. This is the preflight review entry point for bug fixes,
-small features, and quick tasks when the user wants multi-model review before
-anything leaves the machine.
+Run the same review stack used by `review-pr` (three MMR CLI channels plus
+the Superpowers code-reviewer agent as a complementary 4th channel), but on
+local code before commit or push. This is the preflight review entry point
+for bug fixes, small features, and quick tasks when the user wants
+multi-model review before anything leaves the machine.
 
-The three channels are:
+The three CLI channels are:
 1. **Codex CLI** — implementation correctness, security, API contracts
 2. **Gemini CLI** — architectural patterns, broad-context reasoning
-3. **Claude CLI** — Claude subagent review of code quality, tests, and plan alignment
+3. **Claude CLI** — code quality, tests, and plan alignment
+
+Plus the 4th channel:
+4. **Superpowers code-reviewer** — agent-based review dispatched via the
+   `superpowers:code-reviewer` skill, reconciled into the same MMR job via
+   `mmr reconcile` for a unified verdict.
+
+Scope: the full local delivery candidate (committed branch diff + staged +
+unstaged changes) by default, or a narrower slice when `--staged` or
+`--base`/`--head` flags are provided. **Untracked files are not reviewed** —
+use `(diff -u /dev/null <path> || true) | mmr review --diff -` directly for
+brand-new files.
 
 ## Inputs
 
@@ -40,7 +52,7 @@ The three channels are:
 
 ## Expected Outputs
 
-- A three-channel review summary for the local delivery candidate
+- A reconciled four-channel review summary for the local delivery candidate (three MMR CLI channels + Superpowers code-reviewer)
 - One of these verdicts: `pass`, `degraded-pass`, `blocked`, `needs-user-decision`
 - Fixed code when findings are resolved in normal mode
 
@@ -48,15 +60,57 @@ The three channels are:
 
 ### Primary: MMR CLI + Agent Reconcile
 
-When the MMR CLI is installed, use it as the primary entry point:
+When the MMR CLI is installed, use it as the primary entry point. Pick the
+invocation that matches the scope the user asked for:
 
 ```bash
-# Staged changes
+# Default (no flags) — full local delivery candidate:
+# committed branch diff (vs origin/main or main) + staged + unstaged.
+# `mmr review` with no input flags defaults to `git diff` alone
+# (unstaged only), so we MUST synthesize the combined bundle explicitly
+# and pipe it in via --diff -:
+# Resolve the TRUNK ref (not the branch's own upstream — we want the
+# full delivery candidate, not just un-pushed work). Precedence:
+# origin/HEAD (the remote's default branch) → origin/main → main →
+# origin/master → master → HEAD~1 → HEAD (working-tree-only fallback).
+# NOTE: do NOT use `@{u}` / branch upstream here — on a feature branch
+# that tracks `origin/<branch>`, `@{u}` is that remote branch, so
+# diffing against its merge-base would silently exclude already-pushed
+# branch commits from the review.
+BASE_REF=""
+if   ORIGIN_HEAD=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null); then BASE_REF="${ORIGIN_HEAD#refs/remotes/}"
+elif git rev-parse --verify origin/main   >/dev/null 2>&1; then BASE_REF=origin/main
+elif git rev-parse --verify main          >/dev/null 2>&1; then BASE_REF=main
+elif git rev-parse --verify origin/master >/dev/null 2>&1; then BASE_REF=origin/master
+elif git rev-parse --verify master        >/dev/null 2>&1; then BASE_REF=master
+elif git rev-parse --verify HEAD~1        >/dev/null 2>&1; then BASE_REF=HEAD~1
+else                                                           BASE_REF=HEAD
+fi
+# Compute the merge-base so we only review the local delivery candidate,
+# not unrelated upstream changes that have accumulated on BASE_REF since
+# the branch diverged. `git diff <merge-base>` then compares that point
+# to the working tree (including the index), giving one coherent patch
+# that covers committed branch work + staged + unstaged edits, with
+# repeated edits to the same file collapsed into a single final hunk.
+MERGE_BASE=$(git merge-base "$BASE_REF" HEAD 2>/dev/null || echo "$BASE_REF")
+git diff "$MERGE_BASE" | mmr review --diff - --sync --format json
+
+# Staged changes only:
 mmr review --staged --sync --format json
 
-# Branch diff against main
+# Branch diff against main (committed only, no staged/unstaged):
 mmr review --base main --sync --format json
+
+# Explicit ref range:
+mmr review --base <base-ref> --head <head-ref> --sync --format json
 ```
+
+Routing rules:
+- If `--staged` flag passed to the tool → use the `--staged` MMR invocation
+- If `--base`/`--head` flags passed → use the ref-range MMR invocation
+- Otherwise (no flags) → use the synthesized full-delivery-candidate form
+  above. Do NOT fall back to bare `mmr review` — it would miss committed
+  and staged work.
 
 After the CLI review completes, dispatch the agent's code-reviewer skill (4th channel) and inject findings into the MMR job for unified reconciliation:
 
@@ -89,11 +143,14 @@ Determine the delivery candidate to review.
 
 #### Mode A: Explicit ref range
 
-If both `BASE_REF` and `HEAD_REF` are provided:
+If `BASE_REF` is provided (with or without `HEAD_REF`):
 
 ```bash
 git rev-parse --verify "$BASE_REF"
-git rev-parse --verify "$HEAD_REF"
+# When --head is omitted, default head to HEAD so the base-only form
+# mirrors the MMR primary path (`mmr review --base <ref>`).
+HEAD_REF="${HEAD_REF:-HEAD}"
+[ "$HEAD_REF" != "HEAD" ] && git rev-parse --verify "$HEAD_REF"
 REVIEW_DIFF=$(git diff "$BASE_REF...$HEAD_REF")
 CHANGED_FILES=$(git diff --name-only "$BASE_REF...$HEAD_REF")
 ```
@@ -198,7 +255,7 @@ codex login status 2>/dev/null
 - If `codex` is not installed: skip this channel and record root-cause `not_installed`
 - If auth fails: tell the user to run `! codex login`, retry after recovery, and if recovery is not possible, record root-cause `auth_failed` and continue with the remaining channels
 
-If auth cannot be recovered, or if Codex is not installed, queue a compensating Claude self-review pass focused on implementation correctness, security, and API contracts. Label findings as `[compensating: Codex-equivalent]`. If auth check times out (~5s), retry once; if still failing, record `timeout` and queue compensating pass. This pass runs after all channel dispatch attempts complete.
+If auth cannot be recovered, or if Codex is not installed, queue a compensating Claude self-review pass focused on implementation correctness, security, and API contracts. Label findings as `[compensating: Codex-equivalent]`. If the auth check times out (the configured `channels.codex.auth.timeout`; 5s by default since Codex's check is a local file probe), retry once; if still failing, record `timeout` and queue compensating pass. This pass runs after all channel dispatch attempts complete.
 
 Build the prompt in a temporary file and pass it over stdin:
 
@@ -222,7 +279,7 @@ NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1
 - If `gemini` is not installed: skip this channel and record root-cause `not_installed`
 - If auth fails (including exit 41): tell the user to run `! gemini -p "hello"`, retry after recovery, and if recovery is not possible, record root-cause `auth_failed` and continue with the remaining channels
 
-If auth cannot be recovered, or if Gemini is not installed, queue a compensating Claude self-review pass focused on architectural patterns, design reasoning, and broad context. Label findings as `[compensating: Gemini-equivalent]`. If auth check times out (~5s), retry once; if still failing, record `auth timeout` and queue compensating pass. This pass runs after all channel dispatch attempts complete.
+If auth cannot be recovered, or if Gemini is not installed, queue a compensating Claude self-review pass focused on architectural patterns, design reasoning, and broad context. Label findings as `[compensating: Gemini-equivalent]`. If the auth check times out (the configured `channels.gemini.auth.timeout`; 20s by default since Gemini's check is a full LLM round-trip), retry once; if still failing, record `auth timeout` and queue compensating pass. This pass runs after all channel dispatch attempts complete.
 
 Build the prompt in a temporary file and pass it as a single prompt string:
 
@@ -348,7 +405,8 @@ Output a concise summary in this format:
 ### Channels Executed
 - Codex CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / compensating (Codex-equivalent)]
 - Gemini CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / compensating (Gemini-equivalent)]
-- Claude CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / compensating]
+- Claude CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / none (Claude is never compensated — it IS the compensator for Codex/Gemini)]
+- Agent review (Superpowers code-reviewer, 4th channel) — [completed / skipped], injected via `mmr reconcile`
 
 ### Findings
 [consensus findings first, then single-source findings]

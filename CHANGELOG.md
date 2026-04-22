@@ -4,6 +4,36 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+### Changed
+- Multi-model review (`mmr review`) is no longer framed as PR-only across skills,
+  tool prompts, and seeded CLAUDE.md guidance. The CLI already supported
+  `--staged`, `--base`/`--head`, and `--diff <path | ->` input modes; the
+  wrapper documentation now surfaces all of them as first-class targets.
+  Requests like "multi-model review this doc" now route correctly (e.g.
+  `git diff HEAD -- path/to/doc.md | mmr review --diff -`) instead of
+  refusing. The `--diff` flag expects diff-format content, so raw files
+  are wrapped via `git diff …` or `(diff -u /dev/null … || true)` first
+  (the `|| true` guard is required because `diff` exits 1 whenever files
+  differ, which breaks pipelines under `set -o pipefail`).
+- `content/skills/mmr/SKILL.md` documents all input modes and common
+  non-PR workflows (doc review, pre-commit review).
+- `content/skills/scaffold-runner/SKILL.md` adds a Multi-Model Review Routing
+  table that dispatches by target type (PR vs. local code vs. file vs. ref
+  range) instead of defaulting to `review-user-stories`.
+- `content/tools/review-pr.md` clarifies it's the PR-scoped wrapper around
+  the more general `mmr review` CLI.
+- `content/pipeline/environment/automated-pr-review.md` now seeds a
+  target-agnostic Code Review block into downstream projects, wrapped in
+  `<!-- scaffold:automated-pr-review:claude-md start/end -->` markers for
+  idempotent Update Mode rewrites.
+
+### Migration
+- Existing scaffold-initialized projects have a PR-only Code Review block in
+  their CLAUDE.md. Re-run `scaffold run automated-pr-review` to refresh it
+  with the target-agnostic version. Update Mode preserves custom review
+  rules, reviewer bot name, round cap, and severity definitions; only the
+  Code Review block text is replaced.
+
 ## [3.23.0] — 2026-04-22
 
 ### Added

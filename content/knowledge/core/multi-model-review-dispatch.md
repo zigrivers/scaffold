@@ -48,7 +48,7 @@ When an AI agent dispatches CLI reviews via a tool runner (Claude Code Bash tool
 
 Before dispatching, verify the model CLI is installed and authenticated using a two-step process that produces distinct statuses for the orchestration layer:
 
-**Step 1 — Installation check:**
+**Step 1 — Installation check** (all three MMR channels):
 
 ```bash
 # Codex: not found -> status: "not_installed"
@@ -56,6 +56,9 @@ command -v codex >/dev/null 2>&1
 
 # Gemini: not found -> status: "not_installed"
 command -v gemini >/dev/null 2>&1
+
+# Claude CLI: not found -> status: "not_installed"
+command -v claude >/dev/null 2>&1
 ```
 
 If the CLI is not found, report status `not_installed` to the orchestration layer. Do not prompt the user to install it.
@@ -64,17 +67,23 @@ If the CLI is not found, report status `not_installed` to the orchestration laye
 
 ```bash
 # Codex: fail -> status: "auth_failed"
-codex login status 2>/dev/null
+codex login status 2>/dev/null                                       # local file probe
 
 # Gemini: exit 41 -> status: "auth_failed"
-NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1
+NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1             # full LLM round-trip
+
+# Claude CLI: non-zero -> status: "auth_failed"
+claude -p "respond with ok" 2>/dev/null                              # full LLM round-trip
 ```
+
+Prefer `mmr config test` as a single-command pre-flight that runs all three checks and emits structured JSON.
 
 If auth fails, report status `auth_failed` and surface recovery to the user:
 - Codex: "Codex auth expired — run `! codex login` to re-authenticate"
 - Gemini: "Gemini auth expired — run `! gemini -p \"hello\"` to re-authenticate"
+- Claude CLI: "Claude CLI auth expired — run `! claude login` to re-authenticate"
 
-If auth check times out (~5 seconds), retry once. If still failing, report `timeout`.
+Auth-check timeouts: Codex's check is a local file probe so the default is 5s; Gemini's and Claude's are full LLM round-trips and routinely take 9-14s, so MMR's built-in defaults use 20s for those two. If a check times out, retry once. If still failing, report `timeout`.
 If auth succeeds, report `ready` and proceed to dispatch.
 
 **Post-dispatch terminal states:**

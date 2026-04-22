@@ -1,0 +1,29 @@
+# Transitional repo-local override: raises auth timeouts so the installed
+# `mmr` CLI (Homebrew / npm-global) works immediately on this repo even
+# when it's pinned to a version whose built-in defaults still have the
+# too-tight 5s auth timeout.
+#
+# The authoritative fix lives in packages/mmr/src/config/defaults.ts
+# (auth.timeout: 20 for claude and gemini). Once the next MMR release
+# publishes and users pick it up, this file can be removed without
+# behavior change for those users.
+#
+# MMR's config loader (packages/mmr/src/config/loader.ts deepMerge) merges
+# this file into the built-in defaults recursively — it does NOT replace
+# the entire `channels` map. Codex, Claude, and Gemini all stay enabled
+# with their default commands/flags/env/auth recipes; only the fields
+# explicitly set below are overridden.
+#
+# Why raise auth timeouts for claude and gemini specifically: their
+# "auth check" commands (`claude -p 'respond with ok'` and
+# `NO_BROWSER=true gemini -p 'respond with ok' -o json`) are full LLM
+# round-trips that routinely take 9-14s in practice, well over the
+# legacy 5s default. Codex's check (`codex login status`) is a local
+# file probe and stays at the default.
+channels:
+  claude:
+    auth:
+      timeout: 20
+  gemini:
+    auth:
+      timeout: 20

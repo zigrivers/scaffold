@@ -111,21 +111,58 @@ Minimum checklist:
 
 Before pushing, review `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md. Fix any issues and re-run `make check-all`. Log recurring patterns to tasks/lessons.md.
 
-### Mandatory 3-Channel PR Review
+### Mandatory Code Review
 
-After creating every PR, run **all three** code review channels before moving
-to the next task. A PostToolUse hook on `gh pr create` will remind you.
+**Mandatory after `gh pr create`** — run all review channels before moving to
+the next task. A PostToolUse hook on `gh pr create` will remind you.
+**Optional but supported** for any non-PR target: staged changes, an unstaged
+working tree, a branch diff, a specific diff file, or an arbitrary document.
+The MMR CLI accepts any of these — the review is not gated to PRs.
 
-**Entry point:** Use `scaffold run review-pr` or follow the instructions in
-`content/tools/review-pr.md`. The tool handles dispatch, auth checks,
-reconciliation, and verdict logic.
+**Channel model:** direct `mmr review` runs the three CLI channels (Codex,
+Gemini, Claude). The scaffold wrappers (`scaffold run review-pr` and
+`scaffold run review-code`) add the Superpowers code-reviewer agent as a
+complementary 4th channel and reconcile its findings into the same MMR job.
+(`scaffold run post-implementation-review` has its own channel layout
+documented in `content/tools/post-implementation-review.md` — consult that
+file directly rather than assuming it matches this pattern.)
+
+**Entry points by target:**
+- PR → `scaffold run review-pr` (or `mmr review --pr <number>`)
+- Local code before commit → `scaffold run review-code` (recommended — covers
+  the committed branch diff plus staged and unstaged changes to tracked files,
+  all in one review job). There is no single `mmr review` flag equivalent;
+  for narrower scopes you can run `mmr review --staged` (staged only) or
+  `git diff HEAD | mmr review --diff -` (all tracked uncommitted, no
+  committed branch diff), but `scaffold run review-code` is what you want
+  for full pre-push coverage. **Untracked / brand-new files are not reviewed
+  by `review-code`** — use the `(diff -u /dev/null <path> || true) | mmr
+  review --diff -` pattern below.
+- Branch diff → `mmr review --base <ref> --head <ref>`
+- Changes to a specific tracked file or doc (pending edits only) →
+  `git diff HEAD -- path/to/file.md | mmr review --diff -` (fails with
+  "no diff content" if the file has no local changes — use the next
+  form instead)
+- Current contents of any file (tracked-with-no-changes, untracked, or
+  brand-new), synthesized as an "all added" diff →
+  `(diff -u /dev/null path/to/file.md || true) | mmr review --diff -`
+  (the `|| true` guard is required because `diff` exits 1 whenever files
+  differ, which breaks pipelines under `set -o pipefail`)
+- Pre-made patch or diff file → `mmr review --diff path/to/changes.patch`
+
+The `--diff` flag expects diff-format content (a path to a `.patch`/`.diff`
+file, or `-` for stdin piping a git/diff command). It does **not** accept raw
+document content — wrap the target in a diff first.
+
+The wrapper tools (`review-pr`, `review-code`) handle dispatch, auth checks,
+reconciliation, and verdict logic. For targets not covered by a wrapper, call
+`mmr review` directly — it accepts `--focus "…" --sync --format json` the same
+way.
 
 **The three channels:**
 1. **Codex CLI** — implementation correctness, security, API contracts
 2. **Gemini CLI** — architectural patterns, broad-context reasoning
 3. **Claude CLI** — plan alignment, code quality, testing
-
-**Primary entry point:** `mmr review --pr <number> --sync --format json`
 
 **Critical rules:**
 - **Foreground only** — Always run Codex, Gemini, and Claude CLI commands as
@@ -155,8 +192,14 @@ reconciliation, and verdict logic.
 <!-- Escape hatch only. Canonical commands live in content/tools/review-pr.md.
      Update both if CLI syntax changes. -->
 ```bash
-# Primary (recommended):
-mmr review --pr "$PR_NUMBER" --sync --format json
+# Primary — pick the input mode that matches your target
+mmr review --pr "$PR_NUMBER" --sync --format json                    # PR
+mmr review --staged --sync --format json                             # pre-commit (staged)
+git diff HEAD | mmr review --diff - --sync --format json             # tracked uncommitted (no untracked)
+mmr review --base main --head "$BRANCH" --sync --format json         # branch diff
+git diff HEAD -- docs/foo.md | mmr review --diff - --sync --format json  # single file
+mmr review --diff path/to/changes.patch --sync --format json         # existing diff file
+
 # Capture job_id, dispatch agent review, then inject:
 mmr reconcile "$JOB_ID" --channel superpowers --input findings.json
 

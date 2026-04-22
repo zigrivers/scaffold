@@ -38,7 +38,7 @@ Either way, Scaffold constructs the prompt and the target AI tool does the work.
 
 **Depth scale** (1-5) — Controls how thorough each step's output is, from "focus on the core deliverable" (1) to "explore all angles, tradeoffs, and edge cases" (5). Depth resolves with 4-level precedence: CLI flag > step override > custom default > preset default.
 
-**Multi-model validation** — At depth 4-5, all 19 review and validation steps can dispatch independent reviews to Codex and/or Gemini CLIs. Two independent models catch more blind spots than one. When both CLIs are available, findings are reconciled by confidence level (both agree = high confidence, single model P0 = still actionable). When a channel is unavailable, a compensating Claude self-review pass runs in its place (labeled `[compensating: Codex-equivalent]` or `[compensating: Gemini-equivalent]`, single-source confidence). CLI commands must always run in the foreground — background execution produces empty output. See the [Multi-Model Review](#multi-model-review) section.
+**Multi-model validation** — At depth 4-5, review and validation steps can dispatch independent reviews to the three MMR CLI channels (Codex, Gemini, Claude) via the `mmr` CLI, plus the Superpowers code-reviewer agent as a complementary 4th channel on wrapper invocations (`scaffold run review-pr`, `scaffold run review-code`). The MMR-backed wrappers are the preferred path; some older depth-5 validation steps still dispatch Codex/Gemini directly via the `multi-model-dispatch` skill (migration in progress). Multiple independent models catch more blind spots than one. Findings are reconciled by confidence level (multiple channels agree = high confidence, single channel P0 = still actionable). When Codex or Gemini is unavailable, a compensating Claude self-review pass runs in its place (labeled `[compensating: Codex-equivalent]` or `[compensating: Gemini-equivalent]`, single-source confidence); there is no compensating pass when Claude itself is unavailable — the review simply proceeds with the remaining channels. CLI commands must always run in the foreground — background execution produces empty output. `mmr review` also supports non-PR targets (staged changes, branch diff, specific files) — see the [Multi-Model Review](#multi-model-review) section.
 
 **State management** — Pipeline progress is tracked in `.scaffold/state.json` with atomic file writes and crash recovery. An advisory lock prevents concurrent runs. Decisions are logged to an append-only `decisions.jsonl`. Pressing Ctrl+C during any command exits cleanly with an informative message — no stack traces, no orphaned locks, no corrupted state.
 
@@ -826,7 +826,7 @@ Claude sets up your local dev environment with one-command startup and live relo
 | `dev-env-setup` | Claude configures your project so `make dev` (or equivalent) starts everything — dev server with live reload, local database, environment variables — and documents the setup in a getting-started guide. |
 | `design-system` | Claude creates a visual language — color palette (WCAG-compliant), typography scale, spacing system, component patterns — and generates working theme config files for your frontend framework. *(web apps only)* |
 | `git-workflow` | Claude sets up your branching strategy, commit message format, PR workflow, CI pipeline with lint and test jobs, and worktree scripts so multiple AI agents can work in parallel without conflicts. |
-| `automated-pr-review` | Claude configures automated code review — using Codex and/or Gemini CLIs for dual-model review when available, or an external bot — with severity definitions and review criteria tailored to your project. *(optional)* |
+| `automated-pr-review` | Claude configures automated code review — three-CLI MMR dispatch (Codex, Gemini, Claude) plus Superpowers code-reviewer as a complementary 4th channel via the scaffold wrappers, with severity definitions and review criteria tailored to your project. Covers PRs and non-PR targets (local code, diffs, files). *(optional)* |
 | `ai-memory-setup` | Claude extracts conventions from your docs into path-scoped rule files that load automatically, optimizes CLAUDE.md with a pointer pattern, and optionally sets up persistent cross-session memory. |
 
 ### Phase 4 — Testing Integration (integration)
@@ -1214,7 +1214,9 @@ channels:
     command: claude -p
     auth:
       check: "claude -p 'respond with ok' 2>/dev/null"
-      timeout: 5
+      # Claude's auth probe is a full LLM round-trip (not a local status
+      # check) and routinely takes 9-14s, so 20s is the realistic default.
+      timeout: 20
       failure_exit_codes: [1]
       recovery: "Run: claude login"
 
@@ -1228,7 +1230,10 @@ channels:
       NO_BROWSER: "true"
     auth:
       check: "NO_BROWSER=true gemini -p 'respond with ok' -o json 2>&1"
-      timeout: 5
+      # Gemini's auth probe is also a full LLM round-trip; same reasoning
+      # as Claude. Codex stays at the 5s default (see below) because its
+      # check is a local file probe.
+      timeout: 20
       failure_exit_codes: [41]
       recovery: "Run: gemini -p 'hello' (interactive, opens browser)"
     timeout: 360     # Gemini tends to be slower
@@ -1285,11 +1290,12 @@ When multiple channels return findings, mmr applies consensus rules:
 
 | Scenario | Confidence | Action |
 |----------|-----------|--------|
-| Both models flag the same issue | **High** | Fix immediately |
-| Both models approve | **High** | Proceed confidently |
-| One flags P0, other approves | **High** | Fix it (P0 is critical) |
-| One flags P1, other approves | **Medium** | Review before fixing |
-| Models contradict each other | **Low** | Present both to user |
+| 2+ channels flag the same issue | **High** | Fix immediately |
+| All channels approve | **High** | Proceed confidently |
+| One channel flags P0, others approve | **High** | Fix it (P0 is critical) |
+| One channel flags P1, others approve | **Medium** | Review before fixing |
+| Channels contradict each other | **Low** | Present all perspectives to user |
+| Compensating-pass P0/P1/P2 finding | **Single-source** | Fix per normal thresholds, label as compensating |
 
 Scaffold verifies CLI authentication before every dispatch. If a token has expired, it tells you and provides the command to re-authenticate — it never silently skips a review.
 
@@ -1302,15 +1308,15 @@ At depth 1-3, reviews are Claude-only — still thorough with multiple passes, b
 ### What You Need
 
 - **Depth 4 or 5** — set during `scaffold init` or override per step
-- **At least one additional CLI** — Codex or Gemini (or both for triple-model review)
-- **Valid authentication** — Scaffold checks before every dispatch and tells you if credentials need refreshing
+- **At least one additional CLI** — Codex, Gemini, and/or Claude CLI. All three dispatched independently as MMR channels when available. Missing Codex or Gemini channels fall back to compensating Claude passes (labeled `[compensating: Codex-equivalent]` / `[compensating: Gemini-equivalent]`, single-source confidence); if Claude itself is unavailable, the review proceeds with the remaining channels — MMR does not compensate for a missing Claude channel.
+- **Valid authentication** — Scaffold checks before every dispatch (run `mmr config test` to pre-flight all three at once) and tells you if credentials need refreshing
 
 ## Methodology Presets
 
 Not every project needs all 60 steps. Choose a methodology when you run `scaffold init`:
 
 ### deep (depth 5)
-All steps enabled. Comprehensive analysis of every angle — domain modeling, ADRs, security review, traceability matrix, the works. At depth 4-5, review steps dispatch to Codex/Gemini CLIs for multi-model validation. Best for complex systems, team projects, or when you want thorough documentation.
+All steps enabled. Comprehensive analysis of every angle — domain modeling, ADRs, security review, traceability matrix, the works. At depth 4-5, review steps dispatch to the three MMR CLI channels (Codex, Gemini, Claude) for multi-model validation, with the Superpowers code-reviewer agent added as a complementary 4th channel via the scaffold wrappers. Best for complex systems, team projects, or when you want thorough documentation.
 
 ### mvp (depth 1)
 Only 7 critical steps: create-prd, review-prd, user-stories, review-user-stories, tdd, implementation-plan, and implementation-playbook. Minimal ceremony — get to code fast. Best for prototypes, hackathons, or solo projects.
@@ -1372,7 +1378,8 @@ scaffold check add-e2e-testing
 # → Applicable: yes | Platform: web | Brownfield: no | Mode: fresh
 
 scaffold check automated-pr-review
-# → Applicable: yes | GitHub remote: yes | Available CLIs: codex, gemini | Recommended: local-cli (dual-model)
+# → Applicable: yes | GitHub remote: yes | Available CLIs: codex, gemini, claude | Recommended: local-cli (three-CLI MMR review)
+# (suffix is `(three-CLI MMR review)` / `(two-CLI MMR review)` / `(single-CLI review)` based on how many of codex/gemini/claude are detected)
 
 scaffold check ai-memory-setup
 # → Rules: no | MCP server: none | Hooks: none | Mode: fresh
@@ -1452,9 +1459,9 @@ These are orthogonal to the pipeline — usable at any time, not tied to pipelin
 | `scaffold run update` | Update Scaffold to the latest version. |
 | `scaffold run dashboard` | Open a visual progress dashboard in your browser. |
 | `scaffold run prompt-pipeline` | Print the full pipeline reference table. |
-| `scaffold run review-code` | Run all 3 code review channels on local code before commit or push. |
-| `scaffold run review-pr` | Run all 3 code review channels (Codex CLI, Gemini CLI, Superpowers) on a PR. |
-| `scaffold run post-implementation-review` | Full 3-channel codebase review after an AI agent completes all tasks — checks requirements coverage, security, architecture alignment, and more. |
+| `scaffold run review-code` | Run all 3 MMR CLI review channels (Codex CLI, Gemini CLI, Claude CLI) on tracked local code (committed branch diff + staged + unstaged — no untracked files) before commit or push, plus Superpowers code-reviewer as a complementary 4th channel. |
+| `scaffold run review-pr` | Run all 3 MMR CLI review channels (Codex CLI, Gemini CLI, Claude CLI) on a PR, plus Superpowers code-reviewer as a complementary 4th channel. Also usable on non-PR targets (staged changes, branch diff, specific files) via `mmr review` directly. |
+| `scaffold run post-implementation-review` | Full codebase review (Codex CLI + Gemini CLI + Superpowers code-reviewer — note: does not currently include Claude CLI as a standard channel) after an AI agent completes all tasks — checks requirements coverage, security, architecture alignment, and more. |
 | `scaffold run spark` | Explore and expand a raw project idea through Socratic questioning, competitive research, and innovation expansion. Produces a `docs/spark-brief.md` that feeds into `create-vision`. At depth 4+, dispatches to external models for independent research and adversarial red-teaming. |
 | `scaffold run session-analyzer` | Analyze Claude Code session logs for patterns and insights. |
 

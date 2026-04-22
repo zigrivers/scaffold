@@ -202,9 +202,9 @@ When the user asks "what tools are available?", "what can I build?", or "show me
 | `scaffold run update` | Update scaffold to the latest version |
 | `scaffold run dashboard` | Open a visual progress dashboard in your browser |
 | `scaffold run prompt-pipeline` | Print the full pipeline reference table |
-| `scaffold run review-code` | Run all 3 code review channels on local code before commit or push |
-| `scaffold run review-pr` | Run all 3 code review channels (Codex CLI, Gemini CLI, Superpowers) on a PR |
-| `scaffold run post-implementation-review` | Full 3-channel codebase review after an AI agent completes all tasks |
+| `scaffold run review-code` | Run all 3 CLI review channels (Codex CLI, Gemini CLI, Claude CLI) on tracked local code (committed branch diff + staged + unstaged — no untracked files) before commit or push, plus Superpowers code-reviewer as a complementary 4th channel |
+| `scaffold run review-pr` | Run all 3 code review channels (Codex CLI, Gemini CLI, Claude CLI) on a PR, plus Superpowers code-reviewer as a complementary 4th channel |
+| `scaffold run post-implementation-review` | Full codebase review (Codex CLI, Gemini CLI, Superpowers code-reviewer) after an AI agent completes all tasks |
 | `scaffold run session-analyzer` | Analyze Claude Code session logs for patterns and insights |
 
 **Display rules:**
@@ -240,7 +240,8 @@ Respond to these natural language requests:
 | "Is X applicable?" / "Do I need X?" | Run `scaffold check <step>` to detect platform and brownfield status |
 | "Set up memory" / "Configure AI memory" / "Add memory" | Run `scaffold run ai-memory-setup` — sets up modular rules, optional MCP memory server, and external context |
 | "Set up testing" / "Add Playwright" / "Add Maestro" | Run `scaffold run add-e2e-testing` — auto-detects web/mobile and configures the right framework(s) |
-| "Run multi-model review" / "Review stories with other models" | Run `scaffold run review-user-stories` at depth 5 (multi-model capabilities are now built into review-user-stories) |
+| "Run multi-model review" / "Review X with all three models" | Route by target — see [Multi-Model Review Routing](#multi-model-review-routing) |
+| "Review stories with other models" | Run `scaffold run review-user-stories` at depth 5 (multi-model capabilities are built into review-user-stories) |
 | "Skip X" | Run `scaffold skip <step> --reason "<user's reason>"` |
 | "Skip X, Y, and Z" | Run `scaffold skip <step1> <step2> <step3> --reason "<reason>"` |
 | "What's left?" / "Show remaining" | Run `scaffold status --compact`, show only pending/in-progress steps |
@@ -338,28 +339,73 @@ scaffold check add-e2e-testing
 
 This is useful when the user asks "Do I need this step?" or when previewing which optional steps apply before running them.
 
+### Multi-Model Review Routing
+
+When the user asks for a "multi-model review", "review this with all three models",
+"run MMR on X", or similar — **do not assume the target is a PR**. Route based on
+what the user is pointing at:
+
+| Target | Command |
+|---|---|
+| GitHub PR (explicit number or current branch's PR) | `scaffold run review-pr [<PR#>]` |
+| Local uncommitted / staged code, before commit or push | `scaffold run review-code` |
+| Pending edits to a tracked file (changes since HEAD) | `git diff HEAD -- <path> \| mmr review --diff - --sync --format json` |
+| Current contents of any file (tracked-with-no-changes, untracked, or brand-new) | `(diff -u /dev/null <path> \|\| true) \| mmr review --diff - --sync --format json` |
+| A branch diff against main (or another ref) | `mmr review --base <ref> --head <ref> --sync --format json` |
+| An existing patch or diff file | `mmr review --diff <path.patch> --sync --format json` |
+| A diff piped from another command | `<cmd> \| mmr review --diff - --sync --format json` (stdin) |
+| A user-story review specifically at depth 5 | `scaffold run review-user-stories` |
+
+If the user's target is ambiguous ("review this with MMR"), ask once which of
+the above applies — don't default to `review-pr` just because it's the most
+common entry point. Doc reviews and uncommitted-work reviews are equally
+first-class.
+
+Pass `--focus "..."` to MMR when the user describes what to evaluate (clarity,
+completeness, security, performance, etc.). See the `mmr` skill for all input
+modes and flags.
+
+**Note on `--diff`:** the flag requires diff-format content (path to a
+`.patch`/`.diff` file, or `-` for stdin). To review a regular document or
+source file, wrap it in a diff first using `git diff HEAD -- <path>`
+(tracked) or `(diff -u /dev/null <path> || true)` (untracked — the
+`|| true` guard is required because `diff` exits 1 whenever files
+differ, which breaks pipelines under `set -o pipefail`) and pipe the
+result into `mmr review --diff -`.
+
 ### Multi-Model Review at Depth 4-5
 
-All review and validation steps now support independent multi-model validation at depth 4-5 using Codex and/or Gemini CLIs. The `multi-model-dispatch` skill documents the correct invocation patterns:
+All review and validation steps support independent multi-model validation at depth 4-5. Two distinct paths exist — **never mix them** — pick based on what step is running:
 
-- **Codex**: `codex exec --skip-git-repo-check -s read-only --ephemeral "prompt" 2>/dev/null` (NOT bare `codex`)
-- **Gemini**: `NO_BROWSER=true gemini -p "prompt" --output-format json --approval-mode yolo 2>/dev/null`
+#### Path A: MMR-backed review (PREFERRED — always use for these steps)
+
+Applies to: `scaffold run review-pr`, `scaffold run review-code`, and any pipeline review step that invokes `mmr review` directly.
+
+- **Channel model:** three CLIs (Codex + Gemini + Claude) dispatched and reconciled by the MMR CLI; scaffold wrappers add the Superpowers code-reviewer agent as a complementary 4th channel reconciled into the same MMR job via `mmr reconcile`.
+- **Note:** `scaffold run post-implementation-review` follows a different channel layout (raw-CLI dispatch of Codex + Gemini + Superpowers, with optional `mmr reconcile` injection if a prior `mmr review` job exists). Treat it as its own path — consult `content/tools/post-implementation-review.md` for specifics.
+- **Invocation:** go through the wrapper (`scaffold run …`) or call `mmr review …` directly. Do NOT shell out to `codex`/`gemini`/`claude` yourself for these steps — MMR handles dispatch, parsing, compensating passes, and verdict.
+- **Auth pre-flight:** run `mmr config test` once per session — it probes all three CLIs and reports status in one call.
+- **If auth fails** for any channel, surface recovery commands to the user: `! codex login`, `! gemini -p "hello"`, or `! claude login`. MMR will emit a compensating pass (via `claude -p`) for each missing external channel, labelled `[compensating: Codex-equivalent]` / `[compensating: Gemini-equivalent]`. Maximum achievable verdict in that case is `degraded-pass`.
+- **Never silently skip a CLI due to auth failure** — surface it to the user.
+
+#### Path B: Legacy / non-MMR direct dispatch
+
+Applies to: some older depth-5 validation steps and any ad-hoc manual dispatch not routed through MMR. The `multi-model-dispatch` skill documents the raw invocation patterns:
+
+- **Codex:** `codex exec --skip-git-repo-check -s read-only --ephemeral "prompt" 2>/dev/null` (NOT bare `codex`)
+- **Gemini:** `NO_BROWSER=true gemini -p "prompt" --output-format json --approval-mode yolo 2>/dev/null`
+- **Claude CLI:** `claude -p "prompt" --output-format json 2>/dev/null`
 
 **`NO_BROWSER=true` is required for all Gemini invocations** from Claude Code's Bash tool. Without it, Gemini's child process relaunch shows a consent prompt that hangs in non-TTY shells.
 
-**Auth verification is mandatory before dispatch.** CLI tokens expire mid-session. Before running any review at depth 4-5:
-1. Check Codex auth: `codex login status`
-2. Check Gemini auth: `NO_BROWSER=true gemini -p "respond with ok" -o json` (exit 41 = auth failure)
-3. If auth fails, tell the user to re-authenticate: `! gemini -p "hello"` or `! codex login` (the `!` prefix runs it interactively with TTY access)
-4. **Never silently skip a CLI due to auth failure** — surface it to the user
+Auth pre-flight for Path B dispatch:
+1. Codex: `codex login status`
+2. Gemini: `NO_BROWSER=true gemini -p "respond with ok" -o json` (exit 41 = auth failure)
+3. Claude CLI: `claude -p "respond with ok"` (typically uses the active Claude Code session)
+4. If any fail: `! codex login`, `! gemini -p "hello"`, or `! claude login` (the `!` prefix runs it interactively with TTY access).
+5. **Never silently skip a CLI due to auth failure** — surface it to the user.
 
-When running a review step at depth 4-5:
-1. Check CLI availability before dispatching
-2. If both available, run dual-model review for highest quality
-3. If one available, run single-model external review
-4. If neither available, fall back to Claude-only adversarial self-review
-
-The runner should surface the depth choice as a decision point for review steps, noting that depth 4-5 enables multi-model validation if CLIs are available.
+The runner should surface the depth choice as a decision point for review steps, noting that depth 4-5 enables three-CLI multi-model validation when the CLIs are available.
 
 ## Batch Execution
 
