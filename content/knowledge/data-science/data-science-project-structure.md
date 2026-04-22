@@ -8,7 +8,7 @@ A solo data-science project accumulates artifacts faster than most software: hal
 
 ## Summary
 
-A solo DS project has six top-level directories that each answer one question: `notebooks/` (exploration), `src/` (importable Python modules), `data/` (gitignored datasets, split into raw/interim/processed), `models/` (serialized artifacts, tracked via DVC or git-lfs), `reports/` (rendered outputs — figures, HTML, markdown), and `tests/` (pytest suite mirroring `src/`). `configs/` holds YAML run parameters, and `pyproject.toml` at the root defines the package. The `.gitignore` excludes all of `data/`, most of `models/`, and common binary formats. Reusable logic follows a strict promotion path: explored in a notebook, extracted into `src/`, unit-tested in `tests/`, then re-imported by notebooks or pipeline scripts.
+A solo DS project has six top-level directories that each answer one question: `notebooks/` (exploration), `src/` (importable Python modules), `data/` (split into raw/interim/processed — `data/raw/` is always gitignored; small processed artifacts may be committed or DVC-tracked), `models/` (serialized artifacts, tracked via DVC or git-lfs), `reports/` (rendered outputs — figures, HTML, markdown), and `tests/` (pytest suite mirroring `src/`). `configs/` holds YAML run parameters, and `pyproject.toml` at the root defines the package. The `.gitignore` excludes raw data, most of `models/`, and common binary formats that were not deliberately promoted. Reusable logic follows a strict promotion path: explored in a notebook, extracted into `src/`, unit-tested in `tests/`, then re-imported by notebooks or pipeline scripts.
 
 ## Deep Guidance
 
@@ -25,10 +25,10 @@ project-root/
 │       ├── training.py     # Model fitting routines
 │       ├── evaluation.py   # Metrics, CV loops, slice analysis
 │       └── serving.py      # Inference helpers (load artifact, predict)
-├── data/               # GITIGNORED — all datasets live here
-│   ├── raw/            # Immutable inputs as received from source
-│   ├── interim/        # Partially transformed, cached between stages
-│   └── processed/      # Analysis-ready datasets consumed by training
+├── data/               # Datasets at every pipeline stage
+│   ├── raw/            # Immutable inputs — GITIGNORED (always)
+│   ├── interim/        # Cached intermediates — small Parquet may be committed
+│   └── processed/      # Analysis-ready — usually DVC-tracked; small files may be committed
 ├── models/             # Serialized model artifacts (DVC / git-lfs tracked)
 ├── reports/            # Rendered output: figures/, HTML reports, markdown summaries
 │   └── figures/
@@ -42,20 +42,34 @@ project-root/
 One-liners per dir:
 - `notebooks/` — exploration, EDA, prototyping; numbered `01-…`, `02-…` so ordering is obvious
 - `src/` — every reusable function that a second notebook or a pipeline script will call
-- `data/` — all datasets at every stage; nothing here is ever committed to git
+- `data/` — all datasets at every stage; raw is always gitignored, selected processed artifacts (small Parquet in `data/interim/` or `data/processed/`) may be committed directly or tracked via DVC — see `data-science-data-versioning`
 - `models/` — trained model artifacts; tracked through DVC or git-lfs pointers, never raw binaries
 - `reports/` — things a human reads: charts, HTML reports, markdown summaries
 - `tests/` — pytest tests for code in `src/`
 - `configs/` — experiment parameters (paths, seeds, hyperparams) separate from code
 
-### Data: gitignore everything large
+### Data: gitignore raw, deliberately admit small processed artifacts
 
-The single hardest rule in DS project hygiene: **never commit files under `data/` or raw model binaries under `models/` to git**. A 200 MB parquet file in history is permanent — `git filter-repo` is the only cure and it rewrites every commit. Prevent the problem at the `.gitignore` layer before it happens.
+The single hardest rule in DS project hygiene: **never commit raw datasets under `data/raw/` or raw model binaries under `models/` to git**. A 200 MB parquet file committed to history is permanent — `git filter-repo` is the only cure and it rewrites every commit. Prevent the problem at the `.gitignore` layer before it happens.
+
+Gitignoring the entire `data/` tree is the safest default, but it under-serves a common small-team workflow: a cleaned, analysis-ready Parquet in `data/interim/` that's <10 MB, changes rarely, and is useful to have alongside the code. See `data-science-data-versioning` for the full size-based decision rule. The pattern below gitignores raw data and external copies wholesale, and allows opt-in commits of small processed Parquet through a deliberate un-ignore rule. Anything larger (>50 MB, frequent churn, binary artifacts) goes through DVC or git-lfs instead — never direct git commits.
 
 ```gitignore
-# Data — entire directory is local-only
-data/
+# Raw / external data — never committed (bulky, usually not redistributable)
+data/raw/
+data/external/
+
+# Processed / interim data — default: ignore; opt in to specific small artifacts below
+data/interim/*
+data/processed/*
 !data/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+# Allow small cleaned Parquet to be committed (see data-science-data-versioning
+# for size guidance — under ~10 MB, rare changes). Larger artifacts belong in
+# DVC or git-lfs.
+!data/interim/*.parquet
+!data/processed/*.parquet
 
 # Model artifacts — tracked via DVC or git-lfs, not raw binaries
 models/
@@ -63,7 +77,6 @@ models/
 !models/**/*.dvc
 
 # Common large binary formats (defense in depth — catch anything dropped elsewhere)
-*.parquet
 *.feather
 *.joblib
 *.pt
@@ -91,7 +104,9 @@ __pycache__/
 !.env.example
 ```
 
-The `!data/.gitkeep` pattern keeps the empty directory in git so clones of the repo retain the structure. For versioned datasets and models, see `data-versioning` — DVC or git-lfs pointers are committed, the binaries themselves live in remote storage. Prefer `joblib` or framework-native formats (`.pt`, `.onnx`) over stdlib pickle for model artifacts — pickle loads execute arbitrary code, so a model file from an untrusted source becomes an RCE vector.
+Two things are load-bearing in this snippet. First, `*.parquet` is **not** in the blanket block-list — we want `data/interim/*.parquet` to match as "allowed" once the un-ignore rules kick in. Second, the `!data/interim/*.parquet` and `!data/processed/*.parquet` patterns mean processed Parquet is committable **by default** at this layer; the policy choice of whether to actually commit a given file is made at `git add` time, not in `.gitignore`. If your team's policy is DVC-first for every dataset, drop those `!…*.parquet` lines. The `!data/.gitkeep` family keeps the directories present in fresh clones.
+
+For versioned datasets and models, see `data-science-data-versioning` — DVC or git-lfs pointers are committed, the binaries themselves live in remote storage. Prefer `joblib` or framework-native formats (`.pt`, `.onnx`) over stdlib pickle for model artifacts — pickle loads execute arbitrary code, so a model file from an untrusted source becomes an RCE vector.
 
 ### Notebooks → src/ promotion
 
