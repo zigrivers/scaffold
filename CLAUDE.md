@@ -115,13 +115,15 @@ Before pushing, review `git diff origin/main...HEAD` against CLAUDE.md and docs/
 
 **Mandatory after `gh pr create`** — run all three code review channels before
 moving to the next task. A PostToolUse hook on `gh pr create` will remind you.
-**Optional but supported** for any non-PR target: uncommitted changes, a branch
-diff, a specific diff file, or an arbitrary document. The MMR CLI accepts any
-of these — the "3-channel review" is not gated to PRs.
+**Optional but supported** for any non-PR target: staged changes, an unstaged
+working tree, a branch diff, a specific diff file, or an arbitrary document.
+The MMR CLI accepts any of these — the "3-channel review" is not gated to PRs.
 
 **Entry points by target:**
 - PR → `scaffold run review-pr` (or `mmr review --pr <number>`)
-- Local code before commit → `scaffold run review-code` (or `mmr review --staged`)
+- Local code before commit → `scaffold run review-code` (recommended — covers
+  staged + unstaged). Direct-CLI equivalents: `mmr review --staged` for staged
+  only, or `git diff HEAD | mmr review --diff -` to include unstaged edits.
 - Branch diff → `mmr review --base <ref> --head <ref>`
 - Single file / document / arbitrary diff → `mmr review --diff <path>`
   (use `--diff -` for stdin)

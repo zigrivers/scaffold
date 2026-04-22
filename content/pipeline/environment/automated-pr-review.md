@@ -133,9 +133,10 @@ markers, replace it in place and add the markers.
 
 <!-- scaffold:automated-pr-review:claude-md start -->
 **Mandatory after `gh pr create`** — run `/scaffold:review-pr <PR#>` to execute
-all three review channels (Codex CLI, Gemini CLI, Superpowers code-reviewer).
-Fix P0/P1/P2 findings before moving to the next task. A post-hook on
-`gh pr create` will remind you.
+all three review channels (Codex CLI, Gemini CLI, Claude CLI), plus the
+Superpowers code-reviewer agent as a complementary 4th channel. Fix P0/P1/P2
+findings before moving to the next task. A post-hook on `gh pr create` will
+remind you.
 
 **Optional but supported** for non-PR targets — the same three-channel review
 works on any diff or file. Call `mmr review` directly or use `scaffold run
@@ -144,10 +145,11 @@ review-code` for local pre-commit review. The review is not PR-gated.
 | When | Command |
 |------|---------|
 | After creating a PR | `/scaffold:review-pr <PR#>` |
-| Before commit / push (local code) | `scaffold run review-code` |
+| Before commit / push (local code, staged + unstaged) | `scaffold run review-code` |
 | Specific file or document | `mmr review --diff <path> --sync --format json` |
 | Branch diff | `mmr review --base <ref> --head <ref> --sync --format json` |
-| Staged changes | `mmr review --staged --sync --format json` |
+| Staged changes only | `mmr review --staged --sync --format json` |
+| Unstaged working tree | `git diff HEAD \| mmr review --diff - --sync --format json` |
 | Dual-model CLI only (no reconciliation) | `scripts/cli-pr-review.sh <PR#>` |
 <!-- scaffold:automated-pr-review:claude-md end -->
 ```
