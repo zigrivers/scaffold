@@ -1214,7 +1214,9 @@ channels:
     command: claude -p
     auth:
       check: "claude -p 'respond with ok' 2>/dev/null"
-      timeout: 5
+      # Claude's auth probe is a full LLM round-trip (not a local status
+      # check) and routinely takes 9-14s, so 20s is the realistic default.
+      timeout: 20
       failure_exit_codes: [1]
       recovery: "Run: claude login"
 
@@ -1223,6 +1225,10 @@ channels:
     command: gemini -p
     flags:
       - "--approval-mode yolo"
+    auth:
+      # Gemini's auth probe is also a full LLM round-trip; same reasoning.
+      # Codex stays at the 5s default because its check is a local file probe.
+      timeout: 20
       - "--output-format json"
     env:
       NO_BROWSER: "true"
@@ -1285,11 +1291,12 @@ When multiple channels return findings, mmr applies consensus rules:
 
 | Scenario | Confidence | Action |
 |----------|-----------|--------|
-| Both models flag the same issue | **High** | Fix immediately |
-| Both models approve | **High** | Proceed confidently |
-| One flags P0, other approves | **High** | Fix it (P0 is critical) |
-| One flags P1, other approves | **Medium** | Review before fixing |
-| Models contradict each other | **Low** | Present both to user |
+| 2+ channels flag the same issue | **High** | Fix immediately |
+| All channels approve | **High** | Proceed confidently |
+| One channel flags P0, others approve | **High** | Fix it (P0 is critical) |
+| One channel flags P1, others approve | **Medium** | Review before fixing |
+| Channels contradict each other | **Low** | Present all perspectives to user |
+| Compensating-pass P0/P1/P2 finding | **Single-source** | Fix per normal thresholds, label as compensating |
 
 Scaffold verifies CLI authentication before every dispatch. If a token has expired, it tells you and provides the command to re-authenticate — it never silently skips a review.
 
