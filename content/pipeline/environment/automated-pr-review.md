@@ -53,7 +53,7 @@ review-fix loop locally.
 - (mvp) Post-PR-creation hook configured in settings to remind agents to run review-pr
 - (deep) Legacy GitHub Actions workflows detected and cleanup offered
 - (deep) Three-CLI review (Codex, Gemini, Claude) enabled when all three CLIs available, with per-channel auth checks and compensating passes
-- (deep) Scaffold wrappers (review-pr, review-code, post-implementation-review) add the Superpowers code-reviewer agent as a complementary 4th channel and reconcile its findings through MMR
+- (deep) The MMR scaffold wrappers (review-pr, review-code) add the Superpowers code-reviewer agent as a complementary 4th channel and reconcile its findings through MMR. `post-implementation-review` follows a separate channel layout (Codex + Gemini + Superpowers, with optional `mmr reconcile` injection) and is not one of the MMR wrappers.
 
 ## Methodology Scaling
 - **deep**: Full setup with local three-CLI review dispatched through MMR

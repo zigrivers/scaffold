@@ -69,13 +69,16 @@ invocation that matches the scope the user asked for:
 # `mmr review` with no input flags defaults to `git diff` alone
 # (unstaged only), so we MUST synthesize the combined bundle explicitly
 # and pipe it in via --diff -:
-# Resolve the base ref using the same precedence as the manual fallback
-# below (Mode C). Prefer the explicit upstream, then origin/HEAD, then
-# origin/main, main, master, and finally HEAD~1. If none exist, fall
-# through to HEAD (working-tree-only review against the last commit).
+# Resolve the TRUNK ref (not the branch's own upstream — we want the
+# full delivery candidate, not just un-pushed work). Precedence:
+# origin/HEAD (the remote's default branch) → origin/main → main →
+# origin/master → master → HEAD~1 → HEAD (working-tree-only fallback).
+# NOTE: do NOT use `@{u}` / branch upstream here — on a feature branch
+# that tracks `origin/<branch>`, `@{u}` is that remote branch, so
+# diffing against its merge-base would silently exclude already-pushed
+# branch commits from the review.
 BASE_REF=""
-if   UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null) && [ -n "$UPSTREAM" ]; then BASE_REF="$UPSTREAM"
-elif ORIGIN_HEAD=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null); then BASE_REF="${ORIGIN_HEAD#refs/remotes/}"
+if   ORIGIN_HEAD=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null); then BASE_REF="${ORIGIN_HEAD#refs/remotes/}"
 elif git rev-parse --verify origin/main   >/dev/null 2>&1; then BASE_REF=origin/main
 elif git rev-parse --verify main          >/dev/null 2>&1; then BASE_REF=main
 elif git rev-parse --verify origin/master >/dev/null 2>&1; then BASE_REF=origin/master
