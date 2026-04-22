@@ -83,12 +83,14 @@ elif git rev-parse --verify master        >/dev/null 2>&1; then BASE_REF=master
 elif git rev-parse --verify HEAD~1        >/dev/null 2>&1; then BASE_REF=HEAD~1
 else                                                           BASE_REF=HEAD
 fi
-# Single diff covering committed branch work + staged + unstaged in
-# one coherent BASE_REF → working-tree patch. `git diff <ref>` compares
-# <ref> to the working tree (including the index), so repeated edits
-# to the same file collapse into one correct final patch rather than
-# concatenated intermediate-state hunks.
-git diff "$BASE_REF" | mmr review --diff - --sync --format json
+# Compute the merge-base so we only review the local delivery candidate,
+# not unrelated upstream changes that have accumulated on BASE_REF since
+# the branch diverged. `git diff <merge-base>` then compares that point
+# to the working tree (including the index), giving one coherent patch
+# that covers committed branch work + staged + unstaged edits, with
+# repeated edits to the same file collapsed into a single final hunk.
+MERGE_BASE=$(git merge-base "$BASE_REF" HEAD 2>/dev/null || echo "$BASE_REF")
+git diff "$MERGE_BASE" | mmr review --diff - --sync --format json
 
 # Staged changes only:
 mmr review --staged --sync --format json
@@ -138,11 +140,14 @@ Determine the delivery candidate to review.
 
 #### Mode A: Explicit ref range
 
-If both `BASE_REF` and `HEAD_REF` are provided:
+If `BASE_REF` is provided (with or without `HEAD_REF`):
 
 ```bash
 git rev-parse --verify "$BASE_REF"
-git rev-parse --verify "$HEAD_REF"
+# When --head is omitted, default head to HEAD so the base-only form
+# mirrors the MMR primary path (`mmr review --base <ref>`).
+HEAD_REF="${HEAD_REF:-HEAD}"
+[ "$HEAD_REF" != "HEAD" ] && git rev-parse --verify "$HEAD_REF"
 REVIEW_DIFF=$(git diff "$BASE_REF...$HEAD_REF")
 CHANGED_FILES=$(git diff --name-only "$BASE_REF...$HEAD_REF")
 ```
