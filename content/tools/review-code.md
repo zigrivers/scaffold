@@ -60,15 +60,40 @@ brand-new files.
 
 ### Primary: MMR CLI + Agent Reconcile
 
-When the MMR CLI is installed, use it as the primary entry point:
+When the MMR CLI is installed, use it as the primary entry point. Pick the
+invocation that matches the scope the user asked for:
 
 ```bash
-# Staged changes
+# Default (no flags) — full local delivery candidate:
+# committed branch diff (vs origin/main or main) + staged + unstaged.
+# `mmr review` with no input flags defaults to `git diff` alone
+# (unstaged only), so we MUST synthesize the combined bundle explicitly
+# and pipe it in via --diff -:
+BASE_REF=$(git rev-parse --verify origin/main 2>/dev/null && echo origin/main \
+  || git rev-parse --verify main 2>/dev/null && echo main \
+  || echo HEAD)
+{
+  [ "$BASE_REF" != "HEAD" ] && git diff "$BASE_REF...HEAD"
+  git diff --cached
+  git diff
+} | mmr review --diff - --sync --format json
+
+# Staged changes only:
 mmr review --staged --sync --format json
 
-# Branch diff against main
+# Branch diff against main (committed only, no staged/unstaged):
 mmr review --base main --sync --format json
+
+# Explicit ref range:
+mmr review --base <base-ref> --head <head-ref> --sync --format json
 ```
+
+Routing rules:
+- If `--staged` flag passed to the tool → use the `--staged` MMR invocation
+- If `--base`/`--head` flags passed → use the ref-range MMR invocation
+- Otherwise (no flags) → use the synthesized full-delivery-candidate form
+  above. Do NOT fall back to bare `mmr review` — it would miss committed
+  and staged work.
 
 After the CLI review completes, dispatch the agent's code-reviewer skill (4th channel) and inject findings into the MMR job for unified reconciliation:
 
