@@ -157,7 +157,7 @@ review-code` for local pre-commit review. The review is not PR-gated.
 | When | Command |
 |------|---------|
 | After creating a PR | `/scaffold:review-pr <PR#>` |
-| Before commit / push (local code: staged, unstaged, and untracked) | `scaffold run review-code` |
+| Before commit / push (tracked local code: committed + staged + unstaged) | `scaffold run review-code` |
 | Changes to a specific tracked file or doc | `git diff HEAD -- <path> \| mmr review --diff - --sync --format json` |
 | Untracked / brand-new file | `(diff -u /dev/null <path> \|\| true) \| mmr review --diff - --sync --format json` |
 | Branch diff | `mmr review --base <ref> --head <ref> --sync --format json` |

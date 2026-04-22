@@ -130,10 +130,11 @@ file directly rather than assuming it matches this pattern.)
 **Entry points by target:**
 - PR → `scaffold run review-pr` (or `mmr review --pr <number>`)
 - Local code before commit → `scaffold run review-code` (recommended — covers
-  staged, unstaged, **and untracked** files). Direct-CLI equivalents:
-  `mmr review --staged` for staged only, or `git diff HEAD | mmr review --diff -`
-  for all **tracked** uncommitted changes (this does not include untracked
-  files; use `review-code` for full worktree coverage).
+  the committed branch diff plus staged and unstaged changes to tracked files).
+  Direct-CLI equivalents: `mmr review --staged` for staged only, or
+  `git diff HEAD | mmr review --diff -` for all tracked uncommitted changes.
+  **Untracked / brand-new files are not reviewed by `review-code`** — use the
+  `(diff -u /dev/null <path> || true) | mmr review --diff -` pattern below.
 - Branch diff → `mmr review --base <ref> --head <ref>`
 - Changes to a specific file or doc →
   `git diff HEAD -- path/to/file.md | mmr review --diff -`

@@ -202,9 +202,9 @@ When the user asks "what tools are available?", "what can I build?", or "show me
 | `scaffold run update` | Update scaffold to the latest version |
 | `scaffold run dashboard` | Open a visual progress dashboard in your browser |
 | `scaffold run prompt-pipeline` | Print the full pipeline reference table |
-| `scaffold run review-code` | Run all 3 CLI review channels (Codex CLI, Gemini CLI, Claude CLI) on local code before commit or push, plus Superpowers code-reviewer as a complementary 4th channel |
+| `scaffold run review-code` | Run all 3 CLI review channels (Codex CLI, Gemini CLI, Claude CLI) on tracked local code (committed branch diff + staged + unstaged — no untracked files) before commit or push, plus Superpowers code-reviewer as a complementary 4th channel |
 | `scaffold run review-pr` | Run all 3 code review channels (Codex CLI, Gemini CLI, Claude CLI) on a PR, plus Superpowers code-reviewer as a complementary 4th channel |
-| `scaffold run post-implementation-review` | Full codebase review (Codex, Gemini, Claude CLIs + Superpowers code-reviewer) after an AI agent completes all tasks |
+| `scaffold run post-implementation-review` | Full codebase review (Codex CLI, Gemini CLI, Superpowers code-reviewer) after an AI agent completes all tasks |
 | `scaffold run session-analyzer` | Analyze Claude Code session logs for patterns and insights |
 
 **Display rules:**
@@ -379,9 +379,10 @@ All review and validation steps support independent multi-model validation at de
 
 #### Path A: MMR-backed review (PREFERRED — always use for these steps)
 
-Applies to: `scaffold run review-pr`, `scaffold run review-code`, `scaffold run post-implementation-review`, and any pipeline review step that invokes `mmr review`.
+Applies to: `scaffold run review-pr`, `scaffold run review-code`, and any pipeline review step that invokes `mmr review` directly.
 
 - **Channel model:** three CLIs (Codex + Gemini + Claude) dispatched and reconciled by the MMR CLI; scaffold wrappers add the Superpowers code-reviewer agent as a complementary 4th channel reconciled into the same MMR job via `mmr reconcile`.
+- **Note:** `scaffold run post-implementation-review` follows a different channel layout (raw-CLI dispatch of Codex + Gemini + Superpowers, with optional `mmr reconcile` injection if a prior `mmr review` job exists). Treat it as its own path — consult `content/tools/post-implementation-review.md` for specifics.
 - **Invocation:** go through the wrapper (`scaffold run …`) or call `mmr review …` directly. Do NOT shell out to `codex`/`gemini`/`claude` yourself for these steps — MMR handles dispatch, parsing, compensating passes, and verdict.
 - **Auth pre-flight:** run `mmr config test` once per session — it probes all three CLIs and reports status in one call.
 - **If auth fails** for any channel, surface recovery commands to the user: `! codex login`, `! gemini -p "hello"`, or `! claude login`. MMR will emit a compensating pass (via `claude -p`) for each missing external channel, labelled `[compensating: Codex-equivalent]` / `[compensating: Gemini-equivalent]`. Maximum achievable verdict in that case is `degraded-pass`.
