@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [1.2.1] — 2026-04-27
 
 ### Fixed
 - `mmr review --diff -` and `mmr reconcile ... --input -` now accept the bare `-` token for stdin when written with a space separator. Previously yargs treated the `-` as an unknown positional and rejected the command unless callers used `--diff=-` / `--input=-`. This unblocks the `git diff HEAD | mmr review --diff -` pattern documented in CLAUDE.md.

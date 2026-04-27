@@ -4,6 +4,14 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+### Notes
+- Bundled `@zigrivers/mmr` 1.2.0 → 1.2.1 (patch). Fixes a yargs argparse bug
+  where `mmr review --diff -` and `mmr reconcile … --input -` (with a space
+  before `-`) were rejected as `Unknown argument: -`. The equals form
+  (`--diff=-`) was unaffected. Restores the documented
+  `git diff HEAD | mmr review --diff -` pattern. Released independently as
+  tag `mmr-v1.2.1`; no scaffold version bump.
+
 ## [3.24.0] — 2026-04-22
 
 ### Changed
