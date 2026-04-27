@@ -1,6 +1,6 @@
 {
   "name": "@zigrivers/mmr",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Multi-model code review CLI — async dispatch, reconciliation, and severity gating",
   "type": "module",
   "license": "MIT",
