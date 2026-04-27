@@ -39,6 +39,14 @@ describe('review command argv parsing', () => {
     const args = parse(reviewCommand, ['review', '--diff', '/tmp/x.patch'])
     expect(args.diff).toBe('/tmp/x.patch')
   })
+
+  it('rejects a trailing "--diff" with no value', () => {
+    expect(() => parse(reviewCommand, ['review', '--diff'])).toThrow()
+  })
+
+  it('rejects "--diff" followed by another flag (no silent flag-swallowing)', () => {
+    expect(() => parse(reviewCommand, ['review', '--diff', '--pr', '5'])).toThrow()
+  })
 })
 
 describe('reconcile command argv parsing', () => {
@@ -54,5 +62,24 @@ describe('reconcile command argv parsing', () => {
       'reconcile', 'mmr-abc', '--channel', 'superpowers', '--input=-',
     ])
     expect(args.input).toBe('-')
+  })
+
+  it('accepts a normal file path for --input', () => {
+    const args = parse(reconcileCommand, [
+      'reconcile', 'mmr-abc', '--channel', 'superpowers', '--input', '/tmp/findings.json',
+    ])
+    expect(args.input).toBe('/tmp/findings.json')
+  })
+
+  it('rejects a trailing "--input" with no value', () => {
+    expect(() => parse(reconcileCommand, [
+      'reconcile', 'mmr-abc', '--channel', 'superpowers', '--input',
+    ])).toThrow()
+  })
+
+  it('rejects "--input" followed by another flag (no silent flag-swallowing)', () => {
+    expect(() => parse(reconcileCommand, [
+      'reconcile', 'mmr-abc', '--input', '--channel', 'superpowers',
+    ])).toThrow()
   })
 })
