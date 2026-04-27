@@ -73,6 +73,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     yargs
       .option('diff', {
         type: 'string',
+        requiresArg: true,
         describe: 'Path to diff file, or - for stdin',
       })
       .option('pr', {
