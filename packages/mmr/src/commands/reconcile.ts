@@ -32,6 +32,7 @@ export const reconcileCommand: CommandModule<object, ReconcileArgs> = {
       .option('input', {
         type: 'string',
         demandOption: true,
+        requiresArg: true,
         describe: 'Findings: file path, - for stdin, or inline JSON',
       })
       .option('format', {
