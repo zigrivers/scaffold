@@ -4,6 +4,15 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+### Notes
+- Bundled `@zigrivers/mmr` 1.2.1 → 1.2.2 (patch). Two fixes:
+  (1) default `gemini` channel command was `'gemini -p'` and failed
+  every dispatch in 0s because `-p` requires a positional value while
+  MMR pipes prompts via stdin; (2) per-channel `error` field now
+  includes the captured stderr / spawn-error log instead of a generic
+  `"Channel failed"` string. Released independently as tag
+  `mmr-v1.2.2`; no scaffold version bump.
+
 ## [3.24.1] — 2026-04-27
 
 ### Fixed

@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.2.2] — 2026-04-27
+
+### Fixed
+- **Default `gemini` channel command was broken — channel failed every dispatch in 0s.**
+  `BUILTIN_CHANNELS.gemini.command` was `'gemini -p'`. The `-p`/`--prompt`
+  flag *requires* a positional value, but MMR delivers prompts via stdin.
+  With `gemini -p --output-format json` and prompt on stdin, gemini parsed
+  `--output-format` as `-p`'s value and bailed out with
+  `Not enough arguments following: p`, failing the channel in 0s every
+  time. Default command is now just `'gemini'` so gemini reads stdin
+  natively. Auth probe at `auth.check` keeps `-p "respond with ok"` since
+  that supplies an explicit value. Reproduced across 4 real MMR jobs
+  before the fix; verified via local-build smoke test (gemini now
+  completes in ~14s with valid output).
+- **Channel logs were captured but never surfaced in the failure error.**
+  The dispatcher wrote stderr / spawn-error detail to `<channel>.log`
+  via `saveChannelLog`, but `runResultsPipeline` only emitted a generic
+  `"Channel failed"` / `"Channel timed out"` and ignored the log.
+  Consumers had no way to diagnose failures without manually reading
+  `~/.mmr/jobs/<id>/channels/<name>.log`. Now `JobStore.loadChannelLog`
+  pulls the saved log and the per-channel `error` field includes the
+  first 1000 chars of stderr / spawn-error text, with a single `…`
+  truncation marker. Whitespace-only logs and missing logs fall through
+  cleanly to the base message.
+
 ## [1.2.1] — 2026-04-27
 
 ### Fixed
