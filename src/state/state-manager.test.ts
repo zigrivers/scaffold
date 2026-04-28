@@ -367,6 +367,111 @@ describe('StateManager', () => {
       const changed = manager.reconcileWithPipeline(pipelineSteps)
       expect(changed).toBe(false)
     })
+
+    it('prunes pending state entries for steps that are now disabled', () => {
+      // Repro: project once had a step enabled (e.g., methodology change or
+      // project-type switch), state.json got a pending entry, then the step
+      // became disabled. The stale entry should be cleaned up.
+      const tempDir = makeTempDir()
+      const manager = new StateManager(tempDir, computeEligible)
+      manager.initializeState({
+        ...INIT_OPTIONS,
+        enabledSteps: [
+          { slug: 'create-prd', produces: ['docs/prd.md'] },
+          { slug: 'create-architecture', produces: ['docs/architecture.md'] },
+          { slug: 'performance-budgets', produces: ['docs/performance-budgets.md'] },
+        ],
+      })
+
+      const pipelineSteps = [
+        { slug: 'create-prd', produces: ['docs/prd.md'], enabled: true },
+        { slug: 'create-architecture', produces: ['docs/architecture.md'], enabled: true },
+        { slug: 'performance-budgets', produces: ['docs/performance-budgets.md'], enabled: false },
+      ]
+
+      const changed = manager.reconcileWithPipeline(pipelineSteps)
+      expect(changed).toBe(true)
+
+      const state = manager.loadState()
+      expect(state.steps['performance-budgets']).toBeUndefined()
+      expect(state.steps['create-prd']).toBeDefined()
+    })
+
+    it('preserves completed entries for steps that became disabled (history)', () => {
+      const tempDir = makeTempDir()
+      const manager = new StateManager(tempDir, computeEligible)
+      manager.initializeState({
+        ...INIT_OPTIONS,
+        enabledSteps: [
+          { slug: 'create-prd', produces: ['docs/prd.md'] },
+          { slug: 'old-step', produces: ['docs/old.md'] },
+        ],
+      })
+      manager.setInProgress('old-step', 'agent-1')
+      manager.markCompleted('old-step', ['docs/old.md'], 'agent-1', 3)
+
+      const pipelineSteps = [
+        { slug: 'create-prd', produces: ['docs/prd.md'], enabled: true },
+        { slug: 'old-step', produces: ['docs/old.md'], enabled: false },
+      ]
+
+      const changed = manager.reconcileWithPipeline(pipelineSteps)
+      expect(changed).toBe(false)
+
+      const state = manager.loadState()
+      expect(state.steps['old-step']).toBeDefined()
+      expect(state.steps['old-step'].status).toBe('completed')
+    })
+
+    it('preserves skipped entries for steps that became disabled (audit)', () => {
+      const tempDir = makeTempDir()
+      const manager = new StateManager(tempDir, computeEligible)
+      manager.initializeState({
+        ...INIT_OPTIONS,
+        enabledSteps: [
+          { slug: 'create-prd', produces: ['docs/prd.md'] },
+          { slug: 'old-step', produces: ['docs/old.md'] },
+        ],
+      })
+      manager.markSkipped('old-step', 'not applicable', 'user')
+
+      const pipelineSteps = [
+        { slug: 'create-prd', produces: ['docs/prd.md'], enabled: true },
+        { slug: 'old-step', produces: ['docs/old.md'], enabled: false },
+      ]
+
+      const changed = manager.reconcileWithPipeline(pipelineSteps)
+      expect(changed).toBe(false)
+
+      const state = manager.loadState()
+      expect(state.steps['old-step']).toBeDefined()
+      expect(state.steps['old-step'].status).toBe('skipped')
+    })
+
+    it('preserves in_progress entries for steps that became disabled (active work)', () => {
+      const tempDir = makeTempDir()
+      const manager = new StateManager(tempDir, computeEligible)
+      manager.initializeState({
+        ...INIT_OPTIONS,
+        enabledSteps: [
+          { slug: 'create-prd', produces: ['docs/prd.md'] },
+          { slug: 'old-step', produces: ['docs/old.md'] },
+        ],
+      })
+      manager.setInProgress('old-step', 'agent-1')
+
+      const pipelineSteps = [
+        { slug: 'create-prd', produces: ['docs/prd.md'], enabled: true },
+        { slug: 'old-step', produces: ['docs/old.md'], enabled: false },
+      ]
+
+      const changed = manager.reconcileWithPipeline(pipelineSteps)
+      expect(changed).toBe(false)
+
+      const state = manager.loadState()
+      expect(state.steps['old-step']).toBeDefined()
+      expect(state.steps['old-step'].status).toBe('in_progress')
+    })
   })
 
   describe('atomic writes', () => {
