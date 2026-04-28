@@ -150,21 +150,29 @@ describe('skip command', () => {
     // of pulling new pipeline steps into state. Without this call,
     // `scaffold skip <new-step>` would fail with DEP_TARGET_MISSING for
     // a step added in a recent scaffold version upgrade.
-    const reconcileFn = vi.fn(() => true)
+    //
+    // Round-3 Codex P2: the previous shape of this test always returned
+    // the same post-reconcile state, so it would still have passed if
+    // skip.ts performed the existence check before reconcile. Now the
+    // mock loadState returns DIFFERENT state depending on whether
+    // reconcileWithPipeline has been called yet. If skip.ts ever
+    // regresses to checking existence first, the second loadState (in
+    // the existence-check branch) returns a state with no newly-added
+    // entry → the skip would fail with DEP_TARGET_MISSING and
+    // markSkipped wouldn't be called.
+    let reconciled = false
+    const reconcileFn = vi.fn(() => { reconciled = true; return true })
     const markSkippedFn = vi.fn()
+    const loadStateFn = vi.fn(() =>
+      makeState({
+        steps: reconciled
+          ? { 'newly-added-step': { status: 'pending', source: 'pipeline', produces: [] } }
+          : {},
+        next_eligible: [],
+      }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
+    )
     MockStateManager.mockImplementation(() => ({
-      loadState: vi.fn(() =>
-        makeState({
-          // Brand-new pipeline step that was never in state pre-call.
-          // After reconcile runs, the entry is added as pending — so
-          // by the time the existence check at skip.ts:126 fires, the
-          // slug is in state.steps and the skip proceeds.
-          steps: {
-            'newly-added-step': { status: 'pending', source: 'pipeline', produces: [] },
-          },
-          next_eligible: [],
-        }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
-      ),
+      loadState: loadStateFn,
       markSkipped: markSkippedFn,
       reconcileWithPipeline: reconcileFn,
     }) as unknown as InstanceType<typeof StateManager>)
@@ -181,6 +189,11 @@ describe('skip command', () => {
     await skipCommand.handler(argv as Parameters<typeof skipCommand.handler>[0])
 
     expect(reconcileFn).toHaveBeenCalledTimes(1)
+    // Lock in call order: reconcile must precede the loadState that
+    // feeds the existence check. invocationCallOrder is a global
+    // monotonic counter across all vitest mocks.
+    expect(reconcileFn.mock.invocationCallOrder[0])
+      .toBeLessThan(loadStateFn.mock.invocationCallOrder[0])
     expect(markSkippedFn).toHaveBeenCalledWith('newly-added-step', 'no longer applicable', 'scaffold-skip')
   })
 
