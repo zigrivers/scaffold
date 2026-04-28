@@ -10,7 +10,7 @@ conditional: null
 stateless: true
 category: tool
 knowledge-base: [multi-model-review-dispatch, automated-review-tooling]
-argument-hint: "[--base <ref>] [--head <ref>] [--staged] [--report-only]"
+argument-hint: "[--base <ref>] [--head <ref>] [--staged] [--report-only] [--fix-threshold P0|P1|P2|P3]"
 ---
 
 ## Purpose
@@ -44,6 +44,7 @@ brand-new files.
   - `--head <ref>` — explicit head ref for diff review
   - `--staged` — review only staged changes (`git diff --cached`)
   - `--report-only` — collect findings and verdict, but do not apply fixes
+  - `--fix-threshold P0|P1|P2|P3` — override the project's configured threshold for this run
 - `docs/coding-standards.md` (required) — coding conventions for review context
 - `docs/tdd-standards.md` (optional) — test expectations
 - `docs/review-standards.md` (optional) — severity definitions and review criteria
@@ -62,6 +63,14 @@ brand-new files.
 
 When the MMR CLI is installed, use it as the primary entry point. Pick the
 invocation that matches the scope the user asked for:
+
+A common helper across all four invocation modes — set `MMR_FLAGS` once
+and reuse it:
+
+```bash
+MMR_FLAGS=(--sync --format json)
+[ -n "$FIX_THRESHOLD" ] && MMR_FLAGS+=(--fix-threshold "$FIX_THRESHOLD")
+```
 
 ```bash
 # Default (no flags) — full local delivery candidate:
@@ -93,16 +102,16 @@ fi
 # that covers committed branch work + staged + unstaged edits, with
 # repeated edits to the same file collapsed into a single final hunk.
 MERGE_BASE=$(git merge-base "$BASE_REF" HEAD 2>/dev/null || echo "$BASE_REF")
-git diff "$MERGE_BASE" | mmr review --diff - --sync --format json
+git diff "$MERGE_BASE" | mmr review --diff - "${MMR_FLAGS[@]}"
 
 # Staged changes only:
-mmr review --staged --sync --format json
+mmr review --staged "${MMR_FLAGS[@]}"
 
 # Branch diff against main (committed only, no staged/unstaged):
-mmr review --base main --sync --format json
+mmr review --base main "${MMR_FLAGS[@]}"
 
 # Explicit ref range:
-mmr review --base <base-ref> --head <head-ref> --sync --format json
+mmr review --base <base-ref> --head <head-ref> "${MMR_FLAGS[@]}"
 ```
 
 Routing rules:
@@ -133,6 +142,14 @@ Parse `$ARGUMENTS` and set:
 - `STAGED_ONLY=true` if `$ARGUMENTS` contains `--staged`
 - `BASE_REF` from `--base <ref>` if present
 - `HEAD_REF` from `--head <ref>` if present
+- `FIX_THRESHOLD` from `--fix-threshold <value>` if present (must match `P0`, `P1`, `P2`, or `P3`); leave empty to defer to `.mmr.yaml`/built-in default
+
+```bash
+FIX_THRESHOLD=""
+if [[ "$ARGUMENTS" =~ (^|[[:space:]])--fix-threshold[[:space:]]+(P[0-3])($|[[:space:]]) ]]; then
+  FIX_THRESHOLD="${BASH_REMATCH[2]}"
+fi
+```
 
 If `--head` is provided without `--base`, stop and tell the user both refs are
 required for explicit-range review.
@@ -312,14 +329,14 @@ clean ref range exists.
 All channels should receive an equivalent prompt bundle built from the local review scope:
 
 ```text
-You are reviewing local code changes before commit or push. Report only P0, P1,
-and P2 issues.
+You are reviewing local code changes before commit or push. Report all P0, P1,
+P2, and P3 findings; the project's fix threshold is applied downstream.
 
 ## Scope
 [scope label]
 
 ## Review Standards
-[docs/review-standards.md if present, otherwise define P0/P1/P2]
+[docs/review-standards.md if present, otherwise define P0–P3]
 
 ## Coding Standards
 [docs/coding-standards.md]
@@ -342,7 +359,7 @@ Respond with JSON:
   "approved": true/false,
   "findings": [
     {
-      "severity": "P0" | "P1" | "P2",
+      "severity": "P0" | "P1" | "P2" | "P3",
       "location": "file:line or section",
       "description": "what is wrong",
       "suggestion": "specific fix"
@@ -364,7 +381,7 @@ Use these rules:
 | Any single P2 | Fix unless clearly inapplicable; if disputed, surface to user |
 | All executed channels approve | Candidate passes review |
 | Strong contradiction on a medium-severity issue | Verdict becomes `needs-user-decision` |
-| Compensating-pass P0/P1/P2 finding | Single-source confidence — fix per normal thresholds, but label as compensating in summary |
+| Compensating-pass blocking finding | Single-source confidence — fix per normal thresholds, but label as compensating in summary |
 
 ### Step 7: Apply Fixes Unless in Report-Only Mode
 
@@ -374,10 +391,10 @@ If `REPORT_ONLY=true`:
 - Stop
 
 Otherwise:
-1. Fix all P0/P1/P2 findings
+1. Fix all findings at or above `fix_threshold` (read from `results.fix_threshold` in the verdict JSON; default `P2`)
 2. Re-run the channels that produced findings
 3. Keep iterating as long as each new round surfaces *different, concrete, fixable* findings — that is healthy review/fix iteration, not a stuck loop
-4. The 3-round limit is **per finding**: stop and surface to the user when the *same* P0/P1/P2 finding (or set) recurs across 3 attempts without progress. Other stop conditions: a finding is genuinely ambiguous (channels contradict each other), or the user explicitly asks to stop. Use verdict `needs-user-decision` for ambiguity, `blocked` for stuck-loop cases.
+4. The 3-round limit is **per finding**: stop and surface to the user when the *same* blocking finding (or set) recurs across 3 attempts without progress. Other stop conditions: a finding is genuinely ambiguous (channels contradict each other), or the user explicitly asks to stop. Use verdict `needs-user-decision` for ambiguity, `blocked` for stuck-loop cases.
 
 **Fix cycle channel rule:** Re-run only channels that originally completed or ran as compensating passes. Never retry a channel marked `not_installed`, `auth_failed`, or `timeout` during fix rounds — its availability does not change within a session.
 
@@ -385,9 +402,9 @@ Otherwise:
 
 Return exactly one verdict:
 
-- `pass` — all channels completed with `full` coverage, no unresolved P0/P1/P2
-- `degraded-pass` — at least one channel was skipped/compensated (coverage is not all `full`), but all executed and compensating channels have no unresolved P0/P1/P2
-- `blocked` — gate failed: at least one unresolved finding sits at or above the fix threshold (typically the *same* finding(s) remain unresolved after 3 fix attempts; default threshold is `P2`, so this means an unresolved P0/P1/P2)
+- `pass` — all channels completed with `full` coverage, no unresolved findings at or above `fix_threshold`
+- `degraded-pass` — at least one channel was skipped/compensated (coverage is not all `full`), but all executed and compensating channels have no unresolved findings at or above `fix_threshold`
+- `blocked` — gate failed: at least one unresolved finding sits at or above the fix threshold (typically the *same* finding(s) remain unresolved after 3 fix attempts; the threshold defaults to `P2` but is configurable via `.mmr.yaml` or `--fix-threshold`)
 - `needs-user-decision` — no channels completed (no reconciled result was possible), reviewer disagreement / contradictions, or a finding requires human judgment that automated iteration can't resolve
 
 When compensating passes ran for any channel, the maximum achievable verdict is `degraded-pass` — never `pass`, even if all findings are resolved. When both external channels were compensated, the review summary must note: "All findings are single-model (Claude only)."
@@ -424,5 +441,5 @@ for the next delivery step (commit, push, or PR creation).
 2. **All 3 channels are mandatory** — skip only when a tool is genuinely not installed, never by choice.
 3. **Auth failures are not silent** — always surface to the user with recovery instructions.
 4. **Independence** — never share one channel's output with another.
-5. **Fix before proceeding** — P0/P1/P2 findings must be resolved before moving to the next task.
+5. **Fix before proceeding** — findings at or above `fix_threshold` must be resolved before moving to the next task.
 6. **Dispatch pattern** follows `multi-model-review-dispatch` knowledge entry. When modifying channel dispatch in this file, verify consistency with `review-pr.md` and `post-implementation-review.md`.
