@@ -41,7 +41,15 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
   },
   gemini: {
     enabled: true,
-    command: 'gemini -p',
+    // No `-p` here: gemini's `-p/--prompt` flag *requires* a positional
+    // value, but MMR delivers prompts via stdin. With `gemini -p
+    // --output-format json` and prompt on stdin, gemini parses
+    // `--output-format` as `-p`'s value and bails out with
+    // "Not enough arguments following: p", failing the channel in 0s.
+    // Without `-p`, gemini reads stdin natively. The auth probe at
+    // `auth.check` below keeps `-p "respond with ok"` because that
+    // invocation supplies an explicit prompt value.
+    command: 'gemini',
     flags: ['--output-format', 'json'],
     env: { NO_BROWSER: 'true' },
     auth: {
