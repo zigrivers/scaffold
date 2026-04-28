@@ -4,6 +4,10 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.25.0] — 2026-04-28
+
+Bundles `@zigrivers/mmr@1.3.0`.
+
 ### Added
 - **`--fix-threshold` passthrough on review wrappers.** `scaffold run review-pr`,
   `review-code`, and `post-implementation-review` now accept
