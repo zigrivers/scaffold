@@ -245,6 +245,66 @@ describe('next command', () => {
     expect(reconcileFn).not.toHaveBeenCalled()
   })
 
+  it('pipeline_complete in multi-service root mode (no --service) limits to global steps', async () => {
+    // Round-4 Codex P1: in a multi-service project, root state holds
+    // only global steps. Without restricting completion to globals,
+    // the handler would check every enabled pipeline slug and report
+    // pipeline_complete: false forever because per-service steps are
+    // tracked in service state, not root state.
+    vi.mocked(loadConfig).mockReturnValue({
+      config: {
+        version: 2, methodology: 'deep', platforms: ['claude-code'],
+        project: {
+          services: [
+            { name: 'api', projectType: 'backend', backendConfig: { apiStyle: 'rest' } },
+          ],
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      errors: [], warnings: [],
+    })
+    const metaPrompts = new Map([
+      ['global-step', makeFrontmatter('global-step', 'g', 'pre', 1)],
+      ['service-step', makeFrontmatter('service-step', 's', 'pre', 2)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
+    vi.mocked(resolvePipeline).mockReturnValueOnce({
+      graph: { nodes: new Map(), edges: new Map() },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      preset: {} as any,
+      overlay: {
+        steps: { 'global-step': { enabled: true }, 'service-step': { enabled: true } },
+        knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      stepMeta: new Map([
+        ['global-step', makeFrontmatter('global-step', 'g', 'pre', 1).frontmatter],
+        ['service-step', makeFrontmatter('service-step', 's', 'pre', 2).frontmatter],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ]) as any,
+      computeEligible: mockComputeEligible as unknown as ReturnType<
+        typeof resolvePipeline
+      >['computeEligible'],
+      globalSteps: new Set(['global-step']),
+      getPipelineHash: vi.fn((_scope) => 'test-hash-multi'),
+    })
+    // Root state has only global-step completed. service-step lives
+    // in per-service state, absent here.
+    const steps = {
+      'global-step': { status: 'completed', source: 'pipeline', produces: [] },
+    }
+    mockStateWith(MockStateManager, steps)
+    mockComputeEligible.mockReturnValue([])
+
+    mockResolveOutputMode.mockReturnValue('json')
+    await nextCommand.handler(defaultArgv({ format: 'json' }))
+    const envelope = JSON.parse(writtenLines.join(''))
+    const parsed = envelope.data ?? envelope
+    expect(parsed.pipeline_complete).toBe(true)
+  })
+
   it('pipeline_complete in --service mode excludes global steps', async () => {
     // Round-3 Codex P1: service-scoped state intentionally omits global
     // steps. With reconcile dropped, allDone was computed across every

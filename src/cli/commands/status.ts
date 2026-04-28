@@ -144,12 +144,24 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     // pending-entries are not required.
     const state = stateManager.loadState()
 
+    // Multi-service root: when config defines services[] and no
+    // --service was passed, we're operating at the root scope. Root
+    // state holds only global steps; service-local steps live in
+    // per-service state. The scope filter must skip them on every
+    // surface, and readEligible must use 'global' scope so its
+    // cached/live eligibility computation matches.
+    const isMultiServiceRoot =
+      !service && (context.config?.project?.services?.length ?? 0) > 0
+
     // Compute eligible once — readEligible returns the cached
     // next_eligible list when the graph hash (and root save_counter, for
     // service scope) still match, else falls back to a live compute.
-    const scopeOptionsForRead = service
-      ? { scope: 'service' as const, globalSteps: pipeline.globalSteps }
-      : undefined
+    const scopeOptionsForRead =
+      service
+        ? { scope: 'service' as const, globalSteps: pipeline.globalSteps }
+        : isMultiServiceRoot
+          ? { scope: 'global' as const, globalSteps: pipeline.globalSteps }
+          : undefined
     const validatedEligible = readEligible(
       state,
       pipeline,
@@ -173,12 +185,19 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     //    overlay is "not in this project". Matches the prior
     //    reconciliation default (`?? false`) so totals don't inflate.
     const { steps } = state
-    // Service-scope filter: in service mode, the service's view excludes
-    // global steps (they belong to root state). Matches the old
-    // reconcileWithPipeline behavior at state-manager.ts:229.
+    // Scope filter — three cases, matching computeEligible's scope arg
+    // (eligibility.ts:33-37) and state-manager.ts:229's reconcile path:
+    //   - service mode (--service <name>): exclude global steps;
+    //     they belong to root state.
+    //   - multi-service root mode (services[] but no --service): include
+    //     only global steps; service-local steps live in per-service
+    //     state and shouldn't inflate root totals.
+    //   - flat / single-project mode (no services[]): include
+    //     everything (no scope concept).
     const isInScope = (slug: string): boolean => {
-      if (!service) return true
-      return !pipeline.globalSteps.has(slug)
+      if (service) return !pipeline.globalSteps.has(slug)
+      if (isMultiServiceRoot) return pipeline.globalSteps.has(slug)
+      return true
     }
     const enabledSlugs = [...context.metaPrompts.keys()]
       .filter(slug => pipeline.overlay.steps[slug]?.enabled === true)

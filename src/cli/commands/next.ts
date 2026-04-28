@@ -85,9 +85,17 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     // from churning every time the user runs `scaffold next` after a
     // version upgrade or methodology change.
     const state = stateManager.loadState()
-    const scopeOptions = service
-      ? { scope: 'service' as const, globalSteps: pipeline.globalSteps }
-      : undefined
+    // Multi-service root: when config defines services[] and no
+    // --service was passed, root state holds only global steps; tell
+    // computeEligible to filter to globals-only via scope: 'global'.
+    const isMultiServiceRoot =
+      !service && (context.config?.project?.services?.length ?? 0) > 0
+    const scopeOptions =
+      service
+        ? { scope: 'service' as const, globalSteps: pipeline.globalSteps }
+        : isMultiServiceRoot
+          ? { scope: 'global' as const, globalSteps: pipeline.globalSteps }
+          : undefined
     const eligible = readEligible(
       state,
       pipeline,
@@ -130,12 +138,21 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     //    overlay is "not in this project"). This matches the prior
     //    reconciliation default (`?? false`).
     //
-    //    Service-scope: when called with --service, exclude global
-    //    steps (they belong to root state). Matches state-manager's
-    //    reconcile path which skipped them at state-manager.ts:229.
+    //    Scope-aware filter — three modes (matches readEligible scope
+    //    above):
+    //    - service mode (--service <name>): exclude global steps.
+    //    - multi-service root mode (config.services[] present, no
+    //      --service): include only global steps; service-local steps
+    //      live in per-service state and shouldn't gate root completion.
+    //    - flat / single-project mode: include everything.
+    const inScope = (slug: string): boolean => {
+      if (service) return !pipeline.globalSteps.has(slug)
+      if (isMultiServiceRoot) return pipeline.globalSteps.has(slug)
+      return true
+    }
     const enabledPipelineSlugs = [...context.metaPrompts.keys()]
       .filter(slug => pipeline.overlay.steps[slug]?.enabled === true)
-      .filter(slug => !service || !pipeline.globalSteps.has(slug))
+      .filter(inScope)
     const allDone =
       enabledPipelineSlugs.length > 0 &&
       enabledPipelineSlugs.every(slug => {
