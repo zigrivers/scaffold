@@ -258,6 +258,26 @@ describe('StateManager', () => {
       expect(typeof state.steps['create-prd'].at).toBe('string')
       expect(state.in_progress).toBeNull()
     })
+
+    it('throws STEP_NOT_IN_STATE when called on a slug that is not tracked', () => {
+      // Round-1 Gemini P2 on PR #312: markSkipped used to deref
+      // state.steps[step] without a guard, so an upstream caller
+      // bypassing the existence check would get a raw TypeError.
+      // Mirror markCompleted's guard so the failure mode is a
+      // structured ScaffoldError instead.
+      const tempDir = makeTempDir()
+      const manager = new StateManager(tempDir, computeEligible)
+      manager.initializeState(INIT_OPTIONS)
+
+      try {
+        manager.markSkipped('does-not-exist', 'reason', 'actor')
+        expect.fail('Expected markSkipped to throw STEP_NOT_IN_STATE')
+      } catch (err) {
+        const e = err as { code?: string; message: string }
+        expect(e.code).toBe('STEP_NOT_IN_STATE')
+        expect(e.message).toMatch(/does-not-exist/)
+      }
+    })
   })
 
   describe('clearInProgress', () => {

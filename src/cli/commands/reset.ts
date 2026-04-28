@@ -113,6 +113,16 @@ async function resetStep(
       resolvedPipeline.globalSteps,
       resolvedPipeline.getPipelineHash(service ? 'service' : 'global'),
     )
+    // Reconcile state with the current pipeline before the existence
+    // check — `scaffold reset <new-step>` should resolve a step added
+    // in a recent scaffold upgrade, even though status/next no longer
+    // reconcile on read (see v3.24.3 / PR #311).
+    const pipelineSteps = [...context.metaPrompts.values()].map(m => ({
+      slug: m.frontmatter.name,
+      produces: m.frontmatter.outputs,
+      enabled: resolvedPipeline.overlay.steps[m.frontmatter.name]?.enabled === true,
+    }))
+    stateManager.reconcileWithPipeline(pipelineSteps)
     const state = stateManager.loadState()
 
     // Check step exists in state

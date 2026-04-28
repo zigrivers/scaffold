@@ -189,6 +189,12 @@ export class StateManager {
   /** Transition step to skipped; records reason and actor. */
   markSkipped(step: string, reason: string, skippedBy: string): void {
     const state = this.loadState()
+    if (!(step in state.steps)) {
+      throw Object.assign(new Error(`Cannot mark unknown step '${step}' as skipped`), {
+        code: 'STEP_NOT_IN_STATE',
+        exitCode: 1,
+      })
+    }
     state.steps[step].status = 'skipped'
     state.steps[step].at = new Date().toISOString()
     state.steps[step].reason = reason

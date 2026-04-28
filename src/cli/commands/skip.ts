@@ -108,6 +108,19 @@ const skipCommand: CommandModule<Record<string, unknown>, SkipArgs> = {
         pipeline.globalSteps,
         pipeline.getPipelineHash(service ? 'service' : 'global'),
       )
+      // Reconcile state with the current pipeline before checking
+      // step existence. Without this, `scaffold skip <new-step>` for
+      // a step added in a recent scaffold version upgrade would fail
+      // with "step not found" because the entry was never auto-added
+      // to state (status/next no longer reconcile on read since
+      // v3.24.3). Reconcile is only run from explicit user actions
+      // now — and skip is one of them.
+      const pipelineSteps = [...context.metaPrompts.values()].map(m => ({
+        slug: m.frontmatter.name,
+        produces: m.frontmatter.outputs,
+        enabled: pipeline.overlay.steps[m.frontmatter.name]?.enabled === true,
+      }))
+      stateManager.reconcileWithPipeline(pipelineSteps)
       const state = stateManager.loadState()
       const reason = argv.reason ?? 'user-requested'
 

@@ -176,6 +176,19 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
         pipeline.globalSteps,
         pipeline.getPipelineHash(service ? 'service' : 'global'),
       )
+      // Reconcile state with the current pipeline before reading. With
+      // status/next no longer reconciling on read (v3.24.3 / PR #311),
+      // explicit user actions are now the only path that updates state
+      // for new pipeline steps. setInProgress auto-creates entries
+      // anyway, but reconciling here keeps state coherent for things
+      // like crash-recovery analysis and dependency checks before the
+      // setInProgress call.
+      const pipelineSteps = [...context.metaPrompts.values()].map(m => ({
+        slug: m.frontmatter.name,
+        produces: m.frontmatter.outputs,
+        enabled: pipeline.overlay.steps[m.frontmatter.name]?.enabled === true,
+      }))
+      stateManager.reconcileWithPipeline(pipelineSteps)
       let state = stateManager.loadState()
 
       // Crash recovery: in_progress is non-null from a previous run
