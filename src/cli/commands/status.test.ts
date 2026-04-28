@@ -710,6 +710,61 @@ describe('status command', () => {
     expect(phaseSlugs).not.toContain('disabled-pending')
   })
 
+  it('progress totals stay consistent with phases when a disabled+completed audit entry exists', async () => {
+    // Round-2 Codex P1: phasesData preserves disabled steps with
+    // non-pending status (history / audit visibility), but progress
+    // totals were derived from the enabled-pipeline ∩ state intersection
+    // and excluded those audit entries. The two surfaces have to
+    // agree so that completed-counts in progress matches what phases
+    // shows.
+    vi.mocked(loadConfig).mockReturnValue({
+      config: {
+        version: 2, methodology: 'deep', platforms: ['claude-code'],
+        project: { projectType: 'web-app' },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      errors: [], warnings: [],
+    })
+    vi.mocked(resolveOverlayState).mockReturnValue({
+      steps: {
+        'enabled-step': { enabled: true },
+        'old-disabled-step': { enabled: false },
+      },
+      knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
+    })
+    const metaPrompts = new Map([
+      ['enabled-step', makeFrontmatter('enabled-step', 'pre', 1)],
+      ['old-disabled-step', makeFrontmatter('old-disabled-step', 'pre', 2)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
+    // 'old-disabled-step' was completed under a previous methodology
+    // and is now disabled — its state entry is preserved as audit history.
+    const steps = {
+      'enabled-step': { status: 'pending', source: 'pipeline', produces: [] },
+      'old-disabled-step': { status: 'completed', source: 'pipeline', produces: [] },
+    }
+    mockStateWith(MockStateManager, steps, { next_eligible: ['enabled-step'] })
+
+    mockResolveOutputMode.mockReturnValue('json')
+    await statusCommand.handler(defaultArgv({ format: 'json' }))
+    const envelope = JSON.parse(writtenLines.join(''))
+    const parsed = envelope.data ?? envelope
+
+    // 1 enabled (pending) + 1 audit-preserved disabled (completed)
+    // = 2 total, 1 completed, 1 pending, 50%.
+    expect(parsed.progress.total).toBe(2)
+    expect(parsed.progress.completed).toBe(1)
+    expect(parsed.progress.pending).toBe(1)
+    expect(parsed.progress.percentage).toBe(50)
+
+    // The audit entry should also be present in phases.
+    const phaseSlugs = (parsed.phases as Array<{ steps: Array<{ slug: string }> }>)
+      .flatMap(p => p.steps.map(s => s.slug))
+    expect(phaseSlugs).toContain('old-disabled-step')
+  })
+
   it('compact JSON `steps` includes pipeline steps that are missing from state (post-reconcile-drop)', async () => {
     // Round-1 Codex P1: compact JSON used to iterate Object.entries(steps)
     // only. With reconcile dropped, enabled pipeline steps without a state

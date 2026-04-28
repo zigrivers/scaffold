@@ -157,31 +157,42 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       service ? () => readRootSaveCounter(projectRoot) : undefined,
     )
 
-    // 5. Build progress stats from the enabled pipeline + state
-    //    intersection. Iterating `state.steps` alone undercounts when
-    //    state isn't pre-populated (which is the steady state after we
-    //    stopped reconciling); iterating the pipeline alone overcounts
-    //    by including disabled steps. The intersection is correct in
-    //    both directions.
+    // 5. Build the unified "surfaced" slug set used by progress totals,
+    //    phasesData, the interactive listing, and compact JSON. Keeping
+    //    them all in sync prevents the inconsistency where, e.g., a
+    //    historical disabled+completed entry shows up in phases (audit)
+    //    but doesn't count toward progress totals.
     //
-    //    "Enabled" = explicitly set to `true` in the overlay (presets
+    //    A slug is surfaced if it is:
+    //    (a) enabled in the active overlay (explicit `enabled: true`), OR
+    //    (b) preserved disabled state entry with non-pending status
+    //        (history / active-work audit, kept by reconcile-prune).
+    //
+    //    "Enabled" = explicitly `enabled: true` in overlay. Presets
     //    enumerate every known pipeline step, so a step absent from
-    //    overlay is "not in this project"). This matches the prior
+    //    overlay is "not in this project". Matches the prior
     //    reconciliation default (`?? false`) so totals don't inflate.
     const { steps } = state
     const enabledSlugs = [...context.metaPrompts.keys()]
       .filter(slug => pipeline.overlay.steps[slug]?.enabled === true)
+    const auditDisabledSlugs = Object.entries(steps)
+      .filter(([slug, entry]) =>
+        pipeline.overlay.steps[slug]?.enabled !== true && entry.status !== 'pending')
+      .map(([slug]) => slug)
+    const surfacedSlugs = [...new Set<string>([...enabledSlugs, ...auditDisabledSlugs])]
     const statusOf = (slug: string): string =>
       steps[slug]?.status ?? 'pending'
-    const completed = enabledSlugs.filter(s => statusOf(s) === 'completed').length
-    const skipped = enabledSlugs.filter(s => statusOf(s) === 'skipped').length
-    const inProgress = enabledSlugs.filter(s => statusOf(s) === 'in_progress').length
-    const total = enabledSlugs.length
+    const completed = surfacedSlugs.filter(s => statusOf(s) === 'completed').length
+    const skipped = surfacedSlugs.filter(s => statusOf(s) === 'skipped').length
+    const inProgress = surfacedSlugs.filter(s => statusOf(s) === 'in_progress').length
+    const total = surfacedSlugs.length
     const pending = total - completed - skipped - inProgress
     const pct = total > 0 ? Math.round((completed + skipped) / total * 100) : 0
 
     const methodology =
-      (context.config as ConfigWithMethodology)?.methodology?.preset ?? state.config_methodology
+      (context.config as ConfigWithMethodology)?.methodology?.preset
+      ?? state.config_methodology
+      ?? 'unknown'
 
     const isCompact = argv.compact === true
     const actionableStatuses = new Set(['pending', 'in_progress'])
