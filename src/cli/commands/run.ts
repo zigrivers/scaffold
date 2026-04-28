@@ -15,6 +15,7 @@ import { detectMethodologyChange } from '../../core/assembly/methodology-change.
 import { detectCycles } from '../../core/dependency/dependency.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
+import { pipelineStepsForReconcile } from '../../core/pipeline/reconcile-input.js'
 import { findProjectRoot } from '../../cli/middleware/project-root.js'
 import { createOutputContext } from '../../cli/output/context.js'
 import { displayErrors } from '../../cli/output/error-display.js'
@@ -182,13 +183,11 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       // for new pipeline steps. setInProgress auto-creates entries
       // anyway, but reconciling here keeps state coherent for things
       // like crash-recovery analysis and dependency checks before the
-      // setInProgress call.
-      const pipelineSteps = [...context.metaPrompts.values()].map(m => ({
-        slug: m.frontmatter.name,
-        produces: m.frontmatter.outputs,
-        enabled: pipeline.overlay.steps[m.frontmatter.name]?.enabled === true,
-      }))
-      stateManager.reconcileWithPipeline(pipelineSteps)
+      // setInProgress call. The helper handles scope filtering for
+      // service / multi-service-root / flat.
+      stateManager.reconcileWithPipeline(
+        pipelineStepsForReconcile(context, pipeline, service),
+      )
       let state = stateManager.loadState()
 
       // Crash recovery: in_progress is non-null from a previous run

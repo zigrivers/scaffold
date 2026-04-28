@@ -8,6 +8,7 @@ import { shutdown } from '../shutdown.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
+import { pipelineStepsForReconcile } from '../../core/pipeline/reconcile-input.js'
 import { guardStepCommand } from '../guards.js'
 import { StatePathResolver } from '../../state/state-path-resolver.js'
 import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
@@ -114,13 +115,11 @@ const skipCommand: CommandModule<Record<string, unknown>, SkipArgs> = {
       // with "step not found" because the entry was never auto-added
       // to state (status/next no longer reconcile on read since
       // v3.24.3). Reconcile is only run from explicit user actions
-      // now — and skip is one of them.
-      const pipelineSteps = [...context.metaPrompts.values()].map(m => ({
-        slug: m.frontmatter.name,
-        produces: m.frontmatter.outputs,
-        enabled: pipeline.overlay.steps[m.frontmatter.name]?.enabled === true,
-      }))
-      stateManager.reconcileWithPipeline(pipelineSteps)
+      // now — and skip is one of them. The helper handles the
+      // scope filter (service / multi-service-root / flat).
+      stateManager.reconcileWithPipeline(
+        pipelineStepsForReconcile(context, pipeline, service),
+      )
       const state = stateManager.loadState()
       const reason = argv.reason ?? 'user-requested'
 

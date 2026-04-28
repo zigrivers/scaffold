@@ -11,6 +11,7 @@ import { shutdown } from '../shutdown.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
+import { pipelineStepsForReconcile } from '../../core/pipeline/reconcile-input.js'
 import { guardStepCommand, guardSteplessCommand } from '../guards.js'
 import { StatePathResolver } from '../../state/state-path-resolver.js'
 import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
@@ -116,13 +117,11 @@ async function resetStep(
     // Reconcile state with the current pipeline before the existence
     // check — `scaffold reset <new-step>` should resolve a step added
     // in a recent scaffold upgrade, even though status/next no longer
-    // reconcile on read (see v3.24.3 / PR #311).
-    const pipelineSteps = [...context.metaPrompts.values()].map(m => ({
-      slug: m.frontmatter.name,
-      produces: m.frontmatter.outputs,
-      enabled: resolvedPipeline.overlay.steps[m.frontmatter.name]?.enabled === true,
-    }))
-    stateManager.reconcileWithPipeline(pipelineSteps)
+    // reconcile on read (see v3.24.3 / PR #311). The helper handles
+    // scope filtering for service / multi-service-root / flat.
+    stateManager.reconcileWithPipeline(
+      pipelineStepsForReconcile(context, resolvedPipeline, service),
+    )
     const state = stateManager.loadState()
 
     // Check step exists in state

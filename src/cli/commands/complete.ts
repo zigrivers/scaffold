@@ -7,6 +7,7 @@ import { acquireLock, getLockPath, releaseLock } from '../../state/lock-manager.
 import { findClosestMatch } from '../../utils/levenshtein.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
+import { pipelineStepsForReconcile } from '../../core/pipeline/reconcile-input.js'
 import { shutdown } from '../shutdown.js'
 import { guardStepCommand } from '../guards.js'
 import { StatePathResolver } from '../../state/state-path-resolver.js'
@@ -97,13 +98,11 @@ const completeCommand: CommandModule<Record<string, unknown>, CompleteArgs> = {
       // Reconcile state with the current pipeline before the existence
       // check — `scaffold complete <new-step>` should work for a step
       // added in a recent scaffold upgrade, even though status/next no
-      // longer reconcile on read (see v3.24.3 / PR #311).
-      const pipelineSteps = [...context.metaPrompts.values()].map(m => ({
-        slug: m.frontmatter.name,
-        produces: m.frontmatter.outputs,
-        enabled: pipeline.overlay.steps[m.frontmatter.name]?.enabled === true,
-      }))
-      stateManager.reconcileWithPipeline(pipelineSteps)
+      // longer reconcile on read (see v3.24.3 / PR #311). The helper
+      // handles scope filtering for service / multi-service-root / flat.
+      stateManager.reconcileWithPipeline(
+        pipelineStepsForReconcile(context, pipeline, service),
+      )
       const state = stateManager.loadState()
 
       // Check step exists in state
