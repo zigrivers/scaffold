@@ -168,7 +168,7 @@ Once in-progress work is complete (or if there was none):
    - This reviews the local delivery candidate without requiring a PR
    - Surface auth failures immediately and retry after recovery
    - If recovery is not possible, document reduced review coverage and continue with the available channels
-   - Fix any P0/P1/P2 findings before proceeding
+   - Fix any findings at or above `fix_threshold` before proceeding
 
 3. **Create PR** (if not already created for in-progress work)
    - Push the branch: `git push -u origin HEAD`
@@ -184,7 +184,7 @@ Once in-progress work is complete (or if there was none):
      4. **Superpowers code-reviewer** (4th channel): dispatch `superpowers:code-reviewer` subagent with BASE_SHA and HEAD_SHA
    - Verify auth before each CLI (`mmr config test` pre-flights all three at once)
    - All four channels should execute. Missing Codex or Gemini → MMR runs a compensating Claude pass in its place (degraded-pass verdict). Missing Claude CLI → review proceeds without compensation.
-   - Fix any P0/P1/P2 findings before proceeding
+   - Fix any findings at or above `fix_threshold` before proceeding
    - Do NOT move to the next task until the review completes
 
 5. **Between-task cleanup**
@@ -239,7 +239,7 @@ Once in-progress work is complete (or if there was none):
 5. **TDD is not optional** — Continue the red-green-refactor cycle for any in-progress work.
 6. **Quality gates before PR** — Never create a PR with failing checks.
 7. **Honor pre-push review when requested** — If the user or project workflow asks for pre-push multi-model review, run `scaffold run review-code` after quality gates and before `git push`.
-8. **Code review before next task** — After creating a PR, run `scaffold run review-pr`: three CLI channels (Codex CLI, Gemini CLI, Claude CLI) via MMR plus the Superpowers code-reviewer agent as a complementary 4th channel. Fix all P0/P1/P2 findings before moving on.
+8. **Code review before next task** — After creating a PR, run `scaffold run review-pr`: three CLI channels (Codex CLI, Gemini CLI, Claude CLI) via MMR plus the Superpowers code-reviewer agent as a complementary 4th channel. Fix all findings at or above `fix_threshold` before moving on.
 9. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
 
 ---
