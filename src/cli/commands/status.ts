@@ -200,10 +200,13 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     // 6. Check command staleness
     const staleCommandCount = checkCommandStaleness(projectRoot)
 
-    // Build phases array: group meta-prompts by phase with per-phase counts
+    // Build phases array: group meta-prompts by phase with per-phase counts.
+    // Steps disabled by the active overlay/preset are excluded — they are
+    // not part of this project's pipeline and must not surface as pending.
     const phasesData = PHASES.map(phaseInfo => {
       const phaseSteps = [...context.metaPrompts.values()]
         .filter(m => m.frontmatter.phase === phaseInfo.slug)
+        .filter(m => pipeline.overlay.steps[m.frontmatter.name]?.enabled === true)
         .map(m => {
           const entry = steps[m.frontmatter.name]
           const cd = crossDepMap.get(m.frontmatter.name)

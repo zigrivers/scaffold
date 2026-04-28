@@ -227,13 +227,27 @@ export class StateManager {
     for (const step of pipelineSteps) {
       // Skip global steps when service-scoped — they belong to root state
       if (this.pathResolver.isServiceScoped && this.globalSteps?.has(step.slug)) continue
-      // Only add enabled steps that aren't already tracked
-      if (step.enabled && !state.steps[step.slug]) {
-        state.steps[step.slug] = {
-          status: 'pending',
-          source: 'pipeline',
-          produces: step.produces,
+
+      const existing = state.steps[step.slug]
+
+      if (step.enabled) {
+        // Add tracking entry for newly-enabled steps
+        if (!existing) {
+          state.steps[step.slug] = {
+            status: 'pending',
+            source: 'pipeline',
+            produces: step.produces,
+          }
+          changed = true
         }
+        continue
+      }
+
+      // Step is disabled in current overlay/preset. Prune stale `pending`
+      // entries that leaked in from a prior configuration; preserve any
+      // history (completed/skipped) and active work (in_progress).
+      if (existing && existing.status === 'pending') {
+        delete state.steps[step.slug]
         changed = true
       }
     }

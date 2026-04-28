@@ -448,6 +448,56 @@ describe('status command', () => {
     expect(exitSpy).toHaveBeenCalledWith(0)
   })
 
+  it('omits steps disabled by overlay from phasesData and detail listing', async () => {
+    // Repro: a step exists in content/pipeline/ but is disabled by the
+    // active overlay (e.g., game-specific step on a web-app project).
+    // It must not appear in `phases[].steps[]` or the interactive listing,
+    // even if a stale `pending` entry exists in state.
+    vi.mocked(loadConfig).mockReturnValue({
+      config: {
+        version: 2, methodology: 'deep', platforms: ['claude-code'],
+        project: { projectType: 'web-app' },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      errors: [], warnings: [],
+    })
+    const mockOverlay = vi.mocked(resolveOverlayState)
+    mockOverlay.mockReturnValue({
+      steps: {
+        'enabled-step': { enabled: true },
+        // 'disabled-step' intentionally absent → effective `enabled: false`
+      },
+      knowledge: {},
+      reads: {},
+      dependencies: {},
+      crossReads: {},
+    })
+
+    const metaPrompts = new Map([
+      ['enabled-step', makeFrontmatter('enabled-step', 'foundation', 1)],
+      ['disabled-step', makeFrontmatter('disabled-step', 'foundation', 2)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
+
+    const steps = {
+      'enabled-step': { status: 'pending', source: 'pipeline', produces: [] },
+      'disabled-step': { status: 'pending', source: 'pipeline', produces: [] },
+    }
+    mockStateWith(MockStateManager, steps, { next_eligible: ['enabled-step'] })
+
+    mockResolveOutputMode.mockReturnValue('json')
+    await statusCommand.handler(defaultArgv({ format: 'json' }))
+    const envelope = JSON.parse(writtenLines.join(''))
+    const parsed = envelope.data ?? envelope
+
+    const allPhaseSlugs = (parsed.phases as Array<{ steps: Array<{ slug: string }> }>)
+      .flatMap(p => p.steps.map(s => s.slug))
+    expect(allPhaseSlugs).toContain('enabled-step')
+    expect(allPhaseSlugs).not.toContain('disabled-step')
+  })
+
   describe('--compact flag', () => {
     it('hides completed and skipped steps from detail list', async () => {
       const steps = {
@@ -542,6 +592,11 @@ describe('status command', () => {
       mockDiscoverMetaPrompts.mockReturnValue(new Map([
         ['system-architecture', stepWithCrossReads()],
       ]))
+      vi.mocked(resolveOverlayState).mockReturnValueOnce({
+        steps: { 'system-architecture': { enabled: true } },
+        knowledge: {}, reads: {}, dependencies: {},
+        crossReads: { 'system-architecture': [{ service: 'shared-lib', step: 'api-contracts' }] },
+      })
       mockStateWith(MockStateManager, {
         'system-architecture': { status: 'pending', source: 'pipeline', produces: [] },
       })
