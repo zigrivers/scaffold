@@ -21,6 +21,18 @@ describe('loadConfig', () => {
     expect(config.defaults.timeout).toBe(300)
   })
 
+  it('default gemini command does not pass `-p` (prompt is piped via stdin)', () => {
+    // Repro: `gemini -p` requires a positional value; with prompt
+    // delivered via stdin and `--output-format json` as the next argv
+    // token, gemini parses that flag as `-p`'s value and bails with
+    // "Not enough arguments following: p", failing the channel in 0s.
+    // Default command must omit `-p` so gemini reads stdin natively.
+    const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
+    const geminiCmd = config.channels.gemini?.command ?? ''
+    expect(geminiCmd.split(/\s+/)).not.toContain('-p')
+    expect(geminiCmd).toBe('gemini')
+  })
+
   it('loads project .mmr.yaml and merges with defaults', () => {
     const yaml = [
       'version: 1',

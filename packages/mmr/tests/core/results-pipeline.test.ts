@@ -62,6 +62,42 @@ describe('runResultsPipeline', () => {
     expect(exitCode).toBe(0)
   })
 
+  it('surfaces the captured stderr/log as the failed channel error detail', () => {
+    // Repro: gemini default command was wrong → 0s elapsed, "Channel
+    // failed". Stderr was captured to <channel>.log but never read back,
+    // so consumers had no diagnostic. Now perChannel.error should include
+    // the head of the saved log for any failed/timeout channel.
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['gemini'] })
+    store.updateChannel(job.job_id, 'gemini', { status: 'failed' })
+    store.saveChannelLog(job.job_id, 'gemini',
+      'Not enough arguments following: p\nUsage: gemini [options] [command]')
+
+    const { results } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.per_channel.gemini.status).toBe('failed')
+    expect(results.per_channel.gemini.error).toContain('Channel failed')
+    expect(results.per_channel.gemini.error).toContain('Not enough arguments following: p')
+  })
+
+  it('keeps the generic error when no log is present for a failed channel', () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['gemini'] })
+    store.updateChannel(job.job_id, 'gemini', { status: 'failed' })
+
+    const { results } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.per_channel.gemini.error).toBe('Channel failed')
+  })
+
+  it('truncates long log content in error detail', () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['gemini'] })
+    store.updateChannel(job.job_id, 'gemini', { status: 'failed' })
+    const longLog = 'x'.repeat(10_000)
+    store.saveChannelLog(job.job_id, 'gemini', longLog)
+
+    const { results } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    const errorMsg = results.per_channel.gemini.error ?? ''
+    // Cap at a reasonable size so the JSON output stays readable.
+    expect(errorMsg.length).toBeLessThan(2_000)
+  })
+
   it('produces needs-user-decision when no channels completed', () => {
     const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude', 'gemini'] })
     store.updateChannel(job.job_id, 'claude', { status: 'failed' })

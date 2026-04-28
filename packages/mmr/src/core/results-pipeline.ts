@@ -21,6 +21,38 @@ export interface PipelineResult {
   exitCode: number
 }
 
+/** Maximum chars of channel-log detail to embed in the per-channel error
+ *  field. Keeps JSON output readable while preserving the head of any
+ *  stderr / spawn-error message captured by the dispatcher. */
+const ERROR_DETAIL_MAX_CHARS = 1_000
+
+/**
+ * Append the head of the channel's saved log to the base error message
+ * when one exists. Quietly returns the base message if no log was
+ * written or if reading it throws — the diagnostic should never mask
+ * the underlying status.
+ */
+function appendLogDetail(
+  baseMsg: string,
+  store: JobStore,
+  jobId: string,
+  channel: string,
+): string {
+  let log: string | null = null
+  try {
+    log = store.loadChannelLog(jobId, channel)
+  } catch {
+    return baseMsg
+  }
+  if (!log) return baseMsg
+  const trimmed = log.trim()
+  if (trimmed.length === 0) return baseMsg
+  const detail = trimmed.length > ERROR_DETAIL_MAX_CHARS
+    ? `${trimmed.slice(0, ERROR_DETAIL_MAX_CHARS)}…`
+    : trimmed
+  return `${baseMsg}: ${detail}`
+}
+
 /**
  * Run the full results pipeline: parse channel outputs, reconcile findings,
  * derive verdict, format output.
@@ -38,11 +70,17 @@ export function runResultsPipeline(
 
   for (const [name, entry] of Object.entries(job.channels)) {
     if (entry.status !== 'completed') {
-      const errorMsg = entry.status === 'failed' ? 'Channel failed'
+      const baseMsg = entry.status === 'failed' ? 'Channel failed'
         : entry.status === 'timeout' ? 'Channel timed out'
           : entry.status === 'auth_failed' ? 'Auth check failed'
             : entry.status === 'not_installed' ? 'CLI not found on PATH'
               : undefined
+      // Pull captured stderr / spawn-error detail from the channel log
+      // so callers see the actual failure reason (wrong flag, missing
+      // binary path, exit code, etc.) instead of just "Channel failed".
+      const errorMsg = baseMsg !== undefined
+        ? appendLogDetail(baseMsg, store, job.job_id, name)
+        : undefined
       perChannel[name] = {
         status: entry.status,
         elapsed: entry.elapsed ?? '0s',

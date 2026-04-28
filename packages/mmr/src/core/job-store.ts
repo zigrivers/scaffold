@@ -147,6 +147,17 @@ export class JobStore {
     fs.writeFileSync(filePath, log)
   }
 
+  /**
+   * Load the saved channel log (stderr / spawn-error message). Returns
+   * null when no log was written — this happens for channels that
+   * completed cleanly or failed without producing diagnostic output.
+   */
+  loadChannelLog(jobId: string, channel: string): string | null {
+    const filePath = this.channelFilePath(jobId, channel, `${channel}.log`)
+    if (!fs.existsSync(filePath)) return null
+    return fs.readFileSync(filePath, 'utf-8')
+  }
+
   /** Register a new channel in the base job.json metadata so loadJob can discover it */
   registerChannel(jobId: string, channel: string, initial: Partial<ChannelJobEntry>): void {
     this.validateChannelName(channel)
