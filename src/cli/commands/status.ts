@@ -134,21 +134,17 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       pipeline.getPipelineHash(service ? 'service' : 'global'),
     )
 
-    // Reconcile state with current pipeline — adds any new steps that were
-    // introduced after the project was initialized (e.g., story-tests).
-    const pipelineSteps = [...context.metaPrompts.values()].map(m => ({
-      slug: m.frontmatter.name,
-      produces: m.frontmatter.outputs,
-      // Steps not in overlay/preset map are disabled. This requires presets to enumerate
-      // all known pipeline steps (which they do — see deep.yml/mvp.yml/custom-defaults.yml).
-      enabled: pipeline.overlay.steps[m.frontmatter.name]?.enabled ?? false,
-    }))
-    stateManager.reconcileWithPipeline(pipelineSteps)
-
+    // `scaffold status` is a read-only inspection. We deliberately do NOT
+    // call reconcileWithPipeline here — pre-populating pending entries
+    // for every enabled pipeline step is convenient but causes state.json
+    // (which is committed in most projects) to churn whenever a scaffold
+    // version upgrade adds steps or methodology changes flip enable bits.
+    // Eligibility, phasesData, and progress totals are all derivable from
+    // the pipeline graph + overlay + state intersection, so the persisted
+    // pending-entries are not required.
     const state = stateManager.loadState()
 
-    // Compute eligible once (cache-validated) — reused by both JSON and
-    // interactive output branches. readEligible returns the cached
+    // Compute eligible once — readEligible returns the cached
     // next_eligible list when the graph hash (and root save_counter, for
     // service scope) still match, else falls back to a live compute.
     const scopeOptionsForRead = service
@@ -161,13 +157,22 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       service ? () => readRootSaveCounter(projectRoot) : undefined,
     )
 
-    // 5. Build progress stats
+    // 5. Build progress stats from the enabled pipeline + state
+    //    intersection. Iterating `state.steps` alone undercounts when
+    //    state isn't pre-populated (which is the steady state after we
+    //    stopped reconciling); iterating the pipeline alone overcounts
+    //    by including disabled steps. The intersection is correct in
+    //    both directions.
     const { steps } = state
-    const completed = Object.values(steps).filter(s => s.status === 'completed').length
-    const skipped = Object.values(steps).filter(s => s.status === 'skipped').length
-    const pending = Object.values(steps).filter(s => s.status === 'pending').length
-    const inProgress = Object.values(steps).filter(s => s.status === 'in_progress').length
-    const total = Object.keys(steps).length
+    const enabledSlugs = [...context.metaPrompts.keys()]
+      .filter(slug => pipeline.overlay.steps[slug]?.enabled !== false)
+    const statusOf = (slug: string): string =>
+      steps[slug]?.status ?? 'pending'
+    const completed = enabledSlugs.filter(s => statusOf(s) === 'completed').length
+    const skipped = enabledSlugs.filter(s => statusOf(s) === 'skipped').length
+    const inProgress = enabledSlugs.filter(s => statusOf(s) === 'in_progress').length
+    const total = enabledSlugs.length
+    const pending = total - completed - skipped - inProgress
     const pct = total > 0 ? Math.round((completed + skipped) / total * 100) : 0
 
     const methodology =
@@ -180,9 +185,19 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     // (not just actionable ones — status surfaces completed/skipped too).
     // Cache is hoisted across all steps so each foreign service's state is
     // loaded + migrated at most once per status invocation.
+    //
+    // Iterate the pipeline (metaPrompts ∪ state.steps) rather than state
+    // alone: now that we don't reconcile, state may not yet contain
+    // entries for every enabled pipeline step, but the cross-dep
+    // readiness UI must still show them. Union with state covers any
+    // historical entries for steps no longer in metaPrompts.
     const crossDepMap = new Map<string, ReturnType<typeof resolveCrossReadReadiness>>()
     const sharedForeignCache = new Map<string, PipelineState | null | 'read-error'>()
-    for (const slug of Object.keys(steps)) {
+    const slugsForCrossDep = new Set<string>([
+      ...context.metaPrompts.keys(),
+      ...Object.keys(steps),
+    ])
+    for (const slug of slugsForCrossDep) {
       // overlay.crossReads is the authoritative merged map (frontmatter ∪ overlay
       // overrides) since Wave 3c+1. Defaults to [] for steps not in metaPrompts.
       const crossReads = pipeline.overlay.crossReads[slug] ?? []
@@ -278,18 +293,27 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
         pending: '○',
       }
 
-      for (const [slug, entry] of Object.entries(steps)) {
+      // Iterate the union of pipeline keys and state keys so enabled
+      // steps without a state entry still show as pending. State alone
+      // is incomplete now that we don't reconcile on read.
+      const listSlugs = [...new Set<string>([
+        ...context.metaPrompts.keys(),
+        ...Object.keys(steps),
+      ])]
+      for (const slug of listSlugs) {
+        const entry = steps[slug]
+        const status = entry?.status ?? 'pending'
         // Mirror phasesData: hide overlay-disabled entries that are still
         // `pending` (the bug class fix B prunes). Keep historical
         // (completed/skipped) and active-work (in_progress) entries
         // visible so the operator retains audit + active-work context.
-        if (isDisabled(slug) && entry.status === 'pending') continue
-        if (isCompact && !actionableStatuses.has(entry.status)) continue
+        if (isDisabled(slug) && status === 'pending') continue
+        if (isCompact && !actionableStatuses.has(status)) continue
         const fm = pipeline.stepMeta.get(slug)
         const phase = fm?.phase ?? '?'
-        const icon = statusIcons[entry.status] ?? '?'
+        const icon = statusIcons[status] ?? '?'
         if (argv.phase !== undefined && phase !== String(argv.phase)) continue
-        output.info(`  ${icon} [${entry.status}] ${slug}`)
+        output.info(`  ${icon} [${status}] ${slug}`)
         const cd = crossDepMap.get(slug)
         if (cd?.length) {
           for (const cdEntry of cd) {

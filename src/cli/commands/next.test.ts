@@ -226,6 +226,25 @@ describe('next command', () => {
     expect(exitSpy).toHaveBeenCalledWith(1)
   })
 
+  it('does NOT call reconcileWithPipeline — next is a read-only inspection', async () => {
+    // `scaffold next` must not modify state.json (avoids unwanted git
+    // diffs from running an inspection command). Eligibility is computed
+    // live from the pipeline graph + state, with no need to pre-populate
+    // pending entries for new steps.
+    const reconcileFn = vi.fn(() => false)
+    type LoadReturn = ReturnType<InstanceType<typeof StateManager>['loadState']>
+    MockStateManager.mockImplementation(() => ({
+      loadState: vi.fn(
+        () => makeState({ steps: {} }) as unknown as LoadReturn,
+      ),
+      reconcileWithPipeline: reconcileFn,
+    }) as unknown as InstanceType<typeof StateManager>)
+
+    await nextCommand.handler(defaultArgv())
+
+    expect(reconcileFn).not.toHaveBeenCalled()
+  })
+
   it('shows "Pipeline complete!" when all steps are completed or skipped', async () => {
     const steps = {
       'step-a': { status: 'completed', source: 'pipeline', produces: [] },

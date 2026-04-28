@@ -235,6 +235,15 @@ describe('status command', () => {
   })
 
   it('outputs progress percentage to stdout', async () => {
+    const metaPrompts = new Map([
+      ['step-a', makeFrontmatter('step-a', 'pre', 1)],
+      ['step-b', makeFrontmatter('step-b', 'pre', 2)],
+      ['step-c', makeFrontmatter('step-c', 'pre', 3)],
+      ['step-d', makeFrontmatter('step-d', 'pre', 4)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
     const steps = {
       'step-a': { status: 'completed', source: 'pipeline', produces: [] },
       'step-b': { status: 'completed', source: 'pipeline', produces: [] },
@@ -263,6 +272,15 @@ describe('status command', () => {
 
   it('JSON mode returns correct StatusResult shape', async () => {
     mockResolveOutputMode.mockReturnValue('json')
+    const metaPrompts = new Map([
+      ['step-a', makeFrontmatter('step-a', 'pre', 1)],
+      ['step-b', makeFrontmatter('step-b', 'pre', 2)],
+      ['step-c', makeFrontmatter('step-c', 'pre', 3)],
+      ['step-d', makeFrontmatter('step-d', 'pre', 4)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
     const steps = {
       'step-a': { status: 'completed', source: 'pipeline', produces: [] },
       'step-b': { status: 'skipped', source: 'pipeline', produces: [] },
@@ -333,6 +351,17 @@ describe('status command', () => {
   })
 
   it('calculates percentage: completed+skipped count, pending+in_progress do not', async () => {
+    const metaPrompts = new Map([
+      ['s1', makeFrontmatter('s1', 'pre', 1)],
+      ['s2', makeFrontmatter('s2', 'pre', 2)],
+      ['s3', makeFrontmatter('s3', 'pre', 3)],
+      ['s4', makeFrontmatter('s4', 'pre', 4)],
+      ['s5', makeFrontmatter('s5', 'pre', 5)],
+      ['s6', makeFrontmatter('s6', 'pre', 6)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
     const steps = {
       's1': { status: 'completed', source: 'pipeline', produces: [] },
       's2': { status: 'completed', source: 'pipeline', produces: [] },
@@ -354,7 +383,14 @@ describe('status command', () => {
     expect(parsed.progress.total).toBe(6)
   })
 
-  it('calls reconcileWithPipeline to add new pipeline steps to state', async () => {
+  it('does NOT call reconcileWithPipeline — status is a read-only inspection', async () => {
+    // `scaffold status` must not modify state.json. Previously it called
+    // reconcileWithPipeline, which would add entries for new pipeline steps
+    // and prune disabled+pending entries — both legitimate state transitions
+    // but inappropriate as a side-effect of an inspection command. Pipeline
+    // steps that don't exist in state still display correctly because
+    // phasesData iterates `context.metaPrompts` and progress totals are
+    // derived from the enabled pipeline + state intersection.
     const metaPrompts = new Map([
       ['step-a', makeFrontmatter('step-a', 'quality', 900)],
       ['step-b', makeFrontmatter('step-b', 'quality', 910)],
@@ -364,12 +400,10 @@ describe('status command', () => {
       metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
     )
 
-    // State only has step-a and step-b; story-tests is missing
     const steps = {
       'step-a': { status: 'completed', source: 'pipeline', produces: [] },
       'step-b': { status: 'pending', source: 'pipeline', produces: [] },
     }
-    // Track reconcileWithPipeline calls
     const reconcileFn = vi.fn(() => false)
     type LoadReturn = ReturnType<InstanceType<typeof StateManager>['loadState']>
     MockStateManager.mockImplementation(() => ({
@@ -381,13 +415,56 @@ describe('status command', () => {
 
     await statusCommand.handler(defaultArgv())
 
-    // Verify reconcileWithPipeline was called with pipeline steps
-    expect(reconcileFn).toHaveBeenCalledTimes(1)
-    const pipelineArg = (reconcileFn.mock.calls[0] as unknown as [Array<{ slug: string }>])[0]
-    const slugs = pipelineArg.map((s: { slug: string }) => s.slug)
-    expect(slugs).toContain('story-tests')
-    expect(slugs).toContain('step-a')
-    expect(slugs).toContain('step-b')
+    expect(reconcileFn).not.toHaveBeenCalled()
+  })
+
+  it('progress totals derive from the enabled pipeline + state intersection (not state alone)', async () => {
+    // After dropping reconcileWithPipeline from status, state.steps no
+    // longer carries a pre-populated entry for every enabled pipeline step.
+    // Totals must therefore come from the pipeline graph (filtered by
+    // overlay) so percentages stay correct on fresh / never-engaged steps.
+    vi.mocked(loadConfig).mockReturnValue({
+      config: {
+        version: 2, methodology: 'deep', platforms: ['claude-code'],
+        project: { projectType: 'web-app' },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      errors: [], warnings: [],
+    })
+    vi.mocked(resolveOverlayState).mockReturnValue({
+      steps: {
+        'step-a': { enabled: true },
+        'step-b': { enabled: true },
+        'step-c': { enabled: true },
+        'step-d': { enabled: false },
+      },
+      knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
+    })
+    const metaPrompts = new Map([
+      ['step-a', makeFrontmatter('step-a', 'pre', 1)],
+      ['step-b', makeFrontmatter('step-b', 'pre', 2)],
+      ['step-c', makeFrontmatter('step-c', 'pre', 3)],
+      ['step-d', makeFrontmatter('step-d', 'pre', 4)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
+    const steps = {
+      'step-a': { status: 'completed', source: 'pipeline', produces: [] },
+      // step-b, step-c, step-d intentionally absent from state
+    }
+    mockStateWith(MockStateManager, steps, { next_eligible: ['step-b', 'step-c'] })
+
+    mockResolveOutputMode.mockReturnValue('json')
+    await statusCommand.handler(defaultArgv({ format: 'json' }))
+    const envelope = JSON.parse(writtenLines.join(''))
+    const parsed = envelope.data ?? envelope
+
+    // 3 enabled (step-a/b/c), 1 completed, 0 in-progress, 0 skipped, 2 pending
+    expect(parsed.progress.total).toBe(3)
+    expect(parsed.progress.completed).toBe(1)
+    expect(parsed.progress.pending).toBe(2)
+    expect(parsed.progress.percentage).toBe(33)
   })
 
   it('uses overlay steps when config has projectType: game', async () => {
@@ -645,6 +722,16 @@ describe('status command', () => {
     })
 
     it('shows summary counts in compact mode', async () => {
+      const metaPrompts = new Map([
+        ['s1', makeFrontmatter('s1', 'pre', 1)],
+        ['s2', makeFrontmatter('s2', 'pre', 2)],
+        ['s3', makeFrontmatter('s3', 'pre', 3)],
+        ['s4', makeFrontmatter('s4', 'pre', 4)],
+        ['s5', makeFrontmatter('s5', 'pre', 5)],
+      ])
+      mockDiscoverMetaPrompts.mockReturnValue(
+        metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+      )
       const steps = {
         's1': { status: 'completed', source: 'pipeline', produces: [] },
         's2': { status: 'completed', source: 'pipeline', produces: [] },

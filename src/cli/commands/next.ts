@@ -77,17 +77,13 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
       pipeline.getPipelineHash(service ? 'service' : 'global'),
     )
 
-    // Reconcile state with current pipeline — adds any new steps that were
-    // introduced after the project was initialized.
-    const pipelineSteps = [...context.metaPrompts.values()].map(m => ({
-      slug: m.frontmatter.name,
-      produces: m.frontmatter.outputs,
-      // Steps not in overlay/preset map are disabled. This requires presets to enumerate
-      // all known pipeline steps (which they do — see deep.yml/mvp.yml/custom-defaults.yml).
-      enabled: pipeline.overlay.steps[m.frontmatter.name]?.enabled ?? false,
-    }))
-    stateManager.reconcileWithPipeline(pipelineSteps)
-
+    // `scaffold next` is a read-only inspection. We deliberately do NOT
+    // call reconcileWithPipeline here — eligibility is derived live from
+    // the pipeline graph + state, and `computeEligible` treats steps
+    // missing from state as pending (the same default reconcile would
+    // pre-populate). Skipping reconcile prevents committed state.json
+    // from churning every time the user runs `scaffold next` after a
+    // version upgrade or methodology change.
     const state = stateManager.loadState()
     const scopeOptions = service
       ? { scope: 'service' as const, globalSteps: pipeline.globalSteps }
