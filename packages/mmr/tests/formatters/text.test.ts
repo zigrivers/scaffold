@@ -77,4 +77,36 @@ describe('formatText', () => {
     const output = formatText(results)
     expect(output).toContain('NEEDS DECISION')
   })
+
+  it('shows advisory count when present', () => {
+    const results: ReconciledResults = {
+      job_id: 'mmr-adv',
+      verdict: 'pass',
+      fix_threshold: 'P2',
+      advisory_count: 3,
+      approved: true,
+      summary: 'Review passed',
+      reconciled_findings: [],
+      per_channel: { claude: { status: 'completed', elapsed: '5s', findings: [] } },
+      metadata: { channels_dispatched: 1, channels_completed: 1, channels_partial: 0, total_elapsed: '5s' },
+    }
+    const output = formatText(results)
+    expect(output).toContain('Advisory: 3')
+  })
+
+  it('omits advisory segment when count is zero', () => {
+    const results: ReconciledResults = {
+      job_id: 'mmr-noadv',
+      verdict: 'pass',
+      fix_threshold: 'P2',
+      advisory_count: 0,
+      approved: true,
+      summary: 'Review passed',
+      reconciled_findings: [],
+      per_channel: { claude: { status: 'completed', elapsed: '5s', findings: [] } },
+      metadata: { channels_dispatched: 1, channels_completed: 1, channels_partial: 0, total_elapsed: '5s' },
+    }
+    const output = formatText(results)
+    expect(output).not.toContain('Advisory')
+  })
 })

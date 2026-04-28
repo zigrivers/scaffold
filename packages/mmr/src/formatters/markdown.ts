@@ -16,10 +16,15 @@ export function formatMarkdown(results: ReconciledResults): string {
 
   lines.push(`## Multi-Model Review — ${gate}`)
   lines.push('')
-  lines.push(
-    `**Job:** ${results.job_id} | **Threshold:** ${results.fix_threshold}` +
-    ` | **Elapsed:** ${results.metadata.total_elapsed}`,
-  )
+  const segments = [
+    `**Job:** ${results.job_id}`,
+    `**Threshold:** ${results.fix_threshold}`,
+  ]
+  if (results.advisory_count > 0) {
+    segments.push(`**Advisory:** ${results.advisory_count}`)
+  }
+  segments.push(`**Elapsed:** ${results.metadata.total_elapsed}`)
+  lines.push(segments.join(' | '))
   lines.push('')
 
   if (results.reconciled_findings.length > 0) {
