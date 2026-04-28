@@ -129,8 +129,13 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     //    enumerate every known pipeline step, so a step absent from
     //    overlay is "not in this project"). This matches the prior
     //    reconciliation default (`?? false`).
+    //
+    //    Service-scope: when called with --service, exclude global
+    //    steps (they belong to root state). Matches state-manager's
+    //    reconcile path which skipped them at state-manager.ts:229.
     const enabledPipelineSlugs = [...context.metaPrompts.keys()]
       .filter(slug => pipeline.overlay.steps[slug]?.enabled === true)
+      .filter(slug => !service || !pipeline.globalSteps.has(slug))
     const allDone =
       enabledPipelineSlugs.length > 0 &&
       enabledPipelineSlugs.every(slug => {

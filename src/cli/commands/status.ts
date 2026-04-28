@@ -173,11 +173,20 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     //    overlay is "not in this project". Matches the prior
     //    reconciliation default (`?? false`) so totals don't inflate.
     const { steps } = state
+    // Service-scope filter: in service mode, the service's view excludes
+    // global steps (they belong to root state). Matches the old
+    // reconcileWithPipeline behavior at state-manager.ts:229.
+    const isInScope = (slug: string): boolean => {
+      if (!service) return true
+      return !pipeline.globalSteps.has(slug)
+    }
     const enabledSlugs = [...context.metaPrompts.keys()]
       .filter(slug => pipeline.overlay.steps[slug]?.enabled === true)
+      .filter(isInScope)
     const auditDisabledSlugs = Object.entries(steps)
       .filter(([slug, entry]) =>
         pipeline.overlay.steps[slug]?.enabled !== true && entry.status !== 'pending')
+      .filter(([slug]) => isInScope(slug))
       .map(([slug]) => slug)
     const surfacedSlugs = [...new Set<string>([...enabledSlugs, ...auditDisabledSlugs])]
     const statusOf = (slug: string): string =>
@@ -214,6 +223,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       ...Object.keys(steps),
     ])
     for (const slug of slugsForCrossDep) {
+      if (!isInScope(slug)) continue
       // overlay.crossReads is the authoritative merged map (frontmatter ∪ overlay
       // overrides) since Wave 3c+1. Defaults to [] for steps not in metaPrompts.
       const crossReads = pipeline.overlay.crossReads[slug] ?? []
@@ -243,6 +253,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     const phasesData = PHASES.map(phaseInfo => {
       const phaseSteps = [...context.metaPrompts.values()]
         .filter(m => m.frontmatter.phase === phaseInfo.slug)
+        .filter(m => isInScope(m.frontmatter.name))
         .map(m => {
           const entry = steps[m.frontmatter.name]
           const cd = crossDepMap.get(m.frontmatter.name)
@@ -290,6 +301,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
           ...Object.keys(steps),
         ])]
         result.steps = compactSlugs
+          .filter(slug => isInScope(slug))
           .map(slug => {
             const entry = steps[slug]
             const status = entry?.status ?? 'pending'
@@ -330,6 +342,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
         ...Object.keys(steps),
       ])]
       for (const slug of listSlugs) {
+        if (!isInScope(slug)) continue
         const entry = steps[slug]
         const status = entry?.status ?? 'pending'
         // Mirror phasesData: hide overlay-disabled entries that are still
