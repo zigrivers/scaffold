@@ -223,13 +223,23 @@ If any P0, P1, or P2 findings exist:
 
 ### Step 8: Confirm Completion
 
-After all findings are resolved (or you've hit a per-finding stop condition per Step 7), output:
+**Success path** — all findings resolved (verdict is `pass` or `degraded-pass`):
 
 ```
 Code review complete. Verdict: [pass/degraded-pass]. Channels: [N] executed, [N] compensating. PR #[number] is ready for merge.
 ```
 
-Do NOT proceed to the next task or merge until this confirmation is output.
+**Stop path** — a per-finding stop condition from Step 7 was hit (verdict is `blocked` or `needs-user-decision`). Do NOT use the ready-for-merge message and do NOT merge. Instead, hand off to the user:
+
+```
+Code review halted. Verdict: [blocked/needs-user-decision]. PR #[number] is NOT ready for merge.
+Unresolved findings:
+- [severity] [location] — [description] (rounds attempted: [N])
+- ...
+Reason for stop: [same finding recurred 3× / channels contradict each other / user requested stop]
+```
+
+In either path, output the message and stop. Do NOT proceed to the next task without this confirmation.
 
 ## Fallback Behavior
 
