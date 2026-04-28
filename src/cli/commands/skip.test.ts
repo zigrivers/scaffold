@@ -17,6 +17,7 @@ vi.mock('../../state/state-manager.js', () => ({
   StateManager: vi.fn().mockImplementation(() => ({
     loadState: vi.fn(),
     markSkipped: vi.fn(),
+    reconcileWithPipeline: vi.fn(() => false),
   })),
 }))
 
@@ -115,6 +116,7 @@ describe('skip command', () => {
         }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
       ),
       markSkipped: vi.fn(),
+      reconcileWithPipeline: vi.fn(() => false),
     }) as unknown as InstanceType<typeof StateManager>)
   })
 
@@ -142,6 +144,59 @@ describe('skip command', () => {
   })
 
   // Test 2: Marks step as skipped successfully
+  it('reconciles state before existence check so new pipeline steps are skippable', async () => {
+    // Round-1 Codex P0 on PR #312: with reconcile dropped from
+    // status/next, mutating commands had to take over the responsibility
+    // of pulling new pipeline steps into state. Without this call,
+    // `scaffold skip <new-step>` would fail with DEP_TARGET_MISSING for
+    // a step added in a recent scaffold version upgrade.
+    //
+    // Round-3 Codex P2: the previous shape of this test always returned
+    // the same post-reconcile state, so it would still have passed if
+    // skip.ts performed the existence check before reconcile. Now the
+    // mock loadState returns DIFFERENT state depending on whether
+    // reconcileWithPipeline has been called yet. If skip.ts ever
+    // regresses to checking existence first, the second loadState (in
+    // the existence-check branch) returns a state with no newly-added
+    // entry → the skip would fail with DEP_TARGET_MISSING and
+    // markSkipped wouldn't be called.
+    let reconciled = false
+    const reconcileFn = vi.fn(() => { reconciled = true; return true })
+    const markSkippedFn = vi.fn()
+    const loadStateFn = vi.fn(() =>
+      makeState({
+        steps: reconciled
+          ? { 'newly-added-step': { status: 'pending', source: 'pipeline', produces: [] } }
+          : {},
+        next_eligible: [],
+      }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
+    )
+    MockStateManager.mockImplementation(() => ({
+      loadState: loadStateFn,
+      markSkipped: markSkippedFn,
+      reconcileWithPipeline: reconcileFn,
+    }) as unknown as InstanceType<typeof StateManager>)
+
+    const argv = {
+      step: 'newly-added-step',
+      reason: 'no longer applicable',
+      format: undefined,
+      auto: undefined,
+      verbose: undefined,
+      root: undefined,
+      force: undefined,
+    }
+    await skipCommand.handler(argv as Parameters<typeof skipCommand.handler>[0])
+
+    expect(reconcileFn).toHaveBeenCalledTimes(1)
+    // Lock in call order: reconcile must precede the loadState that
+    // feeds the existence check. invocationCallOrder is a global
+    // monotonic counter across all vitest mocks.
+    expect(reconcileFn.mock.invocationCallOrder[0])
+      .toBeLessThan(loadStateFn.mock.invocationCallOrder[0])
+    expect(markSkippedFn).toHaveBeenCalledWith('newly-added-step', 'no longer applicable', 'scaffold-skip')
+  })
+
   it('marks step as skipped successfully', async () => {
     const mockMarkSkipped = vi.fn()
     MockStateManager.mockImplementation(() => ({
@@ -154,6 +209,7 @@ describe('skip command', () => {
         }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
       ),
       markSkipped: mockMarkSkipped,
+      reconcileWithPipeline: vi.fn(() => false),
     }) as unknown as InstanceType<typeof StateManager>)
 
     const argv = {
@@ -181,6 +237,7 @@ describe('skip command', () => {
         }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
       ),
       markSkipped: vi.fn(),
+      reconcileWithPipeline: vi.fn(() => false),
     }) as unknown as InstanceType<typeof StateManager>)
 
     const argv = {
@@ -211,6 +268,7 @@ describe('skip command', () => {
         }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
       ),
       markSkipped: vi.fn(),
+      reconcileWithPipeline: vi.fn(() => false),
     }) as unknown as InstanceType<typeof StateManager>)
 
     const argv = {
@@ -243,6 +301,7 @@ describe('skip command', () => {
         }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
       ),
       markSkipped: vi.fn(),
+      reconcileWithPipeline: vi.fn(() => false),
     }) as unknown as InstanceType<typeof StateManager>)
 
     const argv = {
@@ -276,6 +335,7 @@ describe('skip command', () => {
         }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
       ),
       markSkipped: mockMarkSkipped,
+      reconcileWithPipeline: vi.fn(() => false),
     }) as unknown as InstanceType<typeof StateManager>)
 
     // Spy on createOutputContext to inject our confirm mock
@@ -330,6 +390,7 @@ describe('skip command', () => {
         }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
       ),
       markSkipped: vi.fn(),
+      reconcileWithPipeline: vi.fn(() => false),
     }) as unknown as InstanceType<typeof StateManager>)
 
     const argv = {
@@ -361,6 +422,7 @@ describe('skip command', () => {
         }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
       ),
       markSkipped: mockMarkSkipped,
+      reconcileWithPipeline: vi.fn(() => false),
     }) as unknown as InstanceType<typeof StateManager>)
 
     const argv = {
@@ -394,6 +456,7 @@ describe('skip command', () => {
         }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
       ),
       markSkipped: vi.fn(),
+      reconcileWithPipeline: vi.fn(() => false),
     }) as unknown as InstanceType<typeof StateManager>)
 
     const argv = {
@@ -443,6 +506,7 @@ describe('skip command', () => {
           }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
         ),
         markSkipped: mockMarkSkipped,
+        reconcileWithPipeline: vi.fn(() => false),
       }) as unknown as InstanceType<typeof StateManager>)
 
       const argv = {
@@ -474,6 +538,7 @@ describe('skip command', () => {
           }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
         ),
         markSkipped: mockMarkSkipped,
+        reconcileWithPipeline: vi.fn(() => false),
       }) as unknown as InstanceType<typeof StateManager>)
 
       const argv = {
@@ -508,6 +573,7 @@ describe('skip command', () => {
           }) as unknown as ReturnType<InstanceType<typeof StateManager>['loadState']>,
         ),
         markSkipped: mockMarkSkipped,
+        reconcileWithPipeline: vi.fn(() => false),
       }) as unknown as InstanceType<typeof StateManager>)
 
       const argv = {

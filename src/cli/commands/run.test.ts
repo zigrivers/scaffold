@@ -20,6 +20,7 @@ vi.mock('../../state/state-manager.js', () => {
   StateManagerMock.prototype.markCompleted = vi.fn()
   StateManagerMock.prototype.markSkipped = vi.fn()
   StateManagerMock.prototype.clearInProgress = vi.fn()
+  StateManagerMock.prototype.reconcileWithPipeline = vi.fn(() => false)
   return { StateManager: StateManagerMock }
 })
 
