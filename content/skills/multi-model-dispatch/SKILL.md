@@ -147,13 +147,13 @@ When dispatching a review, bundle all relevant context into the prompt. Each CLI
 ### Template for Artifact Review
 
 ```
-You are reviewing a project artifact for quality issues. Report P0 (critical), P1 (high), and P2 (medium) issues.
+You are reviewing a project artifact for quality issues. Report all P0, P1, P2, and P3 findings; the project's fix threshold is applied downstream.
 
 ## Severity Definitions
 - P0: Will cause implementation failure, data loss, security vulnerability, or fundamental architectural flaw
 - P1: Will cause bugs in normal usage, inconsistency across documents, or blocks downstream work
 - P2: Improvement opportunity — style, naming, documentation, minor optimization
-- Do NOT report P3 issues (personal preference, trivial nits)
+- P3: Personal preference, trivial nits — included so a strict project (`fix_threshold: P3`) can act on them; otherwise advisory
 
 ## Review Standards
 [paste contents of docs/review-standards.md if it exists, otherwise use severity definitions above]
@@ -170,7 +170,7 @@ Respond with a JSON object:
   "approved": true/false,
   "findings": [
     {
-      "severity": "P0" or "P1" or "P2",
+      "severity": "P0" or "P1" or "P2" or "P3",
       "location": "section or line reference",
       "description": "what's wrong",
       "suggestion": "specific fix"
@@ -179,13 +179,13 @@ Respond with a JSON object:
   "summary": "one-line assessment"
 }
 
-If no P0/P1/P2 issues found, respond with: { "approved": true, "findings": [], "summary": "No issues found." }
+If no findings, respond with: { "approved": true, "findings": [], "summary": "No issues found." }
 ```
 
 ### Template for PR Diff Review
 
 ```
-You are reviewing a pull request diff. Report P0, P1, and P2 issues.
+You are reviewing a pull request diff. Report all P0, P1, P2, and P3 findings; the project's fix threshold is applied downstream.
 
 ## Review Standards
 [paste docs/review-standards.md]

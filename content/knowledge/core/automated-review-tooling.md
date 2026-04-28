@@ -14,7 +14,7 @@ Automated code review leverages AI models to provide consistent, thorough code r
 
 See `review-methodology` for severity definitions (P0-P3). See `multi-model-review-dispatch` for finding reconciliation rules.
 
-**Action thresholds:** P0/P1/P2 findings must be fixed before proceeding to the next task. P3 findings are recorded but not actioned.
+**Action thresholds:** Findings at or above the configured `fix_threshold` (read from `results.fix_threshold` in the verdict JSON; default `P2`) must be fixed before proceeding to the next task. Findings below threshold are recorded as advisory but not actioned.
 
 ### Degraded-Mode Behavior
 
@@ -24,8 +24,8 @@ These are the authoritative verdict definitions. Tool files (`review-code.md`, `
 
 | Verdict | Condition |
 |---------|-----------|
-| `pass` | All channels completed, no unresolved P0/P1/P2 |
-| `degraded-pass` | Some channels unavailable, compensating passes ran, no unresolved P0/P1/P2 |
+| `pass` | All channels completed, no unresolved findings at or above `fix_threshold` |
+| `degraded-pass` | Some channels unavailable, compensating passes ran, no unresolved findings at or above `fix_threshold` |
 | `blocked` | Findings at or above fix threshold remain unresolved |
 | `needs-user-decision` | No channels completed — insufficient data for a determination |
 
@@ -47,7 +47,7 @@ When a channel (Codex or Gemini) is unavailable, the CLI dispatches a compensati
 - Missing Gemini → focus on architectural patterns, design reasoning, broad context.
 - Missing both → two compensating passes (one per missing channel's strength area).
 - Compensating-pass findings are **single-source confidence** — they do NOT raise to high confidence even if they agree with another channel's findings.
-- Normal mandatory-fix thresholds apply: P0/P1/P2 findings from compensating passes still require fixing.
+- Normal mandatory-fix thresholds apply: findings at or above `fix_threshold` from compensating passes still require fixing.
 
 #### Foreground-Only Execution
 
@@ -63,7 +63,7 @@ After all channels complete (including compensating passes), reconcile findings 
 
 Reconciliation normalizes findings from all channels (real and compensating) to a common schema, then matches findings across channels by location and category. The purpose is to detect when multiple independent channels agree on a finding (raising confidence) and to surface contradictions that require human judgment. A finding reported by Codex alone has lower confidence than the same finding reported by both Codex and Gemini.
 
-The reconciliation output is a deduplicated list of findings with confidence scores. High-confidence findings (agreed by 2+ real channels) are actionable without further discussion. Low-confidence findings (single-source, or from compensating passes) still require action at P0/P1/P2 but should be noted as lower-confidence in the review summary.
+The reconciliation output is a deduplicated list of findings with confidence scores. High-confidence findings (agreed by 2+ real channels) are actionable without further discussion. Low-confidence findings (single-source, or from compensating passes) still require action when at or above `fix_threshold` but should be noted as lower-confidence in the review summary.
 
 Findings that appear in all three channels (Codex, Gemini, Claude) are considered maximum-confidence and should be surfaced first in the review summary. Findings that appear in only one channel should include the channel name in the finding description to help the developer assess confidence independently.
 
@@ -112,16 +112,16 @@ Apply the following evaluation order to determine the final verdict. The first m
 ```
 Verdict evaluation order:
 1. No channels completed? → needs-user-decision
-2. Any unresolved P0/P1/P2 after 3 fix rounds? → blocked
+2. Any unresolved findings at or above `fix_threshold` after 3 fix rounds? → blocked
 3. Any channel not at full coverage? → degraded-pass
-4. All channels completed, no unresolved P0/P1/P2? → pass
+4. All channels completed, no unresolved findings at or above `fix_threshold`? → pass
 ```
 
 A channel is "not at full coverage" when: it ran as a compensating pass instead of a real tool, or it timed out.
 
 **Verdict precedence reminder:** `needs-user-decision` > `blocked` > `degraded-pass` > `pass`. When multiple conditions apply simultaneously, the higher-precedence verdict wins.
 
-The verdict is always computed after all fix rounds are exhausted — do not emit a partial verdict mid-cycle. If a fix round resolves all P0/P1/P2 findings, the verdict upgrades from `blocked` to `pass` or `degraded-pass` depending on channel coverage. This upgrade must be verified explicitly by re-running the reconciliation step after each fix round, not assumed from the fact that fixes were applied.
+The verdict is always computed after all fix rounds are exhausted — do not emit a partial verdict mid-cycle. If a fix round resolves all findings at or above `fix_threshold`, the verdict upgrades from `blocked` to `pass` or `degraded-pass` depending on channel coverage. This upgrade must be verified explicitly by re-running the reconciliation step after each fix round, not assumed from the fact that fixes were applied.
 
 ### Security-Focused Review Checklist
 
