@@ -16,10 +16,17 @@ export function formatText(results: ReconciledResults): string {
 
   lines.push(`MMR ${gate} — ${results.job_id}`)
   const chCount = `${results.metadata.channels_completed}/${results.metadata.channels_dispatched}`
-  lines.push(
-    `Threshold: ${results.fix_threshold} | Channels: ${chCount}` +
-    ` | Elapsed: ${results.metadata.total_elapsed}`,
+  const segments = [
+    `Threshold: ${results.fix_threshold}`,
+  ]
+  if (results.advisory_count > 0) {
+    segments.push(`Advisory: ${results.advisory_count}`)
+  }
+  segments.push(
+    `Channels: ${chCount}`,
+    `Elapsed: ${results.metadata.total_elapsed}`,
   )
+  lines.push(segments.join(' | '))
   lines.push('')
 
   if (results.reconciled_findings.length > 0) {

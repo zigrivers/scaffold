@@ -1,7 +1,6 @@
 import type { CommandModule, ArgumentsCamelCase } from 'yargs'
 import fs from 'node:fs'
 import path from 'node:path'
-import yaml from 'js-yaml'
 import { loadConfig } from '../config/loader.js'
 import { BUILTIN_CHANNELS } from '../config/defaults.js'
 import { checkInstalled, checkAuth } from '../core/auth.js'
@@ -18,25 +17,35 @@ async function configInit(): Promise<void> {
   }
 
   // Auto-detect which CLIs are installed
-  const channels: Record<string, { enabled: boolean }> = {}
+  const channelLines: string[] = ['channels:']
   for (const [name, chConfig] of Object.entries(BUILTIN_CHANNELS)) {
     const cmd = chConfig.command.split(' ')[0]
     const installed = await checkInstalled(cmd)
-    channels[name] = { enabled: installed }
+    channelLines.push(`  ${name}:`)
+    channelLines.push(`    enabled: ${installed}`)
     console.log(`  ${name}: ${installed ? 'detected' : 'not found'}`)
   }
 
-  const config = {
-    version: 1,
-    defaults: {
-      fix_threshold: 'P2',
-      timeout: 300,
-      format: 'json',
-    },
-    channels,
-  }
+  const template = [
+    'version: 1',
+    '',
+    'defaults:',
+    '  # fix_threshold: minimum severity that blocks the review verdict.',
+    '  # Findings below this severity are kept in the result as advisory',
+    '  # but don\'t cause `blocked`. Choose based on project risk profile:',
+    '  #   P0 — block only on critical (security, data loss, broken functionality)',
+    '  #   P1 — block on critical + significant bugs                 [low friction]',
+    '  #   P2 — block on critical + significant + suggestions        [DEFAULT]',
+    '  #   P3 — block on everything down to nits                     [strict]',
+    '  fix_threshold: P2',
+    '  timeout: 300',
+    '  format: json',
+    '',
+    ...channelLines,
+    '',
+  ].join('\n')
 
-  fs.writeFileSync(configPath, yaml.dump(config, { lineWidth: 120 }))
+  fs.writeFileSync(configPath, template)
   console.log(`\nCreated ${configPath}`)
 }
 

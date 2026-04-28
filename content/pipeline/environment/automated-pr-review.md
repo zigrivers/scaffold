@@ -100,6 +100,18 @@ Check if AGENTS.md exists first. If it exists, check for scaffold tracking comme
 
 ## Instructions
 
+### MMR Configuration
+
+If `.mmr.yaml` does not exist in the project root and `mmr` is on `PATH`,
+run `mmr config init` once to create one. The generated file pins
+`fix_threshold: P2` (the recommended default for typical software work)
+with an explanatory comment block describing each severity tier — edit
+the value if your project warrants a different gate (`P1` for low-friction
+prototypes; `P3` for security-sensitive work).
+
+If `mmr` is not installed, install it before running multi-model review;
+otherwise channels will degrade.
+
 ### Configure Review Enforcement Hook
 
 Add a Claude Code hook to the project's `.claude/settings.json` that fires after
@@ -118,7 +130,7 @@ Add this to `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "if echo \"$CC_BASH_COMMAND\" | grep -q 'gh pr create'; then echo '\\n⚠️  MANDATORY: Run all 3 CLI review channels plus the Superpowers 4th channel before proceeding to the next task:\\n\\n  1. Codex CLI:\\n     Auth: codex login status 2>/dev/null\\n     Run:  codex exec --skip-git-repo-check -s read-only --ephemeral \"REVIEW_PROMPT\" 2>/dev/null\\n\\n  2. Gemini CLI:\\n     Auth: NO_BROWSER=true gemini -p \"respond with ok\" -o json 2>&1\\n     Run:  NO_BROWSER=true gemini -p \"REVIEW_PROMPT\" --output-format json --approval-mode yolo 2>/dev/null\\n\\n  3. Claude CLI:\\n     Auth: claude -p \"respond with ok\" 2>/dev/null\\n     Run:  claude -p \"REVIEW_PROMPT\" --output-format json 2>/dev/null\\n\\n  4. Superpowers code-reviewer (complementary 4th channel):\\n     Dispatch superpowers:code-reviewer subagent with BASE_SHA and HEAD_SHA\\n\\nIf auth fails: tell user to run ! codex login, ! gemini -p \"hello\", or ! claude login (as applicable).\\nDo not silently skip channels — surface auth failures and let MMR decide: missing Codex/Gemini get compensating Claude passes (degraded-pass verdict); missing Claude proceeds without compensation.\\nFix all P0/P1/P2 findings before moving on.\\nFull instructions: scaffold run review-pr'; fi"
+            "command": "if echo \"$CC_BASH_COMMAND\" | grep -q 'gh pr create'; then echo '\\n⚠️  MANDATORY: Run all 3 CLI review channels plus the Superpowers 4th channel before proceeding to the next task:\\n\\n  1. Codex CLI:\\n     Auth: codex login status 2>/dev/null\\n     Run:  codex exec --skip-git-repo-check -s read-only --ephemeral \"REVIEW_PROMPT\" 2>/dev/null\\n\\n  2. Gemini CLI:\\n     Auth: NO_BROWSER=true gemini -p \"respond with ok\" -o json 2>&1\\n     Run:  NO_BROWSER=true gemini -p \"REVIEW_PROMPT\" --output-format json --approval-mode yolo 2>/dev/null\\n\\n  3. Claude CLI:\\n     Auth: claude -p \"respond with ok\" 2>/dev/null\\n     Run:  claude -p \"REVIEW_PROMPT\" --output-format json 2>/dev/null\\n\\n  4. Superpowers code-reviewer (complementary 4th channel):\\n     Dispatch superpowers:code-reviewer subagent with BASE_SHA and HEAD_SHA\\n\\nIf auth fails: tell user to run ! codex login, ! gemini -p \"hello\", or ! claude login (as applicable).\\nDo not silently skip channels — surface auth failures and let MMR decide: missing Codex/Gemini get compensating Claude passes (degraded-pass verdict); missing Claude proceeds without compensation.\\nFix all findings at or above the configured fix_threshold (see results.fix_threshold in the verdict JSON; default P2).\\nFull instructions: scaffold run review-pr'; fi"
           }
         ]
       }
@@ -151,8 +163,8 @@ markers, replace it in place and add the markers.
 <!-- scaffold:automated-pr-review:claude-md start -->
 **Mandatory after `gh pr create`** — run `/scaffold:review-pr <PR#>` to execute
 all three review channels (Codex CLI, Gemini CLI, Claude CLI), plus the
-Superpowers code-reviewer agent as a complementary 4th channel. Fix P0/P1/P2
-findings before moving to the next task. A post-hook on `gh pr create` will
+Superpowers code-reviewer agent as a complementary 4th channel. Fix findings
+at or above `fix_threshold` before moving to the next task. A post-hook on `gh pr create` will
 remind you.
 
 **Optional but supported** for non-PR targets — the review is not PR-gated.

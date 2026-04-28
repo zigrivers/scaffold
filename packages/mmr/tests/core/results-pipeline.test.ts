@@ -197,4 +197,55 @@ describe('runResultsPipeline', () => {
     expect(results.per_channel['claude'].error).toBe('Channel failed')
     expect(results.per_channel['claude'].findings).toEqual([])
   })
+
+  it('emits advisory_count for findings strictly below threshold', () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
+    store.updateChannel(job.job_id, 'claude', {
+      status: 'completed',
+      started_at: '2026-04-28T00:00:00Z',
+      completed_at: '2026-04-28T00:00:10Z',
+    })
+    store.saveChannelOutput(
+      job.job_id,
+      'claude',
+      JSON.stringify({
+        approved: true,
+        findings: [
+          { severity: 'P3', location: 'a.ts:1', description: 'nit', suggestion: 'fix' },
+          { severity: 'P3', location: 'b.ts:2', description: 'nit', suggestion: 'fix' },
+        ],
+        summary: 'two P3 nits',
+      }),
+    )
+
+    const { results } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.verdict).toBe('pass')
+    expect(results.advisory_count).toBe(2)
+  })
+
+  it('only counts findings strictly below threshold as advisory', () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
+    store.updateChannel(job.job_id, 'claude', {
+      status: 'completed',
+      started_at: '2026-04-28T00:00:00Z',
+      completed_at: '2026-04-28T00:00:10Z',
+    })
+    store.saveChannelOutput(
+      job.job_id,
+      'claude',
+      JSON.stringify({
+        approved: false,
+        findings: [
+          { severity: 'P0', location: 'a.ts:1', description: 'crit', suggestion: 'fix' },
+          { severity: 'P2', location: 'b.ts:2', description: 'sugg', suggestion: 'fix' },
+          { severity: 'P3', location: 'c.ts:3', description: 'nit', suggestion: 'fix' },
+        ],
+        summary: 'mixed',
+      }),
+    )
+
+    const { results } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.verdict).toBe('blocked')
+    expect(results.advisory_count).toBe(1)
+  })
 })

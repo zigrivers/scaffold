@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **`advisory_count` field in reconciled results.** Findings strictly below
+  the configured `fix_threshold` are now counted in `results.advisory_count`
+  in the JSON output and rendered as `Advisory: N` (text) or
+  `**Advisory:** N` (markdown) in the verdict copy when non-zero. The gate
+  is unchanged — advisory findings remain in `reconciled_findings` but
+  don't cause `blocked`.
+- **Self-documenting `mmr config init` template.** New `.mmr.yaml` files
+  include an explanatory comment block above `fix_threshold` describing
+  the P0–P3 tiers, and the value is written explicitly (`P2`) rather than
+  relying on the schema default — so future default shifts don't silently
+  change behavior for existing projects.
+
 ## [1.2.2] — 2026-04-27
 
 ### Fixed

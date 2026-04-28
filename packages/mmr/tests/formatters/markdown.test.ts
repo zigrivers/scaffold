@@ -8,6 +8,7 @@ describe('formatMarkdown', () => {
       job_id: 'mmr-abc123',
       verdict: 'blocked',
       fix_threshold: 'P2',
+      advisory_count: 0,
       approved: false,
       summary: 'Review blocked — 1 finding(s) at or above P2',
       reconciled_findings: [{
@@ -33,6 +34,7 @@ describe('formatMarkdown', () => {
       job_id: 'mmr-test',
       verdict: 'pass',
       fix_threshold: 'P2',
+      advisory_count: 0,
       approved: true,
       summary: 'Review passed',
       reconciled_findings: [],
@@ -48,6 +50,7 @@ describe('formatMarkdown', () => {
       job_id: 'mmr-test',
       verdict: 'degraded-pass',
       fix_threshold: 'P2',
+      advisory_count: 0,
       approved: true,
       summary: 'Review passed (degraded — some channels unavailable)',
       reconciled_findings: [],
@@ -63,6 +66,7 @@ describe('formatMarkdown', () => {
       job_id: 'mmr-test',
       verdict: 'blocked',
       fix_threshold: 'P2',
+      advisory_count: 0,
       approved: false,
       summary: 'Review blocked — 1 finding(s) at or above P2',
       reconciled_findings: [{
@@ -88,6 +92,7 @@ describe('formatMarkdown', () => {
       job_id: 'mmr-test',
       verdict: 'needs-user-decision',
       fix_threshold: 'P2',
+      advisory_count: 0,
       approved: false,
       summary: 'No channels completed — manual review needed',
       reconciled_findings: [],
@@ -96,5 +101,37 @@ describe('formatMarkdown', () => {
     }
     const md = formatMarkdown(results)
     expect(md).toContain('## Multi-Model Review — NEEDS DECISION')
+  })
+
+  it('shows advisory count when present', () => {
+    const results: ReconciledResults = {
+      job_id: 'mmr-adv',
+      verdict: 'pass',
+      fix_threshold: 'P2',
+      advisory_count: 3,
+      approved: true,
+      summary: 'Review passed',
+      reconciled_findings: [],
+      per_channel: {},
+      metadata: { channels_dispatched: 1, channels_completed: 1, channels_partial: 0, total_elapsed: '5s' },
+    }
+    const output = formatMarkdown(results)
+    expect(output).toContain('**Advisory:** 3')
+  })
+
+  it('omits advisory segment when count is zero', () => {
+    const results: ReconciledResults = {
+      job_id: 'mmr-noadv',
+      verdict: 'pass',
+      fix_threshold: 'P2',
+      advisory_count: 0,
+      approved: true,
+      summary: 'Review passed',
+      reconciled_findings: [],
+      per_channel: {},
+      metadata: { channels_dispatched: 1, channels_completed: 1, channels_partial: 0, total_elapsed: '5s' },
+    }
+    const output = formatMarkdown(results)
+    expect(output).not.toContain('Advisory')
   })
 })

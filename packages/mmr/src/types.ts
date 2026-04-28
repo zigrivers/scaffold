@@ -80,6 +80,7 @@ export interface ReconciledResults {
   job_id: string
   verdict: Verdict
   fix_threshold: Severity
+  advisory_count: number
   approved: boolean
   summary: string
   reconciled_findings: ReconciledFinding[]

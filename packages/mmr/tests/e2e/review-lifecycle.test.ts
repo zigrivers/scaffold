@@ -74,6 +74,7 @@ describe('review lifecycle (unit integration)', () => {
     const approved = verdict === 'pass' || verdict === 'degraded-pass'
     const results: ReconciledResults = {
       job_id: job.job_id, verdict, fix_threshold: 'P2',
+      advisory_count: 0,
       approved,
       summary: approved ? 'Review passed' : `Review blocked — ${reconciled.length} finding(s) at or above P2`,
       reconciled_findings: reconciled,
@@ -133,6 +134,7 @@ describe('review lifecycle (unit integration)', () => {
     const approved = verdict === 'pass' || verdict === 'degraded-pass'
     const results: ReconciledResults = {
       job_id: job.job_id, verdict, fix_threshold: 'P2',
+      advisory_count: 0,
       approved,
       summary: 'Review passed (degraded — some channels unavailable)',
       reconciled_findings: reconciled,
@@ -165,6 +167,7 @@ describe('review lifecycle (unit integration)', () => {
 
     const results: ReconciledResults = {
       job_id: job.job_id, verdict, fix_threshold: 'P2',
+      advisory_count: 0,
       approved: false,
       summary: 'No channels completed — manual review needed',
       reconciled_findings: [],

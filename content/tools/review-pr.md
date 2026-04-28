@@ -9,7 +9,7 @@ conditional: null
 stateless: true
 category: tool
 knowledge-base: [multi-model-review-dispatch, automated-review-tooling]
-argument-hint: "<PR number or blank for current branch>"
+argument-hint: "<PR# or blank> [--fix-threshold P0|P1|P2|P3]"
 ---
 
 ## Purpose
@@ -44,7 +44,7 @@ The three channels are:
 
 ## Inputs
 
-- $ARGUMENTS — PR number (optional; auto-detected from current branch if omitted)
+- $ARGUMENTS — PR number (optional; auto-detected from current branch if omitted) and/or `--fix-threshold P0|P1|P2|P3` to override the project's configured threshold for this run
 - `.mmr.yaml` — MMR CLI configuration (channels, review_criteria, defaults)
 
 The CLI handles review context via config (`review_criteria` in `.mmr.yaml`).
@@ -54,7 +54,7 @@ in the review criteria config rather than read at dispatch time.
 ## Expected Outputs
 
 - All three CLI review channels executed (or fallback documented) plus the Superpowers code-reviewer 4th channel reconciled via `mmr reconcile`
-- P0/P1/P2 findings fixed before proceeding
+- findings at or above the configured `fix_threshold` fixed before proceeding (read from `results.fix_threshold` in the verdict JSON; default `P2`)
 - Review summary with per-channel results and reconciliation
 
 ## Instructions
@@ -62,8 +62,21 @@ in the review criteria config rather than read at dispatch time.
 ### Step 1: Identify the PR
 
 ```bash
-# Use argument if provided, otherwise detect from current branch
-PR_NUMBER="${ARGUMENTS:-$(gh pr view --json number -q .number 2>/dev/null)}"
+# Strip --fix-threshold from $ARGUMENTS if present; remainder is the PR number.
+# Strip the entire matched span (BASH_REMATCH[0]) — including whatever
+# whitespace separator was used (space, tab, multi-space). Replacing with a
+# single space preserves token boundaries; tr -d '[:space:]' below drops
+# everything else.
+FIX_THRESHOLD=""
+ARGS_REMAINING="$ARGUMENTS"
+if [[ "$ARGS_REMAINING" =~ (^|[[:space:]])--fix-threshold[[:space:]]+(P[0-3])($|[[:space:]]) ]]; then
+  FIX_THRESHOLD="${BASH_REMATCH[2]}"
+  ARGS_REMAINING="${ARGS_REMAINING//${BASH_REMATCH[0]}/ }"
+fi
+
+# Use remaining argument if provided, otherwise detect from current branch
+PR_NUMBER="$(echo "$ARGS_REMAINING" | tr -d '[:space:]')"
+PR_NUMBER="${PR_NUMBER:-$(gh pr view --json number -q .number 2>/dev/null)}"
 ```
 
 If no PR is found, stop and tell the user to create a PR first.
@@ -73,7 +86,9 @@ If no PR is found, stop and tell the user to create a PR first.
 Use the MMR CLI as the primary entry point for automated dispatch, reconciliation, and verdict:
 
 ```bash
-MMR_RESULT=$(mmr review --pr "$PR_NUMBER" --sync --format json)
+MMR_FLAGS=(--pr "$PR_NUMBER" --sync --format json)
+[ -n "$FIX_THRESHOLD" ] && MMR_FLAGS+=(--fix-threshold "$FIX_THRESHOLD")
+MMR_RESULT=$(mmr review "${MMR_FLAGS[@]}")
 # Extract job_id from JSON output for use in mmr reconcile
 JOB_ID=$(echo "$MMR_RESULT" | grep -o '"job_id": "[^"]*"' | head -1 | cut -d'"' -f4)
 ```
@@ -168,7 +183,7 @@ reconcile findings after all channels complete:
 | One channel flags P0, others approve | **High** | Fix it — P0 is critical from any source |
 | One channel flags P1, others approve | **Medium** | Fix it — P1 findings are mandatory regardless of source count |
 | Channels contradict each other | **Low** | Present to user for adjudication |
-| Compensating-pass P0/P1/P2 finding | **Single-source** | Fix per normal thresholds, label as compensating |
+| Compensating-pass blocking finding | **Single-source** | Fix per normal thresholds, label as compensating |
 
 ### Step 6: Report Results
 
@@ -200,7 +215,7 @@ Output a review summary in this format:
 
 Return exactly one verdict:
 
-- `pass` — all channels completed and the gate passed (no unresolved findings at or above the configured fix threshold; default threshold is `P2`, so this means no unresolved P0/P1/P2)
+- `pass` — all channels completed and the gate passed (no unresolved findings at or above the configured fix threshold; the threshold defaults to `P2` but is configurable via `.mmr.yaml` or `--fix-threshold`)
 - `degraded-pass` — gate passed but some channels were skipped or replaced by compensating passes (max achievable verdict when any channel was compensated)
 - `blocked` — gate failed: at least one unresolved finding sits at or above the fix threshold (typically the *same* finding(s) remain unresolved after 3 fix attempts)
 - `needs-user-decision` — no channels completed (no reconciled result was possible), reviewer disagreement / contradictions, or a finding requires human judgment that automated iteration can't resolve
@@ -209,15 +224,15 @@ Verdict precedence: `needs-user-decision` > `blocked` > `degraded-pass` > `pass`
 
 When compensating passes ran, maximum achievable verdict is `degraded-pass`. When both external channels were compensated, note "All findings are single-model."
 
-### Step 7: Fix P0/P1/P2 Findings
+### Step 7: Fix Blocking Findings
 
-If any P0, P1, or P2 findings exist:
+If any findings sit at or above `fix_threshold` (the verdict JSON's `fix_threshold` field; default `P2`):
 1. Fix them in the code
 2. Push the fixes: `git push`
 3. Re-run the review to verify fixes: `mmr review --pr "$PR_NUMBER" --sync --format json`
 4. The 3-round limit is **per finding**, not total rounds:
    - **Keep going** when each new round surfaces *different, concrete, fixable* findings — that is healthy review/fix iteration.
-   - **Stop and ask the user** when (a) the *same* P0/P1/P2 finding (or set) recurs across 3 attempts without progress, (b) a finding is genuinely ambiguous (channels contradict each other), or (c) the user explicitly asks to stop.
+   - **Stop and ask the user** when (a) the *same* blocking finding (or set) recurs across 3 attempts without progress, (b) a finding is genuinely ambiguous (channels contradict each other), or (c) the user explicitly asks to stop.
    - **When stopped**, do NOT merge automatically. Document the unresolved findings (severity, location, attempt count) and let the user decide whether to continue fixing, create follow-up issues, or override.
 
 **Note:** Fix cycles are an orchestration concern — the caller (agent or human) handles the fix loop. The CLI provides the review and verdict; the caller decides whether to fix and re-run.
@@ -261,8 +276,8 @@ In either path, output the message and stop. Do NOT proceed to the next task wit
 2. **All three CLI channels are mandatory** — Codex CLI, Gemini CLI, and Claude CLI. Plus the Superpowers code-reviewer agent as a complementary 4th channel reconciled via `mmr reconcile` (Step 3). Skip a CLI channel only when a tool is genuinely not installed or auth cannot be recovered (in which case MMR emits a compensating pass for missing Codex/Gemini channels; a missing Claude CLI has no compensator). Never skip by choice.
 3. **Auth failures are not silent** — always surface to the user with the exact recovery command.
 4. **Independence** — never share one channel's output with another. Each reviews the diff independently.
-5. **Fix before proceeding** — P0/P1/P2 findings must be resolved before moving to the next task.
-6. **3-round limit (per finding)** — never attempt to fix the *same* P0/P1/P2 finding more than 3 times. Each round that surfaces a *new* fixable finding is healthy iteration — keep going. Stop only when the same finding recurs across 3 attempts, channels contradict each other, or the user asks to stop.
+5. **Fix before proceeding** — findings at or above `fix_threshold` must be resolved before moving to the next task.
+6. **3-round limit (per finding)** — never attempt to fix the *same* blocking finding more than 3 times. Each round that surfaces a *new* fixable finding is healthy iteration — keep going. Stop only when the same finding recurs across 3 attempts, channels contradict each other, or the user asks to stop.
 7. **Document everything** — the review summary must show which channels ran and which were skipped, with reasons.
 8. **CLI-first** — use `mmr review --sync` as the primary entry point. Manual dispatch is a fallback only.
 9. **Job storage** — the CLI stores job data at `~/.mmr/jobs/{job-id}/results.json`. Review results are available via `mmr results <job-id>`.

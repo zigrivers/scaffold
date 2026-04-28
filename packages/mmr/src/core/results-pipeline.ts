@@ -157,10 +157,15 @@ export function runResultsPipeline(
         return `Review blocked — ${blockingCount} finding(s) at or above ${fixThreshold}`
       })()
 
+  const advisoryCount = reconciledFindings.filter(
+    (f) => SEVERITY_ORDER[f.severity] > SEVERITY_ORDER[fixThreshold],
+  ).length
+
   const results: ReconciledResults = {
     job_id: job.job_id,
     verdict,
     fix_threshold: fixThreshold,
+    advisory_count: advisoryCount,
     approved,
     summary,
     reconciled_findings: reconciledFindings,
