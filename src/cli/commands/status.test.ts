@@ -535,6 +535,59 @@ describe('status command', () => {
     expect(allOutput).not.toContain('disabled-step')
   })
 
+  it('keeps disabled steps with completed/skipped/in_progress status visible (audit + active work)', async () => {
+    // P2 from review: silently hiding ALL disabled entries loses operator
+    // visibility on historical and especially active work. Only pending
+    // entries (the bug class fix B prunes) should be hidden.
+    vi.mocked(loadConfig).mockReturnValue({
+      config: {
+        version: 2, methodology: 'deep', platforms: ['claude-code'],
+        project: { projectType: 'web-app' },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      errors: [], warnings: [],
+    })
+    vi.mocked(resolveOverlayState).mockReturnValue({
+      steps: {
+        'enabled-step': { enabled: true },
+        'disabled-completed': { enabled: false },
+        'disabled-skipped': { enabled: false },
+        'disabled-in-progress': { enabled: false },
+        'disabled-pending': { enabled: false },
+      },
+      knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
+    })
+    const metaPrompts = new Map([
+      ['enabled-step', makeFrontmatter('enabled-step', 'foundation', 1)],
+      ['disabled-completed', makeFrontmatter('disabled-completed', 'foundation', 2)],
+      ['disabled-skipped', makeFrontmatter('disabled-skipped', 'foundation', 3)],
+      ['disabled-in-progress', makeFrontmatter('disabled-in-progress', 'foundation', 4)],
+      ['disabled-pending', makeFrontmatter('disabled-pending', 'foundation', 5)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
+    const steps = {
+      'enabled-step': { status: 'pending', source: 'pipeline', produces: [] },
+      'disabled-completed': { status: 'completed', source: 'pipeline', produces: [] },
+      'disabled-skipped': { status: 'skipped', source: 'pipeline', produces: [] },
+      'disabled-in-progress': { status: 'in_progress', source: 'pipeline', produces: [] },
+      'disabled-pending': { status: 'pending', source: 'pipeline', produces: [] },
+    }
+    mockStateWith(MockStateManager, steps, { next_eligible: ['enabled-step'] })
+
+    mockResolveOutputMode.mockReturnValue('json')
+    await statusCommand.handler(defaultArgv({ format: 'json' }))
+    const envelope = JSON.parse(writtenLines.join(''))
+    const parsed = envelope.data ?? envelope
+    const phaseSlugs = (parsed.phases as Array<{ steps: Array<{ slug: string }> }>)
+      .flatMap(p => p.steps.map(s => s.slug))
+    expect(phaseSlugs).toContain('disabled-completed')
+    expect(phaseSlugs).toContain('disabled-skipped')
+    expect(phaseSlugs).toContain('disabled-in-progress')
+    expect(phaseSlugs).not.toContain('disabled-pending')
+  })
+
   it('omits disabled steps from compact JSON `steps` array', async () => {
     vi.mocked(loadConfig).mockReturnValue({
       config: {
@@ -668,11 +721,6 @@ describe('status command', () => {
       mockDiscoverMetaPrompts.mockReturnValue(new Map([
         ['system-architecture', stepWithCrossReads()],
       ]))
-      vi.mocked(resolveOverlayState).mockReturnValueOnce({
-        steps: { 'system-architecture': { enabled: true } },
-        knowledge: {}, reads: {}, dependencies: {},
-        crossReads: { 'system-architecture': [{ service: 'shared-lib', step: 'api-contracts' }] },
-      })
       mockStateWith(MockStateManager, {
         'system-architecture': { status: 'pending', source: 'pipeline', produces: [] },
       })

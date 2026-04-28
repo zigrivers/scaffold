@@ -201,16 +201,17 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     const staleCommandCount = checkCommandStaleness(projectRoot)
 
     // Build phases array: group meta-prompts by phase with per-phase counts.
-    // Steps the active overlay marks `enabled: false` are excluded — they
-    // are not part of this project's pipeline and must not surface as
-    // pending. Steps absent from the overlay default to enabled (matches
-    // buildGraph's default-true behavior).
+    // We hide entries that are *disabled by overlay AND in `pending` status* —
+    // those are the leak class fix B prunes from state. Disabled steps with
+    // historical status (completed/skipped) or active work (in_progress)
+    // remain visible so the operator can see audit/active context. Steps
+    // absent from the overlay default to enabled (matches buildGraph's
+    // default-true behavior).
     const isDisabled = (slug: string): boolean =>
       pipeline.overlay.steps[slug]?.enabled === false
     const phasesData = PHASES.map(phaseInfo => {
       const phaseSteps = [...context.metaPrompts.values()]
         .filter(m => m.frontmatter.phase === phaseInfo.slug)
-        .filter(m => !isDisabled(m.frontmatter.name))
         .map(m => {
           const entry = steps[m.frontmatter.name]
           const cd = crossDepMap.get(m.frontmatter.name)
@@ -220,6 +221,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
             ...(cd && cd.length > 0 ? { crossDependencies: cd } : {}),
           }
         })
+        .filter(s => !(isDisabled(s.slug) && s.status === 'pending'))
       const phaseCompleted = phaseSteps.filter(s => s.status === 'completed').length
       const phaseSkipped = phaseSteps.filter(s => s.status === 'skipped').length
       const phasePending = phaseSteps.filter(s => s.status === 'pending').length
@@ -249,7 +251,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       if (isCompact) {
         result.compact = true
         result.steps = Object.entries(steps)
-          .filter(([slug]) => !isDisabled(slug))
+          .filter(([slug, entry]) => !(isDisabled(slug) && entry.status === 'pending'))
           .filter(([, entry]) => actionableStatuses.has(entry.status))
           .map(([slug, entry]) => {
             const cd = crossDepMap.get(slug)
@@ -277,10 +279,11 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       }
 
       for (const [slug, entry] of Object.entries(steps)) {
-        // Mirror phasesData: steps the overlay marks disabled are not
-        // part of this project's pipeline and must not appear in the
-        // listing, even if a stale entry survives in state.
-        if (isDisabled(slug)) continue
+        // Mirror phasesData: hide overlay-disabled entries that are still
+        // `pending` (the bug class fix B prunes). Keep historical
+        // (completed/skipped) and active-work (in_progress) entries
+        // visible so the operator retains audit + active-work context.
+        if (isDisabled(slug) && entry.status === 'pending') continue
         if (isCompact && !actionableStatuses.has(entry.status)) continue
         const fm = pipeline.stepMeta.get(slug)
         const phase = fm?.phase ?? '?'
