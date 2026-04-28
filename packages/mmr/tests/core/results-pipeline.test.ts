@@ -86,7 +86,18 @@ describe('runResultsPipeline', () => {
     expect(results.per_channel.gemini.error).toBe('Channel failed')
   })
 
-  it('truncates long log content in error detail', () => {
+  it('keeps the generic error when log contains only whitespace', () => {
+    // The trim() guard in appendLogDetail must keep us from rendering
+    // "Channel failed: " with an empty payload after the colon.
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['gemini'] })
+    store.updateChannel(job.job_id, 'gemini', { status: 'failed' })
+    store.saveChannelLog(job.job_id, 'gemini', '   \n\t  \n')
+
+    const { results } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.per_channel.gemini.error).toBe('Channel failed')
+  })
+
+  it('truncates long log content with a single ellipsis marker', () => {
     const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['gemini'] })
     store.updateChannel(job.job_id, 'gemini', { status: 'failed' })
     const longLog = 'x'.repeat(10_000)
@@ -94,8 +105,10 @@ describe('runResultsPipeline', () => {
 
     const { results } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
     const errorMsg = results.per_channel.gemini.error ?? ''
-    // Cap at a reasonable size so the JSON output stays readable.
-    expect(errorMsg.length).toBeLessThan(2_000)
+    // Contract: 'Channel failed: ' prefix + at most 1000 payload chars + '…'.
+    expect(errorMsg.endsWith('…')).toBe(true)
+    const prefix = 'Channel failed: '
+    expect(errorMsg.length).toBe(prefix.length + 1000 + 1)
   })
 
   it('produces needs-user-decision when no channels completed', () => {
