@@ -124,8 +124,13 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     //    state may have no entry for newly-enabled steps. Compute from
     //    the enabled pipeline ∩ state intersection: pending if missing
     //    or status === 'pending', done if 'completed' or 'skipped'.
+    //
+    //    "Enabled" = explicitly set to `true` in the overlay (presets
+    //    enumerate every known pipeline step, so a step absent from
+    //    overlay is "not in this project"). This matches the prior
+    //    reconciliation default (`?? false`).
     const enabledPipelineSlugs = [...context.metaPrompts.keys()]
-      .filter(slug => pipeline.overlay.steps[slug]?.enabled !== false)
+      .filter(slug => pipeline.overlay.steps[slug]?.enabled === true)
     const allDone =
       enabledPipelineSlugs.length > 0 &&
       enabledPipelineSlugs.every(slug => {

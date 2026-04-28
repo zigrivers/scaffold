@@ -294,6 +294,18 @@ describe('next command', () => {
     mockDiscoverMetaPrompts.mockReturnValue(
       metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
     )
+    vi.mocked(loadConfig).mockReturnValue({
+      config: {
+        version: 2, methodology: 'deep', platforms: ['claude-code'],
+        project: { projectType: 'web-app' },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      errors: [], warnings: [],
+    })
+    vi.mocked(resolveOverlayState).mockReturnValue({
+      steps: { 'step-a': { enabled: true }, 'step-b': { enabled: true } },
+      knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
+    })
     const steps = {
       'step-a': { status: 'completed', source: 'pipeline', produces: [] },
       'step-b': { status: 'skipped', source: 'pipeline', produces: [] },

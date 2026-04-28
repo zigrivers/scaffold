@@ -244,6 +244,21 @@ describe('status command', () => {
     mockDiscoverMetaPrompts.mockReturnValue(
       metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
     )
+    vi.mocked(loadConfig).mockReturnValue({
+      config: {
+        version: 2, methodology: 'deep', platforms: ['claude-code'],
+        project: { projectType: 'web-app' },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      errors: [], warnings: [],
+    })
+    vi.mocked(resolveOverlayState).mockReturnValue({
+      steps: {
+        'step-a': { enabled: true }, 'step-b': { enabled: true },
+        'step-c': { enabled: true }, 'step-d': { enabled: true },
+      },
+      knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
+    })
     const steps = {
       'step-a': { status: 'completed', source: 'pipeline', produces: [] },
       'step-b': { status: 'completed', source: 'pipeline', produces: [] },
@@ -281,6 +296,21 @@ describe('status command', () => {
     mockDiscoverMetaPrompts.mockReturnValue(
       metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
     )
+    vi.mocked(loadConfig).mockReturnValue({
+      config: {
+        version: 2, methodology: 'deep', platforms: ['claude-code'],
+        project: { projectType: 'web-app' },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      errors: [], warnings: [],
+    })
+    vi.mocked(resolveOverlayState).mockReturnValue({
+      steps: {
+        'step-a': { enabled: true }, 'step-b': { enabled: true },
+        'step-c': { enabled: true }, 'step-d': { enabled: true },
+      },
+      knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
+    })
     const steps = {
       'step-a': { status: 'completed', source: 'pipeline', produces: [] },
       'step-b': { status: 'skipped', source: 'pipeline', produces: [] },
@@ -362,6 +392,21 @@ describe('status command', () => {
     mockDiscoverMetaPrompts.mockReturnValue(
       metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
     )
+    vi.mocked(loadConfig).mockReturnValue({
+      config: {
+        version: 2, methodology: 'deep', platforms: ['claude-code'],
+        project: { projectType: 'web-app' },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      errors: [], warnings: [],
+    })
+    vi.mocked(resolveOverlayState).mockReturnValue({
+      steps: {
+        s1: { enabled: true }, s2: { enabled: true }, s3: { enabled: true },
+        s4: { enabled: true }, s5: { enabled: true }, s6: { enabled: true },
+      },
+      knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
+    })
     const steps = {
       's1': { status: 'completed', source: 'pipeline', produces: [] },
       's2': { status: 'completed', source: 'pipeline', produces: [] },
@@ -772,6 +817,21 @@ describe('status command', () => {
       mockDiscoverMetaPrompts.mockReturnValue(
         metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
       )
+      vi.mocked(loadConfig).mockReturnValue({
+        config: {
+          version: 2, methodology: 'deep', platforms: ['claude-code'],
+          project: { projectType: 'web-app' },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
+        errors: [], warnings: [],
+      })
+      vi.mocked(resolveOverlayState).mockReturnValue({
+        steps: {
+          s1: { enabled: true }, s2: { enabled: true }, s3: { enabled: true },
+          s4: { enabled: true }, s5: { enabled: true },
+        },
+        knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
+      })
       const steps = {
         's1': { status: 'completed', source: 'pipeline', produces: [] },
         's2': { status: 'completed', source: 'pipeline', produces: [] },

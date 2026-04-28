@@ -163,9 +163,14 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     //    stopped reconciling); iterating the pipeline alone overcounts
     //    by including disabled steps. The intersection is correct in
     //    both directions.
+    //
+    //    "Enabled" = explicitly set to `true` in the overlay (presets
+    //    enumerate every known pipeline step, so a step absent from
+    //    overlay is "not in this project"). This matches the prior
+    //    reconciliation default (`?? false`) so totals don't inflate.
     const { steps } = state
     const enabledSlugs = [...context.metaPrompts.keys()]
-      .filter(slug => pipeline.overlay.steps[slug]?.enabled !== false)
+      .filter(slug => pipeline.overlay.steps[slug]?.enabled === true)
     const statusOf = (slug: string): string =>
       steps[slug]?.status ?? 'pending'
     const completed = enabledSlugs.filter(s => statusOf(s) === 'completed').length
