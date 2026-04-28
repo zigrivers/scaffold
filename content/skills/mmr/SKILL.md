@@ -119,12 +119,19 @@ Re-run `mmr config test` after re-authenticating to verify.
 
 ## Severity Gate
 
-Default threshold is P2 (fix P0/P1/P2, skip P3). Override per-review:
+Default threshold is `P2` (the verdict gate blocks on P0, P1, and P2;
+P3 findings are kept in the result as **advisory** but don't cause
+`blocked`). Override per-review:
 
 ```bash
 mmr review --pr 47 --fix-threshold P1   # Only fix P0 and P1
 mmr review --pr 47 --fix-threshold P0   # Only fix critical issues
 ```
+
+The verdict JSON includes `advisory_count` (count of findings strictly
+below the threshold). Formatted output shows `Advisory: N` (text) or
+`**Advisory:** N` (markdown) when non-zero — useful for spotting real
+findings that the gate didn't block.
 
 ## Output Formats
 
