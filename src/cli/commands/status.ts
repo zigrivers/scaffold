@@ -218,12 +218,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     // historical entries for steps no longer in metaPrompts.
     const crossDepMap = new Map<string, ReturnType<typeof resolveCrossReadReadiness>>()
     const sharedForeignCache = new Map<string, PipelineState | null | 'read-error'>()
-    const slugsForCrossDep = new Set<string>([
-      ...context.metaPrompts.keys(),
-      ...Object.keys(steps),
-    ])
-    for (const slug of slugsForCrossDep) {
-      if (!isInScope(slug)) continue
+    for (const slug of surfacedSlugs) {
       // overlay.crossReads is the authoritative merged map (frontmatter ∪ overlay
       // overrides) since Wave 3c+1. Defaults to [] for steps not in metaPrompts.
       const crossReads = pipeline.overlay.crossReads[slug] ?? []
@@ -241,19 +236,17 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     // 6. Check command staleness
     const staleCommandCount = checkCommandStaleness(projectRoot)
 
-    // Build phases array: group meta-prompts by phase with per-phase counts.
-    // We hide entries that are *disabled by overlay AND in `pending` status* —
-    // those are the leak class fix B prunes from state. Disabled steps with
-    // historical status (completed/skipped) or active work (in_progress)
-    // remain visible so the operator can see audit/active context. Steps
-    // absent from the overlay default to enabled (matches buildGraph's
-    // default-true behavior).
-    const isDisabled = (slug: string): boolean =>
-      pipeline.overlay.steps[slug]?.enabled === false
+    // Build phases array from the same `surfacedSlugs` set used for
+    // progress totals. This guarantees totals/phases/listing/compact
+    // stay in lockstep — every surface answers the same "is this slug
+    // part of the project's view right now?" question via one set,
+    // rather than each surface re-deriving the answer with a slightly
+    // different predicate.
+    const surfacedSet = new Set<string>(surfacedSlugs)
     const phasesData = PHASES.map(phaseInfo => {
       const phaseSteps = [...context.metaPrompts.values()]
         .filter(m => m.frontmatter.phase === phaseInfo.slug)
-        .filter(m => isInScope(m.frontmatter.name))
+        .filter(m => surfacedSet.has(m.frontmatter.name))
         .map(m => {
           const entry = steps[m.frontmatter.name]
           const cd = crossDepMap.get(m.frontmatter.name)
@@ -263,7 +256,6 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
             ...(cd && cd.length > 0 ? { crossDependencies: cd } : {}),
           }
         })
-        .filter(s => !(isDisabled(s.slug) && s.status === 'pending'))
       const phaseCompleted = phaseSteps.filter(s => s.status === 'completed').length
       const phaseSkipped = phaseSteps.filter(s => s.status === 'skipped').length
       const phasePending = phaseSteps.filter(s => s.status === 'pending').length
@@ -292,22 +284,14 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       }
       if (isCompact) {
         result.compact = true
-        // Iterate the union of pipeline keys ∪ state keys for the same
-        // reason as the interactive listing: enabled pipeline steps
-        // without a state entry are pending and must be surfaced. State
-        // alone is incomplete now that we don't reconcile on read.
-        const compactSlugs = [...new Set<string>([
-          ...context.metaPrompts.keys(),
-          ...Object.keys(steps),
-        ])]
-        result.steps = compactSlugs
-          .filter(slug => isInScope(slug))
+        // Compact JSON also derives from `surfacedSlugs` — same source
+        // of truth as phases and progress totals.
+        result.steps = surfacedSlugs
           .map(slug => {
             const entry = steps[slug]
             const status = entry?.status ?? 'pending'
             return { slug, status }
           })
-          .filter(({ slug, status }) => !(isDisabled(slug) && status === 'pending'))
           .filter(({ status }) => actionableStatuses.has(status))
           .map(({ slug, status }) => {
             const cd = crossDepMap.get(slug)
@@ -334,22 +318,11 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
         pending: '○',
       }
 
-      // Iterate the union of pipeline keys and state keys so enabled
-      // steps without a state entry still show as pending. State alone
-      // is incomplete now that we don't reconcile on read.
-      const listSlugs = [...new Set<string>([
-        ...context.metaPrompts.keys(),
-        ...Object.keys(steps),
-      ])]
-      for (const slug of listSlugs) {
-        if (!isInScope(slug)) continue
+      // Interactive listing also iterates `surfacedSlugs` — single
+      // source of truth shared with phases / compact / progress totals.
+      for (const slug of surfacedSlugs) {
         const entry = steps[slug]
         const status = entry?.status ?? 'pending'
-        // Mirror phasesData: hide overlay-disabled entries that are still
-        // `pending` (the bug class fix B prunes). Keep historical
-        // (completed/skipped) and active-work (in_progress) entries
-        // visible so the operator retains audit + active-work context.
-        if (isDisabled(slug) && status === 'pending') continue
         if (isCompact && !actionableStatuses.has(status)) continue
         const fm = pipeline.stepMeta.get(slug)
         const phase = fm?.phase ?? '?'
