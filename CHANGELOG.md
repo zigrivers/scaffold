@@ -4,6 +4,28 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.24.2] — 2026-04-28
+
+### Changed
+- **Clarified the 3-round limit in review tool prompts and CLAUDE.md.** The
+  rule is **per finding**, not per total review rounds. The previous wording
+  ("after 3 fix rounds with unresolved findings, stop") let careful readers
+  treat any 3 review rounds as the cap, even when each round produced a
+  *new, different, fixable* finding (which is healthy review/fix iteration,
+  not a stuck loop). The corrected rule reads: stop and surface to the user
+  only when the *same* P0/P1/P2 finding (or set) recurs across 3 fix
+  attempts, when channels contradict each other, or when the user
+  explicitly asks to stop.
+- **Aligned verdict definitions in `review-pr.md` and `review-code.md`
+  with `deriveVerdict` in `packages/mmr/src/core/reconciler.ts`.** Phrased
+  the verdicts in terms of the configured fix threshold (default `P2`)
+  rather than hardcoding `P0/P1/P2`, and moved "no reconciled result was
+  possible" from `blocked` to `needs-user-decision` (matches the
+  zero-channels-completed branch in the code).
+- **Split `review-pr.md` Step 8 into success and stop paths** so the
+  ready-for-merge message is no longer reachable when a stop condition
+  fires.
+
 ### Notes
 - Bundled `@zigrivers/mmr` 1.2.1 → 1.2.2 (patch). Two fixes:
   (1) default `gemini` channel command was `'gemini -p'` and failed
@@ -11,7 +33,7 @@ All notable changes to Scaffold are documented here.
   MMR pipes prompts via stdin; (2) per-channel `error` field now
   includes the captured stderr / spawn-error log instead of a generic
   `"Channel failed"` string. Released independently as tag
-  `mmr-v1.2.2`; no scaffold version bump.
+  `mmr-v1.2.2`.
 
 ## [3.24.1] — 2026-04-27
 
