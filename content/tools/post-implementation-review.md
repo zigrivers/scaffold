@@ -10,7 +10,7 @@ conditional: null
 stateless: true
 category: tool
 knowledge-base: [multi-model-review-dispatch, automated-review-tooling, post-implementation-review-methodology]
-argument-hint: "[--report-only]"
+argument-hint: "[--report-only] [--fix-threshold P0|P1|P2|P3]"
 ---
 
 ## Purpose
@@ -30,7 +30,7 @@ The three channels are:
 
 ## Inputs
 
-- `$ARGUMENTS` — `--report-only` flag (optional; omit to review + fix)
+- `$ARGUMENTS` — `--report-only` flag and/or `--fix-threshold P0|P1|P2|P3` (both optional)
 - `docs/user-stories.md` (required) — user stories with acceptance criteria; organizing manifest for Phase 2
 - `docs/implementation-plan.md` (optional) — implementation tasks; used to cross-check that all planned deliverables were built
 - `docs/coding-standards.md` (required) — coding conventions for review context
@@ -43,13 +43,13 @@ The three channels are:
 ## Expected Outputs
 
 - `docs/reviews/post-implementation-review.md` — consolidated findings report
-- Fixed code (P0/P1/P2 findings resolved) — in review+fix and update modes
+- Fixed code (findings at or above `fix_threshold` resolved) — in review+fix and update modes
 
 ## Mode Detection
 
 | Condition | Mode |
 |-----------|------|
-| No prior report, no `--report-only` | **Review + Fix** — run all phases, then fix P0/P1/P2 |
+| No prior report, no `--report-only` | **Review + Fix** — run all phases, then fix findings at or above `fix_threshold` |
 | No prior report, `--report-only` | **Report Only** — run all phases, write report, no code changes |
 | Prior report exists, no `--report-only` | **Update Mode** — load prior findings, skip to Phase 3 fix execution |
 | Prior report exists, `--report-only` | **Re-review** — run full review fresh, overwrite prior report |
@@ -62,6 +62,12 @@ The three channels are:
 # Detect --report-only flag
 REPORT_ONLY=false
 [[ "$ARGUMENTS" == *"--report-only"* ]] && REPORT_ONLY=true
+
+# Detect --fix-threshold flag
+FIX_THRESHOLD=""
+if [[ "$ARGUMENTS" =~ (^|[[:space:]])--fix-threshold[[:space:]]+(P[0-3])($|[[:space:]]) ]]; then
+  FIX_THRESHOLD="${BASH_REMATCH[2]}"
+fi
 
 # Detect prior report
 PRIOR_REPORT="docs/reviews/post-implementation-review.md"
@@ -482,6 +488,12 @@ diff-only), so it operates independently of `mmr review`. Use `mmr reconcile` on
 when you want to merge post-implementation findings into an existing MMR job for a
 single unified verdict.
 
+If `$FIX_THRESHOLD` is set and a fresh `mmr review` is dispatched as part
+of this flow (e.g., to seed a job for `mmr reconcile`), forward it to that
+invocation: `mmr review … --fix-threshold "$FIX_THRESHOLD" …`. The
+existing `mmr reconcile` call does not take `--fix-threshold` directly —
+the job's threshold is set at `mmr review` time.
+
 ### Step 6: Consolidate Findings
 
 Merge all findings from Phase 1 (`CODEX_PHASE1_FINDINGS`, `GEMINI_PHASE1_FINDINGS`,
@@ -495,8 +507,12 @@ entry. Record all source channels in a `sources` array on the merged finding.
 
 **Sorting:** P0 first, then P1, then P2, then P3.
 
-**Fix queue:** P0, P1, and P2 findings enter the fix queue. P3 findings are recorded
-in the report but not actioned.
+**Fix queue:** Findings at or above the configured `fix_threshold` enter the
+fix queue. The threshold defaults to `P2` (so P0, P1, P2 enter the queue and
+P3 is advisory) and is configurable via `.mmr.yaml`, `--fix-threshold`
+passed to this command, or the user's `~/.mmr/config.yaml`. The agent
+reads the active threshold from `$FIX_THRESHOLD` if set; otherwise from
+`.mmr.yaml` or the built-in default.
 
 ### Step 7: Write the Findings Report
 
@@ -543,7 +559,7 @@ Create `docs/reviews/` if it does not exist. Write the following to
 - [criterion]: satisfied | partial | not-satisfied
 
 **Findings:**
-[P0/P1/P2/P3 findings for this story, or "No findings."]
+[Findings sorted by severity, or "No findings."]
 
 [Repeat for each story]
 
@@ -616,7 +632,7 @@ recorded at the start of Step 8:
 git diff --name-only $PRE_FIX_SHA..HEAD
 ```
 
-This captures files from every severity-tier commit (P0, P1, P2), not just
+This captures files from every severity-tier commit, not just
 the most recent one.
 
 Dispatch `superpowers:code-reviewer` with:
@@ -701,7 +717,7 @@ the user they require manual attention before the project is ready to release.
 3. **Auth failures are not silent** — always surface to the user with the exact recovery command (`! codex login` or `! gemini -p "hello"`). Wait for user response before queuing a compensating pass.
 4. **Independence** — never share one channel's output with another. Each reviews independently.
 5. **Verify every fix** — run tests (or re-read the file) immediately after each fix before moving on.
-6. **3-round limit (per finding)** — never attempt to fix the *same* P0/P1/P2 finding more than 3 times. Each round that surfaces a *new, different, fixable* finding is healthy iteration — keep going. Stop only when the same finding recurs across 3 attempts, channels contradict each other, or the user asks to stop. Surface unresolved findings to the user.
+6. **3-round limit (per finding)** — never attempt to fix the *same* blocking finding more than 3 times. Each round that surfaces a *new, different, fixable* finding is healthy iteration — keep going. Stop only when the same finding recurs across 3 attempts, channels contradict each other, or the user asks to stop. Surface unresolved findings to the user.
 7. **Document everything** — the report must show which channels ran, which were compensating, which were skipped, and the root cause for any degraded channel.
 8. **No auto-merge** — this tool modifies local files only. It never pushes, merges, or creates PRs.
 9. **Dispatch pattern cross-reference** — Phase 2 parallel dispatch uses `superpowers:dispatching-parallel-agents`. Each story subagent dispatches its own `superpowers:code-reviewer` as Channel 3. This two-level nesting is intentional and supported.
