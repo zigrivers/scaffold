@@ -4,6 +4,32 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.24.3] — 2026-04-28
+
+### Fixed
+- **`scaffold status` and `scaffold next` no longer modify `state.json`.**
+  Both commands previously called `reconcileWithPipeline` to pre-populate
+  pending entries for new pipeline steps and prune disabled-pending
+  entries. Both behaviors are real state transitions and inappropriate
+  as side-effects of inspection commands — running them produced
+  unwanted git diffs whenever a scaffold version upgrade added steps,
+  methodology flipped enable bits, or v3.24.0→v3.24.1 first-run pruned
+  stale entries. State now mutates only as a result of explicit user
+  actions (`scaffold run`, `scaffold skip`, `scaffold complete`,
+  `scaffold reset`, schema migration on first load).
+- **Status surfaces unified.** Progress totals, `phases[].steps[]`, the
+  interactive listing, compact JSON `result.steps`, and cross-dep
+  readiness all derive from a single `surfacedSlugs` set so they stay
+  in lockstep — preventing the inconsistency where, e.g., a historical
+  disabled+completed entry shows up in phases (audit) but doesn't
+  count toward progress totals.
+- **Multi-service scope.** Both commands now correctly scope to
+  globals-only when running at the root of a multi-service project
+  (no `--service`), and to non-globals-only when running with
+  `--service <name>`. Matches `computeEligible`'s scope-arg semantics
+  at `packages/mmr/...` (eligibility.ts:33-37) and the prior
+  reconciliation skip at state-manager.ts:229.
+
 ## [3.24.2] — 2026-04-28
 
 ### Changed
