@@ -200,9 +200,9 @@ Output a review summary in this format:
 
 Return exactly one verdict:
 
-- `pass` — all channels completed and the gate passed (no unresolved P0/P1/P2 at or above the fix threshold)
+- `pass` — all channels completed and the gate passed (no unresolved findings at or above the configured fix threshold; default threshold is `P2`, so this means no unresolved P0/P1/P2)
 - `degraded-pass` — gate passed but some channels were skipped or replaced by compensating passes (max achievable verdict when any channel was compensated)
-- `blocked` — gate failed: P0/P1/P2 findings exist at or above the fix threshold (typically the *same* finding(s) remain unresolved after 3 fix attempts)
+- `blocked` — gate failed: at least one unresolved finding sits at or above the fix threshold (typically the *same* finding(s) remain unresolved after 3 fix attempts)
 - `needs-user-decision` — no channels completed (no reconciled result was possible), reviewer disagreement / contradictions, or a finding requires human judgment that automated iteration can't resolve
 
 Verdict precedence: `needs-user-decision` > `blocked` > `degraded-pass` > `pass`.
