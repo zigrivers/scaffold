@@ -701,7 +701,7 @@ the user they require manual attention before the project is ready to release.
 3. **Auth failures are not silent** — always surface to the user with the exact recovery command (`! codex login` or `! gemini -p "hello"`). Wait for user response before queuing a compensating pass.
 4. **Independence** — never share one channel's output with another. Each reviews independently.
 5. **Verify every fix** — run tests (or re-read the file) immediately after each fix before moving on.
-6. **3-round limit** — never attempt to fix the same finding more than 3 times. Surface unresolved findings to the user.
+6. **3-round limit (per finding)** — never attempt to fix the *same* P0/P1/P2 finding more than 3 times. Each round that surfaces a *new, different, fixable* finding is healthy iteration — keep going. Stop only when the same finding recurs across 3 attempts, channels contradict each other, or the user asks to stop. Surface unresolved findings to the user.
 7. **Document everything** — the report must show which channels ran, which were compensating, which were skipped, and the root cause for any degraded channel.
 8. **No auto-merge** — this tool modifies local files only. It never pushes, merges, or creates PRs.
 9. **Dispatch pattern cross-reference** — Phase 2 parallel dispatch uses `superpowers:dispatching-parallel-agents`. Each story subagent dispatches its own `superpowers:code-reviewer` as Channel 3. This two-level nesting is intentional and supported.

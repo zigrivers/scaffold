@@ -200,10 +200,10 @@ Output a review summary in this format:
 
 Return exactly one verdict:
 
-- `pass` — all channels ran, no unresolved P0/P1/P2
-- `degraded-pass` — channels skipped/compensated, no unresolved P0/P1/P2
-- `blocked` — same P0/P1/P2 finding remains unresolved after 3 fix attempts
-- `needs-user-decision` — contradictions or unresolvable findings
+- `pass` — all channels completed and the gate passed (no unresolved P0/P1/P2 at or above the fix threshold)
+- `degraded-pass` — gate passed but some channels were skipped or replaced by compensating passes (max achievable verdict when any channel was compensated)
+- `blocked` — gate failed: P0/P1/P2 findings exist at or above the fix threshold (typically the *same* finding(s) remain unresolved after 3 fix attempts)
+- `needs-user-decision` — no channels completed (no reconciled result was possible), reviewer disagreement / contradictions, or a finding requires human judgment that automated iteration can't resolve
 
 Verdict precedence: `needs-user-decision` > `blocked` > `degraded-pass` > `pass`.
 
@@ -215,7 +215,10 @@ If any P0, P1, or P2 findings exist:
 1. Fix them in the code
 2. Push the fixes: `git push`
 3. Re-run the review to verify fixes: `mmr review --pr "$PR_NUMBER" --sync --format json`
-4. The 3-round limit is **per finding**, not total rounds. As long as each new round surfaces *different, concrete, fixable* findings, that is healthy review/fix iteration — keep going. Stop and ask the user only when the *same* P0/P1/P2 finding (or set) recurs across 3 attempts without progress, when a finding is genuinely ambiguous (channels contradict each other), or when the user explicitly asks to stop. Do NOT merge automatically while findings remain. Document the unresolved findings and let the user decide whether to continue fixing, create follow-up issues, or override.
+4. The 3-round limit is **per finding**, not total rounds:
+   - **Keep going** when each new round surfaces *different, concrete, fixable* findings — that is healthy review/fix iteration.
+   - **Stop and ask the user** when (a) the *same* P0/P1/P2 finding (or set) recurs across 3 attempts without progress, (b) a finding is genuinely ambiguous (channels contradict each other), or (c) the user explicitly asks to stop.
+   - **When stopped**, do NOT merge automatically. Document the unresolved findings (severity, location, attempt count) and let the user decide whether to continue fixing, create follow-up issues, or override.
 
 **Note:** Fix cycles are an orchestration concern — the caller (agent or human) handles the fix loop. The CLI provides the review and verdict; the caller decides whether to fix and re-run.
 
