@@ -202,7 +202,7 @@ Return exactly one verdict:
 
 - `pass` — all channels ran, no unresolved P0/P1/P2
 - `degraded-pass` — channels skipped/compensated, no unresolved P0/P1/P2
-- `blocked` — unresolved P0/P1/P2 after 3 fix rounds
+- `blocked` — same P0/P1/P2 finding remains unresolved after 3 fix attempts
 - `needs-user-decision` — contradictions or unresolvable findings
 
 Verdict precedence: `needs-user-decision` > `blocked` > `degraded-pass` > `pass`.
@@ -215,7 +215,7 @@ If any P0, P1, or P2 findings exist:
 1. Fix them in the code
 2. Push the fixes: `git push`
 3. Re-run the review to verify fixes: `mmr review --pr "$PR_NUMBER" --sync --format json`
-4. After 3 fix rounds with unresolved P0/P1/P2 findings, stop and ask the user for direction — do NOT merge automatically. Document remaining findings and let the user decide whether to continue fixing, create follow-up issues, or override.
+4. The 3-round limit is **per finding**, not total rounds. As long as each new round surfaces *different, concrete, fixable* findings, that is healthy review/fix iteration — keep going. Stop and ask the user only when the *same* P0/P1/P2 finding (or set) recurs across 3 attempts without progress, when a finding is genuinely ambiguous (channels contradict each other), or when the user explicitly asks to stop. Do NOT merge automatically while findings remain. Document the unresolved findings and let the user decide whether to continue fixing, create follow-up issues, or override.
 
 **Note:** Fix cycles are an orchestration concern — the caller (agent or human) handles the fix loop. The CLI provides the review and verdict; the caller decides whether to fix and re-run.
 
@@ -223,7 +223,7 @@ If any P0, P1, or P2 findings exist:
 
 ### Step 8: Confirm Completion
 
-After all findings are resolved (or 3 rounds complete), output:
+After all findings are resolved (or you've hit a per-finding stop condition per Step 7), output:
 
 ```
 Code review complete. Verdict: [pass/degraded-pass]. Channels: [N] executed, [N] compensating. PR #[number] is ready for merge.
@@ -249,7 +249,7 @@ Do NOT proceed to the next task or merge until this confirmation is output.
 3. **Auth failures are not silent** — always surface to the user with the exact recovery command.
 4. **Independence** — never share one channel's output with another. Each reviews the diff independently.
 5. **Fix before proceeding** — P0/P1/P2 findings must be resolved before moving to the next task.
-6. **3-round limit** — never attempt more than 3 fix rounds. Surface unresolved findings to the user.
+6. **3-round limit (per finding)** — never attempt to fix the *same* P0/P1/P2 finding more than 3 times. Each round that surfaces a *new* fixable finding is healthy iteration — keep going. Stop only when the same finding recurs across 3 attempts, channels contradict each other, or the user asks to stop.
 7. **Document everything** — the review summary must show which channels ran and which were skipped, with reasons.
 8. **CLI-first** — use `mmr review --sync` as the primary entry point. Manual dispatch is a fallback only.
 9. **Job storage** — the CLI stores job data at `~/.mmr/jobs/{job-id}/results.json`. Review results are available via `mmr results <job-id>`.

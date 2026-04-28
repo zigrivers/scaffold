@@ -551,7 +551,7 @@ Create `docs/reviews/` if it does not exist. Write the following to
 _Populated during fix execution._
 
 ## Remaining Findings
-_Populated if any findings exceed 3 fix rounds._
+_Populated when the same finding remains unresolved after 3 fix attempts._
 ```
 
 **If Report Only mode:** After writing the report, stop. Tell the user:

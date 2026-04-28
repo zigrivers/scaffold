@@ -185,8 +185,13 @@ way.
 - **Verdict handling** — proceed only on `pass` or `degraded-pass`. If the
   review returns `blocked` or `needs-user-decision`, stop and surface the
   verdict and remaining findings to the user. Do NOT merge automatically.
-- **3-round limit** — after 3 fix rounds with unresolved findings, stop and
-  ask the user.
+- **3-round limit** — the limit is **per finding**, not per total review
+  rounds. Stop and ask the user only when the *same* P0/P1/P2 finding (or
+  set of findings) remains unresolved after 3 fix attempts. Each round
+  surfacing a *new, different, fixable* finding is healthy review/fix
+  iteration — keep going. Other stop conditions: a finding is genuinely
+  ambiguous or channels contradict each other; the user explicitly asks
+  to stop.
 
 **Quick reference** (when `scaffold run` is unavailable):
 <!-- Escape hatch only. Canonical commands live in content/tools/review-pr.md.

@@ -376,8 +376,8 @@ If `REPORT_ONLY=true`:
 Otherwise:
 1. Fix all P0/P1/P2 findings
 2. Re-run the channels that produced findings
-3. Repeat for up to 3 fix rounds
-4. If any finding remains unresolved after 3 rounds, stop with verdict `needs-user-decision`
+3. Keep iterating as long as each new round surfaces *different, concrete, fixable* findings — that is healthy review/fix iteration, not a stuck loop
+4. The 3-round limit is **per finding**: stop and surface to the user when the *same* P0/P1/P2 finding (or set) recurs across 3 attempts without progress. Other stop conditions: a finding is genuinely ambiguous (channels contradict each other), or the user explicitly asks to stop. Use verdict `needs-user-decision` for ambiguity, `blocked` for stuck-loop cases.
 
 **Fix cycle channel rule:** Re-run only channels that originally completed or ran as compensating passes. Never retry a channel marked `not_installed`, `auth_failed`, or `timeout` during fix rounds — its availability does not change within a session.
 
@@ -387,8 +387,8 @@ Return exactly one verdict:
 
 - `pass` — all channels completed with `full` coverage, no unresolved P0/P1/P2
 - `degraded-pass` — at least one channel was skipped/compensated (coverage is not all `full`), but all executed and compensating channels have no unresolved P0/P1/P2
-- `blocked` — unresolved P0/P1/P2 findings remain after 3 fix rounds, OR no reconciled result was possible
-- `needs-user-decision` — reviewer disagreement on a finding, or findings still unresolved after 3 rounds that require human judgment
+- `blocked` — same P0/P1/P2 finding (or set) remains unresolved after 3 fix attempts, OR no reconciled result was possible
+- `needs-user-decision` — reviewer disagreement / contradictions, or a finding requires human judgment that automated iteration can't resolve
 
 When compensating passes ran for any channel, the maximum achievable verdict is `degraded-pass` — never `pass`, even if all findings are resolved. When both external channels were compensated, the review summary must note: "All findings are single-model (Claude only)."
 
