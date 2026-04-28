@@ -62,12 +62,16 @@ in the review criteria config rather than read at dispatch time.
 ### Step 1: Identify the PR
 
 ```bash
-# Strip --fix-threshold from $ARGUMENTS if present; remainder is the PR number
+# Strip --fix-threshold from $ARGUMENTS if present; remainder is the PR number.
+# Strip the entire matched span (BASH_REMATCH[0]) — including whatever
+# whitespace separator was used (space, tab, multi-space). Replacing with a
+# single space preserves token boundaries; tr -d '[:space:]' below drops
+# everything else.
 FIX_THRESHOLD=""
 ARGS_REMAINING="$ARGUMENTS"
 if [[ "$ARGS_REMAINING" =~ (^|[[:space:]])--fix-threshold[[:space:]]+(P[0-3])($|[[:space:]]) ]]; then
   FIX_THRESHOLD="${BASH_REMATCH[2]}"
-  ARGS_REMAINING="${ARGS_REMAINING//--fix-threshold ${FIX_THRESHOLD}/}"
+  ARGS_REMAINING="${ARGS_REMAINING//${BASH_REMATCH[0]}/ }"
 fi
 
 # Use remaining argument if provided, otherwise detect from current branch

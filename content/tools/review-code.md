@@ -65,7 +65,10 @@ When the MMR CLI is installed, use it as the primary entry point. Pick the
 invocation that matches the scope the user asked for:
 
 A common helper across all four invocation modes — set `MMR_FLAGS` once
-and reuse it:
+and reuse it. **Note:** `FIX_THRESHOLD` is parsed from `$ARGUMENTS` in
+Step 1 below; if you're skipping ahead to the invocations, run Step 1's
+detection block first so the `--fix-threshold` flag actually flows
+through.
 
 ```bash
 MMR_FLAGS=(--sync --format json)

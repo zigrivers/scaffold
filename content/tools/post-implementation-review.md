@@ -590,7 +590,10 @@ PRE_FIX_SHA=$(git rev-parse HEAD)
 This is used in Step 9 to identify all files modified across all fix commits,
 regardless of how many severity-tier commits are made.
 
-Process the fix queue in priority order: all P0s first, then all P1s, then all P2s.
+Process the fix queue in priority order: iterate severity tiers from most
+critical to least, processing every tier from `P0` down to and including
+the configured `fix_threshold` (default `P2`). At threshold `P3` this
+includes all four tiers; at `P0` only critical findings are processed.
 Within each severity tier, fix high-confidence findings (multi-source) first.
 
 For each finding:
@@ -609,15 +612,16 @@ For each finding:
    - Stop attempting to fix it
    - Continue to the next finding in the queue
 
-After all P0s are fixed, re-read each P0-modified file once to confirm correctness
-before moving to P1s.
+After all findings in a severity tier are fixed, re-read each modified file
+once to confirm correctness before moving to the next tier.
 
-Commit after each severity tier:
+Commit after each severity tier processed (the tier label varies by run —
+`P0`, `P1`, `P2`, or `P3` depending on the configured threshold):
 
 ```bash
 git add [modified source files only — not the report]
-git commit -m "fix: resolve P0 post-implementation review findings"
-# Replace P0 with P1 or P2 for the respective tiers
+git commit -m "fix: resolve <tier> post-implementation review findings"
+# Substitute <tier> with the severity label of the tier you just processed
 ```
 
 ### Step 9: Final Verification Pass
