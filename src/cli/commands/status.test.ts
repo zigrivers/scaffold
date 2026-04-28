@@ -465,7 +465,7 @@ describe('status command', () => {
     mockOverlay.mockReturnValue({
       steps: {
         'enabled-step': { enabled: true },
-        // 'disabled-step' intentionally absent → effective `enabled: false`
+        'disabled-step': { enabled: false },
       },
       knowledge: {},
       reads: {},
@@ -496,6 +496,82 @@ describe('status command', () => {
       .flatMap(p => p.steps.map(s => s.slug))
     expect(allPhaseSlugs).toContain('enabled-step')
     expect(allPhaseSlugs).not.toContain('disabled-step')
+  })
+
+  it('omits disabled steps from interactive detail listing even with stale state entries', async () => {
+    // Same setup as above but assert the text-mode listing.
+    vi.mocked(loadConfig).mockReturnValue({
+      config: {
+        version: 2, methodology: 'deep', platforms: ['claude-code'],
+        project: { projectType: 'web-app' },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      errors: [], warnings: [],
+    })
+    vi.mocked(resolveOverlayState).mockReturnValue({
+      steps: {
+        'enabled-step': { enabled: true },
+        'disabled-step': { enabled: false },
+      },
+      knowledge: {}, reads: {}, dependencies: {},
+      crossReads: {},
+    })
+    const metaPrompts = new Map([
+      ['enabled-step', makeFrontmatter('enabled-step', 'foundation', 1)],
+      ['disabled-step', makeFrontmatter('disabled-step', 'foundation', 2)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
+    const steps = {
+      'enabled-step': { status: 'pending', source: 'pipeline', produces: [] },
+      'disabled-step': { status: 'pending', source: 'pipeline', produces: [] },
+    }
+    mockStateWith(MockStateManager, steps, { next_eligible: ['enabled-step'] })
+
+    await statusCommand.handler(defaultArgv())
+    const allOutput = writtenLines.join('')
+    expect(allOutput).toContain('enabled-step')
+    expect(allOutput).not.toContain('disabled-step')
+  })
+
+  it('omits disabled steps from compact JSON `steps` array', async () => {
+    vi.mocked(loadConfig).mockReturnValue({
+      config: {
+        version: 2, methodology: 'deep', platforms: ['claude-code'],
+        project: { projectType: 'web-app' },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      errors: [], warnings: [],
+    })
+    vi.mocked(resolveOverlayState).mockReturnValue({
+      steps: {
+        'enabled-step': { enabled: true },
+        'disabled-step': { enabled: false },
+      },
+      knowledge: {}, reads: {}, dependencies: {},
+      crossReads: {},
+    })
+    const metaPrompts = new Map([
+      ['enabled-step', makeFrontmatter('enabled-step', 'foundation', 1)],
+      ['disabled-step', makeFrontmatter('disabled-step', 'foundation', 2)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
+    const steps = {
+      'enabled-step': { status: 'pending', source: 'pipeline', produces: [] },
+      'disabled-step': { status: 'pending', source: 'pipeline', produces: [] },
+    }
+    mockStateWith(MockStateManager, steps, { next_eligible: ['enabled-step'] })
+
+    mockResolveOutputMode.mockReturnValue('json')
+    await statusCommand.handler(defaultArgv({ format: 'json', compact: true }))
+    const envelope = JSON.parse(writtenLines.join(''))
+    const parsed = envelope.data ?? envelope
+    const compactSlugs = (parsed.steps as Array<{ slug: string }>).map(s => s.slug)
+    expect(compactSlugs).toContain('enabled-step')
+    expect(compactSlugs).not.toContain('disabled-step')
   })
 
   describe('--compact flag', () => {

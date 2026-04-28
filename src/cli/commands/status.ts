@@ -201,12 +201,16 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     const staleCommandCount = checkCommandStaleness(projectRoot)
 
     // Build phases array: group meta-prompts by phase with per-phase counts.
-    // Steps disabled by the active overlay/preset are excluded — they are
-    // not part of this project's pipeline and must not surface as pending.
+    // Steps the active overlay marks `enabled: false` are excluded — they
+    // are not part of this project's pipeline and must not surface as
+    // pending. Steps absent from the overlay default to enabled (matches
+    // buildGraph's default-true behavior).
+    const isDisabled = (slug: string): boolean =>
+      pipeline.overlay.steps[slug]?.enabled === false
     const phasesData = PHASES.map(phaseInfo => {
       const phaseSteps = [...context.metaPrompts.values()]
         .filter(m => m.frontmatter.phase === phaseInfo.slug)
-        .filter(m => pipeline.overlay.steps[m.frontmatter.name]?.enabled === true)
+        .filter(m => !isDisabled(m.frontmatter.name))
         .map(m => {
           const entry = steps[m.frontmatter.name]
           const cd = crossDepMap.get(m.frontmatter.name)
@@ -245,6 +249,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       if (isCompact) {
         result.compact = true
         result.steps = Object.entries(steps)
+          .filter(([slug]) => !isDisabled(slug))
           .filter(([, entry]) => actionableStatuses.has(entry.status))
           .map(([slug, entry]) => {
             const cd = crossDepMap.get(slug)
@@ -272,6 +277,10 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       }
 
       for (const [slug, entry] of Object.entries(steps)) {
+        // Mirror phasesData: steps the overlay marks disabled are not
+        // part of this project's pipeline and must not appear in the
+        // listing, even if a stale entry survives in state.
+        if (isDisabled(slug)) continue
         if (isCompact && !actionableStatuses.has(entry.status)) continue
         const fm = pipeline.stepMeta.get(slug)
         const phase = fm?.phase ?? '?'
