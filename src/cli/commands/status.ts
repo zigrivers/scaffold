@@ -265,14 +265,27 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       }
       if (isCompact) {
         result.compact = true
-        result.steps = Object.entries(steps)
-          .filter(([slug, entry]) => !(isDisabled(slug) && entry.status === 'pending'))
-          .filter(([, entry]) => actionableStatuses.has(entry.status))
-          .map(([slug, entry]) => {
+        // Iterate the union of pipeline keys ∪ state keys for the same
+        // reason as the interactive listing: enabled pipeline steps
+        // without a state entry are pending and must be surfaced. State
+        // alone is incomplete now that we don't reconcile on read.
+        const compactSlugs = [...new Set<string>([
+          ...context.metaPrompts.keys(),
+          ...Object.keys(steps),
+        ])]
+        result.steps = compactSlugs
+          .map(slug => {
+            const entry = steps[slug]
+            const status = entry?.status ?? 'pending'
+            return { slug, status }
+          })
+          .filter(({ slug, status }) => !(isDisabled(slug) && status === 'pending'))
+          .filter(({ status }) => actionableStatuses.has(status))
+          .map(({ slug, status }) => {
             const cd = crossDepMap.get(slug)
             return {
               slug,
-              status: entry.status,
+              status,
               ...(cd && cd.length > 0 ? { crossDependencies: cd } : {}),
             }
           })

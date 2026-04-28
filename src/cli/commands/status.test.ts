@@ -665,6 +665,46 @@ describe('status command', () => {
     expect(phaseSlugs).not.toContain('disabled-pending')
   })
 
+  it('compact JSON `steps` includes pipeline steps that are missing from state (post-reconcile-drop)', async () => {
+    // Round-1 Codex P1: compact JSON used to iterate Object.entries(steps)
+    // only. With reconcile dropped, enabled pipeline steps without a state
+    // entry would be omitted from result.steps even though they are
+    // actionable pending steps. Must iterate pipeline ∪ state union.
+    vi.mocked(loadConfig).mockReturnValue({
+      config: {
+        version: 2, methodology: 'deep', platforms: ['claude-code'],
+        project: { projectType: 'web-app' },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      errors: [], warnings: [],
+    })
+    vi.mocked(resolveOverlayState).mockReturnValue({
+      steps: { 'tracked': { enabled: true }, 'untracked': { enabled: true } },
+      knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
+    })
+    const metaPrompts = new Map([
+      ['tracked', makeFrontmatter('tracked', 'pre', 1)],
+      ['untracked', makeFrontmatter('untracked', 'pre', 2)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
+    // Only 'tracked' has a state entry; 'untracked' is a fresh enabled
+    // step with no state entry.
+    const steps = {
+      'tracked': { status: 'in_progress', source: 'pipeline', produces: [] },
+    }
+    mockStateWith(MockStateManager, steps, { next_eligible: ['untracked'] })
+
+    mockResolveOutputMode.mockReturnValue('json')
+    await statusCommand.handler(defaultArgv({ format: 'json', compact: true }))
+    const envelope = JSON.parse(writtenLines.join(''))
+    const parsed = envelope.data ?? envelope
+    const compactSlugs = (parsed.steps as Array<{ slug: string }>).map(s => s.slug)
+    expect(compactSlugs).toContain('tracked')
+    expect(compactSlugs).toContain('untracked')
+  })
+
   it('omits disabled steps from compact JSON `steps` array', async () => {
     vi.mocked(loadConfig).mockReturnValue({
       config: {

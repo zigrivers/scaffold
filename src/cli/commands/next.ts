@@ -119,11 +119,19 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
       }
     }
 
-    // 5. Check pipeline completion
-    const stepValues = Object.values(state.steps)
+    // 5. Check pipeline completion. Now that we don't reconcile, the
+    //    pipeline-graph is the source of truth for "what steps exist";
+    //    state may have no entry for newly-enabled steps. Compute from
+    //    the enabled pipeline ∩ state intersection: pending if missing
+    //    or status === 'pending', done if 'completed' or 'skipped'.
+    const enabledPipelineSlugs = [...context.metaPrompts.keys()]
+      .filter(slug => pipeline.overlay.steps[slug]?.enabled !== false)
     const allDone =
-      stepValues.length > 0 &&
-      stepValues.every(s => s.status === 'completed' || s.status === 'skipped')
+      enabledPipelineSlugs.length > 0 &&
+      enabledPipelineSlugs.every(slug => {
+        const status = state.steps[slug]?.status
+        return status === 'completed' || status === 'skipped'
+      })
 
     if (outputMode === 'json') {
       output.result({

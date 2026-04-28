@@ -245,7 +245,55 @@ describe('next command', () => {
     expect(reconcileFn).not.toHaveBeenCalled()
   })
 
+  it('pipeline_complete is false when an enabled pipeline step is missing from state', async () => {
+    // Round-1 Codex P1: with reconcile dropped, allDone was computed from
+    // state.steps alone. If state was all completed/skipped but the
+    // pipeline had a newly-added step missing from state, allDone went
+    // true incorrectly. Compute completion from enabled pipeline ∩ state.
+    vi.mocked(loadConfig).mockReturnValue({
+      config: {
+        version: 2, methodology: 'deep', platforms: ['claude-code'],
+        project: { projectType: 'web-app' },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      errors: [], warnings: [],
+    })
+    vi.mocked(resolveOverlayState).mockReturnValue({
+      steps: {
+        'old-step': { enabled: true },
+        'newly-added-step': { enabled: true },
+      },
+      knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
+    })
+    const metaPrompts = new Map([
+      ['old-step', makeFrontmatter('old-step', 'old', 'pre', 1)],
+      ['newly-added-step', makeFrontmatter('newly-added-step', 'new', 'pre', 2)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
+    // State has only old-step (completed); newly-added-step has no entry
+    const steps = {
+      'old-step': { status: 'completed', source: 'pipeline', produces: [] },
+    }
+    mockStateWith(MockStateManager, steps)
+    mockComputeEligible.mockReturnValue(['newly-added-step'])
+
+    mockResolveOutputMode.mockReturnValue('json')
+    await nextCommand.handler(defaultArgv({ format: 'json' }))
+    const envelope = JSON.parse(writtenLines.join(''))
+    const parsed = envelope.data ?? envelope
+    expect(parsed.pipeline_complete).toBe(false)
+  })
+
   it('shows "Pipeline complete!" when all steps are completed or skipped', async () => {
+    const metaPrompts = new Map([
+      ['step-a', makeFrontmatter('step-a', 'a', 'pre', 1)],
+      ['step-b', makeFrontmatter('step-b', 'b', 'pre', 2)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
     const steps = {
       'step-a': { status: 'completed', source: 'pipeline', produces: [] },
       'step-b': { status: 'skipped', source: 'pipeline', produces: [] },
