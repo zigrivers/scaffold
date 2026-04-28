@@ -77,21 +77,25 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
       pipeline.getPipelineHash(service ? 'service' : 'global'),
     )
 
-    // Reconcile state with current pipeline — adds any new steps that were
-    // introduced after the project was initialized.
-    const pipelineSteps = [...context.metaPrompts.values()].map(m => ({
-      slug: m.frontmatter.name,
-      produces: m.frontmatter.outputs,
-      // Steps not in overlay/preset map are disabled. This requires presets to enumerate
-      // all known pipeline steps (which they do — see deep.yml/mvp.yml/custom-defaults.yml).
-      enabled: pipeline.overlay.steps[m.frontmatter.name]?.enabled ?? false,
-    }))
-    stateManager.reconcileWithPipeline(pipelineSteps)
-
+    // `scaffold next` is a read-only inspection. We deliberately do NOT
+    // call reconcileWithPipeline here — eligibility is derived live from
+    // the pipeline graph + state, and `computeEligible` treats steps
+    // missing from state as pending (the same default reconcile would
+    // pre-populate). Skipping reconcile prevents committed state.json
+    // from churning every time the user runs `scaffold next` after a
+    // version upgrade or methodology change.
     const state = stateManager.loadState()
-    const scopeOptions = service
-      ? { scope: 'service' as const, globalSteps: pipeline.globalSteps }
-      : undefined
+    // Multi-service root: when config defines services[] and no
+    // --service was passed, root state holds only global steps; tell
+    // computeEligible to filter to globals-only via scope: 'global'.
+    const isMultiServiceRoot =
+      !service && (context.config?.project?.services?.length ?? 0) > 0
+    const scopeOptions =
+      service
+        ? { scope: 'service' as const, globalSteps: pipeline.globalSteps }
+        : isMultiServiceRoot
+          ? { scope: 'global' as const, globalSteps: pipeline.globalSteps }
+          : undefined
     const eligible = readEligible(
       state,
       pipeline,
@@ -123,11 +127,38 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
       }
     }
 
-    // 5. Check pipeline completion
-    const stepValues = Object.values(state.steps)
+    // 5. Check pipeline completion. Now that we don't reconcile, the
+    //    pipeline-graph is the source of truth for "what steps exist";
+    //    state may have no entry for newly-enabled steps. Compute from
+    //    the enabled pipeline ∩ state intersection: pending if missing
+    //    or status === 'pending', done if 'completed' or 'skipped'.
+    //
+    //    "Enabled" = explicitly set to `true` in the overlay (presets
+    //    enumerate every known pipeline step, so a step absent from
+    //    overlay is "not in this project"). This matches the prior
+    //    reconciliation default (`?? false`).
+    //
+    //    Scope-aware filter — three modes (matches readEligible scope
+    //    above):
+    //    - service mode (--service <name>): exclude global steps.
+    //    - multi-service root mode (config.services[] present, no
+    //      --service): include only global steps; service-local steps
+    //      live in per-service state and shouldn't gate root completion.
+    //    - flat / single-project mode: include everything.
+    const inScope = (slug: string): boolean => {
+      if (service) return !pipeline.globalSteps.has(slug)
+      if (isMultiServiceRoot) return pipeline.globalSteps.has(slug)
+      return true
+    }
+    const enabledPipelineSlugs = [...context.metaPrompts.keys()]
+      .filter(slug => pipeline.overlay.steps[slug]?.enabled === true)
+      .filter(inScope)
     const allDone =
-      stepValues.length > 0 &&
-      stepValues.every(s => s.status === 'completed' || s.status === 'skipped')
+      enabledPipelineSlugs.length > 0 &&
+      enabledPipelineSlugs.every(slug => {
+        const status = state.steps[slug]?.status
+        return status === 'completed' || status === 'skipped'
+      })
 
     if (outputMode === 'json') {
       output.result({

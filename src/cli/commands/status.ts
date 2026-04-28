@@ -134,26 +134,34 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       pipeline.getPipelineHash(service ? 'service' : 'global'),
     )
 
-    // Reconcile state with current pipeline — adds any new steps that were
-    // introduced after the project was initialized (e.g., story-tests).
-    const pipelineSteps = [...context.metaPrompts.values()].map(m => ({
-      slug: m.frontmatter.name,
-      produces: m.frontmatter.outputs,
-      // Steps not in overlay/preset map are disabled. This requires presets to enumerate
-      // all known pipeline steps (which they do — see deep.yml/mvp.yml/custom-defaults.yml).
-      enabled: pipeline.overlay.steps[m.frontmatter.name]?.enabled ?? false,
-    }))
-    stateManager.reconcileWithPipeline(pipelineSteps)
-
+    // `scaffold status` is a read-only inspection. We deliberately do NOT
+    // call reconcileWithPipeline here — pre-populating pending entries
+    // for every enabled pipeline step is convenient but causes state.json
+    // (which is committed in most projects) to churn whenever a scaffold
+    // version upgrade adds steps or methodology changes flip enable bits.
+    // Eligibility, phasesData, and progress totals are all derivable from
+    // the pipeline graph + overlay + state intersection, so the persisted
+    // pending-entries are not required.
     const state = stateManager.loadState()
 
-    // Compute eligible once (cache-validated) — reused by both JSON and
-    // interactive output branches. readEligible returns the cached
+    // Multi-service root: when config defines services[] and no
+    // --service was passed, we're operating at the root scope. Root
+    // state holds only global steps; service-local steps live in
+    // per-service state. The scope filter must skip them on every
+    // surface, and readEligible must use 'global' scope so its
+    // cached/live eligibility computation matches.
+    const isMultiServiceRoot =
+      !service && (context.config?.project?.services?.length ?? 0) > 0
+
+    // Compute eligible once — readEligible returns the cached
     // next_eligible list when the graph hash (and root save_counter, for
     // service scope) still match, else falls back to a live compute.
-    const scopeOptionsForRead = service
-      ? { scope: 'service' as const, globalSteps: pipeline.globalSteps }
-      : undefined
+    const scopeOptionsForRead =
+      service
+        ? { scope: 'service' as const, globalSteps: pipeline.globalSteps }
+        : isMultiServiceRoot
+          ? { scope: 'global' as const, globalSteps: pipeline.globalSteps }
+          : undefined
     const validatedEligible = readEligible(
       state,
       pipeline,
@@ -161,17 +169,58 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       service ? () => readRootSaveCounter(projectRoot) : undefined,
     )
 
-    // 5. Build progress stats
+    // 5. Build the unified "surfaced" slug set used by progress totals,
+    //    phasesData, the interactive listing, and compact JSON. Keeping
+    //    them all in sync prevents the inconsistency where, e.g., a
+    //    historical disabled+completed entry shows up in phases (audit)
+    //    but doesn't count toward progress totals.
+    //
+    //    A slug is surfaced if it is:
+    //    (a) enabled in the active overlay (explicit `enabled: true`), OR
+    //    (b) preserved disabled state entry with non-pending status
+    //        (history / active-work audit, kept by reconcile-prune).
+    //
+    //    "Enabled" = explicitly `enabled: true` in overlay. Presets
+    //    enumerate every known pipeline step, so a step absent from
+    //    overlay is "not in this project". Matches the prior
+    //    reconciliation default (`?? false`) so totals don't inflate.
     const { steps } = state
-    const completed = Object.values(steps).filter(s => s.status === 'completed').length
-    const skipped = Object.values(steps).filter(s => s.status === 'skipped').length
-    const pending = Object.values(steps).filter(s => s.status === 'pending').length
-    const inProgress = Object.values(steps).filter(s => s.status === 'in_progress').length
-    const total = Object.keys(steps).length
+    // Scope filter — three cases, matching computeEligible's scope arg
+    // (eligibility.ts:33-37) and state-manager.ts:229's reconcile path:
+    //   - service mode (--service <name>): exclude global steps;
+    //     they belong to root state.
+    //   - multi-service root mode (services[] but no --service): include
+    //     only global steps; service-local steps live in per-service
+    //     state and shouldn't inflate root totals.
+    //   - flat / single-project mode (no services[]): include
+    //     everything (no scope concept).
+    const isInScope = (slug: string): boolean => {
+      if (service) return !pipeline.globalSteps.has(slug)
+      if (isMultiServiceRoot) return pipeline.globalSteps.has(slug)
+      return true
+    }
+    const enabledSlugs = [...context.metaPrompts.keys()]
+      .filter(slug => pipeline.overlay.steps[slug]?.enabled === true)
+      .filter(isInScope)
+    const auditDisabledSlugs = Object.entries(steps)
+      .filter(([slug, entry]) =>
+        pipeline.overlay.steps[slug]?.enabled !== true && entry.status !== 'pending')
+      .filter(([slug]) => isInScope(slug))
+      .map(([slug]) => slug)
+    const surfacedSlugs = [...new Set<string>([...enabledSlugs, ...auditDisabledSlugs])]
+    const statusOf = (slug: string): string =>
+      steps[slug]?.status ?? 'pending'
+    const completed = surfacedSlugs.filter(s => statusOf(s) === 'completed').length
+    const skipped = surfacedSlugs.filter(s => statusOf(s) === 'skipped').length
+    const inProgress = surfacedSlugs.filter(s => statusOf(s) === 'in_progress').length
+    const total = surfacedSlugs.length
+    const pending = total - completed - skipped - inProgress
     const pct = total > 0 ? Math.round((completed + skipped) / total * 100) : 0
 
     const methodology =
-      (context.config as ConfigWithMethodology)?.methodology?.preset ?? state.config_methodology
+      (context.config as ConfigWithMethodology)?.methodology?.preset
+      ?? state.config_methodology
+      ?? 'unknown'
 
     const isCompact = argv.compact === true
     const actionableStatuses = new Set(['pending', 'in_progress'])
@@ -180,9 +229,15 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     // (not just actionable ones — status surfaces completed/skipped too).
     // Cache is hoisted across all steps so each foreign service's state is
     // loaded + migrated at most once per status invocation.
+    //
+    // Iterate the pipeline (metaPrompts ∪ state.steps) rather than state
+    // alone: now that we don't reconcile, state may not yet contain
+    // entries for every enabled pipeline step, but the cross-dep
+    // readiness UI must still show them. Union with state covers any
+    // historical entries for steps no longer in metaPrompts.
     const crossDepMap = new Map<string, ReturnType<typeof resolveCrossReadReadiness>>()
     const sharedForeignCache = new Map<string, PipelineState | null | 'read-error'>()
-    for (const slug of Object.keys(steps)) {
+    for (const slug of surfacedSlugs) {
       // overlay.crossReads is the authoritative merged map (frontmatter ∪ overlay
       // overrides) since Wave 3c+1. Defaults to [] for steps not in metaPrompts.
       const crossReads = pipeline.overlay.crossReads[slug] ?? []
@@ -200,18 +255,17 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     // 6. Check command staleness
     const staleCommandCount = checkCommandStaleness(projectRoot)
 
-    // Build phases array: group meta-prompts by phase with per-phase counts.
-    // We hide entries that are *disabled by overlay AND in `pending` status* —
-    // those are the leak class fix B prunes from state. Disabled steps with
-    // historical status (completed/skipped) or active work (in_progress)
-    // remain visible so the operator can see audit/active context. Steps
-    // absent from the overlay default to enabled (matches buildGraph's
-    // default-true behavior).
-    const isDisabled = (slug: string): boolean =>
-      pipeline.overlay.steps[slug]?.enabled === false
+    // Build phases array from the same `surfacedSlugs` set used for
+    // progress totals. This guarantees totals/phases/listing/compact
+    // stay in lockstep — every surface answers the same "is this slug
+    // part of the project's view right now?" question via one set,
+    // rather than each surface re-deriving the answer with a slightly
+    // different predicate.
+    const surfacedSet = new Set<string>(surfacedSlugs)
     const phasesData = PHASES.map(phaseInfo => {
       const phaseSteps = [...context.metaPrompts.values()]
         .filter(m => m.frontmatter.phase === phaseInfo.slug)
+        .filter(m => surfacedSet.has(m.frontmatter.name))
         .map(m => {
           const entry = steps[m.frontmatter.name]
           const cd = crossDepMap.get(m.frontmatter.name)
@@ -221,7 +275,6 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
             ...(cd && cd.length > 0 ? { crossDependencies: cd } : {}),
           }
         })
-        .filter(s => !(isDisabled(s.slug) && s.status === 'pending'))
       const phaseCompleted = phaseSteps.filter(s => s.status === 'completed').length
       const phaseSkipped = phaseSteps.filter(s => s.status === 'skipped').length
       const phasePending = phaseSteps.filter(s => s.status === 'pending').length
@@ -250,14 +303,20 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       }
       if (isCompact) {
         result.compact = true
-        result.steps = Object.entries(steps)
-          .filter(([slug, entry]) => !(isDisabled(slug) && entry.status === 'pending'))
-          .filter(([, entry]) => actionableStatuses.has(entry.status))
-          .map(([slug, entry]) => {
+        // Compact JSON also derives from `surfacedSlugs` — same source
+        // of truth as phases and progress totals.
+        result.steps = surfacedSlugs
+          .map(slug => {
+            const entry = steps[slug]
+            const status = entry?.status ?? 'pending'
+            return { slug, status }
+          })
+          .filter(({ status }) => actionableStatuses.has(status))
+          .map(({ slug, status }) => {
             const cd = crossDepMap.get(slug)
             return {
               slug,
-              status: entry.status,
+              status,
               ...(cd && cd.length > 0 ? { crossDependencies: cd } : {}),
             }
           })
@@ -278,18 +337,17 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
         pending: '○',
       }
 
-      for (const [slug, entry] of Object.entries(steps)) {
-        // Mirror phasesData: hide overlay-disabled entries that are still
-        // `pending` (the bug class fix B prunes). Keep historical
-        // (completed/skipped) and active-work (in_progress) entries
-        // visible so the operator retains audit + active-work context.
-        if (isDisabled(slug) && entry.status === 'pending') continue
-        if (isCompact && !actionableStatuses.has(entry.status)) continue
+      // Interactive listing also iterates `surfacedSlugs` — single
+      // source of truth shared with phases / compact / progress totals.
+      for (const slug of surfacedSlugs) {
+        const entry = steps[slug]
+        const status = entry?.status ?? 'pending'
+        if (isCompact && !actionableStatuses.has(status)) continue
         const fm = pipeline.stepMeta.get(slug)
         const phase = fm?.phase ?? '?'
-        const icon = statusIcons[entry.status] ?? '?'
+        const icon = statusIcons[status] ?? '?'
         if (argv.phase !== undefined && phase !== String(argv.phase)) continue
-        output.info(`  ${icon} [${entry.status}] ${slug}`)
+        output.info(`  ${icon} [${status}] ${slug}`)
         const cd = crossDepMap.get(slug)
         if (cd?.length) {
           for (const cdEntry of cd) {
