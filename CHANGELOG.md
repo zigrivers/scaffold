@@ -4,6 +4,23 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.24.1] — 2026-04-27
+
+### Fixed
+- **`scaffold status` no longer surfaces overlay-disabled steps as pending.**
+  When a project's overlay or methodology disabled a step that previously
+  had a `pending` state entry (e.g., game-specific `performance-budgets` /
+  `analytics-telemetry` on a non-game project), the entry leaked into
+  `phases[].steps[]` and the interactive listing, leading consumers and
+  AI agents to treat them as eligible work. Two-layer fix:
+  - `reconcileWithPipeline` now prunes `pending` state entries for steps
+    that became disabled. `completed` / `skipped` / `in_progress` entries
+    are preserved as history / audit / active-work signals.
+  - `scaffold status` filters out overlay-disabled `pending` entries
+    across `phasesData`, the interactive listing, and the compact JSON
+    `steps` array. Disabled entries with non-pending status remain
+    visible so the operator retains audit and active-work context.
+
 ### Notes
 - Bundled `@zigrivers/mmr` 1.2.0 → 1.2.1 (patch). Fixes a yargs argparse bug
   where `mmr review --diff -` and `mmr reconcile … --input -` (with a space
