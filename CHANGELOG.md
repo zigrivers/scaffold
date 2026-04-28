@@ -4,6 +4,38 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+### Added
+- **`--fix-threshold` passthrough on review wrappers.** `scaffold run review-pr`,
+  `review-code`, and `post-implementation-review` now accept
+  `--fix-threshold P0|P1|P2|P3` in `$ARGUMENTS` and forward it to `mmr review`.
+  Default behavior unchanged — when the flag is omitted, MMR uses
+  `.mmr.yaml` or its built-in default (`P2`).
+- **MMR delegated-init guidance** in `automated-pr-review.md`. Pipeline now
+  prompts the agent to run `mmr config init` if `.mmr.yaml` is missing,
+  rather than scaffold writing the file directly.
+
+### Changed
+- **Agent-facing docs read `fix_threshold` from the MMR verdict JSON**
+  instead of hardcoding `P0/P1/P2`. Files updated: `CLAUDE.md`,
+  `content/tools/review-pr.md`, `review-code.md`,
+  `post-implementation-review.md`,
+  `content/pipeline/build/{single,multi}-agent-{start,resume}.md`,
+  `content/pipeline/environment/automated-pr-review.md`,
+  `content/skills/mmr/SKILL.md`,
+  `content/skills/multi-model-dispatch/SKILL.md`,
+  and `content/knowledge/core/automated-review-tooling.md`. Behavior is
+  unchanged at the default threshold (`P2`); projects that lower or raise
+  the threshold now get consistent behavior across all wrappers and
+  prompts.
+- **Per-channel review prompt** in `review-code.md` and the templates in
+  `content/skills/multi-model-dispatch/SKILL.md` now ask channels for all
+  P0–P3 findings (was P0/P1/P2 only). Required so projects running at
+  threshold `P3` actually surface P3 findings.
+
+### Internal
+- Bats regression guard (`tests/fix-threshold-language-guard.bats`)
+  prevents reintroduction of literal `P0/P1/P2` into agent-facing docs.
+
 ## [3.24.3] — 2026-04-28
 
 ### Fixed
