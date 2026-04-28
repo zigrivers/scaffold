@@ -387,8 +387,8 @@ Return exactly one verdict:
 
 - `pass` — all channels completed with `full` coverage, no unresolved P0/P1/P2
 - `degraded-pass` — at least one channel was skipped/compensated (coverage is not all `full`), but all executed and compensating channels have no unresolved P0/P1/P2
-- `blocked` — same P0/P1/P2 finding (or set) remains unresolved after 3 fix attempts, OR no reconciled result was possible
-- `needs-user-decision` — reviewer disagreement / contradictions, or a finding requires human judgment that automated iteration can't resolve
+- `blocked` — gate failed: P0/P1/P2 findings exist at or above the fix threshold (typically the *same* finding(s) remain unresolved after 3 fix attempts)
+- `needs-user-decision` — no channels completed (no reconciled result was possible), reviewer disagreement / contradictions, or a finding requires human judgment that automated iteration can't resolve
 
 When compensating passes ran for any channel, the maximum achievable verdict is `degraded-pass` — never `pass`, even if all findings are resolved. When both external channels were compensated, the review summary must note: "All findings are single-model (Claude only)."
 
