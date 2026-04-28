@@ -38,6 +38,13 @@ export function pipelineStepsForReconcile(
     .map(m => ({
       slug: m.frontmatter.name,
       produces: m.frontmatter.outputs,
-      enabled: pipeline.overlay.steps[m.frontmatter.name]?.enabled === true,
+      // Use the resolved graph, not the overlay, as the enablement
+      // truth source. `buildGraph` defaults missing overlay entries
+      // to `enabled: true` (graph.ts:26), so a pipeline step that
+      // exists in metaPrompts but isn't enumerated by the active
+      // preset is still treated as enabled here. Without this,
+      // `scaffold skip <new-step>` would fail and existing state
+      // entries could be pruned when a preset trails the pipeline.
+      enabled: pipeline.graph.nodes.get(m.frontmatter.name)?.enabled === true,
     }))
 }

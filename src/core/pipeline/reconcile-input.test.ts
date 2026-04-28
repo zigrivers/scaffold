@@ -41,13 +41,17 @@ function makePipeline(
   globalSlugs: string[],
 ): ResolvedPipeline {
   const steps: Record<string, { enabled: boolean }> = {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nodes = new Map<string, { enabled: boolean }>() as any
   for (const [slug, e] of Object.entries(enabled)) {
     steps[slug] = { enabled: e }
+    nodes.set(slug, { enabled: e })
   }
   return {
     overlay: {
       steps, knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
     },
+    graph: { nodes, edges: new Map() },
     globalSteps: new Set(globalSlugs),
   } as unknown as ResolvedPipeline
 }
@@ -97,6 +101,40 @@ describe('pipelineStepsForReconcile', () => {
     )
     const result = pipelineStepsForReconcile(context, pipeline, undefined)
     expect(result.map(s => s.slug)).toEqual(['global-step'])
+  })
+
+  it('treats a step in metaPrompts but missing from overlay as enabled (graph-default)', async () => {
+    // Round-2 Codex P1: production presets enumerate every known step,
+    // but a pipeline step shipped in a scaffold version where the preset
+    // hasn't been updated should still be reachable via mutating
+    // commands. buildGraph defaults missing overlay entries to
+    // `enabled: true` (src/core/dependency/graph.ts:26); the helper
+    // must follow that convention so reconcile sees enabled=true and
+    // adds the entry rather than silently passing enabled=false (which
+    // would also prune any existing pending entry).
+    const { buildGraph } = await import('../dependency/graph.js')
+    const orphanStep = fm('step-not-in-preset')
+    const ctx = makeContext([['step-not-in-preset', orphanStep]])
+    const overlayStepsMap = new Map<string, { enabled: boolean }>()  // empty
+    const realGraph = buildGraph(
+      [orphanStep.frontmatter],
+      overlayStepsMap,
+      {},
+      {},
+    )
+    const pipeline = {
+      overlay: {
+        steps: {},  // empty — the orphan-step case
+        knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
+      },
+      graph: realGraph,
+      globalSteps: new Set<string>(),
+    } as unknown as ResolvedPipeline
+
+    const result = pipelineStepsForReconcile(ctx, pipeline, undefined)
+    expect(result).toHaveLength(1)
+    expect(result[0].slug).toBe('step-not-in-preset')
+    expect(result[0].enabled).toBe(true)
   })
 
   it('flat single-project (no services[]): scope is unconstrained even without --service', () => {
