@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-04-28
+
 ### Added
 - **`advisory_count` field in reconciled results.** Findings strictly below
   the configured `fix_threshold` are now counted in `results.advisory_count`
