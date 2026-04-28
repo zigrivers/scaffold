@@ -181,12 +181,12 @@ way.
   - Codex: `! codex login`
   - Gemini: `! gemini -p "hello"`
 - **Independence** — never share one channel's output with another.
-- **Fix all P0/P1/P2** findings before proceeding to the next task.
+- **Fix all blocking findings** (severity at or above `results.fix_threshold` in the verdict JSON; the project default lives in `.mmr.yaml` and is `P2` unless changed) before proceeding to the next task. Use `--fix-threshold P0|P1|P2|P3` on `scaffold run review-pr` / `review-code` to override per-invocation.
 - **Verdict handling** — proceed only on `pass` or `degraded-pass`. If the
   review returns `blocked` or `needs-user-decision`, stop and surface the
   verdict and remaining findings to the user. Do NOT merge automatically.
 - **3-round limit** — the limit is **per finding**, not per total review
-  rounds. Stop and ask the user only when the *same* P0/P1/P2 finding (or
+  rounds. Stop and ask the user only when the *same* blocking finding (or
   set of findings) remains unresolved after 3 fix attempts. Each round
   surfacing a *new, different, fixable* finding is healthy review/fix
   iteration — keep going. Other stop conditions: a finding is genuinely
