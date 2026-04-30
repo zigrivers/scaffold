@@ -9,16 +9,23 @@ All notable changes to Scaffold are documented here.
 ### Fixed
 - **Codex AGENTS.md now emits direct `mmr review` recipes for `review-code`
   and `review-pr`** instead of the `scaffold run <step>` shim. The shim
-  works in Claude Code (slash commands re-inject the meta-prompt as
-  instructions) but breaks in Codex, which executes `scaffold run` as a
-  shell command and treats the 45 KB meta-prompt as an opaque result —
-  agents reported "scaffold run review-code emitted the review wrapper
-  again rather than an actionable verdict" and fell back to bare
-  `mmr review --staged`, losing the 4th-channel Superpowers reconcile.
-  The codex adapter now inlines a deterministic recipe (multi-mode
-  `mmr review` invocation + `mmr reconcile --channel superpowers` +
-  verdict-handling guidance) for these two tools while leaving prompt-
-  style steps unchanged.
+  works in Claude Code (slash commands re-inject the meta-prompt into the
+  model's context) but breaks in Codex, which executes `scaffold run` as a
+  shell command and treats the 45 KB meta-prompt as opaque stdout — agents
+  reported "scaffold run review-code emitted the review wrapper again
+  rather than an actionable verdict" and fell back to bare
+  `mmr review --staged`. The codex adapter now inlines a deterministic
+  recipe (full 7-level BASE_REF resolution ladder + empty-diff guard +
+  multi-mode `mmr review` invocation + verdict-handling guidance) for
+  these two tools, with `gh pr view` PR-number detection in the review-pr
+  recipe. Non-executor steps still use `scaffold run <slug>` unchanged.
+
+### Limitations
+- The Codex recipes ship **3-channel** coverage (Codex, Gemini, Claude CLI).
+  The 4th-channel Superpowers `code-reviewer` reconcile requires a harness
+  that can dispatch agent skills, which Codex cannot do directly — the
+  recipes link users at `scaffold run review-{code,pr}` from a Claude Code
+  session for full 4-channel coverage.
 
 ## [3.25.0] — 2026-04-28
 

@@ -148,10 +148,12 @@ describe('CodexAdapter', () => {
   // stdout intended for harnesses that re-inject it as instructions (Claude
   // Code slash commands). Codex executes it as a shell command and treats
   // stdout as a result, so the embedded bash never runs. For review-code
-  // and review-pr — which are pure shell-executable wrappers around
-  // `mmr review` + `mmr reconcile` — emit direct recipes instead.
+  // and review-pr, emit direct `mmr review` recipes inline. The 4th-channel
+  // Superpowers reconcile is intentionally NOT included — Codex cannot
+  // dispatch agent skills, so the recipes ship 3-channel coverage and point
+  // users at the Claude Code path when they need 4-channel.
   describe('codex-incompatible executor tools', () => {
-    it('review-code emits direct mmr review + reconcile recipes, not `scaffold run review-code`', () => {
+    it('review-code emits direct mmr review recipe with full BASE_REF ladder + empty-diff guard', () => {
       adapter.initialize(makeContext())
       adapter.generateStepWrapper(makeStepInput({
         slug: 'review-code',
@@ -160,13 +162,35 @@ describe('CodexAdapter', () => {
       }))
       const result = adapter.finalize(makeFinalizeInput([]))
       const content = result.files[0].content
-      expect(content).not.toMatch(/`scaffold run review-code`/)
+
+      // No leftover `Run \`scaffold run review-code\`` shim line. The recipe
+      // may still reference `scaffold run review-code` in the 4th-channel
+      // note (pointing Codex users at the Claude Code path), but the shim
+      // form must not be the primary instruction.
+      expect(content).not.toMatch(/Run `scaffold run review-code`/)
+
+      // Direct mmr review invocations are present
       expect(content).toContain('mmr review --staged')
-      expect(content).toContain('mmr reconcile')
-      expect(content).toContain('--channel superpowers')
+      expect(content).toContain('mmr review --diff -')
+
+      // BASE_REF resolution mirrors content/tools/review-code.md (7-level ladder)
+      expect(content).toContain('git symbolic-ref refs/remotes/origin/HEAD')
+      expect(content).toContain('origin/main')
+      expect(content).toContain('origin/master')
+      expect(content).toContain('HEAD~1')
+
+      // Empty-diff guard prevents 'no diff content' failure on clean trees
+      expect(content).toContain('if [ -z "$DIFF" ]')
+
+      // No reconcile claim — Codex can't dispatch the Superpowers skill
+      expect(content).not.toContain('mmr reconcile')
+      expect(content).not.toContain('--channel superpowers')
+
+      // 4-channel guidance points at the Claude Code path
+      expect(content).toMatch(/4-channel coverage.*Claude Code/i)
     })
 
-    it('review-pr emits direct mmr review --pr recipe, not `scaffold run review-pr`', () => {
+    it('review-pr emits direct mmr review --pr recipe with PR_NUMBER detection', () => {
       adapter.initialize(makeContext())
       adapter.generateStepWrapper(makeStepInput({
         slug: 'review-pr',
@@ -175,9 +199,15 @@ describe('CodexAdapter', () => {
       }))
       const result = adapter.finalize(makeFinalizeInput([]))
       const content = result.files[0].content
-      expect(content).not.toMatch(/`scaffold run review-pr`/)
+
+      expect(content).not.toMatch(/Run `scaffold run review-pr`/)
       expect(content).toContain('mmr review --pr')
-      expect(content).toContain('mmr reconcile')
+
+      // PR_NUMBER detection is shown so agents don't run with an empty value
+      expect(content).toContain('gh pr view --json number')
+
+      // No reconcile claim
+      expect(content).not.toContain('mmr reconcile')
     })
 
     it('non-executor tools still use `scaffold run <slug>`', () => {
@@ -189,6 +219,17 @@ describe('CodexAdapter', () => {
       }))
       const result = adapter.finalize(makeFinalizeInput([]))
       expect(result.files[0].content).toContain('scaffold run automated-pr-review')
+    })
+
+    it('executor recipes are deterministic across runs', () => {
+      const run = () => {
+        const a = new CodexAdapter()
+        a.initialize(makeContext())
+        a.generateStepWrapper(makeStepInput({ slug: 'review-code', phase: null }))
+        a.generateStepWrapper(makeStepInput({ slug: 'review-pr', phase: null }))
+        return a.finalize(makeFinalizeInput([])).files[0].content
+      }
+      expect(run()).toBe(run())
     })
   })
 })
