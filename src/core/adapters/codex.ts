@@ -44,7 +44,11 @@ const PHASE_ORDER = [
 // shape here in sync with those files.
 const CODEX_EXECUTOR_RECIPES: Record<string, string> = {
   'review-code': `Run multi-model review on local code before commit or push
-(3 MMR CLI channels: Codex, Gemini, Claude).
+(3 MMR CLI channels: Codex, Gemini, Claude). Pick **one** of the three modes
+below.
+
+**Mode 1 — full local delivery candidate** (committed branch diff + staged
++ unstaged; the most common case):
 
 \`\`\`bash
 # Resolve trunk ref — same ladder as content/tools/review-code.md.
@@ -60,22 +64,29 @@ else                                                            BASE_REF=HEAD
 fi
 MERGE_BASE=$(git merge-base "$BASE_REF" HEAD 2>/dev/null || echo "$BASE_REF")
 
-# Default — full local delivery candidate (committed branch diff + staged + unstaged):
-DIFF=$(git diff "$MERGE_BASE")
-if [ -z "$DIFF" ]; then
+# --quiet exits 0 when there's no diff. Streams the diff directly into mmr
+# rather than buffering through a shell variable (large diffs can OOM).
+if git diff --quiet "$MERGE_BASE"; then
   echo "No changes to review"; exit 0
 fi
-printf '%s\\n' "$DIFF" | mmr review --diff - --sync --format json
-
-# Or: staged only
-mmr review --staged --sync --format json
-
-# Or: explicit branch diff (substitute BRANCH_NAME)
-mmr review --base main --head BRANCH_NAME --sync --format json
-
-# Optional: override fix threshold for this invocation
-# mmr review --staged --fix-threshold P1 --sync --format json
+git diff "$MERGE_BASE" | mmr review --diff - --sync --format json
 \`\`\`
+
+**Mode 2 — staged changes only** (e.g. pre-commit gate):
+
+\`\`\`bash
+mmr review --staged --sync --format json
+\`\`\`
+
+**Mode 3 — explicit branch diff** (substitute the actual branch name for
+\`BRANCH_NAME\`):
+
+\`\`\`bash
+mmr review --base main --head BRANCH_NAME --sync --format json
+\`\`\`
+
+Append \`--fix-threshold P0|P1|P2|P3\` to any of the above to override the
+project's configured threshold for this invocation.
 
 Verdicts: proceed only on \`pass\` or \`degraded-pass\`. On \`blocked\` or
 \`needs-user-decision\`, stop and surface to the user. Fix all findings at or above
@@ -96,10 +107,10 @@ if [ -z "$PR_NUMBER" ]; then
   echo "PR_NUMBER not set and no PR for current branch"; exit 1
 fi
 mmr review --pr "$PR_NUMBER" --sync --format json
-
-# Optional: override fix threshold for this invocation
-# mmr review --pr "$PR_NUMBER" --fix-threshold P1 --sync --format json
 \`\`\`
+
+Append \`--fix-threshold P0|P1|P2|P3\` to override the project's configured
+threshold for this invocation.
 
 Verdicts: proceed only on \`pass\` or \`degraded-pass\`. On \`blocked\` or
 \`needs-user-decision\`, stop and surface to the user. Fix all findings at or above
@@ -159,7 +170,11 @@ export class CodexAdapter implements PlatformAdapter {
 
 This document describes the Scaffold pipeline steps for use with Codex.
 
-Run each step using: \`scaffold run <step-slug>\`
+Run each step using \`scaffold run <step-slug>\` **unless the step below
+provides an inline shell recipe** — in that case, run the recipe directly.
+\`scaffold run\` writes a meta-prompt to stdout that Codex cannot interpret
+as instructions, so steps with executable shell behavior emit the commands
+inline here.
 
 ${sections.join('\n\n')}
 `

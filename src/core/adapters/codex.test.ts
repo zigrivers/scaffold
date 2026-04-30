@@ -179,8 +179,15 @@ describe('CodexAdapter', () => {
       expect(content).toContain('origin/master')
       expect(content).toContain('HEAD~1')
 
-      // Empty-diff guard prevents 'no diff content' failure on clean trees
-      expect(content).toContain('if [ -z "$DIFF" ]')
+      // Empty-diff guard prevents 'no diff content' failure on clean trees;
+      // uses --quiet to avoid buffering the entire diff into a shell variable
+      expect(content).toContain('git diff --quiet "$MERGE_BASE"')
+
+      // Modes are split into separate fenced code blocks so an agent
+      // executing one block doesn't run all three reviews in sequence.
+      expect(content).toMatch(/\*\*Mode 1\b/)
+      expect(content).toMatch(/\*\*Mode 2\b/)
+      expect(content).toMatch(/\*\*Mode 3\b/)
 
       // No reconcile claim — Codex can't dispatch the Superpowers skill
       expect(content).not.toContain('mmr reconcile')
