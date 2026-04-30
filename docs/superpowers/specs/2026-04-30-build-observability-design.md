@@ -462,7 +462,10 @@ The `scaffold observe ack` CLI command is the only user-facing way to mutate fin
 The single shape all renderers consume:
 
 ```ts
+export type Verdict = "pass" | "degraded-pass" | "blocked";
+
 export interface EngineOutput {
+  schema_version: "1.0";                  // versioned starting in v1 so consumers can pin
   invocation: {
     command: "progress" | "audit";
     args: Record<string, unknown>;
@@ -477,8 +480,35 @@ export interface EngineOutput {
   needs_attention: NeedsAttentionItem[];  // stall detection output — always present (may be empty)
   graph_stats: GraphStats;                // node + edge counts by type — always present
   fix_threshold: "P0" | "P1" | "P2" | "P3";  // resolved per the order in 2.4; always present
+  verdict: Verdict;                       // engine-computed; see derivation below
+  summary: FindingsSummary;               // pre-computed counts for renderers; always present
+}
+
+export interface FindingsSummary {
+  total: number;
+  by_severity: { P0: number; P1: number; P2: number; P3: number };
+  by_severity_status: {
+    P0: { open: number; acknowledged: number; skipped: number };
+    P1: { open: number; acknowledged: number; skipped: number };
+    P2: { open: number; acknowledged: number; skipped: number };
+    P3: { open: number; acknowledged: number; skipped: number };
+  };
+  blocking: number;        // count of findings where severityRank(severity) <= severityRank(fix_threshold) && status === "open"
+  acknowledged: number;    // count of findings where status === "acknowledged"
+  skipped_lenses: number;  // count of distinct lens_ids that emitted lens_skipped evidence
 }
 ```
+
+`summary` is computed by the engine immediately after findings are aggregated, so all three renderers and downstream consumers see the same counts. Renderers must never recompute these counts from `findings[]`; they always read from `summary`. The `by_severity_status` breakdown supports the per-severity Visible/Acknowledged tables in markdown reports and the "P2 (3) + acknowledged 1 hidden" terminal lines without touching `findings[]`.
+
+**`verdict` derivation** (deterministic; computed by the engine, not by renderers):
+- `progress` command: `verdict` is always `"pass"` (progress does not gate; it informs).
+- `audit` command:
+  - `"blocked"` if any finding has `severityRank(severity) <= severityRank(fix_threshold)` and `status === "open"` (i.e., at least one open blocking finding).
+  - `"degraded-pass"` otherwise if any required adapter for an enabled lens is `unavailable` AND that lens emitted a `lens_skipped` evidence finding (i.e., the audit completed but with reduced confidence).
+  - `"pass"` otherwise.
+
+Renderers display the verdict; they don't compute it. Persisted JSON sidecars include the verdict verbatim.
 
 `blocking_findings` is **not** carried in the JSON. It's a derived view: `findings.filter(f => severityRank(f.severity) <= severityRank(fix_threshold) && f.status === "open")`. Renderers compute it; the engine emits the inputs. This avoids redundant data and the inconsistency risk of two arrays that must agree.
 
@@ -1033,5 +1063,305 @@ lenses:
 
 Lenses read this config at startup; missing keys fall through to the registry defaults shown in 3.10.
 
-<!-- Sections 4–N to follow -->
+## Section 4 — Renderers
+
+Three renderers consume the engine's `EngineOutput` JSON and produce text/HTML. They share a common library (`src/observability/renderers/_lib.ts`) for severity badges, time formatting, redaction (render-time pass), and section ordering.
+
+### 4.1 Terminal renderer
+
+**Surface:** stdout, ≤ 80 columns by default (`COLUMNS` env-var or `--width=N`), markdown formatting suitable for direct read or piping to `glow`/`bat`.
+
+**Progress snapshot** (`scaffold observe progress` with no flags, default 24-hour window):
+
+```
+build observability — progress (since 2026-04-29 14:00 · 24h)
+
+⚠ needs attention (3)
+  • PR #41 stale 67h — opened 2026-04-27, no commits, awaiting review
+  • task T-031 (alice) claimed 5h — branch alice-feat-auth, no commits since
+  • blocker on T-024 (bob) unaddressed 3h — kind=external (vendor outage)
+
+active agents (2)
+  alice  · T-031 user-auth: refresh token rotation       branch alice-feat-auth   PR pending
+  bob    · T-024 billing: idempotent retry on 429        branch bob-billing       blocked
+
+completed in window (4)
+  ✓ T-029 (alice)  pr_submitted #40  src/auth/login.ts +124 -8        2026-04-29 19:14
+  ✓ T-028 (charlie) pr_submitted #39  src/queue/worker.ts +48 -12      2026-04-29 17:02
+  ✓ T-027 (alice)  pr_submitted #38  src/auth/session.ts +73 -2       2026-04-29 15:48
+  ✓ T-026 (bob)    pr_submitted #37  src/billing/cents.ts +21 -4      2026-04-29 14:31
+
+upcoming (next 5, dependency-ordered)
+  T-032  user-auth: SSO callback handler              ready  · wave 2
+  T-033  user-auth: session expiry tests              ready  · wave 2
+  T-034  billing: refund flow                         blocked by T-024
+  T-035  observability: emit task_claimed events      ready  · wave 3
+  T-036  docs: update auth section                    ready  · wave 3
+
+story coverage (top 3 by activity)
+  user-auth-1   plan 4/5 done · ACs 4/4 with tests · 4/4 passing
+  billing-2     plan 1/3 done · ACs 1/2 with tests · 1/1 passing
+  observability plan 0/3 done · ACs 0/3 with tests · — (no run)
+
+recent decisions (3)
+  refresh-token-strategy   chose sliding-window over absolute  affects: src/auth/**
+  idempotency-keys         use uuid-v7 for cross-service                affects: src/queue/**
+  pii-redaction-defaults   block on regex pack v2 in prod       affects: src/**
+
+availability: git ✓ · gh ✓ · pipeline_docs ✓ · tests ✓ · state ✓ · beads — · mmr ✓ · audit_history ✓
+                                                       (— = unavailable, no enrichment from this source)
+
+(rerun with --replay for the full timeline · --json for raw data)
+```
+
+**Progress replay** (`scaffold observe progress --replay`): adds a `timeline` section after `recent decisions`, with one event per line:
+
+```
+timeline (89 events · 24h window)
+  2026-04-29 19:14  ledger  task_completed  T-029 (alice)  → PR #40
+  2026-04-29 18:55  git     commit          alice/src/auth/login.ts (sha 4af2e1)
+  2026-04-29 18:42  ledger  decision_recorded  refresh-token-strategy (alice)
+  2026-04-29 18:11  mmr     job_completed   PR #38 verdict=pass
+  2026-04-29 17:48  gh      pr_opened       PR #40 alice-feat-auth
+  2026-04-29 17:02  ledger  task_completed  T-028 (charlie) → PR #39
+  …
+
+  ("ledger" in the source column refers to events from the activity ledger
+   — the agent-driven workflow stream — and is intentionally distinct from
+   the "state" adapter in availability, which surfaces .scaffold/state.json
+   pipeline-step transitions as a separate replay source.)
+```
+
+**Audit findings** (`scaffold observe audit`):
+
+Note on numbers below: `fix_threshold=P2` means severities `{P0, P1, P2}` are *blocking* (severityRank ≤ rank of threshold; "at or above"). P3 is advisory. So with 1 P0 + 2 P1 + 4 P2 + 0 P3, blocking = 7 and advisory = 0. The example uses a project that has set `fix_threshold=P1` (so only P0+P1 = 3 are blocking and the four P2s are advisory) to keep the example illustrative.
+
+```
+build observability — audit (profile=fast · scope=all · 24h window)
+
+verdict: blocked  ·  fix_threshold: P1  ·  blocking findings: 3 (of 7 total · 1 acknowledged hidden)
+
+P0 (1)
+  [3a8c1f02] [B-ac-coverage] AC user-auth-1.3 has failing test
+    docs/user-stories.md#user-auth-1
+    src/auth/test/refresh.spec.ts::"rejects expired token"
+    fix: investigate test failure; AC may not yet be implemented
+
+P1 (2)
+  [9d1e02f4] [A-tdd] new public function without test — src/auth/sso.ts::handleCallback
+    docs/tdd-standards.md
+    fix: add a test for handleCallback before merging
+  [b471c8a9] [E-design] 4 ad-hoc color values in src/components/SsoButton.tsx (threshold: 3)
+    docs/design-system.md
+    fix: replace #4f46e5, #ef4444, rgba(0,0,0,0.1), #f3f4f6 with tokens
+
+advisory P2 (3)  ·  P3 (0)  ·  skipped lenses: 0
+acknowledged: 1  (1 P2 hidden — run with --show-acknowledged to see)
+
+(finding IDs above [in brackets] are the first 8 chars of the stable Finding.id;
+ use the full or truncated id with `scaffold observe ack <id>` to acknowledge)
+
+next actions:
+  scaffold observe audit --fix     # auto-fix above-threshold findings
+  scaffold observe ack <id>        # acknowledge a finding to unblock
+```
+
+When `tests` is unavailable: the verdict line shows `verdict: degraded-pass · 1 lens skipped`; specific findings note `evidence: lens_skipped (tests adapter unavailable)`.
+
+### 4.2 Markdown report renderer
+
+**Files written:**
+- Progress: `docs/build-status/<YYYY-MM-DD-HHmm>.md` + `<YYYY-MM-DD-HHmm>.json` sidecar
+- Audit (multi-lens):  `docs/audits/<YYYY-MM-DD-HHmm>-<profile>-<scope>.md` + `.json` sidecar, where `<profile>` is `fast` or `full` and `<scope>` is `docs`, `code`, or `all` (matching the CLI flags in Section 1).
+- Audit (single-lens):  `docs/audits/<YYYY-MM-DD-HHmm>-<profile>-lens-<lens-id>.md` + `.json` sidecar (e.g., `…-fast-lens-B-ac-coverage.json`).
+
+The markdown is the human-readable rendering, intended to live in repo history and be cited from PR descriptions. The JSON sidecar is the durable machine record (read by the `audit-history` adapter and by future audit runs for trend analysis).
+
+**Both** the markdown report and the JSON sidecar are *persisted renderer outputs* and run through the engine's render-time redaction pass before writing. The `audit-history` adapter therefore reads only redacted content; secrets cannot leak via sidecar even if they slipped past the write-time pass.
+
+**Audit markdown report shape:**
+
+```markdown
+# Build Observability Audit — 2026-04-30 14:22
+
+**Verdict:** blocked
+**Profile:** fast
+**Scope:** all
+**Fix threshold:** P1
+**Window:** 2026-04-29 14:22 – 2026-04-30 14:22 (24h)
+**Job:** [`mmr-bdf04e1c`](../mmr/jobs/bdf04e1c.json)
+<!-- when this audit was the doc-conformance MMR channel of a PR review -->
+
+## Needs Attention
+
+<!-- Section 4.5 — present only when needs_attention[] is non-empty.
+     Same items as the terminal "⚠ needs attention" block, formatted as a table. -->
+
+| Signal | Item | Age |
+|---|---|---|
+| pr_stale | PR #41 (alice-feat-auth) — opened, no commits, awaiting review | 67h |
+
+## Summary
+
+7 findings · 3 blocking (severities at or above P1, the project's fix_threshold) · 1 acknowledged (1 P2 hidden) · 0 skipped lenses.
+
+| Severity | Total | Visible | Acknowledged |
+|---|---|---|---|
+| P0 | 1 | 1 | 0 |
+| P1 | 2 | 2 | 0 |
+| P2 | 4 | 3 | 1 |
+| P3 | 0 | 0 | 0 |
+
+## Findings
+
+### [P0] B-ac-coverage — AC user-auth-1.3 has failing test
+
+…
+
+(one section per finding, with full evidence and fix-hint)
+
+## Availability
+
+| Adapter | Status | Reason / Notes |
+|---|---|---|
+| git | ✓ available | |
+| gh | ✓ available | |
+| pipeline_docs | ✓ available | |
+| tests | ✓ available | last run 2026-04-30 13:58 |
+| state | ✓ available | |
+| beads | — unavailable | `.beads/` not present (project chose markdown-only tracking) |
+| mmr | ✓ available | most-recent job 4 hours ago |
+| audit_history | ✓ available | 12 prior reports |
+
+## Acknowledged
+
+| Finding | Acknowledged at | By | Note |
+|---|---|---|---|
+| `8a3b…f201` E-design — 1 ad-hoc color in src/components/Banner.tsx | 2026-04-28 09:14 | alice | Approved exception for legacy red until design refresh in wave 5 |
+```
+
+**JSON sidecar shape** (machine-readable; `audit-history` adapter reads only this). The sidecar is exactly the `EngineOutput` shape (Section 2.5) plus a small wrapper:
+
+```json
+{
+  "report_id": "audit-2026-04-30-1422-fast-all",
+  "engine_output": { /* full EngineOutput JSON, redacted */ }
+}
+```
+
+`report_id` is the same string used in the filename (without extension). The sidecar is single-versioned via `engine_output.schema_version` (Section 2.5) — there is no separate envelope version. Future schema bumps (e.g., `"2.0"`) increment that field. Consumers should pin to a major version and tolerate added fields. Older sidecars (`schema_version: "1.0"`) stay readable by newer engines.
+
+### 4.3 Dashboard panel renderer
+
+**Surface:** HTML fragments injected into `.scaffold/dashboard.html` at named anchor comments by `scripts/generate-dashboard.sh`.
+
+```html
+<!-- existing dashboard sections (pipeline progress, beads tasks, etc.) -->
+
+<!-- observe:progress -->
+<section id="build-progress" class="panel">
+  <header>
+    <h2>Build Progress</h2>
+    <!-- availability_summary is renderer-internal: a one-line "git ✓ · gh ✓ · …" string
+         the dashboard renderer derives from EngineOutput.availability before rendering. -->
+    <span class="meta">last 24h · {{availability_summary}}</span>
+  </header>
+  {{#if needs_attention}}
+  <aside class="needs-attention" role="alert">
+    <h3>⚠ Needs Attention ({{needs_attention.length}})</h3>
+    <ul>{{#each needs_attention}}<li>{{summary}} ({{age_hours}}h)</li>{{/each}}</ul>
+  </aside>
+  {{/if}}
+  <div class="grid grid-2">
+    <div class="card"><h3>Active Agents</h3>{{> active-agents}}</div>
+    <div class="card"><h3>Completed (24h)</h3>{{> completed-in-window}}</div>
+    <div class="card"><h3>Upcoming</h3>{{> upcoming}}</div>
+    <div class="card"><h3>Recent Decisions</h3>{{> recent-decisions}}</div>
+  </div>
+  <details><summary>Story coverage</summary>{{> story-coverage}}</details>
+  <details><summary>Timeline (replay)</summary>{{> replay}}</details>
+</section>
+<!-- /observe:progress -->
+
+<!-- observe:audit -->
+<section id="build-audit" class="panel" data-verdict="{{verdict}}">
+  <header>
+    <h2>Audit</h2>
+    <span class="badge severity-{{verdict}}">{{verdict}}</span>
+    <span class="meta">{{summary.blocking}} blocking · threshold {{fix_threshold}}</span>
+  </header>
+  <div class="finding-filters">
+    <button data-filter="all">All ({{summary.total}})</button>
+    <button data-filter="blocking">Blocking ({{summary.blocking}})</button>
+    <button data-filter="P0">P0 ({{summary.by_severity.P0}})</button>
+    <button data-filter="P1">P1 ({{summary.by_severity.P1}})</button>
+    <button data-filter="P2">P2 ({{summary.by_severity.P2}})</button>
+    <button data-filter="P3">P3 ({{summary.by_severity.P3}})</button>
+  </div>
+  {{#if findings.length}}
+  <ol class="findings">
+    {{#each findings}}
+    <li class="finding severity-{{severity}}" data-status="{{status}}">
+      <header>
+        <span class="badge">{{severity}}</span>
+        <code class="finding-id" title="run scaffold observe ack {{id_short}} to acknowledge">{{id_short}}</code>
+        <span class="lens">[{{lens_id}}]</span>
+        <span class="title">{{title}}</span>
+      </header>
+      <p>{{description}}</p>
+      <!-- id_short, evidence_json, fix_hint_json are renderer-internal:
+           id_short = finding.id.slice(0, 8); evidence_json = JSON.stringify(finding.evidence);
+           fix_hint_json = JSON.stringify(finding.fix_hint); each HTML-escaped. -->
+      <details><summary>Evidence</summary><pre>{{evidence_json}}</pre></details>
+      {{#if fix_hint}}<details><summary>Fix hint</summary><pre>{{fix_hint_json}}</pre></details>{{/if}}
+    </li>
+    {{/each}}
+  </ol>
+  {{else}}
+  <p class="empty">No findings. <span class="meta">verdict: {{verdict}}</span></p>
+  {{/if}}
+</section>
+<!-- /observe:audit -->
+```
+
+**Theme tokens.** Severity badges use `--sev-p0|p1|p2|p3` from `lib/dashboard-theme.css` (extended for this design — these tokens are added to the theme file). Light/dark variants follow the existing convention.
+
+**Verdict-to-severity mapping** (used wherever a verdict needs a colored badge, e.g., the `data-verdict` attribute and the optional `severity-{verdict}` class on the audit panel):
+- `blocked` → `--sev-p0` (red — same as P0 findings)
+- `degraded-pass` → `--sev-p2` (yellow — same as P2 findings)
+- `pass` → a neutral success token `--sev-pass` (green; new token, added alongside `--sev-p*`)
+
+This mapping is implemented in `renderers/_lib.ts::verdictToSeverityToken()` and used uniformly by terminal (color codes), markdown (badge text), and dashboard (CSS class).
+
+**Interaction.** Inline JS already used by the dashboard's Beads modal is reused for the finding-filter buttons. Filtering is client-side, no fetch.
+
+### 4.4 Common rendering rules
+
+- **Redaction.** All persisted renderers (markdown report, dashboard) run the engine's render-time redaction pass before writing. Terminal renderer applies secret-detection only (paths preserved for navigation; see Section 1's Redaction policy).
+- **Severity badges.** All renderers map severity → display badge: P0 → red ●, P1 → orange ●, P2 → yellow ●, P3 → blue ◯. Color-blind-safe icons backstop color.
+- **Empty states.** Each section/panel has a documented empty-state ("no upcoming tasks", "no audit findings", "no decisions in window"). Renderers do not show an empty `<ul>` or a bare heading.
+- **Time formatting.** All times shown to users are local-timezone (read from `process.env.TZ` or system default), with UTC ISO retained in JSON outputs.
+- **Truncation.** Long fields (decision summaries, finding descriptions) are truncated to ≤ 200 chars in default views with a `details/summary` (markdown/dashboard) or `…` (terminal) for full text.
+
+### 4.5 The "Needs Attention" surface
+
+Stall-detection output is rendered identically in spirit across surfaces but adapts to surface affordances:
+
+- **Terminal**: `⚠ needs attention (N)` block at the top of `progress` and `audit` output. Lists items with age and summary.
+- **Markdown report**: a `## Needs Attention` section near the top with a table of items.
+- **Dashboard**: `<aside class="needs-attention" role="alert">` with the items as a list. The aside is colored with `--sev-p1` to draw the eye.
+
+When `needs_attention[]` is empty, the surface is omitted entirely (no "no items needing attention" — silence is the signal).
+
+### 4.6 The `--json` output
+
+Both `progress` and `audit` accept `--json`, emitting the full `EngineOutput` shape to stdout (no wrapper — just the engine output object including its `schema_version` field). This is the canonical interchange format for any downstream consumer (e.g., a script that posts the audit verdict to Slack, or a custom dashboard). Renderers other than `--json` are derivations of this shape; nothing visible in the JSON is computed by a renderer (verdict and `summary` are engine-computed per 2.5).
+
+**Redaction.** `--json` is a machine-readable format used by local automation, IDE integrations, and internal tools that often require unmasked paths to navigate. By default, `--json` therefore applies *secret-detection only* (same as the terminal renderer); paths and usernames pass through unmodified. Persisted artifacts (markdown reports under `docs/build-status/` and `docs/audits/`, JSON sidecars next to them, dashboard HTML) are unaffected — they always run the full persisted-output redaction including path/username masking.
+
+If a caller pipes `--json` to a destination that becomes shared (CI logs, committed file, posted to a service), they can opt into the stricter pass with `--mask-paths`. The flag exists at the engine level so it applies uniformly to whichever subcommand is invoked. Defaulting to safer paths-masked would be wrong here: it would silently break tooling that depends on path-aware navigation, and the audit's *durable* outputs (markdown + sidecars) are already always-masked.
+
+Schema versioning: `schema_version: "1.0"` is present in the engine output from v1. Future breaking changes bump the version (e.g., `"2.0"`); non-breaking additions don't. Consumers should pin to a major version and tolerate added fields.
+
+<!-- Sections 5–N to follow -->
 
