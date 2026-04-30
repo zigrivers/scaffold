@@ -1555,5 +1555,126 @@ Per Section 1's multi-worktree concurrency model, the central archive needs to b
 - **Crash recovery:** if a worktree directory is deleted without harvest (manual `rm -rf` or `git worktree remove` skipping the wrapper), the central archive's `active/<worktree-id>.jsonl` for that UUID still has the most recent flush. Run `scaffold observe harvest --recover` to scan for stale `active/*` files and re-flush remaining events from any still-existing worktrees.
 - **Dashboard awareness:** the dashboard's "Active agents" panel reads `git worktree list --porcelain` for currently-attached worktrees and the central archive's `active/*.jsonl` for any stale entries; stale entries are highlighted with a "this worktree no longer exists; run `scaffold observe harvest --recover`" affordance.
 
-<!-- Sections 6–N to follow -->
+## Section 6 — Testing Strategy
+
+Testing follows scaffold's existing convention: TypeScript unit/integration tests via **vitest** (configured at the repo root), shell/CLI end-to-end tests via **bats-core** (`tests/*.bats`), and the project-wide `make check-all` gate that runs both. This section pins what each layer must cover so the implementation plan can sequence the work.
+
+### 6.1 Unit tests (vitest)
+
+**Engine internals** — `src/observability/engine/` (excluding adapters):
+
+- `event-schemas.spec.ts` + `ledger-writer.spec.ts` (cross-event invariants live in the writer, since they need ledger context) — every event type's allowlist enforced (extra fields dropped, missing required fields rejected). Each event type's payload validation has at least one valid case and one invalid case per failure mode. **Writer-enforced cross-event invariants** (Section 2.2) are explicitly covered:
+  - `task_claimed` with `task_id: null` is rejected unless `payload.unplanned === true`.
+  - `task_completed` with a `task_id` is rejected if no prior `task_claimed` event from the same `actor_label`/`worktree_id` references that `task_id`.
+  - `finding_acknowledged` is rejected if `task_id !== null`.
+  - `task_completed` with `outcome: "pr_submitted"` requires `pr_number` to be present.
+  - The 4 KiB size limit is enforced at the writer, not the schema layer; both layers tested.
+- `redact.spec.ts` — secret-detector regex pack tested against an external fixture file `tests/fixtures/observability/secret-corpus.txt` containing labeled positive examples (must redact) and negative examples (must not). Path-rewriting tested for `/Users/<n>`, `/home/<n>`, repo-relative, and Windows path forms. Top-level + payload field coverage. Render-time vs write-time mode behaviors.
+- `ledger-writer.spec.ts` — append atomicity under concurrent writes (spawn N child processes in parallel, each writing M events; assert N×M lines, no truncation, no interleaving). Lockfile stale-recovery (kill a writer mid-acquire, ensure next writer can proceed within stale-lock window). 4 KiB rejection path. Identity-file creation and reuse.
+- `synthesizer.spec.ts` — adapter availability matrix (8 adapters × {available, degraded, unavailable}); for each combination, assert the resulting `EngineOutput.availability` map and that no missing-adapter case throws. Cross-source dedup using `correlation_id`. Sort-key tie-breaks at same-millisecond timestamps.
+- `doc-graph.spec.ts` — graph build from synthetic doc fixtures (`tests/fixtures/observability/projects/<scenario>/`); assert expected node and edge counts, provenance per node, glob expansion for `decision_to_file` *including the zero-match path* (assertion: a `decision_unresolved_glob` provenance annotation is recorded and *no* invalid `decision_to_file` edge is created), missing-artifact tolerance, role-map application, and `.scaffold/observability.yaml` role-map override.
+- `checks-runner.spec.ts` — topological ordering with `depends_on`, cycle rejection, shared findings buffer access, lens skip behavior when required adapters are unavailable.
+- `findings-aggregator.spec.ts` — stable id derivation (no line-number leak across mutations), status computation from `finding_acknowledged` event ordering, `summary` totals/by-severity-status math.
+- `stall.spec.ts` — each stall signal at and below threshold, heartbeat reset behavior, `state.json` fallback when the wave/phase budget data is missing.
+- `verdict.spec.ts` — verdict derivation across all combinations of (open blocking findings, lens_skipped findings, no findings), confirming `pass`/`degraded-pass`/`blocked` per Section 2.5 rules.
+
+**Lens checks** — `src/observability/checks/`:
+
+- One spec per lens file (e.g., `lens-a-tdd.spec.ts`). Each spec uses the synthetic doc-graph and ledger fixtures from `tests/fixtures/observability/projects/<scenario>/` covering at minimum:
+  - (a) clean state — no findings.
+  - (b) one violation per severity tier the lens emits.
+  - (c) `lens_skipped` when each *required* adapter is unavailable.
+  - (d) per-sub-check behavior when an *optional* adapter is unavailable: explicitly cover Lens B's `tests`-driven downgrade (failing-test-P0 suppressed; structural P1 preserved) and `gh`-driven task-coverage skip; Lens F's `state`-driven untouched-story P2 skip; Lens A's `tests`-richness escalation; Lens E's threshold-config behavior; Lens C's linter-integration tag.
+  - (e) cross-lens correlation: Lens G reading Lens D's findings produces P0 when D has emitted an unsanctioned-dep finding for the same file, P1 otherwise.
+  - (f) **Lens H phase-aware subsets** — explicit cases for each row of the Section 3.9 phase-activation table (after `user-stories`, after `tech-stack`, … through build-phase full lens). Each subset's enabled checks are asserted; checks gated by missing artifacts are asserted skipped (not merely silent).
+
+**Renderers** — `src/observability/renderers/`:
+
+- `terminal.spec.ts` — snapshot tests of stdout for representative `EngineOutput` fixtures: progress (clean/with-stall/multi-agent), audit (zero/some/many findings, blocked/pass/degraded-pass verdicts).
+- `markdown.spec.ts` — snapshot tests of the generated markdown report and the JSON sidecar for the same fixtures.
+- `dashboard.spec.ts` — snapshot tests of the HTML fragment outputs.
+- All snapshot tests run through the render-time redaction pass; fixtures intentionally include username-shaped paths and secret-shaped strings to verify nothing leaks to snapshots.
+
+### 6.2 Integration tests (vitest, with fixture projects)
+
+`tests/integration/observability/` runs end-to-end through the engine (no mocks) but inside isolated tmpdirs, against fully-populated fixture projects:
+
+- **`progress.test.ts`** — single-agent and multi-agent fixture projects; spawns several `scaffold observe event` calls in sequence (and in parallel, for the multi-agent case), then runs `scaffold observe progress --json` and asserts the resulting `EngineOutput` matches expected snapshot/replay shape.
+- **`audit-fast-clean.test.ts`** — fixture project with consistent docs and code; assert verdict `pass`, zero findings.
+- **`audit-fast-drift.test.ts`** — fixture project with intentional drift in each lens family; assert each lens emits its expected findings (count + severity + lens_id), that `summary` is consistent with `findings`, that the verdict is `blocked`, and that fix_threshold gating math is correct.
+- **`audit-full-llm-mock.test.ts`** — full-profile audit with the LLM dispatcher stubbed out (returns fixed JSON). Confirms the LLM-graded checks integrate correctly without making real network calls.
+- **`harvest-recover.test.ts`** — create two worktrees, write events in both, delete one without harvest, run `harvest --recover`, assert the central archive captured the surviving worktree's events and the deleted worktree's `active/<id>.jsonl` was rotated to the archive.
+- **`phase-boundary.test.ts`** — programmatically call `StateManager.markCompleted("user-stories", …)` on a fixture project; assert that `runAudit()` was invoked with the expected lens subset and that the markdown audit file was written.
+
+Fixture projects live at `tests/fixtures/observability/projects/`:
+- `clean-monorepo/` — three services, full PRD/stories/coding-standards/tdd-standards/tech-stack/architecture/design-system/decisions/implementation-plan/implementation-playbook plus tests with results, no drift, no missing artifacts. Designed so every enabled lens runs without a `lens_skipped` evidence (i.e., audit verdict is `pass`, not `degraded-pass`). Used by `audit-fast-clean.test.ts`.
+- `drift-each-lens/` — same artifact set as `clean-monorepo` but with one intentional drift per lens, designed to trip exactly one finding per lens at known severities.
+- `partial-pipeline/` — only PRD + user-stories exist (planning phase scenario for Lens H subsets). Audits here intentionally produce `degraded-pass` verdicts due to lens skips; the test asserts the *expected* skipped-lens set, not zero findings.
+- `multi-worktree-active/` — two worktrees, in-flight task on each, used for harvest tests.
+- `degraded-no-tests/` — clean docs but `tests` adapter missing; verifies Lens B optional-adapter downgrade.
+- `degraded-no-gh/` — clean docs and tests but `gh` is not authenticated; verifies Lens B's task-coverage sub-check skip and Lens F's `gh`-informed checks.
+
+### 6.3 End-to-end tests (bats-core)
+
+`tests/observability.bats` — exercises the actual CLI binary in isolated tmpdirs:
+
+- Each subcommand (`progress`, `audit`, `event`, `ack`, `harvest`, `gc`) at least once with a representative fixture project. Checks exit codes match Section 5.1 (`0`/`1`/`2`/`3`/`64–78`), and key strings appear in stdout (verdict, finding count, expected sections).
+- `--json` mode: parse stdout JSON and validate against the schema (`schema_version: "1.0"`, expected fields present).
+- `ack` flow: run audit → pick a finding id from the JSON → call `ack` with the 8-char prefix → re-run audit → assert finding's `status: acknowledged`, `summary.blocking` decreased by 1, and the finding no longer appears in the default-rendered terminal output (but appears with `--show-acknowledged`).
+- `--fix` flow: run audit on a `drift-each-lens` fixture with the dispatcher set to a deterministic scripted-fix command (a tiny shell script that performs a known edit and exits); assert the post-fix audit shows fewer findings, that the working tree has staged changes, and that aborting mid-flow restores the pre-fix state.
+- Phase-boundary trigger: run a no-op pipeline-step completion that calls `markCompleted`; assert a markdown audit file is created at the expected path.
+
+### 6.4 MMR-channel tests
+
+All MMR-channel tests must be **hermetic** — no live network, no real PR fetch, no real Codex/Gemini/Claude/Superpowers commands. The test harness:
+- A pre-baked fixture PR diff at `tests/fixtures/observability/mmr/pr-diff.patch` plus a stub `gh` command on `$PATH` (a tiny shell script) that returns canned `gh pr view` JSON for the fixture PR number.
+- A `tests/fixtures/observability/mmr/test-config.yaml` MMR config that overrides `BUILTIN_CHANNELS` for the test: each external channel (`codex`, `gemini`, `claude`, `superpowers`) is replaced with a deterministic shell script that emits a fixed findings payload via the channel's expected stdout format. The `doc-conformance` channel is the *real* one (the binary under test); only the other channels are stubbed.
+- All `mmr review` invocations in the test pass `--config=tests/fixtures/observability/mmr/test-config.yaml` so they pick up the stubs.
+
+Tests:
+- **`packages/mmr/tests/parser-doc-conformance.spec.ts`** (vitest, no shell) — `getParser('doc-conformance')` does not return the default fallback. The parser parses a JSON-array payload into `ParsedOutput.findings`. Round-trip a representative engine output through the parser and assert the MMR finding shape matches Section 5.3's mapping table.
+- **`tests/observability-mmr.bats`** (bats, hermetic harness):
+  - `mmr review --diff tests/fixtures/observability/mmr/pr-diff.patch --channels=doc-conformance --sync --format=json --config=…` runs the channel against the fixture diff; assert exit zero and that the resulting findings match an oracle JSON produced by running `scaffold observe audit --json` directly on the same diff.
+  - `mmr review --diff … --config=…` (all channels, with the other four stubbed) — confirm the doc-conformance channel reconciles alongside the four stubs without spurious cross-channel collapse and without losing findings.
+
+No bats test invokes a live `gh pr view`, real `codex exec`, real `gemini`, or real `claude`; CI runs without these tools authenticated.
+
+### 6.5 Concurrency / robustness tests
+
+`tests/integration/observability/concurrency.test.ts` (vitest) — exercises edge cases that simple unit tests miss:
+
+- 50 concurrent `scaffold observe event` invocations from the same worktree; assert no torn lines, no event loss, lockfile released after each.
+- Synthesizer reading mid-flush (write-then-rename atomicity) — race a `gc` rotation against a `harvest --recover` and a `progress --replay` reader; assert all three exit zero and the reader sees a consistent snapshot.
+- Stale lockfile recovery — kill a writer mid-`flock`, assert the next writer proceeds after the stale window.
+- Crash mid-write — truncate the ledger file mid-line, assert the synthesizer recovers via the malformed-line skip path and `availability.ledger.malformed_lines` reports the count.
+
+### 6.6 Performance budgets
+
+These are tracked as test thresholds, not gates; failing them produces a warning, not a test failure (so CI doesn't flake on slow runners). Tracked in `tests/performance/observability/`:
+
+- Fast-profile audit on the `drift-each-lens` fixture: ≤ 5 s on small repos, ≤ 30 s on the `clean-monorepo` fixture.
+- Full-profile audit (LLM-mocked): ≤ 30 s on small repos.
+- `progress` snapshot rendering: ≤ 1 s on a 90-day-deep ledger fixture (~10k events).
+- Dashboard fragment regeneration: ≤ 2 s for both `observe:progress` and `observe:audit` panels.
+
+### 6.7 Schema-version migration tests
+
+When the engine bumps `schema_version` past `"1.0"` in a future release, a migration test suite verifies older sidecars stay readable:
+
+- A pinned set of `tests/fixtures/observability/sidecars-v1/*.json` files (representative outputs from this v1 design) must continue to be parseable by the latest engine and must produce the same trend data via the `audit-history` adapter.
+- New schema versions must declare their migration in `src/observability/engine/schema-migrations.ts` (a pure transform `(v_n, sidecar) => sidecar`), with tests asserting bidirectional compatibility within a major version and one-way migration across major versions.
+
+### 6.8 Coverage targets
+
+- Engine internals (`src/observability/engine/`): ≥ 90% line coverage; all error paths covered.
+- Lens checks (`src/observability/checks/`): ≥ 85% line coverage; every severity tier reachable via fixtures.
+- Adapters: ≥ 70% line coverage (lower because mocking external CLIs has diminishing returns; integration tests pick up the slack).
+- Renderers: 100% snapshot-coverage of representative `EngineOutput` shapes. Snapshots required:
+  - **Progress** (verdict is always `pass` per Section 2.5): one snapshot for the *clean* shape (no needs_attention, no degradation), one for *with-stall* (needs_attention populated), one for *multi-agent* (multiple worktrees in `active_agents`), one for *replay-included*.
+  - **Audit**: one snapshot per verdict (`pass` / `degraded-pass` / `blocked`), per renderer.
+- CLI entry (`src/cli/commands/observe.ts`): exit-code coverage for every documented code in Section 5.1.
+
+Coverage is reported via vitest's built-in `--coverage` and surfaced in `make check-all` output. Drops below targets fail the gate.
+
+<!-- end of design -->
 
