@@ -224,7 +224,7 @@ stall:
 - **Build-command meta-prompts** (single-/multi-agent-start, both resume variants, review-pr, review-code) gain explicit instruction blocks telling the executing agent to invoke `scaffold observe event <type> --key=value …` at named workflow points. Each meta-prompt change is small (a paragraph plus the literal command) but unambiguous about *when* the agent should record events.
 - **CLI-owned events** (MMR completion, scaffold-step state transitions, decision-log writes) call into the ledger writer directly from `StateManager`, the MMR wrapper, and `decision-logger` — no agent involvement required. This guarantees these events are captured even when work is happening outside a build-command meta-prompt.
 - **MMR** gains a 5th channel: `doc-conformance`. Implements the cheap deterministic subset of the audit (the `fast` profile), reconciles into MMR's job format, uses MMR's fix-threshold, and blocks on the PR gate.
-- **PostToolUse hook** on `gh pr create` already exists; we extend it so it also kicks off `scaffold observe audit --profile=fast` against the PR diff (or, equivalently, runs the doc-conformance MMR channel — same effect via a different surface).
+- **PostToolUse hook** on `gh pr create` already exists; the doc-conformance audit runs as a built-in MMR channel inside `scaffold run review-pr`, so no new hook trigger is needed. The existing hook's reminder text is updated to mention the audit (see Section 5.5 for hook details).
 - **Pipeline phases** that produce planning artifacts (stories, plan, tech-stack, design-system, decisions) gain an optional post-phase audit hook (advisory) that runs the relevant cross-doc lenses.
 - **Dashboard generator** (`scripts/generate-dashboard.sh`) gains progress and audit panels.
 
@@ -1363,5 +1363,197 @@ If a caller pipes `--json` to a destination that becomes shared (CI logs, commit
 
 Schema versioning: `schema_version: "1.0"` is present in the engine output from v1. Future breaking changes bump the version (e.g., `"2.0"`); non-breaking additions don't. Consumers should pin to a major version and tolerate added fields.
 
-<!-- Sections 5–N to follow -->
+## Section 5 — Operational Integration
+
+How the engine attaches to the rest of scaffold: CLI shape, phase-boundary triggers, MMR channel, `--fix` flow, hooks, and worktree lifecycle.
+
+### 5.1 CLI surface — full flags, exit codes, help
+
+```
+scaffold observe progress [options]
+  --since=<ref|time|"last-check">    time window for snapshot/replay; default "last 24h"
+                                      ref: git commit/branch; time: ISO 8601 or "24h"/"3d";
+                                      "last-check": stamp from last invocation in same repo
+  --replay                            include replay timeline (default off)
+  --json                              emit raw EngineOutput; secret-detection only by default
+  --mask-paths                        with --json: also mask absolute paths and usernames
+  --no-stall-check                    suppress "needs attention" section
+  --width=<n>                         terminal width override (default $COLUMNS or 80)
+  --output=<path>                     write markdown report to <path> instead of docs/build-status/
+
+scaffold observe audit [options]
+  --profile=fast|full                 default fast for PR gate, full for phase boundary / on-demand
+  --scope=docs|code|all               default all; docs runs only Lens H, code runs A-G
+  --lens=<id>[,<id>…]                 run only specified lenses (overrides --scope)
+  --include-snapshot                  also produce a Snapshot in EngineOutput
+  --replay                            include replay timeline
+  --fix                               dispatch agent to fix above-threshold findings
+  --report-only                       force advisory output even at PR gate
+  --fix-threshold=P0|P1|P2|P3         override resolved fix-threshold (Section 2.4)
+  --since=<ref|time|"last-check">     time window
+  --json                              emit raw EngineOutput; secret-detection only by default
+  --mask-paths                        with --json: also mask absolute paths and usernames
+  --output=<path>                     write markdown report to <path> instead of docs/audits/
+  --show-acknowledged                 include acknowledged findings in default views
+
+scaffold observe event <type> [--key=value …]
+  ledger-write entry point. Validates payload against allowlisted schema for <type>.
+  Exits non-zero with a specific error code on schema violations.
+
+scaffold observe ack <finding-id> [options]
+  --status=acknowledged|open          default acknowledged; "open" revokes prior ack
+  --note=<text>                       ≤ 200 chars; included in ack ledger event
+  Accepts full id or any prefix ≥ 8 chars matching a single finding from the most-recent audit
+  sidecar in docs/audits/. Errors if prefix is ambiguous.
+
+scaffold observe harvest [options]
+  --worktree=<path>                   harvest a specific worktree's ledger before teardown
+  --recover                           scan stale active/* archives and re-flush
+
+scaffold observe gc [options]
+  --max-age-days=<n>                  rotate archives older than n days (default 90)
+  --max-size-mib=<n>                  trigger threshold for ad-hoc rotation (default 50)
+```
+
+**Exit codes** (uniform across subcommands; consumers can switch on these):
+- `0` — success; for `audit`, equivalent to verdict `pass` or `degraded-pass`.
+- `1` — `audit` only: verdict `blocked`.
+- `2` — usage error (bad flags, unknown lens, ambiguous finding-id prefix).
+- `3` — engine error (corrupted ledger, write-time payload schema violation, ack-without-prior-audit).
+- `64–78` — reserved for adapter-specific failures, mirroring `sysexits.h` for shell-friendly handling.
+
+**Help text** is generated from a single `commands/observe.commands.ts` definition file; the `scaffold observe --help` and per-subcommand `--help` outputs include the flag reference above plus the verdict-derivation summary, redaction note, and a link to the spec.
+
+**Backward compatibility note** — `scaffold observe` is a new top-level command. It does not displace any existing CLI surface; the existing `scaffold next`, `scaffold status`, `scaffold run …`, and `scaffold dashboard` commands continue to work unchanged.
+
+### 5.2 Phase-boundary triggers
+
+The audit's cross-doc lens (H) runs automatically at the end of each pipeline phase that produces a planning artifact. Two scaffold code paths today complete a step: the centralized `StateManager.markCompleted(step, outputs, completedBy, depth)` method, and the `scaffold complete` command (`src/cli/commands/complete.ts`), which currently mutates state and calls `stateManager.saveState(state)` *without* going through `markCompleted`.
+
+**Required refactor (part of this design's implementation work):** centralize all completion transitions through `StateManager.markCompleted`. `src/cli/commands/complete.ts` is updated to call `markCompleted` instead of mutating state directly. Once centralized, the phase-audit hook is added to `markCompleted` itself — every completion path triggers the audit with no special-casing.
+
+**Hook point:** `StateManager.markCompleted(step, outputs, completedBy, depth)` — after the state mutation persists, calls `await runPhaseAudit(step)` (added to the same module or imported as a peer; `markCompleted` becomes async). Errors from `runPhaseAudit` are caught and logged as `[audit] error: <message>` so a failing audit never breaks step completion.
+
+**`runPhaseAudit(step)`** consults the slug-to-phase-subset map (from Section 3.9):
+- User-stories → Lens H subset: stories-cover-PRD, orphan-stories.
+- Tech-stack → adds tech-stack-supports-PRD (full-profile only).
+- …etc per the table in 3.9.
+
+It then invokes the audit engine **via a TypeScript API** (`runAudit({ profile: "fast", lens: ["H-cross-doc"], scope: "docs", outputMarkdownPath: "docs/audits/<auto>.md" })` exported from `src/observability/engine/api.ts`), not by shelling out to the `scaffold` binary. Calling the binary from inside `StateManager` would create runtime circularity (CLI → StateManager → CLI) and brittle PATH/installation dependencies; calling the engine library directly avoids both. The CLI command (`scaffold observe audit`) is itself a thin wrapper around the same `runAudit` API. Subset selection within Lens H is driven by the slug; the lens's check-runner skips checks whose required artifacts don't exist.
+
+**Execution semantics — "non-gating, time-capped":**
+- The state transition (writing `state.json` to disk) is *complete* before `runPhaseAudit` is invoked. The audit cannot fail-the-step; that's what "non-blocking" means here.
+- The audit subprocess runs in the foreground with a configurable wall-clock cap (default 60s; `.scaffold/observability.yaml` `phase_audit.timeout_s`). When the cap fires, the subprocess is killed and a `[audit] timed out at 60s — partial findings written` message is logged. The CLI command that called `markCompleted` does block on the audit for up to that window before returning to the user; this is intentional so the user sees the audit's findings in the same terminal output that confirmed step completion, rather than getting back to the prompt and missing them.
+- Projects that want non-blocking-on-the-CLI behavior set `phase_audit.detached: true`, which causes `runPhaseAudit` to fork-and-detach (the audit still runs; the CLI just doesn't wait). Default is `false` for visibility.
+
+**Surfacing:** The audit prints a compact `[audit] N findings — see docs/audits/<file>.md` line at the end of `markCompleted`'s output.
+
+**Opt-out:** `phase_audit.enabled: false` in `.scaffold/observability.yaml`. Intended for early prototyping only.
+
+**Single audit code path:** there is one audit *implementation* — the `runAudit()` TypeScript API in `src/observability/engine/api.ts` — and several thin wrappers around it: `scaffold observe audit` (CLI), the MMR `doc-conformance` channel (which goes through the CLI because it lives in MMR's process), `runPhaseAudit` (which calls `runAudit()` directly from `StateManager`), and any future entry point. All wrappers normalize their inputs and delegate to the same library function, so changes to audit semantics happen in one place.
+
+### 5.3 MMR channel — `doc-conformance`
+
+The audit's PR-gate role is delivered as a 5th built-in MMR channel using MMR's existing **command-based channel architecture**.
+
+**MMR's actual model** (from `packages/mmr/src/config/defaults.ts`): channels are `ChannelConfigParsed` entries in the `BUILTIN_CHANNELS` map. Each entry declares a `command:` string (e.g., `claude -p`, `codex exec`, `gemini`), an auth `check`/`recovery` pair, and an `output_parser:` (`'default'` | `'gemini'` | …). MMR's dispatcher spawns the channel's command via `child_process`, pipes the prompt to stdin, and parses stdout into MMR's internal `Finding[]` shape via the named parser. There is no `MmrChannel.run` interface today.
+
+**Adding the doc-conformance channel:**
+- Add a new `BUILTIN_CHANNELS["doc-conformance"]` entry with:
+  - `command: 'scaffold observe audit --profile=fast --scope=all --json --output-mode=mmr-findings'`
+  - `auth.check: 'scaffold --version >/dev/null 2>&1'` (no external auth)
+  - `auth.recovery: 'npm install -g @zigrivers/scaffold'`
+  - `output_parser: 'doc-conformance'` (a new parser added to `packages/mmr/src/parsers/`)
+- The new `--output-mode=mmr-findings` flag on `scaffold observe audit` emits the engine's `Finding[]` directly in MMR's `Finding` shape (location, severity, description, suggestion) as a JSON array on stdout. This avoids inventing a packaged channel interface and reuses MMR's existing dispatcher.
+- **Parser registration:** the `doc-conformance` parser is added to MMR's in-process parser registry at `packages/mmr/src/core/parser.ts` (where `getParser(name)` resolves names to parser functions today). Without explicit registration there, `getParser('doc-conformance')` would silently fall back to the `default` parser, which expects free-form text and would emit zero findings — silently passing the PR gate. The parser receives the *captured stdout string* from MMR's dispatcher (not stdin); it `JSON.parse()`s the array and maps each entry to MMR's `ParsedOutput.findings`. Tests must cover both the registration path (`getParser('doc-conformance')` returns the new function, not the default) and the parse path (a JSON-array input produces the expected findings).
+
+**Mapping engine `Finding` → MMR `Finding`:**
+- **`location`** receives a *stable composite anchor* derived from the engine's stable id semantics: `<source_doc>::<lens_id>::<short_id>` (e.g., `docs/user-stories.md#user-auth-1::B-ac-coverage::3a8c1f02`). MMR's reconciler groups by `normalizeLocation(location)`, so this composite preserves identity across re-runs (the engine's `id` is part of the location string) while staying unique per finding. **This requires no changes to MMR's reconciler.**
+- **`severity`** → severity (1:1; both use P0–P3).
+- **`description`** ← `lens_id` + `title` (channel-prefixed: `[doc-conformance/<lens_id>] <title>`).
+- **`suggestion`** ← `fix_hint.prompt || fix_hint.target`, rendered to text. Empty string when `fix_hint` is absent.
+
+**Reconciliation:** MMR groups findings across channels by `normalizeLocation(location)`. Our location strings are deliberately unique per stable id, so the reconciler treats each as a distinct finding (no spurious cross-channel collapse). When the *same* doc-conformance finding appears in two MMR runs (e.g., before and after a fix attempt), the location string is identical, so MMR's reconciler treats them as the same finding and counts only once.
+
+**Registration paths:**
+- Built-in to MMR via the `BUILTIN_CHANNELS` map. Once MMR ships a version that includes this entry, every project picks it up automatically when MMR loads its config.
+- Distribution: scaffold's release process bundles the MMR version that has `doc-conformance` in `BUILTIN_CHANNELS`. Existing projects pick it up when they `npm update -g @zigrivers/scaffold` (and the MMR major version is compatible).
+- **No `scaffold update` config-file mutation.** The earlier draft incorrectly claimed `scaffold update` would add the channel to `~/.mmr/config.yaml`. It doesn't, and shouldn't — built-in channels live in MMR's source, not in user/project config files. User config files only opt OUT (via `channels_disabled` if they set it).
+
+**Opt-out:** users who don't want doc-conformance gating set `channels_disabled: ["doc-conformance"]` in `~/.mmr/config.yaml` or `.mmr.yaml`.
+
+### 5.4 The `--fix` flow
+
+When `scaffold observe audit --fix` is invoked, the engine produces findings and then dispatches an agent to fix above-threshold ones. This mirrors MMR's existing `--fix` mode but operates on the audit's domain (doc/code conformance) rather than MMR's (code review).
+
+**Phases:**
+1. **Audit** — produce the EngineOutput as usual.
+2. **Plan** — the engine constructs a fix plan: list of blocking findings, defined as `severityRank(severity) <= severityRank(fix_threshold) && status === "open"` (i.e., `summary.blocking`). Acknowledged and skipped findings are excluded. Plan order: severity rank ascending (P0 first), then `lens_id` lex order within a severity. Each finding's `fix_hint` (when present) becomes the prompt seed.
+3. **Dispatch** — for each finding in plan order, the engine spawns the configured fix dispatcher subprocess with the finding's evidence and fix_hint inlined. The dispatcher command is configurable in `.scaffold/observability.yaml` `fix.dispatcher_command` (default `"claude -p"`); other reasonable values include `"codex exec --skip-git-repo-check -s ask --ephemeral"` or any agent CLI that accepts a prompt on stdin and exits when done. Following MMR's channel model, the value is a shell command string; the engine appends the prompt via stdin. The agent gets a deterministic working-directory and a short instruction set: "Fix this specific finding only. Do not do unrelated work. Stage the change. Exit when done."
+4. **Verify** — after each fix attempt, re-run the relevant lens (a single-lens audit). If the finding ID no longer appears in `findings[]`, the fix is accepted and the engine moves on. If it still appears, retry up to 2 more times (3 total per finding, matching MMR's per-finding limit). After 3 failures, emit a `fix_failed` notice in the engine output and continue to the next finding.
+5. **Final report** — a fresh audit run produces the post-fix report, written as an additional markdown report + sidecar (filename `…-postfix.md`).
+
+**Index-and-worktree safety on abort.** The `--fix` flow needs a clean rollback semantics for Ctrl-C. The engine implements this with two pre-flight steps and one cleanup step:
+- **Before any fix dispatches:** capture (a) the current `git stash create` (without applying or storing in stash list — just a snapshot ref), and (b) the list of files currently staged via `git diff --cached --name-only`.
+- **During each fix:** the agent stages its changes with `git add <paths>`. The engine records each *newly* staged path (not already in pre-flight staged list) in an in-memory ledger.
+- **On Ctrl-C / abort:**
+  1. For each path the engine staged during this run: `git restore --staged --worktree <path>` to revert both index and working tree to the pre-fix state.
+  2. Restore the pre-flight stash snapshot if it differs from current state (covers any working-tree changes the engine staged but the agent also modified mid-run).
+  3. Files that were staged *before* `--fix` started are left as the user had them.
+- **On successful exit:** the engine simply exits; user reviews staged changes and commits in their normal flow.
+
+This is documented but cannot be silently relied on; the user is informed at start-of-fix-flow: "On Ctrl-C, the engine will restore the index and working tree to the state before --fix started. Do not edit files in this terminal during the fix flow."
+
+**No auto-commit.** The `--fix` flow stages changes but never commits. Rationale: doc-vs-code drift fixes can be subtle (e.g., a coding-standards "rule" interpretation may be wrong), and human review is essential before commits land.
+
+**Foreground only.** `--fix` runs synchronously; never spawns background agents. Long fix chains are user-visible at every step.
+
+### 5.5 PostToolUse hook — informational only
+
+The existing PostToolUse hook on `gh pr create` (configured in `.claude/settings.json`) already reminds agents to run `scaffold run review-pr`. The doc-conformance channel ships as a built-in MMR channel (see 5.3), so it runs automatically inside `scaffold run review-pr` alongside Codex, Gemini, Claude, and the Superpowers code-reviewer.
+
+**No new hook.** We do *not* extend the PostToolUse hook to invoke `scaffold observe audit` separately. Doing so would cause double-runs (the hook would dispatch the audit, and `scaffold run review-pr` would dispatch it again via MMR's channel orchestration).
+
+**Hook message extension:** the hook's existing reminder text gains one line:
+> The doc-conformance audit runs automatically as a channel of `scaffold run review-pr`. To run audit standalone (e.g., for a deeper full-profile pass before the PR exists), use `scaffold observe audit --profile=full`.
+
+**Section 1 alignment:** Section 1's integration-points bullet — "PostToolUse hook on `gh pr create` already exists; we extend it so it also kicks off `scaffold observe audit --profile=fast` against the PR diff (or, equivalently, runs the doc-conformance MMR channel — same effect via a different surface)" — is resolved by this section: we pick the channel-via-MMR path, not a separate hook trigger. The "(or, equivalently, …)" was the choice; we made it.
+
+### 5.6 Worktree lifecycle integration
+
+Per Section 1's multi-worktree concurrency model, the central archive needs to be flushed before a worktree is removed. **Today's `scripts/setup-agent-worktree.sh` only creates the worktree and branch; it does not write `.scaffold/identity.json`.** This design adds that step.
+
+- **Setup additions to `scripts/setup-agent-worktree.sh` (new code, not existing):**
+  - After `git worktree add`, write `.scaffold/identity.json` to the new worktree:
+    ```bash
+    mkdir -p "$worktree_dir/.scaffold"
+    if [ ! -f "$worktree_dir/.scaffold/identity.json" ]; then
+      uuid="$(uuidgen | tr 'A-Z' 'a-z')"
+      printf '{"worktree_id":"%s","worktree_label":"%s","created_at":"%s"}\n' \
+        "$uuid" "$agent_suffix" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        > "$worktree_dir/.scaffold/identity.json"
+    fi
+    ```
+  - Existing identity files are preserved if the script is re-run on the same path (the `if [ ! -f ... ]` guard).
+- **Teardown — new `scripts/teardown-agent-worktree.sh`:** today there is no teardown script; users invoke `git worktree remove` directly. This design adds the partner teardown script:
+  ```bash
+  worktree_dir="$1"
+  # Read the actual branch from the worktree (do not guess from the suffix convention).
+  branch_name="$(git -C "$worktree_dir" branch --show-current 2>/dev/null || true)"
+
+  scaffold observe harvest --worktree="$worktree_dir"
+  git worktree remove "$worktree_dir"
+
+  # Optional branch cleanup, only if we can resolve the branch and it is not the
+  # primary repo's checked-out branch (deleting the latter would fail anyway).
+  if [ -n "$branch_name" ] && \
+     [ "$branch_name" != "$(git -C "$REPO_DIR" branch --show-current)" ]; then
+    git -C "$REPO_DIR" branch -D "$branch_name"
+  fi
+  ```
+  Reading the branch from the worktree directly (`git branch --show-current` inside it) avoids hardcoding the `<agent>-workspace` naming convention — that convention may evolve, and worktrees created by other tooling may not follow it.
+- **Crash recovery:** if a worktree directory is deleted without harvest (manual `rm -rf` or `git worktree remove` skipping the wrapper), the central archive's `active/<worktree-id>.jsonl` for that UUID still has the most recent flush. Run `scaffold observe harvest --recover` to scan for stale `active/*` files and re-flush remaining events from any still-existing worktrees.
+- **Dashboard awareness:** the dashboard's "Active agents" panel reads `git worktree list --porcelain` for currently-attached worktrees and the central archive's `active/*.jsonl` for any stale entries; stale entries are highlighted with a "this worktree no longer exists; run `scaffold observe harvest --recover`" affordance.
+
+<!-- Sections 6–N to follow -->
 
