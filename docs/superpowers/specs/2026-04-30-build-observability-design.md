@@ -90,7 +90,7 @@ The `scaffold observe event` subcommand is the **ledger-write entry point** invo
 
 Lives in `src/observability/` and has four parts:
 
-1. **Ledger writer** — exposed as `scaffold observe event <type> --key=value …`. Build-command meta-prompts (`single-agent-start`, `multi-agent-start`, both `*-resume` variants, `review-pr`, `review-code`) gain explicit instruction blocks telling the executing agent to invoke this command at named workflow points: after claiming a task (`task_claimed`), after completion (`task_completed`), when recording a decision (`decision_recorded`), when hitting a blocker (`blocker_hit`), and after opening a PR (`pr_opened`). For events owned by CLI code rather than meta-prompts (e.g., MMR completion, scaffold-step state transitions), the writer is invoked directly from existing TypeScript components — `StateManager`, `decision-logger`, the MMR wrapper — so those events are captured even if no agent meta-prompt is involved. Multi-worktree concurrency model in the next subsection.
+1. **Ledger writer** — exposed as `scaffold observe event <type> --key=value …`. Build-command meta-prompts (`single-agent-start`, `multi-agent-start`, both `*-resume` variants, `review-pr`, `review-code`) gain explicit instruction blocks telling the executing agent to invoke this command at named workflow points: after claiming a task (`task_claimed`), after completion (`task_completed`), when recording a decision (`decision_recorded`), when hitting a blocker (`blocker_hit`), and after opening a PR (`pr_opened`). The ledger captures *agent-driven workflow events* — the narrative spine of what the team did. **Tool-emitted signals** (MMR completions, scaffold-step state transitions, PR merges) stay in their existing artifacts (`.mmr/jobs/`, `.scaffold/state.json`, GitHub) and are surfaced into the engine output by the corresponding source adapters as synthesized replay events. The one exception is `decision_recorded`, which is shared: agents call it from meta-prompts; CLI code (`decision-logger`) calls the same writer directly when invoked from a TypeScript path. Multi-worktree concurrency model in the next subsection.
 2. **Synthesizer** — at report time, fills gaps the ledger doesn't capture. Built as a set of *source adapters*, each returning structured `{ status: "available" | "degraded" | "unavailable", evidence: …, missing: […] }`:
    - `git` adapter — log, diff, branches, worktree listing. Degraded if working tree dirty in unexpected ways; unavailable if not a git repo.
    - `gh` adapter — PR list, view, checks. Degraded if `gh` is unauthenticated or rate-limited (still reports what it can from local refs); unavailable if `gh` is not installed.
@@ -265,4 +265,434 @@ packages/mmr-channel-doc-conformance/   MMR channel wrapper; calls fast-profile 
 .scaffold/observability.yaml      per-project config (stall thresholds, role-map extensions)
 ```
 
-<!-- Sections 2–N to follow -->
+## Section 2 — Data Model
+
+The design's contracts: the schemas that flow between components. Everything in the engine speaks JSON. Renderers, downstream tools, and tests bind to these shapes.
+
+### 2.1 Allowed event types
+
+Eight event types in v1, declared in `src/observability/engine/event-schemas.ts`. Each has an allowlisted payload schema; fields outside the allowlist are dropped at write time. **Note:** `task_id`, `actor_label`, `branch`, `worktree_id`, `event_id`, `ts`, `type` live on the `BaseEvent` envelope (see 2.2). The "Payload" column lists fields that are *not* on the envelope.
+
+| Type | Emitted by | task_id | Payload (allowlisted) |
+|---|---|---|---|
+| `task_claimed` | Build-command meta-prompts (single/multi-agent-start, resume) | optional (`null` for ad-hoc/unplanned work) | `task_title`, `story_id?`, `wave?`, `unplanned?: boolean` |
+| `task_completed` | Same | optional (must match `task_claimed` if set) | `outcome` ∈ `pr_submitted \| dropped \| superseded`, `pr_number?`, `commit_sha?` |
+| `decision_recorded` | Same; also `decision-logger` directly | optional (allowed when made during a task) | `key`, `summary` (≤ 500 chars), `affects` (string[], file globs or doc paths), `links?` (string[] of repo-relative paths or PR numbers) |
+| `blocker_hit` | Build-command meta-prompts | optional | `kind` ∈ `dependency \| ambiguity \| external \| environment`, `summary` (≤ 500 chars) |
+| `blocker_resolved` | Same | optional | `summary` (≤ 500 chars), `references` (event_id[]) |
+| `pr_opened` | Build-command meta-prompts | optional | `pr_number` |
+| `progress_heartbeat` | Optional; emitted by long shell-command wrappers | optional | `note` (≤ 200 chars) |
+| `finding_acknowledged` | `scaffold observe ack <finding-id>` (CLI command) | null | `finding_id`, `status` ∈ `acknowledged \| open`, `note?` (≤ 200 chars) |
+
+`finding_acknowledged` is what agents and humans use to transition findings out of the default `open` state. The engine reads these events when computing current finding status; the latest `finding_acknowledged` event for a given `finding_id` wins. The user-writable status values are `acknowledged` (excluded from blocking_findings) and `open` (revoke a prior acknowledgment). The `skipped` status is engine-set only — emitted by lenses that lack the adapter data they need — and is *never* written via a `finding_acknowledged` event. There is no `fixed` status: a finding that's been resolved simply does not reappear in the next run's `findings[]` (which is a current-state snapshot, not a history).
+
+**Terminal PR status** (`pr_merged`, `pr_closed`) is **not** a ledger event — it's surfaced by the `gh` adapter as a synthesized replay event. Agents reporting `task_completed` typically use `outcome: "pr_submitted"`; the actual merge state is observable from `gh` later. This separates "what the agent did" (workflow) from "what the world reported back" (state).
+
+**Tool-emitted signals** (PR merges, MMR completions, scaffold-step state transitions, test runs) are **not** ledger event types. They live in their existing artifacts (`gh`, `.mmr/jobs/`, `.scaffold/state.json`, test runners) and are surfaced by the corresponding source adapters as **synthesized replay events** at report time (see 2.7). Source adapters remain read-only; they never write to the ledger. This keeps the ledger lean (agent-driven narrative only) and avoids duplicating data that already has authoritative storage elsewhere.
+
+### 2.2 Event payload schemas (TypeScript sketch)
+
+```ts
+// src/observability/engine/event-schemas.ts (sketch)
+export type EventType =
+  | "task_claimed" | "task_completed"
+  | "decision_recorded"
+  | "blocker_hit" | "blocker_resolved"
+  | "pr_opened"
+  | "progress_heartbeat"
+  | "finding_acknowledged";
+
+export interface BaseEvent {
+  event_id: string;          // ULID
+  worktree_id: string;       // UUID from .scaffold/identity.json
+  actor_label: string;
+  branch: string;
+  task_id: string | null;    // null for finding_acknowledged and unplanned work; optional for all others
+  type: EventType;
+  ts: string;                // ISO 8601 UTC
+}
+
+// Payloads exclude fields that live on BaseEvent (task_id, actor_label, branch, etc.).
+export interface TaskClaimedPayload {
+  task_title: string;
+  story_id?: string;
+  wave?: string;
+  unplanned?: boolean;       // true when task_id is null and the work isn't tracked in the plan/playbook
+}
+
+export type Event =
+  | (BaseEvent & { type: "task_claimed";        payload: TaskClaimedPayload })
+  | (BaseEvent & { type: "task_completed";      payload: TaskCompletedPayload })
+  | (BaseEvent & { type: "decision_recorded";   payload: DecisionRecordedPayload })
+  | (BaseEvent & { type: "blocker_hit";         payload: BlockerHitPayload })
+  | (BaseEvent & { type: "blocker_resolved";    payload: BlockerResolvedPayload })
+  | (BaseEvent & { type: "pr_opened";           payload: PrOpenedPayload })
+  | (BaseEvent & { type: "progress_heartbeat";  payload: HeartbeatPayload })
+  | (BaseEvent & { type: "finding_acknowledged"; task_id: null; payload: FindingAckPayload });
+```
+
+`task_id` is `null | string` on every event. `task_claimed` with `task_id: null` requires `payload.unplanned: true` (writer-enforced) so unplanned work is explicit. `task_completed` events with `task_id` set must match a prior `task_claimed` with the same `task_id` from the same actor; orphan completions are rejected by the writer.
+
+Schemas are also expressed as JSON Schema (`event-schemas.json`) for consumers outside TypeScript (e.g., `mmr-channel-doc-conformance` may be a separate package).
+
+### 2.3 Doc-graph schema
+
+The doc-graph is the typed object the audit and progress features both reason over. Built once per command invocation by `doc-graph.ts` from the source adapters' output.
+
+```ts
+// src/observability/engine/doc-graph.ts (sketch)
+export interface DocGraph {
+  features: Feature[];                     // from PRD
+  stories: Story[];                        // from user-stories
+  acceptance_criteria: AcceptanceCriterion[]; // child-of-story; flattened for graph queries
+  plan_tasks: PlanTask[];                  // from implementation-plan
+  playbook_tasks: PlaybookTask[];          // from implementation-playbook (precedence over plan)
+  tests: Test[];                           // from story-tests-map + filesystem
+  pull_requests: PullRequest[];            // from gh adapter; PR-level metadata
+  files: FileNode[];                       // from PR diffs + git
+  rules: Rule[];                           // from coding-standards, tdd-standards
+  components: SanctionedComponent[];       // from tech-stack + architecture docs
+  tokens: DesignToken[];                   // from design-system
+  decisions: Decision[];                   // from decisions.jsonl + recent decision_recorded ledger events
+  edges: Edge[];                           // typed edges, see below
+  provenance: Record<NodeId, AdapterId>;   // per-node mapping: which adapter contributed this node
+}
+
+export type Edge =
+  | { kind: "feature_to_story";        from: FeatureId;   to: StoryId }
+  | { kind: "story_to_ac";             from: StoryId;     to: AcId }
+  | { kind: "ac_to_test";              from: AcId;        to: TestId }
+  | { kind: "story_to_plan_task";      from: StoryId;     to: PlanTaskId }
+  | { kind: "plan_task_to_playbook";   from: PlanTaskId;  to: PlaybookTaskId }
+  | { kind: "playbook_task_to_pr";     from: PlaybookTaskId; to: PrNumber }
+  | { kind: "pr_to_file";              from: PrNumber;    to: FilePath }
+  | { kind: "file_to_token_use";       from: FilePath;    to: TokenId | "ad_hoc" }
+  | { kind: "file_to_component_use";   from: FilePath;    to: ComponentId | "unsanctioned" }
+  | { kind: "decision_supersedes";     from: DecisionId;  to: DecisionId }
+  | { kind: "decision_links_doc";      from: DecisionId;  to: DocAnchor }
+  | { kind: "decision_to_file";        from: DecisionId;  to: FileNodeId };
+```
+
+**ID conventions.** Every graph entity has an ID of the form `"<kind>:<stable-id>"` — `FeatureId`, `StoryId`, `AcId`, `PlanTaskId`, `PlaybookTaskId`, `TestId`, `PrId` (e.g., `"pr:42"`), `FileNodeId` (e.g., `"file:src/auth/login.ts"`), `RuleId`, `ComponentId`, `TokenId`, `DecisionId`, `DocAnchor` are all aliases of `NodeId`. Edge `from`/`to` always reference these IDs, never raw values. Where collections referenced raw types in earlier drafts (`PrNumber`, `FilePath`), the constructor normalizes to the kinded ID at graph build time.
+
+`provenance` is a per-node map so audits can explain *why* a node exists ("this AC came from `docs/user-stories.md`") and *which adapter degraded* if a node is missing ("the `pull_requests` collection is empty because `gh` is unavailable"). `AdapterId` is the same identifier used in the `availability` map (e.g., `"plan_doc"`, `"gh"`).
+
+The `decision_to_file` edge connects a decision to specific files. The `affects` payload of a `decision_recorded` event is a list of globs; at graph build time, the doc-graph constructor expands each glob against `files` to materialize concrete `decision_to_file` edges, one per matched file. Globs that match zero files are recorded under `provenance` as a `decision_unresolved_glob` annotation so lenses can flag stale `affects` patterns.
+
+**Orphan and missing-edge detection.** Audit lenses operate on the graph by querying for orphan nodes (a `Story` with no `story_to_ac` outgoing edge, an `AC` with no `ac_to_test` outgoing edge, etc.) and unsanctioned uses (a `file_to_component_use` edge whose target is `"unsanctioned"`). Each lens declares which edges and node-types it requires; when those are absent because of an unavailable adapter, the lens emits `lens_skipped`.
+
+**Stable IDs.** Every node has a stable ID derived from its source artifact (e.g., a story ID is `<doc-anchor-slug>` from the user-stories markdown). IDs are deterministic so trends across audit runs can be computed.
+
+### 2.4 Finding schema
+
+Findings are the audit's output — the unit that flows to fix-threshold logic, MMR reconcile, and renderers.
+
+```ts
+export interface Finding {
+  id: string;                 // stable across runs; derivation below
+  lens_id: string;            // e.g. "B-ac-coverage", "H-cross-doc"
+  severity: "P0" | "P1" | "P2" | "P3";
+  title: string;              // ≤ 80 chars
+  description: string;        // ≤ 500 chars; full detail in evidence
+  source_doc: string;         // repo-relative path or doc anchor that this audit grades against
+  evidence: Evidence;
+  fix_hint?: FixHint;         // optional, machine-readable
+  confidence: "high" | "medium" | "low";
+  first_seen: string;         // ISO date — when this finding's stable id first appeared
+  last_seen: string;          // ISO date — most recent run that surfaced it
+  status: "open" | "acknowledged" | "skipped";
+  ack_note?: string;          // populated when status was set via finding_acknowledged event
+}
+
+export type Evidence =
+  | { kind: "missing_node";     graph_query: string; expected: string }
+  | { kind: "orphan_node";      graph_query: string; node_id: NodeId }
+  | { kind: "rule_violation";   rule_id: RuleId; file: FileNodeId; lines?: [number, number] }
+  | { kind: "ac_not_covered";   story_id: StoryId; ac_id: AcId; missing_tests: TestId[] }
+  | { kind: "doc_disagreement"; left_doc: string; right_doc: string; conflict: string }
+  | { kind: "lens_skipped";     reason: "adapter_unavailable" | "insufficient_data"; needed: string[] };
+
+export interface FixHint {
+  kind: "edit_doc" | "add_test" | "rename_token" | "record_decision" | "open_task";
+  target: string;             // file path or task title
+  patch?: string;             // unified diff if mechanically derivable
+  prompt?: string;            // free-form prompt for an agent fix loop
+}
+```
+
+**Stable ID derivation.** A finding's `id` is `sha256(lens_id || "" || normalized_source_anchor || "" || canonical_evidence)[0:16]`, where:
+- `normalized_source_anchor` is the *symbolic* location, never a line number — for `rule_violation` it's `<file>::<symbol-path>` resolved via tree-sitter or a tag scan; for `ac_not_covered` it's `<story_id>::<ac_id>`; for `doc_disagreement` it's `<left_doc>::<right_doc>::<sorted-conflict-keys>`; for `missing_node`/`orphan_node`/`lens_skipped` it's the `graph_query` string verbatim.
+- `canonical_evidence` is the JSON-stable serialization of `evidence` with line numbers stripped and arrays sorted.
+
+This means insertions/deletions above a finding don't change its ID; only the *nature* of the finding does. `first_seen` therefore tracks the actual lifetime of a drift, not the lifetime of a line offset.
+
+**`findings[]` is a current-state snapshot, not a history.** Each audit run produces the set of findings *currently true* against the current code+docs. Findings that no longer hold simply don't appear. Trend data (when something first appeared, when it was acknowledged) lives in the `audit-history` adapter (JSON sidecars) and the ledger's `finding_acknowledged` events. The `findings[]` array therefore omits status `"fixed"` (which would be a historical artifact); fixed drift is gone, not "still in the array but marked".
+
+**Status mutation.** Findings start `"open"` by default. Status values:
+- `open` — the default; finding is currently detected and not acknowledged. Counted in blocking_findings.
+- `acknowledged` — human or agent has accepted the finding as known/intentional. Excluded from blocking_findings.
+- `skipped` — engine-set only; emitted by lenses that return `lens_skipped` evidence because a required adapter is unavailable.
+
+Status is computed by `findings-aggregator.ts`: take the most recent applicable `finding_acknowledged` ledger event for each `finding_id`. If the latest event has `status: "acknowledged"`, the finding is acknowledged. If the latest event has `status: "open"`, acknowledgment is revoked (back to default). If no event exists for the finding_id, the finding is `open`. Lens-emitted `skipped` overrides anything from the ledger — adapter availability dictates this status, not user input.
+
+The `scaffold observe ack` CLI command is the only user-facing way to mutate finding status. It writes a `finding_acknowledged` ledger event with `status: "acknowledged" | "open"`.
+
+**Severity rubric (mirrors MMR):**
+- **P0** — broken-by-design: tests skipped on production-critical paths; a sanctioned-stack item replaced with an alternative without a recorded decision; an entire user story has no implementation-plan task.
+- **P1** — substantive drift: ACs without test coverage; design-system tokens bypassed in user-facing UI; coding-standards rules violated more than threshold occurrences in changed files.
+- **P2** — soft drift: small standards inconsistencies; recently-introduced unsanctioned-but-trivial dependencies; documentation lag (e.g., decision recorded in code comment but not in decisions log).
+- **P3** — advisory / nice-to-have: stylistic suggestions; opportunities to consolidate; lens skipped because of unavailable enrichment (Beads, MMR).
+
+**Severity ordering.** `P0` is most severe, `P3` is least severe. The phrase "at or above threshold T" means severities whose rank is ≤ T's rank, where rank is `P0=0, P1=1, P2=2, P3=3`. So `fix_threshold=P2` blocks on `{P0, P1, P2}` (anything with rank ≤ 2). The engine and renderers use a `severityRank()` helper rather than naive string comparison.
+
+**`fix_threshold` resolution order** (no dependency on MMR adapter availability — the threshold is a config read, not a job-result read):
+1. CLI flag `--fix-threshold P0|P1|P2|P3` if provided.
+2. `audit_fix_threshold` from `.mmr.yaml` if present.
+3. `fix_threshold` from `.mmr.yaml` if present (shared with MMR).
+4. Default `P2`.
+
+`.mmr.yaml` is read by a small dedicated config loader inside the engine (not via the `mmr` adapter, which deals with job results). The threshold therefore resolves correctly whether or not MMR has ever run.
+
+### 2.5 Engine output JSON shape
+
+The single shape all renderers consume:
+
+```ts
+export interface EngineOutput {
+  invocation: {
+    command: "progress" | "audit";
+    args: Record<string, unknown>;
+    started_at: string;
+    completed_at: string;
+    scaffold_version: string;
+  };
+  availability: AvailabilityMap;          // see 2.6 — always present
+  snapshot: Snapshot | null;              // see 2.7 — present for progress; null for audit unless --include-snapshot
+  replay: ReplayTimeline | null;          // present when --replay (progress) or audit/full
+  findings: Finding[];                    // present for audit; empty array for progress; current-state snapshot only
+  needs_attention: NeedsAttentionItem[];  // stall detection output — always present (may be empty)
+  graph_stats: GraphStats;                // node + edge counts by type — always present
+  fix_threshold: "P0" | "P1" | "P2" | "P3";  // resolved per the order in 2.4; always present
+}
+```
+
+`blocking_findings` is **not** carried in the JSON. It's a derived view: `findings.filter(f => severityRank(f.severity) <= severityRank(fix_threshold) && f.status === "open")`. Renderers compute it; the engine emits the inputs. This avoids redundant data and the inconsistency risk of two arrays that must agree.
+
+Both commands produce the same shape with the same required fields; whichever fields don't apply to a given command are explicitly `null` (snapshot/replay) or `[]` (findings, needs_attention). Renderers handle nulls/empties uniformly: a missing snapshot just means that section is omitted from the rendered view.
+
+`audit` may opt into a snapshot via `--include-snapshot` when the user wants a combined view (often paired with `--profile=full`). `progress` may opt into a replay via `--replay`; otherwise replay is `null`.
+
+### 2.6 Availability map
+
+```ts
+export interface AvailabilityMap {
+  // one entry per source adapter
+  git:           AdapterStatus;
+  gh:            AdapterStatus;
+  plan_doc:      AdapterStatus;
+  tests:         AdapterStatus;
+  state:         AdapterStatus;
+  beads:         AdapterStatus;
+  mmr:           AdapterStatus;
+  audit_history: AdapterStatus;
+  // ledger summary
+  ledger: {
+    events_read: number;
+    malformed_lines: number;
+    sources: { worktree_id: string; events: number; harvested_at?: string }[];
+  };
+}
+
+export interface AdapterStatus {
+  status: "available" | "degraded" | "unavailable";
+  reason?: string;        // human-readable explanation when degraded/unavailable
+  evidence_paths?: string[];  // which files/commands contributed
+}
+```
+
+Renderers display the availability map prominently when any adapter is `degraded` or `unavailable`, so users know which inputs the report was built from.
+
+### 2.7 Snapshot and replay shapes
+
+```ts
+export interface Snapshot {
+  current_phase: string;                   // pipeline phase slug
+  active_agents: ActiveAgent[];            // worktree_id → current task → branch → PR
+  completed_in_window: TaskCompletion[];   // since `--since` or default 24h
+  in_flight: TaskInFlight[];
+  blocked: BlockedTask[];                  // each with reason + age
+  upcoming: UpcomingTask[];                // dependency-ordered, plan/playbook
+  recent_decisions: DecisionSummary[];     // top N from ledger + decisions log
+  story_coverage: StoryCoverageRow[];      // story_id → {plan_tasks, playbook_tasks, ACs covered/missed}
+}
+
+export interface ReplayTimeline {
+  window: { from: string; to: string };
+  events: ReplayEvent[];                   // ledger events + synthesized git/PR events, time-sorted
+}
+
+export interface ReplayEvent {
+  sort_id: string;                         // unique per event; deterministic ordering
+  correlation_id: string | null;           // logical key for cross-source dedupe; null for non-correlatable events
+  ts: string;
+  source: "ledger" | "git" | "gh" | "tests" | "mmr" | "state";
+  kind: string;                            // e.g., "task_completed", "commit", "pr_merged", "test_run_failed", "step_completed"
+  actor_label?: string;
+  task_id?: string;
+  summary: string;                         // ≤ 200 chars; for terminal/markdown rendering
+  link?: string;                           // PR URL, commit hash, file anchor
+}
+```
+
+The replay stream is the *fused* timeline: ledger events provide the agent-driven narrative spine; the synthesizer interleaves commits, PR opens/merges, test runs, MMR completions, and scaffold-step state transitions from the source adapters at report time.
+
+**`sort_id` derivation per source** (always unique per event; used for stable ordering):
+- `ledger` → `"ledger:" + event_id` (the ULID)
+- `git` → `"git:" + commit_sha`
+- `gh` → `"gh:" + pr_number + ":" + event_kind` (e.g., `"gh:42:opened"`, `"gh:42:merged"`)
+- `tests` → `"tests:" + run_id + ":" + test_name` (test runners that don't expose a run_id fall back to `"tests:" + sha256(file_path + test_name + ts)[0:12]`; `test_name` includes the suite path so collisions across same-named tests in different files are impossible)
+- `mmr` → `"mmr:" + job_id`
+- `state` → `"state:" + step_slug + ":" + state_transition_kind` (e.g., `"state:user-stories:completed"`)
+
+**`correlation_id` derivation per logical event** (used for cross-source dedupe; same logical event from different sources gets the same `correlation_id`):
+- PR-open events from `ledger` (`pr_opened`) and `gh` → `"pr:" + pr_number + ":opened"`
+- PR-merge events from `gh` → `"pr:" + pr_number + ":merged"`
+- Other events without a known cross-source twin → `null`
+
+Sort key is `(ts, source_priority, sort_id)` with `ledger > mmr > gh > git > state > tests` as the tiebreak when timestamps collide.
+
+**Dedupe** runs on `correlation_id` (skipping events with `correlation_id === null`): when multiple events share a `correlation_id`, the engine keeps exactly one — the highest-priority source wins, ties broken by earliest `ts`. Other events pass through unchanged. This is what makes a ledger `pr_opened` event suppress the matching synthesized `gh` PR-open replay event.
+
+### 2.8 Auxiliary type definitions
+
+Compact definitions for types referenced above. Field-level documentation lives in TypeScript JSDoc; this section pins the shapes so renderers and tests can bind to them.
+
+```ts
+// Event payload types (referenced by the union in 2.2)
+export interface TaskCompletedPayload {
+  outcome: "pr_submitted" | "dropped" | "superseded";
+  pr_number?: number;
+  commit_sha?: string;
+}
+
+export interface DecisionRecordedPayload {
+  key: string;                  // stable slug, used as DecisionId
+  summary: string;              // ≤ 500 chars
+  affects: string[];            // file globs or doc paths
+  links?: string[];             // repo-relative paths or PR numbers
+}
+
+export interface BlockerHitPayload {
+  kind: "dependency" | "ambiguity" | "external" | "environment";
+  summary: string;              // ≤ 500 chars
+}
+
+export interface BlockerResolvedPayload {
+  summary: string;              // ≤ 500 chars
+  references: string[];         // event_ids of related blocker_hit events
+}
+
+export interface PrOpenedPayload {
+  pr_number: number;
+}
+
+export interface HeartbeatPayload {
+  note: string;                 // ≤ 200 chars
+}
+
+export interface FindingAckPayload {
+  finding_id: string;
+  status: "acknowledged" | "open";
+  note?: string;                // ≤ 200 chars
+}
+
+// Snapshot child types
+export interface ActiveAgent {
+  worktree_id: string;
+  actor_label: string;
+  branch: string;
+  current_task: { id: string | null; title: string; claimed_at: string } | null;
+  open_pr: { number: number; url: string; opened_at: string } | null;
+}
+
+export interface TaskCompletion {
+  task_id: string | null;     // null for unplanned work
+  task_title: string;
+  outcome: "pr_submitted" | "merged" | "dropped" | "superseded";
+  pr_number?: number;
+  merged_at?: string;
+  by: string;                 // actor_label
+}
+
+export interface TaskInFlight {
+  task_id: string;
+  task_title: string;
+  story_id?: string;
+  by: string;                 // actor_label
+  claimed_at: string;
+  age_hours: number;
+  branch: string;
+  pr_number?: number;
+}
+
+export interface BlockedTask {
+  task_id: string;
+  task_title: string;
+  blocker_kind: "dependency" | "ambiguity" | "external" | "environment";
+  reason: string;             // ≤ 200 chars
+  blocked_at: string;
+  age_hours: number;
+}
+
+export interface UpcomingTask {
+  task_id: string;
+  task_title: string;
+  story_id?: string;
+  ready: boolean;             // true when all dependencies are satisfied
+  blocked_by: string[];       // task_ids of unsatisfied dependencies
+  wave?: string;
+}
+
+export interface DecisionSummary {
+  decision_id: DecisionId;
+  key: string;
+  summary: string;
+  recorded_at: string;
+  affects: string[];          // file globs
+}
+
+export interface StoryCoverageRow {
+  story_id: StoryId;
+  story_title: string;
+  plan_tasks: { id: PlanTaskId; status: "todo" | "in_flight" | "done" }[];
+  playbook_tasks: { id: PlaybookTaskId; status: "todo" | "in_flight" | "done" }[];
+  acs_total: number;
+  acs_with_tests: number;
+  acs_test_passing: number;
+}
+
+// Stall detection
+export interface NeedsAttentionItem {
+  signal: "task_stale" | "pr_stale" | "pr_review_stale"
+        | "blocker_unaddressed" | "audit_findings_unresolved"
+        | "lens_skipped_repeatedly";
+  ref: { kind: "task" | "pr" | "finding" | "lens"; id: string };
+  age_hours: number;
+  threshold_hours: number;
+  summary: string;            // human-readable
+}
+
+// Graph stats
+export interface GraphStats {
+  nodes_by_kind: Record<string, number>;   // e.g., { story: 14, plan_task: 23, file: 156 }
+  edges_by_kind: Record<string, number>;
+  orphans_by_kind: Record<string, number>; // count of nodes with no inbound edges where one is expected
+  unsanctioned_uses: number;               // file_to_component_use edges to "unsanctioned"
+  ad_hoc_token_uses: number;               // file_to_token_use edges to "ad_hoc"
+}
+```
+
+These auxiliary types are referenced by `Snapshot` (2.7), `EngineOutput` (2.5), and the stall-detection block in Section 1; their definitions are stable contracts that renderers, tests, and downstream consumers can rely on.
+
+<!-- Sections 3–N to follow -->
+
