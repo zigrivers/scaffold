@@ -94,7 +94,7 @@ Lives in `src/observability/` and has four parts:
 2. **Synthesizer** — at report time, fills gaps the ledger doesn't capture. Built as a set of *source adapters*, each returning structured `{ status: "available" | "degraded" | "unavailable", evidence: …, missing: […] }`:
    - `git` adapter — log, diff, branches, worktree listing. Degraded if working tree dirty in unexpected ways; unavailable if not a git repo.
    - `gh` adapter — PR list, view, checks. Degraded if `gh` is unauthenticated or rate-limited (still reports what it can from local refs); unavailable if `gh` is not installed.
-   - `plan-doc` adapter — `docs/implementation-plan.md` and `docs/implementation-playbook.md` checkmarks; precedence: playbook is authoritative for execution status when present, plan is authoritative for AC/dependency structure.
+   - `pipeline_docs` adapter — reads all scaffold-pipeline planning artifacts: `docs/prd.md`, `docs/user-stories.md`, `docs/tech-stack.md`, `docs/coding-standards.md`, `docs/tdd-standards.md`, `docs/design-system.md`, `docs/implementation-plan.md`, `docs/implementation-playbook.md`, `docs/architecture/`, `docs/decisions/` (or canonical decisions doc), and `decisions.jsonl`. Returns parsed structured fields (frontmatter, headings, ID-anchored sections, tables) for the doc-graph builder. Each artifact is independently optional; missing artifacts are absent from the graph rather than failing the adapter. For execution-status precedence: playbook is authoritative when present, plan is authoritative for AC/dependency structure.
    - `tests` adapter — runs `make test`/`pnpm test`/etc. when invoked with `--profile=full` or when the audit explicitly needs test results; otherwise reads cached test output from `.scaffold/last-test-run.json`.
    - `state` adapter — reads `.scaffold/state.json` at root and, when present, walks `.scaffold/services/<name>/state.json` for service-scoped multi-service projects, merging by step-slug.
    - `beads` adapter — `bd list/show/dep` when present; unavailable when `.beads/` doesn't exist, in which case Beads-specific enrichment fields are simply omitted from the engine output.
@@ -253,7 +253,7 @@ src/observability/
     redact.ts                     write-time + render-time redaction (paths, secrets)
     stall.ts                      stall-signal evaluation
     checks-runner.ts              orchestrator for checks framework
-  adapters/                       git.ts, gh.ts, plan-doc.ts, tests.ts, state.ts, beads.ts, mmr.ts, audit-history.ts
+  adapters/                       git.ts, gh.ts, pipeline-docs.ts, tests.ts, state.ts, beads.ts, mmr.ts, audit-history.ts
   checks/                         one file per lens (lens-a-tdd.ts … lens-h-cross-doc.ts)
   renderers/                      terminal.ts, markdown.ts, dashboard.ts
 src/cli/commands/observe.ts       CLI entry; subcommands: progress, audit, event, harvest, gc, digest
@@ -359,23 +359,27 @@ export interface DocGraph {
 }
 
 export type Edge =
-  | { kind: "feature_to_story";        from: FeatureId;   to: StoryId }
-  | { kind: "story_to_ac";             from: StoryId;     to: AcId }
-  | { kind: "ac_to_test";              from: AcId;        to: TestId }
-  | { kind: "story_to_plan_task";      from: StoryId;     to: PlanTaskId }
-  | { kind: "plan_task_to_playbook";   from: PlanTaskId;  to: PlaybookTaskId }
-  | { kind: "playbook_task_to_pr";     from: PlaybookTaskId; to: PrNumber }
-  | { kind: "pr_to_file";              from: PrNumber;    to: FilePath }
-  | { kind: "file_to_token_use";       from: FilePath;    to: TokenId | "ad_hoc" }
-  | { kind: "file_to_component_use";   from: FilePath;    to: ComponentId | "unsanctioned" }
-  | { kind: "decision_supersedes";     from: DecisionId;  to: DecisionId }
-  | { kind: "decision_links_doc";      from: DecisionId;  to: DocAnchor }
-  | { kind: "decision_to_file";        from: DecisionId;  to: FileNodeId };
+  | { kind: "feature_to_story";          from: FeatureId;      to: StoryId }
+  | { kind: "story_to_ac";               from: StoryId;        to: AcId }
+  | { kind: "ac_to_test";                from: AcId;           to: TestId }
+  | { kind: "test_to_file";              from: TestId;         to: FileNodeId }
+  | { kind: "story_to_plan_task";        from: StoryId;        to: PlanTaskId }
+  | { kind: "plan_task_to_playbook";     from: PlanTaskId;     to: PlaybookTaskId }
+  | { kind: "playbook_task_to_story";    from: PlaybookTaskId; to: StoryId }
+  | { kind: "playbook_task_to_pr";       from: PlaybookTaskId; to: PrId }
+  | { kind: "pr_to_file";                from: PrId;           to: FileNodeId }
+  | { kind: "file_to_token_use";         from: FileNodeId;     to: TokenId | "ad_hoc" }
+  | { kind: "file_to_component_use";     from: FileNodeId;     to: ComponentId | "unsanctioned" }
+  | { kind: "decision_supersedes";       from: DecisionId;     to: DecisionId }
+  | { kind: "decision_links_doc";        from: DecisionId;     to: DocAnchor }
+  | { kind: "decision_to_file";          from: DecisionId;     to: FileNodeId };
 ```
+
+`test_to_file` connects each test node to the source file it lives in, derived from filesystem walking by `pipeline_docs` and `tests` adapters. `playbook_task_to_story` is a *direct* link useful for unplanned tasks (where no PlanTask exists) and for orphan-detection on the playbook side without traversing through plan tasks. `feature_to_story` and `playbook_task_to_pr` and `pr_to_file` use the kinded ID aliases.
 
 **ID conventions.** Every graph entity has an ID of the form `"<kind>:<stable-id>"` — `FeatureId`, `StoryId`, `AcId`, `PlanTaskId`, `PlaybookTaskId`, `TestId`, `PrId` (e.g., `"pr:42"`), `FileNodeId` (e.g., `"file:src/auth/login.ts"`), `RuleId`, `ComponentId`, `TokenId`, `DecisionId`, `DocAnchor` are all aliases of `NodeId`. Edge `from`/`to` always reference these IDs, never raw values. Where collections referenced raw types in earlier drafts (`PrNumber`, `FilePath`), the constructor normalizes to the kinded ID at graph build time.
 
-`provenance` is a per-node map so audits can explain *why* a node exists ("this AC came from `docs/user-stories.md`") and *which adapter degraded* if a node is missing ("the `pull_requests` collection is empty because `gh` is unavailable"). `AdapterId` is the same identifier used in the `availability` map (e.g., `"plan_doc"`, `"gh"`).
+`provenance` is a per-node map so audits can explain *why* a node exists ("this AC came from `docs/user-stories.md`") and *which adapter degraded* if a node is missing ("the `pull_requests` collection is empty because `gh` is unavailable"). `AdapterId` is the same identifier used in the `availability` map (e.g., `"pipeline_docs"`, `"gh"`).
 
 The `decision_to_file` edge connects a decision to specific files. The `affects` payload of a `decision_recorded` event is a list of globs; at graph build time, the doc-graph constructor expands each glob against `files` to materialize concrete `decision_to_file` edges, one per matched file. Globs that match zero files are recorded under `provenance` as a `decision_unresolved_glob` annotation so lenses can flag stale `affects` patterns.
 
@@ -489,7 +493,7 @@ export interface AvailabilityMap {
   // one entry per source adapter
   git:           AdapterStatus;
   gh:            AdapterStatus;
-  plan_doc:      AdapterStatus;
+  pipeline_docs: AdapterStatus;
   tests:         AdapterStatus;
   state:         AdapterStatus;
   beads:         AdapterStatus;
@@ -606,6 +610,98 @@ export interface FindingAckPayload {
   note?: string;                // ≤ 200 chars
 }
 
+// Doc-graph node types — minimal field set used by lenses
+export interface Feature {
+  id: FeatureId;
+  title: string;
+  priority: "must" | "should" | "could" | "wont";
+  source_anchor: string;        // link back to docs/prd.md
+  prose?: string;               // raw section text; optional, populated when full profile asks
+}
+export interface Story {
+  id: StoryId;
+  title: string;
+  priority: "must" | "should" | "could" | "wont";
+  kind?: "ui" | "api" | "data" | "infra" | "doc";
+  feature_id?: FeatureId;       // direct backref when discoverable
+  source_anchor: string;
+}
+export interface AcceptanceCriterion {
+  id: AcId;
+  story_id: StoryId;
+  text: string;                 // ≤ 500 chars
+  source_anchor: string;
+}
+export interface PlanTask {
+  id: PlanTaskId;
+  title: string;
+  status: "todo" | "in_flight" | "done" | "skipped";
+  story_id?: StoryId;
+  wave?: string;
+  source_anchor: string;
+}
+export interface PlaybookTask {
+  id: PlaybookTaskId;
+  title: string;
+  status: "todo" | "in_flight" | "done" | "skipped";
+  story_id?: StoryId;            // direct link supports unplanned tasks
+  plan_task_id?: PlanTaskId;     // present when this playbook task tracks a plan task
+  source_anchor: string;
+}
+export interface Test {
+  id: TestId;
+  name: string;
+  file_path: string;             // raw path; canonical FileNodeId is "file:" + file_path
+  framework?: string;            // e.g., vitest, pytest
+  last_status?: "passing" | "failing" | "skipped" | "unknown";  // from tests adapter when available
+}
+export interface PullRequest {
+  id: PrId;
+  number: number;
+  url: string;
+  state: "open" | "merged" | "closed";
+  branch: string;
+  opened_at: string;
+  merged_at?: string;
+}
+export interface FileNode {
+  id: FileNodeId;
+  path: string;
+  language?: string;
+}
+export interface Rule {
+  id: RuleId;
+  description: string;
+  pattern?: string;             // regex/AST query for fast deterministic match
+  forbidden?: string[];         // forbidden imports/symbols/literals
+  match?: string;               // glob/scope of files this rule applies to
+  language?: string;             // language tag, when applicable
+  severity?: "P0" | "P1" | "P2" | "P3";
+  enforce_via?: "linter" | "engine" | "llm";
+}
+export interface SanctionedComponent {
+  id: ComponentId;
+  package_or_url: string;
+  layer?: string;               // architectural layer this component belongs to
+  source_anchor: string;
+}
+export interface DesignToken {
+  id: TokenId;
+  category: "color" | "spacing" | "typography" | "shadow" | "radius" | "motion";
+  value: string;
+  priority: "must" | "should" | "could" | "wont";  // governs lens E severity escalation
+  source_anchor: string;
+}
+export interface Decision {
+  id: DecisionId;
+  key: string;
+  summary: string;
+  affects: string[];            // file globs
+  superseded_by?: DecisionId;
+  source_anchor: string;
+  recorded_at: string;
+}
+
 // Snapshot child types
 export interface ActiveAgent {
   worktree_id: string;
@@ -694,5 +790,248 @@ export interface GraphStats {
 
 These auxiliary types are referenced by `Snapshot` (2.7), `EngineOutput` (2.5), and the stall-detection block in Section 1; their definitions are stable contracts that renderers, tests, and downstream consumers can rely on.
 
-<!-- Sections 3–N to follow -->
+## Section 3 — The Eight Audit Lenses
+
+Each lens is a check module under `src/observability/checks/` exporting `(graph, code, ledger, availability) → finding[]`. A lens declares its required adapters; if any are `unavailable`, the lens emits a single `lens_skipped` finding (P3) and otherwise contributes nothing. This is how graceful degradation surfaces to the user — they see *which* lenses skipped and *why*.
+
+### 3.1 Profile membership
+
+Each lens belongs to one or both profiles:
+
+- **fast** — cheap, deterministic, runs on every PR via the `mmr-channel-doc-conformance` channel. Bounded by graph traversal + regex/string matching; no LLM calls. Target wall-clock budget: ≤ 5 s per PR (small repos) / ≤ 30 s per PR (large repos).
+- **full** — runs at phase boundaries and on-demand (`scaffold observe audit --profile=full`). May call LLMs for fuzzy judgments (e.g., "does this code's pattern actually match the rule's intent?"). No wall-clock budget; designed for human-paced review.
+
+Every lens implements `fast` checks where possible. `full` mode adds judgment-based checks on top of `fast` results.
+
+### 3.2 Lens A — TDD violations (`A-tdd`)
+
+**Checks:**
+- (fast) Walk PR diff. For every test file added or modified, look for a corresponding source file change in the same PR. For every source file added or modified outside test directories, look for a matching test file change. Emit findings on asymmetry that violates the project's TDD policy from `docs/tdd-standards.md`.
+- (fast) Detect skipped tests (`it.skip`, `xit`, `@Disabled`, `[Ignore]`, language-appropriate forms) introduced or untouched in the PR. Emit P0 if the skip is on a test that maps (via `story-tests-map`) to a story with `priority: "must"`; P1 otherwise.
+- (full) For each AC missing test coverage, ask the LLM whether the production change appears to implement that AC; high-confidence "yes" + "no test" combinations escalate from P1 to P0.
+
+**Required adapters:** `git`, `pipeline_docs` (for `docs/tdd-standards.md`).
+**Optional adapters:** `tests` (boosts evidence richness for full-profile severity escalation).
+
+**Severity rubric:**
+- P0 — skipped test on `priority: "must"` story; production-only PR (no test changes anywhere) when TDD policy requires test-first.
+- P1 — AC without a test edge in the changed scope; new public function without a test file touched in the PR.
+- P2 — TDD-policy phrasing-violation that doesn't change observable test coverage (e.g., refactoring tests *after* implementation when policy says "tests-first").
+- P3 — `lens_skipped` when `docs/tdd-standards.md` is missing.
+
+**Example finding:**
+```
+[P0] A-tdd: skipped test on critical story
+source_doc: docs/tdd-standards.md
+evidence: { kind: "rule_violation", rule_id: "tdd-no-skip", file: "file:src/auth/test.spec.ts", lines: [42, 42] }
+fix_hint: { kind: "add_test", target: "src/auth/test.spec.ts", prompt: "Re-enable test 'rejects expired token' (story user-auth-1, AC 1.3)." }
+```
+
+### 3.3 Lens B — AC completion (`B-ac-coverage`)
+
+**Checks:**
+- (fast, structural) Graph query: every `AcceptanceCriterion` → outgoing `ac_to_test` edge. ACs with no `ac_to_test` edge produce P1 findings. This check is purely graph-structural and runs even when `tests` is unavailable.
+- (fast, test-execution) For ACs that *do* have `ac_to_test` edges, when `tests` adapter is `available`: ACs whose tests are `failing` produce P0; ACs whose tests have status `unknown` (test exists but has not run in the time window) produce P1.
+- (fast, task-coverage) For each `PlaybookTask` with status `done`: traverse `playbook_task_to_story` → `story_to_ac` → `ac_to_test` → `test_to_file` to get the set of test-files associated with the task's parent story. Independently, traverse `playbook_task_to_pr` → `pr_to_file` to get files touched by the task's PRs. The check then differentiates by execution evidence:
+  - If `tests` adapter is `available` AND the task's story has at least one AC test that ran in the time window — irrespective of whether the test file appears in the PR diff — the task is considered covered. Bug fixes and refactors that don't add or modify tests are correctly *not* flagged.
+  - If `tests` adapter is `available` and *no* AC test ran in the time window for this story → P1 ("task closed but no AC test exercised").
+  - If `tests` adapter is `unavailable` and the intersection of test-files-with-AC-edges and PR-touched-files is empty → P2 (best-available signal: task closed and no test files were touched in the PR; without execution data, we can't be confident this is actually broken).
+- (full) For ACs with tests but ambiguous coverage, LLM grades whether the test actually exercises the AC's behavior.
+
+**Required adapters:** `pipeline_docs` (for stories + plan + playbook).
+**Optional adapters:** `tests` (provides test execution status), `gh` (provides PR file lists for the task-coverage check; without it, that check is skipped — but the structural check still runs).
+
+**Severity rubric:**
+- P0 — AC's test is `failing` (only when `tests` adapter is available).
+- P1 — AC with no `ac_to_test` edge; playbook task closed `done` with no AC test exercised in window (`tests` available); AC's test status is `unknown` (`tests` available).
+- P2 — playbook task closed `done` with empty test-file intersection (only when `tests` is unavailable — degraded signal); full-profile LLM low-confidence "yes, test exercises AC."
+- P3 — `lens_skipped` for the *task-coverage* sub-check when `gh` is unavailable (the structural sub-check still runs); `lens_skipped` for the entire lens when `docs/user-stories.md` is missing.
+
+The downgrade rule is **scoped per sub-check**: if `tests` is unavailable, only test-execution-dependent findings are downgraded — failing-test P0 is suppressed entirely (we can't know it's failing without execution data), unknown-status P1 is suppressed, and task-coverage drops from P1 to P2 with a degraded-signal note. The structural "AC without `ac_to_test`" P1 stays at P1 regardless of `tests` availability — it's pure graph data.
+
+### 3.4 Lens C — Coding-standards drift (`C-standards`)
+
+**Checks:**
+- (fast) Parse `docs/coding-standards.md` rules (declared as `## Rule: <id>` blocks with `pattern:`, `forbidden:`, or `match:` fields). For each rule, run a deterministic match against changed files in the PR. Emit findings on violations.
+- (fast) Tooling integration: if the project's lint config (eslint/ruff/etc.) is referenced in coding-standards, run the linter on changed files and report violations against rules tagged `enforce-via: linter`.
+- (full) For freeform-prose rules (rules without a deterministic `pattern:` field), feed the rule and the changed file region to the LLM with a "does this conform?" prompt.
+
+**Required adapters:** `git`, `pipeline_docs` (for `docs/coding-standards.md`).
+**Optional adapters:** `tests` (only relevant if a rule covers test code conventions).
+
+**Severity rubric:**
+- P0 — rule explicitly tagged `severity: P0` violated.
+- P1 — multiple violations of the same rule in the same PR; rule tagged `severity: P1`.
+- P2 — single violation of an untagged rule.
+- P3 — `lens_skipped` when `docs/coding-standards.md` is missing.
+
+### 3.5 Lens D — Tech-stack / architecture drift (`D-stack`)
+
+**Checks:**
+- (fast) For each `file_to_component_use` edge in the doc-graph, verify the target is a sanctioned `ComponentId` (not `"unsanctioned"`). Emit findings for unsanctioned uses.
+- (fast) Imports/dependencies analysis: parse import statements (TypeScript, Python, Go, etc., per project) in changed files; cross-reference against the allowlist derived from `docs/tech-stack.md` and any `package.json`/`pyproject.toml`/`go.mod`/etc. dependency lists. Emit findings on imports of newly introduced packages that don't appear in the tech-stack doc.
+- (fast) Architecture-doc cross-check: if changed files belong to architectural layers/services described in `docs/architecture/`, verify the change respects the documented inter-layer rules (e.g., "domain layer must not import from infra layer").
+- (full) For ambiguous component categorizations (e.g., a generic utility that could be sanctioned or unsanctioned depending on context), LLM grades.
+
+**Required adapters:** `git`, `pipeline_docs` (for tech-stack + architecture docs).
+**Optional adapters:** none.
+
+**Severity rubric:**
+- P0 — unsanctioned dependency added without a `decision_recorded` event (or `docs/decisions/` entry) referencing the change.
+- P1 — sanctioned component used outside its documented layer; inter-layer rule violation.
+- P2 — tech-stack doc is older than the dependency manifest; dependency is in the manifest but not yet in the doc.
+- P3 — `lens_skipped` when no tech-stack or architecture docs exist.
+
+### 3.6 Lens E — Design-system drift (`E-design`)
+
+**Checks:**
+- (fast) For each `file_to_token_use` edge in the doc-graph, count occurrences targeting `"ad_hoc"`. Files with > N ad-hoc uses (default N = 3, configurable in `.scaffold/observability.yaml`) produce findings.
+- (fast) For UI files (per project's `ui_glob` config, default `src/components/**/*.{tsx,jsx,vue,svelte}` and `src/styles/**/*.{css,scss}`), parse style sources via deterministic parsers:
+  - CSS / SCSS — `postcss` AST: walk `Declaration` nodes, extract values for color-shaped (`color`, `background*`, `border-color`, `fill`, `stroke`), spacing-shaped (`margin*`, `padding*`, `gap`, `top|right|bottom|left`), and typography-shaped (`font-size`, `font-family`, `font-weight`, `line-height`) properties.
+  - TSX / JSX — `@babel/parser` AST: walk JSX `style={...}` object expressions and `className` string-literal Tailwind/UnoCSS classes. For Tailwind, decode arbitrary-value syntax `bg-[#ff0]` into a literal value.
+  - Vue / Svelte — language-specific parsers (`@vue/compiler-sfc`, `svelte/compiler`) extracting style blocks; values then go through the CSS parser.
+  - Each extracted value is cross-referenced against the design-system token table; values that don't resolve to a token become `file_to_token_use → "ad_hoc"` edges in the graph and are subject to the ad-hoc threshold check above. Direct (per-property) findings are also emitted for explicitly-token-governed properties (those whose token is `priority: "must"` in `docs/design-system.md`).
+- (full) For pattern-level drift (e.g., "this component reimplements `<Modal>` instead of using the design-system one"), LLM grades by comparing structural signatures.
+
+**Required adapters:** `git`, `pipeline_docs` (for `docs/design-system.md`).
+
+**Severity rubric:**
+- P0 — production UI uses raw color/spacing values for a token-governed property whose token is `priority: "must"` in design-system.
+- P1 — > N ad-hoc uses in the same file; reimplementation of an existing design-system component.
+- P2 — single ad-hoc use in a non-critical-priority file.
+- P3 — `lens_skipped` when `docs/design-system.md` is missing.
+
+### 3.7 Lens F — Missing scope (`F-scope`)
+
+**Checks:**
+- (fast) Graph query: for every `Feature` whose `priority` is `must` or `should`, look for an outgoing `feature_to_story` edge. Missing → P1 (P0 if `priority: must`).
+- (fast) Graph query: for every `Story` whose `priority` is `must` or `should`, look for either an outgoing `story_to_plan_task` edge OR an inbound `playbook_task_to_story` edge (the playbook side covers unplanned-but-tracked work). If neither exists → P0 for `must`, P1 for `should`.
+- (fast) Graph query: every `Story` → status check via its `PlanTask`s or `PlaybookTask`s. If all tasks are `todo` *and* the ledger has no `task_claimed` event for any of those tasks within the project's wave/phase budget (per `.scaffold/state.json`'s phase progression) → P2 ("story has plan but no agent has touched it").
+- (full) LLM cross-check between PRD prose and stories: features described in PRD prose that no story captures (beyond what the structured graph catches — e.g., features mentioned only in narrative sections).
+
+**Required adapters:** `pipeline_docs`.
+**Optional adapters:** `tests` (informs status), `gh` (informs in-flight via PRs), `state` (provides phase budget for the wave-progression check; without it, the P2 "untouched story" check is skipped).
+
+**Severity rubric:**
+- P0 — `priority: must` story with no plan task and no playbook task.
+- P1 — `priority: should` story without coverage; `priority: must` feature without a story.
+- P2 — story planned but untouched past its expected wave/phase.
+- P3 — `lens_skipped` when PRD or stories are missing.
+
+### 3.8 Lens G — Undocumented decisions (`G-decisions`)
+
+**Checks:**
+- (fast) For each `decision_recorded` ledger event in the time window: confirm a corresponding entry exists in `docs/decisions/` (or the canonical decisions doc — discovered via doc-graph). Findings when ledger has decisions that aren't in the doc.
+- (fast) Inverse: for each entry in `docs/decisions/`, confirm a matching `decision_recorded` ledger event exists (or that the entry pre-dates the ledger's earliest event). Findings when decisions are documented but never went through the ledger (suggesting missed instrumentation, not necessarily a bug).
+- (fast) Heuristic scan of recent commits for "decision-shaped" commit messages. Patterns are loaded from `src/observability/checks/data/decision-keywords.txt` (engine asset, bundled with the package; users can override via `.scaffold/observability.yaml` `lenses.G-decisions.keywords_file`). Default patterns include `/(decided|chose|going with|will use|migrating to|adopting|switching to)\b/i`. Commits matching the patterns that lack a matching ledger event or doc entry → P2 candidates.
+- (fast) **Cross-lens correlation:** when Lens D produces an `unsanctioned-dependency` finding for a file change in the same audit run, Lens G inspects the ledger for any `decision_recorded` event whose `affects` glob matches the changed file *and* whose summary mentions the dependency. If none exists, Lens G escalates to P0 ("unsanctioned dependency added without recorded decision"). This correlation is computed by the checks-runner after Lens D completes; Lens G sees Lens D's findings via the runner's shared findings buffer, not via re-running checks.
+- (full) LLM scan of recent code changes for non-obvious choices (caching strategy, retry policy, schema shape, default values) that lack any documented rationale. High-judgment, lower-confidence findings.
+
+**Required adapters:** `git`, `pipeline_docs` (for decisions doc).
+**Optional adapters:** none — the ledger is always available even if other adapters degrade.
+
+**Severity rubric:**
+- P0 — Lens D unsanctioned-dependency finding with no corresponding `decision_recorded` event in the ledger.
+- P1 — ledger/doc divergence (event without doc, or doc without event when both should exist).
+- P2 — decision-keyword commit without matching event/doc.
+- P3 — full-profile LLM-only findings; `lens_skipped` when no decisions doc exists *and* the ledger has zero decision events.
+
+### 3.9 Lens H — Cross-doc inconsistency (`H-cross-doc`)
+
+This is the audit's *only* lens that runs throughout the entire pipeline (not just build phase). It activates as soon as the second planning artifact exists.
+
+**Checks (fast — fully deterministic over the doc-graph):**
+- **Stories cover PRD features.** Every `Feature` with `priority: must`/`should` has at least one `feature_to_story` edge; reverse: every `Story` references a feature (orphan stories).
+- **Plan covers stories.** Every `Story` with `priority: must` has at least one `story_to_plan_task` edge OR an inbound `playbook_task_to_story` edge (playbook covers unplanned-but-tracked work); P0 if missing for `must`, P1 if missing for `should`.
+- **Playbook tracks plan.** Once playbook exists, every `PlanTask` has a `plan_task_to_playbook` edge; orphans on either side reported.
+- **Coding-standards languages exist in tech-stack.** Each `Rule` with a `language` field must reference a language declared in tech-stack (sanctioned components or explicit language list); rules referencing unsanctioned languages are P1 ("standards reference language not in tech-stack").
+- **Design-system covers stories' UI surfaces.** For each `Story` with `kind: "ui"`, at least one design-system token category (color, typography, spacing) must exist in the graph; if no tokens at all, P1.
+- **Decisions log internally consistent.** No `decision_supersedes` edge points to a `Decision` that doesn't exist; no `decision_to_file` edge points to a `FileNode` that doesn't exist (uses unresolved-glob annotations from the doc-graph); a `Decision` that's been superseded must not appear as the latest version of its `key`.
+
+**Checks (full — LLM-graded over prose):**
+- **Tech-stack supports PRD constraints.** PRD prose contains constraints (perf budgets, platform targets, language policies, offline-availability, etc.) that aren't expressed as structured fields. The LLM reads PRD + tech-stack and flags conflicts ("PRD says 'must work offline' but tech-stack chose PostgreSQL with no offline mode"). Findings are P0 for direct contradictions, P2 for soft tensions.
+- **PRD-to-stories semantic coverage.** LLM reads PRD prose and the structured story list; flags features described only in PRD prose that no story addresses. Complements the structural orphan-feature check.
+- **Cross-doc terminology drift.** LLM grades whether the same concept is named consistently across PRD/stories/standards/design-system. P2 findings only.
+
+**Required adapters:** `pipeline_docs` (for whichever planning artifacts exist; lens runs on whatever subset is present).
+
+**Severity rubric:**
+- P0 — direct contradiction surfaced by full-profile check (PRD says A, tech-stack says ¬A); decision supersedes nonexistent decision; `must`-priority story not covered by plan or playbook.
+- P1 — orphan story; `should`-priority story not covered; standards reference language not in tech-stack; story tagged `ui` but no design-system tokens exist.
+- P2 — soft inconsistencies (terminology drift, full-profile low-confidence findings).
+- P3 — `lens_skipped` when fewer than two planning artifacts exist.
+
+**Pipeline-phase activation.** This lens has *phase-aware subsets* — only the checks whose required artifacts exist run at any given phase boundary:
+
+| After phase boundary | Lens H subset that runs |
+|---|---|
+| `user-stories` | stories-cover-PRD; orphan-stories |
+| `tech-stack` | + tech-stack-supports-PRD |
+| `coding-standards` | + standards-consistent-with-tech-stack |
+| `design-system` | + design-system-covers-UI-stories |
+| `implementation-plan` | + plan-covers-stories |
+| `decisions` (any time `decisions.jsonl` is written) | + decisions-internally-consistent |
+| `implementation-playbook` | + playbook-tracks-plan |
+| Build phase | full lens, including LLM-graded prose conflicts when `--profile=full` |
+
+This is what makes Lens H the audit's earliest-warning system: drift between docs gets caught before build phase even starts.
+
+### 3.10 Lens registry
+
+A central manifest declares profile membership, required/optional adapters, lens-to-lens dependencies, and severity defaults so the engine can introspect them and the dashboard can list them:
+
+```ts
+// src/observability/checks/registry.ts
+export interface LensManifest {
+  id: string;
+  name: string;
+  profiles: ("fast" | "full")[];
+  required: AdapterId[];
+  optional: AdapterId[];
+  depends_on?: string[];   // lens IDs whose findings this lens reads via the runner's shared buffer
+}
+
+export const LENS_REGISTRY: LensManifest[] = [
+  { id: "A-tdd",         name: "TDD violations",          profiles: ["fast", "full"],
+    required: ["git", "pipeline_docs"], optional: ["tests"] },
+  { id: "B-ac-coverage", name: "AC completion",           profiles: ["fast", "full"],
+    required: ["pipeline_docs"], optional: ["tests", "gh"] },
+  { id: "C-standards",   name: "Coding-standards drift",  profiles: ["fast", "full"],
+    required: ["git", "pipeline_docs"], optional: ["tests"] },
+  { id: "D-stack",       name: "Tech-stack drift",        profiles: ["fast", "full"],
+    required: ["git", "pipeline_docs"], optional: [] },
+  { id: "E-design",      name: "Design-system drift",     profiles: ["fast", "full"],
+    required: ["git", "pipeline_docs"], optional: [] },
+  { id: "F-scope",       name: "Missing scope",           profiles: ["fast", "full"],
+    required: ["pipeline_docs"], optional: ["tests", "gh", "state"] },
+  { id: "G-decisions",   name: "Undocumented decisions",  profiles: ["fast", "full"],
+    required: ["git", "pipeline_docs"], optional: [],
+    depends_on: ["D-stack"] },
+  { id: "H-cross-doc",   name: "Cross-doc inconsistency", profiles: ["fast", "full"],
+    required: ["pipeline_docs"], optional: [] },
+];
+```
+
+The `checks-runner` (src/observability/engine/checks-runner.ts) topologically orders lenses by `depends_on` before running them. When a lens declares a dependency, it gets read access to that lens's already-emitted findings via the runner's shared findings buffer — but never write access. Cycles in `depends_on` are rejected at startup with a clear error.
+
+### 3.11 Where lenses get configuration
+
+Per-project knobs (rule severity overrides, ad-hoc-token thresholds, lens enable/disable, glob patterns for UI files, custom lint integrations) live in `.scaffold/observability.yaml` under a `lenses:` section:
+
+```yaml
+lenses:
+  E-design:
+    ad_hoc_token_threshold: 5
+    ui_glob: "src/components/**/*.{tsx,vue}"
+  C-standards:
+    enforce_via_linter: true
+    rule_overrides:
+      no-console: P1
+  H-cross-doc:
+    skip_phase_subsets: ["design-system"]   # skip a specific phase subset if not relevant
+```
+
+Lenses read this config at startup; missing keys fall through to the registry defaults shown in 3.10.
+
+<!-- Sections 4–N to follow -->
 
