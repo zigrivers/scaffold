@@ -4,6 +4,22 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.25.1] — 2026-04-29
+
+### Fixed
+- **Codex AGENTS.md now emits direct `mmr review` recipes for `review-code`
+  and `review-pr`** instead of the `scaffold run <step>` shim. The shim
+  works in Claude Code (slash commands re-inject the meta-prompt as
+  instructions) but breaks in Codex, which executes `scaffold run` as a
+  shell command and treats the 45 KB meta-prompt as an opaque result —
+  agents reported "scaffold run review-code emitted the review wrapper
+  again rather than an actionable verdict" and fell back to bare
+  `mmr review --staged`, losing the 4th-channel Superpowers reconcile.
+  The codex adapter now inlines a deterministic recipe (multi-mode
+  `mmr review` invocation + `mmr reconcile --channel superpowers` +
+  verdict-handling guidance) for these two tools while leaving prompt-
+  style steps unchanged.
+
 ## [3.25.0] — 2026-04-28
 
 Bundles `@zigrivers/mmr@1.3.0`.

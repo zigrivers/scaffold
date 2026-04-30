@@ -143,4 +143,52 @@ describe('CodexAdapter', () => {
     const result = adapter.finalize(makeFinalizeInput([]))
     expect(result.files[0].content).not.toContain('old-step')
   })
+
+  // Codex-incompatible tools: `scaffold run <step>` emits a meta-prompt to
+  // stdout intended for harnesses that re-inject it as instructions (Claude
+  // Code slash commands). Codex executes it as a shell command and treats
+  // stdout as a result, so the embedded bash never runs. For review-code
+  // and review-pr — which are pure shell-executable wrappers around
+  // `mmr review` + `mmr reconcile` — emit direct recipes instead.
+  describe('codex-incompatible executor tools', () => {
+    it('review-code emits direct mmr review + reconcile recipes, not `scaffold run review-code`', () => {
+      adapter.initialize(makeContext())
+      adapter.generateStepWrapper(makeStepInput({
+        slug: 'review-code',
+        description: 'Pre-commit multi-model review',
+        phase: null,
+      }))
+      const result = adapter.finalize(makeFinalizeInput([]))
+      const content = result.files[0].content
+      expect(content).not.toMatch(/`scaffold run review-code`/)
+      expect(content).toContain('mmr review --staged')
+      expect(content).toContain('mmr reconcile')
+      expect(content).toContain('--channel superpowers')
+    })
+
+    it('review-pr emits direct mmr review --pr recipe, not `scaffold run review-pr`', () => {
+      adapter.initialize(makeContext())
+      adapter.generateStepWrapper(makeStepInput({
+        slug: 'review-pr',
+        description: 'PR multi-model review',
+        phase: null,
+      }))
+      const result = adapter.finalize(makeFinalizeInput([]))
+      const content = result.files[0].content
+      expect(content).not.toMatch(/`scaffold run review-pr`/)
+      expect(content).toContain('mmr review --pr')
+      expect(content).toContain('mmr reconcile')
+    })
+
+    it('non-executor tools still use `scaffold run <slug>`', () => {
+      adapter.initialize(makeContext())
+      adapter.generateStepWrapper(makeStepInput({
+        slug: 'automated-pr-review',
+        description: 'Configure automated PR review',
+        phase: 'environment',
+      }))
+      const result = adapter.finalize(makeFinalizeInput([]))
+      expect(result.files[0].content).toContain('scaffold run automated-pr-review')
+    })
+  })
 })
