@@ -1467,6 +1467,8 @@ These are orthogonal to the pipeline — usable at any time, not tied to pipelin
 
 Use `scaffold run spark` before `create-vision` when you have a vague idea that needs sharpening. Use `scaffold run review-code` before commit or push when you want a local gate on the current delivery candidate. Use `scaffold run review-pr` after a GitHub PR exists.
 
+> **Codex users:** the generated `AGENTS.md` ships direct `mmr review` shell recipes for `review-code` and `review-pr` (3-channel coverage: Codex CLI, Gemini CLI, Claude CLI). The Superpowers `code-reviewer` 4th-channel reconcile requires a harness that can dispatch agent skills — Codex cannot do this directly, so run `scaffold run review-{code,pr}` from a Claude Code session when you need full 4-channel coverage.
+
 Run any of these via the CLI or ask the scaffold runner skill in Claude Code or Gemini.
 
 ## Releasing Your Project
