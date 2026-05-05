@@ -152,6 +152,20 @@ describe('event-schemas', () => {
     expect(r.ok).toBe(false)
   })
 
+  it('rejects ts with overflowed calendar day (Feb 30)', () => {
+    const r = validateEvent({
+      ...base, ts: '2026-02-30T12:00:00Z', type: 'task_claimed', payload: { task_title: 'x' },
+    })
+    expect(r.ok).toBe(false)
+  })
+
+  it('accepts valid offset timestamp', () => {
+    const r = validateEvent({
+      ...base, ts: '2026-04-01T02:00:00+05:30', type: 'task_claimed', payload: { task_title: 'x' },
+    })
+    expect(r.ok).toBe(true)
+  })
+
   it('does not include extra top-level fields in the returned event', () => {
     const r = validateEvent({
       ...base, type: 'task_claimed', payload: { task_title: 'x' }, extra: 'should-not-appear',

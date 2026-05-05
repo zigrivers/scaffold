@@ -16,13 +16,26 @@ export type ValidationResult =
   | { ok: false; errors: string[] }
 
 const REQUIRED_BASE = ['event_id', 'worktree_id', 'actor_label', 'branch', 'type', 'ts'] as const
-// Anchored: requires timezone (Z or ±HH:MM); rejects trailing junk and invalid calendar values
-const ISO_8601_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/
+// Anchored ISO 8601: requires timezone (Z or ±HH:MM); rejects trailing junk
+const ISO_PARTS_RE =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|([+-])(\d{2}):(\d{2}))$/
 
 function isValidIso(ts: string): boolean {
-  if (!ISO_8601_RE.test(ts)) return false
+  const m = ISO_PARTS_RE.exec(ts)
+  if (!m) return false
+  const [yr, mo, dy, hr, mn, sc] = [+m[1], +m[2], +m[3], +m[4], +m[5], +m[6]]
+  if (mo < 1 || mo > 12 || dy < 1 || hr > 23 || mn > 59 || sc > 59) return false
   const d = new Date(ts)
-  return !isNaN(d.getTime())
+  if (isNaN(d.getTime())) return false
+  // Round-trip: shift UTC back to local time to detect calendar overflow (e.g. Feb 30)
+  // that JS Date normalizes silently instead of returning NaN.
+  const offSign = m[8] === '-' ? -1 : 1
+  const offMs = m[8] ? offSign * (+m[9] * 60 + +m[10]) * 60000 : 0
+  const local = new Date(d.getTime() + offMs)
+  return (
+    local.getUTCFullYear() === yr && local.getUTCMonth() + 1 === mo &&
+    local.getUTCDate() === dy && local.getUTCHours() === hr && local.getUTCMinutes() === mn
+  )
 }
 
 const VALID_OUTCOMES = ['pr_submitted', 'dropped', 'superseded'] as const
