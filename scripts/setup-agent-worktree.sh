@@ -22,6 +22,11 @@ command -v git >/dev/null 2>&1 || {
 raw_name="$1"
 agent_suffix="$(echo "$raw_name" | tr '[:upper:]' '[:lower:]' | tr '_' '-' | tr -cd 'a-z0-9-')"
 
+if [ -z "$agent_suffix" ]; then
+    echo "Error: agent name '${raw_name}' normalizes to empty string — use alphanumeric characters" >&2
+    exit 1
+fi
+
 # ─── Resolve paths ──────────────────────────────────────────
 
 repo_name="$(basename "$REPO_DIR")"

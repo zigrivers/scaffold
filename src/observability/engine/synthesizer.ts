@@ -1,4 +1,6 @@
-import { access, readFile, readdir, stat } from 'node:fs/promises'
+import { createReadStream } from 'node:fs'
+import { createInterface } from 'node:readline'
+import { access, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type {
   AvailabilityMap, Event, Snapshot,
@@ -58,22 +60,25 @@ export async function readMergedLedger(primaryRoot: string): Promise<MergedLedge
   const seen = new Set<string>()
 
   async function ingestFile(path: string, worktree_id: string, harvested_at?: string): Promise<void> {
-    let txt: string
-    try { txt = await readFile(path, 'utf8') } catch { return }
     let perSource = 0
-    for (const line of txt.split('\n')) {
-      if (!line.trim()) continue
-      try {
-        const raw = JSON.parse(line) as Record<string, unknown>
-        if (typeof raw.event_id !== 'string' || typeof raw.ts !== 'string') { malformed++; continue }
-        const ev = raw as unknown as Event
-        if (seen.has(ev.event_id)) continue
-        seen.add(ev.event_id)
-        events.push(ev)
-        perSource++
-      } catch {
-        malformed++
+    try {
+      const rl = createInterface({ input: createReadStream(path), crlfDelay: Infinity })
+      for await (const line of rl) {
+        if (!line.trim()) continue
+        try {
+          const raw = JSON.parse(line) as Record<string, unknown>
+          if (typeof raw.event_id !== 'string' || typeof raw.ts !== 'string') { malformed++; continue }
+          const ev = raw as unknown as Event
+          if (seen.has(ev.event_id)) continue
+          seen.add(ev.event_id)
+          events.push(ev)
+          perSource++
+        } catch {
+          malformed++
+        }
       }
+    } catch {
+      return
     }
     sources.push({ worktree_id, events: perSource, harvested_at })
   }
