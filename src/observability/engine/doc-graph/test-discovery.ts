@@ -5,32 +5,49 @@ import type { Test } from '../types.js'
 
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.scaffold', '.beads', '.mmr', 'coverage'])
 
+interface DiscoveredTest {
+  name: string
+  is_skipped: boolean
+}
+
 interface DiscoveryRule {
   framework: Test['framework']
   fileMatcher: (filename: string) => boolean
-  extractTestNames: (content: string) => string[]
+  extractTests: (content: string) => DiscoveredTest[]
 }
 
 const RULES: DiscoveryRule[] = [
   {
     framework: 'vitest',
     fileMatcher: (f) => /\.(test|spec)\.(ts|tsx|js|jsx)$/.test(f),
-    extractTestNames: (c) => Array.from(c.matchAll(/\b(?:it|test)\s*\(\s*['"`](.+?)['"`]/g), (m) => m[1]),
+    extractTests: (c) => {
+      const results: DiscoveredTest[] = []
+      for (const m of c.matchAll(/\b(?:it|test)\.skip\s*\(\s*['"`](.+?)['"`]/g)) results.push({ name: m[1], is_skipped: true })
+      for (const m of c.matchAll(/\b(?:xit|xtest)\s*\(\s*['"`](.+?)['"`]/g)) results.push({ name: m[1], is_skipped: true })
+      for (const m of c.matchAll(/\b(?:it|test)\s*\(\s*['"`](.+?)['"`]/g)) results.push({ name: m[1], is_skipped: false })
+      return results
+    },
   },
   {
     framework: 'jest',
     fileMatcher: (f) => /\.(test|spec)\.(ts|tsx|js|jsx)$/.test(f),
-    extractTestNames: (c) => Array.from(c.matchAll(/\b(?:it|test)\s*\(\s*['"`](.+?)['"`]/g), (m) => m[1]),
+    extractTests: (c) => {
+      const results: DiscoveredTest[] = []
+      for (const m of c.matchAll(/\b(?:it|test)\.skip\s*\(\s*['"`](.+?)['"`]/g)) results.push({ name: m[1], is_skipped: true })
+      for (const m of c.matchAll(/\b(?:xit|xtest)\s*\(\s*['"`](.+?)['"`]/g)) results.push({ name: m[1], is_skipped: true })
+      for (const m of c.matchAll(/\b(?:it|test)\s*\(\s*['"`](.+?)['"`]/g)) results.push({ name: m[1], is_skipped: false })
+      return results
+    },
   },
   {
     framework: 'pytest',
     fileMatcher: (f) => /^test_.+\.py$/.test(f) || /_test\.py$/.test(f),
-    extractTestNames: (c) => Array.from(c.matchAll(/^def\s+(test_[\w]+)\s*\(/gm), (m) => m[1]),
+    extractTests: (c) => Array.from(c.matchAll(/^def\s+(test_[\w]+)\s*\(/gm), (m) => ({ name: m[1], is_skipped: false })),
   },
   {
     framework: 'go-test',
     fileMatcher: (f) => /_test\.go$/.test(f),
-    extractTestNames: (c) => Array.from(c.matchAll(/^func\s+(Test[\w]+)\s*\(/gm), (m) => m[1]),
+    extractTests: (c) => Array.from(c.matchAll(/^func\s+(Test[\w]+)\s*\(/gm), (m) => ({ name: m[1], is_skipped: false })),
   },
 ]
 
@@ -71,13 +88,14 @@ export async function discoverTests(cwd: string): Promise<Test[]> {
     if (!rule) continue
     let content: string
     try { content = readFileSync(join(cwd, rel), 'utf8') } catch { continue }
-    for (const name of rule.extractTestNames(content)) {
+    for (const { name, is_skipped } of rule.extractTests(content)) {
       const idHash = createHash('sha256').update(`${rel}::${name}`).digest('hex').slice(0, 12)
       out.push({
         id: `test:${rel}::${idHash}`,
         name,
         file_path: rel,
         framework: rule.framework,
+        ...(is_skipped ? { last_status: 'skip' as const } : {}),
       })
     }
   }
