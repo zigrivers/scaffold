@@ -31,10 +31,13 @@ export const pipelineDocsAdapter: BaseAdapter & {
   id: 'pipeline_docs',
 
   async probe(cwd: string): Promise<AdapterStatus> {
+    const entries = Object.entries(PIPELINE_ARTIFACTS) as Array<[ArtifactKey, string]>
+    const exists = await Promise.all(entries.map(([, rel]) => fileExists(join(cwd, rel))))
     const present: string[] = []
     let canonicalCount = 0
-    for (const [k, rel] of Object.entries(PIPELINE_ARTIFACTS) as Array<[ArtifactKey, string]>) {
-      if (await fileExists(join(cwd, rel))) {
+    for (let i = 0; i < entries.length; i++) {
+      if (exists[i]) {
+        const [k, rel] = entries[i]
         present.push(rel)
         if (CANONICAL_REQUIRED.includes(k)) canonicalCount++
       }

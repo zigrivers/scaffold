@@ -33,7 +33,9 @@ export const gitAdapter: BaseAdapter & {
     try {
       await git(cwd, ['rev-parse', '--is-inside-work-tree'])
       return { status: 'available' }
-    } catch {
+    } catch (err: unknown) {
+      const e = err as { code?: string }
+      if (e.code === 'ENOENT') return { status: 'unavailable', reason: 'git binary not found' }
       return { status: 'unavailable', reason: 'not a git repository' }
     }
   },
