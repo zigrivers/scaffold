@@ -29,6 +29,7 @@ export interface BaseEvent {
 export interface TaskClaimedPayload {
   task_title: string; story_id?: string; wave?: string; unplanned?: boolean
 }
+// 'merged' is not agent-recordable — it's derived from the gh adapter
 export interface TaskCompletedPayload {
   outcome: 'pr_submitted' | 'dropped' | 'superseded'; pr_number?: number; commit_sha?: string
 }
@@ -41,6 +42,7 @@ export interface BlockerHitPayload {
 export interface BlockerResolvedPayload { summary: string; references: string[] }
 export interface PrOpenedPayload { pr_number: number }
 export interface HeartbeatPayload { note: string }
+// 'skipped' is engine-set only; user-writable values are 'acknowledged' | 'open'
 export interface FindingAckPayload { finding_id: string; status: 'acknowledged' | 'open'; note?: string }
 
 export type Event =
