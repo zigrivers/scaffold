@@ -20,7 +20,7 @@ command -v git >/dev/null 2>&1 || {
 # ─── Normalize agent name ───────────────────────────────────
 
 raw_name="$1"
-agent_suffix="$(echo "$raw_name" | tr '[:upper:]' '[:lower:]' | tr '_' '-' | tr -cd 'a-z0-9-')"
+agent_suffix="$(echo "$raw_name" | tr '[:upper:]' '[:lower:]' | tr '_' '-' | tr -cd 'a-z0-9-' | sed 's/^-*//;s/-*$//')"
 
 if [ -z "$agent_suffix" ]; then
     echo "Error: agent name '${raw_name}' normalizes to empty string — use alphanumeric characters" >&2
@@ -35,19 +35,18 @@ branch_name="${agent_suffix}-workspace"
 
 # ─── Create worktree ────────────────────────────────────────
 
-if [ -d "$worktree_dir" ]; then
+if [ ! -d "$worktree_dir" ]; then
+    # Create the workspace branch if it doesn't exist
+    if ! git -C "$REPO_DIR" rev-parse --verify "$branch_name" >/dev/null 2>&1; then
+        git -C "$REPO_DIR" branch "$branch_name"
+    fi
+
+    git -C "$REPO_DIR" worktree add "$worktree_dir" "$branch_name"
+
+    echo "Created worktree at $worktree_dir on branch $branch_name"
+else
     echo "Worktree already exists at $worktree_dir"
-    exit 0
 fi
-
-# Create the workspace branch if it doesn't exist
-if ! git -C "$REPO_DIR" rev-parse --verify "$branch_name" >/dev/null 2>&1; then
-    git -C "$REPO_DIR" branch "$branch_name"
-fi
-
-git -C "$REPO_DIR" worktree add "$worktree_dir" "$branch_name"
-
-echo "Created worktree at $worktree_dir on branch $branch_name"
 
 # ─── Write .scaffold/identity.json (for build observability) ────────────
 mkdir -p "$worktree_dir/.scaffold"
