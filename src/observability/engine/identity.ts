@@ -12,7 +12,11 @@ export function readIdentity(worktreeRoot: string): WorktreeIdentity | null {
   if (!existsSync(path)) return null
   try {
     const data = JSON.parse(readFileSync(path, 'utf8')) as Partial<WorktreeIdentity>
-    if (typeof data?.worktree_id !== 'string' || typeof data?.worktree_label !== 'string') return null
+    if (
+      typeof data?.worktree_id !== 'string' ||
+      typeof data?.worktree_label !== 'string' ||
+      typeof data?.created_at !== 'string'
+    ) return null
     return data as WorktreeIdentity
   } catch {
     return null
