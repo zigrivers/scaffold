@@ -72,6 +72,10 @@ describe('scrubSecrets', () => {
     expect(out).not.toContain('abc')
     expect(out).toContain('user=alice')
   })
+
+  it('redacts quoted values containing embedded escaped quotes', () => {
+    expect(scrubSecrets('api_key="my\\"secret"')).toBe('api_key=[REDACTED:kv-secret]')
+  })
 })
 
 describe('sanitizePath', () => {
@@ -86,21 +90,21 @@ describe('sanitizePath', () => {
   it('leaves repo-relative paths unchanged', () => {
     expect(sanitizePath('src/auth/login.ts')).toBe('src/auth/login.ts')
   })
-  it('rewrites Windows backslash user paths to ~', () => {
+  it('rewrites Windows backslash user paths to ~, preserving drive letter', () => {
     expect(sanitizePath('C:\\Users\\alice\\repo\\file.ts'))
-      .toBe('~\\repo\\file.ts')
+      .toBe('C:\\~\\repo\\file.ts')
   })
-  it('rewrites Windows forward-slash user paths to ~', () => {
+  it('rewrites Windows forward-slash user paths to ~, preserving drive letter', () => {
     expect(sanitizePath('C:/Users/alice/repo/file.ts'))
-      .toBe('~/repo/file.ts')
+      .toBe('C:/~/repo/file.ts')
   })
   it('rewrites macOS user paths with spaces in username to ~', () => {
     expect(sanitizePath('/Users/John Doe/Documents/repo/file.ts'))
       .toBe('~/Documents/repo/file.ts')
   })
-  it('rewrites Windows backslash paths with spaces in username to ~', () => {
+  it('rewrites Windows backslash paths with spaces in username to ~, preserving drive letter', () => {
     expect(sanitizePath('C:\\Users\\John Doe\\repo\\file.ts'))
-      .toBe('~\\repo\\file.ts')
+      .toBe('C:\\~\\repo\\file.ts')
   })
   it('does not rewrite home-like paths that are not root-level home dirs', () => {
     expect(sanitizePath('/mnt/home/alice/file.ts')).toBe('/mnt/home/alice/file.ts')
@@ -150,11 +154,11 @@ describe('redactEvent (write-time)', () => {
     expect(cast.token).toBe('[REDACTED:kv-secret]')
   })
 
-  it('preserves Map instances unchanged (non-plain-object pass-through)', () => {
-    const m = new Map([['key', 'value']])
-    const res = redactEvent({ data: m } as never) as { data: unknown }
+  it('recurses into Map instances to redact secret string values', () => {
+    const m = new Map([['k', 'ghp_1234567890abcdefABCDEF1234567890abcdef']])
+    const res = redactEvent({ data: m } as never) as { data: Map<string, string> }
     expect(res.data).toBeInstanceOf(Map)
-    expect(res.data).toBe(m)
+    expect(res.data.get('k')).toBe('[REDACTED:github-token]')
   })
 })
 

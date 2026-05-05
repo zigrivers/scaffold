@@ -5,7 +5,7 @@ const KV_KEY = String.raw`(?<![A-Za-z])(?:secret|token|password|api[_-]?key)(?![
 // kv-secret: prefix (key+sep) in <kvp>, value in <kvv>.
 // Unquoted values stop at delimiters and strip trailing sentence punctuation.
 const KV_PART = String.raw`(?<kvp>\b(?:[A-Za-z0-9_-]*` + KV_KEY + String.raw`[A-Za-z0-9_-]*)\s*[=:]\s*)`
-  + String.raw`(?<kvv>(?:"[^"]*"|'[^']*'|[^'"\s,;]+(?<![,.!;])))`
+  + String.raw`(?<kvv>(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^'"\s,;]+(?<![,.!;])))`
 
 // Single-pass combined regex — one replace call instead of four.
 // Raw high-entropy hex is intentionally omitted: it false-positives on file hashes and misses non-hex
@@ -32,8 +32,8 @@ export function scrubSecrets(input: string): string {
 }
 
 export function sanitizePath(s: string): string {
-  // Windows first: C:\Users\<name> or C:/Users/<name> (either slash style)
-  let out = s.replace(/[A-Za-z]:[/\\]Users[/\\][^/\\]+/g, '~')
+  // Windows: preserve drive letter; replace \Users\<name> with \~ to keep drive context.
+  let out = s.replace(/([A-Za-z]:[/\\])Users[/\\][^/\\]+/g, '$1~')
   // Unix: /Users/<name> or /home/<name> — negative lookbehind avoids mid-path matches like /mnt/home/alice
   out = out.replace(/(?<![/a-zA-Z0-9])\/(?:Users|home)\/[^/]+/g, '~')
   return out
@@ -52,8 +52,19 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 function recursivelyTransform(v: unknown, transform: (s: string) => string, sensitiveKey = false): unknown {
   if (typeof v === 'string') return sensitiveKey ? '[REDACTED:kv-secret]' : transform(v)
   if (Array.isArray(v)) return v.map((x) => recursivelyTransform(x, transform, sensitiveKey))
-  // Deep redaction applies to plain objects and arrays only; Map/Set/class instances pass through
-  // unchanged — event payloads do not embed raw secrets in Map/Set entries.
+  if (v instanceof Map) {
+    const out = new Map()
+    for (const [k, val] of v) {
+      out.set(recursivelyTransform(k, transform, sensitiveKey), recursivelyTransform(val, transform, sensitiveKey))
+    }
+    return out
+  }
+  if (v instanceof Set) {
+    const out = new Set()
+    for (const item of v) { out.add(recursivelyTransform(item, transform, sensitiveKey)) }
+    return out
+  }
+  // Other class instances (Date, etc.) pass through; only plain objects are recursed into.
   if (isPlainObject(v)) {
     const out: Record<string, unknown> = {}
     for (const [k, val] of Object.entries(v)) {
