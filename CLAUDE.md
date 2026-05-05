@@ -65,6 +65,9 @@ When modifying prompts:
 | `gh pr diff` | Review PR diff before merging |
 | `gh pr checks` | Check CI status on current PR |
 | `make dashboard-test` | Generate test-ready dashboard HTML for visual verification |
+| `scaffold observe event <type> ...` | Write a build-observability ledger event |
+| `scaffold observe progress` | Show snapshot of in-flight, completed, and recent decisions |
+| `scaffold observe harvest --worktree=<path>` | Flush a worktree's ledger to the primary archive |
 
 ### Committing and Creating PRs
 
@@ -248,6 +251,8 @@ See `docs/project-structure.md` for the full authoritative guide.
 | `.scaffold/` | Runtime state (config, state, decisions) |
 
 **File placement**: Scripts → `scripts/<name>.sh` | Tests → `tests/<name>.bats` | Docs → `docs/<topic>.md` | Source → `src/` | Content → `content/<category>/`
+
+**Build observability** lives under `src/observability/`. Build-command meta-prompts (`single-agent-start`, `multi-agent-start`, the resume variants, `review-pr`, `review-code`) are expected to call `scaffold observe event …` at named workflow points (claim/complete/decision/blocker/PR-open). Plan 1 ships the foundation (ledger, adapters, snapshot); Plans 2+ add the audit, doc-graph, lenses, additional renderers, and operational hooks. See `docs/superpowers/specs/2026-04-30-build-observability-design.md`.
 
 ## Dev Environment
 
