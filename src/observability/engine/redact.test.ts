@@ -154,11 +154,31 @@ describe('redactEvent (write-time)', () => {
     expect(cast.token).toBe('[REDACTED:kv-secret]')
   })
 
-  it('recurses into Map instances to redact secret string values', () => {
-    const m = new Map([['k', 'ghp_1234567890abcdefABCDEF1234567890abcdef']])
-    const res = redactEvent({ data: m } as never) as { data: Map<string, string> }
+  it('recurses into Maps, applying key-sensitive detection for Map keys', () => {
+    const m = new Map<string, unknown>([
+      ['password', 'hunter2'],
+      ['user', 'alice'],
+      ['count', 42],
+    ])
+    const res = redactEvent({ data: m } as never) as { data: Map<string, unknown> }
     expect(res.data).toBeInstanceOf(Map)
-    expect(res.data.get('k')).toBe('[REDACTED:github-token]')
+    expect(res.data.get('password')).toBe('[REDACTED:kv-secret]')
+    expect(res.data.get('user')).toBe('alice')
+    expect(res.data.get('count')).toBe(42)
+  })
+
+  it('redacts numeric and boolean values under sensitive object keys', () => {
+    const result = redactEvent({ api_key: 12345, count: 7 } as never) as Record<string, unknown>
+    expect(result.api_key).toBe('[REDACTED:kv-secret]')
+    expect(result.count).toBe(7)
+  })
+
+  it('handles circular references without stack overflow', () => {
+    const obj: Record<string, unknown> = { label: 'test' }
+    obj.self = obj
+    expect(() => redactEvent(obj as never)).not.toThrow()
+    const result = redactEvent(obj as never) as Record<string, unknown>
+    expect(result.label).toBe('test')
   })
 })
 

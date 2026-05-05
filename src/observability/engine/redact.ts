@@ -1,6 +1,6 @@
-// Sensitive keyword must appear as a whole segment (bounded by non-letters) so that
-// 'tokenization_method' does not match on 'token'. Security still errs toward over-redaction.
-const KV_KEY = String.raw`(?<![A-Za-z])(?:secret|token|password|api[_-]?key)(?![A-Za-z])`
+// Lookahead ensures keyword ends a segment: 'tokenization_method' does not match ('token'
+// followed by 'i'), but camelCase keys like 'myToken' and 'updateToken' do match.
+const KV_KEY = String.raw`(?:secret|token|password|api[_-]?key)(?![A-Za-z])`
 
 // kv-secret: prefix (key+sep) in <kvp>, value in <kvv>.
 // Unquoted values stop at delimiters and strip trailing sentence punctuation.
@@ -39,36 +39,51 @@ export function sanitizePath(s: string): string {
   return out
 }
 
-// Matches object keys whose names indicate a sensitive value (e.g. { password: 'abc' }).
-// Uses non-letter boundaries so 'tokenization_method' does not trigger on 'token'.
-const SENSITIVE_KEY_RE = /(?<![A-Za-z])(?:secret|token|password|api[_-]?key)(?![A-Za-z])/i
+// Matches object keys indicating a sensitive value; lookahead ensures 'tokenization_method'
+// does not trigger on 'token', while camelCase keys like 'myToken' are correctly matched.
+const SENSITIVE_KEY_RE = /(?:secret|token|password|api[_-]?key)(?![A-Za-z])/i
 
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  if (v === null || typeof v !== 'object') return false
-  const proto = Object.getPrototypeOf(v) as unknown
-  return proto === Object.prototype || proto === null
-}
-
-function recursivelyTransform(v: unknown, transform: (s: string) => string, sensitiveKey = false): unknown {
+function recursivelyTransform(
+  v: unknown,
+  transform: (s: string) => string,
+  sensitiveKey = false,
+  seen = new WeakSet<object>(),
+): unknown {
   if (typeof v === 'string') return sensitiveKey ? '[REDACTED:kv-secret]' : transform(v)
-  if (Array.isArray(v)) return v.map((x) => recursivelyTransform(x, transform, sensitiveKey))
+  if (sensitiveKey && (typeof v === 'number' || typeof v === 'boolean')) return '[REDACTED:kv-secret]'
+  if (Array.isArray(v)) {
+    if (seen.has(v)) return v
+    seen.add(v)
+    return v.map((x) => recursivelyTransform(x, transform, sensitiveKey, seen))
+  }
   if (v instanceof Map) {
+    if (seen.has(v)) return v
+    seen.add(v)
     const out = new Map()
     for (const [k, val] of v) {
-      out.set(recursivelyTransform(k, transform, sensitiveKey), recursivelyTransform(val, transform, sensitiveKey))
+      const keyIsSensitive = typeof k === 'string' && SENSITIVE_KEY_RE.test(k)
+      out.set(
+        recursivelyTransform(k, transform, false, seen),
+        recursivelyTransform(val, transform, sensitiveKey || keyIsSensitive, seen),
+      )
     }
     return out
   }
   if (v instanceof Set) {
+    if (seen.has(v)) return v
+    seen.add(v)
     const out = new Set()
-    for (const item of v) { out.add(recursivelyTransform(item, transform, sensitiveKey)) }
+    for (const item of v) { out.add(recursivelyTransform(item, transform, sensitiveKey, seen)) }
     return out
   }
-  // Other class instances (Date, etc.) pass through; only plain objects are recursed into.
-  if (isPlainObject(v)) {
+  if (typeof v === 'object' && v !== null) {
+    if (seen.has(v)) return v
+    seen.add(v)
+    const entries = Object.entries(v as Record<string, unknown>)
+    if (entries.length === 0) return v // No enumerable props: Date, Error, etc. pass through.
     const out: Record<string, unknown> = {}
-    for (const [k, val] of Object.entries(v)) {
-      out[k] = recursivelyTransform(val, transform, sensitiveKey || SENSITIVE_KEY_RE.test(k))
+    for (const [k, val] of entries) {
+      out[k] = recursivelyTransform(val, transform, sensitiveKey || SENSITIVE_KEY_RE.test(k), seen)
     }
     return out
   }
