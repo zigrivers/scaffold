@@ -52,6 +52,7 @@
     "@inquirer/prompts": "^7.4.0",
     "js-yaml": "^4.1.0",
     "mdast-util-from-markdown": "^2.0.3",
+    "minimatch": "^10.2.5",
     "proper-lockfile": "^4.1.2",
     "remark-gfm": "^4.0.1",
     "remark-parse": "^11.0.0",
