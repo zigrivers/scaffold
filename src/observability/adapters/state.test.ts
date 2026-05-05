@@ -26,7 +26,8 @@ describe('state adapter', () => {
 
   it('readMergedState merges service-scoped state under each service step', async () => {
     mkdirSync(join(dir, '.scaffold/services/api'), { recursive: true })
-    writeFileSync(join(dir, '.scaffold/state.json'), JSON.stringify({ steps: { 'tech-stack': { status: 'completed' } } }))
+    const rootState = JSON.stringify({ steps: { 'tech-stack': { status: 'completed' } } })
+    writeFileSync(join(dir, '.scaffold/state.json'), rootState)
     writeFileSync(
       join(dir, '.scaffold/services/api/state.json'),
       JSON.stringify({ steps: { 'coding-standards': { status: 'in_progress' } } }),
