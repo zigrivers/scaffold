@@ -305,7 +305,7 @@ export interface Rule {
   id: string
   description: string
   pattern?: string
-  forbidden?: string
+  forbidden?: string[]
   match?: string
   language?: string
   severity?: string
