@@ -190,6 +190,21 @@ describe('redactEvent (write-time)', () => {
     expect(result.message).toBe('~/src/file.ts threw')
     expect(result.message).not.toContain('/Users/alice')
   })
+
+  it('redacts enumerable properties on Error instances', () => {
+    const err = Object.assign(new Error('oops'), { token: 'secret-val', code: 'E_TOKEN' })
+    const result = redactEvent(err as never) as Error & Record<string, unknown>
+    expect(result).toBeInstanceOf(Error)
+    expect(result.token).toBe('[REDACTED:kv-secret]')
+    expect(result.code).toBe('E_TOKEN')
+  })
+
+  it('preserves Buffer and non-plain-object values unchanged', () => {
+    const buf = Buffer.from('hello')
+    const result = redactEvent({ data: buf } as never) as { data: Buffer }
+    expect(result.data).toBeInstanceOf(Buffer)
+    expect(result.data).toBe(buf)
+  })
 })
 
 describe('redactRendered (render-time)', () => {

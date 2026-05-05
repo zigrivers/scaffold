@@ -83,15 +83,21 @@ function recursivelyTransform(
     const out = new Error(transform(v.message))
     if (v.stack) out.stack = transform(v.stack)
     seen.set(v, out)
+    for (const [k, val] of Object.entries(v)) {
+      (out as unknown as Record<string, unknown>)[k] = recursivelyTransform(
+        val, transform, sensitiveKey || SENSITIVE_KEY_RE.test(k), seen,
+      )
+    }
     return out
   }
   if (typeof v === 'object' && v !== null) {
+    // Only traverse plain objects; Buffers, TypedArrays, and custom class instances pass through.
+    const proto = Object.getPrototypeOf(v) as unknown
+    if (proto !== Object.prototype && proto !== null) return v
     if (seen.has(v)) return seen.get(v)
-    const entries = Object.entries(v as Record<string, unknown>)
-    if (entries.length === 0) return v // No enumerable props: Date, etc. pass through.
     const out: Record<string, unknown> = {}
     seen.set(v, out)
-    for (const [k, val] of entries) {
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
       out[k] = recursivelyTransform(val, transform, sensitiveKey || SENSITIVE_KEY_RE.test(k), seen)
     }
     return out
