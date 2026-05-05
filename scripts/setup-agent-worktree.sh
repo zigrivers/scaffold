@@ -50,9 +50,15 @@ if [ ! -f "$worktree_dir/.scaffold/identity.json" ]; then
     if command -v uuidgen >/dev/null 2>&1; then
         identity_uuid="$(uuidgen | tr 'A-Z' 'a-z')"
     else
-        # Fallback: build a UUID-shaped string from /dev/urandom hex
-        identity_uuid="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n' | \
-            sed -E 's/^(.{8})(.{4})(.{4})(.{4})(.{12})$/\1-\2-\3-\4-\5/')"
+        # Fallback: RFC 4122 UUID v4 via python3 or /dev/urandom with version/variant bits set
+        if command -v python3 >/dev/null 2>&1; then
+            identity_uuid="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+        else
+            raw="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+            p1="${raw:0:8}" p2="${raw:8:4}" p3="4${raw:13:3}"
+            hi="$(printf '%x' "$(( (16#${raw:16:1} & 3) | 8 ))")"
+            identity_uuid="${p1}-${p2}-${p3}-${hi}${raw:17:3}-${raw:20:12}"
+        fi
     fi
     created_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf '{\n  "worktree_id": "%s",\n  "worktree_label": "%s",\n  "created_at": "%s"\n}\n' \

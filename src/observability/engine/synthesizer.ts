@@ -113,7 +113,7 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
 
   const inFlightByTask = new Map<string, TaskInFlight>()
   const completed: TaskCompletion[] = []
-  const blocked: BlockedTask[] = []
+  const blockedByEventId = new Map<string, BlockedTask>()
   const decisions: DecisionSummary[] = []
   const claimsByTask = new Map<string, Event & { type: 'task_claimed' }>()
 
@@ -134,10 +134,17 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
         age_hours: round1(ageH),
         branch: e.branch,
       })
-    } else if (e.type === 'task_completed' && e.task_id) {
-      inFlightByTask.delete(e.task_id)
+    } else if (e.type === 'task_completed') {
+      if (e.task_id) {
+        inFlightByTask.delete(e.task_id)
+      } else {
+        const anonymousKey = [...inFlightByTask.entries()]
+          .reverse()
+          .find(([, t]) => t.by === e.actor_label && t.task_id === null)?.[0]
+        if (anonymousKey) inFlightByTask.delete(anonymousKey)
+      }
       if (ts >= cutoff) {
-        const claim = claimsByTask.get(e.task_id)
+        const claim = e.task_id ? claimsByTask.get(e.task_id) : undefined
         const comp = e as Event & { type: 'task_completed' }
         completed.push({
           task_id: e.task_id,
@@ -150,7 +157,7 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
     } else if (e.type === 'blocker_hit') {
       const ageH = Math.max(0, (Date.now() - ts) / 3600 / 1000)
       const bh = e as Event & { type: 'blocker_hit' }
-      blocked.push({
+      blockedByEventId.set(e.event_id, {
         task_id: e.task_id ?? '(none)',
         task_title: claimsByTask.get(e.task_id ?? '')?.payload.task_title ?? '(unknown)',
         blocker_kind: bh.payload.kind,
@@ -160,10 +167,14 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
       })
     } else if (e.type === 'blocker_resolved') {
       const br = e as Event & { type: 'blocker_resolved' }
-      const idx = [...blocked].reverse().findIndex(
-        (b) => br.payload.references.length === 0 || b.task_id === e.task_id,
-      )
-      if (idx >= 0) blocked.splice(blocked.length - 1 - idx, 1)
+      if (br.payload.references.length > 0) {
+        for (const ref of br.payload.references) blockedByEventId.delete(ref)
+      } else {
+        const staleKey = [...blockedByEventId.entries()]
+          .reverse()
+          .find(([, b]) => e.task_id == null || b.task_id === e.task_id)?.[0]
+        if (staleKey) blockedByEventId.delete(staleKey)
+      }
     } else if (e.type === 'decision_recorded') {
       const dr = e as Event & { type: 'decision_recorded' }
       decisions.push({
@@ -202,7 +213,7 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
     active_agents: activeAgents,
     completed_in_window: completed,
     in_flight: [...inFlightByTask.values()],
-    blocked,
+    blocked: [...blockedByEventId.values()],
     upcoming: [],
     recent_decisions: decisions.slice(0, 10),
     story_coverage: [],

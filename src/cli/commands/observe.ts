@@ -25,7 +25,7 @@ const BOOLEAN_KEYS = new Set(['unplanned'])
 function snakeKey(k: string): string { return k.replace(/-/g, '_') }
 
 function coerce(rawKey: string, raw: string): unknown {
-  if (NUMERIC_KEYS.has(rawKey)) return Number(raw)
+  if (NUMERIC_KEYS.has(rawKey)) { const n = Number(raw); return Number.isNaN(n) ? undefined : n }
   if (BOOLEAN_KEYS.has(rawKey)) return raw === 'true'
   if (ARRAY_KEYS.has(rawKey)) return raw.split(',').map((s) => s.trim()).filter(Boolean)
   return raw
