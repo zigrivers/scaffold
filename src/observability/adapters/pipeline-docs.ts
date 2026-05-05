@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { access, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AdapterStatus, BaseAdapter } from './types.js'
 
@@ -21,6 +21,10 @@ const CANONICAL_REQUIRED: ArtifactKey[] = [
   'prd', 'user_stories', 'implementation_plan', 'tech_stack', 'coding_standards',
 ]
 
+async function fileExists(path: string): Promise<boolean> {
+  try { await access(path); return true } catch { return false }
+}
+
 export const pipelineDocsAdapter: BaseAdapter & {
   readArtifacts(cwd: string): Promise<ArtifactBundle>
 } = {
@@ -30,7 +34,7 @@ export const pipelineDocsAdapter: BaseAdapter & {
     const present: string[] = []
     let canonicalCount = 0
     for (const [k, rel] of Object.entries(PIPELINE_ARTIFACTS) as Array<[ArtifactKey, string]>) {
-      if (existsSync(join(cwd, rel))) {
+      if (await fileExists(join(cwd, rel))) {
         present.push(rel)
         if (CANONICAL_REQUIRED.includes(k)) canonicalCount++
       }
@@ -50,10 +54,12 @@ export const pipelineDocsAdapter: BaseAdapter & {
 
   async readArtifacts(cwd: string): Promise<ArtifactBundle> {
     const out = {} as ArtifactBundle
-    for (const [k, rel] of Object.entries(PIPELINE_ARTIFACTS) as Array<[ArtifactKey, string]>) {
-      const p = join(cwd, rel)
-      out[k] = existsSync(p) ? readFileSync(p, 'utf8') : null
-    }
+    await Promise.all(
+      (Object.entries(PIPELINE_ARTIFACTS) as Array<[ArtifactKey, string]>).map(async ([k, rel]) => {
+        const p = join(cwd, rel)
+        try { out[k] = await readFile(p, 'utf8') } catch { out[k] = null }
+      }),
+    )
     return out
   },
 }

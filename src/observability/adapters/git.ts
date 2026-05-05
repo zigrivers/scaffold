@@ -45,7 +45,7 @@ export const gitAdapter: BaseAdapter & {
       let cur: Partial<WorktreeInfo> = {}
       for (const line of out.split('\n')) {
         if (line.startsWith('worktree ')) {
-          if (cur.path) wts.push(cur as WorktreeInfo)
+          if (cur.path) wts.push({ path: cur.path, branch: cur.branch ?? '', head: cur.head ?? '' })
           cur = { path: line.slice('worktree '.length).trim() }
         } else if (line.startsWith('HEAD ')) {
           cur.head = line.slice('HEAD '.length).trim()

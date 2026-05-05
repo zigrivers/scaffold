@@ -44,13 +44,14 @@ export const ghAdapter: BaseAdapter & {
 
   async listOpenPRs(cwd: string, opts: GhAdapterOpts = {}): Promise<PrInfo[]> {
     const bin = opts.ghBin ?? 'gh'
-    const probe = await ghAdapter.probe(cwd, opts)
+    // Probe with only ghBin (not ghArgs) so we always check real auth status.
+    const probe = await ghAdapter.probe(cwd, { ghBin: bin })
     if (probe.status !== 'available') return []
     try {
       const { stdout } = await execFile(bin, [
         'pr', 'list', '--state', 'open', '--json',
         'number,url,state,headRefName,createdAt,mergedAt',
-      ], { cwd })
+      ], { cwd, maxBuffer: 32 * 1024 * 1024 })
       const raw = JSON.parse(stdout) as Array<{
         number: number
         url: string

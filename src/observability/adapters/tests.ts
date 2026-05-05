@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { access, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AdapterStatus, BaseAdapter } from './types.js'
 
@@ -23,17 +23,17 @@ export const testsAdapter: BaseAdapter & {
   id: 'tests',
 
   async probe(cwd: string): Promise<AdapterStatus> {
-    if (!existsSync(join(cwd, REL))) {
+    try {
+      await access(join(cwd, REL))
+    } catch {
       return { status: 'unavailable', reason: 'no cached test run; run tests to populate' }
     }
     return { status: 'available', evidence_paths: [REL] }
   },
 
   async lastRun(cwd: string): Promise<TestRun | null> {
-    const p = join(cwd, REL)
-    if (!existsSync(p)) return null
     try {
-      return JSON.parse(readFileSync(p, 'utf8')) as TestRun
+      return JSON.parse(await readFile(join(cwd, REL), 'utf8')) as TestRun
     } catch {
       return null
     }
