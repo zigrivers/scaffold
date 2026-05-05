@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { v4 as uuidv4 } from 'uuid'
+import { randomUUID } from 'node:crypto'
 import type { WorktreeIdentity } from './types.js'
 
 export function identityPath(worktreeRoot: string): string {
@@ -21,7 +21,7 @@ export function ensureIdentity(worktreeRoot: string, label: string): WorktreeIde
   const existing = readIdentity(worktreeRoot)
   if (existing) return existing
   const id: WorktreeIdentity = {
-    worktree_id: uuidv4(),
+    worktree_id: randomUUID(),
     worktree_label: label,
     created_at: new Date().toISOString(),
   }
