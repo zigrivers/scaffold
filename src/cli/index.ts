@@ -22,6 +22,7 @@ import skillCommand from './commands/skill.js'
 import checkCommand from './commands/check.js'
 import completeCommand from './commands/complete.js'
 import reworkCommand from './commands/rework.js'
+import observeCommand from './commands/observe.js'
 
 export async function runCli(argv: string[]): Promise<void> {
   shutdown.install()
@@ -48,6 +49,7 @@ export async function runCli(argv: string[]): Promise<void> {
     .command(checkCommand)
     .command(completeCommand)
     .command(reworkCommand)
+    .command(observeCommand)
     .options({
       format: {
         type: 'string',

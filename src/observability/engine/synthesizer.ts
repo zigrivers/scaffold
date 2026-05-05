@@ -174,7 +174,7 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
 
   const actorsSeen = new Set(events.map((e) => e.actor_label))
   const activeAgents: ActiveAgent[] = [...actorsSeen].map((actor) => {
-    const ev = events.findLast((e) => e.actor_label === actor)
+    const ev = [...events].reverse().find((e) => e.actor_label === actor)
     const inflight = inFlightByActor.get(actor) ?? null
     return {
       worktree_id: ev?.worktree_id ?? '',
