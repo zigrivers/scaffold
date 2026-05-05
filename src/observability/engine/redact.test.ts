@@ -40,6 +40,14 @@ describe('sanitizePath', () => {
   it('leaves repo-relative paths unchanged', () => {
     expect(sanitizePath('src/auth/login.ts')).toBe('src/auth/login.ts')
   })
+  it('rewrites Windows backslash user paths to ~', () => {
+    expect(sanitizePath('C:\\Users\\alice\\repo\\file.ts'))
+      .toBe('~\\repo\\file.ts')
+  })
+  it('rewrites Windows forward-slash user paths to ~', () => {
+    expect(sanitizePath('C:/Users/alice/repo/file.ts'))
+      .toBe('~/repo/file.ts')
+  })
 })
 
 describe('redactEvent (write-time)', () => {

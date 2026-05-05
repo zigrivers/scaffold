@@ -23,7 +23,11 @@ export function scrubSecrets(input: string): string {
 }
 
 export function sanitizePath(s: string): string {
-  return s.replace(/\/(?:Users|home)\/[^/\s]+/g, '~')
+  // Windows first: C:\Users\<name> or C:/Users/<name> (either slash style)
+  let out = s.replace(/[A-Za-z]:[/\\]Users[/\\][^/\\\s]+/g, '~')
+  // Unix: /Users/<name> or /home/<name>
+  out = out.replace(/\/(?:Users|home)\/[^/\s]+/g, '~')
+  return out
 }
 
 function recursivelyTransform(v: unknown, transform: (s: string) => string): unknown {
