@@ -1,7 +1,7 @@
 import { access, copyFile, mkdir, rename, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { lock } from 'proper-lockfile'
-import { readIdentity } from './identity.js'
+import { readIdentityAsync } from './identity.js'
 import { ledgerPath } from './ledger-writer.js'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -27,7 +27,7 @@ export async function harvestWorktree(input: HarvestInput): Promise<void> {
     return
   }
 
-  const id = readIdentity(input.worktreeRoot)
+  const id = await readIdentityAsync(input.worktreeRoot)
   if (!id) {
     throw new Error(`worktree at ${input.worktreeRoot} has no .scaffold/identity.json`)
   }
