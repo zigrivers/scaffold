@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { EngineOutput, Severity, Verdict, FindingsSummary } from './types.js'
 import { composeAvailability, readMergedLedger, composeSnapshot } from './synthesizer.js'
@@ -28,7 +28,7 @@ const EMPTY_SUMMARY: FindingsSummary = {
 
 async function scaffoldVersion(): Promise<string> {
   const candidates = [
-    join(fileURLToPath(import.meta.url), '../../../package.json'),
+    join(dirname(fileURLToPath(import.meta.url)), '../../../package.json'),
     join(process.cwd(), 'package.json'),
   ]
   for (const p of candidates) {

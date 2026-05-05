@@ -105,7 +105,7 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
   const cutoff = Date.now() - input.sinceHours * 3600 * 1000
   const { events } = input
 
-  const inFlightByActor = new Map<string, TaskInFlight>()
+  const inFlightByTask = new Map<string, TaskInFlight>()
   const completed: TaskCompletion[] = []
   const blocked: BlockedTask[] = []
   const decisions: DecisionSummary[] = []
@@ -118,7 +118,7 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
     if (e.type === 'task_claimed' && e.task_id) {
       claimsByTask.set(e.task_id, e as Event & { type: 'task_claimed' })
       const ageH = Math.max(0, (Date.now() - ts) / 3600 / 1000)
-      inFlightByActor.set(e.actor_label, {
+      inFlightByTask.set(e.task_id, {
         task_id: e.task_id,
         task_title: (e as Event & { type: 'task_claimed' }).payload.task_title,
         story_id: (e as Event & { type: 'task_claimed' }).payload.story_id,
@@ -128,8 +128,7 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
         branch: e.branch,
       })
     } else if (e.type === 'task_completed' && e.task_id) {
-      const cur = inFlightByActor.get(e.actor_label)
-      if (cur && cur.task_id === e.task_id) inFlightByActor.delete(e.actor_label)
+      inFlightByTask.delete(e.task_id)
       if (ts >= cutoff) {
         const claim = claimsByTask.get(e.task_id)
         const comp = e as Event & { type: 'task_completed' }
@@ -175,7 +174,7 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
   const actorsSeen = new Set(events.map((e) => e.actor_label))
   const activeAgents: ActiveAgent[] = [...actorsSeen].map((actor) => {
     const ev = [...events].reverse().find((e) => e.actor_label === actor)
-    const inflight = inFlightByActor.get(actor) ?? null
+    const inflight = [...inFlightByTask.values()].find((t) => t.by === actor) ?? null
     return {
       worktree_id: ev?.worktree_id ?? '',
       actor_label: actor,
@@ -191,7 +190,7 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
     current_phase: input.currentPhase,
     active_agents: activeAgents,
     completed_in_window: completed,
-    in_flight: [...inFlightByActor.values()],
+    in_flight: [...inFlightByTask.values()],
     blocked,
     upcoming: [],
     recent_decisions: decisions.slice(0, 10),
