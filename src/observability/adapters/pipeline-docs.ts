@@ -2,6 +2,8 @@ import { access, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AdapterStatus, BaseAdapter } from './types.js'
 
+// Canonical paths produced by scaffold's own pipeline steps in consumer projects.
+// The scaffold repo itself does not follow this layout (it is the tool, not a project built by it).
 export const PIPELINE_ARTIFACTS = {
   prd:                     'docs/prd.md',
   user_stories:            'docs/user-stories.md',

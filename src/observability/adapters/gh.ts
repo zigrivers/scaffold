@@ -58,7 +58,7 @@ export const ghAdapter: BaseAdapter & {
         state: string
         headRefName: string
         createdAt: string
-        mergedAt?: string
+        mergedAt?: string | null
       }>
       return raw.map((p) => ({
         number: p.number,
@@ -66,7 +66,7 @@ export const ghAdapter: BaseAdapter & {
         state: p.state.toLowerCase() as PrInfo['state'],
         branch: p.headRefName,
         opened_at: p.createdAt,
-        merged_at: p.mergedAt,
+        merged_at: p.mergedAt ?? undefined,
       }))
     } catch {
       return []
