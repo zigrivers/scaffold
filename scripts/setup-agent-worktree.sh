@@ -43,3 +43,20 @@ fi
 git -C "$REPO_DIR" worktree add "$worktree_dir" "$branch_name"
 
 echo "Created worktree at $worktree_dir on branch $branch_name"
+
+# ─── Write .scaffold/identity.json (for build observability) ────────────
+mkdir -p "$worktree_dir/.scaffold"
+if [ ! -f "$worktree_dir/.scaffold/identity.json" ]; then
+    if command -v uuidgen >/dev/null 2>&1; then
+        identity_uuid="$(uuidgen | tr 'A-Z' 'a-z')"
+    else
+        # Fallback: build a UUID-shaped string from /dev/urandom hex
+        identity_uuid="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n' | \
+            sed -E 's/^(.{8})(.{4})(.{4})(.{4})(.{12})$/\1-\2-\3-\4-\5/')"
+    fi
+    created_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf '{\n  "worktree_id": "%s",\n  "worktree_label": "%s",\n  "created_at": "%s"\n}\n' \
+        "$identity_uuid" "$agent_suffix" "$created_at" \
+        > "$worktree_dir/.scaffold/identity.json"
+    echo "Wrote $worktree_dir/.scaffold/identity.json (worktree_id=$identity_uuid)"
+fi
