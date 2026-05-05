@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { WorktreeIdentity } from './types.js'
@@ -12,6 +13,20 @@ export function readIdentity(worktreeRoot: string): WorktreeIdentity | null {
   if (!existsSync(path)) return null
   try {
     const data = JSON.parse(readFileSync(path, 'utf8')) as Partial<WorktreeIdentity>
+    if (
+      typeof data?.worktree_id !== 'string' ||
+      typeof data?.worktree_label !== 'string' ||
+      typeof data?.created_at !== 'string'
+    ) return null
+    return data as WorktreeIdentity
+  } catch {
+    return null
+  }
+}
+
+export async function readIdentityAsync(worktreeRoot: string): Promise<WorktreeIdentity | null> {
+  try {
+    const data = JSON.parse(await readFile(identityPath(worktreeRoot), 'utf8')) as Partial<WorktreeIdentity>
     if (
       typeof data?.worktree_id !== 'string' ||
       typeof data?.worktree_label !== 'string' ||
