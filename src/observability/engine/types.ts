@@ -139,7 +139,7 @@ export interface TaskCompletion {
   by: string
 }
 export interface TaskInFlight {
-  task_id: string
+  task_id: string | null
   task_title: string
   story_id?: string
   by: string
