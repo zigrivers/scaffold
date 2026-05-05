@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ensureIdentity, readIdentity } from './identity.js'
+import { ensureIdentity, readIdentity, identityPath } from './identity.js'
 
 describe('identity', () => {
   let dir: string
@@ -14,8 +14,8 @@ describe('identity', () => {
     const id = ensureIdentity(dir, 'agent-alice')
     expect(id.worktree_label).toBe('agent-alice')
     expect(id.worktree_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
-    expect(existsSync(join(dir, '.scaffold/identity.json'))).toBe(true)
-    const written = JSON.parse(readFileSync(join(dir, '.scaffold/identity.json'), 'utf8'))
+    expect(existsSync(identityPath(dir))).toBe(true)
+    const written = JSON.parse(readFileSync(identityPath(dir), 'utf8'))
     expect(written.worktree_id).toBe(id.worktree_id)
     expect(written.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T/)
   })
