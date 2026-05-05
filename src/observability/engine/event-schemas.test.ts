@@ -116,6 +116,22 @@ describe('event-schemas', () => {
     expect(r.ok).toBe(true)
   })
 
+  it('rejects pr_opened with non-positive-integer pr_number', () => {
+    for (const bad of [0, -1, 1.5, NaN, Infinity]) {
+      const r = validateEvent({ ...base, type: 'pr_opened', payload: { pr_number: bad } })
+      expect(r.ok, `should reject pr_number=${bad}`).toBe(false)
+    }
+  })
+
+  it('rejects task_completed pr_submitted with invalid pr_number', () => {
+    for (const bad of [0, -1, 1.5, NaN]) {
+      const r = validateEvent({
+        ...base, type: 'task_completed', payload: { outcome: 'pr_submitted', pr_number: bad },
+      })
+      expect(r.ok, `should reject pr_number=${bad}`).toBe(false)
+    }
+  })
+
   it('accepts a valid progress_heartbeat event', () => {
     const r = validateEvent({
       ...base, type: 'progress_heartbeat', payload: { note: 'still going' },

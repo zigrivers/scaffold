@@ -24,7 +24,7 @@ function isValidIso(ts: string): boolean {
   const m = ISO_PARTS_RE.exec(ts)
   if (!m) return false
   const [yr, mo, dy, hr, mn, sc] = [+m[1], +m[2], +m[3], +m[4], +m[5], +m[6]]
-  if (mo < 1 || mo > 12 || dy < 1 || hr > 23 || mn > 59 || sc > 59) return false
+  if (mo < 1 || mo > 12 || dy < 1 || dy > 31 || hr > 23 || mn > 59 || sc > 59) return false
   const d = new Date(ts)
   if (isNaN(d.getTime())) return false
   // Round-trip: shift UTC back to local time to detect calendar overflow (e.g. Feb 30)
@@ -115,8 +115,9 @@ export function validateEvent(input: unknown): ValidationResult {
     if (!VALID_OUTCOMES.includes(filteredPayload.outcome as never)) {
       errors.push('task_completed.payload.outcome must be pr_submitted | dropped | superseded')
     }
-    if (filteredPayload.outcome === 'pr_submitted' && typeof filteredPayload.pr_number !== 'number') {
-      errors.push('task_completed.payload.pr_number required when outcome=pr_submitted')
+    if (filteredPayload.outcome === 'pr_submitted' &&
+        !(Number.isSafeInteger(filteredPayload.pr_number) && (filteredPayload.pr_number as number) > 0)) {
+      errors.push('task_completed.payload.pr_number must be a positive integer when outcome=pr_submitted')
     }
     optStr('task_completed.payload.commit_sha', filteredPayload.commit_sha, errors)
     break
@@ -139,7 +140,9 @@ export function validateEvent(input: unknown): ValidationResult {
     }
     break
   case 'pr_opened':
-    if (typeof filteredPayload.pr_number !== 'number') errors.push('pr_opened.payload.pr_number required')
+    if (!(Number.isSafeInteger(filteredPayload.pr_number) && (filteredPayload.pr_number as number) > 0)) {
+      errors.push('pr_opened.payload.pr_number must be a positive integer')
+    }
     break
   case 'progress_heartbeat':
     if (typeof filteredPayload.note !== 'string') errors.push('progress_heartbeat.payload.note required')
