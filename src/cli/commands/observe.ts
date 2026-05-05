@@ -54,7 +54,7 @@ export async function handleEvent(input: HandleEventInput): Promise<number> {
     })
     return 0
   } catch (err: unknown) {
-    const msg = (err as Error).message
+    const msg = err instanceof Error ? err.message : String(err)
     process.stderr.write(`scaffold observe event: ${msg}\n`)
     if (/validation failed|too large/i.test(msg)) return 2
     return 3
@@ -90,7 +90,7 @@ export async function handleProgress(input: HandleProgressInput): Promise<number
     process.stdout.write((input.maskPaths ? redactRendered(rendered) : rendered) + '\n')
     return 0
   } catch (err: unknown) {
-    process.stderr.write(`scaffold observe progress: ${(err as Error).message}\n`)
+    process.stderr.write(`scaffold observe progress: ${err instanceof Error ? err.message : String(err)}\n`)
     return 3
   }
 }
@@ -112,7 +112,7 @@ export async function handleHarvest(input: HandleHarvestInput): Promise<number> 
     await harvestWorktree(input)
     return 0
   } catch (err: unknown) {
-    process.stderr.write(`scaffold observe harvest: ${(err as Error).message}\n`)
+    process.stderr.write(`scaffold observe harvest: ${err instanceof Error ? err.message : String(err)}\n`)
     return 3
   }
 }

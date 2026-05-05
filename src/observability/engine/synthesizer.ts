@@ -64,7 +64,9 @@ export async function readMergedLedger(primaryRoot: string): Promise<MergedLedge
     for (const line of txt.split('\n')) {
       if (!line.trim()) continue
       try {
-        const ev = JSON.parse(line) as Event
+        const raw = JSON.parse(line) as Record<string, unknown>
+        if (typeof raw.event_id !== 'string' || typeof raw.ts !== 'string') { malformed++; continue }
+        const ev = raw as unknown as Event
         if (seen.has(ev.event_id)) continue
         seen.add(ev.event_id)
         events.push(ev)

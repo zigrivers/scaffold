@@ -42,6 +42,7 @@ tests/screenshots/dashboard-test.html
 .scaffold/lock.json
 .scaffold/*.tmp
 .scaffold/**/*.tmp
+.scaffold/identity.json
 .scaffold/activity.jsonl
 .scaffold/activity-archive/
 # <<< scaffold managed
