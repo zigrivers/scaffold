@@ -16,10 +16,29 @@ export type ValidationResult =
   | { ok: false; errors: string[] }
 
 const REQUIRED_BASE = ['event_id', 'worktree_id', 'actor_label', 'branch', 'type', 'ts'] as const
+const ISO_8601_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/
 
 const VALID_OUTCOMES = ['pr_submitted', 'dropped', 'superseded'] as const
 const VALID_BLOCKER_KINDS = ['dependency', 'ambiguity', 'external', 'environment'] as const
 const VALID_ACK_STATUSES = ['acknowledged', 'open'] as const
+
+function isStringArray(v: unknown): v is string[] {
+  return Array.isArray(v) && v.every(x => typeof x === 'string')
+}
+
+function optStr(label: string, v: unknown, errors: string[]): void {
+  if (v !== undefined && typeof v !== 'string') errors.push(`${label} must be a string when present`)
+}
+
+function optBool(label: string, v: unknown, errors: string[]): void {
+  if (v !== undefined && typeof v !== 'boolean') errors.push(`${label} must be a boolean when present`)
+}
+
+function optStrArr(label: string, v: unknown, errors: string[]): void {
+  if (v !== undefined && !isStringArray(v)) {
+    errors.push(`${label} must be a string[] when present`)
+  }
+}
 
 export function validateEvent(input: unknown): ValidationResult {
   const errors: string[] = []
@@ -30,6 +49,9 @@ export function validateEvent(input: unknown): ValidationResult {
 
   for (const k of REQUIRED_BASE) {
     if (typeof e[k] !== 'string') errors.push(`${k} must be a string`)
+  }
+  if (typeof e.ts === 'string' && !ISO_8601_RE.test(e.ts)) {
+    errors.push('ts must be an ISO 8601 timestamp')
   }
   if (e.task_id !== null && typeof e.task_id !== 'string') {
     errors.push('task_id must be string or null')
@@ -58,6 +80,9 @@ export function validateEvent(input: unknown): ValidationResult {
     if (typeof filteredPayload.task_title !== 'string') {
       errors.push('task_claimed.payload.task_title required')
     }
+    optStr('task_claimed.payload.story_id', filteredPayload.story_id, errors)
+    optStr('task_claimed.payload.wave', filteredPayload.wave, errors)
+    optBool('task_claimed.payload.unplanned', filteredPayload.unplanned, errors)
     if (e.task_id === null && filteredPayload.unplanned !== true) {
       errors.push('task_claimed with task_id=null requires payload.unplanned=true')
     }
@@ -69,11 +94,13 @@ export function validateEvent(input: unknown): ValidationResult {
     if (filteredPayload.outcome === 'pr_submitted' && typeof filteredPayload.pr_number !== 'number') {
       errors.push('task_completed.payload.pr_number required when outcome=pr_submitted')
     }
+    optStr('task_completed.payload.commit_sha', filteredPayload.commit_sha, errors)
     break
   case 'decision_recorded':
     if (typeof filteredPayload.key !== 'string') errors.push('decision_recorded.payload.key required')
     if (typeof filteredPayload.summary !== 'string') errors.push('decision_recorded.payload.summary required')
-    if (!Array.isArray(filteredPayload.affects)) errors.push('decision_recorded.payload.affects required')
+    if (!isStringArray(filteredPayload.affects)) errors.push('decision_recorded.payload.affects must be string[]')
+    optStrArr('decision_recorded.payload.links', filteredPayload.links, errors)
     break
   case 'blocker_hit':
     if (!VALID_BLOCKER_KINDS.includes(filteredPayload.kind as never)) {
@@ -83,7 +110,9 @@ export function validateEvent(input: unknown): ValidationResult {
     break
   case 'blocker_resolved':
     if (typeof filteredPayload.summary !== 'string') errors.push('blocker_resolved.payload.summary required')
-    if (!Array.isArray(filteredPayload.references)) errors.push('blocker_resolved.payload.references required')
+    if (!isStringArray(filteredPayload.references)) {
+      errors.push('blocker_resolved.payload.references must be string[]')
+    }
     break
   case 'pr_opened':
     if (typeof filteredPayload.pr_number !== 'number') errors.push('pr_opened.payload.pr_number required')
@@ -99,10 +128,23 @@ export function validateEvent(input: unknown): ValidationResult {
     if (!VALID_ACK_STATUSES.includes(filteredPayload.status as never)) {
       errors.push('finding_acknowledged.payload.status must be acknowledged | open')
     }
+    optStr('finding_acknowledged.payload.note', filteredPayload.note, errors)
     break
   }
 
   if (errors.length > 0) return { ok: false, errors }
-  const event = { ...e, payload: filteredPayload } as unknown as Event
+
+  // Construct event explicitly from validated fields only
+  const event: Event = {
+    event_id:    e.event_id as string,
+    worktree_id: e.worktree_id as string,
+    actor_label: e.actor_label as string,
+    branch:      e.branch as string,
+    task_id:     e.task_id as string | null,
+    type,
+    ts:          e.ts as string,
+    payload:     filteredPayload,
+  } as unknown as Event
+
   return { ok: true, event, dropped_fields: droppedFields }
 }

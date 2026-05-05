@@ -64,4 +64,78 @@ describe('event-schemas', () => {
   it('exposes the per-type payload key allowlist for ledger-writer use', () => {
     expect(EVENT_PAYLOAD_KEYS.task_claimed).toEqual(['task_title', 'story_id', 'wave', 'unplanned'])
   })
+
+  it('accepts a valid task_completed event', () => {
+    const r = validateEvent({
+      ...base, type: 'task_completed', payload: { outcome: 'dropped' },
+    })
+    expect(r.ok).toBe(true)
+  })
+
+  it('accepts a valid decision_recorded event', () => {
+    const r = validateEvent({
+      ...base, type: 'decision_recorded',
+      payload: { key: 'use-postgres', summary: 'chose postgres', affects: ['src/db/**'] },
+    })
+    expect(r.ok).toBe(true)
+  })
+
+  it('rejects decision_recorded with non-string-array affects', () => {
+    const r = validateEvent({
+      ...base, type: 'decision_recorded',
+      payload: { key: 'k', summary: 's', affects: 'not-an-array' } as never,
+    })
+    expect(r.ok).toBe(false)
+  })
+
+  it('accepts a valid blocker_hit event', () => {
+    const r = validateEvent({
+      ...base, type: 'blocker_hit', payload: { kind: 'dependency', summary: 'waiting on API' },
+    })
+    expect(r.ok).toBe(true)
+  })
+
+  it('rejects blocker_hit with invalid kind', () => {
+    const r = validateEvent({
+      ...base, type: 'blocker_hit', payload: { kind: 'unknown', summary: 's' } as never,
+    })
+    expect(r.ok).toBe(false)
+  })
+
+  it('accepts a valid blocker_resolved event', () => {
+    const r = validateEvent({
+      ...base, type: 'blocker_resolved', payload: { summary: 'resolved', references: ['ev-1'] },
+    })
+    expect(r.ok).toBe(true)
+  })
+
+  it('accepts a valid pr_opened event', () => {
+    const r = validateEvent({
+      ...base, type: 'pr_opened', payload: { pr_number: 42 },
+    })
+    expect(r.ok).toBe(true)
+  })
+
+  it('accepts a valid progress_heartbeat event', () => {
+    const r = validateEvent({
+      ...base, type: 'progress_heartbeat', payload: { note: 'still going' },
+    })
+    expect(r.ok).toBe(true)
+  })
+
+  it('rejects malformed ts', () => {
+    const r = validateEvent({
+      ...base, ts: 'not-a-date', type: 'task_claimed', payload: { task_title: 'x' },
+    })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.errors[0]).toMatch(/ISO/)
+  })
+
+  it('does not include extra top-level fields in the returned event', () => {
+    const r = validateEvent({
+      ...base, type: 'task_claimed', payload: { task_title: 'x' }, extra: 'should-not-appear',
+    })
+    expect(r.ok).toBe(true)
+    if (r.ok) expect((r.event as unknown as Record<string, unknown>).extra).toBeUndefined()
+  })
 })
