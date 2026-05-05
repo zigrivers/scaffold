@@ -4,12 +4,12 @@ const KV_PART = String.raw`(?<kvp>\b(?:[A-Za-z0-9_-]*(?:secret|token|password|ap
   + String.raw`(?<kvv>(?:"[^"]*"|\S+(?<![,.!;])))`
 
 // Single-pass combined regex — one replace call instead of four.
-// Threshold for high-entropy is 64 chars (SHA-256) to avoid redacting Git SHA-1 hashes (40 chars).
+// Raw high-entropy hex is intentionally omitted: it false-positives on file hashes and misses non-hex
+// secrets (e.g. AWS SAKs). The kv-secret pattern catches structured secrets by key name.
 const COMBINED_RE = new RegExp(
   [
     String.raw`(?<awskey>\bAKIA[0-9A-Z]{16}\b)`,
     String.raw`(?<github>\bgh[pousr]_[A-Za-z0-9]{36,}\b)`,
-    String.raw`(?<entropy>\b[A-Fa-f0-9]{64,}\b)`,
     KV_PART,
   ].join('|'),
   'gi',
@@ -23,7 +23,6 @@ export function scrubSecrets(input: string): string {
     if (groups.kvp !== undefined) return `${groups.kvp}[REDACTED:kv-secret]`
     if (groups.awskey !== undefined) return '[REDACTED:aws-key]'
     if (groups.github !== undefined) return '[REDACTED:github-token]'
-    if (groups.entropy !== undefined) return '[REDACTED:high-entropy]'
     return match
   })
 }
@@ -51,7 +50,7 @@ function recursivelyTransform(v: unknown, transform: (s: string) => string, sens
   if (isPlainObject(v)) {
     const out: Record<string, unknown> = {}
     for (const [k, val] of Object.entries(v)) {
-      out[k] = recursivelyTransform(val, transform, SENSITIVE_KEY_RE.test(k))
+      out[k] = recursivelyTransform(val, transform, sensitiveKey || SENSITIVE_KEY_RE.test(k))
     }
     return out
   }

@@ -56,11 +56,9 @@ describe('scrubSecrets', () => {
     expect(scrubSecrets(`commit ${sha1}`)).toContain(sha1)
   })
 
-  it('redacts 64-char hex strings (SHA-256 length secrets)', () => {
-    const sha256 = '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08'
-    const out = scrubSecrets(`raw hash ${sha256}`)
-    expect(out).not.toContain(sha256)
-    expect(out).toContain('[REDACTED:high-entropy]')
+  it('does not redact bare hex strings without key=value context', () => {
+    const sha256 = 'a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4'
+    expect(scrubSecrets(`file-sha256 ${sha256}`)).toContain(sha256)
   })
 })
 
@@ -113,6 +111,13 @@ describe('redactEvent (write-time)', () => {
     const result = redactEvent({ password: 'abc123', msg: 'hello' } as never) as Record<string, string>
     expect(result.password).toBe('[REDACTED:kv-secret]')
     expect(result.msg).toBe('hello')
+  })
+
+  it('redacts leaf values nested under a sensitive key even when child key is not sensitive', () => {
+    const result = redactEvent({ password: { value: 'hunter2', extra: 'note' } } as never)
+    const inner = (result as { password: Record<string, string> }).password
+    expect(inner.value).toBe('[REDACTED:kv-secret]')
+    expect(inner.extra).toBe('[REDACTED:kv-secret]')
   })
 
   it('preserves non-plain-object values (e.g. Date instances) unchanged', () => {
