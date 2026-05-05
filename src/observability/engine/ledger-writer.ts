@@ -1,6 +1,7 @@
-import { appendFileSync, mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { appendFile, mkdir, writeFile } from 'node:fs/promises'
+import { join, basename } from 'node:path'
 import { ulid } from 'ulid'
+import { lock } from 'proper-lockfile'
 import type { EventType } from './types.js'
 import { validateEvent } from './event-schemas.js'
 import { redactEvent } from './redact.js'
@@ -44,11 +45,21 @@ export async function writeEvent(worktreeRoot: string, input: WriteEventInput): 
     throw new Error(`event too large (>${MAX_EVENT_BYTES} bytes / 4 KiB): split or summarize the payload`)
   }
 
-  mkdirSync(join(worktreeRoot, '.scaffold'), { recursive: true })
-  appendFileSync(ledgerPath(worktreeRoot), line, { mode: 0o644 })
+  const path = ledgerPath(worktreeRoot)
+  await mkdir(join(worktreeRoot, '.scaffold'), { recursive: true })
+  await writeFile(path, '', { flag: 'a', mode: 0o644 })
+
+  const release = await lock(path, {
+    retries: { retries: 10, factor: 1.5, minTimeout: 50, maxTimeout: 500 },
+    stale: 30_000,
+  })
+  try {
+    await appendFile(path, line, { mode: 0o644 })
+  } finally {
+    await release()
+  }
 }
 
 function deriveLabel(worktreeRoot: string): string {
-  const segments = worktreeRoot.split('/').filter(Boolean)
-  return segments[segments.length - 1] ?? 'primary'
+  return basename(worktreeRoot) || 'primary'
 }

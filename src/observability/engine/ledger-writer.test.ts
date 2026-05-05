@@ -49,3 +49,35 @@ describe('ledger-writer (basic append)', () => {
     })).rejects.toThrow(/unplanned/)
   })
 })
+
+describe('ledger-writer (concurrency)', () => {
+  let dir: string
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'observe-lw-conc-'))
+    ensureIdentity(dir, 'agent-concurrent')
+  })
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }) })
+
+  it('serializes 10 concurrent writes without data loss or corruption', async () => {
+    const N = 10
+    const writes = Array.from({ length: N }, (_, i) =>
+      writeEvent(dir, {
+        type: 'task_claimed',
+        branch: `branch-${i}`,
+        task_id: `T-${String(i).padStart(3, '0')}`,
+        payload: { task_title: `Task ${i}` },
+      }),
+    )
+    await Promise.all(writes)
+
+    const text = readFileSync(join(dir, '.scaffold/activity.jsonl'), 'utf8')
+    const lines = text.trim().split('\n')
+    expect(lines).toHaveLength(N)
+    for (const line of lines) {
+      expect(() => JSON.parse(line)).not.toThrow()
+    }
+    const taskIds = new Set(lines.map(l => (JSON.parse(l) as { task_id: string }).task_id))
+    expect(taskIds.size).toBe(N)
+  })
+})
