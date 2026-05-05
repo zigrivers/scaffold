@@ -16,7 +16,14 @@ export type ValidationResult =
   | { ok: false; errors: string[] }
 
 const REQUIRED_BASE = ['event_id', 'worktree_id', 'actor_label', 'branch', 'type', 'ts'] as const
-const ISO_8601_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/
+// Anchored: requires timezone (Z or ±HH:MM); rejects trailing junk and invalid calendar values
+const ISO_8601_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/
+
+function isValidIso(ts: string): boolean {
+  if (!ISO_8601_RE.test(ts)) return false
+  const d = new Date(ts)
+  return !isNaN(d.getTime())
+}
 
 const VALID_OUTCOMES = ['pr_submitted', 'dropped', 'superseded'] as const
 const VALID_BLOCKER_KINDS = ['dependency', 'ambiguity', 'external', 'environment'] as const
@@ -50,11 +57,15 @@ export function validateEvent(input: unknown): ValidationResult {
   for (const k of REQUIRED_BASE) {
     if (typeof e[k] !== 'string') errors.push(`${k} must be a string`)
   }
-  if (typeof e.ts === 'string' && !ISO_8601_RE.test(e.ts)) {
-    errors.push('ts must be an ISO 8601 timestamp')
+  if (typeof e.ts === 'string' && !isValidIso(e.ts)) {
+    errors.push('ts must be a valid ISO 8601 UTC/offset timestamp')
   }
+  // task_id is a required field that may be null (not optional/absent)
   if (e.task_id !== null && typeof e.task_id !== 'string') {
-    errors.push('task_id must be string or null')
+    errors.push('task_id must be a string or null')
+  }
+  if (!('task_id' in e)) {
+    errors.push('task_id is required (string or null)')
   }
   if (typeof e.payload !== 'object' || e.payload === null) {
     errors.push('payload must be an object')
@@ -134,7 +145,8 @@ export function validateEvent(input: unknown): ValidationResult {
 
   if (errors.length > 0) return { ok: false, errors }
 
-  // Construct event explicitly from validated fields only
+  // Double-cast is deliberate: the Event union is too narrow for generic construction;
+  // runtime validation above ensures shape correctness before this cast.
   const event: Event = {
     event_id:    e.event_id as string,
     worktree_id: e.worktree_id as string,

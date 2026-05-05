@@ -131,6 +131,27 @@ describe('event-schemas', () => {
     if (!r.ok) expect(r.errors[0]).toMatch(/ISO/)
   })
 
+  it('rejects ts without timezone', () => {
+    const r = validateEvent({
+      ...base, ts: '2026-04-30T12:00:00', type: 'task_claimed', payload: { task_title: 'x' },
+    })
+    expect(r.ok).toBe(false)
+  })
+
+  it('rejects ts with invalid calendar values', () => {
+    const r = validateEvent({
+      ...base, ts: '2026-99-99T12:00:00Z', type: 'task_claimed', payload: { task_title: 'x' },
+    })
+    expect(r.ok).toBe(false)
+  })
+
+  it('rejects ts with trailing junk', () => {
+    const r = validateEvent({
+      ...base, ts: '2026-04-30T12:00:00Zjunk', type: 'task_claimed', payload: { task_title: 'x' },
+    })
+    expect(r.ok).toBe(false)
+  })
+
   it('does not include extra top-level fields in the returned event', () => {
     const r = validateEvent({
       ...base, type: 'task_claimed', payload: { task_title: 'x' }, extra: 'should-not-appear',
