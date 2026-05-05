@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { harvestWorktree } from './harvester.js'
+import { harvestWorktree, activeArchiveFile } from './harvester.js'
 import { writeEvent } from './ledger-writer.js'
 import { ensureIdentity, readIdentity } from './identity.js'
 
@@ -26,7 +26,7 @@ describe('harvester', () => {
 
     await harvestWorktree({ primaryRoot: primary, worktreeRoot: worktree })
 
-    const archived = join(primary, '.scaffold/activity-archive/active', `${id.worktree_id}.jsonl`)
+    const archived = activeArchiveFile(primary, id.worktree_id)
     expect(existsSync(archived)).toBe(true)
     const lines = readFileSync(archived, 'utf8').trim().split('\n')
     expect(lines).toHaveLength(1)
@@ -43,7 +43,7 @@ describe('harvester', () => {
     await harvestWorktree({ primaryRoot: primary, worktreeRoot: worktree })
 
     const id = readIdentity(worktree)!
-    const archived = join(primary, '.scaffold/activity-archive/active', `${id.worktree_id}.jsonl`)
+    const archived = activeArchiveFile(primary, id.worktree_id)
     const lines = readFileSync(archived, 'utf8').trim().split('\n')
     expect(lines).toHaveLength(2)
     expect(JSON.parse(lines[1]).type).toBe('task_completed')
@@ -55,7 +55,7 @@ describe('harvester', () => {
     try {
       await harvestWorktree({ primaryRoot: primary, worktreeRoot: empty })
       const id = readIdentity(empty)!
-      const archived = join(primary, '.scaffold/activity-archive/active', `${id.worktree_id}.jsonl`)
+      const archived = activeArchiveFile(primary, id.worktree_id)
       expect(existsSync(archived)).toBe(false)
     } finally {
       rmSync(empty, { recursive: true, force: true })

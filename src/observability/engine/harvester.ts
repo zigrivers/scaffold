@@ -1,5 +1,6 @@
 import { access, copyFile, mkdir, rename, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { lock } from 'proper-lockfile'
 import { readIdentityAsync } from './identity.js'
 import { ledgerPath } from './ledger-writer.js'
@@ -40,23 +41,21 @@ export async function harvestWorktree(input: HarvestInput): Promise<void> {
   const dest = activeArchiveFile(input.primaryRoot, id.worktree_id)
   await mkdir(join(archiveDir(input.primaryRoot), 'active'), { recursive: true })
 
-  // Hold the same lock as writeEvent for a consistent (non-torn) snapshot.
+  // Hold the same lock as writeEvent for a consistent snapshot.
+  // rename is inside the lock scope so a slower concurrent harvester cannot
+  // overwrite a newer archive produced by a faster one.
   const release = await lock(sourceLedger, {
     retries: { retries: 10, factor: 1.5, minTimeout: 50, maxTimeout: 500 },
     stale: 30_000,
   })
-  const tmp = `${dest}.tmp.${process.pid}.${Date.now()}`
+  const tmp = `${dest}.tmp.${randomUUID()}`
   try {
     await copyFile(sourceLedger, tmp)
-  } finally {
-    await release()
-  }
-
-  // Rename outside the lock — only the source needs protection during the copy.
-  try {
     await rename(tmp, dest)
   } catch (err) {
-    try { await unlink(tmp) } catch { /* ignore */ }
+    try { await unlink(tmp) } catch { /* tmp may not exist if copyFile never created it */ }
     throw err
+  } finally {
+    await release()
   }
 }
