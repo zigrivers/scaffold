@@ -36,8 +36,14 @@ describe('scrubSecrets', () => {
     expect(out).toContain('[REDACTED:kv-secret]')
   })
 
-  it('redacts quoted values that contain spaces', () => {
+  it('redacts double-quoted values that contain spaces', () => {
     const out = scrubSecrets('api_key="value with spaces"')
+    expect(out).not.toContain('value with spaces')
+    expect(out).toContain('[REDACTED:kv-secret]')
+  })
+
+  it('redacts single-quoted values that contain spaces', () => {
+    const out = scrubSecrets('api_key=\'value with spaces\'')
     expect(out).not.toContain('value with spaces')
     expect(out).toContain('[REDACTED:kv-secret]')
   })
@@ -89,6 +95,10 @@ describe('sanitizePath', () => {
   it('rewrites Windows backslash paths with spaces in username to ~', () => {
     expect(sanitizePath('C:\\Users\\John Doe\\repo\\file.ts'))
       .toBe('~\\repo\\file.ts')
+  })
+  it('does not rewrite home-like paths that are not root-level home dirs', () => {
+    expect(sanitizePath('/mnt/home/alice/file.ts')).toBe('/mnt/home/alice/file.ts')
+    expect(sanitizePath('/var/Users/shared/file.ts')).toBe('/var/Users/shared/file.ts')
   })
 })
 
