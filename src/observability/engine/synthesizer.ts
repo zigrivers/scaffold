@@ -194,7 +194,7 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
     } else if (e.type === 'pr_opened') {
       const po = e as Event & { type: 'pr_opened' }
       openPrByActor.set(e.actor_label, { number: po.payload.pr_number, opened_at: e.ts })
-    } else if (e.type === 'decision_recorded') {
+    } else if (e.type === 'decision_recorded' && ts >= cutoff) {
       const dr = e as Event & { type: 'decision_recorded' }
       decisions.push({
         decision_id: `decision:${dr.payload.key}`,

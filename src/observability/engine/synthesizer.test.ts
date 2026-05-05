@@ -135,4 +135,18 @@ describe('synthesizer.composeSnapshot', () => {
     expect(snap.active_agents[0].open_pr).not.toBeNull()
     expect(snap.active_agents[0].open_pr?.number).toBe(42)
   })
+
+  it('excludes decision_recorded events older than sinceHours from recent_decisions', () => {
+    const oldTs = new Date(Date.now() - 49 * 3600 * 1000).toISOString()
+    const newTs = new Date().toISOString()
+    const base = { event_id: 'x', worktree_id: 'w', actor_label: 'a', branch: 'b', task_id: null }
+    const events = [
+      { ...base, event_id: 'old-dec', type: 'decision_recorded' as const, ts: oldTs,
+        payload: { key: 'old-key', summary: 'old', affects: [] } },
+      { ...base, event_id: 'new-dec', type: 'decision_recorded' as const, ts: newTs,
+        payload: { key: 'new-key', summary: 'new', affects: [] } },
+    ]
+    const snap = composeSnapshot({ events, sinceHours: 24, currentPhase: 'build' })
+    expect(snap.recent_decisions.map((d) => d.key)).toEqual(['new-key'])
+  })
 })
