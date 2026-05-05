@@ -46,6 +46,11 @@ describe('scrubSecrets', () => {
     expect(scrubSecrets('my_password=password')).toBe('my_password=[REDACTED:kv-secret]')
   })
 
+  it('preserves trailing punctuation outside the secret value', () => {
+    expect(scrubSecrets('Set password=hunter2.')).toBe('Set password=[REDACTED:kv-secret].')
+    expect(scrubSecrets('Keys: token=abc123, other=xyz')).toBe('Keys: token=[REDACTED:kv-secret], other=xyz')
+  })
+
   it('does not redact 40-char hex strings (Git SHA-1 length)', () => {
     const sha1 = 'da39a3ee5e6b4b0d3255bfef95601890afd80709'
     expect(scrubSecrets(`commit ${sha1}`)).toContain(sha1)
@@ -102,6 +107,12 @@ describe('redactEvent (write-time)', () => {
     expect(out.payload.summary).toContain('[REDACTED:')
     expect(out.payload.affects[0]).toBe('~/Documents/repo/src/file.ts')
     expect(out.branch).toContain('[REDACTED:')
+  })
+
+  it('redacts string values whose object key matches a sensitive pattern', () => {
+    const result = redactEvent({ password: 'abc123', msg: 'hello' } as never) as Record<string, string>
+    expect(result.password).toBe('[REDACTED:kv-secret]')
+    expect(result.msg).toBe('hello')
   })
 
   it('preserves non-plain-object values (e.g. Date instances) unchanged', () => {

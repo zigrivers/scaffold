@@ -1,6 +1,7 @@
 // kv-secret prefix group (key + separator); value group is adjacent in the combined regex.
+// Unquoted value: \S+(?<![,.!;]) strips trailing sentence/list punctuation (keeps dots inside values).
 const KV_PART = String.raw`(?<kvp>\b(?:[A-Za-z0-9_-]*(?:secret|token|password|api[_-]?key)[A-Za-z0-9_-]*)\s*[=:]\s*)`
-  + String.raw`(?<kvv>(?:"[^"]*"|\S+))`
+  + String.raw`(?<kvv>(?:"[^"]*"|\S+(?<![,.!;])))`
 
 // Single-pass combined regex — one replace call instead of four.
 // Threshold for high-entropy is 64 chars (SHA-256) to avoid redacting Git SHA-1 hashes (40 chars).
@@ -15,7 +16,6 @@ const COMBINED_RE = new RegExp(
 )
 
 export function scrubSecrets(input: string): string {
-  COMBINED_RE.lastIndex = 0
   return input.replace(COMBINED_RE, (match, ...args) => {
     // Named groups object is always the last argument for a regex with named groups.
     const groups = args[args.length - 1] as Record<string, string | undefined>
@@ -36,19 +36,22 @@ export function sanitizePath(s: string): string {
   return out
 }
 
+// Matches keys whose names indicate a sensitive value (e.g. { password: 'abc' }).
+const SENSITIVE_KEY_RE = /(?:secret|token|password|api[_-]?key)/i
+
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   if (v === null || typeof v !== 'object') return false
   const proto = Object.getPrototypeOf(v) as unknown
   return proto === Object.prototype || proto === null
 }
 
-function recursivelyTransform(v: unknown, transform: (s: string) => string): unknown {
-  if (typeof v === 'string') return transform(v)
-  if (Array.isArray(v)) return v.map((x) => recursivelyTransform(x, transform))
+function recursivelyTransform(v: unknown, transform: (s: string) => string, sensitiveKey = false): unknown {
+  if (typeof v === 'string') return sensitiveKey ? '[REDACTED:kv-secret]' : transform(v)
+  if (Array.isArray(v)) return v.map((x) => recursivelyTransform(x, transform, sensitiveKey))
   if (isPlainObject(v)) {
     const out: Record<string, unknown> = {}
     for (const [k, val] of Object.entries(v)) {
-      out[k] = recursivelyTransform(val, transform)
+      out[k] = recursivelyTransform(val, transform, SENSITIVE_KEY_RE.test(k))
     }
     return out
   }
