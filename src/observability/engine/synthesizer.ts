@@ -6,6 +6,7 @@ import type {
   AvailabilityMap, Event, Snapshot,
   ActiveAgent, TaskInFlight, TaskCompletion, BlockedTask, DecisionSummary,
 } from './types.js'
+import { validateEvent } from './event-schemas.js'
 import { gitAdapter } from '../adapters/git.js'
 import { ghAdapter } from '../adapters/gh.js'
 import { pipelineDocsAdapter } from '../adapters/pipeline-docs.js'
@@ -66,9 +67,9 @@ export async function readMergedLedger(primaryRoot: string): Promise<MergedLedge
       for await (const line of rl) {
         if (!line.trim()) continue
         try {
-          const raw = JSON.parse(line) as Record<string, unknown>
-          if (typeof raw.event_id !== 'string' || typeof raw.ts !== 'string') { malformed++; continue }
-          const ev = raw as unknown as Event
+          const result = validateEvent(JSON.parse(line))
+          if (!result.ok) { malformed++; continue }
+          const ev = result.event
           if (seen.has(ev.event_id)) continue
           seen.add(ev.event_id)
           events.push(ev)
