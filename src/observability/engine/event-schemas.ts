@@ -46,8 +46,20 @@ function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every(x => typeof x === 'string')
 }
 
-function optStr(label: string, v: unknown, errors: string[]): void {
-  if (v !== undefined && typeof v !== 'string') errors.push(`${label} must be a string when present`)
+function optStr(label: string, v: unknown, errors: string[], maxLen?: number): void {
+  if (v !== undefined && typeof v !== 'string') {
+    errors.push(`${label} must be a string when present`)
+  } else if (v !== undefined && maxLen !== undefined && (v as string).length > maxLen) {
+    errors.push(`${label} must be ≤${maxLen} chars`)
+  }
+}
+
+function reqStr(label: string, v: unknown, errors: string[], maxLen?: number): void {
+  if (typeof v !== 'string') {
+    errors.push(`${label} required`)
+  } else if (maxLen !== undefined && v.length > maxLen) {
+    errors.push(`${label} must be ≤${maxLen} chars`)
+  }
 }
 
 function optBool(label: string, v: unknown, errors: string[]): void {
@@ -125,8 +137,8 @@ export function validateEvent(input: unknown): ValidationResult {
     optStr('task_completed.payload.commit_sha', filteredPayload.commit_sha, errors)
     break
   case 'decision_recorded':
-    if (typeof filteredPayload.key !== 'string') errors.push('decision_recorded.payload.key required')
-    if (typeof filteredPayload.summary !== 'string') errors.push('decision_recorded.payload.summary required')
+    reqStr('decision_recorded.payload.key', filteredPayload.key, errors)
+    reqStr('decision_recorded.payload.summary', filteredPayload.summary, errors, 500)
     if (!isStringArray(filteredPayload.affects)) errors.push('decision_recorded.payload.affects must be string[]')
     optStrArr('decision_recorded.payload.links', filteredPayload.links, errors)
     break
@@ -134,10 +146,10 @@ export function validateEvent(input: unknown): ValidationResult {
     if (!VALID_BLOCKER_KINDS.includes(filteredPayload.kind as never)) {
       errors.push('blocker_hit.payload.kind must be dependency | ambiguity | external | environment')
     }
-    if (typeof filteredPayload.summary !== 'string') errors.push('blocker_hit.payload.summary required')
+    reqStr('blocker_hit.payload.summary', filteredPayload.summary, errors, 500)
     break
   case 'blocker_resolved':
-    if (typeof filteredPayload.summary !== 'string') errors.push('blocker_resolved.payload.summary required')
+    reqStr('blocker_resolved.payload.summary', filteredPayload.summary, errors, 500)
     if (!isStringArray(filteredPayload.references)) {
       errors.push('blocker_resolved.payload.references must be string[]')
     }
@@ -148,7 +160,7 @@ export function validateEvent(input: unknown): ValidationResult {
     }
     break
   case 'progress_heartbeat':
-    if (typeof filteredPayload.note !== 'string') errors.push('progress_heartbeat.payload.note required')
+    reqStr('progress_heartbeat.payload.note', filteredPayload.note, errors, 200)
     break
   case 'finding_acknowledged':
     if (e.task_id !== null) errors.push('finding_acknowledged requires task_id=null')
@@ -158,7 +170,7 @@ export function validateEvent(input: unknown): ValidationResult {
     if (!VALID_ACK_STATUSES.includes(filteredPayload.status as never)) {
       errors.push('finding_acknowledged.payload.status must be acknowledged | open')
     }
-    optStr('finding_acknowledged.payload.note', filteredPayload.note, errors)
+    optStr('finding_acknowledged.payload.note', filteredPayload.note, errors, 200)
     break
   }
 

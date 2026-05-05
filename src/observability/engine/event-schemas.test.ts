@@ -144,6 +144,24 @@ describe('event-schemas', () => {
     expect(r.ok).toBe(false)
   })
 
+  it('rejects decision_recorded summary over 500 chars', () => {
+    const r = validateEvent({
+      ...base, type: 'decision_recorded',
+      payload: { key: 'k', summary: 'x'.repeat(501), affects: [] },
+    })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.errors[0]).toMatch(/500/)
+  })
+
+  it('rejects progress_heartbeat note over 200 chars', () => {
+    const r = validateEvent({
+      ...base, type: 'progress_heartbeat',
+      payload: { note: 'x'.repeat(201) },
+    })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.errors[0]).toMatch(/200/)
+  })
+
   it('accepts a valid progress_heartbeat event', () => {
     const r = validateEvent({
       ...base, type: 'progress_heartbeat', payload: { note: 'still going' },
