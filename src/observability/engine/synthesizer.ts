@@ -178,7 +178,11 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
 
   decisions.sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))
 
-  const actorsSeen = new Set(events.map((e) => e.actor_label))
+  const recentEvents = events.filter((e) => Date.parse(e.ts) >= cutoff)
+  const actorsSeen = new Set([
+    ...recentEvents.map((e) => e.actor_label),
+    ...[...inFlightByTask.values()].map((t) => t.by),
+  ])
   const activeAgents: ActiveAgent[] = [...actorsSeen].map((actor) => {
     const ev = [...events].reverse().find((e) => e.actor_label === actor)
     const inflight = [...inFlightByTask.values()].find((t) => t.by === actor) ?? null

@@ -139,6 +139,8 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
           if (skip.has(k)) continue
           if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
             kv[k] = String(v)
+          } else if (Array.isArray(v)) {
+            kv[k] = v.join(',')
           }
         }
         const code = await handleEvent({
