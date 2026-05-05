@@ -66,6 +66,12 @@ describe('scrubSecrets', () => {
     const sha256 = 'a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4'
     expect(scrubSecrets(`file-sha256 ${sha256}`)).toContain(sha256)
   })
+
+  it('does not swallow adjacent kv pairs when comma-delimited without spaces', () => {
+    const out = scrubSecrets('api_key=abc,user=alice')
+    expect(out).not.toContain('abc')
+    expect(out).toContain('user=alice')
+  })
 })
 
 describe('sanitizePath', () => {
@@ -135,6 +141,20 @@ describe('redactEvent (write-time)', () => {
     const result = redactEvent({ ts: d, label: 'test' } as never) as { ts: unknown }
     expect(result.ts).toBeInstanceOf(Date)
     expect(result.ts).toBe(d)
+  })
+
+  it('does not redact values under keys where sensitive word is embedded in a larger word', () => {
+    const result = redactEvent({ tokenization_method: 'bpe', token: 'secret-val' } as never)
+    const cast = result as Record<string, string>
+    expect(cast.tokenization_method).toBe('bpe')
+    expect(cast.token).toBe('[REDACTED:kv-secret]')
+  })
+
+  it('preserves Map instances unchanged (non-plain-object pass-through)', () => {
+    const m = new Map([['key', 'value']])
+    const res = redactEvent({ data: m } as never) as { data: unknown }
+    expect(res.data).toBeInstanceOf(Map)
+    expect(res.data).toBe(m)
   })
 })
 
