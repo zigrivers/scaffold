@@ -26,10 +26,18 @@ export interface BaseEvent {
   ts: string               // ISO 8601 UTC
 }
 
-export interface TaskClaimedPayload { task_title: string; story_id?: string; wave?: string; unplanned?: boolean }
-export interface TaskCompletedPayload { outcome: 'pr_submitted' | 'dropped' | 'superseded'; pr_number?: number; commit_sha?: string }
-export interface DecisionRecordedPayload { key: string; summary: string; affects: string[]; links?: string[] }
-export interface BlockerHitPayload { kind: 'dependency' | 'ambiguity' | 'external' | 'environment'; summary: string }
+export interface TaskClaimedPayload {
+  task_title: string; story_id?: string; wave?: string; unplanned?: boolean
+}
+export interface TaskCompletedPayload {
+  outcome: 'pr_submitted' | 'dropped' | 'superseded'; pr_number?: number; commit_sha?: string
+}
+export interface DecisionRecordedPayload {
+  key: string; summary: string; affects: string[]; links?: string[]
+}
+export interface BlockerHitPayload {
+  kind: 'dependency' | 'ambiguity' | 'external' | 'environment'; summary: string
+}
 export interface BlockerResolvedPayload { summary: string; references: string[] }
 export interface PrOpenedPayload { pr_number: number }
 export interface HeartbeatPayload { note: string }
@@ -64,7 +72,11 @@ export interface AvailabilityMap {
   beads: AdapterStatus
   mmr: AdapterStatus
   audit_history: AdapterStatus
-  ledger: { events_read: number; malformed_lines: number; sources: { worktree_id: string; events: number; harvested_at?: string }[] }
+  ledger: {
+    events_read: number
+    malformed_lines: number
+    sources: { worktree_id: string; events: number; harvested_at?: string }[]
+  }
 }
 
 // ─── Findings (used by audit; types now so Plan 2 doesn't change EngineOutput shape) ─
@@ -195,8 +207,12 @@ export interface ReplayTimeline {
 }
 
 // ─── Stall detection ────────────────────────────────────────────────────
+export type NeedsAttentionSignal =
+  | 'task_stale' | 'pr_stale' | 'pr_review_stale'
+  | 'blocker_unaddressed' | 'audit_findings_unresolved' | 'lens_skipped_repeatedly'
+
 export interface NeedsAttentionItem {
-  signal: 'task_stale' | 'pr_stale' | 'pr_review_stale' | 'blocker_unaddressed' | 'audit_findings_unresolved' | 'lens_skipped_repeatedly'
+  signal: NeedsAttentionSignal
   ref: { kind: 'task' | 'pr' | 'finding' | 'lens'; id: string }
   age_hours: number
   threshold_hours: number

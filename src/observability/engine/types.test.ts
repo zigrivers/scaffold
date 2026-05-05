@@ -2,16 +2,9 @@ import { describe, it, expectTypeOf } from 'vitest'
 import type {
   Verdict,
   EngineOutput,
-  Finding,
-  Snapshot,
-  ReplayEvent,
-  AvailabilityMap,
-  AdapterStatus,
   FindingsSummary,
-  Event,
   EventType,
-  ActiveAgent,
-} from './types'
+} from './types.js'
 
 describe('engine types', () => {
   it('Verdict enum has exactly three values', () => {
