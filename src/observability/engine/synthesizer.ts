@@ -85,12 +85,12 @@ export async function readMergedLedger(primaryRoot: string): Promise<MergedLedge
   try {
     await access(activeDir)
     const files = (await readdir(activeDir)).filter((f) => f.endsWith('.jsonl'))
-    await Promise.all(files.map(async (file) => {
+    for (const file of files) {
       const path = join(activeDir, file)
       const worktree_id = file.replace(/\.jsonl$/, '')
       const harvested_at = (await stat(path)).mtime.toISOString()
       await ingestFile(path, worktree_id, harvested_at)
-    }))
+    }
   } catch { /* no archive yet — local-only */ }
 
   events.sort((a, b) => {
@@ -139,6 +139,9 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
     } else if (e.type === 'task_completed') {
       if (e.task_id) {
         inFlightByTask.delete(e.task_id)
+        for (const [key, b] of blockedByEventId.entries()) {
+          if (b.task_id === e.task_id) blockedByEventId.delete(key)
+        }
       } else {
         const anonymousKey = [...inFlightByTask.entries()]
           .reverse()
@@ -172,10 +175,12 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
       if (br.payload.references.length > 0) {
         for (const ref of br.payload.references) blockedByEventId.delete(ref)
       } else {
-        const staleKey = [...blockedByEventId.entries()]
-          .reverse()
-          .find(([, b]) => e.task_id == null || b.task_id === e.task_id)?.[0]
-        if (staleKey) blockedByEventId.delete(staleKey)
+        if (e.task_id != null) {
+          const staleKey = [...blockedByEventId.entries()]
+            .reverse()
+            .find(([, b]) => b.task_id === e.task_id)?.[0]
+          if (staleKey) blockedByEventId.delete(staleKey)
+        }
       }
     } else if (e.type === 'decision_recorded') {
       const dr = e as Event & { type: 'decision_recorded' }
