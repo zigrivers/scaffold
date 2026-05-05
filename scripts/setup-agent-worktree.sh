@@ -55,11 +55,14 @@ if [ ! -f "$worktree_dir/.scaffold/identity.json" ]; then
     if command -v uuidgen >/dev/null 2>&1; then
         identity_uuid="$(uuidgen | tr 'A-Z' 'a-z')"
     else
-        # Fallback: RFC 4122 UUID v4 via python3 or /dev/urandom with version/variant bits set
+        # Fallback: RFC 4122 UUID v4 via python3, Linux kernel, or od as last resort
         if command -v python3 >/dev/null 2>&1; then
             identity_uuid="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+        elif [ -r /proc/sys/kernel/random/uuid ]; then
+            identity_uuid="$(cat /proc/sys/kernel/random/uuid)"
         else
-            raw="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+            # od: strip all non-hex chars for portability across platforms
+            raw="$(od -vAn -N16 -tx1 /dev/urandom | tr -dc '0-9a-f')"
             p1="${raw:0:8}" p2="${raw:8:4}" p3="4${raw:13:3}"
             hi="$(printf '%x' "$(( (16#${raw:16:1} & 3) | 8 ))")"
             identity_uuid="${p1}-${p2}-${p3}-${hi}${raw:17:3}-${raw:20:12}"

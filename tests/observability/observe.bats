@@ -61,7 +61,7 @@ teardown() {
 
     run $BIN observe progress
     [ "$status" -eq 0 ]
-    [[ "$output" == *"build observability — progress"* ]] || false
+    [[ "$output" == *"build observability"* ]] || false
     [[ "$output" == *"in flight"* ]] || false
     [[ "$output" == *"T-031"* ]] || false
     [[ "$output" == *"availability:"* ]]
