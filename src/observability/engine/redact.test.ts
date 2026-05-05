@@ -1,10 +1,11 @@
+import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { redactEvent, redactRendered, scrubSecrets, sanitizePath } from './redact.js'
 
 const corpus = readFileSync(
-  join(new URL('.', import.meta.url).pathname, '../../../tests/observability/fixtures/secret-corpus.txt'),
+  join(fileURLToPath(new URL('.', import.meta.url)), '../../../tests/observability/fixtures/secret-corpus.txt'),
   'utf8',
 )
 
@@ -25,6 +26,20 @@ describe('scrubSecrets', () => {
 
   it('returns the input unchanged when no secrets present', () => {
     expect(scrubSecrets('hello world\nno secrets here')).toBe('hello world\nno secrets here')
+  })
+
+  it('redacts compound env-style key names (SECRET_TOKEN, ACCESS_TOKEN, CLIENT_SECRET)', () => {
+    const out = scrubSecrets('SECRET_TOKEN=abc ACCESS_TOKEN: xyz CLIENT_SECRET=qrs')
+    expect(out).not.toContain('abc')
+    expect(out).not.toContain('xyz')
+    expect(out).not.toContain('qrs')
+    expect(out).toContain('[REDACTED:kv-secret]')
+  })
+
+  it('redacts quoted values that contain spaces', () => {
+    const out = scrubSecrets('api_key="value with spaces"')
+    expect(out).not.toContain('value with spaces')
+    expect(out).toContain('[REDACTED:kv-secret]')
   })
 })
 
@@ -47,6 +62,14 @@ describe('sanitizePath', () => {
   it('rewrites Windows forward-slash user paths to ~', () => {
     expect(sanitizePath('C:/Users/alice/repo/file.ts'))
       .toBe('~/repo/file.ts')
+  })
+  it('rewrites macOS user paths with spaces in username to ~', () => {
+    expect(sanitizePath('/Users/John Doe/Documents/repo/file.ts'))
+      .toBe('~/Documents/repo/file.ts')
+  })
+  it('rewrites Windows backslash paths with spaces in username to ~', () => {
+    expect(sanitizePath('C:\\Users\\John Doe\\repo\\file.ts'))
+      .toBe('~\\repo\\file.ts')
   })
 })
 

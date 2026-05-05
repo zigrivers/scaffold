@@ -1,9 +1,13 @@
+// Catches compound env-style names: SECRET_TOKEN, ACCESS_TOKEN, CLIENT_SECRET, etc.
+const KV_SECRET_RE =
+  /\b(?:[A-Za-z0-9_-]*(?:secret|token|password|api[_-]?key)[A-Za-z0-9_-]*)\s*[=:]\s*((?:"[^"]*"|\S+))/gi
+
 // Secret-detector regex pack. Order matters: longer patterns first.
 const SECRET_PATTERNS: Array<{ name: string; re: RegExp }> = [
   { name: 'aws-key',      re: /\bAKIA[0-9A-Z]{16}\b/g },
   { name: 'github-token', re: /\bgh[pousr]_[A-Za-z0-9]{36,}\b/g },
   { name: 'high-entropy', re: /\b[A-Fa-f0-9]{40,}\b/g },
-  { name: 'kv-secret',    re: /\b(?:secret|token|password|api[_-]?key)\s*[=:]\s*"?([^\s",]+)"?/gi },
+  { name: 'kv-secret',    re: KV_SECRET_RE },
 ]
 
 export function scrubSecrets(input: string): string {
@@ -24,9 +28,9 @@ export function scrubSecrets(input: string): string {
 
 export function sanitizePath(s: string): string {
   // Windows first: C:\Users\<name> or C:/Users/<name> (either slash style)
-  let out = s.replace(/[A-Za-z]:[/\\]Users[/\\][^/\\\s]+/g, '~')
+  let out = s.replace(/[A-Za-z]:[/\\]Users[/\\][^/\\]+/g, '~')
   // Unix: /Users/<name> or /home/<name>
-  out = out.replace(/\/(?:Users|home)\/[^/\s]+/g, '~')
+  out = out.replace(/\/(?:Users|home)\/[^/]+/g, '~')
   return out
 }
 
