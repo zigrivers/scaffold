@@ -45,8 +45,8 @@ teardown() {
 
     run $BIN observe progress --json --since-hours=24
     [ "$status" -eq 0 ]
-    [[ "$output" == *'"schema_version":"1.0"'* ]]
-    [[ "$output" == *'"task_id":"T-001"'* ]]
+    [[ "$output" == *'"schema_version": "1.0"'* ]] || false
+    [[ "$output" == *'"task_id": "T-001"'* ]] || false
     [[ "$output" == *'"in_flight"'* ]]
 }
 
@@ -61,8 +61,8 @@ teardown() {
 
     run $BIN observe progress
     [ "$status" -eq 0 ]
-    [[ "$output" == *"build observability — progress"* ]]
-    [[ "$output" == *"in flight"* ]]
-    [[ "$output" == *"T-031"* ]]
+    [[ "$output" == *"build observability — progress"* ]] || false
+    [[ "$output" == *"in flight"* ]] || false
+    [[ "$output" == *"T-031"* ]] || false
     [[ "$output" == *"availability:"* ]]
 }
