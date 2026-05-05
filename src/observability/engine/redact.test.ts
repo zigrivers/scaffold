@@ -179,6 +179,16 @@ describe('redactEvent (write-time)', () => {
     expect(() => redactEvent(obj as never)).not.toThrow()
     const result = redactEvent(obj as never) as Record<string, unknown>
     expect(result.label).toBe('test')
+    expect(result).not.toBe(obj)
+    expect(result.self).toBe(result) // cycle resolves to the sanitized clone, not the original
+  })
+
+  it('sanitizes Error message and stack, returning a new Error instance', () => {
+    const err = new Error('/Users/alice/src/file.ts threw')
+    const result = redactEvent(err as never) as Error
+    expect(result).toBeInstanceOf(Error)
+    expect(result.message).toBe('~/src/file.ts threw')
+    expect(result.message).not.toContain('/Users/alice')
   })
 })
 

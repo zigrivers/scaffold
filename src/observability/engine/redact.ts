@@ -1,10 +1,11 @@
+// Shared keyword group: both the string-scrubber (KV_PART) and object-key sensor use this.
 // Lookahead ensures keyword ends a segment: 'tokenization_method' does not match ('token'
 // followed by 'i'), but camelCase keys like 'myToken' and 'updateToken' do match.
-const KV_KEY = String.raw`(?:secret|token|password|api[_-]?key)(?![A-Za-z])`
+const KEYWORDS = String.raw`(?:secret|token|password|api[_-]?key)(?![A-Za-z])`
 
 // kv-secret: prefix (key+sep) in <kvp>, value in <kvv>.
 // Unquoted values stop at delimiters and strip trailing sentence punctuation.
-const KV_PART = String.raw`(?<kvp>\b(?:[A-Za-z0-9_-]*` + KV_KEY + String.raw`[A-Za-z0-9_-]*)\s*[=:]\s*)`
+const KV_PART = String.raw`(?<kvp>\b(?:[A-Za-z0-9_-]*` + KEYWORDS + String.raw`[A-Za-z0-9_-]*)\s*[=:]\s*)`
   + String.raw`(?<kvv>(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^'"\s,;]+(?<![,.!;])))`
 
 // Single-pass combined regex — one replace call instead of four.
@@ -39,27 +40,28 @@ export function sanitizePath(s: string): string {
   return out
 }
 
-// Matches object keys indicating a sensitive value; lookahead ensures 'tokenization_method'
-// does not trigger on 'token', while camelCase keys like 'myToken' are correctly matched.
-const SENSITIVE_KEY_RE = /(?:secret|token|password|api[_-]?key)(?![A-Za-z])/i
+// Same keyword group as KEYWORDS — compiled separately for use as a RegExp test.
+const SENSITIVE_KEY_RE = new RegExp(KEYWORDS, 'i')
 
 function recursivelyTransform(
   v: unknown,
   transform: (s: string) => string,
   sensitiveKey = false,
-  seen = new WeakSet<object>(),
+  seen = new WeakMap<object, unknown>(),
 ): unknown {
   if (typeof v === 'string') return sensitiveKey ? '[REDACTED:kv-secret]' : transform(v)
   if (sensitiveKey && (typeof v === 'number' || typeof v === 'boolean')) return '[REDACTED:kv-secret]'
   if (Array.isArray(v)) {
-    if (seen.has(v)) return v
-    seen.add(v)
-    return v.map((x) => recursivelyTransform(x, transform, sensitiveKey, seen))
+    if (seen.has(v)) return seen.get(v)
+    const out: unknown[] = []
+    seen.set(v, out)
+    for (const x of v) { out.push(recursivelyTransform(x, transform, sensitiveKey, seen)) }
+    return out
   }
   if (v instanceof Map) {
-    if (seen.has(v)) return v
-    seen.add(v)
+    if (seen.has(v)) return seen.get(v)
     const out = new Map()
+    seen.set(v, out)
     for (const [k, val] of v) {
       const keyIsSensitive = typeof k === 'string' && SENSITIVE_KEY_RE.test(k)
       out.set(
@@ -70,18 +72,25 @@ function recursivelyTransform(
     return out
   }
   if (v instanceof Set) {
-    if (seen.has(v)) return v
-    seen.add(v)
+    if (seen.has(v)) return seen.get(v)
     const out = new Set()
+    seen.set(v, out)
     for (const item of v) { out.add(recursivelyTransform(item, transform, sensitiveKey, seen)) }
     return out
   }
+  if (v instanceof Error) {
+    if (seen.has(v)) return seen.get(v)
+    const out = new Error(transform(v.message))
+    if (v.stack) out.stack = transform(v.stack)
+    seen.set(v, out)
+    return out
+  }
   if (typeof v === 'object' && v !== null) {
-    if (seen.has(v)) return v
-    seen.add(v)
+    if (seen.has(v)) return seen.get(v)
     const entries = Object.entries(v as Record<string, unknown>)
-    if (entries.length === 0) return v // No enumerable props: Date, Error, etc. pass through.
+    if (entries.length === 0) return v // No enumerable props: Date, etc. pass through.
     const out: Record<string, unknown> = {}
+    seen.set(v, out)
     for (const [k, val] of entries) {
       out[k] = recursivelyTransform(val, transform, sensitiveKey || SENSITIVE_KEY_RE.test(k), seen)
     }
