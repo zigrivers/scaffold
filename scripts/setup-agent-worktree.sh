@@ -20,7 +20,7 @@ command -v git >/dev/null 2>&1 || {
 # ─── Normalize agent name ───────────────────────────────────
 
 raw_name="$1"
-agent_suffix="$(echo "$raw_name" | tr '[:upper:]' '[:lower:]' | tr '_' '-')"
+agent_suffix="$(echo "$raw_name" | tr '[:upper:]' '[:lower:]' | tr '_' '-' | tr -cd 'a-z0-9-')"
 
 # ─── Resolve paths ──────────────────────────────────────────
 

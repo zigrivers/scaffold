@@ -86,7 +86,8 @@ export async function handleProgress(input: HandleProgressInput): Promise<number
       process.stdout.write((input.maskPaths ? redactRendered(blob) : blob) + '\n')
       return 0
     }
-    process.stdout.write(renderProgressTerminal(out) + '\n')
+    const rendered = renderProgressTerminal(out)
+    process.stdout.write((input.maskPaths ? redactRendered(rendered) : rendered) + '\n')
     return 0
   } catch (err: unknown) {
     process.stderr.write(`scaffold observe progress: ${(err as Error).message}\n`)

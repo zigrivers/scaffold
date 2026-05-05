@@ -25,7 +25,8 @@ export function renderProgressTerminal(out: EngineOutput): string {
   if (snap && snap.in_flight.length > 0) {
     lines.push(`in flight (${snap.in_flight.length})`)
     for (const t of snap.in_flight) {
-      lines.push(`  ${t.task_id} ${t.task_title}  by ${t.by} · age ${t.age_hours}h · branch ${t.branch}`)
+      const tid = t.task_id ?? '(unplanned)'
+      lines.push(`  ${tid} ${t.task_title}  by ${t.by} · age ${t.age_hours}h · branch ${t.branch}`)
     }
     lines.push('')
   }
