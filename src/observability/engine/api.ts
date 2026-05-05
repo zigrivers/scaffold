@@ -52,6 +52,7 @@ export async function runProgress(input: RunProgressInput): Promise<EngineOutput
     currentPhase: 'build',
   })
 
+  // TODO: derive verdict/fix_threshold from actual findings once finding collection is implemented
   const fix_threshold: Severity = 'P2'
   const verdict: Verdict = 'pass'
 

@@ -32,7 +32,9 @@ function coerce(rawKey: string, raw: string): unknown {
 }
 
 function buildPayload(type: EventType, kv: Record<string, string>): Record<string, unknown> {
-  const allowed = new Set(EVENT_PAYLOAD_KEYS[type])
+  const keys = EVENT_PAYLOAD_KEYS[type]
+  if (!keys) return {}
+  const allowed = new Set(keys)
   const out: Record<string, unknown> = {}
   for (const [rawKey, raw] of Object.entries(kv)) {
     const snake = snakeKey(rawKey)
@@ -146,7 +148,7 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
           taskId: (argv.taskId ?? argv['task-id'] ?? null) as string | null,
           keyValues: kv,
         })
-        process.exit(code)
+        process.exitCode = code
       },
     )
     .command(
@@ -163,7 +165,7 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
           maskPaths: !!(argv['mask-paths'] ?? argv.maskPaths),
           sinceHours: (argv['since-hours'] ?? argv.sinceHours ?? 24) as number,
         })
-        process.exit(code)
+        process.exitCode = code
       },
     )
     .command(
@@ -175,11 +177,11 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
           primaryRoot: process.cwd(),
           worktreeRoot: argv.worktree as string,
         })
-        process.exit(code)
+        process.exitCode = code
       },
     )
     .demandCommand(1, 'observe requires a subcommand: event | progress | harvest'),
-  handler: async () => { /* subcommand handlers call process.exit */ },
+  handler: async () => { /* intentional: subcommands set process.exitCode */ },
 }
 
 export default observeCommand

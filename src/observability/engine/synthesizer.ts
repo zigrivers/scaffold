@@ -13,6 +13,7 @@ import { beadsAdapter } from '../adapters/beads.js'
 import { mmrAdapter } from '../adapters/mmr.js'
 import { auditHistoryAdapter } from '../adapters/audit-history.js'
 import { archiveDir } from './harvester.js'
+import { ledgerPath } from './ledger-writer.js'
 
 export interface SynthesizerOpts {
   ghBin?: string
@@ -51,24 +52,15 @@ export interface MergedLedger {
 }
 
 export async function readMergedLedger(primaryRoot: string): Promise<MergedLedger> {
-  const activeDir = join(archiveDir(primaryRoot), 'active')
-  try {
-    await access(activeDir)
-  } catch {
-    return { events: [], summary: { events_read: 0, malformed_lines: 0, sources: [] } }
-  }
-  const files = (await readdir(activeDir)).filter((f) => f.endsWith('.jsonl'))
   const events: Event[] = []
   const sources: MergedLedger['summary']['sources'] = []
   let malformed = 0
   const seen = new Set<string>()
 
-  await Promise.all(files.map(async (file) => {
-    const path = join(activeDir, file)
-    const worktree_id = file.replace(/\.jsonl$/, '')
-    let perSource = 0
+  async function ingestFile(path: string, worktree_id: string, harvested_at?: string): Promise<void> {
     let txt: string
     try { txt = await readFile(path, 'utf8') } catch { return }
+    let perSource = 0
     for (const line of txt.split('\n')) {
       if (!line.trim()) continue
       try {
@@ -81,9 +73,23 @@ export async function readMergedLedger(primaryRoot: string): Promise<MergedLedge
         malformed++
       }
     }
-    const harvested_at = (await stat(path)).mtime.toISOString()
     sources.push({ worktree_id, events: perSource, harvested_at })
-  }))
+  }
+
+  const localLedger = ledgerPath(primaryRoot)
+  await ingestFile(localLedger, 'local')
+
+  const activeDir = join(archiveDir(primaryRoot), 'active')
+  try {
+    await access(activeDir)
+    const files = (await readdir(activeDir)).filter((f) => f.endsWith('.jsonl'))
+    await Promise.all(files.map(async (file) => {
+      const path = join(activeDir, file)
+      const worktree_id = file.replace(/\.jsonl$/, '')
+      const harvested_at = (await stat(path)).mtime.toISOString()
+      await ingestFile(path, worktree_id, harvested_at)
+    }))
+  } catch { /* no archive yet — local-only */ }
 
   events.sort((a, b) => {
     if (a.ts !== b.ts) return a.ts < b.ts ? -1 : 1
@@ -115,11 +121,12 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
     const ts = Date.parse(e.ts)
     if (Number.isNaN(ts)) continue
 
-    if (e.type === 'task_claimed' && e.task_id) {
-      claimsByTask.set(e.task_id, e as Event & { type: 'task_claimed' })
+    if (e.type === 'task_claimed') {
+      const key = e.task_id ?? e.event_id
+      if (e.task_id) claimsByTask.set(e.task_id, e as Event & { type: 'task_claimed' })
       const ageH = Math.max(0, (Date.now() - ts) / 3600 / 1000)
-      inFlightByTask.set(e.task_id, {
-        task_id: e.task_id,
+      inFlightByTask.set(key, {
+        task_id: e.task_id ?? null,
         task_title: (e as Event & { type: 'task_claimed' }).payload.task_title,
         story_id: (e as Event & { type: 'task_claimed' }).payload.story_id,
         by: e.actor_label,
