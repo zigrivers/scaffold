@@ -41,6 +41,22 @@ describe('scrubSecrets', () => {
     expect(out).not.toContain('value with spaces')
     expect(out).toContain('[REDACTED:kv-secret]')
   })
+
+  it('redacts value correctly when value text also appears in the key name', () => {
+    expect(scrubSecrets('my_password=password')).toBe('my_password=[REDACTED:kv-secret]')
+  })
+
+  it('does not redact 40-char hex strings (Git SHA-1 length)', () => {
+    const sha1 = 'da39a3ee5e6b4b0d3255bfef95601890afd80709'
+    expect(scrubSecrets(`commit ${sha1}`)).toContain(sha1)
+  })
+
+  it('redacts 64-char hex strings (SHA-256 length secrets)', () => {
+    const sha256 = '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08'
+    const out = scrubSecrets(`raw hash ${sha256}`)
+    expect(out).not.toContain(sha256)
+    expect(out).toContain('[REDACTED:high-entropy]')
+  })
 })
 
 describe('sanitizePath', () => {
@@ -86,6 +102,13 @@ describe('redactEvent (write-time)', () => {
     expect(out.payload.summary).toContain('[REDACTED:')
     expect(out.payload.affects[0]).toBe('~/Documents/repo/src/file.ts')
     expect(out.branch).toContain('[REDACTED:')
+  })
+
+  it('preserves non-plain-object values (e.g. Date instances) unchanged', () => {
+    const d = new Date('2026-01-01T00:00:00Z')
+    const result = redactEvent({ ts: d, label: 'test' } as never) as { ts: unknown }
+    expect(result.ts).toBeInstanceOf(Date)
+    expect(result.ts).toBe(d)
   })
 })
 
