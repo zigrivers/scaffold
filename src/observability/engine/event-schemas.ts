@@ -86,7 +86,7 @@ export function validateEvent(input: unknown): ValidationResult {
   if (errors.length > 0) return { ok: false, errors }
 
   const type = e.type as EventType
-  if (!(type in EVENT_PAYLOAD_KEYS)) {
+  if (!Object.hasOwn(EVENT_PAYLOAD_KEYS, type)) {
     return { ok: false, errors: [`unknown event type: ${String(type)}`] }
   }
 
@@ -115,9 +115,12 @@ export function validateEvent(input: unknown): ValidationResult {
     if (!VALID_OUTCOMES.includes(filteredPayload.outcome as never)) {
       errors.push('task_completed.payload.outcome must be pr_submitted | dropped | superseded')
     }
-    if (filteredPayload.outcome === 'pr_submitted' &&
+    if (filteredPayload.outcome === 'pr_submitted' && filteredPayload.pr_number === undefined) {
+      errors.push('task_completed.payload.pr_number required when outcome=pr_submitted')
+    }
+    if (filteredPayload.pr_number !== undefined &&
         !(Number.isSafeInteger(filteredPayload.pr_number) && (filteredPayload.pr_number as number) > 0)) {
-      errors.push('task_completed.payload.pr_number must be a positive integer when outcome=pr_submitted')
+      errors.push('task_completed.payload.pr_number must be a positive integer when present')
     }
     optStr('task_completed.payload.commit_sha', filteredPayload.commit_sha, errors)
     break

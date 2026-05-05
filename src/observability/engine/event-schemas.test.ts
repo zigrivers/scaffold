@@ -132,6 +132,18 @@ describe('event-schemas', () => {
     }
   })
 
+  it('rejects task_completed dropped with invalid pr_number when present', () => {
+    const r = validateEvent({
+      ...base, type: 'task_completed', payload: { outcome: 'dropped', pr_number: -5 } as never,
+    })
+    expect(r.ok).toBe(false)
+  })
+
+  it('rejects type=toString (prototype pollution guard)', () => {
+    const r = validateEvent({ ...base, type: 'toString', payload: {} })
+    expect(r.ok).toBe(false)
+  })
+
   it('accepts a valid progress_heartbeat event', () => {
     const r = validateEvent({
       ...base, type: 'progress_heartbeat', payload: { note: 'still going' },
