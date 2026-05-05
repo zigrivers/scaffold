@@ -116,34 +116,70 @@ export async function handleHarvest(input: HandleHarvestInput): Promise<number> 
 
 // ─── Yargs CommandModule ──────────────────────────────────────────────────────
 
-interface ObserveArgs {
-  subcommand?: string
-  type?: string
-  branch?: string
-  taskId?: string
-  json?: boolean
-  sinceHours?: number
-  root?: string
-  worktree?: string
-  set?: string[]
-}
+type AnyArgv = Record<string, unknown>
 
-const observeCommand: CommandModule<Record<string, unknown>, ObserveArgs> = {
-  command: 'observe <subcommand>',
+const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
+  command: 'observe',
   describe: 'Build observability — record events, view progress, harvest ledgers',
-  builder: (yargs) => {
-    return yargs
-      .positional('subcommand', { choices: ['event', 'progress', 'harvest'] as const, type: 'string' })
-      .option('type', { type: 'string', describe: 'Event type (for observe event)' })
-      .option('branch', { type: 'string', describe: 'Current branch name' })
-      .option('task-id', { type: 'string', describe: 'Task ID' })
-      .option('json', { type: 'boolean', default: false, describe: 'Output raw EngineOutput JSON' })
-      .option('since-hours', { type: 'number', default: 24, describe: 'Look-back window (hours)' })
-      .option('root', { type: 'string', describe: 'Primary worktree root (defaults to cwd)' })
-      .option('worktree', { type: 'string', describe: 'Worktree root to harvest (for observe harvest)' })
-      .option('set', { type: 'array', string: true, describe: 'key=value payload fields' })
-  },
-  handler: async () => { /* dispatch handled by CLI wrapper */ },
+  builder: (yargs) => yargs
+    .command(
+      'event <type>',
+      'Write a ledger event',
+      (y) => y
+        .positional('type', { type: 'string', demandOption: true })
+        .option('branch', { type: 'string', demandOption: true })
+        .option('task-id', { type: 'string' })
+        .strict(false),
+      async (argv) => {
+        const skip = new Set(['_', '$0', 'subcommand', 'branch', 'task-id', 'taskId', 'type'])
+        const kv: Record<string, string> = {}
+        for (const [k, v] of Object.entries(argv)) {
+          if (skip.has(k)) continue
+          if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
+            kv[k] = String(v)
+          }
+        }
+        const code = await handleEvent({
+          cwd: process.cwd(),
+          type: argv.type as EventType,
+          branch: argv.branch as string,
+          taskId: (argv.taskId ?? argv['task-id'] ?? null) as string | null,
+          keyValues: kv,
+        })
+        process.exit(code)
+      },
+    )
+    .command(
+      'progress',
+      'Show build progress snapshot',
+      (y) => y
+        .option('json', { type: 'boolean', default: false })
+        .option('mask-paths', { type: 'boolean', default: false })
+        .option('since-hours', { type: 'number', default: 24 }),
+      async (argv) => {
+        const code = await handleProgress({
+          cwd: process.cwd(),
+          json: !!(argv.json),
+          maskPaths: !!(argv['mask-paths'] ?? argv.maskPaths),
+          sinceHours: (argv['since-hours'] ?? argv.sinceHours ?? 24) as number,
+        })
+        process.exit(code)
+      },
+    )
+    .command(
+      'harvest',
+      'Flush a worktree ledger to the primary archive',
+      (y) => y.option('worktree', { type: 'string', demandOption: true }),
+      async (argv) => {
+        const code = await handleHarvest({
+          primaryRoot: process.cwd(),
+          worktreeRoot: argv.worktree as string,
+        })
+        process.exit(code)
+      },
+    )
+    .demandCommand(1, 'observe requires a subcommand: event | progress | harvest'),
+  handler: async () => { /* subcommand handlers call process.exit */ },
 }
 
 export default observeCommand

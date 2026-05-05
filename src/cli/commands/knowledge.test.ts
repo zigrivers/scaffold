@@ -22,10 +22,10 @@ vi.mock('../../cli/middleware/output-mode.js', () => ({
 vi.mock('../../config/loader.js', () => ({
   loadConfig: vi.fn(),
 }))
-vi.mock('node:child_process', () => ({
-  execSync: vi.fn(),
-  execFileSync: vi.fn(),
-}))
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>()
+  return { ...actual, execSync: vi.fn(), execFileSync: vi.fn() }
+})
 vi.mock('../../core/assembly/meta-prompt-loader.js', () => ({
   discoverMetaPrompts: vi.fn(),
 }))
