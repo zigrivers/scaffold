@@ -125,4 +125,14 @@ describe('synthesizer.composeSnapshot', () => {
     const snap = composeSnapshot({ events: merged.events, sinceHours: 24, currentPhase: 'build' })
     expect(snap.recent_decisions.map((d) => d.key)).toEqual(['newer', 'older'])
   })
+
+  it('populates open_pr on active_agent from pr_opened event', async () => {
+    await writeEvent(wtA, { type: 'task_claimed', branch: 'a', task_id: 'T-1', payload: { task_title: 'A' } })
+    await writeEvent(wtA, { type: 'pr_opened', branch: 'a', task_id: 'T-1', payload: { pr_number: 42 } })
+    await harvestWorktree({ primaryRoot: primary, worktreeRoot: wtA })
+    const merged = await readMergedLedger(primary)
+    const snap = composeSnapshot({ events: merged.events, sinceHours: 24, currentPhase: 'build' })
+    expect(snap.active_agents[0].open_pr).not.toBeNull()
+    expect(snap.active_agents[0].open_pr?.number).toBe(42)
+  })
 })

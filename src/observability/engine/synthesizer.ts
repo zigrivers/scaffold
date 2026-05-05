@@ -93,8 +93,10 @@ export async function readMergedLedger(primaryRoot: string): Promise<MergedLedge
     for (const file of files) {
       const path = join(activeDir, file)
       const worktree_id = file.replace(/\.jsonl$/, '')
-      const harvested_at = (await stat(path)).mtime.toISOString()
-      await ingestFile(path, worktree_id, harvested_at)
+      try {
+        const harvested_at = (await stat(path)).mtime.toISOString()
+        await ingestFile(path, worktree_id, harvested_at)
+      } catch { /* file removed between readdir and stat — skip */ }
     }
   } catch { /* no archive yet — local-only */ }
 
@@ -123,6 +125,7 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
   const blockedByEventId = new Map<string, BlockedTask>()
   const decisions: DecisionSummary[] = []
   const claimsByTask = new Map<string, Event & { type: 'task_claimed' }>()
+  const openPrByActor = new Map<string, { number: number; opened_at: string }>()
 
   for (const e of events) {
     const ts = Date.parse(e.ts)
@@ -187,6 +190,9 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
           if (staleKey) blockedByEventId.delete(staleKey)
         }
       }
+    } else if (e.type === 'pr_opened') {
+      const po = e as Event & { type: 'pr_opened' }
+      openPrByActor.set(e.actor_label, { number: po.payload.pr_number, opened_at: e.ts })
     } else if (e.type === 'decision_recorded') {
       const dr = e as Event & { type: 'decision_recorded' }
       decisions.push({
@@ -209,6 +215,7 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
   const activeAgents: ActiveAgent[] = [...actorsSeen].map((actor) => {
     const ev = [...events].reverse().find((e) => e.actor_label === actor)
     const inflight = [...inFlightByTask.values()].find((t) => t.by === actor) ?? null
+    const pr = openPrByActor.get(actor) ?? null
     return {
       worktree_id: ev?.worktree_id ?? '',
       actor_label: actor,
@@ -216,7 +223,7 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
       current_task: inflight
         ? { id: inflight.task_id, title: inflight.task_title, claimed_at: inflight.claimed_at }
         : null,
-      open_pr: null,
+      open_pr: pr ? { number: pr.number, url: '', opened_at: pr.opened_at } : null,
     }
   })
 

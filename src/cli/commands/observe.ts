@@ -7,6 +7,7 @@ import { redactRendered } from '../../observability/engine/redact.js'
 import { harvestWorktree } from '../../observability/engine/harvester.js'
 import { renderProgressTerminal } from '../../observability/renderers/terminal.js'
 import { readIdentityAsync } from '../../observability/engine/identity.js'
+import { findProjectRoot } from '../middleware/project-root.js'
 
 // ─── handleEvent ─────────────────────────────────────────────────────────────
 
@@ -145,7 +146,7 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
           }
         }
         const code = await handleEvent({
-          cwd: process.cwd(),
+          cwd: findProjectRoot(process.cwd()) ?? process.cwd(),
           type: argv.type as EventType,
           branch: argv.branch as string,
           taskId: (argv.taskId ?? argv['task-id'] ?? null) as string | null,
@@ -163,7 +164,7 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
         .option('since-hours', { type: 'number', default: 24 }),
       async (argv) => {
         const code = await handleProgress({
-          cwd: process.cwd(),
+          cwd: findProjectRoot(process.cwd()) ?? process.cwd(),
           json: !!(argv.json),
           maskPaths: !!(argv['mask-paths'] ?? argv.maskPaths),
           sinceHours: (argv['since-hours'] ?? argv.sinceHours ?? 24) as number,
@@ -177,7 +178,7 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
       (y) => y.option('worktree', { type: 'string', demandOption: true }),
       async (argv) => {
         const code = await handleHarvest({
-          primaryRoot: process.cwd(),
+          primaryRoot: findProjectRoot(process.cwd()) ?? process.cwd(),
           worktreeRoot: argv.worktree as string,
         })
         process.exitCode = code
