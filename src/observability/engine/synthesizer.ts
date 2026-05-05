@@ -80,7 +80,7 @@ export async function readMergedLedger(primaryRoot: string): Promise<MergedLedge
     } catch {
       return
     }
-    sources.push({ worktree_id, events: perSource, harvested_at })
+    if (perSource > 0) sources.push({ worktree_id, events: perSource, harvested_at })
   }
 
   const localLedger = ledgerPath(primaryRoot)

@@ -7,6 +7,8 @@ import { redactRendered } from '../../observability/engine/redact.js'
 import { harvestWorktree } from '../../observability/engine/harvester.js'
 import { renderProgressTerminal } from '../../observability/renderers/terminal.js'
 import { readIdentityAsync } from '../../observability/engine/identity.js'
+import { stat } from 'node:fs/promises'
+import { join } from 'node:path'
 import { findProjectRoot } from '../middleware/project-root.js'
 
 // ─── handleEvent ─────────────────────────────────────────────────────────────
@@ -105,6 +107,14 @@ export interface HandleHarvestInput {
 
 export async function handleHarvest(input: HandleHarvestInput): Promise<number> {
   try {
+    const gitEntry = await stat(join(input.primaryRoot, '.git')).catch(() => null)
+    if (gitEntry && !gitEntry.isDirectory()) {
+      process.stderr.write(
+        `scaffold observe harvest: primaryRoot ${input.primaryRoot} is a git worktree, not the main repository.\n` +
+        '  Run harvest from the primary repository root.\n',
+      )
+      return 3
+    }
     const id = await readIdentityAsync(input.worktreeRoot)
     if (!id) {
       process.stderr.write(`scaffold observe harvest: worktree at ${input.worktreeRoot} has no identity.json\n`)
