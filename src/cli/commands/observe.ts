@@ -5,6 +5,7 @@ import { EVENT_PAYLOAD_KEYS } from '../../observability/engine/event-schemas.js'
 import { runProgress } from '../../observability/engine/api.js'
 import { redactRendered } from '../../observability/engine/redact.js'
 import { harvestWorktree } from '../../observability/engine/harvester.js'
+import { renderProgressTerminal } from '../../observability/renderers/terminal.js'
 import { readIdentityAsync } from '../../observability/engine/identity.js'
 
 // ─── handleEvent ─────────────────────────────────────────────────────────────
@@ -76,15 +77,14 @@ export async function handleProgress(input: HandleProgressInput): Promise<number
       sinceHours: input.sinceHours,
       ghBin: input.ghBin,
       bdBin: input.bdBin,
+      args: { sinceHours: input.sinceHours },
     })
     if (input.json) {
       const blob = JSON.stringify(out, null, 2)
       process.stdout.write((input.maskPaths ? redactRendered(blob) : blob) + '\n')
       return 0
     }
-    const inFlight = out.snapshot?.in_flight.length ?? 0
-    const completed = out.snapshot?.completed_in_window.length ?? 0
-    process.stdout.write(`build observability — progress: ${inFlight} in-flight, ${completed} completed in window\n`)
+    process.stdout.write(renderProgressTerminal(out) + '\n')
     return 0
   } catch (err: unknown) {
     process.stderr.write(`scaffold observe progress: ${(err as Error).message}\n`)
