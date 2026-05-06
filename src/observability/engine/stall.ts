@@ -40,7 +40,8 @@ export function evaluateStall(input: EvaluateStallInput): NeedsAttentionItem[] {
     if (e.type === 'task_claimed' && e.task_id) {
       lastClaimByTask.set(e.task_id, e)
     } else if (e.type === 'task_completed' && e.task_id) {
-      lastResolutionByTask.set(e.task_id, e)
+      const prev = lastResolutionByTask.get(e.task_id)
+      if (!prev || prev.ts < e.ts) lastResolutionByTask.set(e.task_id, e)
     } else if (e.type === 'progress_heartbeat' && e.task_id) {
       const prev = lastHeartbeatByTask.get(e.task_id)
       if (!prev || prev.ts < e.ts) lastHeartbeatByTask.set(e.task_id, e)
@@ -71,7 +72,8 @@ export function evaluateStall(input: EvaluateStallInput): NeedsAttentionItem[] {
   const taskStaleH = parseHours(input.config.stall.task_stale)
   if (taskStaleH !== null) {
     for (const [taskId, claim] of lastClaimByTask) {
-      if (lastResolutionByTask.has(taskId)) continue
+      const resolution = lastResolutionByTask.get(taskId)
+      if (resolution && resolution.ts >= claim.ts) continue
       const heartbeat = lastHeartbeatByTask.get(taskId)?.ts
       const branchCommit = latestCommitOnBranchSince(claim.branch, claim.ts)
       const lastActivityTs = [claim.ts, heartbeat, branchCommit].filter((x): x is string => Boolean(x)).sort().pop()!

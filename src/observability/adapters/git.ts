@@ -103,11 +103,18 @@ export const gitAdapter: BaseAdapter & {
       } catch { /* branch may not exist yet */ }
     }
     if (out.length > 0) return out
-    // Fallback when no worktrees are known
+    // Fallback when no worktrees are known — tag commits with the current HEAD branch so
+    // stall.ts branch-matching can suppress false-positive task_stale signals.
+    let headBranch: string | undefined
+    try {
+      headBranch = (await git(cwd, ['rev-parse', '--abbrev-ref', 'HEAD'])).trim() || undefined
+      if (headBranch === 'HEAD') headBranch = undefined // detached HEAD
+    } catch { /* ignore */ }
     const commits = await gitAdapter.recentCommits(cwd, opts)
     return commits.map((c) => ({
       sort_id: `git:${c.sha}`, correlation_id: null, ts: c.ts,
       source: 'git' as const, kind: 'commit', actor_label: c.author,
+      ...(headBranch ? { branch: headBranch } : {}),
       summary: `${c.subject.slice(0, 200)} (${c.sha.slice(0, 7)})`, link: c.sha,
     }))
   },

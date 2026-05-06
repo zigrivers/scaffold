@@ -23,7 +23,7 @@ export function needsAttentionLines(items: NeedsAttentionItem[]): string[] {
   if (items.length === 0) return []
   const lines: string[] = [`⚠ needs attention (${items.length})`]
   for (const i of items) {
-    const ageStr = i.signal === 'lens_skipped_repeatedly' ? `${i.threshold_hours}× streak` : `${i.age_hours}h`
+    const ageStr = i.signal === 'lens_skipped_repeatedly' ? `${i.threshold_count ?? i.threshold_hours}× streak` : `${i.age_hours}h`
     lines.push(`  • ${i.summary} [${ageStr}]`)
   }
   return lines

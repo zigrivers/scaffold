@@ -96,7 +96,7 @@ function decisionsSection(out: EngineOutput): string {
 function needsAttentionSection(out: EngineOutput): string {
   if (out.needs_attention.length === 0) return ''
   const rows = out.needs_attention.map((i) => {
-    const ageStr = i.signal === 'lens_skipped_repeatedly' ? `${i.threshold_hours}× streak` : `${i.age_hours}h`
+    const ageStr = i.signal === 'lens_skipped_repeatedly' ? `${i.threshold_count ?? i.threshold_hours}× streak` : `${i.age_hours}h`
     return `| ${i.signal} | ${mdEscape(i.summary)} | ${ageStr} |`
   })
   return ['## Needs Attention', '', '| Signal | Item | Age |', '|---|---|---|', ...rows].join('\n')
