@@ -177,10 +177,10 @@ export async function runProgress(input: RunProgressInput): Promise<EngineOutput
       auditHistoryAdapter.lensSkippedStreaks(input.primaryRoot),
       auditHistoryAdapter.latestFindings(input.primaryRoot),
     ])
-    // Stall detection needs a wider window than the display window so recent activity
-    // just outside sinceHours doesn't produce false positives.
+    // Stall detection always uses a wider window so recent activity just outside sinceHours
+    // doesn't produce false positives — never reuse the display-window replay events.
     const stallSinceHours = Math.max(input.sinceHours, 7 * 24)
-    const adapterEventsForStall = replay?.events ?? (await Promise.all([
+    const adapterEventsForStall = (await Promise.all([
       gitAdapter.replayEvents(input.primaryRoot, { sinceHours: stallSinceHours }),
       ghAdapter.replayEvents(input.primaryRoot, { sinceHours: stallSinceHours, ghBin: input.ghBin }),
       mmrAdapter.replayEvents(input.primaryRoot, { sinceHours: stallSinceHours }),

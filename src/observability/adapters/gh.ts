@@ -4,6 +4,7 @@ import type { AdapterStatus, BaseAdapter } from './types.js'
 import type { ReplayEvent } from '../engine/types.js'
 
 const execFile = promisify(execFileCb)
+const GH_TIMEOUT_MS = 30_000
 
 export interface PrInfo {
   number: number
@@ -32,7 +33,7 @@ export const ghAdapter: BaseAdapter & {
     const bin = opts.ghBin ?? 'gh'
     const args = opts.ghArgs ?? ['auth', 'status']
     try {
-      await execFile(bin, args, { cwd })
+      await execFile(bin, args, { cwd, timeout: GH_TIMEOUT_MS })
       return { status: 'available' }
     } catch (err: unknown) {
       const e = err as { code?: string; stderr?: string }
@@ -55,7 +56,7 @@ export const ghAdapter: BaseAdapter & {
       const { stdout } = await execFile(bin, [
         'pr', 'list', '--state', 'open', '--json',
         'number,url,state,headRefName,createdAt,mergedAt',
-      ], { cwd, maxBuffer: 32 * 1024 * 1024 })
+      ], { cwd, maxBuffer: 32 * 1024 * 1024, timeout: GH_TIMEOUT_MS })
       const raw = JSON.parse(stdout) as Array<{
         number: number
         url: string
@@ -123,7 +124,7 @@ export const ghAdapter: BaseAdapter & {
       const { stdout } = await execFile(bin, [
         'pr', 'list', '--state', 'merged', '--search', `merged:>=${since}`, '--json',
         'number,url,state,headRefName,createdAt,mergedAt',
-      ], { cwd })
+      ], { cwd, timeout: GH_TIMEOUT_MS })
       merged = (JSON.parse(stdout) as Array<{
         number: number; url: string; state: string; headRefName: string; createdAt: string; mergedAt?: string
       }>).map((p) => ({
@@ -136,7 +137,7 @@ export const ghAdapter: BaseAdapter & {
       const { stdout } = await execFile(bin, [
         'pr', 'list', '--state', 'closed', '--search', `closed:>=${since}`, '--json',
         'number,url,state,headRefName,createdAt,closedAt',
-      ], { cwd })
+      ], { cwd, timeout: GH_TIMEOUT_MS })
       closedUnmerged = (JSON.parse(stdout) as Array<{
         number: number; url: string; state: string; headRefName: string; createdAt: string; closedAt?: string
       }>).map((p) => ({

@@ -219,6 +219,7 @@ export interface NeedsAttentionItem {
   ref: { kind: 'task' | 'pr' | 'finding' | 'lens'; id: string }
   age_hours: number
   threshold_hours: number
+  threshold_count?: number
   summary: string
 }
 

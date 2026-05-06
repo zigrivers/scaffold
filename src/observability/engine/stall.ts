@@ -174,7 +174,8 @@ export function evaluateStall(input: EvaluateStallInput): NeedsAttentionItem[] {
       signal: 'lens_skipped_repeatedly',
       ref: { kind: 'lens', id: lensId },
       age_hours: 0,
-      threshold_hours: 3,
+      threshold_hours: 0,
+      threshold_count: 3,
       summary: `lens ${lensId} skipped for ${streak} consecutive audits`,
     })
   }
