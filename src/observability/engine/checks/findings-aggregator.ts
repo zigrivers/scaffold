@@ -18,7 +18,9 @@ function emptyByStatus(): { open: number; acknowledged: number; skipped: number 
   return { open: 0, acknowledged: 0, skipped: 0 }
 }
 
-export function aggregate(rawFindings: Finding[], events: Event[], fixThreshold: Severity): { findings: Finding[]; summary: FindingsSummary } {
+export function aggregate(
+  rawFindings: Finding[], events: Event[], fixThreshold: Severity,
+): { findings: Finding[]; summary: FindingsSummary } {
   const acks = buildAckMap(events)
 
   const findings = rawFindings.map((f) => {

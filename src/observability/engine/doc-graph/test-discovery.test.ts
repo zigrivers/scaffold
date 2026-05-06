@@ -13,8 +13,8 @@ describe('discoverTests', () => {
     mkdirSync(join(dir, 'src/auth'), { recursive: true })
     writeFileSync(join(dir, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }))
     writeFileSync(join(dir, 'src/auth/login.test.ts'),
-      "import { it, expect } from 'vitest'\nit('signs in', () => { expect(1).toBe(1) })\n")
-    writeFileSync(join(dir, 'src/auth/signup.spec.ts'), "it('signs up', () => {})\n")
+      'import { it, expect } from \'vitest\'\nit(\'signs in\', () => { expect(1).toBe(1) })\n')
+    writeFileSync(join(dir, 'src/auth/signup.spec.ts'), 'it(\'signs up\', () => {})\n')
 
     const tests = await discoverTests(dir)
     const sorted = tests.sort((a, b) => a.id.localeCompare(b.id))
@@ -31,7 +31,7 @@ describe('discoverTests', () => {
     writeFileSync(join(dir, 'package.json'), '{}')
     mkdirSync(join(dir, 'pkg/auth'), { recursive: true })
     writeFileSync(join(dir, 'pkg/auth/login_test.go'),
-      "package auth\nimport \"testing\"\nfunc TestSignsIn(t *testing.T) {}\n")
+      'package auth\nimport "testing"\nfunc TestSignsIn(t *testing.T) {}\n')
     const tests = await discoverTests(dir)
     expect(tests).toHaveLength(1)
     expect(tests[0].framework).toBe('go-test')

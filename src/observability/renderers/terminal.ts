@@ -1,4 +1,4 @@
-import type { EngineOutput } from '../engine/types.js'
+import type { EngineOutput, Finding, Severity } from '../engine/types.js'
 import { availabilityLine } from './_lib.js'
 import { scrubSecrets } from '../engine/redact.js'
 
@@ -47,6 +47,47 @@ export function renderProgressTerminal(out: EngineOutput): string {
   }
   lines.push(`availability: ${availabilityLine(out.availability)}`)
   lines.push('                              (✓ available  · ~ degraded  · — unavailable)')
+
+  return scrubSecrets(lines.join('\n'))
+}
+
+const SEVERITY_LABEL: Record<Severity, string> = { P0: '[P0]', P1: '[P1]', P2: '[P2]', P3: '[P3]' }
+
+export interface RenderAuditOptions {
+  showAcknowledged?: boolean
+}
+
+export function renderAuditTerminal(out: EngineOutput, opts: RenderAuditOptions = {}): string {
+  const lines: string[] = []
+  const profile = out.invocation.args.profile ?? 'fast'
+  const scope = out.invocation.args.scope ?? 'all'
+  lines.push(`build observability — audit (profile: ${profile} · scope: ${scope})`)
+  lines.push('')
+
+  const visibleFindings: Finding[] = out.findings.filter((f) => {
+    if (f.status === 'skipped') return false
+    if (f.status === 'acknowledged' && !opts.showAcknowledged) return false
+    return true
+  })
+
+  if (visibleFindings.length === 0) {
+    lines.push('  no findings')
+  } else {
+    for (const f of visibleFindings) {
+      const sev = SEVERITY_LABEL[f.severity] ?? `[${f.severity}]`
+      const status = f.status !== 'open' ? ` (${f.status})` : ''
+      lines.push(`  ${sev} ${f.title}${status}`)
+      if (f.lens_id) lines.push(`       lens: ${f.lens_id}`)
+      if (f.fix_hint) {
+        lines.push(`       fix:  ${f.fix_hint.prompt}`)
+      }
+    }
+  }
+  lines.push('')
+
+  const s = out.summary
+  lines.push(`verdict: ${out.verdict}  (blocking: ${s.blocking}  acknowledged: ${s.acknowledged}  total: ${s.total})`)
+  lines.push(`availability: ${availabilityLine(out.availability)}`)
 
   return scrubSecrets(lines.join('\n'))
 }

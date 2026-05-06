@@ -33,7 +33,7 @@ describe('parseDesignTokens', () => {
   })
 
   it('defaults priority to "should" when column is missing', () => {
-    const md = `## Colors\n\n| Token | Value |\n|---|---|\n| --color-x | #fff |\n`
+    const md = '## Colors\n\n| Token | Value |\n|---|---|\n| --color-x | #fff |\n'
     const tokens = parseDesignTokens(md)
     expect(tokens[0].priority).toBe('should')
   })

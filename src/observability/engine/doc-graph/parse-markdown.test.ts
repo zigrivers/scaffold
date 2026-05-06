@@ -34,7 +34,7 @@ Final section.
     ])
   })
 
-  it('sectionAfterHeading returns the markdown text under a given heading until the next same-or-higher heading', () => {
+  it('sectionAfterHeading returns markdown text until the next same-or-higher heading', () => {
     const root = parseMarkdown(sample)
     const h2s = headingsAtDepth(root, 2)
     const body = sectionAfterHeading(root, h2s[0])

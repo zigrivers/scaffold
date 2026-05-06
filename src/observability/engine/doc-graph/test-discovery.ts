@@ -22,9 +22,12 @@ const RULES: DiscoveryRule[] = [
     fileMatcher: (f) => /\.(test|spec)\.(ts|tsx|js|jsx)$/.test(f),
     extractTests: (c) => {
       const results: DiscoveredTest[] = []
-      for (const m of c.matchAll(/\b(?:it|test)\.skip\s*\(\s*['"`](.+?)['"`]/g)) results.push({ name: m[1], is_skipped: true })
-      for (const m of c.matchAll(/\b(?:xit|xtest)\s*\(\s*['"`](.+?)['"`]/g)) results.push({ name: m[1], is_skipped: true })
-      for (const m of c.matchAll(/\b(?:it|test)\s*\(\s*['"`](.+?)['"`]/g)) results.push({ name: m[1], is_skipped: false })
+      const skipDot = /\b(?:it|test)\.skip\s*\(\s*['"`](.+?)['"`]/g
+      const xSkip = /\b(?:xit|xtest)\s*\(\s*['"`](.+?)['"`]/g
+      const normal = /\b(?:it|test)\s*\(\s*['"`](.+?)['"`]/g
+      for (const m of c.matchAll(skipDot)) results.push({ name: m[1], is_skipped: true })
+      for (const m of c.matchAll(xSkip)) results.push({ name: m[1], is_skipped: true })
+      for (const m of c.matchAll(normal)) results.push({ name: m[1], is_skipped: false })
       return results
     },
   },
@@ -33,21 +36,28 @@ const RULES: DiscoveryRule[] = [
     fileMatcher: (f) => /\.(test|spec)\.(ts|tsx|js|jsx)$/.test(f),
     extractTests: (c) => {
       const results: DiscoveredTest[] = []
-      for (const m of c.matchAll(/\b(?:it|test)\.skip\s*\(\s*['"`](.+?)['"`]/g)) results.push({ name: m[1], is_skipped: true })
-      for (const m of c.matchAll(/\b(?:xit|xtest)\s*\(\s*['"`](.+?)['"`]/g)) results.push({ name: m[1], is_skipped: true })
-      for (const m of c.matchAll(/\b(?:it|test)\s*\(\s*['"`](.+?)['"`]/g)) results.push({ name: m[1], is_skipped: false })
+      const skipDot = /\b(?:it|test)\.skip\s*\(\s*['"`](.+?)['"`]/g
+      const xSkip = /\b(?:xit|xtest)\s*\(\s*['"`](.+?)['"`]/g
+      const normal = /\b(?:it|test)\s*\(\s*['"`](.+?)['"`]/g
+      for (const m of c.matchAll(skipDot)) results.push({ name: m[1], is_skipped: true })
+      for (const m of c.matchAll(xSkip)) results.push({ name: m[1], is_skipped: true })
+      for (const m of c.matchAll(normal)) results.push({ name: m[1], is_skipped: false })
       return results
     },
   },
   {
     framework: 'pytest',
     fileMatcher: (f) => /^test_.+\.py$/.test(f) || /_test\.py$/.test(f),
-    extractTests: (c) => Array.from(c.matchAll(/^def\s+(test_[\w]+)\s*\(/gm), (m) => ({ name: m[1], is_skipped: false })),
+    extractTests: (c) => Array.from(
+      c.matchAll(/^def\s+(test_[\w]+)\s*\(/gm), (m) => ({ name: m[1], is_skipped: false }),
+    ),
   },
   {
     framework: 'go-test',
     fileMatcher: (f) => /_test\.go$/.test(f),
-    extractTests: (c) => Array.from(c.matchAll(/^func\s+(Test[\w]+)\s*\(/gm), (m) => ({ name: m[1], is_skipped: false })),
+    extractTests: (c) => Array.from(
+      c.matchAll(/^func\s+(Test[\w]+)\s*\(/gm), (m) => ({ name: m[1], is_skipped: false }),
+    ),
   },
 ]
 

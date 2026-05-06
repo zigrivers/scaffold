@@ -13,7 +13,8 @@ export function resolveFixThreshold(cwd: string, cliOverride?: string): Severity
   const mmrPath = join(cwd, '.mmr.yaml')
   if (existsSync(mmrPath)) {
     try {
-      const cfg = yaml.load(readFileSync(mmrPath, 'utf8')) as { audit_fix_threshold?: unknown; fix_threshold?: unknown } | null
+      type MmrCfg = { audit_fix_threshold?: unknown; fix_threshold?: unknown }
+      const cfg = yaml.load(readFileSync(mmrPath, 'utf8')) as MmrCfg | null
       if (cfg && isSeverity(cfg.audit_fix_threshold)) return cfg.audit_fix_threshold
       if (cfg && isSeverity(cfg.fix_threshold)) return cfg.fix_threshold
     } catch { /* fall through to default */ }

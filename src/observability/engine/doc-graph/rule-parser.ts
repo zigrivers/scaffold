@@ -15,16 +15,16 @@ function parseRuleSection(body: string): Partial<Omit<Rule, 'id' | 'source_ancho
     const key = m[1].replace(/-/g, '_').toLowerCase()
     const raw = m[2].trim()
     switch (key) {
-      case 'pattern': out.pattern = raw; break
-      case 'forbidden': out.forbidden = raw.split(',').map((s) => s.trim()).filter(Boolean); break
-      case 'match': out.match = raw; break
-      case 'language': out.language = raw; break
-      case 'severity':
-        if ((VALID_SEVERITY as readonly string[]).includes(raw)) out.severity = raw as Rule['severity']
-        break
-      case 'enforce_via':
-        if ((VALID_ENFORCE as readonly string[]).includes(raw)) out.enforce_via = raw as Rule['enforce_via']
-        break
+    case 'pattern': out.pattern = raw; break
+    case 'forbidden': out.forbidden = raw.split(',').map((s) => s.trim()).filter(Boolean); break
+    case 'match': out.match = raw; break
+    case 'language': out.language = raw; break
+    case 'severity':
+      if ((VALID_SEVERITY as readonly string[]).includes(raw)) out.severity = raw as Rule['severity']
+      break
+    case 'enforce_via':
+      if ((VALID_ENFORCE as readonly string[]).includes(raw)) out.enforce_via = raw as Rule['enforce_via']
+      break
     }
   }
   return out

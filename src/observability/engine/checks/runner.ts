@@ -64,7 +64,9 @@ function lensSkippedFinding(manifest: LensManifest, missing: AdapterId[]): Findi
 
 export async function runChecks(input: RunChecksInput): Promise<Finding[]> {
   const sorted = topoSort(input.registry)
-  const enabledIds = input.enabledIds ?? new Set(input.registry.filter((m) => m.profiles.includes(input.profile)).map((m) => m.id))
+  const enabledIds = input.enabledIds ?? new Set(
+    input.registry.filter((m) => m.profiles.includes(input.profile)).map((m) => m.id),
+  )
   const allFindings: Finding[] = []
 
   for (const manifest of sorted) {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { aggregate } from './findings-aggregator'
-import type { Finding, Event } from '../types'
+import { aggregate } from './findings-aggregator.js'
+import type { Finding, Event } from '../types.js'
 
 function f(id: string, severity: Finding['severity'], status: Finding['status'] = 'open'): Finding {
   return {
@@ -49,7 +49,8 @@ describe('aggregate', () => {
     ]
     const out = aggregate(findings, [], 'P2')
     expect(out.summary.blocking).toBe(2)        // p0-open, p2-open (acknowledged + p3 are excluded)
-    expect(out.summary.acknowledged).toBe(0)    // p1-ack starts acknowledged via finding.status; ack count uses ledger-driven mutations
+    // p1-ack starts acknowledged via finding.status; ack count uses ledger-driven mutations
+    expect(out.summary.acknowledged).toBe(0)
     expect(out.summary.by_severity).toEqual({ P0: 1, P1: 1, P2: 1, P3: 1 })
     expect(out.summary.by_severity_status.P0).toEqual({ open: 1, acknowledged: 0, skipped: 0 })
     expect(out.summary.by_severity_status.P1).toEqual({ open: 0, acknowledged: 1, skipped: 0 })

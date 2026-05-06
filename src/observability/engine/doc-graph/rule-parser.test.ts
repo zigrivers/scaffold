@@ -39,6 +39,7 @@ Description: Use \`const\` for never-reassigned bindings.
   })
 
   it('returns [] when no Rule headings exist', () => {
-    expect(parseRules('# Coding Standards\n\n## TypeScript\n\nUse TypeScript everywhere.\n', 'docs/coding-standards.md')).toEqual([])
+    const md = '# Coding Standards\n\n## TypeScript\n\nUse TypeScript everywhere.\n'
+    expect(parseRules(md, 'docs/coding-standards.md')).toEqual([])
   })
 })

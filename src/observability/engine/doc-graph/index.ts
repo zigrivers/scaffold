@@ -48,7 +48,8 @@ export async function buildDocGraph(cwd: string): Promise<DocGraph> {
   const { stories, acs } = artifacts.user_stories ? parseStories(artifacts.user_stories) : { stories: [], acs: [] }
   const planTasks = artifacts.implementation_plan ? parsePlanTasks(artifacts.implementation_plan) : []
   const playbookTasks = artifacts.implementation_playbook ? parsePlaybookTasks(artifacts.implementation_playbook) : []
-  const codingRules = artifacts.coding_standards ? parseRules(artifacts.coding_standards, 'docs/coding-standards.md') : []
+  const codingRules = artifacts.coding_standards
+    ? parseRules(artifacts.coding_standards, 'docs/coding-standards.md') : []
   const tddRules = artifacts.tdd_standards ? parseRules(artifacts.tdd_standards, 'docs/tdd-standards.md') : []
   const components = artifacts.tech_stack ? parseSanctionedComponents(artifacts.tech_stack) : []
   const tokens = artifacts.design_system ? parseDesignTokens(artifacts.design_system) : []

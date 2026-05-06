@@ -54,13 +54,15 @@ describe('api.runAudit', () => {
     writeFileSync(join(project, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }))
     writeFileSync(join(project, 'docs/plan.md'), '# PRD\n## Features\n### F [priority: must]\n')
     writeFileSync(join(project, 'docs/user-stories.md'),
-      `## Story s-1: T [priority: must]\n\n### AC 1: t\nGiven X.\n`)
+      '## Story s-1: T [priority: must]\n\n### AC 1: t\nGiven X.\n')
     writeFileSync(join(project, 'docs/tdd-standards.md'), '# TDD\n')
   })
   afterEach(() => { rmSync(project, { recursive: true, force: true }) })
 
   it('produces an audit EngineOutput with findings + verdict + summary', async () => {
-    const out = await runAudit({ primaryRoot: project, profile: 'fast', scope: 'all', sinceHours: 24, ghBin: '/no/such/gh', bdBin: '/no/such/bd' })
+    const out = await runAudit({
+      primaryRoot: project, profile: 'fast', scope: 'all', sinceHours: 24, ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+    })
     expect(out.invocation.command).toBe('audit')
     expect(out.findings.length).toBeGreaterThan(0)
     expect(out.verdict).toBe('blocked')
@@ -69,13 +71,22 @@ describe('api.runAudit', () => {
   })
 
   it('honors --lens to scope a single-lens run', async () => {
-    const out = await runAudit({ primaryRoot: project, profile: 'fast', scope: 'all', sinceHours: 24, lensIds: ['H-cross-doc'], ghBin: '/no/such/gh', bdBin: '/no/such/bd' })
+    const out = await runAudit({
+      primaryRoot: project, profile: 'fast', scope: 'all', sinceHours: 24,
+      lensIds: ['H-cross-doc'], ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+    })
     expect(out.findings.every((f) => f.lens_id === 'H-cross-doc')).toBe(true)
   })
 
   it('respects --fix-threshold for verdict + summary.blocking', async () => {
-    const tight = await runAudit({ primaryRoot: project, profile: 'fast', scope: 'all', sinceHours: 24, fixThresholdOverride: 'P0', ghBin: '/no/such/gh', bdBin: '/no/such/bd' })
-    const lax   = await runAudit({ primaryRoot: project, profile: 'fast', scope: 'all', sinceHours: 24, fixThresholdOverride: 'P3', ghBin: '/no/such/gh', bdBin: '/no/such/bd' })
+    const tight = await runAudit({
+      primaryRoot: project, profile: 'fast', scope: 'all', sinceHours: 24,
+      fixThresholdOverride: 'P0', ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+    })
+    const lax = await runAudit({
+      primaryRoot: project, profile: 'fast', scope: 'all', sinceHours: 24,
+      fixThresholdOverride: 'P3', ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+    })
     expect(tight.summary.blocking).toBeLessThanOrEqual(lax.summary.blocking)
   })
 })

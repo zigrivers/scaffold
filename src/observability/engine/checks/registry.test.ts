@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { LENS_REGISTRY, getLensManifest } from './registry'
+import { LENS_REGISTRY, getLensManifest } from './registry.js'
 
 describe('LENS_REGISTRY', () => {
   it('has the three Plan-2 lenses with correct profile membership', () => {

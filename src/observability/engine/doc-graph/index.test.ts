@@ -17,11 +17,12 @@ describe('buildDocGraph', () => {
     writeFileSync(join(dir, 'docs/plan.md'),
       '# PRD\n\n## Features\n\n### User Auth [priority: must]\n\nUsers sign in.\n')
     writeFileSync(join(dir, 'docs/user-stories.md'),
-      '# Stories\n\n## Story user-auth-1: Sign in [priority: must]\n\n### AC 1: signs in\nGiven valid credentials, the user signs in.\n')
+      '# Stories\n\n## Story user-auth-1: Sign in [priority: must]\n\n' +
+      '### AC 1: signs in\nGiven valid credentials, the user signs in.\n')
     writeFileSync(join(dir, 'docs/implementation-plan.md'),
       '# Plan\n\n## Task T-001: Login form [story: user-auth-1] [status: done]\n')
     writeFileSync(join(dir, 'src/auth/login.test.ts'),
-      "import { it, expect } from 'vitest'\nit('AC 1: signs in', () => { expect(1).toBe(1) })\n")
+      'import { it, expect } from \'vitest\'\nit(\'AC 1: signs in\', () => { expect(1).toBe(1) })\n')
 
     const graph = await buildDocGraph(dir)
     expect(graph.features).toHaveLength(1)

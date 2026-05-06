@@ -1,5 +1,7 @@
 import { minimatch } from 'minimatch'
-import type { Feature, Story, AcceptanceCriterion, PlanTask, PlaybookTask, Test, FileNode, Decision, PullRequest, Edge } from '../types.js'
+import type {
+  Feature, Story, AcceptanceCriterion, PlanTask, PlaybookTask, Test, FileNode, Decision, PullRequest, Edge,
+} from '../types.js'
 
 export interface BuildEdgesInput {
   features: Feature[]

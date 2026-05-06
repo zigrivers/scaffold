@@ -26,7 +26,10 @@ export const lensHCrossDoc: LensFn = async (graph) => {
         source_doc: feat.source_anchor,
         evidence: { kind: 'orphan_node', graph_query: `feature_to_story.from = ${feat.id}`, node_id: feat.id },
         confidence: 'high', first_seen: now, last_seen: now, status: 'open',
-        fix_hint: { kind: 'edit_doc', target: 'docs/user-stories.md', prompt: `Add a story covering feature "${feat.title}".` },
+        fix_hint: {
+          kind: 'edit_doc', target: 'docs/user-stories.md',
+          prompt: `Add a story covering feature "${feat.title}".`,
+        },
       })
     }
 
@@ -77,9 +80,16 @@ export const lensHCrossDoc: LensFn = async (graph) => {
       title: `story not covered by plan or playbook: ${s.title}`,
       description: `Story ${s.id} (priority: ${s.priority}) has no plan task or playbook task.`,
       source_doc: s.source_anchor,
-      evidence: { kind: 'orphan_node', graph_query: `story_to_plan_task.from = ${s.id} OR playbook_task_to_story.to = ${s.id}`, node_id: s.id },
+      evidence: {
+        kind: 'orphan_node',
+        graph_query: `story_to_plan_task.from = ${s.id} OR playbook_task_to_story.to = ${s.id}`,
+        node_id: s.id,
+      },
       confidence: 'high', first_seen: now, last_seen: now, status: 'open',
-      fix_hint: { kind: 'edit_doc', target: 'docs/implementation-plan.md', prompt: `Add a plan task tracing back to story ${s.id}.` },
+      fix_hint: {
+        kind: 'edit_doc', target: 'docs/implementation-plan.md',
+        prompt: `Add a plan task tracing back to story ${s.id}.`,
+      },
     })
   }
 
@@ -108,10 +118,13 @@ export const lensHCrossDoc: LensFn = async (graph) => {
       findings.push({
         id: makeFindingId([lensId, 'supersedes-missing', e.from, e.to]),
         lens_id: lensId, severity: 'P0',
-        title: `decision supersedes non-existent decision`,
+        title: 'decision supersedes non-existent decision',
         description: `${e.from} supersedes ${e.to}, but ${e.to} does not exist.`,
         source_doc: 'decisions.jsonl',
-        evidence: { kind: 'doc_disagreement', left_doc: 'decisions.jsonl', right_doc: 'decisions.jsonl', conflict: `${e.from} -> ${e.to} (missing)` },
+        evidence: {
+          kind: 'doc_disagreement', left_doc: 'decisions.jsonl', right_doc: 'decisions.jsonl',
+          conflict: `${e.from} -> ${e.to} (missing)`,
+        },
         confidence: 'high', first_seen: now, last_seen: now, status: 'open',
       })
     }
@@ -127,7 +140,10 @@ export const lensHCrossDoc: LensFn = async (graph) => {
       source_doc: 'decisions.jsonl',
       evidence: { kind: 'doc_disagreement', left_doc: 'decisions.jsonl', right_doc: 'filesystem', conflict: u.glob },
       confidence: 'medium', first_seen: now, last_seen: now, status: 'open',
-      fix_hint: { kind: 'edit_doc', target: 'decisions.jsonl', prompt: `Update the affects glob for decision ${u.decision_id}.` },
+      fix_hint: {
+        kind: 'edit_doc', target: 'decisions.jsonl',
+        prompt: `Update the affects glob for decision ${u.decision_id}.`,
+      },
     })
   }
 

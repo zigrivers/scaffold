@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { runChecks } from './runner'
-import type { LensManifest } from './registry'
-import type { Finding } from '../types'
+import { runChecks } from './runner.js'
+import type { LensManifest } from './registry.js'
+import type { Finding } from '../types.js'
 
-const stubGraph = { features: [], stories: [], acceptance_criteria: [], plan_tasks: [], playbook_tasks: [], tests: [], pull_requests: [], files: [], rules: [], components: [], tokens: [], decisions: [], edges: [], provenance: {}, unresolved_globs: [] }
+const stubGraph = {
+  features: [], stories: [], acceptance_criteria: [], plan_tasks: [], playbook_tasks: [], tests: [],
+  pull_requests: [], files: [], rules: [], components: [], tokens: [], decisions: [],
+  edges: [], provenance: {}, unresolved_globs: [],
+}
 const stubAvailability = {
   git: { status: 'available' as const }, gh: { status: 'unavailable' as const, reason: 'no gh' },
   pipeline_docs: { status: 'available' as const }, tests: { status: 'available' as const },
@@ -23,7 +27,9 @@ describe('runChecks', () => {
       X: async () => { order.push('X'); return [] as Finding[] },
       Y: async () => { order.push('Y'); return [] as Finding[] },
     }
-    await runChecks({ registry, lenses, graph: stubGraph, ledger: { events: [] }, availability: stubAvailability, profile: 'fast' })
+    await runChecks({
+      registry, lenses, graph: stubGraph, ledger: { events: [] }, availability: stubAvailability, profile: 'fast',
+    })
     expect(order).toEqual(['Y', 'X'])
   })
 
@@ -32,7 +38,9 @@ describe('runChecks', () => {
       { id: 'NeedsGh', name: 'NG', profiles: ['fast'], required: ['gh'], optional: [] },
     ]
     const lenses = { NeedsGh: async () => [{ id: 'should-not-be-called' } as never as Finding] }
-    const findings = await runChecks({ registry, lenses, graph: stubGraph, ledger: { events: [] }, availability: stubAvailability, profile: 'fast' })
+    const findings = await runChecks({
+      registry, lenses, graph: stubGraph, ledger: { events: [] }, availability: stubAvailability, profile: 'fast',
+    })
     expect(findings).toHaveLength(1)
     expect(findings[0].lens_id).toBe('NeedsGh')
     expect(findings[0].severity).toBe('P3')
@@ -42,7 +50,10 @@ describe('runChecks', () => {
   it('passes upstream findings to downstream via the shared buffer', async () => {
     const registry: LensManifest[] = [
       { id: 'D-stack', name: 'D', profiles: ['fast'], required: ['pipeline_docs'], optional: [] },
-      { id: 'G-decisions', name: 'G', profiles: ['fast'], required: ['pipeline_docs'], optional: [], depends_on: ['D-stack'] },
+      {
+        id: 'G-decisions', name: 'G', profiles: ['fast'],
+        required: ['pipeline_docs'], optional: [], depends_on: ['D-stack'],
+      },
     ]
     const seen: Finding[][] = []
     const lenses = {
@@ -52,7 +63,9 @@ describe('runChecks', () => {
         return [] as Finding[]
       },
     }
-    await runChecks({ registry, lenses, graph: stubGraph, ledger: { events: [] }, availability: stubAvailability, profile: 'fast' })
+    await runChecks({
+      registry, lenses, graph: stubGraph, ledger: { events: [] }, availability: stubAvailability, profile: 'fast',
+    })
     expect(seen).toHaveLength(1)
     expect(seen[0]).toHaveLength(1)
     expect(seen[0][0].lens_id).toBe('D-stack')
@@ -63,6 +76,8 @@ describe('runChecks', () => {
       { id: 'A', name: 'A', profiles: ['fast'], required: ['pipeline_docs'], optional: [], depends_on: ['B'] },
       { id: 'B', name: 'B', profiles: ['fast'], required: ['pipeline_docs'], optional: [], depends_on: ['A'] },
     ]
-    await expect(runChecks({ registry, lenses: {}, graph: stubGraph, ledger: { events: [] }, availability: stubAvailability, profile: 'fast' })).rejects.toThrow(/cycle/i)
+    await expect(runChecks({
+      registry, lenses: {}, graph: stubGraph, ledger: { events: [] }, availability: stubAvailability, profile: 'fast',
+    })).rejects.toThrow(/cycle/i)
   })
 })

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { lensHCrossDoc } from './lens-h-cross-doc'
-import type { DocGraph, AvailabilityMap } from '../engine/types'
+import { lensHCrossDoc } from './lens-h-cross-doc.js'
+import type { DocGraph, AvailabilityMap, Finding } from '../engine/types.js'
 
 const stubAvail: AvailabilityMap = {
   git: { status: 'available' }, gh: { status: 'unavailable' },
@@ -24,7 +24,7 @@ describe('lensHCrossDoc', () => {
     const g = emptyGraph()
     g.features = [{ id: 'feature:user-auth', title: 'User Auth', priority: 'must', source_anchor: '' }]
     const findings = await lensHCrossDoc(g, { events: [] }, stubAvail, [], new Set(['H-cross-doc']))
-    const f = findings.find((x) => /no story/i.test(x.title))
+    const f = findings.find((x: Finding) => /no story/i.test(x.title))
     expect(f?.severity).toBe('P1')
     expect(f?.lens_id).toBe('H-cross-doc')
   })
@@ -33,7 +33,7 @@ describe('lensHCrossDoc', () => {
     const g = emptyGraph()
     g.stories = [{ id: 'story:s-1', title: 'Sign in', priority: 'must', source_anchor: '' }]
     const findings = await lensHCrossDoc(g, { events: [] }, stubAvail, [], new Set(['H-cross-doc']))
-    const f = findings.find((x) => /not covered/i.test(x.title))
+    const f = findings.find((x: Finding) => /not covered/i.test(x.title))
     expect(f?.severity).toBe('P0')
   })
 
@@ -41,7 +41,7 @@ describe('lensHCrossDoc', () => {
     const g = emptyGraph()
     g.stories = [{ id: 'story:s-1', title: 'Settings', priority: 'should', source_anchor: '' }]
     const findings = await lensHCrossDoc(g, { events: [] }, stubAvail, [], new Set(['H-cross-doc']))
-    const f = findings.find((x) => /not covered/i.test(x.title))
+    const f = findings.find((x: Finding) => /not covered/i.test(x.title))
     expect(f?.severity).toBe('P1')
   })
 
@@ -55,15 +55,18 @@ describe('lensHCrossDoc', () => {
     ]
     g.plan_tasks = [{ id: 'plan_task:t', title: 't', status: 'todo', source_anchor: '' }]
     const findings = await lensHCrossDoc(g, { events: [] }, stubAvail, [], new Set(['H-cross-doc']))
-    expect(findings.some((f) => /orphan/i.test(f.title))).toBe(true)
+    expect(findings.some((f: Finding) => /orphan/i.test(f.title))).toBe(true)
   })
 
   it('emits P0 for decision_supersedes targeting non-existent decision', async () => {
     const g = emptyGraph()
-    g.decisions = [{ id: 'decision:current', key: 'current', summary: 'now', affects: [], source_anchor: '', recorded_at: '2026-04-30T00:00:00Z' }]
+    g.decisions = [{
+      id: 'decision:current', key: 'current', summary: 'now',
+      affects: [], source_anchor: '', recorded_at: '2026-04-30T00:00:00Z',
+    }]
     g.edges = [{ kind: 'decision_supersedes', from: 'decision:current', to: 'decision:nonexistent' }]
     const findings = await lensHCrossDoc(g, { events: [] }, stubAvail, [], new Set(['H-cross-doc']))
-    const f = findings.find((x) => /supersedes/i.test(x.title))
+    const f = findings.find((x: Finding) => /supersedes/i.test(x.title))
     expect(f?.severity).toBe('P0')
   })
 

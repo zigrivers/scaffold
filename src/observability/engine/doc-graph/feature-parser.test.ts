@@ -37,7 +37,7 @@ Users sign in with Google.
   })
 
   it('defaults priority to "should" when no tag is present', () => {
-    const md = `## Features\n\n### Bare Feature\n\nNo priority tag.\n`
+    const md = '## Features\n\n### Bare Feature\n\nNo priority tag.\n'
     const features = parseFeatures(md)
     expect(features[0].priority).toBe('should')
   })
@@ -46,8 +46,8 @@ Users sign in with Google.
     expect(parseFeatures('# PRD\n\n## Problem\nFoo\n')).toEqual([])
   })
 
-  it("handles MoSCoW words in heading without explicit tag (Must, Should, Could, Won't)", () => {
-    const md = "## Features\n\n### Login (Must)\n\n### Reports (Could)\n\n### Multi-tenant (Won't)\n"
+  it('handles MoSCoW words in heading without explicit tag (Must, Should, Could, Won\'t)', () => {
+    const md = '## Features\n\n### Login (Must)\n\n### Reports (Could)\n\n### Multi-tenant (Won\'t)\n'
     const features = parseFeatures(md)
     expect(features.map((f) => f.priority)).toEqual(['must', 'could', 'wont'])
   })

@@ -2,12 +2,12 @@ import type { CommandModule } from 'yargs'
 import { writeEvent } from '../../observability/engine/ledger-writer.js'
 import type { EventType } from '../../observability/engine/types.js'
 import { EVENT_PAYLOAD_KEYS } from '../../observability/engine/event-schemas.js'
-import { runProgress } from '../../observability/engine/api.js'
+import { runProgress, runAudit } from '../../observability/engine/api.js'
 import { redactRendered } from '../../observability/engine/redact.js'
 import { harvestWorktree } from '../../observability/engine/harvester.js'
-import { renderProgressTerminal } from '../../observability/renderers/terminal.js'
+import { renderProgressTerminal, renderAuditTerminal } from '../../observability/renderers/terminal.js'
 import { readIdentityAsync } from '../../observability/engine/identity.js'
-import { stat } from 'node:fs/promises'
+import { stat, readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { findProjectRoot } from '../middleware/project-root.js'
 
@@ -128,6 +128,123 @@ export async function handleHarvest(input: HandleHarvestInput): Promise<number> 
   }
 }
 
+// ─── handleAudit ─────────────────────────────────────────────────────────────
+
+export interface HandleAuditInput {
+  cwd: string
+  json: boolean
+  profile: 'fast' | 'full'
+  scope: 'docs' | 'code' | 'all'
+  sinceHours: number
+  lensIds?: string[]
+  fixThresholdOverride?: string
+  maskPaths?: boolean
+  showAcknowledged?: boolean
+  ghBin?: string
+  bdBin?: string
+}
+
+export async function handleAudit(input: HandleAuditInput): Promise<number> {
+  try {
+    const out = await runAudit({
+      primaryRoot: input.cwd,
+      profile: input.profile,
+      scope: input.scope,
+      sinceHours: input.sinceHours,
+      lensIds: input.lensIds,
+      fixThresholdOverride: input.fixThresholdOverride,
+      ghBin: input.ghBin,
+      bdBin: input.bdBin,
+      args: { profile: input.profile, scope: input.scope, sinceHours: input.sinceHours },
+    })
+    const exitCode = out.verdict === 'blocked' ? 1 : 0
+    if (input.json) {
+      const blob = JSON.stringify(out, null, 2)
+      process.stdout.write((input.maskPaths ? redactRendered(blob) : blob) + '\n')
+      return exitCode
+    }
+    const rendered = renderAuditTerminal(out, { showAcknowledged: input.showAcknowledged })
+    process.stdout.write((input.maskPaths ? redactRendered(rendered) : rendered) + '\n')
+    return exitCode
+  } catch (err: unknown) {
+    process.stderr.write(`scaffold observe audit: ${err instanceof Error ? err.message : String(err)}\n`)
+    return 3
+  }
+}
+
+// ─── handleAck ───────────────────────────────────────────────────────────────
+
+export interface HandleAckInput {
+  cwd: string
+  prefixOrId: string
+  status: 'acknowledged' | 'open'
+  note?: string
+}
+
+interface AuditSidecar {
+  engine_output?: { findings?: { id: string }[] }
+}
+
+async function loadAllFindingIds(auditsDir: string): Promise<string[] | null> {
+  let entries: string[]
+  try {
+    entries = await readdir(auditsDir)
+  } catch {
+    return null
+  }
+  const jsonFiles = entries.filter((e) => e.endsWith('.json')).map((e) => join(auditsDir, e))
+  if (jsonFiles.length === 0) return null
+
+  const withMtime = await Promise.all(
+    jsonFiles.map(async (f) => ({ f, mtime: (await stat(f)).mtimeMs })),
+  )
+  withMtime.sort((a, b) => b.mtime - a.mtime)
+  const newest = withMtime[0].f
+
+  const raw = JSON.parse(await readFile(newest, 'utf8')) as AuditSidecar
+  const findings = raw?.engine_output?.findings ?? []
+  return findings.map((fi) => fi.id)
+}
+
+export async function handleAck(input: HandleAckInput): Promise<number> {
+  const auditsDir = join(input.cwd, 'docs/audits')
+  const ids = await loadAllFindingIds(auditsDir)
+  if (ids === null) {
+    process.stderr.write('scaffold observe ack: no audit sidecars found in docs/audits/\n')
+    return 3
+  }
+
+  const matches = ids.filter((id) => id.startsWith(input.prefixOrId))
+  if (matches.length === 0) {
+    process.stderr.write(`scaffold observe ack: no finding matches prefix "${input.prefixOrId}"\n`)
+    return 2
+  }
+  if (matches.length > 1) {
+    process.stderr.write(
+      `scaffold observe ack: ambiguous prefix "${input.prefixOrId}" matches ${matches.length} findings\n`,
+    )
+    return 2
+  }
+
+  const findingId = matches[0]
+  try {
+    await writeEvent(input.cwd, {
+      type: 'finding_acknowledged',
+      branch: 'main',
+      task_id: null,
+      payload: {
+        finding_id: findingId,
+        status: input.status,
+        ...(input.note ? { note: input.note } : {}),
+      },
+    })
+    return 0
+  } catch (err: unknown) {
+    process.stderr.write(`scaffold observe ack: ${err instanceof Error ? err.message : String(err)}\n`)
+    return 3
+  }
+}
+
 // ─── Yargs CommandModule ──────────────────────────────────────────────────────
 
 type AnyArgv = Record<string, unknown>
@@ -194,7 +311,51 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
         process.exitCode = code
       },
     )
-    .demandCommand(1, 'observe requires a subcommand: event | progress | harvest'),
+    .command(
+      'audit',
+      'Run audit lenses and report findings',
+      (y) => y
+        .option('json', { type: 'boolean', default: false })
+        .option('mask-paths', { type: 'boolean', default: false })
+        .option('since-hours', { type: 'number', default: 24 })
+        .option('profile', { type: 'string', choices: ['fast', 'full'] as const, default: 'fast' })
+        .option('scope', { type: 'string', choices: ['docs', 'code', 'all'] as const, default: 'all' })
+        .option('lens', { type: 'array', string: true })
+        .option('fix-threshold', { type: 'string' })
+        .option('show-acknowledged', { type: 'boolean', default: false }),
+      async (argv) => {
+        const code = await handleAudit({
+          cwd: findProjectRoot(process.cwd()) ?? process.cwd(),
+          json: !!(argv.json),
+          maskPaths: !!(argv['mask-paths'] ?? argv.maskPaths),
+          sinceHours: (argv['since-hours'] ?? argv.sinceHours ?? 24) as number,
+          profile: (argv.profile ?? 'fast') as 'fast' | 'full',
+          scope: (argv.scope ?? 'all') as 'docs' | 'code' | 'all',
+          lensIds: argv.lens as string[] | undefined,
+          fixThresholdOverride: argv['fix-threshold'] as string | undefined,
+          showAcknowledged: !!(argv['show-acknowledged'] ?? argv.showAcknowledged),
+        })
+        process.exitCode = code
+      },
+    )
+    .command(
+      'ack <prefix-or-id>',
+      'Acknowledge or reopen a finding by ID prefix',
+      (y) => y
+        .positional('prefix-or-id', { type: 'string', demandOption: true })
+        .option('status', { type: 'string', choices: ['acknowledged', 'open'] as const, default: 'acknowledged' })
+        .option('note', { type: 'string' }),
+      async (argv) => {
+        const code = await handleAck({
+          cwd: findProjectRoot(process.cwd()) ?? process.cwd(),
+          prefixOrId: argv['prefix-or-id'] as string,
+          status: (argv.status ?? 'acknowledged') as 'acknowledged' | 'open',
+          note: argv.note as string | undefined,
+        })
+        process.exitCode = code
+      },
+    )
+    .demandCommand(1, 'observe requires a subcommand: event | progress | harvest | audit | ack'),
   handler: async () => { /* intentional: subcommands set process.exitCode */ },
 }
 

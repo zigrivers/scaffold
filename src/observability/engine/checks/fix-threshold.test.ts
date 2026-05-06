@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { resolveFixThreshold } from './fix-threshold'
+import { resolveFixThreshold } from './fix-threshold.js'
 
 describe('resolveFixThreshold', () => {
   let dir: string

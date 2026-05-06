@@ -24,7 +24,9 @@ function parseStoryHeading(text: string): { storyKey: string; title: string } | 
   return null
 }
 
-function parseAcsFromSection(root: Root, story: Story, storyStartIdx: number, storyEndIdx: number): AcceptanceCriterion[] {
+function parseAcsFromSection(
+  root: Root, story: Story, storyStartIdx: number, storyEndIdx: number,
+): AcceptanceCriterion[] {
   const out: AcceptanceCriterion[] = []
 
   // (a) ### AC <n>: <title> headings

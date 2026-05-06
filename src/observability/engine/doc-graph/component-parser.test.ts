@@ -35,7 +35,7 @@ describe('parseSanctionedComponents', () => {
   })
 
   it('skips H3 entries without package_or_url field', () => {
-    const md = `## Frontend\n\n### Some Section Without Package\n\nProse only.\n`
+    const md = '## Frontend\n\n### Some Section Without Package\n\nProse only.\n'
     expect(parseSanctionedComponents(md)).toEqual([])
   })
 })

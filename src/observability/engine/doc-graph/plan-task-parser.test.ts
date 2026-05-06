@@ -31,7 +31,7 @@ ACs: 1.1, 1.2
   })
 
   it('also accepts H3 task headings (deep methodology format)', () => {
-    const md = `# Implementation Plan\n\n## Wave 1\n\n### Task T-001: Foo [story: s-1]\nBody.\n`
+    const md = '# Implementation Plan\n\n## Wave 1\n\n### Task T-001: Foo [story: s-1]\nBody.\n'
     const tasks = parsePlanTasks(md)
     expect(tasks).toHaveLength(1)
     expect(tasks[0].id).toBe('plan_task:T-001')

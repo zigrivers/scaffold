@@ -68,6 +68,8 @@ When modifying prompts:
 | `scaffold observe event <type> ...` | Write a build-observability ledger event |
 | `scaffold observe progress` | Show snapshot of in-flight, completed, and recent decisions |
 | `scaffold observe harvest --worktree=<path>` | Flush a worktree's ledger to the primary archive |
+| `scaffold observe audit [--json] [--profile fast\|full] [--scope docs\|code\|all]` | Run audit lenses and report findings; exits 1 if verdict=blocked |
+| `scaffold observe ack <prefix-or-id> [--status acknowledged\|open] [--note "…"]` | Acknowledge or reopen a finding by ID prefix |
 
 ### Committing and Creating PRs
 

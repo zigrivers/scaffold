@@ -10,9 +10,15 @@ describe('parseDecisions', () => {
   afterEach(() => { rmSync(dir, { recursive: true, force: true }) })
 
   it('reads decisions.jsonl entries', async () => {
-    writeFileSync(join(dir, 'decisions.jsonl'),
-      JSON.stringify({ key: 'use-postgres', summary: 'Use Postgres for primary store', affects: ['src/db/**'], recorded_at: '2026-04-29T00:00:00Z' }) + '\n' +
-      JSON.stringify({ key: 'caching-strategy', summary: 'TTL=60s', affects: ['src/cache/**'], superseded_by: 'caching-strategy-v2', recorded_at: '2026-04-29T01:00:00Z' }) + '\n')
+    const line1 = JSON.stringify({
+      key: 'use-postgres', summary: 'Use Postgres for primary store',
+      affects: ['src/db/**'], recorded_at: '2026-04-29T00:00:00Z',
+    })
+    const line2 = JSON.stringify({
+      key: 'caching-strategy', summary: 'TTL=60s', affects: ['src/cache/**'],
+      superseded_by: 'caching-strategy-v2', recorded_at: '2026-04-29T01:00:00Z',
+    })
+    writeFileSync(join(dir, 'decisions.jsonl'), `${line1}\n${line2}\n`)
 
     const decs = await parseDecisions(dir)
     expect(decs).toHaveLength(2)
@@ -28,8 +34,18 @@ describe('parseDecisions', () => {
 
   it('reads decisions from docs/decisions/*.md frontmatter', async () => {
     mkdirSync(join(dir, 'docs/decisions'), { recursive: true })
-    writeFileSync(join(dir, 'docs/decisions/use-redis.md'),
-      '---\nkey: use-redis\nsummary: Add Redis for hot-path caching\naffects: ["src/cache/**", "src/api/handler.ts"]\nrecorded_at: 2026-04-30T00:00:00Z\n---\n\n## Context\nWe need a cache.\n')
+    writeFileSync(join(dir, 'docs/decisions/use-redis.md'), [
+      '---',
+      'key: use-redis',
+      'summary: Add Redis for hot-path caching',
+      'affects: ["src/cache/**", "src/api/handler.ts"]',
+      'recorded_at: 2026-04-30T00:00:00Z',
+      '---',
+      '',
+      '## Context',
+      'We need a cache.',
+      '',
+    ].join('\n'))
     const decs = await parseDecisions(dir)
     expect(decs).toHaveLength(1)
     expect(decs[0]).toMatchObject({
