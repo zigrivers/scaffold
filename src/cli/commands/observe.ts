@@ -8,6 +8,7 @@ import { harvestWorktree } from '../../observability/engine/harvester.js'
 import { renderProgressTerminal, renderAuditTerminal } from '../../observability/renderers/terminal.js'
 import { renderProgressMarkdown, renderAuditMarkdown } from '../../observability/renderers/markdown.js'
 import { writeSidecar, deriveReportId, sidecarPath } from '../../observability/renderers/sidecar.js'
+import { renderProgressFragment, renderAuditFragment } from '../../observability/renderers/dashboard.js'
 import { readIdentityAsync } from '../../observability/engine/identity.js'
 import { stat, readdir, readFile } from 'node:fs/promises'
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -86,6 +87,7 @@ export interface HandleProgressInput {
   sinceHours: number
   maskPaths?: boolean
   output?: string
+  render?: 'dashboard-fragment'
   ghBin?: string
   bdBin?: string
 }
@@ -99,6 +101,10 @@ export async function handleProgress(input: HandleProgressInput): Promise<number
       bdBin: input.bdBin,
       args: { sinceHours: input.sinceHours },
     })
+    if (input.render === 'dashboard-fragment') {
+      process.stdout.write(renderProgressFragment(out) + '\n')
+      return 0
+    }
     const sidecarFinal = await writeSidecar(input.cwd, out)
     if (input.json) {
       const blob = JSON.stringify(out, null, 2)
@@ -160,6 +166,7 @@ export interface HandleAuditInput {
   maskPaths?: boolean
   showAcknowledged?: boolean
   output?: string
+  render?: 'dashboard-fragment-audit'
   ghBin?: string
   bdBin?: string
 }
@@ -177,6 +184,10 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
       bdBin: input.bdBin,
       args: { profile: input.profile, scope: input.scope, sinceHours: input.sinceHours },
     })
+    if (input.render === 'dashboard-fragment-audit') {
+      process.stdout.write(renderAuditFragment(out) + '\n')
+      return out.verdict === 'blocked' ? 1 : 0
+    }
     const sidecarFinal = await writeSidecar(input.cwd, out)
     if (input.json) {
       const blob = JSON.stringify(out, null, 2)
@@ -315,7 +326,8 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
         .option('json', { type: 'boolean', default: false })
         .option('mask-paths', { type: 'boolean', default: false })
         .option('since-hours', { type: 'number', default: 24 })
-        .option('output', { type: 'string', describe: 'Override markdown report destination path' }),
+        .option('output', { type: 'string', describe: 'Override markdown report destination path' })
+        .option('render', { type: 'string', choices: ['dashboard-fragment'] as const, describe: 'Emit HTML fragment to stdout' }),
       async (argv) => {
         const code = await handleProgress({
           cwd: findProjectRoot(process.cwd()) ?? process.cwd(),
@@ -323,6 +335,7 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
           maskPaths: !!(argv['mask-paths'] ?? argv.maskPaths),
           sinceHours: (argv['since-hours'] ?? argv.sinceHours ?? 24) as number,
           output: argv.output as string | undefined,
+          render: argv.render as 'dashboard-fragment' | undefined,
         })
         process.exitCode = code
       },
@@ -351,7 +364,8 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
         .option('lens', { type: 'array', string: true })
         .option('fix-threshold', { type: 'string' })
         .option('show-acknowledged', { type: 'boolean', default: false })
-        .option('output', { type: 'string', describe: 'Override markdown report destination path' }),
+        .option('output', { type: 'string', describe: 'Override markdown report destination path' })
+        .option('render', { type: 'string', choices: ['dashboard-fragment-audit'] as const, describe: 'Emit HTML fragment to stdout' }),
       async (argv) => {
         const code = await handleAudit({
           cwd: findProjectRoot(process.cwd()) ?? process.cwd(),
@@ -364,6 +378,7 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
           fixThresholdOverride: argv['fix-threshold'] as string | undefined,
           showAcknowledged: !!(argv['show-acknowledged'] ?? argv.showAcknowledged),
           output: argv.output as string | undefined,
+          render: argv.render as 'dashboard-fragment-audit' | undefined,
         })
         process.exitCode = code
       },

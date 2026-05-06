@@ -286,3 +286,42 @@ describe('observe progress + audit write markdown reports and sidecars', () => {
     expect(readdirSync(join(proj, 'docs/build-status')).find((f) => f.endsWith('.json'))).toBeDefined()
   })
 })
+
+describe('observe --render=dashboard-fragment', () => {
+  let proj: string
+  beforeEach(async () => {
+    proj = mkdtempSync(join(tmpdir(), 'observe-frag-'))
+    execSync('git init -q', { cwd: proj })
+    execSync('git config user.email t@e.com && git config user.name T', { cwd: proj, shell: '/bin/sh' })
+    ensureIdentity(proj, 'primary')
+    mkdirSync(join(proj, 'docs'), { recursive: true })
+    writeFileSync(join(proj, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }))
+    writeFileSync(join(proj, 'docs/plan.md'), '# PRD\n## Features\n### F [priority: must]\n')
+    writeFileSync(join(proj, 'docs/user-stories.md'),
+      '## Story s-1: T [priority: must]\n\n### AC 1: t\n')
+    writeFileSync(join(proj, 'docs/tdd-standards.md'), '# TDD\n')
+  })
+  afterEach(() => { rmSync(proj, { recursive: true, force: true }) })
+
+  it('handleProgress with render=dashboard-fragment prints HTML to stdout and skips markdown/sidecar', async () => {
+    let captured = ''
+    const origWrite = process.stdout.write.bind(process.stdout)
+    process.stdout.write = ((s: string | Uint8Array) => { captured += String(s); return true }) as never
+    try {
+      await handleProgress({ cwd: proj, json: false, sinceHours: 24, render: 'dashboard-fragment', ghBin: '/no/such/gh', bdBin: '/no/such/bd' })
+    } finally { process.stdout.write = origWrite }
+    expect(captured).toMatch(/<section id="build-progress"/)
+    expect(existsSync(join(proj, 'docs/build-status'))).toBe(false)
+  })
+
+  it('handleAudit with render=dashboard-fragment-audit prints HTML to stdout', async () => {
+    let captured = ''
+    const origWrite = process.stdout.write.bind(process.stdout)
+    process.stdout.write = ((s: string | Uint8Array) => { captured += String(s); return true }) as never
+    try {
+      await handleAudit({ cwd: proj, json: false, profile: 'fast', scope: 'all', sinceHours: 24, render: 'dashboard-fragment-audit', ghBin: '/no/such/gh', bdBin: '/no/such/bd' })
+    } finally { process.stdout.write = origWrite }
+    expect(captured).toMatch(/<section id="build-audit"/)
+    expect(existsSync(join(proj, 'docs/audits'))).toBe(false)
+  })
+})
