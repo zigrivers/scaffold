@@ -102,8 +102,19 @@ describe('buildEdges (with token + component uses)', () => {
     const result = buildEdges({ ...minimalInput, token_uses: tokenUses })
     const edges = result.edges.filter((e) => e.kind === 'file_to_token_use')
     expect(edges).toHaveLength(2)
-    expect(edges[0]).toEqual({ kind: 'file_to_token_use', from: 'file:src/styles/btn.css', to: 'token:--color-primary' })
-    expect(edges[1]).toEqual({ kind: 'file_to_token_use', from: 'file:src/styles/btn.css', to: 'ad_hoc' })
+    expect(edges[0]).toEqual({ kind: 'file_to_token_use', from: 'file:src/styles/btn.css', to: 'token:--color-primary', property: 'color' })
+    expect(edges[1]).toEqual({ kind: 'file_to_token_use', from: 'file:src/styles/btn.css', to: 'ad_hoc', property: 'background' })
+  })
+
+  it('preserves the `property` field on file_to_token_use edges when provided by the detector', () => {
+    const tokenUses = [
+      { file: 'src/styles/btn.css', property: 'color',   value: '#4f46e5', token_id: 'token:--color-primary' },
+      { file: 'src/styles/btn.css', property: 'padding', value: '8px',     token_id: 'ad_hoc' },
+    ]
+    const result = buildEdges({ ...minimalInput, token_uses: tokenUses } as never)
+    const edges = result.edges.filter((e) => e.kind === 'file_to_token_use') as Array<{ kind: 'file_to_token_use'; from: string; to: string; property?: string }>
+    expect(edges[0].property).toBe('color')
+    expect(edges[1].property).toBe('padding')
   })
 
   it('emits file_to_component_use edges for each detected import', () => {
