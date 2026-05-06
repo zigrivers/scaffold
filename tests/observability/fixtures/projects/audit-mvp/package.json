@@ -1,0 +1,7 @@
+{
+  "name": "audit-mvp-fixture",
+  "version": "0.1.0",
+  "scripts": {
+    "test": "vitest run"
+  }
+}

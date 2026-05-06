@@ -257,3 +257,144 @@ export interface WorktreeIdentity {
   worktree_label: string
   created_at: string
 }
+
+// ─── Doc-graph node types (Plan 2) ──────────────────────────────────────
+export interface Feature {
+  id: string
+  title: string
+  priority: 'must' | 'should' | 'could' | 'wont'
+  source_anchor: string
+  prose?: string
+}
+
+export interface Story {
+  id: string
+  title: string
+  priority: 'must' | 'should' | 'could' | 'wont'
+  kind?: 'ui' | 'api' | 'data' | 'infra' | 'doc'
+  feature_id?: string
+  source_anchor: string
+}
+
+export interface AcceptanceCriterion {
+  id: string
+  story_id: string
+  text: string
+  source_anchor: string
+}
+
+export interface PlanTask {
+  id: string
+  title: string
+  status: 'todo' | 'in_flight' | 'done' | 'skipped'
+  story_id?: string
+  wave?: string
+  source_anchor: string
+}
+
+export interface PlaybookTask {
+  id: string
+  title: string
+  status: 'todo' | 'in_flight' | 'done' | 'skipped'
+  story_id?: string
+  plan_task_id?: string
+  source_anchor: string
+}
+
+export interface Rule {
+  id: string
+  description: string
+  pattern?: string
+  forbidden?: string[]
+  match?: string
+  language?: string
+  severity?: string
+  enforce_via?: string
+  source_anchor: string
+}
+
+export interface SanctionedComponent {
+  id: string
+  package_or_url: string
+  layer?: string
+  source_anchor: string
+}
+
+export interface DesignToken {
+  id: string
+  category: 'color' | 'spacing' | 'typography' | 'shadow' | 'radius' | 'motion'
+  value: string
+  priority: 'must' | 'should' | 'could' | 'wont'
+  source_anchor: string
+}
+
+export interface Decision {
+  id: string
+  key: string
+  summary: string
+  affects: string[]
+  superseded_by?: string
+  source_anchor: string
+  recorded_at: string
+}
+
+export interface Test {
+  id: string
+  name: string
+  file_path: string
+  framework: 'vitest' | 'jest' | 'pytest' | 'go-test' | 'bats'
+  last_status?: 'pass' | 'fail' | 'skip' | 'unknown'
+}
+
+export interface FileNode {
+  id: string
+  path: string
+}
+
+export interface PullRequest {
+  id: string
+  number: number
+  url: string
+  title?: string
+  state?: 'open' | 'closed' | 'merged'
+}
+
+export type EdgeKind =
+  | 'feature_to_story'
+  | 'story_to_ac'
+  | 'ac_to_test'
+  | 'test_to_file'
+  | 'story_to_plan_task'
+  | 'plan_task_to_playbook'
+  | 'playbook_task_to_story'
+  | 'playbook_task_to_pr'
+  | 'pr_to_file'
+  | 'file_to_token_use'
+  | 'file_to_component_use'
+  | 'decision_supersedes'
+  | 'decision_links_doc'
+  | 'decision_to_file'
+
+export interface Edge {
+  kind: EdgeKind
+  from: string
+  to: string
+}
+
+export interface DocGraph {
+  features: Feature[]
+  stories: Story[]
+  acceptance_criteria: AcceptanceCriterion[]
+  plan_tasks: PlanTask[]
+  playbook_tasks: PlaybookTask[]
+  tests: Test[]
+  pull_requests: PullRequest[]
+  files: FileNode[]
+  rules: Rule[]
+  components: SanctionedComponent[]
+  tokens: DesignToken[]
+  decisions: Decision[]
+  edges: Edge[]
+  provenance: Record<string, string>
+  unresolved_globs: Array<{ decision_id: string; glob: string }>
+}
