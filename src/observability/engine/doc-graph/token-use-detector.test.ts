@@ -15,7 +15,7 @@ describe('detectCssTokenUses', () => {
     expect(uses).toEqual([
       { file: 'src/styles/btn.css', property: 'color',      value: '#4f46e5', token_id: 'token:--color-primary' },
       { file: 'src/styles/btn.css', property: 'padding',    value: '8px',     token_id: 'token:--sp-2' },
-      { file: 'src/styles/btn.css', property: 'background', value: '#abcdef', token_id: 'ad_hoc' },
+      { file: 'src/styles/btn.css', property: 'background', value: '#abcdef', token_id: 'ad_hoc:color' },
     ])
   })
 
@@ -23,8 +23,8 @@ describe('detectCssTokenUses', () => {
     const css = `.box { padding: 8px 16px; margin: 4px; }`
     const uses = detectCssTokenUses(css, tokens, 'src/styles/box.css')
     expect(uses.find((u) => u.value === '8px' && u.token_id === 'token:--sp-2')).toBeDefined()
-    expect(uses.find((u) => u.value === '16px' && u.token_id === 'ad_hoc')).toBeDefined()
-    expect(uses.find((u) => u.value === '4px' && u.token_id === 'ad_hoc')).toBeDefined()
+    expect(uses.find((u) => u.value === '16px' && u.token_id === 'ad_hoc:spacing')).toBeDefined()
+    expect(uses.find((u) => u.value === '4px' && u.token_id === 'ad_hoc:spacing')).toBeDefined()
   })
 
   it('ignores values that are CSS variables (var(--…))', () => {
@@ -50,7 +50,7 @@ describe('detectJsxTokenUses', () => {
     expect(uses).toEqual([
       { file: 'src/components/Btn.tsx', property: 'color',      value: '#4f46e5', token_id: 'token:--color-primary' },
       { file: 'src/components/Btn.tsx', property: 'padding',    value: '8px',     token_id: 'token:--sp-2' },
-      { file: 'src/components/Btn.tsx', property: 'background', value: '#abcdef', token_id: 'ad_hoc' },
+      { file: 'src/components/Btn.tsx', property: 'background', value: '#abcdef', token_id: 'ad_hoc:color' },
     ])
   })
 

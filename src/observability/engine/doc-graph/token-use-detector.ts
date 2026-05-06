@@ -29,7 +29,7 @@ function tokenIdFor(value: string, tokens: DesignToken[], category: DesignToken[
   if (!category) return 'ad_hoc'
   const v = value.trim().toLowerCase()
   const match = tokens.find((t) => t.category === category && t.value.trim().toLowerCase() === v)
-  return match ? match.id : 'ad_hoc'
+  return match ? match.id : `ad_hoc:${category}`
 }
 
 function categoryOfProp(prop: string): DesignToken['category'] | null {

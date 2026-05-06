@@ -44,7 +44,7 @@ export interface ObservabilityConfig {
 export const DEFAULT_CONFIG: ObservabilityConfig = {
   lenses: {
     'C-standards': { enforce_via_linter: true, rule_overrides: {} },
-    'E-design':    { ad_hoc_token_threshold: 3, ui_glob: 'src/components/**/*.{tsx,jsx,vue,svelte},src/styles/**/*.{css,scss}' },
+    'E-design':    { ad_hoc_token_threshold: 3, ui_glob: 'src/components/**/*.tsx' },
     'F-scope':     { untouched_story_grace_hours: 168 },
     'G-decisions': {},
     'H-cross-doc': {},
