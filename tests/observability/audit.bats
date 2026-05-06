@@ -208,13 +208,13 @@ EOF
 
     run $BIN observe audit --since-hours=24
     [ "$status" -eq 1 ] # blocked
-    md_count="$(ls docs/audits/audit-*-fast-all.md 2>/dev/null | wc -l | tr -d ' ')"
-    json_count="$(ls docs/audits/audit-*-fast-all.json 2>/dev/null | wc -l | tr -d ' ')"
+    md_count="$(ls docs/audits/audit-*-fast-all-*.md 2>/dev/null | wc -l | tr -d ' ')"
+    json_count="$(ls docs/audits/audit-*-fast-all-*.json 2>/dev/null | wc -l | tr -d ' ')"
     [ "$md_count" -ge 1 ]
     [ "$json_count" -ge 1 ]
 
     # Sidecar JSON contains the engine_output wrapper
-    sidecar="$(ls docs/audits/audit-*-fast-all.json | head -1)"
+    sidecar="$(ls docs/audits/audit-*-fast-all-*.json | head -1)"
     grep -q '"engine_output"' "$sidecar"
     grep -q '"schema_version": "1.0"' "$sidecar"
 }

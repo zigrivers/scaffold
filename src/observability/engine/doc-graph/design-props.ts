@@ -1,6 +1,7 @@
 export const COLOR_PROPS = new Set([
   'color', 'background', 'background-color', 'border-color', 'border-top-color',
   'border-right-color', 'border-bottom-color', 'border-left-color',
+  'border', 'border-top', 'border-right', 'border-bottom', 'border-left',
   'outline-color', 'text-decoration-color', 'fill', 'stroke', 'caret-color',
   'column-rule-color', 'accent-color',
 ])
