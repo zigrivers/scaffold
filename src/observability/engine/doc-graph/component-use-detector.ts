@@ -27,6 +27,14 @@ function isBuiltin(specifier: string): boolean {
   return specifier.startsWith('node:') || builtinModules.includes(specifier)
 }
 
+function normalizeSpecifier(specifier: string): string {
+  if (specifier.startsWith('@')) {
+    const parts = specifier.split('/')
+    return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : specifier
+  }
+  return specifier.split('/')[0]
+}
+
 export function detectComponentUses(
   source: string,
   components: SanctionedComponent[],
@@ -43,7 +51,8 @@ export function detectComponentUses(
   }
   function pushUse(specifier: string) {
     if (isRelative(specifier) || isBuiltin(specifier)) return
-    const match = components.find((c) => packageNameOf(c) === specifier)
+    const normalized = normalizeSpecifier(specifier)
+    const match = components.find((c) => packageNameOf(c) === normalized)
     out.push({ file: filePath, specifier, component_id: match ? match.id : 'unsanctioned' })
   }
   traverse(ast, {

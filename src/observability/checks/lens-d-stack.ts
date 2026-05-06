@@ -60,14 +60,14 @@ export const lensDStack: LensFn = async (graph, ledger) => {
     const filePath = from.replace(/^file:/, '')
     if (decisionsCoverPath(ledger.events, filePath, specifier)) continue
     findings.push({
-      id: makeFindingId([lensId, 'unsanctioned', from]),
+      id: makeFindingId([lensId, 'unsanctioned', from, specifier]),
       lens_id: lensId, severity: 'P0',
-      title: `unsanctioned dependency: ${filePath}`,
-      description: `${filePath} imports an unsanctioned package. Record a decision or remove the import.`,
+      title: `unsanctioned dependency: '${specifier}' in ${filePath}`,
+      description: `${filePath} imports '${specifier}' which is not in the sanctioned stack. Record a decision or remove the import.`,
       source_doc: 'docs/tech-stack.md',
       evidence: { kind: 'rule_violation', rule_id: 'tech-stack-unsanctioned', file: from },
       confidence: 'high', first_seen: now, last_seen: now, status: 'open',
-      fix_hint: { kind: 'record_decision', target: 'decisions.jsonl', prompt: `Record a decision for the unsanctioned dependency in ${filePath}.` },
+      fix_hint: { kind: 'record_decision', target: 'decisions.jsonl', prompt: `Record a decision for '${specifier}' in ${filePath}.` },
     })
   }
 

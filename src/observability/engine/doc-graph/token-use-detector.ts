@@ -104,6 +104,7 @@ export function detectJsxTokenUses(source: string, tokens: DesignToken[], filePa
         for (const piece of splitShorthand(property, (valueNode as StringLiteral).value)) {
           const cat = categoryOfProp(piece.property)
           if (!cat) continue
+          if (!isLiteral(piece.value)) continue
           out.push({
             file: filePath,
             property: piece.property,
