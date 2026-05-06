@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { EngineOutput, Severity, Verdict, FindingsSummary } from './types.js'
+import type { EngineOutput, Severity, Verdict, FindingsSummary, ReplayEvent } from './types.js'
 import { composeAvailability, readMergedLedger, composeSnapshot, composeReplay } from './synthesizer.js'
 import { evaluateStall } from './stall.js'
 import { buildDocGraph } from './doc-graph/index.js'
@@ -152,21 +152,36 @@ export async function runProgress(input: RunProgressInput): Promise<EngineOutput
     currentPhase: 'build',
   })
 
+  // Stall detection needs a wider window than the display window; fetch once and filter in-memory.
+  const stallSinceHours = Math.max(input.sinceHours, 7 * 24)
+  const displayFrom = new Date(Date.now() - input.sinceHours * 3_600_000).toISOString()
+
+  // ---- Pre-fetch shared adapter events (git/gh/mmr) with the wider stall window ----
+  const needsAdapters = input.replay || !input.noStallCheck
+  const [sharedGitEvents, sharedGhEvents, sharedMmrEvents] = needsAdapters
+    ? await Promise.all([
+      gitAdapter.replayEvents(input.primaryRoot, { sinceHours: stallSinceHours }),
+      ghAdapter.replayEvents(input.primaryRoot, { sinceHours: stallSinceHours, ghBin: input.ghBin }),
+      mmrAdapter.replayEvents(input.primaryRoot, { sinceHours: stallSinceHours }),
+    ])
+    : [[], [], []] as [ReplayEvent[], ReplayEvent[], ReplayEvent[]]
+
   // ---- Replay ----
   let replay: EngineOutput['replay'] = null
   if (input.replay) {
-    const window = {
-      from: new Date(Date.now() - input.sinceHours * 3_600_000).toISOString(),
-      to: started_at,
-    }
-    const adapterEvents = (await Promise.all([
-      gitAdapter.replayEvents(input.primaryRoot, { sinceHours: input.sinceHours }),
-      ghAdapter.replayEvents(input.primaryRoot, { sinceHours: input.sinceHours, ghBin: input.ghBin }),
-      mmrAdapter.replayEvents(input.primaryRoot, { sinceHours: input.sinceHours }),
+    const [stateEvents, testsEvents] = await Promise.all([
       stateAdapter.replayEvents(input.primaryRoot, { sinceHours: input.sinceHours }),
       testsAdapter.replayEvents(input.primaryRoot, { sinceHours: input.sinceHours }),
-    ])).flat()
-    replay = composeReplay({ ledgerEvents: merged.events, adapterEvents, window })
+    ])
+    // Filter shared events to the display window; state+tests are already scoped to sinceHours.
+    const adapterEvents = [
+      ...sharedGitEvents.filter((e) => e.ts >= displayFrom),
+      ...sharedGhEvents.filter((e) => e.ts >= displayFrom),
+      ...sharedMmrEvents.filter((e) => e.ts >= displayFrom),
+      ...stateEvents,
+      ...testsEvents,
+    ]
+    replay = composeReplay({ ledgerEvents: merged.events, adapterEvents, window: { from: displayFrom, to: started_at } })
   }
 
   // ---- Stall ----
@@ -177,14 +192,7 @@ export async function runProgress(input: RunProgressInput): Promise<EngineOutput
       auditHistoryAdapter.lensSkippedStreaks(input.primaryRoot),
       auditHistoryAdapter.latestFindings(input.primaryRoot),
     ])
-    // Stall detection always uses a wider window so recent activity just outside sinceHours
-    // doesn't produce false positives — never reuse the display-window replay events.
-    const stallSinceHours = Math.max(input.sinceHours, 7 * 24)
-    const adapterEventsForStall = (await Promise.all([
-      gitAdapter.replayEvents(input.primaryRoot, { sinceHours: stallSinceHours }),
-      ghAdapter.replayEvents(input.primaryRoot, { sinceHours: stallSinceHours, ghBin: input.ghBin }),
-      mmrAdapter.replayEvents(input.primaryRoot, { sinceHours: stallSinceHours }),
-    ])).flat()
+    const adapterEventsForStall = [...sharedGitEvents, ...sharedGhEvents, ...sharedMmrEvents]
     needs_attention = evaluateStall({
       now: started_at,
       ledgerEvents: merged.events,

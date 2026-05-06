@@ -127,9 +127,13 @@ export const auditHistoryAdapter: BaseAdapter & {
     const files = await listJsonFiles(cwd)
     for (const f of files) {
       const s = await safeRead(f)
-      if (s?.engine_output?.invocation?.command === 'audit' && s.engine_output.findings) {
-        return s.engine_output.findings as Finding[]
-      }
+      if (s?.engine_output?.invocation?.command !== 'audit') continue
+      if (!s.engine_output.findings) continue
+      // Skip scoped audits (--lens filter): their findings are incomplete and would cause
+      // false negatives — other lenses' open findings would appear resolved.
+      const args = s.engine_output.invocation.args as Record<string, unknown> | undefined
+      if (args && Array.isArray(args.lensIds) && (args.lensIds as unknown[]).length > 0) continue
+      return s.engine_output.findings as Finding[]
     }
     return []
   },
