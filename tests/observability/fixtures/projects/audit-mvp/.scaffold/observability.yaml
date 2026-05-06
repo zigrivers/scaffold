@@ -1,0 +1,4 @@
+lenses:
+  E-design:
+    ui_glob: "src/components/**/*.tsx"
+    ad_hoc_token_threshold: 2
