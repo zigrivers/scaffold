@@ -5,10 +5,17 @@ import { redactEngineOutput } from '../engine/redact.js'
 
 function dateStamp(iso: string): string {
   const d = new Date(iso)
+  if (isNaN(d.valueOf())) {
+    return `unknown-${Date.now()}`
+  }
   const pad2 = (n: number) => String(n).padStart(2, '0')
   const pad3 = (n: number) => String(n).padStart(3, '0')
   return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}` +
     `-${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}${pad2(d.getUTCSeconds())}${pad3(d.getUTCMilliseconds())}`
+}
+
+function safeLensId(raw: string): string {
+  return raw.replace(/[^a-zA-Z0-9_-]/g, '_')
 }
 
 export function deriveReportId(out: EngineOutput): string {
@@ -17,7 +24,7 @@ export function deriveReportId(out: EngineOutput): string {
   const args = out.invocation.args as { profile?: string; scope?: string; lensIds?: string[] }
   const profile = args.profile ?? 'fast'
   if (Array.isArray(args.lensIds) && args.lensIds.length === 1) {
-    return `audit-${stamp}-${profile}-lens-${args.lensIds[0]}`
+    return `audit-${stamp}-${profile}-lens-${safeLensId(args.lensIds[0])}`
   }
   return `audit-${stamp}-${profile}-${args.scope ?? 'all'}`
 }

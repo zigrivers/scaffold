@@ -121,7 +121,8 @@ export async function handleProgress(input: HandleProgressInput): Promise<number
       const mdFinal = await writeMarkdownReport(input.cwd, out, md, input.output)
       const rendered = renderProgressTerminal(out)
       process.stdout.write((input.maskPaths ? redactRendered(rendered) : rendered) + '\n')
-      process.stdout.write(`\n(written: ${mdFinal}${sidecarFinal ? ` + ${sidecarFinal}` : ''})\n`)
+      const footer = `\n(written: ${mdFinal}${sidecarFinal ? ` + ${sidecarFinal}` : ''})\n`
+      process.stdout.write(input.maskPaths ? redactRendered(footer) : footer)
     }
     return 0
   } catch (err: unknown) {
@@ -210,7 +211,8 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
       const mdFinal = await writeMarkdownReport(input.cwd, out, md, input.output)
       const rendered = renderAuditTerminal(out, { showAcknowledged: input.showAcknowledged })
       process.stdout.write((input.maskPaths ? redactRendered(rendered) : rendered) + '\n')
-      process.stdout.write(`\n(written: ${mdFinal}${sidecarFinal ? ` + ${sidecarFinal}` : ''})\n`)
+      const footer = `\n(written: ${mdFinal}${sidecarFinal ? ` + ${sidecarFinal}` : ''})\n`
+      process.stdout.write(input.maskPaths ? redactRendered(footer) : footer)
     }
     return out.verdict === 'blocked' ? 1 : 0
   } catch (err: unknown) {

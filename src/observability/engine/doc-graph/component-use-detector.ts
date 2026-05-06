@@ -5,10 +5,11 @@ import type { NodePath } from '@babel/traverse'
 import type { CallExpression, Identifier, ImportDeclaration, StringLiteral } from '@babel/types'
 import type { SanctionedComponent } from '../types.js'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TraverseFn = (ast: unknown, visitors: Record<string, (path: NodePath<any>) => void>) => void
 const traverse = (
   (traverseDefault as unknown as { default: unknown }).default ?? traverseDefault
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-) as (ast: unknown, visitors: Record<string, (path: NodePath<any>) => void>) => void
+) as TraverseFn
 
 export interface ComponentUse {
   file: string

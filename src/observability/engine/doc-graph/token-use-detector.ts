@@ -10,10 +10,11 @@ import { categoryOfProp } from './design-props.js'
 
 // esModuleInterop is enabled in tsconfig.json; the runtime guard handles
 // @babel/traverse's inconsistent CJS default-export shape across versions.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TraverseFn = (ast: unknown, visitors: Record<string, (path: NodePath<any>) => void>) => void
 const traverse = (
   (traverseDefault as unknown as { default: unknown }).default ?? traverseDefault
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-) as (ast: unknown, visitors: Record<string, (path: NodePath<any>) => void>) => void
+) as TraverseFn
 
 export interface TokenUse {
   file: string
