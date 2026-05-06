@@ -2,17 +2,26 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { EngineOutput, Severity, Verdict, FindingsSummary } from './types.js'
-import { composeAvailability, readMergedLedger, composeSnapshot } from './synthesizer.js'
+import { composeAvailability, readMergedLedger, composeSnapshot, composeReplay } from './synthesizer.js'
+import { evaluateStall } from './stall.js'
 import { buildDocGraph } from './doc-graph/index.js'
 import { runChecks } from './checks/runner.js'
 import { LENS_REGISTRY, LENS_IMPLEMENTATIONS } from './checks/registry.js'
 import { aggregate } from './checks/findings-aggregator.js'
 import { resolveFixThreshold } from './checks/fix-threshold.js'
 import { loadObservabilityConfig } from './checks/observability-config.js'
+import { gitAdapter } from '../adapters/git.js'
+import { ghAdapter } from '../adapters/gh.js'
+import { mmrAdapter } from '../adapters/mmr.js'
+import { stateAdapter } from '../adapters/state.js'
+import { testsAdapter } from '../adapters/tests.js'
+import { auditHistoryAdapter } from '../adapters/audit-history.js'
 
 export interface RunProgressInput {
   primaryRoot: string
   sinceHours: number
+  replay?: boolean
+  noStallCheck?: boolean
   ghBin?: string
   bdBin?: string
   args?: Record<string, unknown>
@@ -143,7 +152,43 @@ export async function runProgress(input: RunProgressInput): Promise<EngineOutput
     currentPhase: 'build',
   })
 
-  // TODO: derive verdict/fix_threshold from actual findings once finding collection is implemented
+  // ---- Replay ----
+  let replay: EngineOutput['replay'] = null
+  if (input.replay) {
+    const window = {
+      from: new Date(Date.now() - input.sinceHours * 3_600_000).toISOString(),
+      to: started_at,
+    }
+    const adapterEvents = (await Promise.all([
+      gitAdapter.replayEvents(input.primaryRoot, { sinceHours: input.sinceHours }),
+      ghAdapter.replayEvents(input.primaryRoot, { sinceHours: input.sinceHours, ghBin: input.ghBin }),
+      mmrAdapter.replayEvents(input.primaryRoot, { sinceHours: input.sinceHours }),
+      stateAdapter.replayEvents(input.primaryRoot, { sinceHours: input.sinceHours }),
+      testsAdapter.replayEvents(input.primaryRoot, { sinceHours: input.sinceHours }),
+    ])).flat()
+    replay = composeReplay({ ledgerEvents: merged.events, adapterEvents, window })
+  }
+
+  // ---- Stall ----
+  let needs_attention: EngineOutput['needs_attention'] = []
+  if (!input.noStallCheck) {
+    const config = loadObservabilityConfig(input.primaryRoot)
+    const skippedStreaks = await auditHistoryAdapter.lensSkippedStreaks(input.primaryRoot)
+    const adapterEventsForStall = replay?.events ?? (await Promise.all([
+      gitAdapter.replayEvents(input.primaryRoot, { sinceHours: input.sinceHours }),
+      ghAdapter.replayEvents(input.primaryRoot, { sinceHours: input.sinceHours, ghBin: input.ghBin }),
+      mmrAdapter.replayEvents(input.primaryRoot, { sinceHours: input.sinceHours }),
+    ])).flat()
+    needs_attention = evaluateStall({
+      now: started_at,
+      ledgerEvents: merged.events,
+      replayEvents: adapterEventsForStall,
+      findings: [],
+      config,
+      lensSkippedStreaks: skippedStreaks,
+    })
+  }
+
   const fix_threshold: Severity = 'P2'
   const verdict: Verdict = 'pass'
 
@@ -158,9 +203,9 @@ export async function runProgress(input: RunProgressInput): Promise<EngineOutput
     },
     availability,
     snapshot,
-    replay: null,
+    replay,
     findings: [],
-    needs_attention: [],
+    needs_attention,
     graph_stats: {
       nodes_by_kind: {},
       edges_by_kind: {},
