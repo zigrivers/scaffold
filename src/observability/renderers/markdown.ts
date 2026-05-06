@@ -2,7 +2,8 @@ import type { EngineOutput, AvailabilityMap, AdapterStatus, Finding, Severity } 
 import { redactRendered, sanitizePath } from '../engine/redact.js'
 
 function mdEscape(s: string): string {
-  return s.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\|/g, '\\|').replace(/\*/g, '\\*').replace(/_/g, '\\_')
+  return s.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\|/g, '\\|')
+    .replace(/\*/g, '\\*').replace(/_/g, '\\_').replace(/`/g, '\\`')
 }
 
 function fmtDate(iso: string): string {

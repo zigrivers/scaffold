@@ -10,7 +10,6 @@ export const SPACING_PROPS = new Set([
   'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
   'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
   'gap', 'row-gap', 'column-gap', 'top', 'right', 'bottom', 'left',
-  'width', 'min-width', 'max-width', 'height', 'min-height', 'max-height',
   'border-width', 'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
   'outline-width', 'outline-offset', 'inset', 'flex-basis', 'border-spacing',
 ])

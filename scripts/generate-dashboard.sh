@@ -870,11 +870,11 @@ _local_dist="$REPO_DIR/dist/index.js"
 observe_progress_html=""
 observe_audit_html=""
 if [ -f "$_local_dist" ]; then
-    observe_progress_html="$(node "$_local_dist" observe progress --render=dashboard-fragment 2>/dev/null || true)"
-    observe_audit_html="$(node "$_local_dist" observe audit --render=dashboard-fragment-audit 2>/dev/null || true)"
+    observe_progress_html="$(node "$_local_dist" observe progress --render=dashboard-fragment || true)"
+    observe_audit_html="$(node "$_local_dist" observe audit --render=dashboard-fragment-audit || true)"
 elif command -v scaffold >/dev/null 2>&1; then
-    observe_progress_html="$(scaffold observe progress --render=dashboard-fragment 2>/dev/null || true)"
-    observe_audit_html="$(scaffold observe audit --render=dashboard-fragment-audit 2>/dev/null || true)"
+    observe_progress_html="$(scaffold observe progress --render=dashboard-fragment || true)"
+    observe_audit_html="$(scaffold observe audit --render=dashboard-fragment-audit || true)"
 fi
 
 cat >> "$OUTPUT_FILE" <<OBSERVEPANELS
