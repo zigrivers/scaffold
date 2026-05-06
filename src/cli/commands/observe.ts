@@ -118,10 +118,16 @@ export async function handleProgress(input: HandleProgressInput): Promise<number
       process.stdout.write((input.maskPaths ? redactRendered(blob) : blob) + '\n')
     } else {
       const md = renderProgressMarkdown(out)
-      const mdFinal = await writeMarkdownReport(input.cwd, out, md, input.output)
+      let mdFinal: string | null = null
+      try {
+        mdFinal = await writeMarkdownReport(input.cwd, out, md, input.output)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        process.stderr.write(`scaffold observe progress: markdown write failed: ${msg}\n`)
+      }
       const rendered = renderProgressTerminal(out)
       process.stdout.write((input.maskPaths ? redactRendered(rendered) : rendered) + '\n')
-      const footer = `\n(written: ${mdFinal}${sidecarFinal ? ` + ${sidecarFinal}` : ''})\n`
+      const footer = `\n(written: ${mdFinal ?? '(failed)'}${sidecarFinal ? ` + ${sidecarFinal}` : ''})\n`
       process.stdout.write(input.maskPaths ? redactRendered(footer) : footer)
     }
     return 0
@@ -208,10 +214,16 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
       process.stdout.write((input.maskPaths ? redactRendered(blob) : blob) + '\n')
     } else {
       const md = renderAuditMarkdown(out)
-      const mdFinal = await writeMarkdownReport(input.cwd, out, md, input.output)
+      let mdFinal: string | null = null
+      try {
+        mdFinal = await writeMarkdownReport(input.cwd, out, md, input.output)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        process.stderr.write(`scaffold observe audit: markdown write failed: ${msg}\n`)
+      }
       const rendered = renderAuditTerminal(out, { showAcknowledged: input.showAcknowledged })
       process.stdout.write((input.maskPaths ? redactRendered(rendered) : rendered) + '\n')
-      const footer = `\n(written: ${mdFinal}${sidecarFinal ? ` + ${sidecarFinal}` : ''})\n`
+      const footer = `\n(written: ${mdFinal ?? '(failed)'}${sidecarFinal ? ` + ${sidecarFinal}` : ''})\n`
       process.stdout.write(input.maskPaths ? redactRendered(footer) : footer)
     }
     return out.verdict === 'blocked' ? 1 : 0

@@ -76,7 +76,8 @@ export function renderAuditFragment(out: EngineOutput): string {
   const metaText = `${out.summary.blocking} blocking · threshold ${escape(out.fix_threshold)}` +
     ` · profile=${escape(args.profile ?? '?')} scope=${escape(args.scope ?? '?')}`
   const fragment = '<section id="build-audit" class="panel"' +
-    ` data-verdict="${escape(out.verdict)}" style="--verdict-color: var(${verdictToken})">
+    ` data-verdict="${escape(out.verdict)}" data-threshold="${escape(out.fix_threshold)}"` +
+    ` style="--verdict-color: var(${verdictToken})">
   <header>
     <h2>Audit</h2>
     <span class="badge" style="color: var(${verdictToken})">${escape(out.verdict)}</span>

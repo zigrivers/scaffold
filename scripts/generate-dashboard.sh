@@ -836,6 +836,31 @@ function copyCmd(el) {
         });
     }
 }
+function initAuditFilters() {
+    var section = document.getElementById('build-audit');
+    if (!section) return;
+    var threshold = section.getAttribute('data-threshold') || 'P2';
+    var rank = {P0: 0, P1: 1, P2: 2, P3: 3};
+    var threshRank = rank[threshold] !== undefined ? rank[threshold] : 2;
+    var buttons = section.querySelectorAll('[data-filter]');
+    var findings = section.querySelectorAll('.finding');
+    buttons.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            buttons.forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            var filter = btn.getAttribute('data-filter');
+            findings.forEach(function(f) {
+                var sev = f.getAttribute('data-severity') || '';
+                var sevRank = rank[sev] !== undefined ? rank[sev] : 99;
+                var show = filter === 'all'
+                    || (filter === 'blocking' && sevRank <= threshRank)
+                    || filter === sev;
+                f.style.display = show ? '' : 'none';
+            });
+        });
+    });
+}
+document.addEventListener('DOMContentLoaded', initAuditFilters);
 </script>
 HTMLTAIL
 
