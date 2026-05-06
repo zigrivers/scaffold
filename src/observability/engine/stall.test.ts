@@ -33,10 +33,11 @@ function ledgerBlockerHit(taskId: string, ts: string): Event {
     payload: { kind: 'external', summary: 'vendor outage' },
   } as Event
 }
-function commitReplayEvent(sha: string, ts: string): ReplayEvent {
+function commitReplayEvent(sha: string, ts: string, branch?: string): ReplayEvent {
   return {
     sort_id: `git:${sha}`, correlation_id: null, ts,
     source: 'git', kind: 'commit', summary: 'work', actor_label: 'agent-alice',
+    ...(branch ? { branch } : {}),
   }
 }
 function prMergedReplayEvent(prNum: number, ts: string): ReplayEvent {
@@ -73,7 +74,7 @@ describe('evaluateStall', () => {
 
   it('does not emit task_stale when commits are present on the branch since claim', () => {
     const events = [ledgerTaskClaimed('T-001', '2026-05-04T08:00:00Z')]
-    const replay = [commitReplayEvent('abc', '2026-05-04T13:30:00Z')]
+    const replay = [commitReplayEvent('abc', '2026-05-04T13:30:00Z', 'feat')]
     const items = evaluateStall({
       now: NOW, ledgerEvents: events, replayEvents: replay, findings: [],
       config: DEFAULT_CONFIG, lensSkippedStreaks: {},

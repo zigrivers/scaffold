@@ -1,14 +1,15 @@
 import { createHash } from 'node:crypto'
 import { minimatch } from 'minimatch'
-import type { Finding, Event } from '../engine/types.js'
+import type { Finding, Event, DocGraph } from '../engine/types.js'
 import type { LensFn } from '../engine/checks/runner.js'
 import { gitAdapter, type CommitInfo } from '../adapters/git.js'
 
 const DECISION_KEYWORDS = [
   'decided', 'decision', 'adopt', 'migrate', 'deprecate', 'replace', 'switching to', 'switch to',
 ]
+const DECISION_SCAN_HOURS = 7 * 24
 
-function loadKeywords(_cwd: string): string[] {
+function loadKeywords(): string[] {
   return DECISION_KEYWORDS
 }
 
@@ -28,8 +29,13 @@ function decisionEventCoversFile(events: Event[], filePath: string): boolean {
   return false
 }
 
-
-export const lensGDecisions: LensFn = async (graph, ledger, _availability, upstreamFindings) => {
+async function lensGDecisionsImpl(
+  cwd: string,
+  graph: DocGraph,
+  ledger: { events: Event[] },
+  availability: Parameters<LensFn>[2],
+  upstreamFindings: Finding[],
+): Promise<Finding[]> {
   const findings: Finding[] = []
   const now = new Date().toISOString()
 
@@ -95,14 +101,15 @@ export const lensGDecisions: LensFn = async (graph, ledger, _availability, upstr
   }
 
   // (d) Decision-keyword commit scan
-  if (_availability.git.status === 'available') {
-    const cwd = process.cwd()
-    const keywords = loadKeywords(cwd)
+  if (availability.git.status === 'available') {
+    const keywords = loadKeywords()
     const escaped = keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
     const keywordRe = new RegExp(`\\b(${escaped})\\b`, 'i')
     const eventKeys = new Set([...eventsByKey.keys(), ...graph.decisions.map((d) => d.key)])
     let recentCommits: CommitInfo[]
-    try { recentCommits = await gitAdapter.recentCommits(cwd, { sinceHours: 24 * 7 }) } catch { recentCommits = [] }
+    try {
+      recentCommits = await gitAdapter.recentCommits(cwd, { sinceHours: DECISION_SCAN_HOURS })
+    } catch { recentCommits = [] }
     for (const c of recentCommits) {
       if (!keywordRe.test(c.subject)) continue
       const slug = c.subject.toLowerCase().replace(/[^\w\s-]+/g, ' ').trim().replace(/\s+/g, '-').slice(0, 64)
@@ -130,3 +137,11 @@ export const lensGDecisions: LensFn = async (graph, ledger, _availability, upstr
 
   return findings
 }
+
+export function makeLensGDecisions(projectRoot: string): LensFn {
+  return (graph, ledger, availability, upstreamFindings) =>
+    lensGDecisionsImpl(projectRoot, graph, ledger, availability, upstreamFindings)
+}
+
+export const lensGDecisions: LensFn = (graph, ledger, availability, upstreamFindings) =>
+  lensGDecisionsImpl(process.cwd(), graph, ledger, availability, upstreamFindings)

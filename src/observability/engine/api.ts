@@ -6,7 +6,7 @@ import { composeAvailability, readMergedLedger, composeSnapshot, composeReplay }
 import { evaluateStall } from './stall.js'
 import { buildDocGraph } from './doc-graph/index.js'
 import { runChecks } from './checks/runner.js'
-import { LENS_REGISTRY, LENS_IMPLEMENTATIONS } from './checks/registry.js'
+import { LENS_REGISTRY, LENS_IMPLEMENTATIONS, makeLensImplementations } from './checks/registry.js'
 import { aggregate } from './checks/findings-aggregator.js'
 import { resolveFixThreshold } from './checks/fix-threshold.js'
 import { loadObservabilityConfig } from './checks/observability-config.js'
@@ -96,7 +96,7 @@ export async function runAudit(input: RunAuditInput): Promise<EngineOutput> {
 
   const rawFindings = await runChecks({
     registry: LENS_REGISTRY,
-    lenses: LENS_IMPLEMENTATIONS,
+    lenses: makeLensImplementations(input.primaryRoot),
     graph,
     ledger: { events: merged.events },
     availability,
@@ -177,10 +177,13 @@ export async function runProgress(input: RunProgressInput): Promise<EngineOutput
       auditHistoryAdapter.lensSkippedStreaks(input.primaryRoot),
       auditHistoryAdapter.latestFindings(input.primaryRoot),
     ])
+    // Stall detection needs a wider window than the display window so recent activity
+    // just outside sinceHours doesn't produce false positives.
+    const stallSinceHours = Math.max(input.sinceHours, 7 * 24)
     const adapterEventsForStall = replay?.events ?? (await Promise.all([
-      gitAdapter.replayEvents(input.primaryRoot, { sinceHours: input.sinceHours }),
-      ghAdapter.replayEvents(input.primaryRoot, { sinceHours: input.sinceHours, ghBin: input.ghBin }),
-      mmrAdapter.replayEvents(input.primaryRoot, { sinceHours: input.sinceHours }),
+      gitAdapter.replayEvents(input.primaryRoot, { sinceHours: stallSinceHours }),
+      ghAdapter.replayEvents(input.primaryRoot, { sinceHours: stallSinceHours, ghBin: input.ghBin }),
+      mmrAdapter.replayEvents(input.primaryRoot, { sinceHours: stallSinceHours }),
     ])).flat()
     needs_attention = evaluateStall({
       now: started_at,

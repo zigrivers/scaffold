@@ -59,7 +59,9 @@ export function evaluateStall(input: EvaluateStallInput): NeedsAttentionItem[] {
     for (const r of input.replayEvents) {
       if (r.source !== 'git' || r.kind !== 'commit') continue
       if (r.ts <= since) continue
-      if (r.branch && r.branch !== branch) continue
+      // Require explicit branch match; commits without branch info are ignored
+      // to avoid a commit on an unrelated branch suppressing task_stale.
+      if (!r.branch || r.branch !== branch) continue
       if (latest === null || r.ts > latest) latest = r.ts
     }
     return latest

@@ -5,7 +5,7 @@ import { lensCStandards } from '../../checks/lens-c-standards.js'
 import { lensDStack } from '../../checks/lens-d-stack.js'
 import { lensEDesign } from '../../checks/lens-e-design.js'
 import { lensFScope } from '../../checks/lens-f-scope.js'
-import { lensGDecisions } from '../../checks/lens-g-decisions.js'
+import { lensGDecisions, makeLensGDecisions } from '../../checks/lens-g-decisions.js'
 import { lensHCrossDoc } from '../../checks/lens-h-cross-doc.js'
 
 export type LensFn = (
@@ -54,4 +54,10 @@ export const LENS_IMPLEMENTATIONS: Record<string, LensFn> = {
   'F-scope':       lensFScope,
   'G-decisions':   lensGDecisions,
   'H-cross-doc':   lensHCrossDoc,
+}
+
+export { makeLensGDecisions }
+
+export function makeLensImplementations(projectRoot: string): Record<string, LensFn> {
+  return { ...LENS_IMPLEMENTATIONS, 'G-decisions': makeLensGDecisions(projectRoot) }
 }
