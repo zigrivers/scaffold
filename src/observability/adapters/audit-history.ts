@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { access, readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AdapterStatus, BaseAdapter } from './types.js'
 import type { Severity } from '../engine/types.js'
@@ -20,14 +20,16 @@ interface SidecarShape {
   }
 }
 
-function listJsonFiles(cwd: string): string[] {
+async function listJsonFiles(cwd: string): Promise<string[]> {
   const d = join(cwd, DIR)
-  if (!existsSync(d)) return []
-  return readdirSync(d).filter((f) => f.endsWith('.json')).map((f) => join(d, f))
+  const exists = await access(d).then(() => true).catch(() => false)
+  if (!exists) return []
+  const entries = await readdir(d)
+  return entries.filter((f) => f.endsWith('.json')).map((f) => join(d, f))
 }
 
-function safeRead(path: string): SidecarShape | null {
-  try { return JSON.parse(readFileSync(path, 'utf8')) as SidecarShape } catch { return null }
+async function safeRead(path: string): Promise<SidecarShape | null> {
+  try { return JSON.parse(await readFile(path, 'utf8')) as SidecarShape } catch { return null }
 }
 
 export interface AuditTrendPoint {
@@ -47,21 +49,22 @@ export const auditHistoryAdapter: BaseAdapter & {
   id: 'audit_history',
 
   async probe(cwd: string): Promise<AdapterStatus> {
-    const files = listJsonFiles(cwd)
+    const files = await listJsonFiles(cwd)
     if (files.length === 0) return { status: 'unavailable', reason: 'no audit JSON sidecars under docs/audits/' }
     return { status: 'available', evidence_paths: [DIR] }
   },
 
   async listSidecars(cwd: string): Promise<string[]> {
-    const files = listJsonFiles(cwd)
-    return files.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)
+    const files = await listJsonFiles(cwd)
+    const withMtime = await Promise.all(files.map(async (f) => ({ f, mtime: (await stat(f)).mtimeMs })))
+    return withMtime.sort((a, b) => b.mtime - a.mtime).map(({ f }) => f)
   },
 
   async readTrends(cwd: string): Promise<AuditTrendPoint[]> {
-    const files = listJsonFiles(cwd)
+    const files = await listJsonFiles(cwd)
     const points: AuditTrendPoint[] = []
     for (const f of files) {
-      const s = safeRead(f)
+      const s = await safeRead(f)
       if (!s?.engine_output?.summary) continue
       if (s.engine_output.invocation.command !== 'audit') continue
       points.push({
@@ -77,9 +80,9 @@ export const auditHistoryAdapter: BaseAdapter & {
   },
 
   async lensSkippedStreaks(cwd: string): Promise<Record<string, number>> {
-    const files = listJsonFiles(cwd)
-    const sidecars = files
-      .map((f) => safeRead(f))
+    const files = await listJsonFiles(cwd)
+    const raw = await Promise.all(files.map((f) => safeRead(f)))
+    const sidecars = raw
       .filter((s): s is SidecarShape => Boolean(s?.engine_output))
       .filter((s) => s.engine_output.invocation.command === 'audit')
       .sort((a, b) => b.engine_output.invocation.started_at.localeCompare(a.engine_output.invocation.started_at))

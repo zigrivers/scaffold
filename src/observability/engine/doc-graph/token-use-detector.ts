@@ -7,6 +7,8 @@ import type {
 } from '@babel/types'
 import type { DesignToken } from '../types.js'
 
+// esModuleInterop is enabled in tsconfig.json; the runtime guard handles
+// @babel/traverse's inconsistent CJS default-export shape across versions.
 const traverse = (
   (traverseDefault as unknown as { default: unknown }).default ?? traverseDefault
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

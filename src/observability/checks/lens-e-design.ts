@@ -57,12 +57,16 @@ export const lensEDesign: LensFn = async (graph) => {
   // (b) per-property must-priority bypass — uses the `property` field on the edge
   const mustCategories = new Set(graph.tokens.filter((t) => t.priority === 'must').map((t) => t.category))
   if (mustCategories.size > 0) {
+    const seenMustBypass = new Set<string>()
     for (const e of graph.edges) {
       if (e.kind !== 'file_to_token_use') continue
       if (!(e as { to: string }).to.startsWith('ad_hoc')) continue
       const ed = e as { from: string; to: string; property?: string }
       const cat = categoryOfProp(ed.property)
       if (!cat || !mustCategories.has(cat)) continue
+      const dedupeKey = `${ed.from}::${ed.property ?? ''}`
+      if (seenMustBypass.has(dedupeKey)) continue
+      seenMustBypass.add(dedupeKey)
       findings.push({
         id: makeFindingId([lensId, 'must-priority', ed.from, ed.property ?? '']),
         lens_id: lensId, severity: 'P0',
