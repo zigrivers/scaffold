@@ -927,3 +927,97 @@ h2 {
   --sev-p3: #60a5fa;
   --sev-pass: #4ade80;
 }
+
+/* Build-observability panel layout */
+.panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--sp-4) var(--sp-6);
+    margin-bottom: var(--sp-6);
+}
+.panel > header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-4);
+    flex-wrap: wrap;
+}
+.panel > header h2 {
+    margin: 0;
+    font-size: var(--text-base);
+    font-weight: var(--fw-semi);
+}
+.panel .meta {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+}
+.grid { display: grid; gap: var(--sp-4); }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+
+/* Finding filters */
+.finding-filters {
+    display: flex;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+    margin-bottom: var(--sp-4);
+}
+.finding-filters button {
+    padding: var(--sp-1) var(--sp-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-inset);
+    color: var(--text);
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+.finding-filters button:hover,
+.finding-filters button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+/* Findings list */
+.findings {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+}
+.finding {
+    background: var(--bg-inset);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-3) var(--sp-4);
+}
+.finding header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+    margin-bottom: var(--sp-2);
+}
+.finding-id {
+    font-family: var(--font-mono, monospace);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px var(--sp-1);
+}
+.finding .lens {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+.finding .title {
+    font-size: var(--text-sm);
+    font-weight: var(--fw-semi);
+    flex: 1;
+}
+.finding p { margin: 0; font-size: var(--text-sm); color: var(--text-muted); }
+.empty { color: var(--text-muted); font-size: var(--text-sm); text-align: center; padding: var(--sp-4); }
