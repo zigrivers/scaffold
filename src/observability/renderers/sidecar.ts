@@ -23,8 +23,10 @@ export function deriveReportId(out: EngineOutput): string {
   if (out.invocation.command === 'progress') return `progress-${stamp}`
   const args = out.invocation.args as { profile?: string; scope?: string; lensIds?: string[] }
   const profile = args.profile ?? 'fast'
-  if (Array.isArray(args.lensIds) && args.lensIds.length === 1) {
-    return `audit-${stamp}-${profile}-lens-${safeLensId(args.lensIds[0])}`
+  if (Array.isArray(args.lensIds) && args.lensIds.length > 0) {
+    const sorted = [...args.lensIds].map(safeLensId).sort()
+    if (sorted.length === 1) return `audit-${stamp}-${profile}-lens-${sorted[0]}`
+    return `audit-${stamp}-${profile}-lenses-${sorted.join('+')}`
   }
   return `audit-${stamp}-${profile}-${args.scope ?? 'all'}`
 }

@@ -48,6 +48,12 @@ describe('sidecar', () => {
     expect(deriveReportId(out)).toMatch(/^audit-\d{4}-\d{2}-\d{2}-\d{9}-fast-lens-B-ac-coverage$/)
   })
 
+  it('deriveReportId formats multi-lens audits with sorted lens IDs joined by +', () => {
+    const lensArgs = { profile: 'fast', scope: 'all', lensIds: ['B-ac-coverage', 'A-tdd'] }
+    const out = { ...baseOut, invocation: { ...baseOut.invocation, args: lensArgs } }
+    expect(deriveReportId(out)).toMatch(/^audit-\d{4}-\d{2}-\d{2}-\d{9}-fast-lenses-A-tdd\+B-ac-coverage$/)
+  })
+
   it('deriveReportId formats progress reports as progress-<date>', () => {
     const out = { ...baseOut, invocation: { ...baseOut.invocation, command: 'progress' as const, args: {} } }
     expect(deriveReportId(out)).toMatch(/^progress-\d{4}-\d{2}-\d{2}-\d{9}$/)

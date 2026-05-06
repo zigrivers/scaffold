@@ -22,6 +22,8 @@ async function writeMarkdownReport(
   const absPath = overridePath
     ? (isAbsolute(overridePath) ? overridePath : join(cwd, overridePath))
     : join(cwd, relPath)
+  const existing = await stat(absPath).catch(() => null)
+  if (existing?.isDirectory()) throw new Error(`output path is a directory: ${absPath}`)
   await mkdir(dirname(absPath), { recursive: true })
   await writeFile(absPath, body, { mode: 0o644 })
   return absPath
