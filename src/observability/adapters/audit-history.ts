@@ -1,4 +1,4 @@
-import { access, readdir, readFile } from 'node:fs/promises'
+import { access, readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AdapterStatus, BaseAdapter } from './types.js'
 import type { Severity } from '../engine/types.js'
@@ -63,9 +63,9 @@ export const auditHistoryAdapter: BaseAdapter & {
   },
 
   async listSidecars(cwd: string): Promise<string[]> {
-    // Filenames are date-stamped (audit-YYYY-MM-DD-HHmmss-…), so lexicographic
-    // desc from listJsonFiles already equals chronological desc — no stat needed.
-    return listJsonFiles(cwd)
+    const files = await listJsonFiles(cwd)
+    const withMtime = await Promise.all(files.map(async (f) => ({ f, mtime: (await stat(f)).mtimeMs })))
+    return withMtime.sort((a, b) => b.mtime - a.mtime).map(({ f }) => f)
   },
 
   async readTrends(cwd: string): Promise<AuditTrendPoint[]> {

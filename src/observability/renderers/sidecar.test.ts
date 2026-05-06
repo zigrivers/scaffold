@@ -37,7 +37,7 @@ describe('sidecar', () => {
   afterEach(() => { rmSync(dir, { recursive: true, force: true }) })
 
   it('deriveReportId formats audit ids by date + profile + scope', () => {
-    expect(deriveReportId(baseOut)).toMatch(/^audit-\d{4}-\d{2}-\d{2}-\d{6}-fast-all$/)
+    expect(deriveReportId(baseOut)).toMatch(/^audit-\d{4}-\d{2}-\d{2}-\d{9}-fast-all$/)
   })
 
   it('deriveReportId formats single-lens audits as audit-<date>-<profile>-lens-<id>', () => {
@@ -45,12 +45,12 @@ describe('sidecar', () => {
       ...baseOut,
       invocation: { ...baseOut.invocation, args: { profile: 'fast', scope: 'all', lensIds: ['B-ac-coverage'] } },
     }
-    expect(deriveReportId(out)).toMatch(/^audit-\d{4}-\d{2}-\d{2}-\d{6}-fast-lens-B-ac-coverage$/)
+    expect(deriveReportId(out)).toMatch(/^audit-\d{4}-\d{2}-\d{2}-\d{9}-fast-lens-B-ac-coverage$/)
   })
 
   it('deriveReportId formats progress reports as progress-<date>', () => {
     const out = { ...baseOut, invocation: { ...baseOut.invocation, command: 'progress' as const, args: {} } }
-    expect(deriveReportId(out)).toMatch(/^progress-\d{4}-\d{2}-\d{2}-\d{6}$/)
+    expect(deriveReportId(out)).toMatch(/^progress-\d{4}-\d{2}-\d{2}-\d{9}$/)
   })
 
   it('sidecarPath returns docs/audits/<id>.json for audit, docs/build-status/<id>.json for progress', () => {
