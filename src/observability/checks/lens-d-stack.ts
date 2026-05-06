@@ -27,12 +27,19 @@ function fileLayer(path: string, pathToLayer: Array<{ glob: string; layer: strin
   return null
 }
 
-function decisionsCoverPath(events: Event[], filePath: string): boolean {
+function decisionsCoverPath(events: Event[], filePath: string, specifier: string): boolean {
   for (const e of events) {
     if (e.type !== 'decision_recorded') continue
     const raw = (e.payload as { affects?: unknown }).affects
     const affects = Array.isArray(raw) ? raw.filter((g): g is string => typeof g === 'string') : []
-    if (affects.some((g) => minimatch(filePath, g))) return true
+    if (!affects.some((g) => minimatch(filePath, g))) continue
+    // If decision names specific packages, require the specifier to appear there.
+    const pkgs = (e.payload as { packages?: unknown }).packages
+    if (Array.isArray(pkgs)) {
+      if ((pkgs as unknown[]).some((p) => p === specifier)) return true
+      continue
+    }
+    return true
   }
   return false
 }
@@ -47,10 +54,11 @@ export const lensDStack: LensFn = async (graph, ledger) => {
   for (const edge of graph.edges) {
     if (edge.kind !== 'file_to_component_use') continue
     const to = (edge as { kind: string; from: string; to: string }).to
-    if (to !== 'unsanctioned') continue
+    if (!to.startsWith('unsanctioned')) continue
     const from = (edge as { kind: string; from: string; to: string }).from
+    const specifier = to.includes(':') ? to.split(':').slice(1).join(':') : ''
     const filePath = from.replace(/^file:/, '')
-    if (decisionsCoverPath(ledger.events, filePath)) continue
+    if (decisionsCoverPath(ledger.events, filePath, specifier)) continue
     findings.push({
       id: makeFindingId([lensId, 'unsanctioned', from]),
       lens_id: lensId, severity: 'P0',

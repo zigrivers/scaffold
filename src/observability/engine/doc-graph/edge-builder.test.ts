@@ -115,6 +115,6 @@ describe('buildEdges (with token + component uses)', () => {
     const edges = result.edges.filter((e) => e.kind === 'file_to_component_use')
     expect(edges).toHaveLength(2)
     expect(edges[0]).toEqual({ kind: 'file_to_component_use', from: 'file:src/lib/auth.ts', to: 'component:react' })
-    expect(edges[1]).toEqual({ kind: 'file_to_component_use', from: 'file:src/lib/auth.ts', to: 'unsanctioned' })
+    expect(edges[1]).toEqual({ kind: 'file_to_component_use', from: 'file:src/lib/auth.ts', to: 'unsanctioned:lodash' })
   })
 })

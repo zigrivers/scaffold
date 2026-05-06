@@ -93,6 +93,6 @@ describe('buildDocGraph', () => {
     const componentEdges = graph.edges.filter((e) => e.kind === 'file_to_component_use')
     expect(componentEdges.length).toBeGreaterThanOrEqual(2)
     expect(componentEdges.find((e) => e.to === 'component:react')).toBeDefined()
-    expect(componentEdges.find((e) => e.to === 'unsanctioned')).toBeDefined()
+    expect(componentEdges.find((e) => (e as { to: string }).to.startsWith('unsanctioned'))).toBeDefined()
   })
 })

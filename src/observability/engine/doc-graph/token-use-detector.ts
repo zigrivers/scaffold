@@ -81,6 +81,8 @@ export function detectJsxTokenUses(source: string, tokens: DesignToken[], filePa
   } catch {
     return out
   }
+  // Only inline `style={{ key: 'value' }}` object literals are analyzed.
+  // Variable-referenced styles (style={styles.btn}) are out of scope.
   traverse(ast, {
     JSXAttribute(path: NodePath<JSXAttribute>) {
       const node = path.node as JSXAttribute

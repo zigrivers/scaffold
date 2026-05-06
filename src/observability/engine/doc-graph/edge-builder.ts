@@ -97,7 +97,8 @@ export function buildEdges(input: BuildEdgesInput): BuildEdgesResult {
 
   for (const use of input.component_uses ?? []) {
     const fileId = fileIdByPath.get(use.file) ?? `file:${use.file}`
-    edges.push({ kind: 'file_to_component_use', from: fileId, to: use.component_id as never })
+    const edgeTo = use.component_id === 'unsanctioned' ? `unsanctioned:${use.specifier}` : use.component_id
+    edges.push({ kind: 'file_to_component_use', from: fileId, to: edgeTo as never })
   }
 
   return { edges, unresolved_globs: unresolvedGlobs }

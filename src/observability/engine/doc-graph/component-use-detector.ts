@@ -1,7 +1,7 @@
 import { parse as babelParse } from '@babel/parser'
 import traverseDefault from '@babel/traverse'
 import type { NodePath } from '@babel/traverse'
-import type { ImportDeclaration } from '@babel/types'
+import type { CallExpression, Identifier, ImportDeclaration, StringLiteral } from '@babel/types'
 import type { SanctionedComponent } from '../types.js'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -32,18 +32,24 @@ export function detectComponentUses(
   try {
     ast = babelParse(source, { sourceType: 'module', plugins: ['typescript', 'jsx'] })
   } catch {
-    return out
+    try {
+      ast = babelParse(source, { sourceType: 'script', plugins: ['typescript', 'jsx'] })
+    } catch { return out }
+  }
+  function pushUse(specifier: string) {
+    if (isRelative(specifier)) return
+    const match = components.find((c) => packageNameOf(c) === specifier)
+    out.push({ file: filePath, specifier, component_id: match ? match.id : 'unsanctioned' })
   }
   traverse(ast, {
     ImportDeclaration(path: NodePath<ImportDeclaration>) {
-      const specifier = (path.node as ImportDeclaration).source.value
-      if (isRelative(specifier)) return
-      const match = components.find((c) => packageNameOf(c) === specifier)
-      out.push({
-        file: filePath,
-        specifier,
-        component_id: match ? match.id : 'unsanctioned',
-      })
+      pushUse((path.node as ImportDeclaration).source.value)
+    },
+    CallExpression(path: NodePath<CallExpression>) {
+      const node = path.node as CallExpression
+      if (node.callee.type !== 'Identifier' || (node.callee as Identifier).name !== 'require') return
+      if (node.arguments.length === 0 || node.arguments[0].type !== 'StringLiteral') return
+      pushUse((node.arguments[0] as StringLiteral).value)
     },
   })
   return out
