@@ -31,7 +31,8 @@ function findPatternViolations(rule: Rule, file: string, content: string): RuleV
   if (rule.forbidden) {
     const lines = content.split('\n')
     for (const sym of rule.forbidden) {
-      const symRe = new RegExp(`\\b${sym.replace(/\s+/g, '\\s+')}\\b`)
+      const escaped = sym.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')
+      const symRe = new RegExp(`\\b${escaped}\\b`)
       for (let i = 0; i < lines.length; i++) {
         if (symRe.test(lines[i])) out.push({ rule, file, lineStart: i + 1, lineEnd: i + 1 })
       }
