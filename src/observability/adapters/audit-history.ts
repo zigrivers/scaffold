@@ -1,4 +1,4 @@
-import { access, readdir, readFile, stat } from 'node:fs/promises'
+import { access, readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AdapterStatus, BaseAdapter } from './types.js'
 import type { Severity } from '../engine/types.js'
@@ -63,15 +63,9 @@ export const auditHistoryAdapter: BaseAdapter & {
   },
 
   async listSidecars(cwd: string): Promise<string[]> {
-    // Collect ALL json files then sort by mtime and cap — applying MAX_SIDECAR_SCAN
-    // before the mtime sort would exclude recently-modified older-named files.
-    const d = join(cwd, DIR)
-    const exists = await access(d).then(() => true).catch(() => false)
-    if (!exists) return []
-    const entries = await readdir(d)
-    const paths = entries.filter((f) => f.endsWith('.json')).map((f) => join(d, f))
-    const withMtime = await Promise.all(paths.map(async (f) => ({ f, mtime: (await stat(f)).mtimeMs })))
-    return withMtime.sort((a, b) => b.mtime - a.mtime).slice(0, MAX_SIDECAR_SCAN).map(({ f }) => f)
+    // Sidecar filenames are date-stamped by the engine, so filename desc == chrono desc.
+    // Avoids stat() on every file; consistent with listJsonFiles.
+    return listJsonFiles(cwd)
   },
 
   async readTrends(cwd: string): Promise<AuditTrendPoint[]> {
