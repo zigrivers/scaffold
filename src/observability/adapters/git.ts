@@ -79,16 +79,36 @@ export const gitAdapter: BaseAdapter & {
   },
 
   async replayEvents(cwd: string, opts: { sinceHours: number }): Promise<ReplayEvent[]> {
+    const worktrees = await gitAdapter.listWorktrees(cwd)
+    const since = `${opts.sinceHours}.hours.ago`
+    const fmt = '%H%x09%cI%x09%an%x09%s'
+    const seen = new Set<string>()
+    const out: ReplayEvent[] = []
+    for (const wt of worktrees) {
+      if (!wt.branch) continue
+      try {
+        const raw = await git(cwd, ['log', wt.branch, `--since=${since}`, `--pretty=format:${fmt}`])
+        for (const line of raw.split('\n').filter(Boolean)) {
+          const [sha, ts, author, ...rest] = line.split('\t')
+          if (seen.has(sha)) continue
+          seen.add(sha)
+          out.push({
+            sort_id: `git:${sha}`, correlation_id: null, ts,
+            source: 'git' as const, kind: 'commit',
+            actor_label: author, branch: wt.branch,
+            summary: `${rest.join('\t').slice(0, 200)} (${sha.slice(0, 7)})`,
+            link: sha,
+          })
+        }
+      } catch { /* branch may not exist yet */ }
+    }
+    if (out.length > 0) return out
+    // Fallback when no worktrees are known
     const commits = await gitAdapter.recentCommits(cwd, opts)
     return commits.map((c) => ({
-      sort_id: `git:${c.sha}`,
-      correlation_id: null,
-      ts: c.ts,
-      source: 'git' as const,
-      kind: 'commit',
-      actor_label: c.author,
-      summary: `${c.subject.slice(0, 200)} (${c.sha.slice(0, 7)})`,
-      link: c.sha,
+      sort_id: `git:${c.sha}`, correlation_id: null, ts: c.ts,
+      source: 'git' as const, kind: 'commit', actor_label: c.author,
+      summary: `${c.subject.slice(0, 200)} (${c.sha.slice(0, 7)})`, link: c.sha,
     }))
   },
 }

@@ -12,6 +12,7 @@ export interface PrInfo {
   branch: string
   opened_at: string
   merged_at?: string
+  closed_at?: string
 }
 
 export interface GhAdapterOpts {
@@ -98,6 +99,15 @@ export const ghAdapter: BaseAdapter & {
           link: p.url,
         })
       }
+      if (p.state === 'closed' && !p.merged_at && p.closed_at && p.closed_at >= cutoff) {
+        out.push({
+          sort_id: `gh:${p.number}:closed`,
+          correlation_id: `pr:${p.number}:closed`,
+          ts: p.closed_at, source: 'gh', kind: 'pr_closed',
+          summary: `PR #${p.number} closed without merge`,
+          link: p.url,
+        })
+      }
     }
     return out
   },
@@ -106,10 +116,10 @@ export const ghAdapter: BaseAdapter & {
     const probe = await ghAdapter.probe(cwd, { ghBin: opts.ghBin })
     if (probe.status === 'unavailable') return []
     const open = await ghAdapter.listOpenPRs(cwd, { ghBin: opts.ghBin })
+    const bin = opts.ghBin ?? 'gh'
+    const since = new Date(Date.now() - opts.sinceHours * 3_600_000).toISOString().slice(0, 10)
     let merged: PrInfo[] = []
     try {
-      const bin = opts.ghBin ?? 'gh'
-      const since = new Date(Date.now() - opts.sinceHours * 3_600_000).toISOString().slice(0, 10)
       const { stdout } = await execFile(bin, [
         'pr', 'list', '--state', 'merged', '--search', `merged:>=${since}`, '--json',
         'number,url,state,headRefName,createdAt,mergedAt',
@@ -121,6 +131,19 @@ export const ghAdapter: BaseAdapter & {
         branch: p.headRefName, opened_at: p.createdAt, merged_at: p.mergedAt,
       }))
     } catch { /* gh unavailable or not authed for merged query */ }
-    return ghAdapter._prsToReplayEvents([...open, ...merged], opts)
+    let closedUnmerged: PrInfo[] = []
+    try {
+      const { stdout } = await execFile(bin, [
+        'pr', 'list', '--state', 'closed', '--search', `closed:>=${since}`, '--json',
+        'number,url,state,headRefName,createdAt,closedAt',
+      ], { cwd })
+      closedUnmerged = (JSON.parse(stdout) as Array<{
+        number: number; url: string; state: string; headRefName: string; createdAt: string; closedAt?: string
+      }>).map((p) => ({
+        number: p.number, url: p.url, state: 'closed' as const,
+        branch: p.headRefName, opened_at: p.createdAt, closed_at: p.closedAt,
+      }))
+    } catch { /* gh unavailable or query unsupported */ }
+    return ghAdapter._prsToReplayEvents([...open, ...merged, ...closedUnmerged], opts)
   },
 }

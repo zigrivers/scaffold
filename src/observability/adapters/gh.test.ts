@@ -54,4 +54,34 @@ describe('gh adapter — replayEvents', () => {
   it('typeof replayEvents is function', () => {
     expect(typeof ghAdapter.replayEvents).toBe('function')
   })
+
+  it('emits pr_closed for a closed-unmerged PR within window', () => {
+    const now = Date.now()
+    const recentOpen = new Date(now - 3 * 3_600_000).toISOString()
+    const recentClose = new Date(now - 1 * 3_600_000).toISOString()
+    const prs = [
+      {
+        number: 99, url: 'https://example/pr/99', state: 'closed' as const,
+        branch: 'feat-x', opened_at: recentOpen, closed_at: recentClose,
+      },
+    ]
+    const events = ghAdapter._prsToReplayEvents(prs, { sinceHours: 24 })
+    const closed = events.find((e) => e.kind === 'pr_closed')
+    expect(closed).toBeDefined()
+    expect(closed?.correlation_id).toBe('pr:99:closed')
+    expect(closed?.sort_id).toBe('gh:99:closed')
+  })
+
+  it('does not emit pr_closed for a merged PR', () => {
+    const now = Date.now()
+    const recentTs = new Date(now - 1 * 3_600_000).toISOString()
+    const prs = [
+      {
+        number: 100, url: 'https://example/pr/100', state: 'closed' as const,
+        branch: 'feat-y', opened_at: recentTs, merged_at: recentTs, closed_at: recentTs,
+      },
+    ]
+    const events = ghAdapter._prsToReplayEvents(prs, { sinceHours: 24 })
+    expect(events.find((e) => e.kind === 'pr_closed')).toBeUndefined()
+  })
 })

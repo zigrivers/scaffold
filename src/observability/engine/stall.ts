@@ -54,11 +54,12 @@ export function evaluateStall(input: EvaluateStallInput): NeedsAttentionItem[] {
     }
   }
 
-  function latestCommitOnBranchSince(_branch: string, since: string): string | null {
+  function latestCommitOnBranchSince(branch: string, since: string): string | null {
     let latest: string | null = null
     for (const r of input.replayEvents) {
       if (r.source !== 'git' || r.kind !== 'commit') continue
       if (r.ts <= since) continue
+      if (r.branch && r.branch !== branch) continue
       if (latest === null || r.ts > latest) latest = r.ts
     }
     return latest

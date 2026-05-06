@@ -200,6 +200,7 @@ export interface ReplayEvent {
   kind: string
   actor_label?: string
   task_id?: string
+  branch?: string
   summary: string
   link?: string
 }

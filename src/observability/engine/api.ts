@@ -173,7 +173,10 @@ export async function runProgress(input: RunProgressInput): Promise<EngineOutput
   let needs_attention: EngineOutput['needs_attention'] = []
   if (!input.noStallCheck) {
     const config = loadObservabilityConfig(input.primaryRoot)
-    const skippedStreaks = await auditHistoryAdapter.lensSkippedStreaks(input.primaryRoot)
+    const [skippedStreaks, latestFindings] = await Promise.all([
+      auditHistoryAdapter.lensSkippedStreaks(input.primaryRoot),
+      auditHistoryAdapter.latestFindings(input.primaryRoot),
+    ])
     const adapterEventsForStall = replay?.events ?? (await Promise.all([
       gitAdapter.replayEvents(input.primaryRoot, { sinceHours: input.sinceHours }),
       ghAdapter.replayEvents(input.primaryRoot, { sinceHours: input.sinceHours, ghBin: input.ghBin }),
@@ -183,7 +186,7 @@ export async function runProgress(input: RunProgressInput): Promise<EngineOutput
       now: started_at,
       ledgerEvents: merged.events,
       replayEvents: adapterEventsForStall,
-      findings: [],
+      findings: latestFindings,
       config,
       lensSkippedStreaks: skippedStreaks,
     })

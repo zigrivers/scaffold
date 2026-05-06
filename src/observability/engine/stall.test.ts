@@ -134,6 +134,20 @@ describe('evaluateStall', () => {
     expect(items.find((i) => i.signal === 'lens_skipped_repeatedly')).toBeDefined()
   })
 
+  it('does not suppress task_stale when the commit is on a different branch', () => {
+    const events = [ledgerTaskClaimed('T-001', '2026-05-04T08:00:00Z')]
+    const replay = [{
+      sort_id: 'git:xyz', correlation_id: null, ts: '2026-05-04T13:30:00Z',
+      source: 'git' as const, kind: 'commit', summary: 'work', actor_label: 'agent-bob',
+      branch: 'other-branch',
+    }]
+    const items = evaluateStall({
+      now: NOW, ledgerEvents: events, replayEvents: replay, findings: [],
+      config: DEFAULT_CONFIG, lensSkippedStreaks: {},
+    })
+    expect(items.find((i) => i.signal === 'task_stale')).toBeDefined()
+  })
+
   it('does not emit a signal when its threshold is configured "off"', () => {
     const events = [ledgerTaskClaimed('T-001', '2026-05-04T08:00:00Z')]
     const config = { ...DEFAULT_CONFIG, stall: { ...DEFAULT_CONFIG.stall, task_stale: 'off' } }
