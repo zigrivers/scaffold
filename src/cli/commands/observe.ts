@@ -127,6 +127,7 @@ export async function handleProgress(input: HandleProgressInput): Promise<number
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         process.stderr.write(`scaffold observe progress: markdown write failed: ${msg}\n`)
+        if (input.output) return 3
       }
       const rendered = renderProgressTerminal(out)
       process.stdout.write((input.maskPaths ? redactRendered(rendered) : rendered) + '\n')
@@ -224,6 +225,7 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         process.stderr.write(`scaffold observe audit: markdown write failed: ${msg}\n`)
+        if (input.output) return 3
       }
       const rendered = renderAuditTerminal(out, { showAcknowledged: input.showAcknowledged })
       process.stdout.write((input.maskPaths ? redactRendered(rendered) : rendered) + '\n')
