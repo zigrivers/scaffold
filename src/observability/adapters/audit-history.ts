@@ -70,20 +70,20 @@ export const auditHistoryAdapter: BaseAdapter & {
 
   async readTrends(cwd: string): Promise<AuditTrendPoint[]> {
     const files = await listJsonFiles(cwd)
-    const points: AuditTrendPoint[] = []
-    for (const f of files) {
-      const s = await safeRead(f)
-      if (!s?.engine_output?.summary) continue
-      if (s.engine_output.invocation.command !== 'audit') continue
-      points.push({
+    const raw = await Promise.all(files.map((f) => safeRead(f)))
+    const points: AuditTrendPoint[] = raw.flatMap((s) => {
+      if (!s?.engine_output?.summary) return []
+      if (s.engine_output.invocation.command !== 'audit') return []
+      const sum = s.engine_output.summary
+      return [{
         ts: s.engine_output.invocation.started_at,
-        total: s.engine_output.summary.total,
-        blocking: s.engine_output.summary.blocking,
-        acknowledged: s.engine_output.summary.acknowledged,
-        skipped_lenses: s.engine_output.summary.skipped_lenses,
-        by_severity: s.engine_output.summary.by_severity,
-      })
-    }
+        total: sum.total,
+        blocking: sum.blocking,
+        acknowledged: sum.acknowledged,
+        skipped_lenses: sum.skipped_lenses,
+        by_severity: sum.by_severity,
+      }]
+    })
     return points.sort((a, b) => b.ts.localeCompare(a.ts))
   },
 

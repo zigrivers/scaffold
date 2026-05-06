@@ -146,12 +146,12 @@ function findingSection(f: Finding): string {
     '',
     '**Evidence:**',
     '',
-    '```json',
+    '````json',
     JSON.stringify(f.evidence, null, 2),
-    '```',
+    '````',
   ]
   if (f.fix_hint) {
-    lines.push('', '**Fix hint:**', '', '```json', JSON.stringify(f.fix_hint, null, 2), '```')
+    lines.push('', '**Fix hint:**', '', '````json', JSON.stringify(f.fix_hint, null, 2), '````')
   }
   return lines.join('\n')
 }

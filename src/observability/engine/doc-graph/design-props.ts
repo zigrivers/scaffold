@@ -2,7 +2,7 @@ export const COLOR_PROPS = new Set([
   'color', 'background', 'background-color', 'border-color', 'border-top-color',
   'border-right-color', 'border-bottom-color', 'border-left-color',
   'outline-color', 'text-decoration-color', 'fill', 'stroke', 'caret-color',
-  'column-rule-color', 'box-shadow', 'text-shadow',
+  'column-rule-color', 'box-shadow', 'text-shadow', 'accent-color',
 ])
 
 export const SPACING_PROPS = new Set([
@@ -13,11 +13,11 @@ export const SPACING_PROPS = new Set([
   'border-width', 'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
   'border-radius', 'border-top-left-radius', 'border-top-right-radius',
   'border-bottom-left-radius', 'border-bottom-right-radius',
-  'outline-width', 'outline-offset', 'inset', 'flex-basis',
+  'outline-width', 'outline-offset', 'inset', 'flex-basis', 'border-spacing',
 ])
 
 export const TYPOGRAPHY_PROPS = new Set([
-  'font-size', 'font-family', 'font-weight', 'font-style', 'font-variant',
+  'font', 'font-size', 'font-family', 'font-weight', 'font-style', 'font-variant',
   'line-height', 'letter-spacing', 'word-spacing', 'text-indent',
   'text-decoration', 'text-transform', 'vertical-align',
 ])
