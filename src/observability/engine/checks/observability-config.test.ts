@@ -15,7 +15,7 @@ describe('loadObservabilityConfig', () => {
 
   it('merges user values over defaults at the lens-keyed level', () => {
     writeFileSync(ensureConfigDir(dir),
-`lenses:
+      `lenses:
   E-design:
     ad_hoc_token_threshold: 5
     ui_glob: "src/components/**/*.{tsx,vue}"

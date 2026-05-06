@@ -16,7 +16,9 @@ function header(out: EngineOutput, kind: 'Progress' | 'Audit'): string {
 }
 
 function availabilityTable(a: AvailabilityMap): string {
-  const ord: (keyof AvailabilityMap)[] = ['git', 'gh', 'pipeline_docs', 'tests', 'state', 'beads', 'mmr', 'audit_history']
+  const ord: (keyof AvailabilityMap)[] = [
+    'git', 'gh', 'pipeline_docs', 'tests', 'state', 'beads', 'mmr', 'audit_history',
+  ]
   const rows = ord.map((k) => {
     const s = a[k] as AdapterStatus
     const reason = s.reason ? sanitizePath(s.reason) : ''
@@ -31,8 +33,11 @@ function ledgerSummary(a: AvailabilityMap): string {
     '',
     `- Events read: ${a.ledger.events_read}`,
     `- Malformed lines: ${a.ledger.malformed_lines}`,
-    `- Sources:`,
-    ...a.ledger.sources.map((s) => `  - \`${s.worktree_id}\` — ${s.events} events${s.harvested_at ? ` (harvested ${fmtDate(s.harvested_at)})` : ''}`),
+    '- Sources:',
+    ...a.ledger.sources.map((s) => {
+      const harvested = s.harvested_at ? ` (harvested ${fmtDate(s.harvested_at)})` : ''
+      return `  - \`${s.worktree_id}\` — ${s.events} events${harvested}`
+    }),
   ]
   return lines.join('\n')
 }
@@ -55,7 +60,9 @@ function completedSection(out: EngineOutput): string {
     const pr = c.pr_number ? `PR #${c.pr_number}` : '—'
     return `| ${c.task_id ?? '(unplanned)'} | ${c.task_title} | ${c.outcome} | ${pr} | ${c.by} |`
   })
-  return ['## Completed in Window', '', '| Task | Title | Outcome | PR | By |', '|---|---|---|---|---|', ...rows].join('\n')
+  return [
+    '## Completed in Window', '', '| Task | Title | Outcome | PR | By |', '|---|---|---|---|---|', ...rows,
+  ].join('\n')
 }
 
 function inFlightSection(out: EngineOutput): string {
@@ -68,8 +75,10 @@ function inFlightSection(out: EngineOutput): string {
 function decisionsSection(out: EngineOutput): string {
   const ds = out.snapshot?.recent_decisions ?? []
   if (ds.length === 0) return ''
-  const rows = ds.slice(0, 10).map((d) =>
-    `| \`${d.key}\` | ${d.summary} | ${fmtDate(d.recorded_at)} | ${d.affects.length > 0 ? d.affects.join(', ') : '—'} |`)
+  const rows = ds.slice(0, 10).map((d) => {
+    const affects = d.affects.length > 0 ? d.affects.join(', ') : '—'
+    return `| \`${d.key}\` | ${d.summary} | ${fmtDate(d.recorded_at)} | ${affects} |`
+  })
   return ['## Recent Decisions', '', '| Key | Summary | Recorded | Affects |', '|---|---|---|---|', ...rows].join('\n')
 }
 
@@ -105,7 +114,9 @@ function summaryTable(out: EngineOutput): string {
   const hdr = [
     '## Summary',
     '',
-    `${out.summary.total} findings · ${out.summary.blocking} blocking (severity at or above ${out.fix_threshold}) · ${out.summary.acknowledged} acknowledged · ${out.summary.skipped_lenses} skipped lenses.`,
+    `${out.summary.total} findings · ${out.summary.blocking} blocking` +
+    ` (severity at or above ${out.fix_threshold}) · ${out.summary.acknowledged} acknowledged` +
+    ` · ${out.summary.skipped_lenses} skipped lenses.`,
     '',
     '| Severity | Total | Visible | Acknowledged |',
     '|---|---|---|---|',
@@ -151,8 +162,12 @@ function findingsSection(out: EngineOutput): string {
 function acknowledgedSection(out: EngineOutput): string {
   const acks = out.findings.filter((f) => f.status === 'acknowledged')
   if (acks.length === 0) return ''
-  const rows = acks.map((f) => `| \`${f.id.slice(0, 8)}\` | ${f.severity} | ${f.lens_id} | ${f.title} | ${f.ack_note ?? ''} |`)
-  return ['## Acknowledged', '', '| ID | Severity | Lens | Title | Note |', '|---|---|---|---|---|', ...rows].join('\n')
+  const rows = acks.map((f) =>
+    `| \`${f.id.slice(0, 8)}\` | ${f.severity} | ${f.lens_id} | ${f.title} | ${f.ack_note ?? ''} |`,
+  )
+  return [
+    '## Acknowledged', '', '| ID | Severity | Lens | Title | Note |', '|---|---|---|---|---|', ...rows,
+  ].join('\n')
 }
 
 function skippedSection(out: EngineOutput): string {

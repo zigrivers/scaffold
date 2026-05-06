@@ -223,7 +223,10 @@ import type { EngineOutput } from './types.js'
 describe('redactEngineOutput (structured)', () => {
   const skeleton: EngineOutput = {
     schema_version: '1.0',
-    invocation: { command: 'audit', args: { user: '/Users/alice/repo' }, started_at: '', completed_at: '', scaffold_version: '0.0.0' },
+    invocation: {
+      command: 'audit', args: { user: '/Users/alice/repo' },
+      started_at: '', completed_at: '', scaffold_version: '0.0.0',
+    },
     availability: {
       git: { status: 'available' }, gh: { status: 'unavailable' },
       pipeline_docs: { status: 'available' }, tests: { status: 'available' },
@@ -240,10 +243,15 @@ describe('redactEngineOutput (structured)', () => {
         confidence: 'high', first_seen: '', last_seen: '', status: 'open' },
     ],
     needs_attention: [],
-    graph_stats: { nodes_by_kind: {}, edges_by_kind: {}, orphans_by_kind: {}, unsanctioned_uses: 0, ad_hoc_token_uses: 0 },
+    graph_stats: {
+      nodes_by_kind: {}, edges_by_kind: {}, orphans_by_kind: {}, unsanctioned_uses: 0, ad_hoc_token_uses: 0,
+    },
     fix_threshold: 'P2', verdict: 'pass',
     summary: { total: 1, by_severity: { P0: 0, P1: 1, P2: 0, P3: 0 },
-      by_severity_status: { P0: { open: 0, acknowledged: 0, skipped: 0 }, P1: { open: 1, acknowledged: 0, skipped: 0 }, P2: { open: 0, acknowledged: 0, skipped: 0 }, P3: { open: 0, acknowledged: 0, skipped: 0 } },
+      by_severity_status: {
+        P0: { open: 0, acknowledged: 0, skipped: 0 }, P1: { open: 1, acknowledged: 0, skipped: 0 },
+        P2: { open: 0, acknowledged: 0, skipped: 0 }, P3: { open: 0, acknowledged: 0, skipped: 0 },
+      },
       blocking: 0, acknowledged: 0, skipped_lenses: 0 },
   }
 

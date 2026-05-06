@@ -40,7 +40,10 @@ describe('lensGDecisions', () => {
   it('emits P1 for doc decision without matching ledger event (when ledger has any decisions)', async () => {
     const g = emptyGraph()
     g.decisions = [
-      { id: 'decision:archive-policy', key: 'archive-policy', summary: 'After 90 days', affects: [], source_anchor: 'docs/decisions/archive-policy.md', recorded_at: '2026-05-04T00:00:00Z' },
+      {
+        id: 'decision:archive-policy', key: 'archive-policy', summary: 'After 90 days',
+        affects: [], source_anchor: 'docs/decisions/archive-policy.md', recorded_at: '2026-05-04T00:00:00Z',
+      },
     ]
     const events = [decisionEvent('different-key', 'unrelated')]
     const findings = await lensGDecisions(g, { events }, baseAvail, [], new Set(['G-decisions']))

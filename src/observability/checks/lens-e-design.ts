@@ -42,11 +42,15 @@ export const lensEDesign: LensFn = async (graph) => {
       id: makeFindingId([lensId, 'ad-hoc', fileId]),
       lens_id: lensId, severity: 'P1',
       title: `${count} ad-hoc design values in ${fileId.replace(/^file:/, '')} (threshold: ${threshold})`,
-      description: `${fileId.replace(/^file:/, '')} has ${count} style values that don't resolve to design-system tokens.`,
+      description: `${fileId.replace(/^file:/, '')} has ${count} style values` +
+        ' that don\'t resolve to design-system tokens.',
       source_doc: 'docs/design-system.md',
       evidence: { kind: 'rule_violation', rule_id: 'design-ad-hoc-threshold', file: fileId },
       confidence: 'high', first_seen: now, last_seen: now, status: 'open',
-      fix_hint: { kind: 'rename_token', target: fileId.replace(/^file:/, ''), prompt: `Replace ad-hoc values with design-system tokens in ${fileId.replace(/^file:/, '')}.` },
+      fix_hint: {
+        kind: 'rename_token', target: fileId.replace(/^file:/, ''),
+        prompt: `Replace ad-hoc values with design-system tokens in ${fileId.replace(/^file:/, '')}.`,
+      },
     })
   }
 
@@ -63,11 +67,15 @@ export const lensEDesign: LensFn = async (graph) => {
         id: makeFindingId([lensId, 'must-priority', ed.from, ed.property ?? '']),
         lens_id: lensId, severity: 'P0',
         title: `must-priority token bypassed in ${ed.from.replace(/^file:/, '')} (property: ${ed.property})`,
-        description: `${ed.from.replace(/^file:/, '')} uses an ad-hoc value for property "${ed.property}" whose category (${cat}) has a must-priority token.`,
+        description: `${ed.from.replace(/^file:/, '')} uses an ad-hoc value for property "${ed.property}"` +
+          ` whose category (${cat}) has a must-priority token.`,
         source_doc: 'docs/design-system.md',
         evidence: { kind: 'rule_violation', rule_id: 'design-must-token', file: ed.from },
         confidence: 'high', first_seen: now, last_seen: now, status: 'open',
-        fix_hint: { kind: 'rename_token', target: ed.from.replace(/^file:/, ''), prompt: `Replace the ad-hoc ${ed.property} value with the corresponding must-priority token.` },
+        fix_hint: {
+          kind: 'rename_token', target: ed.from.replace(/^file:/, ''),
+          prompt: `Replace the ad-hoc ${ed.property} value with the corresponding must-priority token.`,
+        },
       })
     }
   }

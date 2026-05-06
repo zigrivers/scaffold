@@ -78,7 +78,10 @@ export const lensGDecisions: LensFn = async (graph, ledger, _availability, upstr
       source_doc: 'decisions.jsonl',
       evidence: { kind: 'rule_violation', rule_id: 'unsanctioned-dep-no-decision', file: `file:${filePath}` },
       confidence: 'high', first_seen: now, last_seen: now, status: 'open',
-      fix_hint: { kind: 'record_decision', target: 'decisions.jsonl', prompt: `Record a decision for the unsanctioned dependency in ${filePath}.` },
+      fix_hint: {
+        kind: 'record_decision', target: 'decisions.jsonl',
+        prompt: `Record a decision for the unsanctioned dependency in ${filePath}.`,
+      },
     })
   }
 

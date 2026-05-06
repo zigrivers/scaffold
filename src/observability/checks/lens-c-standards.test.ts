@@ -23,8 +23,9 @@ describe('lensCStandards', () => {
     mkdirSync(join(dir, 'src'), { recursive: true })
     writeFileSync(join(dir, 'package.json'), '{}')
     writeFileSync(join(dir, 'docs/coding-standards.md'),
-      '# Coding Standards\n### Rule: no-console\n- pattern: `console\\.log\\(`\n- match: src/**/*.ts\n- language: typescript\n')
-    writeFileSync(join(dir, 'src/foo.ts'), "console.log('debug')\n")
+      '# Coding Standards\n### Rule: no-console\n' +
+      '- pattern: `console\\.log\\(`\n- match: src/**/*.ts\n- language: typescript\n')
+    writeFileSync(join(dir, 'src/foo.ts'), 'console.log(\'debug\')\n')
 
     const graph = await buildDocGraph(dir)
     const findings = await lensCStandards(graph, { events: [] }, stubAvail, [], new Set(['C-standards']))
@@ -43,7 +44,7 @@ describe('lensCStandards', () => {
     writeFileSync(join(dir, 'package.json'), '{}')
     writeFileSync(join(dir, 'docs/coding-standards.md'),
       '### Rule: no-console\n- pattern: `console\\.log\\(`\n- match: src/**/*.ts\n- severity: P0\n')
-    writeFileSync(join(dir, 'src/foo.ts'), "console.log('debug')\n")
+    writeFileSync(join(dir, 'src/foo.ts'), 'console.log(\'debug\')\n')
     const graph = await buildDocGraph(dir)
     const findings = await lensCStandards(graph, { events: [] }, stubAvail, [], new Set(['C-standards']))
     expect(findings[0].severity).toBe('P0')
@@ -70,7 +71,7 @@ describe('lensCStandards', () => {
     writeFileSync(join(dir, 'package.json'), '{}')
     writeFileSync(join(dir, 'docs/coding-standards.md'),
       '### Rule: no-console\n- pattern: `console\\.log\\(`\n- match: src/**/*.ts\n- severity: P2\n')
-    writeFileSync(join(dir, 'src/foo.ts'), "console.log('x')\n")
+    writeFileSync(join(dir, 'src/foo.ts'), 'console.log(\'x\')\n')
     writeFileSync(join(dir, '.scaffold/observability.yaml'),
       'lenses:\n  C-standards:\n    rule_overrides:\n      no-console: P0\n')
     const graph = await buildDocGraph(dir)
@@ -84,7 +85,7 @@ describe('lensCStandards', () => {
     writeFileSync(join(dir, 'package.json'), '{}')
     writeFileSync(join(dir, 'docs/coding-standards.md'),
       '### Rule: no-eval\n- forbidden: eval, new Function\n- match: src/**/*.ts\n')
-    writeFileSync(join(dir, 'src/foo.ts'), "eval('1 + 1')\n")
+    writeFileSync(join(dir, 'src/foo.ts'), 'eval(\'1 + 1\')\n')
     const graph = await buildDocGraph(dir)
     const findings = await lensCStandards(graph, { events: [] }, stubAvail, [], new Set(['C-standards']))
     expect(findings[0].lens_id).toBe('C-standards')

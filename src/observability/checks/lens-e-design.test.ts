@@ -28,7 +28,8 @@ describe('lensEDesign', () => {
     writeFileSync(join(dir, '.scaffold/observability.yaml'),
       'lenses:\n  E-design:\n    ui_glob: "src/components/**/*.tsx"\n    ad_hoc_token_threshold: 3\n')
     writeFileSync(join(dir, 'src/components/Big.tsx'),
-      "export const Big = () => <div style={{ color: '#abc', background: '#def', borderColor: '#123', padding: '13px' }} />")
+      'export const Big = () => ' +
+      '<div style={{ color: \'#abc\', background: \'#def\', borderColor: \'#123\', padding: \'13px\' }} />')
     const graph = await buildDocGraph(dir)
     const findings = await lensEDesign(graph, { events: [] }, stubAvail, [], new Set(['E-design']))
     expect(findings.find((f) => /ad-hoc/i.test(f.title))).toBeDefined()
@@ -45,7 +46,7 @@ describe('lensEDesign', () => {
     writeFileSync(join(dir, '.scaffold/observability.yaml'),
       'lenses:\n  E-design:\n    ui_glob: "src/components/**/*.tsx"\n')
     writeFileSync(join(dir, 'src/components/Btn.tsx'),
-      "export const Btn = () => <button style={{ color: '#zz0011' }}>X</button>")
+      'export const Btn = () => <button style={{ color: \'#zz0011\' }}>X</button>')
     const graph = await buildDocGraph(dir)
     const findings = await lensEDesign(graph, { events: [] }, stubAvail, [], new Set(['E-design']))
     const must = findings.find((f) => /must-priority/i.test(f.title))
@@ -63,7 +64,7 @@ describe('lensEDesign', () => {
     writeFileSync(join(dir, '.scaffold/observability.yaml'),
       'lenses:\n  E-design:\n    ui_glob: "src/components/**/*.tsx"\n    ad_hoc_token_threshold: 100\n')
     writeFileSync(join(dir, 'src/components/Btn.tsx'),
-      `export const Btn = () => <button style={{ color: '#zz0011', padding: '13px' }} />`)
+      'export const Btn = () => <button style={{ color: \'#zz0011\', padding: \'13px\' }} />')
     const graph = await buildDocGraph(dir)
     const findings = await lensEDesign(graph, { events: [] }, stubAvail, [], new Set(['E-design']))
     expect(findings.find((f) => /must-priority/i.test(f.title) && /color/i.test(f.description))?.severity).toBe('P0')
@@ -80,7 +81,8 @@ describe('lensEDesign', () => {
     writeFileSync(join(dir, '.scaffold/observability.yaml'),
       'lenses:\n  E-design:\n    ui_glob: "src/components/**/*.tsx"\n')
     writeFileSync(join(dir, 'src/components/Btn.tsx'),
-      `export const Btn = () => <button style={{ color: '#aaa', background: '#bbb', borderColor: '#ccc', padding: '11px' }} />`)
+      'export const Btn = () => ' +
+      '<button style={{ color: \'#aaa\', background: \'#bbb\', borderColor: \'#ccc\', padding: \'11px\' }} />')
     const graph = await buildDocGraph(dir)
     const findings = await lensEDesign(graph, { events: [] }, stubAvail, [], new Set(['E-design']))
     expect(findings.find((f) => /must-priority/i.test(f.title))).toBeUndefined()
@@ -96,7 +98,7 @@ describe('lensEDesign', () => {
     writeFileSync(join(dir, '.scaffold/observability.yaml'),
       'lenses:\n  E-design:\n    ui_glob: "src/components/**/*.tsx"\n')
     writeFileSync(join(dir, 'src/components/Btn.tsx'),
-      "export const Btn = () => <button style={{ color: '#4f46e5' }}>X</button>")
+      'export const Btn = () => <button style={{ color: \'#4f46e5\' }}>X</button>')
     const graph = await buildDocGraph(dir)
     const findings = await lensEDesign(graph, { events: [] }, stubAvail, [], new Set(['E-design']))
     expect(findings).toEqual([])

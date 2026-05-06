@@ -4,7 +4,9 @@ import { LENS_REGISTRY, getLensManifest } from './registry.js'
 describe('LENS_REGISTRY', () => {
   it('has all eight lenses', () => {
     const ids = LENS_REGISTRY.map((m) => m.id).sort()
-    expect(ids).toEqual(['A-tdd', 'B-ac-coverage', 'C-standards', 'D-stack', 'E-design', 'F-scope', 'G-decisions', 'H-cross-doc'])
+    expect(ids).toEqual([
+      'A-tdd', 'B-ac-coverage', 'C-standards', 'D-stack', 'E-design', 'F-scope', 'G-decisions', 'H-cross-doc',
+    ])
   })
 
   it('every entry declares fast profile membership', () => {

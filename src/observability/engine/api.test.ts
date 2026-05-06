@@ -108,12 +108,15 @@ describe('api.runAudit (Plan 3 — eight lenses)', () => {
     writeFileSync(join(project, 'docs/coding-standards.md'),
       '### Rule: no-eval\n- forbidden: eval\n- match: src/**/*.ts\n- severity: P1\n')
     writeFileSync(join(project, 'src/lib/x.ts'),
-      "import { uniq } from 'lodash'\neval('1+1')\n")
+      'import { uniq } from \'lodash\'\neval(\'1+1\')\n')
   })
   afterEach(() => { rmSync(project, { recursive: true, force: true }) })
 
   it('--scope=code runs A/B/C/D/E/F/G but not H', async () => {
-    const out = await runAudit({ primaryRoot: project, profile: 'fast', scope: 'code', sinceHours: 24, ghBin: '/no/such/gh', bdBin: '/no/such/bd' })
+    const out = await runAudit({
+      primaryRoot: project, profile: 'fast', scope: 'code', sinceHours: 24,
+      ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+    })
     const lensIds = new Set(out.findings.map((f) => f.lens_id))
     expect(lensIds.has('H-cross-doc')).toBe(false)
     expect(lensIds.has('C-standards')).toBe(true)
@@ -122,7 +125,10 @@ describe('api.runAudit (Plan 3 — eight lenses)', () => {
   })
 
   it('--scope=docs runs only H', async () => {
-    const out = await runAudit({ primaryRoot: project, profile: 'fast', scope: 'docs', sinceHours: 24, ghBin: '/no/such/gh', bdBin: '/no/such/bd' })
+    const out = await runAudit({
+      primaryRoot: project, profile: 'fast', scope: 'docs', sinceHours: 24,
+      ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+    })
     const lensIds = new Set(out.findings.map((f) => f.lens_id))
     expect(lensIds.has('H-cross-doc')).toBe(true)
     for (const id of ['A-tdd', 'B-ac-coverage', 'C-standards', 'D-stack', 'E-design', 'F-scope', 'G-decisions']) {

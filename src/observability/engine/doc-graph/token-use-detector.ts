@@ -7,8 +7,10 @@ import type {
 } from '@babel/types'
 import type { DesignToken } from '../types.js'
 
+const traverse = (
+  (traverseDefault as unknown as { default: unknown }).default ?? traverseDefault
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const traverse = ((traverseDefault as unknown as { default: unknown }).default ?? traverseDefault) as (ast: unknown, visitors: Record<string, (path: NodePath<any>) => void>) => void
+) as (ast: unknown, visitors: Record<string, (path: NodePath<any>) => void>) => void
 
 export interface TokenUse {
   file: string
@@ -95,8 +97,8 @@ export function detectJsxTokenUses(source: string, tokens: DesignToken[], filePa
         if (prop.type !== 'ObjectProperty') continue
         const op = prop as ObjectProperty
         const keyName = op.key.type === 'Identifier' ? (op.key as Identifier).name
-                      : op.key.type === 'StringLiteral' ? (op.key as StringLiteral).value
-                      : null
+          : op.key.type === 'StringLiteral' ? (op.key as StringLiteral).value
+            : null
         if (!keyName) continue
         const valueNode = op.value
         if (valueNode.type !== 'StringLiteral') continue

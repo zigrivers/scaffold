@@ -24,9 +24,14 @@ export const lensFScope: LensFn = async (graph, ledger, availability) => {
       title: `feature has no story: ${feat.title}`,
       description: `Feature ${feat.id} (priority: ${feat.priority}) has no covering story.`,
       source_doc: feat.source_anchor,
-      evidence: { kind: 'orphan_node', graph_query: `feature_to_story.from = ${feat.id}`, node_id: feat.id },
+      evidence: {
+        kind: 'orphan_node', graph_query: `feature_to_story.from = ${feat.id}`, node_id: feat.id,
+      },
       confidence: 'high', first_seen: now, last_seen: now, status: 'open',
-      fix_hint: { kind: 'edit_doc', target: 'docs/user-stories.md', prompt: `Add a story for feature "${feat.title}".` },
+      fix_hint: {
+        kind: 'edit_doc', target: 'docs/user-stories.md',
+        prompt: `Add a story for feature "${feat.title}".`,
+      },
     })
   }
 
@@ -42,9 +47,16 @@ export const lensFScope: LensFn = async (graph, ledger, availability) => {
       title: `story has no plan task or playbook: ${s.title}`,
       description: `Story ${s.id} (priority: ${s.priority}) has no plan task or playbook task.`,
       source_doc: s.source_anchor,
-      evidence: { kind: 'orphan_node', graph_query: `story_to_plan_task.from = ${s.id} OR playbook_task_to_story.to = ${s.id}`, node_id: s.id },
+      evidence: {
+        kind: 'orphan_node',
+        graph_query: `story_to_plan_task.from = ${s.id} OR playbook_task_to_story.to = ${s.id}`,
+        node_id: s.id,
+      },
       confidence: 'high', first_seen: now, last_seen: now, status: 'open',
-      fix_hint: { kind: 'edit_doc', target: 'docs/implementation-plan.md', prompt: `Add a plan task tracking story ${s.id}.` },
+      fix_hint: {
+        kind: 'edit_doc', target: 'docs/implementation-plan.md',
+        prompt: `Add a plan task tracking story ${s.id}.`,
+      },
     })
   }
 

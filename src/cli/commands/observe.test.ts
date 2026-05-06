@@ -249,7 +249,9 @@ describe('observe progress + audit write markdown reports and sidecars', () => {
   afterEach(() => { rmSync(proj, { recursive: true, force: true }) })
 
   it('progress writes docs/build-status/<id>.md and .json', async () => {
-    const code = await handleProgress({ cwd: proj, json: false, sinceHours: 24, ghBin: '/no/such/gh', bdBin: '/no/such/bd' })
+    const code = await handleProgress({
+      cwd: proj, json: false, sinceHours: 24, ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+    })
     expect(code).toBe(0)
     const files = readdirSync(join(proj, 'docs/build-status'))
     expect(files.find((f) => /^progress-.*\.md$/.test(f))).toBeDefined()
@@ -272,7 +274,10 @@ describe('observe progress + audit write markdown reports and sidecars', () => {
     const origWrite = process.stdout.write.bind(process.stdout)
     process.stdout.write = ((s: string | Uint8Array) => { captured += String(s); return true }) as never
     try {
-      await handleAudit({ cwd: proj, json: true, profile: 'fast', scope: 'all', sinceHours: 24, ghBin: '/no/such/gh', bdBin: '/no/such/bd' })
+      await handleAudit({
+        cwd: proj, json: true, profile: 'fast', scope: 'all', sinceHours: 24,
+        ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+      })
     } finally { process.stdout.write = origWrite }
     expect(JSON.parse(captured).schema_version).toBe('1.0')
     const files = readdirSync(join(proj, 'docs/audits'))
@@ -281,7 +286,10 @@ describe('observe progress + audit write markdown reports and sidecars', () => {
 
   it('--output=<path> overrides the markdown path but keeps the standard sidecar location', async () => {
     const customMd = join(proj, 'tmp-out.md')
-    await handleProgress({ cwd: proj, json: false, sinceHours: 24, output: customMd, ghBin: '/no/such/gh', bdBin: '/no/such/bd' })
+    await handleProgress({
+      cwd: proj, json: false, sinceHours: 24, output: customMd,
+      ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+    })
     expect(existsSync(customMd)).toBe(true)
     expect(readdirSync(join(proj, 'docs/build-status')).find((f) => f.endsWith('.json'))).toBeDefined()
   })
@@ -308,7 +316,10 @@ describe('observe --render=dashboard-fragment', () => {
     const origWrite = process.stdout.write.bind(process.stdout)
     process.stdout.write = ((s: string | Uint8Array) => { captured += String(s); return true }) as never
     try {
-      await handleProgress({ cwd: proj, json: false, sinceHours: 24, render: 'dashboard-fragment', ghBin: '/no/such/gh', bdBin: '/no/such/bd' })
+      await handleProgress({
+        cwd: proj, json: false, sinceHours: 24, render: 'dashboard-fragment',
+        ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+      })
     } finally { process.stdout.write = origWrite }
     expect(captured).toMatch(/<section id="build-progress"/)
     expect(existsSync(join(proj, 'docs/build-status'))).toBe(false)
@@ -319,7 +330,10 @@ describe('observe --render=dashboard-fragment', () => {
     const origWrite = process.stdout.write.bind(process.stdout)
     process.stdout.write = ((s: string | Uint8Array) => { captured += String(s); return true }) as never
     try {
-      await handleAudit({ cwd: proj, json: false, profile: 'fast', scope: 'all', sinceHours: 24, render: 'dashboard-fragment-audit', ghBin: '/no/such/gh', bdBin: '/no/such/bd' })
+      await handleAudit({
+        cwd: proj, json: false, profile: 'fast', scope: 'all', sinceHours: 24,
+        render: 'dashboard-fragment-audit', ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+      })
     } finally { process.stdout.write = origWrite }
     expect(captured).toMatch(/<section id="build-audit"/)
     expect(existsSync(join(proj, 'docs/audits'))).toBe(false)

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { auditHistoryAdapter, type AuditTrendPoint } from './audit-history.js'
+import { auditHistoryAdapter } from './audit-history.js'
 
 describe('audit_history adapter', () => {
   let dir: string
@@ -41,12 +41,20 @@ describe('audit_history adapter — parse trend data', () => {
     mkdirSync(join(dir, 'docs/audits'), { recursive: true })
     writeFileSync(join(dir, 'docs/audits/audit-2026-04-30-1422-fast-all.json'), JSON.stringify({
       report_id: 'audit-2026-04-30-1422-fast-all',
-      engine_output: { schema_version: '1.0', invocation: { command: 'audit', started_at: '2026-04-30T14:22:00Z' }, summary: { total: 5 } },
+      engine_output: {
+        schema_version: '1.0',
+        invocation: { command: 'audit', started_at: '2026-04-30T14:22:00Z' },
+        summary: { total: 5 },
+      },
     }))
     await new Promise((r) => setTimeout(r, 30))
     writeFileSync(join(dir, 'docs/audits/audit-2026-05-01-0900-fast-all.json'), JSON.stringify({
       report_id: 'audit-2026-05-01-0900-fast-all',
-      engine_output: { schema_version: '1.0', invocation: { command: 'audit', started_at: '2026-05-01T09:00:00Z' }, summary: { total: 3 } },
+      engine_output: {
+        schema_version: '1.0',
+        invocation: { command: 'audit', started_at: '2026-05-01T09:00:00Z' },
+        summary: { total: 3 },
+      },
     }))
     const list = await auditHistoryAdapter.listSidecars(dir)
     expect(list[0]).toMatch(/2026-05-01/)
@@ -58,13 +66,22 @@ describe('audit_history adapter — parse trend data', () => {
       report_id: 'audit-2026-04-30-1422-fast-all',
       engine_output: { schema_version: '1.0',
         invocation: { command: 'audit', started_at: '2026-04-30T14:22:00Z' },
-        summary: { total: 5, by_severity: { P0: 1, P1: 2, P2: 2, P3: 0 }, blocking: 3, acknowledged: 0, skipped_lenses: 0 } },
+        summary: {
+          total: 5, by_severity: { P0: 1, P1: 2, P2: 2, P3: 0 },
+          blocking: 3, acknowledged: 0, skipped_lenses: 0,
+        },
+      },
     }))
     writeFileSync(join(dir, 'docs/audits/audit-2026-05-01-0900-fast-all.json'), JSON.stringify({
       report_id: 'audit-2026-05-01-0900-fast-all',
-      engine_output: { schema_version: '1.0',
+      engine_output: {
+        schema_version: '1.0',
         invocation: { command: 'audit', started_at: '2026-05-01T09:00:00Z' },
-        summary: { total: 3, by_severity: { P0: 0, P1: 1, P2: 2, P3: 0 }, blocking: 1, acknowledged: 0, skipped_lenses: 0 } },
+        summary: {
+          total: 3, by_severity: { P0: 0, P1: 1, P2: 2, P3: 0 },
+          blocking: 1, acknowledged: 0, skipped_lenses: 0,
+        },
+      },
     }))
     const trends = await auditHistoryAdapter.readTrends(dir)
     expect(trends).toHaveLength(2)
@@ -80,10 +97,15 @@ describe('audit_history adapter — parse trend data', () => {
         engine_output: {
           schema_version: '1.0',
           invocation: { command: 'audit', started_at: ts },
-          summary: { total: 0, by_severity: { P0: 0, P1: 0, P2: 0, P3: 0 }, blocking: 0, acknowledged: 0, skipped_lenses: skippedLenses.length },
-          findings: skippedLenses.map((id) => ({ id: `skipped-${id}`, lens_id: id, severity: 'P3', status: 'skipped',
+          summary: {
+            total: 0, by_severity: { P0: 0, P1: 0, P2: 0, P3: 0 },
+            blocking: 0, acknowledged: 0, skipped_lenses: skippedLenses.length,
+          },
+          findings: skippedLenses.map((id) => ({
+            id: `skipped-${id}`, lens_id: id, severity: 'P3', status: 'skipped',
             evidence: { kind: 'lens_skipped', reason: 'adapter_unavailable', needed: ['gh'] },
-            confidence: 'high', title: '', description: '', source_doc: '', first_seen: '', last_seen: '' })),
+            confidence: 'high', title: '', description: '', source_doc: '', first_seen: '', last_seen: '',
+          })),
         },
       }))
     mkRun('docs/audits/audit-2026-04-29-fast-all.json', '2026-04-29T00:00:00Z', ['B-ac-coverage'])

@@ -327,7 +327,10 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
         .option('mask-paths', { type: 'boolean', default: false })
         .option('since-hours', { type: 'number', default: 24 })
         .option('output', { type: 'string', describe: 'Override markdown report destination path' })
-        .option('render', { type: 'string', choices: ['dashboard-fragment'] as const, describe: 'Emit HTML fragment to stdout' }),
+        .option('render', {
+          type: 'string', choices: ['dashboard-fragment'] as const,
+          describe: 'Emit HTML fragment to stdout',
+        }),
       async (argv) => {
         const code = await handleProgress({
           cwd: findProjectRoot(process.cwd()) ?? process.cwd(),
@@ -365,7 +368,10 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
         .option('fix-threshold', { type: 'string' })
         .option('show-acknowledged', { type: 'boolean', default: false })
         .option('output', { type: 'string', describe: 'Override markdown report destination path' })
-        .option('render', { type: 'string', choices: ['dashboard-fragment-audit'] as const, describe: 'Emit HTML fragment to stdout' }),
+        .option('render', {
+          type: 'string', choices: ['dashboard-fragment-audit'] as const,
+          describe: 'Emit HTML fragment to stdout',
+        }),
       async (argv) => {
         const code = await handleAudit({
           cwd: findProjectRoot(process.cwd()) ?? process.cwd(),

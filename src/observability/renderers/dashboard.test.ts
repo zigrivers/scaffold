@@ -4,7 +4,10 @@ import type { EngineOutput } from '../engine/types.js'
 
 const baseOut: EngineOutput = {
   schema_version: '1.0',
-  invocation: { command: 'progress', args: { sinceHours: 24 }, started_at: '2026-05-04T14:00:00Z', completed_at: '2026-05-04T14:00:01Z', scaffold_version: '3.25.1' },
+  invocation: {
+    command: 'progress', args: { sinceHours: 24 },
+    started_at: '2026-05-04T14:00:00Z', completed_at: '2026-05-04T14:00:01Z', scaffold_version: '3.25.1',
+  },
   availability: {
     git: { status: 'available' }, gh: { status: 'unavailable' },
     pipeline_docs: { status: 'available' }, tests: { status: 'available' },
@@ -14,18 +17,31 @@ const baseOut: EngineOutput = {
   },
   snapshot: {
     current_phase: 'build',
-    active_agents: [{ worktree_id: 'wid-a', actor_label: 'agent-alice', branch: 'feat-auth',
-      current_task: { id: 'T-031', title: 'refresh token rotation', claimed_at: '2026-05-04T13:55:00Z' }, open_pr: null }],
+    active_agents: [{
+      worktree_id: 'wid-a', actor_label: 'agent-alice', branch: 'feat-auth',
+      current_task: { id: 'T-031', title: 'refresh token rotation', claimed_at: '2026-05-04T13:55:00Z' },
+      open_pr: null,
+    }],
     completed_in_window: [], in_flight: [], blocked: [], upcoming: [],
-    recent_decisions: [{ decision_id: 'decision:foo', key: 'foo', summary: 'bar', recorded_at: '2026-05-04T13:00:00Z', affects: [] }],
+    recent_decisions: [{
+      decision_id: 'decision:foo', key: 'foo', summary: 'bar',
+      recorded_at: '2026-05-04T13:00:00Z', affects: [],
+    }],
     story_coverage: [],
   },
   replay: null, findings: [], needs_attention: [],
-  graph_stats: { nodes_by_kind: {}, edges_by_kind: {}, orphans_by_kind: {}, unsanctioned_uses: 0, ad_hoc_token_uses: 0 },
+  graph_stats: {
+    nodes_by_kind: {}, edges_by_kind: {}, orphans_by_kind: {}, unsanctioned_uses: 0, ad_hoc_token_uses: 0,
+  },
   fix_threshold: 'P2', verdict: 'pass',
-  summary: { total: 0, by_severity: { P0: 0, P1: 0, P2: 0, P3: 0 },
-    by_severity_status: { P0: { open: 0, acknowledged: 0, skipped: 0 }, P1: { open: 0, acknowledged: 0, skipped: 0 }, P2: { open: 0, acknowledged: 0, skipped: 0 }, P3: { open: 0, acknowledged: 0, skipped: 0 } },
-    blocking: 0, acknowledged: 0, skipped_lenses: 0 },
+  summary: {
+    total: 0, by_severity: { P0: 0, P1: 0, P2: 0, P3: 0 },
+    by_severity_status: {
+      P0: { open: 0, acknowledged: 0, skipped: 0 }, P1: { open: 0, acknowledged: 0, skipped: 0 },
+      P2: { open: 0, acknowledged: 0, skipped: 0 }, P3: { open: 0, acknowledged: 0, skipped: 0 },
+    },
+    blocking: 0, acknowledged: 0, skipped_lenses: 0,
+  },
 }
 
 describe('verdictToSeverityToken', () => {
@@ -62,9 +78,14 @@ describe('renderAuditFragment', () => {
         evidence: { kind: 'rule_violation', rule_id: 'r', file: 'f' },
         confidence: 'high', first_seen: '', last_seen: '', status: 'open' },
     ],
-    summary: { total: 1, by_severity: { P0: 1, P1: 0, P2: 0, P3: 0 },
-      by_severity_status: { P0: { open: 1, acknowledged: 0, skipped: 0 }, P1: { open: 0, acknowledged: 0, skipped: 0 }, P2: { open: 0, acknowledged: 0, skipped: 0 }, P3: { open: 0, acknowledged: 0, skipped: 0 } },
-      blocking: 1, acknowledged: 0, skipped_lenses: 0 },
+    summary: {
+      total: 1, by_severity: { P0: 1, P1: 0, P2: 0, P3: 0 },
+      by_severity_status: {
+        P0: { open: 1, acknowledged: 0, skipped: 0 }, P1: { open: 0, acknowledged: 0, skipped: 0 },
+        P2: { open: 0, acknowledged: 0, skipped: 0 }, P3: { open: 0, acknowledged: 0, skipped: 0 },
+      },
+      blocking: 1, acknowledged: 0, skipped_lenses: 0,
+    },
   }
 
   it('emits a self-contained <section id="build-audit"> with verdict + finding data', () => {

@@ -7,7 +7,10 @@ import type { EngineOutput } from '../engine/types.js'
 
 const baseOut: EngineOutput = {
   schema_version: '1.0',
-  invocation: { command: 'audit', args: { profile: 'fast', scope: 'all' }, started_at: '2026-05-04T14:22:00Z', completed_at: '2026-05-04T14:22:01Z', scaffold_version: '3.25.1' },
+  invocation: {
+    command: 'audit', args: { profile: 'fast', scope: 'all' },
+    started_at: '2026-05-04T14:22:00Z', completed_at: '2026-05-04T14:22:01Z', scaffold_version: '3.25.1',
+  },
   availability: {
     git: { status: 'available' }, gh: { status: 'unavailable' },
     pipeline_docs: { status: 'available' }, tests: { status: 'available' },
@@ -16,10 +19,15 @@ const baseOut: EngineOutput = {
     ledger: { events_read: 0, malformed_lines: 0, sources: [] },
   },
   snapshot: null, replay: null, findings: [], needs_attention: [],
-  graph_stats: { nodes_by_kind: {}, edges_by_kind: {}, orphans_by_kind: {}, unsanctioned_uses: 0, ad_hoc_token_uses: 0 },
+  graph_stats: {
+    nodes_by_kind: {}, edges_by_kind: {}, orphans_by_kind: {}, unsanctioned_uses: 0, ad_hoc_token_uses: 0,
+  },
   fix_threshold: 'P2', verdict: 'pass',
   summary: { total: 0, by_severity: { P0: 0, P1: 0, P2: 0, P3: 0 },
-    by_severity_status: { P0: { open: 0, acknowledged: 0, skipped: 0 }, P1: { open: 0, acknowledged: 0, skipped: 0 }, P2: { open: 0, acknowledged: 0, skipped: 0 }, P3: { open: 0, acknowledged: 0, skipped: 0 } },
+    by_severity_status: {
+      P0: { open: 0, acknowledged: 0, skipped: 0 }, P1: { open: 0, acknowledged: 0, skipped: 0 },
+      P2: { open: 0, acknowledged: 0, skipped: 0 }, P3: { open: 0, acknowledged: 0, skipped: 0 },
+    },
     blocking: 0, acknowledged: 0, skipped_lenses: 0 },
 }
 
@@ -33,7 +41,10 @@ describe('sidecar', () => {
   })
 
   it('deriveReportId formats single-lens audits as audit-<date>-<profile>-lens-<id>', () => {
-    const out = { ...baseOut, invocation: { ...baseOut.invocation, args: { profile: 'fast', scope: 'all', lensIds: ['B-ac-coverage'] } } }
+    const out = {
+      ...baseOut,
+      invocation: { ...baseOut.invocation, args: { profile: 'fast', scope: 'all', lensIds: ['B-ac-coverage'] } },
+    }
     expect(deriveReportId(out)).toMatch(/^audit-\d{4}-\d{2}-\d{2}-\d{4}-fast-lens-B-ac-coverage$/)
   })
 

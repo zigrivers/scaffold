@@ -67,11 +67,15 @@ export const lensDStack: LensFn = async (graph, ledger) => {
       id: makeFindingId([lensId, 'unsanctioned', from, specifier]),
       lens_id: lensId, severity: 'P0',
       title: `unsanctioned dependency: '${specifier}' in ${filePath}`,
-      description: `${filePath} imports '${specifier}' which is not in the sanctioned stack. Record a decision or remove the import.`,
+      description: `${filePath} imports '${specifier}' which is not in the sanctioned stack.` +
+        ' Record a decision or remove the import.',
       source_doc: 'docs/tech-stack.md',
       evidence: { kind: 'rule_violation', rule_id: 'tech-stack-unsanctioned', file: from },
       confidence: 'high', first_seen: now, last_seen: now, status: 'open',
-      fix_hint: { kind: 'record_decision', target: 'decisions.jsonl', prompt: `Record a decision for '${specifier}' in ${filePath}.` },
+      fix_hint: {
+        kind: 'record_decision', target: 'decisions.jsonl',
+        prompt: `Record a decision for '${specifier}' in ${filePath}.`,
+      },
     })
   }
 
@@ -90,7 +94,8 @@ export const lensDStack: LensFn = async (graph, ledger) => {
       id: makeFindingId([lensId, 'layer', from, to]),
       lens_id: lensId, severity: 'P1',
       title: `component used outside its layer: ${component.id} in ${filePath}`,
-      description: `${component.id} is declared in layer "${component.layer}" but is used from ${filePath} (inferred layer "${inferredLayer}").`,
+      description: `${component.id} is declared in layer "${component.layer}" but is used from` +
+        ` ${filePath} (inferred layer "${inferredLayer}").`,
       source_doc: 'docs/tech-stack.md',
       evidence: { kind: 'rule_violation', rule_id: 'tech-stack-layer', file: from },
       confidence: 'medium', first_seen: now, last_seen: now, status: 'open',

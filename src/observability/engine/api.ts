@@ -56,7 +56,9 @@ export interface RunAuditInput {
 }
 
 const SCOPE_DOC_LENSES = new Set(['H-cross-doc'])
-const SCOPE_CODE_LENSES = new Set(['A-tdd', 'B-ac-coverage', 'C-standards', 'D-stack', 'E-design', 'F-scope', 'G-decisions'])
+const SCOPE_CODE_LENSES = new Set([
+  'A-tdd', 'B-ac-coverage', 'C-standards', 'D-stack', 'E-design', 'F-scope', 'G-decisions',
+])
 
 function pickEnabledIds(scope: RunAuditInput['scope'], explicit?: string[]): Set<string> {
   if (explicit && explicit.length > 0) return new Set(explicit)

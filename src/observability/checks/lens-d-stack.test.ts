@@ -24,7 +24,7 @@ describe('lensDStack', () => {
     writeFileSync(join(dir, 'package.json'), '{}')
     writeFileSync(join(dir, 'docs/tech-stack.md'),
       '## Frontend\n\n### React\n\npackage_or_url: react@18\n')
-    writeFileSync(join(dir, 'src/lib/x.ts'), "import { uniq } from 'lodash'\n")
+    writeFileSync(join(dir, 'src/lib/x.ts'), 'import { uniq } from \'lodash\'\n')
     const graph = await buildDocGraph(dir)
     const findings = await lensDStack(graph, { events: [] }, stubAvail, [], new Set(['D-stack']))
     expect(findings.length).toBe(1)
@@ -41,7 +41,7 @@ describe('lensDStack', () => {
     writeFileSync(join(dir, 'package.json'), '{}')
     writeFileSync(join(dir, 'docs/tech-stack.md'),
       '## Frontend\n\n### React\n\npackage_or_url: react@18\n')
-    writeFileSync(join(dir, 'src/lib/x.ts'), "import { uniq } from 'lodash'\n")
+    writeFileSync(join(dir, 'src/lib/x.ts'), 'import { uniq } from \'lodash\'\n')
     const graph = await buildDocGraph(dir)
     const events = [{
       event_id: 'ulid-x', worktree_id: 'wid', actor_label: 'a', branch: 'b', task_id: null,
@@ -58,7 +58,7 @@ describe('lensDStack', () => {
     writeFileSync(join(dir, 'package.json'), '{}')
     writeFileSync(join(dir, 'docs/tech-stack.md'),
       '## Frontend\n\n### React\n\npackage_or_url: react@18\nlayer: frontend\n')
-    writeFileSync(join(dir, 'src/api/handler.ts'), "import React from 'react'\n")
+    writeFileSync(join(dir, 'src/api/handler.ts'), 'import React from \'react\'\n')
     const graph = await buildDocGraph(dir)
     const findings = await lensDStack(graph, { events: [] }, stubAvail, [], new Set(['D-stack']))
     const layerFinding = findings.find((f) => /layer/i.test(f.title))

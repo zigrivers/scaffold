@@ -51,7 +51,9 @@ describe('lensFScope', () => {
     g.stories = [{ id: 'story:s-1', title: 'S1', priority: 'must', source_anchor: '' }]
     g.plan_tasks = [{ id: 'plan_task:t', title: 't', status: 'todo', story_id: 'story:s-1', source_anchor: '' }]
     g.edges = [{ kind: 'story_to_plan_task', from: 'story:s-1', to: 'plan_task:t' }]
-    const findings = await lensFScope(g, { events: [] }, baseAvail({ state: { status: 'unavailable' } }), [], new Set(['F-scope']))
+    const findings = await lensFScope(
+      g, { events: [] }, baseAvail({ state: { status: 'unavailable' } }), [], new Set(['F-scope']),
+    )
     expect(findings.find((x) => /untouched/i.test(x.title))).toBeUndefined()
   })
 
