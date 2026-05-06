@@ -89,7 +89,7 @@ export function evaluateStall(input: EvaluateStallInput): NeedsAttentionItem[] {
     }
   }
 
-  // pr_stale
+  // pr_stale — age is based on latest of open time or branch commit time
   const prStaleH = parseHours(input.config.stall.pr_stale)
   if (prStaleH !== null) {
     for (const [pn, opened] of prOpenedById) {
@@ -101,37 +101,21 @@ export function evaluateStall(input: EvaluateStallInput): NeedsAttentionItem[] {
           && r.correlation_id === `pr:${pn}:closed` && r.ts > opened.ts,
       )
       if (merged || closed) continue
-      const age = ageHours(now, opened.ts)
+      const branchCommit = latestCommitOnBranchSince(opened.branch, opened.ts)
+      const lastActivityTs = branchCommit ?? opened.ts
+      const age = ageHours(now, lastActivityTs)
       if (age <= prStaleH) continue
       out.push({
         signal: 'pr_stale',
         ref: { kind: 'pr', id: String(pn) },
         age_hours: round1(age),
         threshold_hours: prStaleH,
-        summary: `PR #${pn} opened ${round1(age)}h ago, not merged or closed`,
+        summary: `PR #${pn} opened ${round1(ageHours(now, opened.ts))}h ago, no recent activity`,
       })
     }
   }
 
-  // pr_review_stale
-  const prReviewStaleH = parseHours(input.config.stall.pr_review_stale)
-  if (prReviewStaleH !== null) {
-    for (const [pn, opened] of prOpenedById) {
-      const mmrSince = input.replayEvents.find(
-        (r) => r.source === 'mmr' && r.kind === 'job_completed' && r.ts > opened.ts,
-      )
-      if (mmrSince) continue
-      const age = ageHours(now, opened.ts)
-      if (age <= prReviewStaleH) continue
-      out.push({
-        signal: 'pr_review_stale',
-        ref: { kind: 'pr', id: String(pn) },
-        age_hours: round1(age),
-        threshold_hours: prReviewStaleH,
-        summary: `PR #${pn} has no completed MMR review in ${round1(age)}h`,
-      })
-    }
-  }
+  // pr_review_stale — deferred to Plan 6 pending mmr adapter carrying per-PR correlation_id
 
   // blocker_unaddressed
   const blockerH = parseHours(input.config.stall.blocker_unaddressed)

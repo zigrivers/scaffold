@@ -143,5 +143,4 @@ export function makeLensGDecisions(projectRoot: string): LensFn {
     lensGDecisionsImpl(projectRoot, graph, ledger, availability, upstreamFindings)
 }
 
-export const lensGDecisions: LensFn = (graph, ledger, availability, upstreamFindings) =>
-  lensGDecisionsImpl(process.cwd(), graph, ledger, availability, upstreamFindings)
+export const lensGDecisions: LensFn = makeLensGDecisions(process.cwd())

@@ -195,6 +195,7 @@ export async function runProgress(input: RunProgressInput): Promise<EngineOutput
     })
   }
 
+  // TODO(Plan 6): derive verdict from needs_attention severity
   const fix_threshold: Severity = 'P2'
   const verdict: Verdict = 'pass'
 

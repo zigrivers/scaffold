@@ -124,7 +124,7 @@ export const ghAdapter: BaseAdapter & {
       const { stdout } = await execFile(bin, [
         'pr', 'list', '--state', 'merged', '--search', `merged:>=${since}`, '--json',
         'number,url,state,headRefName,createdAt,mergedAt',
-      ], { cwd, timeout: GH_TIMEOUT_MS })
+      ], { cwd, maxBuffer: 32 * 1024 * 1024, timeout: GH_TIMEOUT_MS })
       merged = (JSON.parse(stdout) as Array<{
         number: number; url: string; state: string; headRefName: string; createdAt: string; mergedAt?: string
       }>).map((p) => ({
@@ -137,7 +137,7 @@ export const ghAdapter: BaseAdapter & {
       const { stdout } = await execFile(bin, [
         'pr', 'list', '--state', 'closed', '--search', `closed:>=${since}`, '--json',
         'number,url,state,headRefName,createdAt,closedAt',
-      ], { cwd, timeout: GH_TIMEOUT_MS })
+      ], { cwd, maxBuffer: 32 * 1024 * 1024, timeout: GH_TIMEOUT_MS })
       closedUnmerged = (JSON.parse(stdout) as Array<{
         number: number; url: string; state: string; headRefName: string; createdAt: string; closedAt?: string
       }>).map((p) => ({
