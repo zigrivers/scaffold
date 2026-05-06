@@ -371,7 +371,9 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
           describe: 'Emit HTML fragment to stdout',
         })
         .option('replay', { type: 'boolean', default: false, describe: 'Include the replay timeline in EngineOutput' })
-        .option('stall-check', { type: 'boolean', default: true, describe: 'Run stall detection (use --no-stall-check to suppress)' }),
+        .option('stall-check', {
+          type: 'boolean', default: true, describe: 'Run stall detection (use --no-stall-check to suppress)',
+        }),
       async (argv) => {
         const code = await handleProgress({
           cwd: findProjectRoot(process.cwd()) ?? process.cwd(),

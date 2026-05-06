@@ -40,7 +40,8 @@ describe('mmr adapter — replayEvents', () => {
   it('returns ReplayEvent[] for completed MMR jobs', async () => {
     const a = join(dir, '.mmr/jobs/job-a'); mkdirSync(a, { recursive: true })
     const recentTs = new Date(Date.now() - 1 * 3_600_000).toISOString()
-    writeFileSync(join(a, 'result.json'), JSON.stringify({ verdict: 'pass', completed_at: recentTs, fix_threshold: 'P2' }))
+    writeFileSync(join(a, 'result.json'),
+      JSON.stringify({ verdict: 'pass', completed_at: recentTs, fix_threshold: 'P2' }))
     const b = join(dir, '.mmr/jobs/job-b'); mkdirSync(b, { recursive: true })
     writeFileSync(join(b, 'result.json'), JSON.stringify({ verdict: 'blocked', completed_at: recentTs }))
     const events = await mmrAdapter.replayEvents(dir, { sinceHours: 24 })

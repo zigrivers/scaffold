@@ -88,8 +88,13 @@ export function evaluateStall(input: EvaluateStallInput): NeedsAttentionItem[] {
   const prStaleH = parseHours(input.config.stall.pr_stale)
   if (prStaleH !== null) {
     for (const [pn, opened] of prOpenedById) {
-      const merged = input.replayEvents.find((r) => r.source === 'gh' && r.correlation_id === `pr:${pn}:merged` && r.ts > opened.ts)
-      const closed = input.replayEvents.find((r) => r.source === 'gh' && r.kind === 'pr_closed' && r.correlation_id === `pr:${pn}:closed` && r.ts > opened.ts)
+      const merged = input.replayEvents.find(
+        (r) => r.source === 'gh' && r.correlation_id === `pr:${pn}:merged` && r.ts > opened.ts,
+      )
+      const closed = input.replayEvents.find(
+        (r) => r.source === 'gh' && r.kind === 'pr_closed'
+          && r.correlation_id === `pr:${pn}:closed` && r.ts > opened.ts,
+      )
       if (merged || closed) continue
       const age = ageHours(now, opened.ts)
       if (age <= prStaleH) continue
@@ -107,7 +112,9 @@ export function evaluateStall(input: EvaluateStallInput): NeedsAttentionItem[] {
   const prReviewStaleH = parseHours(input.config.stall.pr_review_stale)
   if (prReviewStaleH !== null) {
     for (const [pn, opened] of prOpenedById) {
-      const mmrSince = input.replayEvents.find((r) => r.source === 'mmr' && r.kind === 'job_completed' && r.ts > opened.ts)
+      const mmrSince = input.replayEvents.find(
+        (r) => r.source === 'mmr' && r.kind === 'job_completed' && r.ts > opened.ts,
+      )
       if (mmrSince) continue
       const age = ageHours(now, opened.ts)
       if (age <= prReviewStaleH) continue

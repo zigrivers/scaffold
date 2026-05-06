@@ -143,8 +143,15 @@ describe('renderProgressTerminal — replay + needs_attention', () => {
     out.replay = {
       window: { from: '2026-05-04T13:00:00Z', to: '2026-05-04T14:00:00Z' },
       events: [
-        { sort_id: 'ledger:ulid-A', correlation_id: null, ts: '2026-05-04T13:55:00Z', source: 'ledger', kind: 'task_claimed', actor_label: 'agent-alice', task_id: 'T-031', summary: 'T-031 claimed: refresh token rotation' },
-        { sort_id: 'git:abc', correlation_id: null, ts: '2026-05-04T13:50:00Z', source: 'git', kind: 'commit', summary: 'wip', actor_label: 'agent-alice' },
+        {
+          sort_id: 'ledger:ulid-A', correlation_id: null, ts: '2026-05-04T13:55:00Z',
+          source: 'ledger', kind: 'task_claimed', actor_label: 'agent-alice',
+          task_id: 'T-031', summary: 'T-031 claimed: refresh token rotation',
+        },
+        {
+          sort_id: 'git:abc', correlation_id: null, ts: '2026-05-04T13:50:00Z',
+          source: 'git', kind: 'commit', summary: 'wip', actor_label: 'agent-alice',
+        },
       ],
     }
     const text = renderProgressTerminal(out)

@@ -161,10 +161,13 @@ describe('synthesizer.composeReplay', () => {
       type: 'task_claimed', ts: '2026-05-04T10:00:00Z', payload: { task_title: 'A' },
     } as Event]
     const adapterReplay: ReplayEvent[] = [
-      { sort_id: 'git:abc', correlation_id: null, ts: '2026-05-04T11:00:00Z', source: 'git', kind: 'commit', summary: 'work' },
-      { sort_id: 'mmr:job-1', correlation_id: null, ts: '2026-05-04T10:30:00Z', source: 'mmr', kind: 'job_completed', summary: 'pass' },
+      { sort_id: 'git:abc', correlation_id: null, ts: '2026-05-04T11:00:00Z',
+        source: 'git', kind: 'commit', summary: 'work' },
+      { sort_id: 'mmr:job-1', correlation_id: null, ts: '2026-05-04T10:30:00Z',
+        source: 'mmr', kind: 'job_completed', summary: 'pass' },
     ]
-    const out = composeReplay({ ledgerEvents: ledger, adapterEvents: adapterReplay, window: { from: '2026-05-04T00:00:00Z', to: '2026-05-04T23:59:00Z' } })
+    const win = { from: '2026-05-04T00:00:00Z', to: '2026-05-04T23:59:00Z' }
+    const out = composeReplay({ ledgerEvents: ledger, adapterEvents: adapterReplay, window: win })
     expect(out.events.map((e) => e.sort_id)).toEqual(['ledger:ulid-A', 'mmr:job-1', 'git:abc'])
   })
 
@@ -174,10 +177,13 @@ describe('synthesizer.composeReplay', () => {
       type: 'pr_opened', ts: '2026-05-04T09:00:00Z', payload: { pr_number: 42 },
     } as Event]
     const adapterReplay: ReplayEvent[] = [
-      { sort_id: 'gh:42:opened', correlation_id: 'pr:42:opened', ts: '2026-05-04T09:00:00Z', source: 'gh', kind: 'pr_opened', summary: 'PR #42' },
-      { sort_id: 'gh:42:merged', correlation_id: 'pr:42:merged', ts: '2026-05-04T17:00:00Z', source: 'gh', kind: 'pr_merged', summary: 'PR #42 merged' },
+      { sort_id: 'gh:42:opened', correlation_id: 'pr:42:opened', ts: '2026-05-04T09:00:00Z',
+        source: 'gh', kind: 'pr_opened', summary: 'PR #42' },
+      { sort_id: 'gh:42:merged', correlation_id: 'pr:42:merged', ts: '2026-05-04T17:00:00Z',
+        source: 'gh', kind: 'pr_merged', summary: 'PR #42 merged' },
     ]
-    const out = composeReplay({ ledgerEvents: ledger, adapterEvents: adapterReplay, window: { from: '2026-05-04T00:00:00Z', to: '2026-05-04T23:59:00Z' } })
+    const win2 = { from: '2026-05-04T00:00:00Z', to: '2026-05-04T23:59:00Z' }
+    const out = composeReplay({ ledgerEvents: ledger, adapterEvents: adapterReplay, window: win2 })
     expect(out.events.map((e) => e.kind)).toEqual(['pr_opened', 'pr_merged'])
     expect(out.events[0].source).toBe('ledger')
   })
@@ -187,7 +193,8 @@ describe('synthesizer.composeReplay', () => {
       event_id: 'ulid-old', worktree_id: 'wid', actor_label: 'alice', branch: 'b', task_id: 'T-1',
       type: 'task_claimed', ts: '2026-04-01T00:00:00Z', payload: { task_title: 'old' },
     } as Event]
-    const out = composeReplay({ ledgerEvents: ledger, adapterEvents: [], window: { from: '2026-05-04T00:00:00Z', to: '2026-05-04T23:59:00Z' } })
+    const win3 = { from: '2026-05-04T00:00:00Z', to: '2026-05-04T23:59:00Z' }
+    const out = composeReplay({ ledgerEvents: ledger, adapterEvents: [], window: win3 })
     expect(out.events).toEqual([])
   })
 
@@ -196,7 +203,8 @@ describe('synthesizer.composeReplay', () => {
       event_id: 'ulid-Z', worktree_id: 'wid', actor_label: 'alice', branch: 'b', task_id: 'T-1',
       type: 'task_claimed', ts: '2026-05-04T10:00:00Z', payload: { task_title: 'Z' },
     } as Event]
-    const out = composeReplay({ ledgerEvents: ledger, adapterEvents: [], window: { from: '2026-05-04T00:00:00Z', to: '2026-05-04T23:59:00Z' } })
+    const win4 = { from: '2026-05-04T00:00:00Z', to: '2026-05-04T23:59:00Z' }
+    const out = composeReplay({ ledgerEvents: ledger, adapterEvents: [], window: win4 })
     expect(out.events[0].sort_id).toBe('ledger:ulid-Z')
   })
 })

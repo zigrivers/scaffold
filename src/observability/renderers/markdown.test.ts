@@ -169,7 +169,8 @@ describe('renderProgressMarkdown — replay + needs_attention', () => {
     const out = JSON.parse(JSON.stringify(fixture)) as EngineOutput
     out.replay = { window: { from: '2026-05-04T13:00:00Z', to: '2026-05-04T14:00:00Z' },
       events: [{ sort_id: 'ledger:ulid-A', correlation_id: null, ts: '2026-05-04T13:55:00Z',
-        source: 'ledger', kind: 'task_claimed', actor_label: 'agent-alice', task_id: 'T-031', summary: 'T-031 claimed' }] }
+        source: 'ledger', kind: 'task_claimed', actor_label: 'agent-alice',
+        task_id: 'T-031', summary: 'T-031 claimed' }] }
     const md = renderProgressMarkdown(out)
     expect(md).toContain('## Timeline')
     expect(md).toMatch(/\| .*ledger.* \| .*task_claimed.* \|/)

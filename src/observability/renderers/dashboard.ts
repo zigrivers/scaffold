@@ -30,10 +30,10 @@ function timelineDetails(out: EngineOutput): string {
   if (!out.replay || out.replay.events.length === 0) return ''
   const rows = out.replay.events.slice(0, 100).map((e) =>
     `<tr><td>${escape(e.ts)}</td><td>${escape(e.source)}</td><td>${escape(e.kind)}</td>` +
-    `<td>${escape(e.summary)}</td></tr>`
+    `<td>${escape(e.summary)}</td></tr>`,
   ).join('')
   return `<details class="timeline"><summary>Timeline (${out.replay.events.length} events)</summary>` +
-    `<table><thead><tr><th>Time</th><th>Source</th><th>Kind</th><th>Summary</th></tr></thead>` +
+    '<table><thead><tr><th>Time</th><th>Source</th><th>Kind</th><th>Summary</th></tr></thead>' +
     `<tbody>${rows}</tbody></table></details>`
 }
 

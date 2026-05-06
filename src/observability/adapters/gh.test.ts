@@ -36,8 +36,10 @@ describe('gh adapter — replayEvents', () => {
     const recentOpen = new Date(now - 2 * 3_600_000).toISOString()   // 2h ago — within 24h window
     const recentMerge = new Date(now - 1 * 3_600_000).toISOString()  // 1h ago — within 24h window
     const prs = [
-      { number: 42, url: 'https://example/pr/42', state: 'open' as const, branch: 'feat-a', opened_at: recentOpen },
-      { number: 41, url: 'https://example/pr/41', state: 'merged' as const, branch: 'feat-b', opened_at: recentOpen, merged_at: recentMerge },
+      { number: 42, url: 'https://example/pr/42', state: 'open' as const,
+        branch: 'feat-a', opened_at: recentOpen },
+      { number: 41, url: 'https://example/pr/41', state: 'merged' as const,
+        branch: 'feat-b', opened_at: recentOpen, merged_at: recentMerge },
     ]
     const events = ghAdapter._prsToReplayEvents(prs, { sinceHours: 24 })
     const open = events.find((e) => e.kind === 'pr_opened' && e.correlation_id === 'pr:42:opened')

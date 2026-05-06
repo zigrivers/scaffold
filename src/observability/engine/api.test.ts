@@ -154,7 +154,9 @@ describe('api.runProgress (Plan 5 — replay + stall)', () => {
   })
 
   it('runProgress with replay=true populates EngineOutput.replay with the ledger event', async () => {
-    const out = await runProgress({ primaryRoot: project, sinceHours: 24, replay: true, ghBin: '/no/such/gh', bdBin: '/no/such/bd' })
+    const out = await runProgress({
+      primaryRoot: project, sinceHours: 24, replay: true, ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+    })
     expect(out.replay).not.toBeNull()
     expect(out.replay!.events.length).toBeGreaterThanOrEqual(1)
     expect(out.replay!.events[0].source).toBe('ledger')
@@ -167,7 +169,8 @@ describe('api.runProgress (Plan 5 — replay + stall)', () => {
   })
 
   it('runProgress with stall check populates needs_attention when stall conditions trip', async () => {
-    const identity = JSON.parse(require('node:fs').readFileSync(join(wt, '.scaffold/identity.json'), 'utf8'))
+    const { readFileSync: readFS } = await import('node:fs')
+    const identity = JSON.parse(readFS(join(wt, '.scaffold/identity.json'), 'utf8'))
     const archived = join(project, '.scaffold/activity-archive/active', identity.worktree_id + '.jsonl')
     writeFileSync(archived, JSON.stringify({
       event_id: 'ulid-old', worktree_id: 'wid', actor_label: 'agent-alice', branch: 'a',
@@ -181,7 +184,9 @@ describe('api.runProgress (Plan 5 — replay + stall)', () => {
   })
 
   it('--no-stall-check leaves needs_attention empty', async () => {
-    const out = await runProgress({ primaryRoot: project, sinceHours: 24, noStallCheck: true, ghBin: '/no/such/gh', bdBin: '/no/such/bd' })
+    const out = await runProgress({
+      primaryRoot: project, sinceHours: 24, noStallCheck: true, ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+    })
     expect(out.needs_attention).toEqual([])
   })
 })

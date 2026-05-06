@@ -261,19 +261,27 @@ function ledgerEventToReplay(e: Event): ReplayEvent {
   let task_id: string | undefined
   if (e.task_id) task_id = e.task_id
   let correlation_id: string | null = null
-  if (e.type === 'task_claimed') summary = `${e.task_id} claimed: ${(e.payload as { task_title: string }).task_title}`
-  else if (e.type === 'task_completed') summary = `${e.task_id} completed (${(e.payload as { outcome: string }).outcome})`
-  else if (e.type === 'decision_recorded') summary = `decision recorded: ${(e.payload as { key: string }).key}`
-  else if (e.type === 'blocker_hit') summary = `blocker on ${e.task_id ?? '(no task)'}: ${(e.payload as { summary: string }).summary}`
-  else if (e.type === 'blocker_resolved') summary = `blocker resolved on ${e.task_id ?? '(no task)'}`
+  if (e.type === 'task_claimed')
+    summary = `${e.task_id} claimed: ${(e.payload as { task_title: string }).task_title}`
+  else if (e.type === 'task_completed')
+    summary = `${e.task_id} completed (${(e.payload as { outcome: string }).outcome})`
+  else if (e.type === 'decision_recorded')
+    summary = `decision recorded: ${(e.payload as { key: string }).key}`
+  else if (e.type === 'blocker_hit')
+    summary = `blocker on ${e.task_id ?? '(no task)'}: ${(e.payload as { summary: string }).summary}`
+  else if (e.type === 'blocker_resolved')
+    summary = `blocker resolved on ${e.task_id ?? '(no task)'}`
   else if (e.type === 'pr_opened') {
     const pn = (e.payload as { pr_number: number }).pr_number
     summary = `PR #${pn} opened`
     correlation_id = `pr:${pn}:opened`
     kind = 'pr_opened'
+  } else if (e.type === 'progress_heartbeat')
+    summary = `heartbeat on ${e.task_id ?? '(no task)'}: ${(e.payload as { note: string }).note}`
+  else if (e.type === 'finding_acknowledged') {
+    const p = e.payload as { finding_id: string; status: string }
+    summary = `finding ${p.finding_id} → ${p.status}`
   }
-  else if (e.type === 'progress_heartbeat') summary = `heartbeat on ${e.task_id ?? '(no task)'}: ${(e.payload as { note: string }).note}`
-  else if (e.type === 'finding_acknowledged') summary = `finding ${(e.payload as { finding_id: string }).finding_id} → ${(e.payload as { status: string }).status}`
   return {
     sort_id: `ledger:${e.event_id}`,
     correlation_id,

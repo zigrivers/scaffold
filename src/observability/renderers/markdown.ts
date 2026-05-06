@@ -105,7 +105,7 @@ function needsAttentionSection(out: EngineOutput): string {
 function timelineSection(out: EngineOutput): string {
   if (!out.replay || out.replay.events.length === 0) return ''
   const rows = out.replay.events.slice(0, 100).map((e) =>
-    `| ${e.ts} | ${e.source} | ${e.kind} | ${mdEscape(e.summary)} |`
+    `| ${e.ts} | ${e.source} | ${e.kind} | ${mdEscape(e.summary)} |`,
   )
   return ['## Timeline', '', `Window: ${out.replay.window.from} – ${out.replay.window.to}`, '',
     '| Time | Source | Kind | Summary |', '|---|---|---|---|', ...rows].join('\n')

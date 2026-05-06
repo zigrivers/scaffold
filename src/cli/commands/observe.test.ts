@@ -356,7 +356,9 @@ describe('observe progress --replay + --no-stall-check', () => {
     const orig = process.stdout.write.bind(process.stdout)
     process.stdout.write = ((s: string | Uint8Array) => { captured += String(s); return true }) as never
     try {
-      await handleProgress({ cwd: proj, json: true, sinceHours: 24, replay: true, ghBin: '/no/such/gh', bdBin: '/no/such/bd' })
+      await handleProgress({
+        cwd: proj, json: true, sinceHours: 24, replay: true, ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+      })
     } finally { process.stdout.write = orig }
     const obj = JSON.parse(captured)
     expect(obj.replay).not.toBeNull()
@@ -368,7 +370,9 @@ describe('observe progress --replay + --no-stall-check', () => {
     const orig = process.stdout.write.bind(process.stdout)
     process.stdout.write = ((s: string | Uint8Array) => { captured += String(s); return true }) as never
     try {
-      await handleProgress({ cwd: proj, json: true, sinceHours: 24, noStallCheck: true, ghBin: '/no/such/gh', bdBin: '/no/such/bd' })
+      await handleProgress({
+        cwd: proj, json: true, sinceHours: 24, noStallCheck: true, ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+      })
     } finally { process.stdout.write = orig }
     expect(JSON.parse(captured).needs_attention).toEqual([])
   })
