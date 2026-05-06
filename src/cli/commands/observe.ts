@@ -91,6 +91,8 @@ export interface HandleProgressInput {
   maskPaths?: boolean
   output?: string
   render?: 'dashboard-fragment'
+  replay?: boolean
+  noStallCheck?: boolean
   ghBin?: string
   bdBin?: string
 }
@@ -100,9 +102,11 @@ export async function handleProgress(input: HandleProgressInput): Promise<number
     const out = await runProgress({
       primaryRoot: input.cwd,
       sinceHours: input.sinceHours,
+      replay: input.replay,
+      noStallCheck: input.noStallCheck,
       ghBin: input.ghBin,
       bdBin: input.bdBin,
-      args: { sinceHours: input.sinceHours },
+      args: { sinceHours: input.sinceHours, replay: input.replay },
     })
     if (input.render === 'dashboard-fragment') {
       const fragment = renderProgressFragment(out)
@@ -365,7 +369,9 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
         .option('render', {
           type: 'string', choices: ['dashboard-fragment'] as const,
           describe: 'Emit HTML fragment to stdout',
-        }),
+        })
+        .option('replay', { type: 'boolean', default: false, describe: 'Include the replay timeline in EngineOutput' })
+        .option('no-stall-check', { type: 'boolean', default: false, describe: 'Suppress stall detection' }),
       async (argv) => {
         const code = await handleProgress({
           cwd: findProjectRoot(process.cwd()) ?? process.cwd(),
@@ -374,6 +380,8 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
           sinceHours: (argv['since-hours'] ?? argv.sinceHours ?? 24) as number,
           output: argv.output as string | undefined,
           render: argv.render as 'dashboard-fragment' | undefined,
+          replay: !!(argv.replay),
+          noStallCheck: !!(argv['no-stall-check'] ?? argv.noStallCheck),
         })
         process.exitCode = code
       },
