@@ -1,6 +1,7 @@
 import { access, readFile, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AdapterStatus, BaseAdapter } from './types.js'
+import type { ReplayEvent } from '../engine/types.js'
 
 export interface MmrJobResult {
   verdict: 'pass' | 'degraded-pass' | 'blocked' | 'needs-user-decision'
@@ -30,6 +31,7 @@ async function listResultFiles(cwd: string): Promise<string[]> {
 
 export const mmrAdapter: BaseAdapter & {
   mostRecentJob(cwd: string): Promise<MmrJobResult | null>
+  replayEvents(cwd: string, opts: { sinceHours: number }): Promise<ReplayEvent[]>
 } = {
   id: 'mmr',
 
@@ -49,5 +51,28 @@ export const mmrAdapter: BaseAdapter & {
     } catch {
       return null
     }
+  },
+
+  async replayEvents(cwd: string, opts: { sinceHours: number }): Promise<ReplayEvent[]> {
+    const dir = join(cwd, JOBS_DIR)
+    try { await access(dir) } catch { return [] }
+    const cutoff = new Date(Date.now() - opts.sinceHours * 3_600_000).toISOString()
+    const subs = await readdir(dir)
+    const out: ReplayEvent[] = []
+    await Promise.all(subs.map(async (sub) => {
+      const p = join(dir, sub, 'result.json')
+      try { await access(p) } catch { return }
+      let job: MmrJobResult
+      try { job = JSON.parse(await readFile(p, 'utf8')) as MmrJobResult } catch { return }
+      if (!job.completed_at || job.completed_at < cutoff) return
+      out.push({
+        sort_id: `mmr:${sub}`,
+        correlation_id: null,
+        ts: job.completed_at,
+        source: 'mmr', kind: 'job_completed',
+        summary: `MMR job ${sub} verdict=${job.verdict}`,
+      })
+    }))
+    return out
   },
 }

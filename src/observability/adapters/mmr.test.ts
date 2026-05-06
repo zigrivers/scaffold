@@ -31,3 +31,27 @@ describe('mmr adapter', () => {
     expect(j?.verdict).toBe('blocked')
   })
 })
+
+describe('mmr adapter — replayEvents', () => {
+  let dir: string
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'observe-mmr-rep-')) })
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }) })
+
+  it('returns ReplayEvent[] for completed MMR jobs', async () => {
+    const a = join(dir, '.mmr/jobs/job-a'); mkdirSync(a, { recursive: true })
+    const recentTs = new Date(Date.now() - 1 * 3_600_000).toISOString()
+    writeFileSync(join(a, 'result.json'), JSON.stringify({ verdict: 'pass', completed_at: recentTs, fix_threshold: 'P2' }))
+    const b = join(dir, '.mmr/jobs/job-b'); mkdirSync(b, { recursive: true })
+    writeFileSync(join(b, 'result.json'), JSON.stringify({ verdict: 'blocked', completed_at: recentTs }))
+    const events = await mmrAdapter.replayEvents(dir, { sinceHours: 24 })
+    expect(events).toHaveLength(2)
+    expect(events[0].source).toBe('mmr')
+    expect(events[0].kind).toBe('job_completed')
+    expect(events.find((e) => e.sort_id === 'mmr:job-a')?.summary).toContain('pass')
+    expect(events.find((e) => e.sort_id === 'mmr:job-b')?.summary).toContain('blocked')
+  })
+
+  it('returns [] when no jobs in window', async () => {
+    expect(await mmrAdapter.replayEvents(dir, { sinceHours: 24 })).toEqual([])
+  })
+})
