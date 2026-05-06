@@ -1,6 +1,7 @@
 import { execFile as execFileCb } from 'node:child_process'
 import { promisify } from 'node:util'
 import type { AdapterStatus, BaseAdapter } from './types.js'
+import type { ReplayEvent } from '../engine/types.js'
 
 const execFile = promisify(execFileCb)
 
@@ -26,6 +27,7 @@ async function git(cwd: string, args: string[]): Promise<string> {
 export const gitAdapter: BaseAdapter & {
   listWorktrees(cwd: string): Promise<WorktreeInfo[]>
   recentCommits(cwd: string, opts: { sinceHours: number }): Promise<CommitInfo[]>
+  replayEvents(cwd: string, opts: { sinceHours: number }): Promise<ReplayEvent[]>
 } = {
   id: 'git',
 
@@ -74,5 +76,19 @@ export const gitAdapter: BaseAdapter & {
     } catch {
       return []
     }
+  },
+
+  async replayEvents(cwd: string, opts: { sinceHours: number }): Promise<ReplayEvent[]> {
+    const commits = await gitAdapter.recentCommits(cwd, opts)
+    return commits.map((c) => ({
+      sort_id: `git:${c.sha}`,
+      correlation_id: null,
+      ts: c.ts,
+      source: 'git' as const,
+      kind: 'commit',
+      actor_label: c.author,
+      summary: `${c.subject.slice(0, 200)} (${c.sha.slice(0, 7)})`,
+      link: c.sha,
+    }))
   },
 }

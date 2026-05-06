@@ -45,3 +45,28 @@ describe('git adapter', () => {
     expect(cs[0].subject).toBe('initial')
   })
 })
+
+describe('git adapter — replayEvents', () => {
+  let dir: string
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), 'observe-git-rep-'))
+    execSync('git init -q', { cwd: dir })
+    execSync('git config user.email t@e.com && git config user.name T', { cwd: dir, shell: '/bin/sh' })
+    writeFileSync(join(dir, 'a.txt'), '1\n')
+    execSync('git add a.txt && git commit -q -m "first"', { cwd: dir, shell: '/bin/sh' })
+    writeFileSync(join(dir, 'b.txt'), '1\n')
+    execSync('git add b.txt && git commit -q -m "second"', { cwd: dir, shell: '/bin/sh' })
+  })
+  afterAll(() => { rmSync(dir, { recursive: true, force: true }) })
+
+  it('returns ReplayEvent[] for commits in the time window', async () => {
+    const events = await gitAdapter.replayEvents(dir, { sinceHours: 24 })
+    expect(events.length).toBeGreaterThanOrEqual(2)
+    expect(events[0].source).toBe('git')
+    expect(events[0].kind).toBe('commit')
+    expect(events[0].sort_id).toMatch(/^git:[0-9a-f]{40}$/)
+    expect(events[0].correlation_id).toBeNull()
+    expect(events[0].summary.length).toBeGreaterThan(0)
+    expect(typeof events[0].link).toBe('string')
+  })
+})
