@@ -59,6 +59,13 @@ describe('renderProgressFragment', () => {
     expect(html).toContain('refresh token rotation')
   })
 
+  it('reflects sinceHours from invocation args in the meta span', () => {
+    const out = JSON.parse(JSON.stringify(baseOut)) as EngineOutput
+    out.invocation.args = { sinceHours: 48 }
+    const html = renderProgressFragment(out)
+    expect(html).toContain('last 48h')
+  })
+
   it('escapes HTML special characters in user-controlled fields', () => {
     const tainted = JSON.parse(JSON.stringify(baseOut)) as EngineOutput
     tainted.snapshot!.active_agents[0].current_task!.title = 'evil <script>alert(1)</script>'

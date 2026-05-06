@@ -2,8 +2,8 @@ import type { EngineOutput, Verdict, Severity } from '../engine/types.js'
 import { redactRendered } from '../engine/redact.js'
 
 export function verdictToSeverityToken(v: Verdict): string {
-  const map: Record<string, string> = { blocked: '--sev-p0', 'degraded-pass': '--sev-p2', pass: '--sev-pass' }
-  return map[v] ?? '--sev-p3'
+  const map: Record<Verdict, string> = { blocked: '--sev-p0', 'degraded-pass': '--sev-p2', pass: '--sev-pass' }
+  return map[v]
 }
 
 function escape(s: string): string {
@@ -30,10 +30,11 @@ export function renderProgressFragment(out: EngineOutput): string {
     `<li><code>${escape(d.key)}</code>: ${escape(d.summary)}</li>`,
   ).join('') || '<li><em>none</em></li>'
 
+  const sinceHours = Number(out.invocation.args.sinceHours ?? 24)
   const fragment = `<section id="build-progress" class="panel">
   <header>
     <h2>Build Progress</h2>
-    <span class="meta">last 24h · phase: ${escape(snap?.current_phase ?? '(unknown)')}</span>
+    <span class="meta">last ${sinceHours}h · phase: ${escape(snap?.current_phase ?? '(unknown)')}</span>
   </header>
   <div class="grid grid-2">
     <div class="card"><h3>Active Agents</h3><ul>${agents}</ul></div>
