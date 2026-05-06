@@ -117,5 +117,5 @@ export function redactRendered(blob: string): string {
 
 /** Render-time redaction of a structured EngineOutput. Recurses through every string field. */
 export function redactEngineOutput(out: EngineOutput): EngineOutput {
-  return recursivelyTransform(structuredClone(out), (s) => sanitizePath(scrubSecrets(s))) as EngineOutput
+  return recursivelyTransform(out, (s) => sanitizePath(scrubSecrets(s))) as EngineOutput
 }

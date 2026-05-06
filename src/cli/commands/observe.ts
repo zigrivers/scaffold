@@ -194,7 +194,7 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
     })
     if (input.render === 'dashboard-fragment-audit') {
       process.stdout.write(renderAuditFragment(out) + '\n')
-      return 0
+      return out.verdict === 'blocked' ? 1 : 0
     }
     let sidecarFinal: string | null = null
     try {
