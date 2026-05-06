@@ -38,7 +38,8 @@ export function evaluateStall(input: EvaluateStallInput): NeedsAttentionItem[] {
 
   for (const e of input.ledgerEvents) {
     if (e.type === 'task_claimed' && e.task_id) {
-      lastClaimByTask.set(e.task_id, e)
+      const prev = lastClaimByTask.get(e.task_id)
+      if (!prev || prev.ts < e.ts) lastClaimByTask.set(e.task_id, e)
     } else if (e.type === 'task_completed' && e.task_id) {
       const prev = lastResolutionByTask.get(e.task_id)
       if (!prev || prev.ts < e.ts) lastResolutionByTask.set(e.task_id, e)
