@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { renderProgressMarkdown } from './markdown.js'
+import { renderProgressMarkdown, renderAuditMarkdown } from './markdown.js'
 import type { EngineOutput } from '../engine/types.js'
 
 const fixture: EngineOutput = {
@@ -58,5 +58,73 @@ describe('renderProgressMarkdown', () => {
     const md = renderProgressMarkdown(tainted)
     expect(md).not.toContain('ghp_1234567890abcdefABCDEF1234567890abcdef')
     expect(md).toContain('[REDACTED:')
+  })
+})
+
+describe('renderAuditMarkdown', () => {
+  const auditFixture: EngineOutput = {
+    ...fixture,
+    invocation: { ...fixture.invocation, command: 'audit', args: { profile: 'fast', scope: 'all' } },
+    snapshot: null,
+    findings: [
+      { id: '3a8c1f0211223344', lens_id: 'B-ac-coverage', severity: 'P0',
+        title: 'AC has failing test', description: 'src/auth/test.spec.ts is failing.',
+        source_doc: 'docs/user-stories.md#user-auth-1',
+        evidence: { kind: 'rule_violation', rule_id: 'ac-test-failing', file: 'file:src/auth/test.spec.ts' },
+        confidence: 'high', first_seen: '2026-05-04T00:00:00Z', last_seen: '2026-05-04T00:00:00Z', status: 'open',
+        fix_hint: { kind: 'add_test', target: 'src/auth/test.spec.ts', prompt: 'Re-enable test' } },
+      { id: '9d1e02f455667788', lens_id: 'A-tdd', severity: 'P1',
+        title: 'AC without test', description: 'AC has no test.', source_doc: 'docs/user-stories.md#story-s-1',
+        evidence: { kind: 'ac_not_covered', story_id: 'story:s-1', ac_id: 'ac:s-1.1', missing_tests: [] },
+        confidence: 'medium', first_seen: '2026-05-04T00:00:00Z', last_seen: '2026-05-04T00:00:00Z', status: 'acknowledged', ack_note: 'tracked separately' },
+    ],
+    fix_threshold: 'P1', verdict: 'blocked',
+    summary: {
+      total: 2, by_severity: { P0: 1, P1: 1, P2: 0, P3: 0 },
+      by_severity_status: {
+        P0: { open: 1, acknowledged: 0, skipped: 0 }, P1: { open: 0, acknowledged: 1, skipped: 0 },
+        P2: { open: 0, acknowledged: 0, skipped: 0 }, P3: { open: 0, acknowledged: 0, skipped: 0 },
+      },
+      blocking: 1, acknowledged: 1, skipped_lenses: 0,
+    },
+  }
+
+  it('renders verdict, threshold, summary table, and one section per finding', () => {
+    const md = renderAuditMarkdown(auditFixture)
+    expect(md).toMatch(/^# Build Observability — Audit/m)
+    expect(md).toContain('**Verdict:** blocked')
+    expect(md).toContain('**Profile:** fast')
+    expect(md).toContain('**Scope:** all')
+    expect(md).toContain('**Fix threshold:** P1')
+    expect(md).toContain('## Summary')
+    expect(md).toMatch(/\| P0 \| 1 \| 1 \| 0 \|/)
+    expect(md).toContain('## Findings')
+    expect(md).toContain('### [P0] B-ac-coverage — AC has failing test')
+    expect(md).toContain('`3a8c1f02')
+    expect(md).toContain('## Acknowledged')
+    expect(md).toContain('tracked separately')
+  })
+
+  it('omits Acknowledged section when there are none', () => {
+    const out = JSON.parse(JSON.stringify(auditFixture)) as EngineOutput
+    out.findings = out.findings.filter((f) => f.status !== 'acknowledged')
+    out.summary.acknowledged = 0
+    out.summary.by_severity_status.P1 = { open: 1, acknowledged: 0, skipped: 0 }
+    const md = renderAuditMarkdown(out)
+    expect(md).not.toContain('## Acknowledged')
+  })
+
+  it('emits a Skipped Lenses section when any lens skipped', () => {
+    const out = JSON.parse(JSON.stringify(auditFixture)) as EngineOutput
+    out.findings.push({
+      id: 'ffeeddccbbaa9988', lens_id: 'D-stack', severity: 'P3',
+      title: 'D-stack: skipped', description: 'pipeline_docs unavailable',
+      source_doc: '', evidence: { kind: 'lens_skipped', reason: 'adapter_unavailable', needed: ['pipeline_docs'] },
+      confidence: 'high', first_seen: '', last_seen: '', status: 'skipped',
+    })
+    out.summary.skipped_lenses = 1
+    const md = renderAuditMarkdown(out)
+    expect(md).toContain('## Skipped Lenses')
+    expect(md).toContain('D-stack')
   })
 })
