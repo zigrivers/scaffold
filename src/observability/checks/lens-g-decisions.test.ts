@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { lensGDecisions } from './lens-g-decisions.js'
+import { makeLensGDecisions } from './lens-g-decisions.js'
+
+const lensGDecisions = makeLensGDecisions(process.cwd())
 import { gitAdapter } from '../adapters/git.js'
 import type { DocGraph, AvailabilityMap, Event, Finding } from '../engine/types.js'
 
