@@ -2,6 +2,8 @@ import { minimatch } from 'minimatch'
 import type {
   Feature, Story, AcceptanceCriterion, PlanTask, PlaybookTask, Test, FileNode, Decision, PullRequest, Edge,
 } from '../types.js'
+import type { TokenUse } from './token-use-detector.js'
+import type { ComponentUse } from './component-use-detector.js'
 
 export interface BuildEdgesInput {
   features: Feature[]
@@ -16,6 +18,8 @@ export interface BuildEdgesInput {
   ac_to_test_overrides?: Record<string, string[]>
   pr_to_files?: Record<number, string[]>
   playbook_task_to_pr?: Record<string, number[]>
+  token_uses?: TokenUse[]
+  component_uses?: ComponentUse[]
 }
 
 export interface BuildEdgesResult {
@@ -84,6 +88,16 @@ export function buildEdges(input: BuildEdgesInput): BuildEdgesResult {
       }
     }
     if (d.superseded_by) edges.push({ kind: 'decision_supersedes', from: d.id, to: d.superseded_by })
+  }
+
+  for (const use of input.token_uses ?? []) {
+    const fileId = fileIdByPath.get(use.file) ?? `file:${use.file}`
+    edges.push({ kind: 'file_to_token_use', from: fileId, to: use.token_id as never })
+  }
+
+  for (const use of input.component_uses ?? []) {
+    const fileId = fileIdByPath.get(use.file) ?? `file:${use.file}`
+    edges.push({ kind: 'file_to_component_use', from: fileId, to: use.component_id as never })
   }
 
   return { edges, unresolved_globs: unresolvedGlobs }
