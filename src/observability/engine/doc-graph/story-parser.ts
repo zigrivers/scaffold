@@ -1,5 +1,5 @@
 import type { Story, AcceptanceCriterion } from '../types.js'
-import { parseMarkdown, headingsAtDepth, sectionAfterHeading, extractInlineTags } from './parse-markdown.js'
+import { parseMarkdown, headingsAtDepth, sectionAfterHeading, extractInlineTags, slugify } from './parse-markdown.js'
 import type { Root, Heading, List, RootContent } from 'mdast'
 
 interface ParsedStories { stories: Story[]; acs: AcceptanceCriterion[] }
@@ -92,7 +92,7 @@ export function parseStories(md: string): ParsedStories {
     const kind = (['ui', 'api', 'data', 'infra', 'doc'] as const).find((k) => k === tags.kind)
     const rawFeature = tags.feature
     const featureId = rawFeature
-      ? (rawFeature.startsWith('feature:') ? rawFeature : `feature:${rawFeature}`)
+      ? `feature:${slugify(rawFeature.startsWith('feature:') ? rawFeature.slice('feature:'.length) : rawFeature)}`
       : undefined
     const story: Story = {
       id: `story:${parsed.storyKey}`,

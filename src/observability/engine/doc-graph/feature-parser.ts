@@ -71,5 +71,14 @@ export function parseFeatures(md: string, sourcePath = 'docs/plan.md'): Feature[
       prose,
     })
   }
+
+  // Deduplicate IDs that collide after slugification
+  const seen = new Map<string, number>()
+  for (const f of features) {
+    const count = (seen.get(f.id) ?? 0) + 1
+    seen.set(f.id, count)
+    if (count > 1) f.id = `${f.id}-${count}`
+  }
+
   return features
 }
