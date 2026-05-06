@@ -1,5 +1,5 @@
 import type { EngineOutput, Finding, Severity } from '../engine/types.js'
-import { availabilityLine } from './_lib.js'
+import { availabilityLine, needsAttentionLines } from './_lib.js'
 import { scrubSecrets } from '../engine/redact.js'
 
 export function renderProgressTerminal(out: EngineOutput): string {
@@ -9,6 +9,12 @@ export function renderProgressTerminal(out: EngineOutput): string {
     `build observability — progress (last ${sinceHours}h · phase: ${out.snapshot?.current_phase ?? 'unknown'})`,
   )
   lines.push('')
+
+  const banner = needsAttentionLines(out.needs_attention)
+  if (banner.length > 0) {
+    lines.push(...banner)
+    lines.push('')
+  }
 
   const snap = out.snapshot
   if (snap && snap.active_agents.length > 0) {
@@ -45,6 +51,16 @@ export function renderProgressTerminal(out: EngineOutput): string {
     }
     lines.push('')
   }
+  if (out.replay && out.replay.events.length > 0) {
+    lines.push(`timeline (${out.replay.events.length} events · ${out.replay.window.from} – ${out.replay.window.to})`)
+    for (const e of out.replay.events.slice(0, 50)) {
+      const ts = e.ts.replace('T', ' ').replace(/:\d{2}\.\d+Z$/, '').replace(/Z$/, '')
+      const actor = e.actor_label ? ` · ${e.actor_label}` : ''
+      lines.push(`  ${ts}  ${e.source.padEnd(7)} ${e.kind.padEnd(20).slice(0, 20)} ${e.summary}${actor}`)
+    }
+    lines.push('')
+  }
+
   lines.push(`availability: ${availabilityLine(out.availability)}`)
   lines.push('                              (✓ available  · ~ degraded  · — unavailable)')
 

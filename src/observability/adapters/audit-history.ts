@@ -1,7 +1,7 @@
 import { access, readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AdapterStatus, BaseAdapter } from './types.js'
-import type { Severity } from '../engine/types.js'
+import type { Severity, Finding } from '../engine/types.js'
 
 const DIR = 'docs/audits'
 
@@ -16,7 +16,7 @@ interface SidecarShape {
       acknowledged: number
       skipped_lenses: number
     }
-    findings?: Array<{ lens_id: string; status: string; evidence?: { kind?: string } }>
+    findings?: Array<Finding & { lens_id: string; status: string; evidence?: { kind?: string } }>
   }
 }
 
@@ -60,6 +60,7 @@ export const auditHistoryAdapter: BaseAdapter & {
   listSidecars(cwd: string): Promise<string[]>
   readTrends(cwd: string): Promise<AuditTrendPoint[]>
   lensSkippedStreaks(cwd: string): Promise<Record<string, number>>
+  latestFindings(cwd: string): Promise<Finding[]>
 } = {
   id: 'audit_history',
 
@@ -120,5 +121,20 @@ export const auditHistoryAdapter: BaseAdapter & {
       }
     }
     return streaks
+  },
+
+  async latestFindings(cwd: string): Promise<Finding[]> {
+    const files = await listJsonFiles(cwd)
+    for (const f of files) {
+      const s = await safeRead(f)
+      if (s?.engine_output?.invocation?.command !== 'audit') continue
+      if (!s.engine_output.findings) continue
+      // Skip scoped audits (--lens filter): their findings are incomplete and would cause
+      // false negatives — other lenses' open findings would appear resolved.
+      const args = s.engine_output.invocation.args as Record<string, unknown> | undefined
+      if (args && Array.isArray(args.lensIds) && (args.lensIds as unknown[]).length > 0) continue
+      return s.engine_output.findings as Finding[]
+    }
+    return []
   },
 }

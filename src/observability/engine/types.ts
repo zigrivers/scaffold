@@ -200,6 +200,7 @@ export interface ReplayEvent {
   kind: string
   actor_label?: string
   task_id?: string
+  branch?: string
   summary: string
   link?: string
 }
@@ -218,6 +219,7 @@ export interface NeedsAttentionItem {
   ref: { kind: 'task' | 'pr' | 'finding' | 'lens'; id: string }
   age_hours: number
   threshold_hours: number
+  threshold_count?: number
   summary: string
 }
 

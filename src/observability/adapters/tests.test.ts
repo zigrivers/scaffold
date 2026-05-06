@@ -39,3 +39,34 @@ describe('tests adapter', () => {
     expect(r?.results[0].status).toBe('passing')
   })
 })
+
+describe('tests adapter — replayEvents', () => {
+  let dir: string
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'observe-t-rep-')) })
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }) })
+
+  it('returns one ReplayEvent per cached test run (failed runs noted)', async () => {
+    mkdirSync(join(dir, '.scaffold'), { recursive: true })
+    const recentTs = new Date(Date.now() - 1 * 3_600_000).toISOString()
+    writeFileSync(join(dir, '.scaffold/last-test-run.json'), JSON.stringify({
+      ran_at: recentTs,
+      passed: 100, failed: 2,
+      results: [
+        { name: 'login passes', file_path: 'src/a.test.ts', status: 'passing' },
+        { name: 'reset broken', file_path: 'src/b.test.ts', status: 'failing' },
+      ],
+    }))
+    const events = await testsAdapter.replayEvents(dir, { sinceHours: 24 })
+    expect(events).toHaveLength(2)
+    const run = events.find((e) => e.kind === 'test_run_completed')
+    const failure = events.find((e) => e.kind === 'test_run_failed')
+    expect(run).toBeDefined()
+    expect(failure).toBeDefined()
+    expect(run?.summary).toContain('100 passed')
+    expect(failure?.summary).toContain('reset broken')
+  })
+
+  it('returns [] when no cached run exists', async () => {
+    expect(await testsAdapter.replayEvents(dir, { sinceHours: 24 })).toEqual([])
+  })
+})

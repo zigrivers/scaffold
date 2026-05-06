@@ -123,3 +123,48 @@ describe('renderProgressTerminal', () => {
     expect(out).toContain('[REDACTED:')
   })
 })
+
+describe('renderProgressTerminal — replay + needs_attention', () => {
+  it('prepends a "needs attention" banner when needs_attention is non-empty', () => {
+    const out = JSON.parse(JSON.stringify(fixtureOutput)) as EngineOutput
+    out.needs_attention = [{
+      signal: 'task_stale', ref: { kind: 'task', id: 'T-031' },
+      age_hours: 5.2, threshold_hours: 4,
+      summary: 'task T-031 (agent-alice) claimed 5h ago, no recent activity',
+    }]
+    const text = renderProgressTerminal(out)
+    expect(text).toMatch(/⚠ needs attention/i)
+    expect(text).toContain('T-031')
+    expect(text).toContain('5.2h')
+  })
+
+  it('prints a timeline section when replay is populated', () => {
+    const out = JSON.parse(JSON.stringify(fixtureOutput)) as EngineOutput
+    out.replay = {
+      window: { from: '2026-05-04T13:00:00Z', to: '2026-05-04T14:00:00Z' },
+      events: [
+        {
+          sort_id: 'ledger:ulid-A', correlation_id: null, ts: '2026-05-04T13:55:00Z',
+          source: 'ledger', kind: 'task_claimed', actor_label: 'agent-alice',
+          task_id: 'T-031', summary: 'T-031 claimed: refresh token rotation',
+        },
+        {
+          sort_id: 'git:abc', correlation_id: null, ts: '2026-05-04T13:50:00Z',
+          source: 'git', kind: 'commit', summary: 'wip', actor_label: 'agent-alice',
+        },
+      ],
+    }
+    const text = renderProgressTerminal(out)
+    expect(text).toMatch(/timeline/i)
+    expect(text).toContain('T-031 claimed')
+    expect(text).toContain('git')
+    expect(text).toContain('commit')
+  })
+
+  it('omits the timeline section when replay is null', () => {
+    const out = JSON.parse(JSON.stringify(fixtureOutput)) as EngineOutput
+    out.replay = null
+    const text = renderProgressTerminal(out)
+    expect(text).not.toMatch(/^timeline/im)
+  })
+})

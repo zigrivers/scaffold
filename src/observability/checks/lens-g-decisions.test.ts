@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { lensGDecisions } from './lens-g-decisions.js'
+import { makeLensGDecisions } from './lens-g-decisions.js'
+
+const lensGDecisions = makeLensGDecisions(process.cwd())
+import { gitAdapter } from '../adapters/git.js'
 import type { DocGraph, AvailabilityMap, Event, Finding } from '../engine/types.js'
 
 const baseAvail: AvailabilityMap = {
@@ -87,5 +90,37 @@ describe('lensGDecisions', () => {
     } as Event]
     const findings = await lensGDecisions(g, { events }, baseAvail, upstream, new Set(['G-decisions']))
     expect(findings.find((x) => /unsanctioned dep/i.test(x.title))).toBeUndefined()
+  })
+})
+
+describe('lensGDecisions — decision-keyword commit scan', () => {
+  it('emits P2 for commits with decision-keyword messages that lack matching event/doc', async () => {
+    const orig = gitAdapter.recentCommits
+    gitAdapter.recentCommits = async () => [{
+      sha: 'a'.repeat(40), branch: null, ts: new Date().toISOString(),
+      author: 'alice', subject: 'decided to migrate to Postgres',
+    }]
+    try {
+      const findings = await lensGDecisions(emptyGraph(), { events: [] }, baseAvail, [], new Set(['G-decisions']))
+      const f = findings.find((x) => /decision-keyword commit/i.test(x.title))
+      expect(f?.severity).toBe('P2')
+    } finally {
+      gitAdapter.recentCommits = orig
+    }
+  })
+
+  it('does not emit when a matching ledger event covers the commit subject', async () => {
+    const orig = gitAdapter.recentCommits
+    gitAdapter.recentCommits = async () => [{
+      sha: 'b'.repeat(40), branch: null, ts: new Date().toISOString(),
+      author: 'alice', subject: 'decided to migrate to Postgres',
+    }]
+    try {
+      const events = [decisionEvent('migrate-to-postgres', 'switched to postgres')]
+      const findings = await lensGDecisions(emptyGraph(), { events }, baseAvail, [], new Set(['G-decisions']))
+      expect(findings.find((x) => /decision-keyword commit/i.test(x.title))).toBeUndefined()
+    } finally {
+      gitAdapter.recentCommits = orig
+    }
   })
 })

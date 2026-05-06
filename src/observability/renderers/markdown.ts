@@ -93,6 +93,24 @@ function decisionsSection(out: EngineOutput): string {
   return ['## Recent Decisions', '', '| Key | Summary | Recorded | Affects |', '|---|---|---|---|', ...rows].join('\n')
 }
 
+function needsAttentionSection(out: EngineOutput): string {
+  if (out.needs_attention.length === 0) return ''
+  const rows = out.needs_attention.map((i) => {
+    const ageStr = i.signal === 'lens_skipped_repeatedly' ? `${i.threshold_count ?? i.threshold_hours}× streak` : `${i.age_hours}h`
+    return `| ${i.signal} | ${mdEscape(i.summary)} | ${ageStr} |`
+  })
+  return ['## Needs Attention', '', '| Signal | Item | Age |', '|---|---|---|', ...rows].join('\n')
+}
+
+function timelineSection(out: EngineOutput): string {
+  if (!out.replay || out.replay.events.length === 0) return ''
+  const rows = out.replay.events.slice(0, 100).map((e) =>
+    `| ${e.ts} | ${e.source} | ${e.kind} | ${mdEscape(e.summary)} |`,
+  )
+  return ['## Timeline', '', `Window: ${out.replay.window.from} – ${out.replay.window.to}`, '',
+    '| Time | Source | Kind | Summary |', '|---|---|---|---|', ...rows].join('\n')
+}
+
 export function renderProgressMarkdown(out: EngineOutput): string {
   const sinceHours = Number(out.invocation.args.sinceHours ?? 24)
   const windowEnd = fmtDate(out.invocation.started_at)
@@ -102,10 +120,12 @@ export function renderProgressMarkdown(out: EngineOutput): string {
     `**Window:** last ${sinceHours} hours (ending ${windowEnd})`,
     `**Phase:** ${out.snapshot?.current_phase ?? '(unknown)'}`,
     '',
+    needsAttentionSection(out),
     activeAgentsSection(out),
     inFlightSection(out),
     completedSection(out),
     decisionsSection(out),
+    timelineSection(out),
     availabilityTable(out.availability),
     '',
     ledgerSummary(out.availability),

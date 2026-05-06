@@ -19,8 +19,11 @@ async function safeReadJson(path: string): Promise<unknown> {
   try { return JSON.parse(await readFile(path, 'utf8')) } catch { return null }
 }
 
+import type { ReplayEvent } from '../engine/types.js'
+
 export const stateAdapter: BaseAdapter & {
   readMergedState(cwd: string): Promise<MergedState>
+  replayEvents(cwd: string, opts: { sinceHours: number }): Promise<ReplayEvent[]>
 } = {
   id: 'state',
 
@@ -58,5 +61,32 @@ export const stateAdapter: BaseAdapter & {
       // no services dir — fine
     }
     return merged
+  },
+
+  async replayEvents(cwd: string, opts: { sinceHours: number }): Promise<ReplayEvent[]> {
+    const path = join(cwd, ROOT_STATE)
+    let mtimeIso: string
+    try {
+      const s = await stat(path)
+      mtimeIso = s.mtime.toISOString()
+    } catch {
+      return []
+    }
+    const cutoff = new Date(Date.now() - opts.sinceHours * 3_600_000).toISOString()
+    if (mtimeIso < cutoff) return []
+    const merged = await stateAdapter.readMergedState(cwd)
+    const out: ReplayEvent[] = []
+    for (const [slug, entry] of Object.entries(merged.steps)) {
+      if (entry.status !== 'completed' && entry.status !== 'in_progress') continue
+      const kind = entry.status === 'completed' ? 'step_completed' : 'step_in_progress'
+      out.push({
+        sort_id: `state:${slug}:${entry.status}`,
+        correlation_id: null,
+        ts: mtimeIso,
+        source: 'state', kind,
+        summary: `pipeline step ${slug} → ${entry.status}`,
+      })
+    }
+    return out
   },
 }

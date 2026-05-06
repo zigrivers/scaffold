@@ -155,3 +155,24 @@ describe('renderAuditMarkdown', () => {
     expect(md).toContain('D-stack')
   })
 })
+
+describe('renderProgressMarkdown — replay + needs_attention', () => {
+  it('prepends a "Needs Attention" table when needs_attention is non-empty', () => {
+    const out = JSON.parse(JSON.stringify(fixture)) as EngineOutput
+    out.needs_attention = [{ signal: 'pr_stale', ref: { kind: 'pr', id: '42' },
+      age_hours: 67, threshold_hours: 48, summary: 'PR #42 opened 67h ago, not merged or closed' }]
+    const md = renderProgressMarkdown(out)
+    expect(md).toContain('## Needs Attention')
+    expect(md).toMatch(/\| pr_stale \| .*PR #42/)
+  })
+  it('appends a "Timeline" section when replay is populated', () => {
+    const out = JSON.parse(JSON.stringify(fixture)) as EngineOutput
+    out.replay = { window: { from: '2026-05-04T13:00:00Z', to: '2026-05-04T14:00:00Z' },
+      events: [{ sort_id: 'ledger:ulid-A', correlation_id: null, ts: '2026-05-04T13:55:00Z',
+        source: 'ledger', kind: 'task_claimed', actor_label: 'agent-alice',
+        task_id: 'T-031', summary: 'T-031 claimed' }] }
+    const md = renderProgressMarkdown(out)
+    expect(md).toContain('## Timeline')
+    expect(md).toMatch(/\| .*ledger.* \| .*task_claimed.* \|/)
+  })
+})

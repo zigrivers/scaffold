@@ -339,3 +339,41 @@ describe('observe --render=dashboard-fragment', () => {
     expect(existsSync(join(proj, 'docs/audits'))).toBe(false)
   })
 })
+
+describe('observe progress --replay + --no-stall-check', () => {
+  let proj: string
+  beforeEach(async () => {
+    proj = mkdtempSync(join(tmpdir(), 'observe-cli5-'))
+    execSync('git init -q', { cwd: proj })
+    execSync('git config user.email t@e.com && git config user.name T', { cwd: proj, shell: '/bin/sh' })
+    ensureIdentity(proj, 'primary')
+    await writeEvent(proj, { type: 'task_claimed', branch: 'a', task_id: 'T-1', payload: { task_title: 'A' } })
+  })
+  afterEach(() => { rmSync(proj, { recursive: true, force: true }) })
+
+  it('--replay --json includes replay.events in stdout', async () => {
+    let captured = ''
+    const orig = process.stdout.write.bind(process.stdout)
+    process.stdout.write = ((s: string | Uint8Array) => { captured += String(s); return true }) as never
+    try {
+      await handleProgress({
+        cwd: proj, json: true, sinceHours: 24, replay: true, ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+      })
+    } finally { process.stdout.write = orig }
+    const obj = JSON.parse(captured)
+    expect(obj.replay).not.toBeNull()
+    expect(obj.replay.events.length).toBeGreaterThan(0)
+  })
+
+  it('--no-stall-check produces empty needs_attention regardless of conditions', async () => {
+    let captured = ''
+    const orig = process.stdout.write.bind(process.stdout)
+    process.stdout.write = ((s: string | Uint8Array) => { captured += String(s); return true }) as never
+    try {
+      await handleProgress({
+        cwd: proj, json: true, sinceHours: 24, noStallCheck: true, ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+      })
+    } finally { process.stdout.write = orig }
+    expect(JSON.parse(captured).needs_attention).toEqual([])
+  })
+})

@@ -37,3 +37,32 @@ describe('state adapter', () => {
     expect(merged.steps['coding-standards@api'].status).toBe('in_progress')
   })
 })
+
+describe('state adapter — replayEvents', () => {
+  let dir: string
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'observe-st-rep-')) })
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }) })
+
+  it('returns ReplayEvents for completed and in_progress steps using state.json mtime', async () => {
+    mkdirSync(join(dir, '.scaffold'), { recursive: true })
+    writeFileSync(join(dir, '.scaffold/state.json'), JSON.stringify({
+      version: '1.0', methodology: 'deep',
+      steps: {
+        'user-stories':       { status: 'completed',   source: 'pipeline' },
+        'tech-stack':         { status: 'in_progress', source: 'pipeline' },
+        'coding-standards':   { status: 'pending',     source: 'pipeline' },
+      },
+    }))
+    const events = await stateAdapter.replayEvents(dir, { sinceHours: 24 })
+    const slugs = events.map((e) => e.kind)
+    expect(slugs).toContain('step_completed')
+    expect(slugs).toContain('step_in_progress')
+    expect(slugs).not.toContain('step_pending')
+    expect(events[0].source).toBe('state')
+    expect(events.find((e) => e.kind === 'step_completed')?.sort_id).toBe('state:user-stories:completed')
+  })
+
+  it('returns [] when state.json does not exist', async () => {
+    expect(await stateAdapter.replayEvents(dir, { sinceHours: 24 })).toEqual([])
+  })
+})

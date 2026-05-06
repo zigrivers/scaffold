@@ -237,3 +237,23 @@ EOF
     [ "$md_count" -ge 1 ]
     [ "$json_count" -ge 1 ]
 }
+
+@test "observe progress --replay --json includes a non-empty replay.events array" {
+    $BIN observe event task_claimed --branch=main --task-id=T-001 --task-title="hello"
+    $BIN observe harvest --worktree="$SANDBOX"
+
+    run $BIN observe progress --replay --json --since-hours=24
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"replay"'* ]]
+    [[ "$output" == *'"task_claimed"'* ]]
+    [[ "$output" == *'"source": "ledger"'* ]]
+}
+
+@test "observe progress --no-stall-check returns empty needs_attention" {
+    $BIN observe event task_claimed --branch=main --task-id=T-001 --task-title="hello"
+    $BIN observe harvest --worktree="$SANDBOX"
+
+    run $BIN observe progress --no-stall-check --json --since-hours=24
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"needs_attention": []'* ]]
+}

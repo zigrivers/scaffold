@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import type {
   AvailabilityMap, Event, Snapshot,
   ActiveAgent, TaskInFlight, TaskCompletion, BlockedTask, DecisionSummary,
+  ReplayEvent, ReplayTimeline,
 } from './types.js'
 import { validateEvent } from './event-schemas.js'
 import { gitAdapter } from '../adapters/git.js'
@@ -241,3 +242,80 @@ export function composeSnapshot(input: ComposeSnapshotInput): Snapshot {
 }
 
 function round1(n: number): number { return Math.round(n * 10) / 10 }
+
+// ─── Replay composer ────────────────────────────────────────────────────────
+
+export interface ComposeReplayInput {
+  ledgerEvents: Event[]
+  adapterEvents: ReplayEvent[]
+  window: { from: string; to: string }
+}
+
+const SOURCE_PRIORITY: Record<ReplayEvent['source'], number> = {
+  ledger: 0, mmr: 1, gh: 2, git: 3, state: 4, tests: 5,
+}
+
+function ledgerEventToReplay(e: Event): ReplayEvent {
+  let kind: string = e.type
+  let summary = ''
+  let task_id: string | undefined
+  if (e.task_id) task_id = e.task_id
+  let correlation_id: string | null = null
+  if (e.type === 'task_claimed')
+    summary = `${e.task_id} claimed: ${(e.payload as { task_title: string }).task_title}`
+  else if (e.type === 'task_completed')
+    summary = `${e.task_id} completed (${(e.payload as { outcome: string }).outcome})`
+  else if (e.type === 'decision_recorded')
+    summary = `decision recorded: ${(e.payload as { key: string }).key}`
+  else if (e.type === 'blocker_hit')
+    summary = `blocker on ${e.task_id ?? '(no task)'}: ${(e.payload as { summary: string }).summary}`
+  else if (e.type === 'blocker_resolved')
+    summary = `blocker resolved on ${e.task_id ?? '(no task)'}`
+  else if (e.type === 'pr_opened') {
+    const pn = (e.payload as { pr_number: number }).pr_number
+    summary = `PR #${pn} opened`
+    correlation_id = `pr:${pn}:opened`
+    kind = 'pr_opened'
+  } else if (e.type === 'progress_heartbeat')
+    summary = `heartbeat on ${e.task_id ?? '(no task)'}: ${(e.payload as { note: string }).note}`
+  else if (e.type === 'finding_acknowledged') {
+    const p = e.payload as { finding_id: string; status: string }
+    summary = `finding ${p.finding_id} → ${p.status}`
+  }
+  return {
+    sort_id: `ledger:${e.event_id}`,
+    correlation_id,
+    ts: e.ts, source: 'ledger', kind,
+    actor_label: e.actor_label, task_id,
+    summary,
+  }
+}
+
+export function composeReplay(input: ComposeReplayInput): ReplayTimeline {
+  const allEvents: ReplayEvent[] = [
+    ...input.ledgerEvents.map(ledgerEventToReplay),
+    ...input.adapterEvents,
+  ].filter((e) => e.ts >= input.window.from && e.ts <= input.window.to)
+
+  // Dedupe by correlation_id, keeping highest-priority source (lowest number)
+  const byCorrelation = new Map<string, ReplayEvent>()
+  const passthrough: ReplayEvent[] = []
+  for (const e of allEvents) {
+    if (e.correlation_id === null) { passthrough.push(e); continue }
+    const prev = byCorrelation.get(e.correlation_id)
+    if (!prev) { byCorrelation.set(e.correlation_id, e); continue }
+    if (SOURCE_PRIORITY[e.source] < SOURCE_PRIORITY[prev.source]) {
+      byCorrelation.set(e.correlation_id, e)
+    } else if (SOURCE_PRIORITY[e.source] === SOURCE_PRIORITY[prev.source] && e.ts < prev.ts) {
+      byCorrelation.set(e.correlation_id, e)
+    }
+  }
+  const merged = [...passthrough, ...byCorrelation.values()]
+  merged.sort((a, b) => {
+    if (a.ts !== b.ts) return a.ts < b.ts ? -1 : 1
+    const pri = SOURCE_PRIORITY[a.source] - SOURCE_PRIORITY[b.source]
+    if (pri !== 0) return pri
+    return a.sort_id < b.sort_id ? -1 : 1
+  })
+  return { window: input.window, events: merged }
+}

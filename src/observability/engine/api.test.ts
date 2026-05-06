@@ -136,3 +136,57 @@ describe('api.runAudit (Plan 3 — eight lenses)', () => {
     }
   })
 })
+
+describe('api.runProgress (Plan 5 — replay + stall)', () => {
+  let project: string, wt: string
+  beforeEach(async () => {
+    project = mkdtempSync(join(tmpdir(), 'observe-prog5-pri-'))
+    wt = mkdtempSync(join(tmpdir(), 'observe-prog5-wt-'))
+    execSync('git init -q', { cwd: project })
+    execSync('git config user.email t@e.com && git config user.name T', { cwd: project, shell: '/bin/sh' })
+    ensureIdentity(wt, 'agent-alice')
+    await writeEvent(wt, { type: 'task_claimed', branch: 'a', task_id: 'T-1', payload: { task_title: 'A' } })
+    await harvestWorktree({ primaryRoot: project, worktreeRoot: wt })
+  })
+  afterEach(() => {
+    rmSync(project, { recursive: true, force: true })
+    rmSync(wt, { recursive: true, force: true })
+  })
+
+  it('runProgress with replay=true populates EngineOutput.replay with the ledger event', async () => {
+    const out = await runProgress({
+      primaryRoot: project, sinceHours: 24, replay: true, ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+    })
+    expect(out.replay).not.toBeNull()
+    expect(out.replay!.events.length).toBeGreaterThanOrEqual(1)
+    expect(out.replay!.events[0].source).toBe('ledger')
+    expect(out.replay!.events[0].kind).toBe('task_claimed')
+  })
+
+  it('runProgress without replay leaves replay null', async () => {
+    const out = await runProgress({ primaryRoot: project, sinceHours: 24, ghBin: '/no/such/gh', bdBin: '/no/such/bd' })
+    expect(out.replay).toBeNull()
+  })
+
+  it('runProgress with stall check populates needs_attention when stall conditions trip', async () => {
+    const { readFileSync: readFS } = await import('node:fs')
+    const identity = JSON.parse(readFS(join(wt, '.scaffold/identity.json'), 'utf8'))
+    const archived = join(project, '.scaffold/activity-archive/active', identity.worktree_id + '.jsonl')
+    writeFileSync(archived, JSON.stringify({
+      event_id: 'ulid-old', worktree_id: 'wid', actor_label: 'agent-alice', branch: 'a',
+      task_id: 'T-OLD', type: 'task_claimed',
+      ts: new Date(Date.now() - 6 * 3_600_000).toISOString(),
+      payload: { task_title: 'old' },
+    }) + '\n', { flag: 'a' })
+    const out = await runProgress({ primaryRoot: project, sinceHours: 24, ghBin: '/no/such/gh', bdBin: '/no/such/bd' })
+    const stale = out.needs_attention.find((n) => n.signal === 'task_stale' && n.ref.id === 'T-OLD')
+    expect(stale).toBeDefined()
+  })
+
+  it('--no-stall-check leaves needs_attention empty', async () => {
+    const out = await runProgress({
+      primaryRoot: project, sinceHours: 24, noStallCheck: true, ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+    })
+    expect(out.needs_attention).toEqual([])
+  })
+})

@@ -1,8 +1,10 @@
 import { execFile as execFileCb } from 'node:child_process'
 import { promisify } from 'node:util'
 import type { AdapterStatus, BaseAdapter } from './types.js'
+import type { ReplayEvent } from '../engine/types.js'
 
 const execFile = promisify(execFileCb)
+const GIT_TIMEOUT_MS = 30_000
 
 export interface WorktreeInfo {
   path: string
@@ -19,13 +21,14 @@ export interface CommitInfo {
 }
 
 async function git(cwd: string, args: string[]): Promise<string> {
-  const { stdout } = await execFile('git', args, { cwd, maxBuffer: 32 * 1024 * 1024 })
+  const { stdout } = await execFile('git', args, { cwd, maxBuffer: 32 * 1024 * 1024, timeout: GIT_TIMEOUT_MS })
   return stdout
 }
 
 export const gitAdapter: BaseAdapter & {
   listWorktrees(cwd: string): Promise<WorktreeInfo[]>
   recentCommits(cwd: string, opts: { sinceHours: number }): Promise<CommitInfo[]>
+  replayEvents(cwd: string, opts: { sinceHours: number }): Promise<ReplayEvent[]>
 } = {
   id: 'git',
 
@@ -74,5 +77,46 @@ export const gitAdapter: BaseAdapter & {
     } catch {
       return []
     }
+  },
+
+  async replayEvents(cwd: string, opts: { sinceHours: number }): Promise<ReplayEvent[]> {
+    const worktrees = await gitAdapter.listWorktrees(cwd)
+    const since = `${opts.sinceHours}.hours.ago`
+    const fmt = '%H%x09%cI%x09%an%x09%s'
+    const seen = new Set<string>()
+    const out: ReplayEvent[] = []
+    for (const wt of worktrees) {
+      if (!wt.branch) continue
+      try {
+        const raw = await git(cwd, ['log', wt.branch, `--since=${since}`, `--pretty=format:${fmt}`])
+        for (const line of raw.split('\n').filter(Boolean)) {
+          const [sha, ts, author, ...rest] = line.split('\t')
+          if (seen.has(sha)) continue
+          seen.add(sha)
+          out.push({
+            sort_id: `git:${sha}`, correlation_id: null, ts,
+            source: 'git' as const, kind: 'commit',
+            actor_label: author, branch: wt.branch,
+            summary: `${rest.join('\t').slice(0, 200)} (${sha.slice(0, 7)})`,
+            link: sha,
+          })
+        }
+      } catch { /* branch may not exist yet */ }
+    }
+    if (out.length > 0) return out
+    // Fallback when no worktrees are known — tag commits with the current HEAD branch so
+    // stall.ts branch-matching can suppress false-positive task_stale signals.
+    let headBranch: string | undefined
+    try {
+      headBranch = (await git(cwd, ['rev-parse', '--abbrev-ref', 'HEAD'])).trim() || undefined
+      if (headBranch === 'HEAD') headBranch = undefined // detached HEAD
+    } catch { /* ignore */ }
+    const commits = await gitAdapter.recentCommits(cwd, opts)
+    return commits.map((c) => ({
+      sort_id: `git:${c.sha}`, correlation_id: null, ts: c.ts,
+      source: 'git' as const, kind: 'commit', actor_label: c.author,
+      ...(headBranch ? { branch: headBranch } : {}),
+      summary: `${c.subject.slice(0, 200)} (${c.sha.slice(0, 7)})`, link: c.sha,
+    }))
   },
 }

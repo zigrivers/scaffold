@@ -121,4 +121,31 @@ describe('audit_history adapter — parse trend data', () => {
     writeFileSync(join(dir, 'docs/audits/x.json'), '{}')
     expect((await auditHistoryAdapter.probe(dir)).status).toBe('available')
   })
+
+  it('latestFindings returns findings from the most recent audit sidecar', async () => {
+    mkdirSync(join(dir, 'docs/audits'), { recursive: true })
+    const finding = {
+      id: 'abc123', lens_id: 'A-tdd', severity: 'P1', status: 'open',
+      title: 'test', description: 'd', source_doc: '',
+      evidence: { kind: 'rule_violation', rule_id: 'r', file: 'f' },
+      confidence: 'high', first_seen: '2026-05-01T00:00:00Z', last_seen: '2026-05-01T00:00:00Z',
+    }
+    writeFileSync(join(dir, 'docs/audits/audit-2026-05-01.json'), JSON.stringify({
+      report_id: 'audit-2026-05-01',
+      engine_output: {
+        schema_version: '1.0',
+        invocation: { command: 'audit', started_at: '2026-05-01T00:00:00Z' },
+        findings: [finding],
+      },
+    }))
+    const found = await auditHistoryAdapter.latestFindings(dir)
+    expect(found).toHaveLength(1)
+    expect(found[0].id).toBe('abc123')
+    expect(found[0].severity).toBe('P1')
+  })
+
+  it('latestFindings returns [] when no audit sidecars exist', async () => {
+    const found = await auditHistoryAdapter.latestFindings(dir)
+    expect(found).toEqual([])
+  })
 })
