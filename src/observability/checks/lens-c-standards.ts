@@ -7,7 +7,7 @@ import type { LensFn } from '../engine/checks/runner.js'
 import { loadObservabilityConfig } from '../engine/checks/observability-config.js'
 
 const lensId = 'C-standards'
-const ESCALATION_THRESHOLD = 5
+const DEFAULT_ESCALATION_THRESHOLD = 5
 
 function makeFindingId(parts: string[]): string {
   return createHash('sha256').update(parts.join('::')).digest('hex').slice(0, 16)
@@ -41,11 +41,11 @@ function findPatternViolations(rule: Rule, file: string, content: string): RuleV
   return out
 }
 
-function severityFor(rule: Rule, totalCount: number, override?: Severity): Severity {
+function severityFor(rule: Rule, totalCount: number, escalationThreshold: number, override?: Severity): Severity {
   if (override) return override
   const VALID: Severity[] = ['P0', 'P1', 'P2', 'P3']
   if (rule.severity && (VALID as string[]).includes(rule.severity)) return rule.severity as Severity
-  if (totalCount > ESCALATION_THRESHOLD) return 'P1'
+  if (totalCount > escalationThreshold) return 'P1'
   return 'P2'
 }
 
@@ -55,6 +55,7 @@ export const lensCStandards: LensFn = async (graph) => {
   const cwd = graph.cwd
   const config = loadObservabilityConfig(cwd)
   const overrides = config.lenses['C-standards']?.rule_overrides ?? {}
+  const escalationThreshold = config.lenses['C-standards']?.escalation_threshold ?? DEFAULT_ESCALATION_THRESHOLD
 
   const fileContents = new Map<string, string>()
   for (const f of graph.files) {
@@ -81,7 +82,7 @@ export const lensCStandards: LensFn = async (graph) => {
     if (!rule) continue
     const ruleKey = rule.id.replace(/^rule:/, '')
     const override = overrides[ruleKey] as Severity | undefined
-    const severity = severityFor(rule, vs.length, override)
+    const severity = severityFor(rule, vs.length, escalationThreshold, override)
     for (const v of vs) {
       findings.push({
         id: makeFindingId([lensId, ruleId, v.file, String(v.lineStart)]),

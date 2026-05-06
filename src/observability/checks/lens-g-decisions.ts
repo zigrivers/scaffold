@@ -46,7 +46,8 @@ export const lensGDecisions: LensFn = async (graph, ledger, _availability, upstr
   const eventsByKey = new Map<string, Event>()
   for (const e of ledger.events) {
     if (e.type !== 'decision_recorded') continue
-    const key = (e.payload as { key: string }).key
+    const key = (e.payload as { key?: unknown }).key
+    if (typeof key !== 'string' || !key) continue
     eventsByKey.set(key, e)
   }
   for (const [key] of eventsByKey) {

@@ -9,6 +9,7 @@ export interface ELensConfig {
 export interface CLensConfig {
   enforce_via_linter?: boolean
   rule_overrides?: Record<string, 'P0' | 'P1' | 'P2' | 'P3'>
+  escalation_threshold?: number
 }
 export interface FLensConfig {
   untouched_story_grace_hours?: number

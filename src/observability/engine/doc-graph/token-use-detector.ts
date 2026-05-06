@@ -41,6 +41,7 @@ function categoryOfProp(prop: string): DesignToken['category'] | null {
 
 function splitShorthand(prop: string, value: string): { property: string; value: string }[] {
   if (!/^(margin|padding|gap)$/i.test(prop)) return [{ property: prop, value }]
+  if (value.includes('(')) return [{ property: prop, value }]
   return value.split(/\s+/).filter(Boolean).map((v) => ({ property: prop, value: v }))
 }
 
