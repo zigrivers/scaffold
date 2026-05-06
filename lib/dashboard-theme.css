@@ -911,3 +911,19 @@ h2 {
 .hidden {
     display: none;
 }
+
+/* Build-observability severity + verdict tokens (Plan 4) */
+:root {
+  --sev-p0: #dc2626;        /* red 600 */
+  --sev-p1: #ea580c;        /* orange 600 */
+  --sev-p2: #ca8a04;        /* yellow 600 */
+  --sev-p3: #2563eb;        /* blue 600 */
+  --sev-pass: #16a34a;      /* green 600 */
+}
+[data-theme="dark"] {
+  --sev-p0: #f87171;
+  --sev-p1: #fb923c;
+  --sev-p2: #facc15;
+  --sev-p3: #60a5fa;
+  --sev-pass: #4ade80;
+}
