@@ -16,9 +16,9 @@ import { dirname, isAbsolute, join } from 'node:path'
 import { findProjectRoot } from '../middleware/project-root.js'
 
 async function writeMarkdownReport(
-  cwd: string, out: EngineOutput, body: string, overridePath?: string,
+  cwd: string, out: EngineOutput, body: string, reportId: string, overridePath?: string,
 ): Promise<string> {
-  const relPath = sidecarPath(deriveReportId(out), out.invocation.command).replace(/\.json$/, '.md')
+  const relPath = sidecarPath(reportId, out.invocation.command).replace(/\.json$/, '.md')
   const absPath = overridePath
     ? (isAbsolute(overridePath) ? overridePath : join(cwd, overridePath))
     : join(cwd, relPath)
@@ -109,9 +109,10 @@ export async function handleProgress(input: HandleProgressInput): Promise<number
       process.stdout.write((input.maskPaths ? redactRendered(fragment) : fragment) + '\n')
       return 0
     }
+    const reportId = deriveReportId(out)
     let sidecarFinal: string | null = null
     try {
-      sidecarFinal = await writeSidecar(input.cwd, out)
+      sidecarFinal = await writeSidecar(input.cwd, out, undefined, reportId)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       process.stderr.write(`scaffold observe progress: sidecar write failed: ${msg}\n`)
@@ -123,7 +124,7 @@ export async function handleProgress(input: HandleProgressInput): Promise<number
       const md = renderProgressMarkdown(out)
       let mdFinal: string | null = null
       try {
-        mdFinal = await writeMarkdownReport(input.cwd, out, md, input.output)
+        mdFinal = await writeMarkdownReport(input.cwd, out, md, reportId, input.output)
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         process.stderr.write(`scaffold observe progress: markdown write failed: ${msg}\n`)
@@ -207,9 +208,10 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
       process.stdout.write((input.maskPaths ? redactRendered(fragment) : fragment) + '\n')
       return 0
     }
+    const reportId = deriveReportId(out)
     let sidecarFinal: string | null = null
     try {
-      sidecarFinal = await writeSidecar(input.cwd, out)
+      sidecarFinal = await writeSidecar(input.cwd, out, undefined, reportId)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       process.stderr.write(`scaffold observe audit: sidecar write failed: ${msg}\n`)
@@ -221,7 +223,7 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
       const md = renderAuditMarkdown(out)
       let mdFinal: string | null = null
       try {
-        mdFinal = await writeMarkdownReport(input.cwd, out, md, input.output)
+        mdFinal = await writeMarkdownReport(input.cwd, out, md, reportId, input.output)
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         process.stderr.write(`scaffold observe audit: markdown write failed: ${msg}\n`)

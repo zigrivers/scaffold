@@ -41,15 +41,17 @@ export function sidecarPath(reportId: string, command: 'progress' | 'audit'): st
   return `${dir}/${reportId}.json`
 }
 
-export async function writeSidecar(cwd: string, out: EngineOutput, overridePath?: string): Promise<string> {
-  const reportId = deriveReportId(out)
-  const defaultPath = sidecarPath(reportId, out.invocation.command)
+export async function writeSidecar(
+  cwd: string, out: EngineOutput, overridePath?: string, reportId?: string,
+): Promise<string> {
+  const id = reportId ?? deriveReportId(out)
+  const defaultPath = sidecarPath(id, out.invocation.command)
   const absPath = overridePath
     ? (isAbsolute(overridePath) ? overridePath : join(cwd, overridePath))
     : join(cwd, defaultPath)
   await mkdir(dirname(absPath), { recursive: true })
   const redacted = redactEngineOutput(out)
-  const wrapper = { report_id: reportId, engine_output: redacted }
+  const wrapper = { report_id: id, engine_output: redacted }
   await writeFile(absPath, JSON.stringify(wrapper, null, 2) + '\n', { mode: 0o644 })
   return absPath
 }

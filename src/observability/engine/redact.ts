@@ -115,7 +115,21 @@ export function redactRendered(blob: string): string {
   return sanitizePath(scrubSecrets(blob))
 }
 
-/** Render-time redaction of a structured EngineOutput. Recurses through every string field. */
+function transformStrings(v: unknown, transform: (s: string) => string): unknown {
+  if (typeof v === 'string') return transform(v)
+  if (typeof v !== 'object' || v === null) return v
+  if (Array.isArray(v)) return v.map((x) => transformStrings(x, transform))
+  const proto = Object.getPrototypeOf(v) as unknown
+  if (proto !== Object.prototype && proto !== null) return v
+  const out: Record<string, unknown> = {}
+  for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+    out[k] = transformStrings(val, transform)
+  }
+  return out
+}
+
+/** Render-time redaction of a structured EngineOutput. Scrubs paths and secrets in string values only;
+ *  non-string values (numbers, booleans) are preserved regardless of key name. */
 export function redactEngineOutput(out: EngineOutput): EngineOutput {
-  return recursivelyTransform(out, (s) => sanitizePath(scrubSecrets(s))) as EngineOutput
+  return transformStrings(out, (s) => sanitizePath(scrubSecrets(s))) as EngineOutput
 }

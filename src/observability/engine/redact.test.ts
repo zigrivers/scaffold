@@ -268,4 +268,10 @@ describe('redactEngineOutput (structured)', () => {
     redactEngineOutput(skeleton)
     expect(JSON.stringify(skeleton)).toBe(before)
   })
+
+  it('preserves numeric fields whose key contains "token" (ad_hoc_token_uses, etc.)', () => {
+    const out = redactEngineOutput(skeleton)
+    expect(typeof out.graph_stats.ad_hoc_token_uses).toBe('number')
+    expect(out.graph_stats.ad_hoc_token_uses).toBe(0)
+  })
 })
