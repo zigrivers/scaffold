@@ -55,7 +55,6 @@ export function detectCssTokenUses(source: string, tokens: DesignToken[], filePa
   root.walkDecls((decl) => {
     const cat = categoryOfProp(decl.prop)
     if (!cat) return
-    if (!isLiteral(decl.value)) return
     for (const piece of splitShorthand(decl.prop, decl.value)) {
       if (!isLiteral(piece.value)) continue
       out.push({

@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { runAudit } from '../../src/observability/engine/api'
 
-const FIXTURE = join(__dirname, 'fixtures/projects/audit-mvp')
+const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/projects/audit-mvp')
 
 describe('runAudit against the audit-mvp fixture', () => {
   it('trips one finding per Plan-3 lens (all 8)', async () => {

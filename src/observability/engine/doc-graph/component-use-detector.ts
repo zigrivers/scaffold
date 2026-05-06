@@ -15,8 +15,12 @@ export interface ComponentUse {
 }
 
 function packageNameOf(component: SanctionedComponent): string {
-  const m = component.package_or_url.match(/^(@?[^@]+(?:\/[^@]+)?)(?:@.+)?$/)
-  return m ? m[1] : component.package_or_url
+  const s = component.package_or_url
+  if (s.startsWith('@')) {
+    const parts = s.split('/')
+    return parts.length >= 2 ? `${parts[0]}/${parts[1].split('@')[0]}` : s
+  }
+  return s.split('/')[0].split('@')[0] || s
 }
 
 function isRelative(specifier: string): boolean {
