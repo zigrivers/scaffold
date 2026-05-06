@@ -89,10 +89,11 @@ EOF
     run $BIN observe audit --json --profile=fast --scope=all
     [ "$status" -eq 1 ]
     mkdir -p docs/audits
-    echo "$output" | node -e "
+    # Strip ANSI escape sequences before parsing (spinner may contaminate output in TTY mode)
+    echo "$output" | sed $'s/\x1b\\[[0-9;?]*[a-zA-Z]//g' | node -e "
 const chunks = []; process.stdin.on('data', c => chunks.push(c));
 process.stdin.on('end', () => {
-  const out = JSON.parse(chunks.join(''));
+  const out = JSON.parse(chunks.join('').trim());
   const sidecar = { report_id: 'e2e-test', engine_output: out };
   const fs = require('fs');
   fs.writeFileSync('docs/audits/2026-05-05-fast-all.json', JSON.stringify(sidecar));
@@ -114,4 +115,77 @@ console.log(sc.engine_output.findings[0].id.slice(0, 8));
 @test "observe ack exits 3 when no sidecar exists" {
     run $BIN observe ack aabbccdd --status=acknowledged
     [ "$status" -eq 3 ]
+}
+
+@test "observe audit --json --scope=code surfaces C/D/E/F/G when fixtures violate them" {
+    # Build a quick in-place fixture
+    mkdir -p src/lib src/components docs .scaffold
+    cat > docs/plan.md <<'EOF'
+# PRD
+## Features
+### F [priority: must]
+EOF
+    cat > docs/user-stories.md <<'EOF'
+## Story s-1: T [priority: must]
+
+### AC 1: t
+Given X.
+EOF
+    cat > docs/tech-stack.md <<'EOF'
+## Frontend
+
+### React
+- package_or_url: react@18
+EOF
+    cat > docs/coding-standards.md <<'EOF'
+### Rule: no-console
+- pattern: `console\\.log\\(`
+- match: src/**/*.ts
+EOF
+    cat > docs/design-system.md <<'EOF'
+## Colors
+| Token | Value | Priority |
+|---|---|---|
+| --color-primary | #4f46e5 | must |
+EOF
+    cat > .scaffold/observability.yaml <<'EOF'
+lenses:
+  E-design:
+    ui_glob: "src/components/**/*.tsx"
+    ad_hoc_token_threshold: 2
+EOF
+    cat > src/lib/x.ts <<'EOF'
+import { uniq } from 'lodash'
+console.log('debug', uniq([1, 2]))
+EOF
+    cat > src/components/Btn.tsx <<'EOF'
+export const Btn = () => <button style={{ color: '#aabbcc', background: '#112233', borderColor: '#445566' }} />
+EOF
+    cat > docs/tdd-standards.md <<'EOF'
+# TDD
+EOF
+
+    run $BIN observe audit --json --scope=code --since-hours=24
+    [ "$status" -eq 1 ] # blocked
+    [[ "$output" == *'"C-standards"'* ]]
+    [[ "$output" == *'"D-stack"'* ]]
+    [[ "$output" == *'"E-design"'* ]]
+    [[ "$output" == *'"F-scope"'* ]]
+    [[ "$output" == *'"G-decisions"'* ]]
+}
+
+@test "observe audit --lens C-standards limits to that single lens" {
+    cat > docs/coding-standards.md <<'EOF'
+### Rule: no-console
+- pattern: `console\\.log\\(`
+- match: src/**/*.ts
+EOF
+    mkdir -p src
+    echo "console.log('a')" > src/foo.ts
+
+    run $BIN observe audit --json --lens C-standards --since-hours=24
+    [[ "$output" == *'"C-standards"'* ]]
+    # No other lens IDs should appear in findings
+    [[ "$output" != *'"A-tdd"'* ]]
+    [[ "$output" != *'"H-cross-doc"'* ]]
 }

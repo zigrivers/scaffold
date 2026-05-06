@@ -59,10 +59,10 @@ export const DEFAULT_CONFIG: ObservabilityConfig = {
 
 const CONFIG_PATH = '.scaffold/observability.yaml'
 
-function deepMerge<T extends Record<string, unknown>>(base: T, over: Record<string, unknown>): T {
-  const out: Record<string, unknown> = { ...base }
+function deepMerge<T>(base: T, over: Record<string, unknown>): T {
+  const out: Record<string, unknown> = { ...(base as Record<string, unknown>) }
   for (const [k, v] of Object.entries(over)) {
-    const baseV = base[k]
+    const baseV = (base as Record<string, unknown>)[k]
     if (v && typeof v === 'object' && !Array.isArray(v) && baseV && typeof baseV === 'object' && !Array.isArray(baseV)) {
       out[k] = deepMerge(baseV as Record<string, unknown>, v as Record<string, unknown>)
     } else {

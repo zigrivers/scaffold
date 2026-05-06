@@ -1,12 +1,14 @@
 import postcss from 'postcss'
 import { parse as babelParse } from '@babel/parser'
 import traverseDefault from '@babel/traverse'
+import type { NodePath } from '@babel/traverse'
 import type {
   JSXAttribute, ObjectExpression, ObjectProperty, Identifier, StringLiteral,
 } from '@babel/types'
 import type { DesignToken } from '../types.js'
 
-const traverse = (traverseDefault as unknown as { default: typeof traverseDefault }).default ?? traverseDefault
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const traverse = ((traverseDefault as unknown as { default: unknown }).default ?? traverseDefault) as (ast: unknown, visitors: Record<string, (path: NodePath<any>) => void>) => void
 
 export interface TokenUse {
   file: string
@@ -80,7 +82,7 @@ export function detectJsxTokenUses(source: string, tokens: DesignToken[], filePa
     return out
   }
   traverse(ast, {
-    JSXAttribute(path) {
+    JSXAttribute(path: NodePath<JSXAttribute>) {
       const node = path.node as JSXAttribute
       const nameNode = node.name
       if (nameNode.type !== 'JSXIdentifier' || nameNode.name !== 'style') return

@@ -4,6 +4,7 @@ import type { LensManifest } from './registry.js'
 import type { Finding } from '../types.js'
 
 const stubGraph = {
+  cwd: '',
   features: [], stories: [], acceptance_criteria: [], plan_tasks: [], playbook_tasks: [], tests: [],
   pull_requests: [], files: [], rules: [], components: [], tokens: [], decisions: [],
   edges: [], provenance: {}, unresolved_globs: [],

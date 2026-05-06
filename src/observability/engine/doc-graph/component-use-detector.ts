@@ -1,9 +1,11 @@
 import { parse as babelParse } from '@babel/parser'
 import traverseDefault from '@babel/traverse'
+import type { NodePath } from '@babel/traverse'
 import type { ImportDeclaration } from '@babel/types'
 import type { SanctionedComponent } from '../types.js'
 
-const traverse = (traverseDefault as unknown as { default: typeof traverseDefault }).default ?? traverseDefault
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const traverse = ((traverseDefault as unknown as { default: unknown }).default ?? traverseDefault) as (ast: unknown, visitors: Record<string, (path: NodePath<any>) => void>) => void
 
 export interface ComponentUse {
   file: string
@@ -33,7 +35,7 @@ export function detectComponentUses(
     return out
   }
   traverse(ast, {
-    ImportDeclaration(path) {
+    ImportDeclaration(path: NodePath<ImportDeclaration>) {
       const specifier = (path.node as ImportDeclaration).source.value
       if (isRelative(specifier)) return
       const match = components.find((c) => packageNameOf(c) === specifier)
