@@ -102,11 +102,13 @@ export function detectJsxTokenUses(source: string, tokens: DesignToken[], filePa
         if (valueNode.type !== 'StringLiteral') continue
         const property = camelToKebab(keyName)
         for (const piece of splitShorthand(property, (valueNode as StringLiteral).value)) {
+          const cat = categoryOfProp(piece.property)
+          if (!cat) continue
           out.push({
             file: filePath,
             property: piece.property,
             value: piece.value,
-            token_id: tokenIdFor(piece.value, tokens, categoryOfProp(piece.property)),
+            token_id: tokenIdFor(piece.value, tokens, cat),
           })
         }
       }

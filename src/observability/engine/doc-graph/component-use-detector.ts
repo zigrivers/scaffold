@@ -1,3 +1,4 @@
+import { builtinModules } from 'node:module'
 import { parse as babelParse } from '@babel/parser'
 import traverseDefault from '@babel/traverse'
 import type { NodePath } from '@babel/traverse'
@@ -22,6 +23,10 @@ function isRelative(specifier: string): boolean {
   return specifier.startsWith('.') || specifier.startsWith('/')
 }
 
+function isBuiltin(specifier: string): boolean {
+  return specifier.startsWith('node:') || builtinModules.includes(specifier)
+}
+
 export function detectComponentUses(
   source: string,
   components: SanctionedComponent[],
@@ -37,7 +42,7 @@ export function detectComponentUses(
     } catch { return out }
   }
   function pushUse(specifier: string) {
-    if (isRelative(specifier)) return
+    if (isRelative(specifier) || isBuiltin(specifier)) return
     const match = components.find((c) => packageNameOf(c) === specifier)
     out.push({ file: filePath, specifier, component_id: match ? match.id : 'unsanctioned' })
   }
