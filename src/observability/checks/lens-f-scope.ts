@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { Finding } from '../engine/types.js'
 import type { LensFn } from '../engine/checks/runner.js'
+import { loadObservabilityConfig } from '../engine/checks/observability-config.js'
 
 const lensId = 'F-scope'
 
@@ -49,25 +50,32 @@ export const lensFScope: LensFn = async (graph, ledger, availability) => {
 
   // (c) Story planned but untouched — only when state adapter is available
   if (availability.state.status === 'available') {
-    const claimedTaskIds = new Set(
-      ledger.events.filter((e) => e.type === 'task_claimed' && e.task_id).map((e) => e.task_id as string),
-    )
-    for (const s of graph.stories) {
-      const planTasks = graph.plan_tasks.filter((p) => p.story_id === s.id)
-      if (planTasks.length === 0) continue
-      const allTodo = planTasks.every((p) => p.status === 'todo')
-      if (!allTodo) continue
-      const everClaimed = planTasks.some((p) => claimedTaskIds.has(p.id.replace(/^plan_task:/, '')))
-      if (everClaimed) continue
-      findings.push({
-        id: makeFindingId([lensId, 'untouched', s.id]),
-        lens_id: lensId, severity: 'P2',
-        title: `story planned but untouched: ${s.title}`,
-        description: `Story ${s.id} has plan tasks but none have been claimed.`,
-        source_doc: s.source_anchor,
-        evidence: { kind: 'orphan_node', graph_query: `task_claimed for story ${s.id}`, node_id: s.id },
-        confidence: 'low', first_seen: now, last_seen: now, status: 'open',
-      })
+    const config = loadObservabilityConfig(graph.cwd)
+    const graceHours = config.lenses['F-scope']?.untouched_story_grace_hours ?? 168
+    const graceCutoff = Date.now() - graceHours * 3_600_000
+    const eventTimestamps = ledger.events.map((e) => new Date(e.ts).getTime()).filter(isFinite)
+    const oldestEventTs = eventTimestamps.length > 0 ? Math.min(...eventTimestamps) : Date.now()
+    if (oldestEventTs < graceCutoff) {
+      const claimedTaskIds = new Set(
+        ledger.events.filter((e) => e.type === 'task_claimed' && e.task_id).map((e) => e.task_id as string),
+      )
+      for (const s of graph.stories) {
+        const planTasks = graph.plan_tasks.filter((p) => p.story_id === s.id)
+        if (planTasks.length === 0) continue
+        const allTodo = planTasks.every((p) => p.status === 'todo')
+        if (!allTodo) continue
+        const everClaimed = planTasks.some((p) => claimedTaskIds.has(p.id.replace(/^plan_task:/, '')))
+        if (everClaimed) continue
+        findings.push({
+          id: makeFindingId([lensId, 'untouched', s.id]),
+          lens_id: lensId, severity: 'P2',
+          title: `story planned but untouched: ${s.title}`,
+          description: `Story ${s.id} has plan tasks but none have been claimed.`,
+          source_doc: s.source_anchor,
+          evidence: { kind: 'orphan_node', graph_query: `task_claimed for story ${s.id}`, node_id: s.id },
+          confidence: 'low', first_seen: now, last_seen: now, status: 'open',
+        })
+      }
     }
   }
 

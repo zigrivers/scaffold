@@ -1,11 +1,7 @@
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { minimatch } from 'minimatch'
 import type { Finding, Event } from '../engine/types.js'
 import type { LensFn } from '../engine/checks/runner.js'
-import { loadObservabilityConfig } from '../engine/checks/observability-config.js'
 
 const lensId = 'G-decisions'
 
@@ -23,19 +19,6 @@ function decisionEventCoversFile(events: Event[], filePath: string): boolean {
   return false
 }
 
-function loadKeywords(cwd: string): string[] {
-  const config = loadObservabilityConfig(cwd)
-  const overridePath = (config.lenses['G-decisions'] as { keywords_file?: string } | undefined)?.keywords_file
-  const bundledPath = join(dirname(fileURLToPath(import.meta.url)), 'data/decision-keywords.txt')
-  const candidates = [
-    overridePath ? join(cwd, overridePath) : null,
-    bundledPath,
-  ].filter((p): p is string => Boolean(p))
-  for (const p of candidates) {
-    try { return readFileSync(p, 'utf8').split('\n').map((s) => s.trim()).filter(Boolean) } catch { /* try next */ }
-  }
-  return ['decided', 'chose', 'going with', 'will use']
-}
 
 export const lensGDecisions: LensFn = async (graph, ledger, _availability, upstreamFindings) => {
   const findings: Finding[] = []
