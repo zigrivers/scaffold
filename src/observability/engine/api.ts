@@ -8,6 +8,7 @@ import { runChecks } from './checks/runner.js'
 import { LENS_REGISTRY, LENS_IMPLEMENTATIONS } from './checks/registry.js'
 import { aggregate } from './checks/findings-aggregator.js'
 import { resolveFixThreshold } from './checks/fix-threshold.js'
+import { loadObservabilityConfig } from './checks/observability-config.js'
 
 export interface RunProgressInput {
   primaryRoot: string
@@ -55,7 +56,7 @@ export interface RunAuditInput {
 }
 
 const SCOPE_DOC_LENSES = new Set(['H-cross-doc'])
-const SCOPE_CODE_LENSES = new Set(['A-tdd', 'B-ac-coverage'])
+const SCOPE_CODE_LENSES = new Set(['A-tdd', 'B-ac-coverage', 'C-standards', 'D-stack', 'E-design', 'F-scope', 'G-decisions'])
 
 function pickEnabledIds(scope: RunAuditInput['scope'], explicit?: string[]): Set<string> {
   if (explicit && explicit.length > 0) return new Set(explicit)
@@ -78,6 +79,8 @@ export async function runAudit(input: RunAuditInput): Promise<EngineOutput> {
 
   const graph = await buildDocGraph(input.primaryRoot)
   const enabledIds = pickEnabledIds(input.scope, input.lensIds)
+  const config = loadObservabilityConfig(input.primaryRoot)
+  for (const disabled of config.disabled_lenses) enabledIds.delete(disabled)
   const fix_threshold: Severity = resolveFixThreshold(input.primaryRoot, input.fixThresholdOverride)
 
   const rawFindings = await runChecks({
