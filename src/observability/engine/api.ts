@@ -6,7 +6,7 @@ import { composeAvailability, readMergedLedger, composeSnapshot, composeReplay }
 import { evaluateStall } from './stall.js'
 import { buildDocGraph } from './doc-graph/index.js'
 import { runChecks } from './checks/runner.js'
-import { LENS_REGISTRY, LENS_IMPLEMENTATIONS, makeLensImplementations } from './checks/registry.js'
+import { LENS_REGISTRY, makeLensImplementations } from './checks/registry.js'
 import { aggregate } from './checks/findings-aggregator.js'
 import { resolveFixThreshold } from './checks/fix-threshold.js'
 import { loadObservabilityConfig } from './checks/observability-config.js'
