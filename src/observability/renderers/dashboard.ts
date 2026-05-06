@@ -17,6 +17,26 @@ function escape(s: string): string {
 
 const SEVERITIES: Severity[] = ['P0', 'P1', 'P2', 'P3']
 
+function needsAttentionAside(out: EngineOutput): string {
+  if (out.needs_attention.length === 0) return ''
+  const items = out.needs_attention.map((i) => {
+    const ageStr = i.signal === 'lens_skipped_repeatedly' ? `${i.threshold_hours}× streak` : `${i.age_hours}h`
+    return `<li><code>${escape(i.signal)}</code> ${escape(i.summary)} <span class="age">[${ageStr}]</span></li>`
+  }).join('')
+  return `<aside class="needs-attention"><h3>Needs Attention</h3><ul>${items}</ul></aside>`
+}
+
+function timelineDetails(out: EngineOutput): string {
+  if (!out.replay || out.replay.events.length === 0) return ''
+  const rows = out.replay.events.slice(0, 100).map((e) =>
+    `<tr><td>${escape(e.ts)}</td><td>${escape(e.source)}</td><td>${escape(e.kind)}</td>` +
+    `<td>${escape(e.summary)}</td></tr>`
+  ).join('')
+  return `<details class="timeline"><summary>Timeline (${out.replay.events.length} events)</summary>` +
+    `<table><thead><tr><th>Time</th><th>Source</th><th>Kind</th><th>Summary</th></tr></thead>` +
+    `<tbody>${rows}</tbody></table></details>`
+}
+
 export function renderProgressFragment(out: EngineOutput): string {
   const snap = out.snapshot
   const agents = (snap?.active_agents ?? []).map((a) => {
@@ -36,10 +56,12 @@ export function renderProgressFragment(out: EngineOutput): string {
     <h2>Build Progress</h2>
     <span class="meta">last ${sinceHours}h · phase: ${escape(snap?.current_phase ?? '(unknown)')}</span>
   </header>
+  ${needsAttentionAside(out)}
   <div class="grid grid-2">
     <div class="card"><h3>Active Agents</h3><ul>${agents}</ul></div>
     <div class="card"><h3>Recent Decisions</h3><ul>${decisions}</ul></div>
   </div>
+  ${timelineDetails(out)}
 </section>`
   return redactRendered(fragment)
 }

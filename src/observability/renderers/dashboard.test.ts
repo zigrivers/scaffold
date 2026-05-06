@@ -127,3 +127,25 @@ describe('renderAuditFragment', () => {
     expect(html).toMatch(/no findings/i)
   })
 })
+
+describe('renderProgressFragment — needs_attention + replay', () => {
+  it('renders a needs-attention aside when needs_attention is non-empty', () => {
+    const out = JSON.parse(JSON.stringify(baseOut)) as EngineOutput
+    out.needs_attention = [{ signal: 'pr_stale', ref: { kind: 'pr', id: '42' },
+      age_hours: 67, threshold_hours: 48, summary: 'PR #42 opened 67h ago, not merged or closed' }]
+    const html = renderProgressFragment(out)
+    expect(html).toMatch(/needs-attention/)
+    expect(html).toContain('pr_stale')
+    expect(html).toContain('PR #42')
+  })
+  it('renders a timeline details element when replay is populated', () => {
+    const out = JSON.parse(JSON.stringify(baseOut)) as EngineOutput
+    out.replay = { window: { from: '2026-05-04T13:00:00Z', to: '2026-05-04T14:00:00Z' },
+      events: [{ sort_id: 'ledger:ulid-A', correlation_id: null, ts: '2026-05-04T13:55:00Z',
+        source: 'ledger', kind: 'task_claimed', actor_label: 'agent-alice', task_id: 'T-031', summary: 'T-031 claimed' }] }
+    const html = renderProgressFragment(out)
+    expect(html).toMatch(/timeline/)
+    expect(html).toContain('task_claimed')
+    expect(html).toContain('T-031 claimed')
+  })
+})
