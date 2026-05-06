@@ -56,13 +56,18 @@ export const lensCStandards: LensFn = async (graph) => {
   const config = loadObservabilityConfig(cwd)
   const overrides = config.lenses['C-standards']?.rule_overrides ?? {}
 
+  const fileContents = new Map<string, string>()
+  for (const f of graph.files) {
+    try { fileContents.set(f.path, readFileSync(join(cwd, f.path), 'utf8')) } catch { /* skip unreadable */ }
+  }
+
   const violationsByRule = new Map<string, RuleViolation[]>()
   for (const rule of graph.rules) {
     const matches = (file: string) => !rule.match || minimatch(file, rule.match)
     for (const f of graph.files) {
       if (!matches(f.path)) continue
-      let content: string
-      try { content = readFileSync(join(cwd, f.path), 'utf8') } catch { continue }
+      const content = fileContents.get(f.path)
+      if (content === undefined) continue
       const vs = findPatternViolations(rule, f.path, content)
       if (vs.length === 0) continue
       const list = violationsByRule.get(rule.id) ?? []

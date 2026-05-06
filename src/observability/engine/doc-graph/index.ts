@@ -75,17 +75,16 @@ export async function buildDocGraph(cwd: string): Promise<DocGraph> {
   const tokenUses: TokenUse[] = []
   const componentUses: ComponentUse[] = []
   for (const f of files) {
-    if (uiGlobs.length > 0 && uiGlobs.some((g) => minimatch(f.path, g))) {
-      let content: string
-      try { content = readFileSync(join(cwd, f.path), 'utf8') } catch { continue }
+    const isUi = uiGlobs.length > 0 && uiGlobs.some((g) => minimatch(f.path, g))
+    const isScript = /\.(ts|tsx|js|jsx|mts|cts)$/.test(f.path) && !f.path.endsWith('.d.ts')
+    if (!isUi && !isScript) continue
+    let content: string
+    try { content = readFileSync(join(cwd, f.path), 'utf8') } catch { continue }
+    if (isUi) {
       if (/\.(css|scss)$/.test(f.path)) tokenUses.push(...detectCssTokenUses(content, tokens, f.path))
       else if (/\.(tsx|jsx)$/.test(f.path)) tokenUses.push(...detectJsxTokenUses(content, tokens, f.path))
     }
-    if (/\.(ts|tsx|js|jsx|mts|cts)$/.test(f.path) && !f.path.endsWith('.d.ts')) {
-      let content: string
-      try { content = readFileSync(join(cwd, f.path), 'utf8') } catch { continue }
-      componentUses.push(...detectComponentUses(content, components, f.path))
-    }
+    if (isScript) componentUses.push(...detectComponentUses(content, components, f.path))
   }
 
   const { edges, unresolved_globs } = buildEdges({
