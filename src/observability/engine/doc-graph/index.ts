@@ -32,9 +32,15 @@ function discoverFiles(cwd: string): FileNode[] {
 }
 
 function inferAcToTestOverrides(acs: { id: string }[], tests: Test[]): Record<string, string[]> {
+  const tailCounts = new Map<string, number>()
+  for (const ac of acs) {
+    const tail = ac.id.split('.').pop() ?? ''
+    tailCounts.set(tail, (tailCounts.get(tail) ?? 0) + 1)
+  }
   const out: Record<string, string[]> = {}
   for (const ac of acs) {
     const tail = ac.id.split('.').pop() ?? ''
+    if ((tailCounts.get(tail) ?? 0) > 1) continue
     const matchers = [new RegExp(`^AC\\s*${tail}\\b`, 'i'), new RegExp(`\\bac\\s*${tail}\\b`, 'i')]
     const matchedTests = tests.filter((t) => matchers.some((re) => re.test(t.name)))
     if (matchedTests.length > 0) out[ac.id] = matchedTests.map((t) => t.id)

@@ -37,26 +37,5 @@ export const lensATdd: LensFn = async (graph) => {
     })
   }
 
-  // (c) AC without ac_to_test edge
-  for (const ac of graph.acceptance_criteria) {
-    const hasTest = graph.edges.some((e) => e.kind === 'ac_to_test' && e.from === ac.id)
-    if (hasTest) continue
-    const story = graph.stories.find((s) => s.id === ac.story_id)
-    const severity = story?.priority === 'must' ? 'P1' : 'P2'
-    findings.push({
-      id: makeFindingId([lensId, 'no-test', ac.id]),
-      lens_id: lensId,
-      severity,
-      title: `AC without test coverage: ${ac.id}`,
-      description: `Acceptance criterion ${ac.id} has no linked test.`,
-      source_doc: ac.source_anchor,
-      evidence: { kind: 'ac_not_covered', story_id: ac.story_id, ac_id: ac.id, missing_tests: [] },
-      confidence: 'medium',
-      first_seen: now, last_seen: now,
-      status: 'open',
-      fix_hint: { kind: 'add_test', target: 'tests/', prompt: `Add a test exercising AC ${ac.id}.` },
-    })
-  }
-
   return findings
 }

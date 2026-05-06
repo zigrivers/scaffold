@@ -159,13 +159,13 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
       args: { profile: input.profile, scope: input.scope, sinceHours: input.sinceHours },
     })
     const exitCode = out.verdict === 'blocked' ? 1 : 0
-    const dateStr = new Date().toISOString().slice(0, 10)
-    const sidecarName = `${dateStr}-${input.profile}-${input.scope}.json`
+    const tsStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    const sidecarName = `${tsStr}-${input.profile}-${input.scope}.json`
     const auditsDir = join(input.cwd, 'docs/audits')
     try {
       await mkdir(auditsDir, { recursive: true })
       await writeFile(join(auditsDir, sidecarName), JSON.stringify({
-        report_id: `audit-${dateStr}-${input.profile}-${input.scope}`,
+        report_id: `audit-${tsStr}-${input.profile}-${input.scope}`,
         engine_output: out,
       }, null, 2))
     } catch { /* best-effort — don't fail the command if write fails */ }
@@ -206,14 +206,8 @@ async function loadAllFindingIds(auditsDir: string): Promise<string[] | null> {
   const jsonPaths = entries.filter((e) => e.endsWith('.json')).map((e) => join(auditsDir, e))
   if (jsonPaths.length === 0) return null
 
-  const withMtime = await Promise.all(
-    jsonPaths.map(async (f) => ({ f, mtime: await stat(f).then((s) => s.mtimeMs).catch(() => 0) })),
-  )
-  withMtime.sort((a, b) => b.mtime - a.mtime)
-  const recent = withMtime.slice(0, 20).map((x) => x.f)
-
   const allIds = new Set<string>()
-  await Promise.all(recent.map(async (f) => {
+  await Promise.all(jsonPaths.map(async (f) => {
     try {
       const raw = JSON.parse(await readFile(f, 'utf8')) as AuditSidecar
       for (const fi of raw?.engine_output?.findings ?? []) allIds.add(fi.id)
