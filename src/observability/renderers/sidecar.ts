@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { EngineOutput } from '../engine/types.js'
 import { redactEngineOutput } from '../engine/redact.js'
@@ -30,9 +30,9 @@ export async function writeSidecar(cwd: string, out: EngineOutput, overridePath?
   const reportId = deriveReportId(out)
   const relPath = overridePath ?? sidecarPath(reportId, out.invocation.command)
   const absPath = join(cwd, relPath)
-  mkdirSync(dirname(absPath), { recursive: true })
+  await mkdir(dirname(absPath), { recursive: true })
   const redacted = redactEngineOutput(out)
   const wrapper = { report_id: reportId, engine_output: redacted }
-  writeFileSync(absPath, JSON.stringify(wrapper, null, 2) + '\n', { mode: 0o644 })
+  await writeFile(absPath, JSON.stringify(wrapper, null, 2) + '\n', { mode: 0o644 })
   return absPath
 }

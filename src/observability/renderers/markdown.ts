@@ -1,6 +1,10 @@
 import type { EngineOutput, AvailabilityMap, AdapterStatus, Finding, Severity } from '../engine/types.js'
 import { redactRendered, sanitizePath } from '../engine/redact.js'
 
+function mdEscape(s: string): string {
+  return s.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\|/g, '\\|')
+}
+
 function fmtDate(iso: string): string {
   const d = new Date(iso); if (isNaN(d.valueOf())) return iso
   return d.toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC')
@@ -46,9 +50,11 @@ function activeAgentsSection(out: EngineOutput): string {
   const ag = out.snapshot?.active_agents ?? []
   if (ag.length === 0) return ''
   const rows = ag.map((a) => {
-    const task = a.current_task ? `${a.current_task.id ?? '(unplanned)'} — ${a.current_task.title}` : 'idle'
+    const taskStr = a.current_task
+      ? `${mdEscape(a.current_task.id ?? '(unplanned)')} — ${mdEscape(a.current_task.title)}`
+      : 'idle'
     const pr = a.open_pr ? ` (PR #${a.open_pr.number})` : ''
-    return `| ${a.actor_label} | ${a.branch} | ${task}${pr} |`
+    return `| ${mdEscape(a.actor_label)} | ${mdEscape(a.branch)} | ${taskStr}${pr} |`
   })
   return ['## Active Agents', '', '| Actor | Branch | Current Task |', '|---|---|---|', ...rows].join('\n')
 }
@@ -58,7 +64,8 @@ function completedSection(out: EngineOutput): string {
   if (cs.length === 0) return ''
   const rows = cs.map((c) => {
     const pr = c.pr_number ? `PR #${c.pr_number}` : '—'
-    return `| ${c.task_id ?? '(unplanned)'} | ${c.task_title} | ${c.outcome} | ${pr} | ${c.by} |`
+    const tid = mdEscape(c.task_id ?? '(unplanned)')
+    return `| ${tid} | ${mdEscape(c.task_title)} | ${mdEscape(c.outcome)} | ${pr} | ${mdEscape(c.by)} |`
   })
   return [
     '## Completed in Window', '', '| Task | Title | Outcome | PR | By |', '|---|---|---|---|---|', ...rows,
@@ -68,7 +75,10 @@ function completedSection(out: EngineOutput): string {
 function inFlightSection(out: EngineOutput): string {
   const ts = out.snapshot?.in_flight ?? []
   if (ts.length === 0) return ''
-  const rows = ts.map((t) => `| ${t.task_id} | ${t.task_title} | ${t.by} | ${t.age_hours}h | ${t.branch} |`)
+  const rows = ts.map((t) =>
+    `| ${mdEscape(t.task_id ?? '(unplanned)')} | ${mdEscape(t.task_title)}` +
+    ` | ${mdEscape(t.by)} | ${t.age_hours}h | ${mdEscape(t.branch)} |`,
+  )
   return ['## In Flight', '', '| Task | Title | By | Age | Branch |', '|---|---|---|---|---|', ...rows].join('\n')
 }
 
@@ -76,8 +86,8 @@ function decisionsSection(out: EngineOutput): string {
   const ds = out.snapshot?.recent_decisions ?? []
   if (ds.length === 0) return ''
   const rows = ds.slice(0, 10).map((d) => {
-    const affects = d.affects.length > 0 ? d.affects.join(', ') : '—'
-    return `| \`${d.key}\` | ${d.summary} | ${fmtDate(d.recorded_at)} | ${affects} |`
+    const affects = d.affects.length > 0 ? mdEscape(d.affects.join(', ')) : '—'
+    return `| \`${mdEscape(d.key)}\` | ${mdEscape(d.summary)} | ${fmtDate(d.recorded_at)} | ${affects} |`
   })
   return ['## Recent Decisions', '', '| Key | Summary | Recorded | Affects |', '|---|---|---|---|', ...rows].join('\n')
 }
@@ -128,11 +138,11 @@ function summaryTable(out: EngineOutput): string {
 function findingSection(f: Finding): string {
   const idShort = f.id.slice(0, 8)
   const lines = [
-    `### [${f.severity}] ${f.lens_id} — ${f.title}`,
+    `### [${f.severity}] ${mdEscape(f.lens_id)} — ${mdEscape(f.title)}`,
     '',
-    `\`${idShort}\` · *source:* \`${f.source_doc || '—'}\` · *confidence:* ${f.confidence}`,
+    `\`${idShort}\` · *source:* \`${mdEscape(f.source_doc || '—')}\` · *confidence:* ${f.confidence}`,
     '',
-    f.description,
+    mdEscape(f.description),
     '',
     '**Evidence:**',
     '',
@@ -163,7 +173,8 @@ function acknowledgedSection(out: EngineOutput): string {
   const acks = out.findings.filter((f) => f.status === 'acknowledged')
   if (acks.length === 0) return ''
   const rows = acks.map((f) =>
-    `| \`${f.id.slice(0, 8)}\` | ${f.severity} | ${f.lens_id} | ${f.title} | ${f.ack_note ?? ''} |`,
+    `| \`${f.id.slice(0, 8)}\` | ${f.severity} | ${mdEscape(f.lens_id)}` +
+    ` | ${mdEscape(f.title)} | ${mdEscape(f.ack_note ?? '')} |`,
   )
   return [
     '## Acknowledged', '', '| ID | Severity | Lens | Title | Note |', '|---|---|---|---|---|', ...rows,
@@ -173,7 +184,9 @@ function acknowledgedSection(out: EngineOutput): string {
 function skippedSection(out: EngineOutput): string {
   const skipped = out.findings.filter((f) => f.status === 'skipped')
   if (skipped.length === 0) return ''
-  const rows = skipped.map((f) => `| ${f.lens_id} | ${(f.evidence as { reason?: string }).reason ?? '—'} |`)
+  const rows = skipped.map((f) =>
+    `| ${mdEscape(f.lens_id)} | ${mdEscape((f.evidence as { reason?: string }).reason ?? '—')} |`,
+  )
   return ['## Skipped Lenses', '', '| Lens | Reason |', '|---|---|', ...rows].join('\n')
 }
 
