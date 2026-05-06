@@ -1,5 +1,5 @@
 import type { EngineOutput, AvailabilityMap, AdapterStatus, Finding, Severity } from '../engine/types.js'
-import { scrubSecrets, sanitizePath } from '../engine/redact.js'
+import { redactRendered, sanitizePath } from '../engine/redact.js'
 
 function fmtDate(iso: string): string {
   const d = new Date(iso); if (isNaN(d.valueOf())) return iso
@@ -99,7 +99,7 @@ export function renderProgressMarkdown(out: EngineOutput): string {
     '',
     ledgerSummary(out.availability),
   ].filter(Boolean)
-  return scrubSecrets(sections.join('\n\n')) + '\n'
+  return redactRendered(sections.join('\n\n')) + '\n'
 }
 
 const SEVERITIES: Severity[] = ['P0', 'P1', 'P2', 'P3']
@@ -193,5 +193,5 @@ export function renderAuditMarkdown(out: EngineOutput): string {
     skippedSection(out),
     availabilityTable(out.availability),
   ].filter(Boolean)
-  return scrubSecrets(sections.join('\n\n')) + '\n'
+  return redactRendered(sections.join('\n\n')) + '\n'
 }

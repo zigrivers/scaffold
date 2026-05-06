@@ -10,19 +10,20 @@ import { renderProgressMarkdown, renderAuditMarkdown } from '../../observability
 import { writeSidecar, deriveReportId, sidecarPath } from '../../observability/renderers/sidecar.js'
 import { renderProgressFragment, renderAuditFragment } from '../../observability/renderers/dashboard.js'
 import { readIdentityAsync } from '../../observability/engine/identity.js'
-import { stat, readdir, readFile } from 'node:fs/promises'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { stat, readdir, readFile, mkdir, writeFile } from 'node:fs/promises'
 import { execSync } from 'node:child_process'
 import { dirname, isAbsolute, join } from 'node:path'
 import { findProjectRoot } from '../middleware/project-root.js'
 
-function writeMarkdownReport(cwd: string, out: EngineOutput, body: string, overridePath?: string): string {
+async function writeMarkdownReport(
+  cwd: string, out: EngineOutput, body: string, overridePath?: string,
+): Promise<string> {
   const relPath = sidecarPath(deriveReportId(out), out.invocation.command).replace(/\.json$/, '.md')
   const absPath = overridePath
     ? (isAbsolute(overridePath) ? overridePath : join(cwd, overridePath))
     : join(cwd, relPath)
-  mkdirSync(dirname(absPath), { recursive: true })
-  writeFileSync(absPath, body, { mode: 0o644 })
+  await mkdir(dirname(absPath), { recursive: true })
+  await writeFile(absPath, body, { mode: 0o644 })
   return absPath
 }
 
@@ -111,7 +112,7 @@ export async function handleProgress(input: HandleProgressInput): Promise<number
       process.stdout.write((input.maskPaths ? redactRendered(blob) : blob) + '\n')
     } else {
       const md = renderProgressMarkdown(out)
-      const mdFinal = writeMarkdownReport(input.cwd, out, md, input.output)
+      const mdFinal = await writeMarkdownReport(input.cwd, out, md, input.output)
       const rendered = renderProgressTerminal(out)
       process.stdout.write((input.maskPaths ? redactRendered(rendered) : rendered) + '\n')
       process.stdout.write(`\n(written: ${mdFinal} + ${sidecarFinal})\n`)
@@ -194,7 +195,7 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
       process.stdout.write((input.maskPaths ? redactRendered(blob) : blob) + '\n')
     } else {
       const md = renderAuditMarkdown(out)
-      const mdFinal = writeMarkdownReport(input.cwd, out, md, input.output)
+      const mdFinal = await writeMarkdownReport(input.cwd, out, md, input.output)
       const rendered = renderAuditTerminal(out, { showAcknowledged: input.showAcknowledged })
       process.stdout.write((input.maskPaths ? redactRendered(rendered) : rendered) + '\n')
       process.stdout.write(`\n(written: ${mdFinal} + ${sidecarFinal})\n`)

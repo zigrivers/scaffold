@@ -20,12 +20,18 @@ interface SidecarShape {
   }
 }
 
+const MAX_SIDECAR_SCAN = 100
+
 async function listJsonFiles(cwd: string): Promise<string[]> {
   const d = join(cwd, DIR)
   const exists = await access(d).then(() => true).catch(() => false)
   if (!exists) return []
   const entries = await readdir(d)
-  return entries.filter((f) => f.endsWith('.json')).map((f) => join(d, f))
+  return entries
+    .filter((f) => f.endsWith('.json'))
+    .sort((a, b) => b.localeCompare(a))
+    .slice(0, MAX_SIDECAR_SCAN)
+    .map((f) => join(d, f))
 }
 
 async function safeRead(path: string): Promise<SidecarShape | null> {
