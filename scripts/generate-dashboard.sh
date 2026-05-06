@@ -837,10 +837,28 @@ function copyCmd(el) {
     }
 }
 </script>
+HTMLTAIL
+
+# ─── Build-observability panels (Plan 4) ───────────────────────────────
+observe_progress_html=""
+observe_audit_html=""
+if command -v scaffold >/dev/null 2>&1; then
+    observe_progress_html="$(scaffold observe progress --render=dashboard-fragment 2>/dev/null || true)"
+    observe_audit_html="$(scaffold observe audit --render=dashboard-fragment-audit 2>/dev/null || true)"
+fi
+
+cat >> "$OUTPUT_FILE" <<OBSERVEPANELS
+<!-- observe:progress -->
+${observe_progress_html}
+<!-- /observe:progress -->
+
+<!-- observe:audit -->
+${observe_audit_html}
+<!-- /observe:audit -->
 </div>
 </body>
 </html>
-HTMLTAIL
+OBSERVEPANELS
 
 echo "Dashboard written to: $OUTPUT_FILE"
 
