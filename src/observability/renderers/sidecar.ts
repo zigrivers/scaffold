@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join } from 'node:path'
 import type { EngineOutput } from '../engine/types.js'
 import { redactEngineOutput } from '../engine/redact.js'
 
@@ -36,8 +36,10 @@ export function sidecarPath(reportId: string, command: 'progress' | 'audit'): st
 
 export async function writeSidecar(cwd: string, out: EngineOutput, overridePath?: string): Promise<string> {
   const reportId = deriveReportId(out)
-  const relPath = overridePath ?? sidecarPath(reportId, out.invocation.command)
-  const absPath = join(cwd, relPath)
+  const defaultPath = sidecarPath(reportId, out.invocation.command)
+  const absPath = overridePath
+    ? (isAbsolute(overridePath) ? overridePath : join(cwd, overridePath))
+    : join(cwd, defaultPath)
   await mkdir(dirname(absPath), { recursive: true })
   const redacted = redactEngineOutput(out)
   const wrapper = { report_id: reportId, engine_output: redacted }

@@ -63,9 +63,15 @@ export const auditHistoryAdapter: BaseAdapter & {
   },
 
   async listSidecars(cwd: string): Promise<string[]> {
-    const files = await listJsonFiles(cwd)
-    const withMtime = await Promise.all(files.map(async (f) => ({ f, mtime: (await stat(f)).mtimeMs })))
-    return withMtime.sort((a, b) => b.mtime - a.mtime).map(({ f }) => f)
+    // Collect ALL json files then sort by mtime and cap — applying MAX_SIDECAR_SCAN
+    // before the mtime sort would exclude recently-modified older-named files.
+    const d = join(cwd, DIR)
+    const exists = await access(d).then(() => true).catch(() => false)
+    if (!exists) return []
+    const entries = await readdir(d)
+    const paths = entries.filter((f) => f.endsWith('.json')).map((f) => join(d, f))
+    const withMtime = await Promise.all(paths.map(async (f) => ({ f, mtime: (await stat(f)).mtimeMs })))
+    return withMtime.sort((a, b) => b.mtime - a.mtime).slice(0, MAX_SIDECAR_SCAN).map(({ f }) => f)
   },
 
   async readTrends(cwd: string): Promise<AuditTrendPoint[]> {
