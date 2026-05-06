@@ -19,12 +19,11 @@ function findPatternViolations(rule: Rule, file: string, content: string): RuleV
   const out: RuleViolation[] = []
   if (rule.pattern) {
     let re: RegExp
-    try { re = new RegExp(rule.pattern, 'g') } catch { return out }
+    try { re = new RegExp(rule.pattern) } catch { return out }
     const lines = content.split('\n')
     for (let i = 0; i < lines.length; i++) {
       if (re.test(lines[i])) {
         out.push({ rule, file, lineStart: i + 1, lineEnd: i + 1 })
-        re.lastIndex = 0
       }
     }
   }

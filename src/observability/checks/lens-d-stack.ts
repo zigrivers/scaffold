@@ -50,13 +50,17 @@ export const lensDStack: LensFn = async (graph, ledger) => {
   const config = loadObservabilityConfig(graph.cwd)
   const pathToLayer = config.lenses['D-stack']?.path_to_layer ?? DEFAULT_PATH_TO_LAYER
 
-  // (a) unsanctioned dependency without a recorded decision
+  // (a) unsanctioned dependency without a recorded decision (one finding per file+specifier)
+  const seenUnsanctioned = new Set<string>()
   for (const edge of graph.edges) {
     if (edge.kind !== 'file_to_component_use') continue
     const to = (edge as { kind: string; from: string; to: string }).to
     if (!to.startsWith('unsanctioned')) continue
     const from = (edge as { kind: string; from: string; to: string }).from
     const specifier = to.includes(':') ? to.split(':').slice(1).join(':') : ''
+    const dedupKey = `${from}::${specifier}`
+    if (seenUnsanctioned.has(dedupKey)) continue
+    seenUnsanctioned.add(dedupKey)
     const filePath = from.replace(/^file:/, '')
     if (decisionsCoverPath(ledger.events, filePath, specifier)) continue
     findings.push({
