@@ -1,5 +1,6 @@
-import { existsSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
+import { minimatch } from 'minimatch'
 import type { DocGraph, FileNode, AdapterId, Test } from '../types.js'
 import { pipelineDocsAdapter } from '../../adapters/pipeline-docs.js'
 import { parseFeatures } from './feature-parser.js'
@@ -12,6 +13,11 @@ import { parseDesignTokens } from './token-parser.js'
 import { parseDecisions } from './decision-parser.js'
 import { discoverTests } from './test-discovery.js'
 import { buildEdges } from './edge-builder.js'
+import { detectCssTokenUses, detectJsxTokenUses } from './token-use-detector.js'
+import type { TokenUse } from './token-use-detector.js'
+import { detectComponentUses } from './component-use-detector.js'
+import type { ComponentUse } from './component-use-detector.js'
+import { loadObservabilityConfig } from '../checks/observability-config.js'
 
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.scaffold', '.beads', '.mmr', 'coverage'])
 
@@ -64,9 +70,28 @@ export async function buildDocGraph(cwd: string): Promise<DocGraph> {
   const files = discoverFiles(cwd)
   const acToTestOverrides = inferAcToTestOverrides(acs, tests)
 
+  const config = loadObservabilityConfig(cwd)
+  const uiGlobs = (config.lenses['E-design']?.ui_glob ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+  const tokenUses: TokenUse[] = []
+  const componentUses: ComponentUse[] = []
+  for (const f of files) {
+    if (uiGlobs.length > 0 && uiGlobs.some((g) => minimatch(f.path, g))) {
+      let content: string
+      try { content = readFileSync(join(cwd, f.path), 'utf8') } catch { continue }
+      if (/\.(css|scss)$/.test(f.path)) tokenUses.push(...detectCssTokenUses(content, tokens, f.path))
+      else if (/\.(tsx|jsx)$/.test(f.path)) tokenUses.push(...detectJsxTokenUses(content, tokens, f.path))
+    }
+    if (/\.(ts|tsx|js|jsx|mts|cts)$/.test(f.path) && !f.path.endsWith('.d.ts')) {
+      let content: string
+      try { content = readFileSync(join(cwd, f.path), 'utf8') } catch { continue }
+      componentUses.push(...detectComponentUses(content, components, f.path))
+    }
+  }
+
   const { edges, unresolved_globs } = buildEdges({
     features, stories, acs, plan_tasks: planTasks, playbook_tasks: playbookTasks,
     tests, files, decisions, ac_to_test_overrides: acToTestOverrides,
+    token_uses: tokenUses, component_uses: componentUses,
   })
 
   const provenance: Record<string, AdapterId> = {}
