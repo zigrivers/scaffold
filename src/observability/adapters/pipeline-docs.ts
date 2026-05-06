@@ -1,4 +1,4 @@
-import { existsSync, statSync, readFileSync } from 'node:fs'
+import { access, stat, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AdapterStatus, BaseAdapter } from './types.js'
 
@@ -26,12 +26,14 @@ const CANONICAL_REQUIRED: ArtifactKey[] = [
   'prd', 'user_stories', 'implementation_plan', 'tech_stack', 'coding_standards',
 ]
 
-function firstExistingCandidate(cwd: string, candidates: string[]): string | null {
+async function firstExistingCandidate(cwd: string, candidates: string[]): Promise<string | null> {
   for (const rel of candidates) {
     const abs = join(cwd, rel)
-    if (existsSync(abs)) {
-      try { if (statSync(abs).size > 0) return rel } catch { return rel }
-    }
+    try {
+      await access(abs)
+      const s = await stat(abs)
+      if (s.size > 0) return rel
+    } catch { /* not found or empty */ }
   }
   return null
 }
@@ -42,10 +44,14 @@ export const pipelineDocsAdapter: BaseAdapter & {
   id: 'pipeline_docs',
 
   async probe(cwd: string): Promise<AdapterStatus> {
+    const entries = Object.entries(PIPELINE_ARTIFACTS) as Array<[ArtifactKey, string[]]>
+    const results = await Promise.all(entries.map(async ([k, candidates]) => ({
+      k,
+      found: await firstExistingCandidate(cwd, candidates),
+    })))
     const present: string[] = []
     let canonicalCount = 0
-    for (const [k, candidates] of Object.entries(PIPELINE_ARTIFACTS) as Array<[ArtifactKey, string[]]>) {
-      const found = firstExistingCandidate(cwd, candidates)
+    for (const { k, found } of results) {
       if (found) {
         present.push(found)
         if (CANONICAL_REQUIRED.includes(k)) canonicalCount++
@@ -61,11 +67,12 @@ export const pipelineDocsAdapter: BaseAdapter & {
   },
 
   async readArtifacts(cwd: string): Promise<ArtifactBundle> {
-    const out = {} as ArtifactBundle
-    for (const [k, candidates] of Object.entries(PIPELINE_ARTIFACTS) as Array<[ArtifactKey, string[]]>) {
-      const found = firstExistingCandidate(cwd, candidates)
-      out[k] = found ? readFileSync(join(cwd, found), 'utf8') : null
-    }
-    return out
+    const entries = Object.entries(PIPELINE_ARTIFACTS) as Array<[ArtifactKey, string[]]>
+    const results = await Promise.all(entries.map(async ([k, candidates]) => {
+      const found = await firstExistingCandidate(cwd, candidates)
+      const content = found ? await readFile(join(cwd, found), 'utf8').catch(() => null) : null
+      return [k, content] as [ArtifactKey, string | null]
+    }))
+    return Object.fromEntries(results) as ArtifactBundle
   },
 }

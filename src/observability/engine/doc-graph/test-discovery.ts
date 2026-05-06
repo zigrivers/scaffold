@@ -112,7 +112,7 @@ export async function discoverTests(cwd: string): Promise<Test[]> {
         name,
         file_path: rel,
         framework: rule.framework,
-        ...(is_skipped ? { last_status: 'skip' as const } : {}),
+        last_status: (is_skipped ? 'skip' : 'unknown') as 'skip' | 'unknown',
       })
     }
   }
