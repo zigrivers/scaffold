@@ -20,6 +20,8 @@ interface SidecarShape {
   }
 }
 
+// Caps sidecar scanning to prevent unbounded reads on mature repos; 100 audits
+// covers months of daily runs while keeping probe/trend latency under ~200ms.
 const MAX_SIDECAR_SCAN = 100
 
 async function listJsonFiles(cwd: string): Promise<string[]> {

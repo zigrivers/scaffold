@@ -1,3 +1,5 @@
+import type { EngineOutput } from './types.js'
+
 // Shared keyword group: both the string-scrubber (KV_PART) and object-key sensor use this.
 // Lookahead ensures keyword ends a segment: 'tokenization_method' does not match ('token'
 // followed by 'i'), but camelCase keys like 'myToken' and 'updateToken' do match.
@@ -112,8 +114,6 @@ export function redactEvent<T>(event: T): T {
 export function redactRendered(blob: string): string {
   return sanitizePath(scrubSecrets(blob))
 }
-
-import type { EngineOutput } from './types.js'
 
 /** Render-time redaction of a structured EngineOutput. Recurses through every string field. */
 export function redactEngineOutput(out: EngineOutput): EngineOutput {

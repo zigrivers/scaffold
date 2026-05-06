@@ -9,10 +9,27 @@ function makeFindingId(parts: string[]): string {
   return createHash('sha256').update(parts.join('::')).digest('hex').slice(0, 16)
 }
 
-const COLOR_PROPS = new Set(['color', 'background', 'background-color', 'border-color', 'fill', 'stroke'])
-const SPACING_PROPS = new Set(['margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
-  'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'gap', 'top', 'right', 'bottom', 'left'])
-const TYPOGRAPHY_PROPS = new Set(['font-size', 'font-family', 'font-weight', 'line-height'])
+const COLOR_PROPS = new Set([
+  'color', 'background', 'background-color', 'border-color', 'border-top-color',
+  'border-right-color', 'border-bottom-color', 'border-left-color',
+  'outline-color', 'text-decoration-color', 'fill', 'stroke', 'caret-color',
+  'column-rule-color', 'box-shadow', 'text-shadow',
+])
+const SPACING_PROPS = new Set([
+  'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+  'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+  'gap', 'row-gap', 'column-gap', 'top', 'right', 'bottom', 'left',
+  'width', 'min-width', 'max-width', 'height', 'min-height', 'max-height',
+  'border-width', 'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
+  'border-radius', 'border-top-left-radius', 'border-top-right-radius',
+  'border-bottom-left-radius', 'border-bottom-right-radius',
+  'outline-width', 'outline-offset', 'inset', 'flex-basis',
+])
+const TYPOGRAPHY_PROPS = new Set([
+  'font-size', 'font-family', 'font-weight', 'font-style', 'font-variant',
+  'line-height', 'letter-spacing', 'word-spacing', 'text-indent',
+  'text-decoration', 'text-transform', 'vertical-align',
+])
 
 function categoryOfProp(prop: string | undefined): 'color' | 'spacing' | 'typography' | null {
   if (!prop) return null
