@@ -254,7 +254,26 @@ See `docs/project-structure.md` for the full authoritative guide.
 
 **File placement**: Scripts → `scripts/<name>.sh` | Tests → `tests/<name>.bats` | Docs → `docs/<topic>.md` | Source → `src/` | Content → `content/<category>/`
 
-**Build observability** lives under `src/observability/`. Build-command meta-prompts (`single-agent-start`, `multi-agent-start`, the resume variants, `review-pr`, `review-code`) are expected to call `scaffold observe event …` at named workflow points (claim/complete/decision/blocker/PR-open). Plan 1 ships the foundation (ledger, adapters, snapshot); Plans 2+ add the audit, doc-graph, lenses, additional renderers, and operational hooks. See `docs/superpowers/specs/2026-04-30-build-observability-design.md`.
+**Build observability** lives under `src/observability/`. Build-command meta-prompts call `scaffold observe event …` at named workflow points (claim/complete/decision/blocker/PR-open). The audit covers all eight lenses: A-tdd, B-ac-coverage, C-standards, D-stack, E-design, F-scope, G-decisions (with cross-lens correlation to D), H-cross-doc. Per-project lens config lives in `.scaffold/observability.yaml` (E's ad-hoc threshold + ui_glob, C's rule overrides, F's wave budget, disabled_lenses, stall thresholds). `scaffold observe audit --scope=code` runs A–G; `--scope=docs` runs only H; `--scope=all` runs everything; `--lens <id>` overrides scope. Markdown + dashboard renderers and replay/stall come in Plans 4 + 5; phase-boundary triggers, MMR doc-conformance channel, and the `--fix` flow come in Plans 6 + 7 + 8. See `docs/superpowers/specs/2026-04-30-build-observability-design.md` for the full design.
+
+Example `.scaffold/observability.yaml`:
+
+```yaml
+lenses:
+  C-standards:
+    enforce_via_linter: true
+    rule_overrides:
+      no-console: P1
+  E-design:
+    ad_hoc_token_threshold: 5
+    ui_glob: "src/components/**/*.{tsx,vue}"
+  F-scope:
+    untouched_story_grace_hours: 168
+disabled_lenses: []
+phase_audit:
+  enabled: true
+  timeout_s: 60
+```
 
 ## Dev Environment
 

@@ -382,6 +382,7 @@ export interface Edge {
 }
 
 export interface DocGraph {
+  cwd: string
   features: Feature[]
   stories: Story[]
   acceptance_criteria: AcceptanceCriterion[]

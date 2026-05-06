@@ -79,3 +79,42 @@ describe('buildEdges', () => {
     expect(result.edges.find((e) => e.kind === 'decision_to_file' && e.from === 'decision:obsolete')).toBeUndefined()
   })
 })
+
+import type { TokenUse } from './token-use-detector.js'
+import type { ComponentUse } from './component-use-detector.js'
+
+describe('buildEdges (with token + component uses)', () => {
+  const minimalInput = {
+    features: [], stories: [], acs: [], plan_tasks: [], playbook_tasks: [],
+    tests: [], decisions: [],
+    files: [
+      { id: 'file:src/styles/btn.css',      path: 'src/styles/btn.css' },
+      { id: 'file:src/components/Btn.tsx',  path: 'src/components/Btn.tsx' },
+      { id: 'file:src/lib/auth.ts',         path: 'src/lib/auth.ts' },
+    ],
+  }
+
+  it('emits file_to_token_use edges for each detected use', () => {
+    const tokenUses: TokenUse[] = [
+      { file: 'src/styles/btn.css', property: 'color',      value: '#4f46e5', token_id: 'token:--color-primary' },
+      { file: 'src/styles/btn.css', property: 'background', value: '#abcdef', token_id: 'ad_hoc' },
+    ]
+    const result = buildEdges({ ...minimalInput, token_uses: tokenUses })
+    const edges = result.edges.filter((e) => e.kind === 'file_to_token_use')
+    expect(edges).toHaveLength(2)
+    expect(edges[0]).toEqual({ kind: 'file_to_token_use', from: 'file:src/styles/btn.css', to: 'token:--color-primary' })
+    expect(edges[1]).toEqual({ kind: 'file_to_token_use', from: 'file:src/styles/btn.css', to: 'ad_hoc' })
+  })
+
+  it('emits file_to_component_use edges for each detected import', () => {
+    const componentUses: ComponentUse[] = [
+      { file: 'src/lib/auth.ts', specifier: 'react',  component_id: 'component:react' },
+      { file: 'src/lib/auth.ts', specifier: 'lodash', component_id: 'unsanctioned' },
+    ]
+    const result = buildEdges({ ...minimalInput, component_uses: componentUses })
+    const edges = result.edges.filter((e) => e.kind === 'file_to_component_use')
+    expect(edges).toHaveLength(2)
+    expect(edges[0]).toEqual({ kind: 'file_to_component_use', from: 'file:src/lib/auth.ts', to: 'component:react' })
+    expect(edges[1]).toEqual({ kind: 'file_to_component_use', from: 'file:src/lib/auth.ts', to: 'unsanctioned:lodash' })
+  })
+})

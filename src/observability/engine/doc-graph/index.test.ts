@@ -46,4 +46,53 @@ describe('buildDocGraph', () => {
     expect(graph.stories).toEqual([])
     expect(graph.edges).toEqual([])
   })
+
+  it('emits file_to_token_use and file_to_component_use edges when detectors match', async () => {
+    mkdirSync(join(dir, 'docs'), { recursive: true })
+    mkdirSync(join(dir, 'src/styles'), { recursive: true })
+    mkdirSync(join(dir, 'src/lib'), { recursive: true })
+    mkdirSync(join(dir, '.scaffold'), { recursive: true })
+
+    writeFileSync(join(dir, 'package.json'), '{}')
+    writeFileSync(join(dir, 'docs/design-system.md'), [
+      '# Design System',
+      '',
+      '## Color',
+      '',
+      '| Token | Value | Priority |',
+      '|-------|-------|----------|',
+      '| --color-primary | #4f46e5 | must |',
+      '',
+    ].join('\n'))
+    writeFileSync(join(dir, 'docs/tech-stack.md'), [
+      '# Tech Stack',
+      '',
+      '## Frontend',
+      '',
+      '### React',
+      '',
+      'package_or_url: react@18',
+      'layer: frontend',
+      '',
+    ].join('\n'))
+    writeFileSync(join(dir, 'src/styles/btn.css'),
+      '.btn { color: #4f46e5; background: #abcdef; }\n')
+    writeFileSync(join(dir, 'src/lib/auth.ts'),
+      'import React from \'react\'\nimport { something } from \'unknown-pkg\'\n')
+    writeFileSync(join(dir, '.scaffold/observability.yaml'), [
+      'lenses:',
+      '  E-design:',
+      '    ui_glob: "src/styles/**/*.css,src/styles/**/*.scss"',
+    ].join('\n'))
+
+    const graph = await buildDocGraph(dir)
+    const tokenEdge = graph.edges.find((e) => e.kind === 'file_to_token_use')
+    expect(tokenEdge).toBeDefined()
+    expect(tokenEdge?.from).toBe('file:src/styles/btn.css')
+
+    const componentEdges = graph.edges.filter((e) => e.kind === 'file_to_component_use')
+    expect(componentEdges.length).toBeGreaterThanOrEqual(2)
+    expect(componentEdges.find((e) => e.to === 'component:react')).toBeDefined()
+    expect(componentEdges.find((e) => (e as { to: string }).to.startsWith('unsanctioned'))).toBeDefined()
+  })
 })
