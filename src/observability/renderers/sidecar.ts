@@ -18,17 +18,22 @@ function safeLensId(raw: string): string {
   return raw.replace(/[^a-zA-Z0-9_-]/g, '_')
 }
 
+function shortId(): string {
+  return Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0')
+}
+
 export function deriveReportId(out: EngineOutput): string {
   const stamp = dateStamp(out.invocation.started_at)
-  if (out.invocation.command === 'progress') return `progress-${stamp}`
+  const suffix = shortId()
+  if (out.invocation.command === 'progress') return `progress-${stamp}-${suffix}`
   const args = out.invocation.args as { profile?: string; scope?: string; lensIds?: string[] }
   const profile = args.profile ?? 'fast'
   if (Array.isArray(args.lensIds) && args.lensIds.length > 0) {
     const sorted = [...args.lensIds].map(safeLensId).sort()
-    if (sorted.length === 1) return `audit-${stamp}-${profile}-lens-${sorted[0]}`
-    return `audit-${stamp}-${profile}-lenses-${sorted.join('+')}`
+    if (sorted.length === 1) return `audit-${stamp}-${profile}-lens-${sorted[0]}-${suffix}`
+    return `audit-${stamp}-${profile}-lenses-${sorted.join('+')}-${suffix}`
   }
-  return `audit-${stamp}-${profile}-${args.scope ?? 'all'}`
+  return `audit-${stamp}-${profile}-${args.scope ?? 'all'}-${suffix}`
 }
 
 export function sidecarPath(reportId: string, command: 'progress' | 'audit'): string {

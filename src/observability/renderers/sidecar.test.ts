@@ -37,7 +37,7 @@ describe('sidecar', () => {
   afterEach(() => { rmSync(dir, { recursive: true, force: true }) })
 
   it('deriveReportId formats audit ids by date + profile + scope', () => {
-    expect(deriveReportId(baseOut)).toMatch(/^audit-\d{4}-\d{2}-\d{2}-\d{9}-fast-all$/)
+    expect(deriveReportId(baseOut)).toMatch(/^audit-\d{4}-\d{2}-\d{2}-\d{9}-fast-all-[a-f0-9]{6}$/)
   })
 
   it('deriveReportId formats single-lens audits as audit-<date>-<profile>-lens-<id>', () => {
@@ -45,31 +45,32 @@ describe('sidecar', () => {
       ...baseOut,
       invocation: { ...baseOut.invocation, args: { profile: 'fast', scope: 'all', lensIds: ['B-ac-coverage'] } },
     }
-    expect(deriveReportId(out)).toMatch(/^audit-\d{4}-\d{2}-\d{2}-\d{9}-fast-lens-B-ac-coverage$/)
+    expect(deriveReportId(out)).toMatch(/^audit-\d{4}-\d{2}-\d{2}-\d{9}-fast-lens-B-ac-coverage-[a-f0-9]{6}$/)
   })
 
   it('deriveReportId formats multi-lens audits with sorted lens IDs joined by +', () => {
     const lensArgs = { profile: 'fast', scope: 'all', lensIds: ['B-ac-coverage', 'A-tdd'] }
     const out = { ...baseOut, invocation: { ...baseOut.invocation, args: lensArgs } }
-    expect(deriveReportId(out)).toMatch(/^audit-\d{4}-\d{2}-\d{2}-\d{9}-fast-lenses-A-tdd\+B-ac-coverage$/)
+    expect(deriveReportId(out)).toMatch(/^audit-\d{4}-\d{2}-\d{2}-\d{9}-fast-lenses-A-tdd\+B-ac-coverage-[a-f0-9]{6}$/)
   })
 
   it('deriveReportId formats progress reports as progress-<date>', () => {
     const out = { ...baseOut, invocation: { ...baseOut.invocation, command: 'progress' as const, args: {} } }
-    expect(deriveReportId(out)).toMatch(/^progress-\d{4}-\d{2}-\d{2}-\d{9}$/)
+    expect(deriveReportId(out)).toMatch(/^progress-\d{4}-\d{2}-\d{2}-\d{9}-[a-f0-9]{6}$/)
   })
 
   it('sidecarPath returns docs/audits/<id>.json for audit, docs/build-status/<id>.json for progress', () => {
     expect(sidecarPath(deriveReportId(baseOut), 'audit')).toMatch(/^docs\/audits\/audit-/)
     const pOut = { ...baseOut, invocation: { ...baseOut.invocation, command: 'progress' as const, args: {} } }
-    expect(sidecarPath(deriveReportId(pOut), 'progress')).toMatch(/^docs\/build-status\/progress-/)
+    const progressPattern = /^docs\/build-status\/progress-\d{4}-\d{2}-\d{2}-\d{9}-[a-f0-9]{6}\.json$/
+    expect(sidecarPath(deriveReportId(pOut), 'progress')).toMatch(progressPattern)
   })
 
   it('writeSidecar writes a redacted EngineOutput wrapped under engine_output', async () => {
     const path = await writeSidecar(dir, baseOut)
     expect(existsSync(path)).toBe(true)
     const obj = JSON.parse(readFileSync(path, 'utf8')) as { report_id: string; engine_output: EngineOutput }
-    expect(obj.report_id).toBe(deriveReportId(baseOut))
+    expect(obj.report_id).toMatch(/^audit-\d{4}-\d{2}-\d{2}-\d{9}-fast-all-[a-f0-9]{6}$/)
     expect(obj.engine_output.schema_version).toBe('1.0')
     expect(obj.engine_output.verdict).toBe('pass')
   })
