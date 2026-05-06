@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, statSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { AdapterStatus, BaseAdapter } from './types.js'
 
@@ -28,7 +28,10 @@ const CANONICAL_REQUIRED: ArtifactKey[] = [
 
 function firstExistingCandidate(cwd: string, candidates: string[]): string | null {
   for (const rel of candidates) {
-    if (existsSync(join(cwd, rel))) return rel
+    const abs = join(cwd, rel)
+    if (existsSync(abs)) {
+      try { if (statSync(abs).size > 0) return rel } catch { return rel }
+    }
   }
   return null
 }

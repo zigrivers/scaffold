@@ -7,7 +7,7 @@ import { redactRendered } from '../../observability/engine/redact.js'
 import { harvestWorktree } from '../../observability/engine/harvester.js'
 import { renderProgressTerminal, renderAuditTerminal } from '../../observability/renderers/terminal.js'
 import { readIdentityAsync } from '../../observability/engine/identity.js'
-import { stat, readdir, readFile } from 'node:fs/promises'
+import { stat, readdir, readFile, writeFile, mkdir } from 'node:fs/promises'
 import { execSync } from 'node:child_process'
 import { join } from 'node:path'
 import { findProjectRoot } from '../middleware/project-root.js'
@@ -159,6 +159,16 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
       args: { profile: input.profile, scope: input.scope, sinceHours: input.sinceHours },
     })
     const exitCode = out.verdict === 'blocked' ? 1 : 0
+    const dateStr = new Date().toISOString().slice(0, 10)
+    const sidecarName = `${dateStr}-${input.profile}-${input.scope}.json`
+    const auditsDir = join(input.cwd, 'docs/audits')
+    try {
+      await mkdir(auditsDir, { recursive: true })
+      await writeFile(join(auditsDir, sidecarName), JSON.stringify({
+        report_id: `audit-${dateStr}-${input.profile}-${input.scope}`,
+        engine_output: out,
+      }, null, 2))
+    } catch { /* best-effort — don't fail the command if write fails */ }
     if (input.json) {
       const blob = JSON.stringify(out, null, 2)
       process.stdout.write((input.maskPaths ? redactRendered(blob) : blob) + '\n')
@@ -193,11 +203,17 @@ async function loadAllFindingIds(auditsDir: string): Promise<string[] | null> {
   } catch {
     return null
   }
-  const jsonFiles = entries.filter((e) => e.endsWith('.json')).map((e) => join(auditsDir, e))
-  if (jsonFiles.length === 0) return null
+  const jsonPaths = entries.filter((e) => e.endsWith('.json')).map((e) => join(auditsDir, e))
+  if (jsonPaths.length === 0) return null
+
+  const withMtime = await Promise.all(
+    jsonPaths.map(async (f) => ({ f, mtime: await stat(f).then((s) => s.mtimeMs).catch(() => 0) })),
+  )
+  withMtime.sort((a, b) => b.mtime - a.mtime)
+  const recent = withMtime.slice(0, 20).map((x) => x.f)
 
   const allIds = new Set<string>()
-  await Promise.all(jsonFiles.map(async (f) => {
+  await Promise.all(recent.map(async (f) => {
     try {
       const raw = JSON.parse(await readFile(f, 'utf8')) as AuditSidecar
       for (const fi of raw?.engine_output?.findings ?? []) allIds.add(fi.id)

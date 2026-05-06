@@ -63,7 +63,7 @@ const RULES: DiscoveryRule[] = [
     framework: 'bats',
     fileMatcher: (f) => /\.bats$/.test(f),
     extractTests: (c) => Array.from(
-      c.matchAll(/^@test\s+['"](.+?)['"]\s*\{/gm), (m) => ({ name: m[1], is_skipped: false }),
+      c.matchAll(/^\s*@test\s+['"](.+?)['"]\s*\{/gm), (m) => ({ name: m[1], is_skipped: false }),
     ),
   },
 ]
