@@ -1256,3 +1256,57 @@ describe('StateManager.saveState — scope-correct eligibility + cache counters'
     expect(written.next_eligible_root_counter).toBeUndefined()  // root must never write this
   })
 })
+
+const INIT_OPTIONS_PLAN6 = {
+  enabledSteps: [
+    { slug: 'create-prd', produces: ['docs/plan.md'] },
+    { slug: 'user-stories', produces: ['docs/user-stories.md'] },
+    { slug: 'tech-stack', produces: ['docs/tech-stack.md'] },
+  ],
+  scaffoldVersion: '2.0.0',
+  methodology: 'deep',
+  initMode: 'greenfield' as const,
+}
+
+describe('StateManager — step timestamps (Plan 6)', () => {
+  it('markCompleted sets completed_at to an ISO timestamp', () => {
+    const tempDir = makeTempDir()
+    const manager = new StateManager(tempDir, computeEligible)
+    manager.initializeState(INIT_OPTIONS_PLAN6)
+    manager.setInProgress('user-stories', 'agent-1')
+
+    const before = new Date().toISOString()
+    manager.markCompleted('user-stories', ['docs/user-stories.md'], 'pipeline', 1)
+
+    const state = manager.loadState()
+    expect(state.steps['user-stories'].completed_at).toBeDefined()
+    expect(state.steps['user-stories'].completed_at! >= before).toBe(true)
+  })
+
+  it('markInProgress(step) sets status=in_progress + in_progress_started_at', () => {
+    const tempDir = makeTempDir()
+    const manager = new StateManager(tempDir, computeEligible)
+    manager.initializeState(INIT_OPTIONS_PLAN6)
+
+    manager.markInProgress('tech-stack')
+
+    const state = manager.loadState()
+    expect(state.steps['tech-stack'].status).toBe('in_progress')
+    expect(state.steps['tech-stack'].in_progress_started_at).toBeDefined()
+  })
+
+  it('markCompleted does not regress an already-completed step (completed_at stays stable)', async () => {
+    const tempDir = makeTempDir()
+    const manager = new StateManager(tempDir, computeEligible)
+    manager.initializeState(INIT_OPTIONS_PLAN6)
+    manager.setInProgress('user-stories', 'agent-1')
+    manager.markCompleted('user-stories', ['docs/user-stories.md'], 'pipeline', 1)
+    const firstTs = manager.loadState().steps['user-stories'].completed_at
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 10))
+
+    manager.setInProgress('tech-stack', 'agent-1')
+    manager.markCompleted('user-stories', ['docs/user-stories.md'], 'pipeline', 1)
+    expect(manager.loadState().steps['user-stories'].completed_at).toBe(firstTs)
+  })
+})

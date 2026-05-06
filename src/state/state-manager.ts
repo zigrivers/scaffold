@@ -174,8 +174,10 @@ export class StateManager {
         exitCode: 1,
       })
     }
+    const wasCompleted = state.steps[step].status === 'completed'
     state.steps[step].status = 'completed'
     state.steps[step].at = new Date().toISOString()
+    if (!wasCompleted) state.steps[step].completed_at = new Date().toISOString()
     state.steps[step].completed_by = completedBy
     state.steps[step].depth = depth
     if (outputs.length > 0) {
@@ -183,6 +185,21 @@ export class StateManager {
     }
     state.steps[step].produces = outputs
     state.in_progress = null
+    this.saveState(state)
+  }
+
+  /** Transition step to in_progress and record in_progress_started_at (idempotent). */
+  markInProgress(step: string): void {
+    const state = this.loadState()
+    if (!(step in state.steps)) {
+      throw Object.assign(new Error(`Cannot mark unknown step '${step}' as in_progress`), {
+        code: 'STEP_NOT_IN_STATE',
+        exitCode: 1,
+      })
+    }
+    if (state.steps[step].status === 'in_progress') return
+    state.steps[step].status = 'in_progress'
+    state.steps[step].in_progress_started_at = new Date().toISOString()
     this.saveState(state)
   }
 
