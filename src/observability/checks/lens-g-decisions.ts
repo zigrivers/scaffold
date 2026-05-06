@@ -2,6 +2,13 @@ import { createHash } from 'node:crypto'
 import { minimatch } from 'minimatch'
 import type { Finding, Event } from '../engine/types.js'
 import type { LensFn } from '../engine/checks/runner.js'
+import { gitAdapter } from '../adapters/git.js'
+
+const DECISION_KEYWORDS = ['decided', 'decision', 'adopt', 'migrate', 'deprecate', 'replace', 'switching to', 'switch to']
+
+function loadKeywords(_cwd: string): string[] {
+  return DECISION_KEYWORDS
+}
 
 const lensId = 'G-decisions'
 
@@ -83,6 +90,32 @@ export const lensGDecisions: LensFn = async (graph, ledger, _availability, upstr
         prompt: `Record a decision for the unsanctioned dependency in ${filePath}.`,
       },
     })
+  }
+
+  // (d) Decision-keyword commit scan
+  if (_availability.git.status === 'available') {
+    const cwd = process.cwd()
+    const keywords = loadKeywords(cwd)
+    const keywordRe = new RegExp(`\\b(${keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'i')
+    const eventKeys = new Set([...eventsByKey.keys(), ...graph.decisions.map((d) => d.key)])
+    let recentCommits
+    try { recentCommits = await gitAdapter.recentCommits(cwd, { sinceHours: 24 * 7 }) } catch { recentCommits = [] }
+    for (const c of recentCommits) {
+      if (!keywordRe.test(c.subject)) continue
+      const slug = c.subject.toLowerCase().replace(/[^\w\s-]+/g, ' ').trim().replace(/\s+/g, '-').slice(0, 64)
+      const covered = [...eventKeys].some((k) => slug.includes(k) || k.includes(slug.slice(0, 24)))
+      if (covered) continue
+      findings.push({
+        id: makeFindingId([lensId, 'decision-keyword-commit', c.sha]),
+        lens_id: lensId, severity: 'P2',
+        title: `decision-keyword commit without matching event/doc: ${c.sha.slice(0, 7)}`,
+        description: `Commit ${c.sha.slice(0, 7)} ("${c.subject.slice(0, 100)}") looks like a decision but has no matching ledger event or decisions-doc entry.`,
+        source_doc: 'decisions.jsonl',
+        evidence: { kind: 'doc_disagreement', left_doc: 'git log', right_doc: 'decisions.jsonl', conflict: c.subject.slice(0, 100) },
+        confidence: 'low', first_seen: now, last_seen: now, status: 'open',
+        fix_hint: { kind: 'record_decision', target: 'decisions.jsonl', prompt: `Record a decision for: "${c.subject.slice(0, 100)}".` },
+      })
+    }
   }
 
   return findings
