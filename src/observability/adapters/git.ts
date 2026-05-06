@@ -4,6 +4,7 @@ import type { AdapterStatus, BaseAdapter } from './types.js'
 import type { ReplayEvent } from '../engine/types.js'
 
 const execFile = promisify(execFileCb)
+const GIT_TIMEOUT_MS = 30_000
 
 export interface WorktreeInfo {
   path: string
@@ -20,7 +21,7 @@ export interface CommitInfo {
 }
 
 async function git(cwd: string, args: string[]): Promise<string> {
-  const { stdout } = await execFile('git', args, { cwd, maxBuffer: 32 * 1024 * 1024 })
+  const { stdout } = await execFile('git', args, { cwd, maxBuffer: 32 * 1024 * 1024, timeout: GIT_TIMEOUT_MS })
   return stdout
 }
 
