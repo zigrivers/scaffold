@@ -49,6 +49,7 @@
     "prepublishOnly": "bash scripts/prepublish.sh"
   },
   "dependencies": {
+    "@babel/traverse": "^7.29.0",
     "@inquirer/prompts": "^7.4.0",
     "js-yaml": "^4.1.0",
     "mdast-util-from-markdown": "^2.0.3",
@@ -67,6 +68,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
+    "@types/babel__traverse": "^7.28.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.13.0",
     "@types/uuid": "^10.0.0",
