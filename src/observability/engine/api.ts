@@ -1,16 +1,13 @@
-import { readFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { EngineOutput, Severity, Verdict, FindingsSummary } from './types.js'
 import { composeAvailability, readMergedLedger, composeSnapshot } from './synthesizer.js'
 import { buildDocGraph } from './doc-graph/index.js'
 import { runChecks } from './checks/runner.js'
-import { LENS_REGISTRY } from './checks/registry.js'
+import { LENS_REGISTRY, LENS_IMPLEMENTATIONS } from './checks/registry.js'
 import { aggregate } from './checks/findings-aggregator.js'
 import { resolveFixThreshold } from './checks/fix-threshold.js'
-import { lensATdd } from '../checks/lens-a-tdd.js'
-import { lensBAcCoverage } from '../checks/lens-b-ac-coverage.js'
-import { lensHCrossDoc } from '../checks/lens-h-cross-doc.js'
 
 export interface RunProgressInput {
   primaryRoot: string
@@ -34,18 +31,15 @@ const EMPTY_SUMMARY: FindingsSummary = {
   skipped_lenses: 0,
 }
 
-async function scaffoldVersion(): Promise<string> {
-  const candidates = [
-    join(dirname(fileURLToPath(import.meta.url)), '../../../package.json'),
-    join(process.cwd(), 'package.json'),
-  ]
-  for (const p of candidates) {
-    try {
-      const pkg = JSON.parse(await readFile(p, 'utf8')) as { version?: string }
-      if (pkg.version) return pkg.version
-    } catch { /* try next */ }
+function scaffoldVersion(): string {
+  try {
+    const pkg = JSON.parse(
+      readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../../package.json'), 'utf8'),
+    ) as { version?: string }
+    return pkg.version ?? '0.0.0'
+  } catch {
+    return '0.0.0'
   }
-  return '0.0.0'
 }
 
 export interface RunAuditInput {
@@ -76,12 +70,6 @@ function deriveVerdict(blocking: number, skippedLenses: number): Verdict {
   return 'pass'
 }
 
-const LENS_FUNCTIONS = {
-  'A-tdd':         lensATdd,
-  'B-ac-coverage': lensBAcCoverage,
-  'H-cross-doc':   lensHCrossDoc,
-}
-
 export async function runAudit(input: RunAuditInput): Promise<EngineOutput> {
   const started_at = new Date().toISOString()
   const merged = await readMergedLedger(input.primaryRoot)
@@ -94,7 +82,7 @@ export async function runAudit(input: RunAuditInput): Promise<EngineOutput> {
 
   const rawFindings = await runChecks({
     registry: LENS_REGISTRY,
-    lenses: LENS_FUNCTIONS,
+    lenses: LENS_IMPLEMENTATIONS,
     graph,
     ledger: { events: merged.events },
     availability,
@@ -111,7 +99,7 @@ export async function runAudit(input: RunAuditInput): Promise<EngineOutput> {
       args: input.args ?? {},
       started_at,
       completed_at: new Date().toISOString(),
-      scaffold_version: await scaffoldVersion(),
+      scaffold_version: scaffoldVersion(),
     },
     availability,
     snapshot: null,
@@ -161,7 +149,7 @@ export async function runProgress(input: RunProgressInput): Promise<EngineOutput
       args: input.args ?? {},
       started_at,
       completed_at: new Date().toISOString(),
-      scaffold_version: await scaffoldVersion(),
+      scaffold_version: scaffoldVersion(),
     },
     availability,
     snapshot,

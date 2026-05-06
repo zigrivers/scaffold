@@ -59,6 +59,13 @@ const RULES: DiscoveryRule[] = [
       c.matchAll(/^func\s+(Test[\w]+)\s*\(/gm), (m) => ({ name: m[1], is_skipped: false }),
     ),
   },
+  {
+    framework: 'bats',
+    fileMatcher: (f) => /\.bats$/.test(f),
+    extractTests: (c) => Array.from(
+      c.matchAll(/^@test\s+['"](.+?)['"]\s*\{/gm), (m) => ({ name: m[1], is_skipped: false }),
+    ),
+  },
 ]
 
 function chooseRule(cwd: string, file: string): DiscoveryRule | null {

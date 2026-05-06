@@ -1,4 +1,12 @@
-import type { AdapterId } from '../types.js'
+import type { AdapterId, DocGraph, Event, AvailabilityMap, Finding } from '../types.js'
+import { lensATdd } from '../../checks/lens-a-tdd.js'
+import { lensBAcCoverage } from '../../checks/lens-b-ac-coverage.js'
+import { lensHCrossDoc } from '../../checks/lens-h-cross-doc.js'
+
+export type LensFn = (
+  graph: DocGraph, ledger: { events: Event[] }, availability: AvailabilityMap,
+  upstream: Finding[], enabledIds: Set<string>,
+) => Promise<Finding[]>
 
 export interface LensManifest {
   id: string
@@ -20,4 +28,10 @@ export const LENS_REGISTRY: LensManifest[] = [
 
 export function getLensManifest(id: string): LensManifest | undefined {
   return LENS_REGISTRY.find((m) => m.id === id)
+}
+
+export const LENS_IMPLEMENTATIONS: Record<string, LensFn> = {
+  'A-tdd':         lensATdd,
+  'B-ac-coverage': lensBAcCoverage,
+  'H-cross-doc':   lensHCrossDoc,
 }

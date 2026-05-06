@@ -8,6 +8,7 @@ import { harvestWorktree } from '../../observability/engine/harvester.js'
 import { renderProgressTerminal, renderAuditTerminal } from '../../observability/renderers/terminal.js'
 import { readIdentityAsync } from '../../observability/engine/identity.js'
 import { stat, readdir, readFile } from 'node:fs/promises'
+import { execSync } from 'node:child_process'
 import { join } from 'node:path'
 import { findProjectRoot } from '../middleware/project-root.js'
 
@@ -195,15 +196,14 @@ async function loadAllFindingIds(auditsDir: string): Promise<string[] | null> {
   const jsonFiles = entries.filter((e) => e.endsWith('.json')).map((e) => join(auditsDir, e))
   if (jsonFiles.length === 0) return null
 
-  const withMtime = await Promise.all(
-    jsonFiles.map(async (f) => ({ f, mtime: (await stat(f)).mtimeMs })),
-  )
-  withMtime.sort((a, b) => b.mtime - a.mtime)
-  const newest = withMtime[0].f
-
-  const raw = JSON.parse(await readFile(newest, 'utf8')) as AuditSidecar
-  const findings = raw?.engine_output?.findings ?? []
-  return findings.map((fi) => fi.id)
+  const allIds = new Set<string>()
+  await Promise.all(jsonFiles.map(async (f) => {
+    try {
+      const raw = JSON.parse(await readFile(f, 'utf8')) as AuditSidecar
+      for (const fi of raw?.engine_output?.findings ?? []) allIds.add(fi.id)
+    } catch { /* skip malformed */ }
+  }))
+  return allIds.size > 0 ? [...allIds] : null
 }
 
 export async function handleAck(input: HandleAckInput): Promise<number> {
@@ -227,10 +227,14 @@ export async function handleAck(input: HandleAckInput): Promise<number> {
   }
 
   const findingId = matches[0]
+  let branch = 'main'
+  try {
+    branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: input.cwd, encoding: 'utf8' }).trim()
+  } catch { /* fallback */ }
   try {
     await writeEvent(input.cwd, {
       type: 'finding_acknowledged',
-      branch: 'main',
+      branch,
       task_id: null,
       payload: {
         finding_id: findingId,

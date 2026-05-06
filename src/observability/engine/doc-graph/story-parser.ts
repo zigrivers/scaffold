@@ -90,11 +90,16 @@ export function parseStories(md: string): ParsedStories {
     const tags = extractInlineTags(head.textContent)
     const priority = priorityFromTags(tags)
     const kind = (['ui', 'api', 'data', 'infra', 'doc'] as const).find((k) => k === tags.kind)
+    const rawFeature = tags.feature
+    const featureId = rawFeature
+      ? (rawFeature.startsWith('feature:') ? rawFeature : `feature:${rawFeature}`)
+      : undefined
     const story: Story = {
       id: `story:${parsed.storyKey}`,
       title: parsed.title,
       priority,
       kind,
+      feature_id: featureId,
       source_anchor: `docs/user-stories.md#story-${parsed.storyKey}`,
     }
     stories.push(story)

@@ -83,7 +83,7 @@ export function buildEdges(input: BuildEdgesInput): BuildEdgesResult {
         edges.push({ kind: 'decision_to_file', from: d.id, to: fileId })
       }
     }
-    if (d.superseded_by) edges.push({ kind: 'decision_supersedes', from: d.superseded_by, to: d.id })
+    if (d.superseded_by) edges.push({ kind: 'decision_supersedes', from: d.id, to: d.superseded_by })
   }
 
   return { edges, unresolved_globs: unresolvedGlobs }
