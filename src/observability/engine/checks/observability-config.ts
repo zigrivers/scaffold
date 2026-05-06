@@ -17,6 +17,10 @@ export interface GLensConfig {
   keywords_file?: string
 }
 
+export interface DLensConfig {
+  path_to_layer?: Array<{ glob: string; layer: string }>
+}
+
 export interface StallConfig {
   task_stale?: string | 'off'
   pr_stale?: string | 'off'
@@ -30,7 +34,7 @@ export interface ObservabilityConfig {
     'A-tdd'?: Record<string, never>
     'B-ac-coverage'?: Record<string, never>
     'C-standards'?: CLensConfig
-    'D-stack'?: Record<string, never>
+    'D-stack'?: DLensConfig
     'E-design'?: ELensConfig
     'F-scope'?: FLensConfig
     'G-decisions'?: GLensConfig

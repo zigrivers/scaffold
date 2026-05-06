@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { minimatch } from 'minimatch'
 import type { Finding, Event } from '../engine/types.js'
 import type { LensFn } from '../engine/checks/runner.js'
+import { loadObservabilityConfig } from '../engine/checks/observability-config.js'
 
 const lensId = 'D-stack'
 
@@ -9,7 +10,7 @@ function makeFindingId(parts: string[]): string {
   return createHash('sha256').update(parts.join('::')).digest('hex').slice(0, 16)
 }
 
-const PATH_TO_LAYER: Array<{ glob: string; layer: string }> = [
+const DEFAULT_PATH_TO_LAYER: Array<{ glob: string; layer: string }> = [
   { glob: 'src/api/**',        layer: 'backend'  },
   { glob: 'src/server/**',     layer: 'backend'  },
   { glob: 'src/components/**', layer: 'frontend' },
@@ -19,8 +20,8 @@ const PATH_TO_LAYER: Array<{ glob: string; layer: string }> = [
   { glob: 'src/migrations/**', layer: 'data'     },
 ]
 
-function fileLayer(path: string): string | null {
-  for (const { glob, layer } of PATH_TO_LAYER) {
+function fileLayer(path: string, pathToLayer: Array<{ glob: string; layer: string }>): string | null {
+  for (const { glob, layer } of pathToLayer) {
     if (minimatch(path, glob)) return layer
   }
   return null
@@ -29,7 +30,8 @@ function fileLayer(path: string): string | null {
 function decisionsCoverPath(events: Event[], filePath: string): boolean {
   for (const e of events) {
     if (e.type !== 'decision_recorded') continue
-    const { affects } = e.payload as { affects: string[] }
+    const raw = (e.payload as { affects?: unknown }).affects
+    const affects = Array.isArray(raw) ? raw.filter((g): g is string => typeof g === 'string') : []
     if (affects.some((g) => minimatch(filePath, g))) return true
   }
   return false
@@ -38,6 +40,8 @@ function decisionsCoverPath(events: Event[], filePath: string): boolean {
 export const lensDStack: LensFn = async (graph, ledger) => {
   const findings: Finding[] = []
   const now = new Date().toISOString()
+  const config = loadObservabilityConfig(graph.cwd)
+  const pathToLayer = config.lenses['D-stack']?.path_to_layer ?? DEFAULT_PATH_TO_LAYER
 
   // (a) unsanctioned dependency without a recorded decision
   for (const edge of graph.edges) {
@@ -68,7 +72,7 @@ export const lensDStack: LensFn = async (graph, ledger) => {
     const filePath = from.replace(/^file:/, '')
     const component = graph.components.find((c) => c.id === to)
     if (!component?.layer) continue
-    const inferredLayer = fileLayer(filePath)
+    const inferredLayer = fileLayer(filePath, pathToLayer)
     if (!inferredLayer || inferredLayer === component.layer) continue
     findings.push({
       id: makeFindingId([lensId, 'layer', from, to]),

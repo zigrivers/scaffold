@@ -16,7 +16,8 @@ function makeFindingId(parts: string[]): string {
 function decisionEventCoversFile(events: Event[], filePath: string): boolean {
   for (const e of events) {
     if (e.type !== 'decision_recorded') continue
-    const { affects } = e.payload as { affects: string[] }
+    const raw = (e.payload as { affects?: unknown }).affects
+    const affects = Array.isArray(raw) ? raw.filter((g): g is string => typeof g === 'string') : []
     if (affects.some((g) => minimatch(filePath, g))) return true
   }
   return false
@@ -96,8 +97,6 @@ export const lensGDecisions: LensFn = async (graph, ledger, _availability, upstr
       fix_hint: { kind: 'record_decision', target: 'decisions.jsonl', prompt: `Record a decision for the unsanctioned dependency in ${filePath}.` },
     })
   }
-
-  void loadKeywords(graph.cwd)  // referenced for future use; commit-scan deferred to Plan 5+
 
   return findings
 }
