@@ -206,7 +206,7 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
     if (input.render === 'dashboard-fragment-audit') {
       const fragment = renderAuditFragment(out)
       process.stdout.write((input.maskPaths ? redactRendered(fragment) : fragment) + '\n')
-      return 0
+      return out.verdict === 'blocked' ? 1 : 0
     }
     const reportId = deriveReportId(out)
     let sidecarFinal: string | null = null

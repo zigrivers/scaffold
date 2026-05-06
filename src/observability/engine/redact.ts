@@ -115,15 +115,19 @@ export function redactRendered(blob: string): string {
   return sanitizePath(scrubSecrets(blob))
 }
 
-function transformStrings(v: unknown, transform: (s: string) => string): unknown {
+function transformStrings(
+  v: unknown, transform: (s: string) => string, seen = new WeakSet<object>(),
+): unknown {
   if (typeof v === 'string') return transform(v)
   if (typeof v !== 'object' || v === null) return v
-  if (Array.isArray(v)) return v.map((x) => transformStrings(x, transform))
+  if (seen.has(v as object)) return v
+  seen.add(v as object)
+  if (Array.isArray(v)) return v.map((x) => transformStrings(x, transform, seen))
   const proto = Object.getPrototypeOf(v) as unknown
   if (proto !== Object.prototype && proto !== null) return v
   const out: Record<string, unknown> = {}
   for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
-    out[k] = transformStrings(val, transform)
+    out[k] = transformStrings(val, transform, seen)
   }
   return out
 }

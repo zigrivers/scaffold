@@ -867,18 +867,14 @@ HTMLTAIL
 # ─── Build-observability panels (Plan 4) ───────────────────────────────
 # Prefer local build so dashboard-test works without a global scaffold install.
 _local_dist="$REPO_DIR/dist/index.js"
-if [ -f "$_local_dist" ]; then
-    _scaffold_cmd="node $_local_dist"
-elif command -v scaffold >/dev/null 2>&1; then
-    _scaffold_cmd="scaffold"
-else
-    _scaffold_cmd=""
-fi
 observe_progress_html=""
 observe_audit_html=""
-if [ -n "$_scaffold_cmd" ]; then
-    observe_progress_html="$($_scaffold_cmd observe progress --render=dashboard-fragment 2>/dev/null || true)"
-    observe_audit_html="$($_scaffold_cmd observe audit --render=dashboard-fragment-audit 2>/dev/null || true)"
+if [ -f "$_local_dist" ]; then
+    observe_progress_html="$(node "$_local_dist" observe progress --render=dashboard-fragment 2>/dev/null || true)"
+    observe_audit_html="$(node "$_local_dist" observe audit --render=dashboard-fragment-audit 2>/dev/null || true)"
+elif command -v scaffold >/dev/null 2>&1; then
+    observe_progress_html="$(scaffold observe progress --render=dashboard-fragment 2>/dev/null || true)"
+    observe_audit_html="$(scaffold observe audit --render=dashboard-fragment-audit 2>/dev/null || true)"
 fi
 
 cat >> "$OUTPUT_FILE" <<OBSERVEPANELS
