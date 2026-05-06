@@ -8,6 +8,7 @@ import { StatePathResolver } from './state-path-resolver.js'
 import path from 'node:path'
 import fs from 'node:fs'
 import type { MethodologyName } from '../types/index.js'
+import { runPhaseAudit, type PhaseAuditResult } from '../observability/engine/phase-audit.js'
 
 export class StateManager {
   private statePath: string
@@ -18,6 +19,11 @@ export class StateManager {
    * loaded; `null` = loaded but root file had no save_counter (legacy).
    */
   private loadedRootCounter: number | null | undefined = undefined
+  private phaseAuditFn: typeof runPhaseAudit = runPhaseAudit
+
+  setPhaseAuditFn(fn: typeof runPhaseAudit): void {
+    this.phaseAuditFn = fn
+  }
 
   constructor(
     private projectRoot: string,
@@ -165,8 +171,8 @@ export class StateManager {
     this.saveState(state)
   }
 
-  /** Transition step to completed; records outputs, actor, and depth. */
-  markCompleted(step: string, outputs: string[], completedBy: string, depth: DepthLevel): void {
+  /** Transition step to completed; records outputs, actor, and depth. Invokes phase-audit hook post-save. */
+  async markCompleted(step: string, outputs: string[], completedBy: string, depth: DepthLevel): Promise<PhaseAuditResult | undefined> {
     const state = this.loadState()
     if (!(step in state.steps)) {
       throw Object.assign(new Error(`Cannot mark unknown step '${step}' as completed`), {
@@ -186,6 +192,12 @@ export class StateManager {
     state.steps[step].produces = outputs
     state.in_progress = null
     this.saveState(state)
+
+    try {
+      return await this.phaseAuditFn({ primaryRoot: this.projectRoot, step })
+    } catch (err) {
+      return { ran: true, step, reason: (err as Error).message, verdict: undefined, findings_count: undefined }
+    }
   }
 
   /** Transition step to in_progress and record in_progress_started_at (idempotent). */
