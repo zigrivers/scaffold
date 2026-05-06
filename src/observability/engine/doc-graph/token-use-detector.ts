@@ -6,6 +6,7 @@ import type {
   JSXAttribute, ObjectExpression, ObjectProperty, Identifier, StringLiteral,
 } from '@babel/types'
 import type { DesignToken } from '../types.js'
+import { categoryOfProp } from './design-props.js'
 
 // esModuleInterop is enabled in tsconfig.json; the runtime guard handles
 // @babel/traverse's inconsistent CJS default-export shape across versions.
@@ -21,10 +22,6 @@ export interface TokenUse {
   token_id: string
 }
 
-const COLOR_PROPS = /^(color|background(-color)?|border(-color)?|fill|stroke)$/i
-const SPACING_PROPS = /^(margin|padding)(-(top|right|bottom|left))?$|^(gap|top|right|bottom|left)$/i
-const TYPOGRAPHY_PROPS = /^(font-size|font-family|font-weight|line-height)$/i
-
 function isLiteral(value: string): boolean {
   return !/^var\(/i.test(value.trim()) && value.trim().length > 0
 }
@@ -34,13 +31,6 @@ function tokenIdFor(value: string, tokens: DesignToken[], category: DesignToken[
   const v = value.trim().toLowerCase()
   const match = tokens.find((t) => t.category === category && t.value.trim().toLowerCase() === v)
   return match ? match.id : `ad_hoc:${category}`
-}
-
-function categoryOfProp(prop: string): DesignToken['category'] | null {
-  if (COLOR_PROPS.test(prop)) return 'color'
-  if (SPACING_PROPS.test(prop)) return 'spacing'
-  if (TYPOGRAPHY_PROPS.test(prop)) return 'typography'
-  return null
 }
 
 function splitShorthand(prop: string, value: string): { property: string; value: string }[] {

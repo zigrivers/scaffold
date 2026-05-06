@@ -106,7 +106,13 @@ export async function handleProgress(input: HandleProgressInput): Promise<number
       process.stdout.write(renderProgressFragment(out) + '\n')
       return 0
     }
-    const sidecarFinal = await writeSidecar(input.cwd, out)
+    let sidecarFinal: string | null = null
+    try {
+      sidecarFinal = await writeSidecar(input.cwd, out)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      process.stderr.write(`scaffold observe progress: sidecar write failed: ${msg}\n`)
+    }
     if (input.json) {
       const blob = JSON.stringify(out, null, 2)
       process.stdout.write((input.maskPaths ? redactRendered(blob) : blob) + '\n')
@@ -115,7 +121,7 @@ export async function handleProgress(input: HandleProgressInput): Promise<number
       const mdFinal = await writeMarkdownReport(input.cwd, out, md, input.output)
       const rendered = renderProgressTerminal(out)
       process.stdout.write((input.maskPaths ? redactRendered(rendered) : rendered) + '\n')
-      process.stdout.write(`\n(written: ${mdFinal} + ${sidecarFinal})\n`)
+      process.stdout.write(`\n(written: ${mdFinal}${sidecarFinal ? ` + ${sidecarFinal}` : ''})\n`)
     }
     return 0
   } catch (err: unknown) {
@@ -183,13 +189,19 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
       fixThresholdOverride: input.fixThresholdOverride,
       ghBin: input.ghBin,
       bdBin: input.bdBin,
-      args: { profile: input.profile, scope: input.scope, sinceHours: input.sinceHours },
+      args: { profile: input.profile, scope: input.scope, sinceHours: input.sinceHours, lensIds: input.lensIds },
     })
     if (input.render === 'dashboard-fragment-audit') {
       process.stdout.write(renderAuditFragment(out) + '\n')
       return out.verdict === 'blocked' ? 1 : 0
     }
-    const sidecarFinal = await writeSidecar(input.cwd, out)
+    let sidecarFinal: string | null = null
+    try {
+      sidecarFinal = await writeSidecar(input.cwd, out)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      process.stderr.write(`scaffold observe audit: sidecar write failed: ${msg}\n`)
+    }
     if (input.json) {
       const blob = JSON.stringify(out, null, 2)
       process.stdout.write((input.maskPaths ? redactRendered(blob) : blob) + '\n')
@@ -198,7 +210,7 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
       const mdFinal = await writeMarkdownReport(input.cwd, out, md, input.output)
       const rendered = renderAuditTerminal(out, { showAcknowledged: input.showAcknowledged })
       process.stdout.write((input.maskPaths ? redactRendered(rendered) : rendered) + '\n')
-      process.stdout.write(`\n(written: ${mdFinal} + ${sidecarFinal})\n`)
+      process.stdout.write(`\n(written: ${mdFinal}${sidecarFinal ? ` + ${sidecarFinal}` : ''})\n`)
     }
     return out.verdict === 'blocked' ? 1 : 0
   } catch (err: unknown) {

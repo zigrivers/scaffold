@@ -46,12 +46,13 @@ export function renderProgressFragment(out: EngineOutput): string {
 
 export function renderAuditFragment(out: EngineOutput): string {
   const args = out.invocation.args as { profile?: string; scope?: string }
-  const findings = out.findings.filter((f) => f.status !== 'skipped')
+  const findings = out.findings.filter((f) => f.status !== 'skipped' && f.status !== 'acknowledged')
 
+  const threshIdx = SEVERITIES.indexOf(out.fix_threshold as Severity)
   const filterButtons = (['all', 'blocking', ...SEVERITIES] as const).map((f) => {
-    const count = f === 'all' ? out.summary.total
-      : f === 'blocking' ? out.summary.blocking
-        : out.summary.by_severity[f as Severity]
+    const count = f === 'all' ? findings.length
+      : f === 'blocking' ? findings.filter((fi) => SEVERITIES.indexOf(fi.severity) <= threshIdx).length
+        : findings.filter((fi) => fi.severity === (f as Severity)).length
     return `<button data-filter="${escape(String(f))}">${escape(String(f))} (${count})</button>`
   }).join(' ')
 

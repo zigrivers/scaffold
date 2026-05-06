@@ -104,6 +104,22 @@ describe('renderAuditFragment', () => {
     expect(html).toContain('data-verdict="blocked"')
   })
 
+  it('excludes acknowledged findings from visible list and filter counts', () => {
+    const out: EngineOutput = { ...auditOut,
+      findings: [
+        ...auditOut.findings,
+        { id: 'aaaaaaaaaaaaaaaa', lens_id: 'B-ac-coverage', severity: 'P1',
+          title: 'acked', description: 'd', source_doc: 'docs/user-stories.md#s-1',
+          evidence: { kind: 'rule_violation', rule_id: 'r', file: 'f' },
+          confidence: 'high', first_seen: '', last_seen: '', status: 'acknowledged' },
+      ],
+      summary: { ...auditOut.summary, total: 2, acknowledged: 1, by_severity: { P0: 1, P1: 1, P2: 0, P3: 0 } },
+    }
+    const html = renderAuditFragment(out)
+    expect(html).not.toContain('aaaaaaaaaa')
+    expect(html).toContain('all (1)')
+  })
+
   it('renders empty-state when no findings', () => {
     const out = { ...auditOut, findings: [], verdict: 'pass' as const,
       summary: { ...auditOut.summary, total: 0, blocking: 0, by_severity: { P0: 0, P1: 0, P2: 0, P3: 0 } } }
