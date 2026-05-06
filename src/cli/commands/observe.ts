@@ -105,7 +105,8 @@ export async function handleProgress(input: HandleProgressInput): Promise<number
       args: { sinceHours: input.sinceHours },
     })
     if (input.render === 'dashboard-fragment') {
-      process.stdout.write(renderProgressFragment(out) + '\n')
+      const fragment = renderProgressFragment(out)
+      process.stdout.write((input.maskPaths ? redactRendered(fragment) : fragment) + '\n')
       return 0
     }
     let sidecarFinal: string | null = null
@@ -201,8 +202,9 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
       args: { profile: input.profile, scope: input.scope, sinceHours: input.sinceHours, lensIds: input.lensIds },
     })
     if (input.render === 'dashboard-fragment-audit') {
-      process.stdout.write(renderAuditFragment(out) + '\n')
-      return out.verdict === 'blocked' ? 1 : 0
+      const fragment = renderAuditFragment(out)
+      process.stdout.write((input.maskPaths ? redactRendered(fragment) : fragment) + '\n')
+      return 0
     }
     let sidecarFinal: string | null = null
     try {
