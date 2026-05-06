@@ -52,6 +52,40 @@ describe('lensEDesign', () => {
     expect(must?.severity).toBe('P0')
   })
 
+  it('emits P0 only for ad-hoc uses on properties whose category has a must-priority token', async () => {
+    mkdirSync(join(dir, 'docs'), { recursive: true })
+    mkdirSync(join(dir, 'src/components'), { recursive: true })
+    mkdirSync(join(dir, '.scaffold'), { recursive: true })
+    writeFileSync(join(dir, 'package.json'), '{}')
+    // Only color is must-priority; spacing is not in the design system at all.
+    writeFileSync(join(dir, 'docs/design-system.md'),
+      '## Colors\n\n| Token | Value | Priority |\n|---|---|---|\n| --color-primary | #4f46e5 | must |\n')
+    writeFileSync(join(dir, '.scaffold/observability.yaml'),
+      'lenses:\n  E-design:\n    ui_glob: "src/components/**/*.tsx"\n    ad_hoc_token_threshold: 100\n')
+    writeFileSync(join(dir, 'src/components/Btn.tsx'),
+      `export const Btn = () => <button style={{ color: '#zz0011', padding: '13px' }} />`)
+    const graph = await buildDocGraph(dir)
+    const findings = await lensEDesign(graph, { events: [] }, stubAvail, [], new Set(['E-design']))
+    expect(findings.find((f) => /must-priority/i.test(f.title) && /color/i.test(f.description))?.severity).toBe('P0')
+    expect(findings.find((f) => /must-priority/i.test(f.title) && /padding/i.test(f.description))).toBeUndefined()
+  })
+
+  it('does NOT emit must-priority P0 when the design-system declares no must tokens', async () => {
+    mkdirSync(join(dir, 'docs'), { recursive: true })
+    mkdirSync(join(dir, 'src/components'), { recursive: true })
+    mkdirSync(join(dir, '.scaffold'), { recursive: true })
+    writeFileSync(join(dir, 'package.json'), '{}')
+    writeFileSync(join(dir, 'docs/design-system.md'),
+      '## Colors\n\n| Token | Value | Priority |\n|---|---|---|\n| --color-primary | #4f46e5 | should |\n')
+    writeFileSync(join(dir, '.scaffold/observability.yaml'),
+      'lenses:\n  E-design:\n    ui_glob: "src/components/**/*.tsx"\n')
+    writeFileSync(join(dir, 'src/components/Btn.tsx'),
+      `export const Btn = () => <button style={{ color: '#aaa', background: '#bbb', borderColor: '#ccc', padding: '11px' }} />`)
+    const graph = await buildDocGraph(dir)
+    const findings = await lensEDesign(graph, { events: [] }, stubAvail, [], new Set(['E-design']))
+    expect(findings.find((f) => /must-priority/i.test(f.title))).toBeUndefined()
+  })
+
   it('emits no findings when files use tokens correctly', async () => {
     mkdirSync(join(dir, 'docs'), { recursive: true })
     mkdirSync(join(dir, 'src/components'), { recursive: true })
