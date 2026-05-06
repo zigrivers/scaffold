@@ -150,3 +150,53 @@ describe('synthesizer.composeSnapshot', () => {
     expect(snap.recent_decisions.map((d) => d.key)).toEqual(['new-key'])
   })
 })
+
+import { composeReplay } from './synthesizer.js'
+import type { Event, ReplayEvent } from './types.js'
+
+describe('synthesizer.composeReplay', () => {
+  it('merges ledger events + adapter replay events sorted by (ts, source_priority, sort_id)', () => {
+    const ledger: Event[] = [{
+      event_id: 'ulid-A', worktree_id: 'wid', actor_label: 'alice', branch: 'b', task_id: 'T-1',
+      type: 'task_claimed', ts: '2026-05-04T10:00:00Z', payload: { task_title: 'A' },
+    } as Event]
+    const adapterReplay: ReplayEvent[] = [
+      { sort_id: 'git:abc', correlation_id: null, ts: '2026-05-04T11:00:00Z', source: 'git', kind: 'commit', summary: 'work' },
+      { sort_id: 'mmr:job-1', correlation_id: null, ts: '2026-05-04T10:30:00Z', source: 'mmr', kind: 'job_completed', summary: 'pass' },
+    ]
+    const out = composeReplay({ ledgerEvents: ledger, adapterEvents: adapterReplay, window: { from: '2026-05-04T00:00:00Z', to: '2026-05-04T23:59:00Z' } })
+    expect(out.events.map((e) => e.sort_id)).toEqual(['ledger:ulid-A', 'mmr:job-1', 'git:abc'])
+  })
+
+  it('dedupes cross-source events sharing a correlation_id (ledger > gh > git priority)', () => {
+    const ledger: Event[] = [{
+      event_id: 'ulid-X', worktree_id: 'wid', actor_label: 'alice', branch: 'b', task_id: null,
+      type: 'pr_opened', ts: '2026-05-04T09:00:00Z', payload: { pr_number: 42 },
+    } as Event]
+    const adapterReplay: ReplayEvent[] = [
+      { sort_id: 'gh:42:opened', correlation_id: 'pr:42:opened', ts: '2026-05-04T09:00:00Z', source: 'gh', kind: 'pr_opened', summary: 'PR #42' },
+      { sort_id: 'gh:42:merged', correlation_id: 'pr:42:merged', ts: '2026-05-04T17:00:00Z', source: 'gh', kind: 'pr_merged', summary: 'PR #42 merged' },
+    ]
+    const out = composeReplay({ ledgerEvents: ledger, adapterEvents: adapterReplay, window: { from: '2026-05-04T00:00:00Z', to: '2026-05-04T23:59:00Z' } })
+    expect(out.events.map((e) => e.kind)).toEqual(['pr_opened', 'pr_merged'])
+    expect(out.events[0].source).toBe('ledger')
+  })
+
+  it('filters events outside the time window', () => {
+    const ledger: Event[] = [{
+      event_id: 'ulid-old', worktree_id: 'wid', actor_label: 'alice', branch: 'b', task_id: 'T-1',
+      type: 'task_claimed', ts: '2026-04-01T00:00:00Z', payload: { task_title: 'old' },
+    } as Event]
+    const out = composeReplay({ ledgerEvents: ledger, adapterEvents: [], window: { from: '2026-05-04T00:00:00Z', to: '2026-05-04T23:59:00Z' } })
+    expect(out.events).toEqual([])
+  })
+
+  it('ledger events get sort_id "ledger:<event_id>"', () => {
+    const ledger: Event[] = [{
+      event_id: 'ulid-Z', worktree_id: 'wid', actor_label: 'alice', branch: 'b', task_id: 'T-1',
+      type: 'task_claimed', ts: '2026-05-04T10:00:00Z', payload: { task_title: 'Z' },
+    } as Event]
+    const out = composeReplay({ ledgerEvents: ledger, adapterEvents: [], window: { from: '2026-05-04T00:00:00Z', to: '2026-05-04T23:59:00Z' } })
+    expect(out.events[0].sort_id).toBe('ledger:ulid-Z')
+  })
+})
