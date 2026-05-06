@@ -70,6 +70,10 @@ When modifying prompts:
 | `scaffold observe harvest --worktree=<path>` | Flush a worktree's ledger to the primary archive |
 | `scaffold observe audit [--json] [--profile fast\|full] [--scope docs\|code\|all]` | Run audit lenses and report findings; exits 1 if verdict=blocked |
 | `scaffold observe ack <prefix-or-id> [--status acknowledged\|open] [--note "…"]` | Acknowledge or reopen a finding by ID prefix |
+| `scaffold observe progress --output=<path>` | Write the progress markdown report to a custom path (sidecar still goes to docs/build-status/) |
+| `scaffold observe audit --output=<path>` | Write the audit markdown report to a custom path (sidecar still goes to docs/audits/) |
+| `scaffold observe progress --render=dashboard-fragment` | Emit HTML for the dashboard panel; skip markdown/sidecar |
+| `scaffold observe audit --render=dashboard-fragment-audit` | Emit HTML for the audit dashboard panel; skip markdown/sidecar |
 
 ### Committing and Creating PRs
 
@@ -254,7 +258,7 @@ See `docs/project-structure.md` for the full authoritative guide.
 
 **File placement**: Scripts → `scripts/<name>.sh` | Tests → `tests/<name>.bats` | Docs → `docs/<topic>.md` | Source → `src/` | Content → `content/<category>/`
 
-**Build observability** lives under `src/observability/`. Build-command meta-prompts call `scaffold observe event …` at named workflow points (claim/complete/decision/blocker/PR-open). The audit covers all eight lenses: A-tdd, B-ac-coverage, C-standards, D-stack, E-design, F-scope, G-decisions (with cross-lens correlation to D), H-cross-doc. Per-project lens config lives in `.scaffold/observability.yaml` (E's ad-hoc threshold + ui_glob, C's rule overrides, F's wave budget, disabled_lenses, stall thresholds). `scaffold observe audit --scope=code` runs A–G; `--scope=docs` runs only H; `--scope=all` runs everything; `--lens <id>` overrides scope. Markdown + dashboard renderers and replay/stall come in Plans 4 + 5; phase-boundary triggers, MMR doc-conformance channel, and the `--fix` flow come in Plans 6 + 7 + 8. See `docs/superpowers/specs/2026-04-30-build-observability-design.md` for the full design.
+**Build observability** lives under `src/observability/`. Build-command meta-prompts call `scaffold observe event …` at named workflow points (claim/complete/decision/blocker/PR-open). The audit covers all eight lenses: A-tdd, B-ac-coverage, C-standards, D-stack, E-design, F-scope, G-decisions (with cross-lens correlation to D), H-cross-doc. Per-project lens config lives in `.scaffold/observability.yaml` (E's ad-hoc threshold + ui_glob, C's rule overrides, F's wave budget, disabled_lenses, stall thresholds). `scaffold observe audit --scope=code` runs A–G; `--scope=docs` runs only H; `--scope=all` runs everything; `--lens <id>` overrides scope. Plan 4 ships persisted output: `scaffold observe progress` writes `docs/build-status/<id>.md` + `<id>.json` sidecars, `scaffold observe audit` writes `docs/audits/<id>.md` + sidecars, and `scripts/generate-dashboard.sh` injects "Build Progress" and "Audit" panels via named anchors. The `audit-history` adapter reads sidecars for trend analysis (severity-tier trajectories, lens-skipped streaks). `--output=<path>` overrides the markdown destination; `--render=dashboard-fragment[-audit]` skips persisted output and prints HTML to stdout. Replay/stall detection come in Plan 5; phase-boundary triggers, MMR doc-conformance channel, and the `--fix` flow come in Plans 6 + 7 + 8. See `docs/superpowers/specs/2026-04-30-build-observability-design.md` for the full design.
 
 Example `.scaffold/observability.yaml`:
 

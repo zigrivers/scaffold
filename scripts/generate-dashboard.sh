@@ -836,11 +836,59 @@ function copyCmd(el) {
         });
     }
 }
+function initAuditFilters() {
+    var section = document.getElementById('build-audit');
+    if (!section) return;
+    var threshold = section.getAttribute('data-threshold') || 'P2';
+    var rank = {P0: 0, P1: 1, P2: 2, P3: 3};
+    var threshRank = rank[threshold] !== undefined ? rank[threshold] : 2;
+    var buttons = section.querySelectorAll('[data-filter]');
+    var findings = section.querySelectorAll('.finding');
+    buttons.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            buttons.forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            var filter = btn.getAttribute('data-filter');
+            findings.forEach(function(f) {
+                var sev = f.getAttribute('data-severity') || '';
+                var sevRank = rank[sev] !== undefined ? rank[sev] : 99;
+                var show = filter === 'all'
+                    || (filter === 'blocking' && sevRank <= threshRank)
+                    || filter === sev;
+                f.style.display = show ? '' : 'none';
+            });
+        });
+    });
+}
+document.addEventListener('DOMContentLoaded', initAuditFilters);
 </script>
+HTMLTAIL
+
+# ─── Build-observability panels (Plan 4) ───────────────────────────────
+# Prefer local build so dashboard-test works without a global scaffold install.
+_local_dist="$REPO_DIR/dist/index.js"
+observe_progress_html=""
+observe_audit_html=""
+if [ -f "$_local_dist" ]; then
+    observe_progress_html="$(node "$_local_dist" observe progress --render=dashboard-fragment || true)"
+    observe_audit_html="$(node "$_local_dist" observe audit --render=dashboard-fragment-audit || true)"
+elif command -v scaffold >/dev/null 2>&1; then
+    observe_progress_html="$(scaffold observe progress --render=dashboard-fragment || true)"
+    observe_audit_html="$(scaffold observe audit --render=dashboard-fragment-audit || true)"
+fi
+
+cat >> "$OUTPUT_FILE" <<OBSERVEPANELS
+<!-- observe:progress -->
+${observe_progress_html}
+<!-- /observe:progress -->
+
+<!-- observe:audit -->
+${observe_audit_html}
+<!-- /observe:audit -->
 </div>
 </body>
 </html>
-HTMLTAIL
+OBSERVEPANELS
 
 echo "Dashboard written to: $OUTPUT_FILE"
 

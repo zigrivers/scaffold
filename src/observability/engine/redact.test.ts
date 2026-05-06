@@ -216,3 +216,62 @@ describe('redactRendered (render-time)', () => {
     expect(out).toContain('[REDACTED:')
   })
 })
+
+import { redactEngineOutput } from './redact.js'
+import type { EngineOutput } from './types.js'
+
+describe('redactEngineOutput (structured)', () => {
+  const skeleton: EngineOutput = {
+    schema_version: '1.0',
+    invocation: {
+      command: 'audit', args: { user: '/Users/alice/repo' },
+      started_at: '', completed_at: '', scaffold_version: '0.0.0',
+    },
+    availability: {
+      git: { status: 'available' }, gh: { status: 'unavailable' },
+      pipeline_docs: { status: 'available' }, tests: { status: 'available' },
+      state: { status: 'available' }, beads: { status: 'unavailable' },
+      mmr: { status: 'available' }, audit_history: { status: 'unavailable' },
+      ledger: { events_read: 0, malformed_lines: 0, sources: [] },
+    },
+    snapshot: null, replay: null,
+    findings: [
+      { id: 'abc12345' + '0'.repeat(8), lens_id: 'A-tdd', severity: 'P1',
+        title: 'token=ghp_1234567890abcdefABCDEF1234567890abcdef',
+        description: '/Users/alice/Documents/repo/src/x.ts', source_doc: '',
+        evidence: { kind: 'rule_violation', rule_id: 'r', file: '/Users/alice/repo/src/x.ts' },
+        confidence: 'high', first_seen: '', last_seen: '', status: 'open' },
+    ],
+    needs_attention: [],
+    graph_stats: {
+      nodes_by_kind: {}, edges_by_kind: {}, orphans_by_kind: {}, unsanctioned_uses: 0, ad_hoc_token_uses: 0,
+    },
+    fix_threshold: 'P2', verdict: 'pass',
+    summary: { total: 1, by_severity: { P0: 0, P1: 1, P2: 0, P3: 0 },
+      by_severity_status: {
+        P0: { open: 0, acknowledged: 0, skipped: 0 }, P1: { open: 1, acknowledged: 0, skipped: 0 },
+        P2: { open: 0, acknowledged: 0, skipped: 0 }, P3: { open: 0, acknowledged: 0, skipped: 0 },
+      },
+      blocking: 0, acknowledged: 0, skipped_lenses: 0 },
+  }
+
+  it('scrubs secrets and rewrites paths in-depth', () => {
+    const out = redactEngineOutput(skeleton)
+    expect(JSON.stringify(out)).not.toContain('ghp_1234567890abcdefABCDEF1234567890abcdef')
+    expect(JSON.stringify(out)).not.toContain('/Users/alice')
+    expect(JSON.stringify(out)).toContain('~')
+    expect(JSON.stringify(out)).toContain('[REDACTED:')
+  })
+
+  it('does not mutate the input', () => {
+    const before = JSON.stringify(skeleton)
+    redactEngineOutput(skeleton)
+    expect(JSON.stringify(skeleton)).toBe(before)
+  })
+
+  it('preserves numeric fields whose key contains "token" (ad_hoc_token_uses, etc.)', () => {
+    const out = redactEngineOutput(skeleton)
+    expect(typeof out.graph_stats.ad_hoc_token_uses).toBe('number')
+    expect(out.graph_stats.ad_hoc_token_uses).toBe(0)
+  })
+})

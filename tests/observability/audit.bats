@@ -189,3 +189,51 @@ EOF
     [[ "$output" != *'"A-tdd"'* ]]
     [[ "$output" != *'"H-cross-doc"'* ]]
 }
+
+@test "observe audit writes docs/audits/<id>.md and matching .json sidecar" {
+    cat > docs/plan.md <<'EOF'
+# PRD
+## Features
+### F [priority: must]
+EOF
+    cat > docs/user-stories.md <<'EOF'
+## Story s-1: T [priority: must]
+
+### AC 1: t
+Given X.
+EOF
+    cat > docs/tdd-standards.md <<'EOF'
+# TDD
+EOF
+
+    run $BIN observe audit --since-hours=24
+    [ "$status" -eq 1 ] # blocked
+    md_count="$(ls docs/audits/audit-*-fast-all-*.md 2>/dev/null | wc -l | tr -d ' ')"
+    json_count="$(ls docs/audits/audit-*-fast-all-*.json 2>/dev/null | wc -l | tr -d ' ')"
+    [ "$md_count" -ge 1 ]
+    [ "$json_count" -ge 1 ]
+
+    # Sidecar JSON contains the engine_output wrapper
+    sidecar="$(ls docs/audits/audit-*-fast-all-*.json | head -1)"
+    grep -q '"engine_output"' "$sidecar"
+    grep -q '"schema_version": "1.0"' "$sidecar"
+}
+
+@test "observe audit --render=dashboard-fragment-audit prints HTML and skips persisted output" {
+    rm -rf docs/audits
+    run $BIN observe audit --render=dashboard-fragment-audit --since-hours=24
+    [[ "$output" == *'<section id="build-audit"'* ]]
+    [ ! -d docs/audits ]
+}
+
+@test "observe progress writes docs/build-status/<id>.md and .json" {
+    $BIN observe event task_claimed --branch=main --task-id=T-001 --task-title="hello"
+    $BIN observe harvest --worktree="$SANDBOX"
+
+    run $BIN observe progress --since-hours=24
+    [ "$status" -eq 0 ]
+    md_count="$(ls docs/build-status/progress-*.md 2>/dev/null | wc -l | tr -d ' ')"
+    json_count="$(ls docs/build-status/progress-*.json 2>/dev/null | wc -l | tr -d ' ')"
+    [ "$md_count" -ge 1 ]
+    [ "$json_count" -ge 1 ]
+}

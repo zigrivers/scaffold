@@ -92,7 +92,7 @@ export function buildEdges(input: BuildEdgesInput): BuildEdgesResult {
 
   for (const use of input.token_uses ?? []) {
     const fileId = fileIdByPath.get(use.file) ?? `file:${use.file}`
-    edges.push({ kind: 'file_to_token_use', from: fileId, to: use.token_id as never })
+    edges.push({ kind: 'file_to_token_use', from: fileId, to: use.token_id as never, property: use.property })
   }
 
   for (const use of input.component_uses ?? []) {

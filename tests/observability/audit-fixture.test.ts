@@ -12,7 +12,9 @@ describe('runAudit against the audit-mvp fixture', () => {
       ghBin: '/no/such/gh', bdBin: '/no/such/bd',
     })
     const lensIds = new Set(out.findings.map((f) => f.lens_id))
-    for (const id of ['A-tdd', 'B-ac-coverage', 'C-standards', 'D-stack', 'E-design', 'F-scope', 'G-decisions', 'H-cross-doc']) {
+    for (const id of [
+      'A-tdd', 'B-ac-coverage', 'C-standards', 'D-stack', 'E-design', 'F-scope', 'G-decisions', 'H-cross-doc',
+    ]) {
       expect(lensIds.has(id), `expected ${id} to emit at least one finding`).toBe(true)
     }
     expect(out.verdict).toBe('blocked')

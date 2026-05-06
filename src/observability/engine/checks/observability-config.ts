@@ -68,7 +68,9 @@ function deepMerge<T>(base: T, over: Record<string, unknown>): T {
   const out: Record<string, unknown> = { ...(base as Record<string, unknown>) }
   for (const [k, v] of Object.entries(over)) {
     const baseV = (base as Record<string, unknown>)[k]
-    if (v && typeof v === 'object' && !Array.isArray(v) && baseV && typeof baseV === 'object' && !Array.isArray(baseV)) {
+    const bothObjects = v && typeof v === 'object' && !Array.isArray(v)
+      && baseV && typeof baseV === 'object' && !Array.isArray(baseV)
+    if (bothObjects) {
       out[k] = deepMerge(baseV as Record<string, unknown>, v as Record<string, unknown>)
     } else {
       out[k] = v

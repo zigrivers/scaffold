@@ -1,16 +1,33 @@
 import type { CommandModule } from 'yargs'
 import { writeEvent } from '../../observability/engine/ledger-writer.js'
-import type { EventType } from '../../observability/engine/types.js'
+import type { EventType, EngineOutput } from '../../observability/engine/types.js'
 import { EVENT_PAYLOAD_KEYS } from '../../observability/engine/event-schemas.js'
 import { runProgress, runAudit } from '../../observability/engine/api.js'
 import { redactRendered } from '../../observability/engine/redact.js'
 import { harvestWorktree } from '../../observability/engine/harvester.js'
 import { renderProgressTerminal, renderAuditTerminal } from '../../observability/renderers/terminal.js'
+import { renderProgressMarkdown, renderAuditMarkdown } from '../../observability/renderers/markdown.js'
+import { writeSidecar, deriveReportId, sidecarPath } from '../../observability/renderers/sidecar.js'
+import { renderProgressFragment, renderAuditFragment } from '../../observability/renderers/dashboard.js'
 import { readIdentityAsync } from '../../observability/engine/identity.js'
-import { stat, readdir, readFile, writeFile, mkdir } from 'node:fs/promises'
+import { stat, readdir, readFile, mkdir, writeFile } from 'node:fs/promises'
 import { execSync } from 'node:child_process'
-import { join } from 'node:path'
+import { dirname, isAbsolute, join } from 'node:path'
 import { findProjectRoot } from '../middleware/project-root.js'
+
+async function writeMarkdownReport(
+  cwd: string, out: EngineOutput, body: string, reportId: string, overridePath?: string,
+): Promise<string> {
+  const relPath = sidecarPath(reportId, out.invocation.command).replace(/\.json$/, '.md')
+  const absPath = overridePath
+    ? (isAbsolute(overridePath) ? overridePath : join(cwd, overridePath))
+    : join(cwd, relPath)
+  const existing = await stat(absPath).catch(() => null)
+  if (existing?.isDirectory()) throw new Error(`output path is a directory: ${absPath}`)
+  await mkdir(dirname(absPath), { recursive: true })
+  await writeFile(absPath, body, { mode: 0o644 })
+  return absPath
+}
 
 // ─── handleEvent ─────────────────────────────────────────────────────────────
 
@@ -72,6 +89,8 @@ export interface HandleProgressInput {
   json: boolean
   sinceHours: number
   maskPaths?: boolean
+  output?: string
+  render?: 'dashboard-fragment'
   ghBin?: string
   bdBin?: string
 }
@@ -85,13 +104,37 @@ export async function handleProgress(input: HandleProgressInput): Promise<number
       bdBin: input.bdBin,
       args: { sinceHours: input.sinceHours },
     })
+    if (input.render === 'dashboard-fragment') {
+      const fragment = renderProgressFragment(out)
+      process.stdout.write((input.maskPaths ? redactRendered(fragment) : fragment) + '\n')
+      return 0
+    }
+    const reportId = deriveReportId(out)
+    let sidecarFinal: string | null = null
+    try {
+      sidecarFinal = await writeSidecar(input.cwd, out, undefined, reportId)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      process.stderr.write(`scaffold observe progress: sidecar write failed: ${msg}\n`)
+    }
     if (input.json) {
       const blob = JSON.stringify(out, null, 2)
       process.stdout.write((input.maskPaths ? redactRendered(blob) : blob) + '\n')
-      return 0
+    } else {
+      const md = renderProgressMarkdown(out)
+      let mdFinal: string | null = null
+      try {
+        mdFinal = await writeMarkdownReport(input.cwd, out, md, reportId, input.output)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        process.stderr.write(`scaffold observe progress: markdown write failed: ${msg}\n`)
+        if (input.output) return 3
+      }
+      const rendered = renderProgressTerminal(out)
+      process.stdout.write((input.maskPaths ? redactRendered(rendered) : rendered) + '\n')
+      const footer = `\n(written: ${mdFinal ?? '(failed)'}${sidecarFinal ? ` + ${sidecarFinal}` : ''})\n`
+      process.stdout.write(input.maskPaths ? redactRendered(footer) : footer)
     }
-    const rendered = renderProgressTerminal(out)
-    process.stdout.write((input.maskPaths ? redactRendered(rendered) : rendered) + '\n')
     return 0
   } catch (err: unknown) {
     process.stderr.write(`scaffold observe progress: ${err instanceof Error ? err.message : String(err)}\n`)
@@ -141,6 +184,8 @@ export interface HandleAuditInput {
   fixThresholdOverride?: string
   maskPaths?: boolean
   showAcknowledged?: boolean
+  output?: string
+  render?: 'dashboard-fragment-audit'
   ghBin?: string
   bdBin?: string
 }
@@ -156,27 +201,40 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
       fixThresholdOverride: input.fixThresholdOverride,
       ghBin: input.ghBin,
       bdBin: input.bdBin,
-      args: { profile: input.profile, scope: input.scope, sinceHours: input.sinceHours },
+      args: { profile: input.profile, scope: input.scope, sinceHours: input.sinceHours, lensIds: input.lensIds },
     })
-    const exitCode = out.verdict === 'blocked' ? 1 : 0
-    const tsStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-    const sidecarName = `${tsStr}-${input.profile}-${input.scope}.json`
-    const auditsDir = join(input.cwd, 'docs/audits')
+    if (input.render === 'dashboard-fragment-audit') {
+      const fragment = renderAuditFragment(out)
+      process.stdout.write((input.maskPaths ? redactRendered(fragment) : fragment) + '\n')
+      return out.verdict === 'blocked' ? 1 : 0
+    }
+    const reportId = deriveReportId(out)
+    let sidecarFinal: string | null = null
     try {
-      await mkdir(auditsDir, { recursive: true })
-      await writeFile(join(auditsDir, sidecarName), JSON.stringify({
-        report_id: `audit-${tsStr}-${input.profile}-${input.scope}`,
-        engine_output: out,
-      }, null, 2))
-    } catch { /* best-effort — don't fail the command if write fails */ }
+      sidecarFinal = await writeSidecar(input.cwd, out, undefined, reportId)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      process.stderr.write(`scaffold observe audit: sidecar write failed: ${msg}\n`)
+    }
     if (input.json) {
       const blob = JSON.stringify(out, null, 2)
       process.stdout.write((input.maskPaths ? redactRendered(blob) : blob) + '\n')
-      return exitCode
+    } else {
+      const md = renderAuditMarkdown(out)
+      let mdFinal: string | null = null
+      try {
+        mdFinal = await writeMarkdownReport(input.cwd, out, md, reportId, input.output)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        process.stderr.write(`scaffold observe audit: markdown write failed: ${msg}\n`)
+        if (input.output) return 3
+      }
+      const rendered = renderAuditTerminal(out, { showAcknowledged: input.showAcknowledged })
+      process.stdout.write((input.maskPaths ? redactRendered(rendered) : rendered) + '\n')
+      const footer = `\n(written: ${mdFinal ?? '(failed)'}${sidecarFinal ? ` + ${sidecarFinal}` : ''})\n`
+      process.stdout.write(input.maskPaths ? redactRendered(footer) : footer)
     }
-    const rendered = renderAuditTerminal(out, { showAcknowledged: input.showAcknowledged })
-    process.stdout.write((input.maskPaths ? redactRendered(rendered) : rendered) + '\n')
-    return exitCode
+    return out.verdict === 'blocked' ? 1 : 0
   } catch (err: unknown) {
     process.stderr.write(`scaffold observe audit: ${err instanceof Error ? err.message : String(err)}\n`)
     return 3
@@ -302,13 +360,20 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
       (y) => y
         .option('json', { type: 'boolean', default: false })
         .option('mask-paths', { type: 'boolean', default: false })
-        .option('since-hours', { type: 'number', default: 24 }),
+        .option('since-hours', { type: 'number', default: 24 })
+        .option('output', { type: 'string', describe: 'Override markdown report destination path' })
+        .option('render', {
+          type: 'string', choices: ['dashboard-fragment'] as const,
+          describe: 'Emit HTML fragment to stdout',
+        }),
       async (argv) => {
         const code = await handleProgress({
           cwd: findProjectRoot(process.cwd()) ?? process.cwd(),
           json: !!(argv.json),
           maskPaths: !!(argv['mask-paths'] ?? argv.maskPaths),
           sinceHours: (argv['since-hours'] ?? argv.sinceHours ?? 24) as number,
+          output: argv.output as string | undefined,
+          render: argv.render as 'dashboard-fragment' | undefined,
         })
         process.exitCode = code
       },
@@ -336,7 +401,12 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
         .option('scope', { type: 'string', choices: ['docs', 'code', 'all'] as const, default: 'all' })
         .option('lens', { type: 'array', string: true })
         .option('fix-threshold', { type: 'string' })
-        .option('show-acknowledged', { type: 'boolean', default: false }),
+        .option('show-acknowledged', { type: 'boolean', default: false })
+        .option('output', { type: 'string', describe: 'Override markdown report destination path' })
+        .option('render', {
+          type: 'string', choices: ['dashboard-fragment-audit'] as const,
+          describe: 'Emit HTML fragment to stdout',
+        }),
       async (argv) => {
         const code = await handleAudit({
           cwd: findProjectRoot(process.cwd()) ?? process.cwd(),
@@ -348,6 +418,8 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
           lensIds: argv.lens as string[] | undefined,
           fixThresholdOverride: argv['fix-threshold'] as string | undefined,
           showAcknowledged: !!(argv['show-acknowledged'] ?? argv.showAcknowledged),
+          output: argv.output as string | undefined,
+          render: argv.render as 'dashboard-fragment-audit' | undefined,
         })
         process.exitCode = code
       },

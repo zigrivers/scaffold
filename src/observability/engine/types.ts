@@ -379,6 +379,7 @@ export interface Edge {
   kind: EdgeKind
   from: string
   to: string
+  property?: string
 }
 
 export interface DocGraph {

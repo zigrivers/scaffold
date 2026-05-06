@@ -24,7 +24,7 @@ describe('detectComponentUses', () => {
   })
 
   it('treats relative imports as in-repo (skipped, not unsanctioned)', () => {
-    const ts = `import { foo } from './foo'\nimport bar from '../bar'`
+    const ts = 'import { foo } from \'./foo\'\nimport bar from \'../bar\''
     expect(detectComponentUses(ts, components, 'src/x.ts')).toEqual([])
   })
 
@@ -32,7 +32,7 @@ describe('detectComponentUses', () => {
     const local: SanctionedComponent[] = [
       { id: 'component:trpc', package_or_url: '@trpc/server@10', layer: 'backend', source_anchor: '' },
     ]
-    const ts = `import { router } from '@trpc/server'`
+    const ts = 'import { router } from \'@trpc/server\''
     const uses = detectComponentUses(ts, local, 'src/x.ts')
     expect(uses[0]).toMatchObject({ specifier: '@trpc/server', component_id: 'component:trpc' })
   })

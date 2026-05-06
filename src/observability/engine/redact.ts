@@ -1,3 +1,5 @@
+import type { EngineOutput } from './types.js'
+
 // Shared keyword group: both the string-scrubber (KV_PART) and object-key sensor use this.
 // Lookahead ensures keyword ends a segment: 'tokenization_method' does not match ('token'
 // followed by 'i'), but camelCase keys like 'myToken' and 'updateToken' do match.
@@ -111,4 +113,27 @@ export function redactEvent<T>(event: T): T {
 
 export function redactRendered(blob: string): string {
   return sanitizePath(scrubSecrets(blob))
+}
+
+function transformStrings(
+  v: unknown, transform: (s: string) => string, seen = new WeakSet<object>(),
+): unknown {
+  if (typeof v === 'string') return transform(v)
+  if (typeof v !== 'object' || v === null) return v
+  if (seen.has(v as object)) return v
+  seen.add(v as object)
+  if (Array.isArray(v)) return v.map((x) => transformStrings(x, transform, seen))
+  const proto = Object.getPrototypeOf(v) as unknown
+  if (proto !== Object.prototype && proto !== null) return v
+  const out: Record<string, unknown> = {}
+  for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+    out[k] = transformStrings(val, transform, seen)
+  }
+  return out
+}
+
+/** Render-time redaction of a structured EngineOutput. Scrubs paths and secrets in string values only;
+ *  non-string values (numbers, booleans) are preserved regardless of key name. */
+export function redactEngineOutput(out: EngineOutput): EngineOutput {
+  return transformStrings(out, (s) => sanitizePath(scrubSecrets(s))) as EngineOutput
 }

@@ -6,7 +6,10 @@ import type { CallExpression, Identifier, ImportDeclaration, StringLiteral } fro
 import type { SanctionedComponent } from '../types.js'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const traverse = ((traverseDefault as unknown as { default: unknown }).default ?? traverseDefault) as (ast: unknown, visitors: Record<string, (path: NodePath<any>) => void>) => void
+type TraverseFn = (ast: unknown, visitors: Record<string, (path: NodePath<any>) => void>) => void
+const traverse = (
+  (traverseDefault as unknown as { default: unknown }).default ?? traverseDefault
+) as TraverseFn
 
 export interface ComponentUse {
   file: string
