@@ -108,6 +108,7 @@ export async function buildDocGraph(cwd: string): Promise<DocGraph> {
   for (const f of files) provenance[f.id] = 'git'
 
   return {
+    cwd,
     features, stories, acceptance_criteria: acs,
     plan_tasks: planTasks, playbook_tasks: playbookTasks,
     tests, pull_requests: [], files,

@@ -12,6 +12,7 @@ const stubAvail: AvailabilityMap = {
 
 function emptyGraph(): DocGraph {
   return {
+    cwd: '',
     features: [], stories: [], acceptance_criteria: [],
     plan_tasks: [], playbook_tasks: [], tests: [], pull_requests: [],
     files: [], rules: [], components: [], tokens: [], decisions: [],

@@ -4,6 +4,7 @@ import type { DocGraph, AvailabilityMap, Story, AcceptanceCriterion, Test, Edge,
 
 function graphOf(input: { stories: Story[]; acs: AcceptanceCriterion[]; tests: Test[]; edges: Edge[] }): DocGraph {
   return {
+    cwd: '',
     features: [], stories: input.stories,
     acceptance_criteria: input.acs,
     plan_tasks: [], playbook_tasks: [],
