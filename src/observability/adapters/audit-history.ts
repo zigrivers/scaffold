@@ -1,4 +1,4 @@
-import { access, readdir, readFile } from 'node:fs/promises'
+import { access, readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AdapterStatus, BaseAdapter } from './types.js'
 import type { Severity } from '../engine/types.js'
@@ -29,11 +29,18 @@ async function listJsonFiles(cwd: string): Promise<string[]> {
   const exists = await access(d).then(() => true).catch(() => false)
   if (!exists) return []
   const entries = await readdir(d)
-  return entries
-    .filter((f) => f.endsWith('.json'))
-    .sort((a, b) => b.localeCompare(a))
+  const jsons = entries.filter((f) => f.endsWith('.json'))
+  const withMtimes = await Promise.all(
+    jsons.map(async (f) => {
+      const p = join(d, f)
+      const st = await stat(p).catch(() => null)
+      return { path: p, mtime: st?.mtimeMs ?? 0 }
+    }),
+  )
+  return withMtimes
+    .sort((a, b) => b.mtime - a.mtime)
     .slice(0, MAX_SIDECAR_SCAN)
-    .map((f) => join(d, f))
+    .map((x) => x.path)
 }
 
 async function safeRead(path: string): Promise<SidecarShape | null> {
@@ -63,8 +70,6 @@ export const auditHistoryAdapter: BaseAdapter & {
   },
 
   async listSidecars(cwd: string): Promise<string[]> {
-    // Sidecar filenames are date-stamped by the engine, so filename desc == chrono desc.
-    // Avoids stat() on every file; consistent with listJsonFiles.
     return listJsonFiles(cwd)
   },
 
