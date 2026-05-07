@@ -1326,7 +1326,8 @@ describe('StateManager.markCompleted — phase audit hook (Plan 6)', () => {
     const manager = makeBootstrapped()
     const stub = async (input: { primaryRoot: string; step: string }): Promise<PhaseAuditResult> => ({
       ran: true, step: input.step, verdict: 'pass', findings_count: 0, blocking_count: 0,
-      markdown_path: 'docs/audits/audit-x.md', sidecar_path: 'docs/audits/audit-x.json', timed_out: false, elapsed_ms: 5,
+      markdown_path: 'docs/audits/audit-x.md', sidecar_path: 'docs/audits/audit-x.json',
+      timed_out: false, elapsed_ms: 5,
     })
     manager.setPhaseAuditFn(stub)
     const result = await manager.markCompleted('user-stories', ['docs/user-stories.md'], 'pipeline', 1)

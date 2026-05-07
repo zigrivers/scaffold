@@ -172,7 +172,9 @@ export class StateManager {
   }
 
   /** Transition step to completed; records outputs, actor, and depth. Invokes phase-audit hook post-save. */
-  async markCompleted(step: string, outputs: string[], completedBy: string, depth: DepthLevel): Promise<PhaseAuditResult | undefined> {
+  async markCompleted(
+    step: string, outputs: string[], completedBy: string, depth: DepthLevel,
+  ): Promise<PhaseAuditResult | undefined> {
     const state = this.loadState()
     if (!(step in state.steps)) {
       throw Object.assign(new Error(`Cannot mark unknown step '${step}' as completed`), {

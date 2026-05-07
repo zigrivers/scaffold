@@ -181,7 +181,9 @@ export async function runProgress(input: RunProgressInput): Promise<EngineOutput
       ...stateEvents,
       ...testsEvents,
     ]
-    replay = composeReplay({ ledgerEvents: merged.events, adapterEvents, window: { from: displayFrom, to: started_at } })
+    replay = composeReplay({
+      ledgerEvents: merged.events, adapterEvents, window: { from: displayFrom, to: started_at },
+    })
   }
 
   // ---- Stall ----

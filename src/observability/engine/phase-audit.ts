@@ -32,7 +32,10 @@ function raceTimeout<T>(
   promise: Promise<T>,
   ms: number,
 ): Promise<{ value: T; timed_out: false } | { value: undefined; timed_out: true }> {
-  if (ms <= 0) return Promise.resolve({ value: undefined as unknown as T, timed_out: true } as { value: undefined; timed_out: true })
+  if (ms <= 0) {
+    const timedOut = { value: undefined as unknown as T, timed_out: true as const }
+    return Promise.resolve(timedOut as { value: undefined; timed_out: true })
+  }
   return new Promise((resolve) => {
     const timer = setTimeout(() => resolve({ value: undefined, timed_out: true }), ms)
     promise.then((value) => {
@@ -116,5 +119,6 @@ export function formatPhaseAuditLine(r: PhaseAuditResult): string {
   if (!r.ran) return ''
   if (r.detached) return `[audit] dispatched in background (step: ${r.step})`
   if (r.timed_out) return `[audit] timed out after ${r.elapsed_ms}ms — partial findings may not be written`
-  return `[audit] ${r.findings_count} findings (${r.blocking_count ?? 0} blocking, verdict=${r.verdict}) — see ${r.markdown_path}`
+  const summary = `${r.findings_count} findings (${r.blocking_count ?? 0} blocking, verdict=${r.verdict})`
+  return `[audit] ${summary} — see ${r.markdown_path}`
 }

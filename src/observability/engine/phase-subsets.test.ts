@@ -3,7 +3,11 @@ import { PHASE_BOUNDARY_STEPS, isPhaseBoundary, phaseLabel } from './phase-subse
 
 describe('phase-subsets', () => {
   it('isPhaseBoundary returns true for spec §3.9 boundary steps', () => {
-    for (const slug of ['user-stories', 'tech-stack', 'coding-standards', 'design-system', 'implementation-plan', 'implementation-playbook']) {
+    const boundarySlugs = [
+      'user-stories', 'tech-stack', 'coding-standards',
+      'design-system', 'implementation-plan', 'implementation-playbook',
+    ]
+    for (const slug of boundarySlugs) {
       expect(isPhaseBoundary(slug), `slug: ${slug}`).toBe(true)
     }
   })

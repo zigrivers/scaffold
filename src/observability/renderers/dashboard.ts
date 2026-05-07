@@ -20,7 +20,9 @@ const SEVERITIES: Severity[] = ['P0', 'P1', 'P2', 'P3']
 function needsAttentionAside(out: EngineOutput): string {
   if (out.needs_attention.length === 0) return ''
   const items = out.needs_attention.map((i) => {
-    const ageStr = i.signal === 'lens_skipped_repeatedly' ? `${i.threshold_count ?? i.threshold_hours}× streak` : `${i.age_hours}h`
+    const ageStr = i.signal === 'lens_skipped_repeatedly'
+      ? `${i.threshold_count ?? i.threshold_hours}× streak`
+      : `${i.age_hours}h`
     return `<li><code>${escape(i.signal)}</code> ${escape(i.summary)} <span class="age">[${ageStr}]</span></li>`
   }).join('')
   return `<aside class="needs-attention"><h3>Needs Attention</h3><ul>${items}</ul></aside>`
