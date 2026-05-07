@@ -24,6 +24,10 @@ describe('BUILTIN_CHANNELS — doc-conformance', () => {
     expect(BUILTIN_CHANNELS['doc-conformance'].auth.timeout).toBe(20)
   })
 
+  it('failure_exit_codes includes 127 so a missing binary fails auth rather than silently passing', () => {
+    expect(BUILTIN_CHANNELS['doc-conformance'].auth.failure_exit_codes).toContain(127)
+  })
+
   it('is disabled by default (requires explicit opt-in due to 3 LLM calls)', () => {
     expect(BUILTIN_CHANNELS['doc-conformance'].enabled).toBe(false)
   })
