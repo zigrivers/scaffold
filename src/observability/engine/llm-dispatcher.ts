@@ -92,32 +92,53 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
 }
 
 function extractJsonObject(text: string): unknown {
-  // Find the first { or [ — LLM prompts request objects but guard against arrays too
-  const objIdx = text.indexOf('{')
-  const arrIdx = text.indexOf('[')
-  const start = objIdx === -1 ? arrIdx : arrIdx === -1 ? objIdx : Math.min(objIdx, arrIdx)
-  if (start === -1) throw new Error('no JSON object or array found in output')
+  // Fast path: try parsing the whole trimmed string first (common when LLM outputs
+  // pure JSON with no conversational preamble).
+  try { return JSON.parse(text.trim()) } catch { /* fall through to extraction */ }
 
-  const isArray = text[start] === '['
-  const open = isArray ? '[' : '{'
-  const close = isArray ? ']' : '}'
-
-  let depth = 0
-  let inString = false
-
-  for (let i = start; i < text.length; i++) {
+  // Extraction path: collect all top-level { or [ positions (not nested), then try
+  // from the LAST one first. This handles preamble examples: if the LLM writes
+  // "Example: { ... }. Results: { ... }", we pick the last block (results), not
+  // the first (example).
+  const starts: Array<number> = []
+  let inStr = false
+  let d = 0
+  for (let i = 0; i < text.length; i++) {
     const ch = text[i]
-    if (inString) {
-      if (ch === '\\') { i++ } else if (ch === '"') { inString = false }
+    if (inStr) {
+      if (ch === '\\') { i++ } else if (ch === '"') { inStr = false }
       continue
     }
-    if (ch === '"') { inString = true }
-    else if (ch === open) { depth++ }
-    else if (ch === close) {
-      depth--
-      if (depth === 0) return JSON.parse(text.slice(start, i + 1))
+    if (ch === '"') { inStr = true }
+    else if (ch === '{' || ch === '[') { if (d === 0) starts.push(i); d++ }
+    else if (ch === '}' || ch === ']') { d-- }
+  }
+
+  if (starts.length === 0) throw new Error('no JSON object or array found in output')
+
+  // Try each top-level start from last to first
+  for (let s = starts.length - 1; s >= 0; s--) {
+    const start = starts[s]
+    const open = text[start] as '{' | '['
+    const close = open === '{' ? '}' : ']'
+    let depth = 0
+    let inString = false
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i]
+      if (inString) {
+        if (ch === '\\') { i++ } else if (ch === '"') { inString = false }
+        continue
+      }
+      if (ch === '"') { inString = true }
+      else if (ch === open) { depth++ }
+      else if (ch === close) {
+        depth--
+        if (depth === 0) {
+          try { return JSON.parse(text.slice(start, i + 1)) } catch { break }
+        }
+      }
     }
   }
 
-  throw new Error('unbalanced braces/brackets in JSON output')
+  throw new Error('no valid JSON found in output')
 }
