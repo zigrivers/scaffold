@@ -369,7 +369,7 @@ EOF
     [[ "$output" == *"::H-cross-doc::"* ]]
 }
 
-@test "observe audit --profile=full does not crash when LLM dispatcher is missing" {
+@test "observe audit --profile=full does not crash when LLM calls time out" {
     cat > docs/plan.md <<'EOF'
 # PRD
 ## Features
@@ -386,7 +386,6 @@ EOF
 EOF
     cat > .scaffold/observability.yaml <<'EOF'
 llm:
-  dispatcher_command: "/no/such/llm"
   timeout_s: 1
 EOF
 
