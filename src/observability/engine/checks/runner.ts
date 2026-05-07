@@ -12,7 +12,7 @@ export type LensFn = (
   availability: AvailabilityMap,
   upstreamFindings: Finding[],
   enabledIds: Set<string>,
-  context: LensContext,
+  context?: LensContext,
 ) => Promise<Finding[]>
 
 export interface RunChecksInput {
