@@ -346,3 +346,51 @@ EOF
         false
     fi
 }
+
+@test "observe audit --output-mode=mmr-findings emits a JSON array" {
+    cat > docs/plan.md <<'EOF'
+# PRD
+## Features
+### F [priority: must]
+EOF
+    cat > docs/user-stories.md <<'EOF'
+## Story s-1: T [priority: must]
+
+### AC 1: t
+Given X.
+EOF
+    cat > docs/tdd-standards.md <<'EOF'
+# TDD
+EOF
+
+    run $BIN observe audit --output-mode=mmr-findings --since-hours=24
+    [ "$status" -eq 1 ]
+    [[ "$output" == \[* ]]
+    [[ "$output" == *"::H-cross-doc::"* ]]
+}
+
+@test "observe audit --profile=full does not crash when LLM dispatcher is missing" {
+    cat > docs/plan.md <<'EOF'
+# PRD
+## Features
+### F [priority: must]
+EOF
+    cat > docs/user-stories.md <<'EOF'
+## Story s-1: T [priority: must]
+
+### AC 1: t
+Given X.
+EOF
+    cat > docs/tdd-standards.md <<'EOF'
+# TDD
+EOF
+    cat > .scaffold/observability.yaml <<'EOF'
+llm:
+  dispatcher_command: "/no/such/llm"
+  timeout_s: 1
+EOF
+
+    run $BIN observe audit --profile=full --since-hours=24 --json
+    [ "$status" -eq 1 ] || [ "$status" -eq 0 ]
+    [[ "$output" == *'"schema_version": "1.0"'* ]] || false
+}
