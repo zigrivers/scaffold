@@ -340,6 +340,38 @@ describe('observe --render=dashboard-fragment', () => {
   })
 })
 
+describe('observe audit --output-mode=mmr-findings', () => {
+  let proj: string
+  beforeEach(() => {
+    proj = mkdtempSync(join(tmpdir(), 'observe-mmrf-'))
+    execSync('git init -q', { cwd: proj })
+    execSync('git config user.email t@e.com && git config user.name T', { cwd: proj, shell: '/bin/sh' })
+    mkdirSync(join(proj, 'docs'), { recursive: true })
+    writeFileSync(join(proj, 'package.json'), '{}')
+    writeFileSync(join(proj, 'docs/plan.md'), '# PRD\n## Features\n### F [priority: must]\n')
+    writeFileSync(join(proj, 'docs/user-stories.md'),
+      '## Story s-1: T [priority: must]\n\n### AC 1: t\n')
+    writeFileSync(join(proj, 'docs/tdd-standards.md'), '# TDD\n')
+  })
+  afterEach(() => { rmSync(proj, { recursive: true, force: true }) })
+
+  it('emits a JSON array suitable for MMR consumption', async () => {
+    let captured = ''
+    const orig = process.stdout.write.bind(process.stdout)
+    process.stdout.write = ((s: string | Uint8Array) => { captured += String(s); return true }) as never
+    try {
+      await handleAudit({
+        cwd: proj, json: false, profile: 'fast', scope: 'all', sinceHours: 24,
+        outputMode: 'mmr-findings', ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+      })
+    } finally { process.stdout.write = orig }
+
+    const parsed = JSON.parse(captured) as Array<{ severity: string; location: string }>
+    expect(Array.isArray(parsed)).toBe(true)
+    expect(parsed.every((f) => f.severity && f.location)).toBe(true)
+  })
+})
+
 describe('observe progress --replay + --no-stall-check', () => {
   let proj: string
   beforeEach(async () => {
