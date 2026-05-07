@@ -56,7 +56,7 @@ export interface RunAuditInput {
   primaryRoot: string
   profile: 'fast' | 'full'
   scope: 'docs' | 'code' | 'all'
-  sinceHours: number
+  sinceHours?: number
   lensIds?: string[]
   fixThresholdOverride?: string
   ghBin?: string
