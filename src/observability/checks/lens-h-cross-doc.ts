@@ -149,13 +149,22 @@ export const lensHCrossDoc: LensFn = async (graph, _ledger, _availability, _upst
     })
   }
 
-  // Full-profile LLM-graded checks
+  // Full-profile LLM-graded checks (~60s × 3 calls = ~180s worst-case).
+  // Sequential intentionally: parallel calls to the same LLM provider risk
+  // rate-limiting which would silently drop findings. Users who opt into
+  // full-profile accept the latency; the doc-conformance channel sets a
+  // 240s timeout to accommodate it.
   if (context?.profile === 'full') {
-    const config = loadObservabilityConfig(context.cwd)
-    const cmd = config.llm.dispatcher_command ?? 'claude -p'
-    const timeoutMs = (config.llm.timeout_s ?? 60) * 1000
+    let cmd = 'claude -p'
+    let timeoutMs = 60_000
+    try {
+      const config = loadObservabilityConfig(context.cwd)
+      cmd = config.llm.dispatcher_command ?? cmd
+      timeoutMs = (config.llm.timeout_s ?? 60) * 1000
+    } catch {
+      // Malformed observability.yaml — fall back to defaults so the audit continues
+    }
 
-    // Sequential to avoid dispatcher rate-limiting; each call has its own timeout
     findings.push(...await runTechStackVsPrd(graph, context, cmd, timeoutMs, now, makeFindingId))
     findings.push(...await runPrdToStoriesCoverage(graph, context, cmd, timeoutMs, now, makeFindingId))
     findings.push(...await runTerminologyDrift(graph, context, cmd, timeoutMs, now, makeFindingId))

@@ -83,7 +83,9 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
     stderr: 'suppress',
   },
   'doc-conformance': {
-    enabled: true,
+    // Disabled by default: runs up to 3 LLM calls (~3 min) via scaffold observe audit.
+    // Enable in .mmr.yaml or pass --channels=doc-conformance to use.
+    enabled: false,
     command: 'scaffold observe audit --profile=full --scope=all --output-mode=mmr-findings',
     flags: [],
     env: {},

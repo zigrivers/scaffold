@@ -34,8 +34,13 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
       resolved = true
       // Kill the entire process group (negated PID) so wrapper scripts and
       // child LLM processes are all terminated, not just the sh -c parent.
-      try { process.kill(-child.pid!, 'SIGTERM') } catch { /* ignore if already gone */ }
-      setTimeout(() => { try { process.kill(-child.pid!, 'SIGKILL') } catch { /* ignore */ } }, 500)
+      // Negated PID is POSIX-only; Windows does not support process groups.
+      if (process.platform !== 'win32') {
+        try { process.kill(-child.pid!, 'SIGTERM') } catch { /* ignore if already gone */ }
+        setTimeout(() => { try { process.kill(-child.pid!, 'SIGKILL') } catch { /* ignore */ } }, 500)
+      } else {
+        try { child.kill('SIGTERM') } catch { /* ignore */ }
+      }
       resolve({ ok: false, reason: `timed out after ${input.timeoutMs}ms`, raw: stdout })
     }, input.timeoutMs)
 
