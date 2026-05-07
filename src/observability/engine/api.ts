@@ -101,6 +101,7 @@ export async function runAudit(input: RunAuditInput): Promise<EngineOutput> {
     ledger: { events: merged.events },
     availability,
     profile: input.profile,
+    cwd: input.primaryRoot,
     enabledIds,
   })
   const { findings, summary } = aggregate(rawFindings, merged.events, fix_threshold)
