@@ -19,7 +19,7 @@ describe('BUILTIN_CHANNELS — doc-conformance', () => {
     expect(BUILTIN_CHANNELS['doc-conformance'].auth.check).toMatch(/scaffold/)
   })
 
-  it('has enabled=true', () => {
-    expect(BUILTIN_CHANNELS['doc-conformance'].enabled).toBe(true)
+  it('is disabled by default (requires explicit opt-in due to 3 LLM calls)', () => {
+    expect(BUILTIN_CHANNELS['doc-conformance'].enabled).toBe(false)
   })
 })

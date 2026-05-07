@@ -87,8 +87,15 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
 }
 
 function extractJsonObject(text: string): unknown {
-  const start = text.indexOf('{')
-  if (start === -1) throw new Error('no JSON object found in output')
+  // Find the first { or [ — LLM prompts request objects but guard against arrays too
+  const objIdx = text.indexOf('{')
+  const arrIdx = text.indexOf('[')
+  const start = objIdx === -1 ? arrIdx : arrIdx === -1 ? objIdx : Math.min(objIdx, arrIdx)
+  if (start === -1) throw new Error('no JSON object or array found in output')
+
+  const isArray = text[start] === '['
+  const open = isArray ? '[' : '{'
+  const close = isArray ? ']' : '}'
 
   let depth = 0
   let inString = false
@@ -100,12 +107,12 @@ function extractJsonObject(text: string): unknown {
       continue
     }
     if (ch === '"') { inString = true }
-    else if (ch === '{') { depth++ }
-    else if (ch === '}') {
+    else if (ch === open) { depth++ }
+    else if (ch === close) {
       depth--
       if (depth === 0) return JSON.parse(text.slice(start, i + 1))
     }
   }
 
-  throw new Error('unbalanced braces in JSON output')
+  throw new Error('unbalanced braces/brackets in JSON output')
 }

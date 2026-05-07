@@ -40,7 +40,7 @@ describe('doc-conformance channel — hermetic integration', () => {
     expect(ch.output_parser).toBe('doc-conformance')
     expect(ch.command).toMatch(/scaffold observe audit/)
     expect(ch.command).toMatch(/--output-mode=mmr-findings/)
-    expect(ch.enabled).toBe(true)
+    expect(ch.enabled).toBe(false) // disabled by default; enable via .mmr.yaml or --channels=doc-conformance
   })
 
   it('runAudit output is parseable by the doc-conformance parser as a JSON array', async () => {
