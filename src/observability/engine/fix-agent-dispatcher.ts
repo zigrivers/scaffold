@@ -18,7 +18,7 @@ function parseShell(cmd: string): string[] {
   let inDouble = false
   for (let i = 0; i < cmd.length; i++) {
     const ch = cmd[i]
-    if (ch === "'" && !inDouble) { inSingle = !inSingle }
+    if (ch === '\'' && !inDouble) { inSingle = !inSingle }
     else if (ch === '"' && !inSingle) { inDouble = !inDouble }
     else if (ch === ' ' && !inSingle && !inDouble) { if (current) { args.push(current); current = '' } }
     else { current += ch }
@@ -44,7 +44,10 @@ export function dispatchFixAgent(input: DispatchFixInput): Promise<DispatchFixRe
       if (resolved) return
       resolved = true
       try { child.kill('SIGTERM') } catch { /* ignore */ }
-      resolve({ ok: false, reason: `timed out after ${input.timeoutMs}ms`, timed_out: true, elapsed_ms: Date.now() - started })
+      resolve({
+        ok: false, reason: `timed out after ${input.timeoutMs}ms`,
+        timed_out: true, elapsed_ms: Date.now() - started,
+      })
     }, input.timeoutMs)
 
     child.on('error', (err: NodeJS.ErrnoException) => {

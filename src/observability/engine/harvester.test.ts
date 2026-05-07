@@ -77,8 +77,11 @@ describe('harvester.recoverStaleArchives', () => {
   it('rotates active-archive entries whose worktree path no longer exists', async () => {
     const activeDir = join(primary, '.scaffold/activity-archive/active')
     mkdirSync(activeDir, { recursive: true })
-    writeFileSync(join(activeDir, 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jsonl'),
-      JSON.stringify({ event_id: 'ulid-x', worktree_id: 'aaaa', actor_label: 'orphan', branch: 'b', task_id: 'T-1', type: 'task_claimed', ts: '2026-04-01T00:00:00Z', payload: { task_title: 'gone' } }) + '\n')
+    const staleEntry = JSON.stringify({
+      event_id: 'ulid-x', worktree_id: 'aaaa', actor_label: 'orphan', branch: 'b',
+      task_id: 'T-1', type: 'task_claimed', ts: '2026-04-01T00:00:00Z', payload: { task_title: 'gone' },
+    })
+    writeFileSync(join(activeDir, 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jsonl'), `${staleEntry}\n`)
 
     const result = await recoverStaleArchives({ primaryRoot: primary })
     expect(result.rotated).toContain('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee')
@@ -94,7 +97,8 @@ describe('harvester.recoverStaleArchives', () => {
     const wtPath = mkdtempSync(join(tmpdir(), 'observe-recover-wt-'))
     try {
       mkdirSync(join(wtPath, '.scaffold'), { recursive: true })
-      writeFileSync(join(wtPath, '.scaffold/identity.json'), JSON.stringify({ worktree_id: wtId, worktree_label: 'live', created_at: '2026-05-04T00:00:00Z' }))
+      const identity = JSON.stringify({ worktree_id: wtId, worktree_label: 'live', created_at: '2026-05-04T00:00:00Z' })
+      writeFileSync(join(wtPath, '.scaffold/identity.json'), identity)
       writeFileSync(join(activeDir, `${wtId}.jsonl`), '{}\n')
 
       const result = await recoverStaleArchives({ primaryRoot: primary, listWorktrees: () => [wtPath] })

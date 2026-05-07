@@ -113,7 +113,7 @@ describe('runFixFlow', () => {
   it('continues to the next finding after a per-finding failure', async () => {
     const stubDispatcher = vi.fn(async () => ({ ok: true as const, exit_code: 0 as const, elapsed_ms: 50 }))
     const stubVerify = vi.fn(async (_p: string, fnd: Finding) =>
-      ({ stillPresent: fnd.id === 'a' })
+      ({ stillPresent: fnd.id === 'a' }),
     )
 
     const initial = makeFixtureWithFindings([f('a', 'P0', 'A-tdd'), f('b', 'P1', 'B-ac-coverage')])

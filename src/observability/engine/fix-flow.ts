@@ -56,7 +56,8 @@ function buildFindingPrompt(finding: Finding): string {
       : '',
     '## Instructions',
     '',
-    'Fix this specific finding only. Do not do unrelated work. Stage your changes with `git add` when finished. Exit when done.',
+    'Fix this specific finding only. Do not do unrelated work.',
+    'Stage your changes with `git add` when finished. Exit when done.',
   ].filter(Boolean).join('\n')
 }
 
