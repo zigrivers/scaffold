@@ -154,12 +154,16 @@ export const lensHCrossDoc: LensFn = async (graph, _ledger, _availability, _upst
   // rate-limiting which would silently drop findings. Users who opt into
   // full-profile accept the latency; the doc-conformance channel sets a
   // 240s timeout to accommodate it.
+  //
+  // SECURITY: dispatcher_command is intentionally NOT loaded from project-local
+  // observability.yaml — executing a repo-controlled command string would allow
+  // arbitrary code execution when auditing untrusted repositories. Only timeout
+  // is project-configurable (performance only, not code execution).
   if (context?.profile === 'full') {
-    let cmd = 'claude -p'
+    const cmd = 'claude -p'
     let timeoutMs = 60_000
     try {
       const config = loadObservabilityConfig(context.cwd)
-      cmd = config.llm.dispatcher_command ?? cmd
       timeoutMs = (config.llm.timeout_s ?? 60) * 1000
     } catch {
       // Malformed observability.yaml — fall back to defaults so the audit continues
