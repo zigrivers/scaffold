@@ -31,7 +31,8 @@ export interface StallConfig {
 }
 
 export interface LlmConfig {
-  dispatcher_command?: string
+  // dispatcher_command is intentionally not exposed: executing a repo-controlled
+  // command would allow arbitrary code execution in untrusted repos.
   timeout_s?: number
   parallel_checks?: boolean // opt-in parallel LLM calls; default false to avoid rate-limiting
 }
@@ -67,7 +68,7 @@ export const DEFAULT_CONFIG: ObservabilityConfig = {
     blocker_unaddressed: '2h', audit_findings_unresolved: '24h',
   },
   phase_audit: { enabled: true, timeout_s: 60, detached: false },
-  llm: { dispatcher_command: 'claude -p', timeout_s: 60 },
+  llm: { timeout_s: 60 },
 }
 
 const CONFIG_PATH = '.scaffold/observability.yaml'

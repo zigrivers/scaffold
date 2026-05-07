@@ -90,7 +90,7 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
     flags: [],
     env: {},
     auth: {
-      check: 'scaffold --version >/dev/null 2>&1',
+      check: 'scaffold --version >/dev/null 2>&1 && claude --version >/dev/null 2>&1',
       timeout: 5,
       failure_exit_codes: [1],
       recovery: 'Install scaffold: npm install -g @zigrivers/scaffold  (or: brew install scaffold)',

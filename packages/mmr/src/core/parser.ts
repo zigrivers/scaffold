@@ -176,7 +176,7 @@ function docConformanceParser(raw: string): ParsedOutput {
         summary: 'doc-conformance: output was not a JSON array',
       }
     }
-    const findings = arr.map(validateFinding)
+    const findings = arr.map(validateFindingStrict)
     const approved = findings.every((f) => f.severity === 'P2' || f.severity === 'P3')
     const summary = `doc-conformance: ${findings.length} finding(s)${approved ? '' : ' (blocking)'}`
     return { approved, findings, summary }

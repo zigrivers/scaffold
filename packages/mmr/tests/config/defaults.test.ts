@@ -15,8 +15,9 @@ describe('BUILTIN_CHANNELS — doc-conformance', () => {
     expect(BUILTIN_CHANNELS['doc-conformance'].output_parser).toBe('doc-conformance')
   })
 
-  it('auth.check verifies scaffold is installed', () => {
+  it('auth.check verifies both scaffold and claude are installed', () => {
     expect(BUILTIN_CHANNELS['doc-conformance'].auth.check).toMatch(/scaffold/)
+    expect(BUILTIN_CHANNELS['doc-conformance'].auth.check).toMatch(/claude/)
   })
 
   it('is disabled by default (requires explicit opt-in due to 3 LLM calls)', () => {

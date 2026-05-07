@@ -123,7 +123,11 @@ function extractJsonObject(text: string): unknown {
 
   if (starts.length === 0) throw new Error('no JSON object or array found in output')
 
-  // Try each top-level start from last to first
+  // Try each top-level start from last to first.
+  // Safety: tracking only the matched open/close pair ({} or []) is sufficient.
+  // Nested arrays inside objects (or vice-versa) are balanced sub-content; they
+  // never produce a spurious depth-0 event for the outer pair. Strings are
+  // handled by the inString guard, so delimiters inside string values are skipped.
   for (let s = starts.length - 1; s >= 0; s--) {
     const start = starts[s]
     const open = text[start] as '{' | '['

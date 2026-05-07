@@ -157,8 +157,9 @@ export const lensHCrossDoc: LensFn = async (graph, _ledger, _availability, _upst
   //
   // SECURITY: dispatcher_command is intentionally NOT loaded from project-local
   // observability.yaml — executing a repo-controlled command string would allow
-  // arbitrary code execution when auditing untrusted repositories. Only timeout
-  // is project-configurable (performance only, not code execution).
+  // arbitrary code execution when auditing untrusted repositories. Only
+  // timeout_s and parallel_checks are project-configurable (performance only,
+  // not code execution).
   if (context?.profile === 'full') {
     const cmd = 'claude -p'
     let timeoutMs = 60_000

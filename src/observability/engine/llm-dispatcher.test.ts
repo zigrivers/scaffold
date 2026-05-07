@@ -52,6 +52,22 @@ describe('dispatchLlm', () => {
     if (!result.ok) expect(result.reason).toMatch(/ENOENT|not found|spawn|exit|error/i)
   })
 
+  it('handles objects containing nested arrays (mixed delimiters) correctly', async () => {
+    // Verifies that tracking only {/} or [/] per top-level block is sufficient:
+    // inner [1,2] brackets are balanced content and never produce spurious depth=0 events.
+    const json = '{"findings":[[{"id":"x","v":1}],[{"id":"y"}]]}'
+    const result = await dispatchLlm({
+      prompt: 'irrelevant',
+      command: `cat >/dev/null; printf '%s' '${json}'`,
+      timeoutMs: 5000,
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      const parsed = result.parsed as { findings: unknown[][] }
+      expect(parsed.findings).toHaveLength(2)
+    }
+  })
+
   it('extracts the LAST JSON block when output has preamble JSON before the real result', async () => {
     // LLMs sometimes emit an example block before the real answer, e.g.:
     //   "Example: {"findings":[...fake...]}. Results: {"findings":[...real...]}"
