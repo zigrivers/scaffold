@@ -4,6 +4,125 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.26.0] — 2026-05-07
+
+### Added
+
+**Build Observability system** — a new subsystem (`src/observability/`) that records what is happening during a build, surfaces stalls and audit findings at every command boundary, and (new in this release) dispatches AI agents to fix blocking findings automatically. All data lives under `.scaffold/` and is never required for normal pipeline operation.
+
+#### Ledger and events (`scaffold observe event`)
+
+- **Append-only activity ledger** at `.scaffold/activity.jsonl` with `proper-lockfile` for concurrent-write safety. Eight event types: `task_claimed`, `task_completed`, `decision_made`, `blocker_raised`, `pr_opened`, `pr_merged`, `progress_heartbeat`, `build_completed`. Each event carries `worktree_id`, `actor_label`, `branch`, `task_id`, `ts` (ISO-8601), and a type-specific `payload`.
+- **Identity files** — each worktree writes `.scaffold/identity.json` on first use (`worktree_id` UUID, `worktree_label`, `created_at`). Harvester and cross-worktree correlation use these IDs.
+
+#### Progress snapshot (`scaffold observe progress`)
+
+- Live progress report fusing the ledger, git history, GitHub PR state, MMR job results, pipeline state, and test suite results via six adapters (`git`, `gh`, `pipeline_docs`, `tests`, `mmr`, `state`). Outputs to terminal (default), markdown (`docs/build-status/<id>.md`), JSON sidecar (`docs/build-status/<id>.json`), or HTML dashboard fragment (`--render=dashboard-fragment`).
+- **`--replay` flag** — fuses the ledger with synthesized adapter events into a chronological timeline, deduplicated by `correlation_id` (ledger > mmr > gh > git > state > tests source priority). Per-step `completed_at` / `in_progress_started_at` timestamps replace file-mtime fallbacks.
+- **Stall detection** — fires at every command-execution boundary and surfaces six signal types: `task_stale`, `pr_stale`, `pr_review_stale`, `blocker_unaddressed`, `audit_findings_unresolved`, `lens_skipped_repeatedly`. Configurable thresholds in `.scaffold/observability.yaml` under `stall:`. Suppress with `--no-stall-check`.
+- **`--output=<path>`** overrides the markdown destination (sidecar still goes to `docs/build-status/`).
+
+#### Audit (`scaffold observe audit`)
+
+Eight-lens audit suite that reads the doc-graph built from project documents and source code:
+
+| Lens | What it checks |
+|------|----------------|
+| **A-tdd** | Test-first evidence — failing-test commit, test file + implementation file timestamp ordering |
+| **B-ac-coverage** | Acceptance-criteria coverage — story count vs. tested story count |
+| **C-standards** | Coding-standards compliance — ESLint, optionally gated by `enforce_via_linter: true` |
+| **D-stack** | Stack conformance — imports vs. sanctioned tech-stack document |
+| **E-design** | Design-token usage — CSS custom-property adherence, JSX style-prop and component-use checks |
+| **F-scope** | Scope coverage — implementation tasks vs. user story coverage |
+| **G-decisions** | Decision log completeness — significant commit keywords (remove, migrate, replace, …) without a matching ADR |
+| **H-cross-doc** | Cross-document consistency — doc-graph orphan detection plus three full-profile LLM-graded checks: tech-stack-supports-PRD (P0/P2), PRD-to-stories semantic coverage (P1), cross-doc terminology drift (P2) |
+
+- **`--scope=code|docs|all`** (default `all`). `--scope=code` runs A–G; `--scope=docs` runs H only. `--lens <id>` overrides scope to a single lens.
+- **`--profile=fast|full`** — `full` enables the three LLM-graded Lens H sub-checks (requires `claude` CLI).
+- **Per-finding IDs** — stable UUIDs for cross-run correlation. `scaffold observe ack <prefix-or-id>` acknowledges or reopens findings.
+- **Persisted output** — `docs/audits/<id>.md` + `<id>.json` sidecar. `--output=<path>` overrides markdown path.
+- **`--render=dashboard-fragment-audit`** emits an HTML panel for the dashboard; skips file writes.
+- **`--output-mode=mmr-findings`** emits findings in MMR's Finding shape for the `doc-conformance` built-in channel.
+- **Phase-boundary triggers** — `scaffold complete` runs `H-cross-doc` automatically after completing any phase-boundary step (`user-stories`, `tech-stack`, `coding-standards`, `design-system`, `implementation-plan`, `implementation-playbook`). Non-gating. Config: `phase_audit.enabled` (default `true`), `phase_audit.timeout_s` (default `60`), `phase_audit.detached` (default `false`).
+- **`--fix` flag** — after the initial audit, dispatches a fix agent for each blocking finding. See [Fix flow](#fix-flow) below.
+
+#### Fix flow (`scaffold observe audit --fix`)
+
+Autonomous fix loop that dispatches an AI agent for each blocking finding and verifies the fix:
+
+1. **Audit** — run the standard audit and collect blocking findings.
+2. **Plan** — `buildFixPlan` filters to open findings at or above `fix_threshold` and sorts by severity (P0 first), tiebreaking by lens ID.
+3. **Dispatch** — for each finding, spawn the configured `dispatcher_command` (default `claude -p`) as a subprocess. The finding prompt (description, evidence, fix hint, instructions) is written to stdin. stdout and stderr are inherited so the user sees live output.
+4. **Verify** — re-run the finding's lens (up to `per_finding_max_attempts` times, default 3) to confirm the issue is resolved.
+5. **Post-fix report** — run a full audit and write `docs/audits/<id>-postfix.{md,json}`.
+
+**Abort safety** — `captureSnapshot` records `git stash create` + pre-existing staged paths before the first dispatch. A `SIGINT` handler calls `restoreSnapshot` (reverting only fix-flow-staged paths, then re-applying the stash) so Ctrl-C leaves the working tree in its original state.
+
+**Config** (`.scaffold/observability.yaml` under `fix:`):
+```yaml
+fix:
+  dispatcher_command: "claude -p"   # default
+  timeout_s: 300                     # per-dispatch timeout
+  per_finding_max_attempts: 3        # retries before declaring a finding failed
+```
+
+#### Harvest and recovery (`scaffold observe harvest`)
+
+- **`--worktree=<path>`** — flushes a worktree's ledger to the central archive (`.scaffold/activity-archive/active/<worktree-id>.jsonl`). Holds the same `proper-lockfile` as the ledger writer for a consistent snapshot.
+- **`--recover`** — scans `.scaffold/activity-archive/active/` for entries whose worktree no longer appears in `git worktree list`, and rotates them into `YYYY-MM.jsonl` monthly archives. Run after worktrees are removed to prevent unbounded archive growth.
+
+#### Worktree teardown (`scripts/teardown-agent-worktree.sh`)
+
+A new utility script that safely decommissions an agent worktree:
+
+```bash
+scripts/teardown-agent-worktree.sh <worktree-path>
+```
+
+1. Derives the primary repo via `git -C <worktree> rev-parse --git-common-dir` — works from any CWD, not hardcoded to the script location.
+2. Harvests the worktree's ledger to the central archive (`scaffold observe harvest --worktree=<path>`).
+3. Removes the worktree with `git worktree remove`.
+4. Deletes the workspace branch if it is not the primary repo's current HEAD.
+
+#### MMR `doc-conformance` channel
+
+- **Built-in channel** — `mmr review --channels=doc-conformance` runs `scaffold observe audit --output-mode=mmr-findings` as a built-in channel. Disabled by default; enable via `.mmr.yaml` or `--channels=doc-conformance`. Opt out when globally enabled via `channels_disabled: ["doc-conformance"]`.
+- **Stable finding IDs** — composite location `<source_doc>::<lens_id>::<short_id>` for consistent cross-run deduplication in MMR.
+
+#### Dashboard integration
+
+- `scripts/generate-dashboard.sh` injects "Build Progress" and "Audit" HTML panels into the dashboard via named anchors. Panels include stall signals ("Needs Attention"), timeline, findings by severity, and lens skips.
+- `scaffold observe progress --render=dashboard-fragment` and `scaffold observe audit --render=dashboard-fragment-audit` emit standalone HTML fragments for injection.
+
+#### Configuration reference
+
+`.scaffold/observability.yaml` controls all subsystems:
+
+```yaml
+lenses:
+  C-standards:
+    enforce_via_linter: true       # fail lens if linter is not installed
+    rule_overrides:
+      no-console: P1               # override per-rule severity
+  E-design:
+    ad_hoc_token_threshold: 5      # ad-hoc token count before E fires
+    ui_glob: "src/components/**/*.{tsx,vue}"
+  F-scope:
+    untouched_story_grace_hours: 168
+disabled_lenses: []
+stall:
+  task_stale_hours: 4
+  pr_stale_hours: 24
+phase_audit:
+  enabled: true
+  timeout_s: 60
+  detached: false                  # true = fire-and-forget
+fix:
+  dispatcher_command: "claude -p"
+  timeout_s: 300
+  per_finding_max_attempts: 3
+```
+
 ## [3.25.1] — 2026-04-29
 
 ### Fixed
