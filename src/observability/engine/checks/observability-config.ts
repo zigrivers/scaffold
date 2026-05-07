@@ -30,6 +30,11 @@ export interface StallConfig {
   audit_findings_unresolved?: string | 'off'
 }
 
+export interface LlmConfig {
+  dispatcher_command?: string
+  timeout_s?: number
+}
+
 export interface ObservabilityConfig {
   lenses: {
     'A-tdd'?: Record<string, never>
@@ -44,6 +49,7 @@ export interface ObservabilityConfig {
   disabled_lenses: string[]
   stall: StallConfig
   phase_audit: { enabled: boolean; timeout_s: number; detached: boolean }
+  llm: LlmConfig
 }
 
 export const DEFAULT_CONFIG: ObservabilityConfig = {
@@ -60,6 +66,7 @@ export const DEFAULT_CONFIG: ObservabilityConfig = {
     blocker_unaddressed: '2h', audit_findings_unresolved: '24h',
   },
   phase_audit: { enabled: true, timeout_s: 60, detached: false },
+  llm: { dispatcher_command: 'claude -p', timeout_s: 60 },
 }
 
 const CONFIG_PATH = '.scaffold/observability.yaml'
