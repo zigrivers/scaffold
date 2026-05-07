@@ -93,7 +93,7 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
       check: 'scaffold --version >/dev/null 2>&1',
       timeout: 5,
       failure_exit_codes: [1],
-      recovery: 'npm install -g @zigrivers/scaffold',
+      recovery: 'Install scaffold: npm install -g @zigrivers/scaffold  (or: brew install scaffold)',
     },
     prompt_wrapper: '{{prompt}}',
     output_parser: 'doc-conformance',

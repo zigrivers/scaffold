@@ -60,15 +60,16 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
       resolve({ ok: false, reason: `subprocess error (${code}): ${err.message}`, raw: stdout })
     })
 
-    child.on('close', (code) => {
+    child.on('close', (code, signal) => {
       if (resolved) return
       resolved = true
       clearTimeout(timer)
       stdout += decoder.end()
       stderr += stderrDecoder.end()
-      if (code !== 0) {
+      if (code !== 0 || code === null) {
+        const codeStr = code !== null ? `exit ${code}` : `signal ${signal ?? 'unknown'}`
         const hint = stderr.trim() ? ` — stderr: ${stderr.trim().slice(0, 200)}` : ''
-        resolve({ ok: false, reason: `subprocess exit ${code}${hint}`, raw: stdout })
+        resolve({ ok: false, reason: `subprocess ${codeStr}${hint}`, raw: stdout })
         return
       }
       // Brace-depth extraction — tolerates LLM filler text before/after the JSON block
@@ -117,7 +118,7 @@ function extractJsonObject(text: string): unknown {
     }
     if (ch === '"') { inStr = true }
     else if (ch === '{' || ch === '[') { if (d === 0) starts.push(i); d++ }
-    else if (ch === '}' || ch === ']') { d-- }
+    else if (ch === '}' || ch === ']') { if (d > 0) d-- }
   }
 
   if (starts.length === 0) throw new Error('no JSON object or array found in output')

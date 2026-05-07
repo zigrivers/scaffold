@@ -144,6 +144,34 @@ describe('validateFindingStrict', () => {
   })
 })
 
+describe('doc-conformance parser', () => {
+  const parse = getParser('doc-conformance')
+
+  it('parses a valid findings array', () => {
+    const raw = JSON.stringify([
+      { severity: 'P1', location: 'lens::H-cross-doc::feature-no-story', description: 'missing story', suggestion: 'add story' },
+    ])
+    const result = parse(raw)
+    expect(Array.isArray(result.findings)).toBe(true)
+    expect(result.findings[0].severity).toBe('P1')
+  })
+
+  it('returns a P1 blocking finding when output is not an array', () => {
+    const raw = '{"findings": []}'
+    const result = parse(raw)
+    expect(result.approved).toBe(false)
+    expect(result.findings).toHaveLength(1)
+    expect(result.findings[0].severity).toBe('P1')
+  })
+
+  it('returns a blocking finding when output fails to parse', () => {
+    const raw = 'not-json'
+    const result = parse(raw)
+    expect(result.approved).toBe(false)
+    expect(result.findings.length).toBeGreaterThan(0)
+  })
+})
+
 describe('validateParsedOutputStrict', () => {
   it('accepts valid wrapper with findings', () => {
     const result = validateParsedOutputStrict({
