@@ -78,7 +78,9 @@ describe('state adapter — replayEvents with real timestamps (Plan 6)', () => {
       version: '1.0', methodology: 'deep',
       steps: {
         'user-stories': { status: 'completed', source: 'pipeline', completed_at: '2026-05-04T10:30:00.000Z' },
-        'tech-stack':   { status: 'in_progress', source: 'pipeline', in_progress_started_at: '2026-05-04T13:45:00.000Z' },
+        'tech-stack': {
+          status: 'in_progress', source: 'pipeline', in_progress_started_at: '2026-05-04T13:45:00.000Z',
+        },
         'coding-standards': { status: 'pending', source: 'pipeline' },
       },
     }))
