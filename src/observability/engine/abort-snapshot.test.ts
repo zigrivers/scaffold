@@ -46,7 +46,7 @@ describe('abort-snapshot', () => {
     expect(existsSync(join(proj, 'fixed.txt'))).toBe(false)
     // b.txt remains staged (user's pre-existing work)
     const status = git(proj, ['status', '--short'])
-    expect(status).toMatch(/^A  b\.txt/m)
+    expect(status).toMatch(/^A {2}b\.txt/mu)
   })
 
   it('restoreSnapshot is idempotent', () => {
