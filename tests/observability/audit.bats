@@ -257,3 +257,92 @@ EOF
     [ "$status" -eq 0 ]
     [[ "$output" == *'"needs_attention": []'* ]]
 }
+
+@test "scaffold complete user-stories triggers a phase audit and prints the [audit] line" {
+    cat > .scaffold/state.json <<'EOF'
+{
+  "schema-version": 1,
+  "methodology": "deep",
+  "steps": {
+    "create-prd":   { "status": "completed",   "source": "pipeline" },
+    "user-stories": { "status": "in_progress", "source": "pipeline" }
+  },
+  "in_progress": null
+}
+EOF
+    mkdir -p docs
+    cat > docs/plan.md <<'EOF'
+# PRD
+## Features
+### F [priority: must]
+EOF
+    cat > docs/user-stories.md <<'EOF'
+## Story s-1: T [priority: must]
+
+### AC 1: t
+Given X.
+EOF
+
+    run $BIN complete user-stories
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"[audit]"* ]]
+    [[ "$output" == *"docs/audits/audit-"* ]]
+
+    json="$(ls docs/audits/audit-*.json 2>/dev/null | head -1)"
+    [ -n "$json" ]
+    grep -q '"engine_output"' "$json"
+}
+
+@test "scaffold complete create-prd does NOT trigger a phase audit (not a boundary step)" {
+    cat > .scaffold/state.json <<'EOF'
+{
+  "schema-version": 1,
+  "methodology": "deep",
+  "steps": { "create-prd": { "status": "in_progress", "source": "pipeline" } },
+  "in_progress": null
+}
+EOF
+    mkdir -p docs
+    cat > docs/plan.md <<'EOF'
+# PRD
+EOF
+
+    run $BIN complete create-prd
+    [ "$status" -eq 0 ]
+    if echo "$output" | grep -q "\[audit\]"; then
+        echo "Unexpected [audit] line: $output"
+        false
+    fi
+}
+
+@test "phase_audit.enabled=false suppresses the trigger on a boundary step" {
+    cat > .scaffold/state.json <<'EOF'
+{
+  "schema-version": 1,
+  "methodology": "deep",
+  "steps": { "user-stories": { "status": "in_progress", "source": "pipeline" } },
+  "in_progress": null
+}
+EOF
+    mkdir -p docs
+    cat > docs/plan.md <<'EOF'
+# PRD
+EOF
+    cat > docs/user-stories.md <<'EOF'
+## Story s-1: T [priority: must]
+
+### AC 1: t
+Given X.
+EOF
+    cat > .scaffold/observability.yaml <<'EOF'
+phase_audit:
+  enabled: false
+EOF
+
+    run $BIN complete user-stories
+    [ "$status" -eq 0 ]
+    if echo "$output" | grep -q "\[audit\]"; then
+        echo "Unexpected [audit] line when disabled: $output"
+        false
+    fi
+}
