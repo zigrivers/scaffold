@@ -96,7 +96,7 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
     prompt_wrapper: '{{prompt}}',
     output_parser: 'doc-conformance',
     stderr: 'capture',
-    timeout: 60,
+    timeout: 240, // 3 sequential LLM calls × 60s each + margin
   },
 }
 
