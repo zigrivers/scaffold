@@ -84,7 +84,7 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
   },
   'doc-conformance': {
     enabled: true,
-    command: 'scaffold observe audit --profile=fast --scope=all --output-mode=mmr-findings',
+    command: 'scaffold observe audit --profile=full --scope=all --output-mode=mmr-findings',
     flags: [],
     env: {},
     auth: {
