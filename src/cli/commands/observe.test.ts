@@ -409,3 +409,36 @@ describe('observe progress --replay + --no-stall-check', () => {
     expect(JSON.parse(captured).needs_attention).toEqual([])
   })
 })
+
+describe('observe audit --fix', () => {
+  it('runs the fix flow and prints fixed/failed counts', async () => { // fix flow runs a full audit twice (initial + postfix) — allow 30s
+    const proj = mkdtempSync(join(tmpdir(), 'observe-fix-cli-'))
+    execSync('git init -q', { cwd: proj })
+    execSync('git config user.email t@e.com && git config user.name T', { cwd: proj, shell: '/bin/sh' })
+    mkdirSync(join(proj, 'docs'), { recursive: true })
+    writeFileSync(join(proj, 'package.json'), '{}')
+    writeFileSync(join(proj, 'docs/plan.md'), '# PRD\n## Features\n### F [priority: must]\n')
+    writeFileSync(join(proj, 'docs/user-stories.md'),
+      '## Story s-1: T [priority: must]\n\n### AC 1: t\nGiven X.\n')
+    writeFileSync(join(proj, 'docs/tdd-standards.md'), '# TDD\n')
+    execSync('git add . && git commit -q -m initial', { cwd: proj, shell: '/bin/sh' })
+
+    mkdirSync(join(proj, '.scaffold'), { recursive: true })
+    writeFileSync(join(proj, '.scaffold/observability.yaml'),
+      'fix:\n  dispatcher_command: \'sh -c "cat >/dev/null; exit 0"\'\n  timeout_s: 5\n')
+
+    let captured = ''
+    const orig = process.stdout.write.bind(process.stdout)
+    process.stdout.write = ((s: string | Uint8Array) => { captured += String(s); return true }) as never
+    try {
+      await handleAudit({
+        cwd: proj, json: false, profile: 'fast', scope: 'all', sinceHours: 24, fix: true,
+        ghBin: '/no/such/gh', bdBin: '/no/such/bd',
+      })
+    } finally { process.stdout.write = orig }
+    rmSync(proj, { recursive: true, force: true })
+
+    expect(captured).toMatch(/fix flow/i)
+    expect(captured).toMatch(/postfix\.md/)
+  }, 30_000)
+})

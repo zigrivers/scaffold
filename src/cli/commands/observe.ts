@@ -15,6 +15,8 @@ import { stat, readdir, readFile, mkdir, writeFile } from 'node:fs/promises'
 import { execSync } from 'node:child_process'
 import { dirname, isAbsolute, join } from 'node:path'
 import { findProjectRoot } from '../middleware/project-root.js'
+import { runFixFlow } from '../../observability/engine/fix-flow.js'
+import { captureSnapshot, restoreSnapshot } from '../../observability/engine/abort-snapshot.js'
 
 async function writeMarkdownReport(
   cwd: string, out: EngineOutput, body: string, reportId: string, overridePath?: string,
@@ -192,6 +194,7 @@ export interface HandleAuditInput {
   output?: string
   render?: 'dashboard-fragment-audit'
   outputMode?: 'mmr-findings'
+  fix?: boolean
   ghBin?: string
   bdBin?: string
 }
@@ -244,6 +247,33 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
       const footer = `\n(written: ${mdFinal ?? '(failed)'}${sidecarFinal ? ` + ${sidecarFinal}` : ''})\n`
       process.stdout.write(input.maskPaths ? redactRendered(footer) : footer)
     }
+    if (input.fix && out.summary.blocking > 0) {
+      const snapshot = captureSnapshot(input.cwd)
+      const onAbort = (): void => {
+        process.stderr.write('\n[fix] interrupted — restoring index and worktree…\n')
+        restoreSnapshot(snapshot)
+        process.exit(130)
+      }
+      process.on('SIGINT', onAbort)
+      try {
+        process.stdout.write('\n[fix] starting fix flow…\n')
+        const fixResult = await runFixFlow({
+          primaryRoot: input.cwd, initial: out, abortSnapshot: snapshot,
+          ghBin: input.ghBin, bdBin: input.bdBin,
+        })
+        process.stdout.write(`[fix] fixed ${fixResult.fixed.length}, failed ${fixResult.failed.length}\n`)
+        process.stdout.write(`[fix] post-fix report: ${fixResult.postfix_markdown_path}\n`)
+        if (fixResult.failed.length > 0) {
+          const ids = fixResult.failed.map((id) => id.slice(0, 8)).join(', ')
+          process.stdout.write(`[fix] failed finding ids: ${ids}\n`)
+          return 1
+        }
+        return 0
+      } finally {
+        process.removeListener('SIGINT', onAbort)
+      }
+    }
+
     return out.verdict === 'blocked' ? 1 : 0
   } catch (err: unknown) {
     process.stderr.write(`scaffold observe audit: ${err instanceof Error ? err.message : String(err)}\n`)
@@ -426,6 +456,10 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
         .option('output-mode', {
           type: 'string', choices: ['mmr-findings'] as const,
           describe: 'Emit findings in MMR Finding shape (skips markdown/sidecar)',
+        })
+        .option('fix', {
+          type: 'boolean', default: false,
+          describe: 'Dispatch the fix flow for blocking findings after audit',
         }),
       async (argv) => {
         const code = await handleAudit({
@@ -441,6 +475,7 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
           output: argv.output as string | undefined,
           render: argv.render as 'dashboard-fragment-audit' | undefined,
           outputMode: argv['output-mode'] as 'mmr-findings' | undefined,
+          fix: !!(argv.fix),
         })
         process.exitCode = code
       },
