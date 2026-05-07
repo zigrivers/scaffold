@@ -1,5 +1,5 @@
-import type { Finding, Severity } from './types'
-import { severityRank } from './types'
+import type { Finding, Severity } from './types.js'
+import { severityRank } from './types.js'
 
 export function buildFixPlan(findings: Finding[], fixThreshold: Severity): Finding[] {
   const thresholdRank = severityRank(fixThreshold)

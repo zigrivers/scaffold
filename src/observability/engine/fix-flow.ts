@@ -1,14 +1,14 @@
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import type { EngineOutput, Finding } from './types'
-import { buildFixPlan } from './fix-plan'
-import { dispatchFixAgent, type DispatchFixResult } from './fix-agent-dispatcher'
-import { runAudit } from './api'
-import { renderAuditMarkdown } from '../renderers/markdown'
-import { writeSidecar, deriveReportId } from '../renderers/sidecar'
-import { captureSnapshot, recordStaged, type AbortSnapshot } from './abort-snapshot'
-import { loadObservabilityConfig } from './checks/observability-config'
+import type { EngineOutput, Finding } from './types.js'
+import { buildFixPlan } from './fix-plan.js'
+import { dispatchFixAgent, type DispatchFixResult } from './fix-agent-dispatcher.js'
+import { runAudit } from './api.js'
+import { renderAuditMarkdown } from '../renderers/markdown.js'
+import { writeSidecar, deriveReportId } from '../renderers/sidecar.js'
+import { captureSnapshot, recordStaged, type AbortSnapshot } from './abort-snapshot.js'
+import { loadObservabilityConfig } from './checks/observability-config.js'
 
 export type FixDispatcher = (
   input: { prompt: string; command: string; timeoutMs: number; cwd: string }

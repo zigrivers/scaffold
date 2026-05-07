@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { buildFixPlan } from './fix-plan'
-import type { Finding } from './types'
+import { buildFixPlan } from './fix-plan.js'
+import type { Finding } from './types.js'
 
 function f(id: string, severity: Finding['severity'], lens_id: string, status: Finding['status'] = 'open'): Finding {
   return {
@@ -20,7 +20,7 @@ describe('buildFixPlan', () => {
       f('d', 'P3', 'D-stack'),
     ]
     const plan = buildFixPlan(findings, 'P2')
-    expect(plan.map((f) => f.id)).toEqual(['a', 'b', 'c'])
+    expect(plan.map((fnd) => fnd.id)).toEqual(['a', 'b', 'c'])
   })
 
   it('orders by severity (P0 first), tiebreak by lens_id', () => {
@@ -30,7 +30,7 @@ describe('buildFixPlan', () => {
       f('a-p0', 'P0', 'A-tdd'),
     ]
     const plan = buildFixPlan(findings, 'P2')
-    expect(plan.map((f) => f.id)).toEqual(['a-p0', 'a-p1', 'z-p1'])
+    expect(plan.map((fnd) => fnd.id)).toEqual(['a-p0', 'a-p1', 'z-p1'])
   })
 
   it('excludes acknowledged + skipped findings', () => {
@@ -40,7 +40,7 @@ describe('buildFixPlan', () => {
       f('c', 'P2', 'C-standards', 'open'),
     ]
     const plan = buildFixPlan(findings, 'P2')
-    expect(plan.map((f) => f.id)).toEqual(['c'])
+    expect(plan.map((fnd) => fnd.id)).toEqual(['c'])
   })
 
   it('returns [] when no blocking findings exist', () => {

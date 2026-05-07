@@ -393,3 +393,33 @@ EOF
     [ "$status" -eq 1 ] || [ "$status" -eq 0 ]
     [[ "$output" == *'"schema_version": "1.0"'* ]] || false
 }
+
+@test "observe audit --fix runs the fix flow with a stub dispatcher" {
+    cat > docs/plan.md <<'EOF'
+# PRD
+## Features
+### F [priority: must]
+EOF
+    cat > docs/user-stories.md <<'EOF'
+## Story s-1: T [priority: must]
+
+### AC 1: t
+Given X.
+EOF
+    cat > docs/tdd-standards.md <<'EOF'
+# TDD
+EOF
+    cat > .scaffold/observability.yaml <<'EOF'
+fix:
+  dispatcher_command: 'sh -c "cat >/dev/null; exit 0"'
+  timeout_s: 5
+  per_finding_max_attempts: 1
+EOF
+
+    git add . && git commit -q -m initial
+
+    run $BIN observe audit --fix --since-hours=24
+    [ "$status" -eq 0 ] || [ "$status" -eq 1 ]
+    [[ "$output" == *"[fix] starting fix flow"* ]]
+    [[ "$output" == *"-postfix.md"* ]]
+}

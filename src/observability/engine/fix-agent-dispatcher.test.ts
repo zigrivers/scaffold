@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { dispatchFixAgent } from './fix-agent-dispatcher'
+import { dispatchFixAgent } from './fix-agent-dispatcher.js'
 
 describe('dispatchFixAgent', () => {
   it('returns ok=true when subprocess exits 0', async () => {

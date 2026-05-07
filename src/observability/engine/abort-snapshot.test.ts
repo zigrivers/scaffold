@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { captureSnapshot, restoreSnapshot, recordStaged } from './abort-snapshot'
+import { captureSnapshot, restoreSnapshot, recordStaged } from './abort-snapshot.js'
 
 function git(cwd: string, args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8' })
