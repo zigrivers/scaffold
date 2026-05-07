@@ -411,7 +411,8 @@ describe('observe progress --replay + --no-stall-check', () => {
 })
 
 describe('observe audit --fix', () => {
-  it('runs the fix flow and prints fixed/failed counts', async () => { // fix flow runs a full audit twice (initial + postfix) — allow 30s
+  // fix flow runs a full audit twice (initial + postfix) — allow 30s
+  it('runs the fix flow and prints fixed/failed counts', async () => {
     const proj = mkdtempSync(join(tmpdir(), 'observe-fix-cli-'))
     execSync('git init -q', { cwd: proj })
     execSync('git config user.email t@e.com && git config user.name T', { cwd: proj, shell: '/bin/sh' })
@@ -448,8 +449,11 @@ describe('observe harvest --recover', () => {
     const primary = mkdtempSync(join(tmpdir(), 'observe-rcli-'))
     const activeDir = join(primary, '.scaffold/activity-archive/active')
     mkdirSync(activeDir, { recursive: true })
-    writeFileSync(join(activeDir, '11111111-2222-4333-8444-555555555555.jsonl'),
-      JSON.stringify({ event_id: 'ulid-x', worktree_id: '11111111', actor_label: 'gone', branch: 'b', task_id: null, type: 'progress_heartbeat', ts: '2026-04-01T00:00:00Z', payload: { note: 'orphaned' } }) + '\n')
+    const staleEntry = JSON.stringify({
+      event_id: 'ulid-x', worktree_id: '11111111', actor_label: 'gone', branch: 'b',
+      task_id: null, type: 'progress_heartbeat', ts: '2026-04-01T00:00:00Z', payload: { note: 'orphaned' },
+    })
+    writeFileSync(join(activeDir, '11111111-2222-4333-8444-555555555555.jsonl'), `${staleEntry}\n`)
 
     let captured = ''
     const orig = process.stdout.write.bind(process.stdout)
