@@ -52,6 +52,22 @@ describe('dispatchLlm', () => {
     if (!result.ok) expect(result.reason).toMatch(/ENOENT|not found|spawn|exit|error/i)
   })
 
+  it('extracts the LAST JSON block when output has preamble JSON before the real result', async () => {
+    // LLMs sometimes emit an example block before the real answer, e.g.:
+    //   "Example: {"findings":[...fake...]}. Results: {"findings":[...real...]}"
+    // extractJsonObject must return the LAST top-level block, not the first.
+    const preamble = 'Example: {"findings":["fake"]}. Here is the real output:'
+    const real = '{"findings":[],"answer":"real"}'
+    const combined = `${preamble} ${real}`
+    const result = await dispatchLlm({
+      prompt: 'irrelevant',
+      command: `cat >/dev/null; printf '%s' '${combined}'`,
+      timeoutMs: 5000,
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.parsed).toEqual({ findings: [], answer: 'real' })
+  })
+
   it('kills entire process group on timeout — backgrounded child does not outlive timeout', async () => {
     // The command backgrounds a subshell that writes a marker file after 400ms.
     // Timeout fires at 100ms. Without process-group kill, only the sh parent dies and

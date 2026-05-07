@@ -81,8 +81,14 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
     })
 
     try {
-      child.stdin?.write(input.prompt)
-      child.stdin?.end()
+      if (child.stdin) {
+        const flushed = child.stdin.write(input.prompt)
+        if (!flushed) {
+          child.stdin.once('drain', () => { child.stdin?.end() })
+        } else {
+          child.stdin.end()
+        }
+      }
     } catch (err) {
       resolved = true
       clearTimeout(timer)
