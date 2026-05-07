@@ -14,7 +14,7 @@ teardown() {
     rm -rf "$SANDBOX" "${SANDBOX}-testagent" 2>/dev/null || true
 }
 
-TEARDOWN_SCRIPT="$BATS_TEST_DIRNAME/teardown-agent-worktree.sh"
+TEARDOWN_SCRIPT="$BATS_TEST_DIRNAME/../scripts/teardown-agent-worktree.sh"
 
 @test "teardown-agent-worktree.sh removes the worktree" {
     git worktree add -b testagent-workspace "${SANDBOX}-testagent" 2>/dev/null

@@ -27,6 +27,9 @@ function parseShell(cmd: string): string[] {
   return args
 }
 
+// dispatcher_command is maintainer-controlled (.scaffold/observability.yaml in the user's own repo).
+// spawn() without shell:true limits injection to the argv array, but `sh -c "..."` is a valid config.
+// This is intentional: the fix dispatcher is project-local, not run against untrusted third-party repos.
 export function dispatchFixAgent(input: DispatchFixInput): Promise<DispatchFixResult> {
   return new Promise((resolve) => {
     const started = Date.now()

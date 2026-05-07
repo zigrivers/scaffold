@@ -419,7 +419,7 @@ EOF
     git add . && git commit -q -m initial
 
     run $BIN observe audit --fix --since-hours=24
-    [ "$status" -eq 0 ] || [ "$status" -eq 1 ]
+    [ "$status" -le 1 ]
     [[ "$output" == *"[fix] starting fix flow"* ]]
     [[ "$output" == *"-postfix.md"* ]]
 }
