@@ -51,4 +51,30 @@ describe('dispatchLlm', () => {
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.reason).toMatch(/ENOENT|not found|spawn|exit|error/i)
   })
+
+  it('kills entire process group on timeout — backgrounded child does not outlive timeout', async () => {
+    // The command backgrounds a subshell that writes a marker file after 400ms.
+    // Timeout fires at 100ms. Without process-group kill, only the sh parent dies and
+    // the backgrounded sleep survives to create the file. With process-group kill, the
+    // entire subtree is killed and the file is never created.
+    const os = await import('node:os')
+    const path = await import('node:path')
+    const fs = await import('node:fs')
+
+    const markerFile = path.join(os.tmpdir(), `disp-pg-${process.pid}.marker`)
+    if (fs.existsSync(markerFile)) fs.unlinkSync(markerFile)
+
+    await dispatchLlm({
+      prompt: 'irrelevant',
+      command: `(sleep 0.4 && touch ${markerFile}) &`,
+      timeoutMs: 100,
+    })
+
+    // Wait 700ms — enough for the background sleep to have fired if it survived
+    await new Promise((r) => setTimeout(r, 700))
+
+    const survived = fs.existsSync(markerFile)
+    if (survived) fs.unlinkSync(markerFile)
+    expect(survived).toBe(false)
+  })
 })

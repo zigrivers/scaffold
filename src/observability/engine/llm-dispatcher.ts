@@ -15,7 +15,9 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
   return new Promise((resolve) => {
     let child
     try {
-      child = spawn('sh', ['-c', input.command], { stdio: ['pipe', 'pipe', 'pipe'] })
+      // detached: true puts the child in its own process group so the timeout
+      // can kill the entire subtree (wrapper scripts + child LLM processes)
+      child = spawn('sh', ['-c', input.command], { detached: true, stdio: ['pipe', 'pipe', 'pipe'] })
     } catch (err) {
       resolve({ ok: false, reason: `spawn failed: ${(err as Error).message}` })
       return
@@ -30,7 +32,10 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
     const timer = setTimeout(() => {
       if (resolved) return
       resolved = true
-      try { child.kill('SIGTERM') } catch { /* ignore */ }
+      // Kill the entire process group (negated PID) so wrapper scripts and
+      // child LLM processes are all terminated, not just the sh -c parent.
+      try { process.kill(-child.pid!, 'SIGTERM') } catch { /* ignore if already gone */ }
+      setTimeout(() => { try { process.kill(-child.pid!, 'SIGKILL') } catch { /* ignore */ } }, 500)
       resolve({ ok: false, reason: `timed out after ${input.timeoutMs}ms`, raw: stdout })
     }, input.timeoutMs)
 
