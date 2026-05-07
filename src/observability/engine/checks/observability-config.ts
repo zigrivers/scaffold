@@ -33,6 +33,7 @@ export interface StallConfig {
 export interface LlmConfig {
   dispatcher_command?: string
   timeout_s?: number
+  parallel_checks?: boolean // opt-in parallel LLM calls; default false to avoid rate-limiting
 }
 
 export interface ObservabilityConfig {

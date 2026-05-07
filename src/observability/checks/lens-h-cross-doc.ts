@@ -162,16 +162,27 @@ export const lensHCrossDoc: LensFn = async (graph, _ledger, _availability, _upst
   if (context?.profile === 'full') {
     const cmd = 'claude -p'
     let timeoutMs = 60_000
+    let parallelChecks = false
     try {
       const config = loadObservabilityConfig(context.cwd)
       timeoutMs = (config.llm.timeout_s ?? 60) * 1000
+      parallelChecks = config.llm.parallel_checks ?? false
     } catch {
       // Malformed observability.yaml — fall back to defaults so the audit continues
     }
 
-    findings.push(...await runTechStackVsPrd(graph, context, cmd, timeoutMs, now, makeFindingId))
-    findings.push(...await runPrdToStoriesCoverage(graph, context, cmd, timeoutMs, now, makeFindingId))
-    findings.push(...await runTerminologyDrift(graph, context, cmd, timeoutMs, now, makeFindingId))
+    if (parallelChecks) {
+      const [a, b, c] = await Promise.all([
+        runTechStackVsPrd(graph, context, cmd, timeoutMs, now, makeFindingId),
+        runPrdToStoriesCoverage(graph, context, cmd, timeoutMs, now, makeFindingId),
+        runTerminologyDrift(graph, context, cmd, timeoutMs, now, makeFindingId),
+      ])
+      findings.push(...a, ...b, ...c)
+    } else {
+      findings.push(...await runTechStackVsPrd(graph, context, cmd, timeoutMs, now, makeFindingId))
+      findings.push(...await runPrdToStoriesCoverage(graph, context, cmd, timeoutMs, now, makeFindingId))
+      findings.push(...await runTerminologyDrift(graph, context, cmd, timeoutMs, now, makeFindingId))
+    }
   }
 
   return findings

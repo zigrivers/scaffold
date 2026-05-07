@@ -16,8 +16,11 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
     let child
     try {
       // detached: true puts the child in its own process group so the timeout
-      // can kill the entire subtree (wrapper scripts + child LLM processes)
-      child = spawn('sh', ['-c', input.command], { detached: true, stdio: ['pipe', 'pipe', 'pipe'] })
+      // can kill the entire subtree (wrapper scripts + child LLM processes).
+      // On Windows, 'sh' is unavailable; use cmd.exe instead.
+      const shell = process.platform === 'win32' ? 'cmd.exe' : 'sh'
+      const shellArgs = process.platform === 'win32' ? ['/d', '/s', '/c', input.command] : ['-c', input.command]
+      child = spawn(shell, shellArgs, { detached: true, stdio: ['pipe', 'pipe', 'pipe'] })
     } catch (err) {
       resolve({ ok: false, reason: `spawn failed: ${(err as Error).message}` })
       return
@@ -35,9 +38,11 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
       // Kill the entire process group (negated PID) so wrapper scripts and
       // child LLM processes are all terminated, not just the sh -c parent.
       // Negated PID is POSIX-only; Windows does not support process groups.
-      if (process.platform !== 'win32') {
-        try { process.kill(-child.pid!, 'SIGTERM') } catch { /* ignore if already gone */ }
-        setTimeout(() => { try { process.kill(-child.pid!, 'SIGKILL') } catch { /* ignore */ } }, 500)
+      // Guard child.pid — it may be undefined if spawn failed asynchronously.
+      if (process.platform !== 'win32' && child.pid !== undefined) {
+        const pid = child.pid
+        try { process.kill(-pid, 'SIGTERM') } catch { /* ignore if already gone */ }
+        setTimeout(() => { try { process.kill(-pid, 'SIGKILL') } catch { /* ignore */ } }, 500)
       } else {
         try { child.kill('SIGTERM') } catch { /* ignore */ }
       }
