@@ -82,6 +82,22 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
     output_parser: 'default',
     stderr: 'suppress',
   },
+  'doc-conformance': {
+    enabled: true,
+    command: 'scaffold observe audit --profile=fast --scope=all --output-mode=mmr-findings',
+    flags: [],
+    env: {},
+    auth: {
+      check: 'scaffold --version >/dev/null 2>&1',
+      timeout: 5,
+      failure_exit_codes: [1],
+      recovery: 'npm install -g @zigrivers/scaffold',
+    },
+    prompt_wrapper: '{{prompt}}',
+    output_parser: 'doc-conformance',
+    stderr: 'capture',
+    timeout: 60,
+  },
 }
 
 // Seed DEFAULT_CONFIG with builtin channels
