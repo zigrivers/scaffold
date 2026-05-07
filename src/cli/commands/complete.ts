@@ -12,6 +12,7 @@ import { shutdown } from '../shutdown.js'
 import { guardStepCommand } from '../guards.js'
 import { StatePathResolver } from '../../state/state-path-resolver.js'
 import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
+import { formatPhaseAuditLine } from '../../observability/engine/phase-audit.js'
 
 interface CompleteArgs {
   step: string
@@ -135,22 +136,10 @@ const completeCommand: CommandModule<Record<string, unknown>, CompleteArgs> = {
       }
 
       const previousStatus = stepEntry.status
+      const outputs = stepEntry.produces ?? []
 
-      // Mark as completed
-      state.steps[argv.step] = {
-        status: 'completed',
-        source: stepEntry.source ?? 'pipeline',
-        produces: stepEntry.produces ?? [],
-        at: new Date().toISOString(),
-        completed_by: 'user',
-      }
-
-      // Clear in_progress if it references this step
-      if (state.in_progress?.step === argv.step) {
-        state.in_progress = null
-      }
-
-      stateManager.saveState(state)
+      const auditResult = await stateManager.markCompleted(argv.step, outputs, 'user', 3)
+      const auditLine = auditResult ? formatPhaseAuditLine(auditResult) : ''
 
       if (outputMode === 'json') {
         output.result({
@@ -161,6 +150,7 @@ const completeCommand: CommandModule<Record<string, unknown>, CompleteArgs> = {
       } else {
         output.success(`Step '${argv.step}' marked as completed (was ${previousStatus})`)
         output.info('Run `scaffold next` to see eligible steps')
+        if (auditLine) process.stdout.write(auditLine + '\n')
       }
       process.exitCode = 0
     })

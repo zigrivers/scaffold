@@ -179,4 +179,26 @@ describe('complete command', () => {
     expect(allOutput).toContain('review-testing')
     expect(process.exitCode).toBe(2)
   })
+
+  describe('Plan 6 — routes through markCompleted', () => {
+    it('sets completed_at on the step entry (markCompleted path)', async () => {
+      writeState({ 'review-testing': { status: 'in_progress', source: 'pipeline' } })
+      await completeCommand.handler(defaultArgv())
+
+      const state = JSON.parse(fs.readFileSync(path.join(tempDir, '.scaffold', 'state.json'), 'utf8'))
+      expect(state.steps['review-testing'].status).toBe('completed')
+      expect(state.steps['review-testing'].completed_at).toBeDefined()
+      expect(process.exitCode).toBe(0)
+    })
+
+    it('still completes the step when phase audit fails internally', async () => {
+      writeState({ 'user-stories': { status: 'in_progress', source: 'pipeline' } })
+      // No docs/user-stories.md means runAudit might fail, but markCompleted catches that
+      await completeCommand.handler(defaultArgv({ step: 'user-stories' }))
+
+      const state = JSON.parse(fs.readFileSync(path.join(tempDir, '.scaffold', 'state.json'), 'utf8'))
+      expect(state.steps['user-stories'].status).toBe('completed')
+      expect(process.exitCode).toBe(0)
+    })
+  })
 })
