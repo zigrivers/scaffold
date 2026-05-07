@@ -142,12 +142,12 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       process.exit(1)
     }
 
-    // 3. Determine enabled channels — channels_disabled applies even to explicit --channels args
+    // 3. Determine enabled channels — channels_disabled applies to the default list only;
+    //    explicit --channels args override it (users know what they're asking for)
     const disabledSet = new Set(config.channels_disabled ?? [])
-    const requestedChannels = args.channels ?? Object.entries(config.channels)
+    const channelNames = args.channels ?? Object.entries(config.channels)
       .filter(([name, ch]) => ch.enabled && !disabledSet.has(name))
       .map(([name]) => name)
-    const channelNames = requestedChannels.filter((name) => !disabledSet.has(name))
 
     if (channelNames.length === 0) {
       console.error('No channels enabled. Configure channels or pass --channels.')

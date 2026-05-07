@@ -63,17 +63,16 @@ const baseOut: EngineOutput = {
 }
 
 describe('renderMmrFindings', () => {
-  it('emits a JSON array — one entry per non-skipped finding (skipped lenses excluded)', () => {
+  it('emits a JSON array — only open findings (acknowledged and skipped excluded)', () => {
     const out = renderMmrFindings(baseOut)
     const parsed = JSON.parse(out) as Array<{ severity: string; location: string; description: string; suggestion?: string }>
-    expect(parsed).toHaveLength(2)
-    expect(parsed.every((f) => ['P0', 'P1', 'P2', 'P3'].includes(f.severity))).toBe(true)
+    expect(parsed).toHaveLength(1)
+    expect(parsed[0].severity).toBe('P0')
   })
 
   it('builds composite location <source_doc>::<lens_id>::<short_id> for stable cross-run identity', () => {
     const arr = JSON.parse(renderMmrFindings(baseOut)) as Array<{ location: string }>
     expect(arr[0].location).toBe('docs/user-stories.md#user-auth-1::B-ac-coverage::3a8c1f02')
-    expect(arr[1].location).toBe('docs/user-stories.md#story-s-1::A-tdd::9d1e02f4')
   })
 
   it('description prefixes lens_id and includes the engine title', () => {
@@ -85,7 +84,6 @@ describe('renderMmrFindings', () => {
   it('suggestion is fix_hint.prompt when present, else fix_hint.target, else empty string', () => {
     const arr = JSON.parse(renderMmrFindings(baseOut)) as Array<{ suggestion?: string }>
     expect(arr[0].suggestion).toBe('Re-enable the test')
-    expect(arr[1].suggestion).toBe('')
   })
 
   it('emits a stable JSON shape that is valid JSON.parse-able', () => {

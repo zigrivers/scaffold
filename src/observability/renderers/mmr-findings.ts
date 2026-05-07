@@ -25,7 +25,7 @@ function findingToMmr(f: Finding): MmrFindingShape {
 
 export function renderMmrFindings(out: EngineOutput): string {
   const findings = out.findings
-    .filter((f) => f.status !== 'skipped')
+    .filter((f) => f.status === 'open')
     .map(findingToMmr)
   return redactRendered(JSON.stringify(findings))
 }

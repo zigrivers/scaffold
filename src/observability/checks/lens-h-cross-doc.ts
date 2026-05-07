@@ -155,18 +155,22 @@ export const lensHCrossDoc: LensFn = async (graph, _ledger, _availability, _upst
     const cmd = config.llm.dispatcher_command ?? 'claude -p'
     const timeoutMs = (config.llm.timeout_s ?? 60) * 1000
 
-    const llmResults = await Promise.all([
-      runTechStackVsPrd(graph, context, cmd, timeoutMs, now, makeFindingId),
-      runPrdToStoriesCoverage(graph, context, cmd, timeoutMs, now, makeFindingId),
-      runTerminologyDrift(graph, context, cmd, timeoutMs, now, makeFindingId),
-    ])
-    for (const batch of llmResults) findings.push(...batch)
+    // Sequential to avoid dispatcher rate-limiting; each call has its own timeout
+    findings.push(...await runTechStackVsPrd(graph, context, cmd, timeoutMs, now, makeFindingId))
+    findings.push(...await runPrdToStoriesCoverage(graph, context, cmd, timeoutMs, now, makeFindingId))
+    findings.push(...await runTerminologyDrift(graph, context, cmd, timeoutMs, now, makeFindingId))
   }
 
   return findings
 }
 
 type LlmFinding = { severity: string; title: string; description: string }
+
+function isValidLlmFinding(x: unknown): x is LlmFinding {
+  if (typeof x !== 'object' || x === null) return false
+  const f = x as Record<string, unknown>
+  return typeof f.severity === 'string' && typeof f.title === 'string' && typeof f.description === 'string'
+}
 
 async function runTechStackVsPrd(
   graph: Parameters<LensFn>[0],
@@ -203,7 +207,7 @@ Return {"findings": []} if there are no issues.`
   if (!result.ok) return []
   const parsed = result.parsed as { findings?: unknown }
   if (!Array.isArray(parsed.findings)) return []
-  return (parsed.findings as LlmFinding[])
+  return parsed.findings.filter(isValidLlmFinding)
     .filter((f) => f.severity === 'P0' || f.severity === 'P2')
     .map((f) => ({
       id: mkId([lensId, 'tech-stack-vs-prd', f.title]),
@@ -252,7 +256,7 @@ Return {"findings": []} if all PRD-prose features are covered.`
   if (!result.ok) return []
   const parsed = result.parsed as { findings?: unknown }
   if (!Array.isArray(parsed.findings)) return []
-  return (parsed.findings as LlmFinding[])
+  return parsed.findings.filter(isValidLlmFinding)
     .filter((f) => f.severity === 'P1')
     .map((f) => ({
       id: mkId([lensId, 'prd-feature-no-story-prose', f.title]),
@@ -306,7 +310,7 @@ Return {"findings": []} when terminology is internally consistent.`
   if (!result.ok) return []
   const parsed = result.parsed as { findings?: unknown }
   if (!Array.isArray(parsed.findings)) return []
-  return (parsed.findings as LlmFinding[])
+  return parsed.findings.filter(isValidLlmFinding)
     .filter((f) => f.severity === 'P2')
     .map((f) => ({
       id: mkId([lensId, 'terminology-drift', f.title]),
