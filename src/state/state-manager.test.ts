@@ -232,13 +232,13 @@ describe('StateManager', () => {
       expect(state.steps['create-prd'].depth).toBe(4)
     })
 
-    it('throws STEP_NOT_IN_STATE for an unknown step slug', () => {
+    it('throws STEP_NOT_IN_STATE for an unknown step slug', async () => {
       const tempDir = makeTempDir()
       const manager = new StateManager(tempDir, computeEligible)
       manager.initializeState(INIT_OPTIONS)
 
-      expect(() => manager.markCompleted('nonexistent-step', [], 'agent-1', 3))
-        .toThrow('nonexistent-step')
+      await expect(manager.markCompleted('nonexistent-step', [], 'agent-1', 3))
+        .rejects.toThrow('nonexistent-step')
     })
   })
 
@@ -1254,5 +1254,106 @@ describe('StateManager.saveState — scope-correct eligibility + cache counters'
       fs.readFileSync(path.join(tmpRoot, '.scaffold', 'state.json'), 'utf8'),
     )
     expect(written.next_eligible_root_counter).toBeUndefined()  // root must never write this
+  })
+})
+
+const INIT_OPTIONS_PLAN6 = {
+  enabledSteps: [
+    { slug: 'create-prd', produces: ['docs/plan.md'] },
+    { slug: 'user-stories', produces: ['docs/user-stories.md'] },
+    { slug: 'tech-stack', produces: ['docs/tech-stack.md'] },
+  ],
+  scaffoldVersion: '2.0.0',
+  methodology: 'deep',
+  initMode: 'greenfield' as const,
+}
+
+import type { PhaseAuditResult } from '../observability/engine/phase-audit.js'
+
+describe('StateManager — step timestamps (Plan 6)', () => {
+  it('markCompleted sets completed_at to an ISO timestamp', () => {
+    const tempDir = makeTempDir()
+    const manager = new StateManager(tempDir, computeEligible)
+    manager.initializeState(INIT_OPTIONS_PLAN6)
+    manager.setInProgress('user-stories', 'agent-1')
+
+    const before = new Date().toISOString()
+    manager.markCompleted('user-stories', ['docs/user-stories.md'], 'pipeline', 1)
+
+    const state = manager.loadState()
+    expect(state.steps['user-stories'].completed_at).toBeDefined()
+    expect(state.steps['user-stories'].completed_at! >= before).toBe(true)
+  })
+
+  it('markInProgress(step) sets status=in_progress + in_progress_started_at', () => {
+    const tempDir = makeTempDir()
+    const manager = new StateManager(tempDir, computeEligible)
+    manager.initializeState(INIT_OPTIONS_PLAN6)
+
+    manager.markInProgress('tech-stack')
+
+    const state = manager.loadState()
+    expect(state.steps['tech-stack'].status).toBe('in_progress')
+    expect(state.steps['tech-stack'].in_progress_started_at).toBeDefined()
+  })
+
+  it('markCompleted does not regress an already-completed step (completed_at stays stable)', async () => {
+    const tempDir = makeTempDir()
+    const manager = new StateManager(tempDir, computeEligible)
+    manager.initializeState(INIT_OPTIONS_PLAN6)
+    manager.setInProgress('user-stories', 'agent-1')
+    await manager.markCompleted('user-stories', ['docs/user-stories.md'], 'pipeline', 1)
+    const firstTs = manager.loadState().steps['user-stories'].completed_at
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 10))
+
+    manager.setInProgress('tech-stack', 'agent-1')
+    await manager.markCompleted('user-stories', ['docs/user-stories.md'], 'pipeline', 1)
+    expect(manager.loadState().steps['user-stories'].completed_at).toBe(firstTs)
+  })
+})
+
+describe('StateManager.markCompleted — phase audit hook (Plan 6)', () => {
+  function makeBootstrapped() {
+    const tempDir = makeTempDir()
+    const manager = new StateManager(tempDir, computeEligible)
+    manager.initializeState(INIT_OPTIONS_PLAN6)
+    manager.setInProgress('user-stories', 'agent-1')
+    return manager
+  }
+
+  it('returns the phase-audit result when the step is a boundary', async () => {
+    const manager = makeBootstrapped()
+    const stub = async (input: { primaryRoot: string; step: string }): Promise<PhaseAuditResult> => ({
+      ran: true, step: input.step, verdict: 'pass', findings_count: 0, blocking_count: 0,
+      markdown_path: 'docs/audits/audit-x.md', sidecar_path: 'docs/audits/audit-x.json',
+      timed_out: false, elapsed_ms: 5,
+    })
+    manager.setPhaseAuditFn(stub)
+    const result = await manager.markCompleted('user-stories', ['docs/user-stories.md'], 'pipeline', 1)
+    expect(result).toBeDefined()
+    expect(result!.ran).toBe(true)
+    expect(result!.verdict).toBe('pass')
+  })
+
+  it('returns ran=false from the hook for non-boundary steps', async () => {
+    const manager = makeBootstrapped()
+    let called = false
+    const stub = async (input: { primaryRoot: string; step: string }): Promise<PhaseAuditResult> => {
+      called = true
+      return { ran: false, step: input.step, reason: `${input.step} is not a phase boundary` }
+    }
+    manager.setPhaseAuditFn(stub)
+    const result = await manager.markCompleted('create-prd', ['docs/plan.md'], 'pipeline', 1)
+    expect(called).toBe(true)
+    expect(result?.ran).toBe(false)
+  })
+
+  it('does not throw if runPhaseAudit fails internally; returns an error-shaped result', async () => {
+    const manager = makeBootstrapped()
+    manager.setPhaseAuditFn(async () => { throw new Error('synthetic failure') })
+    const result = await manager.markCompleted('user-stories', ['docs/user-stories.md'], 'pipeline', 1)
+    expect(result?.reason).toMatch(/synthetic failure/)
+    expect(manager.loadState().steps['user-stories'].status).toBe('completed')
   })
 })

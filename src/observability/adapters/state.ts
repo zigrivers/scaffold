@@ -6,6 +6,8 @@ export interface StepEntry {
   status: 'pending' | 'in_progress' | 'completed' | 'skipped'
   source?: 'pipeline' | 'manual'
   produces?: string[]
+  completed_at?: string
+  in_progress_started_at?: string
 }
 export interface MergedState {
   version?: string
@@ -65,24 +67,27 @@ export const stateAdapter: BaseAdapter & {
 
   async replayEvents(cwd: string, opts: { sinceHours: number }): Promise<ReplayEvent[]> {
     const path = join(cwd, ROOT_STATE)
-    let mtimeIso: string
+    let fallbackTs: string
     try {
       const s = await stat(path)
-      mtimeIso = s.mtime.toISOString()
+      fallbackTs = s.mtime.toISOString()
     } catch {
       return []
     }
     const cutoff = new Date(Date.now() - opts.sinceHours * 3_600_000).toISOString()
-    if (mtimeIso < cutoff) return []
     const merged = await stateAdapter.readMergedState(cwd)
     const out: ReplayEvent[] = []
     for (const [slug, entry] of Object.entries(merged.steps)) {
       if (entry.status !== 'completed' && entry.status !== 'in_progress') continue
+      const ts = entry.status === 'completed'
+        ? (entry.completed_at ?? fallbackTs)
+        : (entry.in_progress_started_at ?? fallbackTs)
+      if (ts < cutoff) continue
       const kind = entry.status === 'completed' ? 'step_completed' : 'step_in_progress'
       out.push({
         sort_id: `state:${slug}:${entry.status}`,
         correlation_id: null,
-        ts: mtimeIso,
+        ts,
         source: 'state', kind,
         summary: `pipeline step ${slug} → ${entry.status}`,
       })

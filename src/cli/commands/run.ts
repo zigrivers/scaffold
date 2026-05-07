@@ -196,7 +196,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
 
         if (crashAction.action === 'auto_complete') {
           const lastDepth = (state.steps[state.in_progress.step]?.depth ?? 3) as DepthLevel
-          stateManager.markCompleted(
+          void stateManager.markCompleted(
             state.in_progress.step,
             [],
             'scaffold-crash-recovery',
@@ -225,7 +225,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
             )
             if (shouldComplete) {
               const lastDepth = (state.steps[state.in_progress!.step]?.depth ?? 3) as DepthLevel
-              stateManager.markCompleted(state.in_progress!.step, [], 'scaffold-crash-recovery', lastDepth)
+              void stateManager.markCompleted(state.in_progress!.step, [], 'scaffold-crash-recovery', lastDepth)
               stateManager.clearInProgress()
             } else {
               stateManager.clearInProgress()
@@ -580,7 +580,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
             // -----------------------------------------------------------------------
             // Step 11: Mark completed
             // -----------------------------------------------------------------------
-            stateManager.markCompleted(
+            void stateManager.markCompleted(
               step,
               metaPrompt.frontmatter.outputs ?? [],
               'scaffold-run',

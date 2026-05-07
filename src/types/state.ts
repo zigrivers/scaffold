@@ -5,6 +5,8 @@ export interface StepStateEntry {
   status: StepStatus
   source: StepSource
   at?: string  // ISO 8601 timestamp (absent for pending)
+  completed_at?: string  // ISO 8601; set once on first completion (no-regression)
+  in_progress_started_at?: string  // ISO 8601; set when step first enters in_progress
   produces?: string[]  // expected output paths (set at init from frontmatter)
   artifacts_verified?: boolean
   completed_by?: string

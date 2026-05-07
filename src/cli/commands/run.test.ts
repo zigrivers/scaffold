@@ -382,7 +382,7 @@ beforeEach(() => {
   const state = makeState()
   vi.mocked(StateManager.prototype.loadState).mockReturnValue(state)
   vi.mocked(StateManager.prototype.setInProgress).mockImplementation(() => undefined)
-  vi.mocked(StateManager.prototype.markCompleted).mockImplementation(() => undefined)
+  vi.mocked(StateManager.prototype.markCompleted).mockImplementation(() => Promise.resolve(undefined))
   vi.mocked(StateManager.prototype.markSkipped).mockImplementation(() => undefined)
   vi.mocked(StateManager.prototype.clearInProgress).mockImplementation(() => undefined)
 

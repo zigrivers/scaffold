@@ -8,7 +8,7 @@ const DIR = 'docs/audits'
 interface SidecarShape {
   engine_output: {
     schema_version: string
-    invocation: { command: 'audit' | 'progress'; started_at: string }
+    invocation: { command: 'audit' | 'progress'; started_at: string; args?: Record<string, unknown> }
     summary?: {
       total: number
       by_severity: Record<Severity, number>
