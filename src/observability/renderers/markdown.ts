@@ -1,4 +1,4 @@
-import type { EngineOutput, AvailabilityMap, AdapterStatus, Finding, Severity } from '../engine/types.js'
+import type { EngineOutput, AvailabilityMap, AdapterStatus, Finding, Severity, Evidence } from '../engine/types.js'
 import { redactRendered, sanitizePath } from '../engine/redact.js'
 
 function mdEscape(s: string): string {
@@ -158,6 +158,13 @@ function summaryTable(out: EngineOutput): string {
   return hdr.join('\n')
 }
 
+function renderEvidence(ev: Evidence): string {
+  if (ev.kind === 'doc_disagreement') {
+    return `*Documents:* \`${mdEscape(ev.left_doc)}\` ↔ \`${mdEscape(ev.right_doc)}\`\n\n*Conflict:* ${mdEscape(ev.conflict)}`
+  }
+  return `\`\`\`\`json\n${JSON.stringify(ev, null, 2)}\n\`\`\`\``
+}
+
 function findingSection(f: Finding): string {
   const idShort = f.id.slice(0, 8)
   const lines = [
@@ -169,9 +176,7 @@ function findingSection(f: Finding): string {
     '',
     '**Evidence:**',
     '',
-    '````json',
-    JSON.stringify(f.evidence, null, 2),
-    '````',
+    renderEvidence(f.evidence),
   ]
   if (f.fix_hint) {
     lines.push('', '**Fix hint:**', '', '````json', JSON.stringify(f.fix_hint, null, 2), '````')
