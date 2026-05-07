@@ -160,7 +160,8 @@ function summaryTable(out: EngineOutput): string {
 
 function renderEvidence(ev: Evidence): string {
   if (ev.kind === 'doc_disagreement') {
-    return `*Documents:* \`${mdEscape(ev.left_doc)}\` ↔ \`${mdEscape(ev.right_doc)}\`\n\n*Conflict:* ${mdEscape(ev.conflict)}`
+    const docs = `\`${mdEscape(ev.left_doc)}\` ↔ \`${mdEscape(ev.right_doc)}\``
+    return `*Documents:* ${docs}\n\n*Conflict:* ${mdEscape(ev.conflict)}`
   }
   return `\`\`\`\`json\n${JSON.stringify(ev, null, 2)}\n\`\`\`\``
 }
