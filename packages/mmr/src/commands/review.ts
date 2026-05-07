@@ -142,9 +142,11 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       process.exit(1)
     }
 
-    // 3. Determine enabled channels
+    // 3. Determine enabled channels — channels_disabled applies to the default list only;
+    //    explicit --channels args override it (users know what they're asking for)
+    const disabledSet = new Set(config.channels_disabled ?? [])
     const channelNames = args.channels ?? Object.entries(config.channels)
-      .filter(([, ch]) => ch.enabled)
+      .filter(([name, ch]) => ch.enabled && !disabledSet.has(name))
       .map(([name]) => name)
 
     if (channelNames.length === 0) {

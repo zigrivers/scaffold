@@ -81,4 +81,25 @@ describe('runChecks', () => {
       registry, lenses: {}, graph: stubGraph, ledger: { events: [] }, availability: stubAvailability, profile: 'fast',
     })).rejects.toThrow(/cycle/i)
   })
+
+  it('passes the profile to each lens function via LensContext', async () => {
+    const captured: string[] = []
+    const registry: LensManifest[] = [
+      { id: 'P', name: 'P', profiles: ['fast', 'full'], required: ['pipeline_docs'], optional: [] },
+    ]
+    const lenses = {
+      P: async (
+        _g: unknown, _l: unknown, _a: unknown, _u: unknown, _e: unknown,
+        ctx?: { profile?: string },
+      ) => {
+        captured.push(ctx?.profile ?? '(missing)')
+        return [] as never[]
+      },
+    }
+    await runChecks({
+      registry, lenses, graph: stubGraph, ledger: { events: [] },
+      availability: stubAvailability, profile: 'full',
+    })
+    expect(captured).toEqual(['full'])
+  })
 })

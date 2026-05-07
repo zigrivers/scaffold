@@ -1,12 +1,18 @@
 import type { Event, Finding, AvailabilityMap, AdapterId, DocGraph } from '../types.js'
 import type { LensManifest } from './registry.js'
 
+export interface LensContext {
+  profile: 'fast' | 'full'
+  cwd: string
+}
+
 export type LensFn = (
   graph: DocGraph,
   ledger: { events: Event[] },
   availability: AvailabilityMap,
   upstreamFindings: Finding[],
   enabledIds: Set<string>,
+  context?: LensContext,
 ) => Promise<Finding[]>
 
 export interface RunChecksInput {
@@ -16,6 +22,7 @@ export interface RunChecksInput {
   ledger: { events: Event[] }
   availability: AvailabilityMap
   profile: 'fast' | 'full'
+  cwd?: string
   enabledIds?: Set<string>
 }
 
@@ -67,6 +74,7 @@ export async function runChecks(input: RunChecksInput): Promise<Finding[]> {
   const enabledIds = input.enabledIds ?? new Set(
     input.registry.filter((m) => m.profiles.includes(input.profile)).map((m) => m.id),
   )
+  const context: LensContext = { profile: input.profile, cwd: input.cwd ?? process.cwd() }
   const allFindings: Finding[] = []
 
   for (const manifest of sorted) {
@@ -80,7 +88,7 @@ export async function runChecks(input: RunChecksInput): Promise<Finding[]> {
     if (!lensFn) continue
     const upstream = (manifest.depends_on ?? [])
       .flatMap((dep) => allFindings.filter((f) => f.lens_id === dep))
-    const findings = await lensFn(input.graph, input.ledger, input.availability, upstream, enabledIds)
+    const findings = await lensFn(input.graph, input.ledger, input.availability, upstream, enabledIds, context)
     allFindings.push(...findings)
   }
   return allFindings

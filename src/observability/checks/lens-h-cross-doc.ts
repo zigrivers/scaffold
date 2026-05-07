@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto'
 import type { Finding } from '../engine/types.js'
-import type { LensFn } from '../engine/checks/runner.js'
+import type { LensFn, LensContext } from '../engine/checks/runner.js'
+import { dispatchLlm } from '../engine/llm-dispatcher.js'
+import { loadObservabilityConfig } from '../engine/checks/observability-config.js'
 
 const lensId = 'H-cross-doc'
 
@@ -8,7 +10,7 @@ function makeFindingId(parts: string[]): string {
   return createHash('sha256').update(parts.join('::')).digest('hex').slice(0, 16)
 }
 
-export const lensHCrossDoc: LensFn = async (graph) => {
+export const lensHCrossDoc: LensFn = async (graph, _ledger, _availability, _upstream, _enabled, context) => {
   const findings: Finding[] = []
   const now = new Date().toISOString()
 
@@ -147,5 +149,204 @@ export const lensHCrossDoc: LensFn = async (graph) => {
     })
   }
 
+  // Full-profile LLM-graded checks (~60s × 3 calls = ~180s worst-case).
+  // Sequential intentionally: parallel calls to the same LLM provider risk
+  // rate-limiting which would silently drop findings. Users who opt into
+  // full-profile accept the latency; the doc-conformance channel sets a
+  // 240s timeout to accommodate it.
+  //
+  // SECURITY: dispatcher_command is intentionally NOT loaded from project-local
+  // observability.yaml — executing a repo-controlled command string would allow
+  // arbitrary code execution when auditing untrusted repositories. Only
+  // timeout_s and parallel_checks are project-configurable (performance only,
+  // not code execution).
+  if (context?.profile === 'full') {
+    const cmd = 'claude -p'
+    let timeoutMs = 60_000
+    let parallelChecks = false
+    try {
+      const config = loadObservabilityConfig(context.cwd)
+      timeoutMs = (config.llm?.timeout_s ?? 60) * 1000
+      parallelChecks = config.llm?.parallel_checks ?? false
+    } catch {
+      // Malformed observability.yaml — fall back to defaults so the audit continues
+    }
+
+    if (parallelChecks) {
+      const [a, b, c] = await Promise.all([
+        runTechStackVsPrd(graph, context, cmd, timeoutMs, now, makeFindingId),
+        runPrdToStoriesCoverage(graph, context, cmd, timeoutMs, now, makeFindingId),
+        runTerminologyDrift(graph, context, cmd, timeoutMs, now, makeFindingId),
+      ])
+      findings.push(...a, ...b, ...c)
+    } else {
+      findings.push(...await runTechStackVsPrd(graph, context, cmd, timeoutMs, now, makeFindingId))
+      findings.push(...await runPrdToStoriesCoverage(graph, context, cmd, timeoutMs, now, makeFindingId))
+      findings.push(...await runTerminologyDrift(graph, context, cmd, timeoutMs, now, makeFindingId))
+    }
+  }
+
   return findings
+}
+
+type LlmFinding = { severity: string; title: string; description: string }
+
+function isValidLlmFinding(x: unknown): x is LlmFinding {
+  if (typeof x !== 'object' || x === null) return false
+  const f = x as Record<string, unknown>
+  return typeof f.severity === 'string' && typeof f.title === 'string' && typeof f.description === 'string'
+}
+
+async function runTechStackVsPrd(
+  graph: Parameters<LensFn>[0],
+  _ctx: LensContext,
+  cmd: string,
+  timeoutMs: number,
+  now: string,
+  mkId: (parts: string[]) => string,
+): Promise<Finding[]> {
+  if (graph.features.length === 0 || graph.components.length === 0) return []
+
+  const prdProse = graph.features
+    .filter((f) => f.priority === 'must' || f.priority === 'should')
+    .map((f) => `### ${f.title} (${f.priority})\n${f.prose ?? '(no prose)'}\n`)
+    .join('\n')
+  const techStackText = graph.components
+    .map((c) => `- ${c.id}: ${c.package_or_url}${c.layer ? ` (layer: ${c.layer})` : ''}`)
+    .join('\n')
+
+  const prompt = `You are auditing two scaffold-pipeline planning documents for direct contradictions or soft tensions.
+
+PRD features (priority: must/should only):
+${prdProse}
+
+Tech stack:
+${techStackText}
+
+Identify findings where the tech-stack contradicts (P0) or is in tension with (P2) the PRD's constraints.
+Return ONLY a JSON object of the form:
+{"findings": [{"severity": "P0"|"P2", "title": "<= 80 chars", "description": "<= 500 chars"}]}
+Return {"findings": []} if there are no issues.`
+
+  const result = await dispatchLlm({ prompt, command: cmd, timeoutMs })
+  if (!result.ok) return []
+  const parsed = result.parsed as { findings?: unknown }
+  if (!Array.isArray(parsed.findings)) return []
+  return parsed.findings.filter(isValidLlmFinding)
+    .filter((f) => f.severity === 'P0' || f.severity === 'P2')
+    .map((f) => ({
+      id: mkId([lensId, 'tech-stack-vs-prd', f.title]),
+      lens_id: lensId, severity: f.severity as 'P0' | 'P2',
+      title: f.title.slice(0, 80),
+      description: f.description.slice(0, 500),
+      source_doc: 'docs/plan.md',
+      evidence: {
+        kind: 'doc_disagreement' as const, left_doc: 'docs/plan.md', right_doc: 'docs/tech-stack.md',
+        conflict: f.title,
+      },
+      confidence: 'medium' as const, first_seen: now, last_seen: now, status: 'open' as const,
+    }))
+}
+
+async function runPrdToStoriesCoverage(
+  graph: Parameters<LensFn>[0],
+  _ctx: LensContext,
+  cmd: string,
+  timeoutMs: number,
+  now: string,
+  mkId: (parts: string[]) => string,
+): Promise<Finding[]> {
+  if (graph.features.length === 0 || graph.stories.length === 0) return []
+
+  const featuresProse = graph.features
+    .map((f) => `### ${f.title}\n${f.prose ?? '(no prose)'}\n`)
+    .join('\n')
+  const storiesList = graph.stories
+    .map((s) => `- ${s.id}: ${s.title} (${s.priority})`)
+    .join('\n')
+
+  const prompt = `You are checking whether the user-stories cover the features described in the PRD's prose.
+
+PRD features (with prose):
+${featuresProse}
+
+Existing user stories:
+${storiesList}
+
+Identify features that are described in PRD prose but have no covering story. Return ONLY a JSON object of the form:
+{"findings": [{"severity": "P1", "title": "<= 80 chars", "description": "<= 500 chars"}]}
+Return {"findings": []} if all PRD-prose features are covered.`
+
+  const result = await dispatchLlm({ prompt, command: cmd, timeoutMs })
+  if (!result.ok) return []
+  const parsed = result.parsed as { findings?: unknown }
+  if (!Array.isArray(parsed.findings)) return []
+  return parsed.findings.filter(isValidLlmFinding)
+    .filter((f) => f.severity === 'P1')
+    .map((f) => ({
+      id: mkId([lensId, 'prd-feature-no-story-prose', f.title]),
+      lens_id: lensId, severity: 'P1' as const,
+      title: f.title.slice(0, 80),
+      description: f.description.slice(0, 500),
+      source_doc: 'docs/plan.md',
+      evidence: {
+        kind: 'doc_disagreement' as const, left_doc: 'docs/plan.md', right_doc: 'docs/user-stories.md',
+        conflict: f.title,
+      },
+      confidence: 'medium' as const, first_seen: now, last_seen: now, status: 'open' as const,
+    }))
+}
+
+async function runTerminologyDrift(
+  graph: Parameters<LensFn>[0],
+  _ctx: LensContext,
+  cmd: string,
+  timeoutMs: number,
+  now: string,
+  mkId: (parts: string[]) => string,
+): Promise<Finding[]> {
+  if (graph.features.length === 0 && graph.stories.length === 0) return []
+
+  const docDigest = [
+    graph.features.length > 0
+      ? `## PRD features\n${graph.features.map((f) => `- ${f.title}: ${(f.prose ?? '').slice(0, 1000)}`).join('\n')}`
+      : '',
+    graph.stories.length > 0
+      ? `## Stories\n${graph.stories.map((s) => `- ${s.id}: ${s.title}`).join('\n')}`
+      : '',
+    graph.rules.length > 0
+      ? `## Standards rules\n${graph.rules.map((r) => `- ${r.id}: ${r.description}`).join('\n')}`
+      : '',
+    graph.tokens.length > 0
+      ? `## Design tokens\n${graph.tokens.map((t) => `- ${t.id} (${t.category})`).join('\n')}`
+      : '',
+  ].filter(Boolean).join('\n\n')
+
+  const prompt = `Detect terminology drift across these scaffold-pipeline planning documents
+— same concept named differently across docs (e.g. "user account" vs "profile" vs "user record").
+
+${docDigest}
+
+Return ONLY a JSON object of the form:
+{"findings": [{"severity": "P2", "title": "<= 80 chars", "description": "<= 500 chars"}]}
+Return {"findings": []} when terminology is internally consistent.`
+
+  const result = await dispatchLlm({ prompt, command: cmd, timeoutMs })
+  if (!result.ok) return []
+  const parsed = result.parsed as { findings?: unknown }
+  if (!Array.isArray(parsed.findings)) return []
+  return parsed.findings.filter(isValidLlmFinding)
+    .filter((f) => f.severity === 'P2')
+    .map((f) => ({
+      id: mkId([lensId, 'terminology-drift', f.title]),
+      lens_id: lensId, severity: 'P2' as const,
+      title: f.title.slice(0, 80),
+      description: f.description.slice(0, 500),
+      source_doc: 'docs/plan.md',
+      evidence: {
+        kind: 'doc_disagreement' as const, left_doc: 'multiple', right_doc: 'multiple',
+        conflict: f.title,
+      },
+      confidence: 'low' as const, first_seen: now, last_seen: now, status: 'open' as const,
+    }))
 }

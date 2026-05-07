@@ -9,6 +9,7 @@ import { renderProgressTerminal, renderAuditTerminal } from '../../observability
 import { renderProgressMarkdown, renderAuditMarkdown } from '../../observability/renderers/markdown.js'
 import { writeSidecar, deriveReportId, sidecarPath } from '../../observability/renderers/sidecar.js'
 import { renderProgressFragment, renderAuditFragment } from '../../observability/renderers/dashboard.js'
+import { renderMmrFindings } from '../../observability/renderers/mmr-findings.js'
 import { readIdentityAsync } from '../../observability/engine/identity.js'
 import { stat, readdir, readFile, mkdir, writeFile } from 'node:fs/promises'
 import { execSync } from 'node:child_process'
@@ -190,6 +191,7 @@ export interface HandleAuditInput {
   showAcknowledged?: boolean
   output?: string
   render?: 'dashboard-fragment-audit'
+  outputMode?: 'mmr-findings'
   ghBin?: string
   bdBin?: string
 }
@@ -207,6 +209,10 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
       bdBin: input.bdBin,
       args: { profile: input.profile, scope: input.scope, sinceHours: input.sinceHours, lensIds: input.lensIds },
     })
+    if (input.outputMode === 'mmr-findings') {
+      process.stdout.write(renderMmrFindings(out))
+      return 0 // Always exit 0 so the MMR dispatcher captures stdout regardless of verdict
+    }
     if (input.render === 'dashboard-fragment-audit') {
       const fragment = renderAuditFragment(out)
       process.stdout.write((input.maskPaths ? redactRendered(fragment) : fragment) + '\n')
@@ -416,6 +422,10 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
         .option('render', {
           type: 'string', choices: ['dashboard-fragment-audit'] as const,
           describe: 'Emit HTML fragment to stdout',
+        })
+        .option('output-mode', {
+          type: 'string', choices: ['mmr-findings'] as const,
+          describe: 'Emit findings in MMR Finding shape (skips markdown/sidecar)',
         }),
       async (argv) => {
         const code = await handleAudit({
@@ -430,6 +440,7 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
           showAcknowledged: !!(argv['show-acknowledged'] ?? argv.showAcknowledged),
           output: argv.output as string | undefined,
           render: argv.render as 'dashboard-fragment-audit' | undefined,
+          outputMode: argv['output-mode'] as 'mmr-findings' | undefined,
         })
         process.exitCode = code
       },

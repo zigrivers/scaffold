@@ -162,9 +162,40 @@ function geminiParser(raw: string): ParsedOutput {
   }
 }
 
+function docConformanceParser(raw: string): ParsedOutput {
+  try {
+    const arr = JSON.parse(raw)
+    if (!Array.isArray(arr)) {
+      return {
+        approved: false,
+        findings: [{
+          severity: 'P1', location: 'doc-conformance',
+          description: 'doc-conformance channel returned valid JSON but not an array — malformed output',
+          suggestion: 'Check scaffold observe audit --output-mode=mmr-findings produces a JSON array',
+        }],
+        summary: 'doc-conformance: output was not a JSON array',
+      }
+    }
+    const findings = arr.map(validateFindingStrict)
+    const approved = findings.every((f) => f.severity === 'P2' || f.severity === 'P3')
+    const summary = `doc-conformance: ${findings.length} finding(s)${approved ? '' : ' (blocking)'}`
+    return { approved, findings, summary }
+  } catch {
+    return {
+      approved: false,
+      findings: [{
+        severity: 'P1', location: 'doc-conformance',
+        description: 'Failed to parse doc-conformance output', suggestion: '',
+      }],
+      summary: 'doc-conformance: parse error',
+    }
+  }
+}
+
 const parsers: Record<string, Parser> = {
   default: defaultParser,
   gemini: geminiParser,
+  'doc-conformance': docConformanceParser,
 }
 
 /**

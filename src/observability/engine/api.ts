@@ -56,7 +56,7 @@ export interface RunAuditInput {
   primaryRoot: string
   profile: 'fast' | 'full'
   scope: 'docs' | 'code' | 'all'
-  sinceHours: number
+  sinceHours?: number
   lensIds?: string[]
   fixThresholdOverride?: string
   ghBin?: string
@@ -101,6 +101,7 @@ export async function runAudit(input: RunAuditInput): Promise<EngineOutput> {
     ledger: { events: merged.events },
     availability,
     profile: input.profile,
+    cwd: input.primaryRoot,
     enabledIds,
   })
   const { findings, summary } = aggregate(rawFindings, merged.events, fix_threshold)
