@@ -17,6 +17,7 @@ import { dirname, isAbsolute, join } from 'node:path'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { runFixFlow } from '../../observability/engine/fix-flow.js'
 import { captureSnapshot, restoreSnapshot } from '../../observability/engine/abort-snapshot.js'
+import { recoverStaleArchives } from '../../observability/engine/harvester.js'
 
 async function writeMarkdownReport(
   cwd: string, out: EngineOutput, body: string, reportId: string, overridePath?: string,
@@ -154,10 +155,17 @@ export async function handleProgress(input: HandleProgressInput): Promise<number
 export interface HandleHarvestInput {
   primaryRoot: string
   worktreeRoot: string
+  recover?: boolean
 }
 
 export async function handleHarvest(input: HandleHarvestInput): Promise<number> {
   try {
+    if (input.recover) {
+      const result = await recoverStaleArchives({ primaryRoot: input.primaryRoot })
+      process.stdout.write(`rotated ${result.rotated.length} stale archive(s)\n`)
+      if (result.rotated.length > 0) process.stdout.write(`  ${result.rotated.join(', ')}\n`)
+      return 0
+    }
     const gitEntry = await stat(join(input.primaryRoot, '.git')).catch(() => null)
     if (gitEntry && !gitEntry.isDirectory()) {
       process.stderr.write(
@@ -427,11 +435,17 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
     .command(
       'harvest',
       'Flush a worktree ledger to the primary archive',
-      (y) => y.option('worktree', { type: 'string', demandOption: true }),
+      (y) => y
+        .option('worktree', { type: 'string', describe: 'Worktree path to harvest' })
+        .option('recover', {
+          type: 'boolean', default: false,
+          describe: 'Scan for stale active-archive entries and rotate them',
+        }),
       async (argv) => {
         const code = await handleHarvest({
           primaryRoot: findProjectRoot(process.cwd()) ?? process.cwd(),
-          worktreeRoot: argv.worktree as string,
+          worktreeRoot: (argv.worktree as string | undefined) ?? '',
+          recover: !!(argv.recover),
         })
         process.exitCode = code
       },

@@ -442,3 +442,24 @@ describe('observe audit --fix', () => {
     expect(captured).toMatch(/postfix\.md/)
   }, 30_000)
 })
+
+describe('observe harvest --recover', () => {
+  it('rotates stale active-archive entries and prints the count', async () => {
+    const primary = mkdtempSync(join(tmpdir(), 'observe-rcli-'))
+    const activeDir = join(primary, '.scaffold/activity-archive/active')
+    mkdirSync(activeDir, { recursive: true })
+    writeFileSync(join(activeDir, '11111111-2222-4333-8444-555555555555.jsonl'),
+      JSON.stringify({ event_id: 'ulid-x', worktree_id: '11111111', actor_label: 'gone', branch: 'b', task_id: null, type: 'progress_heartbeat', ts: '2026-04-01T00:00:00Z', payload: { note: 'orphaned' } }) + '\n')
+
+    let captured = ''
+    const orig = process.stdout.write.bind(process.stdout)
+    process.stdout.write = ((s: string | Uint8Array) => { captured += String(s); return true }) as never
+    try {
+      const code = await handleHarvest({ primaryRoot: primary, worktreeRoot: '', recover: true })
+      expect(code).toBe(0)
+    } finally { process.stdout.write = orig }
+    rmSync(primary, { recursive: true, force: true })
+
+    expect(captured).toMatch(/rotated 1/)
+  })
+})
