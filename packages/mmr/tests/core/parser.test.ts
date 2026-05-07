@@ -164,11 +164,12 @@ describe('doc-conformance parser', () => {
     expect(result.findings[0].severity).toBe('P1')
   })
 
-  it('returns a blocking finding when output fails to parse', () => {
+  it('returns a P1 blocking finding when output fails to parse', () => {
     const raw = 'not-json'
     const result = parse(raw)
     expect(result.approved).toBe(false)
-    expect(result.findings.length).toBeGreaterThan(0)
+    expect(result.findings).toHaveLength(1)
+    expect(result.findings[0].severity).toBe('P1')
   })
 })
 

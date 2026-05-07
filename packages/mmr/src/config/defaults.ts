@@ -90,10 +90,11 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
     flags: [],
     env: {},
     auth: {
-      check: 'scaffold --version >/dev/null 2>&1 && claude --version >/dev/null 2>&1',
-      timeout: 5,
+      // Full-profile checks invoke claude -p; verify it responds, not just that it's installed.
+      check: 'scaffold --version >/dev/null 2>&1 && claude -p "respond with ok" 2>/dev/null',
+      timeout: 20,
       failure_exit_codes: [1],
-      recovery: 'Install scaffold: npm install -g @zigrivers/scaffold  (or: brew install scaffold)',
+      recovery: 'Install scaffold (npm install -g @zigrivers/scaffold or brew install scaffold) and run: claude login',
     },
     prompt_wrapper: '{{prompt}}',
     output_parser: 'doc-conformance',

@@ -184,7 +184,7 @@ function docConformanceParser(raw: string): ParsedOutput {
     return {
       approved: false,
       findings: [{
-        severity: 'P2', location: 'doc-conformance',
+        severity: 'P1', location: 'doc-conformance',
         description: 'Failed to parse doc-conformance output', suggestion: '',
       }],
       summary: 'doc-conformance: parse error',

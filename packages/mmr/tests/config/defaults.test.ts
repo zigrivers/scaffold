@@ -15,9 +15,13 @@ describe('BUILTIN_CHANNELS — doc-conformance', () => {
     expect(BUILTIN_CHANNELS['doc-conformance'].output_parser).toBe('doc-conformance')
   })
 
-  it('auth.check verifies both scaffold and claude are installed', () => {
+  it('auth.check verifies scaffold is installed and claude can run an authenticated prompt', () => {
     expect(BUILTIN_CHANNELS['doc-conformance'].auth.check).toMatch(/scaffold/)
-    expect(BUILTIN_CHANNELS['doc-conformance'].auth.check).toMatch(/claude/)
+    expect(BUILTIN_CHANNELS['doc-conformance'].auth.check).toMatch(/claude -p/)
+  })
+
+  it('auth timeout is 20s to accommodate a live LLM probe', () => {
+    expect(BUILTIN_CHANNELS['doc-conformance'].auth.timeout).toBe(20)
   })
 
   it('is disabled by default (requires explicit opt-in due to 3 LLM calls)', () => {
