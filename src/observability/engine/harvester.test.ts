@@ -62,3 +62,46 @@ describe('harvester', () => {
     }
   })
 })
+
+import { mkdirSync, writeFileSync, readdirSync } from 'node:fs'
+import { recoverStaleArchives } from './harvester.js'
+
+describe('harvester.recoverStaleArchives', () => {
+  let primary: string
+
+  beforeEach(() => {
+    primary = mkdtempSync(join(tmpdir(), 'observe-recover-'))
+  })
+  afterEach(() => { rmSync(primary, { recursive: true, force: true }) })
+
+  it('rotates active-archive entries whose worktree path no longer exists', async () => {
+    const activeDir = join(primary, '.scaffold/activity-archive/active')
+    mkdirSync(activeDir, { recursive: true })
+    writeFileSync(join(activeDir, 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jsonl'),
+      JSON.stringify({ event_id: 'ulid-x', worktree_id: 'aaaa', actor_label: 'orphan', branch: 'b', task_id: 'T-1', type: 'task_claimed', ts: '2026-04-01T00:00:00Z', payload: { task_title: 'gone' } }) + '\n')
+
+    const result = await recoverStaleArchives({ primaryRoot: primary })
+    expect(result.rotated).toContain('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee')
+    expect(existsSync(join(activeDir, 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jsonl'))).toBe(false)
+    const archiveFiles = readdirSync(join(primary, '.scaffold/activity-archive'))
+    expect(archiveFiles.some((f) => /^\d{4}-\d{2}\.jsonl(\.gz)?$/.test(f))).toBe(true)
+  })
+
+  it('leaves active archives whose worktree still exists alone', async () => {
+    const activeDir = join(primary, '.scaffold/activity-archive/active')
+    mkdirSync(activeDir, { recursive: true })
+    const wtId = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff'
+    const wtPath = mkdtempSync(join(tmpdir(), 'observe-recover-wt-'))
+    try {
+      mkdirSync(join(wtPath, '.scaffold'), { recursive: true })
+      writeFileSync(join(wtPath, '.scaffold/identity.json'), JSON.stringify({ worktree_id: wtId, worktree_label: 'live', created_at: '2026-05-04T00:00:00Z' }))
+      writeFileSync(join(activeDir, `${wtId}.jsonl`), '{}\n')
+
+      const result = await recoverStaleArchives({ primaryRoot: primary, listWorktrees: () => [wtPath] })
+      expect(result.rotated).toEqual([])
+      expect(existsSync(join(activeDir, `${wtId}.jsonl`))).toBe(true)
+    } finally {
+      rmSync(wtPath, { recursive: true, force: true })
+    }
+  })
+})
