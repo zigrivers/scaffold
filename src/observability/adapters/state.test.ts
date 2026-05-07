@@ -66,3 +66,37 @@ describe('state adapter — replayEvents', () => {
     expect(await stateAdapter.replayEvents(dir, { sinceHours: 24 })).toEqual([])
   })
 })
+
+describe('state adapter — replayEvents with real timestamps (Plan 6)', () => {
+  let dir: string
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'observe-st-rt-')) })
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }) })
+
+  it('uses StepEntry.completed_at for step_completed events when available', async () => {
+    mkdirSync(join(dir, '.scaffold'), { recursive: true })
+    writeFileSync(join(dir, '.scaffold/state.json'), JSON.stringify({
+      version: '1.0', methodology: 'deep',
+      steps: {
+        'user-stories': { status: 'completed', source: 'pipeline', completed_at: '2026-05-04T10:30:00.000Z' },
+        'tech-stack':   { status: 'in_progress', source: 'pipeline', in_progress_started_at: '2026-05-04T13:45:00.000Z' },
+        'coding-standards': { status: 'pending', source: 'pipeline' },
+      },
+    }))
+    const events = await stateAdapter.replayEvents(dir, { sinceHours: 24 * 365 })
+    const completed = events.find((e) => e.kind === 'step_completed')
+    const inProgress = events.find((e) => e.kind === 'step_in_progress')
+    expect(completed?.ts).toBe('2026-05-04T10:30:00.000Z')
+    expect(inProgress?.ts).toBe('2026-05-04T13:45:00.000Z')
+  })
+
+  it('falls back to file mtime when timestamps are absent', async () => {
+    mkdirSync(join(dir, '.scaffold'), { recursive: true })
+    writeFileSync(join(dir, '.scaffold/state.json'), JSON.stringify({
+      version: '1.0', methodology: 'deep',
+      steps: { 'user-stories': { status: 'completed', source: 'pipeline' } },
+    }))
+    const events = await stateAdapter.replayEvents(dir, { sinceHours: 24 })
+    expect(events).toHaveLength(1)
+    expect(events[0].ts).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+  })
+})
