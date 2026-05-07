@@ -166,8 +166,8 @@ export const lensHCrossDoc: LensFn = async (graph, _ledger, _availability, _upst
     let parallelChecks = false
     try {
       const config = loadObservabilityConfig(context.cwd)
-      timeoutMs = (config.llm.timeout_s ?? 60) * 1000
-      parallelChecks = config.llm.parallel_checks ?? false
+      timeoutMs = (config.llm?.timeout_s ?? 60) * 1000
+      parallelChecks = config.llm?.parallel_checks ?? false
     } catch {
       // Malformed observability.yaml — fall back to defaults so the audit continues
     }
