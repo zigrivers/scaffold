@@ -41,6 +41,7 @@ export const MmrConfigSchema = z.object({
   review_criteria: z.array(z.string()).optional(),
   templates: z.record(TemplateSchema).optional(),
   channels: z.record(ChannelConfigSchema).default({}),
+  channels_disabled: z.array(z.string()).optional(),
 })
 
 export type MmrConfigParsed = z.infer<typeof MmrConfigSchema>

@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { StringDecoder } from 'node:string_decoder'
 
 export interface DispatchInput {
   prompt: string
@@ -22,6 +23,7 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
 
     let stdout = ''
     let resolved = false
+    const decoder = new StringDecoder('utf8')
 
     const timer = setTimeout(() => {
       if (resolved) return
@@ -30,7 +32,7 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
       resolve({ ok: false, reason: `timed out after ${input.timeoutMs}ms`, raw: stdout })
     }, input.timeoutMs)
 
-    child.stdout?.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8') })
+    child.stdout?.on('data', (chunk: Buffer) => { stdout += decoder.write(chunk) })
     child.stderr?.on('data', (_chunk: Buffer) => { /* discard */ })
 
     child.on('error', (err: NodeJS.ErrnoException) => {
@@ -45,12 +47,20 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
       if (resolved) return
       resolved = true
       clearTimeout(timer)
+      stdout += decoder.end()
       if (code !== 0) {
         resolve({ ok: false, reason: `subprocess exit ${code}`, raw: stdout })
         return
       }
+      // Extract the first JSON object/array block — LLMs sometimes emit conversational filler
+      const start = stdout.indexOf('{')
+      const end = stdout.lastIndexOf('}')
+      if (start === -1 || end === -1) {
+        resolve({ ok: false, reason: 'no JSON object found in output', raw: stdout })
+        return
+      }
       try {
-        const parsed = JSON.parse(stdout.trim())
+        const parsed = JSON.parse(stdout.slice(start, end + 1))
         resolve({ ok: true, parsed, raw: stdout })
       } catch (err) {
         resolve({ ok: false, reason: `JSON parse failed: ${(err as Error).message}`, raw: stdout })

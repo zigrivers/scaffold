@@ -155,9 +155,12 @@ export const lensHCrossDoc: LensFn = async (graph, _ledger, _availability, _upst
     const cmd = config.llm.dispatcher_command ?? 'claude -p'
     const timeoutMs = (config.llm.timeout_s ?? 60) * 1000
 
-    await runTechStackVsPrd(graph, context, cmd, timeoutMs, findings, now, makeFindingId)
-    await runPrdToStoriesCoverage(graph, context, cmd, timeoutMs, findings, now, makeFindingId)
-    await runTerminologyDrift(graph, context, cmd, timeoutMs, findings, now, makeFindingId)
+    const llmResults = await Promise.all([
+      runTechStackVsPrd(graph, context, cmd, timeoutMs, now, makeFindingId),
+      runPrdToStoriesCoverage(graph, context, cmd, timeoutMs, now, makeFindingId),
+      runTerminologyDrift(graph, context, cmd, timeoutMs, now, makeFindingId),
+    ])
+    for (const batch of llmResults) findings.push(...batch)
   }
 
   return findings
@@ -170,11 +173,10 @@ async function runTechStackVsPrd(
   _ctx: LensContext,
   cmd: string,
   timeoutMs: number,
-  findings: Finding[],
   now: string,
   mkId: (parts: string[]) => string,
-): Promise<void> {
-  if (graph.features.length === 0 || graph.components.length === 0) return
+): Promise<Finding[]> {
+  if (graph.features.length === 0 || graph.components.length === 0) return []
 
   const prdProse = graph.features
     .filter((f) => f.priority === 'must' || f.priority === 'should')
@@ -198,23 +200,22 @@ Return ONLY a JSON object of the form:
 Return {"findings": []} if there are no issues.`
 
   const result = await dispatchLlm({ prompt, command: cmd, timeoutMs })
-  if (!result.ok) return
+  if (!result.ok) return []
   const parsed = result.parsed as { findings?: LlmFinding[] }
-  for (const f of parsed.findings ?? []) {
-    if (f.severity !== 'P0' && f.severity !== 'P2') continue
-    findings.push({
+  return (parsed.findings ?? [])
+    .filter((f) => f.severity === 'P0' || f.severity === 'P2')
+    .map((f) => ({
       id: mkId([lensId, 'tech-stack-vs-prd', f.title]),
       lens_id: lensId, severity: f.severity as 'P0' | 'P2',
       title: f.title.slice(0, 80),
       description: f.description.slice(0, 500),
       source_doc: 'docs/plan.md',
       evidence: {
-        kind: 'doc_disagreement', left_doc: 'docs/plan.md', right_doc: 'docs/tech-stack.md',
+        kind: 'doc_disagreement' as const, left_doc: 'docs/plan.md', right_doc: 'docs/tech-stack.md',
         conflict: f.title,
       },
-      confidence: 'medium', first_seen: now, last_seen: now, status: 'open',
-    })
-  }
+      confidence: 'medium' as const, first_seen: now, last_seen: now, status: 'open' as const,
+    }))
 }
 
 async function runPrdToStoriesCoverage(
@@ -222,11 +223,10 @@ async function runPrdToStoriesCoverage(
   _ctx: LensContext,
   cmd: string,
   timeoutMs: number,
-  findings: Finding[],
   now: string,
   mkId: (parts: string[]) => string,
-): Promise<void> {
-  if (graph.features.length === 0 || graph.stories.length === 0) return
+): Promise<Finding[]> {
+  if (graph.features.length === 0 || graph.stories.length === 0) return []
 
   const featuresProse = graph.features
     .map((f) => `### ${f.title}\n${f.prose ?? '(no prose)'}\n`)
@@ -248,23 +248,22 @@ Identify features that are described in PRD prose but have no covering story. Re
 Return {"findings": []} if all PRD-prose features are covered.`
 
   const result = await dispatchLlm({ prompt, command: cmd, timeoutMs })
-  if (!result.ok) return
+  if (!result.ok) return []
   const parsed = result.parsed as { findings?: LlmFinding[] }
-  for (const f of parsed.findings ?? []) {
-    if (f.severity !== 'P1') continue
-    findings.push({
+  return (parsed.findings ?? [])
+    .filter((f) => f.severity === 'P1')
+    .map((f) => ({
       id: mkId([lensId, 'prd-feature-no-story-prose', f.title]),
-      lens_id: lensId, severity: 'P1',
+      lens_id: lensId, severity: 'P1' as const,
       title: f.title.slice(0, 80),
       description: f.description.slice(0, 500),
       source_doc: 'docs/plan.md',
       evidence: {
-        kind: 'doc_disagreement', left_doc: 'docs/plan.md', right_doc: 'docs/user-stories.md',
+        kind: 'doc_disagreement' as const, left_doc: 'docs/plan.md', right_doc: 'docs/user-stories.md',
         conflict: f.title,
       },
-      confidence: 'medium', first_seen: now, last_seen: now, status: 'open',
-    })
-  }
+      confidence: 'medium' as const, first_seen: now, last_seen: now, status: 'open' as const,
+    }))
 }
 
 async function runTerminologyDrift(
@@ -272,15 +271,14 @@ async function runTerminologyDrift(
   _ctx: LensContext,
   cmd: string,
   timeoutMs: number,
-  findings: Finding[],
   now: string,
   mkId: (parts: string[]) => string,
-): Promise<void> {
-  if (graph.features.length === 0 && graph.stories.length === 0) return
+): Promise<Finding[]> {
+  if (graph.features.length === 0 && graph.stories.length === 0) return []
 
   const docDigest = [
     graph.features.length > 0
-      ? `## PRD features\n${graph.features.map((f) => `- ${f.title}: ${(f.prose ?? '').slice(0, 200)}`).join('\n')}`
+      ? `## PRD features\n${graph.features.map((f) => `- ${f.title}: ${(f.prose ?? '').slice(0, 1000)}`).join('\n')}`
       : '',
     graph.stories.length > 0
       ? `## Stories\n${graph.stories.map((s) => `- ${s.id}: ${s.title}`).join('\n')}`
@@ -303,21 +301,20 @@ Return ONLY a JSON object of the form:
 Return {"findings": []} when terminology is internally consistent.`
 
   const result = await dispatchLlm({ prompt, command: cmd, timeoutMs })
-  if (!result.ok) return
+  if (!result.ok) return []
   const parsed = result.parsed as { findings?: LlmFinding[] }
-  for (const f of parsed.findings ?? []) {
-    if (f.severity !== 'P2') continue
-    findings.push({
+  return (parsed.findings ?? [])
+    .filter((f) => f.severity === 'P2')
+    .map((f) => ({
       id: mkId([lensId, 'terminology-drift', f.title]),
-      lens_id: lensId, severity: 'P2',
+      lens_id: lensId, severity: 'P2' as const,
       title: f.title.slice(0, 80),
       description: f.description.slice(0, 500),
       source_doc: 'docs/plan.md',
       evidence: {
-        kind: 'doc_disagreement', left_doc: 'multiple', right_doc: 'multiple',
+        kind: 'doc_disagreement' as const, left_doc: 'multiple', right_doc: 'multiple',
         conflict: f.title,
       },
-      confidence: 'low', first_seen: now, last_seen: now, status: 'open',
-    })
-  }
+      confidence: 'low' as const, first_seen: now, last_seen: now, status: 'open' as const,
+    }))
 }

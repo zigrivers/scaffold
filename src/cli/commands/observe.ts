@@ -211,7 +211,7 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
     })
     if (input.outputMode === 'mmr-findings') {
       process.stdout.write(renderMmrFindings(out))
-      return out.verdict === 'blocked' ? 1 : 0
+      return 0 // Always exit 0 so the MMR dispatcher captures stdout regardless of verdict
     }
     if (input.render === 'dashboard-fragment-audit') {
       const fragment = renderAuditFragment(out)

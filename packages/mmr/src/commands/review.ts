@@ -143,8 +143,9 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     }
 
     // 3. Determine enabled channels
+    const disabledSet = new Set(config.channels_disabled ?? [])
     const channelNames = args.channels ?? Object.entries(config.channels)
-      .filter(([, ch]) => ch.enabled)
+      .filter(([name, ch]) => ch.enabled && !disabledSet.has(name))
       .map(([name]) => name)
 
     if (channelNames.length === 0) {
