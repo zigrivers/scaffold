@@ -37,6 +37,12 @@ export interface LlmConfig {
   parallel_checks?: boolean // opt-in parallel LLM calls; default false to avoid rate-limiting
 }
 
+export interface FixConfig {
+  dispatcher_command?: string        // default: "claude -p"
+  timeout_s?: number                 // default: 300 (5 min per finding)
+  per_finding_max_attempts?: number  // default: 3
+}
+
 export interface ObservabilityConfig {
   lenses: {
     'A-tdd'?: Record<string, never>
@@ -52,6 +58,7 @@ export interface ObservabilityConfig {
   stall: StallConfig
   phase_audit: { enabled: boolean; timeout_s: number; detached: boolean }
   llm: LlmConfig
+  fix: FixConfig
 }
 
 export const DEFAULT_CONFIG: ObservabilityConfig = {
@@ -69,6 +76,7 @@ export const DEFAULT_CONFIG: ObservabilityConfig = {
   },
   phase_audit: { enabled: true, timeout_s: 60, detached: false },
   llm: { timeout_s: 60 },
+  fix: { dispatcher_command: 'claude -p', timeout_s: 300, per_finding_max_attempts: 3 },
 }
 
 const CONFIG_PATH = '.scaffold/observability.yaml'
