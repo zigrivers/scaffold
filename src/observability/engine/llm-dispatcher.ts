@@ -22,8 +22,10 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
     }
 
     let stdout = ''
+    let stderr = ''
     let resolved = false
     const decoder = new StringDecoder('utf8')
+    const stderrDecoder = new StringDecoder('utf8')
 
     const timer = setTimeout(() => {
       if (resolved) return
@@ -33,7 +35,7 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
     }, input.timeoutMs)
 
     child.stdout?.on('data', (chunk: Buffer) => { stdout += decoder.write(chunk) })
-    child.stderr?.on('data', (_chunk: Buffer) => { /* discard */ })
+    child.stderr?.on('data', (chunk: Buffer) => { stderr += stderrDecoder.write(chunk) })
 
     child.on('error', (err: NodeJS.ErrnoException) => {
       if (resolved) return
@@ -48,19 +50,15 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
       resolved = true
       clearTimeout(timer)
       stdout += decoder.end()
+      stderr += stderrDecoder.end()
       if (code !== 0) {
-        resolve({ ok: false, reason: `subprocess exit ${code}`, raw: stdout })
+        const hint = stderr.trim() ? ` — stderr: ${stderr.trim().slice(0, 200)}` : ''
+        resolve({ ok: false, reason: `subprocess exit ${code}${hint}`, raw: stdout })
         return
       }
-      // Extract the first JSON object/array block — LLMs sometimes emit conversational filler
-      const start = stdout.indexOf('{')
-      const end = stdout.lastIndexOf('}')
-      if (start === -1 || end === -1) {
-        resolve({ ok: false, reason: 'no JSON object found in output', raw: stdout })
-        return
-      }
+      // Brace-depth extraction — tolerates LLM filler text before/after the JSON block
       try {
-        const parsed = JSON.parse(stdout.slice(start, end + 1))
+        const parsed = extractJsonObject(stdout)
         resolve({ ok: true, parsed, raw: stdout })
       } catch (err) {
         resolve({ ok: false, reason: `JSON parse failed: ${(err as Error).message}`, raw: stdout })
@@ -78,3 +76,26 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
   })
 }
 
+function extractJsonObject(text: string): unknown {
+  const start = text.indexOf('{')
+  if (start === -1) throw new Error('no JSON object found in output')
+
+  let depth = 0
+  let inString = false
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]
+    if (inString) {
+      if (ch === '\\') { i++ } else if (ch === '"') { inString = false }
+      continue
+    }
+    if (ch === '"') { inString = true }
+    else if (ch === '{') { depth++ }
+    else if (ch === '}') {
+      depth--
+      if (depth === 0) return JSON.parse(text.slice(start, i + 1))
+    }
+  }
+
+  throw new Error('unbalanced braces in JSON output')
+}

@@ -201,8 +201,9 @@ Return {"findings": []} if there are no issues.`
 
   const result = await dispatchLlm({ prompt, command: cmd, timeoutMs })
   if (!result.ok) return []
-  const parsed = result.parsed as { findings?: LlmFinding[] }
-  return (parsed.findings ?? [])
+  const parsed = result.parsed as { findings?: unknown }
+  if (!Array.isArray(parsed.findings)) return []
+  return (parsed.findings as LlmFinding[])
     .filter((f) => f.severity === 'P0' || f.severity === 'P2')
     .map((f) => ({
       id: mkId([lensId, 'tech-stack-vs-prd', f.title]),
@@ -249,8 +250,9 @@ Return {"findings": []} if all PRD-prose features are covered.`
 
   const result = await dispatchLlm({ prompt, command: cmd, timeoutMs })
   if (!result.ok) return []
-  const parsed = result.parsed as { findings?: LlmFinding[] }
-  return (parsed.findings ?? [])
+  const parsed = result.parsed as { findings?: unknown }
+  if (!Array.isArray(parsed.findings)) return []
+  return (parsed.findings as LlmFinding[])
     .filter((f) => f.severity === 'P1')
     .map((f) => ({
       id: mkId([lensId, 'prd-feature-no-story-prose', f.title]),
@@ -302,8 +304,9 @@ Return {"findings": []} when terminology is internally consistent.`
 
   const result = await dispatchLlm({ prompt, command: cmd, timeoutMs })
   if (!result.ok) return []
-  const parsed = result.parsed as { findings?: LlmFinding[] }
-  return (parsed.findings ?? [])
+  const parsed = result.parsed as { findings?: unknown }
+  if (!Array.isArray(parsed.findings)) return []
+  return (parsed.findings as LlmFinding[])
     .filter((f) => f.severity === 'P2')
     .map((f) => ({
       id: mkId([lensId, 'terminology-drift', f.title]),

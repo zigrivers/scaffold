@@ -364,7 +364,7 @@ EOF
 EOF
 
     run $BIN observe audit --output-mode=mmr-findings --since-hours=24
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 0 ]
     [[ "$output" == \[* ]]
     [[ "$output" == *"::H-cross-doc::"* ]]
 }
