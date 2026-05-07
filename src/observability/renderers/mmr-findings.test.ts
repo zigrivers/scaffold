@@ -65,7 +65,8 @@ const baseOut: EngineOutput = {
 describe('renderMmrFindings', () => {
   it('emits a JSON array — only open findings (acknowledged and skipped excluded)', () => {
     const out = renderMmrFindings(baseOut)
-    const parsed = JSON.parse(out) as Array<{ severity: string; location: string; description: string; suggestion?: string }>
+    type Shape = { severity: string; location: string; description: string; suggestion?: string }
+    const parsed = JSON.parse(out) as Array<Shape>
     expect(parsed).toHaveLength(1)
     expect(parsed[0].severity).toBe('P0')
   })

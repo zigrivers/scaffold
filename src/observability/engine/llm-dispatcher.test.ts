@@ -35,7 +35,7 @@ describe('dispatchLlm', () => {
   it('passes the prompt to subprocess stdin', async () => {
     const result = await dispatchLlm({
       prompt: 'echo back',
-      command: "read -r line; printf '{\"received\":\"%s\"}' \"$line\"",
+      command: 'read -r line; printf \'{"received":"%s"}\' "$line"',
       timeoutMs: 5000,
     })
     expect(result.ok).toBe(true)
