@@ -1311,6 +1311,124 @@ At depth 1-3, reviews are Claude-only — still thorough with multiple passes, b
 - **At least one additional CLI** — Codex, Gemini, and/or Claude CLI. All three dispatched independently as MMR channels when available. Missing Codex or Gemini channels fall back to compensating Claude passes (labeled `[compensating: Codex-equivalent]` / `[compensating: Gemini-equivalent]`, single-source confidence); if Claude itself is unavailable, the review proceeds with the remaining channels — MMR does not compensate for a missing Claude channel.
 - **Valid authentication** — Scaffold checks before every dispatch (run `mmr config test` to pre-flight all three at once) and tells you if credentials need refreshing
 
+## Build Observability
+
+Build observability gives you a live view of what is happening during a multi-agent implementation run — who claimed what task, which decisions were made, where work is stalled, and whether the codebase conforms to your standards. All data lives under `.scaffold/` and never interferes with the normal pipeline.
+
+### Ledger events
+
+```bash
+scaffold observe event task_claimed   --task-id T-42 --task-title "Add auth flow"
+scaffold observe event decision_made  --task-id T-42 --decision "Use JWT" --rationale "Stateless auth for microservices"
+scaffold observe event task_completed --task-id T-42
+scaffold observe event pr_opened      --pr-number 17
+```
+
+Events are written to `.scaffold/activity.jsonl` (append-only, lockfile-safe). Each event is stamped with a worktree ID, actor label, branch, and ISO-8601 timestamp.
+
+### Progress snapshot
+
+```bash
+scaffold observe progress                       # terminal snapshot
+scaffold observe progress --replay              # full timeline with git/PR/test events fused in
+scaffold observe progress --no-stall-check      # suppress the Needs Attention surface
+scaffold observe progress --output=docs/status.md  # write to a custom path
+```
+
+`--replay` fuses the ledger with six adapter event streams (git, GitHub, MMR, pipeline state, test results, pipeline docs) into a chronological timeline. The "Needs Attention" surface fires when work appears stalled — unclaimed tasks, unreviewed PRs, unresolved blockers, or repeated lens skips.
+
+### Audit
+
+```bash
+scaffold observe audit                          # run all eight lenses (A–H)
+scaffold observe audit --scope=code             # lenses A–G (code conformance only)
+scaffold observe audit --scope=docs             # lens H (cross-document consistency only)
+scaffold observe audit --profile=full           # include LLM-graded Lens H sub-checks
+scaffold observe audit --lens G-decisions       # run a single lens
+scaffold observe audit --output=docs/audit.md   # write to a custom path
+```
+
+Eight lenses cover TDD evidence (A), acceptance-criteria coverage (B), coding-standards compliance (C), stack conformance (D), design-token usage (E), scope coverage (F), decision-log completeness (G), and cross-document consistency (H). Findings get stable IDs for cross-run tracking:
+
+```bash
+scaffold observe ack abc123 --note "accepted, tracked in INFRA-77"
+scaffold observe ack abc123 --status open       # reopen a previously acknowledged finding
+```
+
+`scaffold observe audit` exits 1 when the verdict is `blocked` (findings at or above `fix_threshold`). This makes it composable as a CI gate.
+
+### Automated fix flow
+
+```bash
+scaffold observe audit --fix
+```
+
+After the initial audit, Scaffold dispatches an AI agent for each blocking finding, verifies the fix, and writes a post-fix report:
+
+1. **Plan** — filter and sort blocking findings (P0 first, then by lens).
+2. **Dispatch** — spawn the configured fix agent (default: `claude -p`) with the finding prompt on stdin. Output is live-streamed so you see what the agent is doing.
+3. **Verify** — re-run the finding's lens to confirm the issue is resolved (up to `per_finding_max_attempts` retries).
+4. **Report** — run a full post-fix audit and write `docs/audits/<id>-postfix.{md,json}`.
+
+Press Ctrl-C at any time — Scaffold reverts any staged changes the fix agents made and re-applies your original WIP, leaving the working tree unchanged.
+
+Configure via `.scaffold/observability.yaml`:
+```yaml
+fix:
+  dispatcher_command: "claude -p"   # change to any CLI that reads stdin
+  timeout_s: 300
+  per_finding_max_attempts: 3
+```
+
+### Worktree harvest and teardown
+
+When running parallel agents in separate worktrees, collect their activity before removing the worktree:
+
+```bash
+# Harvest a live worktree's ledger into the central archive
+scaffold observe harvest --worktree=../my-feature-worktree
+
+# Rotate stale archive entries (worktrees that no longer exist)
+scaffold observe harvest --recover
+
+# Full teardown: harvest + remove worktree + delete branch
+scripts/teardown-agent-worktree.sh ../my-feature-worktree
+```
+
+Harvested events accumulate in `.scaffold/activity-archive/`. `--recover` scans for entries whose worktree is gone and rotates them into monthly `YYYY-MM.jsonl` archives.
+
+### Dashboard
+
+```bash
+scripts/generate-dashboard.sh
+```
+
+The generated dashboard includes "Build Progress" and "Audit" panels that refresh from the sidecar JSON files. Each panel shows stall signals, a timeline, findings by severity, and lens skip counts.
+
+### Phase-boundary audits
+
+`scaffold complete <step>` automatically runs a cross-document audit (Lens H) after completing any phase-boundary step — `user-stories`, `tech-stack`, `coding-standards`, `design-system`, `implementation-plan`, or `implementation-playbook`. The audit result is printed inline (`[audit] N findings (verdict=…) — see docs/audits/…`) but never blocks the state transition.
+
+Configure via `.scaffold/observability.yaml`:
+```yaml
+phase_audit:
+  enabled: true    # set false to disable
+  timeout_s: 60
+  detached: false  # true = fire-and-forget (non-blocking always)
+```
+
+### MMR `doc-conformance` channel
+
+```bash
+mmr review --channels=doc-conformance
+```
+
+Runs `scaffold observe audit` as a built-in MMR channel, mapping findings to MMR's Finding shape with stable composite location IDs (`<source_doc>::<lens_id>::<short_id>`). Disabled by default — enable per-project in `.mmr.yaml`:
+```yaml
+channels_enabled:
+  - doc-conformance
+```
+
 ## Methodology Presets
 
 Not every project needs all 60 steps. Choose a methodology when you run `scaffold init`:
