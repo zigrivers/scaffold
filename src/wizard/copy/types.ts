@@ -2,7 +2,7 @@ import type {
   ProjectType, MethodologyName,
   WebAppConfig, BackendConfig, CliConfig, LibraryConfig,
   MobileAppConfig, DataPipelineConfig, MlConfig, BrowserExtensionConfig,
-  GameConfig, ResearchConfig, DataScienceConfig,
+  GameConfig, ResearchConfig, DataScienceConfig, Web3Config,
 } from '../../types/index.js'
 
 export type ValueToOptionKey<T> = T extends readonly (infer U)[] ? U : T
@@ -33,6 +33,7 @@ export type BrowserExtensionCopy = { [K in keyof BrowserExtensionConfig]: Questi
 export type GameCopy             = { [K in keyof GameConfig]:             QuestionCopy<GameConfig[K]> }
 export type ResearchCopy         = { [K in keyof ResearchConfig]:         QuestionCopy<ResearchConfig[K]> }
 export type DataScienceCopy      = { [K in keyof DataScienceConfig]:      QuestionCopy<DataScienceConfig[K]> }
+export type Web3Copy             = { [K in keyof Web3Config]:             QuestionCopy<Web3Config[K]> }
 
 // CoreCopy is individually typed — NOT Record<..., QuestionCopy<string>>
 // because QuestionCopy<string> makes `options` always `never` (the bare-string ban).
@@ -60,4 +61,5 @@ export interface ProjectCopyMap {
   'game':              GameCopy
   'research':          ResearchCopy
   'data-science':      DataScienceCopy
+  'web3':              Web3Copy
 }
