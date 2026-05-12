@@ -244,7 +244,7 @@ describe('web3 vs library collision', () => {
     expect(resolved.chosen?.projectType).toBe('web3')
   })
 
-  it('published-library Hardhat (package.json has main + hardhat.config) → library wins via high-vs-medium tiebreak', async () => {
+  it('published-library Hardhat: library (high) wins over web3 (medium) via tiebreak', async () => {
     // Documented choice: a published Solidity library that uses Hardhat as tooling
     // is genuinely library-like. `library` (high) beats `web3` (medium) via the
     // standard confidence tiebreak in resolveDetection. Both detectors fire — that
