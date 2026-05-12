@@ -4,6 +4,15 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.27.0] — 2026-05-12
+
+### Added
+- `web3` project-type overlay for smart-contract / protocol projects on EVM chains. Includes 14 knowledge documents injected into 22 universal pipeline steps (Foundry tooling, security, upgradeability, gas optimization, oracles, audit workflow, deployment).
+- Brownfield detector recognizes Foundry (`foundry.toml`) and Hardhat (`hardhat.config.{ts,js,cjs,mjs}`) projects at medium-tier; `remappings.txt` and `lib/forge-std` as low-tier supplementary signals.
+- Forward-compatible `Web3Config.scope` discriminator (default `'contracts'`) so W3-2 dApp work can extend additively.
+- 3-scenario `resolve-detection.test.ts` regression pinning web3-vs-library boundary.
+- Per-overlay content eval (`web3-overlay-content.bats`) with 14 keyword-presence checks.
+
 ## [3.26.0] — 2026-05-07
 
 ### Added
