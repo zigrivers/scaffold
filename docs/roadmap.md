@@ -6,6 +6,17 @@ Working document tracking completed work, in-progress items, and future directio
 
 ## Completed Releases
 
+### v3.27.0 (2026-05-12)
+
+Web3 Project-Type Overlay — `scaffold init --project-type web3` targets smart-contract / protocol teams shipping to EVM chains with 14 knowledge documents covering Foundry tooling, security, upgradeability, gas optimization, oracles, audit workflow, and deployment. Implements roadmap "Content & Quality > New Project Type Overlays" for the W3-1 audience; W3-2 (web3 application / dApp) deferred to backlog.
+
+- **New overlay**: `content/methodology/web3-overlay.yml` injects 14 web3 knowledge docs into 22 universal pipeline steps.
+- **Forward-compatible schema**: `Web3Config.scope: 'contracts'` with `.default('contracts')` — W3-2 will extend the enum additively.
+- **Brownfield detector**: medium-tier for `foundry.toml` / `hardhat.config.*`; low-tier for `remappings.txt` / `lib/forge-std`. EVM-only scope.
+- **Library-collision discipline**: detector + library boundary pinned by 3-scenario `resolve-detection.test.ts` regression (foundry-only → web3; typical Hardhat → web3; published-library Hardhat → library via high-vs-medium tiebreak).
+- **Wiring**: schema + validator + detector + wizard copy + adopt mapping + `PROJECT_TYPE_PREFERENCE` entry. New content eval + 8-test E2E block extending the project-type overlay suite.
+- **Review discipline**: 3-round plan MMR (Codex + Claude + Gemini-compensating) + multi-round PR MMR. PR #TBD.
+
 ### v3.24.0 (2026-04-22)
 
 Target-Agnostic Multi-Model Review — `mmr review` is no longer framed as PR-only. Skills, tool specs, knowledge entries, build-loop templates, and README all updated to the three-CLI + Superpowers channel model (Codex + Gemini + Claude + Superpowers code-reviewer), with non-PR targets (staged, branch diff, specific file, arbitrary diff) as first-class routing cases.
@@ -154,7 +165,6 @@ From the v2 PRD Phase 2:
 The overlay system supports any project type. Potential additions:
 
 - **IoT/Embedded** — firmware lifecycle, OTA updates, device provisioning
-- **Blockchain/Web3** — smart contract lifecycle, gas optimization, audit workflows
 
 Each requires: 1 overlay YAML + ~12-14 knowledge documents. Project-type overlays are knowledge-injection (no new pipeline steps required).
 
@@ -200,6 +210,8 @@ Current eval suite: 73 `@test` blocks across 23 bats files in `tests/evals/`. Ar
 Items that are deliberately queued for a future release — scoped but not actively in-flight.
 
 - **DS-2 — Platform / larger-team data science**: extends `DataScienceConfig.audience` with `'platform'` discriminator; adds feature-store, orchestration (Airflow/Dagster), model-registry, lineage, governance knowledge docs.
+- **W3-2 — Web3 application / dApp**: extends `Web3Config.scope` with `'dapp'` discriminator; adds wallet UX, subgraph/indexing, account abstraction, gas sponsorship knowledge docs.
+- **Non-EVM chains (Solana, Move-based)**: separate overlay families; out of scope for current Web3 work.
 
 ---
 
