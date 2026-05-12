@@ -1037,3 +1037,19 @@ describe('data-science wizard questions', () => {
     expect(output.confirm).not.toHaveBeenCalled()
   })
 })
+
+describe('web3 wizard questions', () => {
+  it('uses default scope in auto mode (no flags, no prompts)', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'web3',
+    })
+    expect(answers.projectType).toBe('web3')
+    expect(answers.web3Config).toEqual({ scope: 'contracts' })
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.confirm).not.toHaveBeenCalled()
+  })
+})
