@@ -870,8 +870,24 @@ describe('Hardhat ↔ library collision regression', () => {
     const web3Match = matches.find(m => m.projectType === 'web3')
     expect(libraryMatch?.confidence).toBe('high')
     expect(web3Match?.confidence).toBe('medium')
+    // Prove the resolver actually picks `library` (not just that confidence
+    // tiers differ). Single high-confidence match falls into Case B and
+    // returns it directly without invoking disambiguate. See
+    // src/project/detectors/resolve-detection.test.ts for the canonical
+    // invocation pattern (ResolveDetectionInput shape).
+    const resolved = await resolveDetection({
+      matches,
+      opts: { interactive: false, acceptLowConfidence: false },
+    })
+    expect(resolved.chosen?.projectType).toBe('library')
   })
 })
+```
+
+Add the `resolveDetection` import at the top of the test file:
+
+```typescript
+import { resolveDetection } from './resolve-detection.js'
 ```
 
 - [ ] **Step 2: Run the test**
@@ -880,24 +896,33 @@ describe('Hardhat ↔ library collision regression', () => {
 cd /Users/kenallred/dev-projects/scaffold && npx vitest run src/project/detectors/web3-library-collision.test.ts 2>&1 | tail -15
 ```
 
-Expected: both tests PASS. The typical Hardhat shape has no `main`/`module`/`exports`/`bin` so `detectLibrary` correctly returns null. The typical Foundry shape has no `package.json` at all.
+Expected: all three tests PASS (Test 1, Test 2, Test 3). The typical Hardhat shape has no `main`/`module`/`exports`/`bin` so `detectLibrary` correctly returns null. The typical Foundry shape has no `package.json` at all. The published-library Hardhat shape fires both detectors, but `resolveDetection` (Case B — single high-confidence match) returns `library`.
 
-- [ ] **Step 3 (conditional): if the test FAILS, add minimal Hardhat exclusions to `library.ts`**
+- [ ] **Step 3 (conditional): ONLY if Test 1 fails, add a TIGHTENED Hardhat-as-dev-tool exclusion to `library.ts`**
 
-If `library` unexpectedly fires on the Hardhat fixture, that means the `package.json` shape used in fixture triggered `isPureNpmLib`. This is unlikely with `private: true` and devDependencies-only Hardhat — but if it happens, add a Hardhat / Foundry exclusion analogous to the Python `PYTHON_APP_DEPS` rule:
+This step is CONDITIONAL on Test 1 failing. Test 1 uses a typical Hardhat shape (no `main`/`module`/`exports`/`bin` in `package.json`) which should NOT trigger `isPureNpmLib` in the first place — so the expected path is that Test 1 PASSES on its own and Step 3 is SKIPPED ENTIRELY. Do not pre-emptively edit `library.ts`.
+
+If — and only if — Test 1 unexpectedly fails (library fires for typical Hardhat), apply the following TIGHTENED guard. A naive `!isWeb3Repo` exclusion would also disqualify Test 3's published-library Hardhat fixture (Hardhat config + `main: 'index.js'`) and break Test 3's `library`-wins assertion. The guard below excludes ONLY Hardhat/Foundry projects that are NOT publishing as libraries (no `main`/`module`/`exports`):
 
 ```typescript
 // In src/project/detectors/library.ts, just before the isPureNpmLib computation:
-const isWeb3Repo = ctx.hasFile('foundry.toml')
-  || ctx.hasFile('hardhat.config.ts') || ctx.hasFile('hardhat.config.js')
-  || ctx.hasFile('hardhat.config.cjs') || ctx.hasFile('hardhat.config.mjs')
+// "Web3 dev-tool" = Hardhat or Foundry config present AND the package is NOT
+// shaped like a published library (no main/module/exports). This preserves
+// library detection for genuine published Solidity libraries that use
+// Hardhat as build tooling (Test 3 case).
+const isWeb3DevTool = (ctx.hasFile('hardhat.config.ts') || ctx.hasFile('hardhat.config.js')
+                       || ctx.hasFile('hardhat.config.cjs') || ctx.hasFile('hardhat.config.mjs')
+                       || ctx.hasFile('foundry.toml'))
+                      && !pkg?.main && !pkg?.module && !pkg?.exports
 
 // And amend isPureNpmLib:
 const isPureNpmLib = pkg && (pkg.main || pkg.module || pkg.exports) && !pkg.bin
-  && !isWeb3Repo
+  && !isWeb3DevTool
 ```
 
-Re-run the regression test until it PASSES. Keep the diff minimal (only enough to fix the collision; do not refactor `library.ts`).
+Re-run the regression test until ALL THREE tests PASS (the tightened guard preserves library detection for the Test 3 published-library Hardhat fixture). Keep the diff minimal (only enough to fix the collision; do not refactor `library.ts`).
+
+If Test 1 PASSES on its own (the expected outcome — typical Hardhat repos don't have `main`/`module`/`exports`), SKIP this step entirely and proceed to Step 4 without modifying `library.ts`.
 
 - [ ] **Step 4: Commit**
 
@@ -2124,6 +2149,16 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 **Files:**
 - Modify: `src/e2e/project-type-overlays.test.ts`
 
+- [ ] **Step 0: Verify the actual `resolveProjectOverlay` signature**
+
+Before editing the union in Step 2, confirm the helper's current signature so the verbatim paste in Step 2 doesn't blindly assume `async`:
+
+```bash
+grep -n 'async function resolveProjectOverlay\|function resolveProjectOverlay' /Users/kenallred/dev-projects/scaffold/src/e2e/project-type-overlays.test.ts
+```
+
+The helper IS async — the existing DS describe block uses `await resolveProjectOverlay('data-science')`, which proves the function returns a Promise. The Step 2 union edit below pastes the `async function` signature verbatim. If grep returns a non-async signature for any reason (e.g. a refactor between plan-write and execution), match the actual signature in Step 2 — don't introduce `async` if the helper has become sync.
+
 - [ ] **Step 1: Read the existing file**
 
 The file uses sibling `describe` blocks per project type. Use Read on `/Users/kenallred/dev-projects/scaffold/src/e2e/project-type-overlays.test.ts` to internalize the shape. Focus on:
@@ -2372,7 +2407,20 @@ Find the "Knowledge Document Expansion" table (around line 165-184). Add a row f
 
 Match the existing row format. If the table is sorted by count or by name, follow that order.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Verify no literal `$ISO_DATE` strings remain in `docs/roadmap.md`**
+
+The `$ISO_DATE` token in the entry above is a placeholder — your Edit must substitute the actual computed date (e.g. `2026-05-12`). If Edit pasted the literal `$ISO_DATE` string instead of the resolved value, this check fails. Run:
+
+```bash
+grep -F '$ISO_DATE' /Users/kenallred/dev-projects/scaffold/docs/roadmap.md && {
+  echo "FAIL: literal \$ISO_DATE remains — substitution didn't happen. Re-edit and fix."
+  exit 1
+} || echo "OK: dates substituted correctly"
+```
+
+Do NOT proceed to Step 6 until this check passes.
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git -C /Users/kenallred/dev-projects/scaffold add docs/roadmap.md
@@ -2408,12 +2456,25 @@ Add at the top of the changelog (immediately below `## [Unreleased]`), matching 
 - Medium-tier brownfield detector recognizes Web3 repos via `foundry.toml`, `hardhat.config.{ts,js,cjs,mjs}` signals (medium tier) or `remappings.txt` / `lib/forge-std` (low tier supplementary).
 - Forward-compatible `Web3Config.scope` discriminator (default `'contracts'`) so W3-2 (dApp) can extend additively.
 - Regression test pinning typical Hardhat / Foundry shapes to resolve as `web3` (not `library`).
-- Keyword-presence content eval (`tests/evals/web3-overlay-content.bats`) spot-checks 11 Web3 knowledge docs for required tool mentions.
+- Keyword-presence content eval (`tests/evals/web3-overlay-content.bats`) spot-checks 14 Web3 knowledge docs for required tool mentions.
 ```
 
 The date is final on this commit — no date backfill in Task J4. Only the PR-number backfill (which can't be known until J2 creates the PR) is needed downstream.
 
-- [ ] **Step 2: Commit**
+- [ ] **Step 2: Verify no literal `$ISO_DATE` strings remain in `CHANGELOG.md`**
+
+The `$ISO_DATE` token in the entry above is a placeholder — your Edit must substitute the actual computed date (e.g. `2026-05-12`). If Edit pasted the literal `$ISO_DATE` string instead of the resolved value, this check fails. Run:
+
+```bash
+grep -F '$ISO_DATE' /Users/kenallred/dev-projects/scaffold/CHANGELOG.md && {
+  echo "FAIL: literal \$ISO_DATE remains — substitution didn't happen. Re-edit and fix."
+  exit 1
+} || echo "OK: dates substituted correctly"
+```
+
+Do NOT proceed to Step 3 until this check passes.
+
+- [ ] **Step 3: Commit**
 
 ```bash
 git -C /Users/kenallred/dev-projects/scaffold add CHANGELOG.md
@@ -2433,40 +2494,49 @@ Per `docs/architecture/operations-runbook.md` §4.2 step 5, the version bump mus
 > **Note on departure from DS precedent:** Version bump is bundled with the feature PR here (departs from the DS precedent of a separate bump PR — DS shipped via #299 feature + #300 version bump). Both patterns are runbook-compliant; the runbook does not mandate either. Bundling reduces ceremony for single-feature releases. If reviewers prefer the two-PR pattern, split this task into a follow-up bump PR after the feature merges.
 
 **Files:**
-- Modify: `package.json`
-- Modify: any other version-pinned files in the repo (run a search first to find them all)
+- Modify: `package.json` and `package-lock.json` (atomically via `npm version`)
+- Modify: any other version-pinned files in the repo (e.g. `.claude-plugin/plugin.json`, CLI banner strings)
 
-- [ ] **Step 1: Find every place the version is pinned**
+Don't hardcode the prior version (e.g. `3.26.0`) anywhere in this task — a patch release could ship between plan-write and execution. Derive the prior version from `package.json` if you need to grep for stale references, or use `npm version` (which is version-agnostic about the prior value).
+
+- [ ] **Step 1: Read the current version from `package.json`**
 
 ```bash
-cd /Users/kenallred/dev-projects/scaffold && grep -rn '"version":\s*"3\.26\.0"\|3\.26\.0' --include='*.json' --include='*.md' --include='*.ts' --include='*.yml' . 2>/dev/null | head -30
+cd /Users/kenallred/dev-projects/scaffold && node -p "require('./package.json').version"
 ```
 
-Expected hits: `package.json`, possibly `package-lock.json`, possibly `.claude-plugin/plugin.json`, possibly a CLI banner string in `src/`. Document each hit before editing.
+Record the value (call it `PRIOR_VERSION`) — you'll use it in Step 3 to scan for stragglers.
 
-- [ ] **Step 2: Bump every occurrence to `3.27.0`**
-
-Use Edit on each file (or `npm version 3.27.0 --no-git-tag-version` for `package.json` + `package-lock.json` together). If a CLI banner / status string exists in `src/`, edit it manually.
+- [ ] **Step 2: Bump `package.json` + `package-lock.json` atomically via `npm version`**
 
 ```bash
 cd /Users/kenallred/dev-projects/scaffold && npm version 3.27.0 --no-git-tag-version
 ```
 
-(The `--no-git-tag-version` flag suppresses the auto-tag; tagging is Task J4.)
+`npm version` updates both `package.json` AND `package-lock.json` in one atomic operation — no need to edit either file manually. The `--no-git-tag-version` flag suppresses the auto-tag (tagging is Task J4).
 
-- [ ] **Step 3: Re-run `grep` to confirm no `3.26.0` remains**
+- [ ] **Step 3: Scan for any other version-pinned files**
 
 ```bash
-cd /Users/kenallred/dev-projects/scaffold && grep -rn '3\.26\.0' --include='*.json' --include='*.md' --include='*.ts' --include='*.yml' . 2>/dev/null | grep -v '^./CHANGELOG.md' | grep -v '^./docs/roadmap.md' | head
+cd /Users/kenallred/dev-projects/scaffold && PRIOR_VERSION=$(git show HEAD:package.json | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version")
+echo "PRIOR_VERSION=$PRIOR_VERSION"
+grep -rn "$PRIOR_VERSION" --include='*.json' --include='*.md' --include='*.ts' --include='*.yml' . 2>/dev/null | grep -v '^./CHANGELOG.md' | grep -v '^./docs/roadmap.md' | head -30
 ```
 
-(CHANGELOG and roadmap may legitimately reference the old version in historical entries; that is expected. Other hits should be zero.)
+Expected stragglers: possibly `.claude-plugin/plugin.json`, possibly a CLI banner string in `src/`. Edit each one to `3.27.0` manually. CHANGELOG and roadmap may legitimately reference the prior version in historical entries — leave those.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Verify the new version**
+
+```bash
+grep '"version"' /Users/kenallred/dev-projects/scaffold/package.json | head -1
+# Expected: "version": "3.27.0",
+```
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git -C /Users/kenallred/dev-projects/scaffold add package.json package-lock.json .claude-plugin/plugin.json 2>/dev/null || true
-# Add any other files the grep in Step 1 surfaced
+# Add any other files the grep in Step 3 surfaced
 git -C /Users/kenallred/dev-projects/scaffold commit -m "chore(release): bump version to 3.27.0
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
@@ -2539,7 +2609,7 @@ Implements spec: \`docs/superpowers/specs/2026-04-21-data-science-and-web3-overl
 - [x] Existing detector-coverage test (coverage.test.ts) extended fixture, now claims \`web3\`
 - [x] PROJECT_TYPE_PREFERENCE completeness test covers \`web3\`
 - [x] Hardhat / Foundry → web3 regression test prevents library collision
-- [x] Keyword-presence content eval spot-checks 11 Web3 knowledge docs for required tool mentions
+- [x] Keyword-presence content eval spot-checks 14 Web3 knowledge docs for required tool mentions
 - [x] E2E test exercises Web3 init → config → overlay resolve → knowledge inject (8 cases)
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
