@@ -15,7 +15,7 @@ Web3 Project-Type Overlay — `scaffold init --project-type web3` targets smart-
 - **Brownfield detector**: medium-tier for `foundry.toml` / `hardhat.config.*`; low-tier for `remappings.txt` / `lib/forge-std`. EVM-only scope.
 - **Library-collision discipline**: detector + library boundary pinned by 3-scenario `resolve-detection.test.ts` regression (foundry-only → web3; typical Hardhat → web3; published-library Hardhat → library via high-vs-medium tiebreak).
 - **Wiring**: schema + validator + detector + wizard copy + adopt mapping + `PROJECT_TYPE_PREFERENCE` entry. New content eval + 8-test E2E block extending the project-type overlay suite.
-- **Review discipline**: 3-round plan MMR (Codex + Claude + Gemini-compensating) + multi-round PR MMR. PR #TBD.
+- **Review discipline**: 3-round plan MMR (Codex + Claude + Gemini-compensating) + multi-round PR MMR. PR #338.
 
 ### v3.24.0 (2026-04-22)
 

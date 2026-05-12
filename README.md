@@ -1525,7 +1525,7 @@ scaffold dashboard
 
 ## Knowledge System
 
-Scaffold ships with 235 domain expertise entries organized in eighteen categories:
+Scaffold ships with 267 domain expertise entries organized in nineteen categories:
 
 - **core/** (26 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, design system tokens, user story innovation, AI memory management, coding conventions, tech stack selection, project structure patterns, task tracking, CLAUDE.md patterns, multi-model review dispatch, review step template, dev environment, git workflow patterns, automated review tooling, vision craft
 - **product/** (5 entries) — PRD craft, PRD innovation, gap analysis, vision craft, vision innovation
