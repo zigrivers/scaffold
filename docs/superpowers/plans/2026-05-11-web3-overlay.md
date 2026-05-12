@@ -837,7 +837,7 @@ describe('Hardhat ↔ library collision regression', () => {
     expect(types).not.toContain('library')
   })
 
-  it('published-library Hardhat (package.json has main + Hardhat config) → library wins', () => {
+  it('published-library Hardhat (package.json has main + Hardhat config) → library wins', async () => {
     // Documented choice: a published Solidity library that uses Hardhat as
     // tooling is genuinely library-like. `library` (high confidence) wins
     // over `web3` (medium) via the standard confidence tiebreak in
