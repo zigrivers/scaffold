@@ -211,3 +211,63 @@ describe('resolveDetection Cases A-G', () => {
     expect(m.evidence[0].signal).toBe('user-specified')
   })
 })
+
+describe('web3 vs library collision', () => {
+  it('foundry-only repo resolves to web3', async () => {
+    const ctx = createFakeSignalContext({
+      files: { 'foundry.toml': '[profile.default]\nsrc = "src"\n' },
+      rootEntries: ['foundry.toml'],
+    })
+    const matches = runDetectors(ctx)
+    const types = matches.map(m => m.projectType)
+    expect(types).toContain('web3')
+    expect(types).not.toContain('library')
+    const resolved = await resolveDetection({ matches, opts: { interactive: false, acceptLowConfidence: false } })
+    expect(resolved.chosen?.projectType).toBe('web3')
+  })
+
+  it('typical Hardhat repo (no main/exports) resolves to web3', async () => {
+    const ctx = createFakeSignalContext({
+      packageJson: {
+        name: 'my-hardhat-project',
+        private: true,
+        devDependencies: { hardhat: '^2.0.0' },
+      },
+      files: { 'package.json': '...', 'hardhat.config.ts': 'export default { solidity: "0.8.20" }\n' },
+      rootEntries: ['package.json', 'hardhat.config.ts'],
+    })
+    const matches = runDetectors(ctx)
+    const types = matches.map(m => m.projectType)
+    expect(types).toContain('web3')
+    expect(types).not.toContain('library')
+    const resolved = await resolveDetection({ matches, opts: { interactive: false, acceptLowConfidence: false } })
+    expect(resolved.chosen?.projectType).toBe('web3')
+  })
+
+  it('published-library Hardhat (package.json has main + hardhat.config) → library wins via high-vs-medium tiebreak', async () => {
+    // Documented choice: a published Solidity library that uses Hardhat as tooling
+    // is genuinely library-like. `library` (high) beats `web3` (medium) via the
+    // standard confidence tiebreak in resolveDetection. Both detectors fire — that
+    // is the correct read of the repo shape — and the resolver picks the higher tier.
+    const ctx = createFakeSignalContext({
+      packageJson: {
+        name: 'my-solidity-lib',
+        main: 'index.js',
+        version: '1.0.0',
+        devDependencies: { hardhat: '^2.0.0' },
+      },
+      files: { 'package.json': '...', 'hardhat.config.ts': 'export default { solidity: "0.8.20" }\n' },
+      rootEntries: ['package.json', 'hardhat.config.ts'],
+    })
+    const matches = runDetectors(ctx)
+    const types = matches.map(m => m.projectType)
+    expect(types).toContain('library')
+    expect(types).toContain('web3')
+    const libMatch = matches.find(m => m.projectType === 'library')
+    const w3Match = matches.find(m => m.projectType === 'web3')
+    expect(libMatch?.confidence).toBe('high')
+    expect(w3Match?.confidence).toBe('medium')
+    const resolved = await resolveDetection({ matches, opts: { interactive: false, acceptLowConfidence: false } })
+    expect(resolved.chosen?.projectType).toBe('library')
+  })
+})
