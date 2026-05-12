@@ -1,0 +1,40 @@
+# methodology/web3-overlay.yml
+name: web3
+description: >
+  Web3 overlay — injects smart-contract domain knowledge (EVM chains) into
+  existing pipeline steps for contract architecture, security, testing,
+  upgradeability, gas optimization, and audit workflow.
+project-type: web3
+
+knowledge-overrides:
+  # Foundational
+  create-prd:            { append: [web3-requirements] }
+  user-stories:          { append: [web3-requirements] }
+  coding-standards:      { append: [web3-conventions] }
+  project-structure:     { append: [web3-project-structure] }
+  dev-env-setup:         { append: [web3-dev-environment] }
+  git-workflow:          { append: [web3-conventions] }
+
+  # Architecture & Design
+  system-architecture:   { append: [web3-architecture, web3-access-control, web3-upgradeability, web3-oracles-and-external-data] }
+  tech-stack:            { append: [web3-architecture, web3-dev-environment] }
+  adrs:                  { append: [web3-architecture, web3-upgradeability] }
+  domain-modeling:       { append: [web3-architecture] }
+  api-contracts:         { append: [web3-architecture] }
+  security:              { append: [web3-security, web3-common-vulnerabilities, web3-access-control] }
+  operations:            { append: [web3-deployment-and-verification, web3-gas-optimization] }
+
+  # Testing
+  tdd:                   { append: [web3-testing] }
+  add-e2e-testing:       { append: [web3-testing] }
+  create-evals:          { append: [web3-testing, web3-common-vulnerabilities] }
+
+  # Reviews
+  review-architecture:   { append: [web3-architecture, web3-access-control, web3-upgradeability] }
+  review-api:            { append: [web3-architecture] }
+  review-security:       { append: [web3-security, web3-common-vulnerabilities, web3-audit-workflow] }
+  review-operations:     { append: [web3-deployment-and-verification, web3-gas-optimization] }
+  review-testing:        { append: [web3-testing, web3-audit-workflow] }
+
+  # Planning
+  implementation-plan:   { append: [web3-architecture] }

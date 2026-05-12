@@ -98,7 +98,7 @@ async function discoverRealMetaPrompts(): Promise<Map<string, MetaPromptFile>> {
  */
 async function resolveProjectOverlay(
   projectType: 'web-app' | 'backend' | 'cli' | 'library' | 'mobile-app'
-    | 'data-pipeline' | 'ml' | 'browser-extension' | 'research' | 'data-science',
+    | 'data-pipeline' | 'ml' | 'browser-extension' | 'research' | 'data-science' | 'web3',
   methodology: 'deep' | 'mvp' = 'deep',
 ): Promise<{ overlayState: OverlayState; realMetaPrompts: Map<string, MetaPromptFile> }> {
   const methodologyDir = getPackageMethodologyDir()
@@ -1845,6 +1845,95 @@ describe('data-science overlay integration', () => {
   it('overlay is knowledge-only (no step-overrides, no cross-reads-overrides)', () => {
     const methodologyDir = getPackageMethodologyDir()
     const overlayPath = path.join(methodologyDir, 'data-science-overlay.yml')
+    const { overlay } = loadOverlay(overlayPath)
+    expect(overlay).not.toBeNull()
+    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+    expect(Object.keys(overlay!.crossReadsOverrides)).toHaveLength(0)
+  })
+})
+
+describe('web3 overlay integration', () => {
+  let tmpDir: string
+  beforeEach(() => { tmpDir = makeTempDir() })
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+    vi.restoreAllMocks()
+  })
+
+  it('web3 config with web3Config validates through ConfigSchema', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2,
+      methodology: 'deep',
+      platforms: ['claude-code'],
+      project: {
+        projectType: 'web3',
+        web3Config: { scope: 'contracts' },
+      },
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      const project = result.data.project as Record<string, unknown>
+      expect(project['projectType']).toBe('web3')
+      const wc = project['web3Config'] as Record<string, unknown>
+      expect(wc['scope']).toBe('contracts')
+    }
+  })
+
+  it('web3 overlay loads without errors', () => {
+    const methodologyDir = getPackageMethodologyDir()
+    const overlayPath = path.join(methodologyDir, 'web3-overlay.yml')
+    const { overlay, errors } = loadOverlay(overlayPath)
+    expect(errors).toHaveLength(0)
+    expect(overlay).not.toBeNull()
+    expect(overlay!.projectType).toBe('web3')
+    expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(0)
+  })
+
+  it('overlay injects web3-architecture into system-architecture step', async () => {
+    const { overlayState } = await resolveProjectOverlay('web3')
+    expect(overlayState.knowledge['system-architecture']).toEqual(
+      expect.arrayContaining([
+        'web3-architecture',
+        'web3-access-control',
+        'web3-upgradeability',
+        'web3-oracles-and-external-data',
+      ]),
+    )
+  })
+
+  it('overlay injects web3 knowledge into tech-stack step', async () => {
+    const { overlayState } = await resolveProjectOverlay('web3')
+    expect(overlayState.knowledge['tech-stack']).toContain('web3-architecture')
+    expect(overlayState.knowledge['tech-stack']).toContain('web3-dev-environment')
+  })
+
+  it('overlay injects web3-testing into TDD and add-e2e-testing steps', async () => {
+    const { overlayState } = await resolveProjectOverlay('web3')
+    expect(overlayState.knowledge['tdd']).toContain('web3-testing')
+    expect(overlayState.knowledge['add-e2e-testing']).toContain('web3-testing')
+  })
+
+  it('overlay injects web3 knowledge into foundational steps', async () => {
+    const { overlayState } = await resolveProjectOverlay('web3')
+    expect(overlayState.knowledge['create-prd']).toContain('web3-requirements')
+    expect(overlayState.knowledge['coding-standards']).toContain('web3-conventions')
+    expect(overlayState.knowledge['project-structure']).toContain('web3-project-structure')
+  })
+
+  it('overlay injects security knowledge into security step', async () => {
+    const { overlayState } = await resolveProjectOverlay('web3')
+    expect(overlayState.knowledge['security']).toEqual(
+      expect.arrayContaining([
+        'web3-security',
+        'web3-common-vulnerabilities',
+        'web3-access-control',
+      ]),
+    )
+  })
+
+  it('overlay is knowledge-only (no step-overrides, no cross-reads-overrides)', () => {
+    const methodologyDir = getPackageMethodologyDir()
+    const overlayPath = path.join(methodologyDir, 'web3-overlay.yml')
     const { overlay } = loadOverlay(overlayPath)
     expect(overlay).not.toBeNull()
     expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)

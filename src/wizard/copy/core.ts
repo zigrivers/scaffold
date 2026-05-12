@@ -34,6 +34,10 @@ export const coreCopy: CoreCopy = {
         label: 'Data science project',
         short: 'Analytics, reports, or models — solo / small-team, local-first.',
       },
+      'web3': {
+        label: 'Web3 / smart contracts',
+        short: 'Smart-contract or protocol projects on EVM chains (Foundry / Hardhat).',
+      },
     },
   },
   methodology: {

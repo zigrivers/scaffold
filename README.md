@@ -29,7 +29,7 @@ Either way, Scaffold constructs the prompt and the target AI tool does the work.
 
 **Assembly engine** — At execution time, Scaffold builds a 7-section prompt from: system metadata, the meta-prompt, knowledge base entries, project context (artifacts from prior steps), methodology settings, layered instructions, and depth-specific execution guidance.
 
-**Knowledge base** — 235 domain expertise entries in `content/knowledge/` organized in eighteen categories (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research, data-science) covering testing strategy, domain modeling, API design, security best practices, eval craft, TDD execution, task claiming, worktree management, release management, rendering strategies, data stores, CLI patterns, game engines, library bundling, mobile deployment, batch and streaming pipelines, model training and serving, browser extension manifests and service workers, data-science reproducibility and notebook discipline, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
+**Knowledge base** — 267 domain expertise entries in `content/knowledge/` organized in nineteen categories (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research, data-science, web3) covering testing strategy, domain modeling, API design, security best practices, eval craft, TDD execution, task claiming, worktree management, release management, rendering strategies, data stores, CLI patterns, game engines, library bundling, mobile deployment, batch and streaming pipelines, model training and serving, browser extension manifests and service workers, data-science reproducibility and notebook discipline, smart-contract security and audit workflow, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
 
 **Methodology presets** — Three built-in presets control which steps run and how deep the analysis goes:
 - **deep** (depth 5) — all steps enabled, exhaustive analysis
@@ -368,7 +368,7 @@ Every `scaffold init` wizard question can be answered via CLI flags, making scaf
 | `--depth` | 1-5 | Custom methodology depth (requires `--methodology custom`) |
 | `--adapters` | comma-sep | AI adapters: claude-code, codex, gemini |
 | `--traits` | comma-sep | Project traits: web, mobile |
-| `--project-type` | string | web-app, mobile-app, backend, cli, library, game, data-pipeline, ml, browser-extension, research, data-science |
+| `--project-type` | string | web-app, mobile-app, backend, cli, library, game, data-pipeline, ml, browser-extension, research, data-science, web3 |
 | `--auto` | boolean | Non-interactive mode (uses Zod defaults for unset flags) |
 
 #### Web-App Config Flags (require `--project-type web-app` or auto-set it)
@@ -465,6 +465,14 @@ Data science has one forward-compatible config field in the schema, defaulted au
 |------|------|--------|
 | `dataScienceConfig.audience` | `solo` | Default (applied by the wizard and `--auto`). Covers the DS-1 audience (solo / small-team, local-first, prototyping). A future DS-2 release will extend the enum with `'platform'` (platform-engineered / larger-team DS) additively, without breaking existing configs. |
 
+#### Web3 Config (`--project-type web3`)
+
+Web3 has one forward-compatible config field in the schema, defaulted automatically — no CLI flags are needed in v1:
+
+| Config field | Values | Notes |
+|------|------|--------|
+| `web3Config.scope` | `contracts` | Default (applied by the wizard and `--auto`). Covers the W3-1 audience (smart-contract / protocol projects on EVM chains — Foundry / Hardhat). A future W3-2 release will extend the enum with `'dapp'` (web3 application / dApp) additively, without breaking existing configs. |
+
 #### Game Config Flags (require `--project-type game` or auto-set it)
 
 | Flag | Type | Values |
@@ -514,7 +522,7 @@ during assembly.
 
 - **Flag > auto > interactive**: Flags always take highest precedence. `--auto --engine unreal` uses defaults for everything except engine.
 - **Partial flags + interactive**: Provide some flags and the wizard asks only the remaining questions. `scaffold init --project-type game --engine unreal` prompts interactively for multiplayer, platforms, etc.
-- **Type-specific flags auto-set project type**: `--engine unity` automatically sets `--project-type game`, `--web-rendering ssr` sets `--project-type web-app`, `--backend-api-style rest` sets `--project-type backend`, `--cli-interactivity hybrid` sets `--project-type cli`, `--lib-visibility public` sets `--project-type library`, `--mobile-platform ios` sets `--project-type mobile-app`, `--pipeline-processing batch` sets `--project-type data-pipeline`, `--ml-phase training` sets `--project-type ml`, `--ext-manifest 3` sets `--project-type browser-extension`, `--research-driver code-driven` sets `--project-type research`. Error if conflicting type. (Data science currently has no dedicated CLI flags — pass `--project-type data-science` directly.)
+- **Type-specific flags auto-set project type**: `--engine unity` automatically sets `--project-type game`, `--web-rendering ssr` sets `--project-type web-app`, `--backend-api-style rest` sets `--project-type backend`, `--cli-interactivity hybrid` sets `--project-type cli`, `--lib-visibility public` sets `--project-type library`, `--mobile-platform ios` sets `--project-type mobile-app`, `--pipeline-processing batch` sets `--project-type data-pipeline`, `--ml-phase training` sets `--project-type ml`, `--ext-manifest 3` sets `--project-type browser-extension`, `--research-driver code-driven` sets `--project-type research`. Error if conflicting type. (Data science and web3 currently have no dedicated CLI flags — pass `--project-type data-science` or `--project-type web3` directly.)
 - **Cannot mix flag families**: `--web-rendering ssr --backend-api-style rest` is an error. Each flag family (`--web-*`, `--backend-*`, `--cli-*`, `--lib-*`, `--mobile-*`, `--pipeline-*`, `--ml-*`, `--research-*`, `--ext-*`, game) is exclusive.
 - **Validation**: `--depth` requires `--methodology custom`. `--online-services` requires `--multiplayer online` or `hybrid`. SSR/hybrid rendering is incompatible with static deploy target. Session auth requires server state (not static). ML inference projects must specify a serving pattern. Browser extensions must declare at least one capability (UI surface, content script, or background worker). Notebook-driven research cannot be fully autonomous.
 
@@ -610,6 +618,9 @@ scaffold init --auto --methodology deep --project-type research \
 # Solo / small-team data science project (reproducibility-first)
 scaffold init --auto --methodology deep --project-type data-science
 
+# Web3 smart-contract / protocol project (Foundry / Hardhat on EVM)
+scaffold init --auto --methodology deep --project-type web3
+
 # Multiplayer mobile game with Unity
 scaffold init --project-type game --methodology deep --auto \
   --engine unity --multiplayer online --target-platforms ios,android \
@@ -636,7 +647,7 @@ Scaffold supports **project-type overlays** — domain-specific knowledge and pi
 
 - **Injects domain knowledge** into existing pipeline steps (e.g., SSR caching strategies into `tech-stack`, API pagination patterns into `coding-standards`)
 
-The game overlay additionally adjusts step enablement, remaps artifact references, and adds dependency overrides (because game development has fundamentally different artifacts). The web-app, backend, CLI, library, mobile-app, data-pipeline, ML, browser-extension, research, and data-science overlays are **knowledge-only** — they inject domain expertise into existing steps without changing which steps run or how they depend on each other. The research type additionally supports **domain sub-overlays** (quant-finance, ml-research, simulation) that layer domain-specific knowledge on top of the core research overlay, and the backend type supports a `fintech` sub-overlay. Both research and backend accept `domain` as either a single string or an array (e.g. `domain: ['quant-finance', 'simulation']`) for stacking multiple sub-overlays; the wizard and CLI flags remain single-select in v1, so multi-domain stacking requires hand-editing `.scaffold/config.yml`.
+The game overlay additionally adjusts step enablement, remaps artifact references, and adds dependency overrides (because game development has fundamentally different artifacts). The web-app, backend, CLI, library, mobile-app, data-pipeline, ML, browser-extension, research, data-science, and web3 overlays are **knowledge-only** — they inject domain expertise into existing steps without changing which steps run or how they depend on each other. The research type additionally supports **domain sub-overlays** (quant-finance, ml-research, simulation) that layer domain-specific knowledge on top of the core research overlay, and the backend type supports a `fintech` sub-overlay. Both research and backend accept `domain` as either a single string or an array (e.g. `domain: ['quant-finance', 'simulation']`) for stacking multiple sub-overlays; the wizard and CLI flags remain single-select in v1, so multi-domain stacking requires hand-editing `.scaffold/config.yml`.
 
 Overlays are composable with methodology presets. An MVP web-app gets fewer steps at lower depth; a deep backend project gets exhaustive analysis of every architectural decision.
 
@@ -652,6 +663,7 @@ Overlays are composable with methodology presets. An MVP web-app gets fewer step
 | `browser-extension` | `browser-extension-overlay.yml` | 12 entries (architecture, manifest configuration, service workers, content scripts, cross-browser, store submission, testing, security) | Manifest version, UI surfaces, content script, background worker |
 | `research` | `research-overlay.yml` + domain sub-overlays | 25 entries (experiment loop, tracking, overfitting prevention, backtesting, risk metrics, architecture search, simulation) | Experiment driver, interaction mode, domain, experiment tracking |
 | `data-science` | `data-science-overlay.yml` | 13 entries (reproducibility, experiment tracking, notebook discipline, model evaluation, data versioning, dev environment, observability, project structure, conventions, requirements, security, testing, architecture) | Audience (`solo` default; `platform` reserved for DS-2) |
+| `web3` | `web3-overlay.yml` | 14 entries (Foundry tooling, smart-contract security, upgradeability, gas optimization, oracles, audit workflow, deployment, testing patterns, EVM fundamentals, ABI/interface design, event/log indexing, supply-chain) | Scope (`contracts` default; `dapp` reserved for W3-2) |
 | `game` | `game-overlay.yml` | 24 entries (engines, networking, audio, VR/AR, economy, save systems, certification) | Engine, multiplayer, platforms, economy, narrative, and 6 more |
 
 ### Game Development
@@ -737,7 +749,7 @@ These answers control which conditional steps activate. A single-player puzzle g
 
 #### Multi-type Detection
 
-`scaffold adopt` detects 11 project types from manifest files and directory layouts:
+`scaffold adopt` detects 12 project types from manifest files and directory layouts:
 
 | Type | Key Signals |
 |------|-------------|
@@ -752,6 +764,7 @@ These answers control which conditional steps activate. A single-player puzzle g
 | `browser-extension` | `manifest.json` with `manifest_version` field |
 | `research` | `program.md` + `results.tsv`, backtest/strategy files with trading deps, optimization deps + experiment dirs, simulation framework deps |
 | `data-science` | Marimo signals required (`marimo` dep or `.marimo.toml`); DVC (`dvc.yaml`, `.dvc/config`, `dvc` py dep) is supplementary evidence only. Low-tier; defers to `ml` / `research` / `data-pipeline` when those match at medium/high tier |
+| `web3` | `foundry.toml` or `hardhat.config.{ts,js,cjs,mjs}` (medium-tier); `remappings.txt`, `lib/forge-std` are supplementary low-tier signals. EVM-only scope. Library-collision boundary pinned by tiebreak (high-tier `library` wins over medium-tier `web3` for published-library Hardhat projects) |
 
 Each detector returns a confidence tier (high/medium/low) with evidence trails. Override detection with `--project-type <type>`.
 
@@ -1512,7 +1525,7 @@ scaffold dashboard
 
 ## Knowledge System
 
-Scaffold ships with 235 domain expertise entries organized in eighteen categories:
+Scaffold ships with 267 domain expertise entries organized in nineteen categories:
 
 - **core/** (26 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, design system tokens, user story innovation, AI memory management, coding conventions, tech stack selection, project structure patterns, task tracking, CLAUDE.md patterns, multi-model review dispatch, review step template, dev environment, git workflow patterns, automated review tooling, vision craft
 - **product/** (5 entries) — PRD craft, PRD innovation, gap analysis, vision craft, vision innovation
@@ -1532,6 +1545,7 @@ Scaffold ships with 235 domain expertise entries organized in eighteen categorie
 - **browser-extension/** (12 entries) — Manifest V3, content scripts, service workers, cross-browser compatibility, extension security, store submission
 - **research/** (25 entries) — experiment loop architecture, parameter optimization, overfitting prevention, experiment tracking, security/sandboxing; domain knowledge for quant-finance (backtesting, risk metrics, market data, strategy patterns), ML-research (architecture search, ablation studies, evaluation), and simulation (engine integration, parameter spaces, compute management)
 - **data-science/** (13 entries) — reproducibility, experiment tracking, notebook discipline, model evaluation, data versioning, dev environment (Marimo/Jupyter/Hex), observability, project structure, conventions, requirements, security, testing, architecture
+- **web3/** (14 entries) — Foundry tooling and dev environment, smart-contract security and common vulnerabilities, upgradeability patterns, gas optimization, oracles and external data, audit workflow, deployment and verification, testing patterns, access control, EVM/contract architecture, conventions, project structure, requirements
 
 Each pipeline step declares which knowledge entries it needs in its frontmatter. The assembly engine injects them automatically. Knowledge files with a `## Deep Guidance` section are optimized for the CLI — only the deep guidance content is loaded into the assembled prompt, skipping the summary to avoid redundancy with the prompt text.
 
@@ -1740,7 +1754,7 @@ All build inputs live under `content/`:
 content/
 ├── pipeline/         # 60 meta-prompts organized by 16 phases (phases 0-15, including build)
 ├── tools/            # 10 tool meta-prompts (stateless, category: tool)
-├── knowledge/        # 235 domain expertise entries (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research, data-science)
+├── knowledge/        # 267 domain expertise entries (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research, data-science, web3)
 ├── methodology/      # 3 YAML presets (deep, mvp, custom)
 └── skills/           # Skill templates with {{markers}} for multi-platform resolution (includes mmr)
 ```

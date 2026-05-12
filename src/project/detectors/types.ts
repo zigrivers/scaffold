@@ -4,6 +4,7 @@ import type {
   WebAppConfigSchema, BackendConfigSchema, CliConfigSchema, LibraryConfigSchema,
   MobileAppConfigSchema, DataPipelineConfigSchema, MlConfigSchema, ResearchConfigSchema,
   BrowserExtensionConfigSchema, GameConfigSchema, DataScienceConfigSchema,
+  Web3ConfigSchema,
 } from '../../config/schema.js'
 
 export type Confidence = 'high' | 'medium' | 'low'
@@ -63,11 +64,15 @@ export interface DataScienceMatch extends BaseMatch {
   readonly projectType: 'data-science'
   readonly partialConfig: Partial<z.infer<typeof DataScienceConfigSchema>>
 }
+export interface Web3Match extends BaseMatch {
+  readonly projectType: 'web3'
+  readonly partialConfig: Partial<z.infer<typeof Web3ConfigSchema>>
+}
 
 export type DetectionMatch =
   | WebAppMatch | BackendMatch | CliMatch | LibraryMatch | MobileAppMatch
   | DataPipelineMatch | MlMatch | ResearchMatch | BrowserExtensionMatch | GameMatch
-  | DataScienceMatch
+  | DataScienceMatch | Web3Match
 
 export type Detector = (ctx: import('./context.js').SignalContext) => DetectionMatch | null
 

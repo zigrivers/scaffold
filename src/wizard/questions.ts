@@ -3,7 +3,7 @@ import type {
   ProjectType, GameConfig, WebAppConfig, BackendConfig,
   CliConfig, LibraryConfig, MobileAppConfig,
   DataPipelineConfig, MlConfig, BrowserExtensionConfig,
-  ResearchConfig, DataScienceConfig,
+  ResearchConfig, DataScienceConfig, Web3Config,
 } from '../types/index.js'
 import type {
   GameFlags, WebAppFlags, BackendFlags, CliFlags, LibraryFlags,
@@ -30,6 +30,7 @@ export interface WizardAnswers {
   browserExtensionConfig?: BrowserExtensionConfig
   researchConfig?: ResearchConfig
   dataScienceConfig?: DataScienceConfig
+  web3Config?: Web3Config
 }
 
 /**
@@ -538,6 +539,14 @@ export async function askWizardQuestions(options: {
     dataScienceConfig = { audience: 'solo' }
   }
 
+  // Web3 configuration
+  let web3Config: Web3Config | undefined
+  if (projectType === 'web3') {
+    // W3-1 has a single-value enum (`scope`). Skip the interactive question
+    // and set the default directly — W3-2 will extend this.
+    web3Config = { scope: 'contracts' }
+  }
+
   // Browser extension configuration
   let browserExtensionConfig: BrowserExtensionConfig | undefined
   if (projectType === 'browser-extension') {
@@ -724,6 +733,6 @@ export async function askWizardQuestions(options: {
     methodology, depth, platforms, traits, projectType,
     webAppConfig, backendConfig, cliConfig,
     libraryConfig, mobileAppConfig, dataPipelineConfig,
-    mlConfig, browserExtensionConfig, researchConfig, dataScienceConfig, gameConfig,
+    mlConfig, browserExtensionConfig, researchConfig, dataScienceConfig, web3Config, gameConfig,
   }
 }

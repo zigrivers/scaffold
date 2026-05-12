@@ -146,6 +146,7 @@ export async function collectWizardAnswers(
       ...(answers.browserExtensionConfig && { browserExtensionConfig: answers.browserExtensionConfig }),
       ...(answers.researchConfig && { researchConfig: answers.researchConfig }),
       ...(answers.dataScienceConfig && { dataScienceConfig: answers.dataScienceConfig }),
+      ...(answers.web3Config && { web3Config: answers.web3Config }),
     },
   }
 

@@ -5,6 +5,7 @@ import {
   CliConfigSchema, LibraryConfigSchema, MobileAppConfigSchema,
   DataPipelineConfigSchema, MlConfigSchema, BrowserExtensionConfigSchema,
   GameConfigSchema, ResearchConfigSchema, DataScienceConfigSchema,
+  Web3ConfigSchema,
 } from '../config/schema.js'
 
 /** Step enablement entry used in presets and overlays. */
@@ -58,6 +59,9 @@ export type ResearchConfig = z.infer<typeof ResearchConfigSchema>
 /** Data science project configuration — derived from Zod schema (single source of truth). */
 export type DataScienceConfig = z.infer<typeof DataScienceConfigSchema>
 
+/** Web3 (smart-contract / EVM protocol) configuration — derived from Zod schema (single source of truth). */
+export type Web3Config = z.infer<typeof Web3ConfigSchema>
+
 /**
  * Game-specific configuration — derived from Zod schema (single source of truth).
  * Only valid when projectType === 'game'.
@@ -84,6 +88,7 @@ export type DetectedConfig =
   | { type: 'game'; config: GameConfig }
   | { type: 'research'; config: ResearchConfig }
   | { type: 'data-science'; config: DataScienceConfig }
+  | { type: 'web3'; config: Web3Config }
 
 /** Override entry for knowledge injection. */
 export interface KnowledgeOverride {
@@ -135,6 +140,7 @@ export interface ServiceConfig {
   gameConfig?: GameConfig
   browserExtensionConfig?: BrowserExtensionConfig
   dataScienceConfig?: DataScienceConfig
+  web3Config?: Web3Config
   path?: string
   /** Pipeline step slugs this service exposes for cross-service reference. Closed by default. */
   exports?: Array<{ step: string }>
@@ -156,6 +162,7 @@ export interface ProjectConfig {
   browserExtensionConfig?: BrowserExtensionConfig
   researchConfig?: ResearchConfig
   dataScienceConfig?: DataScienceConfig
+  web3Config?: Web3Config
   services?: ServiceConfig[]
   [key: string]: unknown  // forward compatibility
 }

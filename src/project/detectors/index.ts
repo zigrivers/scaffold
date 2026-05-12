@@ -10,6 +10,7 @@ import { detectBackend } from './backend.js'
 import { detectMl } from './ml.js'
 import { detectResearch } from './research.js'
 import { detectDataScience } from './data-science.js'
+import { detectWeb3 } from './web3.js'
 import { detectCli } from './cli.js'
 import { detectLibrary } from './library.js'
 
@@ -22,6 +23,7 @@ export const ALL_DETECTORS: readonly Detector[] = [
   detectWebApp, detectBackend, detectMl, detectResearch, detectCli,
   // Tier 3: catch-all
   detectDataScience,
+  detectWeb3,
   detectLibrary,
 ]
 
