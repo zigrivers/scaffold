@@ -41,12 +41,13 @@ describe('detector registry completeness', () => {
         'pubspec.yaml': 'name: m\n',
         'next.config.mjs': 'export default { output: "standalone" }',
         'experiment.py': '# experiment',
+        'foundry.toml': '[profile.default]\n',
       },
-      dirs: ['src/routes', 'experiments', 'ios', 'android'],
+      dirs: ['src/routes', 'experiments', 'ios', 'android', 'lib/forge-std'],
       rootEntries: [
         'package.json', 'pyproject.toml', 'Cargo.toml', 'dvc.yaml',
         'manifest.json', 'analysis.ipynb', 'next.config.mjs', 'pubspec.yaml',
-        'experiment.py', 'dbt_project.yml',
+        'experiment.py', 'dbt_project.yml', 'foundry.toml',
       ],
     })
 
