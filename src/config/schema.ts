@@ -18,7 +18,7 @@ const CustomSchema = z.object({
 export const ProjectTypeSchema = z.enum([
   'web-app', 'mobile-app', 'backend', 'cli', 'library', 'game',
   'data-pipeline', 'ml', 'browser-extension', 'research',
-  'data-science',
+  'data-science', 'web3',
 ])
 
 export const WebAppConfigSchema = z.object({
@@ -123,6 +123,12 @@ export const DataScienceConfigSchema = z.object({
   audience: z.enum(['solo']).default('solo'),
 }).strict()
 
+export const Web3ConfigSchema = z.object({
+  // 'contracts' = current W3-1 scope (smart-contract / protocol projects on EVM).
+  // W3-2 will add 'dapp' for web3 application / dApp projects.
+  scope: z.enum(['contracts']).default('contracts'),
+}).strict()
+
 export const ResearchConfigSchema = z.object({
   experimentDriver: z.enum([
     'code-driven', 'config-driven', 'api-driven', 'notebook-driven',
@@ -169,6 +175,7 @@ export const ServiceSchema = z.object({
   gameConfig: GameConfigSchema.optional(),
   browserExtensionConfig: BrowserExtensionConfigSchema.optional(),
   dataScienceConfig: DataScienceConfigSchema.optional(),
+  web3Config: Web3ConfigSchema.optional(),
   path: z.string().optional(),
   exports: z.array(
     z.object({ step: z.string().regex(/^[a-z][a-z0-9-]*$/, 'exports.step must be kebab-case') }),
@@ -204,6 +211,7 @@ export const ProjectSchema = z.object({
   browserExtensionConfig: BrowserExtensionConfigSchema.optional(),
   researchConfig: ResearchConfigSchema.optional(),
   dataScienceConfig: DataScienceConfigSchema.optional(),
+  web3Config: Web3ConfigSchema.optional(),
   services: z.array(ServiceSchema).min(1).optional(),
 }).passthrough()  // allow unknown fields per ADR-033
   .superRefine((data, ctx) => {
