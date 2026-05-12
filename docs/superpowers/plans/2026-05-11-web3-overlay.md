@@ -99,6 +99,10 @@ cd /Users/kenallred/dev-projects/scaffold && npm run type-check
 
 Expected: compile errors in downstream files that switch on `ProjectType` — specifically `src/wizard/copy/index.ts`, `src/wizard/copy/core.ts`, `src/project/adopt.ts`, and `src/project/detectors/types.ts` (no `Web3Match` variant yet). These are expected; we will fix them in Phase A3 / Phase D. Do NOT fix them yet.
 
+The exact error list may vary slightly depending on the order `tsc` emits diagnostics — all downstream errors are expected until Phase D7 completes. The key invariant: errors should be CONFINED to files we modify in Phase D + `adopt.ts` (which is Phase D7). If you see typecheck errors in any other file (e.g. an unrelated test file, a script in `scripts/`, anything outside the `src/wizard/copy/*`, `src/project/adopt.ts`, `src/project/detectors/types.ts` set), STOP and investigate — the schema change may have hit an unexpected dependency.
+
+> **Red window callout:** From this commit forward, `tests/packaging/project-type-overlay-alignment.test.ts` (alignment check between `ProjectType` and `*-overlay.yml`) and `src/project/detectors/disambiguate.test.ts`'s `PROJECT_TYPE_PREFERENCE completeness` test BOTH fail. They resolve in later phases — E1 lands the overlay YAML; C4 adds the disambiguate entry. Do NOT attempt to fix these mid-flow. During Phases A/B/C/D, run `npx vitest run` only for tests directly relevant to the task at hand. The full suite (`make check-all`) is run in Task J1.
+
 - [ ] **Step 6: Commit**
 
 ```bash
@@ -259,6 +263,8 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ---
 
 ## Phase B — Coupling validator
+
+> **Red window reminder (from Task A1 Step 5):** `tests/packaging/project-type-overlay-alignment.test.ts` and `src/project/detectors/disambiguate.test.ts`'s `PROJECT_TYPE_PREFERENCE completeness` test continue to fail throughout Phase B. They resolve in C4 (disambiguate) and E1 (overlay YAML). Do NOT attempt to fix these mid-flow. Only run `npx vitest run` for tests directly relevant to the current task.
 
 ### Task B1: Create `web3CouplingValidator`
 
@@ -780,6 +786,8 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 This task guards against the library-detector collision risk flagged in this plan's preamble and Task C1. A Hardhat project that exports a library shape (`main` / `module` / `exports` in `package.json`) could trigger `detectLibrary` simultaneously with `detectWeb3`. Both detectors firing is FINE — `resolveDetection` then disambiguates by confidence tier (medium beats high only if low/medium are the only matches; actually high wins, but for ambiguous picks `disambiguate()` shows both to the user). The test below pins the typical Hardhat shape (no `main`/`module`/`exports`/`bin`) to ensure `library` does NOT fire spuriously, so a clean Hardhat repo gets a single unambiguous `web3` match.
 
+**Published-library Hardhat case (explicit choice):** A `package.json` with `main: 'index.js'` + Hardhat config + Solidity contracts fires BOTH `detectLibrary` (high) and `detectWeb3` (medium). `library.ts`'s `isPureNpmLib` requires `!pkg.bin` but does NOT exclude Hardhat. Under that shape, `library` (high) wins over `web3` (medium) via the confidence tiebreak. This plan chooses to **document `library` as the correct winner** for that shape — a published Solidity utility library that uses Hardhat as build tooling is genuinely library-like. The third test case below pins that behavior with an `expect(...).toBe('library')` assertion. If reviewers later disagree, a one-line follow-up adds a Hardhat-as-disqualifier (`isPureNpmLib && !ctx.hasFile('hardhat.config.ts') && !ctx.hasFile('hardhat.config.js')`) to `library.ts` to force web3 to win — defer until concrete user feedback justifies it.
+
 **Files:**
 - Create: `src/project/detectors/web3-library-collision.test.ts`
 
@@ -827,6 +835,41 @@ describe('Hardhat ↔ library collision regression', () => {
     const types = matches.map(m => m.projectType)
     expect(types).toContain('web3')
     expect(types).not.toContain('library')
+  })
+
+  it('published-library Hardhat (package.json has main + Hardhat config) → library wins', () => {
+    // Documented choice: a published Solidity library that uses Hardhat as
+    // tooling is genuinely library-like. `library` (high confidence) wins
+    // over `web3` (medium) via the standard confidence tiebreak in
+    // resolveDetection. Both detectors fire — that is correct — and the
+    // user-facing project type is `library`.
+    const ctx = createFakeSignalContext({
+      packageJson: {
+        name: 'my-solidity-lib',
+        main: 'index.js',
+        devDependencies: {
+          hardhat: '^2.22.0',
+          '@nomicfoundation/hardhat-toolbox': '^5.0.0',
+        },
+      },
+      files: {
+        'hardhat.config.ts':
+          'import "@nomicfoundation/hardhat-toolbox"\nexport default { solidity: "0.8.24" }',
+        'package.json': '{}',
+        'index.js': 'module.exports = {}',
+      },
+      rootEntries: ['hardhat.config.ts', 'package.json', 'index.js'],
+    })
+    const matches: DetectionMatch[] = runDetectors(ctx)
+    // Both detectors fire — that's expected:
+    const types = matches.map(m => m.projectType)
+    expect(types).toContain('web3')
+    expect(types).toContain('library')
+    // But the resolved/preferred type is `library` (high beats medium):
+    const libraryMatch = matches.find(m => m.projectType === 'library')
+    const web3Match = matches.find(m => m.projectType === 'web3')
+    expect(libraryMatch?.confidence).toBe('high')
+    expect(web3Match?.confidence).toBe('medium')
   })
 })
 ```
@@ -1096,29 +1139,47 @@ TDD: the test must fail first, before the implementation lands in D5b.
 
 Use Read on `/Users/kenallred/dev-projects/scaffold/src/wizard/questions.test.ts`. Focus on:
 - How the DS branch test is set up (DS-1 has the same single-value enum shape as Web3-1, so it is the closest template).
-- Which helper builds the answers (`runWizard` or `buildAnswers`), the non-interactive defaults, and the mocking pattern.
+- The `makeOutputContext` helper and `askWizardQuestions` import already in scope at the top of the file.
 
-- [ ] **Step 2: Copy the DS test verbatim and adapt for `web3`**
-
-Find the DS test (`'data-science project type sets dataScienceConfig.audience to solo'` or similar). Duplicate it in a new `it(...)` block, then change:
-
-- Project-type string → `'web3'`
-- Expected config assertion → `{ scope: 'contracts' }` at key `web3Config`
-- Any project-type-specific flag inputs → omit (Web3 has no flags)
-
-Example target shape (ADAPT to the real helper names from the file):
+The DS sibling test (verified at lines 1025-1039) looks like this:
 
 ```typescript
-it('web3 project type sets web3Config.scope to contracts', async () => {
-  // Use the exact setup pattern from the DS sibling test, with:
-  //   projectType: 'web3'
-  //   no per-type flags
-  const result = await /* the helper used in sibling tests */({
-    projectType: 'web3',
-    methodology: 'mvp',
-    // ... other required fields copied from the DS sibling
+describe('data-science wizard questions', () => {
+  it('uses default audience in auto mode (no flags, no prompts)', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'data-science',
+    })
+    expect(answers.projectType).toBe('data-science')
+    expect(answers.dataScienceConfig).toEqual({ audience: 'solo' })
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.confirm).not.toHaveBeenCalled()
   })
-  expect(result.web3Config).toEqual({ scope: 'contracts' })
+})
+```
+
+- [ ] **Step 2: Add the Web3 sibling describe block**
+
+Insert immediately after the `data-science wizard questions` describe block (around line 1039 — the last `})` before EOF). Paste the block below VERBATIM:
+
+```typescript
+describe('web3 wizard questions', () => {
+  it('uses default scope in auto mode (no flags, no prompts)', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'web3',
+    })
+    expect(answers.projectType).toBe('web3')
+    expect(answers.web3Config).toEqual({ scope: 'contracts' })
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.confirm).not.toHaveBeenCalled()
+  })
 })
 ```
 
@@ -1146,34 +1207,80 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 **Files:**
 - Modify: `src/wizard/questions.ts`
 
-- [ ] **Step 1: Extend `WizardAnswers`**
+`askWizardQuestions` uses local `let` variables for each per-type config and returns a literal — there is no `answers` object inside the function. However, the `WizardAnswers` **interface** (lines 16-33 of `questions.ts`) describes the shape of the returned object and must be extended so `web3Config` is part of the public contract.
 
-Open `/Users/kenallred/dev-projects/scaffold/src/wizard/questions.ts`. Find the `WizardAnswers` interface (near top of file). Add a field adjacent to the other per-type config fields, after `dataScienceConfig`:
+- [ ] **Step 1: Extend the `WizardAnswers` interface**
+
+Open `/Users/kenallred/dev-projects/scaffold/src/wizard/questions.ts`. The `WizardAnswers` interface near the top of the file (around lines 16-33) lists every per-type config field. Add `web3Config` after `dataScienceConfig`:
 
 ```typescript
+  dataScienceConfig?: DataScienceConfig
   web3Config?: Web3Config
+}
 ```
 
-Add a `Web3Config` import at the top if not already present.
-
-- [ ] **Step 2: Add the Web3 question branch**
-
-Find the chain of `if (projectType === '...')` blocks (around line 140-570). Insert immediately AFTER the closing brace of `if (projectType === 'data-science') { ... }` and BEFORE any return or catch-all logic:
+Add `Web3Config` to the type-import block at the top:
 
 ```typescript
+import type {
+  ProjectType, GameConfig, WebAppConfig, BackendConfig,
+  CliConfig, LibraryConfig, MobileAppConfig,
+  DataPipelineConfig, MlConfig, BrowserExtensionConfig,
+  ResearchConfig, DataScienceConfig, Web3Config,
+} from '../types/index.js'
+```
+
+- [ ] **Step 2: Declare the `web3Config` local variable**
+
+The DS branch is the canonical model — read `src/wizard/questions.ts` around line 532-539. Just BEFORE the data-science block, the existing code declares:
+
+```typescript
+  // Data science configuration
+  let dataScienceConfig: DataScienceConfig | undefined
+  if (projectType === 'data-science') {
+    // ...
+    dataScienceConfig = { audience: 'solo' }
+  }
+```
+
+Immediately AFTER the closing brace of the data-science `if` block, add a Web3 block mirroring the same pattern:
+
+```typescript
+  // Web3 configuration
+  let web3Config: Web3Config | undefined
   if (projectType === 'web3') {
     // W3-1 has a single-value enum (`scope`). Skip the interactive question
     // and set the default directly — the wizard presents the type but the
     // follow-up Q&A carries no meaningful options yet. W3-2 will extend this.
-    answers.web3Config = { scope: 'contracts' }
+    web3Config = { scope: 'contracts' }
   }
 ```
 
-Exact anchor: the line AFTER the closing brace of the `data-science` `if` block.
+Exact anchor: the line AFTER the closing brace of the `data-science` `if` block (around line 539).
 
-- [ ] **Step 3: Add `web3Config` to any return / destructuring blocks**
+- [ ] **Step 3: Add `web3Config` to the return literal**
 
-At the bottom of the function, locate where the function returns `{ methodology, depth, platforms, traits, projectType, ... }`. If the function explicitly destructures `dataScienceConfig`, also add `web3Config` adjacent to it. If the function returns `answers` as a whole, no edit needed.
+At the bottom of the function (around line 723-728) the return literal currently reads:
+
+```typescript
+  return {
+    methodology, depth, platforms, traits, projectType,
+    webAppConfig, backendConfig, cliConfig,
+    libraryConfig, mobileAppConfig, dataPipelineConfig,
+    mlConfig, browserExtensionConfig, researchConfig, dataScienceConfig, gameConfig,
+  }
+```
+
+Add `web3Config` adjacent to `dataScienceConfig`:
+
+```typescript
+  return {
+    methodology, depth, platforms, traits, projectType,
+    webAppConfig, backendConfig, cliConfig,
+    libraryConfig, mobileAppConfig, dataPipelineConfig,
+    mlConfig, browserExtensionConfig, researchConfig, dataScienceConfig, web3Config, gameConfig,
+  }
+```
 
 - [ ] **Step 4: Run the D5a test to confirm it PASSES**
 
@@ -1304,6 +1411,19 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 **Files:**
 - Create: `content/methodology/web3-overlay.yml`
 
+- [ ] **Step 0: Verify the structural-eval directory guard exists**
+
+The plan ships the overlay YAML in E1 before Phase F creates `content/knowledge/web3/`. `tests/evals/overlay-structural-coverage.bats` must have a `[[ -d content/knowledge/<type> ]] || continue` guard so it doesn't fail on the missing knowledge dir during the E1-to-F1 window.
+
+```bash
+grep -n '\[\[ -d "${PROJECT_ROOT}/content/knowledge/' tests/evals/overlay-structural-coverage.bats
+```
+
+Expected: a non-empty match (currently `tests/evals/overlay-structural-coverage.bats:117`).
+
+- **If output is non-empty:** guard exists. Proceed to Step 1.
+- **If output is empty:** STOP. Either the guard was removed in a later PR, or the assumption is wrong. Fallback: before committing the overlay YAML in Step 5, run `mkdir -p content/knowledge/web3` and include the empty directory placeholder (e.g. a `.gitkeep`) in the same commit so the structural eval has a directory to find. Document the deviation in the wrap-up.
+
 - [ ] **Step 1: Write the overlay YAML (matches spec §5.2 exactly)**
 
 ```yaml
@@ -1424,7 +1544,8 @@ topics: [topic1, topic2, ...]
 
 1. **Read** the single named reference doc listed for that task.
 2. **Write** the new file at the target path with proper frontmatter (`name` / `description` / `topics`), an opening framing paragraph, a `## Summary` section, and a `## Deep Guidance` section with subsections that include code blocks.
-3. **Verify** the file with these shell checks:
+3. **Verify** the file with these shell checks. **Substitution rule:** each F1-F14 task lists its required keywords in the task body under a `Required keywords:` line. Copy them into the for-loop below as quoted strings, one per keyword.
+
    ```bash
    FILE="/Users/kenallred/dev-projects/scaffold/<target-path>"
    # Length check: 150-300 lines
@@ -1432,8 +1553,12 @@ topics: [topic1, topic2, ...]
    # Frontmatter check
    head -5 "$FILE" | grep -q '^name:' && echo "OK name" || echo "FAIL name"
    head -5 "$FILE" | grep -q '^description:' && echo "OK description" || echo "FAIL description"
-   # Required keywords (one grep per required keyword — all must return hit)
-   for kw in <LIST_REQUIRED_KEYWORDS_HERE>; do
+   # Required keywords (one grep per required keyword — all must return hit).
+   # WORKED EXAMPLE — if Task F1 says "Required keywords: invariants, threat model, trust assumptions",
+   # substitute the keywords into the loop literally:
+   #     for kw in "invariants" "threat model" "trust assumptions"; do ... ; done
+   # Below is the template — replace the `<keyword1>` etc. with the actual keywords for the task at hand:
+   for kw in "<keyword1>" "<keyword2>" "<keyword3>"; do
      grep -qF "$kw" "$FILE" && echo "OK $kw" || echo "FAIL $kw"
    done
    ```
@@ -1959,6 +2084,18 @@ KB_DIR="${PROJECT_ROOT}/content/knowledge/web3"
 @test "web3-deployment-and-verification mentions Etherscan" {
   grep -q 'Etherscan' "${KB_DIR}/web3-deployment-and-verification.md"
 }
+
+@test "web3-requirements mentions invariants" {
+  grep -q 'invariants' "${KB_DIR}/web3-requirements.md"
+}
+
+@test "web3-project-structure mentions foundry.toml" {
+  grep -q 'foundry.toml' "${KB_DIR}/web3-project-structure.md"
+}
+
+@test "web3-architecture mentions OpenZeppelin" {
+  grep -q 'OpenZeppelin' "${KB_DIR}/web3-architecture.md"
+}
 ```
 
 - [ ] **Step 2: Run the eval**
@@ -1967,7 +2104,7 @@ KB_DIR="${PROJECT_ROOT}/content/knowledge/web3"
 cd /Users/kenallred/dev-projects/scaffold && bats tests/evals/web3-overlay-content.bats 2>&1 | tail -15
 ```
 
-Expected: all 11 tests PASS (assuming Phase F tasks followed the required-keywords guidance).
+Expected: all 14 tests PASS (one per knowledge doc; matches the 14-doc scope of Phase F).
 
 - [ ] **Step 3: Commit**
 
@@ -2167,12 +2304,19 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Add v3.27.0 entry under "Completed Releases"**
 
-Determine today's date with `date -u +%Y-%m-%d` and use it. Determine the PR number with `gh pr view --json number -q .number` (after Task J2 opens the PR) and return to edit this entry before merging. If you are running this task before J2, use a `PR #TBD` marker and set a reminder to backfill the PR number after `gh pr create`.
+Compute the ISO date at commit time so the entry doesn't need a date backfill in Task J4:
 
-Insert above the current latest entry (which after v3.26.0 should be v3.26.0 — confirm by reading the top of `docs/roadmap.md` first):
+```bash
+ISO_DATE=$(date -u +%Y-%m-%d)
+echo "ISO_DATE=$ISO_DATE"
+```
+
+Determine the PR number with `gh pr view --json number -q .number` (after Task J2 opens the PR) and return to edit this entry before merging. If you are running this task before J2, use a `PR #TBD` marker and set a reminder to backfill the PR number after `gh pr create`. (Only the PR-number backfill is needed in J4 — the date is final on the I2 commit.)
+
+Insert above the current latest entry (which after v3.26.0 should be v3.26.0 — confirm by reading the top of `docs/roadmap.md` first). Substitute `$ISO_DATE` literally into the entry below:
 
 ```markdown
-### v3.27.0 (<ISO-DATE-FROM-DATE-COMMAND>)
+### v3.27.0 ($ISO_DATE)
 
 Web3 Project-Type Overlay — `scaffold init --project-type web3` targets teams shipping smart contracts and protocols on EVM chains with 14 knowledge documents covering Solidity conventions, Foundry workflow, security layering, testing (fuzz / invariant / fork), upgradeability, gas optimization, oracle integration, audit workflow, common vulnerabilities, access control, and deployment / verification. Implements roadmap "Content & Quality > New Project Type Overlays" for the W3-1 audience; W3-2 (web3 application / dApp) and non-EVM chains deferred to backlog.
 
@@ -2184,7 +2328,7 @@ Web3 Project-Type Overlay — `scaffold init --project-type web3` targets teams 
 - **Review discipline**: 4-round spec MMR + 3-round plan MMR (Codex + Claude + Gemini-compensating) + 3-channel PR MMR. PR #<NUMBER>.
 ```
 
-**Backfill rule**: after `gh pr create` in Task J2, amend this entry with the real PR number via a separate commit on the same branch. After `gh release create` in Task J4, amend with the real ISO date if it differs from the commit date.
+**Backfill rule**: after `gh pr create` in Task J2, amend this entry with the real PR number via a separate commit on the same branch. The ISO date is set at I2 commit time (not deferred) — no date backfill in J4.
 
 - [ ] **Step 2: Move "Blockchain/Web3" out of "Content & Quality > New Project Type Overlays"**
 
@@ -2246,10 +2390,17 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write the v3.27.0 entry**
 
-Add at the top of the changelog (immediately below `## [Unreleased]`), matching the existing format:
+Compute the ISO date at commit time so the entry doesn't need a date backfill in Task J4:
+
+```bash
+ISO_DATE=$(date -u +%Y-%m-%d)
+echo "ISO_DATE=$ISO_DATE"
+```
+
+Add at the top of the changelog (immediately below `## [Unreleased]`), matching the existing format. Substitute `$ISO_DATE` literally into the heading:
 
 ```markdown
-## [3.27.0] — YYYY-MM-DD
+## [3.27.0] — $ISO_DATE
 
 ### Added
 
@@ -2260,7 +2411,7 @@ Add at the top of the changelog (immediately below `## [Unreleased]`), matching 
 - Keyword-presence content eval (`tests/evals/web3-overlay-content.bats`) spot-checks 11 Web3 knowledge docs for required tool mentions.
 ```
 
-Replace `YYYY-MM-DD` with the actual release date determined in Task J4.
+The date is final on this commit — no date backfill in Task J4. Only the PR-number backfill (which can't be known until J2 creates the PR) is needed downstream.
 
 - [ ] **Step 2: Commit**
 
@@ -2278,6 +2429,8 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ### Task J0: Bump version to 3.27.0 in the same PR
 
 Per `docs/architecture/operations-runbook.md` §4.2 step 5, the version bump must be on `main` before tagging. The cleanest pattern here is to include the version bump in the Web3 PR — feature and version land together.
+
+> **Note on departure from DS precedent:** Version bump is bundled with the feature PR here (departs from the DS precedent of a separate bump PR — DS shipped via #299 feature + #300 version bump). Both patterns are runbook-compliant; the runbook does not mandate either. Bundling reduces ceremony for single-feature releases. If reviewers prefer the two-PR pattern, split this task into a follow-up bump PR after the feature merges.
 
 **Files:**
 - Modify: `package.json`
@@ -2493,7 +2646,7 @@ cd /Users/kenallred/dev-projects/scaffold && gh release create v3.27.0 --title "
 
 ```bash
 cd /Users/kenallred/dev-projects/scaffold && gh run list --workflow=publish.yml --limit 3
-cd /Users/kenallred/dev-projects/scaffold && gh run list --workflow=homebrew-update.yml --limit 3
+cd /Users/kenallred/dev-projects/scaffold && gh run list --workflow=update-homebrew.yml --limit 3
 ```
 
 Both should complete successfully. If the npm publish fails with auth errors, check the trusted-publisher config in npm package settings (per `CLAUDE.md`).
