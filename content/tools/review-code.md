@@ -650,10 +650,9 @@ worktree. Do not run multiple review/fix loops against the same
 
 After each `mmr review …` call (or `mmr results "$JOB_ID"` for the manual
 fallback), iterate the reconciled findings at or above `fix_threshold`,
-call `_review_at_strike_limit` before incrementing, call
-`_review_record_attempt` when still below the strike limit, then stop the
-fix loop and emit verdict `blocked` per Step 8 when any blocking finding has
-hit 3 strikes.
+call `_review_record_attempt`, then stop the fix loop and emit verdict
+`blocked` per Step 8 when the returned attempt count is greater than or equal
+to `${REVIEW_STRIKE_LIMIT:-3}`.
 
 For very noisy fix loops you may suggest `--fix-threshold P1` to narrow the
 gate; the project default stays at P2 per the design's Decision 4. Do not
