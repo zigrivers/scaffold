@@ -525,7 +525,7 @@ In either path, output the message and stop. Do NOT proceed to the next task wit
 3. **Auth failures are not silent** — always surface to the user with the exact recovery command.
 4. **Independence** — never share one channel's output with another. Each reviews the diff independently.
 5. **Fix before proceeding** — findings at or above `fix_threshold` must be resolved before moving to the next task.
-6. **3-round limit (per finding)** — never attempt to fix the *same* blocking finding more than 3 times. Each round that surfaces a *new* fixable finding is healthy iteration — keep going. Stop only when the same finding recurs across 3 attempts, channels contradict each other, or the user asks to stop.
+6. **3-round limit (per finding hash)** — never attempt to fix the *same* blocking finding (identified by the Step 7a hash of `location` + `category` + `description` + `suggestion`) more than 3 times. The attempts file `.scaffold/review-attempts/<session-id>.json` is the source of truth; `_review_at_strike_limit` checks it. Each round that surfaces findings with *new* hashes is healthy iteration — keep going. Stop only when a hash hits 3 attempts, channels contradict each other, or the user asks to stop. For noisy fix loops, optionally suggest `--fix-threshold P1` (the project default stays at P2).
 7. **Document everything** — the review summary must show which channels ran and which were skipped, with reasons.
 8. **CLI-first** — use `mmr review --sync` as the primary entry point. Manual dispatch is a fallback only.
 9. **Job storage** — the CLI stores job data at `~/.mmr/jobs/{job-id}/results.json`. Review results are available via `mmr results <job-id>`.
