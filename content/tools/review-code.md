@@ -441,6 +441,13 @@ _review_session_id() {
     printf '%s' "$__REVIEW_SESSION_ID"
     return
   fi
+  local commit
+  commit=$(git rev-parse --short HEAD 2>/dev/null || echo "")
+  if [ -n "$commit" ]; then
+    __REVIEW_SESSION_ID=$(_review_sanitize_session_id "commit-$commit") || return 1
+    printf '%s' "$__REVIEW_SESSION_ID"
+    return
+  fi
   __REVIEW_SESSION_ID=$(_review_sanitize_session_id "ts-$(date -u +%Y%m%dT%H%M%SZ)") || return 1
   printf '%s' "$__REVIEW_SESSION_ID"
 }
@@ -508,7 +515,19 @@ print(" ".join(p for p in out if p))
 
 _review_normalize_suggestion() {
   _review_require_python3 || return 1
-  printf '%s' "$1" | python3 -c 'import re, sys; print(re.sub(r"\s+", " ", sys.stdin.read().lower()).strip())'
+  printf '%s' "$1" | python3 -c '
+import re, sys
+s = sys.stdin.read()
+parts = s.split("`")
+out = []
+for i, seg in enumerate(parts):
+    if i % 2 == 1:
+        out.append("`" + seg + "`")
+    else:
+        seg = re.sub(r"\s+", " ", seg.lower()).strip()
+        out.append(seg)
+print(" ".join(p for p in out if p))
+'
 }
 
 _review_finding_hash() {
@@ -522,9 +541,9 @@ _review_finding_hash() {
   sugg=$(printf '%s' "$f" | jq -r '.suggestion // ""')
 
   local nloc ndesc nsugg dhash shash
-  nloc=$(_review_normalize_location "$loc")
-  ndesc=$(_review_normalize_description "$desc")
-  nsugg=$(_review_normalize_suggestion "$sugg")
+  nloc=$(_review_normalize_location "$loc") || return 1
+  ndesc=$(_review_normalize_description "$desc") || return 1
+  nsugg=$(_review_normalize_suggestion "$sugg") || return 1
   dhash=$(printf '%s' "$ndesc" | shasum -a 1 | awk '{print $1}')
   shash=$(printf '%s' "$nsugg" | shasum -a 1 | awk '{print $1}')
 
@@ -539,7 +558,8 @@ _review_description_shingle() {
   printf '%s' "$1" | python3 -c '
 import json, sys
 tokens = sys.stdin.read().split()
-shingles = sorted({" ".join(tokens[i:i+5]) for i in range(max(0, len(tokens)-4))})
+n = min(5, len(tokens))
+shingles = [] if n == 0 else sorted({" ".join(tokens[i:i+n]) for i in range(len(tokens)-n+1)})
 print(json.dumps(shingles))
 '
 }
@@ -553,12 +573,12 @@ _review_record_attempt() {
   file=$(_review_attempts_file)
   loc=$(printf '%s' "$f"  | jq -r '.location // ""')
   desc=$(printf '%s' "$f" | jq -r '.description // ""')
-  nloc=$(_review_normalize_location "$loc")
-  ndesc=$(_review_normalize_description "$desc")
+  nloc=$(_review_normalize_location "$loc") || return 1
+  ndesc=$(_review_normalize_description "$desc") || return 1
   if [ -z "$hash" ]; then
-    hash=$(_review_finding_hash "$f")
+    hash=$(_review_finding_hash "$f") || return 1
   fi
-  shingle=$(_review_description_shingle "$ndesc")
+  shingle=$(_review_description_shingle "$ndesc") || return 1
 
   [ -f "$file" ] || jq -n --arg id "$(_review_session_id)" --arg created "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     '{session_id: $id, created_at: $created, findings: {}}' > "$file"
@@ -581,7 +601,7 @@ _review_at_strike_limit() {
   hash="${2:-}"
   file=$(_review_attempts_file)
   [ -f "$file" ] || return 1
-  [ -n "$hash" ] || hash=$(_review_finding_hash "$f")
+  [ -n "$hash" ] || hash=$(_review_finding_hash "$f") || return 1
   local n; n=$(jq -r --arg h "$hash" '.findings[$h].attempts // 0' "$file")
   [ "$n" -ge "${REVIEW_STRIKE_LIMIT:-3}" ]
 }
