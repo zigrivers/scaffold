@@ -426,11 +426,11 @@ _review_session_id() {
   }
 
   if [ -n "${REVIEW_SESSION_ID:-}" ]; then
-    _review_sanitize_session_id "$REVIEW_SESSION_ID"
+    _review_sanitize_session_id "$REVIEW_SESSION_ID" || return 1
     return
   fi
   if [ -n "${__REVIEW_SESSION_ID:-}" ]; then
-    _review_sanitize_session_id "$__REVIEW_SESSION_ID"
+    _review_sanitize_session_id "$__REVIEW_SESSION_ID" || return 1
     return
   fi
   local branch base
@@ -453,8 +453,8 @@ _review_session_id() {
 }
 
 _review_attempts_file() {
-  local id; id=$(_review_session_id)
-  mkdir -p .scaffold/review-attempts
+  local id; id=$(_review_session_id) || return 1
+  mkdir -p .scaffold/review-attempts || return 1
   printf '.scaffold/review-attempts/%s.json' "$id"
 }
 ```
@@ -518,19 +518,28 @@ _review_normalize_description() {
   printf '%s' "$1" | python3 -c '
 import re, sys
 s = sys.stdin.read()
-parts = s.split("`")
 out = []
-for i, seg in enumerate(parts):
-    if i % 2 == 1:
-        # Odd index = inside backticks = code, preserve exactly
-        out.append("`" + seg + "`")
-    else:
-        seg = seg.lower()
-        seg = re.sub(r"\bline\s+\d+\b", "", seg)
-        seg = re.sub(r"\bat\s+line\s+\d+\b", "", seg)
-        seg = re.sub(r"^\s*(p[0-3]|critical|high|medium|low|trivial)\s*:\s*", "", seg)
-        seg = re.sub(r"\s+", " ", seg).strip()
+pattern = re.compile(r"(```[\s\S]*?```|`[^`]*`)")
+pos = 0
+for match in pattern.finditer(s):
+    seg = s[pos:match.start()]
+    seg = seg.lower()
+    seg = re.sub(r"\bline\s+\d+\b", "", seg)
+    seg = re.sub(r"\bat\s+line\s+\d+\b", "", seg)
+    seg = re.sub(r"^\s*(p[0-3]|critical|high|medium|low|trivial)\s*:\s*", "", seg)
+    seg = re.sub(r"\s+", " ", seg).strip()
+    if seg:
         out.append(seg)
+    out.append(match.group(0))
+    pos = match.end()
+seg = s[pos:]
+seg = seg.lower()
+seg = re.sub(r"\bline\s+\d+\b", "", seg)
+seg = re.sub(r"\bat\s+line\s+\d+\b", "", seg)
+seg = re.sub(r"^\s*(p[0-3]|critical|high|medium|low|trivial)\s*:\s*", "", seg)
+seg = re.sub(r"\s+", " ", seg).strip()
+if seg:
+    out.append(seg)
 print(" ".join(p for p in out if p))
 '
 }
@@ -540,37 +549,38 @@ _review_normalize_suggestion() {
   printf '%s' "$1" | python3 -c '
 import re, sys
 s = sys.stdin.read()
-parts = s.split("`")
 out = []
-for i, seg in enumerate(parts):
-    if i % 2 == 1:
-        out.append("`" + seg + "`")
-    else:
-        seg = re.sub(r"\s+", " ", seg.lower()).strip()
+pattern = re.compile(r"(```[\s\S]*?```|`[^`]*`)")
+pos = 0
+for match in pattern.finditer(s):
+    seg = re.sub(r"\s+", " ", s[pos:match.start()].lower()).strip()
+    if seg:
         out.append(seg)
+    out.append(match.group(0))
+    pos = match.end()
+seg = re.sub(r"\s+", " ", s[pos:].lower()).strip()
+if seg:
+    out.append(seg)
 print(" ".join(p for p in out if p))
 '
 }
 
 _review_finding_hash() {
   # Input: $1 = single-finding JSON object (with location, category, description, suggestion fields)
-  # Output: 40-char sha1 hex of normalized_location + "|" + category + "|" + sha1(description_normalized) + "|" + sha1(suggestion_normalized)
+  # Output: 40-char sha1 hex of normalized_location + "|" + category + "|" + sha1(description_normalized)
   _review_require_jq || return 1
   local f="$1"
-  local loc cat desc sugg
+  local loc cat desc
   loc=$(printf '%s' "$f"  | jq -r '.location // ""')
   cat=$(printf '%s' "$f"  | jq -r '.category // .severity // ""')
   desc=$(printf '%s' "$f" | jq -r '.description // ""')
-  sugg=$(printf '%s' "$f" | jq -r '.suggestion // ""')
 
-  local nloc ndesc nsugg dhash shash
+  local nloc ndesc dhash
   nloc=$(_review_normalize_location "$loc") || return 1
   ndesc=$(_review_normalize_description "$desc") || return 1
-  nsugg=$(_review_normalize_suggestion "$sugg") || return 1
   dhash=$(printf '%s' "$ndesc" | _review_sha1) || return 1
-  shash=$(printf '%s' "$nsugg" | _review_sha1) || return 1
 
-  printf '%s|%s|%s|%s' "$nloc" "$cat" "$dhash" "$shash" \
+  printf '%s|%s|%s' "$nloc" "$cat" "$dhash" \
     | _review_sha1
 }
 
@@ -649,9 +659,10 @@ For very noisy fix loops you may suggest `--fix-threshold P1` to narrow the
 gate; the project default stays at P2 per the design's Decision 4. Do not
 auto-change the threshold.
 
-Identity components — `location`, `category`, `description`, `suggestion` —
-mirror MMR T2-A's forthcoming native `finding_key` so this is a clean
-migration when v3.30 ships.
+Identity components — `location`, `category`, and `description` — mirror MMR
+T2-A's forthcoming native `finding_key` while keeping suggestions out of the
+strict hash so alternative fix advice for the same defect does not reset the
+strike counter. This remains a clean migration when v3.30 ships.
 
 ### Step 8: Final Verdict
 
