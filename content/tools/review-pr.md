@@ -153,7 +153,7 @@ Dispatch your platform's code-reviewer skill for a complementary review:
 
 The agent skill runs inside your agent's context — it has access to conversation history, project knowledge, and plan context that external CLIs lack.
 
-**Important:** The agent's review output must use MMR-compatible finding schema: each finding needs `severity` (P0-P3), `location` (file:line), and `description` (`suggestion` is optional). The strict validator in `mmr reconcile` will reject findings with missing or invalid required fields.
+**Important:** The agent's review output must use MMR-compatible finding schema: each finding needs `severity` (P0-P3), `location` (file:line), and `description` (`category` and `suggestion` are optional, but `category` is recommended for finding identity). The strict validator in `mmr reconcile` will reject findings with missing or invalid required fields.
 
 ### Step 4: Inject Agent Review into MMR
 
@@ -230,10 +230,11 @@ If any findings sit at or above `fix_threshold` (the verdict JSON's `fix_thresho
 1. Fix them in the code
 2. Push the fixes: `git push`
 3. Re-run the review to verify fixes: `mmr review --pr "$PR_NUMBER" --sync --format json`
-4. The 3-round limit is **per finding**, not total rounds:
-   - **Keep going** when each new round surfaces *different, concrete, fixable* findings — that is healthy review/fix iteration.
-   - **Stop and ask the user** when (a) the *same* blocking finding (or set) recurs across 3 attempts without progress, (b) a finding is genuinely ambiguous (channels contradict each other), or (c) the user explicitly asks to stop.
-   - **When stopped**, do NOT merge automatically. Document the unresolved findings (severity, location, attempt count) and let the user decide whether to continue fixing, create follow-up issues, or override.
+4. The 3-round limit is **per finding**, enforced by the wrapper-side hash in Step 7a (`.scaffold/review-attempts/<session-id>.json`):
+   - **Keep going** when each new round surfaces genuinely different findings with *new* hashes — that is healthy review/fix iteration.
+   - **Stop and ask the user** when (a) any blocking finding's hash hits 3 attempts in the attempts file (`_review_at_strike_limit` returns true), (b) the same underlying defect keeps recurring across 3 rounds even if reviewer wording changes and produces a new hash, (c) a finding is genuinely ambiguous (channels contradict each other), or (d) the user explicitly asks to stop.
+   - **When stopped**, do NOT merge automatically. Document the unresolved findings (severity, location, hash, attempt count, and semantic recurrence notes when wording changed) and let the user decide whether to continue fixing, create follow-up issues, or override.
+   - Identity components used by the hash — `location`, `category`, `description`, `suggestion` — mirror MMR T2-A's forthcoming native `finding_key` (v3.30) so this bookkeeping migrates cleanly.
 
 **Note:** Fix cycles are an orchestration concern — the caller (agent or human) handles the fix loop. The CLI provides the review and verdict; the caller decides whether to fix and re-run.
 
@@ -499,7 +500,7 @@ Code review complete. Verdict: [pass/degraded-pass]. Channels: [N] executed, [N]
 ```
 Code review halted. Verdict: [blocked/needs-user-decision]. PR #[number] is NOT ready for merge.
 Unresolved findings:
-- [severity] [location] — [description] (rounds attempted: [N])
+- [severity] [location] [hash] — [description] (rounds attempted: [N])
 - ...
 Reason for stop: [same finding recurred 3× / channels contradict each other / user requested stop]
 ```
