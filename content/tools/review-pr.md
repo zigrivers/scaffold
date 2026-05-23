@@ -153,7 +153,7 @@ Dispatch your platform's code-reviewer skill for a complementary review:
 
 The agent skill runs inside your agent's context — it has access to conversation history, project knowledge, and plan context that external CLIs lack.
 
-**Important:** The agent's review output must use MMR-compatible finding schema: each finding needs `severity` (P0-P3), `location` (file:line), and `description` (`suggestion` is optional). The strict validator in `mmr reconcile` will reject findings with missing or invalid required fields.
+**Important:** The agent's review output must use MMR-compatible finding schema: each finding needs `severity` (P0-P3), `location` (file:line), and `description` (`category` and `suggestion` are optional, but `category` is recommended for finding identity). The strict validator in `mmr reconcile` will reject findings with missing or invalid required fields.
 
 ### Step 4: Inject Agent Review into MMR
 
@@ -500,7 +500,7 @@ Code review complete. Verdict: [pass/degraded-pass]. Channels: [N] executed, [N]
 ```
 Code review halted. Verdict: [blocked/needs-user-decision]. PR #[number] is NOT ready for merge.
 Unresolved findings:
-- [severity] [location] — [description] (rounds attempted: [N])
+- [severity] [location] [hash] — [description] (rounds attempted: [N])
 - ...
 Reason for stop: [same finding recurred 3× / channels contradict each other / user requested stop]
 ```
