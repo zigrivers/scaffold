@@ -231,9 +231,9 @@ If any findings sit at or above `fix_threshold` (the verdict JSON's `fix_thresho
 2. Push the fixes: `git push`
 3. Re-run the review to verify fixes: `mmr review --pr "$PR_NUMBER" --sync --format json`
 4. The 3-round limit is **per finding**, enforced by the wrapper-side hash in Step 7a (`.scaffold/review-attempts/<session-id>.json`):
-   - **Keep going** when each new round surfaces findings with *new* hashes — that is healthy review/fix iteration.
-   - **Stop and ask the user** when (a) any blocking finding's hash hits 3 attempts in the attempts file (`_review_at_strike_limit` returns true), (b) a finding is genuinely ambiguous (channels contradict each other), or (c) the user explicitly asks to stop.
-   - **When stopped**, do NOT merge automatically. Document the unresolved findings (severity, location, hash, attempt count) and let the user decide whether to continue fixing, create follow-up issues, or override.
+   - **Keep going** when each new round surfaces genuinely different findings with *new* hashes — that is healthy review/fix iteration.
+   - **Stop and ask the user** when (a) any blocking finding's hash hits 3 attempts in the attempts file (`_review_at_strike_limit` returns true), (b) the same underlying defect keeps recurring across 3 rounds even if reviewer wording changes and produces a new hash, (c) a finding is genuinely ambiguous (channels contradict each other), or (d) the user explicitly asks to stop.
+   - **When stopped**, do NOT merge automatically. Document the unresolved findings (severity, location, hash, attempt count, and semantic recurrence notes when wording changed) and let the user decide whether to continue fixing, create follow-up issues, or override.
    - Identity components used by the hash — `location`, `category`, `description`, `suggestion` — mirror MMR T2-A's forthcoming native `finding_key` (v3.30) so this bookkeeping migrates cleanly.
 
 **Note:** Fix cycles are an orchestration concern — the caller (agent or human) handles the fix loop. The CLI provides the review and verdict; the caller decides whether to fix and re-run.
